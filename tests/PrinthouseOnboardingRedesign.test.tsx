@@ -908,7 +908,7 @@ describe('Printhouse Onboarding Redesign & Regression Tests', () => {
         expect(within(banner as HTMLElement).getByRole('button', { name: /Configure Production Capacity/i })).toBeInTheDocument();
 
         // Recommended card badge must be on Production Capacity card
-        expect(screen.getByText('Recommended Next Action')).toBeInTheDocument();
+        expect(screen.getByText('Next action')).toBeInTheDocument();
     });
 
     it('15. Setup Overview UX Audit: Blocked modules provide explicit dependency resolution action without dead non-interactive cards', async () => {

@@ -239,9 +239,9 @@ export const Topbar: React.FC<{ onMenuClick?: () => void }> = ({ onMenuClick }) 
               className="flex items-center gap-3 pl-2 hover:bg-slate-100 dark:hover:bg-[#1a1a1b]/5 pr-2 py-1 transition-all group"
             >
               <div className="text-right">
-                <p className="text-xs font-black text-slate-900 dark:text-white leading-tight">{getAuthUser()?.name || 'Authorized User'}</p>
+                <p className="text-xs font-black text-slate-900 dark:text-white leading-tight">{getAuthUser()?.name || t('common.authorizedUser') || 'Authorized User'}</p>
                 <p className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest leading-tight">
-                  {getUserRole()}
+                  {t(`role.${getUserRole()}` as any) || getUserRole()}
                 </p>
               </div>
               <div className="w-8 h-8 ppos-surface-muted border ppos-border flex items-center justify-center text-slate-400 dark:text-zinc-500 group-hover:border-slate-300 dark:group-hover:border-white/20 transition-colors">

@@ -6,8 +6,9 @@
  */
 import React, { useState } from 'react';
 import { FieldGuidance } from './FieldGuidance';
-import { Factory, Plus, Edit2, CheckCircle, AlertCircle, Trash2 } from 'lucide-react';
+import { Factory, Plus, Edit2, AlertCircle } from 'lucide-react';
 import { getAuthToken } from '../../../lib/authStore';
+import { useLocale } from '../../../i18n';
 
 interface SiteData {
     siteId: string;
@@ -23,6 +24,7 @@ interface SiteData {
 }
 
 export const ProductionSitesPanel: React.FC<{ sites?: SiteData[]; onSaved?: () => void }> = ({ sites = [], onSaved }) => {
+    const { t } = useLocale();
     const [isEditing, setIsEditing] = useState(false);
     const [editingSiteId, setEditingSiteId] = useState<string | null>(null);
     const [form, setForm] = useState<Partial<SiteData>>({
@@ -81,30 +83,37 @@ export const ProductionSitesPanel: React.FC<{ sites?: SiteData[]; onSaved?: () =
                 setIsEditing(false);
                 if (onSaved) onSaved();
             } else {
-                setErrorMsg(data.error || 'Failed to save production site.');
+                setErrorMsg(data.error || t('setup.sites.errorSave') || 'Failed to save production site.');
             }
         } catch (err) {
-            setErrorMsg('Network error while saving production site.');
+            setErrorMsg(t('setup.sites.errorNetwork') || 'Network error while saving production site.');
         } finally {
             setLoading(false);
         }
+    };
+
+    const formatSiteStatus = (statusStr: string) => {
+        const lower = statusStr.toLowerCase();
+        return t(`status.${lower}` as any) || statusStr;
     };
 
     return (
         <div className="bg-white dark:bg-[#18181b] border border-zinc-200 dark:border-[#27272a] rounded-xl p-7 shadow-sm transition-colors">
             <div className="flex items-center justify-between mb-5">
                 <div>
-                    <h2 className="text-lg font-bold text-zinc-900 dark:text-white m-0">Production Sites</h2>
+                    <h2 className="text-lg font-bold text-zinc-900 dark:text-white m-0">
+                        {t('setup.sites.title') || 'Production Sites'}
+                    </h2>
                     <p className="text-xs text-zinc-600 dark:text-zinc-400 mt-1 mb-0">
-                        Manage your physical printing facilities and production nodes.
+                        {t('setup.sites.subtitle') || 'Manage your physical printing facilities and production nodes.'}
                     </p>
                 </div>
                 {!isEditing && (
                     <button
                         onClick={openCreateForm}
-                        className="bg-[#dc0000] hover:bg-red-700 text-white font-semibold px-4 py-2.5 rounded-lg text-xs transition-colors shadow-sm flex items-center gap-1.5"
+                        className="bg-[#dc0000] hover:bg-red-700 text-white font-semibold px-4 py-2.5 rounded-lg text-xs transition-colors shadow-sm flex items-center gap-1.5 cursor-pointer"
                     >
-                        <Plus size={16} /> Add Production Site
+                        <Plus size={16} /> {t('setup.sites.addSite') || 'Add Production Site'}
                     </button>
                 )}
             </div>
@@ -118,14 +127,17 @@ export const ProductionSitesPanel: React.FC<{ sites?: SiteData[]; onSaved?: () =
             {isEditing ? (
                 <form onSubmit={handleSubmit} className="bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 rounded-lg p-5 mb-5">
                     <h3 className="text-sm font-semibold text-zinc-900 dark:text-white mt-0 mb-4">
-                        {editingSiteId ? 'Edit Production Site' : 'Configure Primary Site'}
+                        {editingSiteId ? (t('setup.sites.editSite') || 'Edit Production Site') : (t('setup.sites.configurePrimary') || 'Configure Primary Site')}
                     </h3>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                         <div>
                             <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">
-                                Facility / Site Name
-                                <FieldGuidance title="Facility Name" description="Unique name for this printing plant (e.g. Madrid Main Plant)." />
+                                {t('setup.sites.facilityName') || 'Facility / Site Name'}
+                                <FieldGuidance 
+                                    title={t('setup.sites.facilityGuidanceTitle') || 'Facility Name'} 
+                                    description={t('setup.sites.facilityGuidanceDesc') || 'Unique name for this printing plant (e.g. Madrid Main Plant).'} 
+                                />
                             </label>
                             <input
                                 type="text"
@@ -139,7 +151,7 @@ export const ProductionSitesPanel: React.FC<{ sites?: SiteData[]; onSaved?: () =
 
                         <div>
                             <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">
-                                Country
+                                {t('setup.sites.country') || 'Country'}
                             </label>
                             <input
                                 type="text"
@@ -152,7 +164,7 @@ export const ProductionSitesPanel: React.FC<{ sites?: SiteData[]; onSaved?: () =
 
                         <div>
                             <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">
-                                City / Location
+                                {t('setup.sites.city') || 'City / Location'}
                             </label>
                             <input
                                 type="text"
@@ -166,13 +178,16 @@ export const ProductionSitesPanel: React.FC<{ sites?: SiteData[]; onSaved?: () =
 
                         <div>
                             <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">
-                                Timezone
-                                <FieldGuidance title="Site Timezone" description="Used to compute SLA deadlines and scheduling cut-off times." />
+                                {t('setup.sites.timezone') || 'Timezone'}
+                                <FieldGuidance 
+                                    title={t('setup.sites.timezoneGuidanceTitle') || 'Site Timezone'} 
+                                    description={t('setup.sites.timezoneGuidanceDesc') || 'Used to compute SLA deadlines and scheduling cut-off times.'} 
+                                />
                             </label>
                             <select
                                 value={form.timezone || 'Europe/Madrid'}
                                 onChange={(e) => setForm({ ...form, timezone: e.target.value })}
-                                className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 px-3 py-2 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-[#dc0000] focus:border-[#dc0000] transition-colors"
+                                className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 px-3 py-2 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-[#dc0000] focus:border-[#dc0000] transition-colors cursor-pointer"
                             >
                                 <option value="Europe/Madrid">Europe/Madrid (CET)</option>
                                 <option value="Europe/London">Europe/London (GMT)</option>
@@ -186,16 +201,16 @@ export const ProductionSitesPanel: React.FC<{ sites?: SiteData[]; onSaved?: () =
                         <button
                             type="submit"
                             disabled={loading}
-                            className="bg-[#dc0000] hover:bg-red-700 text-white font-semibold px-5 py-2 rounded-lg text-xs transition-colors shadow-sm disabled:opacity-50"
+                            className="bg-[#dc0000] hover:bg-red-700 text-white font-semibold px-5 py-2 rounded-lg text-xs transition-colors shadow-sm disabled:opacity-50 cursor-pointer"
                         >
-                            {loading ? 'Saving...' : 'Save Production Site'}
+                            {loading ? (t('common.saving') || 'Saving...') : (t('setup.sites.saveSite') || 'Save Production Site')}
                         </button>
                         <button
                             type="button"
                             onClick={() => setIsEditing(false)}
-                            className="bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 font-medium px-5 py-2 rounded-lg text-xs transition-colors"
+                            className="bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 font-medium px-5 py-2 rounded-lg text-xs transition-colors cursor-pointer"
                         >
-                            Cancel
+                            {t('common.cancel') || 'Cancel'}
                         </button>
                     </div>
                 </form>
@@ -210,20 +225,26 @@ export const ProductionSitesPanel: React.FC<{ sites?: SiteData[]; onSaved?: () =
                             <div>
                                 <div className="flex items-center gap-2 flex-wrap">
                                     <h4 className="text-sm font-semibold text-zinc-900 dark:text-white m-0">{site.siteName}</h4>
-                                    {site.isPrimary && <span className="bg-emerald-100 dark:bg-emerald-950/50 text-emerald-800 dark:text-emerald-300 text-[11px] font-semibold px-2 py-0.5 rounded">Primary Plant</span>}
-                                    <span className="bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 text-[11px] px-2 py-0.5 rounded">{site.status}</span>
+                                    {site.isPrimary && (
+                                        <span className="bg-emerald-100 dark:bg-emerald-950/50 text-emerald-800 dark:text-emerald-300 text-[11px] font-semibold px-2 py-0.5 rounded">
+                                            {t('setup.sites.primaryPlant') || 'Primary Plant'}
+                                        </span>
+                                    )}
+                                    <span className="bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 text-[11px] px-2 py-0.5 rounded">
+                                        {formatSiteStatus(site.status)}
+                                    </span>
                                 </div>
                                 <p className="text-xs text-zinc-600 dark:text-zinc-400 mt-1 mb-0">
-                                    {site.city || 'Pending City'}, {site.country || 'Pending Country'} ({site.timezone || 'CET'})
+                                    {site.city || t('setup.sites.pendingCity') || 'Pending City'}, {site.country || t('setup.sites.pendingCountry') || 'Pending Country'} ({site.timezone || 'CET'})
                                 </p>
                             </div>
                         </div>
 
                         <button
                             onClick={() => openEditForm(site)}
-                            className="bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-750 text-zinc-800 dark:text-zinc-200 px-3.5 py-2 rounded-md text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-xs"
+                            className="bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-750 text-zinc-800 dark:text-zinc-200 px-3.5 py-2 rounded-md text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-xs cursor-pointer"
                         >
-                            <Edit2 size={14} /> Configure Site
+                            <Edit2 size={14} /> {t('setup.sites.configureSite') || 'Configure Site'}
                         </button>
                     </div>
                 ))}

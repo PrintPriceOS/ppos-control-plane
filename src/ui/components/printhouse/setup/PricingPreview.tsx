@@ -5,7 +5,8 @@
  */
 import React, { useState, useEffect } from 'react';
 import { getAuthToken } from '../../../lib/authStore';
-import { Calculator, Play, Info, AlertCircle, Sparkles, Receipt, CheckCircle } from 'lucide-react';
+import { Calculator, Play, Info, AlertCircle, Sparkles, Receipt } from 'lucide-react';
+import { useLocale } from '../../../i18n';
 
 interface PricingPreviewProps {
     priceBookId: string;
@@ -33,6 +34,7 @@ export const PricingPreview: React.FC<PricingPreviewProps> = ({
     materials,
     currency
 }) => {
+    const { t } = useLocale();
     const [quantity, setQuantity] = useState(100);
     const [selectedSiteId, setSelectedSiteId] = useState('');
     const [selectedMachineId, setSelectedMachineId] = useState('');
@@ -52,19 +54,20 @@ export const PricingPreview: React.FC<PricingPreviewProps> = ({
         setSelectedMaterialId('');
     }, [selectedSiteId]);
 
-    const filteredMachines = selectedSiteId
+    // Filter available machines/materials by site
+    const filteredMachines = selectedSiteId 
         ? machines.filter(m => m.siteId === selectedSiteId)
         : machines;
-
+        
     const filteredMaterials = selectedSiteId
         ? materials.filter(m => m.siteId === selectedSiteId)
         : materials;
 
-    const handleToggleCap = (capName: string) => {
-        if (selectedCaps.includes(capName)) {
-            setSelectedCaps(selectedCaps.filter(c => c !== capName));
+    const handleToggleCap = (cap: string) => {
+        if (selectedCaps.includes(cap)) {
+            setSelectedCaps(selectedCaps.filter(c => c !== cap));
         } else {
-            setSelectedCaps([...selectedCaps, capName]);
+            setSelectedCaps([...selectedCaps, cap]);
         }
     };
 
@@ -75,28 +78,30 @@ export const PricingPreview: React.FC<PricingPreviewProps> = ({
         setPreviewResult(null);
 
         try {
-            const res = await fetch('/api/printhouse/onboarding/pricing/preview', {
+            const payload = {
+                priceBookId,
+                quantity,
+                siteId: selectedSiteId || undefined,
+                machineId: selectedMachineId || undefined,
+                materialId: selectedMaterialId || undefined,
+                capabilities: selectedCaps,
+                isExpedited: expedited
+            };
+
+            const res = await fetch('/api/printhouse/onboarding/pricing/simulator', {
                 method: 'POST',
                 headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
                 },
-                body: JSON.stringify({
-                    priceBookId,
-                    quantity: Number(quantity),
-                    siteId: selectedSiteId || null,
-                    machineId: selectedMachineId || null,
-                    materialCatalogId: selectedMaterialId || null,
-                    capabilities: selectedCaps,
-                    expedited
-                })
+                body: JSON.stringify(payload)
             });
 
             const data = await res.json();
             if (res.ok && data.ok) {
-                setPreviewResult(data.data);
+                setPreviewResult(data.simulation);
             } else {
-                setError(data.error || 'Failed to simulate pricing');
+                setError(data.error || 'Failed to calculate simulated price');
             }
         } catch (err: any) {
             setError(err.message || 'Error running simulation');
@@ -111,14 +116,14 @@ export const PricingPreview: React.FC<PricingPreviewProps> = ({
             <div style={{ backgroundColor: '#18181b', borderRadius: '12px', border: '1px solid #27272a', padding: '24px' }}>
                 <h4 style={{ margin: '0 0 16px 0', fontSize: '15px', fontWeight: 600, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <Calculator size={18} style={{ color: '#dc0000' }} />
-                    Simulation Parameters
+                    {t('setup.simulator.title') || 'Simulation Parameters'}
                 </h4>
 
                 <form onSubmit={handleRunSimulation}>
                     {/* Quantity */}
                     <div style={{ marginBottom: '16px' }}>
                         <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#a1a1aa', textTransform: 'uppercase', marginBottom: '8px' }}>
-                            Order Quantity (Units)
+                            {t('setup.simulator.quantity') || 'Order Quantity (Units)'}
                         </label>
                         <input
                             type="number"
@@ -138,7 +143,7 @@ export const PricingPreview: React.FC<PricingPreviewProps> = ({
                         {/* Site */}
                         <div>
                             <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#a1a1aa', textTransform: 'uppercase', marginBottom: '8px' }}>
-                                Target Site (Optional)
+                                {t('setup.simulator.site') || 'Target Site (Optional)'}
                             </label>
                             <select
                                 value={selectedSiteId}
@@ -149,7 +154,7 @@ export const PricingPreview: React.FC<PricingPreviewProps> = ({
                                     outline: 'none'
                                 }}
                             >
-                                <option value="">Global/Default Site</option>
+                                <option value="">{t('setup.simulator.globalSite') || 'Global/Default Site'}</option>
                                 {sites.map(s => (
                                     <option key={s.siteId} value={s.siteId}>{s.siteName}</option>
                                 ))}
@@ -159,7 +164,7 @@ export const PricingPreview: React.FC<PricingPreviewProps> = ({
                         {/* Machine */}
                         <div>
                             <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#a1a1aa', textTransform: 'uppercase', marginBottom: '8px' }}>
-                                Target Machine (Optional)
+                                {t('setup.simulator.machine') || 'Target Machine (Optional)'}
                             </label>
                             <select
                                 value={selectedMachineId}
@@ -170,7 +175,7 @@ export const PricingPreview: React.FC<PricingPreviewProps> = ({
                                     outline: 'none'
                                 }}
                             >
-                                <option value="">No Machine Override</option>
+                                <option value="">{t('setup.simulator.noMachine') || 'No Machine Override'}</option>
                                 {filteredMachines.map(m => (
                                     <option key={m.id} value={m.id}>{m.name}</option>
                                 ))}
@@ -181,7 +186,7 @@ export const PricingPreview: React.FC<PricingPreviewProps> = ({
                     {/* Material */}
                     <div style={{ marginBottom: '16px' }}>
                         <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#a1a1aa', textTransform: 'uppercase', marginBottom: '8px' }}>
-                            Substrate Material Surcharge (Optional)
+                            {t('setup.simulator.material') || 'Substrate Material Surcharge (Optional)'}
                         </label>
                         <select
                             value={selectedMaterialId}
@@ -192,7 +197,7 @@ export const PricingPreview: React.FC<PricingPreviewProps> = ({
                                 outline: 'none'
                             }}
                         >
-                            <option value="">No Material Surcharge</option>
+                            <option value="">{t('setup.simulator.noMaterial') || 'No Material Surcharge'}</option>
                             {filteredMaterials.map(m => (
                                 <option key={m.id} value={m.id}>{m.name}</option>
                             ))}
@@ -202,7 +207,7 @@ export const PricingPreview: React.FC<PricingPreviewProps> = ({
                     {/* Capabilities checklist */}
                     <div style={{ marginBottom: '20px' }}>
                         <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#a1a1aa', textTransform: 'uppercase', marginBottom: '8px' }}>
-                            Finishing Operations / Capabilities
+                            {t('setup.capabilities.finishing') || 'Finishing Operations / Capabilities'}
                         </label>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', backgroundColor: '#09090b', padding: '12px', borderRadius: '8px', border: '1px solid #27272a' }}>
                             {COMMON_CAPABILITIES.map(c => (
@@ -229,7 +234,7 @@ export const PricingPreview: React.FC<PricingPreviewProps> = ({
                             style={{ width: '16px', height: '16px', accentColor: '#dc0000', cursor: 'pointer' }}
                         />
                         <label htmlFor="expedited" style={{ fontSize: '13px', color: '#ffffff', cursor: 'pointer', fontWeight: 600 }}>
-                            Expedited Production Schedule (+20% or surcharge rule)
+                            {t('setup.leadTimes.expeditedDays') ? `${t('setup.leadTimes.expeditedDays')} (+20%)` : 'Expedited Production Schedule (+20%)'}
                         </label>
                     </div>
 
@@ -244,7 +249,7 @@ export const PricingPreview: React.FC<PricingPreviewProps> = ({
                         }}
                     >
                         <Play size={16} fill="#ffffff" />
-                        {loading ? 'Running Simulation...' : 'Calculate Non-Binding Quote'}
+                        {loading ? (t('setup.simulator.running') || 'Running Simulation...') : (t('setup.simulator.run') || 'Run Simulation')}
                     </button>
                 </form>
             </div>
@@ -253,7 +258,7 @@ export const PricingPreview: React.FC<PricingPreviewProps> = ({
             <div style={{ backgroundColor: '#18181b', borderRadius: '12px', border: '1px solid #27272a', padding: '24px', minHeight: '430px', display: 'flex', flexDirection: 'column' }}>
                 <h4 style={{ margin: '0 0 16px 0', fontSize: '15px', fontWeight: 600, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <Receipt size={18} style={{ color: '#10b981' }} />
-                    Calculation Breakdown
+                    {t('setup.simulator.results') || 'Calculation Breakdown'}
                 </h4>
 
                 {error && (
@@ -321,7 +326,7 @@ export const PricingPreview: React.FC<PricingPreviewProps> = ({
                                 <span>{previewResult.taxLabels.netLabel}</span>
                                 <span>{previewResult.netTotal} {previewResult.currency}</span>
                             </div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: '#a1a1aa', marginBottom: '12px', pb: '12px', borderBottom: '1px dashed #27272a', paddingBottom: '8px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: '#a1a1aa', marginBottom: '12px', paddingBottom: '8px', borderBottom: '1px dashed #27272a' }}>
                                 <span>{previewResult.taxLabels.taxLabel}</span>
                                 <span>{previewResult.taxTotal} {previewResult.currency}</span>
                             </div>

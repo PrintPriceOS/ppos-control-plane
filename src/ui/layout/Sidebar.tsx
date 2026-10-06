@@ -270,14 +270,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
                             <NavLink
                                 key={sec.key}
                                 to={targetUrl}
-                                className={`flex items-center gap-2.5 px-2.5 py-1.5 text-xs font-semibold rounded transition-colors group ${
+                                className={`flex items-start gap-2.5 px-2.5 py-1.5 text-xs font-semibold rounded transition-colors group ${
                                     isSubActive
                                         ? 'bg-[#dc0000] text-white font-bold shadow-xs'
                                         : 'text-slate-500 dark:text-zinc-400 hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5'
                                 }`}
                             >
-                                <SecIcon className={`w-3.5 h-3.5 shrink-0 ${isSubActive ? 'text-white' : 'text-slate-400 dark:text-zinc-500 group-hover:text-black dark:group-hover:text-white'}`} />
-                                <span className="truncate">{labelText}</span>
+                                <SecIcon className={`w-3.5 h-3.5 mt-0.5 shrink-0 ${isSubActive ? 'text-white' : 'text-slate-400 dark:text-zinc-500 group-hover:text-black dark:group-hover:text-white'}`} />
+                                <span className="leading-snug break-words">{labelText}</span>
                             </NavLink>
                         );
                     })}

@@ -9,6 +9,7 @@
 import React, { useState, useEffect } from 'react';
 import { Shield, RefreshCw, CheckCircle2, XCircle } from 'lucide-react';
 import { getAuthToken } from '../../../lib/authStore';
+import { useLocale } from '../../../i18n';
 
 interface Capability {
     type: string;
@@ -32,6 +33,7 @@ const MODULE_COLORS: Record<string, string> = {
 };
 
 export const CapabilitiesPanel: React.FC<{ sites?: SiteOption[] }> = ({ sites = [] }) => {
+    const { t } = useLocale();
     const [selectedSiteId, setSelectedSiteId] = useState<string>(sites[0]?.siteId || '');
     const [capabilities, setCapabilities] = useState<Capability[]>([]);
     const [machineCount, setMachineCount] = useState(0);
@@ -74,10 +76,12 @@ export const CapabilitiesPanel: React.FC<{ sites?: SiteOption[] }> = ({ sites = 
         return acc;
     }, {});
 
-    const inputStyle: React.CSSProperties = {
-        width: '100%', background: '#18181b', border: '1px solid #3f3f46',
-        borderRadius: '8px', padding: '10px 14px', color: '#f4f4f5', fontSize: '14px',
-        outline: 'none'
+    const getModuleName = (mod: string) => {
+        if (mod === 'PRINT') return t('setup.capabilities.printMethods') || 'Print Methods';
+        if (mod === 'FINISHING') return t('setup.capabilities.finishing') || 'Finishing & Binding';
+        if (mod === 'QUALITY') return t('setup.capabilities.quality') || 'Quality & Preflight';
+        if (mod === 'FORMAT') return t('setup.capabilities.format') || 'Formats & Substrates';
+        return mod;
     };
 
     return (
@@ -86,7 +90,7 @@ export const CapabilitiesPanel: React.FC<{ sites?: SiteOption[] }> = ({ sites = 
             {sites.length > 1 && (
                 <div className="mb-5">
                     <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">
-                        Production Site
+                        {t('setup.sites.site') || 'Production Site'}
                     </label>
                     <select
                         value={selectedSiteId}
@@ -105,7 +109,7 @@ export const CapabilitiesPanel: React.FC<{ sites?: SiteOption[] }> = ({ sites = 
                 <div className="flex items-center gap-2">
                     <Shield size={20} className="text-[#dc0000]" />
                     <h3 className="m-0 text-lg font-bold text-zinc-900 dark:text-white">
-                        Production Capabilities
+                        {t('setup.capabilities.title') || 'Production Capabilities'}
                     </h3>
                 </div>
                 <button
@@ -120,11 +124,15 @@ export const CapabilitiesPanel: React.FC<{ sites?: SiteOption[] }> = ({ sites = 
             <div className="bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 rounded-xl p-4 sm:px-5 mb-5 flex flex-wrap gap-8 transition-colors">
                 <div>
                     <span className="text-2xl font-extrabold text-zinc-900 dark:text-white">{capabilities.length}</span>
-                    <span className="text-xs text-zinc-500 dark:text-zinc-400 ml-1.5">capabilities</span>
+                    <span className="text-xs text-zinc-500 dark:text-zinc-400 ml-1.5">
+                        {t('setup.capabilities.activeCount') || 'capabilities'}
+                    </span>
                 </div>
                 <div>
                     <span className="text-2xl font-extrabold text-zinc-900 dark:text-white">{machineCount}</span>
-                    <span className="text-xs text-zinc-500 dark:text-zinc-400 ml-1.5">active machines</span>
+                    <span className="text-xs text-zinc-500 dark:text-zinc-400 ml-1.5">
+                        {t('setup.machines.title') || 'machines'}
+                    </span>
                 </div>
                 <div>
                     <span className="text-2xl font-extrabold text-zinc-900 dark:text-white">{Object.keys(groupedByModule).length}</span>
@@ -147,7 +155,7 @@ export const CapabilitiesPanel: React.FC<{ sites?: SiteOption[] }> = ({ sites = 
                             style={{ background: MODULE_COLORS[module] || '#71717a' }}
                         />
                         <h4 className="m-0 text-xs font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider">
-                            {module}
+                            {getModuleName(module)}
                         </h4>
                         <span className="text-xs text-zinc-400">({caps.length})</span>
                     </div>
@@ -177,9 +185,11 @@ export const CapabilitiesPanel: React.FC<{ sites?: SiteOption[] }> = ({ sites = 
             {!loading && capabilities.length === 0 && (
                 <div className="text-center py-10 text-zinc-500 bg-zinc-50 dark:bg-zinc-900/60 rounded-xl border border-zinc-200 dark:border-zinc-800">
                     <Shield size={32} className="mb-3 opacity-40 mx-auto" />
-                    <p className="m-0 font-semibold text-zinc-800 dark:text-zinc-200 text-sm">No capabilities detected</p>
+                    <p className="m-0 font-semibold text-zinc-800 dark:text-zinc-200 text-sm">
+                        {t('setup.capabilities.noCapabilities') || 'No capabilities detected'}
+                    </p>
                     <p className="mt-1 mb-0 text-xs text-zinc-500">
-                        Add machines and configure their features to automatically derive production capabilities.
+                        {t('setup.capabilities.subtitle') || 'Add machines and configure their features to automatically derive production capabilities.'}
                     </p>
                 </div>
             )}
@@ -187,8 +197,7 @@ export const CapabilitiesPanel: React.FC<{ sites?: SiteOption[] }> = ({ sites = 
             {/* Provenance Notice */}
             {capabilities.length > 0 && (
                 <div className="mt-4 p-3.5 bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 rounded-lg text-xs text-indigo-900 dark:text-indigo-300">
-                    💡 Capabilities are automatically derived from your machine configuration.
-                    Update machine features to modify your capability profile.
+                    💡 {t('setup.capabilities.subtitle') || 'Capabilities are automatically derived from your machine configuration.'}
                 </div>
             )}
         </div>

@@ -8,6 +8,7 @@
 import React, { useState, useEffect } from 'react';
 import { Cpu } from 'lucide-react';
 import { getAuthToken } from '../../../lib/authStore';
+import { useLocale } from '../../../i18n';
 
 interface IntegrationProfile {
     id: string;
@@ -23,6 +24,7 @@ interface IntegrationsPanelProps {
 }
 
 export const IntegrationsPanel: React.FC<IntegrationsPanelProps> = ({ siteId, onSaveSuccess }) => {
+    const { t } = useLocale();
     const [profiles, setProfiles] = useState<IntegrationProfile[]>([]);
     const [loading, setLoading] = useState<boolean>(true);
     const [showAddForm, setShowAddForm] = useState<boolean>(false);
@@ -146,18 +148,18 @@ export const IntegrationsPanel: React.FC<IntegrationsPanelProps> = ({ siteId, on
                     <div className="flex items-center gap-2 mb-1">
                         <Cpu size={20} className="text-[#dc0000]" />
                         <h3 className="m-0 text-lg font-bold text-zinc-900 dark:text-white">
-                            Shop-Floor & ERP Integrations
+                            {t('setup.integrations.title')}
                         </h3>
                     </div>
                     <p className="m-0 text-xs text-zinc-500 dark:text-zinc-400">
-                        Configure Webhook, API, JDF/JMF, or MIS integrations to connect PrintPrice OS with your production facility.
+                        {t('setup.integrations.subtitle')}
                     </p>
                 </div>
                 <button
                     onClick={() => setShowAddForm(!showAddForm)}
                     className="bg-[#dc0000] hover:bg-red-700 text-white font-semibold px-4 py-2 rounded-lg text-xs transition-colors shadow-xs cursor-pointer"
                 >
-                    {showAddForm ? 'Cancel' : '+ Add Integration'}
+                    {showAddForm ? t('common.cancel') : `+ ${t('setup.integrations.createProfile')}`}
                 </button>
             </div>
 
@@ -173,12 +175,12 @@ export const IntegrationsPanel: React.FC<IntegrationsPanelProps> = ({ siteId, on
 
             {revealedSecret && (
                 <div className="bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 p-4 rounded-xl mb-5">
-                    <div className="text-xs font-bold text-emerald-900 dark:text-emerald-200 tracking-wider">ONE-TIME SECRET DISPLAY (COPY NOW)</div>
+                    <div className="text-xs font-bold text-emerald-900 dark:text-emerald-200 tracking-wider">{t('setup.integrations.secretReveal')}</div>
                     <code className="block text-sm font-mono text-emerald-800 dark:text-emerald-300 bg-white dark:bg-emerald-950/80 border border-emerald-200 dark:border-emerald-800 p-2.5 rounded-lg mt-2 break-all">
                         {revealedSecret}
                     </code>
                     <p className="m-0 mt-2 text-xs text-emerald-700 dark:text-emerald-400">
-                        ⚠️ This secret will never be shown again. On reload, it will appear redacted as <code>••••••••••••••••</code>.
+                        ⚠️ {t('setup.integrations.secretNotice')}
                     </p>
                 </div>
             )}
@@ -187,7 +189,7 @@ export const IntegrationsPanel: React.FC<IntegrationsPanelProps> = ({ siteId, on
                 <form onSubmit={handleCreateProfile} className="bg-zinc-50 dark:bg-zinc-900/60 p-5 rounded-xl mb-5 border border-zinc-200 dark:border-zinc-800 transition-colors">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
                         <div>
-                            <label className={labelClass}>Integration Name</label>
+                            <label className={labelClass}>{t('setup.integrations.name')}</label>
                             <input
                                 type="text"
                                 required
@@ -198,7 +200,7 @@ export const IntegrationsPanel: React.FC<IntegrationsPanelProps> = ({ siteId, on
                             />
                         </div>
                         <div>
-                            <label className={labelClass}>Integration Type</label>
+                            <label className={labelClass}>{t('setup.integrations.type')}</label>
                             <select
                                 value={formData.integrationType}
                                 onChange={e => setFormData({ ...formData, integrationType: e.target.value })}
@@ -214,7 +216,7 @@ export const IntegrationsPanel: React.FC<IntegrationsPanelProps> = ({ siteId, on
                     </div>
 
                     <div className="mb-4">
-                        <label className={labelClass}>Target Endpoint URL (Required for Webhook/MIS)</label>
+                        <label className={labelClass}>{t('setup.integrations.endpoint')}</label>
                         <input
                             type="url"
                             value={formData.endpointUrl}
@@ -228,7 +230,7 @@ export const IntegrationsPanel: React.FC<IntegrationsPanelProps> = ({ siteId, on
                         type="submit"
                         className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-4 py-2 rounded-lg text-xs transition-colors cursor-pointer shadow-xs"
                     >
-                        Create Integration Profile
+                        {t('setup.integrations.createProfile')}
                     </button>
                 </form>
             )}
@@ -261,7 +263,7 @@ export const IntegrationsPanel: React.FC<IntegrationsPanelProps> = ({ siteId, on
                                         onClick={() => handleGenerateCredential(p.id)}
                                         className="bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 rounded-lg px-3 py-1.5 text-xs font-semibold cursor-pointer transition-colors"
                                     >
-                                        + Generate Key
+                                        + {t('setup.integrations.generateCred')}
                                     </button>
                                     <button
                                         onClick={() => handleTestConnectivity(p.id)}

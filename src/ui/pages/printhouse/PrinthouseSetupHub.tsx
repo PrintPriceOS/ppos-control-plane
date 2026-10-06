@@ -321,7 +321,7 @@ export const PrinthouseSetupHub: React.FC = () => {
                         {t('onboarding.title') || 'Setup'}
                     </span>
                     <ChevronRight size={13} className="text-zinc-400 shrink-0" />
-                    <h1 className="text-xs sm:text-sm font-bold text-zinc-900 dark:text-white truncate m-0">
+                    <h1 className="text-xs sm:text-sm font-bold text-zinc-900 dark:text-white leading-tight break-words m-0">
                         {activeDef.label}
                     </h1>
                     {activeDef.status === 'COMPLETE' && (

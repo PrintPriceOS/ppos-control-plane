@@ -6,6 +6,7 @@
  */
 import React, { useState, useEffect } from 'react';
 import { getAuthToken } from '../../../lib/authStore';
+import { useLocale } from '../../../i18n';
 import { Layers, Plus, Trash2, Link2, Unlink, AlertCircle, CheckCircle } from 'lucide-react';
 
 interface MaterialsPanelProps {
@@ -14,6 +15,7 @@ interface MaterialsPanelProps {
 }
 
 export const MaterialsPanel: React.FC<MaterialsPanelProps> = ({ sites, onSaved }) => {
+    const { t } = useLocale();
     const [selectedSiteId, setSelectedSiteId] = useState(sites[0]?.siteId || '');
     const [materials, setMaterials] = useState<any[]>([]);
     const [machines, setMachines] = useState<any[]>([]);
@@ -198,7 +200,7 @@ export const MaterialsPanel: React.FC<MaterialsPanelProps> = ({ sites, onSaved }
             <div className="flex justify-between items-center mb-5 flex-wrap gap-3">
                 <div className="flex items-center gap-2">
                     <Layers size={20} className="text-[#dc0000]" />
-                    <h2 className="text-lg font-bold text-zinc-900 dark:text-white m-0">Materials & Substrate Catalog</h2>
+                    <h2 className="text-lg font-bold text-zinc-900 dark:text-white m-0">{t('setup.materials.title')}</h2>
                 </div>
 
                 {sites.length > 1 && (
@@ -231,10 +233,10 @@ export const MaterialsPanel: React.FC<MaterialsPanelProps> = ({ sites, onSaved }
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                 {/* Catalog Addition Form */}
                 <form onSubmit={handleCreateMaterial} className="lg:col-span-5 bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 p-5 rounded-xl flex flex-col gap-3 transition-colors">
-                    <h3 className="text-sm font-bold text-zinc-900 dark:text-white m-0 mb-1">Add New Material</h3>
+                    <h3 className="text-sm font-bold text-zinc-900 dark:text-white m-0 mb-1">{t('setup.materials.addMaterial')}</h3>
 
                     <div>
-                        <label className={labelClass}>MATERIAL NAME</label>
+                        <label className={labelClass}>{t('setup.materials.name')}</label>
                         <input
                             type="text"
                             required
@@ -247,7 +249,7 @@ export const MaterialsPanel: React.FC<MaterialsPanelProps> = ({ sites, onSaved }
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                         <div>
-                            <label className={labelClass}>TYPE</label>
+                            <label className={labelClass}>{t('setup.materials.type')}</label>
                             <select
                                 value={materialType}
                                 onChange={(e) => setMaterialType(e.target.value)}
@@ -261,7 +263,7 @@ export const MaterialsPanel: React.FC<MaterialsPanelProps> = ({ sites, onSaved }
                             </select>
                         </div>
                         <div>
-                            <label className={labelClass}>SUBSTRATE CLASS</label>
+                            <label className={labelClass}>{t('setup.materials.class')}</label>
                             <input
                                 type="text"
                                 placeholder="e.g. COATED, UNCOATED"
@@ -274,7 +276,7 @@ export const MaterialsPanel: React.FC<MaterialsPanelProps> = ({ sites, onSaved }
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                         <div>
-                            <label className={labelClass}>GSM (WEIGHT)</label>
+                            <label className={labelClass}>{t('setup.materials.gsm')}</label>
                             <input
                                 type="number"
                                 value={gsm}
@@ -283,7 +285,7 @@ export const MaterialsPanel: React.FC<MaterialsPanelProps> = ({ sites, onSaved }
                             />
                         </div>
                         <div>
-                            <label className={labelClass}>FORMAT SIZE</label>
+                            <label className={labelClass}>{t('setup.materials.format')}</label>
                             <input
                                 type="text"
                                 placeholder="e.g. SRA3, B2, 700x1000"
@@ -296,7 +298,7 @@ export const MaterialsPanel: React.FC<MaterialsPanelProps> = ({ sites, onSaved }
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                         <div>
-                            <label className={labelClass}>FINISH TYPE</label>
+                            <label className={labelClass}>{t('setup.materials.finish')}</label>
                             <input
                                 type="text"
                                 placeholder="e.g. MATT, GLOSS, SILK"
@@ -318,7 +320,7 @@ export const MaterialsPanel: React.FC<MaterialsPanelProps> = ({ sites, onSaved }
                     </div>
 
                     <div>
-                        <label className={labelClass}>SUPPLIER NAME</label>
+                        <label className={labelClass}>{t('setup.materials.supplier')}</label>
                         <input
                             type="text"
                             placeholder="e.g. Antalis Co."
@@ -332,7 +334,7 @@ export const MaterialsPanel: React.FC<MaterialsPanelProps> = ({ sites, onSaved }
                         type="submit"
                         className="bg-[#dc0000] hover:bg-red-700 text-white font-semibold py-2.5 px-4 rounded-lg text-xs transition-colors flex items-center justify-center gap-1.5 mt-2 shadow-xs cursor-pointer"
                     >
-                        <Plus size={16} /> Add to Site Catalog
+                        <Plus size={16} /> {t('setup.materials.save')}
                     </button>
                 </form>
 
@@ -341,7 +343,7 @@ export const MaterialsPanel: React.FC<MaterialsPanelProps> = ({ sites, onSaved }
                     {materials.length === 0 ? (
                         <div className="bg-zinc-50 dark:bg-zinc-900/60 p-8 rounded-xl border border-zinc-200 dark:border-zinc-800 text-center text-zinc-500">
                             <Layers size={32} className="mx-auto mb-3 opacity-40" />
-                            <p className="text-sm font-semibold text-zinc-800 dark:text-zinc-200 m-0">No materials configured for this site yet.</p>
+                            <p className="text-sm font-semibold text-zinc-800 dark:text-zinc-200 m-0">{t('setup.materials.noMaterials')}</p>
                             <p className="text-xs text-zinc-500 mt-1 mb-0">Use the form to configure your first paper stock or media item.</p>
                         </div>
                     ) : (
@@ -374,7 +376,7 @@ export const MaterialsPanel: React.FC<MaterialsPanelProps> = ({ sites, onSaved }
                                     {/* Machine Pairings */}
                                     <div className="bg-white dark:bg-zinc-900/90 p-3 rounded-lg border border-zinc-200 dark:border-zinc-800">
                                         <div className="flex justify-between items-center mb-2">
-                                            <span className="text-[11px] font-bold text-zinc-700 dark:text-zinc-300">Machine Compatibilities</span>
+                                            <span className="text-[11px] font-bold text-zinc-700 dark:text-zinc-300">{t('setup.materials.pairedMachines')}</span>
                                             <button
                                                 onClick={() => setPairingMaterialId(isPairingMode ? null : mat.id)}
                                                 className="text-sky-600 dark:text-sky-400 text-xs font-semibold hover:underline flex items-center gap-1 cursor-pointer"

@@ -6,6 +6,7 @@
  */
 import React, { useState, useEffect } from 'react';
 import { getAuthToken } from '../../../lib/authStore';
+import { useLocale } from '../../../i18n';
 import { Activity, ShieldAlert, Check, RefreshCw, AlertCircle, CheckCircle } from 'lucide-react';
 
 interface CapacityPanelProps {
@@ -14,6 +15,7 @@ interface CapacityPanelProps {
 }
 
 export const CapacityPanel: React.FC<CapacityPanelProps> = ({ sites, onSaved }) => {
+    const { t } = useLocale();
     const [selectedSiteId, setSelectedSiteId] = useState(sites[0]?.siteId || '');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -153,7 +155,7 @@ export const CapacityPanel: React.FC<CapacityPanelProps> = ({ sites, onSaved }) 
             <div className="flex justify-between items-center mb-5 flex-wrap gap-3">
                 <div className="flex items-center gap-2">
                     <Activity size={20} className="text-[#dc0000]" />
-                    <h2 className="text-lg font-bold text-zinc-900 dark:text-white m-0">Indicative Production Capacity</h2>
+                    <h2 className="text-lg font-bold text-zinc-900 dark:text-white m-0">{t('setup.capacity.title')}</h2>
                 </div>
 
                 {sites.length > 1 && (
@@ -190,7 +192,7 @@ export const CapacityPanel: React.FC<CapacityPanelProps> = ({ sites, onSaved }) 
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                         <div>
-                            <label className={labelClass}>DAILY JOBS LIMIT</label>
+                            <label className={labelClass}>{t('setup.capacity.dailyJobs')}</label>
                             <input
                                 type="number"
                                 placeholder="No limit"
@@ -200,7 +202,7 @@ export const CapacityPanel: React.FC<CapacityPanelProps> = ({ sites, onSaved }) 
                             />
                         </div>
                         <div>
-                            <label className={labelClass}>DAILY SHEETS LIMIT</label>
+                            <label className={labelClass}>{t('setup.capacity.dailySheets')}</label>
                             <input
                                 type="number"
                                 placeholder="No limit"
@@ -213,7 +215,7 @@ export const CapacityPanel: React.FC<CapacityPanelProps> = ({ sites, onSaved }) 
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                         <div>
-                            <label className={labelClass}>WORKING DAYS / WEEK</label>
+                            <label className={labelClass}>{t('setup.capacity.workingDays')}</label>
                             <input
                                 type="number"
                                 min="1"
@@ -224,7 +226,7 @@ export const CapacityPanel: React.FC<CapacityPanelProps> = ({ sites, onSaved }) 
                             />
                         </div>
                         <div>
-                            <label className={labelClass}>OPERATING HOURS / DAY</label>
+                            <label className={labelClass}>{t('setup.capacity.operatingHours')}</label>
                             <input
                                 type="number"
                                 min="1"
@@ -237,7 +239,7 @@ export const CapacityPanel: React.FC<CapacityPanelProps> = ({ sites, onSaved }) 
                     </div>
 
                     <div>
-                        <label className={labelClass}>NOTES / EXCEPTIONS</label>
+                        <label className={labelClass}>{t('setup.capacity.notes')}</label>
                         <textarea
                             placeholder="e.g. Closed during national bank holidays"
                             value={notes}
@@ -257,13 +259,13 @@ export const CapacityPanel: React.FC<CapacityPanelProps> = ({ sites, onSaved }) 
                         type="submit"
                         className="bg-[#dc0000] hover:bg-red-700 text-white font-semibold py-2.5 px-4 rounded-lg text-xs transition-colors flex items-center justify-center gap-1.5 mt-1 shadow-xs cursor-pointer"
                     >
-                        <Check size={16} /> Save Site Capacity
+                        <Check size={16} /> {t('setup.capacity.save')}
                     </button>
                 </form>
 
                 {/* Machine-Specific Throughput Constraints */}
                 <div className="lg:col-span-7 flex flex-col gap-3">
-                    <h3 className="text-sm font-bold text-zinc-900 dark:text-white m-0">Machinery Limits</h3>
+                    <h3 className="text-sm font-bold text-zinc-900 dark:text-white m-0">{t('setup.capacity.machineThroughput')}</h3>
                     {machines.length === 0 ? (
                         <div className="bg-zinc-50 dark:bg-zinc-900/60 p-8 rounded-xl border border-zinc-200 dark:border-zinc-800 text-center text-zinc-500">
                             <p className="text-sm font-semibold text-zinc-800 dark:text-zinc-200 m-0">No active machines configured at this site.</p>

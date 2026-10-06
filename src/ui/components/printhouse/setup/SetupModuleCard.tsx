@@ -128,47 +128,48 @@ export const SetupModuleCard: React.FC<SetupModuleCardProps> = ({
                             <span className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">
                                 #{moduleNumber}
                             </span>
-                            {/* Status Badge with Icon & Text */}
-                            <div className="shrink-0">
-                                {status === 'COMPLETE' && (
+                            {/* Status Badge with Icon & Text - Exactly one canonical badge rendered */}
+                            <div className="shrink-0" data-testid="module-status-badge">
+                                {status === 'COMPLETE' ? (
                                     <span 
                                         title={t('setup.status.completed') || 'Completed'}
+                                        data-testid="badge-complete"
                                         className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 px-1.5 py-0.5 rounded border border-emerald-200 dark:border-emerald-800"
                                     >
                                         <CheckCircle size={11} className="text-emerald-500 shrink-0" aria-label={t('setup.status.completed') || 'Completed'} />
                                         <span>{t('setup.status.completed') || 'Completado'}</span>
                                     </span>
-                                )}
-                                {status === 'IN_PROGRESS' && (
+                                ) : status === 'IN_PROGRESS' ? (
                                     <span 
                                         title={t('setup.status.inProgress') || 'In Progress'}
+                                        data-testid="badge-in-progress"
                                         className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/60 px-1.5 py-0.5 rounded border border-amber-200 dark:border-amber-800"
                                     >
                                         <Clock size={11} className="text-amber-500 shrink-0" aria-label={t('setup.status.inProgress') || 'In Progress'} />
                                         <span>{t('setup.status.inProgress') || 'En curso'}</span>
                                     </span>
-                                )}
-                                {status === 'NEEDS_ATTENTION' && (
+                                ) : status === 'NEEDS_ATTENTION' ? (
                                     <span 
                                         title={t('setup.status.needsAttention') || 'Needs Attention'}
+                                        data-testid="badge-needs-attention"
                                         className="inline-flex items-center gap-1 text-[10px] font-bold text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-950/60 px-1.5 py-0.5 rounded border border-red-200 dark:border-red-800"
                                     >
                                         <AlertCircle size={11} className="text-red-500 shrink-0" aria-label={t('setup.status.needsAttention') || 'Needs Attention'} />
                                         <span>{t('setup.status.needsAttention') || 'Atención'}</span>
                                     </span>
-                                )}
-                                {isLocked && (
+                                ) : isLocked ? (
                                     <span 
-                                        title={t('setup.status.prerequisitesRequired') || 'Prerequisites Required'}
+                                        title={t('setup.status.locked') || t('setup.status.prerequisitesRequired') || 'Locked'}
+                                        data-testid="badge-locked"
                                         className="inline-flex items-center gap-1 text-[10px] font-bold text-zinc-600 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded border border-zinc-200 dark:border-zinc-700"
                                     >
-                                        <Lock size={11} className="text-zinc-400 shrink-0" aria-label={t('setup.status.prerequisitesRequired') || 'Prerequisites Required'} />
-                                        <span>{t('setup.status.prerequisitesRequired') || 'Bloqueado'}</span>
+                                        <Lock size={11} className="text-zinc-400 shrink-0" aria-label={t('setup.status.locked') || t('setup.status.prerequisitesRequired') || 'Locked'} />
+                                        <span>{t('setup.status.locked') || t('setup.status.prerequisitesRequired') || 'Bloqueado'}</span>
                                     </span>
-                                )}
-                                {!isLocked && (
+                                ) : (
                                     <span 
                                         title={t('setup.status.notStarted') || 'Pending'}
+                                        data-testid="badge-not-started"
                                         className="inline-flex items-center gap-1 text-[10px] font-bold text-zinc-600 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded border border-zinc-200 dark:border-zinc-700"
                                     >
                                         <Clock size={11} className="text-zinc-400 shrink-0" aria-label={t('setup.status.notStarted') || 'Pending'} />
@@ -184,8 +185,8 @@ export const SetupModuleCard: React.FC<SetupModuleCardProps> = ({
 
                         {isRecommended && (
                             <div className="mt-1">
-                                <span className="inline-block px-1.5 py-0.2 rounded text-[9px] font-bold uppercase tracking-wider bg-red-100 text-[#dc0000] dark:bg-red-950 dark:text-red-300 border border-red-200 dark:border-red-900 truncate max-w-full">
-                                    {t('setup.card.recommendedBadge') || 'Recommended Next Action'}
+                                <span className="inline-block px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-red-100 text-[#dc0000] dark:bg-red-950 dark:text-red-300 border border-red-200 dark:border-red-900 leading-tight">
+                                    {t('setup.card.recommendedBadge') || 'Next action'}
                                 </span>
                             </div>
                         )}

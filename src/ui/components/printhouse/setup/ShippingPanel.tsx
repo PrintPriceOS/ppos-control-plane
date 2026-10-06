@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Truck, Plus, X, Search, Globe, Check, AlertTriangle } from 'lucide-react';
 import { getAuthToken } from '../../../lib/authStore';
+import { useLocale } from '../../../i18n';
 import { COUNTRIES, REGION_PRESETS, getCountryName, getCountryDisplayName } from '../../../lib/countryCatalog';
 
 interface ShippingRegion {
@@ -23,6 +24,7 @@ interface ShippingPanelProps {
 }
 
 export const ShippingPanel: React.FC<ShippingPanelProps> = ({ siteId, onSaveSuccess }) => {
+    const { t } = useLocale();
     const [regions, setRegions] = useState<ShippingRegion[]>([]);
     const [loading, setLoading] = useState<boolean>(true);
     const [showAddForm, setShowAddForm] = useState<boolean>(false);
@@ -183,11 +185,11 @@ export const ShippingPanel: React.FC<ShippingPanelProps> = ({ siteId, onSaveSucc
                     <div className="flex items-center gap-2 mb-1">
                         <Truck size={20} className="text-[#dc0000]" />
                         <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100">
-                            Shipping Regions & Market Coverage
+                            {t('setup.shipping.title')}
                         </h3>
                     </div>
                     <p className="text-xs text-zinc-500">
-                        Configure geographic regions, supported countries (EU, Eurasia, Global), transit times, and delivery rules.
+                        {t('setup.shipping.subtitle')}
                     </p>
                 </div>
 
@@ -205,7 +207,7 @@ export const ShippingPanel: React.FC<ShippingPanelProps> = ({ siteId, onSaveSucc
                         className="px-3.5 py-2 bg-[#dc0000] hover:bg-[#b00000] text-white text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 shadow-sm"
                     >
                         <Plus size={14} />
-                        <span>Add Shipping Region</span>
+                        <span>{t('setup.shipping.addRegion')}</span>
                     </button>
                 </div>
             </div>
@@ -224,7 +226,7 @@ export const ShippingPanel: React.FC<ShippingPanelProps> = ({ siteId, onSaveSucc
                     <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-700 pb-3">
                         <h4 className="text-sm font-bold text-zinc-900 dark:text-white flex items-center gap-2">
                             <Globe size={16} className="text-[#dc0000]" />
-                            <span>New Shipping Region</span>
+                            <span>{t('setup.shipping.addRegion')}</span>
                         </h4>
                         
                         {/* Region Presets */}
@@ -245,7 +247,7 @@ export const ShippingPanel: React.FC<ShippingPanelProps> = ({ siteId, onSaveSucc
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                            <label className={labelClass}>Region Name</label>
+                            <label className={labelClass}>{t('setup.shipping.regionName')}</label>
                             <input
                                 type="text"
                                 required
@@ -256,7 +258,7 @@ export const ShippingPanel: React.FC<ShippingPanelProps> = ({ siteId, onSaveSucc
                             />
                         </div>
                         <div>
-                            <label className={labelClass}>Region Code</label>
+                            <label className={labelClass}>{t('setup.shipping.regionCode')}</label>
                             <input
                                 type="text"
                                 placeholder="e.g. EU_STANDARD"
@@ -363,7 +365,7 @@ export const ShippingPanel: React.FC<ShippingPanelProps> = ({ siteId, onSaveSucc
 
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                         <div>
-                            <label className={labelClass}>Standard Transit (Days)</label>
+                            <label className={labelClass}>{t('setup.shipping.standardTransit')}</label>
                             <input
                                 type="number"
                                 min="1"
@@ -373,7 +375,7 @@ export const ShippingPanel: React.FC<ShippingPanelProps> = ({ siteId, onSaveSucc
                             />
                         </div>
                         <div>
-                            <label className={labelClass}>Expedited Transit (Days)</label>
+                            <label className={labelClass}>{t('setup.shipping.expeditedTransit')}</label>
                             <input
                                 type="number"
                                 min="1"
@@ -383,7 +385,7 @@ export const ShippingPanel: React.FC<ShippingPanelProps> = ({ siteId, onSaveSucc
                             />
                         </div>
                         <div>
-                            <label className={labelClass}>Handling / Packing (Days)</label>
+                            <label className={labelClass}>{t('setup.shipping.handlingDays')}</label>
                             <input
                                 type="number"
                                 min="0"
@@ -400,13 +402,13 @@ export const ShippingPanel: React.FC<ShippingPanelProps> = ({ siteId, onSaveSucc
                             onClick={() => setShowAddForm(false)}
                             className="px-4 py-2 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-200 text-xs font-bold rounded-lg hover:bg-zinc-50"
                         >
-                            Cancel
+                            {t('common.cancel')}
                         </button>
                         <button
                             type="submit"
                             className="px-4 py-2 bg-[#dc0000] hover:bg-[#b00000] text-white text-xs font-bold rounded-lg transition-colors shadow-sm"
                         >
-                            Save Region
+                            {t('setup.shipping.save')}
                         </button>
                     </div>
                 </form>

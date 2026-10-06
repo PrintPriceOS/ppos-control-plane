@@ -9,6 +9,7 @@
 import React, { useState, useEffect } from 'react';
 import { Cog, Plus, Edit2, Trash2, CheckCircle, AlertCircle, Zap, RefreshCw, Sliders, CheckSquare, Square } from 'lucide-react';
 import { getAuthToken } from '../../../lib/authStore';
+import { useLocale } from '../../../i18n';
 
 interface MachineData {
     id: string;
@@ -109,7 +110,28 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 export const MachineFleetPanel: React.FC<{ sites?: SiteOption[]; onSaved?: () => void }> = ({ sites = [], onSaved }) => {
+    const { t } = useLocale();
     const [selectedSiteId, setSelectedSiteId] = useState<string>(sites[0]?.siteId || '');
+
+    const getMachineTypeLabel = (type: string) => {
+        const map: Record<string, string> = {
+            OFFSET_PRESS: t('setup.machines.type.offsetPress') || 'Offset Press',
+            DIGITAL_PRESS: t('setup.machines.type.digitalPress') || 'Digital Press',
+            LARGE_FORMAT: t('setup.machines.type.largeFormat') || 'Large Format',
+            BINDER: t('setup.machines.type.binder') || 'Binder',
+            FINISHER: t('setup.machines.type.finisher') || 'Finisher',
+            CUTTER: t('setup.machines.type.cutter') || 'Cutter',
+            FOLDER: t('setup.machines.type.folder') || 'Folder',
+            LAMINATOR: t('setup.machines.type.laminator') || 'Laminator',
+            OTHER: t('setup.machines.type.other') || 'Other Machinery'
+        };
+        return map[type] || MACHINE_TYPE_LABELS[type] || type;
+    };
+
+    const formatMachineStatus = (st: string) => {
+        const lower = st.toLowerCase();
+        return t(`status.${lower}` as any) || st;
+    };
     const [machines, setMachines] = useState<MachineData[]>([]);
     const [templates, setTemplates] = useState<TemplateData[]>([]);
     const [loading, setLoading] = useState(false);
@@ -417,7 +439,7 @@ export const MachineFleetPanel: React.FC<{ sites?: SiteOption[]; onSaved?: () =>
                 <div className="flex items-center gap-2">
                     <Cog size={20} className="text-[#dc0000]" />
                     <h3 className="m-0 text-lg font-bold text-zinc-900 dark:text-white">
-                        Machinery Fleet {machines.length > 0 && <span className="text-zinc-500 font-normal">({machines.length})</span>}
+                        {t('setup.machines.title') || 'Machinery Fleet'} {machines.length > 0 && <span className="text-zinc-500 font-normal">({machines.length})</span>}
                     </h3>
                 </div>
                 <div className="flex gap-2">
@@ -431,7 +453,7 @@ export const MachineFleetPanel: React.FC<{ sites?: SiteOption[]; onSaved?: () =>
                         onClick={() => openCreateForm()}
                         className="bg-[#dc0000] hover:bg-red-700 text-white font-semibold px-4 py-2 rounded-lg text-xs transition-colors flex items-center gap-1.5 shadow-xs cursor-pointer"
                     >
-                        <Plus size={14} /> Add Machine
+                        <Plus size={14} /> {t('setup.machines.addMachine') || 'Add Machine'}
                     </button>
                 </div>
             </div>
@@ -441,16 +463,16 @@ export const MachineFleetPanel: React.FC<{ sites?: SiteOption[]; onSaved?: () =>
                 <div className="bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 rounded-xl p-5 mb-5 transition-colors">
                     <p className="text-xs text-zinc-600 dark:text-zinc-400 m-0 mb-3 flex items-center">
                         <Zap size={14} className="mr-1 text-amber-500" />
-                        Quick start with a verified template:
+                        {t('setup.machines.quickStart') || 'Quick start with a verified template:'}
                     </p>
                     <div className="flex gap-2.5 flex-wrap">
-                        {templates.map(t => (
+                        {templates.map(tmpl => (
                             <button
-                                key={t.template_id}
-                                onClick={() => openCreateForm(t.template_id)}
+                                key={tmpl.template_id}
+                                onClick={() => openCreateForm(tmpl.template_id)}
                                 className="bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 px-3.5 py-1.5 rounded-lg text-xs font-medium cursor-pointer transition-colors"
                             >
-                                {MACHINE_TYPE_LABELS[t.template_id] || t.template_id}
+                                {getMachineTypeLabel(tmpl.template_id) || tmpl.template_id}
                             </button>
                         ))}
                     </div>
@@ -476,11 +498,11 @@ export const MachineFleetPanel: React.FC<{ sites?: SiteOption[]; onSaved?: () =>
                                 className="text-[11px] font-semibold px-2 py-0.5 rounded text-white"
                                 style={{ background: STATUS_COLORS[m.status] || '#71717a' }}
                             >
-                                {m.status}
+                                {formatMachineStatus(m.status)}
                             </span>
                         </div>
                         <div className="text-xs text-zinc-500 dark:text-zinc-400 mb-2">
-                            {MACHINE_TYPE_LABELS[m.machine_type] || m.machine_type}
+                            {getMachineTypeLabel(m.machine_type)}
                             {m.manufacturer && ` · ${m.manufacturer}`}
                             {m.model && ` ${m.model}`}
                             {m.max_sheet_width_mm && m.max_sheet_height_mm && (
@@ -771,14 +793,14 @@ export const MachineFleetPanel: React.FC<{ sites?: SiteOption[]; onSaved?: () =>
                             onClick={() => setIsEditing(false)}
                             className="px-4 py-2 bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded-lg text-xs font-semibold cursor-pointer transition-colors"
                         >
-                            Cancel
+                            {t('common.cancel') || 'Cancel'}
                         </button>
                         <button
                             onClick={handleSave}
                             disabled={loading}
                             className="px-5 py-2 bg-[#dc0000] hover:bg-red-700 disabled:opacity-50 text-white rounded-lg text-xs font-semibold cursor-pointer transition-colors shadow-xs"
                         >
-                            {loading ? 'Saving...' : editingMachineId ? 'Update Machine & Capabilities' : 'Create Machine & Capabilities'}
+                            {loading ? (t('common.saving') || 'Saving...') : editingMachineId ? (t('setup.machines.editMachine') || 'Update Machine & Capabilities') : (t('setup.machines.saveMachine') || 'Create Machine & Capabilities')}
                         </button>
                     </div>
                 </div>
