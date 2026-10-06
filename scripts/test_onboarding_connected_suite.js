@@ -395,7 +395,7 @@ async function performDeterministicCleanup(directConn) {
             const sessionList = Array.from(tracker.sessionIds);
             if (sessionList.length > 0) {
                 const [foundRuns] = await directConn.query(
-                    `SELECT id FROM printhouse_pricing_calibration_runs WHERE session_id IN (?)`,
+                    `SELECT id FROM printhouse_pricing_calibration_runs WHERE calibration_session_id IN (?)`,
                     [sessionList]
                 );
                 foundRuns.forEach(r => tracker.runIds.add(r.id));
@@ -801,7 +801,7 @@ async function runConnectedSuite() {
 
         // Verify Run in Database and extract real runId
         const [runs] = await directConn.query(
-            `SELECT id, absolute_residual, percent_residual FROM printhouse_pricing_calibration_runs WHERE session_id = ?`,
+            `SELECT id, absolute_residual, percent_residual FROM printhouse_pricing_calibration_runs WHERE calibration_session_id = ?`,
             [sessionId]
         );
         assert(runs.length > 0, `Calibration run recorded in MySQL`);
