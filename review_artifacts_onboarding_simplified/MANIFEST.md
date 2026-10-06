@@ -2,11 +2,11 @@
 **Proyecto:** PrintPrice OS Control Plane
 **Rama:** `phase-39.2-tenant-management-console`
 **Remoto Oficial (Verificado):** `https://github.com/PrintPriceOS/ppos-control-plane.git`
-**Commit Acreditado y Publicado en Remoto (HEAD):** `bcac964c8111b78a6614856e621a484bf8ac632c`
-**Código Auditado y Empaquetado:** HEAD commit `bcac964c8111b78a6614856e621a484bf8ac632c` con resolución integral de los bloqueos de auditoría y acreditación de contratos.
+**Commit Acreditado y Publicado en Remoto (HEAD):** `e97fed79edb6957fe0c2473f8f05ce1f5e1bfce8`
+**Código Auditado y Empaquetado:** HEAD commit `e97fed79edb6957fe0c2473f8f05ce1f5e1bfce8` con resolución integral de los bloqueos de auditoría y acreditación de contratos.
 **Estado del Worktree:** Sincronizado y publicado contra `origin/phase-39.2-tenant-management-console`.
 
-### Auditoría y Resoluciones Implementadas en `bcac964c8111b78a6614856e621a484bf8ac632c`:
+### Auditoría y Resoluciones Implementadas en `e97fed79edb6957fe0c2473f8f05ce1f5e1bfce8`:
 1. **Coherencia Absoluta Informe-Código:** Se acredita una única versión formal del harness (`scripts/test_onboarding_connected_suite.js`), coincidente bit a bit con el archivo empaquetado en el ZIP (`test_onboarding_connected_suite.js`).
 2. **Cálculo Canónico Exclusivo desde `rates_json`:** Se elimina `printer_nodes.rates_checksum` de todas las consultas SQL (SELECT e INSERT). El hash canónico SHA-256 se calcula exclusivamente en memoria de aplicación desde `rates_json` (`computeCanonicalRatesChecksum`), verificando identidad exacta con `INITIAL_RATES_CHECKSUM` antes y después de `POST /reject` y tras intentos de acceso cruzado entre tenants.
 3. **Fixture de Tarifas Compatible con el Motor Real y Claves Documentadas:** Sustitución de claves arbitrarias por el fixture canónico industrial compatible al 100% con `@ppos/pricing-engine` y `buildPriceCalibrationAdapter.js`. Las claves consumidas efectivamente por el motor y el solver inverso (`deterministicInversePricingSolver.js`) son:
@@ -40,7 +40,7 @@
    8. `tenants`
    Verificación de 0 residuos en las 8 tablas con reporte conjunto en el bloque `finally`.
 8. **Invalidación de Extracción Tardía ante Cambio de Familia y Contexto:** Se incrementa `uploadRequestIdRef` al seleccionar o cambiar de familia (`handleSelectFamilyToCalibrate`), al regresar al selector de familias (`handleReturnToFamilySelector`) y al alternar pestañas de entrada. Pruebas de regresión 20 y 21 en Vitest acreditan el descarte de respuestas lentas de PDF.
-9. **Trazabilidad Git Rigurosa y Publicación Remota:** Las correcciones quedan publicadas en el commit `bcac964c8111b78a6614856e621a484bf8ac632c` sobre la rama `phase-39.2-tenant-management-console` y subidas a `origin`.
+9. **Trazabilidad Git Rigurosa y Publicación Remota:** Las correcciones quedan publicadas en el commit `e97fed79edb6957fe0c2473f8f05ce1f5e1bfce8` sobre la rama `phase-39.2-tenant-management-console` y subidas a `origin`.
 10. **Alineación Estricta con Contratos Oficiales de Rutas y Servicios (HEAD):**
     - **Payload canónico `bookSpec`:** En `scripts/test_onboarding_connected_suite.js`, los fixtures de calibración principal y cancelación secundaria adoptan la especificación formal exigida por `calibrationSessionService.validateBookSpec`: `copies`, `interior_pages`, `book_width_mm`, `book_height_mm`, `interior_print`, `cover_print`, `paper_type_interior`, `paper_weight_interior`, `paper_type_cover`, `paper_weight_cover`, `binding_method` y `delivery_country`, empleando los enums reales del servicio.
     - **Semántica explícita del precio:** Se definen de manera unívoca `includesPaper: true`, `includesBinding: true`, `includesFinishing: true` e `includesPackaging: true` en ambos fixtures sin inferir componentes del precio total. Se mantiene la ambigüedad documental de *Die Mysteriösen Steine* sin alteraciones artificiales; el flujo técnico se valida con un fixture sintético explícito de integración (`Synthetic Integration Fixture`).
@@ -105,7 +105,7 @@
     - **Garantía de Paridad entre Evaluación Principal y Gobernanza:** Se garantiza que tanto la evaluación principal (`primarySpec`) como la evaluación de gobernanza de curvas (`specForQ` en `evaluateCurveAcceptance`) evalúen exactamente la misma tirada (1.500 ejemplares), eliminando la discrepancia donde el control de curva generaba `quantity: 1` y sobrescribía `copies: 1`.
     - **Diagnóstico Enriquecido de Rechazo de Curva (Zero Leakage):** Al rechazar por curva (`GOVERNANCE_CURVE_REJECTED` o `GOVERNANCE_CURVE_REQUIRES_REVIEW`), el error incorpora en su mensaje y propiedades (`err.reasons`, `err.evaluatedQuantities`, `err.details`) las razones de rechazo y las cantidades evaluadas, permitiendo trazabilidad y diagnóstico inmediato en el harness conectado sin exponer credenciales ni tokens sensibles.
 
-17. **Ampliación del Harness Conectado para Curvas Multi-Tirada, Compuerta de Tolerancia y Aislamiento Multi-Tenant (Commit `bcac964c8111b78a6614856e621a484bf8ac632c`):**
+17. **Ampliación del Harness Conectado para Curvas Multi-Tirada, Compuerta de Tolerancia y Aislamiento Multi-Tenant (Commit `e97fed79edb6957fe0c2473f8f05ce1f5e1bfce8`):**
     - **Auditoría de Serialización HTTP en `/accept` y Ajuste del Caso B:**
       - Auditoría de `wrapHandler` en `src/api/routes/printhouseOnboardingRoutes.js`: ante rechazo de gobernanza de curva por `calibrationAcceptanceService`, el manejador serializa `err.statusCode = 422`, emitiendo `{ ok: false, error: 'GOVERNANCE_CURVE_REJECTED', message: 'GOVERNANCE_CURVE_REJECTED: [POINT_OUT_OF_TOLERANCE] ...' }` sin array `body.reasons`.
       - Se ajusta el harness para verificar `res.status === 422`, `body.error === 'GOVERNANCE_CURVE_REJECTED'` y la presencia de `POINT_OUT_OF_TOLERANCE` en el mensaje de error o en las razones sanitizadas.
@@ -132,7 +132,7 @@
       - Suite 8 (`runCurveHarnessRegressions`) valida en modo aislado: contrato del solver con `CANONICAL_ACCEPTABLE_RUN_STATUSES` y `EXACTLY_DETERMINED`, compuerta de gobernanza con tolerancias oficiales (`POINT_OUT_OF_TOLERANCE`) y sanitización estricta de diagnósticos de error HTTP wrapHandler sin filtración de secretos.
     - **Diferenciación Estricta entre Pruebas Locales y Pruebas Conectadas:**
       - **Pruebas Locales Ejecutadas:** Suite completa de Vitest (23 suites, 328 tests pasando, 0 fallidos) y compilación de producción con Vite (`dist/` generado limpiamente).
-      - **Pruebas Conectadas:** El presente commit `bcac964c8111b78a6614856e621a484bf8ac632c` se entrega como **PENDIENTE DE VALIDACIÓN CONECTADA EN ENTORNO DE PERSISTENCIA**. No se despliega ni se ejecuta contra bases de datos en esta entrega, y **no se le atribuye al nuevo commit el resultado PASS de pruebas conectadas previas** ejecutadas sobre commits anteriores.
+      - **Pruebas Conectadas:** El presente commit `e97fed79edb6957fe0c2473f8f05ce1f5e1bfce8` se entrega como **PENDIENTE DE VALIDACIÓN CONECTADA EN ENTORNO DE PERSISTENCIA**. No se despliega ni se ejecuta contra bases de datos en esta entrega, y **no se le atribuye al nuevo commit el resultado PASS de pruebas conectadas previas** ejecutadas sobre commits anteriores.
 
 ---
 
@@ -146,7 +146,7 @@
 - **Entorno:**
   - Node.js v20+, Vite 6.4.2, React 19, TypeScript
   - MySQL Target: `ppos_rc_mdw0qd@127.0.0.1:3306/pposrcmdw0qdtest`
-- **Estado de Validación Conectada:** *PENDIENTE DE VALIDACIÓN CONECTADA EN ENTORNO DE PERSISTENCIA* (el harness revisable `test_onboarding_connected_suite.js` se entrega verificado y listo, pero no se despliega ni se ejecuta contra bases de datos en esta entrega, ni se le atribuye a este nuevo commit `bcac964c8111b78a6614856e621a484bf8ac632c` el PASS de ejecuciones conectadas previas de commits anteriores).
+- **Estado de Validación Conectada:** *PENDIENTE DE VALIDACIÓN CONECTADA EN ENTORNO DE PERSISTENCIA* (el harness revisable `test_onboarding_connected_suite.js` se entrega verificado y listo, pero no se despliega ni se ejecuta contra bases de datos en esta entrega, ni se le atribuye a este nuevo commit `e97fed79edb6957fe0c2473f8f05ce1f5e1bfce8` el PASS de ejecuciones conectadas previas de commits anteriores).
 - **Advertencia Legal / Técnica:** *Los checksums SHA-256 incluidos acreditan exclusivamente la integridad criptográfica de los archivos empaquetados contra alteraciones, no su validez funcional ni ejecución conectada.*
 
 ---
