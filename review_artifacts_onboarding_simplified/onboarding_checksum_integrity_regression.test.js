@@ -9,6 +9,7 @@ const {
     resolveConnectedMysqlPassword,
     getDirectMysqlConnectionConfig,
     REQUIRED_MYSQL,
+    parseAndValidatePointResultsJson,
     runCurveHarnessRegressions
 } = require('../scripts/test_onboarding_connected_suite');
 
@@ -398,8 +399,59 @@ describe('Onboarding Harness Checksum Integrity & Normalization Regressions', ()
     });
 
     describe('8. Multi-quantity Curve Harness Regressions', () => {
-        test('8.1 Ejecuta satisfactoriamente runCurveHarnessRegressions (Suites 7-10: multi-target generation, solver contract, governance gate, zero leakage)', () => {
+        test('8.1 Ejecuta satisfactoriamente runCurveHarnessRegressions (Suites 7-11: multi-target generation, solver contract, governance gate, zero leakage, dual point_results parsing)', () => {
             expect(() => runCurveHarnessRegressions()).not.toThrow();
+        });
+    });
+
+    describe('9. parseAndValidatePointResultsJson (Dual parsing, validación estricta de array y rechazo contextual)', () => {
+        const fixtureArray = [
+            { quantity: 100, targetManufacturingPrice: 50.0, predictedManufacturingPrice: 50.0, withinTolerance: true },
+            { quantity: 500, targetManufacturingPrice: 200.0, predictedManufacturingPrice: 200.0, withinTolerance: true }
+        ];
+
+        test('9.1 Cadena JSON válida de array devuelve el array correctamente parseado con todos sus elementos', () => {
+            const jsonStr = JSON.stringify(fixtureArray);
+            const parsed = parseAndValidatePointResultsJson(jsonStr, 'Test 9.1 JSON String');
+            expect(Array.isArray(parsed)).toBe(true);
+            expect(parsed).toHaveLength(2);
+            expect(parsed[0].quantity).toBe(100);
+            expect(parsed[1].quantity).toBe(500);
+        });
+
+        test('9.2 Array nativo devuelto por MySQL driver es devuelto directamente sin alteración', () => {
+            const result = parseAndValidatePointResultsJson(fixtureArray, 'Test 9.2 Native Array');
+            expect(Array.isArray(result)).toBe(true);
+            expect(result).toBe(fixtureArray);
+            expect(result).toHaveLength(2);
+        });
+
+        test('9.3 JSON malformado es rechazado con error contextual que incluye diagnóstico y sin catch silencioso', () => {
+            const malformed = '[{"quantity": 100, "broken":';
+            expect(() => parseAndValidatePointResultsJson(malformed, 'Test 9.3 Malformed JSON')).toThrowError(
+                /\[POINT_RESULTS_VALIDATION_ERROR\] Test 9.3 Malformed JSON: Malformed JSON string/
+            );
+        });
+
+        test('9.4 Objeto no array (tanto cadena JSON como objeto nativo) es rechazado con diagnóstico contextual', () => {
+            const nonArrayJson = '{"quantity": 100, "price": 50}';
+            expect(() => parseAndValidatePointResultsJson(nonArrayJson, 'Test 9.4a JSON Object')).toThrowError(
+                /\[POINT_RESULTS_VALIDATION_ERROR\] Test 9.4a JSON Object: Parsed JSON root is not an array \(received: object\)/
+            );
+
+            const nonArrayNative = { quantity: 100, price: 50 };
+            expect(() => parseAndValidatePointResultsJson(nonArrayNative, 'Test 9.4b Native Object')).toThrowError(
+                /\[POINT_RESULTS_VALIDATION_ERROR\] Test 9.4b Native Object: Expected string or array, received unsupported type object/
+            );
+        });
+
+        test('9.5 Null y undefined son rechazados explícitamente con diagnóstico contextual claro', () => {
+            expect(() => parseAndValidatePointResultsJson(null, 'Test 9.5a Null Value')).toThrowError(
+                /\[POINT_RESULTS_VALIDATION_ERROR\] Test 9.5a Null Value: Value is null or undefined/
+            );
+            expect(() => parseAndValidatePointResultsJson(undefined, 'Test 9.5b Undefined Value')).toThrowError(
+                /\[POINT_RESULTS_VALIDATION_ERROR\] Test 9.5b Undefined Value: Value is null or undefined/
+            );
         });
     });
 });

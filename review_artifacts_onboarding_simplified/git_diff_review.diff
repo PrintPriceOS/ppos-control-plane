@@ -1,8 +1,1157 @@
+diff --git a/raw_build_output.log b/raw_build_output.log
+new file mode 100644
+index 0000000..31eae7d
+--- /dev/null
++++ b/raw_build_output.log
+@@ -0,0 +1,22 @@
++npm notice run @ppos/control-plane@1.9.5 build
++npm notice run vite build
++NODE_ENV=production is not supported in the .env file. Only NODE_ENV=development is supported to create a development build of your project. If you need to set process.env.NODE_ENV, you can set it in the Vite config instead.
++[36mvite v6.4.2 [32mbuilding for production...[36m[39m
++transforming...
++[32m✓[39m 3557 modules transformed.
++rendering chunks...
++computing gzip size...
++[2mdist/[22m[32massets/favicon-BSvESAho.svg       [39m[1m[2m    1.46 kB[22m[1m[22m[2m │ gzip:   0.73 kB[22m
++[2mdist/[22m[32mindex.html                        [39m[1m[2m    2.03 kB[22m[1m[22m[2m │ gzip:   0.80 kB[22m
++[2mdist/[22m[35massets/index-CgsPkVHm.css         [39m[1m[2m  319.76 kB[22m[1m[22m[2m │ gzip:  43.55 kB[22m
++[2mdist/[22m[36massets/vendor-router--EAYNkjI.js  [39m[1m[2m   38.21 kB[22m[1m[22m[2m │ gzip:  13.79 kB[22m
++[2mdist/[22m[36massets/vendor-data-DCAy2JXq.js    [39m[1m[2m   53.34 kB[22m[1m[22m[2m │ gzip:  21.52 kB[22m
++[2mdist/[22m[36massets/vendor-icons-C1bXvJH-.js   [39m[1m[2m  124.84 kB[22m[1m[22m[2m │ gzip:  21.77 kB[22m
++[2mdist/[22m[36massets/vendor-react-rkJnIKN2.js   [39m[1m[2m  194.25 kB[22m[1m[22m[2m │ gzip:  60.73 kB[22m
++[2mdist/[22m[36massets/index-DIXy1gxx.js          [39m[1m[33m3,593.85 kB[39m[22m[2m │ gzip: 707.12 kB[22m
++[33m
++(!) Some chunks are larger than 600 kB after minification. Consider:
++- Using dynamic import() to code-split the application
++- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
++- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.[39m
++[32m✓ built in 14.36s[39m
+diff --git a/raw_vitest_output.log b/raw_vitest_output.log
+new file mode 100644
+index 0000000..196d71e
+--- /dev/null
++++ b/raw_vitest_output.log
+@@ -0,0 +1,1115 @@
++npm notice run @ppos/control-plane@1.9.5 npx
++npm notice run vitest run
++
++[1m[46m RUN [49m[22m [36mv3.2.0 [39m[90mC:/Users/KIKE/Downloads/ppos-control-plane-phase-10-intelligence-layer[39m
++
++ [32m✓[39m tests/migration_156_157_runner.test.js [2m([22m[2m5 tests[22m[2m)[22m[32m 18[2mms[22m[39m
++[90mstdout[2m | tests/pricingEngineClient.test.js[2m > [22m[2mPricingEngineClient Unit & Edge Cases Test Suite[2m > [22m[2m1. Preserves target_margin_pct when explicitly passed as 0
++[22m[39m[MARKETPLACE][PRICING-REQUEST] Requesting deterministic offers from Pricing Engine {
++  orderId: [1mnull[22m,
++  jobId: [32m'job_unknown'[39m,
++  tenantId: [32m'default'[39m,
++  source: [32m'BPE_MARKETPLACE_NATIVE'[39m,
++  sourceRef: [1mnull[22m,
++  traceId: [32m'trace_17fd077f-65c7-44a1-a512-e10786f03775'[39m,
++  sessionId: [1mnull[22m,
++  endpointUsed: [32m'http://127.0.0.1:8004/api/marketplace/offers'[39m
++}
++
++[90mstdout[2m | tests/pricingEngineClient.test.js[2m > [22m[2mPricingEngineClient Unit & Edge Cases Test Suite[2m > [22m[2m1. Preserves target_margin_pct when explicitly passed as 0
++[22m[39m[MARKETPLACE][PRICING-RESPONSE] Received real offers from marketplace endpoint {
++  orderId: [1mnull[22m,
++  jobId: [32m'job_unknown'[39m,
++  tenantId: [32m'default'[39m,
++  source: [32m'BPE_MARKETPLACE_NATIVE'[39m,
++  sourceRef: [1mnull[22m,
++  traceId: [32m'trace_17fd077f-65c7-44a1-a512-e10786f03775'[39m,
++  sessionId: [1mnull[22m,
++  endpointUsed: [32m'http://127.0.0.1:8004/api/marketplace/offers'[39m
++}
++
++[90mstdout[2m | tests/pricingEngineClient.test.js[2m > [22m[2mPricingEngineClient Unit & Edge Cases Test Suite[2m > [22m[2m2. Processes real production BPE response shape (production_cost, suggested_price, estimated_margin, margin_pct)
++[22m[39m[MARKETPLACE][PRICING-REQUEST] Requesting deterministic offers from Pricing Engine {
++  orderId: [1mnull[22m,
++  jobId: [32m'job_unknown'[39m,
++  tenantId: [32m'default'[39m,
++  source: [32m'BPE_MARKETPLACE_NATIVE'[39m,
++  sourceRef: [1mnull[22m,
++  traceId: [32m'trace_fed3f717-d245-4b76-9022-2eaf3fa090fc'[39m,
++  sessionId: [1mnull[22m,
++  endpointUsed: [32m'http://127.0.0.1:8004/api/marketplace/offers'[39m
++}
++
++[90mstdout[2m | tests/pricingEngineClient.test.js[2m > [22m[2mPricingEngineClient Unit & Edge Cases Test Suite[2m > [22m[2m2. Processes real production BPE response shape (production_cost, suggested_price, estimated_margin, margin_pct)
++[22m[39m[MARKETPLACE][PRICING-RESPONSE] Received real offers from marketplace endpoint {
++  orderId: [1mnull[22m,
++  jobId: [32m'job_unknown'[39m,
++  tenantId: [32m'default'[39m,
++  source: [32m'BPE_MARKETPLACE_NATIVE'[39m,
++  sourceRef: [1mnull[22m,
++  traceId: [32m'trace_fed3f717-d245-4b76-9022-2eaf3fa090fc'[39m,
++  sessionId: [1mnull[22m,
++  endpointUsed: [32m'http://127.0.0.1:8004/api/marketplace/offers'[39m
++}
++
++[90mstdout[2m | tests/pricingEngineClient.test.js[2m > [22m[2mPricingEngineClient Unit & Edge Cases Test Suite[2m > [22m[2m3. Rejects response when ALL offers are invalid (missing price, empty string cost, non-finite values)
++[22m[39m[MARKETPLACE][PRICING-REQUEST] Requesting deterministic offers from Pricing Engine {
++  orderId: [1mnull[22m,
++  jobId: [32m'job_unknown'[39m,
++  tenantId: [32m'default'[39m,
++  source: [32m'BPE_MARKETPLACE_NATIVE'[39m,
++  sourceRef: [1mnull[22m,
++  traceId: [32m'trace_24215df4-785b-4e34-bfac-7344ade7a5cf'[39m,
++  sessionId: [1mnull[22m,
++  endpointUsed: [32m'http://127.0.0.1:8004/api/marketplace/offers'[39m
++}
++
++[90mstdout[2m | tests/pricingEngineClient.test.js[2m > [22m[2mPricingEngineClient Unit & Edge Cases Test Suite[2m > [22m[2m3. Rejects response when ALL offers are invalid (missing price, empty string cost, non-finite values)
++[22m[39m[MARKETPLACE][PRICING-RESPONSE] Received real offers from marketplace endpoint {
++  orderId: [1mnull[22m,
++  jobId: [32m'job_unknown'[39m,
++  tenantId: [32m'default'[39m,
++  source: [32m'BPE_MARKETPLACE_NATIVE'[39m,
++  sourceRef: [1mnull[22m,
++  traceId: [32m'trace_24215df4-785b-4e34-bfac-7344ade7a5cf'[39m,
++  sessionId: [1mnull[22m,
++  endpointUsed: [32m'http://127.0.0.1:8004/api/marketplace/offers'[39m
++}
++
++[90mstderr[2m | tests/pricingEngineClient.test.js[2m > [22m[2mPricingEngineClient Unit & Edge Cases Test Suite[2m > [22m[2m3. Rejects response when ALL offers are invalid (missing price, empty string cost, non-finite values)
++[22m[39m[MARKETPLACE][PRICING-OFFER-INVALID] Dropping offer with null/empty/invalid cost or price field { offer: { id: [32m'off-noprice'[39m, production_cost: [33m100[39m } }
++[MARKETPLACE][PRICING-OFFER-INVALID] Dropping offer with null/empty/invalid cost or price field {
++  offer: { id: [32m'off-emptycost'[39m, production_cost: [32m''[39m, suggested_price: [33m150[39m }
++}
++[MARKETPLACE][PRICING-OFFER-INVALID] Dropping offer with non-finite cost/price {
++  offer: { id: [32m'off-nancost'[39m, production_cost: [33mNaN[39m, suggested_price: [33m150[39m }
++}
++[MARKETPLACE][PRICING-OFFER-INVALID] Dropping offer with null/empty/invalid cost or price field {
++  offer: { id: [32m'off-nullprice'[39m, production_cost: [33m100[39m, suggested_price: [1mnull[22m }
++}
++[MARKETPLACE][PRICING-FAILED] All offers in BPE response payload were invalid or malformed {
++  orderId: [1mnull[22m,
++  jobId: [32m'job_unknown'[39m,
++  tenantId: [32m'default'[39m,
++  source: [32m'BPE_MARKETPLACE_NATIVE'[39m,
++  sourceRef: [1mnull[22m,
++  traceId: [32m'trace_24215df4-785b-4e34-bfac-7344ade7a5cf'[39m,
++  sessionId: [1mnull[22m
++}
++
++[90mstdout[2m | tests/pricingEngineClient.test.js[2m > [22m[2mPricingEngineClient Unit & Edge Cases Test Suite[2m > [22m[2m4. Returns ok: false when BPE response explicitly indicates failure or error
++[22m[39m[MARKETPLACE][PRICING-REQUEST] Requesting deterministic offers from Pricing Engine {
++  orderId: [1mnull[22m,
++  jobId: [32m'job_unknown'[39m,
++  tenantId: [32m'default'[39m,
++  source: [32m'BPE_MARKETPLACE_NATIVE'[39m,
++  sourceRef: [1mnull[22m,
++  traceId: [32m'trace_9754cef5-412b-4049-9aa0-d0302df149af'[39m,
++  sessionId: [1mnull[22m,
++  endpointUsed: [32m'http://127.0.0.1:8004/api/marketplace/offers'[39m
++}
++
++[90mstdout[2m | tests/pricingEngineClient.test.js[2m > [22m[2mPricingEngineClient Unit & Edge Cases Test Suite[2m > [22m[2m4. Returns ok: false when BPE response explicitly indicates failure or error
++[22m[39m[MARKETPLACE][PRICING-RESPONSE] Received real offers from marketplace endpoint {
++  orderId: [1mnull[22m,
++  jobId: [32m'job_unknown'[39m,
++  tenantId: [32m'default'[39m,
++  source: [32m'BPE_MARKETPLACE_NATIVE'[39m,
++  sourceRef: [1mnull[22m,
++  traceId: [32m'trace_9754cef5-412b-4049-9aa0-d0302df149af'[39m,
++  sessionId: [1mnull[22m,
++  endpointUsed: [32m'http://127.0.0.1:8004/api/marketplace/offers'[39m
++}
++
++[90mstdout[2m | tests/pricingEngineClient.test.js[2m > [22m[2mPricingEngineClient Unit & Edge Cases Test Suite[2m > [22m[2m5. Rejects empty object {} response body without declaring success
++[22m[39m[MARKETPLACE][PRICING-REQUEST] Requesting deterministic offers from Pricing Engine {
++  orderId: [1mnull[22m,
++  jobId: [32m'job_unknown'[39m,
++  tenantId: [32m'default'[39m,
++  source: [32m'BPE_MARKETPLACE_NATIVE'[39m,
++  sourceRef: [1mnull[22m,
++  traceId: [32m'trace_6068b0d8-d035-445e-ae7c-12039c4ab0e5'[39m,
++  sessionId: [1mnull[22m,
++  endpointUsed: [32m'http://127.0.0.1:8004/api/marketplace/offers'[39m
++}
++
++[90mstdout[2m | tests/pricingEngineClient.test.js[2m > [22m[2mPricingEngineClient Unit & Edge Cases Test Suite[2m > [22m[2m5. Rejects empty object {} response body without declaring success
++[22m[39m[MARKETPLACE][PRICING-RESPONSE] Received real offers from marketplace endpoint {
++  orderId: [1mnull[22m,
++  jobId: [32m'job_unknown'[39m,
++  tenantId: [32m'default'[39m,
++  source: [32m'BPE_MARKETPLACE_NATIVE'[39m,
++  sourceRef: [1mnull[22m,
++  traceId: [32m'trace_6068b0d8-d035-445e-ae7c-12039c4ab0e5'[39m,
++  sessionId: [1mnull[22m,
++  endpointUsed: [32m'http://127.0.0.1:8004/api/marketplace/offers'[39m
++}
++
++ [32m✓[39m tests/pricingEngineClient.test.js [2m([22m[2m7 tests[22m[2m)[22m[32m 29[2mms[22m[39m
++ [32m✓[39m tests/preflightServiceClient.test.js [2m([22m[2m3 tests[22m[2m)[22m[32m 19[2mms[22m[39m
++[90mstdout[2m | tests/auth.middleware.test.js[2m > [22m[2mAuth Middleware Pipeline Suite[2m > [22m[2m1. Accepts valid PPOS_CONTROL_TOKEN system authentication
++[22m[39m[CONTROL][AUTH][SERVICE-TOKEN-ACCEPTED] {
++  route: [32m'/test'[39m,
++  actor: [32m'preflight-worker'[39m,
++  tokenLength: [33m21[39m,
++  authMode: [32m'PPOS_CONTROL_TOKEN'[39m
++}
++
++[90mstdout[2m | tests/auth.middleware.test.js[2m > [22m[2mAuth Middleware Pipeline Suite[2m > [22m[2m2. Rejects invalid PPOS_CONTROL_TOKEN with 401 UNAUTHORIZED
++[22m[39m2026-10-06T12:39:28.813Z [[31mERROR[0m] [audit-logger] audit_auth_denied: [AUDIT] AUTH_DENIED | Status: FAILURE {
++  ip: [32m'127.0.0.1'[39m,
++  method: [32m'GET'[39m,
++  url: [32m'/test'[39m,
++  agent: [90mundefined[39m,
++  error: [32m'JWT Error: jwt malformed'[39m
++}
++
++[90mstderr[2m | tests/auth.middleware.test.js[2m > [22m[2mAuth Middleware Pipeline Suite[2m > [22m[2m2. Rejects invalid PPOS_CONTROL_TOKEN with 401 UNAUTHORIZED
++[22m[39m[AUTH-FAILURE] Unauthorized access attempt: JWT Error: jwt malformed from 127.0.0.1
++
++[90mstdout[2m | tests/auth.middleware.test.js[2m > [22m[2mAuth Middleware Pipeline Suite[2m > [22m[2m2. Rejects invalid PPOS_CONTROL_TOKEN with 401 UNAUTHORIZED
++[22m[39m2026-10-06T12:39:28.815Z [[31mERROR[0m] [data-adapter] query_failed: SQL Query failure: INSERT INTO api_audit_logs (event_type, tenant_id, user_id, status, metadata_json, created_at)
++     ... {
++  error: [32m'MySQL is UNCONFIGURED. Ensure MYSQL_HOST or DATABASE_URL is set in .env'[39m
++}
++
++[90mstdout[2m | tests/auth.middleware.test.js[2m > [22m[2mAuth Middleware Pipeline Suite[2m > [22m[2m2. Rejects invalid PPOS_CONTROL_TOKEN with 401 UNAUTHORIZED
++[22m[39m2026-10-06T12:39:28.816Z [[31mERROR[0m] [audit-logger] audit_persistence_failed: Failed to persist audit log to MySQL {
++  error: [32m'MySQL is UNCONFIGURED. Ensure MYSQL_HOST or DATABASE_URL is set in .env'[39m
++}
++
++[90mstderr[2m | tests/auth.middleware.test.js[2m > [22m[2mAuth Middleware Pipeline Suite[2m > [22m[2m2. Rejects invalid PPOS_CONTROL_TOKEN with 401 UNAUTHORIZED
++[22m[39m[AUDIT_LOG_WRITE_FAILED] Failed to persist audit log to api_audit_logs: MySQL is UNCONFIGURED. Ensure MYSQL_HOST or DATABASE_URL is set in .env {
++  type: [32m'AUTH_DENIED'[39m,
++  tenantId: [32m'system'[39m,
++  userId: [32m'unauthenticated'[39m,
++  status: [32m'FAILURE'[39m,
++  metadata: {
++    ip: [32m'127.0.0.1'[39m,
++    method: [32m'GET'[39m,
++    url: [32m'/test'[39m,
++    agent: [90mundefined[39m,
++    error: [32m'JWT Error: jwt malformed'[39m
++  }
++}
++
++ [32m✓[39m tests/auth.middleware.test.js [2m([22m[2m6 tests[22m[2m)[22m[32m 27[2mms[22m[39m
++[90mstdout[2m | tests/phase195_backend_integrations.test.js[2m > [22m[2mPhase 195 Backend Integrations Suite[2m > [22m[2mGoal F: Governed Rates Publication Control Plane -> BPE[2m > [22m[2mshould publish accepted revision to BPE, verify checksum readback, and support idempotency
++[22m[39m2026-10-06T12:39:28.871Z [[32mINFO[0m] [bpe-publication] generic_event: Revision rev_test_1791290368866 (patch: sha256:accepted_test_checksum_12345, rates: sha256:dda56a43a925d80d4506c72b640a290cb8837e75b8e826e524e03040cf0baccc) is already published and verified to BPE {}
++
++ [32m✓[39m tests/phase195_backend_integrations.test.js [2m([22m[2m12 tests[22m[2m)[22m[32m 133[2mms[22m[39m
++[90mstdout[2m | tests/calibration_residuals_compatibility_regression.test.js[2m > [22m[2mCalibration Residuals & Compatibility Regressions[2m > [22m[2m1. Caso de 1 %: Detección estricta de confusión entre ratio 0.01 y porcentaje 1[2m > [22m[2m1.1 Single-point contract: Rechaza run.percent_residual = 0.01 cuando el error real es 1 % (1.0 percentage points)
++[22m[39m2026-10-06T12:39:28.888Z [[31mERROR[0m] [calibration-acceptance] generic_event: Calibration acceptance failed, transaction rolled back {}
++
++[90mstdout[2m | tests/calibration_residuals_compatibility_regression.test.js[2m > [22m[2mCalibration Residuals & Compatibility Regressions[2m > [22m[2m1. Caso de 1 %: Detección estricta de confusión entre ratio 0.01 y porcentaje 1[2m > [22m[2m1.2 Single-point contract: Acepta run.percent_residual = 1.0 cuando el error real es 1 %
++[22m[39m2026-10-06T12:39:28.939Z [[33mWARN[0m] [calibration-acceptance] generic_event: Failed to enqueue webhook for calibration acceptance (non-fatal): {}
++
++[90mstdout[2m | tests/calibration_residuals_compatibility_regression.test.js[2m > [22m[2mCalibration Residuals & Compatibility Regressions[2m > [22m[2m1. Caso de 1 %: Detección estricta de confusión entre ratio 0.01 y porcentaje 1[2m > [22m[2m1.2 Single-point contract: Acepta run.percent_residual = 1.0 cuando el error real es 1 %
++[22m[39m2026-10-06T12:39:28.944Z [[32mINFO[0m] [calibration-acceptance] generic_event: Calibration run accepted successfully {}
++
++[90mstdout[2m | tests/calibration_residuals_compatibility_regression.test.js[2m > [22m[2mCalibration Residuals & Compatibility Regressions[2m > [22m[2m1. Caso de 1 %: Detección estricta de confusión entre ratio 0.01 y porcentaje 1[2m > [22m[2m1.3 Multi-quantity curve contract: Acepta run.percent_residual = 0.01 (unitless ratio) y rechaza 1.0
++[22m[39m2026-10-06T12:39:28.948Z [[31mERROR[0m] [calibration-acceptance] generic_event: Calibration acceptance failed, transaction rolled back {}
++
++[90mstdout[2m | tests/calibration_residuals_compatibility_regression.test.js[2m > [22m[2mCalibration Residuals & Compatibility Regressions[2m > [22m[2m2. Tolerancias: Valores justo dentro, en el límite exacto y justo fuera[2m > [22m[2m2.1 Justo dentro: residual = 0.49 EUR (0.49 <= 0.50) es aceptado
++[22m[39m2026-10-06T12:39:28.954Z [[33mWARN[0m] [calibration-acceptance] generic_event: Failed to enqueue webhook for calibration acceptance (non-fatal): {}
++
++[90mstdout[2m | tests/calibration_residuals_compatibility_regression.test.js[2m > [22m[2mCalibration Residuals & Compatibility Regressions[2m > [22m[2m2. Tolerancias: Valores justo dentro, en el límite exacto y justo fuera[2m > [22m[2m2.1 Justo dentro: residual = 0.49 EUR (0.49 <= 0.50) es aceptado
++[22m[39m2026-10-06T12:39:28.955Z [[32mINFO[0m] [calibration-acceptance] generic_event: Calibration run accepted successfully {}
++
++[90mstdout[2m | tests/calibration_residuals_compatibility_regression.test.js[2m > [22m[2mCalibration Residuals & Compatibility Regressions[2m > [22m[2m2. Tolerancias: Valores justo dentro, en el límite exacto y justo fuera[2m > [22m[2m2.2 En el límite exacto: residual = 0.50 EUR (0.50 <= 0.50) es aceptado
++[22m[39m2026-10-06T12:39:28.960Z [[33mWARN[0m] [calibration-acceptance] generic_event: Failed to enqueue webhook for calibration acceptance (non-fatal): {}
++
++[90mstdout[2m | tests/calibration_residuals_compatibility_regression.test.js[2m > [22m[2mCalibration Residuals & Compatibility Regressions[2m > [22m[2m2. Tolerancias: Valores justo dentro, en el límite exacto y justo fuera[2m > [22m[2m2.2 En el límite exacto: residual = 0.50 EUR (0.50 <= 0.50) es aceptado
++[22m[39m2026-10-06T12:39:28.961Z [[32mINFO[0m] [calibration-acceptance] generic_event: Calibration run accepted successfully {}
++
++[90mstdout[2m | tests/calibration_residuals_compatibility_regression.test.js[2m > [22m[2mCalibration Residuals & Compatibility Regressions[2m > [22m[2m2. Tolerancias: Valores justo dentro, en el límite exacto y justo fuera[2m > [22m[2m2.3 Justo fuera: residual = 0.51 EUR (0.51 > 0.50) es rechazado por tolerancia
++[22m[39m2026-10-06T12:39:28.965Z [[31mERROR[0m] [calibration-acceptance] generic_event: Calibration acceptance failed, transaction rolled back {}
++
++[90mstdout[2m | tests/calibration_residuals_compatibility_regression.test.js[2m > [22m[2mCalibration Residuals & Compatibility Regressions[2m > [22m[2m2. Tolerancias: Valores justo dentro, en el límite exacto y justo fuera[2m > [22m[2m2.4 Tolerancia por punto en curva: objetivos 100 y 1200 EUR con tolerancia relativa 1 %, residual punto 2 = 5 EUR (5 <= 12) supera comprobación por punto
++[22m[39m2026-10-06T12:39:28.970Z [[33mWARN[0m] [calibration-acceptance] generic_event: Failed to enqueue webhook for calibration acceptance (non-fatal): {}
++
++[90mstdout[2m | tests/calibration_residuals_compatibility_regression.test.js[2m > [22m[2mCalibration Residuals & Compatibility Regressions[2m > [22m[2m2. Tolerancias: Valores justo dentro, en el límite exacto y justo fuera[2m > [22m[2m2.4 Tolerancia por punto en curva: objetivos 100 y 1200 EUR con tolerancia relativa 1 %, residual punto 2 = 5 EUR (5 <= 12) supera comprobación por punto
++[22m[39m2026-10-06T12:39:28.971Z [[32mINFO[0m] [calibration-acceptance] generic_event: Calibration run accepted successfully {}
++
++[90mstdout[2m | tests/calibration_residuals_compatibility_regression.test.js[2m > [22m[2mCalibration Residuals & Compatibility Regressions[2m > [22m[2m2. Tolerancias: Valores justo dentro, en el límite exacto y justo fuera[2m > [22m[2m2.5 Tolerancia por punto en curva: objetivos 100 y 1200 EUR con tolerancia relativa 1 %, residual punto 2 = 15 EUR (15 > 12) es rechazado
++[22m[39m2026-10-06T12:39:28.974Z [[31mERROR[0m] [calibration-acceptance] generic_event: Calibration acceptance failed, transaction rolled back {}
++
++[90mstdout[2m | tests/calibration_residuals_compatibility_regression.test.js[2m > [22m[2mCalibration Residuals & Compatibility Regressions[2m > [22m[2m3. Curva multi-cantidad: Mayor residual en tirada distinta de la primera y validación estricta de puntos[2m > [22m[2m3.1 Acepta curva cuando run.absolute_residual coincide con el máximo de la curva (0.40 EUR en Qty 500) y no con Qty 100 (0.05 EUR)
++[22m[39m2026-10-06T12:39:28.981Z [[33mWARN[0m] [calibration-acceptance] generic_event: Failed to enqueue webhook for calibration acceptance (non-fatal): {}
++
++[90mstdout[2m | tests/calibration_residuals_compatibility_regression.test.js[2m > [22m[2mCalibration Residuals & Compatibility Regressions[2m > [22m[2m3. Curva multi-cantidad: Mayor residual en tirada distinta de la primera y validación estricta de puntos[2m > [22m[2m3.1 Acepta curva cuando run.absolute_residual coincide con el máximo de la curva (0.40 EUR en Qty 500) y no con Qty 100 (0.05 EUR)
++[22m[39m2026-10-06T12:39:28.982Z [[32mINFO[0m] [calibration-acceptance] generic_event: Calibration run accepted successfully {}
++
++[90mstdout[2m | tests/calibration_residuals_compatibility_regression.test.js[2m > [22m[2mCalibration Residuals & Compatibility Regressions[2m > [22m[2m3. Curva multi-cantidad: Mayor residual en tirada distinta de la primera y validación estricta de puntos[2m > [22m[2m3.2 Rechaza curva si run.absolute_residual se asigna erróneamente al primer punto (0.05 EUR) contradiciendo el máximo de la curva (0.40 EUR)
++[22m[39m2026-10-06T12:39:28.986Z [[31mERROR[0m] [calibration-acceptance] generic_event: Calibration acceptance failed, transaction rolled back {}
++
++[90mstdout[2m | tests/calibration_residuals_compatibility_regression.test.js[2m > [22m[2mCalibration Residuals & Compatibility Regressions[2m > [22m[2m3. Curva multi-cantidad: Mayor residual en tirada distinta de la primera y validación estricta de puntos[2m > [22m[2m3.3 Rechaza curva cuando falta point_results_json en tirada multi-cantidad
++[22m[39m2026-10-06T12:39:28.990Z [[31mERROR[0m] [calibration-acceptance] generic_event: Calibration acceptance failed, transaction rolled back {}
++
++[90mstdout[2m | tests/calibration_residuals_compatibility_regression.test.js[2m > [22m[2mCalibration Residuals & Compatibility Regressions[2m > [22m[2m3. Curva multi-cantidad: Mayor residual en tirada distinta de la primera y validación estricta de puntos[2m > [22m[2m3.4 Rechaza curva cuando point_results_json es JSON malformado
++[22m[39m2026-10-06T12:39:28.997Z [[31mERROR[0m] [calibration-acceptance] generic_event: Calibration acceptance failed, transaction rolled back {}
++
++[90mstdout[2m | tests/calibration_residuals_compatibility_regression.test.js[2m > [22m[2mCalibration Residuals & Compatibility Regressions[2m > [22m[2m3. Curva multi-cantidad: Mayor residual en tirada distinta de la primera y validación estricta de puntos[2m > [22m[2m3.5 Rechaza curva cuando point_results_json tiene puntos duplicados
++[22m[39m2026-10-06T12:39:29.001Z [[31mERROR[0m] [calibration-acceptance] generic_event: Calibration acceptance failed, transaction rolled back {}
++
++[90mstdout[2m | tests/calibration_residuals_compatibility_regression.test.js[2m > [22m[2mCalibration Residuals & Compatibility Regressions[2m > [22m[2m3. Curva multi-cantidad: Mayor residual en tirada distinta de la primera y validación estricta de puntos[2m > [22m[2m3.6 Rechaza curva cuando point_results_json tiene puntos desconocidos
++[22m[39m2026-10-06T12:39:29.004Z [[31mERROR[0m] [calibration-acceptance] generic_event: Calibration acceptance failed, transaction rolled back {}
++
++[90mstdout[2m | tests/calibration_residuals_compatibility_regression.test.js[2m > [22m[2mCalibration Residuals & Compatibility Regressions[2m > [22m[2m3. Curva multi-cantidad: Mayor residual en tirada distinta de la primera y validación estricta de puntos[2m > [22m[2m3.7 Rechaza curva cuando faltan puntos en point_results_json
++[22m[39m2026-10-06T12:39:29.008Z [[31mERROR[0m] [calibration-acceptance] generic_event: Calibration acceptance failed, transaction rolled back {}
++
++[90mstdout[2m | tests/calibration_residuals_compatibility_regression.test.js[2m > [22m[2mCalibration Residuals & Compatibility Regressions[2m > [22m[2m3. Curva multi-cantidad: Mayor residual en tirada distinta de la primera y validación estricta de puntos[2m > [22m[2m3.8 Rechaza curva si un punto individual en run.point_results_json tiene residual porcentual contradictorio
++[22m[39m2026-10-06T12:39:29.013Z [[31mERROR[0m] [calibration-acceptance] generic_event: Calibration acceptance failed, transaction rolled back {}
++
++[90mstdout[2m | tests/calibration_residuals_compatibility_regression.test.js[2m > [22m[2mCalibration Residuals & Compatibility Regressions[2m > [22m[2m4. Aislamiento e Integridad: Rechazo limpio sin mutación ni persistencia[2m > [22m[2m4.1 Run con absolute_residual contradictorio es rechazado sin invocar INSERT revisiones ni UPDATE printer_nodes
++[22m[39m2026-10-06T12:39:29.017Z [[31mERROR[0m] [calibration-acceptance] generic_event: Calibration acceptance failed, transaction rolled back {}
++
++[90mstdout[2m | tests/calibration_residuals_compatibility_regression.test.js[2m > [22m[2mCalibration Residuals & Compatibility Regressions[2m > [22m[2m4. Aislamiento e Integridad: Rechazo limpio sin mutación ni persistencia[2m > [22m[2m4.2 Run con percent_residual negativo o inválido es rechazado sin mutación de tarifas
++[22m[39m2026-10-06T12:39:29.021Z [[31mERROR[0m] [calibration-acceptance] generic_event: Calibration acceptance failed, transaction rolled back {}
++
++[90mstdout[2m | tests/calibration_residuals_compatibility_regression.test.js[2m > [22m[2mCalibration Residuals & Compatibility Regressions[2m > [22m[2m5. Resolución de tirada canónica (copies) y paridad en gobernanza de curva[2m > [22m[2m5.1 Servicio real con bookSpec.copies=1500 sin quantity envía tirada 1500 a evaluación principal y a gobernanza de curva (sin mockear evaluateCurveAcceptance)
++[22m[39m2026-10-06T12:39:29.029Z [[33mWARN[0m] [calibration-acceptance] generic_event: Failed to enqueue webhook for calibration acceptance (non-fatal): {}
++
++[90mstdout[2m | tests/calibration_residuals_compatibility_regression.test.js[2m > [22m[2mCalibration Residuals & Compatibility Regressions[2m > [22m[2m5. Resolución de tirada canónica (copies) y paridad en gobernanza de curva[2m > [22m[2m5.1 Servicio real con bookSpec.copies=1500 sin quantity envía tirada 1500 a evaluación principal y a gobernanza de curva (sin mockear evaluateCurveAcceptance)
++[22m[39m2026-10-06T12:39:29.030Z [[32mINFO[0m] [calibration-acceptance] generic_event: Calibration run accepted successfully {}
++
++[90mstdout[2m | tests/calibration_residuals_compatibility_regression.test.js[2m > [22m[2mCalibration Residuals & Compatibility Regressions[2m > [22m[2m5. Resolución de tirada canónica (copies) y paridad en gobernanza de curva[2m > [22m[2m5.2 Rechaza bookSpec cuando copies y quantity están ausentes (MISSING_SPEC_QUANTITY), sin sustituir por 1
++[22m[39m2026-10-06T12:39:29.034Z [[31mERROR[0m] [calibration-acceptance] generic_event: Calibration acceptance failed, transaction rolled back {}
++
++[90mstdout[2m | tests/calibration_residuals_compatibility_regression.test.js[2m > [22m[2mCalibration Residuals & Compatibility Regressions[2m > [22m[2m5. Resolución de tirada canónica (copies) y paridad en gobernanza de curva[2m > [22m[2m5.3 Rechaza bookSpec con copies y quantity contradictorios (CONTRADICTORY_SPEC_QUANTITY)
++[22m[39m2026-10-06T12:39:29.037Z [[31mERROR[0m] [calibration-acceptance] generic_event: Calibration acceptance failed, transaction rolled back {}
++
++[90mstdout[2m | tests/calibration_residuals_compatibility_regression.test.js[2m > [22m[2mCalibration Residuals & Compatibility Regressions[2m > [22m[2m5. Resolución de tirada canónica (copies) y paridad en gobernanza de curva[2m > [22m[2m5.4 Rechaza bookSpec con copies inválidos o no enteros
++[22m[39m2026-10-06T12:39:29.041Z [[31mERROR[0m] [calibration-acceptance] generic_event: Calibration acceptance failed, transaction rolled back {}
++
++[90mstdout[2m | tests/calibration_residuals_compatibility_regression.test.js[2m > [22m[2mCalibration Residuals & Compatibility Regressions[2m > [22m[2m5. Resolución de tirada canónica (copies) y paridad en gobernanza de curva[2m > [22m[2m5.5 Diagnóstico de rechazo de curva incorpora razones y cantidades evaluadas sin exponer secretos
++[22m[39m2026-10-06T12:39:29.045Z [[31mERROR[0m] [calibration-acceptance] generic_event: Calibration acceptance failed, transaction rolled back {}
++
++ [32m✓[39m tests/calibration_residuals_compatibility_regression.test.js [2m([22m[2m24 tests[22m[2m)[22m[32m 174[2mms[22m[39m
++ [32m✓[39m tests/calibrationAcceptanceService.test.js [2m([22m[2m11 tests[22m[2m)[22m[32m 78[2mms[22m[39m
++[90mstdout[2m | tests/onboarding_checksum_integrity_regression.test.js[2m > [22m[2mOnboarding Harness Checksum Integrity & Normalization Regressions[2m > [22m[2m8. Multi-quantity Curve Harness Regressions[2m > [22m[2m8.1 Ejecuta satisfactoriamente runCurveHarnessRegressions (Suites 7-11: multi-target generation, solver contract, governance gate, zero leakage, dual point_results parsing)
++[22m[39m[REGRESSION] Running Curve Harness & Solver Contract Regressions...
++[REGRESSION] All Curve Harness & Solver Contract Regressions Passed Successfully.
++
++ [32m✓[39m tests/onboarding_checksum_integrity_regression.test.js [2m([22m[2m36 tests[22m[2m)[22m[32m 58[2mms[22m[39m
++ [32m✓[39m tests/ErrorUtilsNormalization.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 8[2mms[22m[39m
++ [32m✓[39m tests/IncomingJobsManufacturing.test.tsx [2m([22m[2m5 tests[22m[2m)[22m[33m 313[2mms[22m[39m
++[90mstderr[2m | tests/BetaCohortManagement.test.tsx[2m > [22m[2mBeta Cohort Management — Operational Super Admin Adaptations[2m > [22m[2m1. ControlledBetaCohortActivation renders cleanly without phase references, sample values, and with 3 separated panels
++[22m[39mAn update to TenantSelector inside a test was not wrapped in act(...).
++
++When testing, code that causes React state updates should be wrapped into act(...):
++
++act(() => {
++  /* fire events that update state */
++});
++/* assert on the output */
++
++This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
++An update to TenantSelector inside a test was not wrapped in act(...).
++
++When testing, code that causes React state updates should be wrapped into act(...):
++
++act(() => {
++  /* fire events that update state */
++});
++/* assert on the output */
++
++This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
++
++ [32m✓[39m tests/PrinthouseOnboardingAuditAndGovernance.test.tsx [2m([22m[2m23 tests[22m[2m)[22m[33m 1469[2mms[22m[39m
++   [33m[2m✓[22m[39m Printhouse Calibration Onboarding - Audit, Fidelity and Governance Suite[2m > [22m3. Ambiguity & Discrepancy Resolution[2m > [22m3.1 VariantSpecTable blocks proceeding to rate proposal if critical binding ambiguity is unresolved [33m 311[2mms[22m[39m
++   [33m[2m✓[22m[39m Printhouse Calibration Onboarding - Audit, Fidelity and Governance Suite[2m > [22m5. Production Bundle & Codebase Isolation[2m > [22m5.1 tests/fixtures is NOT imported in any src/ui/ production file [33m 467[2mms[22m[39m
++[90mstderr[2m | tests/SettingsPreferencesBehavior.test.tsx[2m > [22m[2mSettings Preferences Behavior & Synchronization Suite[2m > [22m[2m1. Synchronizes theme bi-directionally between Topbar and Settings
++[22m[39mAn update to Topbar inside a test was not wrapped in act(...).
++
++When testing, code that causes React state updates should be wrapped into act(...):
++
++act(() => {
++  /* fire events that update state */
++});
++/* assert on the output */
++
++This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
++An update to GlobalSettingsPage inside a test was not wrapped in act(...).
++
++When testing, code that causes React state updates should be wrapped into act(...):
++
++act(() => {
++  /* fire events that update state */
++});
++/* assert on the output */
++
++This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
++An update to GlobalSettingsPage inside a test was not wrapped in act(...).
++
++When testing, code that causes React state updates should be wrapped into act(...):
++
++act(() => {
++  /* fire events that update state */
++});
++/* assert on the output */
++
++This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
++An update to GlobalSettingsPage inside a test was not wrapped in act(...).
++
++When testing, code that causes React state updates should be wrapped into act(...):
++
++act(() => {
++  /* fire events that update state */
++});
++/* assert on the output */
++
++This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
++An update to GlobalSettingsPage inside a test was not wrapped in act(...).
++
++When testing, code that causes React state updates should be wrapped into act(...):
++
++act(() => {
++  /* fire events that update state */
++});
++/* assert on the output */
++
++This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
++
++[90mstderr[2m | tests/SettingsPreferencesBehavior.test.tsx[2m > [22m[2mSettings Preferences Behavior & Synchronization Suite[2m > [22m[2m1. Synchronizes theme bi-directionally between Topbar and Settings
++[22m[39mAn update to NotificationBell inside a test was not wrapped in act(...).
++
++When testing, code that causes React state updates should be wrapped into act(...):
++
++act(() => {
++  /* fire events that update state */
++});
++/* assert on the output */
++
++This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
++An update to GlobalSettingsPage inside a test was not wrapped in act(...).
++
++When testing, code that causes React state updates should be wrapped into act(...):
++
++act(() => {
++  /* fire events that update state */
++});
++/* assert on the output */
++
++This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
++An update to GlobalSettingsPage inside a test was not wrapped in act(...).
++
++When testing, code that causes React state updates should be wrapped into act(...):
++
++act(() => {
++  /* fire events that update state */
++});
++/* assert on the output */
++
++This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
++An update to GlobalSettingsPage inside a test was not wrapped in act(...).
++
++When testing, code that causes React state updates should be wrapped into act(...):
++
++act(() => {
++  /* fire events that update state */
++});
++/* assert on the output */
++
++This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
++An update to GlobalSettingsPage inside a test was not wrapped in act(...).
++
++When testing, code that causes React state updates should be wrapped into act(...):
++
++act(() => {
++  /* fire events that update state */
++});
++/* assert on the output */
++
++This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
++
++[90mstderr[2m | tests/SettingsPreferencesBehavior.test.tsx[2m > [22m[2mSettings Preferences Behavior & Synchronization Suite[2m > [22m[2m2. Changes Density and updates root data-density attribute and control spacing
++[22m[39mAn update to GlobalSettingsPage inside a test was not wrapped in act(...).
++
++When testing, code that causes React state updates should be wrapped into act(...):
++
++act(() => {
++  /* fire events that update state */
++});
++/* assert on the output */
++
++This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
++An update to GlobalSettingsPage inside a test was not wrapped in act(...).
++
++When testing, code that causes React state updates should be wrapped into act(...):
++
++act(() => {
++  /* fire events that update state */
++});
++/* assert on the output */
++
++This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
++An update to GlobalSettingsPage inside a test was not wrapped in act(...).
++
++When testing, code that causes React state updates should be wrapped into act(...):
++
++act(() => {
++  /* fire events that update state */
++});
++/* assert on the output */
++
++This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
++An update to GlobalSettingsPage inside a test was not wrapped in act(...).
++
++When testing, code that causes React state updates should be wrapped into act(...):
++
++act(() => {
++  /* fire events that update state */
++});
++/* assert on the output */
++
++This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
++
++[90mstderr[2m | tests/SettingsPreferencesBehavior.test.tsx[2m > [22m[2mSettings Preferences Behavior & Synchronization Suite[2m > [22m[2m2. Changes Density and updates root data-density attribute and control spacing
++[22m[39mAn update to GlobalSettingsPage inside a test was not wrapped in act(...).
++
++When testing, code that causes React state updates should be wrapped into act(...):
++
++act(() => {
++  /* fire events that update state */
++});
++/* assert on the output */
++
++This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
++An update to GlobalSettingsPage inside a test was not wrapped in act(...).
++
++When testing, code that causes React state updates should be wrapped into act(...):
++
++act(() => {
++  /* fire events that update state */
++});
++/* assert on the output */
++
++This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
++An update to GlobalSettingsPage inside a test was not wrapped in act(...).
++
++When testing, code that causes React state updates should be wrapped into act(...):
++
++act(() => {
++  /* fire events that update state */
++});
++/* assert on the output */
++
++This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
++An update to GlobalSettingsPage inside a test was not wrapped in act(...).
++
++When testing, code that causes React state updates should be wrapped into act(...):
++
++act(() => {
++  /* fire events that update state */
++});
++/* assert on the output */
++
++This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
++
++[90mstderr[2m | tests/SettingsPreferencesBehavior.test.tsx[2m > [22m[2mSettings Preferences Behavior & Synchronization Suite[2m > [22m[2m3. Toggles UI animations and respects prefers-reduced-motion
++[22m[39mAn update to GlobalSettingsPage inside a test was not wrapped in act(...).
++
++When testing, code that causes React state updates should be wrapped into act(...):
++
++act(() => {
++  /* fire events that update state */
++});
++/* assert on the output */
++
++This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
++An update to GlobalSettingsPage inside a test was not wrapped in act(...).
++
++When testing, code that causes React state updates should be wrapped into act(...):
++
++act(() => {
++  /* fire events that update state */
++});
++/* assert on the output */
++
++This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
++An update to GlobalSettingsPage inside a test was not wrapped in act(...).
++
++When testing, code that causes React state updates should be wrapped into act(...):
++
++act(() => {
++  /* fire events that update state */
++});
++/* assert on the output */
++
++This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
++An update to GlobalSettingsPage inside a test was not wrapped in act(...).
++
++When testing, code that causes React state updates should be wrapped into act(...):
++
++act(() => {
++  /* fire events that update state */
++});
++/* assert on the output */
++
++This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
++
++[90mstderr[2m | tests/SettingsPreferencesBehavior.test.tsx[2m > [22m[2mSettings Preferences Behavior & Synchronization Suite[2m > [22m[2m3. Toggles UI animations and respects prefers-reduced-motion
++[22m[39mAn update to GlobalSettingsPage inside a test was not wrapped in act(...).
++
++When testing, code that causes React state updates should be wrapped into act(...):
++
++act(() => {
++  /* fire events that update state */
++});
++/* assert on the output */
++
++This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
++An update to GlobalSettingsPage inside a test was not wrapped in act(...).
++
++When testing, code that causes React state updates should be wrapped into act(...):
++
++act(() => {
++  /* fire events that update state */
++});
++/* assert on the output */
++
++This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
++An update to GlobalSettingsPage inside a test was not wrapped in act(...).
++
++When testing, code that causes React state updates should be wrapped into act(...):
++
++act(() => {
++  /* fire events that update state */
++});
++/* assert on the output */
++
++This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
++An update to GlobalSettingsPage inside a test was not wrapped in act(...).
++
++When testing, code that causes React state updates should be wrapped into act(...):
++
++act(() => {
++  /* fire events that update state */
++});
++/* assert on the output */
++
++This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
++
++ [32m✓[39m tests/SettingsPreferencesBehavior.test.tsx [2m([22m[2m5 tests[22m[2m)[22m[33m 1062[2mms[22m[39m
++   [33m[2m✓[22m[39m Settings Preferences Behavior & Synchronization Suite[2m > [22m1. Synchronizes theme bi-directionally between Topbar and Settings [33m 543[2mms[22m[39m
++[90mstdout[2m | tests/backend_tenant_security.test.js
++[22m[39m[GLOBAL-REGISTRY] Registered Policy: gp-guardrail-baseline_v1.0.0 [ACTIVE]
++[DB-INIT] Attempting connection. 
++          DATABASE_URL set: false
++          MYSQL_HOST: DEFAULT(ppos-mysql)
++          MYSQL_USER: DEFAULT(ppos_user)
++          MYSQL_DATABASE: DEFAULT(printprice_os)
++[DB] Initializing pool for ppos-mysql/printprice_os
++[FEDERATION] Registered Instance: local-ops-1 [local]
++[FEDERATION] Registered Instance: eu-west-1 [eu-west]
++[FEDERATION] Registered Instance: us-east-failover [us-east]
++[PREFLIGHT-PERSISTENCE] Initialization delegated to Migration Engine.
++
++[90mstderr[2m | tests/backend_tenant_security.test.js
++[22m[39m[REDIS-CONNECTION-ERROR] connect ECONNREFUSED 127.0.0.1:6379
++
++[90mstdout[2m | tests/backend_tenant_security.test.js[2m > [22m[2mBackend Tenant Authorization & Isolation Security Suite[2m > [22m[2m5. HTTP Auth Chain & Bearer JWT Validation Pipeline[2m > [22m[2mrejects HTTP requests without authorization token (returns 401 Bearer token required)
++[22m[39m2026-10-06T12:39:32.820Z [[31mERROR[0m] [audit-logger] audit_auth_denied: [AUDIT] AUTH_DENIED | Status: FAILURE {
++  ip: [32m'127.0.0.1'[39m,
++  method: [32m'GET'[39m,
++  url: [32m'/'[39m,
++  agent: [90mundefined[39m,
++  error: [32m'Bearer token required'[39m
++}
++
++[90mstderr[2m | tests/backend_tenant_security.test.js[2m > [22m[2mBackend Tenant Authorization & Isolation Security Suite[2m > [22m[2m5. HTTP Auth Chain & Bearer JWT Validation Pipeline[2m > [22m[2mrejects HTTP requests without authorization token (returns 401 Bearer token required)
++[22m[39m[AUTH-FAILURE] Unauthorized access attempt: Bearer token required from 127.0.0.1
++
++[90mstdout[2m | tests/backend_tenant_security.test.js[2m > [22m[2mBackend Tenant Authorization & Isolation Security Suite[2m > [22m[2m5. HTTP Auth Chain & Bearer JWT Validation Pipeline[2m > [22m[2mrejects HTTP requests without authorization token (returns 401 Bearer token required)
++[22m[39m2026-10-06T12:39:32.821Z [[31mERROR[0m] [data-adapter] query_failed: SQL Query failure: INSERT INTO api_audit_logs (event_type, tenant_id, user_id, status, metadata_json, created_at)
++     ... {
++  error: [32m'MySQL is UNCONFIGURED. Ensure MYSQL_HOST or DATABASE_URL is set in .env'[39m
++}
++
++[90mstdout[2m | tests/backend_tenant_security.test.js[2m > [22m[2mBackend Tenant Authorization & Isolation Security Suite[2m > [22m[2m5. HTTP Auth Chain & Bearer JWT Validation Pipeline[2m > [22m[2mrejects HTTP requests without authorization token (returns 401 Bearer token required)
++[22m[39m2026-10-06T12:39:32.822Z [[31mERROR[0m] [audit-logger] audit_persistence_failed: Failed to persist audit log to MySQL {
++  error: [32m'MySQL is UNCONFIGURED. Ensure MYSQL_HOST or DATABASE_URL is set in .env'[39m
++}
++
++[90mstderr[2m | tests/backend_tenant_security.test.js[2m > [22m[2mBackend Tenant Authorization & Isolation Security Suite[2m > [22m[2m5. HTTP Auth Chain & Bearer JWT Validation Pipeline[2m > [22m[2mrejects HTTP requests without authorization token (returns 401 Bearer token required)
++[22m[39m[AUDIT_LOG_WRITE_FAILED] Failed to persist audit log to api_audit_logs: MySQL is UNCONFIGURED. Ensure MYSQL_HOST or DATABASE_URL is set in .env {
++  type: [32m'AUTH_DENIED'[39m,
++  tenantId: [32m'system'[39m,
++  userId: [32m'unauthenticated'[39m,
++  status: [32m'FAILURE'[39m,
++  metadata: {
++    ip: [32m'127.0.0.1'[39m,
++    method: [32m'GET'[39m,
++    url: [32m'/'[39m,
++    agent: [90mundefined[39m,
++    error: [32m'Bearer token required'[39m
++  }
++}
++
++[90mstdout[2m | tests/backend_tenant_security.test.js[2m > [22m[2mBackend Tenant Authorization & Isolation Security Suite[2m > [22m[2m5. HTTP Auth Chain & Bearer JWT Validation Pipeline[2m > [22m[2mrejects HTTP requests with invalid or malformed token (returns 401)
++[22m[39m2026-10-06T12:39:32.833Z [[31mERROR[0m] [audit-logger] audit_auth_denied: [AUDIT] AUTH_DENIED | Status: FAILURE {
++  ip: [32m'127.0.0.1'[39m,
++  method: [32m'GET'[39m,
++  url: [32m'/'[39m,
++  agent: [90mundefined[39m,
++  error: [32m'JWT Error: jwt malformed'[39m
++}
++
++[90mstderr[2m | tests/backend_tenant_security.test.js[2m > [22m[2mBackend Tenant Authorization & Isolation Security Suite[2m > [22m[2m5. HTTP Auth Chain & Bearer JWT Validation Pipeline[2m > [22m[2mrejects HTTP requests with invalid or malformed token (returns 401)
++[22m[39m[AUTH-FAILURE] Unauthorized access attempt: JWT Error: jwt malformed from 127.0.0.1
++
++[90mstdout[2m | tests/backend_tenant_security.test.js[2m > [22m[2mBackend Tenant Authorization & Isolation Security Suite[2m > [22m[2m5. HTTP Auth Chain & Bearer JWT Validation Pipeline[2m > [22m[2mrejects HTTP requests with invalid or malformed token (returns 401)
++[22m[39m2026-10-06T12:39:32.834Z [[31mERROR[0m] [data-adapter] query_failed: SQL Query failure: INSERT INTO api_audit_logs (event_type, tenant_id, user_id, status, metadata_json, created_at)
++     ... {
++  error: [32m'MySQL is UNCONFIGURED. Ensure MYSQL_HOST or DATABASE_URL is set in .env'[39m
++}
++
++[90mstdout[2m | tests/backend_tenant_security.test.js[2m > [22m[2mBackend Tenant Authorization & Isolation Security Suite[2m > [22m[2m5. HTTP Auth Chain & Bearer JWT Validation Pipeline[2m > [22m[2mrejects HTTP requests with invalid or malformed token (returns 401)
++[22m[39m2026-10-06T12:39:32.836Z [[31mERROR[0m] [audit-logger] audit_persistence_failed: Failed to persist audit log to MySQL {
++  error: [32m'MySQL is UNCONFIGURED. Ensure MYSQL_HOST or DATABASE_URL is set in .env'[39m
++}
++
++[90mstderr[2m | tests/backend_tenant_security.test.js[2m > [22m[2mBackend Tenant Authorization & Isolation Security Suite[2m > [22m[2m5. HTTP Auth Chain & Bearer JWT Validation Pipeline[2m > [22m[2mrejects HTTP requests with invalid or malformed token (returns 401)
++[22m[39m[AUDIT_LOG_WRITE_FAILED] Failed to persist audit log to api_audit_logs: MySQL is UNCONFIGURED. Ensure MYSQL_HOST or DATABASE_URL is set in .env {
++  type: [32m'AUTH_DENIED'[39m,
++  tenantId: [32m'system'[39m,
++  userId: [32m'unauthenticated'[39m,
++  status: [32m'FAILURE'[39m,
++  metadata: {
++    ip: [32m'127.0.0.1'[39m,
++    method: [32m'GET'[39m,
++    url: [32m'/'[39m,
++    agent: [90mundefined[39m,
++    error: [32m'JWT Error: jwt malformed'[39m
++  }
++}
++
++ [32m✓[39m tests/backend_tenant_security.test.js [2m([22m[2m21 tests[22m[2m)[22m[32m 84[2mms[22m[39m
++[90mstdout[2m | tests/http_real_auth_flow.test.js
++[22m[39m[GLOBAL-REGISTRY] Registered Policy: gp-guardrail-baseline_v1.0.0 [ACTIVE]
++[DB-INIT] Attempting connection. 
++          DATABASE_URL set: false
++          MYSQL_HOST: DEFAULT(ppos-mysql)
++          MYSQL_USER: DEFAULT(ppos_user)
++          MYSQL_DATABASE: DEFAULT(printprice_os)
++[DB] Initializing pool for ppos-mysql/printprice_os
++[FEDERATION] Registered Instance: local-ops-1 [local]
++[FEDERATION] Registered Instance: eu-west-1 [eu-west]
++[FEDERATION] Registered Instance: us-east-failover [us-east]
++[PREFLIGHT-PERSISTENCE] Initialization delegated to Migration Engine.
++
++[90mstdout[2m | tests/http_real_mfa_flow.test.js
++[22m[39m[GLOBAL-REGISTRY] Registered Policy: gp-guardrail-baseline_v1.0.0 [ACTIVE]
++[DB-INIT] Attempting connection. 
++          DATABASE_URL set: false
++          MYSQL_HOST: DEFAULT(ppos-mysql)
++          MYSQL_USER: DEFAULT(ppos_user)
++          MYSQL_DATABASE: DEFAULT(printprice_os)
++[DB] Initializing pool for ppos-mysql/printprice_os
++[FEDERATION] Registered Instance: local-ops-1 [local]
++[FEDERATION] Registered Instance: eu-west-1 [eu-west]
++[FEDERATION] Registered Instance: us-east-failover [us-east]
++[PREFLIGHT-PERSISTENCE] Initialization delegated to Migration Engine.
++
++[90mstderr[2m | tests/http_real_auth_flow.test.js
++[22m[39m[REDIS-CONNECTION-ERROR] connect ECONNREFUSED 127.0.0.1:6379
++
++[90mstderr[2m | tests/http_real_mfa_flow.test.js
++[22m[39m[REDIS-CONNECTION-ERROR] connect ECONNREFUSED 127.0.0.1:6379
++
++[90mstderr[2m | tests/BetaCohortManagement.test.tsx[2m > [22m[2mBeta Cohort Management — Operational Super Admin Adaptations[2m > [22m[2m4. ControlledBetaInviteIssuance renders cleanly without phase references, preserves exact safety copy, and initializes empty
++[22m[39mAn update to TenantSelector inside a test was not wrapped in act(...).
++
++When testing, code that causes React state updates should be wrapped into act(...):
++
++act(() => {
++  /* fire events that update state */
++});
++/* assert on the output */
++
++This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
++An update to TenantSelector inside a test was not wrapped in act(...).
++
++When testing, code that causes React state updates should be wrapped into act(...):
++
++act(() => {
++  /* fire events that update state */
++});
++/* assert on the output */
++
++This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
++
++[90mstderr[2m | tests/SuperAdminScreensRefactor.test.tsx[2m > [22m[2mSUPER_ADMIN Refactored Operational Screens[2m > [22m[2m8. Critical actions do NOT invoke endpoints when cancelling confirmation dialog
++[22m[39mAn update to LimitedBetaRuntime inside a test was not wrapped in act(...).
++
++When testing, code that causes React state updates should be wrapped into act(...):
++
++act(() => {
++  /* fire events that update state */
++});
++/* assert on the output */
++
++This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
++An update to LimitedBetaRuntime inside a test was not wrapped in act(...).
++
++When testing, code that causes React state updates should be wrapped into act(...):
++
++act(() => {
++  /* fire events that update state */
++});
++/* assert on the output */
++
++This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
++An update to LimitedBetaRuntime inside a test was not wrapped in act(...).
++
++When testing, code that causes React state updates should be wrapped into act(...):
++
++act(() => {
++  /* fire events that update state */
++});
++/* assert on the output */
++
++This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
++
++[90mstdout[2m | tests/phase39_security_and_integrations.test.js
++[22m[39m[GLOBAL-REGISTRY] Registered Policy: gp-guardrail-baseline_v1.0.0 [ACTIVE]
++[DB-INIT] Attempting connection. 
++          DATABASE_URL set: false
++          MYSQL_HOST: DEFAULT(ppos-mysql)
++          MYSQL_USER: DEFAULT(ppos_user)
++          MYSQL_DATABASE: DEFAULT(printprice_os)
++[DB] Initializing pool for ppos-mysql/printprice_os
++[FEDERATION] Registered Instance: local-ops-1 [local]
++[FEDERATION] Registered Instance: eu-west-1 [eu-west]
++[FEDERATION] Registered Instance: us-east-failover [us-east]
++[PREFLIGHT-PERSISTENCE] Initialization delegated to Migration Engine.
++
++[90mstderr[2m | tests/http_real_auth_flow.test.js[2m > [22m[2mHTTP Real Auth Flow & Session Revocation Suite[2m > [22m[2m2. HTTP Logout -> revokes session jti; subsequent HTTP call with same token returns 401
++[22m[39m[REDIS-CONNECTION-ERROR] connect ECONNREFUSED 127.0.0.1:6379
++
++ [32m✓[39m tests/SuperAdminScreensRefactor.test.tsx [2m([22m[2m9 tests[22m[2m)[22m[33m 887[2mms[22m[39m
++[90mstdout[2m | tests/http_real_auth_flow.test.js[2m > [22m[2mHTTP Real Auth Flow & Session Revocation Suite[2m > [22m[2m2. HTTP Logout -> revokes session jti; subsequent HTTP call with same token returns 401
++[22m[39m2026-10-06T12:39:33.130Z [[31mERROR[0m] [audit-logger] audit_auth_denied: [AUDIT] AUTH_DENIED | Status: FAILURE {
++  ip: [32m'127.0.0.1'[39m,
++  method: [32m'GET'[39m,
++  url: [32m'/api/admin/verify'[39m,
++  agent: [32m'axios/1.16.0'[39m,
++  error: [32m'Session has been revoked on the server'[39m
++}
++
++[90mstderr[2m | tests/http_real_auth_flow.test.js[2m > [22m[2mHTTP Real Auth Flow & Session Revocation Suite[2m > [22m[2m2. HTTP Logout -> revokes session jti; subsequent HTTP call with same token returns 401
++[22m[39m[AUTH-FAILURE] Unauthorized access attempt: Session has been revoked on the server from 127.0.0.1
++
++[90mstderr[2m | tests/http_real_mfa_flow.test.js[2m > [22m[2mHTTP Real MFA Challenge, Recovery & Anti-Replay Suite[2m > [22m[2m2. Completing MFA challenge via POST /api/auth/mfa/verify returns full access token
++[22m[39m[REDIS-CONNECTION-ERROR] connect ECONNREFUSED 127.0.0.1:6379
++
++[90mstdout[2m | tests/http_real_auth_flow.test.js[2m > [22m[2mHTTP Real Auth Flow & Session Revocation Suite[2m > [22m[2m3. Technical Service Identity -> accepted independently without human session jti
++[22m[39m[CONTROL][AUTH][SERVICE-TOKEN-ACCEPTED] {
++  route: [32m'/api/admin/verify'[39m,
++  actor: [32m'preflight-worker'[39m,
++  tokenLength: [33m38[39m,
++  authMode: [32m'PPOS_CONTROL_TOKEN'[39m
++}
++
++ [32m✓[39m tests/http_real_mfa_flow.test.js [2m([22m[2m4 tests[22m[2m)[22m[32m 189[2mms[22m[39m
++[90mstdout[2m | tests/http_real_auth_flow.test.js[2m > [22m[2mHTTP Real Auth Flow & Session Revocation Suite[2m > [22m[2m4. User forging claims in unsigned/tampered JWT -> rejected with HTTP 401
++[22m[39m2026-10-06T12:39:33.157Z [[31mERROR[0m] [audit-logger] audit_auth_denied: [AUDIT] AUTH_DENIED | Status: FAILURE {
++  ip: [32m'127.0.0.1'[39m,
++  method: [32m'GET'[39m,
++  url: [32m'/api/admin/verify'[39m,
++  agent: [32m'axios/1.16.0'[39m,
++  error: [32m'JWT Error: invalid signature'[39m
++}
++
++[90mstderr[2m | tests/http_real_auth_flow.test.js[2m > [22m[2mHTTP Real Auth Flow & Session Revocation Suite[2m > [22m[2m4. User forging claims in unsigned/tampered JWT -> rejected with HTTP 401
++[22m[39m[AUTH-FAILURE] Unauthorized access attempt: JWT Error: invalid signature from 127.0.0.1
++
++[90mstderr[2m | tests/http_real_auth_flow.test.js[2m > [22m[2mHTTP Real Auth Flow & Session Revocation Suite[2m > [22m[2m6. Session Revocation Ownership -> non-admin cannot revoke another user session (403); admin can
++[22m[39m[REDIS-CONNECTION-ERROR] connect ECONNREFUSED 127.0.0.1:6379
++
++[90mstdout[2m | tests/http_real_auth_flow.test.js[2m > [22m[2mHTTP Real Auth Flow & Session Revocation Suite[2m > [22m[2m7. Human user JWT without jti when strict jti required -> rejected with HTTP 401
++[22m[39m2026-10-06T12:39:33.222Z [[31mERROR[0m] [audit-logger] audit_auth_denied: [AUDIT] AUTH_DENIED | Status: FAILURE {
++  ip: [32m'127.0.0.1'[39m,
++  method: [32m'GET'[39m,
++  url: [32m'/api/admin/verify'[39m,
++  agent: [32m'axios/1.16.0'[39m,
++  error: [32m'Session tracking ID (jti) is required for user authentication'[39m
++}
++
++ [32m✓[39m tests/PrinthouseOnboardingSimplifiedJourney.test.tsx [2m([22m[2m21 tests[22m[2m)[22m[33m 2635[2mms[22m[39m
++   [33m[2m✓[22m[39m Simplified Printhouse Onboarding Journey Suite[2m > [22m4. Navigates to Step 2 with Dual Entry: PDF Upload vs Manual Offer Form [33m 357[2mms[22m[39m
++[90mstderr[2m | tests/http_real_auth_flow.test.js[2m > [22m[2mHTTP Real Auth Flow & Session Revocation Suite[2m > [22m[2m7. Human user JWT without jti when strict jti required -> rejected with HTTP 401
++[22m[39m[AUTH-FAILURE] Unauthorized access attempt: Session tracking ID (jti) is required for user authentication from 127.0.0.1
++
++[90mstdout[2m | tests/http_real_auth_flow.test.js[2m > [22m[2mHTTP Real Auth Flow & Session Revocation Suite[2m > [22m[2m9. Identity mismatch: different user or different tenant -> strictly rejected with HTTP 401
++[22m[39m2026-10-06T12:39:33.248Z [[31mERROR[0m] [audit-logger] audit_auth_denied: [AUDIT] AUTH_DENIED | Status: FAILURE {
++  ip: [32m'127.0.0.1'[39m,
++  method: [32m'GET'[39m,
++  url: [32m'/api/admin/verify'[39m,
++  agent: [32m'axios/1.16.0'[39m,
++  error: [32m'Session identity mismatch'[39m
++}
++
++[90mstderr[2m | tests/http_real_auth_flow.test.js[2m > [22m[2mHTTP Real Auth Flow & Session Revocation Suite[2m > [22m[2m9. Identity mismatch: different user or different tenant -> strictly rejected with HTTP 401
++[22m[39m[AUTH-FAILURE] Unauthorized access attempt: Session identity mismatch from 127.0.0.1
++
++[90mstderr[2m | tests/http_real_auth_flow.test.js[2m > [22m[2mHTTP Real Auth Flow & Session Revocation Suite[2m > [22m[2m9. Identity mismatch: different user or different tenant -> strictly rejected with HTTP 401
++[22m[39m[AUTH-FAILURE] Unauthorized access attempt: Session identity mismatch from 127.0.0.1
++
++[90mstdout[2m | tests/http_real_auth_flow.test.js[2m > [22m[2mHTTP Real Auth Flow & Session Revocation Suite[2m > [22m[2m9. Identity mismatch: different user or different tenant -> strictly rejected with HTTP 401
++[22m[39m2026-10-06T12:39:33.253Z [[31mERROR[0m] [audit-logger] audit_auth_denied: [AUDIT] AUTH_DENIED | Status: FAILURE {
++  ip: [32m'127.0.0.1'[39m,
++  method: [32m'GET'[39m,
++  url: [32m'/api/admin/verify'[39m,
++  agent: [32m'axios/1.16.0'[39m,
++  error: [32m'Session identity mismatch'[39m
++}
++
++ [32m✓[39m tests/http_real_auth_flow.test.js [2m([22m[2m9 tests[22m[2m)[22m[32m 297[2mms[22m[39m
++[90mstderr[2m | tests/BetaCohortManagement.test.tsx[2m > [22m[2mBeta Cohort Management — Operational Super Admin Adaptations[2m > [22m[2m6. ControlledBetaInviteAcceptance renders cleanly, preserves exact safety copy, and does not leak credentials in DOM
++[22m[39mAn update to TenantSelector inside a test was not wrapped in act(...).
++
++When testing, code that causes React state updates should be wrapped into act(...):
++
++act(() => {
++  /* fire events that update state */
++});
++/* assert on the output */
++
++This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
++An update to TenantSelector inside a test was not wrapped in act(...).
++
++When testing, code that causes React state updates should be wrapped into act(...):
++
++act(() => {
++  /* fire events that update state */
++});
++/* assert on the output */
++
++This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
++
++ [32m✓[39m tests/BetaFormsOperationalHarden.test.tsx [2m([22m[2m13 tests[22m[2m)[22m[33m 1829[2mms[22m[39m
++   [33m[2m✓[22m[39m Beta Forms Operational Hardening - Hierarchical Filtering & Safeguards[2m > [22m5. Destructive confirmation modals cancel without emitting mutations [33m 356[2mms[22m[39m
++[90mstderr[2m | tests/phase39_security_and_integrations.test.js
++[22m[39m[REDIS-CONNECTION-ERROR] connect ECONNREFUSED 127.0.0.1:6379
++
++ [32m✓[39m tests/NodeInspectionDrawerRegression.test.tsx [2m([22m[2m4 tests[22m[2m)[22m[33m 945[2mms[22m[39m
++   [33m[2m✓[22m[39m Node and Machine Inspection Contract & Drawer Regression[2m > [22m1. End-to-end: clicking Inspect Node in FederationLeafletMap preserves node identity and displays node ID in drawer (no "Node: N/A") [33m 360[2mms[22m[39m
++[90mstdout[2m | tests/phase39_security_and_integrations.test.js[2m > [22m[2mPhase 39 Comprehensive Security & Integrations Suite[2m > [22m[2m1. Webhook Re-delivery & Strict Tenant Isolation[2m > [22m[2mshould enforce explicit RBAC: reject VIEWER and unauthenticated on resend route
++[22m[39m2026-10-06T12:39:33.573Z [[31mERROR[0m] [audit-logger] audit_auth_denied: [AUDIT] AUTH_DENIED | Status: FAILURE {
++  ip: [32m'127.0.0.1'[39m,
++  method: [32m'POST'[39m,
++  url: [32m'/api/admin/webhooks/deliveries/del_alpha_001/resend'[39m,
++  agent: [32m'axios/1.16.0'[39m,
++  error: [32m'Bearer token required'[39m
++}
++
++[90mstderr[2m | tests/phase39_security_and_integrations.test.js[2m > [22m[2mPhase 39 Comprehensive Security & Integrations Suite[2m > [22m[2m1. Webhook Re-delivery & Strict Tenant Isolation[2m > [22m[2mshould enforce explicit RBAC: reject VIEWER and unauthenticated on resend route
++[22m[39m[AUTH-FAILURE] Unauthorized access attempt: Bearer token required from 127.0.0.1
++
++[90mstderr[2m | tests/phase39_security_and_integrations.test.js[2m > [22m[2mPhase 39 Comprehensive Security & Integrations Suite[2m > [22m[2m3. Outbox HTTP Real Delivery to Controlled Receiver with Verified Signature[2m > [22m[2mshould dispatch real HTTP request and verify HMAC-SHA256 signature, headers, and payload
++[22m[39m[REDIS-CONNECTION-ERROR] connect ECONNREFUSED 127.0.0.1:6379
++
++[90mstdout[2m | tests/phase39_security_and_integrations.test.js[2m > [22m[2mPhase 39 Comprehensive Security & Integrations Suite[2m > [22m[2m5. BPE Publication & Receiver Hardening[2m > [22m[2mshould verify publication idempotency and readback checksum integrity under strict contract
++[22m[39m2026-10-06T12:39:33.634Z [[32mINFO[0m] [bpe-publication] generic_event: Revision rev_bpe_hardening_1 (patch: sha256:bpe_verified_checksum_999, rates: sha256:8ace7918baa8dad53a7ad9ffd928a9311bc47c32c75c3d9a0136aae1bd7df910) is already published and verified to BPE {}
++
++[90mstdout[2m | tests/phase39_security_and_integrations.test.js[2m > [22m[2mPhase 39 Comprehensive Security & Integrations Suite[2m > [22m[2m5. BPE Publication & Receiver Hardening[2m > [22m[2mshould accept stored rates_checksum in raw 64-char hex format without rewriting historical revision and send canonical sha256 in contract/readback
++[22m[39m2026-10-06T12:39:33.638Z [[32mINFO[0m] [bpe-publication] generic_event: Revision rev_raw_hex_1791290373637 (patch: sha256:bpe_verified_checksum_999, rates: sha256:3496b226c7225846c215aca30a0a6b34cd40583ef1f628862cdbfdb1741031cd) is already published and verified to BPE {}
++
++ [32m✓[39m tests/BetaCohortManagement.test.tsx [2m([22m[2m7 tests[22m[2m)[22m[33m 1893[2mms[22m[39m
++   [33m[2m✓[22m[39m Beta Cohort Management — Operational Super Admin Adaptations[2m > [22m2. ControlledBetaCohortActivation handles HTTP 401 with nested {code, message} safely without crashing (React #31) and prevents retry loops [33m 574[2mms[22m[39m
++   [33m[2m✓[22m[39m Beta Cohort Management — Operational Super Admin Adaptations[2m > [22m3. ControlledBetaCohortActivation requires explicit confirmation for access actions, and canceling emits NO HTTP call [33m 450[2mms[22m[39m
++   [33m[2m✓[22m[39m Beta Cohort Management — Operational Super Admin Adaptations[2m > [22m7. BetaCohortWorkspace switches across all three tabs without crashing and renders localized titles [33m 318[2mms[22m[39m
++[90mstdout[2m | tests/phase39_security_and_integrations.test.js[2m > [22m[2mPhase 39 Comprehensive Security & Integrations Suite[2m > [22m[2m5. BPE Publication & Receiver Hardening[2m > [22m[2mshould accept stored rates_checksum with canonical sha256: prefix and successfully publish
++[22m[39m2026-10-06T12:39:33.640Z [[32mINFO[0m] [bpe-publication] generic_event: Revision rev_canonical_prefix_1791290373639 (patch: sha256:bpe_verified_checksum_999, rates: sha256:28018ead7638ddb9c331db24b185fbf5ad4b6fa0fc2ed271864f6103946d0838) is already published and verified to BPE {}
++
++[90mstderr[2m | tests/phase39_security_and_integrations.test.js
++[22m[39m[REDIS-CONNECTION-ERROR] connect ECONNREFUSED 127.0.0.1:6379
++
++ [32m✓[39m tests/phase39_security_and_integrations.test.js [2m([22m[2m49 tests[22m[2m)[22m[32m 242[2mms[22m[39m
++[90mstderr[2m | tests/PrinthouseOnboardingRedesign.test.tsx[2m > [22m[2mPrinthouse Onboarding Redesign & Regression Tests[2m > [22m[2m8. PrinthouseSetupHub renders continuous workspace shell with compact header and triggers Help & Guide Me
++[22m[39mAn update to PricingPanel inside a test was not wrapped in act(...).
++
++When testing, code that causes React state updates should be wrapped into act(...):
++
++act(() => {
++  /* fire events that update state */
++});
++/* assert on the output */
++
++This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
++An update to PricingPanel inside a test was not wrapped in act(...).
++
++When testing, code that causes React state updates should be wrapped into act(...):
++
++act(() => {
++  /* fire events that update state */
++});
++/* assert on the output */
++
++This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
++An update to PricingPanel inside a test was not wrapped in act(...).
++
++When testing, code that causes React state updates should be wrapped into act(...):
++
++act(() => {
++  /* fire events that update state */
++});
++/* assert on the output */
++
++This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
++An update to PricingPanel inside a test was not wrapped in act(...).
++
++When testing, code that causes React state updates should be wrapped into act(...):
++
++act(() => {
++  /* fire events that update state */
++});
++/* assert on the output */
++
++This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
++An update to PricingPanel inside a test was not wrapped in act(...).
++
++When testing, code that causes React state updates should be wrapped into act(...):
++
++act(() => {
++  /* fire events that update state */
++});
++/* assert on the output */
++
++This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
++An update to PricingPanel inside a test was not wrapped in act(...).
++
++When testing, code that causes React state updates should be wrapped into act(...):
++
++act(() => {
++  /* fire events that update state */
++});
++/* assert on the output */
++
++This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
++An update to PricingPanel inside a test was not wrapped in act(...).
++
++When testing, code that causes React state updates should be wrapped into act(...):
++
++act(() => {
++  /* fire events that update state */
++});
++/* assert on the output */
++
++This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
++An update to PricingPanel inside a test was not wrapped in act(...).
++
++When testing, code that causes React state updates should be wrapped into act(...):
++
++act(() => {
++  /* fire events that update state */
++});
++/* assert on the output */
++
++This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
++
++[90mstderr[2m | tests/PrinthouseOnboardingRedesign.test.tsx[2m > [22m[2mPrinthouse Onboarding Redesign & Regression Tests[2m > [22m[2m8. PrinthouseSetupHub renders continuous workspace shell with compact header and triggers Help & Guide Me
++[22m[39mAn update to PricingPanel inside a test was not wrapped in act(...).
++
++When testing, code that causes React state updates should be wrapped into act(...):
++
++act(() => {
++  /* fire events that update state */
++});
++/* assert on the output */
++
++This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
++An update to PricingPanel inside a test was not wrapped in act(...).
++
++When testing, code that causes React state updates should be wrapped into act(...):
++
++act(() => {
++  /* fire events that update state */
++});
++/* assert on the output */
++
++This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
++An update to PricingPanel inside a test was not wrapped in act(...).
++
++When testing, code that causes React state updates should be wrapped into act(...):
++
++act(() => {
++  /* fire events that update state */
++});
++/* assert on the output */
++
++This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
++An update to PricingPanel inside a test was not wrapped in act(...).
++
++When testing, code that causes React state updates should be wrapped into act(...):
++
++act(() => {
++  /* fire events that update state */
++});
++/* assert on the output */
++
++This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
++An update to PricingPanel inside a test was not wrapped in act(...).
++
++When testing, code that causes React state updates should be wrapped into act(...):
++
++act(() => {
++  /* fire events that update state */
++});
++/* assert on the output */
++
++This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
++An update to PricingPanel inside a test was not wrapped in act(...).
++
++When testing, code that causes React state updates should be wrapped into act(...):
++
++act(() => {
++  /* fire events that update state */
++});
++/* assert on the output */
++
++This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
++An update to PricingPanel inside a test was not wrapped in act(...).
++
++When testing, code that causes React state updates should be wrapped into act(...):
++
++act(() => {
++  /* fire events that update state */
++});
++/* assert on the output */
++
++This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
++An update to PricingPanel inside a test was not wrapped in act(...).
++
++When testing, code that causes React state updates should be wrapped into act(...):
++
++act(() => {
++  /* fire events that update state */
++});
++/* assert on the output */
++
++This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
++
++ [32m✓[39m tests/GovernedQuoteSmokeTest.test.tsx [2m([22m[2m30 tests[22m[2m)[22m[33m 2981[2mms[22m[39m
++   [33m[2m✓[22m[39m GovernedQuoteSmokeTest — Real React Component Unit & Integration Suite[2m > [22m14. QuickCalibrationPanel complex DRAFT lifecycle: applies proposal, captures createSession payload, remounts QuickCalibrationPanel, recovers DRAFT via listSessions, answers clarifications and calculates previewQuote with complex attributes [33m 627[2mms[22m[39m
++   [33m[2m✓[22m[39m GovernedQuoteSmokeTest — Real React Component Unit & Integration Suite[2m > [22m15. Exact Assistant response reproduction: specPatch without booleans derives complexity from text/explanation/warnings and preserves preview approximation [33m 392[2mms[22m[39m
++   [33m[2m✓[22m[39m GovernedQuoteSmokeTest — Real React Component Unit & Integration Suite[2m > [22m28. PricingPanel end-to-end flow: GET returns nodeId & baseline, PUT transmits both, 409 preserves draft, reload gets new baseline, 2nd save uses updated baseline [33m 529[2mms[22m[39m
++[90mstdout[2m | tests/PrinthouseOnboardingRedesign.test.tsx[2m > [22m[2mPrinthouse Onboarding Redesign & Regression Tests[2m > [22m[2m13. Server-side offer resolution: exercises actual server resolver with real evidence payload shape and confirms exact ID match with drawer
++[22m[39m2026-10-06T12:39:37.563Z [[32mINFO[0m] [mysql-client] pool_created: MySQL Connection pool initialized {
++  host: [32m'test-isolated-db-host'[39m,
++  database: [32m'NOT_SET'[39m,
++  user: [32m'NOT_SET'[39m,
++  usedUrl: [33mfalse[39m
++}
++
++ [32m✓[39m tests/PrinthouseOnboardingRedesign.test.tsx [2m([22m[2m20 tests[22m[2m)[22m[33m 3621[2mms[22m[39m
++   [33m[2m✓[22m[39m Printhouse Onboarding Redesign & Regression Tests[2m > [22m8. PrinthouseSetupHub renders continuous workspace shell with compact header and triggers Help & Guide Me [33m 1563[2mms[22m[39m
++   [33m[2m✓[22m[39m Printhouse Onboarding Redesign & Regression Tests[2m > [22m9. Pricing container state preservation: draft, conversation, evidenceId, and variant survive mode toggling and drawer actions [33m 1013[2mms[22m[39m
++
++[2m Test Files [22m [1m[32m23 passed[39m[22m[90m (23)[39m
++[2m      Tests [22m [1m[32m333 passed[39m[22m[90m (333)[39m
++[2m   Start at [22m 14:39:24
++[2m   Duration [22m 13.55s[2m (transform 8.26s, setup 0ms, collect 63.12s, tests 18.99s, environment 41.33s, prepare 8.41s)[22m
++
 diff --git a/scripts/package_onboarding_artifacts.py b/scripts/package_onboarding_artifacts.py
-index a62d95a..8789959 100644
+index a62d95a..f762733 100644
 --- a/scripts/package_onboarding_artifacts.py
 +++ b/scripts/package_onboarding_artifacts.py
-@@ -43,7 +43,24 @@ def compute_sha256(filepath):
+@@ -43,7 +43,26 @@ def compute_sha256(filepath):
  def package():
      os.makedirs(ARTIFACTS_DIR, exist_ok=True)
  
@@ -15,6 +1164,8 @@ index a62d95a..8789959 100644
 +             "scripts/test_onboarding_connected_suite.js",
 +             "tests/onboarding_checksum_integrity_regression.test.js",
 +             "vitest_discovered_suites.txt",
++             "raw_vitest_output.log",
++             "raw_build_output.log",
 +             "scripts/package_onboarding_artifacts.py"],
 +            cwd=REPO_ROOT
 +        )
@@ -28,7 +1179,7 @@ index a62d95a..8789959 100644
      source_files = {
          "test_onboarding_connected_suite.js": os.path.join(REPO_ROOT, "scripts", "test_onboarding_connected_suite.js"),
          "raw_vitest_output.log": os.path.join(REPO_ROOT, "raw_vitest_output.log"),
-@@ -56,7 +73,8 @@ def package():
+@@ -56,7 +75,8 @@ def package():
          "inspect_test_db_schema.js": os.path.join(REPO_ROOT, "scripts", "inspect_test_db_schema.js"),
          "onboarding_checksum_integrity_regression.test.js": os.path.join(REPO_ROOT, "tests", "onboarding_checksum_integrity_regression.test.js"),
          "calibrationAcceptanceService.js": os.path.join(REPO_ROOT, "src", "api", "services", "calibrationAcceptanceService.js"),
@@ -38,7 +1189,7 @@ index a62d95a..8789959 100644
      }
  
      for target_name, src_path in source_files.items():
-@@ -67,7 +85,7 @@ def package():
+@@ -67,7 +87,7 @@ def package():
      git_sha = get_git_sha()
      git_remote = get_git_remote()
  
@@ -47,7 +1198,7 @@ index a62d95a..8789959 100644
      files_to_hash = sorted([f for f in os.listdir(ARTIFACTS_DIR) if f not in ("SHA256SUMS.txt", "MANIFEST.md")])
      sha256_lines = []
      file_checksums = {}
-@@ -78,7 +96,7 @@ def package():
+@@ -78,7 +98,7 @@ def package():
          sha256_lines.append(f"{digest}  {f}")
          file_checksums[f] = digest
  
@@ -56,7 +1207,7 @@ index a62d95a..8789959 100644
      manifest_content = f"""# Manifiesto de Evidencias de Onboarding de Calibración
  **Proyecto:** PrintPrice OS Control Plane
  **Rama:** `phase-39.2-tenant-management-console`
-@@ -108,6 +126,7 @@ def package():
+@@ -108,6 +128,7 @@ def package():
     - `userSessionService.js`: Código fuente real del servicio de sesiones de usuario.
     - `auth_middleware.js`: Middleware de autenticación `requireAdmin` (`src/api/middleware/auth.js`) que valida tokens y sesiones.
     - `auth_and_user_sessions_schema.sql`: Definiciones DDL reales de `control_users` y `user_sessions`, detallando la correspondencia entre `control_users.id`, `userSessionService.createSession`, `user_sessions.id`, y los claims JWT (`sub`, `jti`, `tenant_id`, `role`).
@@ -64,7 +1215,7 @@ index a62d95a..8789959 100644
  6. **Eliminación de `.catch` Silenciosos y Comprobación de `PRODUCTION_DISPATCH_ALLOWED`:** Se eliminaron los manejadores `.catch(() => [[{{ count: 0 }}]])`. Las consultas contra `bpe_pricing_publications` y `printhouse_activation_grants` fallan con diagnóstico explícito en caso de error. Se auditan exhaustivamente los flags comerciales de activación (`marketplace_visible = 1`, `live_quoting_allowed = 1`, `job_routing_allowed = 1`, `production_dispatch_allowed = 1`), además de verificar cero grants totales para el tenant.
  7. **Documentación de Claves Foráneas y Orden de Limpieza en 8 Tablas:** Documentación de las FKs y dependencias efectivas (Migraciones 143, 146, 147, 148, 158, 160). Se implementa el orden de limpieza determinista en 8 tablas:
     1. `printhouse_pricing_calibration_acceptances`
-@@ -130,7 +149,7 @@ def package():
+@@ -130,7 +151,7 @@ def package():
        - Promoción (`POST /pricing/calibrations/:id/ready`): HTTP 200 estricto, comprobación explícita de `body.data.status === 'READY'` (eliminando fallbacks permisivos `ok === true`).
        - Cancelación (`POST /pricing/calibrations/:id/reject`): HTTP 200 estricto, comprobación de `body.data.status === 'REJECTED'`.
        - Aceptación (`POST /pricing/calibrations/:id/accept`): HTTP 200 estricto, validación de `body.data.status === 'ACCEPTED'`, `revisionId` y `acceptanceId`.
@@ -73,7 +1224,7 @@ index a62d95a..8789959 100644
      - **Verificación Directa de `runId` en MySQL:** Tras `POST /calculate`, el identificador `realRunId` (`calcRes.body.data.id`) se verifica directamente en `printhouse_pricing_calibration_runs` por `WHERE id = ?`, asegurando coincidencia de `calibration_session_id` y `tenant_id`.
  
  11. **Resolución de la Validación de Integridad de Checksum (Paso 9):**
-@@ -180,13 +199,38 @@ def package():
+@@ -180,24 +201,74 @@ def package():
      - **Eliminación de Bypass de Gobernanza (`options.skipToleranceCheck`):** Se eliminó el parámetro `options.skipToleranceCheck`. Se conservan únicamente las excepciones preexistentes autorizadas (`skipCurveValidation`, `allowReviewOverride`), documentando sus llamadores.
      - **Validación Estricta de `point_results_json`:** Rechazo inmediato ante JSON malformado (`MALFORMED_POINT_RESULTS_JSON`), puntos ausentes (`MISSING_POINT_IN_RESULTS`), desconocidos (`UNKNOWN_POINT_IN_RESULTS`), duplicados (`DUPLICATE_POINT_IN_RESULTS`) y residuales porcentuales y absolutos contradictorios (`CONTRADICTORY_SUPPLIED_RESIDUAL`).
  
@@ -83,6 +1234,9 @@ index a62d95a..8789959 100644
      - **Garantía de Paridad entre Evaluación Principal y Gobernanza:** Se garantiza que tanto la evaluación principal (`primarySpec`) como la evaluación de gobernanza de curvas (`specForQ` en `evaluateCurveAcceptance`) evalúen exactamente la misma tirada (1.500 ejemplares), eliminando la discrepancia donde el control de curva generaba `quantity: 1` y sobrescribía `copies: 1`.
      - **Diagnóstico Enriquecido de Rechazo de Curva (Zero Leakage):** Al rechazar por curva (`GOVERNANCE_CURVE_REJECTED` o `GOVERNANCE_CURVE_REQUIRES_REVIEW`), el error incorpora en su mensaje y propiedades (`err.reasons`, `err.evaluatedQuantities`, `err.details`) las razones de rechazo y las cantidades evaluadas, permitiendo trazabilidad y diagnóstico inmediato en el harness conectado sin exponer credenciales ni tokens sensibles.
 -    - **Acreditación de Regresiones en Vitest (24 tests en `calibration_residuals_compatibility_regression.test.js`, 327 tests totales):** Se incorporan 6 pruebas específicas de Grupo 5 invocando el servicio real con `bookSpec.copies = 1500` sin `quantity`, sin mockear `evaluateCurveAcceptance`, comprobando que todas las llamadas enviadas al adaptador reciben `copies: 1500` y `quantity: 1500`, verificando rechazo limpio por ausencia, contradicción e invalidez, y validando la composición del diagnóstico sin filtración de secretos.
+-    - **Diferenciación Estricta entre Pruebas Locales y Pruebas Conectadas:**
+-      - **Pruebas Locales Ejecutadas:** Suite completa de Vitest (23 suites, 327 tests pasando, 0 fallidos) y compilación de producción con Vite (`dist/` generado limpiamente).
+-      - **Pruebas Conectadas:** El presente commit `{git_sha}` se entrega como **PENDIENTE DE VALIDACIÓN CONECTADA EN ENTORNO DE PERSISTENCIA**. No se despliega ni se ejecuta contra bases de datos en esta entrega, y **no se le atribuye al nuevo commit el resultado PASS de pruebas conectadas previas** ejecutadas sobre commits anteriores.
 +
 +17. **Ampliación del Harness Conectado para Curvas Multi-Tirada, Compuerta de Tolerancia y Aislamiento Multi-Tenant (Commit `{git_sha}`):**
 +    - **Auditoría de Serialización HTTP en `/accept` y Ajuste del Caso B:**
@@ -107,15 +1261,39 @@ index a62d95a..8789959 100644
 +      - Verificación en base de datos: cero revisiones, cero aceptaciones y tarifas del nodo inalteradas.
 +    - **Escenario 4 (Caso C - Aislamiento Post-Aceptación y de Revisiones):**
 +      - Intento de lectura no autorizada de la revisión de Tenant A (`GET /pricing/revisions/:id`) e intento de aceptación posterior desde Tenant B: rechazo con HTTP 403/404 y verificación de cero mutaciones globales para Tenant B.
-+    - **Acreditación de Regresiones en Vitest (31 pruebas en `onboarding_checksum_integrity_regression.test.js`, 328 tests totales):**
++    - **Acreditación de Regresiones en Vitest (36 pruebas en `onboarding_checksum_integrity_regression.test.js`, 333 tests totales):**
 +      - Suite 8 (`runCurveHarnessRegressions`) valida en modo aislado: contrato del solver con `CANONICAL_ACCEPTABLE_RUN_STATUSES` y `EXACTLY_DETERMINED`, compuerta de gobernanza con tolerancias oficiales (`POINT_OUT_OF_TOLERANCE`) y sanitización estricta de diagnósticos de error HTTP wrapHandler sin filtración de secretos.
-     - **Diferenciación Estricta entre Pruebas Locales y Pruebas Conectadas:**
--      - **Pruebas Locales Ejecutadas:** Suite completa de Vitest (23 suites, 327 tests pasando, 0 fallidos) y compilación de producción con Vite (`dist/` generado limpiamente).
-+      - **Pruebas Locales Ejecutadas:** Suite completa de Vitest (23 suites, 328 tests pasando, 0 fallidos) y compilación de producción con Vite (`dist/` generado limpiamente).
-       - **Pruebas Conectadas:** El presente commit `{git_sha}` se entrega como **PENDIENTE DE VALIDACIÓN CONECTADA EN ENTORNO DE PERSISTENCIA**. No se despliega ni se ejecuta contra bases de datos en esta entrega, y **no se le atribuye al nuevo commit el resultado PASS de pruebas conectadas previas** ejecutadas sobre commits anteriores.
++      - Suite 9 (`parseAndValidatePointResultsJson`) valida exhaustivamente: admisión de string JSON y array nativo de MySQL, validación explícita de `Array.isArray`, y rechazo contextual estricto (sin catch silencioso) de JSON malformado, objeto no array y valores null/undefined.
++
++18. **Cierre de Hallazgos de Entrega 9eaf975 (Dual Parsing de `point_results_json`, Contraste Completo y Regeneración Real de Logs):**
++    - **Dual Parsing & Validación Estricta de `point_results_json`:**
++      - La función `parseAndValidatePointResultsJson(raw, contextDescription)` admite tanto cadena JSON como array nativo devuelto por el driver MySQL (`mysql2`).
++      - Valida explícitamente `Array.isArray(result)`.
++      - Rechaza de forma estricta JSON malformado, null, undefined, cadenas vacías y tipos incorrectos (objetos no array, números, etc.) con diagnóstico contextual detallado (`[POINT_RESULTS_VALIDATION_ERROR]`) y sin ningún catch silencioso.
++    - **5 Regresiones Específicas de Validación de Array:**
++      - Añadidas tanto en el ejecutor autónomo (`runCurveHarnessRegressions`, Suite 11) como en la suite Vitest (`tests/onboarding_checksum_integrity_regression.test.js`, Suite 9):
++        - 9.1 / 11.1 Cadena JSON válida de array devuelve el array correctamente parseado con todos sus elementos.
++        - 9.2 / 11.2 Array nativo devuelto por el driver MySQL se devuelve directamente por identidad sin alteración.
++        - 9.3 / 11.3 JSON malformado lanza error contextual con diagnóstico (`Malformed JSON string`).
++        - 9.4 / 11.4 Objeto no array (cadena JSON u objeto nativo) lanza diagnóstico contextual (`Parsed JSON root is not an array` / `unsupported type object`).
++        - 9.5 / 11.5 Null y undefined lanzan diagnóstico contextual explícito (`Value is null or undefined`).
++    - **Contraste Exhaustivo MySQL/HTTP Punto por Punto:**
++      - En ambas lecturas de `point_results_json` del harness (Lectura 1 en Escenario 2 y Lectura 2 en Escenario 3), se contrasta exhaustivamente cada punto con:
++        - `quantity`: coincidencia exacta de tirada esperada.
++        - `targetManufacturingPrice` / `targetPrice`: finite number, contraste contra esperado y contra respuesta HTTP.
++        - `predictedManufacturingPrice`: finite number, positivo, contraste contra respuesta HTTP.
++        - `absoluteResidual`: finite number, contraste contra respuesta HTTP.
++        - `percentageResidual` / `percentResidual`: finite number (ratio `[0..1]`), contraste contra respuesta HTTP.
++        - `withinTolerance`: booleano de compuerta de tolerancia, contrastado contra respuesta HTTP.
++    - **Regeneración Genuina de Logs Crudos (`raw_vitest_output.log` y `raw_build_output.log`):**
++      - `raw_vitest_output.log`: Ejecutado realmente sobre el código final con captura integral de stdout, stderr y código de salida 0 (23 suites de prueba, 333 tests pasando, 0 fallidos, duración 13.55s).
++      - `raw_build_output.log`: Ejecutado realmente sobre el código final con captura integral de stdout, stderr y código de salida 0 (Vite v6.4.2 building for production, 3557 modules transformed, dist/ generado en 14.36s).
++    - **Distinción Rigurosa de Commits:**
++      - **Commit de Código:** Modificaciones en el código fuente del harness (`scripts/test_onboarding_connected_suite.js`), pruebas de regresión (`tests/onboarding_checksum_integrity_regression.test.js`), listado de suites (`vitest_discovered_suites.txt`) y logs crudos genuinos (`raw_vitest_output.log`, `raw_build_output.log`).
++      - **Commit Documental y de Empaquetado:** Actualización del manifiesto (`MANIFEST.md`), sumas criptográficas (`SHA256SUMS.txt`), diff unificado (`git_diff_review.diff`) y paquete ZIP (`review_artifacts_onboarding_simplified.zip`).
  
  ---
-@@ -194,10 +238,10 @@ def package():
+ 
  ## 1. Entorno de Verificación y Declaración de Evidencias
  - **Distinción entre Capturas Reutilizadas y Entregables Regenerados:**
    - **Evidencias Visuales (15 archivos PNG):** Reutilizadas de la sesión validada de Playwright (`01_onboarding_...` a `08_onboarding_...`), acreditando fidelidad tipográfica, paridad multilingüe EN/ES/DE, densidad cómoda/compacta, y fidelidad documental (1.792 €, interior 4/4). No han sufrido alteraciones visuales en esta iteración.
@@ -124,12 +1302,12 @@ index a62d95a..8789959 100644
  - **Comandos Ejecutados (Pruebas Locales):**
 -  - `npx vitest run`: Ejecución local de 23 suites y 327 tests unitarios y de integración (327 pasados, 0 fallidos).
 -  - `npm run build`: Compilación local de producción Vite (dist generado limpiamente).
-+  - `npx vitest run`: Ejecución local de 23 suites y 328 tests unitarios y de integración (328 pasados, 0 fallidos).
-+  - `npm run build`: Compilación local de producción Vite (dist generado limpiamente en 12.18s).
++  - `npx vitest run`: Ejecución local de 23 suites y 333 tests unitarios y de integración (333 pasados, 0 fallidos, exit code 0).
++  - `npm run build`: Compilación local de producción Vite (dist generado limpiamente en 14.36s, exit code 0).
  - **Entorno:**
    - Node.js v20+, Vite 6.4.2, React 19, TypeScript
    - MySQL Target: `ppos_rc_mdw0qd@127.0.0.1:3306/pposrcmdw0qdtest`
-@@ -225,14 +269,15 @@ def package():
+@@ -225,14 +296,15 @@ def package():
  | `06b_onboarding_step2_mobile_390_dark.png` | PNG (390×844) | Reutilizada | Móvil Paso 2: Indicador 'Paso 2 de 5: Añadir presupuestos', controles superiores en grid sin recortar ni desbordar. | `{file_checksums.get('06b_onboarding_step2_mobile_390_dark.png', '')}` |
  | `07_onboarding_step1_en_light_1280.png` | PNG (1280×800) | Reutilizada | Paridad lingüística en Inglés: 'In setup' y navegación sincronizada. | `{file_checksums.get('07_onboarding_step1_en_light_1280.png', '')}` |
  | `08_onboarding_step1_de_dark_1366.png` | PNG (1366×768) | Reutilizada | Paridad lingüística en Alemán: 'In Konfiguration' y tipografía ajustada sin desbordamientos. | `{file_checksums.get('08_onboarding_step1_de_dark_1366.png', '')}` |
@@ -150,7 +1328,7 @@ index a62d95a..8789959 100644
  | `userSessionService.js` | Evidencia de Código | Incorporado | Servicio oficial de sesiones de usuario (`src/api/services/userSessionService.js`), acreditando parámetros, creación y validación estricta de identidades en capa de aplicación. | `{file_checksums.get('userSessionService.js', '')}` |
  | `auth_middleware.js` | Evidencia de Código | Incorporado | Middleware de autenticación oficial `requireAdmin` (`src/api/middleware/auth.js`), acreditando la verificación de tokens JWT contra `user_sessions.id` (`jti`) y validación de `user_id`. | `{file_checksums.get('auth_middleware.js', '')}` |
  | `auth_and_user_sessions_schema.sql` | Evidencia DDL | Incorporado | Definiciones DDL de `control_users` y `user_sessions`, documentando la correspondencia de identificadores y aclarando que la integridad referencial se asegura en aplicación sin FK relacional. | `{file_checksums.get('auth_and_user_sessions_schema.sql', '')}` |
-@@ -241,13 +286,13 @@ def package():
+@@ -241,13 +313,13 @@ def package():
  ---
  
  ## 3. Invariantes Comprobados en la Suite de Tests
@@ -167,7 +1345,7 @@ index a62d95a..8789959 100644
  
      manifest_path = os.path.join(ARTIFACTS_DIR, "MANIFEST.md")
 diff --git a/scripts/test_onboarding_connected_suite.js b/scripts/test_onboarding_connected_suite.js
-index 2e68829..c16df2d 100644
+index 2e68829..62cf881 100644
 --- a/scripts/test_onboarding_connected_suite.js
 +++ b/scripts/test_onboarding_connected_suite.js
 @@ -146,6 +146,15 @@ const bcrypt = require('bcrypt');
@@ -186,10 +1364,56 @@ index 2e68829..c16df2d 100644
  
  // ── 2. CANONICAL STRINGIFY & CHECKSUM UTILITIES ──
  function canonicalStringify(obj) {
-@@ -500,6 +509,217 @@ function runChecksumIntegrityRegressions() {
+@@ -500,6 +509,334 @@ function runChecksumIntegrityRegressions() {
      console.log('[REGRESSION] All 6 Checksum Integrity & Connection Scope Regression Suites Passed Successfully (Zero Leakage Verified).');
  }
  
++/**
++ * Safely parses and validates point_results_json returned by MySQL or API.
++ * MySQL/mysql2 may return JSON columns as a parsed JavaScript object/array or as a raw JSON string.
++ *
++ * Requirements:
++ * - Accepts both raw JSON string and native JavaScript Array.
++ * - Explicitly validates that the resolved value is an Array (Array.isArray).
++ * - Rejects null, undefined, invalid JSON strings, and non-array types (objects, numbers, etc.)
++ * - Rejection produces contextual diagnostic with contextDescription, received type, and error reason.
++ * - Zero silent catch.
++ *
++ * @param {any} raw
++ * @param {string} contextDescription
++ * @returns {Array<object>}
++ */
++function parseAndValidatePointResultsJson(raw, contextDescription = 'point_results_json') {
++    if (raw === null || raw === undefined) {
++        throw new Error(`[POINT_RESULTS_VALIDATION_ERROR] ${contextDescription}: Value is null or undefined`);
++    }
++
++    if (Array.isArray(raw)) {
++        return raw;
++    }
++
++    if (typeof raw === 'string') {
++        const trimmed = raw.trim();
++        if (trimmed.length === 0) {
++            throw new Error(`[POINT_RESULTS_VALIDATION_ERROR] ${contextDescription}: Empty string received`);
++        }
++        let parsed;
++        try {
++            parsed = JSON.parse(trimmed);
++        } catch (jsonErr) {
++            throw new Error(`[POINT_RESULTS_VALIDATION_ERROR] ${contextDescription}: Malformed JSON string (${jsonErr.message})`);
++        }
++        if (!Array.isArray(parsed)) {
++            const receivedType = parsed === null ? 'null' : typeof parsed;
++            throw new Error(`[POINT_RESULTS_VALIDATION_ERROR] ${contextDescription}: Parsed JSON root is not an array (received: ${receivedType})`);
++        }
++        return parsed;
++    }
++
++    const valType = typeof raw;
++    throw new Error(`[POINT_RESULTS_VALIDATION_ERROR] ${contextDescription}: Expected string or array, received unsupported type ${valType}`);
++}
++
 +function deepMergeRates(target, source) {
 +    const out = JSON.parse(JSON.stringify(target || {}));
 +    for (const key of Object.keys(source || {})) {
@@ -398,13 +1622,84 @@ index 2e68829..c16df2d 100644
 +        throw new Error(`Regression 10b failed: Formatted diagnostic leaked secrets or tokens`);
 +    }
 +
++    // Suite 11: parseAndValidatePointResultsJson regressions (string JSON, array nativo, JSON malformado, objeto no array, null)
++    const validArrayFixture = [{ quantity: 100, targetManufacturingPrice: 50.0, predictedManufacturingPrice: 50.0, withinTolerance: true }];
++    const validJsonStrFixture = JSON.stringify(validArrayFixture);
++
++    // 11.1 String JSON: parses correctly to array
++    const resStringJson = parseAndValidatePointResultsJson(validJsonStrFixture, 'Regression 11.1');
++    if (!Array.isArray(resStringJson) || resStringJson.length !== 1 || resStringJson[0].quantity !== 100) {
++        throw new Error('Regression 11.1 failed: Valid JSON string must parse to expected array');
++    }
++
++    // 11.2 Array nativo: returns directly without re-parsing
++    const resNativeArray = parseAndValidatePointResultsJson(validArrayFixture, 'Regression 11.2');
++    if (!Array.isArray(resNativeArray) || resNativeArray !== validArrayFixture) {
++        throw new Error('Regression 11.2 failed: Native array must be returned directly');
++    }
++
++    // 11.3 JSON malformado: throws contextual error
++    let malformedCaught = false;
++    try {
++        parseAndValidatePointResultsJson('[{"quantity": 100, broken', 'Regression 11.3');
++    } catch (e) {
++        malformedCaught = true;
++        if (!e.message.includes('Malformed JSON string')) {
++            throw new Error(`Regression 11.3 failed: Unexpected error message: ${e.message}`);
++        }
++    }
++    if (!malformedCaught) {
++        throw new Error('Regression 11.3 failed: Malformed JSON string must throw contextual error');
++    }
++
++    // 11.4 Objeto no array (tanto en string JSON como objeto nativo)
++    let nonArrayObjCaught1 = false;
++    try {
++        parseAndValidatePointResultsJson('{"quantity": 100}', 'Regression 11.4a');
++    } catch (e) {
++        nonArrayObjCaught1 = true;
++        if (!e.message.includes('Parsed JSON root is not an array')) {
++            throw new Error(`Regression 11.4a failed: Unexpected error message: ${e.message}`);
++        }
++    }
++    if (!nonArrayObjCaught1) {
++        throw new Error('Regression 11.4a failed: Non-array JSON object string must throw contextual error');
++    }
++
++    let nonArrayObjCaught2 = false;
++    try {
++        parseAndValidatePointResultsJson({ quantity: 100 }, 'Regression 11.4b');
++    } catch (e) {
++        nonArrayObjCaught2 = true;
++        if (!e.message.includes('unsupported type object')) {
++            throw new Error(`Regression 11.4b failed: Unexpected error message: ${e.message}`);
++        }
++    }
++    if (!nonArrayObjCaught2) {
++        throw new Error('Regression 11.4b failed: Non-array native object must throw contextual error');
++    }
++
++    // 11.5 Null y undefined: throws contextual error
++    let nullCaught = false;
++    try {
++        parseAndValidatePointResultsJson(null, 'Regression 11.5');
++    } catch (e) {
++        nullCaught = true;
++        if (!e.message.includes('null or undefined')) {
++            throw new Error(`Regression 11.5 failed: Unexpected error message: ${e.message}`);
++        }
++    }
++    if (!nullCaught) {
++        throw new Error('Regression 11.5 failed: Null must throw contextual error');
++    }
++
 +    console.log('[REGRESSION] All Curve Harness & Solver Contract Regressions Passed Successfully.');
 +}
 +
  // ── 3. CANONICAL INDUSTRIAL RATES FIXTURE & CONSUMED KEYS DOCUMENTATION ──
  // Strictly compatible with @ppos/pricing-engine and src/api/services/buildPriceCalibrationAdapter.js.
  // Documented keys consumed by canonical forward pricing engine and inverse pricing solver:
-@@ -555,6 +775,17 @@ const INITIAL_VALID_RATES = {
+@@ -555,6 +892,17 @@ const INITIAL_VALID_RATES = {
  const INITIAL_RATES_JSON_STR = canonicalStringify(INITIAL_VALID_RATES);
  const INITIAL_RATES_CHECKSUM = computeCanonicalRatesChecksum(INITIAL_VALID_RATES);
  
@@ -422,7 +1717,7 @@ index 2e68829..c16df2d 100644
  const EXECUTION_TAG = 'test_onb_' + Date.now().toString(36) + '_' + crypto.randomBytes(3).toString('hex');
  const tracker = {
      tenants: new Set(),
-@@ -689,10 +920,22 @@ function formatHttpDiagnostic(method, path, res) {
+@@ -689,10 +1037,22 @@ function formatHttpDiagnostic(method, path, res) {
      const status = res.status;
      const body = res.body || {};
      // Extract sanitized error fields, strictly suppressing any Authorization headers or tokens
@@ -445,7 +1740,7 @@ index 2e68829..c16df2d 100644
          details: body.error?.details || body.details || undefined
      };
      return `[${method} ${path} -> HTTP ${status}] ${JSON.stringify(sanitized)}`;
-@@ -1001,6 +1244,28 @@ async function performDeterministicCleanup(directConn) {
+@@ -1001,6 +1361,28 @@ async function performDeterministicCleanup(directConn) {
      }
  }
  
@@ -474,7 +1769,7 @@ index 2e68829..c16df2d 100644
  // ── 6. MAIN CONNECTED ONBOARDING VALIDATION ──
  async function runConnectedSuite() {
      console.log(`\n================================================================`);
-@@ -1063,26 +1328,7 @@ async function runConnectedSuite() {
+@@ -1063,26 +1445,7 @@ async function runConnectedSuite() {
          const [nodeCols] = await directConn.query('SHOW COLUMNS FROM printer_nodes');
          const nodeColSet = new Set(nodeCols.map(c => c.Field));
  
@@ -502,7 +1797,7 @@ index 2e68829..c16df2d 100644
          assert(true, `Created printer node ${FIXTURE_NODE_A} for ${FIXTURE_TENANT_A} with initial valid rates fixture`);
  
          // Generate authentic server sessions and valid JWTs with real user accounts
-@@ -1483,6 +1729,647 @@ async function runConnectedSuite() {
+@@ -1483,6 +1846,693 @@ async function runConnectedSuite() {
              finalNodeIntegrity.storedNormalized !== normalizeSha256Hex(INITIAL_RATES_CHECKSUM),
              `Node rates_json successfully transitioned from baseline to calibrated`
          );
@@ -694,18 +1989,30 @@ index 2e68829..c16df2d 100644
 +        assert(curveRunRows[0].curve_metrics_json !== null, `curve_metrics_json persisted in MySQL`);
 +        assert(curveRunRows[0].identifiability_json !== null, `identifiability_json persisted in MySQL`);
 +
-+        const dbPointResults = JSON.parse(curveRunRows[0].point_results_json);
++        const dbPointResults = parseAndValidatePointResultsJson(curveRunRows[0].point_results_json, 'Scenario 2 curveRunRows[0].point_results_json');
 +        assert(Array.isArray(dbPointResults) && dbPointResults.length === 8,
 +            `Persisted point_results_json contains exactly 8 points`);
 +        for (let i = 0; i < dbPointResults.length; i++) {
 +            const dbPt = dbPointResults[i];
 +            const expQ = CURVE_QUANTITIES[i];
++            const expTarget = validCurveTargets[i].targetManufacturingPrice;
 +            const httpPt = curveRunData.pointResults[i];
++            const httpTarget = httpPt.targetManufacturingPrice ?? httpPt.targetPrice;
++            const dbTarget = dbPt.targetManufacturingPrice ?? dbPt.targetPrice;
++            const httpRatio = httpPt.percentageResidual !== undefined ? httpPt.percentageResidual : httpPt.percentResidual;
++            const dbRatio = dbPt.percentageResidual !== undefined ? dbPt.percentageResidual : dbPt.percentResidual;
++
 +            assert(dbPt.quantity === expQ, `MySQL Point ${i} quantity matches ${expQ}`);
++            assert(Number.isFinite(dbTarget) && Math.abs(dbTarget - expTarget) < 0.01,
++                `MySQL Point ${i} target price is finite and matches expected ${expTarget} EUR`);
++            assert(Number.isFinite(dbTarget) && Math.abs(dbTarget - httpTarget) < 0.01,
++                `MySQL Point ${i} target price matches HTTP response (${httpTarget} EUR)`);
 +            assert(Number.isFinite(dbPt.predictedManufacturingPrice) && Math.abs(dbPt.predictedManufacturingPrice - httpPt.predictedManufacturingPrice) < 0.001,
 +                `MySQL Point ${i} predicted price matches HTTP response`);
 +            assert(Number.isFinite(dbPt.absoluteResidual) && Math.abs(dbPt.absoluteResidual - httpPt.absoluteResidual) < 0.001,
 +                `MySQL Point ${i} absolute residual matches HTTP response`);
++            assert(Number.isFinite(dbRatio) && Math.abs(dbRatio - httpRatio) < 0.0001,
++                `MySQL Point ${i} percentage residual ratio matches HTTP response`);
 +            assert(dbPt.withinTolerance === true, `MySQL Point ${i} withinTolerance is true`);
 +        }
 +
@@ -1045,12 +2352,46 @@ index 2e68829..c16df2d 100644
 +            `SELECT id, status, point_results_json FROM printhouse_pricing_calibration_runs WHERE id = ?`,
 +            [rejectRunId]
 +        );
-+        assert(rejectRunRows.length === 1, `Perturbed run record verified in MySQL by exact ID`);
-+        const dbRejectPts = JSON.parse(rejectRunRows[0].point_results_json);
++        const dbRejectPts = parseAndValidatePointResultsJson(rejectRunRows[0].point_results_json, 'Scenario 3 rejectRunRows[0].point_results_json');
++        assert(Array.isArray(dbRejectPts) && dbRejectPts.length === 8,
++            `Persisted perturbed point_results_json contains exactly 8 points`);
++
++        // Contrast each point between MySQL and HTTP for perturbed run
++        for (let i = 0; i < dbRejectPts.length; i++) {
++            const dbPt = dbRejectPts[i];
++            const httpPt = rejectRunData.pointResults?.find(p => p.quantity === dbPt.quantity);
++            assert(httpPt !== undefined, `MySQL perturbed point q=${dbPt.quantity} found in HTTP response`);
++
++            const dbTarget = dbPt.targetManufacturingPrice ?? dbPt.targetPrice;
++            const httpTarget = httpPt.targetManufacturingPrice ?? httpPt.targetPrice;
++            const dbRatio = dbPt.percentageResidual !== undefined ? dbPt.percentageResidual : dbPt.percentResidual;
++            const httpRatio = httpPt.percentageResidual !== undefined ? httpPt.percentageResidual : httpPt.percentResidual;
++
++            assert(Number.isFinite(dbTarget) && Math.abs(dbTarget - httpTarget) < 0.01,
++                `MySQL perturbed point q=${dbPt.quantity} target price matches HTTP response (${httpTarget} EUR)`);
++            assert(Number.isFinite(dbPt.predictedManufacturingPrice) && Math.abs(dbPt.predictedManufacturingPrice - httpPt.predictedManufacturingPrice) < 0.001,
++                `MySQL perturbed point q=${dbPt.quantity} predicted price matches HTTP response`);
++            assert(Number.isFinite(dbPt.absoluteResidual) && Math.abs(dbPt.absoluteResidual - httpPt.absoluteResidual) < 0.001,
++                `MySQL perturbed point q=${dbPt.quantity} absolute residual matches HTTP response`);
++            assert(Number.isFinite(dbRatio) && Math.abs(dbRatio - httpRatio) < 0.0001,
++                `MySQL perturbed point q=${dbPt.quantity} percentage residual ratio matches HTTP response`);
++            assert(dbPt.withinTolerance === httpPt.withinTolerance,
++                `MySQL perturbed point q=${dbPt.quantity} withinTolerance matches HTTP response`);
++        }
++
 +        const dbPt800 = dbRejectPts.find(p => p.quantity === 800);
 +        assert(dbPt800 && dbPt800.withinTolerance === false, `MySQL persisted point q=800 has withinTolerance: false`);
++        const dbPt800Target = dbPt800.targetManufacturingPrice ?? dbPt800.targetPrice;
++        assert(Number.isFinite(dbPt800Target) && Math.abs(dbPt800Target - 1320.00) < 0.01,
++            `MySQL persisted point q=800 target price is finite 1320.00 EUR`);
 +        assert(Math.abs(dbPt800.predictedManufacturingPrice - pt800.predictedManufacturingPrice) < 0.001,
 +            `MySQL persisted point q=800 predicted price matches HTTP response`);
++        assert(Math.abs(dbPt800.absoluteResidual - pt800.absoluteResidual) < 0.001,
++            `MySQL persisted point q=800 absolute residual matches HTTP response`);
++        const dbPt800Ratio = dbPt800.percentageResidual !== undefined ? dbPt800.percentageResidual : dbPt800.percentResidual;
++        const httpPt800Ratio = pt800.percentageResidual !== undefined ? pt800.percentageResidual : pt800.percentResidual;
++        assert(Number.isFinite(dbPt800Ratio) && Math.abs(dbPt800Ratio - httpPt800Ratio) < 0.0001,
++            `MySQL persisted point q=800 percentage residual ratio matches HTTP response`);
 +
 +        // Attempt Governed Acceptance: MUST be rejected by curve tolerance gate with HTTP 422
 +        // Contract: wrapHandler serializes err.statusCode=422, error=err.code ('GOVERNANCE_CURVE_REJECTED'), message=err.message
@@ -1150,11 +2491,12 @@ index 2e68829..c16df2d 100644
  
      } catch (err) {
          mainError = err;
-@@ -1543,16 +2430,18 @@ module.exports = {
+@@ -1543,16 +2593,19 @@ module.exports = {
      verifyRatesChecksumIntegrity,
      computeCanonicalRatesChecksum,
      canonicalStringify,
 -    runChecksumIntegrityRegressions
++    parseAndValidatePointResultsJson,
 +    runChecksumIntegrityRegressions,
 +    runCurveHarnessRegressions
  };
@@ -1172,39 +2514,91 @@ index 2e68829..c16df2d 100644
          }
      } else {
 diff --git a/tests/onboarding_checksum_integrity_regression.test.js b/tests/onboarding_checksum_integrity_regression.test.js
-index 19b21e3..5e96258 100644
+index 19b21e3..1f1cd90 100644
 --- a/tests/onboarding_checksum_integrity_regression.test.js
 +++ b/tests/onboarding_checksum_integrity_regression.test.js
-@@ -8,7 +8,8 @@ const {
+@@ -8,7 +8,9 @@ const {
      canonicalStringify,
      resolveConnectedMysqlPassword,
      getDirectMysqlConnectionConfig,
 -    REQUIRED_MYSQL
 +    REQUIRED_MYSQL,
++    parseAndValidatePointResultsJson,
 +    runCurveHarnessRegressions
  } = require('../scripts/test_onboarding_connected_suite');
  
  describe('Onboarding Harness Checksum Integrity & Normalization Regressions', () => {
-@@ -395,4 +396,10 @@ describe('Onboarding Harness Checksum Integrity & Normalization Regressions', ()
+@@ -395,4 +397,61 @@ describe('Onboarding Harness Checksum Integrity & Normalization Regressions', ()
              expect(resolveBody).not.toMatch(/process\.env\.MYSQL_PASSWORD/);
          });
      });
 +
 +    describe('8. Multi-quantity Curve Harness Regressions', () => {
-+        test('8.1 Ejecuta satisfactoriamente runCurveHarnessRegressions (Suites 7-10: multi-target generation, solver contract, governance gate, zero leakage)', () => {
++        test('8.1 Ejecuta satisfactoriamente runCurveHarnessRegressions (Suites 7-11: multi-target generation, solver contract, governance gate, zero leakage, dual point_results parsing)', () => {
 +            expect(() => runCurveHarnessRegressions()).not.toThrow();
++        });
++    });
++
++    describe('9. parseAndValidatePointResultsJson (Dual parsing, validación estricta de array y rechazo contextual)', () => {
++        const fixtureArray = [
++            { quantity: 100, targetManufacturingPrice: 50.0, predictedManufacturingPrice: 50.0, withinTolerance: true },
++            { quantity: 500, targetManufacturingPrice: 200.0, predictedManufacturingPrice: 200.0, withinTolerance: true }
++        ];
++
++        test('9.1 Cadena JSON válida de array devuelve el array correctamente parseado con todos sus elementos', () => {
++            const jsonStr = JSON.stringify(fixtureArray);
++            const parsed = parseAndValidatePointResultsJson(jsonStr, 'Test 9.1 JSON String');
++            expect(Array.isArray(parsed)).toBe(true);
++            expect(parsed).toHaveLength(2);
++            expect(parsed[0].quantity).toBe(100);
++            expect(parsed[1].quantity).toBe(500);
++        });
++
++        test('9.2 Array nativo devuelto por MySQL driver es devuelto directamente sin alteración', () => {
++            const result = parseAndValidatePointResultsJson(fixtureArray, 'Test 9.2 Native Array');
++            expect(Array.isArray(result)).toBe(true);
++            expect(result).toBe(fixtureArray);
++            expect(result).toHaveLength(2);
++        });
++
++        test('9.3 JSON malformado es rechazado con error contextual que incluye diagnóstico y sin catch silencioso', () => {
++            const malformed = '[{"quantity": 100, "broken":';
++            expect(() => parseAndValidatePointResultsJson(malformed, 'Test 9.3 Malformed JSON')).toThrowError(
++                /\[POINT_RESULTS_VALIDATION_ERROR\] Test 9.3 Malformed JSON: Malformed JSON string/
++            );
++        });
++
++        test('9.4 Objeto no array (tanto cadena JSON como objeto nativo) es rechazado con diagnóstico contextual', () => {
++            const nonArrayJson = '{"quantity": 100, "price": 50}';
++            expect(() => parseAndValidatePointResultsJson(nonArrayJson, 'Test 9.4a JSON Object')).toThrowError(
++                /\[POINT_RESULTS_VALIDATION_ERROR\] Test 9.4a JSON Object: Parsed JSON root is not an array \(received: object\)/
++            );
++
++            const nonArrayNative = { quantity: 100, price: 50 };
++            expect(() => parseAndValidatePointResultsJson(nonArrayNative, 'Test 9.4b Native Object')).toThrowError(
++                /\[POINT_RESULTS_VALIDATION_ERROR\] Test 9.4b Native Object: Expected string or array, received unsupported type object/
++            );
++        });
++
++        test('9.5 Null y undefined son rechazados explícitamente con diagnóstico contextual claro', () => {
++            expect(() => parseAndValidatePointResultsJson(null, 'Test 9.5a Null Value')).toThrowError(
++                /\[POINT_RESULTS_VALIDATION_ERROR\] Test 9.5a Null Value: Value is null or undefined/
++            );
++            expect(() => parseAndValidatePointResultsJson(undefined, 'Test 9.5b Undefined Value')).toThrowError(
++                /\[POINT_RESULTS_VALIDATION_ERROR\] Test 9.5b Undefined Value: Value is null or undefined/
++            );
 +        });
 +    });
  });
 diff --git a/vitest_discovered_suites.txt b/vitest_discovered_suites.txt
-index 75521af..b4b6558 100644
+index 75521af..d7b2dec 100644
 --- a/vitest_discovered_suites.txt
 +++ b/vitest_discovered_suites.txt
 @@ -1,6 +1,6 @@
  ======================================================================
    PRINTPRICE OS: LISTADO EFECTIVO DE SUITES DESCUBIERTAS POR VITEST   
 -  Total archivos de test: 23 | Total pruebas: 327
-+  Total archivos de test: 23 | Total pruebas: 328
++  Total archivos de test: 23 | Total pruebas: 333
  ======================================================================
  
   1. tests/migration_156_157_runner.test.js (5 tests)
@@ -1213,9 +2607,9 @@ index 75521af..b4b6558 100644
  21. tests/GovernedQuoteSmokeTest.test.tsx (30 tests)
  22. tests/PrinthouseOnboardingRedesign.test.tsx (20 tests)
 -23. tests/onboarding_checksum_integrity_regression.test.js (30 tests)
-+23. tests/onboarding_checksum_integrity_regression.test.js (31 tests)
++23. tests/onboarding_checksum_integrity_regression.test.js (36 tests)
  
  ----------------------------------------------------------------------
 -TOTAL: 23 test files | 327 passed tests | 0 failed
-+TOTAL: 23 test files | 328 passed tests | 0 failed
++TOTAL: 23 test files | 333 passed tests | 0 failed
  ----------------------------------------------------------------------

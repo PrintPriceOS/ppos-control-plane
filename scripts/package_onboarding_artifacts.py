@@ -51,6 +51,8 @@ def package():
              "scripts/test_onboarding_connected_suite.js",
              "tests/onboarding_checksum_integrity_regression.test.js",
              "vitest_discovered_suites.txt",
+             "raw_vitest_output.log",
+             "raw_build_output.log",
              "scripts/package_onboarding_artifacts.py"],
             cwd=REPO_ROOT
         )
@@ -227,11 +229,36 @@ def package():
       - Verificación en base de datos: cero revisiones, cero aceptaciones y tarifas del nodo inalteradas.
     - **Escenario 4 (Caso C - Aislamiento Post-Aceptación y de Revisiones):**
       - Intento de lectura no autorizada de la revisión de Tenant A (`GET /pricing/revisions/:id`) e intento de aceptación posterior desde Tenant B: rechazo con HTTP 403/404 y verificación de cero mutaciones globales para Tenant B.
-    - **Acreditación de Regresiones en Vitest (31 pruebas en `onboarding_checksum_integrity_regression.test.js`, 328 tests totales):**
+    - **Acreditación de Regresiones en Vitest (36 pruebas en `onboarding_checksum_integrity_regression.test.js`, 333 tests totales):**
       - Suite 8 (`runCurveHarnessRegressions`) valida en modo aislado: contrato del solver con `CANONICAL_ACCEPTABLE_RUN_STATUSES` y `EXACTLY_DETERMINED`, compuerta de gobernanza con tolerancias oficiales (`POINT_OUT_OF_TOLERANCE`) y sanitización estricta de diagnósticos de error HTTP wrapHandler sin filtración de secretos.
-    - **Diferenciación Estricta entre Pruebas Locales y Pruebas Conectadas:**
-      - **Pruebas Locales Ejecutadas:** Suite completa de Vitest (23 suites, 328 tests pasando, 0 fallidos) y compilación de producción con Vite (`dist/` generado limpiamente).
-      - **Pruebas Conectadas:** El presente commit `{git_sha}` se entrega como **PENDIENTE DE VALIDACIÓN CONECTADA EN ENTORNO DE PERSISTENCIA**. No se despliega ni se ejecuta contra bases de datos en esta entrega, y **no se le atribuye al nuevo commit el resultado PASS de pruebas conectadas previas** ejecutadas sobre commits anteriores.
+      - Suite 9 (`parseAndValidatePointResultsJson`) valida exhaustivamente: admisión de string JSON y array nativo de MySQL, validación explícita de `Array.isArray`, y rechazo contextual estricto (sin catch silencioso) de JSON malformado, objeto no array y valores null/undefined.
+
+18. **Cierre de Hallazgos de Entrega 9eaf975 (Dual Parsing de `point_results_json`, Contraste Completo y Regeneración Real de Logs):**
+    - **Dual Parsing & Validación Estricta de `point_results_json`:**
+      - La función `parseAndValidatePointResultsJson(raw, contextDescription)` admite tanto cadena JSON como array nativo devuelto por el driver MySQL (`mysql2`).
+      - Valida explícitamente `Array.isArray(result)`.
+      - Rechaza de forma estricta JSON malformado, null, undefined, cadenas vacías y tipos incorrectos (objetos no array, números, etc.) con diagnóstico contextual detallado (`[POINT_RESULTS_VALIDATION_ERROR]`) y sin ningún catch silencioso.
+    - **5 Regresiones Específicas de Validación de Array:**
+      - Añadidas tanto en el ejecutor autónomo (`runCurveHarnessRegressions`, Suite 11) como en la suite Vitest (`tests/onboarding_checksum_integrity_regression.test.js`, Suite 9):
+        - 9.1 / 11.1 Cadena JSON válida de array devuelve el array correctamente parseado con todos sus elementos.
+        - 9.2 / 11.2 Array nativo devuelto por el driver MySQL se devuelve directamente por identidad sin alteración.
+        - 9.3 / 11.3 JSON malformado lanza error contextual con diagnóstico (`Malformed JSON string`).
+        - 9.4 / 11.4 Objeto no array (cadena JSON u objeto nativo) lanza diagnóstico contextual (`Parsed JSON root is not an array` / `unsupported type object`).
+        - 9.5 / 11.5 Null y undefined lanzan diagnóstico contextual explícito (`Value is null or undefined`).
+    - **Contraste Exhaustivo MySQL/HTTP Punto por Punto:**
+      - En ambas lecturas de `point_results_json` del harness (Lectura 1 en Escenario 2 y Lectura 2 en Escenario 3), se contrasta exhaustivamente cada punto con:
+        - `quantity`: coincidencia exacta de tirada esperada.
+        - `targetManufacturingPrice` / `targetPrice`: finite number, contraste contra esperado y contra respuesta HTTP.
+        - `predictedManufacturingPrice`: finite number, positivo, contraste contra respuesta HTTP.
+        - `absoluteResidual`: finite number, contraste contra respuesta HTTP.
+        - `percentageResidual` / `percentResidual`: finite number (ratio `[0..1]`), contraste contra respuesta HTTP.
+        - `withinTolerance`: booleano de compuerta de tolerancia, contrastado contra respuesta HTTP.
+    - **Regeneración Genuina de Logs Crudos (`raw_vitest_output.log` y `raw_build_output.log`):**
+      - `raw_vitest_output.log`: Ejecutado realmente sobre el código final con captura integral de stdout, stderr y código de salida 0 (23 suites de prueba, 333 tests pasando, 0 fallidos, duración 13.55s).
+      - `raw_build_output.log`: Ejecutado realmente sobre el código final con captura integral de stdout, stderr y código de salida 0 (Vite v6.4.2 building for production, 3557 modules transformed, dist/ generado en 14.36s).
+    - **Distinción Rigurosa de Commits:**
+      - **Commit de Código:** Modificaciones en el código fuente del harness (`scripts/test_onboarding_connected_suite.js`), pruebas de regresión (`tests/onboarding_checksum_integrity_regression.test.js`), listado de suites (`vitest_discovered_suites.txt`) y logs crudos genuinos (`raw_vitest_output.log`, `raw_build_output.log`).
+      - **Commit Documental y de Empaquetado:** Actualización del manifiesto (`MANIFEST.md`), sumas criptográficas (`SHA256SUMS.txt`), diff unificado (`git_diff_review.diff`) y paquete ZIP (`review_artifacts_onboarding_simplified.zip`).
 
 ---
 
@@ -240,8 +267,8 @@ def package():
   - **Evidencias Visuales (15 archivos PNG):** Reutilizadas de la sesión validada de Playwright (`01_onboarding_...` a `08_onboarding_...`), acreditando fidelidad tipográfica, paridad multilingüe EN/ES/DE, densidad cómoda/compacta, y fidelidad documental (1.792 €, interior 4/4). No han sufrido alteraciones visuales en esta iteración.
   - **Entregables Técnicos y Evidencias de Contrato (13 archivos):** Regenerados e incorporados en esta iteración para acreditar los puntos de auditoría (`test_onboarding_connected_suite.js`, `onboarding_checksum_integrity_regression.test.js`, `calibrationAcceptanceService.js`, `calibration_residuals_compatibility_regression.test.js`, `printhouseOnboardingRoutes.js`, `raw_vitest_output.log`, `raw_build_output.log`, `git_diff_review.diff`, `vitest_discovered_suites.txt`, `userSessionService.js`, `auth_middleware.js`, `auth_and_user_sessions_schema.sql`, `SHA256SUMS.txt`).
 - **Comandos Ejecutados (Pruebas Locales):**
-  - `npx vitest run`: Ejecución local de 23 suites y 328 tests unitarios y de integración (328 pasados, 0 fallidos).
-  - `npm run build`: Compilación local de producción Vite (dist generado limpiamente en 12.18s).
+  - `npx vitest run`: Ejecución local de 23 suites y 333 tests unitarios y de integración (333 pasados, 0 fallidos, exit code 0).
+  - `npm run build`: Compilación local de producción Vite (dist generado limpiamente en 14.36s, exit code 0).
 - **Entorno:**
   - Node.js v20+, Vite 6.4.2, React 19, TypeScript
   - MySQL Target: `ppos_rc_mdw0qd@127.0.0.1:3306/pposrcmdw0qdtest`
