@@ -95,20 +95,37 @@ export const CalculationComparisonView: React.FC<CalculationComparisonViewProps>
     } else if (isFinitePositive(originalPrice)) {
         resolvedTarget = originalPrice;
     } else if (spec?.runs && spec.runs.length > 0) {
-        const targetRun = spec.runs.find((r: any) => r.id === (spec.selectedVariantId || '') || r.variantKey === (spec.selectedVariantId || '')) || spec.runs[0];
-        if (comparisonMode === 'manufacturing') {
-            if (isFinitePositive(targetRun.manufacturingPrice)) {
-                resolvedTarget = targetRun.manufacturingPrice;
-            } else {
+        let targetRun: any = null;
+        if (spec.selectedVariantId) {
+            targetRun = spec.runs.find((r: any) => r.id === spec.selectedVariantId || r.variantKey === spec.selectedVariantId) || null;
+            if (!targetRun) {
                 resolvedTarget = null;
                 resolvedHasEquivalentBreakdown = false;
-                resolvedIncompleteReason = resolvedIncompleteReason || 'Falta desglose de coste de fabricación. Un total con transporte no puede sustituir al coste de fabricación.';
+                resolvedIncompleteReason = 'La variante seleccionada no existe en el presupuesto. Selecciona una variante válida.';
             }
+        } else if (spec.runs.length === 1) {
+            targetRun = spec.runs[0];
         } else {
-            if (isFinitePositive(targetRun.quotedTotalPrice)) {
-                resolvedTarget = targetRun.quotedTotalPrice;
-            } else if (isFinitePositive(targetRun.totalPrice)) {
-                resolvedTarget = targetRun.totalPrice;
+            resolvedTarget = null;
+            resolvedHasEquivalentBreakdown = false;
+            resolvedIncompleteReason = 'Selecciona explícitamente una variante de tirada para comparar.';
+        }
+
+        if (targetRun) {
+            if (comparisonMode === 'manufacturing') {
+                if (isFinitePositive(targetRun.manufacturingPrice)) {
+                    resolvedTarget = targetRun.manufacturingPrice;
+                } else {
+                    resolvedTarget = null;
+                    resolvedHasEquivalentBreakdown = false;
+                    resolvedIncompleteReason = resolvedIncompleteReason || 'Falta desglose de coste de fabricación. Un total con transporte no puede sustituir al coste de fabricación.';
+                }
+            } else {
+                if (isFinitePositive(targetRun.quotedTotalPrice)) {
+                    resolvedTarget = targetRun.quotedTotalPrice;
+                } else if (isFinitePositive(targetRun.totalPrice)) {
+                    resolvedTarget = targetRun.totalPrice;
+                }
             }
         }
     }
@@ -209,16 +226,20 @@ export const CalculationComparisonView: React.FC<CalculationComparisonViewProps>
                         <AlertTriangle size={16} className="text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
                         <div className="space-y-0.5 text-xs">
                             <span className="font-bold text-amber-900 dark:text-amber-200">
-                                {!hasValidEnginePrice 
-                                    ? 'Cálculo del motor ausente o incompleto' 
-                                    : (!hasEquivalentBreakdown 
-                                        ? (t('review.incompleteComparison') || 'Comparación incompleta') 
-                                        : 'Comparación no válida')}
+                                {resolvedTarget === null && spec?.runs && spec.runs.length > 0
+                                    ? 'Selección de variante requerida o no válida'
+                                    : (!hasValidEnginePrice 
+                                        ? 'Cálculo del motor ausente o incompleto' 
+                                        : (!hasEquivalentBreakdown 
+                                            ? (t('review.incompleteComparison') || 'Comparación incompleta') 
+                                            : 'Comparación no válida'))}
                             </span>
                             <p className="text-[11px] text-amber-800/90 dark:text-amber-300/90 leading-relaxed">
-                                {!hasValidEnginePrice
-                                    ? 'El motor no ha devuelto un resultado de cálculo positivo para esta especificación. El avance a la propuesta de tarifas está bloqueado hasta ejecutar el solver satisfactoriamente.'
-                                    : (incompleteComparisonReason || t('review.incompleteComparisonReason') || 'El desglose de la oferta no permite contrastar magnitudes equivalentes de forma estricta. Verifique si falta desglose de fabricación independiente del transporte.')}
+                                {resolvedIncompleteReason
+                                    ? resolvedIncompleteReason
+                                    : (!hasValidEnginePrice
+                                        ? 'El motor no ha devuelto un resultado de cálculo positivo para esta especificación. El avance a la propuesta de tarifas está bloqueado hasta ejecutar el solver satisfactoriamente.'
+                                        : (incompleteComparisonReason || t('review.incompleteComparisonReason') || 'El desglose de la oferta no permite contrastar magnitudes equivalentes de forma estricta. Verifique si falta desglose de fabricación independiente del transporte.'))}
                             </p>
                         </div>
                     </div>

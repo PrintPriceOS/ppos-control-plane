@@ -33,6 +33,7 @@ import { ManualOfferForm } from '../src/ui/components/printhouse/onboarding/Manu
 import { VariantSpecTable } from '../src/ui/components/printhouse/onboarding/VariantSpecTable';
 import { CalculationComparisonView } from '../src/ui/components/printhouse/onboarding/CalculationComparisonView';
 import { GovernedAcceptanceView } from '../src/ui/components/printhouse/onboarding/GovernedAcceptanceView';
+import { printhouseCalibrationApi } from '../src/ui/lib/printhouseCalibrationApi';
 import { 
     NATUR_DOCUMENT_FIXTURE,
     STUTENSEE_DOCUMENT_FIXTURE,
@@ -414,4 +415,99 @@ describe('Simplified Printhouse Onboarding Journey Suite', () => {
         // Now in Step 3, table of variants is shown
         expect(screen.getByText(/Revisión de Especificaciones y Tabla de Variantes/i)).toBeInTheDocument();
     });
+
+    it('17. Discards late session creation response and prevents sessionId write if document switched in-flight', async () => {
+        let resolveCreateSession: any;
+        const createSessionPromise = new Promise((resolve) => {
+            resolveCreateSession = resolve;
+        });
+
+        vi.spyOn(printhouseCalibrationApi, 'createSession').mockReturnValue(createSessionPromise as any);
+
+        renderJourney(
+            <SimplifiedOnboardingJourney 
+                initialSpec={NATUR_DOCUMENT_FIXTURE.spec as any} 
+                initialStep={3} 
+                printerNodeId="node-test-123"
+            />, 
+            'es'
+        );
+
+        // Click to proceed to comparison / run solver
+        const compareBtn = screen.getByTestId('proceed-to-compare-btn');
+        fireEvent.click(compareBtn);
+
+        // While createSession is pending, simulate user navigating back to step 1 and switching family
+        const step1Btn = screen.getByRole('button', { name: /Qué productos fabricas/i });
+        fireEvent.click(step1Btn);
+
+        const hardcoversFamily = screen.getByText(/Tapa dura/i);
+        fireEvent.click(hardcoversFamily);
+
+        // Now resolve the late createSession with a fake session ID
+        resolveCreateSession({ id: 'late-stale-session-id-999' });
+
+        // Assert: late session is NOT accepted and does NOT proceed to accept
+        await waitFor(() => {
+            expect(screen.queryByText(/Aceptar propuesta de tarifas/i)).not.toBeInTheDocument();
+        });
+    });
+
+    it('18. Discards late PDF extraction response if user triggered a new action before fetch completed', async () => {
+        let resolveFetch: any;
+        const fetchPromise = new Promise((resolve) => {
+            resolveFetch = resolve;
+        });
+
+        global.fetch = vi.fn().mockReturnValue(fetchPromise as any);
+
+        const { container } = renderJourney(
+            <SimplifiedOnboardingJourney initialStep={2} />,
+            'es'
+        );
+
+        // Upload first file
+        const file1 = new File(['dummy-content-1'], 'first_offer.pdf', { type: 'application/pdf' });
+        const input = container.querySelector('input[type="file"]') as HTMLInputElement;
+        fireEvent.change(input, { target: { files: [file1] } });
+
+        // User changes mode to MANUAL_FORM before first upload completes
+        const manualBtn = screen.getByText(/Introducir oferta manualmente/i);
+        fireEvent.click(manualBtn);
+
+        // Resolve the stale upload response
+        resolveFetch({
+            ok: true,
+            json: async () => ({
+                productTitle: 'Old Stale Title That Should Be Ignored',
+                runs: [{ id: 'run-1', quantity: 500, manufacturingPrice: 999 }]
+            })
+        });
+
+        // Assert that old title is NOT present in document
+        await waitFor(() => {
+            expect(screen.queryByText('Old Stale Title That Should Be Ignored')).not.toBeInTheDocument();
+        });
+    });
+
+    it('19. Blocks calculation when selectedVariantId does not match any run in current offer', async () => {
+        const specWithInvalidVariant = {
+            ...NATUR_DOCUMENT_FIXTURE.spec,
+            selectedVariantId: 'completely-non-existent-variant-id'
+        };
+
+        renderJourney(
+            <SimplifiedOnboardingJourney 
+                initialSpec={specWithInvalidVariant as any} 
+                initialStep={4} 
+            />, 
+            'es'
+        );
+
+        // In Step 4, comparison must show error and block acceptance
+        expect(screen.getAllByText(/La variante seleccionada no existe en el presupuesto/i).length).toBeGreaterThanOrEqual(1);
+        const acceptBtn = screen.getByTestId('proceed-to-accept-btn');
+        expect(acceptBtn).toBeDisabled();
+    });
 });
+

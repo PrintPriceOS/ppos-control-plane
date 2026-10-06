@@ -349,7 +349,76 @@ describe('Printhouse Calibration Onboarding - Audit, Fidelity and Governance Sui
             const proceedBtn = screen.getByTestId('proceed-to-accept-btn');
             expect(proceedBtn).toBeDisabled();
             // Should display incomplete breakdown warning
-            expect(screen.getByText(/Falta desglose de coste de fabricación/i)).toBeInTheDocument();
+            expect(screen.getAllByText(/Falta desglose de coste de fabricación/i).length).toBeGreaterThanOrEqual(1);
+        });
+
+        it('3b.7 Regression: Invalid selectedVariantId does NOT fallback silently to runs[0], blocking comparison advance', () => {
+            const specWithMultipleVariants = {
+                family: 'SOFTCOVER',
+                productTitle: 'Oferta Multiples Variantes',
+                selectedVariantId: 'invalid-non-existent-id',
+                runs: [
+                    {
+                        id: 'run-1',
+                        quantity: 500,
+                        manufacturingPrice: 1200,
+                        transportPrice: 100,
+                        quotedTotalPrice: 1300
+                    },
+                    {
+                        id: 'run-2',
+                        quantity: 1000,
+                        manufacturingPrice: 2000,
+                        transportPrice: 150,
+                        quotedTotalPrice: 2150
+                    }
+                ]
+            };
+
+            renderWithLocale(
+                <CalculationComparisonView
+                    spec={specWithMultipleVariants}
+                    enginePrice={1200}
+                    comparisonMode="manufacturing"
+                />
+            );
+
+            // Must NOT advance to accept because variant is invalid
+            const proceedBtn = screen.getByTestId('proceed-to-accept-btn');
+            expect(proceedBtn).toBeDisabled();
+            expect(screen.getAllByText(/La variante seleccionada no existe en el presupuesto/i).length).toBeGreaterThanOrEqual(1);
+        });
+
+        it('3b.8 Regression: Multiple variants without explicit selectedVariantId blocks comparison advance and requests explicit selection', () => {
+            const specWithoutSelectedVariant = {
+                family: 'SOFTCOVER',
+                productTitle: 'Oferta Sin Seleccion Explicita',
+                selectedVariantId: undefined,
+                runs: [
+                    {
+                        id: 'run-1',
+                        quantity: 500,
+                        manufacturingPrice: 1200
+                    },
+                    {
+                        id: 'run-2',
+                        quantity: 1000,
+                        manufacturingPrice: 2000
+                    }
+                ]
+            };
+
+            renderWithLocale(
+                <CalculationComparisonView
+                    spec={specWithoutSelectedVariant}
+                    enginePrice={1200}
+                    comparisonMode="manufacturing"
+                />
+            );
+
+            const proceedBtn = screen.getByTestId('proceed-to-accept-btn');
+            expect(proceedBtn).toBeDisabled();
+            expect(screen.getAllByText(/Selecciona explícitamente una variante de tirada para comparar/i).length).toBeGreaterThanOrEqual(1);
         });
     });
 

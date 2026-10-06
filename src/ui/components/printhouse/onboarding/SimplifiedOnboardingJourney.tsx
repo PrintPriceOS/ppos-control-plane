@@ -130,8 +130,14 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
     // ── Session & Calibration Integration State ──
     const [sessionId, setSessionId] = useState<string | null>(null);
     const [activeRun, setActiveRun] = useState<any>(null);
-    const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null);
+    const [selectedVariantId, setSelectedVariantId] = useState<string | null>(() => {
+        if (initialSpec?.selectedVariantId !== undefined) {
+            return initialSpec.selectedVariantId;
+        }
+        return initialSpec?.runs?.[0]?.id || initialSpec?.runs?.[0]?.variantKey || null;
+    });
     const calculationRequestIdRef = useRef<number>(0);
+    const uploadRequestIdRef = useRef<number>(0);
     const [calculatingSolver, setCalculatingSolver] = useState<boolean>(false);
     const [isSubmittingAcceptance, setIsSubmittingAcceptance] = useState<boolean>(false);
 
@@ -244,6 +250,7 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
         setUploadedFileName(file.name);
         setUploadingPdf(true);
 
+        const thisUploadId = ++uploadRequestIdRef.current;
         // ITEM 3: Invalidate any previous run, proposal, and in-flight calculations
         calculationRequestIdRef.current++;
         setSessionId(null);
@@ -285,6 +292,11 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
                 }
             } catch (e) {
                 // If backend is offline or mock in test, gracefully fallback
+            }
+
+            // Stale upload guard: discard if superseded by another upload or user action
+            if (uploadRequestIdRef.current !== thisUploadId) {
+                return;
             }
 
             const cleanTitle = extractedData?.productTitle || file.name.replace(/\.pdf$/i, '');
@@ -397,11 +409,30 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
         const thisReqId = ++calculationRequestIdRef.current;
         setCalculatingSolver(true);
         try {
-            const targetRun = offer.runs && offer.runs.length > 0 
-                ? (offer.runs.find(r => r.id === selectedVariantId || r.variantKey === selectedVariantId) || offer.runs[0])
-                : null;
-
-            if (!targetRun) {
+            let targetRun: any = null;
+            if (selectedVariantId) {
+                targetRun = offer.runs?.find(r => r.id === selectedVariantId || r.variantKey === selectedVariantId) || null;
+                if (!targetRun) {
+                    setActiveRun(null);
+                    setProposedPatch({});
+                    setComparisonData(prev => ({
+                        ...prev,
+                        originalPrice: null,
+                        enginePrice: null,
+                        difference: null,
+                        residual: null,
+                        isCalculated: false,
+                        hasEquivalentBreakdown: false,
+                        incompleteComparisonReason: 'La variante seleccionada no existe en el presupuesto. Selecciona una variante válida.',
+                        calculationError: 'La variante seleccionada no existe en el presupuesto. Selecciona una variante válida para calcular.'
+                    }));
+                    return;
+                }
+            } else if (offer.runs && offer.runs.length === 1) {
+                targetRun = offer.runs[0];
+            } else {
+                setActiveRun(null);
+                setProposedPatch({});
                 setComparisonData(prev => ({
                     ...prev,
                     originalPrice: null,
@@ -409,7 +440,9 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
                     difference: null,
                     residual: null,
                     isCalculated: false,
-                    calculationError: 'No hay variantes de presupuesto configuradas para calcular.'
+                    hasEquivalentBreakdown: false,
+                    incompleteComparisonReason: 'Selecciona explícitamente una variante de tirada para calcular.',
+                    calculationError: 'Selecciona explícitamente una variante de tirada antes de ejecutar el cálculo.'
                 }));
                 return;
             }
@@ -446,6 +479,8 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
             if (printerNodeId) {
                 try {
                     let sess = sessionId ? await printhouseCalibrationApi.getSession(sessionId) : null;
+                    if (calculationRequestIdRef.current !== thisReqId) return;
+
                     if (!sess) {
                         sess = await printhouseCalibrationApi.createSession({
                             printerNodeId,
@@ -457,13 +492,17 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
                             },
                             targetManufacturingPrice: targetManufacturing
                         });
+                        if (calculationRequestIdRef.current !== thisReqId) return;
                         if (sess?.id) setSessionId(sess.id);
                     }
                     if (sess?.id) {
                         await printhouseCalibrationApi.markSessionReady(sess.id);
+                        if (calculationRequestIdRef.current !== thisReqId) return;
                         runResult = await printhouseCalibrationApi.calculateCalibration(sess.id);
+                        if (calculationRequestIdRef.current !== thisReqId) return;
                     }
                 } catch (e: any) {
+                    if (calculationRequestIdRef.current !== thisReqId) return;
                     runError = e.message || 'Error en la llamada al motor de cálculo';
                 }
             }
@@ -852,7 +891,7 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
                     <VariantSpecTable
                         spec={{
                             ...currentOffer,
-                            selectedVariantId: selectedVariantId || currentOffer.runs?.[0]?.id || currentOffer.runs?.[0]?.variantKey
+                            selectedVariantId: selectedVariantId ?? currentOffer.selectedVariantId ?? null
                         }}
                         onEditOffer={() => {
                             setEntryMode('MANUAL_FORM');
@@ -876,7 +915,7 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
                     <CalculationComparisonView
                         spec={{
                             ...currentOffer,
-                            selectedVariantId: selectedVariantId || currentOffer.runs?.[0]?.id || currentOffer.runs?.[0]?.variantKey
+                            selectedVariantId: selectedVariantId ?? currentOffer.selectedVariantId ?? null
                         }}
                         originalPrice={comparisonData.originalPrice}
                         enginePrice={comparisonData.enginePrice}

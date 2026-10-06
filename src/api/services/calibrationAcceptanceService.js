@@ -414,11 +414,13 @@ class CalibrationAcceptanceService {
                 throw err;
             }
 
-            // Single, deterministic residual convention:
-            // absoluteResidual = |verifiedManufacturingPrice - targetManufacturingPrice|
-            // percentResidual = absoluteResidual / targetManufacturingPrice (ratio format)
+            // Explicit, mathematically grounded residual conventions:
+            // 1. absoluteResidual = |verifiedManufacturingPrice - targetManufacturingPrice| (EUR)
+            // 2. ratioResidual = absoluteResidual / targetManufacturingPrice (unitless ratio 0.00..1.00)
+            // 3. percentResidual = (absoluteResidual / targetManufacturingPrice) * 100 (percentage points 0.00..100.00%)
             const absoluteResidual = Number(Math.abs(verifiedManufacturingPrice - targetManufacturingPrice).toFixed(6));
-            const percentResidual = Number((absoluteResidual / targetManufacturingPrice).toFixed(6));
+            const ratioResidual = Number((absoluteResidual / targetManufacturingPrice).toFixed(6));
+            const percentResidual = Number((ratioResidual * 100).toFixed(4));
 
             // Verify supplied residual from run if provided, rejecting contradictory values
             if (run.absolute_residual !== null && run.absolute_residual !== undefined) {
@@ -434,14 +436,27 @@ class CalibrationAcceptanceService {
             }
 
             if (run.percent_residual !== null && run.percent_residual !== undefined) {
-                const suppliedPct = Number(run.percent_residual);
-                const normalizedSuppliedPct = suppliedPct > 1 ? suppliedPct / 100 : suppliedPct;
-                if (!Number.isFinite(normalizedSuppliedPct) || Math.abs(normalizedSuppliedPct - percentResidual) > 0.01) {
+                const supplied = Number(run.percent_residual);
+                if (!Number.isFinite(supplied) || Number.isNaN(supplied) || supplied < 0) {
                     await connection.rollback();
                     const err = new Error('CONTRADICTORY_SUPPLIED_RESIDUAL');
                     err.code = 'CONTRADICTORY_SUPPLIED_RESIDUAL';
                     err.statusCode = 422;
-                    err.details = `Supplied run percent residual (${suppliedPct}) contradicts verified forward price percent residual (${percentResidual}). Acceptance blocked.`;
+                    err.details = `Supplied run percent residual (${run.percent_residual}) is invalid or negative. Acceptance blocked.`;
+                    throw err;
+                }
+                // Explicit mathematical validation against canonical units:
+                // Case A: Supplied as fractional ratio [0..1] e.g. 0.0040 (0.4%)
+                const matchesRatio = Math.abs(supplied - ratioResidual) <= 0.0005;
+                // Case B: Supplied as percentage points [0..100%] e.g. 0.4000 (0.4%)
+                const matchesPercent = Math.abs(supplied - percentResidual) <= 0.05;
+
+                if (!matchesRatio && !matchesPercent) {
+                    await connection.rollback();
+                    const err = new Error('CONTRADICTORY_SUPPLIED_RESIDUAL');
+                    err.code = 'CONTRADICTORY_SUPPLIED_RESIDUAL';
+                    err.statusCode = 422;
+                    err.details = `Supplied run percent residual (${supplied}) contradicts verified forward price residual (ratio: ${ratioResidual}, percentage: ${percentResidual}%). Acceptance blocked.`;
                     throw err;
                 }
             }
