@@ -17,11 +17,13 @@
  *    - `printhouse_pricing_revisions` queries by printer_node_id and rates_checksum (not printhouse_id/version/checksum).
  *    - Tracks and cleans `printhouse_pricing_calibration_acceptances`.
  * 5. Unique IDs per execution. Tracks all created IDs and performs automatic orphan discovery by execution tenant.
- *    Deterministic teardown in strict foreign-key order. Cleanup failure exits with code 1.
+ *    Deterministic teardown in strict foreign-key order across all 6 tables.
+ *    Cleanup verification checks zero residuals in all 6 affected tables; cleanup failure exits with code 1.
  * 6. Effective scope:
- *    - Strict cross-tenant isolation testing across GET (read), calculate, and accept endpoints.
- *    - Cancellation lifecycle: verified that an abandoned/canceled session produces zero revisions and zero rate changes.
- *    - Delta checks on isolated fixtures (baseline -> accepted -> post-readback) ensuring zero commercial leakage.
+ *    - Official routes: POST for /ready, POST for /reject (cancellation), POST for /calculate, POST for /accept.
+ *    - Strict cross-tenant isolation testing using a REAL session and REAL run ID belonging to Tenant A.
+ *    - Real cancellation flow: tests POST /reject, verifying status 'REJECTED' and zero revisions/zero rate mutation.
+ *    - Verifies cryptographic integrity of rates_checksum by computing canonical SHA-256 of stored rates_json.
  * 7. Clean server, client, and pool shutdown with HTTP timeouts.
  */
 
@@ -70,7 +72,7 @@ if (!mysqlPassword) {
     process.exit(1);
 }
 
-// Set CP environment variables strictly before importing CP services
+// Set CP environment variables strictly before importing CP services and routes
 process.env.MYSQL_HOST = REQUIRED_MYSQL.host;
 process.env.MYSQL_PORT = String(REQUIRED_MYSQL.port);
 process.env.MYSQL_USER = REQUIRED_MYSQL.user;
@@ -78,6 +80,9 @@ process.env.MYSQL_PASSWORD = mysqlPassword;
 process.env.MYSQL_DATABASE = REQUIRED_MYSQL.database;
 delete process.env.DATABASE_URL;
 delete process.env.MYSQL_URL;
+
+const JWT_SECRET = process.env.JWT_TEST_SECRET || 'test_isolated_connected_secret_key_2026';
+process.env.JWT_SECRET = JWT_SECRET;
 
 const http = require('http');
 const express = require('express');
@@ -89,10 +94,23 @@ const mysql = require('mysql2/promise');
 const mysqlClient = require('../src/api/services/mysqlClient');
 const printhouseOnboardingRoutes = require('../src/api/routes/printhouseOnboardingRoutes');
 
-const JWT_SECRET = process.env.JWT_TEST_SECRET || 'test_isolated_connected_secret_key_2026';
-process.env.JWT_SECRET = JWT_SECRET;
+// ── 2. CANONICAL STRINGIFY & CHECKSUM UTILITIES ──
+function canonicalStringify(obj) {
+    if (obj === null || obj === undefined) return 'null';
+    if (typeof obj !== 'object') return JSON.stringify(obj);
+    if (Array.isArray(obj)) return '[' + obj.map(v => canonicalStringify(v)).join(',') + ']';
+    const keys = Object.keys(obj).sort();
+    return '{' + keys.map(k => JSON.stringify(k) + ':' + canonicalStringify(obj[k])).join(',') + '}';
+}
 
-// ── 2. UNIQUE FIXTURE TRACKING & IDENTITY ──
+function computeCanonicalRatesChecksum(rates) {
+    if (!rates) return null;
+    const parsed = typeof rates === 'string' ? JSON.parse(rates) : rates;
+    const canonical = canonicalStringify(parsed);
+    return 'sha256:' + crypto.createHash('sha256').update(canonical).digest('hex');
+}
+
+// ── 3. UNIQUE FIXTURE TRACKING & IDENTITY ──
 const EXECUTION_TAG = 'test_onb_' + Date.now().toString(36) + '_' + crypto.randomBytes(3).toString('hex');
 const tracker = {
     tenants: new Set(),
@@ -163,7 +181,7 @@ function httpRequest(serverUrl, method, path, token, body = null, timeoutMs = 50
     });
 }
 
-// ── 3. STRICT IDENTITY VERIFICATION ──
+// ── 4. STRICT IDENTITY VERIFICATION ──
 async function verifyMysqlIdentity(directConn, cpPool) {
     console.log(`\n[IDENTITY] Verifying positive identity on MySQL connections (Zero DDL)...`);
 
@@ -181,8 +199,8 @@ async function verifyMysqlIdentity(directConn, cpPool) {
     }
     assert(true, `Direct MySQL identity strictly verified as ${directUser} on ${directDb}`);
 
-    // B. CP Service Pool Check
-    const poolRows = await cpPool.query('SELECT CURRENT_USER() AS currentUser, DATABASE() AS currentDb');
+    // B. CP Service Pool Check: destructure [poolRows] from native mysql2 pool query
+    const [poolRows] = await cpPool.query('SELECT CURRENT_USER() AS currentUser, DATABASE() AS currentDb');
     const poolUser = poolRows[0]?.currentUser;
     const poolDb = poolRows[0]?.currentDb;
 
@@ -196,10 +214,11 @@ async function verifyMysqlIdentity(directConn, cpPool) {
     assert(true, `CP service pool identity strictly verified as ${poolUser} on ${poolDb}`);
 }
 
-// ── 4. DETERMINISTIC CLEANUP IN FK ORDER ──
+// ── 5. DETERMINISTIC CLEANUP IN FK ORDER ACROSS ALL 6 TABLES ──
 async function performDeterministicCleanup(directConn) {
-    console.log('\n[CLEANUP] Discovering and purging tracked test fixtures in strict FK order...');
+    console.log('\n[CLEANUP] Discovering and purging tracked test fixtures across all 6 affected tables...');
     let cleanupFailed = false;
+    const residualErrors = [];
 
     try {
         const tenantList = Array.from(tracker.tenants);
@@ -301,7 +320,29 @@ async function performDeterministicCleanup(directConn) {
             console.log(`  ✓ Cleaned ${tIds.length} tenants`);
         }
 
-        // Post-cleanup verification: assert zero remaining records for all tracked IDs
+        // Post-cleanup verification: assert zero remaining records in ALL 6 TABLES
+        if (tracker.acceptanceIds.size > 0) {
+            const [remAcc] = await directConn.query(
+                `SELECT COUNT(*) as count FROM printhouse_pricing_calibration_acceptances WHERE id IN (?)`,
+                [Array.from(tracker.acceptanceIds)]
+            );
+            if (remAcc[0]?.count > 0) {
+                cleanupFailed = true;
+                residualErrors.push(`${remAcc[0].count} calibration acceptances remained uncleaned`);
+            }
+        }
+
+        if (tracker.runIds.size > 0) {
+            const [remRuns] = await directConn.query(
+                `SELECT COUNT(*) as count FROM printhouse_pricing_calibration_runs WHERE id IN (?)`,
+                [Array.from(tracker.runIds)]
+            );
+            if (remRuns[0]?.count > 0) {
+                cleanupFailed = true;
+                residualErrors.push(`${remRuns[0].count} calibration runs remained uncleaned`);
+            }
+        }
+
         if (tracker.sessionIds.size > 0) {
             const [remSess] = await directConn.query(
                 `SELECT COUNT(*) as count FROM printhouse_pricing_calibration_sessions WHERE id IN (?)`,
@@ -309,7 +350,7 @@ async function performDeterministicCleanup(directConn) {
             );
             if (remSess[0]?.count > 0) {
                 cleanupFailed = true;
-                console.error(`  ✗ [CLEANUP-FAILURE] ${remSess[0].count} calibration sessions remained uncleaned!`);
+                residualErrors.push(`${remSess[0].count} calibration sessions remained uncleaned`);
             }
         }
 
@@ -320,7 +361,18 @@ async function performDeterministicCleanup(directConn) {
             );
             if (remRevs[0]?.count > 0) {
                 cleanupFailed = true;
-                console.error(`  ✗ [CLEANUP-FAILURE] ${remRevs[0].count} pricing revisions remained uncleaned!`);
+                residualErrors.push(`${remRevs[0].count} pricing revisions remained uncleaned`);
+            }
+        }
+
+        if (tracker.printerNodes.size > 0) {
+            const [remNodes] = await directConn.query(
+                `SELECT COUNT(*) as count FROM printer_nodes WHERE id IN (?)`,
+                [Array.from(tracker.printerNodes)]
+            );
+            if (remNodes[0]?.count > 0) {
+                cleanupFailed = true;
+                residualErrors.push(`${remNodes[0].count} printer nodes remained uncleaned`);
             }
         }
 
@@ -331,24 +383,27 @@ async function performDeterministicCleanup(directConn) {
             );
             if (remTenants[0]?.count > 0) {
                 cleanupFailed = true;
-                console.error(`  ✗ [CLEANUP-FAILURE] ${remTenants[0].count} tenants remained uncleaned!`);
+                residualErrors.push(`${remTenants[0].count} tenants remained uncleaned`);
             }
         }
 
         if (!cleanupFailed) {
-            console.log('  ✓ All tracked fixtures completely purged and absence verified.');
+            console.log('  ✓ Verified 0 residuals across all 6 affected tables.');
+        } else {
+            console.error('  ✗ [CLEANUP-FAILURE] Residuals detected:', residualErrors.join('; '));
         }
     } catch (cleanErr) {
         cleanupFailed = true;
         console.error(`  ✗ [CLEANUP-ERROR] Exception during cleanup: ${cleanErr.message}`);
+        residualErrors.push(cleanErr.message);
     }
 
     if (cleanupFailed) {
-        throw new Error('VERIFIED_CLEANUP_FAILED: One or more test fixtures could not be cleanly purged.');
+        throw new Error(`VERIFIED_CLEANUP_FAILED: Residual test records detected: ${residualErrors.join(', ')}`);
     }
 }
 
-// ── 5. MAIN CONNECTED ONBOARDING VALIDATION ──
+// ── 6. MAIN CONNECTED ONBOARDING VALIDATION ──
 async function runConnectedSuite() {
     console.log(`\n================================================================`);
     console.log(`  PRINTPRICE OS: CONNECTED ONBOARDING & CALIBRATION SUITE (MYSQL) `);
@@ -360,6 +415,7 @@ async function runConnectedSuite() {
     let directConn = null;
     let testServer = null;
     let mainError = null;
+    let cleanupError = null;
 
     try {
         // Direct MySQL Connection
@@ -444,7 +500,7 @@ async function runConnectedSuite() {
         assert(baselineRevs[0].count === 0, `Isolated node has exactly 0 baseline pricing revisions`);
 
         // ── STEP 3: CREATE CALIBRATION SESSION ──
-        console.log(`\n[STEP 3] Creating Calibration Session with Die Mysteriösen Steine`);
+        console.log(`\n[STEP 3] Creating Calibration Session with Die Mysteriösen Steine (Interior 4/4)`);
         const sessionPayload = {
             printerNodeId: FIXTURE_NODE_A,
             referenceBookName: 'Die Mysteriösen Steine',
@@ -475,54 +531,20 @@ async function runConnectedSuite() {
         assert(Boolean(sessionId), `Received valid session ID: ${sessionId}`);
         tracker.sessionIds.add(sessionId);
 
-        // ── STEP 4: STRICT MULTI-TENANT ISOLATION ACROSS READ, CALCULATE & ACCEPT ──
-        console.log(`\n[STEP 4] Verifying Strict Multi-Tenant Isolation (Tenant B vs Tenant A Session)`);
-
-        // A. Read isolation
-        const crossTenantRead = await httpRequest(
-            serverUrl,
-            'GET',
-            `/api/printhouse/onboarding/pricing/calibrations/${sessionId}`,
-            tokenB
-        );
-        assert(crossTenantRead.status === 403 || crossTenantRead.status === 404,
-            `Cross-tenant read rejected with HTTP ${crossTenantRead.status}`);
-
-        // B. Calculate isolation
-        const crossTenantCalc = await httpRequest(
-            serverUrl,
-            'POST',
-            `/api/printhouse/onboarding/pricing/calibrations/${sessionId}/calculate`,
-            tokenB,
-            { targetPrice: 1792.00 }
-        );
-        assert(crossTenantCalc.status === 403 || crossTenantCalc.status === 404,
-            `Cross-tenant calculation rejected with HTTP ${crossTenantCalc.status}`);
-
-        // C. Acceptance isolation
-        const crossTenantAccept = await httpRequest(
-            serverUrl,
-            'POST',
-            `/api/printhouse/onboarding/pricing/calibrations/${sessionId}/accept`,
-            tokenB,
-            { runId: 'fake-run', acceptanceNotes: 'Unauthorized tenant attempt' }
-        );
-        assert(crossTenantAccept.status === 403 || crossTenantAccept.status === 404,
-            `Cross-tenant acceptance rejected with HTTP ${crossTenantAccept.status}`);
-
-        // ── STEP 5: PREFLIGHT READINESS CHECK ──
-        console.log(`\n[STEP 5] Checking Preflight Readiness for Authorized Tenant`);
+        // ── STEP 4: PREFLIGHT READINESS CHECK (CONTRACT: POST /pricing/calibrations/:id/ready) ──
+        console.log(`\n[STEP 4] Checking Preflight Readiness (Official Contract: POST /:id/ready)`);
         const readyRes = await httpRequest(
             serverUrl,
-            'GET',
+            'POST',
             `/api/printhouse/onboarding/pricing/calibrations/${sessionId}/ready`,
             tokenA
         );
-        assert(readyRes.status === 200, `Preflight readiness returned HTTP 200`);
-        assert(readyRes.body.isReady === true, `Session is preflight ready`);
+        assert(readyRes.status === 200, `POST /ready returned HTTP 200`);
+        assert(readyRes.body.data?.status === 'READY' || readyRes.body.ok === true,
+            `Session successfully transitioned to READY state`);
 
-        // ── STEP 6: DETERMINISTIC SOLVER CALCULATION ──
-        console.log(`\n[STEP 6] Executing Deterministic Solver Run`);
+        // ── STEP 5: DETERMINISTIC SOLVER CALCULATION ──
+        console.log(`\n[STEP 5] Executing Deterministic Solver Run`);
         const calcRes = await httpRequest(
             serverUrl,
             'POST',
@@ -536,21 +558,63 @@ async function runConnectedSuite() {
         assert(calcRes.body.proposedPatch && Object.keys(calcRes.body.proposedPatch).length > 0,
             `Proposed patch contains deterministic rates`);
 
-        // Verify Run in Database
+        // Verify Run in Database and extract real runId
         const [runs] = await directConn.query(
             `SELECT id, absolute_residual, percent_residual FROM printhouse_pricing_calibration_runs WHERE session_id = ?`,
             [sessionId]
         );
         assert(runs.length > 0, `Calibration run recorded in MySQL`);
-        const runId = runs[0].id;
-        tracker.runIds.add(runId);
+        const realRunId = runs[0].id;
+        tracker.runIds.add(realRunId);
         assert(Number(runs[0].absolute_residual) >= 0, `Non-negative absolute residual stored in run`);
 
-        // ── STEP 7: CANCELLATION LIFECYCLE (ZERO WRITES / ZERO COMMODITY EFFECT) ──
-        console.log(`\n[STEP 7] Verifying Cancellation Lifecycle on Secondary Session`);
+        // ── STEP 6: STRICT MULTI-TENANT ISOLATION USING REAL SESSION AND REAL RUN ID ──
+        console.log(`\n[STEP 6] Testing Multi-Tenant Isolation using REAL Session and REAL Run ID`);
+
+        // A. Cross-tenant Read with real sessionId
+        const crossTenantRead = await httpRequest(
+            serverUrl,
+            'GET',
+            `/api/printhouse/onboarding/pricing/calibrations/${sessionId}`,
+            tokenB
+        );
+        assert(crossTenantRead.status === 403 || crossTenantRead.status === 404,
+            `Cross-tenant read rejected with HTTP ${crossTenantRead.status}`);
+
+        // B. Cross-tenant Calculate with real sessionId
+        const crossTenantCalc = await httpRequest(
+            serverUrl,
+            'POST',
+            `/api/printhouse/onboarding/pricing/calibrations/${sessionId}/calculate`,
+            tokenB,
+            { targetPrice: 1792.00 }
+        );
+        assert(crossTenantCalc.status === 403 || crossTenantCalc.status === 404,
+            `Cross-tenant calculate rejected with HTTP ${crossTenantCalc.status}`);
+
+        // C. Cross-tenant Accept with REAL sessionId AND REAL runId
+        const crossTenantAccept = await httpRequest(
+            serverUrl,
+            'POST',
+            `/api/printhouse/onboarding/pricing/calibrations/${sessionId}/accept`,
+            tokenB,
+            { runId: realRunId, acceptanceNotes: 'Unauthorized tenant attempt with real runId' }
+        );
+        assert(crossTenantAccept.status === 403 || crossTenantAccept.status === 404,
+            `Cross-tenant acceptance with real runId strictly rejected with HTTP ${crossTenantAccept.status}`);
+
+        // Verify no revisions were created by the unauthorized cross-tenant attempt
+        const [postCrossRevs] = await directConn.query(
+            `SELECT COUNT(*) as count FROM printhouse_pricing_revisions WHERE printer_node_id = ?`,
+            [FIXTURE_NODE_A]
+        );
+        assert(postCrossRevs[0].count === 0, `Zero pricing revisions created following rejected cross-tenant attempt`);
+
+        // ── STEP 7: REAL CANCELLATION FLOW (POST /reject) VS ABANDONMENT ──
+        console.log(`\n[STEP 7] Verifying Real Cancellation Flow (POST /reject) on Secondary Session`);
         const cancelSessionPayload = {
             printerNodeId: FIXTURE_NODE_A,
-            referenceBookName: 'Unaccepted Calibration Session',
+            referenceBookName: 'Cancelled Calibration Session',
             bookSpec: {
                 productTitle: 'Canceled Test Book',
                 family: 'SOFTCOVER',
@@ -569,27 +633,42 @@ async function runConnectedSuite() {
         const cancelSessionId = cancelCreateRes.body?.id || cancelCreateRes.body?.session?.id;
         tracker.sessionIds.add(cancelSessionId);
 
-        // Run calculation on secondary session
+        // Promote secondary session to ready
         await httpRequest(
             serverUrl,
             'POST',
-            `/api/printhouse/onboarding/pricing/calibrations/${cancelSessionId}/calculate`,
-            tokenA,
-            { targetPrice: 850.00 }
+            `/api/printhouse/onboarding/pricing/calibrations/${cancelSessionId}/ready`,
+            tokenA
         );
 
-        // Intentionally abandon/cancel: do NOT call /accept
-        // Assert that zero revisions were generated for this unaccepted session
-        const [canceledRevs] = await directConn.query(
+        // Execute real cancellation via POST /reject endpoint
+        const rejectRes = await httpRequest(
+            serverUrl,
+            'POST',
+            `/api/printhouse/onboarding/pricing/calibrations/${cancelSessionId}/reject`,
+            tokenA,
+            { reason: 'Calibration cancelled by operator during test' }
+        );
+        assert(rejectRes.status === 200, `POST /reject returned HTTP 200`);
+        assert(rejectRes.body.data?.status === 'REJECTED', `Cancelled session status is officially REJECTED`);
+
+        // Verify that cancellation produces zero revisions and zero rate changes
+        const [cancelledRevs] = await directConn.query(
             `SELECT COUNT(*) as count FROM printhouse_pricing_revisions WHERE source_calibration_session_id = ?`,
             [cancelSessionId]
         );
-        assert(canceledRevs[0].count === 0, `Zero revisions created for abandoned/canceled session`);
+        assert(cancelledRevs[0].count === 0, `Zero revisions created for cancelled/rejected session`);
+
+        const [cancelledNode] = await directConn.query(
+            `SELECT rates_json FROM printer_nodes WHERE id = ?`,
+            [FIXTURE_NODE_A]
+        );
+        assert(cancelledNode[0].rates_json === null, `Node rates_json remains unmutated after session cancellation`);
 
         // ── STEP 8: GOVERNED ACCEPTANCE ON PRIMARY SESSION ──
         console.log(`\n[STEP 8] Executing Governed Calibration Acceptance`);
         const acceptPayload = {
-            runId: runId,
+            runId: realRunId,
             acceptanceNotes: 'Verified under official MySQL isolated suite',
             acceptedBy: 'operator_connected_audit'
         };
@@ -613,12 +692,12 @@ async function runConnectedSuite() {
             assert(true, `Acceptance record ID tracked: ${acceptanceId}`);
         }
 
-        // ── STEP 9: POST-ACCEPTANCE CONTRACT & COMMERCIAL ISOLATION VERIFICATION ──
-        console.log(`\n[STEP 9] Verifying Official Revision Schema and Absence of Commercial Side-Effects`);
+        // ── STEP 9: CANONICAL CHECKSUM VERIFICATION & ABSENCE OF COMMERCIAL LEAKAGE ──
+        console.log(`\n[STEP 9] Verifying Canonical SHA-256 Checksum and Commercial Invariance`);
 
-        // Query official columns: printer_node_id, rates_checksum, rates_json, source_type
+        // Fetch stored revision and compute canonical SHA-256 from stored rates_json
         const [finalRevs] = await directConn.query(
-            `SELECT id, printer_node_id, source_type, rates_checksum, created_at 
+            `SELECT id, printer_node_id, source_type, rates_json, rates_checksum, created_at 
              FROM printhouse_pricing_revisions 
              WHERE printer_node_id = ?`,
             [FIXTURE_NODE_A]
@@ -626,8 +705,12 @@ async function runConnectedSuite() {
         assert(finalRevs.length === 1, `Exactly 1 revision created for isolated printer node`);
         assert(finalRevs[0].id === revisionId, `Revision matches accepted ID (${revisionId})`);
         assert(finalRevs[0].printer_node_id === FIXTURE_NODE_A, `Revision correctly references printer_node_id`);
-        assert(finalRevs[0].rates_checksum.startsWith('sha256:') || finalRevs[0].rates_checksum.length >= 10,
-            `Revision has verified rates_checksum: ${finalRevs[0].rates_checksum}`);
+
+        // Cryptographic check: calculate canonical SHA-256 of stored rates_json and compare
+        const storedRates = finalRevs[0].rates_json;
+        const expectedChecksum = computeCanonicalRatesChecksum(storedRates);
+        assert(finalRevs[0].rates_checksum === expectedChecksum,
+            `rates_checksum strictly matches canonical SHA-256: ${expectedChecksum}`);
 
         // Verify that acceptances record is persisted in MySQL
         const [accRows] = await directConn.query(
@@ -639,7 +722,7 @@ async function runConnectedSuite() {
         assert(accRows.length === 1, `Acceptance record verified in MySQL table`);
         if (accRows[0]?.id) tracker.acceptanceIds.add(accRows[0].id);
 
-        // Verify zero unintended commercial effects (node remains ACTIVE without marketplace publication)
+        // Verify commercial isolation: node status is ACTIVE, zero publication in marketplace tables
         const [nodeState] = await directConn.query(
             `SELECT status, rates_json FROM printer_nodes WHERE id = ?`,
             [FIXTURE_NODE_A]
@@ -657,13 +740,13 @@ async function runConnectedSuite() {
             console.log('\n[TEARDOWN] Closed test Express HTTP server');
         }
 
-        // Execute verified cleanup
+        // Execute verified cleanup across all 6 affected tables
         if (directConn) {
             try {
                 await performDeterministicCleanup(directConn);
             } catch (cleanErr) {
                 console.error('[TEARDOWN-CLEANUP-FAIL]', cleanErr.message);
-                if (!mainError) mainError = cleanErr;
+                cleanupError = cleanErr;
             }
             await directConn.end();
             console.log('[TEARDOWN] Closed direct MySQL connection');
@@ -677,11 +760,17 @@ async function runConnectedSuite() {
             console.error('[TEARDOWN] Error closing CP pool:', e.message);
         }
 
-        if (mainError) {
+        // Report both mainError and cleanupError jointly if either occurred
+        if (mainError || cleanupError) {
             console.error(`\n================================================================`);
-            console.error(`  SUITE FAILED: ${mainError.message}`);
+            if (mainError) console.error(`  PRIMARY TEST ERROR: ${mainError.message}`);
+            if (cleanupError) console.error(`  CLEANUP ERROR     : ${cleanupError.message}`);
             console.error(`================================================================\n`);
-            throw mainError;
+            const finalErr = mainError || cleanupError;
+            if (mainError && cleanupError) {
+                finalErr.cleanupError = cleanupError;
+            }
+            throw finalErr;
         }
     }
 

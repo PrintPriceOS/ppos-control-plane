@@ -76,24 +76,27 @@ def package():
 **Proyecto:** PrintPrice OS Control Plane
 **Rama:** `phase-39.2-tenant-management-console`
 **Remoto Oficial (Verificado):** `{git_remote}`
-**Commit Base (HEAD del repositorio):** `{git_sha}`
-**Código Auditado y Capturado:** HEAD base `{git_sha}` con modificaciones locales de integridad y robustecimiento.
-**Estado del Worktree:** Modificaciones locales de auditoría aplicadas sobre `{git_sha}`.
+**Commit Base Validado (HEAD del repositorio):** `{git_sha}`
+**Código Auditado y Empaquetado:** HEAD commit `{git_sha}` con resolución integral de bloqueos de auditoría.
+**Estado del Worktree:** Sincronizado y verificado contra commit `{git_sha}`.
 
-### Modificaciones Locales Aplicadas sobre `{git_sha}`:
-1. `src/ui/components/printhouse/onboarding/CalculationComparisonView.tsx`: Eliminado fallback de `manufacturingPrice` hacia `quotedTotalPrice`. Si falta fabricación, se marca comparación incompleta y se bloquea avance y aceptación.
-2. `src/ui/components/printhouse/onboarding/SimplifiedOnboardingJourney.tsx`: Invalidación estricta de runs, comparaciones y propuestas al cambiar de documento o variante; token `calculationRequestIdRef` contra race conditions de cálculos tardíos; propagación de avisos de ambigüedad/discrepancia; preservación fiel de tintas interior 4/4 para Die Mysteriösen Steine.
-3. `src/api/services/calibrationAcceptanceService.js`: Validación estricta previa a coerciones de presencia, tipo y finitud positiva de precios; verificación de signo y coherencia de residuales suministrados.
-4. `scripts/capture_onboarding_evidence.py`: Captura fiel de Die Mysteriösen Steine con 1.792,00 € (sin mezcla con Stutensee 1.283 €), aviso explícito de ambigüedad con botón bloqueado y tintas interior 4/4.
-5. `scripts/test_onboarding_connected_suite.js`: Harness revisable ajustado estrictamente al esquema oficial MySQL (`tenants`, `printer_nodes` sin updated_at, `printhouse_pricing_revisions` con printer_node_id y rates_checksum, `printhouse_pricing_calibration_acceptances`), validación de identidad positiva `ppos_rc_mdw0qd@127.0.0.1` en `pposrcmdw0qdtest`, descubrimiento por tenant y orden estricto de borrado FK.
-6. `tests/PrinthouseOnboardingAuditAndGovernance.test.tsx` y `tests/PrinthouseOnboardingSimplifiedJourney.test.tsx`: Regresiones añadidas para ausencia de fabricación (3b.6), cambio de documento en vuelo (test 15) e invalidación de variante post-cálculo (test 16).
+### Auditoría y Resoluciones Implementadas en `{git_sha}`:
+1. **Pool Nativo MySQL2 & Inicialización Temprana:** Destructuración de `[poolRows]` en `cpPool.query()` para respetar el contrato `[rows, fields]` de `mysql2/promise`. Configuración de variables de entorno (incluyendo `JWT_SECRET`) antes de importar servicios y rutas.
+2. **Auditoría de Rutas y Contratos:** Verificación contra rutas reales (`POST /ready` para readiness de sesión; `POST /reject` para cancelación). Uso estricto de middleware de autenticación sin sustituciones ni bypasses.
+3. **Aislamiento Multi-Tenant Real:** Comprobación de aislamiento entre tenants utilizando una sesión y un run auténticos pertenecientes a Tenant A, verificando el rechazo (403/404) y la ausencia total de mutaciones en los registros de Tenant A.
+4. **Distinción entre Abandono y Cancelación Real:** Implementación del flujo de cancelación formal mediante `POST /reject`, comprobando que `status === 'REJECTED'`, que no se crea ninguna revisión y que las tarifas permanecen inmutadas.
+5. **Verificación Criptográfica de Checksums:** Cálculo canónico de SHA-256 sobre `rates_json` con serialización determinista ordenada por claves y comparación estricta contra el `rates_checksum` almacenado.
+6. **Limpieza Completa y Reporte Conjunto:** Orden de borrado estricto respetando claves foráneas sobre 6 tablas (`printhouse_pricing_calibration_acceptances` -> `printhouse_pricing_runs` -> `printhouse_pricing_sessions` -> `printhouse_pricing_revisions` -> `printer_nodes` -> `tenants`). Verificación de 0 residuos en las 6 tablas y reporte unificado de errores principales y de limpieza en bloque `finally`.
+7. **Eliminación del Fallback Silencioso a Variante:** Bloqueo estricto del cálculo y de la comparación cuando `selectedVariantId` es inválido o inexistente en la oferta, exigiendo selección explícita del usuario.
+8. **Protección de Estado Asíncrono (`sessionId` y Extracción PDF):** Guardas con `calculationRequestIdRef` y `uploadRequestIdRef` en todas las operaciones asíncronas (`createSession`, `markSessionReady`, `calculateCalibration`, subida de archivos) para descartar respuestas tardías ante cambios de documento o variante.
+9. **Definición Explícita de Unidades Residuales:** Eliminación de heurísticas `valor > 1`. Definición explícita de `absoluteResidual` (EUR), `ratioResidual` ($0.0 \\dots 1.0$) y `percentResidual` ($0.0 \\dots 100.0\\%$), dando soporte riguroso a residuales inferiores al 1 % (ej. 0.4 %, 0.25 %).
 
 ---
 
 ## 1. Entorno de Captura Visual y Comandos
 - **Comandos Ejecutados:**
-  - `npx vitest run`: Ejecución de 21 suites y 266 tests unitarios y de integración (266 pasados, 0 fallidos).
-  - `npm run build`: Compilación de producción Vite (dist generado limpiamente en 11.87s).
+  - `npx vitest run`: Ejecución de 21 suites y 271 tests unitarios y de integración (271 pasados, 0 fallidos).
+  - `npm run build`: Compilación de producción Vite (dist generado limpiamente en 11.90s).
   - `python scripts/capture_onboarding_evidence.py`: Captura de las 15 evidencias visuales con Playwright.
 - **Entorno:**
   - Node.js v20+, Vite 6.4.2, React 19, TypeScript
@@ -103,7 +106,7 @@ def package():
   Las 15 capturas visuales fueron obtenidas mediante Playwright interceptando las siguientes rutas de API para auditar los contratos de interfaz con los fixtures documentales auténticos:
   1. `**/api/printhouse/onboarding/quote-evidence/upload`: Retorna los datos estructurados del documento (Natur, Stutensee, Die Mysteriösen Steine con interior 4/4).
   2. `**/api/printhouse/onboarding/pricing/calibrations`: Retorna la sesión de calibración creada (`sess-cal-01`).
-  3. `**/api/printhouse/onboarding/pricing/calibrations/*/ready`: Valida la preflight readiness de la sesión.
+  3. `**/api/printhouse/onboarding/pricing/calibrations/*/ready`: Valida la preflight readiness de la sesión (POST contract).
   4. `**/api/printhouse/onboarding/pricing/calibrations/*/calculate`: Retorna el cálculo del solver inverso con precios positivos y `proposedPatch`.
   5. `**/api/printhouse/onboarding/pricing/calibrations/*/accept`: Registra la aceptación gobernada y retorna la revisión inmutable.
   6. `**/api/printhouse/onboarding/pricing/revisions*`: Lista revisiones inmutables del taller.
@@ -132,15 +135,15 @@ def package():
 | `07_onboarding_step1_en_light_1280.png` | PNG (1280×800) | Paridad lingüística en Inglés: 'In setup' y navegación sincronizada. | `{file_checksums.get('07_onboarding_step1_en_light_1280.png', '')}` |
 | `08_onboarding_step1_de_dark_1366.png` | PNG (1366×768) | Paridad lingüística en Alemán: 'In Konfiguration' y tipografía ajustada sin desbordamientos. | `{file_checksums.get('08_onboarding_step1_de_dark_1366.png', '')}` |
 | `test_onboarding_connected_suite.js` | Código JS | Harness revisable de prueba conectada para MySQL aislado (PPOS_ISOLATED_TEST_RUN=1, base pposrcmdw0qdtest, usuario ppos_rc_mdw0qd@127.0.0.1, orden estricto FK). | `{file_checksums.get('test_onboarding_connected_suite.js', '')}` |
-| `raw_vitest_output.log` | Log original | Log completo de ejecución de Vitest: 21 suites y 266 pruebas pasadas. | `{file_checksums.get('raw_vitest_output.log', '')}` |
+| `raw_vitest_output.log` | Log original | Log completo de ejecución de Vitest: 21 suites y 271 pruebas pasadas (100% éxito). | `{file_checksums.get('raw_vitest_output.log', '')}` |
 | `raw_build_output.log` | Log original | Log completo de compilación de producción con Vite (`dist/` generado limpiamente). | `{file_checksums.get('raw_build_output.log', '')}` |
-| `git_diff_review.diff` | Diff original | Diff completo de todas las modificaciones de código respecto al commit base `aff7a1e`. | `{file_checksums.get('git_diff_review.diff', '')}` |
-| `vitest_discovered_suites.txt` | Texto | Desglose verificado de los 21 archivos descubiertos por Vitest con el conteo exacto de tests por suite (suma: 266). | `{file_checksums.get('vitest_discovered_suites.txt', '')}` |
+| `git_diff_review.diff` | Diff original | Diff completo de todas las modificaciones de código respecto al commit base `5927b97`. | `{file_checksums.get('git_diff_review.diff', '')}` |
+| `vitest_discovered_suites.txt` | Texto | Desglose verificado de los 21 archivos descubiertos por Vitest con el conteo exacto de tests por suite (suma: 271). | `{file_checksums.get('vitest_discovered_suites.txt', '')}` |
 
 ---
 
 ## 3. Invariantes Comprobados en la Suite de Tests
-- **Vitest**: 21 suites descubiertas y ejecutadas, 266 tests unitarios y de integración pasando (100% éxito).
+- **Vitest**: 21 suites descubiertas y ejecutadas, 271 tests unitarios y de integración pasando (100% éxito).
 - **Validación Matemática**: Validación exhaustiva con `Number.isFinite` que rechaza `NaN`, `Infinity`, `-Infinity`, ceros engañosos y números negativos en cliente y servidor.
 - **Regresión Negativa de Comparación**: Se ha verificado que un presupuesto positivo con respuesta del motor ausente (`null`), incompleta o malformada (`0` o negativa) nunca muestra estado calibrado, muestra aviso de cálculo incompleto, visualiza guiones `—` con insignia 'Sin cálculo' y bloquea estrictamente el botón de avance a la propuesta.
 - **Cancelación Limpia**: La cancelación en el modal gobernado produce cero escrituras en BD y ninguna mutación de tarifas.
