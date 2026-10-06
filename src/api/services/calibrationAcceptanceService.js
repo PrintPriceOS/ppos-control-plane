@@ -454,39 +454,128 @@ class CalibrationAcceptanceService {
                 const curveMaxAbs = curveEvaluation.curveMetrics.maxAbsoluteResidual;
                 const curveMaxPctRatio = curveEvaluation.curveMetrics.maxPercentageResidual;
 
-                // 1. Point-by-point verification if run.point_results_json is provided
+                // 1. Strict point-by-point verification: point_results_json is mandatory for multi-quantity runs
+                if (!run.point_results_json) {
+                    const err = new Error('MISSING_POINT_RESULTS_JSON');
+                    err.code = 'MISSING_POINT_RESULTS_JSON';
+                    err.statusCode = 422;
+                    err.details = 'Multi-quantity calibration run is missing point_results_json. Acceptance blocked.';
+                    throw err;
+                }
+
                 let runPointResults = null;
-                if (run.point_results_json) {
-                    try {
-                        runPointResults = typeof run.point_results_json === 'string'
-                            ? JSON.parse(run.point_results_json)
-                            : run.point_results_json;
-                    } catch (e) {
-                        runPointResults = null;
+                try {
+                    runPointResults = typeof run.point_results_json === 'string'
+                        ? JSON.parse(run.point_results_json)
+                        : run.point_results_json;
+                } catch (e) {
+                    const err = new Error('MALFORMED_POINT_RESULTS_JSON');
+                    err.code = 'MALFORMED_POINT_RESULTS_JSON';
+                    err.statusCode = 422;
+                    err.details = `Failed to parse point_results_json: ${e.message}`;
+                    throw err;
+                }
+
+                if (!Array.isArray(runPointResults) || runPointResults.length === 0) {
+                    const err = new Error('MALFORMED_POINT_RESULTS_JSON');
+                    err.code = 'MALFORMED_POINT_RESULTS_JSON';
+                    err.statusCode = 422;
+                    err.details = 'point_results_json must be a non-empty array of point evaluation results.';
+                    throw err;
+                }
+
+                const expectedPointsMap = new Map();
+                for (const pt of curveEvaluation.pointResults) {
+                    expectedPointsMap.set(Number(pt.quantity), pt);
+                }
+
+                const seenQuantities = new Set();
+                for (const runPt of runPointResults) {
+                    if (!runPt || typeof runPt !== 'object') {
+                        const err = new Error('MALFORMED_POINT_RESULTS_JSON');
+                        err.code = 'MALFORMED_POINT_RESULTS_JSON';
+                        err.statusCode = 422;
+                        err.details = 'Invalid point result element in point_results_json.';
+                        throw err;
+                    }
+
+                    const runQty = Number(runPt.quantity);
+                    if (!Number.isFinite(runQty)) {
+                        const err = new Error('MALFORMED_POINT_RESULTS_JSON');
+                        err.code = 'MALFORMED_POINT_RESULTS_JSON';
+                        err.statusCode = 422;
+                        err.details = `Invalid non-numeric quantity in point result: ${runPt.quantity}.`;
+                        throw err;
+                    }
+
+                    if (!expectedPointsMap.has(runQty)) {
+                        const err = new Error('UNKNOWN_POINT_IN_RESULTS');
+                        err.code = 'UNKNOWN_POINT_IN_RESULTS';
+                        err.statusCode = 422;
+                        err.details = `point_results_json contains unknown quantity ${runQty} not present in calibration targets.`;
+                        throw err;
+                    }
+
+                    if (seenQuantities.has(runQty)) {
+                        const err = new Error('DUPLICATE_POINT_IN_RESULTS');
+                        err.code = 'DUPLICATE_POINT_IN_RESULTS';
+                        err.statusCode = 422;
+                        err.details = `point_results_json contains duplicate quantity ${runQty}.`;
+                        throw err;
+                    }
+                    seenQuantities.add(runQty);
+
+                    const verifiedPt = expectedPointsMap.get(runQty);
+
+                    // 1a. Verify point absolute residual
+                    if (runPt.absoluteResidual === undefined || runPt.absoluteResidual === null) {
+                        const err = new Error('CONTRADICTORY_SUPPLIED_RESIDUAL');
+                        err.code = 'CONTRADICTORY_SUPPLIED_RESIDUAL';
+                        err.statusCode = 422;
+                        err.details = `Point result at quantity ${runQty} is missing absoluteResidual.`;
+                        throw err;
+                    }
+                    const suppliedPtAbs = Number(runPt.absoluteResidual);
+                    if (!Number.isFinite(suppliedPtAbs) || suppliedPtAbs < 0 || Math.abs(suppliedPtAbs - verifiedPt.absoluteResidual) > 0.05) {
+                        const err = new Error('CONTRADICTORY_SUPPLIED_RESIDUAL');
+                        err.code = 'CONTRADICTORY_SUPPLIED_RESIDUAL';
+                        err.statusCode = 422;
+                        err.details = `Supplied run point absolute residual at quantity ${runQty} (${suppliedPtAbs}) contradicts verified point residual (${verifiedPt.absoluteResidual}). Acceptance blocked.`;
+                        throw err;
+                    }
+
+                    // 1b. Verify point percentage residual (contract: unitless ratio [0..1])
+                    const suppliedPctRaw = runPt.percentageResidual !== undefined ? runPt.percentageResidual : runPt.percentResidual;
+                    if (suppliedPctRaw === undefined || suppliedPctRaw === null) {
+                        const err = new Error('CONTRADICTORY_SUPPLIED_RESIDUAL');
+                        err.code = 'CONTRADICTORY_SUPPLIED_RESIDUAL';
+                        err.statusCode = 422;
+                        err.details = `Point result at quantity ${runQty} is missing percentageResidual.`;
+                        throw err;
+                    }
+                    const suppliedPtPct = Number(suppliedPctRaw);
+                    if (!Number.isFinite(suppliedPtPct) || suppliedPtPct < 0 || Math.abs(suppliedPtPct - verifiedPt.percentageResidual) > 0.005) {
+                        const err = new Error('CONTRADICTORY_SUPPLIED_RESIDUAL');
+                        err.code = 'CONTRADICTORY_SUPPLIED_RESIDUAL';
+                        err.statusCode = 422;
+                        err.details = `Supplied run point percentage residual at quantity ${runQty} (${suppliedPtPct}) contradicts verified point percentage residual (${verifiedPt.percentageResidual}). Acceptance blocked.`;
+                        throw err;
                     }
                 }
 
-                if (Array.isArray(runPointResults)) {
-                    for (const runPt of runPointResults) {
-                        const runQty = Number(runPt.quantity);
-                        const verifiedPt = curveEvaluation.pointResults.find(p => Number(p.quantity) === runQty);
-                        if (verifiedPt && runPt.absoluteResidual !== undefined && runPt.absoluteResidual !== null) {
-                            const suppliedPtAbs = Number(runPt.absoluteResidual);
-                            if (!Number.isFinite(suppliedPtAbs) || Math.abs(suppliedPtAbs - verifiedPt.absoluteResidual) > 0.05) {
-                                const err = new Error('CONTRADICTORY_SUPPLIED_RESIDUAL');
-                                err.code = 'CONTRADICTORY_SUPPLIED_RESIDUAL';
-                                err.statusCode = 422;
-                                err.details = `Supplied run point residual at quantity ${runQty} (${suppliedPtAbs}) contradicts verified point residual (${verifiedPt.absoluteResidual}). Acceptance blocked.`;
-                                throw err;
-                            }
-                        }
-                    }
+                if (seenQuantities.size !== expectedPointsMap.size) {
+                    const missing = [...expectedPointsMap.keys()].filter(q => !seenQuantities.has(q));
+                    const err = new Error('MISSING_POINT_IN_RESULTS');
+                    err.code = 'MISSING_POINT_IN_RESULTS';
+                    err.statusCode = 422;
+                    err.details = `point_results_json is missing calibration targets for quantities: ${missing.join(', ')}.`;
+                    throw err;
                 }
 
                 // 2. Verify aggregate absolute residual against curve maxAbsoluteResidual (NOT against point 0)
                 if (run.absolute_residual !== null && run.absolute_residual !== undefined) {
                     const suppliedAbs = Number(run.absolute_residual);
-                    if (!Number.isFinite(suppliedAbs) || Math.abs(suppliedAbs - curveMaxAbs) > 0.05) {
+                    if (!Number.isFinite(suppliedAbs) || suppliedAbs < 0 || Math.abs(suppliedAbs - curveMaxAbs) > 0.05) {
                         const err = new Error('CONTRADICTORY_SUPPLIED_RESIDUAL');
                         err.code = 'CONTRADICTORY_SUPPLIED_RESIDUAL';
                         err.statusCode = 422;
@@ -495,27 +584,14 @@ class CalibrationAcceptanceService {
                     }
                 }
 
-                // 3. Verify aggregate percentage residual: multi-quantity solver specifies maxPercentageResidual as RATIO [0..1]
+                // 3. Verify aggregate percentage residual: multi-quantity solver specifies maxPercentageResidual as unitless RATIO [0..1]
                 if (run.percent_residual !== null && run.percent_residual !== undefined) {
                     const suppliedPct = Number(run.percent_residual);
-                    if (!Number.isFinite(suppliedPct) || Number.isNaN(suppliedPct) || suppliedPct < 0) {
+                    if (!Number.isFinite(suppliedPct) || suppliedPct < 0 || Math.abs(suppliedPct - curveMaxPctRatio) > 0.005) {
                         const err = new Error('CONTRADICTORY_SUPPLIED_RESIDUAL');
                         err.code = 'CONTRADICTORY_SUPPLIED_RESIDUAL';
                         err.statusCode = 422;
-                        err.details = `Supplied run percent residual (${run.percent_residual}) is invalid or negative. Acceptance blocked.`;
-                        throw err;
-                    }
-
-                    // Contract unit discriminator for curve:
-                    const isExplicitPctPoints = options.percentResidualUnit === 'PERCENTAGE_POINTS' || run.percent_residual_unit === 'PERCENTAGE_POINTS';
-                    const expectedCurvePct = isExplicitPctPoints ? (curveMaxPctRatio * 100) : curveMaxPctRatio;
-                    const curveTol = isExplicitPctPoints ? 0.05 : 0.005;
-
-                    if (Math.abs(suppliedPct - expectedCurvePct) > curveTol) {
-                        const err = new Error('CONTRADICTORY_SUPPLIED_RESIDUAL');
-                        err.code = 'CONTRADICTORY_SUPPLIED_RESIDUAL';
-                        err.statusCode = 422;
-                        err.details = `Supplied run percent residual (${suppliedPct}) contradicts verified curve max percentage residual (${expectedCurvePct}). Acceptance blocked.`;
+                        err.details = `Supplied run percent residual (${suppliedPct}) contradicts verified curve max percentage residual (${curveMaxPctRatio}). Acceptance blocked.`;
                         throw err;
                     }
                 }
@@ -524,7 +600,7 @@ class CalibrationAcceptanceService {
                 // 1. Verify absolute residual
                 if (run.absolute_residual !== null && run.absolute_residual !== undefined) {
                     const suppliedAbs = Number(run.absolute_residual);
-                    if (!Number.isFinite(suppliedAbs) || Math.abs(suppliedAbs - absoluteResidual) > 0.05) {
+                    if (!Number.isFinite(suppliedAbs) || suppliedAbs < 0 || Math.abs(suppliedAbs - absoluteResidual) > 0.05) {
                         const err = new Error('CONTRADICTORY_SUPPLIED_RESIDUAL');
                         err.code = 'CONTRADICTORY_SUPPLIED_RESIDUAL';
                         err.statusCode = 422;
@@ -533,10 +609,10 @@ class CalibrationAcceptanceService {
                     }
                 }
 
-                // 2. Verify percentage residual with documented, verifiable contract discriminator
+                // 2. Verify percentage residual: deterministic single-point solver contract produces PERCENTAGE_POINTS [0..100]
                 if (run.percent_residual !== null && run.percent_residual !== undefined) {
                     const supplied = Number(run.percent_residual);
-                    if (!Number.isFinite(supplied) || Number.isNaN(supplied) || supplied < 0) {
+                    if (!Number.isFinite(supplied) || supplied < 0) {
                         const err = new Error('CONTRADICTORY_SUPPLIED_RESIDUAL');
                         err.code = 'CONTRADICTORY_SUPPLIED_RESIDUAL';
                         err.statusCode = 422;
@@ -544,30 +620,15 @@ class CalibrationAcceptanceService {
                         throw err;
                     }
 
-                    // Documented, verifiable unit discriminator for single-point runs:
-                    // Priority 1: Explicit options override (options.percentResidualUnit === 'RATIO' | 'PERCENTAGE_POINTS')
-                    // Priority 2: Explicit run metadata (run.percent_residual_unit === 'RATIO' | 'PERCENTAGE_POINTS')
-                    // Priority 3: Historical legacy discriminator (run.legacy_ratio === true)
-                    // Priority 4: Canonical solver contract: deterministicInversePricingSolver.solve() produces PERCENTAGE_POINTS
-                    let expectedUnit = 'PERCENTAGE_POINTS';
-                    if (options.percentResidualUnit === 'RATIO' || run.percent_residual_unit === 'RATIO' || run.legacy_ratio === true) {
-                        expectedUnit = 'RATIO';
-                    } else if (options.percentResidualUnit === 'PERCENTAGE_POINTS' || run.percent_residual_unit === 'PERCENTAGE_POINTS') {
-                        expectedUnit = 'PERCENTAGE_POINTS';
-                    } else {
-                        expectedUnit = 'PERCENTAGE_POINTS';
-                    }
-
-                    const expectedValue = expectedUnit === 'PERCENTAGE_POINTS'
-                        ? Number(unroundedPercentagePoints.toFixed(4))
-                        : Number(unroundedRatioResidual.toFixed(6));
-                    const tol = expectedUnit === 'PERCENTAGE_POINTS' ? 0.05 : 0.0005;
+                    // Accredited contract: deterministicInversePricingSolver.solve() produces PERCENTAGE_POINTS
+                    const expectedValue = Number(unroundedPercentagePoints.toFixed(4));
+                    const tol = 0.05;
 
                     if (Math.abs(supplied - expectedValue) > tol) {
                         const err = new Error('CONTRADICTORY_SUPPLIED_RESIDUAL');
                         err.code = 'CONTRADICTORY_SUPPLIED_RESIDUAL';
                         err.statusCode = 422;
-                        err.details = `Supplied run percent residual (${supplied}) contradicts verified forward price residual in unit ${expectedUnit} (expected ${expectedValue}). Acceptance blocked.`;
+                        err.details = `Supplied run percent residual (${supplied}) contradicts verified forward price residual in percentage points (expected ${expectedValue}). Acceptance blocked.`;
                         throw err;
                     }
                 }
@@ -597,15 +658,16 @@ class CalibrationAcceptanceService {
                 throw err;
             }
 
-            const maxResidualToCheck = isMultiQuantity
-                ? Math.max(absoluteResidual, curveEvaluation?.curveMetrics?.maxAbsoluteResidual || 0)
-                : absoluteResidual;
-
-            if (maxResidualToCheck > effectiveTolerance && session.target_manufacturing_price && !options.skipToleranceCheck) {
+            // Single-point acceptance tolerance check:
+            // Evaluates residual against effectiveTolerance for single-point runs.
+            // For curves (isMultiQuantity), each point's residual was already evaluated against its own target's tolerance
+            // by curveEvaluation (POINT_OUT_OF_TOLERANCE -> GOVERNANCE_CURVE_REJECTED).
+            // maxAbsoluteResidual is NOT compared against the first point's tolerance.
+            if (!isMultiQuantity && absoluteResidual > effectiveTolerance && session.target_manufacturing_price && !options.skipCurveValidation) {
                 const err = new Error('CALIBRATION_ACCEPTANCE_TOLERANCE_EXCEEDED');
                 err.code = 'CALIBRATION_ACCEPTANCE_TOLERANCE_EXCEEDED';
                 err.statusCode = 422;
-                err.details = `Verified residual ${maxResidualToCheck} EUR exceeds effective acceptance tolerance ${effectiveTolerance} EUR.`;
+                err.details = `Verified residual ${absoluteResidual} EUR exceeds effective acceptance tolerance ${effectiveTolerance} EUR.`;
                 throw err;
             }
 
