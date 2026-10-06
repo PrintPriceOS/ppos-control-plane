@@ -24,6 +24,7 @@ interface GovernedAcceptanceViewProps {
     accepting?: boolean;
     proposedPatch?: Record<string, any>;
     activeRun?: any;
+    sessionId?: string;
     onAccept?: () => void;
     onAcceptProposal?: () => void;
     onBack?: () => void;
@@ -70,6 +71,7 @@ export const GovernedAcceptanceView: React.FC<GovernedAcceptanceViewProps> = ({
     accepting = false,
     proposedPatch = {},
     activeRun,
+    sessionId,
     onAccept,
     onAcceptProposal,
     onBack,
@@ -104,7 +106,12 @@ export const GovernedAcceptanceView: React.FC<GovernedAcceptanceViewProps> = ({
     const isAcceptActionAllowed = canAccept && !hasInvalidPatchValues && !isAccepted;
 
     return (
-        <div className="space-y-4 text-xs">
+        <div 
+            data-testid="governed-acceptance-view"
+            data-session-id={sessionId || undefined}
+            data-run-id={activeRun?.id || undefined}
+            className="space-y-4 text-xs"
+        >
             <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 shadow-2xs space-y-4">
                 <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-3">
                     <div className="flex items-center gap-2">

@@ -1083,6 +1083,7 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
                         isAccepted={families[selectedFamilyId].status === 'DATA_VALIDATED'}
                         proposedPatch={proposedPatch}
                         activeRun={activeRun}
+                        sessionId={sessionId}
                         onAcceptProposal={handleAcceptProposal}
                         onBackToCompare={() => setCurrentStep(4)}
                     />
