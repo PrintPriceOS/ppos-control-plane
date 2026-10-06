@@ -64,4 +64,9 @@ CREATE TABLE IF NOT EXISTS user_sessions (
 --    - Asserts `session.tenant_id === decoded.tenant_id` (rejects with SESSION_TENANT_MISMATCH)
 --    - Asserts `session.user_id === decoded.sub` (rejects with SESSION_USER_MISMATCH)
 --    - Populates `req.user` with `id: decoded.sub`, `tenantId: decoded.tenant_id`, `sessionId: decoded.jti`
+-- 5. Relational Enforcement & Foreign Key Clarification:
+--    - `user_sessions` does NOT declare an SQL FOREIGN KEY constraint to `control_users(id)` in MySQL.
+--    - Referential integrity and identity binding are enforced strictly at the application layer:
+--      `userSessionService.validateSession` confirms `session.user_id === decoded.sub`, and
+--      `userSessionService.createSession` validates the operator identity before session issuance.
 -- ============================================================================
