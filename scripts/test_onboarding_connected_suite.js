@@ -52,37 +52,49 @@ const REQUIRED_MYSQL = {
     database: 'pposrcmdw0qdtest'
 };
 
+const isRegressionMode = process.argv.includes('--regressions') || process.argv.includes('--self-test');
+
 const configuredMysqlHost = process.env.PPOS_TEST_MYSQL_HOST || REQUIRED_MYSQL.host;
 const configuredMysqlPort = parseInt(process.env.PPOS_TEST_MYSQL_PORT || String(REQUIRED_MYSQL.port), 10);
 const configuredMysqlUser = process.env.PPOS_TEST_MYSQL_USER || REQUIRED_MYSQL.user;
 const configuredMysqlDb = process.env.PPOS_TEST_MYSQL_DATABASE || REQUIRED_MYSQL.database;
 
-if (configuredMysqlHost !== REQUIRED_MYSQL.host ||
-    configuredMysqlPort !== REQUIRED_MYSQL.port ||
-    configuredMysqlUser !== REQUIRED_MYSQL.user ||
-    configuredMysqlDb !== REQUIRED_MYSQL.database) {
-    console.error(`\n[FATAL] Configuration rejected: MySQL parameters must be strictly identical to:`);
-    console.error(`  Host: ${REQUIRED_MYSQL.host}`);
-    console.error(`  Port: ${REQUIRED_MYSQL.port}`);
-    console.error(`  User: ${REQUIRED_MYSQL.user}`);
-    console.error(`  Database: ${REQUIRED_MYSQL.database}`);
-    console.error(`Attempted configuration: ${configuredMysqlUser}@${configuredMysqlHost}:${configuredMysqlPort}/${configuredMysqlDb}`);
-    process.exit(1);
+if (require.main === module && !isRegressionMode) {
+    if (configuredMysqlHost !== REQUIRED_MYSQL.host ||
+        configuredMysqlPort !== REQUIRED_MYSQL.port ||
+        configuredMysqlUser !== REQUIRED_MYSQL.user ||
+        configuredMysqlDb !== REQUIRED_MYSQL.database) {
+        console.error(`\n[FATAL] Configuration rejected: MySQL parameters must be strictly identical to:`);
+        console.error(`  Host: ${REQUIRED_MYSQL.host}`);
+        console.error(`  Port: ${REQUIRED_MYSQL.port}`);
+        console.error(`  User: ${REQUIRED_MYSQL.user}`);
+        console.error(`  Database: ${REQUIRED_MYSQL.database}`);
+        console.error(`Attempted configuration: ${configuredMysqlUser}@${configuredMysqlHost}:${configuredMysqlPort}/${configuredMysqlDb}`);
+        process.exit(1);
+    }
+
+    const mysqlPassword = process.env.PPOS_TEST_MYSQL_PASSWORD;
+    if (!mysqlPassword) {
+        console.error('\n[FATAL] Missing required environment variable: PPOS_TEST_MYSQL_PASSWORD');
+        console.error('Explicit test password must be supplied via PPOS_TEST_MYSQL_PASSWORD.');
+        process.exit(1);
+    }
+
+    // Set CP environment variables strictly before importing CP services and routes
+    process.env.MYSQL_HOST = REQUIRED_MYSQL.host;
+    process.env.MYSQL_PORT = String(REQUIRED_MYSQL.port);
+    process.env.MYSQL_USER = REQUIRED_MYSQL.user;
+    process.env.MYSQL_PASSWORD = mysqlPassword;
+    process.env.MYSQL_DATABASE = REQUIRED_MYSQL.database;
+} else {
+    // Standalone regression mode or unit test require
+    process.env.MYSQL_HOST = process.env.MYSQL_HOST || REQUIRED_MYSQL.host;
+    process.env.MYSQL_PORT = process.env.MYSQL_PORT || String(REQUIRED_MYSQL.port);
+    process.env.MYSQL_USER = process.env.MYSQL_USER || REQUIRED_MYSQL.user;
+    process.env.MYSQL_PASSWORD = process.env.MYSQL_PASSWORD || 'regression_mode_placeholder';
+    process.env.MYSQL_DATABASE = process.env.MYSQL_DATABASE || REQUIRED_MYSQL.database;
 }
 
-const mysqlPassword = process.env.PPOS_TEST_MYSQL_PASSWORD;
-if (!mysqlPassword) {
-    console.error('\n[FATAL] Missing required environment variable: PPOS_TEST_MYSQL_PASSWORD');
-    console.error('Explicit test password must be supplied via PPOS_TEST_MYSQL_PASSWORD.');
-    process.exit(1);
-}
-
-// Set CP environment variables strictly before importing CP services and routes
-process.env.MYSQL_HOST = REQUIRED_MYSQL.host;
-process.env.MYSQL_PORT = String(REQUIRED_MYSQL.port);
-process.env.MYSQL_USER = REQUIRED_MYSQL.user;
-process.env.MYSQL_PASSWORD = mysqlPassword;
-process.env.MYSQL_DATABASE = REQUIRED_MYSQL.database;
 delete process.env.DATABASE_URL;
 delete process.env.MYSQL_URL;
 
@@ -117,6 +129,171 @@ function computeCanonicalRatesChecksum(rates) {
     const parsed = typeof rates === 'string' ? JSON.parse(rates) : rates;
     const canonical = canonicalStringify(parsed);
     return 'sha256:' + crypto.createHash('sha256').update(canonical).digest('hex');
+}
+
+/**
+ * Normalizes a rates checksum admitting strictly 64-character hexadecimal,
+ * with or without 'sha256:' prefix.
+ *
+ * Rejects:
+ * - missing values (null, undefined, empty string, whitespace)
+ * - incorrect types (non-strings)
+ * - invalid lengths (not exactly 64 hex chars, or not exactly 71 chars if prefixed)
+ * - non-hexadecimal characters
+ * - corrupted or multiple prefixes
+ *
+ * Returns strictly 64 lowercase hex characters, or null if invalid.
+ * Does NOT perform indiscriminate prefix stripping.
+ *
+ * @param {any} checksum
+ * @returns {string|null} 64 lowercase hex characters, or null if invalid
+ */
+function normalizeSha256Hex(checksum) {
+    if (typeof checksum !== 'string') return null;
+    const trimmed = checksum.trim();
+    if (!trimmed) return null;
+
+    // Strict validation: must match either exactly 64 hex chars OR 'sha256:' followed by exactly 64 hex chars
+    // Case-insensitive for hex and prefix, returns strictly lowercase 64 hex characters
+    const match = trimmed.match(/^(?:sha256:)?([0-9a-fA-F]{64})$/i);
+    if (!match) return null;
+    return match[1].toLowerCase();
+}
+
+/**
+ * Compares stored and computed checksums with strict equality of normalized digests.
+ * In case of failure, provides detailed diagnostic containing only the stored and computed
+ * checksums (no rates, credentials, tokens or personal data).
+ *
+ * @param {any} stored
+ * @param {any} computed
+ * @returns {{ valid: boolean, storedNormalized: string|null, computedNormalized: string|null, error: string|null }}
+ */
+function verifyRatesChecksumIntegrity(stored, computed) {
+    const storedNorm = normalizeSha256Hex(stored);
+    const computedNorm = normalizeSha256Hex(computed);
+
+    if (!storedNorm) {
+        return {
+            valid: false,
+            storedNormalized: null,
+            computedNormalized: computedNorm,
+            error: `Stored rates_checksum has invalid format or length (got: ${typeof stored === 'string' ? JSON.stringify(stored.length > 80 ? stored.slice(0, 80) + '...' : stored) : typeof stored})`
+        };
+    }
+
+    if (!computedNorm) {
+        return {
+            valid: false,
+            storedNormalized: storedNorm,
+            computedNormalized: null,
+            error: `Computed rates checksum has invalid format or length (got: ${typeof computed === 'string' ? JSON.stringify(computed.length > 80 ? computed.slice(0, 80) + '...' : computed) : typeof computed})`
+        };
+    }
+
+    if (storedNorm !== computedNorm) {
+        return {
+            valid: false,
+            storedNormalized: storedNorm,
+            computedNormalized: computedNorm,
+            error: `Checksum mismatch (stored: "${storedNorm}", calculated: "${computedNorm}")`
+        };
+    }
+
+    return {
+        valid: true,
+        storedNormalized: storedNorm,
+        computedNormalized: computedNorm,
+        error: null
+    };
+}
+
+/**
+ * Executes regression assertions for checksum normalization and comparison:
+ * 1. Hexadecimal puro equivalente (lowercase, uppercase, mixed-case).
+ * 2. Formato sha256:<hash> equivalente (pure vs sha256: prefix, both prefixed, prefix casing).
+ * 3. Hash válido pero diferente (rejects mismatch, sanitizes output without rates/secrets).
+ * 4. Formatos inválidos y valores ausentes (null, undefined, non-strings, lengths != 64, non-hex chars, bad prefixes).
+ */
+function runChecksumIntegrityRegressions() {
+    console.log('[REGRESSION] Running Checksum Integrity Normalization Regressions...');
+    const hashA = '08356ccedaa6377630e6f20e6bf674394d3b28edac46fbfd9621c37ef310f00d';
+    const hashB = 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855';
+
+    // 1. Hexadecimal puro equivalente
+    const reg1a = verifyRatesChecksumIntegrity(hashA, hashA);
+    if (!reg1a.valid || reg1a.storedNormalized !== hashA || reg1a.computedNormalized !== hashA) {
+        throw new Error('Regression 1a failed: Identical pure hex digests must match');
+    }
+    const reg1b = verifyRatesChecksumIntegrity(hashA.toUpperCase(), hashA);
+    if (!reg1b.valid || reg1b.storedNormalized !== hashA) {
+        throw new Error('Regression 1b failed: Uppercase pure hex must normalize and match lowercase');
+    }
+
+    // 2. Formato sha256:<hash> equivalente
+    const reg2a = verifyRatesChecksumIntegrity(hashA, 'sha256:' + hashA);
+    if (!reg2a.valid || reg2a.storedNormalized !== hashA || reg2a.computedNormalized !== hashA) {
+        throw new Error('Regression 2a failed: Pure hex and sha256: prefixed hash must match');
+    }
+    const reg2b = verifyRatesChecksumIntegrity('sha256:' + hashA, hashA);
+    if (!reg2b.valid || reg2b.storedNormalized !== hashA) {
+        throw new Error('Regression 2b failed: Stored sha256: prefix and computed pure hex must match');
+    }
+    const reg2c = verifyRatesChecksumIntegrity('sha256:' + hashA, 'SHA256:' + hashA.toUpperCase());
+    if (!reg2c.valid || reg2c.storedNormalized !== hashA) {
+        throw new Error('Regression 2c failed: Both prefixed with varying prefix/hex case must match');
+    }
+
+    // 3. Hash válido pero diferente
+    const reg3 = verifyRatesChecksumIntegrity(hashA, hashB);
+    if (reg3.valid !== false || !reg3.error) {
+        throw new Error('Regression 3 failed: Distinct valid hashes must be rejected');
+    }
+    if (!reg3.error.includes(hashA) || !reg3.error.includes(hashB)) {
+        throw new Error('Regression 3 failed: Error message must show stored and calculated checksums');
+    }
+    // Verify error does NOT contain secrets, tokens, rates, or personal data
+    if (reg3.error.includes('password') || reg3.error.includes('Bearer') || reg3.error.includes('rates_json')) {
+        throw new Error('Regression 3 failed: Diagnostic error must not leak sensitive fields');
+    }
+
+    // 4. Formatos inválidos y valores ausentes
+    const invalidInputs = [
+        null,
+        undefined,
+        '',
+        '   ',
+        12345,
+        true,
+        {},
+        [],
+        hashA.slice(0, 63), // 63 chars
+        hashA + 'a',        // 65 chars
+        hashA.slice(0, 32), // 32 chars (MD5)
+        hashA.slice(0, 63) + 'g', // non-hex character 'g'
+        'sha256:',          // prefix only without hex
+        'sha256:short',     // prefix with short string
+        'sha256:sha256:' + hashA, // double prefix
+        'md5:' + hashA,     // unsupported algorithm prefix
+        'sha256:' + hashA.slice(0, 63) + 'z' // non-hex character 'z'
+    ];
+
+    for (const invalid of invalidInputs) {
+        const norm = normalizeSha256Hex(invalid);
+        if (norm !== null) {
+            throw new Error(`Regression 4 failed: Expected null for invalid input ${JSON.stringify(invalid)}, got "${norm}"`);
+        }
+        const regInvStored = verifyRatesChecksumIntegrity(invalid, hashA);
+        if (regInvStored.valid !== false) {
+            throw new Error(`Regression 4 failed: Invalid stored input must be rejected: ${JSON.stringify(invalid)}`);
+        }
+        const regInvComputed = verifyRatesChecksumIntegrity(hashA, invalid);
+        if (regInvComputed.valid !== false) {
+            throw new Error(`Regression 4 failed: Invalid computed input must be rejected: ${JSON.stringify(invalid)}`);
+        }
+    }
+
+    console.log('[REGRESSION] All 4 Checksum Integrity Regression Suites Passed Successfully.');
 }
 
 // ── 3. CANONICAL INDUSTRIAL RATES FIXTURE & CONSUMED KEYS DOCUMENTATION ──
@@ -749,9 +926,10 @@ async function runConnectedSuite() {
         );
         assert(baselineNode.length === 1, `Printer node ${FIXTURE_NODE_A} found in database`);
         const baselineChecksum = computeCanonicalRatesChecksum(baselineNode[0].rates_json);
+        const baselineIntegrity = verifyRatesChecksumIntegrity(baselineChecksum, INITIAL_RATES_CHECKSUM);
         assert(
-            baselineChecksum === INITIAL_RATES_CHECKSUM,
-            `Baseline rates strictly match initial valid rates fixture (${INITIAL_RATES_CHECKSUM})`
+            baselineIntegrity.valid === true,
+            `Baseline rates strictly match initial valid rates fixture (stored: "${baselineIntegrity.storedNormalized}", expected: "${baselineIntegrity.computedNormalized}")`
         );
 
         // ── STEP 3: CREATE CALIBRATION SESSION ──
@@ -900,9 +1078,10 @@ async function runConnectedSuite() {
             [FIXTURE_NODE_A]
         );
         const postCrossChecksum = computeCanonicalRatesChecksum(postCrossNode[0].rates_json);
+        const postCrossIntegrity = verifyRatesChecksumIntegrity(postCrossChecksum, INITIAL_RATES_CHECKSUM);
         assert(
-            postCrossChecksum === INITIAL_RATES_CHECKSUM,
-            `Printer node rates strictly unchanged and identical to initial baseline after cross-tenant attempt`
+            postCrossIntegrity.valid === true,
+            `Printer node rates strictly unchanged and identical to initial baseline after cross-tenant attempt (stored: "${postCrossIntegrity.storedNormalized}", expected: "${postCrossIntegrity.computedNormalized}")`
         );
 
         // ── STEP 7: REAL CANCELLATION FLOW (POST /reject) VS ABANDONMENT ──
@@ -983,9 +1162,10 @@ async function runConnectedSuite() {
             [FIXTURE_NODE_A]
         );
         const cancelledChecksum = computeCanonicalRatesChecksum(cancelledNode[0].rates_json);
+        const cancelledIntegrity = verifyRatesChecksumIntegrity(cancelledChecksum, INITIAL_RATES_CHECKSUM);
         assert(
-            cancelledChecksum === INITIAL_RATES_CHECKSUM,
-            `Node rates_json remains strictly identical to baseline fixture after cancellation (${INITIAL_RATES_CHECKSUM})`
+            cancelledIntegrity.valid === true,
+            `Node rates_json remains strictly identical to baseline fixture after cancellation (stored: "${cancelledIntegrity.storedNormalized}", expected: "${cancelledIntegrity.computedNormalized}")`
         );
 
         // ── STEP 8: GOVERNED ACCEPTANCE ON PRIMARY SESSION ──
@@ -1033,8 +1213,11 @@ async function runConnectedSuite() {
         // Cryptographic check: calculate canonical SHA-256 of stored rates_json and compare
         const storedRates = finalRevs[0].rates_json;
         const expectedChecksum = computeCanonicalRatesChecksum(storedRates);
-        assert(finalRevs[0].rates_checksum === expectedChecksum,
-            `rates_checksum strictly matches canonical SHA-256: ${expectedChecksum}`);
+        const checksumIntegrity = verifyRatesChecksumIntegrity(finalRevs[0].rates_checksum, expectedChecksum);
+        assert(
+            checksumIntegrity.valid === true,
+            `rates_checksum strictly matches canonical SHA-256 (stored: "${checksumIntegrity.storedNormalized || finalRevs[0].rates_checksum}", calculated: "${checksumIntegrity.computedNormalized || expectedChecksum}"): ${checksumIntegrity.error || 'OK'}`
+        );
 
         // Verify that acceptances record is persisted in MySQL
         const [accRows] = await directConn.query(
@@ -1082,8 +1265,15 @@ async function runConnectedSuite() {
         );
         assert(nodeState[0].status === 'ACTIVE', `Node status preserved as ACTIVE`);
         const finalNodeChecksum = computeCanonicalRatesChecksum(nodeState[0].rates_json);
-        assert(finalNodeChecksum === expectedChecksum, `Node rates_json updated with calibrated document checksum: ${expectedChecksum}`);
-        assert(finalNodeChecksum !== INITIAL_RATES_CHECKSUM, `Node rates_json successfully transitioned from baseline to calibrated`);
+        const finalNodeIntegrity = verifyRatesChecksumIntegrity(finalNodeChecksum, expectedChecksum);
+        assert(
+            finalNodeIntegrity.valid === true,
+            `Node rates_json updated with calibrated document checksum (stored: "${finalNodeIntegrity.storedNormalized}", expected: "${finalNodeIntegrity.computedNormalized}")`
+        );
+        assert(
+            finalNodeIntegrity.storedNormalized !== normalizeSha256Hex(INITIAL_RATES_CHECKSUM),
+            `Node rates_json successfully transitioned from baseline to calibrated`
+        );
 
     } catch (err) {
         mainError = err;
@@ -1134,10 +1324,28 @@ async function runConnectedSuite() {
     console.log(`================================================================\n`);
 }
 
-module.exports = { runConnectedSuite, REQUIRED_MYSQL };
+module.exports = {
+    runConnectedSuite,
+    REQUIRED_MYSQL,
+    normalizeSha256Hex,
+    verifyRatesChecksumIntegrity,
+    computeCanonicalRatesChecksum,
+    canonicalStringify,
+    runChecksumIntegrityRegressions
+};
 
 if (require.main === module) {
-    runConnectedSuite()
-        .then(() => process.exit(0))
-        .catch(() => process.exit(1));
+    if (isRegressionMode) {
+        try {
+            runChecksumIntegrityRegressions();
+            process.exit(0);
+        } catch (err) {
+            console.error(`\n[FATAL] Checksum regressions failed: ${err.message}`);
+            process.exit(1);
+        }
+    } else {
+        runConnectedSuite()
+            .then(() => process.exit(0))
+            .catch(() => process.exit(1));
+    }
 }

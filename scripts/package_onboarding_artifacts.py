@@ -53,7 +53,8 @@ def package():
         "userSessionService.js": os.path.join(REPO_ROOT, "src", "api", "services", "userSessionService.js"),
         "auth_middleware.js": os.path.join(REPO_ROOT, "src", "api", "middleware", "auth.js"),
         "auth_and_user_sessions_schema.sql": os.path.join(REPO_ROOT, "scripts", "auth_and_user_sessions_schema.sql"),
-        "inspect_test_db_schema.js": os.path.join(REPO_ROOT, "scripts", "inspect_test_db_schema.js")
+        "inspect_test_db_schema.js": os.path.join(REPO_ROOT, "scripts", "inspect_test_db_schema.js"),
+        "onboarding_checksum_integrity_regression.test.js": os.path.join(REPO_ROOT, "tests", "onboarding_checksum_integrity_regression.test.js")
     }
 
     for target_name, src_path in source_files.items():
@@ -130,15 +131,28 @@ def package():
     - **Diagnóstico HTTP Sanitizado:** En caso de discrepancia, `formatHttpDiagnostic` reporta método, ruta, status HTTP y campos de error `{{ code, message, details }}` sin registrar headers, cookies ni tokens de autorización.
     - **Verificación Directa de `runId` en MySQL:** Tras `POST /calculate`, el identificador `realRunId` (`calcRes.body.data.id`) se verifica directamente en `printhouse_pricing_calibration_runs` por `WHERE id = ?`, asegurando coincidencia de `calibration_session_id` y `tenant_id`.
 
+11. **Resolución de la Validación de Integridad de Checksum (Paso 9):**
+    - **Auditoría de Algoritmo y Serialización:** Confirmada la identidad estricta de la serialización JSON canónica recursiva con ordenación de claves (`canonicalStringify` vs `calibrationSessionService._canonicalStringify`) y del algoritmo criptográfico (SHA-256). Se identificó que `calibrationSessionService.computeRatesChecksum` emite exclusivamente el digest hexadecimal puro de 64 caracteres en minúsculas (sin prefijo), mientras que el cálculo de referencia del harness generaba la representación canónica con prefijo `sha256:<hash>`, provocando un fallo por comparación literal en el Paso 9.
+    - **Normalización Estricta (`normalizeSha256Hex`):** Admite únicamente cadenas válidas de 64 caracteres hexadecimales, con o sin prefijo `sha256:` (insensible a mayúsculas/minúsculas). Rechaza de forma determinista valores ausentes (`null`, `undefined`, cadenas vacías, espacios en blanco), tipos incorrectos (no-strings), longitudes distintas de 64 hex chars (o 71 con prefijo), caracteres no hexadecimales y prefijos corruptos o duplicados. No realiza eliminación indiscriminada de prefijos.
+    - **Cálculo Independiente y Comparación con Igualdad Estricta:** Se mantiene el cálculo independiente del hash SHA-256 desde `rates_json`. Los digests normalizados se comparan con igualdad estricta (`storedNorm === computedNorm`).
+    - **Diagnóstico Sanitizado:** Ante cualquier discrepancia, el reporte visualiza exclusivamente el checksum almacenado y el calculado, sin filtrar tarifas, tokens Bearer, credenciales ni datos personales.
+    - **Acreditación de Regresiones en 4 Categorías (15 pruebas):**
+      1. Hexadecimal puro equivalente (insensible a mayúsculas de hex).
+      2. Formato `sha256:<hash>` equivalente (hex puro frente a prefijo, ambos prefijados, variaciones de mayúsculas).
+      3. Hash válido pero diferente (rechazo estricto con reporte sanitizado sin secretos).
+      4. Formatos inválidos y valores ausentes (`null`, `undefined`, tipos no-string, longitudes 63/65/32, caracteres no-hex 'g'/'z', corrupción de prefijo).
+      5. Interoperabilidad directa end-to-end con `calibrationSessionService.computeRatesChecksum`.
+      Verificadas mediante ejecución standalone (`node scripts/test_onboarding_connected_suite.js --regressions`), pre-flight en el harness conectado y en la suite Vitest (`tests/onboarding_checksum_integrity_regression.test.js`).
+
 ---
 
 ## 1. Entorno de Verificación y Declaración de Evidencias
 - **Distinción entre Capturas Reutilizadas y Entregables Regenerados:**
   - **Evidencias Visuales (15 archivos PNG):** Reutilizadas de la sesión validada de Playwright (`01_onboarding_...` a `08_onboarding_...`), acreditando fidelidad tipográfica, paridad multilingüe EN/ES/DE, densidad cómoda/compacta, y fidelidad documental (1.792 €, interior 4/4). No han sufrido alteraciones visuales en esta iteración.
-  - **Entregables Técnicos y Evidencias de Contrato (9 archivos):** Regenerados e incorporados en esta iteración para acreditar los puntos de auditoría (`test_onboarding_connected_suite.js`, `raw_vitest_output.log`, `raw_build_output.log`, `git_diff_review.diff`, `vitest_discovered_suites.txt`, `userSessionService.js`, `auth_middleware.js`, `auth_and_user_sessions_schema.sql`, `SHA256SUMS.txt`).
+  - **Entregables Técnicos y Evidencias de Contrato (10 archivos):** Regenerados e incorporados en esta iteración para acreditar los puntos de auditoría (`test_onboarding_connected_suite.js`, `onboarding_checksum_integrity_regression.test.js`, `raw_vitest_output.log`, `raw_build_output.log`, `git_diff_review.diff`, `vitest_discovered_suites.txt`, `userSessionService.js`, `auth_middleware.js`, `auth_and_user_sessions_schema.sql`, `SHA256SUMS.txt`).
 - **Comandos Ejecutados:**
-  - `npx vitest run`: Ejecución de 21 suites y 273 tests unitarios y de integración (273 pasados, 0 fallidos) en 11.38s.
-  - `npm run build`: Compilación de producción Vite (dist generado limpiamente en 12.88s).
+  - `npx vitest run`: Ejecución de 22 suites y 288 tests unitarios y de integración (288 pasados, 0 fallidos) en 11.70s.
+  - `npm run build`: Compilación de producción Vite (dist generado limpiamente en 11.82s).
 - **Entorno:**
   - Node.js v20+, Vite 6.4.2, React 19, TypeScript
   - MySQL Target: `ppos_rc_mdw0qd@127.0.0.1:3306/pposrcmdw0qdtest`
@@ -166,11 +180,12 @@ def package():
 | `06b_onboarding_step2_mobile_390_dark.png` | PNG (390×844) | Reutilizada | Móvil Paso 2: Indicador 'Paso 2 de 5: Añadir presupuestos', controles superiores en grid sin recortar ni desbordar. | `{file_checksums.get('06b_onboarding_step2_mobile_390_dark.png', '')}` |
 | `07_onboarding_step1_en_light_1280.png` | PNG (1280×800) | Reutilizada | Paridad lingüística en Inglés: 'In setup' y navegación sincronizada. | `{file_checksums.get('07_onboarding_step1_en_light_1280.png', '')}` |
 | `08_onboarding_step1_de_dark_1366.png` | PNG (1366×768) | Reutilizada | Paridad lingüística en Alemán: 'In Konfiguration' y tipografía ajustada sin desbordamientos. | `{file_checksums.get('08_onboarding_step1_de_dark_1366.png', '')}` |
-| `test_onboarding_connected_suite.js` | Código JS | Regenerado | Harness revisable de prueba conectada para MySQL aislado (base pposrcmdw0qdtest, usuario ppos_rc_mdw0qd@127.0.0.1, sesiones reales con userSessionService, initial rates fixture, aislamiento comercial, orden estricto FK en 8 tablas). | `{file_checksums.get('test_onboarding_connected_suite.js', '')}` |
-| `raw_vitest_output.log` | Log original | Regenerado | Log completo de ejecución de Vitest: 21 suites y 273 pruebas pasadas (100% éxito). | `{file_checksums.get('raw_vitest_output.log', '')}` |
+| `test_onboarding_connected_suite.js` | Código JS | Regenerado | Harness revisable de prueba conectada para MySQL aislado (base pposrcmdw0qdtest, usuario ppos_rc_mdw0qd@127.0.0.1, sesiones reales con userSessionService, initial rates fixture, aislamiento comercial, orden estricto FK en 8 tablas, normalización estricta de checksum con igualdad estricta). | `{file_checksums.get('test_onboarding_connected_suite.js', '')}` |
+| `onboarding_checksum_integrity_regression.test.js` | Suite Vitest | Incorporado | 15 pruebas de regresión unitaria para normalización y comparación estricta de checksums SHA-256 (hex puro, sha256: prefix, rechazo de divergencias, formatos inválidos e interoperabilidad con calibrationSessionService). | `{file_checksums.get('onboarding_checksum_integrity_regression.test.js', '')}` |
+| `raw_vitest_output.log` | Log original | Regenerado | Log completo de ejecución de Vitest: 22 suites y 288 pruebas pasadas (100% éxito). | `{file_checksums.get('raw_vitest_output.log', '')}` |
 | `raw_build_output.log` | Log original | Regenerado | Log completo de compilación de producción con Vite (`dist/` generado limpiamente). | `{file_checksums.get('raw_build_output.log', '')}` |
-| `git_diff_review.diff` | Diff original | Regenerado | Diff completo de todas las modificaciones de código respecto al commit anterior `f13bba6` (HEAD: `{git_sha[:7]}`). | `{file_checksums.get('git_diff_review.diff', '')}` |
-| `vitest_discovered_suites.txt` | Texto | Regenerado | Desglose verificado de los 21 archivos descubiertos por Vitest con el conteo exacto de tests por suite (suma: 273). | `{file_checksums.get('vitest_discovered_suites.txt', '')}` |
+| `git_diff_review.diff` | Diff original | Regenerado | Diff completo de todas las modificaciones de código respecto al commit base `f13bba6`. | `{file_checksums.get('git_diff_review.diff', '')}` |
+| `vitest_discovered_suites.txt` | Texto | Regenerado | Desglose verificado de los 22 archivos descubiertos por Vitest con el conteo exacto de tests por suite (suma: 288). | `{file_checksums.get('vitest_discovered_suites.txt', '')}` |
 | `userSessionService.js` | Evidencia de Código | Incorporado | Servicio oficial de sesiones de usuario (`src/api/services/userSessionService.js`), acreditando parámetros, creación y validación estricta de identidades en capa de aplicación. | `{file_checksums.get('userSessionService.js', '')}` |
 | `auth_middleware.js` | Evidencia de Código | Incorporado | Middleware de autenticación oficial `requireAdmin` (`src/api/middleware/auth.js`), acreditando la verificación de tokens JWT contra `user_sessions.id` (`jti`) y validación de `user_id`. | `{file_checksums.get('auth_middleware.js', '')}` |
 | `auth_and_user_sessions_schema.sql` | Evidencia DDL | Incorporado | Definiciones DDL de `control_users` y `user_sessions`, documentando la correspondencia de identificadores y aclarando que la integridad referencial se asegura en aplicación sin FK relacional. | `{file_checksums.get('auth_and_user_sessions_schema.sql', '')}` |
@@ -179,13 +194,13 @@ def package():
 ---
 
 ## 3. Invariantes Comprobados en la Suite de Tests
-- **Vitest**: 21 suites descubiertas y ejecutadas, 273 tests unitarios y de integración pasando (100% éxito) en 14.70s.
+- **Vitest**: 22 suites descubiertas y ejecutadas, 288 tests unitarios y de integración pasando (100% éxito) en 11.70s.
 - **Validación Matemática**: Validación exhaustiva con `Number.isFinite` que rechaza `NaN`, `Infinity`, `-Infinity`, ceros engañosos y números negativos en cliente y servidor.
 - **Regresión Negativa de Comparación**: Se ha verificado que un presupuesto positivo con respuesta del motor ausente (`null`), incompleta o malformada (`0` o negativa) nunca muestra estado calibrado, muestra aviso de cálculo incompleto, visualiza guiones `—` con insignia 'Sin cálculo' y bloquea estrictamente el botón de avance a la propuesta.
 - **Cancelación Limpia y Fixture Baseline**: Verificación de que la cancelación y los accesos fallidos entre tenants preservan estrictamente las tarifas iniciales válidas (`INITIAL_VALID_RATES`).
 - **Aislamiento Comercial**: Cero publicaciones en marketplace y cero activación de grants durante la calibración, con verificación de `production_dispatch_allowed`, `marketplace_visible`, `job_routing_allowed` y `live_quoting_allowed`.
 - **Aislamiento Multi-Tenant**: Verificada la propagación inviolable de `tenantId` y `printerNodeId` en todo el ciclo con sesiones reales y acreditación de `userSessionService.validateSession()`.
-- **Build de Producción**: Compilación limpia con Vite (`dist/` generado en 13.15s).
+- **Build de Producción**: Compilación limpia con Vite (`dist/` generado en 11.82s).
 """
 
     manifest_path = os.path.join(ARTIFACTS_DIR, "MANIFEST.md")

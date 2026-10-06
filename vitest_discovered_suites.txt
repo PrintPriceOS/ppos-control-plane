@@ -1,6 +1,6 @@
 ======================================================================
   PRINTPRICE OS: LISTADO EFECTIVO DE SUITES DESCUBIERTAS POR VITEST   
-  Total archivos de test: 21 | Total pruebas: 271
+  Total archivos de test: 22 | Total pruebas: 288
 ======================================================================
 
  1. tests/migration_156_157_runner.test.js (5 tests)
@@ -14,7 +14,7 @@
  9. tests/IncomingJobsManufacturing.test.tsx (5 tests)
 10. tests/PrinthouseOnboardingAuditAndGovernance.test.tsx (23 tests)
 11. tests/backend_tenant_security.test.js (21 tests)
-12. tests/PrinthouseOnboardingSimplifiedJourney.test.tsx (19 tests)
+12. tests/PrinthouseOnboardingSimplifiedJourney.test.tsx (21 tests)
 13. tests/SettingsPreferencesBehavior.test.tsx (5 tests)
 14. tests/SuperAdminScreensRefactor.test.tsx (9 tests)
 15. tests/NodeInspectionDrawerRegression.test.tsx (4 tests)
@@ -24,7 +24,8 @@
 19. tests/BetaCohortManagement.test.tsx (7 tests)
 20. tests/GovernedQuoteSmokeTest.test.tsx (30 tests)
 21. tests/PrinthouseOnboardingRedesign.test.tsx (20 tests)
+22. tests/onboarding_checksum_integrity_regression.test.js (15 tests)
 
 ----------------------------------------------------------------------
-TOTAL: 21 test files | 271 passed tests | 0 failed
+TOTAL: 22 test files | 288 passed tests | 0 failed
 ----------------------------------------------------------------------
