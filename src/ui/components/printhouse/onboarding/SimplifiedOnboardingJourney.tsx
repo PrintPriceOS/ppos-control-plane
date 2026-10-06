@@ -194,6 +194,10 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
 
     const handleSelectFamilyToCalibrate = (id: ProductFamilyId) => {
         calculationRequestIdRef.current++;
+        uploadRequestIdRef.current++;
+        setUploadingPdf(false);
+        setUploadedFileName(null);
+        setUploadError(null);
         setSelectedFamilyId(id);
         setSelectedVariantId(null);
         setSessionId(null);
@@ -217,6 +221,15 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
             quoteRef: prev.quoteRef || ''
         }));
         setCurrentStep(2);
+    };
+
+    const handleReturnToFamilySelector = () => {
+        calculationRequestIdRef.current++;
+        uploadRequestIdRef.current++;
+        setUploadingPdf(false);
+        setUploadedFileName(null);
+        setUploadError(null);
+        setCurrentStep(1);
     };
 
     // ── Dropzone Handlers ──
@@ -349,9 +362,13 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
             updateFamilyStatus(selectedFamilyId, 'QUOTE_ADDED', defaultRuns.length);
             setCurrentStep(3);
         } catch (err: any) {
-            setUploadError(err.message || 'Error al procesar el presupuesto PDF');
+            if (uploadRequestIdRef.current === thisUploadId) {
+                setUploadError(err.message || 'Error al procesar el presupuesto PDF');
+            }
         } finally {
-            setUploadingPdf(false);
+            if (uploadRequestIdRef.current === thisUploadId) {
+                setUploadingPdf(false);
+            }
         }
     };
 
@@ -725,7 +742,7 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
                         <div className="flex items-center gap-3">
                             <button
                                 type="button"
-                                onClick={() => setCurrentStep(1)}
+                                onClick={handleReturnToFamilySelector}
                                 className="p-2 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-200 rounded-xl transition-colors cursor-pointer"
                                 aria-label="Volver al selector de familias"
                             >
@@ -750,7 +767,11 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
                         <div className="grid grid-cols-2 sm:flex items-center p-1 bg-zinc-100 dark:bg-zinc-800 rounded-xl border border-zinc-200 dark:border-zinc-700 w-full sm:w-auto">
                             <button
                                 type="button"
-                                onClick={() => setEntryMode('UPLOAD_PDF')}
+                                onClick={() => {
+                                    uploadRequestIdRef.current++;
+                                    setUploadingPdf(false);
+                                    setEntryMode('UPLOAD_PDF');
+                                }}
                                 className={`px-2.5 sm:px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 sm:gap-2 cursor-pointer ${
                                     entryMode === 'UPLOAD_PDF'
                                         ? 'bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white shadow-xs'
@@ -762,7 +783,11 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
                             </button>
                             <button
                                 type="button"
-                                onClick={() => setEntryMode('MANUAL_FORM')}
+                                onClick={() => {
+                                    uploadRequestIdRef.current++;
+                                    setUploadingPdf(false);
+                                    setEntryMode('MANUAL_FORM');
+                                }}
                                 className={`px-2.5 sm:px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 sm:gap-2 cursor-pointer ${
                                     entryMode === 'MANUAL_FORM'
                                         ? 'bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white shadow-xs'

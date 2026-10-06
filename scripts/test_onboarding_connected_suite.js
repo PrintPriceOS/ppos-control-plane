@@ -13,17 +13,22 @@
  * 3. Zero DDL/CREATE TABLE. Conforms strictly to official migrated MySQL schema.
  * 4. Rigorous schema compliance:
  *    - Creates official `tenants` records before referencing in `printer_nodes`.
- *    - `printer_nodes` includes email and status; NO updated_at column.
+ *    - `printer_nodes` seeded with initial valid rates matrix fixture (rates_json ONLY; no nonexistent rates_checksum column).
+ *    - Creates real users in `control_users` and trackable authenticated sessions in `user_sessions` via `userSessionService.createSession`.
+ *    - Issues standard JWTs (sub, jti, tenant_id, role, issuer, audience) validating `userSessionService.validateSession` contract.
  *    - `printhouse_pricing_revisions` queries by printer_node_id and rates_checksum (not printhouse_id/version/checksum).
  *    - Tracks and cleans `printhouse_pricing_calibration_acceptances`.
  * 5. Unique IDs per execution. Tracks all created IDs and performs automatic orphan discovery by execution tenant.
- *    Deterministic teardown in strict foreign-key order across all 6 tables.
- *    Cleanup verification checks zero residuals in all 6 affected tables; cleanup failure exits with code 1.
+ *    Deterministic teardown in strict foreign-key order across all 8 tables:
+ *    `acceptances` -> `revisions` -> `runs` -> `sessions` -> `user_sessions` -> `control_users` -> `printer_nodes` -> `tenants`.
+ *    Cleanup verification checks zero residuals in all 8 affected tables; cleanup failure exits with code 1.
  * 6. Effective scope:
  *    - Official routes: POST for /ready, POST for /reject (cancellation), POST for /calculate, POST for /accept.
  *    - Strict cross-tenant isolation testing using a REAL session and REAL run ID belonging to Tenant A.
- *    - Real cancellation flow: tests POST /reject, verifying status 'REJECTED' and zero revisions/zero rate mutation.
- *    - Verifies cryptographic integrity of rates_checksum by computing canonical SHA-256 of stored rates_json.
+ *    - Real cancellation flow: tests POST /reject, verifying status 'REJECTED' and rates matching initial baseline.
+ *    - Commercial isolation: asserts zero publications in `bpe_pricing_publications` and zero activation grants in `printhouse_activation_grants`
+ *      (including production_dispatch_allowed, marketplace_visible, job_routing_allowed, live_quoting_allowed) without silent error catchers.
+ *    - Verifies cryptographic integrity of rates_checksum by computing canonical SHA-256 exclusively from stored rates_json.
  * 7. Clean server, client, and pool shutdown with HTTP timeouts.
  */
 
@@ -83,15 +88,19 @@ delete process.env.MYSQL_URL;
 
 const JWT_SECRET = process.env.JWT_TEST_SECRET || 'test_isolated_connected_secret_key_2026';
 process.env.JWT_SECRET = JWT_SECRET;
+process.env.JWT_AUDIENCE = process.env.JWT_AUDIENCE || 'ppos:control';
+process.env.JWT_ISSUER = process.env.JWT_ISSUER || 'https://auth.printprice.pro';
 
 const http = require('http');
 const express = require('express');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const mysql = require('mysql2/promise');
+const bcrypt = require('bcrypt');
 
 // Import Control Plane services with verified clean environment
 const mysqlClient = require('../src/api/services/mysqlClient');
+const userSessionService = require('../src/api/services/userSessionService');
 const printhouseOnboardingRoutes = require('../src/api/routes/printhouseOnboardingRoutes');
 
 // ── 2. CANONICAL STRINGIFY & CHECKSUM UTILITIES ──
@@ -110,11 +119,67 @@ function computeCanonicalRatesChecksum(rates) {
     return 'sha256:' + crypto.createHash('sha256').update(canonical).digest('hex');
 }
 
-// ── 3. UNIQUE FIXTURE TRACKING & IDENTITY ──
+// ── 3. CANONICAL INDUSTRIAL RATES FIXTURE & CONSUMED KEYS DOCUMENTATION ──
+// Strictly compatible with @ppos/pricing-engine and src/api/services/buildPriceCalibrationAdapter.js.
+// Documented keys consumed by canonical forward pricing engine and inverse pricing solver:
+// - Interior print setup & variable runs: interior_full_colour_fixed, interior_full_colour_var (by signature size '16p', '32p', etc.)
+// - Cover print setup & variable runs: cover_fixed_by_colours, cover_var_per_1000_by_colours (by color count '1'..'5')
+// - Lamination setup & variable runs: lam_fixed, lam_var_per_1000 ('matt', 'gloss', 'varnish')
+// - Binding setup & variable runs: binding_pb_fixed_by_sections, binding_pb_var_per_1000_by_sections (by section count '1'..'30')
+// - Paper setup waste sheets: paper_interior_fixed_by_colours, paper_cover_fixed_by_colours
+// - Paper run waste sheets per 1000: paper_interior_var_per_1000_by_colours, paper_cover_var_per_1000_by_colours
+// - Paper binding waste percentage: paper_waste_for_binding ('pb', 'ss', 'hc', etc.)
+// - Paper prices per kg: paper_price_interior_by_kilo ('offset', 'mc', 'lux', etc.), paper_price_cover_by_kilo ('mc', 'artboard', etc.)
+// - Zero ignored / dummy parameters (eliminates former synthetic hourly/machine placeholders).
+const INITIAL_VALID_RATES = {
+    interior_one_colour_fixed: { '32p': 30, '16p': 18, '8p': 10, '4p': 6 },
+    interior_one_colour_var: { '32p': 12, '16p': 7, '8p': 4, '4p': 2 },
+    interior_two_colour_fixed: { '32p': 50, '16p': 30, '8p': 18, '4p': 10 },
+    interior_two_colour_var: { '32p': 20, '16p': 12, '8p': 7, '4p': 4 },
+    interior_full_colour_fixed: { '32p': 80, '16p': 48, '8p': 28, '4p': 16 },
+    interior_full_colour_var: { '32p': 35, '16p': 20, '8p': 12, '4p': 6 },
+    cover_fixed_by_colours: { '1': 25, '2': 35, '3': 50, '4': 65, '5': 80 },
+    cover_var_per_1000_by_colours: { '1': 10, '2': 14, '3': 20, '4': 26, '5': 32 },
+    lam_fixed: { 'matt': 40, 'gloss': 40, 'varnish': 30 },
+    lam_var_per_1000: { 'matt': 15, 'gloss': 15, 'varnish': 10 },
+    uv_varnish: { fixed: 50, var: 20 },
+    pms_cover: { fixed: 30, var: 12 },
+    pms_interior_fixed: 25,
+    binding_pb_fixed_by_sections: {
+        '1': 80, '2': 85, '3': 90, '4': 95, '5': 100, '6': 105, '7': 110, '8': 115,
+        '9': 120, '10': 125, '11': 130, '12': 135, '13': 140, '14': 145, '15': 150,
+        '16': 155, '17': 160, '18': 165, '19': 170, '20': 175, '21': 180, '22': 185,
+        '23': 190, '24': 195, '25': 200, '26': 205, '27': 210, '28': 215, '29': 220, '30': 225
+    },
+    binding_pb_var_per_1000_by_sections: {
+        '1': 30, '2': 32, '3': 34, '4': 36, '5': 38, '6': 40, '7': 42, '8': 44,
+        '9': 46, '10': 48, '11': 50, '12': 52, '13': 54, '14': 56, '15': 58,
+        '16': 60, '17': 62, '18': 64, '19': 66, '20': 68, '21': 70, '22': 72,
+        '23': 74, '24': 76, '25': 78, '26': 80, '27': 82, '28': 84, '29': 86, '30': 88
+    },
+    binding_ss_fixed_by_sections: { '1': 40, '2': 43, '3': 46, '4': 49, '5': 52 },
+    binding_ss_var_per_1000_by_sections: { '1': 15, '2': 16, '3': 17, '4': 18, '5': 19 },
+    binding_ts_fixed_by_sections: { '1': 100, '2': 106, '3': 112, '4': 118, '5': 124 },
+    binding_ts_var_per_1000_by_sections: { '1': 40, '2': 43, '3': 46, '4': 49, '5': 52 },
+    binding_hc_fixed_by_sections: { '1': 140, '2': 148, '3': 156, '4': 164, '5': 172 },
+    binding_hc_var_per_1000_by_sections: { '1': 55, '2': 59, '3': 63, '4': 67, '5': 71 },
+    paper_interior_fixed_by_colours: { 'one': 5, 'two': 6, 'full': 8 },
+    paper_interior_var_per_1000_by_colours: { 'one': 80, 'two': 95, 'full': 120 },
+    paper_cover_fixed_by_colours: { 'one': 4, 'two': 5, 'full': 6 },
+    paper_cover_var_per_1000_by_colours: { 'one': 60, 'two': 75, 'full': 95 },
+    paper_waste_for_binding: { 'pb': 5, 'ss': 3, 'sc': 5, 'hc': 6, 'wo': 4, 'sp': 4 },
+    paper_price_interior_by_kilo: { 'offset': 1.2, 'mc': 1.45, 'lux': 1.8, 'munken': 2.1, 'other': 1.2 },
+    paper_price_cover_by_kilo: { 'mc': 1.5, 'artboard': 1.65, 'offset': 1.2, 'wfmc': 1.55, 'other': 1.5 }
+};
+const INITIAL_RATES_JSON_STR = canonicalStringify(INITIAL_VALID_RATES);
+const INITIAL_RATES_CHECKSUM = computeCanonicalRatesChecksum(INITIAL_VALID_RATES);
+
 const EXECUTION_TAG = 'test_onb_' + Date.now().toString(36) + '_' + crypto.randomBytes(3).toString('hex');
 const tracker = {
     tenants: new Set(),
     printerNodes: new Set(),
+    controlUserIds: new Set(),
+    userSessionIds: new Set(),
     sessionIds: new Set(),
     runIds: new Set(),
     revisionIds: new Set(),
@@ -135,12 +200,69 @@ function assert(condition, message, details = '') {
     }
 }
 
-function createTestToken(tenantId, role = 'PRINTHOUSE_OPERATOR', userId = 'test-op-1') {
-    return jwt.sign(
-        { id: userId, tenantId, role, email: `${userId}@${tenantId}.example.com` },
-        JWT_SECRET,
-        { expiresIn: '1h' }
+/**
+ * Creates a real authenticated user in control_users, a trackable server session
+ * in user_sessions via userSessionService.createSession, and issues a signed Bearer JWT
+ * that strictly satisfies src/api/middleware/auth.js (sub, tenant_id, role, jti, audience, issuer).
+ *
+ * PRECONDITION & AUTHENTICITY CONTRACT:
+ * - Table `control_users` MUST exist in MySQL target; if absent, execution aborts immediately.
+ * - Insertion into `control_users` MUST return a valid numeric `insertId`.
+ * - Zero fallback to synthetic or invented user IDs.
+ */
+async function createRealUserAndSession(directConn, tenantId, role = 'PRINTHOUSE_OPERATOR', userTag = 'op') {
+    const email = `${userTag}_${Date.now()}_${crypto.randomBytes(3).toString('hex')}@test-connected.local`;
+    const passwordHash = await bcrypt.hash('HarnessSecurePass2026!', 10);
+
+    // 1. Verify existence of control_users. Strictly abort if table is missing.
+    const [userTableCheck] = await directConn.query("SHOW TABLES LIKE 'control_users'");
+    if (!userTableCheck || userTableCheck.length === 0) {
+        throw new Error('ABORT_PRECONDITION_FAILED: Required table "control_users" does not exist in target database. Harness strictly requires authentic user registration; fallback synthetic identities are prohibited.');
+    }
+
+    const [insertRes] = await directConn.query(
+        `INSERT INTO control_users (tenant_id, email, password_hash, role, status, created_at)
+         VALUES (?, ?, ?, ?, 'ACTIVE', NOW())`,
+        [tenantId, email, passwordHash, role]
     );
+
+    const insertId = insertRes.insertId || (Array.isArray(insertRes) && insertRes[0]?.insertId);
+    if (!insertId) {
+        throw new Error('ABORT_INSERT_FAILED: Failed to obtain valid auto-increment insertId from control_users insertion');
+    }
+    const userId = String(insertId);
+    tracker.controlUserIds.add(insertId);
+
+    // 2. Real session creation via official userSessionService.createSession
+    const session = await userSessionService.createSession({
+        userId,
+        tenantId,
+        role,
+        ipAddress: '127.0.0.1',
+        userAgent: 'PPOS-Connected-Harness/1.0',
+        inactivityMinutes: 60,
+        absoluteHours: 24
+    });
+    tracker.userSessionIds.add(session.sessionId);
+
+    // 3. Issue authentic JWT with standard claims matching auth.js / requireAdmin
+    const token = jwt.sign(
+        {
+            sub: userId,
+            tenant_id: tenantId,
+            role,
+            jti: session.sessionId,
+            email
+        },
+        JWT_SECRET,
+        {
+            issuer: process.env.JWT_ISSUER,
+            audience: process.env.JWT_AUDIENCE,
+            expiresIn: '1h'
+        }
+    );
+
+    return { token, sessionId: session.sessionId, userId, tenantId, email };
 }
 
 function httpRequest(serverUrl, method, path, token, body = null, timeoutMs = 5000) {
@@ -214,9 +336,36 @@ async function verifyMysqlIdentity(directConn, cpPool) {
     assert(true, `CP service pool identity strictly verified as ${poolUser} on ${poolDb}`);
 }
 
-// ── 5. DETERMINISTIC CLEANUP IN FK ORDER ACROSS ALL 6 TABLES ──
+// ── 5. DETERMINISTIC CLEANUP IN STRICT FK ORDER ACROSS ALL 8 TABLES ──
+// Documented MySQL Foreign Keys & Dependency Order (Migrations 143, 146, 147, 148, 158, 160):
+// 1. printhouse_pricing_calibration_acceptances:
+//    - FK (pricing_revision_id) REFERENCES printhouse_pricing_revisions(id) ON DELETE CASCADE
+//    - FK (calibration_run_id) REFERENCES printhouse_pricing_calibration_runs(id) ON DELETE CASCADE
+//    - FK (calibration_session_id) REFERENCES printhouse_pricing_calibration_sessions(id) ON DELETE CASCADE
+//    - FK (printer_node_id) REFERENCES printer_nodes(id) ON DELETE CASCADE
+//    - FK (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE
+// 2. printhouse_pricing_revisions:
+//    - FK (printer_node_id) REFERENCES printer_nodes(id) ON DELETE CASCADE
+//    - FK (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE
+//    - Logical references to source_calibration_run_id and source_calibration_session_id
+//      (MUST be purged BEFORE runs and sessions to prevent referential inconsistencies)
+// 3. printhouse_pricing_calibration_runs:
+//    - FK (calibration_session_id) REFERENCES printhouse_pricing_calibration_sessions(id) ON DELETE CASCADE
+//    - FK (printer_node_id) REFERENCES printer_nodes(id) ON DELETE CASCADE
+//    - FK (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE
+// 4. printhouse_pricing_calibration_sessions:
+//    - FK (printer_node_id) REFERENCES printer_nodes(id) ON DELETE CASCADE
+//    - FK (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE
+// 5. user_sessions:
+//    - Scoped to tenant_id; must be purged before tenants
+// 6. control_users:
+//    - Real user accounts created for test tenants; must be purged before tenants
+// 7. printer_nodes:
+//    - FK (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE
+// 8. tenants:
+//    - Root tenant entity
 async function performDeterministicCleanup(directConn) {
-    console.log('\n[CLEANUP] Discovering and purging tracked test fixtures across all 6 affected tables...');
+    console.log('\n[CLEANUP] Discovering and purging tracked test fixtures across all 8 affected tables...');
     let cleanupFailed = false;
     const residualErrors = [];
 
@@ -252,6 +401,18 @@ async function performDeterministicCleanup(directConn) {
                 foundRuns.forEach(r => tracker.runIds.add(r.id));
             }
 
+            const [foundUserSessions] = await directConn.query(
+                `SELECT id FROM user_sessions WHERE tenant_id IN (?)`,
+                [tenantList]
+            );
+            foundUserSessions.forEach(r => tracker.userSessionIds.add(r.id));
+
+            const [foundUsers] = await directConn.query(
+                `SELECT id FROM control_users WHERE tenant_id IN (?)`,
+                [tenantList]
+            );
+            foundUsers.forEach(r => tracker.controlUserIds.add(r.id));
+
             const [foundNodes] = await directConn.query(
                 `SELECT id FROM printer_nodes WHERE tenant_id IN (?)`,
                 [tenantList]
@@ -260,7 +421,7 @@ async function performDeterministicCleanup(directConn) {
         }
 
         // Teardown step: delete in strict foreign key dependency order
-        // 1. Calibration acceptances
+        // 1. Calibration acceptances (references revisions, runs, sessions, nodes, tenants)
         if (tracker.acceptanceIds.size > 0) {
             const accIds = Array.from(tracker.acceptanceIds);
             await directConn.query(
@@ -270,27 +431,7 @@ async function performDeterministicCleanup(directConn) {
             console.log(`  ✓ Cleaned ${accIds.length} calibration acceptances`);
         }
 
-        // 2. Calibration runs
-        if (tracker.runIds.size > 0) {
-            const runIds = Array.from(tracker.runIds);
-            await directConn.query(
-                `DELETE FROM printhouse_pricing_calibration_runs WHERE id IN (?)`,
-                [runIds]
-            );
-            console.log(`  ✓ Cleaned ${runIds.length} calibration runs`);
-        }
-
-        // 3. Calibration sessions
-        if (tracker.sessionIds.size > 0) {
-            const sessIds = Array.from(tracker.sessionIds);
-            await directConn.query(
-                `DELETE FROM printhouse_pricing_calibration_sessions WHERE id IN (?)`,
-                [sessIds]
-            );
-            console.log(`  ✓ Cleaned ${sessIds.length} calibration sessions`);
-        }
-
-        // 4. Pricing revisions
+        // 2. Pricing revisions (BEFORE runs and sessions)
         if (tracker.revisionIds.size > 0) {
             const revIds = Array.from(tracker.revisionIds);
             await directConn.query(
@@ -300,7 +441,47 @@ async function performDeterministicCleanup(directConn) {
             console.log(`  ✓ Cleaned ${revIds.length} pricing revisions`);
         }
 
-        // 5. Printer nodes
+        // 3. Calibration runs (references sessions, nodes, tenants)
+        if (tracker.runIds.size > 0) {
+            const runIds = Array.from(tracker.runIds);
+            await directConn.query(
+                `DELETE FROM printhouse_pricing_calibration_runs WHERE id IN (?)`,
+                [runIds]
+            );
+            console.log(`  ✓ Cleaned ${runIds.length} calibration runs`);
+        }
+
+        // 4. Calibration sessions (references nodes, tenants)
+        if (tracker.sessionIds.size > 0) {
+            const sessIds = Array.from(tracker.sessionIds);
+            await directConn.query(
+                `DELETE FROM printhouse_pricing_calibration_sessions WHERE id IN (?)`,
+                [sessIds]
+            );
+            console.log(`  ✓ Cleaned ${sessIds.length} calibration sessions`);
+        }
+
+        // 5. User sessions (references tenant boundary)
+        if (tracker.userSessionIds.size > 0) {
+            const uSessIds = Array.from(tracker.userSessionIds);
+            await directConn.query(
+                `DELETE FROM user_sessions WHERE id IN (?)`,
+                [uSessIds]
+            );
+            console.log(`  ✓ Cleaned ${uSessIds.length} user sessions`);
+        }
+
+        // 6. Control users (real user records created for test tenants)
+        if (tracker.controlUserIds.size > 0) {
+            const uIds = Array.from(tracker.controlUserIds);
+            await directConn.query(
+                `DELETE FROM control_users WHERE id IN (?)`,
+                [uIds]
+            );
+            console.log(`  ✓ Cleaned ${uIds.length} control users`);
+        }
+
+        // 7. Printer nodes (references tenants)
         if (tracker.printerNodes.size > 0) {
             const nodeIds = Array.from(tracker.printerNodes);
             await directConn.query(
@@ -310,7 +491,7 @@ async function performDeterministicCleanup(directConn) {
             console.log(`  ✓ Cleaned ${nodeIds.length} printer nodes`);
         }
 
-        // 6. Tenants
+        // 8. Tenants (root entity)
         if (tracker.tenants.size > 0) {
             const tIds = Array.from(tracker.tenants);
             await directConn.query(
@@ -320,7 +501,7 @@ async function performDeterministicCleanup(directConn) {
             console.log(`  ✓ Cleaned ${tIds.length} tenants`);
         }
 
-        // Post-cleanup verification: assert zero remaining records in ALL 6 TABLES
+        // Post-cleanup verification: assert zero remaining records in ALL 8 TABLES
         if (tracker.acceptanceIds.size > 0) {
             const [remAcc] = await directConn.query(
                 `SELECT COUNT(*) as count FROM printhouse_pricing_calibration_acceptances WHERE id IN (?)`,
@@ -329,6 +510,17 @@ async function performDeterministicCleanup(directConn) {
             if (remAcc[0]?.count > 0) {
                 cleanupFailed = true;
                 residualErrors.push(`${remAcc[0].count} calibration acceptances remained uncleaned`);
+            }
+        }
+
+        if (tracker.revisionIds.size > 0) {
+            const [remRevs] = await directConn.query(
+                `SELECT COUNT(*) as count FROM printhouse_pricing_revisions WHERE id IN (?)`,
+                [Array.from(tracker.revisionIds)]
+            );
+            if (remRevs[0]?.count > 0) {
+                cleanupFailed = true;
+                residualErrors.push(`${remRevs[0].count} pricing revisions remained uncleaned`);
             }
         }
 
@@ -354,14 +546,25 @@ async function performDeterministicCleanup(directConn) {
             }
         }
 
-        if (tracker.revisionIds.size > 0) {
-            const [remRevs] = await directConn.query(
-                `SELECT COUNT(*) as count FROM printhouse_pricing_revisions WHERE id IN (?)`,
-                [Array.from(tracker.revisionIds)]
+        if (tracker.userSessionIds.size > 0) {
+            const [remUserSess] = await directConn.query(
+                `SELECT COUNT(*) as count FROM user_sessions WHERE id IN (?)`,
+                [Array.from(tracker.userSessionIds)]
             );
-            if (remRevs[0]?.count > 0) {
+            if (remUserSess[0]?.count > 0) {
                 cleanupFailed = true;
-                residualErrors.push(`${remRevs[0].count} pricing revisions remained uncleaned`);
+                residualErrors.push(`${remUserSess[0].count} user sessions remained uncleaned`);
+            }
+        }
+
+        if (tracker.controlUserIds.size > 0) {
+            const [remUsers] = await directConn.query(
+                `SELECT COUNT(*) as count FROM control_users WHERE id IN (?)`,
+                [Array.from(tracker.controlUserIds)]
+            );
+            if (remUsers[0]?.count > 0) {
+                cleanupFailed = true;
+                residualErrors.push(`${remUsers[0].count} control users remained uncleaned`);
             }
         }
 
@@ -388,7 +591,7 @@ async function performDeterministicCleanup(directConn) {
         }
 
         if (!cleanupFailed) {
-            console.log('  ✓ Verified 0 residuals across all 6 affected tables.');
+            console.log('  ✓ Verified 0 residuals across all 8 affected tables.');
         } else {
             console.error('  ✗ [CLEANUP-FAILURE] Residuals detected:', residualErrors.join('; '));
         }
@@ -445,10 +648,7 @@ async function runConnectedSuite() {
         const FIXTURE_TENANT_B = `tenant_${EXECUTION_TAG}_b`;
         const FIXTURE_NODE_A = `node_${EXECUTION_TAG}_a`;
 
-        const tokenA = createTestToken(FIXTURE_TENANT_A, 'PRINTHOUSE_OPERATOR', 'user-op-a');
-        const tokenB = createTestToken(FIXTURE_TENANT_B, 'PRINTHOUSE_OPERATOR', 'user-op-b');
-
-        // ── STEP 1: OFFICIAL SCHEMA SEEDING (TENANTS & PRINTER_NODES) ──
+        // ── STEP 1: OFFICIAL SCHEMA SEEDING (TENANTS, PRINTER_NODES, USERS & AUTH SESSIONS) ──
         console.log(`\n[STEP 1] Seeding Fixtures into Official Schema`);
 
         // Check columns in tenants table
@@ -469,7 +669,7 @@ async function runConnectedSuite() {
         }
         assert(true, `Created official tenants ${FIXTURE_TENANT_A} and ${FIXTURE_TENANT_B}`);
 
-        // Check columns in printer_nodes table (NO updated_at, include email & status)
+        // Check columns in printer_nodes table (NO updated_at, include email, status & initial valid rates_json ONLY)
         const [nodeCols] = await directConn.query('SHOW COLUMNS FROM printer_nodes');
         const nodeColSet = new Set(nodeCols.map(c => c.Field));
 
@@ -483,21 +683,62 @@ async function runConnectedSuite() {
             nodeFields.push('status');
             nodeVals.push('ACTIVE');
         }
+        if (nodeColSet.has('rates_json')) {
+            nodeFields.push('rates_json');
+            nodeVals.push(INITIAL_RATES_JSON_STR);
+        }
 
         await directConn.query(
             `INSERT INTO printer_nodes (${nodeFields.join(',')}) VALUES (${nodeVals.map(() => '?').join(',')})`,
             nodeVals
         );
         tracker.printerNodes.add(FIXTURE_NODE_A);
-        assert(true, `Created printer node ${FIXTURE_NODE_A} for ${FIXTURE_TENANT_A} with official schema columns`);
+        assert(true, `Created printer node ${FIXTURE_NODE_A} for ${FIXTURE_TENANT_A} with initial valid rates fixture`);
+
+        // Generate authentic server sessions and valid JWTs with real user accounts
+        const authA = await createRealUserAndSession(directConn, FIXTURE_TENANT_A, 'PRINTHOUSE_OPERATOR', 'user_op_a');
+        const authB = await createRealUserAndSession(directConn, FIXTURE_TENANT_B, 'PRINTHOUSE_OPERATOR', 'user_op_b');
+        const tokenA = authA.token;
+        const tokenB = authB.token;
+
+        // Accredited contract validation: userSessionService.validateSession() positive checks
+        const sessionCheckA = await userSessionService.validateSession(authA.sessionId, FIXTURE_TENANT_A, authA.userId);
+        assert(sessionCheckA.valid === true, `Session A tracked in user_sessions and validated with middleware contract`);
+        const sessionCheckB = await userSessionService.validateSession(authB.sessionId, FIXTURE_TENANT_B, authB.userId);
+        assert(sessionCheckB.valid === true, `Session B tracked in user_sessions and validated with middleware contract`);
+
+        // Accredited contract validation: userSessionService.validateSession() negative & boundary checks
+        const crossTenantCheck = await userSessionService.validateSession(authA.sessionId, FIXTURE_TENANT_B, authA.userId);
+        assert(crossTenantCheck.valid === false && crossTenantCheck.reason === 'SESSION_TENANT_MISMATCH',
+            `validateSession strictly rejects tenant mismatch (SESSION_TENANT_MISMATCH)`);
+
+        const crossUserCheck = await userSessionService.validateSession(authA.sessionId, FIXTURE_TENANT_A, 'non-existent-user-id');
+        assert(crossUserCheck.valid === false && crossUserCheck.reason === 'SESSION_USER_MISMATCH',
+            `validateSession strictly rejects user mismatch (SESSION_USER_MISMATCH)`);
+
+        const missingSessionCheck = await userSessionService.validateSession('non-existent-session-id', FIXTURE_TENANT_A, authA.userId);
+        assert(missingSessionCheck.valid === false && missingSessionCheck.reason === 'SESSION_NOT_FOUND',
+            `validateSession strictly rejects non-existent session (SESSION_NOT_FOUND)`);
 
         // ── STEP 2: INTAKE BASELINE CHECK ──
-        console.log(`\n[STEP 2] Verifying Clean Baseline on Isolated Fixture`);
+        console.log(`\n[STEP 2] Verifying Baseline Rates on Isolated Fixture`);
         const [baselineRevs] = await directConn.query(
             `SELECT COUNT(*) as count FROM printhouse_pricing_revisions WHERE printer_node_id = ?`,
             [FIXTURE_NODE_A]
         );
         assert(baselineRevs[0].count === 0, `Isolated node has exactly 0 baseline pricing revisions`);
+
+        // Query rates_json exclusively (NO nonexistent printer_nodes.rates_checksum column)
+        const [baselineNode] = await directConn.query(
+            `SELECT rates_json FROM printer_nodes WHERE id = ?`,
+            [FIXTURE_NODE_A]
+        );
+        assert(baselineNode.length === 1, `Printer node ${FIXTURE_NODE_A} found in database`);
+        const baselineChecksum = computeCanonicalRatesChecksum(baselineNode[0].rates_json);
+        assert(
+            baselineChecksum === INITIAL_RATES_CHECKSUM,
+            `Baseline rates strictly match initial valid rates fixture (${INITIAL_RATES_CHECKSUM})`
+        );
 
         // ── STEP 3: CREATE CALIBRATION SESSION ──
         console.log(`\n[STEP 3] Creating Calibration Session with Die Mysteriösen Steine (Interior 4/4)`);
@@ -610,6 +851,18 @@ async function runConnectedSuite() {
         );
         assert(postCrossRevs[0].count === 0, `Zero pricing revisions created following rejected cross-tenant attempt`);
 
+        // Verify node rates remain strictly untouched and match INITIAL_VALID_RATES
+        // Query rates_json exclusively (NO nonexistent printer_nodes.rates_checksum column)
+        const [postCrossNode] = await directConn.query(
+            `SELECT rates_json FROM printer_nodes WHERE id = ?`,
+            [FIXTURE_NODE_A]
+        );
+        const postCrossChecksum = computeCanonicalRatesChecksum(postCrossNode[0].rates_json);
+        assert(
+            postCrossChecksum === INITIAL_RATES_CHECKSUM,
+            `Printer node rates strictly unchanged and identical to initial baseline after cross-tenant attempt`
+        );
+
         // ── STEP 7: REAL CANCELLATION FLOW (POST /reject) VS ABANDONMENT ──
         console.log(`\n[STEP 7] Verifying Real Cancellation Flow (POST /reject) on Secondary Session`);
         const cancelSessionPayload = {
@@ -659,11 +912,16 @@ async function runConnectedSuite() {
         );
         assert(cancelledRevs[0].count === 0, `Zero revisions created for cancelled/rejected session`);
 
+        // Query rates_json exclusively (NO nonexistent printer_nodes.rates_checksum column)
         const [cancelledNode] = await directConn.query(
             `SELECT rates_json FROM printer_nodes WHERE id = ?`,
             [FIXTURE_NODE_A]
         );
-        assert(cancelledNode[0].rates_json === null, `Node rates_json remains unmutated after session cancellation`);
+        const cancelledChecksum = computeCanonicalRatesChecksum(cancelledNode[0].rates_json);
+        assert(
+            cancelledChecksum === INITIAL_RATES_CHECKSUM,
+            `Node rates_json remains strictly identical to baseline fixture after cancellation (${INITIAL_RATES_CHECKSUM})`
+        );
 
         // ── STEP 8: GOVERNED ACCEPTANCE ON PRIMARY SESSION ──
         console.log(`\n[STEP 8] Executing Governed Calibration Acceptance`);
@@ -722,13 +980,44 @@ async function runConnectedSuite() {
         assert(accRows.length === 1, `Acceptance record verified in MySQL table`);
         if (accRows[0]?.id) tracker.acceptanceIds.add(accRows[0].id);
 
-        // Verify commercial isolation: node status is ACTIVE, zero publication in marketplace tables
+        // Verify commercial isolation with strict fail-closed assertion (ZERO .catch error swallowing):
+        // A. Zero records in bpe_pricing_publications
+        const [bpePubs] = await directConn.query(
+            `SELECT COUNT(*) as count FROM bpe_pricing_publications WHERE tenant_id = ? OR printer_node_id = ?`,
+            [FIXTURE_TENANT_A, FIXTURE_NODE_A]
+        );
+        assert(bpePubs[0].count === 0, `Zero records in bpe_pricing_publications (no commercial leakage)`);
+
+        // B. Zero activation grants in printhouse_activation_grants (checking all commercial dispatch and visibility flags)
+        const [grants] = await directConn.query(
+            `SELECT COUNT(*) as count 
+             FROM printhouse_activation_grants 
+             WHERE tenant_id = ? AND (
+                 marketplace_visible = 1 OR 
+                 live_quoting_allowed = 1 OR 
+                 job_routing_allowed = 1 OR 
+                 production_dispatch_allowed = 1
+             )`,
+            [FIXTURE_TENANT_A]
+        );
+        assert(grants[0].count === 0, `Zero active marketplace, routing, or production dispatch grants in printhouse_activation_grants`);
+
+        // Also assert total activation grants for the tenant is strictly 0
+        const [totalGrants] = await directConn.query(
+            `SELECT COUNT(*) as count FROM printhouse_activation_grants WHERE tenant_id = ?`,
+            [FIXTURE_TENANT_A]
+        );
+        assert(totalGrants[0].count === 0, `Zero total records in printhouse_activation_grants for isolated tenant`);
+
+        // C. Node status is ACTIVE and rates_json is updated with accepted calibrated rates
         const [nodeState] = await directConn.query(
             `SELECT status, rates_json FROM printer_nodes WHERE id = ?`,
             [FIXTURE_NODE_A]
         );
         assert(nodeState[0].status === 'ACTIVE', `Node status preserved as ACTIVE`);
-        assert(Boolean(nodeState[0].rates_json), `Node rates_json updated with calibrated document`);
+        const finalNodeChecksum = computeCanonicalRatesChecksum(nodeState[0].rates_json);
+        assert(finalNodeChecksum === expectedChecksum, `Node rates_json updated with calibrated document checksum: ${expectedChecksum}`);
+        assert(finalNodeChecksum !== INITIAL_RATES_CHECKSUM, `Node rates_json successfully transitioned from baseline to calibrated`);
 
     } catch (err) {
         mainError = err;
@@ -740,7 +1029,7 @@ async function runConnectedSuite() {
             console.log('\n[TEARDOWN] Closed test Express HTTP server');
         }
 
-        // Execute verified cleanup across all 6 affected tables
+        // Execute verified cleanup across all 8 affected tables
         if (directConn) {
             try {
                 await performDeterministicCleanup(directConn);

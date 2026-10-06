@@ -509,5 +509,102 @@ describe('Simplified Printhouse Onboarding Journey Suite', () => {
         const acceptBtn = screen.getByTestId('proceed-to-accept-btn');
         expect(acceptBtn).toBeDisabled();
     });
+
+    it('20. Discards late PDF extraction response when switching product family while extraction was in flight', async () => {
+        let resolveFetch: any;
+        const fetchPromise = new Promise((resolve) => {
+            resolveFetch = resolve;
+        });
+
+        global.fetch = vi.fn().mockReturnValue(fetchPromise as any);
+
+        const { container } = renderJourney(
+            <SimplifiedOnboardingJourney initialStep={1} />,
+            'es'
+        );
+
+        // Select HARDCOVER to enter Step 2
+        const selectButtons = screen.getAllByRole('button', { name: /Aportar presupuesto|Seleccionar familia/i });
+        fireEvent.click(selectButtons[0]);
+
+        expect(screen.getByText(/Familia seleccionada/i)).toBeInTheDocument();
+        expect(screen.getAllByText(/Tapa dura/i).length).toBeGreaterThan(0);
+
+        // Upload a PDF for Hardcover
+        const file1 = new File(['hardcover-content'], 'hardcover_quote.pdf', { type: 'application/pdf' });
+        const input = container.querySelector('input[type="file"]') as HTMLInputElement;
+        fireEvent.change(input, { target: { files: [file1] } });
+
+        // User changes mind and goes back to Step 1 (family selector)
+        const backBtn = screen.getByLabelText(/Volver al selector de familias/i);
+        fireEvent.click(backBtn);
+
+        // User now selects WIRE_O family (index 2)
+        const selectButtonsAfter = screen.getAllByRole('button', { name: /Aportar presupuesto|Seleccionar familia/i });
+        fireEvent.click(selectButtonsAfter[2]);
+
+        expect(screen.getAllByText(/Wire-O/i).length).toBeGreaterThan(0);
+
+        // Now late Hardcover extraction finishes
+        resolveFetch({
+            ok: true,
+            json: async () => ({
+                productTitle: 'Hardcover Stale Quote In Flight',
+                runs: [{ id: 'run-hc-stale', quantity: 1500, manufacturingPrice: 3200 }]
+            })
+        });
+
+        // Verify that stale PDF did NOT force progression to Step 3 and did NOT overwrite Wire-O context
+        await waitFor(() => {
+            expect(screen.queryByText('Hardcover Stale Quote In Flight')).not.toBeInTheDocument();
+            expect(screen.queryByText('run-hc-stale')).not.toBeInTheDocument();
+        });
+        // Still on Step 2 with Wire-O active, NOT on Step 3
+        expect(screen.getAllByText(/Wire-O/i).length).toBeGreaterThan(0);
+        expect(screen.queryByTestId('back-to-step2-btn')).not.toBeInTheDocument();
+    });
+
+    it('21. Discards late PDF extraction response when user returns to Step 1 without selecting new family', async () => {
+        let resolveFetch: any;
+        const fetchPromise = new Promise((resolve) => {
+            resolveFetch = resolve;
+        });
+
+        global.fetch = vi.fn().mockReturnValue(fetchPromise as any);
+
+        const { container } = renderJourney(
+            <SimplifiedOnboardingJourney initialStep={2} />,
+            'es'
+        );
+
+        // Upload a PDF in Step 2
+        const file = new File(['pdf-dummy'], 'test_abandoned.pdf', { type: 'application/pdf' });
+        const input = container.querySelector('input[type="file"]') as HTMLInputElement;
+        fireEvent.change(input, { target: { files: [file] } });
+
+        // User returns to Step 1
+        const backBtn = screen.getByLabelText(/Volver al selector de familias/i);
+        fireEvent.click(backBtn);
+
+        // Verify we are on Step 1
+        expect(screen.getAllByText(/Qué productos fabricas/i).length).toBeGreaterThan(0);
+
+        // Late PDF resolves
+        resolveFetch({
+            ok: true,
+            json: async () => ({
+                productTitle: 'Late Abandoned Upload Spec',
+                runs: [{ id: 'run-abandoned', quantity: 1000, manufacturingPrice: 1200 }]
+            })
+        });
+
+        // Verify user remains on Step 1 and is NOT forcefully moved to Step 3
+        await waitFor(() => {
+            expect(screen.queryByText('Late Abandoned Upload Spec')).not.toBeInTheDocument();
+        });
+        expect(screen.getAllByText(/Qué productos fabricas/i).length).toBeGreaterThan(0);
+        expect(screen.queryByTestId('back-to-step2-btn')).not.toBeInTheDocument();
+    });
 });
+
 
