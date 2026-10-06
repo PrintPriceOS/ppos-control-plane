@@ -155,6 +155,11 @@ def package():
     - Se garantiza que los digests se visualicen en logs y aserciones **únicamente cuando hayan superado la validación estricta SHA-256** de 64 caracteres hexadecimales.
     - Se incorporan regresiones específicas que introducen cadenas inválidas con tokens Bearer ficticios, contraseñas de base de datos ficticias y fragmentos de JSON con claves de API y tarifas, verificando que ninguno de estos contenidos aparezca en el diagnóstico resultante.
 
+13. **Resolución del Alcance de Credenciales MySQL y Preparación de Conexión (`resolveConnectedMysqlPassword`):**
+    - Se resuelve de raíz el error `ReferenceError: mysqlPassword is not defined` declarando la variable compartida `sharedMysqlPassword` a nivel de módulo y resolviendo dinámicamente las credenciales dentro de `runConnectedSuite()` mediante `resolveConnectedMysqlPassword()` y `getDirectMysqlConnectionConfig()`.
+    - Se valida explícitamente la presencia de `process.env.PPOS_TEST_MYSQL_PASSWORD` antes de cualquier intento de apertura de conexión con la base de datos MySQL de pruebas, rechazando contraseñas vacías o placeholders con el error controlado `MISSING_TEST_PASSWORD` (y nunca un ReferenceError no capturado).
+    - Se incorporan regresiones específicas tanto autónomas (`node scripts/test_onboarding_connected_suite.js --regressions`, Suite 6) como en Vitest (`tests/onboarding_checksum_integrity_regression.test.js`, Suite 7 con 5 tests) que verifican la resolución de credenciales, la conformación estricta de la configuración de conexión hacia `127.0.0.1:3306/pposrcmdw0qdtest`, el rechazo controlado de contraseñas ausentes sin fuga de secretos y la verificación estática de ausencia de identificadores no declarados en el código fuente.
+
 ---
 
 ## 1. Entorno de Verificación y Declaración de Evidencias
@@ -162,8 +167,8 @@ def package():
   - **Evidencias Visuales (15 archivos PNG):** Reutilizadas de la sesión validada de Playwright (`01_onboarding_...` a `08_onboarding_...`), acreditando fidelidad tipográfica, paridad multilingüe EN/ES/DE, densidad cómoda/compacta, y fidelidad documental (1.792 €, interior 4/4). No han sufrido alteraciones visuales en esta iteración.
   - **Entregables Técnicos y Evidencias de Contrato (10 archivos):** Regenerados e incorporados en esta iteración para acreditar los puntos de auditoría (`test_onboarding_connected_suite.js`, `onboarding_checksum_integrity_regression.test.js`, `raw_vitest_output.log`, `raw_build_output.log`, `git_diff_review.diff`, `vitest_discovered_suites.txt`, `userSessionService.js`, `auth_middleware.js`, `auth_and_user_sessions_schema.sql`, `SHA256SUMS.txt`).
 - **Comandos Ejecutados:**
-  - `npx vitest run`: Ejecución de 22 suites y 296 tests unitarios y de integración (296 pasados, 0 fallidos) en 13.67s.
-  - `npm run build`: Compilación de producción Vite (dist generado limpiamente en 13.10s).
+  - `npx vitest run`: Ejecución de 22 suites y 301 tests unitarios y de integración (301 pasados, 0 fallidos) en 12.42s.
+  - `npm run build`: Compilación de producción Vite (dist generado limpiamente en 12.77s).
 - **Entorno:**
   - Node.js v20+, Vite 6.4.2, React 19, TypeScript
   - MySQL Target: `ppos_rc_mdw0qd@127.0.0.1:3306/pposrcmdw0qdtest`
@@ -191,12 +196,12 @@ def package():
 | `06b_onboarding_step2_mobile_390_dark.png` | PNG (390×844) | Reutilizada | Móvil Paso 2: Indicador 'Paso 2 de 5: Añadir presupuestos', controles superiores en grid sin recortar ni desbordar. | `{file_checksums.get('06b_onboarding_step2_mobile_390_dark.png', '')}` |
 | `07_onboarding_step1_en_light_1280.png` | PNG (1280×800) | Reutilizada | Paridad lingüística en Inglés: 'In setup' y navegación sincronizada. | `{file_checksums.get('07_onboarding_step1_en_light_1280.png', '')}` |
 | `08_onboarding_step1_de_dark_1366.png` | PNG (1366×768) | Reutilizada | Paridad lingüística en Alemán: 'In Konfiguration' y tipografía ajustada sin desbordamientos. | `{file_checksums.get('08_onboarding_step1_de_dark_1366.png', '')}` |
-| `test_onboarding_connected_suite.js` | Código JS | Regenerado | Harness revisable de prueba conectada para MySQL aislado (base pposrcmdw0qdtest, usuario ppos_rc_mdw0qd@127.0.0.1, sesiones reales con userSessionService, initial rates fixture, aislamiento comercial, orden estricto FK en 8 tablas, normalización estricta de checksum con igualdad estricta y diagnósticos sanitizados sin filtración de datos sensibles). | `{file_checksums.get('test_onboarding_connected_suite.js', '')}` |
-| `onboarding_checksum_integrity_regression.test.js` | Suite Vitest | Incorporado | 23 pruebas de regresión unitaria para normalización y comparación estricta de checksums SHA-256 (hex puro, sha256: prefix, rechazo de divergencias, formatos inválidos, interoperabilidad con calibrationSessionService y aserciones de cero filtración de tokens, contraseñas o JSON). | `{file_checksums.get('onboarding_checksum_integrity_regression.test.js', '')}` |
-| `raw_vitest_output.log` | Log original | Regenerado | Log completo de ejecución de Vitest: 22 suites y 296 pruebas pasadas (100% éxito). | `{file_checksums.get('raw_vitest_output.log', '')}` |
-| `raw_build_output.log` | Log original | Regenerado | Log completo de compilación de producción con Vite (`dist/` generado limpiamente). | `{file_checksums.get('raw_build_output.log', '')}` |
+| `test_onboarding_connected_suite.js` | Código JS | Regenerado | Harness revisable de prueba conectada para MySQL aislado (base pposrcmdw0qdtest, usuario ppos_rc_mdw0qd@127.0.0.1, sesiones reales con userSessionService, initial rates fixture, aislamiento comercial, orden estricto FK en 8 tablas, normalización estricta de checksum con igualdad estricta, diagnósticos sanitizados y resolución de alcance seguro de credenciales con getDirectMysqlConnectionConfig). | `{file_checksums.get('test_onboarding_connected_suite.js', '')}` |
+| `onboarding_checksum_integrity_regression.test.js` | Suite Vitest | Incorporado | 28 pruebas de regresión unitaria para normalización y comparación estricta de checksums SHA-256 (hex puro, sha256: prefix, rechazo de divergencias, formatos inválidos, interoperabilidad con calibrationSessionService, aserciones de cero filtración de tokens, contraseñas o JSON, y verificación de alcance y preparación de conexión MySQL). | `{file_checksums.get('onboarding_checksum_integrity_regression.test.js', '')}` |
+| `raw_vitest_output.log` | Log original | Regenerado | Log completo de ejecución de Vitest: 22 suites y 301 pruebas pasadas (100% éxito). | `{file_checksums.get('raw_vitest_output.log', '')}` |
+| `raw_build_output.log` | Log original | Regenerado | Log completo de compilación de producción con Vite (`dist/` generado limpiamente en 12.77s). | `{file_checksums.get('raw_build_output.log', '')}` |
 | `git_diff_review.diff` | Diff original | Regenerado | Diff completo de todas las modificaciones de código respecto al commit base `f13bba6`. | `{file_checksums.get('git_diff_review.diff', '')}` |
-| `vitest_discovered_suites.txt` | Texto | Regenerado | Desglose verificado de los 22 archivos descubiertos por Vitest con el conteo exacto de tests por suite (suma: 296). | `{file_checksums.get('vitest_discovered_suites.txt', '')}` |
+| `vitest_discovered_suites.txt` | Texto | Regenerado | Desglose verificado de los 22 archivos descubiertos por Vitest con el conteo exacto de tests por suite (suma: 301). | `{file_checksums.get('vitest_discovered_suites.txt', '')}` |
 | `userSessionService.js` | Evidencia de Código | Incorporado | Servicio oficial de sesiones de usuario (`src/api/services/userSessionService.js`), acreditando parámetros, creación y validación estricta de identidades en capa de aplicación. | `{file_checksums.get('userSessionService.js', '')}` |
 | `auth_middleware.js` | Evidencia de Código | Incorporado | Middleware de autenticación oficial `requireAdmin` (`src/api/middleware/auth.js`), acreditando la verificación de tokens JWT contra `user_sessions.id` (`jti`) y validación de `user_id`. | `{file_checksums.get('auth_middleware.js', '')}` |
 | `auth_and_user_sessions_schema.sql` | Evidencia DDL | Incorporado | Definiciones DDL de `control_users` y `user_sessions`, documentando la correspondencia de identificadores y aclarando que la integridad referencial se asegura en aplicación sin FK relacional. | `{file_checksums.get('auth_and_user_sessions_schema.sql', '')}` |
@@ -205,13 +210,13 @@ def package():
 ---
 
 ## 3. Invariantes Comprobados en la Suite de Tests
-- **Vitest**: 22 suites descubiertas y ejecutadas, 296 tests unitarios y de integración pasando (100% éxito) en 13.67s.
+- **Vitest**: 22 suites descubiertas y ejecutadas, 301 tests unitarios y de integración pasando (100% éxito) en 12.42s.
 - **Validación Matemática**: Validación exhaustiva con `Number.isFinite` que rechaza `NaN`, `Infinity`, `-Infinity`, ceros engañosos y números negativos en cliente y servidor.
 - **Regresión Negativa de Comparación**: Se ha verificado que un presupuesto positivo con respuesta del motor ausente (`null`), incompleta o malformada (`0` o negativa) nunca muestra estado calibrado, muestra aviso de cálculo incompleto, visualiza guiones `—` con insignia 'Sin cálculo' y bloquea estrictamente el botón de avance a la propuesta.
 - **Cancelación Limpia y Fixture Baseline**: Verificación de que la cancelación y los accesos fallidos entre tenants preservan estrictamente las tarifas iniciales válidas (`INITIAL_VALID_RATES`).
 - **Aislamiento Comercial**: Cero publicaciones en marketplace y cero activación de grants durante la calibración, con verificación de `production_dispatch_allowed`, `marketplace_visible`, `job_routing_allowed` y `live_quoting_allowed`.
 - **Aislamiento Multi-Tenant**: Verificada la propagación inviolable de `tenantId` y `printerNodeId` en todo el ciclo con sesiones reales y acreditación de `userSessionService.validateSession()`.
-- **Build de Producción**: Compilación limpia con Vite (`dist/` generado en 13.10s).
+- **Build de Producción**: Compilación limpia con Vite (`dist/` generado en 12.77s).
 """
 
     manifest_path = os.path.join(ARTIFACTS_DIR, "MANIFEST.md")

@@ -1,11 +1,14 @@
-import { describe, test, expect } from 'vitest';
+import { describe, test, expect, beforeEach, afterEach } from 'vitest';
 const calibrationSessionService = require('../src/api/services/calibrationSessionService');
 const {
     normalizeSha256Hex,
     describeInvalidChecksum,
     verifyRatesChecksumIntegrity,
     computeCanonicalRatesChecksum,
-    canonicalStringify
+    canonicalStringify,
+    resolveConnectedMysqlPassword,
+    getDirectMysqlConnectionConfig,
+    REQUIRED_MYSQL
 } = require('../scripts/test_onboarding_connected_suite');
 
 describe('Onboarding Harness Checksum Integrity & Normalization Regressions', () => {
@@ -282,5 +285,83 @@ describe('Onboarding Harness Checksum Integrity & Normalization Regressions', ()
                 }
             });
         }
+    });
+
+    describe('7. Regresión de alcance de mysqlPassword y preparación de conexión MySQL', () => {
+        let originalPposPass;
+        let originalMysqlPass;
+
+        beforeEach(() => {
+            originalPposPass = process.env.PPOS_TEST_MYSQL_PASSWORD;
+            originalMysqlPass = process.env.MYSQL_PASSWORD;
+        });
+
+        afterEach(() => {
+            if (originalPposPass !== undefined) process.env.PPOS_TEST_MYSQL_PASSWORD = originalPposPass;
+            else delete process.env.PPOS_TEST_MYSQL_PASSWORD;
+            if (originalMysqlPass !== undefined) process.env.MYSQL_PASSWORD = originalMysqlPass;
+            else delete process.env.MYSQL_PASSWORD;
+        });
+
+        test('7.1 Resuelve la contraseña desde PPOS_TEST_MYSQL_PASSWORD con alcance correcto y sin ReferenceError', () => {
+            process.env.PPOS_TEST_MYSQL_PASSWORD = 'vitest_scope_pass_2026';
+            delete process.env.MYSQL_PASSWORD;
+
+            expect(() => resolveConnectedMysqlPassword()).not.toThrow();
+            const pwd = resolveConnectedMysqlPassword();
+            expect(pwd).toBe('vitest_scope_pass_2026');
+        });
+
+        test('7.2 getDirectMysqlConnectionConfig prepara la conexión con parámetros estrictos e identidad aislada', () => {
+            process.env.PPOS_TEST_MYSQL_PASSWORD = 'vitest_scope_pass_2026';
+            delete process.env.MYSQL_PASSWORD;
+
+            const config = getDirectMysqlConnectionConfig();
+            expect(config.host).toBe(REQUIRED_MYSQL.host);
+            expect(config.port).toBe(REQUIRED_MYSQL.port);
+            expect(config.user).toBe(REQUIRED_MYSQL.user);
+            expect(config.database).toBe(REQUIRED_MYSQL.database);
+            expect(config.password).toBe('vitest_scope_pass_2026');
+            expect(typeof config.password).toBe('string');
+        });
+
+        test('7.3 Lanza MISSING_TEST_PASSWORD y NUNCA ReferenceError cuando la contraseña está ausente', () => {
+            delete process.env.PPOS_TEST_MYSQL_PASSWORD;
+            delete process.env.MYSQL_PASSWORD;
+
+            let caught = null;
+            try {
+                resolveConnectedMysqlPassword();
+            } catch (e) {
+                caught = e;
+            }
+
+            expect(caught).not.toBeNull();
+            expect(caught).toBeInstanceOf(Error);
+            expect(caught).not.toBeInstanceOf(ReferenceError);
+            expect(caught.message).toContain('MISSING_TEST_PASSWORD');
+            expect(caught.message).toContain('PPOS_TEST_MYSQL_PASSWORD');
+        });
+
+        test('7.4 Rechaza regression_mode_placeholder en preparación de conexión directa', () => {
+            delete process.env.PPOS_TEST_MYSQL_PASSWORD;
+            process.env.MYSQL_PASSWORD = 'regression_mode_placeholder';
+
+            expect(() => resolveConnectedMysqlPassword()).toThrowError(/MISSING_TEST_PASSWORD/);
+            expect(() => getDirectMysqlConnectionConfig()).toThrowError(/MISSING_TEST_PASSWORD/);
+        });
+
+        test('7.5 Verificación estática: scripts/test_onboarding_connected_suite.js no contiene referencias no declaradas a mysqlPassword', () => {
+            const fs = require('fs');
+            const path = require('path');
+            const harnessPath = path.resolve(__dirname, '../scripts/test_onboarding_connected_suite.js');
+            const harnessCode = fs.readFileSync(harnessPath, 'utf8');
+
+            const runConnectedSuiteMatch = harnessCode.match(/async function runConnectedSuite\(\)[\s\S]*?\n\}/);
+            expect(runConnectedSuiteMatch).not.toBeNull();
+            const body = runConnectedSuiteMatch[0];
+            expect(body).not.toMatch(/password:\s*mysqlPassword\b/);
+            expect(body).toContain('getDirectMysqlConnectionConfig');
+        });
     });
 });
