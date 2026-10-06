@@ -97,14 +97,15 @@ export const PricingPreview: React.FC<PricingPreviewProps> = ({
                 body: JSON.stringify(payload)
             });
 
-            const data = await res.json();
+            const data = await res.json().catch(() => ({}));
             if (res.ok && data.ok) {
                 setPreviewResult(data.simulation);
             } else {
-                setError(data.error || 'Failed to calculate simulated price');
+                const message = typeof data.error === 'string' ? data.error : data.error?.message || data.message || 'Failed to calculate simulated price';
+                setError(message);
             }
         } catch (err: any) {
-            setError(err.message || 'Error running simulation');
+            setError(err instanceof Error ? err.message : 'Error running simulation');
         } finally {
             setLoading(false);
         }

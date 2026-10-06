@@ -316,7 +316,64 @@ export const MachineFleetPanel: React.FC<{ sites?: SiteOption[]; onSaved?: () =>
         }
     };
 
+    const getColorModeLabel = (val: string) => {
+        const keyMap: Record<string, string> = {
+            'CMYK': 'setup.machines.colorMode.CMYK',
+            'CMYK+SPOT': 'setup.machines.colorMode.CMYK_SPOT',
+            'CMYK+WHITE': 'setup.machines.colorMode.CMYK_WHITE',
+            'RGB': 'setup.machines.colorMode.RGB',
+            'GRAYSCALE': 'setup.machines.colorMode.GRAYSCALE',
+            'MONOCHROME': 'setup.machines.colorMode.MONOCHROME',
+            'SPOT_ONLY': 'setup.machines.colorMode.SPOT_ONLY'
+        };
+        const k = keyMap[val];
+        return (k ? t(k as any) : null) || COLOR_MODE_OPTIONS.find(o => o.value === val)?.label || val;
+    };
+
+    const getPrintMethodLabel = (val: string) => {
+        const keyMap: Record<string, string> = {
+            'SHEETFED_OFFSET': 'setup.machines.printMethod.SHEETFED_OFFSET',
+            'DIGITAL_TONER': 'setup.machines.printMethod.DIGITAL_TONER',
+            'DIGITAL_INKJET': 'setup.machines.printMethod.DIGITAL_INKJET',
+            'WIDE_FORMAT_INKJET': 'setup.machines.printMethod.WIDE_FORMAT_INKJET',
+            'WEB_OFFSET': 'setup.machines.printMethod.WEB_OFFSET',
+            'FLEXO': 'setup.machines.printMethod.FLEXO',
+            'SCREEN_PRINTING': 'setup.machines.printMethod.SCREEN_PRINTING'
+        };
+        const k = keyMap[val];
+        return (k ? t(k as any) : null) || PRINT_METHOD_OPTIONS.find(o => o.value === val)?.label || val;
+    };
+
+    const getSidesLabel = (val: string) => {
+        const keyMap: Record<string, string> = {
+            'SIMPLEX': 'setup.machines.sides.SIMPLEX',
+            'DUPLEX': 'setup.machines.sides.DUPLEX'
+        };
+        const k = keyMap[val];
+        return (k ? t(k as any) : null) || SIDES_OPTIONS.find(o => o.value === val)?.label || val;
+    };
+
+    const getCapabilityLabel = (field: string) => {
+        const k = `setup.machines.cap.${field}`;
+        return t(k as any) || CAPABILITY_TOGGLES.find(c => c.field === field)?.label || field;
+    };
+
+    const getCapabilityGroup = (group: string) => {
+        const groupMap: Record<string, string> = {
+            'Quality & Preflight': 'setup.machines.group.quality',
+            'Print Capabilities': 'setup.machines.group.print',
+            'Finishing & Embellishment': 'setup.machines.group.finishing',
+            'Binding & Finishing': 'setup.machines.group.binding'
+        };
+        const k = groupMap[group];
+        return (k ? t(k as any) : null) || group;
+    };
+
     const handleSave = async () => {
+        if (!form.machine_name || !form.machine_name.trim()) {
+            setErrorMsg(t('setup.machines.error.nameRequired') || 'Machine name is required.');
+            return;
+        }
         setLoading(true);
         setErrorMsg(null);
         try {
@@ -328,7 +385,7 @@ export const MachineFleetPanel: React.FC<{ sites?: SiteOption[]; onSaved?: () =>
             const method = isNew ? 'POST' : 'PUT';
 
             const payload: Record<string, any> = {
-                machine_name: form.machine_name,
+                machine_name: form.machine_name.trim(),
                 machine_type: form.machine_type,
                 manufacturer: form.manufacturer ? form.manufacturer.trim() : null,
                 model: form.model ? form.model.trim() : null,
@@ -362,33 +419,52 @@ export const MachineFleetPanel: React.FC<{ sites?: SiteOption[]; onSaved?: () =>
                 },
                 body: JSON.stringify(payload)
             });
-            const data = await res.json();
+            const data = await res.json().catch(() => ({}));
             if (!res.ok) {
-                setErrorMsg(data.error || 'Unknown error');
+                let message = t('setup.machines.error.genericSave') || 'Error saving machine to the server.';
+                if (data) {
+                    if (typeof data.error === 'string') {
+                        message = data.error;
+                    } else if (data.error && typeof data.error.message === 'string') {
+                        message = data.error.message;
+                    } else if (typeof data.message === 'string') {
+                        message = data.message;
+                    } else if (Array.isArray(data.errors) && data.errors.length > 0) {
+                        message = data.errors.map((e: any) => typeof e === 'string' ? e : e?.message || JSON.stringify(e)).join(', ');
+                    }
+                }
+                setErrorMsg(message);
                 return;
             }
             setIsEditing(false);
             await fetchMachines(selectedSiteId);
             onSaved?.();
         } catch (err: any) {
-            setErrorMsg(err.message);
+            const raw = err instanceof Error ? err.message : (typeof err === 'string' ? err : '');
+            setErrorMsg(raw || t('setup.machines.error.genericSave') || 'Error saving machine to the server.');
         } finally {
             setLoading(false);
         }
     };
 
     const handleArchive = async (machineId: string) => {
-        if (!confirm('Archive this machine? It will no longer contribute to site capabilities.')) return;
+        if (!confirm(t('setup.machines.archiveConfirm') || 'Archive this machine? It will no longer contribute to site capabilities.')) return;
         try {
             const token = getAuthToken();
-            await fetch(`/api/printhouse/onboarding/sites/${selectedSiteId}/machines/${machineId}`, {
+            const res = await fetch(`/api/printhouse/onboarding/sites/${selectedSiteId}/machines/${machineId}`, {
                 method: 'DELETE',
                 headers: { 'Authorization': `Bearer ${token}` }
             });
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}));
+                const message = typeof data.error === 'string' ? data.error : data.error?.message || data.message || 'Error archiving machine';
+                setErrorMsg(message);
+                return;
+            }
             await fetchMachines(selectedSiteId);
             onSaved?.();
-        } catch (err) {
-            console.error('Error archiving machine:', err);
+        } catch (err: any) {
+            setErrorMsg(err instanceof Error ? err.message : 'Error archiving machine');
         }
     };
 
@@ -420,7 +496,7 @@ export const MachineFleetPanel: React.FC<{ sites?: SiteOption[]; onSaved?: () =>
             {sites.length > 1 && (
                 <div className="mb-5">
                     <label className={labelClass}>
-                        Production Site
+                        {t('setup.machines.siteLabel') || 'Production Site'}
                     </label>
                     <select
                         value={selectedSiteId}
@@ -506,7 +582,7 @@ export const MachineFleetPanel: React.FC<{ sites?: SiteOption[]; onSaved?: () =>
                             {m.manufacturer && ` · ${m.manufacturer}`}
                             {m.model && ` ${m.model}`}
                             {m.max_sheet_width_mm && m.max_sheet_height_mm && (
-                                <span className="text-zinc-400 dark:text-zinc-500"> · Max Sheet: {m.max_sheet_width_mm} × {m.max_sheet_height_mm} mm</span>
+                                <span className="text-zinc-400 dark:text-zinc-500"> · {t('setup.machines.maxSheet') || 'Max Sheet'}: {m.max_sheet_width_mm} × {m.max_sheet_height_mm} mm</span>
                             )}
                         </div>
                         <div className="flex gap-1.5 flex-wrap">
@@ -543,16 +619,16 @@ export const MachineFleetPanel: React.FC<{ sites?: SiteOption[]; onSaved?: () =>
                 <div className="text-center py-10 text-zinc-500 bg-zinc-50 dark:bg-zinc-900/60 rounded-xl border border-zinc-200 dark:border-zinc-800">
                     <Cog size={32} className="mb-3 opacity-40 mx-auto" />
                     <p className="m-0 text-xs font-semibold text-zinc-700 dark:text-zinc-300">
-                        No machines configured yet. Add your first machine to unlock capabilities.
+                        {t('setup.machines.emptyState') || 'No machines configured yet. Add your first machine to unlock capabilities.'}
                     </p>
                 </div>
             )}
 
             {/* Create/Edit Form */}
             {isEditing && (
-                <div className="bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 mt-3 transition-colors">
+                <div className="bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 mt-3 transition-colors max-h-[80vh] overflow-y-auto overflow-x-hidden">
                     <h4 className="m-0 mb-4 text-base font-bold text-zinc-900 dark:text-white">
-                        {editingMachineId ? 'Edit Machine & Capabilities' : 'Add Machine & Capabilities'}
+                        {editingMachineId ? (t('setup.machines.form.editTitle') || 'Edit Machine & Capabilities') : (t('setup.machines.form.addTitle') || 'Add Machine & Capabilities')}
                     </h4>
 
                     {errorMsg && (
@@ -564,46 +640,46 @@ export const MachineFleetPanel: React.FC<{ sites?: SiteOption[]; onSaved?: () =>
                     {/* Section 1: Identification */}
                     <div className="mb-5">
                         <div className="text-xs font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-2.5">
-                            1. Machine Identification
+                            {t('setup.machines.section.identification') || '1. Machine Identification'}
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             <div>
-                                <label className={labelClass}>Machine Name *</label>
+                                <label className={labelClass}>{t('setup.machines.field.name') || 'Machine Name'} *</label>
                                 <input
                                     className={inputClass}
                                     value={form.machine_name || ''}
                                     onChange={e => setForm({ ...form, machine_name: e.target.value })}
-                                    placeholder="e.g. HP Indigo 100K Digital Press"
+                                    placeholder={t('setup.machines.placeholder.name') || 'e.g. HP Indigo 100K Digital Press'}
                                 />
                             </div>
                             <div>
-                                <label className={labelClass}>Machine Type *</label>
+                                <label className={labelClass}>{t('setup.machines.field.type') || 'Machine Type'} *</label>
                                 <select
                                     className={`${inputClass} cursor-pointer`}
                                     value={form.machine_type || 'DIGITAL_PRESS'}
                                     onChange={e => setForm({ ...form, machine_type: e.target.value })}
                                 >
-                                    {Object.entries(MACHINE_TYPE_LABELS).map(([k, v]) => (
-                                        <option key={k} value={k}>{v}</option>
+                                    {Object.entries(MACHINE_TYPE_LABELS).map(([k]) => (
+                                        <option key={k} value={k}>{getMachineTypeLabel(k)}</option>
                                     ))}
                                 </select>
                             </div>
                             <div>
-                                <label className={labelClass}>Manufacturer</label>
+                                <label className={labelClass}>{t('setup.machines.field.manufacturer') || 'Manufacturer'}</label>
                                 <input
                                     className={inputClass}
                                     value={form.manufacturer || ''}
                                     onChange={e => setForm({ ...form, manufacturer: e.target.value })}
-                                    placeholder="e.g. HP, Heidelberg, Canon, Konica Minolta"
+                                    placeholder={t('setup.machines.placeholder.manufacturer') || 'e.g. HP, Heidelberg, Canon, Konica Minolta'}
                                 />
                             </div>
                             <div>
-                                <label className={labelClass}>Model</label>
+                                <label className={labelClass}>{t('setup.machines.field.model') || 'Model'}</label>
                                 <input
                                     className={inputClass}
                                     value={form.model || ''}
                                     onChange={e => setForm({ ...form, model: e.target.value })}
-                                    placeholder="e.g. 100K Digital Press"
+                                    placeholder={t('setup.machines.placeholder.model') || 'e.g. 100K Digital Press'}
                                 />
                             </div>
                         </div>
@@ -612,11 +688,11 @@ export const MachineFleetPanel: React.FC<{ sites?: SiteOption[]; onSaved?: () =>
                     {/* Section 2: Dimensions */}
                     <div className="mb-5">
                         <div className="text-xs font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-2.5">
-                            2. Sheet & Print Dimensions (mm)
+                            {t('setup.machines.section.dimensions') || '2. Sheet & Print Dimensions (mm)'}
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                             <div>
-                                <label className={labelClass}>Max Sheet Width (mm)</label>
+                                <label className={labelClass}>{t('setup.machines.field.maxSheetWidth') || 'Max Sheet Width (mm)'}</label>
                                 <input
                                     type="number"
                                     className={inputClass}
@@ -626,7 +702,7 @@ export const MachineFleetPanel: React.FC<{ sites?: SiteOption[]; onSaved?: () =>
                                 />
                             </div>
                             <div>
-                                <label className={labelClass}>Max Sheet Height (mm)</label>
+                                <label className={labelClass}>{t('setup.machines.field.maxSheetHeight') || 'Max Sheet Height (mm)'}</label>
                                 <input
                                     type="number"
                                     className={inputClass}
@@ -636,7 +712,7 @@ export const MachineFleetPanel: React.FC<{ sites?: SiteOption[]; onSaved?: () =>
                                 />
                             </div>
                             <div>
-                                <label className={labelClass}>Max Print Width (mm)</label>
+                                <label className={labelClass}>{t('setup.machines.field.maxPrintWidth') || 'Max Print Width (mm)'}</label>
                                 <input
                                     type="number"
                                     className={inputClass}
@@ -646,7 +722,7 @@ export const MachineFleetPanel: React.FC<{ sites?: SiteOption[]; onSaved?: () =>
                                 />
                             </div>
                             <div>
-                                <label className={labelClass}>Min Sheet Width (mm)</label>
+                                <label className={labelClass}>{t('setup.machines.field.minSheetWidth') || 'Min Sheet Width (mm)'}</label>
                                 <input
                                     type="number"
                                     className={inputClass}
@@ -656,7 +732,7 @@ export const MachineFleetPanel: React.FC<{ sites?: SiteOption[]; onSaved?: () =>
                                 />
                             </div>
                             <div>
-                                <label className={labelClass}>Min Sheet Height (mm)</label>
+                                <label className={labelClass}>{t('setup.machines.field.minSheetHeight') || 'Min Sheet Height (mm)'}</label>
                                 <input
                                     type="number"
                                     className={inputClass}
@@ -666,7 +742,7 @@ export const MachineFleetPanel: React.FC<{ sites?: SiteOption[]; onSaved?: () =>
                                 />
                             </div>
                             <div>
-                                <label className={labelClass}>Max Print Height (mm)</label>
+                                <label className={labelClass}>{t('setup.machines.field.maxPrintHeight') || 'Max Print Height (mm)'}</label>
                                 <input
                                     type="number"
                                     className={inputClass}
@@ -681,7 +757,7 @@ export const MachineFleetPanel: React.FC<{ sites?: SiteOption[]; onSaved?: () =>
                     {/* Section 3: Color Modes */}
                     <div className="mb-5">
                         <div className="text-xs font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-2.5">
-                            3. Supported Color Modes
+                            {t('setup.machines.section.colorModes') || '3. Supported Color Modes'}
                         </div>
                         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
                             {COLOR_MODE_OPTIONS.map(opt => {
@@ -698,7 +774,7 @@ export const MachineFleetPanel: React.FC<{ sites?: SiteOption[]; onSaved?: () =>
                                         }`}
                                     >
                                         {checked ? <CheckSquare size={16} className="text-[#dc0000]" /> : <Square size={16} className="text-zinc-400" />}
-                                        <span>{opt.label}</span>
+                                        <span>{getColorModeLabel(opt.value)}</span>
                                     </button>
                                 );
                             })}
@@ -708,10 +784,10 @@ export const MachineFleetPanel: React.FC<{ sites?: SiteOption[]; onSaved?: () =>
                     {/* Section 4: Print Methods & Sides */}
                     <div className="mb-5">
                         <div className="text-xs font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-2.5">
-                            4. Print Methods & Printing Sides
+                            {t('setup.machines.section.printMethodsAndSides') || '4. Print Methods & Printing Sides'}
                         </div>
                         <div className="mb-3">
-                            <label className={labelClass}>Print Methods</label>
+                            <label className={labelClass}>{t('setup.machines.field.printMethods') || 'Print Methods'}</label>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                                 {PRINT_METHOD_OPTIONS.map(opt => {
                                     const checked = (form.supported_print_methods_json || []).includes(opt.value);
@@ -727,14 +803,14 @@ export const MachineFleetPanel: React.FC<{ sites?: SiteOption[]; onSaved?: () =>
                                             }`}
                                         >
                                             {checked ? <CheckSquare size={16} className="text-[#dc0000]" /> : <Square size={16} className="text-zinc-400" />}
-                                            <span>{opt.label}</span>
+                                            <span>{getPrintMethodLabel(opt.value)}</span>
                                         </button>
                                     );
                                 })}
                             </div>
                         </div>
                         <div>
-                            <label className={labelClass}>Printing Sides</label>
+                            <label className={labelClass}>{t('setup.machines.field.printingSides') || 'Printing Sides'}</label>
                             <div className="flex gap-2.5 flex-wrap">
                                 {SIDES_OPTIONS.map(opt => {
                                     const checked = (form.supported_sides_json || []).includes(opt.value);
@@ -750,7 +826,7 @@ export const MachineFleetPanel: React.FC<{ sites?: SiteOption[]; onSaved?: () =>
                                             }`}
                                         >
                                             {checked ? <CheckSquare size={16} className="text-[#dc0000]" /> : <Square size={16} className="text-zinc-400" />}
-                                            <span>{opt.label}</span>
+                                            <span>{getSidesLabel(opt.value)}</span>
                                         </button>
                                     );
                                 })}
@@ -761,11 +837,11 @@ export const MachineFleetPanel: React.FC<{ sites?: SiteOption[]; onSaved?: () =>
                     {/* Section 5: Technical Capabilities */}
                     <div className="mb-6">
                         <div className="text-xs font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-2.5">
-                            5. Technical Capabilities & Features
+                            {t('setup.machines.section.capabilities') || '5. Technical Capabilities & Features'}
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
                             {CAPABILITY_TOGGLES.map(cap => {
-                                const checked = !form[cap.field];
+                                const checked = !!form[cap.field];
                                 return (
                                     <button
                                         type="button"
@@ -779,8 +855,8 @@ export const MachineFleetPanel: React.FC<{ sites?: SiteOption[]; onSaved?: () =>
                                     >
                                         {checked ? <CheckCircle size={16} className="text-emerald-600 dark:text-emerald-400 shrink-0" /> : <Square size={16} className="text-zinc-400 shrink-0" />}
                                         <div>
-                                            <div className="font-semibold">{cap.label}</div>
-                                            <div className="text-[10px] text-zinc-500 dark:text-zinc-400">{cap.group}</div>
+                                            <div className="font-semibold">{getCapabilityLabel(cap.field)}</div>
+                                            <div className="text-[10px] text-zinc-500 dark:text-zinc-400">{getCapabilityGroup(cap.group)}</div>
                                         </div>
                                     </button>
                                 );

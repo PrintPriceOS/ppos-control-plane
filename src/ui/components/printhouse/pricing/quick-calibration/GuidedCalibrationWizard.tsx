@@ -901,18 +901,18 @@ export const GuidedCalibrationWizard: React.FC<GuidedCalibrationWizardProps> = (
                             <div>
                                 <span className="text-xs font-bold text-zinc-900 dark:text-white">
                                     {isAccepted 
-                                        ? 'Pricing Calibrated & Active'
+                                        ? (t('pricing.calibration.calibratedAndActive') || 'Pricing Calibrated & Active')
                                         : activeRun?.status === 'ACCEPTABLE_CANDIDATE'
-                                        ? 'Calibration Candidate Within Governed Tolerance'
+                                        ? (t('pricing.calibration.candidateWithinTolerance') || 'Calibration Candidate Within Governed Tolerance')
                                         : isCalculated && isRunAcceptanceEligible
-                                        ? 'Calibration Calculated — Awaiting Acceptance' 
+                                        ? (t('pricing.calibration.calculatedAwaitingAcceptance') || 'Calibration Calculated — Awaiting Acceptance') 
                                         : isCalculated && (!activeRun || !isRunAcceptanceEligible)
-                                        ? 'Calibration State Inconsistent'
+                                        ? (t('pricing.calibration.stateInconsistent') || 'Calibration State Inconsistent')
                                         : (activeRun && !isRunAcceptanceEligible)
-                                        ? 'Calibration Did Not Converge'
+                                        ? (t('pricing.calibration.didNotConverge') || 'Calibration Did Not Converge')
                                         : isReady
-                                        ? 'Ready to Run Calibration'
-                                        : 'Calibration Setup Incomplete'}
+                                        ? (t('pricing.calibration.readyToRun') || 'Ready to Run Calibration')
+                                        : (t('pricing.calibration.setupIncomplete') || 'Calibration Setup Incomplete')}
                                 </span>
                                 <p className="text-xs text-zinc-500 mt-0.5">
                                     Target Price: <strong className="text-zinc-800 dark:text-zinc-200">€ {draftCommercials.targetManufacturingPrice}</strong> for {draftSpec.copies?.toLocaleString()} copies.
@@ -1005,7 +1005,7 @@ export const GuidedCalibrationWizard: React.FC<GuidedCalibrationWizardProps> = (
                                 onClick={() => setStep(5)}
                                 className="px-5 py-2.5 bg-zinc-900 hover:bg-black dark:bg-white dark:hover:bg-zinc-100 text-white dark:text-zinc-900 text-xs font-bold rounded-xl transition-colors flex items-center gap-2 shadow-sm"
                             >
-                                <span>Verify Pricing</span>
+                                <span>{t('pricing.calibration.verifyPricing') || 'Verify Pricing'}</span>
                                 <ArrowRight size={14} />
                             </button>
                         )}
@@ -1021,12 +1021,12 @@ export const GuidedCalibrationWizard: React.FC<GuidedCalibrationWizardProps> = (
                             <CheckCircle2 size={20} className="text-emerald-600 shrink-0" />
                             <div>
                                 <h4 className="text-xs font-bold text-emerald-900 dark:text-emerald-200">
-                                    {isAccepted ? 'Pricing Calibrated & Active' : 'Pricing Calibration Test Preview'}
+                                    {isAccepted ? (t('pricing.calibration.calibratedAndActive') || 'Pricing Calibrated & Active') : (t('pricing.calibration.previewTitle') || 'Pricing Calibration Test Preview')}
                                 </h4>
                                 <p className="text-[11px] text-emerald-700 dark:text-emerald-300">
                                     {isAccepted
-                                        ? 'Your manufacturing rates are calibrated and confirmed active by server verification.'
-                                        : 'Previewing pricing calculations against current rates without active revision commitment.'}
+                                        ? (t('pricing.calibration.calibratedAndActiveDesc') || 'Your manufacturing rates are calibrated and confirmed active by server verification.')
+                                        : (t('pricing.calibration.previewDesc') || 'Previewing pricing calculations against current rates without active revision commitment.')}
                                 </p>
                             </div>
                         </div>
@@ -1036,7 +1036,7 @@ export const GuidedCalibrationWizard: React.FC<GuidedCalibrationWizardProps> = (
                             onClick={() => setStep(1)}
                             className="px-3 py-1.5 bg-white dark:bg-zinc-800 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200 text-xs font-semibold rounded-lg hover:bg-emerald-50 transition-colors"
                         >
-                            Calibrate Another Book
+                            {t('pricing.calibration.calibrateAnotherBook') || 'Calibrate Another Book'}
                         </button>
                     </div>
 

@@ -114,17 +114,18 @@ export const MaterialsPanel: React.FC<MaterialsPanelProps> = ({ sites, onSaved }
                     supplier_country: supplierCountry
                 })
             });
-            const data = await res.json();
+            const data = await res.json().catch(() => ({}));
             if (res.ok && data.ok) {
                 setSuccessMsg('Material catalog entry created successfully.');
                 setMaterialName('');
                 fetchMaterialsAndMachines();
                 if (onSaved) onSaved();
             } else {
-                setError(data.error || 'Failed to create material');
+                const message = typeof data.error === 'string' ? data.error : data.error?.message || data.message || 'Failed to create material';
+                setError(message);
             }
         } catch (err: any) {
-            setError(err.message || 'Network error');
+            setError(err instanceof Error ? err.message : 'Network error');
         }
     };
 
@@ -141,11 +142,12 @@ export const MaterialsPanel: React.FC<MaterialsPanelProps> = ({ sites, onSaved }
                 fetchMaterialsAndMachines();
                 if (onSaved) onSaved();
             } else {
-                const data = await res.json();
-                setError(data.error || 'Failed to archive');
+                const data = await res.json().catch(() => ({}));
+                const message = typeof data.error === 'string' ? data.error : data.error?.message || data.message || 'Failed to archive';
+                setError(message);
             }
         } catch (err: any) {
-            setError(err.message || 'Error deleting material');
+            setError(err instanceof Error ? err.message : 'Error deleting material');
         }
     };
 
@@ -161,15 +163,16 @@ export const MaterialsPanel: React.FC<MaterialsPanelProps> = ({ sites, onSaved }
                 },
                 body: JSON.stringify({ compatibility_provenance: provenance })
             });
-            const data = await res.json();
+            const data = await res.json().catch(() => ({}));
             if (res.ok && data.ok) {
                 setSuccessMsg('Compatibility established with provenance record.');
                 fetchMaterialsAndMachines();
             } else {
-                setError(data.error || 'Failed to link');
+                const message = typeof data.error === 'string' ? data.error : data.error?.message || data.message || 'Failed to link';
+                setError(message);
             }
         } catch (err: any) {
-            setError(err.message || 'Error linking compatibility');
+            setError(err instanceof Error ? err.message : 'Error linking compatibility');
         }
     };
 
@@ -184,11 +187,12 @@ export const MaterialsPanel: React.FC<MaterialsPanelProps> = ({ sites, onSaved }
                 setSuccessMsg('Compatibility removed.');
                 fetchMaterialsAndMachines();
             } else {
-                const data = await res.json();
-                setError(data.error || 'Failed to remove link');
+                const data = await res.json().catch(() => ({}));
+                const message = typeof data.error === 'string' ? data.error : data.error?.message || data.message || 'Failed to remove link';
+                setError(message);
             }
         } catch (err: any) {
-            setError(err.message || 'Error removing link');
+            setError(err instanceof Error ? err.message : 'Error removing link');
         }
     };
 
@@ -198,9 +202,12 @@ export const MaterialsPanel: React.FC<MaterialsPanelProps> = ({ sites, onSaved }
     return (
         <div className="bg-white dark:bg-[#18181b] border border-zinc-200 dark:border-[#27272a] rounded-xl p-7 shadow-sm transition-colors">
             <div className="flex justify-between items-center mb-5 flex-wrap gap-3">
-                <div className="flex items-center gap-2">
-                    <Layers size={20} className="text-[#dc0000]" />
-                    <h2 className="text-lg font-bold text-zinc-900 dark:text-white m-0">{t('setup.materials.title')}</h2>
+                <div>
+                    <div className="flex items-center gap-2">
+                        <Layers size={20} className="text-[#dc0000]" />
+                        <h2 className="text-lg font-bold text-zinc-900 dark:text-white m-0">{t('setup.materials.title')}</h2>
+                    </div>
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 mb-0">{t('setup.materials.subtitle')}</p>
                 </div>
 
                 {sites.length > 1 && (
@@ -255,11 +262,11 @@ export const MaterialsPanel: React.FC<MaterialsPanelProps> = ({ sites, onSaved }
                                 onChange={(e) => setMaterialType(e.target.value)}
                                 className={`${inputClass} cursor-pointer`}
                             >
-                                <option value="PAPER">Paper Substrate</option>
-                                <option value="BOARD">Rigid Board</option>
-                                <option value="VINYL">Vinyl/Adhesive</option>
-                                <option value="INK">Specialty Ink</option>
-                                <option value="CONSUMABLE">Consumable</option>
+                                <option value="PAPER">{t('setup.materials.type.paper')}</option>
+                                <option value="BOARD">{t('setup.materials.type.board')}</option>
+                                <option value="VINYL">{t('setup.materials.type.vinyl')}</option>
+                                <option value="INK">{t('setup.materials.type.ink')}</option>
+                                <option value="CONSUMABLE">{t('setup.materials.type.consumable')}</option>
                             </select>
                         </div>
                         <div>
@@ -308,7 +315,7 @@ export const MaterialsPanel: React.FC<MaterialsPanelProps> = ({ sites, onSaved }
                             />
                         </div>
                         <div>
-                            <label className={labelClass}>SUPPLIER COUNTRY</label>
+                            <label className={labelClass}>{t('setup.materials.supplierCountry')}</label>
                             <input
                                 type="text"
                                 placeholder="e.g. ES, DE, FR"
@@ -344,7 +351,7 @@ export const MaterialsPanel: React.FC<MaterialsPanelProps> = ({ sites, onSaved }
                         <div className="bg-zinc-50 dark:bg-zinc-900/60 p-8 rounded-xl border border-zinc-200 dark:border-zinc-800 text-center text-zinc-500">
                             <Layers size={32} className="mx-auto mb-3 opacity-40" />
                             <p className="text-sm font-semibold text-zinc-800 dark:text-zinc-200 m-0">{t('setup.materials.noMaterials')}</p>
-                            <p className="text-xs text-zinc-500 mt-1 mb-0">Use the form to configure your first paper stock or media item.</p>
+                            <p className="text-xs text-zinc-500 mt-1 mb-0">{t('setup.materials.noMaterialsDesc')}</p>
                         </div>
                     ) : (
                         materials.map(mat => {
@@ -367,7 +374,7 @@ export const MaterialsPanel: React.FC<MaterialsPanelProps> = ({ sites, onSaved }
                                         <button
                                             onClick={() => handleArchiveMaterial(mat.id)}
                                             className="text-red-500 hover:text-red-700 p-1 cursor-pointer transition-colors"
-                                            title="Archive Material"
+                                            title={t('setup.materials.archive')}
                                         >
                                             <Trash2 size={16} />
                                         </button>
@@ -381,12 +388,12 @@ export const MaterialsPanel: React.FC<MaterialsPanelProps> = ({ sites, onSaved }
                                                 onClick={() => setPairingMaterialId(isPairingMode ? null : mat.id)}
                                                 className="text-sky-600 dark:text-sky-400 text-xs font-semibold hover:underline flex items-center gap-1 cursor-pointer"
                                             >
-                                                <Link2 size={12} /> {isPairingMode ? 'Close Pairing' : 'Manage Pairings'}
+                                                <Link2 size={12} /> {isPairingMode ? t('setup.materials.closePairing') : t('setup.materials.managePairings')}
                                             </button>
                                         </div>
 
                                         {pairedMachineDetails.length === 0 && !isPairingMode && (
-                                            <p className="text-xs text-zinc-500 m-0">Not associated with any machines yet.</p>
+                                            <p className="text-xs text-zinc-500 m-0">{t('setup.materials.noMachinesPaired')}</p>
                                         )}
 
                                         {/* Paired list */}
@@ -412,7 +419,7 @@ export const MaterialsPanel: React.FC<MaterialsPanelProps> = ({ sites, onSaved }
                                         {isPairingMode && (
                                             <div className="flex flex-col gap-2 mt-2">
                                                 {machines.length === 0 ? (
-                                                    <p className="text-xs text-zinc-500 m-0">No machines configured. Configure a machine first.</p>
+                                                    <p className="text-xs text-zinc-500 m-0">{t('setup.materials.noMachinesConfigured')}</p>
                                                 ) : (
                                                     machines.map(m => {
                                                         const isPaired = pairedMachineDetails.some(p => p.startsWith(m.id + ':'));
@@ -424,7 +431,7 @@ export const MaterialsPanel: React.FC<MaterialsPanelProps> = ({ sites, onSaved }
                                                                     <span className="text-xs font-semibold text-zinc-900 dark:text-white">{m.machine_name}</span>
                                                                     {isPaired && (
                                                                         <span className="block text-[10px] text-zinc-500">
-                                                                            Provenance: {currentProvenance}
+                                                                            {t('setup.materials.provenance')}: {currentProvenance}
                                                                         </span>
                                                                     )}
                                                                 </div>
@@ -434,7 +441,7 @@ export const MaterialsPanel: React.FC<MaterialsPanelProps> = ({ sites, onSaved }
                                                                         <>
                                                                             <input
                                                                                 type="text"
-                                                                                placeholder="provenance code"
+                                                                                placeholder={t('setup.materials.provenanceCode')}
                                                                                 value={provenanceMap[m.id] || ''}
                                                                                 onChange={(e) => setProvenanceMap({ ...provenanceMap, [m.id]: e.target.value })}
                                                                                 className="bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 px-2 py-1 rounded text-xs w-28"
@@ -444,7 +451,7 @@ export const MaterialsPanel: React.FC<MaterialsPanelProps> = ({ sites, onSaved }
                                                                                 onClick={() => handlePairMachine(mat.id, m.id)}
                                                                                 className="bg-[#dc0000] hover:bg-red-700 text-white px-2.5 py-1 rounded text-xs font-semibold cursor-pointer transition-colors"
                                                                             >
-                                                                                Link
+                                                                                {t('setup.materials.link')}
                                                                             </button>
                                                                         </>
                                                                     )}
@@ -454,7 +461,7 @@ export const MaterialsPanel: React.FC<MaterialsPanelProps> = ({ sites, onSaved }
                                                                             onClick={() => handleUnpairMachine(mat.id, m.id)}
                                                                             className="bg-zinc-200 dark:bg-zinc-700 hover:bg-red-100 dark:hover:bg-red-950/40 text-red-600 dark:text-red-400 px-2.5 py-1 rounded text-xs font-semibold cursor-pointer transition-colors flex items-center gap-1"
                                                                         >
-                                                                            <Unlink size={12} /> Unlink
+                                                                            <Unlink size={12} /> {t('setup.materials.unlink')}
                                                                         </button>
                                                                     )}
                                                                 </div>

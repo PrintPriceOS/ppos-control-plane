@@ -108,15 +108,16 @@ export const CapacityPanel: React.FC<CapacityPanelProps> = ({ sites, onSaved }) 
                     notes
                 })
             });
-            const data = await res.json();
+            const data = await res.json().catch(() => ({}));
             if (res.ok && data.ok) {
-                setSuccessMsg('Site capacity configuration saved.');
+                setSuccessMsg(t('setup.capacity.savedSite'));
                 if (onSaved) onSaved();
             } else {
-                setError(data.error || 'Failed to save capacity');
+                const message = typeof data.error === 'string' ? data.error : data.error?.message || data.message || 'Failed to save capacity';
+                setError(message);
             }
         } catch (err: any) {
-            setError(err.message || 'Network error');
+            setError(err instanceof Error ? err.message : 'Network error');
         }
     };
 
@@ -135,15 +136,16 @@ export const CapacityPanel: React.FC<CapacityPanelProps> = ({ sites, onSaved }) 
                     capacity_unit_name: machineCapacityUnit[machineId] || 'impressions'
                 })
             });
-            const data = await res.json();
+            const data = await res.json().catch(() => ({}));
             if (res.ok && data.ok) {
-                setSuccessMsg('Machine capacity limit configured.');
+                setSuccessMsg(t('setup.capacity.savedMachine'));
                 fetchCapacityData();
             } else {
-                setError(data.error || 'Failed to update machine capacity');
+                const message = typeof data.error === 'string' ? data.error : data.error?.message || data.message || 'Failed to update machine capacity';
+                setError(message);
             }
         } catch (err: any) {
-            setError(err.message || 'Network error');
+            setError(err instanceof Error ? err.message : 'Network error');
         }
     };
 
@@ -188,7 +190,7 @@ export const CapacityPanel: React.FC<CapacityPanelProps> = ({ sites, onSaved }) 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                 {/* Site Capacity Config Form */}
                 <form onSubmit={handleSaveSiteCapacity} className="lg:col-span-5 bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 p-5 rounded-xl flex flex-col gap-3 transition-colors">
-                    <h3 className="text-sm font-bold text-zinc-900 dark:text-white m-0 mb-1">Site Throughput Targets</h3>
+                    <h3 className="text-sm font-bold text-zinc-900 dark:text-white m-0 mb-1">{t('setup.capacity.siteTargets')}</h3>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                         <div>
@@ -251,7 +253,7 @@ export const CapacityPanel: React.FC<CapacityPanelProps> = ({ sites, onSaved }) 
                     <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/60 p-2.5 rounded-lg flex gap-2 items-start my-1 text-xs text-amber-900 dark:text-amber-300">
                         <ShieldAlert size={14} className="text-amber-500 mt-0.5 shrink-0" />
                         <span className="leading-tight">
-                            <strong>Indicative capacity only.</strong> Dynamic job scheduling, allocation queues, and live routing are not active in this phase.
+                            <strong>{t('setup.capacity.indicativeNotice')}</strong> {t('setup.capacity.indicativeDesc')}
                         </span>
                     </div>
 
@@ -268,8 +270,8 @@ export const CapacityPanel: React.FC<CapacityPanelProps> = ({ sites, onSaved }) 
                     <h3 className="text-sm font-bold text-zinc-900 dark:text-white m-0">{t('setup.capacity.machineThroughput')}</h3>
                     {machines.length === 0 ? (
                         <div className="bg-zinc-50 dark:bg-zinc-900/60 p-8 rounded-xl border border-zinc-200 dark:border-zinc-800 text-center text-zinc-500">
-                            <p className="text-sm font-semibold text-zinc-800 dark:text-zinc-200 m-0">No active machines configured at this site.</p>
-                            <p className="text-xs text-zinc-500 mt-1 mb-0">Go to Machinery tab to add presses first.</p>
+                            <p className="text-sm font-semibold text-zinc-800 dark:text-zinc-200 m-0">{t('setup.capacity.noMachines')}</p>
+                            <p className="text-xs text-zinc-500 mt-1 mb-0">{t('setup.capacity.noMachinesDesc')}</p>
                         </div>
                     ) : (
                         machines.map(m => (
@@ -291,17 +293,17 @@ export const CapacityPanel: React.FC<CapacityPanelProps> = ({ sites, onSaved }) 
                                         onChange={(e) => setMachineCapacityUnit({ ...machineCapacityUnit, [m.id]: e.target.value })}
                                         className="bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 px-2 py-1.5 rounded-lg text-xs cursor-pointer"
                                     >
-                                        <option value="impressions">impressions/day</option>
-                                        <option value="sheets">sheets/day</option>
-                                        <option value="hours">hours/day</option>
-                                        <option value="jobs">jobs/day</option>
+                                        <option value="impressions">{t('setup.capacity.unit.impressions')}</option>
+                                        <option value="sheets">{t('setup.capacity.unit.sheets')}</option>
+                                        <option value="hours">{t('setup.capacity.unit.hours')}</option>
+                                        <option value="jobs">{t('setup.capacity.unit.jobs')}</option>
                                     </select>
                                     <button
                                         type="button"
                                         onClick={() => handleSaveMachineCapacity(m.id)}
                                         className="bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 border border-zinc-300 dark:border-zinc-700 px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-colors"
                                     >
-                                        Save
+                                        {t('setup.capacity.saveMachine')}
                                     </button>
                                 </div>
                             </div>

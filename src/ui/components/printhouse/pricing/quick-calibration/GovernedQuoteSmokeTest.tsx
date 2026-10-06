@@ -211,13 +211,13 @@ export const GovernedQuoteSmokeTest: React.FC<GovernedQuoteSmokeTestProps> = ({
                     </div>
                     <div>
                         <h4 className="text-base font-bold text-zinc-900 dark:text-white flex items-center gap-2">
-                            Test Your Pricing
+                            {t('pricing.smoke.title') || 'Test Your Pricing'}
                             <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-100 dark:bg-emerald-950/60 dark:text-emerald-300 px-2 py-0.5 rounded-full">
-                                Canonical Engine
+                                {t('pricing.smoke.engineBadge') || 'Canonical Engine'}
                             </span>
                         </h4>
                         <p className="text-xs text-zinc-500 mt-0.5">
-                            Simulate real job quotations using current active rates for <span className="font-semibold text-zinc-700 dark:text-zinc-300">{printerNodeName}</span>.
+                            {t('pricing.smoke.subtitle') || 'Simulate real job quotations using current active rates for'} <span className="font-semibold text-zinc-700 dark:text-zinc-300">{printerNodeName}</span>.
                         </p>
                     </div>
                 </div>
@@ -249,11 +249,11 @@ export const GovernedQuoteSmokeTest: React.FC<GovernedQuoteSmokeTestProps> = ({
                 <div className="p-4 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-xl text-xs text-amber-800 dark:text-amber-200 flex items-start gap-3">
                     <AlertTriangle size={16} className="text-amber-600 mt-0.5 shrink-0" />
                     <div>
-                        <p className="font-bold">Production Rates Notice</p>
+                        <p className="font-bold">{t('pricing.smoke.ratesNoticeTitle') || 'Production Rates Notice'}</p>
                         <p className="mt-0.5">
-                            {error.includes('MANUFACTURING_RATES_NOT_CONFIGURED') || error.includes('RATES_NOT_CONFIGURED')
-                                ? 'Active production rates have not yet been accepted and published to this printer node. Complete and accept a calibration run above to activate rates.'
-                                : error}
+                            {typeof error === 'string' && (error.includes('MANUFACTURING_RATES_NOT_CONFIGURED') || error.includes('RATES_NOT_CONFIGURED'))
+                                ? (t('pricing.smoke.ratesNotConfigured') || 'Active production rates have not yet been accepted and published to this printer node. Complete and accept a calibration run above to activate rates.')
+                                : typeof error === 'string' ? error : (error as any)?.message || JSON.stringify(error)}
                         </p>
                     </div>
                 </div>

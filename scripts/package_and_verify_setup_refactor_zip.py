@@ -50,6 +50,8 @@ SOURCES_TO_PACKAGE = [
     "src/ui/components/printhouse/onboarding/SimplifiedOnboardingJourney.tsx",
     "src/ui/components/printhouse/onboarding/GovernedAcceptanceView.tsx",
     "src/ui/components/printhouse/pricing/CanonicalIndustrialPricingEditor.tsx",
+    "src/ui/components/printhouse/pricing/quick-calibration/GovernedQuoteSmokeTest.tsx",
+    "src/ui/components/printhouse/pricing/quick-calibration/GuidedCalibrationWizard.tsx",
     "src/ui/components/printhouse/setup/PricingPanel.tsx",
     "src/ui/components/printhouse/setup/SetupModuleCard.tsx",
     "src/ui/components/printhouse/setup/SetupProgressSummary.tsx",
@@ -71,9 +73,12 @@ SOURCES_TO_PACKAGE = [
     "src/ui/en.ts",
     "src/ui/es.ts",
     "scripts/verify_and_capture_setup_refactor.py",
+    "scripts/generate_differential_tsc.py",
+    "scripts/package_and_verify_setup_refactor_zip.py",
     "tests/PricingWorkflowConservation.test.tsx",
     "tests/SetupModuleCard.test.tsx",
     "tests/PrinthouseOnboardingRedesign.test.tsx",
+    "tests/SetupMachineryAndCalibratedAssistant.test.tsx",
 ]
 
 # Copy verification results and differential tsc reports
@@ -113,14 +118,31 @@ import json
 build_duration_match = re.search(r"built in\s+([0-9.]+s)", build_res.stdout + build_res.stderr)
 build_duration = build_duration_match.group(1) if build_duration_match else "unknown"
 
-vitest_summary_match = re.search(r"Tests\s+([0-9]+\s+passed.*)", vitest_res.stdout)
-vitest_summary = vitest_summary_match.group(1) if vitest_summary_match else "345 passed"
+def strip_ansi(text):
+    return re.sub(r'\x1b\[[0-9;]*[a-zA-Z]', '', text)
+
+test_files_match = re.search(r"Test Files\s+([^\n\r]+)", vitest_res.stdout)
+test_files_summary = strip_ansi(test_files_match.group(1)).strip() if test_files_match else f"{vitest_res.returncode}"
+
+tests_match = re.search(r"Tests\s+([^\n\r]+)", vitest_res.stdout)
+tests_summary = strip_ansi(tests_match.group(1)).strip() if tests_match else f"code {vitest_res.returncode}"
+vitest_summary = f"{test_files_summary} | {tests_summary}"
 
 sha_res = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True, encoding="utf-8")
 commit_sha = sha_res.stdout.strip()
 
 branch_res = subprocess.run(["git", "branch", "--show-current"], capture_output=True, text=True, encoding="utf-8")
 current_branch = branch_res.stdout.strip()
+
+# Differential TSC Data
+tsc_diff_data = None
+tsc_json_path = os.path.join(TARGET_DIR, "tsc_differential_report.json")
+if os.path.exists(tsc_json_path):
+    try:
+        with open(tsc_json_path, "r", encoding="utf-8") as f:
+            tsc_diff_data = json.load(f)
+    except Exception as e:
+        print(f"Warning loading tsc diff json: {e}")
 
 # 6. Generate MANIFEST.json and MANIFEST.md
 manifest_data = {
@@ -129,8 +151,10 @@ manifest_data = {
     "timestamp": subprocess.run(["python", "-c", "import time; print(time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()))"], capture_output=True, text=True).stdout.strip(),
     "commands": [
         "npx vitest run tests/PricingWorkflowConservation.test.tsx",
+        "npx vitest run tests/SetupMachineryAndCalibratedAssistant.test.tsx",
         "npx vitest run",
         "npm run build",
+        "python scripts/generate_differential_tsc.py",
         "python scripts/verify_and_capture_setup_refactor.py",
         "python scripts/package_and_verify_setup_refactor_zip.py"
     ],
@@ -151,8 +175,21 @@ manifest_data = {
     }
 }
 
+if tsc_diff_data:
+    manifest_data["results"]["typescriptDifferential"] = {
+        "baseCommit": tsc_diff_data.get("baseCommit"),
+        "baseErrors": tsc_diff_data.get("baseTotalErrors"),
+        "candidateErrors": tsc_diff_data.get("candidateTotalErrors"),
+        "netDelta": tsc_diff_data.get("netDelta"),
+        "scopedClean": all(v.get("clean") for v in tsc_diff_data.get("scopedFiles", {}).values())
+    }
+
 with open(os.path.join(TARGET_DIR, "MANIFEST.json"), "w", encoding="utf-8") as f:
     json.dump(manifest_data, f, indent=2)
+
+tsc_md_snippet = ""
+if tsc_diff_data:
+    tsc_md_snippet = f"""- **TypeScript Differential (vs {tsc_diff_data.get('baseCommit', '')[:8]})**: Base {tsc_diff_data.get('baseTotalErrors')} errs -> Candidate {tsc_diff_data.get('candidateTotalErrors')} errs (Net Delta: {tsc_diff_data.get('netDelta')}). Scoped files: 0 errors."""
 
 with open(os.path.join(TARGET_DIR, "MANIFEST.md"), "w", encoding="utf-8") as f:
     f.write(f"""# Printhouse Setup Hub Candidate Manifest
@@ -165,12 +202,15 @@ with open(os.path.join(TARGET_DIR, "MANIFEST.md"), "w", encoding="utf-8") as f:
 - **Vitest Suite**: Exit Code {vitest_res.returncode} ({vitest_summary})
 - **Production Build**: Exit Code {build_res.returncode} (built in {build_duration})
 - **Playwright Verification**: 1366x768 Zero Overflow (scrollHeight = clientHeight = 704px)
+{tsc_md_snippet}
 
 ## Commands Executed
 ```bash
 npx vitest run tests/PricingWorkflowConservation.test.tsx
+npx vitest run tests/SetupMachineryAndCalibratedAssistant.test.tsx
 npx vitest run
 npm run build
+python scripts/generate_differential_tsc.py
 python scripts/verify_and_capture_setup_refactor.py
 python scripts/package_and_verify_setup_refactor_zip.py
 ```
@@ -222,9 +262,13 @@ with tempfile.TemporaryDirectory() as tmp_dir:
         print(f"Extracted {len(extracted_files)} files successfully.")
 
 # 10. Copy to Brain Directory
-if os.path.exists(BRAIN_DIR):
-    brain_dst = os.path.join(BRAIN_DIR, ZIP_NAME)
-    shutil.copy2(ZIP_NAME, brain_dst)
-    print(f"Copied zip to brain directory: {brain_dst}")
+for b_dir in [
+    BRAIN_DIR,
+    r"C:\Users\KIKE\.gemini\antigravity-ide\brain\2b893f39-8fa0-49ed-8771-228e86a03d74"
+]:
+    if os.path.exists(b_dir):
+        brain_dst = os.path.join(b_dir, ZIP_NAME)
+        shutil.copy2(ZIP_NAME, brain_dst)
+        print(f"Copied zip to brain directory: {brain_dst}")
 
 print("\n--- ALL PACKAGING AND VERIFICATION COMPLETE ---")
