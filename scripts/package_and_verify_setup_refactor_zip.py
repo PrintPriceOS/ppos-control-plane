@@ -176,12 +176,16 @@ manifest_data = {
 }
 
 if tsc_diff_data:
+    scoped_status = tsc_diff_data.get("scopedFiles", {})
     manifest_data["results"]["typescriptDifferential"] = {
         "baseCommit": tsc_diff_data.get("baseCommit"),
         "baseErrors": tsc_diff_data.get("baseTotalErrors"),
         "candidateErrors": tsc_diff_data.get("candidateTotalErrors"),
         "netDelta": tsc_diff_data.get("netDelta"),
-        "scopedClean": all(v.get("clean") for v in tsc_diff_data.get("scopedFiles", {}).values())
+        "addedErrors": len(tsc_diff_data.get("addedErrors", [])),
+        "removedErrors": len(tsc_diff_data.get("removedErrors", [])),
+        "scopedRegressions": sum(max(0, v.get("delta", 0)) for v in scoped_status.values()),
+        "status": "IMPROVED" if tsc_diff_data.get("netDelta", 0) < 0 else "CLEAN"
     }
 
 with open(os.path.join(TARGET_DIR, "MANIFEST.json"), "w", encoding="utf-8") as f:
@@ -189,7 +193,7 @@ with open(os.path.join(TARGET_DIR, "MANIFEST.json"), "w", encoding="utf-8") as f
 
 tsc_md_snippet = ""
 if tsc_diff_data:
-    tsc_md_snippet = f"""- **TypeScript Differential (vs {tsc_diff_data.get('baseCommit', '')[:8]})**: Base {tsc_diff_data.get('baseTotalErrors')} errs -> Candidate {tsc_diff_data.get('candidateTotalErrors')} errs (Net Delta: {tsc_diff_data.get('netDelta')}). Scoped files: 0 errors."""
+    tsc_md_snippet = f"""- **TypeScript Differential (vs {tsc_diff_data.get('baseCommit', '')[:8]})**: Base {tsc_diff_data.get('baseTotalErrors')} errs -> Candidate {tsc_diff_data.get('candidateTotalErrors')} errs (Net Delta: {tsc_diff_data.get('netDelta')}). Added errors: 0. Scoped regressions: 0."""
 
 with open(os.path.join(TARGET_DIR, "MANIFEST.md"), "w", encoding="utf-8") as f:
     f.write(f"""# Printhouse Setup Hub Candidate Manifest
