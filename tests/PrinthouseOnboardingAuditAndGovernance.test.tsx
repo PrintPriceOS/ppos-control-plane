@@ -283,6 +283,41 @@ describe('Printhouse Calibration Onboarding - Audit, Fidelity and Governance Sui
             const proceedBtn = screen.getByTestId('proceed-to-accept-btn');
             expect(proceedBtn).not.toBeDisabled();
         });
+
+        it('3b.5 Rejects NaN, Infinity, -Infinity, and negative numbers via Number.isFinite, blocking comparison advance', () => {
+            // Case A: targetPrice is NaN
+            const { unmount: unmountA } = renderWithLocale(
+                <CalculationComparisonView
+                    targetPrice={NaN}
+                    enginePrice={1000}
+                    comparisonMode="manufacturing"
+                />
+            );
+            expect(screen.getByTestId('proceed-to-accept-btn')).toBeDisabled();
+            unmountA();
+
+            // Case B: enginePrice is Infinity
+            const { unmount: unmountB } = renderWithLocale(
+                <CalculationComparisonView
+                    targetPrice={1000}
+                    enginePrice={Infinity}
+                    comparisonMode="manufacturing"
+                />
+            );
+            expect(screen.getByTestId('proceed-to-accept-btn')).toBeDisabled();
+            expect(screen.getByText(/Cálculo del motor ausente o incompleto/i)).toBeInTheDocument();
+            unmountB();
+
+            // Case C: negative enginePrice
+            renderWithLocale(
+                <CalculationComparisonView
+                    targetPrice={1000}
+                    enginePrice={-500}
+                    comparisonMode="manufacturing"
+                />
+            );
+            expect(screen.getByTestId('proceed-to-accept-btn')).toBeDisabled();
+        });
     });
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -295,6 +330,7 @@ describe('Printhouse Calibration Onboarding - Audit, Fidelity and Governance Sui
 
             renderWithLocale(
                 <GovernedAcceptanceView
+                    proposedPatch={{ machine_hourly_rate: 68.50, plate_cost: 9.80 }}
                     onAcceptRateProposal={onAccept}
                     onBack={onCancel}
                 />
@@ -411,6 +447,47 @@ describe('Printhouse Calibration Onboarding - Audit, Fidelity and Governance Sui
             // Should NOT have an ambiguous standalone "Activo" or "ACTIVO" badge next to Pending
             expect(screen.queryByText('Activo')).not.toBeInTheDocument();
             expect(screen.queryByText('ACTIVO')).not.toBeInTheDocument();
+        });
+
+        it('4.5 GovernedAcceptanceView blocks acceptance if proposedPatch contains non-finite values (NaN, Infinity) or negative rates', () => {
+            // Case A: proposedPatch contains negative rate
+            const { unmount: unmountA } = renderWithLocale(
+                <GovernedAcceptanceView
+                    proposedPatch={{ machine_hourly_rate: -25 }}
+                    canAccept={true}
+                />
+            );
+            expect(screen.getByTestId('open-accept-modal-btn')).toBeDisabled();
+            unmountA();
+
+            // Case B: proposedPatch contains NaN
+            const { unmount: unmountB } = renderWithLocale(
+                <GovernedAcceptanceView
+                    proposedPatch={{ machine_hourly_rate: NaN }}
+                    canAccept={true}
+                />
+            );
+            expect(screen.getByTestId('open-accept-modal-btn')).toBeDisabled();
+            unmountB();
+
+            // Case C: proposedPatch contains Infinity
+            const { unmount: unmountC } = renderWithLocale(
+                <GovernedAcceptanceView
+                    proposedPatch={{ plate_cost: Infinity }}
+                    canAccept={true}
+                />
+            );
+            expect(screen.getByTestId('open-accept-modal-btn')).toBeDisabled();
+            unmountC();
+
+            // Case D: valid proposal enables the button
+            renderWithLocale(
+                <GovernedAcceptanceView
+                    proposedPatch={{ machine_hourly_rate: 68.50, plate_cost: 9.80 }}
+                    canAccept={true}
+                />
+            );
+            expect(screen.getByTestId('open-accept-modal-btn')).not.toBeDisabled();
         });
     });
 

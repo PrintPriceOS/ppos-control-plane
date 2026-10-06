@@ -129,7 +129,7 @@ def setup_page_routes(page):
         "widthMm": 148,
         "heightMm": 210,
         "pageCount": 592,
-        "interiorPaper": "Munken Print white 1.5 80g",
+        "interiorPaper": "Munken Print White 1.5, 80 g",
         "coverPaper": "Karton 300g",
         "bindingMethod": "thread_sewn",
         "runs": [
@@ -142,7 +142,7 @@ def setup_page_routes(page):
                 "quotedTotalPrice": 4646,
                 "quotedUnitPrice": 9.29,
                 "validationStatus": "CONSISTENT",
-                "paperVariant": "Munken Print white 80g",
+                "paperVariant": "Munken Print White 1.5, 80 g",
                 "logisticsOption": "Standard DE (325 €)",
                 "hasEquivalentBreakdown": True
             },
@@ -155,7 +155,7 @@ def setup_page_routes(page):
                 "quotedTotalPrice": 4929,
                 "quotedUnitPrice": 8.22,
                 "validationStatus": "CONSISTENT",
-                "paperVariant": "Munken Print white 80g",
+                "paperVariant": "Munken Print White 1.5, 80 g",
                 "logisticsOption": "Standard DE (325 €)",
                 "hasEquivalentBreakdown": True
             },
@@ -168,7 +168,7 @@ def setup_page_routes(page):
                 "quotedTotalPrice": 5171,
                 "quotedUnitPrice": 7.39,
                 "validationStatus": "CONSISTENT",
-                "paperVariant": "Munken Print white 80g",
+                "paperVariant": "Munken Print White 1.5, 80 g",
                 "logisticsOption": "Standard DE (325 €)",
                 "hasEquivalentBreakdown": True
             }

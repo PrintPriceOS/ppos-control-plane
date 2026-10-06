@@ -94,6 +94,15 @@ export const GovernedAcceptanceView: React.FC<GovernedAcceptanceViewProps> = ({
     const handleBack = onBackToCompare || onBack || (() => {});
     const patchEntries = Object.entries(proposedPatch || {});
 
+    const hasInvalidPatchValues = patchEntries.some(([_, val]) => {
+        if (typeof val === 'number') {
+            return !Number.isFinite(val) || Number.isNaN(val) || val < 0;
+        }
+        return false;
+    });
+
+    const isAcceptActionAllowed = canAccept && !hasInvalidPatchValues && !isAccepted;
+
     return (
         <div className="space-y-4 text-xs">
             <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 shadow-2xs space-y-4">
@@ -244,9 +253,9 @@ export const GovernedAcceptanceView: React.FC<GovernedAcceptanceViewProps> = ({
                         type="button"
                         data-testid="open-accept-modal-btn"
                         onClick={() => setShowConfirmDialog(true)}
-                        disabled={!canAccept || accepting || isSubmitting}
+                        disabled={!isAcceptActionAllowed || accepting || isSubmitting}
                         className={`px-5 py-2.5 rounded-xl font-bold text-xs flex items-center gap-2 transition-all cursor-pointer ${
-                            canAccept && !accepting && !isSubmitting
+                            isAcceptActionAllowed && !accepting && !isSubmitting
                                 ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs'
                                 : 'bg-zinc-200 dark:bg-zinc-800 text-zinc-400 cursor-not-allowed'
                         }`}

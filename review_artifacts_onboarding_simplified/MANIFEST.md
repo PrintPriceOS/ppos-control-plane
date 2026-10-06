@@ -2,17 +2,35 @@
 **Proyecto:** PrintPrice OS Control Plane
 **Rama:** `phase-39.2-tenant-management-console`
 **Commit Base:** `404bc73bc51b6ca44383c64ded205aa9ab30d89c`
-**Código Capturado (Git SHA):** `5816693a6eedba7c8e60b155c903f0a2377f2340`
-**Entorno de Captura Visual:**
-- Framework: Vite 6.4.2 + React 19 + TypeScript
-- Navegador: Chromium headless via Playwright
-- Servidor Local: `http://localhost:3000` (Dev Server)
-- Declaración de Intercepción: **Mocks de ruta Playwright** utilizados estrictamente para las capturas visuales de interfaz y fixtures documentales auténticas.
-- **Estado de Validación Conectada:** *Pendiente de validación conectada en entorno de persistencia* (debido a la ausencia de los demonios locales MySQL en 127.0.0.1:3306 y MongoDB en 127.0.0.1:27017 en esta estación de trabajo).
+**Código Capturado (Git SHA):** `da2ef94159cee150d3484fb877e9fa051350df38`
+**Estado del Worktree:** Modificaciones locales de auditoría y robustecimiento preparadas para commit/push.
 
 ---
 
-## 1. Inventario de Evidencias y Descripción
+## 1. Entorno de Captura Visual y Comandos
+- **Comandos Ejecutados:**
+  - `npx vitest run`: Ejecución de las 21 suites y 263 tests unitarios y de integración.
+  - `npm run build`: Compilación de producción Vite (dist generado limpiamente en 11.7s).
+  - `python scripts/capture_onboarding_evidence.py`: Captura de las 15 evidencias visuales con Playwright.
+  - `node scripts/test_onboarding_connected_suite.js`: Prueba conectada específica preparada para entorno aislado.
+- **Entorno:**
+  - Node.js v20+, Vite 6.4.2, React 19, TypeScript
+  - Chromium headless via Playwright
+  - Servidor Local: `http://localhost:3000` (Dev Server)
+- **Declaración de Intercepción de Rutas (Mocks de Auditoría Visual):**
+  Las 15 capturas visuales fueron obtenidas mediante Playwright interceptando las siguientes rutas de API para auditar los contratos de interfaz con los fixtures documentales auténticos:
+  1. `**/api/printhouse/onboarding/quote-evidence/upload`: Retorna los datos estructurados del documento (Natur, Stutensee, Die Mysteriösen Steine).
+  2. `**/api/printhouse/onboarding/pricing/calibrations`: Retorna la sesión de calibración creada (`sess-cal-01`).
+  3. `**/api/printhouse/onboarding/pricing/calibrations/*/ready`: Valida la preflight readiness de la sesión.
+  4. `**/api/printhouse/onboarding/pricing/calibrations/*/calculate`: Retorna el cálculo del solver inverso con precios positivos y `proposedPatch`.
+  5. `**/api/printhouse/onboarding/pricing/calibrations/*/accept`: Registra la aceptación gobernada y retorna la revisión inmutable.
+  6. `**/api/printhouse/onboarding/pricing/revisions*`: Lista revisiones inmutables del taller.
+- **Estado de Validación Conectada:** *Pendiente de validación conectada en entorno de persistencia* (servicios MySQL y MongoDB no activos en máquina local).
+- **Advertencia Legal / Técnica:** *Los checksums SHA-256 incluidos acreditan exclusivamente la integridad criptográfica de los archivos empaquetados contra alteraciones, no su validez funcional ni ejecución conectada.*
+
+---
+
+## 2. Inventario de Evidencias y Descripción
 
 | Archivo | Viewport | Tema / Idioma | Descripción | Checksum SHA-256 |
 |---|---|---|---|---|
@@ -21,9 +39,9 @@
 | `02_onboarding_step2_upload_pdf_fixtures_dark_1366.png` | 1366×768 | Dark / ES | Paso 2: Entrada dual limpia (Subir PDF / Oferta manual), sin botones ficticios de terceros. | `9d5e7ac61aba696d4bc72eb029d705673101c0ee927b306e6dc5fd03435d947e` |
 | `02b_onboarding_step2_manual_offer_form_dark_1366.png` | 1366×768 | Dark / ES | Paso 2b: Formulario manual progresivo en 7 secciones con referencia de presupuesto editable y opcional. | `689027329c16cbf0b73b39e58b4cd28cc6d9acb580273062488d02c5e0e95b73` |
 | `03_onboarding_step3_stutensee_discrepancy_dark_1366.png` | 1366×768 | Dark / ES | Paso 3 (Stutensee): Tiradas auténticas de 250 (1.283 + 190 = 1.473 €) y 300 con discrepancia aritmética (1.525 / 300 = 5,08 € vs 3,05 € declarado). | `5364059d3ef5f6efba0b33c75da9265f0767bdc4786fdcab5757d3fe38acc60c` |
-| `03b_onboarding_step3_mysteriosen_ambiguity_dark_1366.png` | 1366×768 | Dark / ES | Paso 3b (Die Mysteriösen Steine): Datos auténticos del PDF (1.792 € fab + 415 € transp = 2.207 € total, 1,47 €/ud) con aviso explícito de ambigüedad técnica Softcover vs cartón 2,4 mm. | `e54081e0b723504d7a74ead6fe77cac204098e5ea1ded6dfcd4a9557c4019a4f` |
-| `03_onboarding_step3_natur_variants_light_1280.png` | 1280×800 | Light / ES | Paso 3 (Natur): Regenerada fielmente con el documento real Natur (148×210 mm, 592p Munken 80g, 500/600/700 con 4.321, 4.604, 4.846 € fab + 325 € transp). Eliminada contaminación de Stutensee. | `3f272e2f3e7ac98b3e21b536a6ba02ac37ec361712bb9fd2d186019f634885b6` |
-| `04_onboarding_step4_compare_calculations_dark_1366.png` | 1366×768 | Dark / ES | Paso 4: Comparación real y positiva. Fabricación declarada 1.283,00 € vs Motor 1.280,00 €, residual +0.2%, ajuste en tolerancia, botón habilitado sin ceros artificiales. | `65aecf4910cf6564dfb4793a87c4683f5f0326ee9d1339bf4317743351de22a9` |
+| `03b_onboarding_step3_mysteriosen_ambiguity_dark_1366.png` | 1366×768 | Dark / ES | Paso 3b (Die Mysteriösen Steine): Datos auténticos del PDF (1.792 € fab + 415 € transp = 2.207 € total, 1,47 €/ud) con aviso explícito de contradicción documental Softcover vs cartón MGP 2,4 mm (sin asunciones de cosido/PUR). | `e54081e0b723504d7a74ead6fe77cac204098e5ea1ded6dfcd4a9557c4019a4f` |
+| `03_onboarding_step3_natur_variants_light_1280.png` | 1280×800 | Light / ES | Paso 3 (Natur): Regenerada con la denominación original exacta 'Munken Print White 1.5, 80 g' (148×210 mm, 592p, 500/600/700 con 4.321, 4.604, 4.846 € fab + 325 € transp). | `2112485a6eb19cb7849351900ab81d711968069256a8aa98ec9692699dc9574e` |
+| `04_onboarding_step4_compare_calculations_dark_1366.png` | 1366×768 | Dark / ES | Paso 4: Comparación real y positiva. Fabricación declarada 1.283,00 € vs Motor 1.280,00 €, residual +0.2%, ajuste en tolerancia, botón habilitado sin ceros artificiales. | `b1be63e4ab0727d1ed96ab6a0da304611ad25f9f4950674e80a0a136bebeb313` |
 | `05_onboarding_step5_rate_proposal_dark_1366.png` | 1366×768 | Dark / ES | Paso 5: Propuesta del solver sin claves técnicas visibles (`{key}`). Bloque de garantías corregido en Dark con alto contraste y sin mención a tablas de BD. | `ea35621c09afdbe20d335368ced4a4093f4da5d3761d80b15e01e7af1a5be34c` |
 | `05b_onboarding_step5_confirm_modal_dark_1366.png` | 1366×768 | Dark / ES | Paso 5: Diálogo modal completo de aceptación gobernada. | `5d4ef83be5587376ac64cd2dcacff27e228fe312b01c56093adfe6147571ebce` |
 | `05b_onboarding_step5_confirm_modal_dialog_dark_1366.png` | Close-up | Dark / ES | Close-up del diálogo: Redacción clara sin nombre de tabla `pricing_revisions`, describe exactamente qué guarda (parámetros industriales) y qué requiere autorización independiente. | `24329d51eddd1c2e45f3b7b9a37d891a67a6e6804b9039b2f2d6361e0910d467` |
@@ -34,9 +52,10 @@
 
 ---
 
-## 2. Invariantes Comprobados en la Suite de Tests
-- **Vitest**: 21 suites ejecutadas, 261 tests unitarios y de integración pasando (100% éxito).
+## 3. Invariantes Comprobados en la Suite de Tests
+- **Vitest**: 21 suites ejecutadas, 263 tests unitarios y de integración pasando (100% éxito).
+- **Validación Matemática**: Validación exhaustiva con `Number.isFinite` que rechaza `NaN`, `Infinity`, `-Infinity`, ceros engañosos y números negativos en cliente y servidor.
 - **Regresión Negativa de Comparación**: Se ha verificado que un presupuesto positivo con respuesta del motor ausente (`null`), incompleta o malformada (`0` o negativa) nunca muestra estado calibrado, muestra aviso de cálculo incompleto, visualiza guiones `—` con insignia 'Sin cálculo' y bloquea estrictamente el botón de avance a la propuesta.
 - **Cancelación Limpia**: La cancelación en el modal gobernado produce cero escrituras en BD y ninguna mutación de tarifas.
 - **Aislamiento de Tenant**: Verificada la propagación inviolable de `tenantId` y `printerNodeId` en todo el ciclo.
-- **Build de Producción**: Compilación limpia con Vite (`dist/` generado en 11.69s).
+- **Build de Producción**: Compilación limpia con Vite (`dist/` generado en 11.72s).

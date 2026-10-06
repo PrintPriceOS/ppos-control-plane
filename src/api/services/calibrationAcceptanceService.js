@@ -368,6 +368,28 @@ class CalibrationAcceptanceService {
             const verifiedManufacturingPrice = forwardResult.predictedManufacturingPrice;
             const targetManufacturingPrice = Number(session.target_manufacturing_price || 0);
 
+            if (verifiedManufacturingPrice !== null && verifiedManufacturingPrice !== undefined) {
+                if (!Number.isFinite(verifiedManufacturingPrice) || Number.isNaN(verifiedManufacturingPrice) || verifiedManufacturingPrice < 0) {
+                    await connection.rollback();
+                    const err = new Error('INVALID_VERIFIED_FORWARD_PRICE');
+                    err.code = 'INVALID_VERIFIED_FORWARD_PRICE';
+                    err.statusCode = 422;
+                    err.details = `Forward pricing calculation returned invalid price: ${verifiedManufacturingPrice}. Acceptance blocked.`;
+                    throw err;
+                }
+            }
+
+            if (session.target_manufacturing_price !== null && session.target_manufacturing_price !== undefined) {
+                if (!Number.isFinite(targetManufacturingPrice) || Number.isNaN(targetManufacturingPrice) || targetManufacturingPrice < 0) {
+                    await connection.rollback();
+                    const err = new Error('INVALID_TARGET_MANUFACTURING_PRICE');
+                    err.code = 'INVALID_TARGET_MANUFACTURING_PRICE';
+                    err.statusCode = 422;
+                    err.details = `Target manufacturing price is not a valid non-negative finite number: ${session.target_manufacturing_price}. Acceptance blocked.`;
+                    throw err;
+                }
+            }
+
             const absoluteResidual = Number(Math.abs(verifiedManufacturingPrice - targetManufacturingPrice).toFixed(6));
             const percentResidual = targetManufacturingPrice > 0 ? Number((absoluteResidual / targetManufacturingPrice).toFixed(6)) : 0;
 

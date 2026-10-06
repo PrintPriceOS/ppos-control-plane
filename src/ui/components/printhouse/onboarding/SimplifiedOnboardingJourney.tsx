@@ -340,9 +340,13 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
                 return;
             }
 
-            const targetManufacturing = typeof firstRun.manufacturingPrice === 'number' && firstRun.manufacturingPrice > 0
+            const isFinitePositive = (val: unknown): val is number => {
+                return typeof val === 'number' && Number.isFinite(val) && !Number.isNaN(val) && val > 0;
+            };
+
+            const targetManufacturing = isFinitePositive(firstRun.manufacturingPrice)
                 ? firstRun.manufacturingPrice
-                : (typeof firstRun.quotedTotalPrice === 'number' && firstRun.quotedTotalPrice > 0 ? firstRun.quotedTotalPrice : null);
+                : (isFinitePositive(firstRun.quotedTotalPrice) ? firstRun.quotedTotalPrice : null);
 
             if (targetManufacturing === null) {
                 setComparisonData(prev => ({
@@ -381,17 +385,35 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
                 }
             }
 
-            const hasValidEnginePrice = runResult && typeof runResult.enginePriceAfter === 'number' && runResult.enginePriceAfter > 0;
+            const hasValidEnginePrice = runResult && isFinitePositive(runResult.enginePriceAfter);
 
             if (hasValidEnginePrice) {
+                const enginePrice = runResult.enginePriceAfter;
+                const orig = isFinitePositive(runResult.targetPrice) ? runResult.targetPrice : targetManufacturing;
+                const diff = (typeof runResult.absoluteResidual === 'number' && Number.isFinite(runResult.absoluteResidual))
+                    ? runResult.absoluteResidual
+                    : (orig - enginePrice);
+                const res = (typeof runResult.percentResidual === 'number' && Number.isFinite(runResult.percentResidual))
+                    ? (runResult.percentResidual / 100)
+                    : (diff / orig);
+
+                if (!Number.isFinite(diff) || !Number.isFinite(res)) {
+                    setActiveRun(null);
+                    setProposedPatch({});
+                    setComparisonData({
+                        originalPrice: orig,
+                        enginePrice: null,
+                        difference: null,
+                        residual: null,
+                        isCalculated: false,
+                        calculationError: 'El motor devolvió valores residuales no finitos o incoherentes.'
+                    });
+                    return;
+                }
+
                 setActiveRun(runResult);
                 const patch = runResult.proposedPatch || runResult.proposed_patch_json || {};
                 setProposedPatch(patch);
-
-                const enginePrice = runResult.enginePriceAfter;
-                const orig = typeof runResult.targetPrice === 'number' && runResult.targetPrice > 0 ? runResult.targetPrice : targetManufacturing;
-                const diff = typeof runResult.absoluteResidual === 'number' ? runResult.absoluteResidual : (orig - enginePrice);
-                const res = typeof runResult.percentResidual === 'number' ? (runResult.percentResidual / 100) : (diff / orig);
 
                 setComparisonData({
                     originalPrice: orig,

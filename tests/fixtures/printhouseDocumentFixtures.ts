@@ -124,7 +124,7 @@ export const NATUR_FIXTURE: DocumentFixture = {
         summary: '592 Seiten + Umschlag'
     },
     materials: {
-        interiorPaper: 'Munken Print white 1.5',
+        interiorPaper: 'Munken Print White 1.5, 80 g',
         interiorGsm: 80,
         interiorVolume: 1.5,
         interiorColors: '4+4',
@@ -141,7 +141,7 @@ export const NATUR_FIXTURE: DocumentFixture = {
     technicalNotes: {
         hasDiscrepancy: false,
         hasTechnicalAmbiguity: false,
-        coverageScopeDisclaimer: 'Acredita exclusivamente rústica con solapas cosida en 148x210mm y Munken 80g. No acredita tapa dura, Wire-O, grapado al caballete ni estampación.'
+        coverageScopeDisclaimer: 'Acredita exclusivamente rústica con solapas cosida en 148x210mm y Munken Print White 1.5, 80 g. No acredita tapa dura, Wire-O, grapado al caballete ni estampación.'
     },
     offers: [
         {
@@ -154,7 +154,7 @@ export const NATUR_FIXTURE: DocumentFixture = {
             computedTotalPrice: 4646,
             computedUnitPrice: 9.292,
             validationStatus: 'CONSISTENT',
-            paperVariant: 'Munken Print white 1.5 80g',
+            paperVariant: 'Munken Print White 1.5, 80 g',
             finishingVariant: 'Glanzlaminierung',
             logisticsOption: 'Standard DE (325 €)',
             hasEquivalentBreakdown: true,
@@ -175,7 +175,7 @@ export const NATUR_FIXTURE: DocumentFixture = {
             computedTotalPrice: 4929,
             computedUnitPrice: 8.215,
             validationStatus: 'CONSISTENT',
-            paperVariant: 'Munken Print white 1.5 80g',
+            paperVariant: 'Munken Print White 1.5, 80 g',
             finishingVariant: 'Glanzlaminierung',
             logisticsOption: 'Standard DE (325 €)',
             hasEquivalentBreakdown: true,
@@ -196,7 +196,7 @@ export const NATUR_FIXTURE: DocumentFixture = {
             computedTotalPrice: 5171,
             computedUnitPrice: 7.387143,
             validationStatus: 'CONSISTENT',
-            paperVariant: 'Munken Print white 1.5 80g',
+            paperVariant: 'Munken Print White 1.5, 80 g',
             finishingVariant: 'Glanzlaminierung',
             logisticsOption: 'Standard DE (325 €)',
             hasEquivalentBreakdown: true,

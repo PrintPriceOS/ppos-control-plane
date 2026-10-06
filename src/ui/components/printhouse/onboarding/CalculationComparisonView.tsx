@@ -80,54 +80,66 @@ export const CalculationComparisonView: React.FC<CalculationComparisonViewProps>
 }) => {
     const { t } = useLocale();
 
-    // 1. Rigorous target price resolution: must be a positive number
+    // Strict validator for positive finite financial amounts
+    const isFinitePositive = (val: unknown): val is number => {
+        return typeof val === 'number' && Number.isFinite(val) && !Number.isNaN(val) && val > 0;
+    };
+
+    // 1. Rigorous target price resolution: must be a positive finite number
     let resolvedTarget: number | null = null;
-    if (typeof explicitTargetPrice === 'number' && explicitTargetPrice > 0) {
+    if (isFinitePositive(explicitTargetPrice)) {
         resolvedTarget = explicitTargetPrice;
-    } else if (typeof originalPrice === 'number' && originalPrice > 0) {
+    } else if (isFinitePositive(originalPrice)) {
         resolvedTarget = originalPrice;
     } else if (spec?.runs && spec.runs.length > 0) {
         const firstRun = spec.runs[0];
         if (comparisonMode === 'manufacturing') {
-            if (typeof firstRun.manufacturingPrice === 'number' && firstRun.manufacturingPrice > 0) {
+            if (isFinitePositive(firstRun.manufacturingPrice)) {
                 resolvedTarget = firstRun.manufacturingPrice;
-            } else if (firstRun.hasEquivalentBreakdown !== false && typeof firstRun.quotedTotalPrice === 'number' && firstRun.quotedTotalPrice > 0) {
+            } else if (firstRun.hasEquivalentBreakdown !== false && isFinitePositive(firstRun.quotedTotalPrice)) {
                 resolvedTarget = firstRun.quotedTotalPrice;
             }
         } else {
-            if (typeof firstRun.quotedTotalPrice === 'number' && firstRun.quotedTotalPrice > 0) {
+            if (isFinitePositive(firstRun.quotedTotalPrice)) {
                 resolvedTarget = firstRun.quotedTotalPrice;
-            } else if (typeof firstRun.totalPrice === 'number' && firstRun.totalPrice > 0) {
+            } else if (isFinitePositive(firstRun.totalPrice)) {
                 resolvedTarget = firstRun.totalPrice;
             }
         }
     }
 
-    // 2. Rigorous engine price resolution: must be a positive number from solver
+    // 2. Rigorous engine price resolution: must be a positive finite number from solver
     let resolvedEnginePrice: number | null = null;
-    if (typeof explicitPredictedPrice === 'number' && explicitPredictedPrice > 0) {
+    if (isFinitePositive(explicitPredictedPrice)) {
         resolvedEnginePrice = explicitPredictedPrice;
-    } else if (typeof enginePrice === 'number' && enginePrice > 0) {
+    } else if (isFinitePositive(enginePrice)) {
         resolvedEnginePrice = enginePrice;
     }
 
     const calculating = explicitCalculating ?? isCalculating ?? false;
-    const hasValidTarget = resolvedTarget !== null && resolvedTarget > 0;
-    const hasValidEnginePrice = resolvedEnginePrice !== null && resolvedEnginePrice > 0;
+    const hasValidTarget = isFinitePositive(resolvedTarget);
+    const hasValidEnginePrice = isFinitePositive(resolvedEnginePrice);
     
-    // Explicit comparison validity: requires BOTH positive declared cost AND positive engine calculation
-    const isComparisonValid = hasValidTarget && hasValidEnginePrice && hasEquivalentBreakdown && !calculationError;
-
-    // 3. Mathematical residual calculation (strictly blocked if data is missing or incomplete)
+    // 3. Mathematical residual calculation (strictly blocked if data is missing, non-finite, or incomplete)
     let residualAbs: number | null = null;
     let residualPercent: number | null = null;
     let isWellFitted = false;
 
-    if (isComparisonValid) {
-        residualAbs = explicitResidualAbs ?? difference ?? (resolvedTarget! - resolvedEnginePrice!);
-        residualPercent = explicitResidualPercent ?? ((residualAbs! / resolvedTarget!) * 100);
-        isWellFitted = Math.abs(residualPercent!) <= 5.0;
+    if (hasValidTarget && hasValidEnginePrice && !calculationError) {
+        const rawDiff = explicitResidualAbs ?? difference ?? (resolvedTarget! - resolvedEnginePrice!);
+        if (typeof rawDiff === 'number' && Number.isFinite(rawDiff)) {
+            residualAbs = rawDiff;
+            const rawPct = explicitResidualPercent ?? ((residualAbs / resolvedTarget!) * 100);
+            if (typeof rawPct === 'number' && Number.isFinite(rawPct)) {
+                residualPercent = rawPct;
+                isWellFitted = Math.abs(residualPercent) <= 5.0;
+            }
+        }
     }
+
+    // Explicit comparison validity: requires BOTH positive declared cost AND positive engine calculation,
+    // plus finite residual and no calculation error.
+    const isComparisonValid = hasValidTarget && hasValidEnginePrice && hasEquivalentBreakdown && !calculationError && residualPercent !== null && Number.isFinite(residualPercent);
 
     // Variants analyzed
     const variantsUsed = explicitVariantsUsed || (spec?.runs?.map((r: any) => `${r.quantity} ej. (${r.paperVariant || 'estándar'})`) || []);
