@@ -34,8 +34,9 @@ for s in SCREENSHOTS:
         print(f"Warning: Screenshot not found: {src}")
 
 # 2. Capture Git Diff & Status
-print("Generating full differential patch (git.diff)...", flush=True)
-diff_out = subprocess.run(["git", "--no-pager", "diff"], capture_output=True, text=True, encoding="utf-8")
+diff_out = subprocess.run(["git", "--no-pager", "diff", "origin/phase-39.2-tenant-management-console"], capture_output=True, text=True, encoding="utf-8")
+if not diff_out.stdout.strip():
+    diff_out = subprocess.run(["git", "--no-pager", "diff"], capture_output=True, text=True, encoding="utf-8")
 with open(os.path.join(TARGET_DIR, "git.diff"), "w", encoding="utf-8") as f:
     f.write(diff_out.stdout)
 
@@ -78,12 +79,10 @@ for src in SOURCES_TO_PACKAGE:
 
 # 4. Vitest Execution Log
 print("Packaging verified Vitest execution log...", flush=True)
-task_10164_log = r"C:\Users\KIKE\.gemini\antigravity-ide\brain\b274e27a-030a-4140-9e90-be1d5a05ecc9\.system_generated\tasks\task-10164.log"
-if os.path.exists(task_10164_log):
-    shutil.copy2(task_10164_log, os.path.join(TARGET_DIR, "vitest.log"))
-    print("Copied verified full vitest run log (341/341 passed).")
-else:
-    print("Warning: task-10164.log not found, keeping existing vitest.log")
+vitest_res = subprocess.run(["npx", "vitest", "run"], capture_output=True, text=True, encoding="utf-8", shell=True)
+with open(os.path.join(TARGET_DIR, "vitest.log"), "w", encoding="utf-8") as f:
+    f.write(vitest_res.stdout + "\n" + vitest_res.stderr)
+print(f"Vitest exited with code: {vitest_res.returncode}")
 
 # 5. Build Execution Log
 print("Running npm run build...", flush=True)

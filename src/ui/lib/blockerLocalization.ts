@@ -111,6 +111,21 @@ const BLOCKER_DICTIONARY: Record<string, { es: string; en: string; de: string }>
         es: 'No hay nodo de imprenta configurado para tarifas',
         en: 'No printer node configured for pricing',
         de: 'Kein Druckerknoten für Tarife konfiguriert'
+    },
+    SHIFT_SCHEDULES_REQUIRED: {
+        es: 'Se requieren turnos de trabajo y límites de capacidad diaria',
+        en: 'Shift schedules and throughput limits required',
+        de: 'Schichtpläne und tägliche Durchsatzgrenzen erforderlich'
+    },
+    TURNAROUND_SLAS_REQUIRED: {
+        es: 'Se requieren plazos de entrega y SLAs de producción para la planificación',
+        en: 'Turnaround SLAs required for scheduling',
+        de: 'Durchlaufzeit-SLAs für die Planung erforderlich'
+    },
+    UNPUBLISHED_PRICE_BOOKS: {
+        es: 'Tarifas y listas de precios no publicadas',
+        en: 'Unpublished price books',
+        de: 'Unveröffentlichte Preisbücher'
     }
 };
 
@@ -124,11 +139,14 @@ const MESSAGE_PATTERN_MAP: { pattern: RegExp; key: string }[] = [
     { pattern: /production machine/i, key: 'ADD_FIRST_MACHINE' },
     { pattern: /capabilities on at least one machine/i, key: 'CONFIGURE_MACHINE_CAPABILITIES' },
     { pattern: /material to the catalog/i, key: 'ADD_FIRST_MATERIAL' },
+    { pattern: /shift schedules|throughput limits/i, key: 'SHIFT_SCHEDULES_REQUIRED' },
     { pattern: /capacity limits/i, key: 'CONFIGURE_SITE_CAPACITY' },
+    { pattern: /turnaround slas|slas required/i, key: 'TURNAROUND_SLAS_REQUIRED' },
     { pattern: /shifts scheduled/i, key: 'NO_ACTIVE_SHIFTS' },
     { pattern: /lead times and cutoff/i, key: 'CONFIGURE_SITE_LEAD_TIMES' },
     { pattern: /cut-off defined/i, key: 'NO_CUTOFF_TIME' },
     { pattern: /no machines configured/i, key: 'SITES_WITHOUT_MACHINES' },
+    { pattern: /unpublished price/i, key: 'UNPUBLISHED_PRICE_BOOKS' },
     { pattern: /interior printing/i, key: 'MISSING_INTERIOR_PRICING' },
     { pattern: /paper cost per kilo/i, key: 'MISSING_PAPER_PRICING' },
     { pattern: /binding rate/i, key: 'MISSING_BINDING_PRICING' },
@@ -137,6 +155,17 @@ const MESSAGE_PATTERN_MAP: { pattern: RegExp; key: string }[] = [
     { pattern: /no printer node/i, key: 'MISSING_PRINTER_NODE' }
 ];
 
+function formatUnknownCode(code: string, loc: 'es' | 'en' | 'de'): string {
+    const readable = code
+        .replace(/[_-]+/g, ' ')
+        .trim()
+        .toLowerCase()
+        .replace(/^./, (str) => str.toUpperCase());
+    if (loc === 'es') return `Requisito pendiente: ${readable}`;
+    if (loc === 'de') return `Ausstehende Anforderung: ${readable}`;
+    return `Pending requirement: ${readable}`;
+}
+
 export function localizeBlocker(item: BlockerInput | string, locale: string = 'es'): string {
     const loc = (locale === 'de' ? 'de' : locale === 'en' ? 'en' : 'es') as 'es' | 'en' | 'de';
 
@@ -144,14 +173,26 @@ export function localizeBlocker(item: BlockerInput | string, locale: string = 'e
     let message = '';
 
     if (typeof item === 'string') {
-        message = item;
+        const trimmed = item.trim();
+        if (/^[A-Z0-9_]+$/.test(trimmed)) {
+            code = trimmed;
+        } else {
+            message = trimmed;
+        }
     } else if (item && typeof item === 'object') {
         code = item.code || '';
         message = item.message || '';
     }
 
-    if (code && BLOCKER_DICTIONARY[code]) {
-        return BLOCKER_DICTIONARY[code][loc];
+    if (code) {
+        if (BLOCKER_DICTIONARY[code]) {
+            return BLOCKER_DICTIONARY[code][loc];
+        }
+        for (const { pattern, key } of MESSAGE_PATTERN_MAP) {
+            if (pattern.test(code)) {
+                return BLOCKER_DICTIONARY[key][loc];
+            }
+        }
     }
 
     if (message) {
@@ -160,7 +201,12 @@ export function localizeBlocker(item: BlockerInput | string, locale: string = 'e
                 return BLOCKER_DICTIONARY[key][loc];
             }
         }
+        return message;
     }
 
-    return message || code || (loc === 'es' ? 'Requisito pendiente' : loc === 'de' ? 'Ausstehende Anforderung' : 'Pending requirement');
+    if (code) {
+        return formatUnknownCode(code, loc);
+    }
+
+    return loc === 'es' ? 'Requisito pendiente' : loc === 'de' ? 'Ausstehende Anforderung' : 'Pending requirement';
 }

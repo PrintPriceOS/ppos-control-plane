@@ -176,7 +176,7 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
 
     const [proposedPatch, setProposedPatch] = useState<Record<string, any>>({});
 
-    // ── Family Draft Persistence & Coherent Ribbon Switching ──
+    // ── Family Draft Persistence & Coherent Ribbon/Card Switching ──
     interface FamilyDraftState {
         offer: ProgressiveSpecState;
         step: 1 | 2 | 3 | 4 | 5;
@@ -186,6 +186,7 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
         comparisonData: any;
         entryMode: 'UPLOAD_PDF' | 'MANUAL_FORM';
         uploadedFileName: string | null;
+        proposedPatch: Record<string, any>;
     }
 
     const familyDraftsRef = useRef<Partial<Record<ProductFamilyId, FamilyDraftState>>>({});
@@ -207,21 +208,28 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
     entryModeRef.current = entryMode;
     const uploadedFileNameRef = useRef(uploadedFileName);
     uploadedFileNameRef.current = uploadedFileName;
+    const proposedPatchRef = useRef(proposedPatch);
+    proposedPatchRef.current = proposedPatch;
 
-    // Respond to targetFamilyId changes from external toolbar/ribbon:
-    // - If clicking the same family: preserve current offer, step, session, and run
-    // - If clicking another: preserve unsaved draft, return to selector (Step 1) or restore target family's specific draft
-    // - Never assign or leak the previous family's offer, session, or run to a different family
-    React.useEffect(() => {
-        if (!targetFamilyId) return;
-
-        const currentActiveFamily = selectedFamilyIdRef.current;
-        if (targetFamilyId === currentActiveFamily) {
+    // Unified family transition: invoked both from ribbon and card selections
+    const transitionToFamily = (targetId: ProductFamilyId, options?: { stepOverride?: 1 | 2 | 3 | 4 | 5; defaultStepForNewFamily?: 1 | 2 | 3 | 4 | 5 }) => {
+        const currentActive = selectedFamilyIdRef.current;
+        if (targetId === currentActive) {
+            if (options?.stepOverride !== undefined && options.stepOverride !== currentStepRef.current) {
+                setCurrentStep(options.stepOverride);
+            }
             return;
         }
 
-        // 1. Save current family draft
-        familyDraftsRef.current[currentActiveFamily] = {
+        // 1. Invalidate any in-flight upload and calculation requests and immediately clear active indicators
+        calculationRequestIdRef.current++;
+        uploadRequestIdRef.current++;
+        setUploadingPdf(false);
+        setCalculatingSolver(false);
+        setUploadError(null);
+
+        // 2. Protect unsaved draft of current family
+        familyDraftsRef.current[currentActive] = {
             offer: currentOfferRef.current,
             step: currentStepRef.current,
             sessionId: sessionIdRef.current,
@@ -229,28 +237,32 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
             selectedVariantId: selectedVariantIdRef.current,
             comparisonData: comparisonDataRef.current,
             entryMode: entryModeRef.current,
-            uploadedFileName: uploadedFileNameRef.current
+            uploadedFileName: uploadedFileNameRef.current,
+            proposedPatch: proposedPatchRef.current || {}
         };
 
-        // 2. Transition to target family
-        setSelectedFamilyId(targetFamilyId);
-        const targetDraft = familyDraftsRef.current[targetFamilyId];
+        // 3. Switch to target family
+        selectedFamilyIdRef.current = targetId;
+        setSelectedFamilyId(targetId);
 
+        const targetDraft = familyDraftsRef.current[targetId];
         if (targetDraft) {
             setCurrentOffer(targetDraft.offer);
-            setCurrentStep(targetDraft.step);
+            setCurrentStep(options?.stepOverride ?? targetDraft.step);
             setSessionId(targetDraft.sessionId);
             setActiveRun(targetDraft.activeRun);
             setSelectedVariantId(targetDraft.selectedVariantId);
             setComparisonData(targetDraft.comparisonData);
             setEntryMode(targetDraft.entryMode);
             setUploadedFileName(targetDraft.uploadedFileName);
+            setProposedPatch(targetDraft.proposedPatch || {});
         } else {
-            setCurrentOffer(createDefaultOffer(targetFamilyId));
-            setCurrentStep(1);
+            setCurrentOffer(createDefaultOffer(targetId));
+            setCurrentStep(options?.defaultStepForNewFamily ?? 1);
             setSessionId(null);
             setActiveRun(null);
             setSelectedVariantId(null);
+            setProposedPatch({}); // Explicitly clean proposedPatch for a new family
             setComparisonData({
                 originalPrice: null,
                 enginePrice: null,
@@ -266,6 +278,12 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
             setUploadedFileName(null);
             setUploadError(null);
         }
+    };
+
+    // Respond to targetFamilyId changes from external toolbar/ribbon:
+    React.useEffect(() => {
+        if (!targetFamilyId) return;
+        transitionToFamily(targetFamilyId, { defaultStepForNewFamily: 1 });
     }, [targetFamilyId]);
 
     const updateFamilyStatus = (id: ProductFamilyId, status: FamilyStatus, quoteCount?: number) => {
@@ -294,62 +312,32 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
     };
 
     const handleSelectFamilyToCalibrate = (id: ProductFamilyId) => {
-        calculationRequestIdRef.current++;
-        uploadRequestIdRef.current++;
-        setUploadingPdf(false);
-        setUploadedFileName(null);
-        setUploadError(null);
-        setSelectedFamilyId(id);
-
-        const draft = familyDraftsRef.current[id];
-        if (draft) {
-            setCurrentOffer(draft.offer);
-            setCurrentStep(draft.step > 1 ? draft.step : 2);
-            setSessionId(draft.sessionId);
-            setActiveRun(draft.activeRun);
-            setSelectedVariantId(draft.selectedVariantId);
-            setComparisonData(draft.comparisonData);
-            setEntryMode(draft.entryMode);
-            setUploadedFileName(draft.uploadedFileName);
-        } else {
-            setSelectedVariantId(null);
-            setSessionId(null);
-            setActiveRun(null);
-            setProposedPatch({});
-            setComparisonData({
-                originalPrice: null,
-                enginePrice: null,
-                difference: null,
-                residual: null,
-                isCalculated: false,
-                hasEquivalentBreakdown: true,
-                incompleteComparisonReason: null,
-                calculationError: null,
-                supportedParameters: [],
-                coverageGaps: []
-            });
-            setCurrentOffer(createDefaultOffer(id));
-            setCurrentStep(2);
-        }
+        const existingDraft = familyDraftsRef.current[id];
+        transitionToFamily(id, {
+            stepOverride: existingDraft ? (existingDraft.step > 1 ? existingDraft.step : 2) : 2,
+            defaultStepForNewFamily: 2
+        });
     };
 
     const handleReturnToFamilySelector = () => {
-        // Protect unsaved changes: save current draft before returning to Step 1
-        familyDraftsRef.current[selectedFamilyId] = {
-            offer: currentOffer,
-            step: currentStep,
-            sessionId,
-            activeRun,
-            selectedVariantId,
-            comparisonData,
-            entryMode,
-            uploadedFileName
-        };
         calculationRequestIdRef.current++;
         uploadRequestIdRef.current++;
         setUploadingPdf(false);
-        setUploadedFileName(null);
+        setCalculatingSolver(false);
         setUploadError(null);
+
+        // Protect unsaved changes: save current draft before returning to Step 1
+        familyDraftsRef.current[selectedFamilyIdRef.current] = {
+            offer: currentOfferRef.current,
+            step: currentStepRef.current,
+            sessionId: sessionIdRef.current,
+            activeRun: activeRunRef.current,
+            selectedVariantId: selectedVariantIdRef.current,
+            comparisonData: comparisonDataRef.current,
+            entryMode: entryModeRef.current,
+            uploadedFileName: uploadedFileNameRef.current,
+            proposedPatch: proposedPatchRef.current || {}
+        };
         setCurrentStep(1);
     };
 
@@ -385,7 +373,9 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
         setUploadingPdf(true);
 
         const thisUploadId = ++uploadRequestIdRef.current;
-        // ITEM 3: Invalidate any previous run, proposal, and in-flight calculations
+        const uploadFamilyId = selectedFamilyIdRef.current;
+
+        // Invalidate any previous run, proposal, and in-flight calculations
         calculationRequestIdRef.current++;
         setSessionId(null);
         setActiveRun(null);
@@ -428,8 +418,8 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
                 // If backend is offline or mock in test, gracefully fallback
             }
 
-            // Stale upload guard: discard if superseded by another upload or user action
-            if (uploadRequestIdRef.current !== thisUploadId) {
+            // Stale upload guard: discard if superseded by another upload, family switch, or user action
+            if (uploadRequestIdRef.current !== thisUploadId || selectedFamilyIdRef.current !== uploadFamilyId) {
                 return;
             }
 
@@ -456,13 +446,13 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
             setSelectedVariantId(initialVariantId);
 
             setCurrentOffer({
-                family: selectedFamilyId,
+                family: uploadFamilyId,
                 productTitle: cleanTitle,
                 quoteRef: generatedRef,
                 quoteDate: extractedData?.quoteDate || new Date().toISOString().split('T')[0],
                 currency: 'EUR',
-                widthMm: extractedData?.widthMm || (selectedFamilyId === 'HARDCOVER' || selectedFamilyId === 'SOFTCOVER' ? 148 : 210),
-                heightMm: extractedData?.heightMm || (selectedFamilyId === 'HARDCOVER' || selectedFamilyId === 'SOFTCOVER' ? 210 : 297),
+                widthMm: extractedData?.widthMm || (uploadFamilyId === 'HARDCOVER' || uploadFamilyId === 'SOFTCOVER' ? 148 : 210),
+                heightMm: extractedData?.heightMm || (uploadFamilyId === 'HARDCOVER' || uploadFamilyId === 'SOFTCOVER' ? 210 : 297),
                 pageCount: extractedData?.pageCount || 64,
                 interiorPaper: extractedData?.interiorPaper || '90g Offset',
                 interiorWeightGsm: extractedData?.interiorWeightGsm || 90,
@@ -471,7 +461,7 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
                 coverWeightGsm: extractedData?.coverWeightGsm || 250,
                 coverColors: extractedData?.coverColors || '4/0',
                 boardThicknessMm: extractedData?.boardThicknessMm,
-                bindingMethod: selectedFamilyId === 'HARDCOVER' ? 'thread_sewn' : selectedFamilyId === 'SOFTCOVER' ? 'adhesive_pur' : selectedFamilyId === 'WIRE_O' ? 'wire_o' : 'saddle_stitch',
+                bindingMethod: uploadFamilyId === 'HARDCOVER' ? 'thread_sewn' : uploadFamilyId === 'SOFTCOVER' ? 'adhesive_pur' : uploadFamilyId === 'WIRE_O' ? 'wire_o' : 'saddle_stitch',
                 hasAmbiguity: Boolean(extractedData?.hasAmbiguity),
                 ambiguityDetails: extractedData?.ambiguityDetails || extractedData?.ambiguityNote,
                 ambiguityNote: extractedData?.ambiguityDetails || extractedData?.ambiguityNote,
@@ -480,10 +470,10 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
                 runs: defaultRuns
             });
 
-            updateFamilyStatus(selectedFamilyId, 'QUOTE_ADDED', defaultRuns.length);
+            updateFamilyStatus(uploadFamilyId, 'QUOTE_ADDED', defaultRuns.length);
             setCurrentStep(3);
         } catch (err: any) {
-            if (uploadRequestIdRef.current === thisUploadId) {
+            if (uploadRequestIdRef.current === thisUploadId && selectedFamilyIdRef.current === uploadFamilyId) {
                 setUploadError(err.message || 'Error al procesar el presupuesto PDF');
             }
         } finally {
@@ -545,6 +535,7 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
     const handleRunSolver = async (specToUse?: ProgressiveSpecState) => {
         const offer = specToUse || currentOffer;
         const thisReqId = ++calculationRequestIdRef.current;
+        const calcFamilyId = selectedFamilyIdRef.current;
         setCalculatingSolver(true);
         try {
             let targetRun: any = null;
@@ -617,7 +608,7 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
             if (printerNodeId) {
                 try {
                     let sess = sessionId ? await printhouseCalibrationApi.getSession(sessionId) : null;
-                    if (calculationRequestIdRef.current !== thisReqId) return;
+                    if (calculationRequestIdRef.current !== thisReqId || selectedFamilyIdRef.current !== calcFamilyId) return;
 
                     if (!sess) {
                         sess = await printhouseCalibrationApi.createSession({
@@ -630,23 +621,23 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
                             },
                             targetManufacturingPrice: targetManufacturing
                         });
-                        if (calculationRequestIdRef.current !== thisReqId) return;
+                        if (calculationRequestIdRef.current !== thisReqId || selectedFamilyIdRef.current !== calcFamilyId) return;
                         if (sess?.id) setSessionId(sess.id);
                     }
                     if (sess?.id) {
                         await printhouseCalibrationApi.markSessionReady(sess.id);
-                        if (calculationRequestIdRef.current !== thisReqId) return;
+                        if (calculationRequestIdRef.current !== thisReqId || selectedFamilyIdRef.current !== calcFamilyId) return;
                         runResult = await printhouseCalibrationApi.calculateCalibration(sess.id);
-                        if (calculationRequestIdRef.current !== thisReqId) return;
+                        if (calculationRequestIdRef.current !== thisReqId || selectedFamilyIdRef.current !== calcFamilyId) return;
                     }
                 } catch (e: any) {
-                    if (calculationRequestIdRef.current !== thisReqId) return;
+                    if (calculationRequestIdRef.current !== thisReqId || selectedFamilyIdRef.current !== calcFamilyId) return;
                     runError = e.message || 'Error en la llamada al motor de cálculo';
                 }
             }
 
-            // ITEM 3: Check if calculation is still valid and not superseded by another document/variant
-            if (calculationRequestIdRef.current !== thisReqId) {
+            // Check if calculation is still valid and not superseded by another family/document/variant
+            if (calculationRequestIdRef.current !== thisReqId || selectedFamilyIdRef.current !== calcFamilyId) {
                 return;
             }
 
@@ -940,7 +931,7 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
                             >
                                 <div className="w-16 h-16 rounded-2xl bg-red-50 dark:bg-red-950/40 text-[#dc0000] flex items-center justify-center border border-red-200 dark:border-red-900/60 shadow-xs">
                                     {uploadingPdf ? (
-                                        <RefreshCw size={28} className="animate-spin text-[#dc0000]" />
+                                        <RefreshCw size={28} data-testid="uploading-spinner" className="animate-spin text-[#dc0000]" />
                                     ) : (
                                         <Upload size={28} />
                                     )}
@@ -948,7 +939,7 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
                                 <div className="space-y-1 max-w-md">
                                     <h3 className="text-base font-bold text-zinc-900 dark:text-white">
                                         {uploadingPdf
-                                            ? 'Analizando presupuesto con extracción técnica...'
+                                            ? (t('entry.analyzingPdf') || 'Analizando presupuesto con extracción técnica...')
                                             : (t('entry.uploadPrompt') || 'Arrastra y suelta tu presupuesto en PDF o examina tu equipo')}
                                     </h3>
                                     <p className="text-xs text-zinc-500 dark:text-zinc-400">

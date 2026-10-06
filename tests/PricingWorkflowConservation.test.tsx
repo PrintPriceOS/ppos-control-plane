@@ -262,4 +262,360 @@ describe('Pricing Workflow Navigation & State Conservation Regressions', () => {
         // Preserved intact without reset
         expect(screen.getByDisplayValue('OFERTA-SOFTCOVER-42')).toBeInTheDocument();
     });
+
+    it('6. Pending upload and calculation in Softcover -> switch to Hardcover -> late resolution leaves Hardcover intact', async () => {
+        let resolveUpload: (val: any) => void = () => {};
+        const uploadPromise = new Promise((resolve) => {
+            resolveUpload = resolve;
+        });
+
+        let resolveCalc: (val: any) => void = () => {};
+        const calcPromise = new Promise((resolve) => {
+            resolveCalc = resolve;
+        });
+
+        fetchMock.mockImplementation((url: string, opts?: any) => {
+            if (url.includes('/api/printhouse/onboarding/quote-evidence/upload')) {
+                return uploadPromise.then((data) => ({
+                    ok: true,
+                    json: () => Promise.resolve({ ok: true, data })
+                }));
+            }
+            if (url.includes('/api/printhouse/onboarding/pricing/industrial')) {
+                return Promise.resolve({
+                    ok: true,
+                    json: () => Promise.resolve({
+                        ok: true,
+                        data: {
+                            nodeId: 'node-berlin-01',
+                            nodeName: 'Fährmann Druckzentrum GmbH',
+                            signatures: [16, 24, 32],
+                            rates: { min_order: 95.0 }
+                        }
+                    })
+                });
+            }
+            return Promise.resolve({
+                ok: true,
+                json: () => Promise.resolve({ ok: true, data: {} })
+            });
+        });
+
+        vi.spyOn(printhouseCalibrationApi, 'calculateCalibration').mockImplementation(() => calcPromise as any);
+
+        const { container } = renderPricingPanel();
+
+        // 1. In Step 1, select Softcover family to calibrate
+        const softcoverCardBtn = screen.getByRole('button', { name: /Select family Softcover/i });
+        await act(async () => {
+            fireEvent.click(softcoverCardBtn);
+        });
+        expect(screen.getByText(/Softcover \/ Paperback/i)).toBeInTheDocument();
+
+        // 2. Trigger an upload in Softcover with pending promise
+        const fileInput = container.querySelector('input[type="file"]') as HTMLInputElement;
+        expect(fileInput).toBeInTheDocument();
+        const dummyFile = new File(['dummy content'], 'pending-softcover.pdf', { type: 'application/pdf' });
+        await act(async () => {
+            fireEvent.change(fileInput, { target: { files: [dummyFile] } });
+        });
+
+        // Verify upload indicator is active
+        expect(screen.getByTestId('uploading-spinner')).toBeInTheDocument();
+
+        // 3. Switch family to Hardcover while upload is pending
+        const assistantBtn = container.querySelector('#pricing-mode-assistant-btn') as HTMLButtonElement;
+        await act(async () => {
+            fireEvent.click(assistantBtn);
+        });
+
+        const ribbon = screen.getByTestId('pricing-family-ribbon');
+        const hardcoverBtn = within(ribbon).getByRole('button', { name: /Hardcover/i });
+        await act(async () => {
+            fireEvent.click(hardcoverBtn);
+        });
+
+        // 4. Hardcover is active, Step 1 selector is shown, and upload indicator is cleared
+        expect(screen.queryByTestId('uploading-spinner')).not.toBeInTheDocument();
+        expect(screen.getByRole('heading', { name: /What products (you produce|do you manufacture)|Qué productos fabricas/i })).toBeInTheDocument();
+
+        // 5. Late resolution of the pending upload with Softcover data
+        await act(async () => {
+            resolveUpload({
+                productTitle: 'LATE SOFTCOVER EVIDENCE BOOK',
+                quoteRef: 'REF-LATE-SOFTCOVER-999',
+                quantity: 500,
+                manufacturingPrice: 850,
+                totalPrice: 950,
+                runs: [
+                    {
+                        id: 'run-late-1',
+                        variantKey: 'run-late-1',
+                        quantity: 500,
+                        manufacturingPrice: 850,
+                        transportPrice: 100,
+                        totalPrice: 950,
+                        quotedTotalPrice: 950,
+                        quotedUnitPrice: 1.9,
+                        validationStatus: 'CONSISTENT'
+                    }
+                ]
+            });
+            resolveCalc({
+                id: 'late-run-001',
+                targetPrice: 850,
+                enginePriceAfter: 840,
+                absoluteResidual: 10,
+                percentResidual: 1.1,
+                proposedPatch: { lam_gloss_rate: 99.9 }
+            });
+        });
+
+        // 6. Assert Hardcover remains 100% intact:
+        expect(screen.queryByText(/LATE SOFTCOVER EVIDENCE BOOK/i)).not.toBeInTheDocument();
+        expect(screen.queryByDisplayValue('REF-LATE-SOFTCOVER-999')).not.toBeInTheDocument();
+        expect(screen.queryByText(/99.9/)).not.toBeInTheDocument();
+        expect(screen.getByRole('heading', { name: /What products (you produce|do you manufacture)|Qué productos fabricas/i })).toBeInTheDocument();
+    });
+
+    it('7. Families with distinct proposed patches and sessions: each restores exclusively its own data and new family is clean', async () => {
+        vi.spyOn(printhouseCalibrationApi, 'createSession').mockImplementation(async (payload: any) => {
+            if (payload.referenceBookName?.includes('Softcover') || payload.bookSpec?.family === 'SOFTCOVER') {
+                return { id: 'session-softcover-101', printerNodeId: payload.printerNodeId };
+            }
+            return { id: 'session-hardcover-202', printerNodeId: payload.printerNodeId };
+        });
+
+        vi.spyOn(printhouseCalibrationApi, 'getSession').mockResolvedValue(null);
+        vi.spyOn(printhouseCalibrationApi, 'markSessionReady').mockResolvedValue({ status: 'READY' } as any);
+
+        vi.spyOn(printhouseCalibrationApi, 'calculateCalibration').mockImplementation(async (sessId: string) => {
+            if (sessId === 'session-softcover-101') {
+                return {
+                    id: 'run-soft-1',
+                    targetPrice: 1250,
+                    enginePriceAfter: 1240,
+                    absoluteResidual: 10,
+                    percentResidual: 0.8,
+                    proposedPatch: { min_order: 120, lam_gloss_rate: 19.5 }
+                };
+            }
+            return {
+                id: 'run-hard-2',
+                targetPrice: 2800,
+                enginePriceAfter: 2790,
+                absoluteResidual: 10,
+                percentResidual: 0.35,
+                proposedPatch: { setup_fixed: 65, board_thickness_cost: 45.0 }
+            };
+        });
+
+        let currentFamilyForUpload = 'SOFTCOVER';
+        fetchMock.mockImplementation((url: string, opts?: any) => {
+            if (url.includes('/api/printhouse/onboarding/quote-evidence/upload')) {
+                if (currentFamilyForUpload === 'SOFTCOVER') {
+                    return Promise.resolve({
+                        ok: true,
+                        json: () => Promise.resolve({
+                            ok: true,
+                            data: {
+                                productTitle: 'Softcover Catalog 2026',
+                                quoteRef: 'REF-SOFT-101',
+                                quantity: 1000,
+                                manufacturingPrice: 1250,
+                                totalPrice: 1400,
+                                runs: [{ id: 'run-soft-1', quantity: 1000, manufacturingPrice: 1250, transportPrice: 150, totalPrice: 1400, quotedTotalPrice: 1400, validationStatus: 'CONSISTENT' }]
+                            }
+                        })
+                    });
+                } else {
+                    return Promise.resolve({
+                        ok: true,
+                        json: () => Promise.resolve({
+                            ok: true,
+                            data: {
+                                productTitle: 'Hardcover Deluxe 2026',
+                                quoteRef: 'REF-HARD-202',
+                                quantity: 500,
+                                manufacturingPrice: 2800,
+                                totalPrice: 3000,
+                                runs: [{ id: 'run-hard-2', quantity: 500, manufacturingPrice: 2800, transportPrice: 200, totalPrice: 3000, quotedTotalPrice: 3000, validationStatus: 'CONSISTENT' }]
+                            }
+                        })
+                    });
+                }
+            }
+            if (url.includes('/api/printhouse/onboarding/pricing/industrial')) {
+                return Promise.resolve({
+                    ok: true,
+                    json: () => Promise.resolve({
+                        ok: true,
+                        data: {
+                            nodeId: 'node-berlin-01',
+                            nodeName: 'Fährmann Druckzentrum GmbH',
+                            signatures: [16, 24, 32],
+                            rates: { min_order: 95.0 }
+                        }
+                    })
+                });
+            }
+            return Promise.resolve({
+                ok: true,
+                json: () => Promise.resolve({ ok: true, data: {} })
+            });
+        });
+
+        const { container } = renderPricingPanel();
+
+        // 1. Select Softcover to calibrate
+        const softcoverCardBtn = screen.getByRole('button', { name: /Select family Softcover/i });
+        await act(async () => {
+            fireEvent.click(softcoverCardBtn);
+        });
+
+        // Upload Softcover quote -> advances automatically to Step 3
+        const softFileInput = container.querySelector('input[type="file"]') as HTMLInputElement;
+        expect(softFileInput).toBeInTheDocument();
+        const softFile = new File(['softcover quote content'], 'softcover-spec.pdf', { type: 'application/pdf' });
+        await act(async () => {
+            fireEvent.change(softFileInput, { target: { files: [softFile] } });
+        });
+
+        // Step 3 -> Proceed to calculate (Step 4)
+        const compareBtn = await screen.findByTestId('proceed-to-compare-btn');
+        await act(async () => {
+            fireEvent.click(compareBtn);
+        });
+
+        // Run solver in Softcover
+        const runSolverBtn = screen.getByTestId('run-solver-btn');
+        await act(async () => {
+            fireEvent.click(runSolverBtn);
+        });
+
+        // Advance to Step 5
+        const proceedAcceptBtn = await screen.findByTestId('proceed-to-accept-btn');
+        await waitFor(() => expect(proceedAcceptBtn).not.toBeDisabled());
+        await act(async () => {
+            fireEvent.click(proceedAcceptBtn);
+        });
+
+        // Verify Step 5 in Softcover displays Softcover proposed patch
+        expect(screen.getByText(/19.50/)).toBeInTheDocument();
+        expect(screen.getByText(/120.00/)).toBeInTheDocument();
+
+        // 2. Switch to Hardcover via Assistant ribbon
+        const assistantBtn = container.querySelector('#pricing-mode-assistant-btn') as HTMLButtonElement;
+        await act(async () => {
+            fireEvent.click(assistantBtn);
+        });
+        const ribbon = screen.getByTestId('pricing-family-ribbon');
+        const hardcoverRibbonBtn = within(ribbon).getByRole('button', { name: /Hardcover/i });
+        await act(async () => {
+            fireEvent.click(hardcoverRibbonBtn);
+        });
+
+        // In Hardcover, select family to calibrate -> Step 2
+        const hardcoverCardBtn = screen.getByRole('button', { name: /Select family Hardcover/i });
+        await act(async () => {
+            fireEvent.click(hardcoverCardBtn);
+        });
+
+        // Upload Hardcover quote -> advances to Step 3
+        currentFamilyForUpload = 'HARDCOVER';
+        const hardFileInput = container.querySelector('input[type="file"]') as HTMLInputElement;
+        expect(hardFileInput).toBeInTheDocument();
+        const hardFile = new File(['hardcover quote content'], 'hardcover-spec.pdf', { type: 'application/pdf' });
+        await act(async () => {
+            fireEvent.change(hardFileInput, { target: { files: [hardFile] } });
+        });
+
+        // Step 3 -> Step 4 -> calculate
+        const compareHardBtn = await screen.findByTestId('proceed-to-compare-btn');
+        await act(async () => {
+            fireEvent.click(compareHardBtn);
+        });
+        const runHardSolverBtn = screen.getByTestId('run-solver-btn');
+        await act(async () => {
+            fireEvent.click(runHardSolverBtn);
+        });
+
+        // Advance Hardcover to Step 5
+        const proceedHardAccept = await screen.findByTestId('proceed-to-accept-btn');
+        await waitFor(() => expect(proceedHardAccept).not.toBeDisabled());
+        await act(async () => {
+            fireEvent.click(proceedHardAccept);
+        });
+
+        // Verify Hardcover Step 5 displays Hardcover's proposal and NOT Softcover's
+        expect(screen.getByText(/45.00/)).toBeInTheDocument();
+        expect(screen.getByText(/65.00/)).toBeInTheDocument();
+        expect(screen.queryByText(/19.50/)).not.toBeInTheDocument();
+
+        // 3. Switch back to Softcover via ribbon -> must restore Softcover's proposedPatch and Step 5 exclusively!
+        await act(async () => {
+            fireEvent.click(assistantBtn);
+        });
+        const ribbonReopen = screen.getByTestId('pricing-family-ribbon');
+        const softcoverRibbonReopen = within(ribbonReopen).getByRole('button', { name: /Softcover/i });
+        await act(async () => {
+            fireEvent.click(softcoverRibbonReopen);
+        });
+
+        expect(screen.getByText(/19.50/)).toBeInTheDocument();
+        expect(screen.getByText(/120.00/)).toBeInTheDocument();
+        expect(screen.queryByText(/45.00/)).not.toBeInTheDocument();
+        expect(screen.queryByText(/65.00/)).not.toBeInTheDocument();
+
+        // 4. Switch to a brand new family (Wire-O) via ribbon -> proposal must be explicitly cleaned
+        await act(async () => {
+            fireEvent.click(assistantBtn);
+        });
+        const ribbonWire = screen.getByTestId('pricing-family-ribbon');
+        const wireRibbonBtn = within(ribbonWire).getByRole('button', { name: /Wire-O/i });
+        await act(async () => {
+            fireEvent.click(wireRibbonBtn);
+        });
+
+        // Wire-O is a clean new family:
+        expect(screen.getByRole('heading', { name: /What products (you produce|do you manufacture)|Qué productos fabricas/i })).toBeInTheDocument();
+        expect(screen.queryByText(/19.50/)).not.toBeInTheDocument();
+        expect(screen.queryByText(/45.00/)).not.toBeInTheDocument();
+    });
+
+    it('8. Selecting the same family in ribbon strictly preserves current draft, inputs and step', async () => {
+        const { container } = renderPricingPanel();
+
+        // 1. Select Softcover to calibrate
+        const softcoverCardBtn = screen.getByRole('button', { name: /Select family Softcover/i });
+        await act(async () => {
+            fireEvent.click(softcoverCardBtn);
+        });
+
+        // Edit quote reference
+        const quoteRefInput = screen.getByPlaceholderText(/OFERTA-2026-001/i);
+        await act(async () => {
+            fireEvent.change(quoteRefInput, { target: { value: 'OFERTA-PRESERVED-SAME-FAMILY' } });
+        });
+        expect(screen.getByDisplayValue('OFERTA-PRESERVED-SAME-FAMILY')).toBeInTheDocument();
+
+        // 2. Open Assistant
+        const assistantBtn = container.querySelector('#pricing-mode-assistant-btn') as HTMLButtonElement;
+        await act(async () => {
+            fireEvent.click(assistantBtn);
+        });
+
+        // Click Softcover (same family) in ribbon
+        const ribbon = screen.getByTestId('pricing-family-ribbon');
+        const softcoverRibbonBtn = within(ribbon).getByRole('button', { name: /Softcover/i });
+        await act(async () => {
+            fireEvent.click(softcoverRibbonBtn);
+        });
+
+        // Verify state is completely preserved at Step 2 with existing input intact
+        const onboardingContainer = container.querySelector('#pricing-workflow-onboarding');
+        expect(onboardingContainer).toHaveClass('block');
+        expect(screen.getByDisplayValue('OFERTA-PRESERVED-SAME-FAMILY')).toBeInTheDocument();
+        expect(screen.getByText(/Softcover \/ Paperback/i)).toBeInTheDocument();
+    });
 });
