@@ -331,7 +331,7 @@ describe('Printhouse Onboarding Redesign & Regression Tests', () => {
         fireEvent.click(actionBtn3);
 
         // Test Back to Step 2 and forward again
-        const backBtn = screen.getByRole('button', { name: /Back/i });
+        const backBtn = screen.getByRole('button', { name: /^Back$/i });
         fireEvent.click(backBtn);
         expect(screen.getByText(/AI Pricing Calibration Assistant/i)).toBeInTheDocument();
         fireEvent.click(screen.getByRole('button', { name: /Next/i }));
@@ -353,7 +353,7 @@ describe('Printhouse Onboarding Redesign & Regression Tests', () => {
         expect(firstResult).toBeInTheDocument();
         fireEvent.click(firstResult);
         // Verify Back, Finish/Exit and X on tutorial card remain accessible
-        expect(screen.getByRole('button', { name: /Back/i })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /^Back$/i })).toBeInTheDocument();
         const exitBtnsOnCard = screen.getAllByRole('button', { name: /Exit tutorial/i });
         expect(exitBtnsOnCard.length).toBeGreaterThan(0);
 

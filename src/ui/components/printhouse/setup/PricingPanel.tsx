@@ -14,6 +14,7 @@ import { PricingRuleBuilder } from './PricingRuleBuilder';
 import { PricingPreview } from './PricingPreview';
 import { QuickCalibrationPanel } from '../pricing/quick-calibration/QuickCalibrationPanel';
 import { PricingWorkflowSelector, PricingWorkflow } from '../pricing/PricingWorkflowSelector';
+import { SimplifiedOnboardingJourney } from '../onboarding/SimplifiedOnboardingJourney';
 import { SetupDrawer } from './SetupDrawer';
 import { Tag, Plus, Edit, Copy, Trash2, ShieldAlert, BadgeAlert, CheckCircle, Calculator, Info, ShieldCheck, HelpCircle, Layers, ChevronDown, ChevronUp, Sparkles, Sliders } from 'lucide-react';
 import { useLocale } from '../../../i18n';
@@ -27,8 +28,8 @@ type PricingSubTab = 'RULES' | 'SIMULATOR';
 
 export const PricingPanel: React.FC<PricingPanelProps> = ({ sites = [], onSaved }) => {
     const { t } = useLocale();
-    // ── Workflow Selection State (Phase 193H Choice-First UX) ──
-    const [selectedWorkflow, setSelectedWorkflow] = useState<PricingWorkflow>('assistant');
+    // ── Workflow Selection State (Choice-First Intuitive Onboarding UX) ──
+    const [selectedWorkflow, setSelectedWorkflow] = useState<PricingWorkflow>('onboarding');
     const [isSecondaryExpanded, setIsSecondaryExpanded] = useState<boolean>(false);
 
     // ── Industrial Pricing State ──
@@ -83,15 +84,46 @@ export const PricingPanel: React.FC<PricingPanelProps> = ({ sites = [], onSaved 
 
     const token = getAuthToken();
 
+    const parseResponseJson = async (res: Response): Promise<{ ok: boolean; status: number; data?: any; error?: string }> => {
+        try {
+            const contentType = res.headers?.get?.('content-type') || '';
+            if (contentType && !contentType.includes('application/json') && !contentType.includes('text/json')) {
+                const text = await res.text().catch(() => '');
+                return {
+                    ok: false,
+                    status: res.status,
+                    error: res.status === 401 
+                        ? 'Sesión no autorizada o expirada (HTTP 401)'
+                        : res.status === 404
+                            ? 'Servicio no disponible o ruta no encontrada (HTTP 404)'
+                            : text.slice(0, 150) || `Error de servidor HTTP ${res.status}`
+                };
+            }
+            const json = await res.json();
+            return {
+                ok: res.ok && json.ok !== false,
+                status: res.status,
+                data: json.data !== undefined ? json.data : json,
+                error: typeof json.error === 'object' ? (json.error?.message || json.error?.code) : (json.error || json.message || (!res.ok ? `Error HTTP ${res.status}` : undefined))
+            };
+        } catch {
+            return {
+                ok: false,
+                status: res.status,
+                error: `Respuesta de servidor no válida o vacía (HTTP ${res.status})`
+            };
+        }
+    };
+
     const fetchIndustrialPricing = async () => {
         setLoadingIndustrial(true);
         try {
             const res = await fetch('/api/printhouse/onboarding/pricing/industrial', {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
-            const json = await res.json();
-            if (json.ok && json.data) {
-                setIndustrialData(json.data);
+            const parsed = await parseResponseJson(res);
+            if (parsed.ok && parsed.data) {
+                setIndustrialData(parsed.data);
             }
         } catch (e) {
             console.debug('Industrial pricing endpoint unavailable in dev offline:', e);
@@ -121,20 +153,20 @@ export const PricingPanel: React.FC<PricingPanelProps> = ({ sites = [], onSaved 
                 },
                 body: JSON.stringify(fullPayload)
             });
-            const json = await res.json();
-            if (!res.ok || !json.ok) {
-                const errMsg = typeof json.error === 'object' ? (json.error.message || json.error.code) : (json.error || 'Failed to save industrial pricing');
+            const parsed = await parseResponseJson(res);
+            if (!parsed.ok) {
+                const errMsg = parsed.error || 'Failed to save industrial pricing';
                 const err: any = new Error(errMsg);
-                err.code = json.error?.code || (res.status === 409 ? 'STALE_BASELINE_CONFLICT' : 'SAVE_ERROR');
+                err.code = res.status === 409 ? 'STALE_BASELINE_CONFLICT' : 'SAVE_ERROR';
                 err.status = res.status;
-                err.data = json;
+                err.data = parsed.data;
                 throw err;
             }
-            if (json.baselineChecksum) {
+            if (parsed.data?.baselineChecksum) {
                 setIndustrialData((prev: any) => prev ? {
                     ...prev,
-                    nodeId: json.nodeId || prev.nodeId,
-                    baselineChecksum: json.baselineChecksum,
+                    nodeId: parsed.data.nodeId || prev.nodeId,
+                    baselineChecksum: parsed.data.baselineChecksum,
                     signatures: payload.signatures !== undefined ? payload.signatures : prev.signatures,
                     deliveryTime: payload.delivery_time !== undefined ? payload.delivery_time : prev.deliveryTime,
                     productionLeadDays: payload.production_lead_days !== undefined ? payload.production_lead_days : prev.productionLeadDays,
@@ -162,22 +194,21 @@ export const PricingPanel: React.FC<PricingPanelProps> = ({ sites = [], onSaved 
             const res = await fetch('/api/printhouse/onboarding/pricing/price-books', {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
-            const data = await res.json();
-            if (res.ok && data.ok) {
-                setPriceBooks(Array.isArray(data.data) ? data.data : []);
-                // Update selectedBook reference if it's currently selected
-                if (selectedBook && Array.isArray(data.data)) {
-                    const updated = data.data.find((b: any) => b.id === selectedBook.id);
+            const parsed = await parseResponseJson(res);
+            if (parsed.ok && parsed.data) {
+                setPriceBooks(Array.isArray(parsed.data) ? parsed.data : []);
+                if (selectedBook && Array.isArray(parsed.data)) {
+                    const updated = parsed.data.find((b: any) => b.id === selectedBook.id);
                     if (updated) setSelectedBook(updated);
                 }
             } else {
-                const isDevLocal = Boolean(import.meta.env?.DEV) && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+                const isDevLocal = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
                 if (!isDevLocal) {
-                    setError(data?.error || data?.message || 'Failed to fetch price books');
+                    setError(parsed.error || 'Failed to fetch price books');
                 }
             }
         } catch (err: any) {
-            const isDevLocal = Boolean(import.meta.env?.DEV) && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+            const isDevLocal = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
             if (!isDevLocal) {
                 setError(err.message || 'Error fetching price books');
             } else {
@@ -194,9 +225,9 @@ export const PricingPanel: React.FC<PricingPanelProps> = ({ sites = [], onSaved 
             const res = await fetch(`/api/printhouse/onboarding/pricing/price-books/${bookId}/rules`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
-            const data = await res.json();
-            if (res.ok && data.ok) {
-                setRules(data.data || []);
+            const parsed = await parseResponseJson(res);
+            if (parsed.ok && parsed.data) {
+                setRules(Array.isArray(parsed.data) ? parsed.data : []);
             }
         } catch (err) {
             console.error('Error fetching rules:', err);
@@ -216,9 +247,10 @@ export const PricingPanel: React.FC<PricingPanelProps> = ({ sites = [], onSaved 
                 const machRes = await fetch(`/api/printhouse/onboarding/sites/${site.siteId}/machines`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
-                const machData = await machRes.json();
-                if (machRes.ok && machData.ok) {
-                    const activeMachines = (machData.machines || [])
+                const parsedMach = await parseResponseJson(machRes);
+                if (parsedMach.ok && parsedMach.data) {
+                    const rawList = Array.isArray(parsedMach.data) ? parsedMach.data : (parsedMach.data.machines || []);
+                    const activeMachines = rawList
                         .filter((m: any) => m.status !== 'ARCHIVED')
                         .map((m: any) => ({ id: m.id, name: m.name, siteId: site.siteId }));
                     tempMachines.push(...activeMachines);
@@ -228,9 +260,10 @@ export const PricingPanel: React.FC<PricingPanelProps> = ({ sites = [], onSaved 
                 const matRes = await fetch(`/api/printhouse/onboarding/sites/${site.siteId}/materials`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
-                const matData = await matRes.json();
-                if (matRes.ok && matData.ok) {
-                    const activeMats = (matData.materials || [])
+                const parsedMat = await parseResponseJson(matRes);
+                if (parsedMat.ok && parsedMat.data) {
+                    const rawList = Array.isArray(parsedMat.data) ? parsedMat.data : (parsedMat.data.materials || []);
+                    const activeMats = rawList
                         .map((m: any) => ({ id: m.id, name: m.material_name || m.name, siteId: site.siteId }));
                     tempMaterials.push(...activeMats);
                 }
@@ -239,7 +272,7 @@ export const PricingPanel: React.FC<PricingPanelProps> = ({ sites = [], onSaved 
             setMachines(tempMachines);
             setMaterials(tempMaterials);
         } catch (err) {
-            console.error('Failed to pre-fetch selectors metadata:', err);
+            console.error('Failed to load global fleet or material data:', err);
         }
     };
 
@@ -545,6 +578,22 @@ export const PricingPanel: React.FC<PricingPanelProps> = ({ sites = [], onSaved 
             </div>
 
             {/* PRIMARY & SECONDARY WORKFLOWS BASED ON SELECTION */}
+            {/* 0. Simplified 4-Family Onboarding Journey Container */}
+            <div
+                id="pricing-workflow-onboarding"
+                className={`space-y-2.5 ${selectedWorkflow === 'onboarding' ? 'block' : 'hidden'}`}
+            >
+                <SimplifiedOnboardingJourney
+                    printerNodeId={industrialData?.nodeId}
+                    printerNodeName={industrialData?.nodeName || 'Primary Production Node'}
+                    onCompleted={() => {
+                        fetchIndustrialPricing();
+                        onSaved?.();
+                    }}
+                    onOpenAdvanced={() => setSelectedWorkflow('assistant')}
+                />
+            </div>
+
             {/* 1. Assistant Calibration Container (Preserved in DOM to retain draft and conversation state) */}
             <div
                 id="pricing-workflow-assistant"
