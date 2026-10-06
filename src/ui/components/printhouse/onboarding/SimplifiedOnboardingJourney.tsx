@@ -17,7 +17,7 @@
  * - Cancel produces zero writes.
  * - End-to-end integration with printhouseCalibrationApi and deterministic solver.
  */
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { 
     Layers, Upload, FileText, CheckCircle2, ArrowLeft, 
     ArrowRight, AlertTriangle, ShieldCheck, RefreshCw, Calculator,
@@ -130,6 +130,8 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
     // ── Session & Calibration Integration State ──
     const [sessionId, setSessionId] = useState<string | null>(null);
     const [activeRun, setActiveRun] = useState<any>(null);
+    const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null);
+    const calculationRequestIdRef = useRef<number>(0);
     const [calculatingSolver, setCalculatingSolver] = useState<boolean>(false);
     const [isSubmittingAcceptance, setIsSubmittingAcceptance] = useState<boolean>(false);
 
@@ -139,6 +141,8 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
         difference: number | null;
         residual: number | null;
         isCalculated: boolean;
+        hasEquivalentBreakdown?: boolean;
+        incompleteComparisonReason?: string | null;
         calculationError?: string | null;
         supportedParameters: string[];
         coverageGaps: string[];
@@ -148,6 +152,8 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
         difference: null,
         residual: null,
         isCalculated: false,
+        hasEquivalentBreakdown: true,
+        incompleteComparisonReason: null,
         calculationError: null,
         supportedParameters: [],
         coverageGaps: []
@@ -181,7 +187,24 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
     };
 
     const handleSelectFamilyToCalibrate = (id: ProductFamilyId) => {
+        calculationRequestIdRef.current++;
         setSelectedFamilyId(id);
+        setSelectedVariantId(null);
+        setSessionId(null);
+        setActiveRun(null);
+        setProposedPatch({});
+        setComparisonData({
+            originalPrice: null,
+            enginePrice: null,
+            difference: null,
+            residual: null,
+            isCalculated: false,
+            hasEquivalentBreakdown: true,
+            incompleteComparisonReason: null,
+            calculationError: null,
+            supportedParameters: [],
+            coverageGaps: []
+        });
         setCurrentOffer(prev => ({ 
             ...createDefaultOffer(id),
             productTitle: prev.productTitle || '',
@@ -220,6 +243,24 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
         setUploadError(null);
         setUploadedFileName(file.name);
         setUploadingPdf(true);
+
+        // ITEM 3: Invalidate any previous run, proposal, and in-flight calculations
+        calculationRequestIdRef.current++;
+        setSessionId(null);
+        setActiveRun(null);
+        setProposedPatch({});
+        setComparisonData({
+            originalPrice: null,
+            enginePrice: null,
+            difference: null,
+            residual: null,
+            isCalculated: false,
+            hasEquivalentBreakdown: true,
+            incompleteComparisonReason: null,
+            calculationError: null,
+            supportedParameters: [],
+            coverageGaps: []
+        });
 
         try {
             // Real quote evidence upload attempt if API available
@@ -265,6 +306,9 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
                 }
             ];
 
+            const initialVariantId = defaultRuns[0]?.id || defaultRuns[0]?.variantKey || 'run-1';
+            setSelectedVariantId(initialVariantId);
+
             setCurrentOffer({
                 family: selectedFamilyId,
                 productTitle: cleanTitle,
@@ -280,7 +324,12 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
                 coverPaper: extractedData?.coverPaper || 'Cartulina 250g',
                 coverWeightGsm: extractedData?.coverWeightGsm || 250,
                 coverColors: extractedData?.coverColors || '4/0',
+                boardThicknessMm: extractedData?.boardThicknessMm,
                 bindingMethod: selectedFamilyId === 'HARDCOVER' ? 'thread_sewn' : selectedFamilyId === 'SOFTCOVER' ? 'adhesive_pur' : selectedFamilyId === 'WIRE_O' ? 'wire_o' : 'saddle_stitch',
+                hasAmbiguity: Boolean(extractedData?.hasAmbiguity),
+                ambiguityDetails: extractedData?.ambiguityDetails || extractedData?.ambiguityNote,
+                ambiguityNote: extractedData?.ambiguityDetails || extractedData?.ambiguityNote,
+                hasDiscrepancy: Boolean(extractedData?.hasDiscrepancy),
                 deliveryCountry: extractedData?.deliveryCountry || 'DE',
                 runs: defaultRuns
             });
@@ -321,13 +370,38 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
         }));
     };
 
+    // ── Variant Selection & Run Invalidation ──
+    const handleSelectVariant = (variantId: string) => {
+        if (variantId === selectedVariantId) return;
+        calculationRequestIdRef.current++;
+        setSelectedVariantId(variantId);
+        setActiveRun(null);
+        setProposedPatch({});
+        setComparisonData({
+            originalPrice: null,
+            enginePrice: null,
+            difference: null,
+            residual: null,
+            isCalculated: false,
+            hasEquivalentBreakdown: true,
+            incompleteComparisonReason: null,
+            calculationError: null,
+            supportedParameters: [],
+            coverageGaps: []
+        });
+    };
+
     // ── Step 4 Deterministic Inverse Solver Calculation ──
     const handleRunSolver = async (specToUse?: ProgressiveSpecState) => {
         const offer = specToUse || currentOffer;
+        const thisReqId = ++calculationRequestIdRef.current;
         setCalculatingSolver(true);
         try {
-            const firstRun = offer.runs && offer.runs.length > 0 ? offer.runs[0] : null;
-            if (!firstRun) {
+            const targetRun = offer.runs && offer.runs.length > 0 
+                ? (offer.runs.find(r => r.id === selectedVariantId || r.variantKey === selectedVariantId) || offer.runs[0])
+                : null;
+
+            if (!targetRun) {
                 setComparisonData(prev => ({
                     ...prev,
                     originalPrice: null,
@@ -344,22 +418,27 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
                 return typeof val === 'number' && Number.isFinite(val) && !Number.isNaN(val) && val > 0;
             };
 
-            const targetManufacturing = isFinitePositive(firstRun.manufacturingPrice)
-                ? firstRun.manufacturingPrice
-                : (isFinitePositive(firstRun.quotedTotalPrice) ? firstRun.quotedTotalPrice : null);
-
-            if (targetManufacturing === null) {
-                setComparisonData(prev => ({
-                    ...prev,
+            // ITEM 1: Strict separation of manufacturing cost:
+            // A total with transport CANNOT substitute manufacturing cost!
+            if (!isFinitePositive(targetRun.manufacturingPrice)) {
+                setActiveRun(null);
+                setProposedPatch({});
+                setComparisonData({
                     originalPrice: null,
                     enginePrice: null,
                     difference: null,
                     residual: null,
                     isCalculated: false,
-                    calculationError: 'La variante no especifica un importe positivo válido para contrastar.'
-                }));
+                    hasEquivalentBreakdown: false,
+                    incompleteComparisonReason: 'Falta desglose de coste de fabricación. Un total con transporte no puede sustituir al coste de fabricación.',
+                    calculationError: 'Falta desglose de coste de fabricación. Solicita desglose o revisión explícita del presupuesto antes de calibrar.',
+                    supportedParameters: [],
+                    coverageGaps: []
+                });
                 return;
             }
+
+            const targetManufacturing = targetRun.manufacturingPrice;
 
             let runResult: any = null;
             let runError: string | null = null;
@@ -371,7 +450,11 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
                         sess = await printhouseCalibrationApi.createSession({
                             printerNodeId,
                             referenceBookName: offer.productTitle || 'Oferta Calibración',
-                            bookSpec: offer,
+                            bookSpec: {
+                                ...offer,
+                                evidenceId: offer.quoteRef || uploadedFileName || 'evidence-quote-doc',
+                                selectedVariantId: targetRun.id || targetRun.variantKey
+                            },
                             targetManufacturingPrice: targetManufacturing
                         });
                         if (sess?.id) setSessionId(sess.id);
@@ -383,6 +466,11 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
                 } catch (e: any) {
                     runError = e.message || 'Error en la llamada al motor de cálculo';
                 }
+            }
+
+            // ITEM 3: Check if calculation is still valid and not superseded by another document/variant
+            if (calculationRequestIdRef.current !== thisReqId) {
+                return;
             }
 
             const hasValidEnginePrice = runResult && isFinitePositive(runResult.enginePriceAfter);
@@ -428,17 +516,14 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
                         `Tintas interior ${offer.interiorColors || '1/1'}`,
                         `Cubierta ${offer.coverPaper || 'Papel estucado'} ${offer.coverColors || '4/0'}`,
                         offer.family === 'HARDCOVER' ? `Cartón Graupappe ${offer.boardThicknessMm || 2.0} mm` : 'Encuadernación de taller',
-                        offer.runs.length > 0 ? `Tiradas analizadas: ${offer.runs.map(r => r.quantity).join(', ')} ejemplares` : 'Tirada estándar',
-                        `Entrega en ${offer.deliveryCity || offer.deliveryCountry || 'Alemania'}`
+                        `Tirada calibrada: ${targetRun.quantity} ej.`
                     ],
                     coverageGaps: [
-                        'No acredita encuadernación Wire-O ni grapado al caballete si no están en esta oferta',
-                        'No acredita acabados de estampación en caliente ni barniz UV sectorizado',
-                        'No acredita comparación controlada entre cosido y encolado sin presupuesto adicional'
+                        'Sin acreditación para Wire-O ni grapado al caballete en este presupuesto.',
+                        'Estampación térmica y barniz selectivo pendientes de presupuesto específico.'
                     ]
                 });
             } else {
-                // Strict: NO silent fallback, NO 0.993 artificial match, NO fake zeros!
                 setActiveRun(null);
                 setProposedPatch({});
                 setComparisonData({
@@ -458,7 +543,9 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
                 });
             }
         } finally {
-            setCalculatingSolver(false);
+            if (calculationRequestIdRef.current === thisReqId) {
+                setCalculatingSolver(false);
+            }
         }
     };
 
@@ -763,7 +850,10 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
                     </div>
 
                     <VariantSpecTable
-                        spec={currentOffer}
+                        spec={{
+                            ...currentOffer,
+                            selectedVariantId: selectedVariantId || currentOffer.runs?.[0]?.id || currentOffer.runs?.[0]?.variantKey
+                        }}
                         onEditOffer={() => {
                             setEntryMode('MANUAL_FORM');
                             setCurrentStep(2);
@@ -784,11 +874,16 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
             {currentStep === 4 && (
                 <div className="space-y-4">
                     <CalculationComparisonView
-                        spec={currentOffer}
+                        spec={{
+                            ...currentOffer,
+                            selectedVariantId: selectedVariantId || currentOffer.runs?.[0]?.id || currentOffer.runs?.[0]?.variantKey
+                        }}
                         originalPrice={comparisonData.originalPrice}
                         enginePrice={comparisonData.enginePrice}
                         difference={comparisonData.difference}
                         residual={comparisonData.residual}
+                        hasEquivalentBreakdown={comparisonData.hasEquivalentBreakdown}
+                        incompleteComparisonReason={comparisonData.incompleteComparisonReason || undefined}
                         supportedParameters={comparisonData.supportedParameters}
                         coverageGaps={comparisonData.coverageGaps}
                         isCalculated={comparisonData.isCalculated}

@@ -60,34 +60,66 @@ def setup_page_routes(page):
         body=json.dumps({"ok": True, "data": []})
     ))
 
-    # Calibration sessions & runs mock APIs
+    # Calibration sessions & runs mock APIs with document-specific fidelity
+    session_state = {"targetPrice": 1792.00, "productTitle": "Die Mysteriösen Steine"}
+
+    def handle_create_session(route, request):
+        if request.method == "POST":
+            try:
+                payload = json.loads(request.post_data or "{}")
+                t_price = payload.get("targetManufacturingPrice")
+                if t_price:
+                    session_state["targetPrice"] = float(t_price)
+                book_spec = payload.get("bookSpec") or {}
+                if book_spec.get("productTitle"):
+                    session_state["productTitle"] = book_spec.get("productTitle")
+            except Exception:
+                pass
+            route.fulfill(
+                status=200, content_type='application/json',
+                body=json.dumps({"ok": True, "data": {"id": "sess-cal-01", "status": "DRAFT"}})
+            )
+        else:
+            route.fulfill(
+                status=200, content_type='application/json',
+                body=json.dumps({"ok": True, "data": []})
+            )
+
+    def handle_calculate(route, request):
+        t_price = session_state.get("targetPrice", 1792.00)
+        # Deterministic simulation matching the EXACT document:
+        engine_after = round(t_price * 0.996, 2)
+        diff = round(abs(t_price - engine_after), 2)
+        pct = round((diff / t_price) * 100, 2)
+        route.fulfill(
+            status=200, content_type='application/json',
+            body=json.dumps({
+                "ok": True,
+                "data": {
+                    "id": "run-cal-01",
+                    "status": "SUCCESS",
+                    "enginePriceBefore": round(t_price * 1.04, 2),
+                    "enginePriceAfter": engine_after,
+                    "targetPrice": t_price,
+                    "absoluteResidual": diff,
+                    "percentResidual": pct,
+                    "proposedPatch": {
+                        "machine_hourly_rate": 68.50,
+                        "plate_cost": 9.80,
+                        "sewing_cost_per_sig": 0.042,
+                        "casing_in_rate": 0.38,
+                        "freight_pallet_rate": 162.50
+                    }
+                }
+            })
+        )
+
     page.route("**/api/printhouse/onboarding/pricing/calibrations/*/ready*", lambda r: r.fulfill(
         status=200, content_type='application/json',
         body=json.dumps({"ok": True, "data": {"id": "sess-cal-01", "status": "READY"}})
     ))
 
-    page.route("**/api/printhouse/onboarding/pricing/calibrations/*/calculate*", lambda r: r.fulfill(
-        status=200, content_type='application/json',
-        body=json.dumps({
-            "ok": True,
-            "data": {
-                "id": "run-cal-01",
-                "status": "SUCCESS",
-                "enginePriceBefore": 1340.00,
-                "enginePriceAfter": 1280.00,
-                "targetPrice": 1283.00,
-                "absoluteResidual": 3.00,
-                "percentResidual": 0.23,
-                "proposedPatch": {
-                    "machine_hourly_rate": 68.50,
-                    "plate_cost": 9.80,
-                    "sewing_cost_per_sig": 0.042,
-                    "casing_in_rate": 0.38,
-                    "freight_pallet_rate": 162.50
-                }
-            }
-        })
-    ))
+    page.route("**/api/printhouse/onboarding/pricing/calibrations/*/calculate*", handle_calculate)
 
     page.route("**/api/printhouse/onboarding/pricing/calibrations/*/accept*", lambda r: r.fulfill(
         status=200, content_type='application/json',
@@ -101,10 +133,7 @@ def setup_page_routes(page):
         })
     ))
 
-    page.route("**/api/printhouse/onboarding/pricing/calibrations*", lambda r: r.fulfill(
-        status=200, content_type='application/json',
-        body=json.dumps({"ok": True, "data": {"id": "sess-cal-01", "status": "DRAFT"}})
-    ))
+    page.route("**/api/printhouse/onboarding/pricing/calibrations*", handle_create_session)
 
     page.route("**/api/printhouse/onboarding/pricing/revisions*", lambda r: r.fulfill(
         status=200, content_type='application/json',
@@ -183,7 +212,9 @@ def setup_page_routes(page):
         "heightMm": 240,
         "pageCount": 72,
         "interiorPaper": "Arctic Volumen 150g",
+        "interiorColors": "4/4",
         "coverPaper": "Silk 130g",
+        "coverColors": "4/0",
         "boardThicknessMm": 2.4,
         "hasAmbiguity": True,
         "ambiguityDetails": "Contradicción documental: El encabezado declara Softcover, pero la especificación técnica incluye cartón MGP 2,4 mm (Tapa dura).",

@@ -185,7 +185,7 @@ describe('Printhouse Calibration Onboarding - Audit, Fidelity and Governance Sui
             );
 
             expect(screen.getByText('Comparación incompleta')).toBeInTheDocument();
-            expect(screen.getByText(/La oferta no desglosa portes/i)).toBeInTheDocument();
+            expect(screen.getAllByText(/La oferta no desglosa portes/i).length).toBeGreaterThanOrEqual(1);
         });
     });
 
@@ -317,6 +317,39 @@ describe('Printhouse Calibration Onboarding - Audit, Fidelity and Governance Sui
                 />
             );
             expect(screen.getByTestId('proceed-to-accept-btn')).toBeDisabled();
+        });
+
+        it('3b.6 Regression: Absent manufacturingPrice with positive totalPrice and positive transportPrice does NOT send total as manufacturing target and blocks comparison advance', () => {
+            const specWithoutManufacturing = {
+                family: 'HARDCOVER',
+                productTitle: 'Oferta Sin Desglose Fabricacion',
+                runs: [
+                    {
+                        id: 'run-no-mfg',
+                        quantity: 1000,
+                        manufacturingPrice: undefined, // absent manufacturing
+                        transportPrice: 200,          // positive transport
+                        quotedTotalPrice: 2200,       // positive total with transport
+                        totalPrice: 2200,
+                        quotedUnitPrice: 2.20,
+                        hasEquivalentBreakdown: false
+                    }
+                ]
+            };
+
+            renderWithLocale(
+                <CalculationComparisonView
+                    spec={specWithoutManufacturing}
+                    enginePrice={1800}
+                    comparisonMode="manufacturing"
+                />
+            );
+
+            // Must NOT advance to accept because manufacturingPrice is absent and total cannot substitute it
+            const proceedBtn = screen.getByTestId('proceed-to-accept-btn');
+            expect(proceedBtn).toBeDisabled();
+            // Should display incomplete breakdown warning
+            expect(screen.getByText(/Falta desglose de coste de fabricación/i)).toBeInTheDocument();
         });
     });
 

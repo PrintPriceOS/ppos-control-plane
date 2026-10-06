@@ -337,4 +337,81 @@ describe('Simplified Printhouse Onboarding Journey Suite', () => {
         expect(screen.getByText('Rückstichheftung / Drahtheftung')).toBeInTheDocument();
         expect(screen.getAllByText(/Welche Produkte stellen Sie her/i).length).toBeGreaterThanOrEqual(1);
     });
+
+    // ── 9. Document and Variant Invalidation & Race Condition Guardrails ──
+    it('15. Discards late calculation response if user uploads or switches document while calculation is in progress', async () => {
+        let resolveCalculate: (val: any) => void = () => {};
+        const slowPromise = new Promise(resolve => {
+            resolveCalculate = resolve;
+        });
+
+        const printhouseCalibrationApi = await import('../src/ui/lib/printhouseCalibrationApi');
+        const calculateSpy = vi.spyOn(printhouseCalibrationApi.printhouseCalibrationApi, 'calculateCalibration').mockImplementation(() => slowPromise as any);
+        const readySpy = vi.spyOn(printhouseCalibrationApi.printhouseCalibrationApi, 'markSessionReady').mockResolvedValue({ id: 'sess-1', status: 'READY' } as any);
+        const createSpy = vi.spyOn(printhouseCalibrationApi.printhouseCalibrationApi, 'createSession').mockResolvedValue({ id: 'sess-1', status: 'DRAFT' } as any);
+
+        const { container } = renderJourney(
+            <SimplifiedOnboardingJourney 
+                printerNodeId="node-test-1" 
+                initialSpec={NATUR_DOCUMENT_FIXTURE.spec as any} 
+                initialStep={3} 
+            />, 
+            'es'
+        );
+
+        // Proceed to calculation in Step 3
+        const proceedBtn = screen.getByTestId('proceed-to-compare-btn');
+        fireEvent.click(proceedBtn);
+
+        // Advance to step 4, calculation is in-flight
+        expect(createSpy).toHaveBeenCalled();
+
+        // While calculation is in progress, user goes back to step 2 and uploads another document
+        const backBtn = screen.getByRole('button', { name: /Volver a especificaciones/i });
+        fireEvent.click(backBtn);
+
+        const backToStep2Btn = screen.getByTestId('back-to-step2-btn');
+        fireEvent.click(backToStep2Btn);
+
+        // User uploads another document
+        const fileInput = container.querySelector('#onboarding-pdf-upload-input') as HTMLInputElement;
+        const fakeFile = new File(['mock content'], 'Presupuesto_Stutensee.pdf', { type: 'application/pdf' });
+        fireEvent.change(fileInput, { target: { files: [fakeFile] } });
+
+        // Now the old calculation resolves with the old document's price
+        resolveCalculate({
+            id: 'run-natur-late',
+            status: 'SUCCESS',
+            enginePriceAfter: 4310,
+            targetPrice: 4321,
+            absoluteResidual: 11,
+            percentResidual: 0.25,
+            proposedPatch: { machine_hourly_rate: 70 }
+        });
+
+        // The late response must NOT be accepted or displayed
+        await waitFor(() => {
+            expect(screen.queryByText(/4.310/i)).not.toBeInTheDocument();
+        });
+    });
+
+    it('16. Invalidates active run and proposal when changing variant after calculation', async () => {
+        renderJourney(
+            <SimplifiedOnboardingJourney 
+                initialSpec={NATUR_DOCUMENT_FIXTURE.spec as any} 
+                initialStep={4} 
+            />, 
+            'es'
+        );
+
+        // Step 4 is rendered
+        expect(screen.getByText(/Comparación de Cálculos/i)).toBeInTheDocument();
+
+        // Go back to Step 3
+        const backBtn = screen.getByRole('button', { name: /Volver a especificaciones/i });
+        fireEvent.click(backBtn);
+
+        // Now in Step 3, table of variants is shown
+        expect(screen.getByText(/Revisión de Especificaciones y Tabla de Variantes/i)).toBeInTheDocument();
+    });
 });

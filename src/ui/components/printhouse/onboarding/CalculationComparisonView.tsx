@@ -87,23 +87,28 @@ export const CalculationComparisonView: React.FC<CalculationComparisonViewProps>
 
     // 1. Rigorous target price resolution: must be a positive finite number
     let resolvedTarget: number | null = null;
+    let resolvedIncompleteReason = incompleteComparisonReason;
+    let resolvedHasEquivalentBreakdown = hasEquivalentBreakdown;
+
     if (isFinitePositive(explicitTargetPrice)) {
         resolvedTarget = explicitTargetPrice;
     } else if (isFinitePositive(originalPrice)) {
         resolvedTarget = originalPrice;
     } else if (spec?.runs && spec.runs.length > 0) {
-        const firstRun = spec.runs[0];
+        const targetRun = spec.runs.find((r: any) => r.id === (spec.selectedVariantId || '') || r.variantKey === (spec.selectedVariantId || '')) || spec.runs[0];
         if (comparisonMode === 'manufacturing') {
-            if (isFinitePositive(firstRun.manufacturingPrice)) {
-                resolvedTarget = firstRun.manufacturingPrice;
-            } else if (firstRun.hasEquivalentBreakdown !== false && isFinitePositive(firstRun.quotedTotalPrice)) {
-                resolvedTarget = firstRun.quotedTotalPrice;
+            if (isFinitePositive(targetRun.manufacturingPrice)) {
+                resolvedTarget = targetRun.manufacturingPrice;
+            } else {
+                resolvedTarget = null;
+                resolvedHasEquivalentBreakdown = false;
+                resolvedIncompleteReason = resolvedIncompleteReason || 'Falta desglose de coste de fabricación. Un total con transporte no puede sustituir al coste de fabricación.';
             }
         } else {
-            if (isFinitePositive(firstRun.quotedTotalPrice)) {
-                resolvedTarget = firstRun.quotedTotalPrice;
-            } else if (isFinitePositive(firstRun.totalPrice)) {
-                resolvedTarget = firstRun.totalPrice;
+            if (isFinitePositive(targetRun.quotedTotalPrice)) {
+                resolvedTarget = targetRun.quotedTotalPrice;
+            } else if (isFinitePositive(targetRun.totalPrice)) {
+                resolvedTarget = targetRun.totalPrice;
             }
         }
     }
@@ -139,7 +144,7 @@ export const CalculationComparisonView: React.FC<CalculationComparisonViewProps>
 
     // Explicit comparison validity: requires BOTH positive declared cost AND positive engine calculation,
     // plus finite residual and no calculation error.
-    const isComparisonValid = hasValidTarget && hasValidEnginePrice && hasEquivalentBreakdown && !calculationError && residualPercent !== null && Number.isFinite(residualPercent);
+    const isComparisonValid = hasValidTarget && hasValidEnginePrice && resolvedHasEquivalentBreakdown && !calculationError && residualPercent !== null && Number.isFinite(residualPercent);
 
     // Variants analyzed
     const variantsUsed = explicitVariantsUsed || (spec?.runs?.map((r: any) => `${r.quantity} ej. (${r.paperVariant || 'estándar'})`) || []);
@@ -365,7 +370,7 @@ export const CalculationComparisonView: React.FC<CalculationComparisonViewProps>
                     {!isComparisonValid && (
                         <span className="text-[11px] text-amber-600 dark:text-amber-400 font-semibold flex items-center gap-1">
                             <AlertTriangle size={13} />
-                            <span>Requiere cálculo de motor válido para continuar</span>
+                            <span>{resolvedIncompleteReason || 'Requiere cálculo de motor válido para continuar'}</span>
                         </span>
                     )}
                     <button

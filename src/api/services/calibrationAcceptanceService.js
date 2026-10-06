@@ -365,33 +365,86 @@ class CalibrationAcceptanceService {
             };
 
             const forwardResult = adapter.evaluateForwardPrice(bookSpec, resultingRates, {}, nodeConfig);
+            if (!forwardResult || forwardResult.predictedManufacturingPrice === null || forwardResult.predictedManufacturingPrice === undefined) {
+                await connection.rollback();
+                const err = new Error('MISSING_VERIFIED_FORWARD_PRICE');
+                err.code = 'MISSING_VERIFIED_FORWARD_PRICE';
+                err.statusCode = 422;
+                err.details = 'Forward pricing calculation returned no predicted manufacturing price. Acceptance blocked.';
+                throw err;
+            }
+
             const verifiedManufacturingPrice = forwardResult.predictedManufacturingPrice;
-            const targetManufacturingPrice = Number(session.target_manufacturing_price || 0);
-
-            if (verifiedManufacturingPrice !== null && verifiedManufacturingPrice !== undefined) {
-                if (!Number.isFinite(verifiedManufacturingPrice) || Number.isNaN(verifiedManufacturingPrice) || verifiedManufacturingPrice < 0) {
-                    await connection.rollback();
-                    const err = new Error('INVALID_VERIFIED_FORWARD_PRICE');
-                    err.code = 'INVALID_VERIFIED_FORWARD_PRICE';
-                    err.statusCode = 422;
-                    err.details = `Forward pricing calculation returned invalid price: ${verifiedManufacturingPrice}. Acceptance blocked.`;
-                    throw err;
-                }
+            if (typeof verifiedManufacturingPrice !== 'number' || !Number.isFinite(verifiedManufacturingPrice) || Number.isNaN(verifiedManufacturingPrice) || verifiedManufacturingPrice <= 0) {
+                await connection.rollback();
+                const err = new Error('INVALID_VERIFIED_FORWARD_PRICE');
+                err.code = 'INVALID_VERIFIED_FORWARD_PRICE';
+                err.statusCode = 422;
+                err.details = `Forward pricing calculation returned invalid price: ${verifiedManufacturingPrice}. Acceptance blocked.`;
+                throw err;
             }
 
-            if (session.target_manufacturing_price !== null && session.target_manufacturing_price !== undefined) {
-                if (!Number.isFinite(targetManufacturingPrice) || Number.isNaN(targetManufacturingPrice) || targetManufacturingPrice < 0) {
-                    await connection.rollback();
-                    const err = new Error('INVALID_TARGET_MANUFACTURING_PRICE');
-                    err.code = 'INVALID_TARGET_MANUFACTURING_PRICE';
-                    err.statusCode = 422;
-                    err.details = `Target manufacturing price is not a valid non-negative finite number: ${session.target_manufacturing_price}. Acceptance blocked.`;
-                    throw err;
-                }
+            // Target manufacturing price validation: MUST be present, non-null, non-undefined, non-empty, and a positive finite number.
+            // Zero is NOT a valid substitute for absence; manufacturing budgets in print production must be strictly positive.
+            if (session.target_manufacturing_price === null || session.target_manufacturing_price === undefined || session.target_manufacturing_price === '') {
+                await connection.rollback();
+                const err = new Error('MISSING_TARGET_MANUFACTURING_PRICE');
+                err.code = 'MISSING_TARGET_MANUFACTURING_PRICE';
+                err.statusCode = 422;
+                err.details = 'Target manufacturing price is absent on calibration session. Acceptance blocked.';
+                throw err;
             }
 
+            if (typeof session.target_manufacturing_price === 'number' && (!Number.isFinite(session.target_manufacturing_price) || session.target_manufacturing_price <= 0)) {
+                await connection.rollback();
+                const err = new Error('INVALID_TARGET_MANUFACTURING_PRICE');
+                err.code = 'INVALID_TARGET_MANUFACTURING_PRICE';
+                err.statusCode = 422;
+                err.details = `Target manufacturing price is not a valid positive finite number: ${session.target_manufacturing_price}. Acceptance blocked.`;
+                throw err;
+            }
+
+            const targetManufacturingPrice = Number(session.target_manufacturing_price);
+            if (!Number.isFinite(targetManufacturingPrice) || Number.isNaN(targetManufacturingPrice) || targetManufacturingPrice <= 0) {
+                await connection.rollback();
+                const err = new Error('INVALID_TARGET_MANUFACTURING_PRICE');
+                err.code = 'INVALID_TARGET_MANUFACTURING_PRICE';
+                err.statusCode = 422;
+                err.details = `Target manufacturing price is not a valid positive finite number: ${session.target_manufacturing_price}. Acceptance blocked.`;
+                throw err;
+            }
+
+            // Single, deterministic residual convention:
+            // absoluteResidual = |verifiedManufacturingPrice - targetManufacturingPrice|
+            // percentResidual = absoluteResidual / targetManufacturingPrice (ratio format)
             const absoluteResidual = Number(Math.abs(verifiedManufacturingPrice - targetManufacturingPrice).toFixed(6));
-            const percentResidual = targetManufacturingPrice > 0 ? Number((absoluteResidual / targetManufacturingPrice).toFixed(6)) : 0;
+            const percentResidual = Number((absoluteResidual / targetManufacturingPrice).toFixed(6));
+
+            // Verify supplied residual from run if provided, rejecting contradictory values
+            if (run.absolute_residual !== null && run.absolute_residual !== undefined) {
+                const suppliedAbs = Number(run.absolute_residual);
+                if (!Number.isFinite(suppliedAbs) || Math.abs(suppliedAbs - absoluteResidual) > 0.05) {
+                    await connection.rollback();
+                    const err = new Error('CONTRADICTORY_SUPPLIED_RESIDUAL');
+                    err.code = 'CONTRADICTORY_SUPPLIED_RESIDUAL';
+                    err.statusCode = 422;
+                    err.details = `Supplied run absolute residual (${suppliedAbs}) contradicts verified forward price residual (${absoluteResidual}). Acceptance blocked.`;
+                    throw err;
+                }
+            }
+
+            if (run.percent_residual !== null && run.percent_residual !== undefined) {
+                const suppliedPct = Number(run.percent_residual);
+                const normalizedSuppliedPct = suppliedPct > 1 ? suppliedPct / 100 : suppliedPct;
+                if (!Number.isFinite(normalizedSuppliedPct) || Math.abs(normalizedSuppliedPct - percentResidual) > 0.01) {
+                    await connection.rollback();
+                    const err = new Error('CONTRADICTORY_SUPPLIED_RESIDUAL');
+                    err.code = 'CONTRADICTORY_SUPPLIED_RESIDUAL';
+                    err.statusCode = 422;
+                    err.details = `Supplied run percent residual (${suppliedPct}) contradicts verified forward price percent residual (${percentResidual}). Acceptance blocked.`;
+                    throw err;
+                }
+            }
 
             // 8. MULTI-QUANTITY CURVE EVALUATION & GOVERNANCE POLICY (Phase 194D)
             const curveEvaluation = this.evaluateCurveAcceptance(session, run, resultingRates, bookSpec, nodeConfig, options);
