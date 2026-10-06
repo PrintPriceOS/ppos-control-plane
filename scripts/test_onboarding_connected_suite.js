@@ -303,6 +303,20 @@ function httpRequest(serverUrl, method, path, token, body = null, timeoutMs = 50
     });
 }
 
+function formatHttpDiagnostic(method, path, res) {
+    if (!res) return `[${method} ${path}] No response object`;
+    const status = res.status;
+    const body = res.body || {};
+    // Extract sanitized error fields, strictly suppressing any Authorization headers or tokens
+    const sanitized = {
+        status,
+        code: body.error?.code || body.code || (typeof body.error === 'string' ? body.error : undefined),
+        message: body.error?.message || body.message || (typeof body.error === 'string' ? body.error : undefined),
+        details: body.error?.details || body.details || undefined
+    };
+    return `[${method} ${path} -> HTTP ${status}] ${JSON.stringify(sanitized)}`;
+}
+
 // ── 4. STRICT IDENTITY VERIFICATION ──
 async function verifyMysqlIdentity(directConn, cpPool) {
     console.log(`\n[IDENTITY] Verifying positive identity on MySQL connections (Zero DDL)...`);
@@ -741,23 +755,33 @@ async function runConnectedSuite() {
         );
 
         // ── STEP 3: CREATE CALIBRATION SESSION ──
-        console.log(`\n[STEP 3] Creating Calibration Session with Die Mysteriösen Steine (Interior 4/4)`);
+        console.log(`\n[STEP 3] Creating Calibration Session with Canonical Integration Fixture`);
+        // Technical specification defined explicitly for integration testing (Phase 193C canonical book spec).
+        // Resolves no documentary ambiguity and is strictly identified as a synthetic integration fixture.
         const sessionPayload = {
             printerNodeId: FIXTURE_NODE_A,
-            referenceBookName: 'Die Mysteriösen Steine',
+            referenceBookName: 'Synthetic Integration Fixture (Perfect Bound 4/4)',
             bookSpec: {
-                productTitle: 'Die Mysteriösen Steine',
-                family: 'SOFTCOVER',
-                formatWidthMm: 170,
-                formatHeightMm: 240,
-                pageCount: 72,
-                interiorPaper: 'Arctic Volumen 150g',
-                interiorColors: '4/4',
-                coverPaper: 'Silk 130g',
-                coverColors: '4/0',
-                runs: [{ id: 'run-1500', quantity: 1500, manufacturingPrice: 1792.00 }]
+                copies: 1500,
+                interior_pages: 72,
+                book_width_mm: 170,
+                book_height_mm: 240,
+                interior_print: '4/4',
+                cover_print: '4/0',
+                paper_type_interior: 'offset',
+                paper_weight_interior: 150,
+                paper_type_cover: 'mc',
+                paper_weight_cover: 250,
+                lamination: 'matt',
+                binding_method: 'perfect bound',
+                delivery_country: 'DE'
             },
-            targetManufacturingPrice: 1792.00
+            targetManufacturingPrice: 1792.00,
+            currency: 'EUR',
+            includesPaper: true,
+            includesBinding: true,
+            includesFinishing: true,
+            includesPackaging: true
         };
 
         const createRes = await httpRequest(
@@ -767,9 +791,10 @@ async function runConnectedSuite() {
             tokenA,
             sessionPayload
         );
-        assert(createRes.status === 201, `Calibration session created with HTTP 201`);
-        const sessionId = createRes.body?.id || createRes.body?.session?.id;
-        assert(Boolean(sessionId), `Received valid session ID: ${sessionId}`);
+        assert(createRes.status === 201, `Calibration session created with HTTP 201`, formatHttpDiagnostic('POST', '/api/printhouse/onboarding/pricing/calibrations', createRes));
+        assert(createRes.body && createRes.body.ok === true && createRes.body.data && typeof createRes.body.data.id === 'string',
+            `Received valid session record in body.data: ${createRes.body?.data?.id}`);
+        const sessionId = createRes.body.data.id;
         tracker.sessionIds.add(sessionId);
 
         // ── STEP 4: PREFLIGHT READINESS CHECK (CONTRACT: POST /pricing/calibrations/:id/ready) ──
@@ -780,12 +805,13 @@ async function runConnectedSuite() {
             `/api/printhouse/onboarding/pricing/calibrations/${sessionId}/ready`,
             tokenA
         );
-        assert(readyRes.status === 200, `POST /ready returned HTTP 200`);
-        assert(readyRes.body.data?.status === 'READY' || readyRes.body.ok === true,
-            `Session successfully transitioned to READY state`);
+        assert(readyRes.status === 200, `POST /ready returned HTTP 200`, formatHttpDiagnostic('POST', `/api/printhouse/onboarding/pricing/calibrations/${sessionId}/ready`, readyRes));
+        assert(readyRes.body && readyRes.body.ok === true, `POST /ready returned ok: true`);
+        assert(readyRes.body.data && readyRes.body.data.status === 'READY',
+            `Session status in body.data is strictly READY: ${readyRes.body?.data?.status}`);
 
         // ── STEP 5: DETERMINISTIC SOLVER CALCULATION ──
-        console.log(`\n[STEP 5] Executing Deterministic Solver Run`);
+        console.log(`\n[STEP 5] Executing Deterministic Solver Run (Official Contract: POST /:id/calculate -> HTTP 201)`);
         const calcRes = await httpRequest(
             serverUrl,
             'POST',
@@ -793,20 +819,33 @@ async function runConnectedSuite() {
             tokenA,
             { targetPrice: 1792.00 }
         );
-        assert(calcRes.status === 200, `Solver execution returned HTTP 200`);
-        assert(typeof calcRes.body.enginePriceAfter === 'number' && calcRes.body.enginePriceAfter > 0,
-            `Engine price after solver is positive: ${calcRes.body.enginePriceAfter} EUR`);
-        assert(calcRes.body.proposedPatch && Object.keys(calcRes.body.proposedPatch).length > 0,
+        assert(calcRes.status === 201, `Solver execution returned HTTP 201`, formatHttpDiagnostic('POST', `/api/printhouse/onboarding/pricing/calibrations/${sessionId}/calculate`, calcRes));
+        assert(calcRes.body && calcRes.body.ok === true && calcRes.body.data,
+            `Solver returned run data in body.data`);
+        const runData = calcRes.body.data;
+        assert(typeof runData.id === 'string' && runData.id.length > 0,
+            `Run ID obtained from response: ${runData.id}`);
+        const realRunId = runData.id;
+        tracker.runIds.add(realRunId);
+
+        const enginePriceAfter = typeof runData.enginePriceAfter === 'number' ? runData.enginePriceAfter : runData.engine_price_after;
+        assert(typeof enginePriceAfter === 'number' && enginePriceAfter > 0,
+            `Engine price after solver is positive: ${enginePriceAfter} EUR`);
+        const proposedPatch = runData.proposedPatch || runData.proposed_patch_json;
+        assert(proposedPatch && Object.keys(proposedPatch).length > 0,
             `Proposed patch contains deterministic rates`);
 
-        // Verify Run in Database and extract real runId
+        // Verify Run in Database by EXACT runId from response and assert calibration_session_id & tenant_id
         const [runs] = await directConn.query(
-            `SELECT id, absolute_residual, percent_residual FROM printhouse_pricing_calibration_runs WHERE calibration_session_id = ?`,
-            [sessionId]
+            `SELECT id, calibration_session_id, tenant_id, absolute_residual, percent_residual 
+             FROM printhouse_pricing_calibration_runs 
+             WHERE id = ?`,
+            [realRunId]
         );
-        assert(runs.length > 0, `Calibration run recorded in MySQL`);
-        const realRunId = runs[0].id;
-        tracker.runIds.add(realRunId);
+        assert(runs.length === 1, `Calibration run record verified in MySQL by exact runId (${realRunId})`);
+        assert(runs[0].id === realRunId, `Exact runId matched in database`);
+        assert(runs[0].calibration_session_id === sessionId, `calibration_session_id strictly matches current session (${sessionId})`);
+        assert(runs[0].tenant_id === FIXTURE_TENANT_A, `tenant_id strictly matches Tenant A (${FIXTURE_TENANT_A})`);
         assert(Number(runs[0].absolute_residual) >= 0, `Non-negative absolute residual stored in run`);
 
         // ── STEP 6: STRICT MULTI-TENANT ISOLATION USING REAL SESSION AND REAL RUN ID ──
@@ -820,7 +859,8 @@ async function runConnectedSuite() {
             tokenB
         );
         assert(crossTenantRead.status === 403 || crossTenantRead.status === 404,
-            `Cross-tenant read rejected with HTTP ${crossTenantRead.status}`);
+            `Cross-tenant read rejected with HTTP ${crossTenantRead.status}`,
+            formatHttpDiagnostic('GET', `/api/printhouse/onboarding/pricing/calibrations/${sessionId}`, crossTenantRead));
 
         // B. Cross-tenant Calculate with real sessionId
         const crossTenantCalc = await httpRequest(
@@ -831,7 +871,8 @@ async function runConnectedSuite() {
             { targetPrice: 1792.00 }
         );
         assert(crossTenantCalc.status === 403 || crossTenantCalc.status === 404,
-            `Cross-tenant calculate rejected with HTTP ${crossTenantCalc.status}`);
+            `Cross-tenant calculate rejected with HTTP ${crossTenantCalc.status}`,
+            formatHttpDiagnostic('POST', `/api/printhouse/onboarding/pricing/calibrations/${sessionId}/calculate`, crossTenantCalc));
 
         // C. Cross-tenant Accept with REAL sessionId AND REAL runId
         const crossTenantAccept = await httpRequest(
@@ -842,7 +883,8 @@ async function runConnectedSuite() {
             { runId: realRunId, acceptanceNotes: 'Unauthorized tenant attempt with real runId' }
         );
         assert(crossTenantAccept.status === 403 || crossTenantAccept.status === 404,
-            `Cross-tenant acceptance with real runId strictly rejected with HTTP ${crossTenantAccept.status}`);
+            `Cross-tenant acceptance with real runId strictly rejected with HTTP ${crossTenantAccept.status}`,
+            formatHttpDiagnostic('POST', `/api/printhouse/onboarding/pricing/calibrations/${sessionId}/accept`, crossTenantAccept));
 
         // Verify no revisions were created by the unauthorized cross-tenant attempt
         const [postCrossRevs] = await directConn.query(
@@ -865,15 +907,31 @@ async function runConnectedSuite() {
 
         // ── STEP 7: REAL CANCELLATION FLOW (POST /reject) VS ABANDONMENT ──
         console.log(`\n[STEP 7] Verifying Real Cancellation Flow (POST /reject) on Secondary Session`);
+        // Synthetic cancellation fixture with explicit bookSpec & price semantics
         const cancelSessionPayload = {
             printerNodeId: FIXTURE_NODE_A,
-            referenceBookName: 'Cancelled Calibration Session',
+            referenceBookName: 'Synthetic Cancellation Fixture (Perfect Bound 4/4)',
             bookSpec: {
-                productTitle: 'Canceled Test Book',
-                family: 'SOFTCOVER',
-                runs: [{ id: 'run-cancel', quantity: 500, manufacturingPrice: 850.00 }]
+                copies: 500,
+                interior_pages: 96,
+                book_width_mm: 148,
+                book_height_mm: 210,
+                interior_print: '4/4',
+                cover_print: '4/0',
+                paper_type_interior: 'offset',
+                paper_weight_interior: 90,
+                paper_type_cover: 'mc',
+                paper_weight_cover: 250,
+                lamination: 'gloss',
+                binding_method: 'perfect bound',
+                delivery_country: 'DE'
             },
-            targetManufacturingPrice: 850.00
+            targetManufacturingPrice: 850.00,
+            currency: 'EUR',
+            includesPaper: true,
+            includesBinding: true,
+            includesFinishing: true,
+            includesPackaging: true
         };
 
         const cancelCreateRes = await httpRequest(
@@ -883,16 +941,22 @@ async function runConnectedSuite() {
             tokenA,
             cancelSessionPayload
         );
-        const cancelSessionId = cancelCreateRes.body?.id || cancelCreateRes.body?.session?.id;
+        assert(cancelCreateRes.status === 201, `Secondary calibration session created with HTTP 201`, formatHttpDiagnostic('POST', '/api/printhouse/onboarding/pricing/calibrations', cancelCreateRes));
+        assert(cancelCreateRes.body && cancelCreateRes.body.ok === true && cancelCreateRes.body.data && typeof cancelCreateRes.body.data.id === 'string',
+            `Received valid secondary session record in body.data: ${cancelCreateRes.body?.data?.id}`);
+        const cancelSessionId = cancelCreateRes.body.data.id;
         tracker.sessionIds.add(cancelSessionId);
 
         // Promote secondary session to ready
-        await httpRequest(
+        const cancelReadyRes = await httpRequest(
             serverUrl,
             'POST',
             `/api/printhouse/onboarding/pricing/calibrations/${cancelSessionId}/ready`,
             tokenA
         );
+        assert(cancelReadyRes.status === 200, `POST /ready on secondary session returned HTTP 200`, formatHttpDiagnostic('POST', `/api/printhouse/onboarding/pricing/calibrations/${cancelSessionId}/ready`, cancelReadyRes));
+        assert(cancelReadyRes.body && cancelReadyRes.body.ok === true && cancelReadyRes.body.data?.status === 'READY',
+            `Secondary session status in body.data is strictly READY: ${cancelReadyRes.body?.data?.status}`);
 
         // Execute real cancellation via POST /reject endpoint
         const rejectRes = await httpRequest(
@@ -902,8 +966,9 @@ async function runConnectedSuite() {
             tokenA,
             { reason: 'Calibration cancelled by operator during test' }
         );
-        assert(rejectRes.status === 200, `POST /reject returned HTTP 200`);
-        assert(rejectRes.body.data?.status === 'REJECTED', `Cancelled session status is officially REJECTED`);
+        assert(rejectRes.status === 200, `POST /reject returned HTTP 200`, formatHttpDiagnostic('POST', `/api/printhouse/onboarding/pricing/calibrations/${cancelSessionId}/reject`, rejectRes));
+        assert(rejectRes.body && rejectRes.body.ok === true, `POST /reject returned ok: true`);
+        assert(rejectRes.body.data?.status === 'REJECTED', `Cancelled session status in body.data is strictly REJECTED`);
 
         // Verify that cancellation produces zero revisions and zero rate changes
         const [cancelledRevs] = await directConn.query(
@@ -924,7 +989,7 @@ async function runConnectedSuite() {
         );
 
         // ── STEP 8: GOVERNED ACCEPTANCE ON PRIMARY SESSION ──
-        console.log(`\n[STEP 8] Executing Governed Calibration Acceptance`);
+        console.log(`\n[STEP 8] Executing Governed Calibration Acceptance (Official Contract: POST /:id/accept -> HTTP 200)`);
         const acceptPayload = {
             runId: realRunId,
             acceptanceNotes: 'Verified under official MySQL isolated suite',
@@ -938,17 +1003,18 @@ async function runConnectedSuite() {
             tokenA,
             acceptPayload
         );
-        assert(acceptRes.status === 200, `Acceptance registered with HTTP 200`);
-
-        const revisionId = acceptRes.body?.revision?.id || acceptRes.body?.revisionId;
-        assert(Boolean(revisionId), `Immutable pricing revision created: ${revisionId}`);
+        assert(acceptRes.status === 200, `Acceptance registered with HTTP 200`, formatHttpDiagnostic('POST', `/api/printhouse/onboarding/pricing/calibrations/${sessionId}/accept`, acceptRes));
+        assert(acceptRes.body && acceptRes.body.ok === true && acceptRes.body.data,
+            `Acceptance returned valid data envelope in body.data`);
+        const acceptData = acceptRes.body.data;
+        assert(acceptData.status === 'ACCEPTED', `Acceptance status is strictly ACCEPTED: ${acceptData.status}`);
+        const revisionId = acceptData.revisionId;
+        assert(typeof revisionId === 'string' && revisionId.length > 0, `Immutable pricing revision created: ${revisionId}`);
         tracker.revisionIds.add(revisionId);
 
-        const acceptanceId = acceptRes.body?.acceptance?.id || acceptRes.body?.acceptanceId;
-        if (acceptanceId) {
-            tracker.acceptanceIds.add(acceptanceId);
-            assert(true, `Acceptance record ID tracked: ${acceptanceId}`);
-        }
+        const acceptanceId = acceptData.acceptanceId;
+        assert(typeof acceptanceId === 'string' && acceptanceId.length > 0, `Acceptance record created: ${acceptanceId}`);
+        tracker.acceptanceIds.add(acceptanceId);
 
         // ── STEP 9: CANONICAL CHECKSUM VERIFICATION & ABSENCE OF COMMERCIAL LEAKAGE ──
         console.log(`\n[STEP 9] Verifying Canonical SHA-256 Checksum and Commercial Invariance`);
