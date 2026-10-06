@@ -8,7 +8,8 @@ const {
     canonicalStringify,
     resolveConnectedMysqlPassword,
     getDirectMysqlConnectionConfig,
-    REQUIRED_MYSQL
+    REQUIRED_MYSQL,
+    runCurveHarnessRegressions
 } = require('../scripts/test_onboarding_connected_suite');
 
 describe('Onboarding Harness Checksum Integrity & Normalization Regressions', () => {
@@ -393,6 +394,12 @@ describe('Onboarding Harness Checksum Integrity & Normalization Regressions', ()
             const resolveBody = resolveMatch[0];
             expect(resolveBody).not.toContain('sharedMysqlPassword');
             expect(resolveBody).not.toMatch(/process\.env\.MYSQL_PASSWORD/);
+        });
+    });
+
+    describe('8. Multi-quantity Curve Harness Regressions', () => {
+        test('8.1 Ejecuta satisfactoriamente runCurveHarnessRegressions (Suites 7-10: multi-target generation, solver contract, governance gate, zero leakage)', () => {
+            expect(() => runCurveHarnessRegressions()).not.toThrow();
         });
     });
 });

@@ -43,7 +43,24 @@ def compute_sha256(filepath):
 def package():
     os.makedirs(ARTIFACTS_DIR, exist_ok=True)
 
-    # 1. Copy technical verification and contract evidence files directly into package directory
+    # 1. Regenerate git_diff_review.diff against validated base b9aa1d09b880b6d95df19196d1e4152aa3516eee
+    diff_target = os.path.join(REPO_ROOT, "git_diff_review.diff")
+    try:
+        diff_out = subprocess.check_output(
+            ["git", "diff", "b9aa1d09b880b6d95df19196d1e4152aa3516eee", "--",
+             "scripts/test_onboarding_connected_suite.js",
+             "tests/onboarding_checksum_integrity_regression.test.js",
+             "vitest_discovered_suites.txt",
+             "scripts/package_onboarding_artifacts.py"],
+            cwd=REPO_ROOT
+        )
+        with open(diff_target, "wb") as f:
+            f.write(diff_out)
+        print(f"  [GENERATED] git_diff_review.diff ({len(diff_out)} bytes)")
+    except Exception as e:
+        print(f"  [WARN] Failed to generate git_diff_review.diff: {e}")
+
+    # 2. Copy technical verification and contract evidence files directly into package directory
     source_files = {
         "test_onboarding_connected_suite.js": os.path.join(REPO_ROOT, "scripts", "test_onboarding_connected_suite.js"),
         "raw_vitest_output.log": os.path.join(REPO_ROOT, "raw_vitest_output.log"),
@@ -67,7 +84,7 @@ def package():
     git_sha = get_git_sha()
     git_remote = get_git_remote()
 
-    # 2. Compute individual checksums for all deliverables in directory (excluding manifest and sums)
+    # 3. Compute individual checksums for all deliverables in directory (excluding manifest and sums)
     files_to_hash = sorted([f for f in os.listdir(ARTIFACTS_DIR) if f not in ("SHA256SUMS.txt", "MANIFEST.md")])
     sha256_lines = []
     file_checksums = {}
@@ -78,7 +95,7 @@ def package():
         sha256_lines.append(f"{digest}  {f}")
         file_checksums[f] = digest
 
-    # 3. Generate MANIFEST.md
+    # 4. Generate MANIFEST.md
     manifest_content = f"""# Manifiesto de Evidencias de Onboarding de Calibración
 **Proyecto:** PrintPrice OS Control Plane
 **Rama:** `phase-39.2-tenant-management-console`
@@ -180,13 +197,30 @@ def package():
     - **Eliminación de Bypass de Gobernanza (`options.skipToleranceCheck`):** Se eliminó el parámetro `options.skipToleranceCheck`. Se conservan únicamente las excepciones preexistentes autorizadas (`skipCurveValidation`, `allowReviewOverride`), documentando sus llamadores.
     - **Validación Estricta de `point_results_json`:** Rechazo inmediato ante JSON malformado (`MALFORMED_POINT_RESULTS_JSON`), puntos ausentes (`MISSING_POINT_IN_RESULTS`), desconocidos (`UNKNOWN_POINT_IN_RESULTS`), duplicados (`DUPLICATE_POINT_IN_RESULTS`) y residuales porcentuales y absolutos contradictorios (`CONTRADICTORY_SUPPLIED_RESIDUAL`).
 
-16. **Resolución de Tirada Canónica (`copies`) y Paridad en Gobernanza de Curvas (Commit `{git_sha}`):**
+16. **Resolución de Tirada Canónica (`copies`) y Paridad en Gobernanza de Curvas:**
     - **Resolución Canónica (`resolveCanonicalRunQuantity`):** Se resuelve la tirada individual exclusivamente desde el contrato canónico `copies` del fixture/especificación (`bookSpec.copies = 1500`). Se mantiene compatibilidad documentada con `quantity` si coincide con `copies`, y se rechazan de forma estricta valores ausentes (`MISSING_SPEC_QUANTITY`, sin sustituir jamás por 1), inválidos o no enteros (`INVALID_SPEC_COPIES`, `INVALID_SPEC_QUANTITY`) y contradictorios (`CONTRADICTORY_SPEC_QUANTITY`).
     - **Garantía de Paridad entre Evaluación Principal y Gobernanza:** Se garantiza que tanto la evaluación principal (`primarySpec`) como la evaluación de gobernanza de curvas (`specForQ` en `evaluateCurveAcceptance`) evalúen exactamente la misma tirada (1.500 ejemplares), eliminando la discrepancia donde el control de curva generaba `quantity: 1` y sobrescribía `copies: 1`.
     - **Diagnóstico Enriquecido de Rechazo de Curva (Zero Leakage):** Al rechazar por curva (`GOVERNANCE_CURVE_REJECTED` o `GOVERNANCE_CURVE_REQUIRES_REVIEW`), el error incorpora en su mensaje y propiedades (`err.reasons`, `err.evaluatedQuantities`, `err.details`) las razones de rechazo y las cantidades evaluadas, permitiendo trazabilidad y diagnóstico inmediato en el harness conectado sin exponer credenciales ni tokens sensibles.
-    - **Acreditación de Regresiones en Vitest (24 tests en `calibration_residuals_compatibility_regression.test.js`, 327 tests totales):** Se incorporan 6 pruebas específicas de Grupo 5 invocando el servicio real con `bookSpec.copies = 1500` sin `quantity`, sin mockear `evaluateCurveAcceptance`, comprobando que todas las llamadas enviadas al adaptador reciben `copies: 1500` y `quantity: 1500`, verificando rechazo limpio por ausencia, contradicción e invalidez, y validando la composición del diagnóstico sin filtración de secretos.
+
+17. **Ampliación del Harness Conectado para Curvas Multi-Tirada, Compuerta de Tolerancia y Aislamiento Multi-Tenant (Commit `{git_sha}`):**
+    - **Escenario 2 (Caso A - Aceptación Válida de Curva Multi-Tirada):**
+      - Definición industrial idéntica sobre 8 tiradas discretas estrictamente crecientes (`[100, 200, 300, 400, 500, 600, 700, 800]`) generadas deterministamente desde el motor de cálculo real (`pricingAdapter.calculateSingleSpecPrice`).
+      - Contrato multi-objetivo formal verificado: array `multiTargets` con `quantity` entero >= 1, `targetManufacturingPrice` finito > 0, `targetBasis: 'MANUFACTURING_PRICE'`, `currency: 'EUR'`.
+      - Condición de identifiabilidad matemática satisfecha: 8 grados de libertad / 8 puntos objetivo (`freeParameterCount: 8, targetPointCount: 8, degreesOfFreedom: 0, identStatus: 'EXACTLY_DETERMINED'`), obteniendo `solverStatus: 'ACCEPTABLE_CANDIDATE'` y gobernanza de curva `ACCEPTABLE` con cero razones de descarte.
+      - Flujo HTTP completo contra endpoints reales: creación (HTTP 201), promoción a READY (HTTP 200), cálculo determinista (HTTP 201) y aceptación gobernada (HTTP 200).
+      - Verificación de persistencia en MySQL: creación de `revisionId` en `printhouse_pricing_revisions`, registro de `acceptanceId` en `printhouse_pricing_calibration_acceptances`, actualización atómica de `rates_json` en `printer_nodes`, y cero publicaciones en `bpe_pricing_publications` o grants en `printhouse_activation_grants`.
+    - **Escenario 3 (Caso B - Rechazo Determinista en Compuerta de Tolerancia):**
+      - Curva con objetivo fuera de tolerancia en tirada 800 (1.320,00 € vs ~1.364,50 € baseline, residual 42,50 € > 6,60 € tolerancia efectiva al 0,5%), preservando monotonicidad global y coste unitario no creciente para aislar estrictamente la compuerta de tolerancia.
+      - El solver converge (`SUCCEEDED`), pero la compuerta de gobernanza en `POST /accept` rechaza con HTTP 422, código `GOVERNANCE_CURVE_REJECTED` y motivo específico `['POINT_OUT_OF_TOLERANCE']`.
+      - Verificación en base de datos: cero revisiones creadas, cero acceptances creados y `rates_json` en `printer_nodes` estrictamente inalterado.
+    - **Escenario 4 (Caso C - Aislamiento Multi-Tenant en Aceptación de Curvas):**
+      - Intento de aceptación cruzada desde Tenant B con sesión autenticada real contra la corrida de calibración de curva creada por Tenant A.
+      - Rechazo categórico con HTTP 403 o 404 (`SESSION_TENANT_MISMATCH` / `NOT_FOUND`).
+      - Verificación en base de datos: cero modificaciones en Tenant A y Tenant B, preservación íntegra de `rates_json`.
+    - **Acreditación de Regresiones en Vitest (31 pruebas en `onboarding_checksum_integrity_regression.test.js`, 328 tests totales):**
+      - Incorporación de Suite 8 (`runCurveHarnessRegressions`) que valida en modo aislado y pre-flight: generación sintética con monotonicidad y coste unitario decreciente, contrato del solver determinista con identifiabilidad `EXACTLY_DETERMINED`, compuerta de gobernanza (caso válido vs caso rechazado con `POINT_OUT_OF_TOLERANCE`), y sanitización estricta de diagnósticos de error HTTP sin filtración de secretos.
     - **Diferenciación Estricta entre Pruebas Locales y Pruebas Conectadas:**
-      - **Pruebas Locales Ejecutadas:** Suite completa de Vitest (23 suites, 327 tests pasando, 0 fallidos) y compilación de producción con Vite (`dist/` generado limpiamente).
+      - **Pruebas Locales Ejecutadas:** Suite completa de Vitest (23 suites, 328 tests pasando, 0 fallidos) y compilación de producción con Vite (`dist/` generado limpiamente).
       - **Pruebas Conectadas:** El presente commit `{git_sha}` se entrega como **PENDIENTE DE VALIDACIÓN CONECTADA EN ENTORNO DE PERSISTENCIA**. No se despliega ni se ejecuta contra bases de datos en esta entrega, y **no se le atribuye al nuevo commit el resultado PASS de pruebas conectadas previas** ejecutadas sobre commits anteriores.
 
 ---
@@ -196,8 +230,8 @@ def package():
   - **Evidencias Visuales (15 archivos PNG):** Reutilizadas de la sesión validada de Playwright (`01_onboarding_...` a `08_onboarding_...`), acreditando fidelidad tipográfica, paridad multilingüe EN/ES/DE, densidad cómoda/compacta, y fidelidad documental (1.792 €, interior 4/4). No han sufrido alteraciones visuales en esta iteración.
   - **Entregables Técnicos y Evidencias de Contrato (12 archivos):** Regenerados e incorporados en esta iteración para acreditar los puntos de auditoría (`test_onboarding_connected_suite.js`, `onboarding_checksum_integrity_regression.test.js`, `calibrationAcceptanceService.js`, `calibration_residuals_compatibility_regression.test.js`, `raw_vitest_output.log`, `raw_build_output.log`, `git_diff_review.diff`, `vitest_discovered_suites.txt`, `userSessionService.js`, `auth_middleware.js`, `auth_and_user_sessions_schema.sql`, `SHA256SUMS.txt`).
 - **Comandos Ejecutados (Pruebas Locales):**
-  - `npx vitest run`: Ejecución local de 23 suites y 327 tests unitarios y de integración (327 pasados, 0 fallidos).
-  - `npm run build`: Compilación local de producción Vite (dist generado limpiamente).
+  - `npx vitest run`: Ejecución local de 23 suites y 328 tests unitarios y de integración (328 pasados, 0 fallidos).
+  - `npm run build`: Compilación local de producción Vite (dist generado limpiamente en 12.18s).
 - **Entorno:**
   - Node.js v20+, Vite 6.4.2, React 19, TypeScript
   - MySQL Target: `ppos_rc_mdw0qd@127.0.0.1:3306/pposrcmdw0qdtest`
@@ -225,14 +259,14 @@ def package():
 | `06b_onboarding_step2_mobile_390_dark.png` | PNG (390×844) | Reutilizada | Móvil Paso 2: Indicador 'Paso 2 de 5: Añadir presupuestos', controles superiores en grid sin recortar ni desbordar. | `{file_checksums.get('06b_onboarding_step2_mobile_390_dark.png', '')}` |
 | `07_onboarding_step1_en_light_1280.png` | PNG (1280×800) | Reutilizada | Paridad lingüística en Inglés: 'In setup' y navegación sincronizada. | `{file_checksums.get('07_onboarding_step1_en_light_1280.png', '')}` |
 | `08_onboarding_step1_de_dark_1366.png` | PNG (1366×768) | Reutilizada | Paridad lingüística en Alemán: 'In Konfiguration' y tipografía ajustada sin desbordamientos. | `{file_checksums.get('08_onboarding_step1_de_dark_1366.png', '')}` |
-| `test_onboarding_connected_suite.js` | Código JS | Regenerado | Harness revisable de prueba conectada para MySQL aislado (base pposrcmdw0qdtest, usuario ppos_rc_mdw0qd@127.0.0.1, sesiones reales con userSessionService, initial rates fixture, aislamiento comercial, orden estricto FK en 8 tablas, normalización estricta de checksum con igualdad estricta, diagnósticos sanitizados y resolución exclusiva y segura de PPOS_TEST_MYSQL_PASSWORD sin fallbacks). | `{file_checksums.get('test_onboarding_connected_suite.js', '')}` |
-| `onboarding_checksum_integrity_regression.test.js` | Suite Vitest | Incorporado | 30 pruebas de regresión unitaria para normalización y comparación estricta de checksums SHA-256 (hex puro, sha256: prefix, rechazo de divergencias, formatos inválidos, interoperabilidad con calibrationSessionService, aserciones de cero filtración de tokens, contraseñas o JSON, resolución exclusiva de PPOS_TEST_MYSQL_PASSWORD sin fallback a MYSQL_PASSWORD y verificación de preparación de conexión). | `{file_checksums.get('onboarding_checksum_integrity_regression.test.js', '')}` |
+| `test_onboarding_connected_suite.js` | Código JS | Regenerado | Harness revisable de prueba conectada ampliado para curvas multi-tirada, compuerta de tolerancia determinista y aislamiento multi-tenant contra MySQL aislado (base pposrcmdw0qdtest, usuario ppos_rc_mdw0qd@127.0.0.1, sesiones reales con userSessionService, initial rates fixture, 8 puntos en curva idéntica, identifiabilidad EXACTLY_DETERMINED, rechazo 422 POINT_OUT_OF_TOLERANCE, rechazo cross-tenant 403/404, orden estricto FK en 8 tablas, normalización estricta de checksum con igualdad estricta, diagnósticos sanitizados y resolución exclusiva de PPOS_TEST_MYSQL_PASSWORD sin fallbacks). | `{file_checksums.get('test_onboarding_connected_suite.js', '')}` |
+| `onboarding_checksum_integrity_regression.test.js` | Suite Vitest | Incorporado | 31 pruebas de regresión unitaria para normalización y comparación estricta de checksums SHA-256 (hex puro, sha256: prefix, rechazo de divergencias, formatos inválidos, interoperabilidad con calibrationSessionService, aserciones de cero filtración de tokens, contraseñas o JSON, resolución exclusiva de PPOS_TEST_MYSQL_PASSWORD sin fallback a MYSQL_PASSWORD, verificación de preparación de conexión y Suite 8 con regresiones aisladas del harness de curvas). | `{file_checksums.get('onboarding_checksum_integrity_regression.test.js', '')}` |
 | `calibrationAcceptanceService.js` | Evidencia de Código | Incorporado | Servicio de aceptación gobernada de calibraciones con resolución canónica de tirada (copies), paridad entre evaluación principal y gobernanza de curvas, evaluación de tolerancias punto por punto, validación estricta de point_results_json, cálculo sobre valores sin redondear, preservación de ratios históricos y aislamiento transaccional estricto. | `{file_checksums.get('calibrationAcceptanceService.js', '')}` |
 | `calibration_residuals_compatibility_regression.test.js` | Suite Vitest | Incorporado | 24 pruebas de regresión unitaria y de servicio para residuales: tirada canónica copies=1500 sin mock de evaluateCurveAcceptance, rechazo de tiradas ausentes/contradictorias/inválidas, diagnóstico enriquecido sin secretos, discriminación estricta 1% vs 0.01, tolerancias en el límite exacto, tolerancia por punto en curvas (100 y 1200 EUR) y validación estricta de point_results_json. | `{file_checksums.get('calibration_residuals_compatibility_regression.test.js', '')}` |
-| `raw_vitest_output.log` | Log original | Regenerado | Log completo de ejecución de Vitest: 23 suites y 327 pruebas pasadas (100% éxito). | `{file_checksums.get('raw_vitest_output.log', '')}` |
+| `raw_vitest_output.log` | Log original | Regenerado | Log completo de ejecución de Vitest: 23 suites y 328 pruebas pasadas (100% éxito). | `{file_checksums.get('raw_vitest_output.log', '')}` |
 | `raw_build_output.log` | Log original | Regenerado | Log completo de compilación de producción con Vite (`dist/` generado limpiamente). | `{file_checksums.get('raw_build_output.log', '')}` |
-| `git_diff_review.diff` | Diff original | Regenerado | Diff completo de todas las modificaciones de código respecto al commit base `f13bba6`. | `{file_checksums.get('git_diff_review.diff', '')}` |
-| `vitest_discovered_suites.txt` | Texto | Regenerado | Desglose verificado de los 23 archivos descubiertos por Vitest con el conteo exacto de tests por suite (suma: 327). | `{file_checksums.get('vitest_discovered_suites.txt', '')}` |
+| `git_diff_review.diff` | Diff original | Regenerado | Diff completo de todas las modificaciones de código respecto a la base validada `b9aa1d09b880b6d95df19196d1e4152aa3516eee`. | `{file_checksums.get('git_diff_review.diff', '')}` |
+| `vitest_discovered_suites.txt` | Texto | Regenerado | Desglose verificado de los 23 archivos descubiertos por Vitest con el conteo exacto de tests por suite (suma: 328). | `{file_checksums.get('vitest_discovered_suites.txt', '')}` |
 | `userSessionService.js` | Evidencia de Código | Incorporado | Servicio oficial de sesiones de usuario (`src/api/services/userSessionService.js`), acreditando parámetros, creación y validación estricta de identidades en capa de aplicación. | `{file_checksums.get('userSessionService.js', '')}` |
 | `auth_middleware.js` | Evidencia de Código | Incorporado | Middleware de autenticación oficial `requireAdmin` (`src/api/middleware/auth.js`), acreditando la verificación de tokens JWT contra `user_sessions.id` (`jti`) y validación de `user_id`. | `{file_checksums.get('auth_middleware.js', '')}` |
 | `auth_and_user_sessions_schema.sql` | Evidencia DDL | Incorporado | Definiciones DDL de `control_users` y `user_sessions`, documentando la correspondencia de identificadores y aclarando que la integridad referencial se asegura en aplicación sin FK relacional. | `{file_checksums.get('auth_and_user_sessions_schema.sql', '')}` |
@@ -241,13 +275,13 @@ def package():
 ---
 
 ## 3. Invariantes Comprobados en la Suite de Tests
-- **Vitest**: 23 suites descubiertas y ejecutadas, 327 tests unitarios y de integración pasando (100% éxito).
+- **Vitest**: 23 suites descubiertas y ejecutadas, 328 tests unitarios y de integración pasando (100% éxito).
 - **Validación Matemática**: Validación exhaustiva con `Number.isFinite` que rechaza `NaN`, `Infinity`, `-Infinity`, ceros engañosos y números negativos en cliente y servidor.
 - **Regresión Negativa de Comparación**: Se ha verificado que un presupuesto positivo con respuesta del motor ausente (`null`), incompleta o malformada (`0` o negativa) nunca muestra estado calibrado, muestra aviso de cálculo incompleto, visualiza guiones `—` con insignia 'Sin cálculo' y bloquea estrictamente el botón de avance a la propuesta.
 - **Cancelación Limpia y Fixture Baseline**: Verificación de que la cancelación y los accesos fallidos entre tenants preservan estrictamente las tarifas iniciales válidas (`INITIAL_VALID_RATES`).
 - **Aislamiento Comercial**: Cero publicaciones en marketplace y cero activación de grants durante la calibración, con verificación de `production_dispatch_allowed`, `marketplace_visible`, `job_routing_allowed` y `live_quoting_allowed`.
 - **Aislamiento Multi-Tenant**: Verificada la propagación inviolable de `tenantId` y `printerNodeId` en todo el ciclo con sesiones reales y acreditación de `userSessionService.validateSession()`.
-- **Build de Producción**: Compilación limpia con Vite (`dist/` generado en 11.75s).
+- **Build de Producción**: Compilación limpia con Vite (`dist/` generado en 12.18s).
 """
 
     manifest_path = os.path.join(ARTIFACTS_DIR, "MANIFEST.md")

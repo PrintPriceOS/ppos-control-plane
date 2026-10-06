@@ -146,6 +146,9 @@ const bcrypt = require('bcrypt');
 const mysqlClient = require('../src/api/services/mysqlClient');
 const userSessionService = require('../src/api/services/userSessionService');
 const printhouseOnboardingRoutes = require('../src/api/routes/printhouseOnboardingRoutes');
+const pricingAdapter = require('../src/api/services/buildPriceCalibrationAdapter');
+const deterministicSolver = require('../src/api/services/deterministicInversePricingSolver');
+const calibrationAcceptanceService = require('../src/api/services/calibrationAcceptanceService');
 
 // ── 2. CANONICAL STRINGIFY & CHECKSUM UTILITIES ──
 function canonicalStringify(obj) {
@@ -500,6 +503,194 @@ function runChecksumIntegrityRegressions() {
     console.log('[REGRESSION] All 6 Checksum Integrity & Connection Scope Regression Suites Passed Successfully (Zero Leakage Verified).');
 }
 
+function deepMergeRates(target, source) {
+    const out = JSON.parse(JSON.stringify(target || {}));
+    for (const key of Object.keys(source || {})) {
+        if (source[key] && typeof source[key] === 'object' && !Array.isArray(source[key])) {
+            out[key] = deepMergeRates(out[key] || {}, source[key]);
+        } else {
+            out[key] = source[key];
+        }
+    }
+    return out;
+}
+
+/**
+ * Executes standalone regression suites for curve multi-targets, solver contracts,
+ * governance tolerance evaluation gate, and safe diagnostics formatting:
+ * 7. Synthetic curve target generation and structure (monotonic total price, non-increasing unit cost).
+ * 8. Multi-quantity solver contract, identifiability (EXACTLY_DETERMINED) and unitless residual ratios.
+ * 9. Governed curve acceptance gate (Valid Curve -> ACCEPTABLE vs Perturbed -> REJECTED with POINT_OUT_OF_TOLERANCE).
+ * 10. Sanitized diagnostic formatting and zero secret/token leakage.
+ */
+function runCurveHarnessRegressions() {
+    console.log('[REGRESSION] Running Curve Harness & Solver Contract Regressions...');
+
+    const CURVE_BOOK_SPEC = {
+        copies: 500,
+        interior_pages: 96,
+        book_width_mm: 148,
+        book_height_mm: 210,
+        interior_print: '4/4',
+        cover_print: '4/0',
+        paper_type_interior: 'offset',
+        paper_weight_interior: 90,
+        paper_type_cover: 'mc',
+        paper_weight_cover: 250,
+        binding_method: 'perfect bound',
+        delivery_country: 'DE'
+    };
+
+    const CURVE_QUANTITIES = [100, 200, 300, 400, 500, 600, 700, 800];
+
+    // Suite 7: Synthetic curve target generation and structure
+    const syntheticTargets = CURVE_QUANTITIES.map(q => {
+        const fwd = pricingAdapter.evaluateForwardPrice({ ...CURVE_BOOK_SPEC, copies: q }, INITIAL_VALID_RATES, {}, {});
+        return {
+            quantity: q,
+            targetManufacturingPrice: Number(fwd.predictedManufacturingPrice.toFixed(2)),
+            targetBasis: 'MANUFACTURING_PRICE',
+            currency: 'EUR'
+        };
+    });
+
+    if (syntheticTargets.length !== 8) {
+        throw new Error('Regression 7a failed: Expected exactly 8 synthetic targets');
+    }
+    for (let i = 0; i < syntheticTargets.length; i++) {
+        const t = syntheticTargets[i];
+        if (!Number.isInteger(t.quantity) || t.quantity < 1) throw new Error(`Regression 7b failed: Target ${i} has invalid quantity`);
+        if (!Number.isFinite(t.targetManufacturingPrice) || t.targetManufacturingPrice <= 0) throw new Error(`Regression 7c failed: Target ${i} has invalid price`);
+        if (t.targetBasis !== 'MANUFACTURING_PRICE') throw new Error(`Regression 7d failed: Target ${i} basis must be MANUFACTURING_PRICE`);
+        if (i > 0) {
+            const prev = syntheticTargets[i - 1];
+            if (t.quantity <= prev.quantity) throw new Error(`Regression 7e failed: Quantities must be strictly ascending`);
+            if (t.targetManufacturingPrice <= prev.targetManufacturingPrice) throw new Error(`Regression 7f failed: Total prices must be monotonic`);
+            const prevUnit = prev.targetManufacturingPrice / prev.quantity;
+            const curUnit = t.targetManufacturingPrice / t.quantity;
+            if (curUnit > prevUnit + 1e-4) throw new Error(`Regression 7g failed: Unit price must be non-increasing (${curUnit} > ${prevUnit})`);
+        }
+    }
+
+    // Suite 8: Solver multi-quantity contract, identifiability and residuals
+    const solverSession = {
+        bookSpec: CURVE_BOOK_SPEC,
+        currentRatesSnapshot: INITIAL_VALID_RATES,
+        multiTargets: syntheticTargets
+    };
+    const solverRes = deterministicSolver.solveMultiQuantity(solverSession);
+    if (solverRes.status !== 'ACCEPTABLE_CANDIDATE' && solverRes.status !== 'SUCCEEDED') {
+        throw new Error(`Regression 8a failed: Expected ACCEPTABLE_CANDIDATE or SUCCEEDED solver status, got: ${solverRes.status}`);
+    }
+    if (!solverRes.identifiabilityReport || solverRes.identifiabilityReport.status !== 'EXACTLY_DETERMINED') {
+        throw new Error(`Regression 8b failed: Identifiability status must be EXACTLY_DETERMINED, got: ${solverRes.identifiabilityReport?.status}`);
+    }
+    if (solverRes.identifiabilityReport.freeParameterCount !== 8 || solverRes.identifiabilityReport.targetPointCount !== 8) {
+        throw new Error(`Regression 8c failed: Expected 8 free parameters and 8 targets`);
+    }
+    if (!Array.isArray(solverRes.pointResults) || solverRes.pointResults.length !== 8) {
+        throw new Error(`Regression 8d failed: pointResults must be array of 8 points`);
+    }
+    for (const pt of solverRes.pointResults) {
+        if (typeof pt.absoluteResidual !== 'number' || pt.absoluteResidual < 0) throw new Error(`Regression 8e failed: Absolute residual must be non-negative`);
+        if (typeof pt.percentageResidual !== 'number' || pt.percentageResidual < 0 || pt.percentageResidual > 1.0) {
+            throw new Error(`Regression 8f failed: Percentage residual in pointResults must be unitless ratio [0..1]`);
+        }
+        if (pt.withinTolerance !== true) throw new Error(`Regression 8g failed: Synthetic point at q=${pt.quantity} must be within tolerance`);
+    }
+    if (solverRes.absoluteResidual !== solverRes.curveMetrics.maxAbsoluteResidual) {
+        throw new Error(`Regression 8h failed: solver absoluteResidual must match curveMetrics.maxAbsoluteResidual`);
+    }
+    if (solverRes.percentResidual !== solverRes.curveMetrics.maxPercentageResidual) {
+        throw new Error(`Regression 8i failed: solver percentResidual must match curveMetrics.maxPercentageResidual`);
+    }
+
+    // Suite 9: Governance tolerance evaluation gate (Valid Curve vs Out-of-Tolerance)
+    const validCurveSessionDb = {
+        book_spec_json: CURVE_BOOK_SPEC,
+        multi_targets_json: syntheticTargets,
+        target_manufacturing_price: syntheticTargets[0].targetManufacturingPrice
+    };
+    const resultingRates = deepMergeRates(INITIAL_VALID_RATES, solverRes.proposedPatch);
+    const nodeConfig = { signatures: null, production_lead_days: 7, delivery_time: 2 };
+    const validGovernance = calibrationAcceptanceService.evaluateCurveAcceptance(
+        validCurveSessionDb,
+        { identifiability_json: solverRes.identifiabilityReport },
+        resultingRates,
+        CURVE_BOOK_SPEC,
+        nodeConfig
+    );
+    if (validGovernance.status !== 'ACCEPTABLE') {
+        throw new Error(`Regression 9a failed: Valid curve must evaluate to ACCEPTABLE, got: ${validGovernance.status} (reasons: ${validGovernance.reasons.join(', ')})`);
+    }
+    if (validGovernance.reasons.length !== 0) {
+        throw new Error(`Regression 9b failed: Valid curve must have zero rejection reasons`);
+    }
+
+    // Perturbed curve: Point 800 set to 1320.00 EUR (baseline is 1364.50 EUR, q=700 is 1267.00 EUR)
+    // Monotonic: 1320 > 1267; Unit non-increasing: 1320/800 = 1.65 < 1267/700 = 1.81.
+    // Residual at 800: ~42.50 EUR > 6.60 EUR effective tolerance.
+    const perturbedTargets = syntheticTargets.map(t => t.quantity === 800 ? { ...t, targetManufacturingPrice: 1320.00 } : { ...t });
+    const perturbedSessionDb = {
+        book_spec_json: CURVE_BOOK_SPEC,
+        multi_targets_json: perturbedTargets,
+        target_manufacturing_price: perturbedTargets[0].targetManufacturingPrice
+    };
+    const perturbedSolverRes = deterministicSolver.solveMultiQuantity({
+        bookSpec: CURVE_BOOK_SPEC,
+        currentRatesSnapshot: INITIAL_VALID_RATES,
+        multiTargets: perturbedTargets
+    });
+    if (perturbedSolverRes.status !== 'SUCCEEDED') {
+        throw new Error(`Regression 9c failed: Expected perturbed solver to produce SUCCEEDED run, got: ${perturbedSolverRes.status}`);
+    }
+    const pt800Solver = perturbedSolverRes.pointResults.find(p => p.quantity === 800);
+    if (!pt800Solver || pt800Solver.withinTolerance !== false) {
+        throw new Error(`Regression 9d failed: Point 800 must have withinTolerance: false in solver`);
+    }
+
+    const perturbedGovernance = calibrationAcceptanceService.evaluateCurveAcceptance(
+        perturbedSessionDb,
+        { identifiability_json: perturbedSolverRes.identifiabilityReport },
+        deepMergeRates(INITIAL_VALID_RATES, perturbedSolverRes.proposedPatch),
+        CURVE_BOOK_SPEC,
+        nodeConfig
+    );
+    if (perturbedGovernance.status !== 'REJECTED') {
+        throw new Error(`Regression 9e failed: Perturbed curve must evaluate to REJECTED, got: ${perturbedGovernance.status}`);
+    }
+    if (!perturbedGovernance.reasons.includes('POINT_OUT_OF_TOLERANCE')) {
+        throw new Error(`Regression 9f failed: Perturbed curve reasons must include POINT_OUT_OF_TOLERANCE, got: [${perturbedGovernance.reasons.join(', ')}]`);
+    }
+    if (perturbedGovernance.curveMetrics.rejectedPointCount !== 1) {
+        throw new Error(`Regression 9g failed: Expected exactly 1 rejected point, got: ${perturbedGovernance.curveMetrics.rejectedPointCount}`);
+    }
+
+    // Suite 10: Sanitized diagnostic formatting and zero secret leakage
+    const testDiagRes = {
+        status: 422,
+        body: {
+            code: 'GOVERNANCE_CURVE_REJECTED',
+            details: {
+                reasons: ['POINT_OUT_OF_TOLERANCE'],
+                evaluatedQuantities: [100, 200, 300, 400, 500, 600, 700, 800],
+                pointCount: 8
+            },
+            unauthorizedSecret: 'super_secret_db_password_123',
+            authorizationHeader: 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9'
+        }
+    };
+    const formattedDiag = formatHttpDiagnostic('POST', '/api/printhouse/onboarding/pricing/calibrations/cal-test/accept', testDiagRes);
+    if (!formattedDiag.includes('HTTP 422') || !formattedDiag.includes('GOVERNANCE_CURVE_REJECTED') || !formattedDiag.includes('POINT_OUT_OF_TOLERANCE')) {
+        throw new Error(`Regression 10a failed: Formatted diagnostic must contain HTTP 422, error code, and reasons`);
+    }
+    if (formattedDiag.includes('super_secret_db_password_123') || formattedDiag.includes('Bearer eyJhbGciOi')) {
+        throw new Error(`Regression 10b failed: Formatted diagnostic leaked secrets or tokens`);
+    }
+
+    console.log('[REGRESSION] All Curve Harness & Solver Contract Regressions Passed Successfully.');
+}
+
 // ── 3. CANONICAL INDUSTRIAL RATES FIXTURE & CONSUMED KEYS DOCUMENTATION ──
 // Strictly compatible with @ppos/pricing-engine and src/api/services/buildPriceCalibrationAdapter.js.
 // Documented keys consumed by canonical forward pricing engine and inverse pricing solver:
@@ -689,10 +880,16 @@ function formatHttpDiagnostic(method, path, res) {
     const status = res.status;
     const body = res.body || {};
     // Extract sanitized error fields, strictly suppressing any Authorization headers or tokens
+    const reasons = body.reasons || body.details?.reasons || (Array.isArray(body.details) ? body.details : undefined);
+    const evaluatedQuantities = body.evaluatedQuantities || body.details?.evaluatedQuantities || undefined;
+    const pointCount = body.details?.pointCount || undefined;
     const sanitized = {
         status,
         code: body.error?.code || body.code || (typeof body.error === 'string' ? body.error : undefined),
         message: body.error?.message || body.message || (typeof body.error === 'string' ? body.error : undefined),
+        reasons,
+        evaluatedQuantities,
+        pointCount,
         details: body.error?.details || body.details || undefined
     };
     return `[${method} ${path} -> HTTP ${status}] ${JSON.stringify(sanitized)}`;
@@ -1001,6 +1198,28 @@ async function performDeterministicCleanup(directConn) {
     }
 }
 
+async function seedPrinterNode(directConn, nodeId, tenantId, name, ratesJsonStr, nodeColSet) {
+    const nodeFields = ['id', 'tenant_id', 'name'];
+    const nodeVals = [nodeId, tenantId, name];
+    if (nodeColSet.has('email')) {
+        nodeFields.push('email');
+        nodeVals.push(`${nodeId}@test-connected.local`);
+    }
+    if (nodeColSet.has('status')) {
+        nodeFields.push('status');
+        nodeVals.push('ACTIVE');
+    }
+    if (nodeColSet.has('rates_json')) {
+        nodeFields.push('rates_json');
+        nodeVals.push(ratesJsonStr);
+    }
+    await directConn.query(
+        `INSERT INTO printer_nodes (${nodeFields.join(',')}) VALUES (${nodeVals.map(() => '?').join(',')})`,
+        nodeVals
+    );
+    tracker.printerNodes.add(nodeId);
+}
+
 // ── 6. MAIN CONNECTED ONBOARDING VALIDATION ──
 async function runConnectedSuite() {
     console.log(`\n================================================================`);
@@ -1063,26 +1282,7 @@ async function runConnectedSuite() {
         const [nodeCols] = await directConn.query('SHOW COLUMNS FROM printer_nodes');
         const nodeColSet = new Set(nodeCols.map(c => c.Field));
 
-        const nodeFields = ['id', 'tenant_id', 'name'];
-        const nodeVals = [FIXTURE_NODE_A, FIXTURE_TENANT_A, `Node ${EXECUTION_TAG}`];
-        if (nodeColSet.has('email')) {
-            nodeFields.push('email');
-            nodeVals.push(`${FIXTURE_NODE_A}@test-connected.local`);
-        }
-        if (nodeColSet.has('status')) {
-            nodeFields.push('status');
-            nodeVals.push('ACTIVE');
-        }
-        if (nodeColSet.has('rates_json')) {
-            nodeFields.push('rates_json');
-            nodeVals.push(INITIAL_RATES_JSON_STR);
-        }
-
-        await directConn.query(
-            `INSERT INTO printer_nodes (${nodeFields.join(',')}) VALUES (${nodeVals.map(() => '?').join(',')})`,
-            nodeVals
-        );
-        tracker.printerNodes.add(FIXTURE_NODE_A);
+        await seedPrinterNode(directConn, FIXTURE_NODE_A, FIXTURE_TENANT_A, `Node ${EXECUTION_TAG}`, INITIAL_RATES_JSON_STR, nodeColSet);
         assert(true, `Created printer node ${FIXTURE_NODE_A} for ${FIXTURE_TENANT_A} with initial valid rates fixture`);
 
         // Generate authentic server sessions and valid JWTs with real user accounts
@@ -1483,6 +1683,384 @@ async function runConnectedSuite() {
             finalNodeIntegrity.storedNormalized !== normalizeSha256Hex(INITIAL_RATES_CHECKSUM),
             `Node rates_json successfully transitioned from baseline to calibrated`
         );
+        console.log(`\n  [SCENARIO 1 COMPLETE] Single-Point Validated Onboarding Flow Passed Successfully (57 Assertions).\n`);
+
+        // ══════════════════════════════════════════════════════════════════════════════
+        // ── SCENARIO 2 (CASO A): MULTI-QUANTITY VALID CURVE ACCEPTANCE ──
+        // ══════════════════════════════════════════════════════════════════════════════
+        console.log(`\n================================================================`);
+        console.log(`  SCENARIO 2 (CASO A): MULTI-QUANTITY VALID CURVE ACCEPTANCE    `);
+        console.log(`================================================================`);
+
+        const FIXTURE_NODE_CURVE_A = `node_${EXECUTION_TAG}_curve_a`;
+        await seedPrinterNode(directConn, FIXTURE_NODE_CURVE_A, FIXTURE_TENANT_A, `Node Curve ${EXECUTION_TAG}`, INITIAL_RATES_JSON_STR, nodeColSet);
+        assert(true, `Created dedicated curve node ${FIXTURE_NODE_CURVE_A} seeded with initial valid rates baseline`);
+
+        // Baseline rates check on FIXTURE_NODE_CURVE_A
+        const [curveNodeBaseline] = await directConn.query(
+            `SELECT rates_json FROM printer_nodes WHERE id = ?`,
+            [FIXTURE_NODE_CURVE_A]
+        );
+        const curveNodeChecksum = computeCanonicalRatesChecksum(curveNodeBaseline[0].rates_json);
+        const curveNodeIntegrity = verifyRatesChecksumIntegrity(curveNodeChecksum, INITIAL_RATES_CHECKSUM);
+        assert(curveNodeIntegrity.valid === true, `Curve node initialized with baseline rates checksum`);
+
+        // Canonical Industrial Book Spec (identical across all 8 points)
+        const CURVE_BOOK_SPEC = {
+            copies: 500,
+            interior_pages: 96,
+            book_width_mm: 148,
+            book_height_mm: 210,
+            interior_print: '4/4',
+            cover_print: '4/0',
+            paper_type_interior: 'offset',
+            paper_weight_interior: 90,
+            paper_type_cover: 'mc',
+            paper_weight_cover: 250,
+            binding_method: 'perfect bound',
+            delivery_country: 'DE'
+        };
+
+        // Generate synthetic multi-targets for 8 distinct print runs from baseline rates
+        // Requirements: >= 3 distinct print runs, exact forward evaluation parity
+        const CURVE_QUANTITIES = [100, 200, 300, 400, 500, 600, 700, 800];
+        const validCurveTargets = CURVE_QUANTITIES.map(q => {
+            const fwd = pricingAdapter.evaluateForwardPrice({ ...CURVE_BOOK_SPEC, copies: q }, INITIAL_VALID_RATES, {}, {});
+            return {
+                quantity: q,
+                targetManufacturingPrice: Number(fwd.predictedManufacturingPrice.toFixed(2)),
+                targetBasis: 'MANUFACTURING_PRICE',
+                currency: 'EUR'
+            };
+        });
+        assert(validCurveTargets.length === 8, `Generated synthetic curve targets with 8 distinct print runs (>= 3 required)`);
+        assert(validCurveTargets.every(t => Number.isInteger(t.quantity) && t.quantity > 0), `All curve target quantities are strictly positive integers`);
+        assert(validCurveTargets.every(t => Number.isFinite(t.targetManufacturingPrice) && t.targetManufacturingPrice > 0), `All curve target prices are finite strictly positive numbers`);
+
+        // Create Curve Calibration Session (Contract: POST /pricing/calibrations -> HTTP 201)
+        const curveSessionPayload = {
+            printerNodeId: FIXTURE_NODE_CURVE_A,
+            referenceBookName: 'Synthetic Multi-Quantity Calibration Curve (8 Points)',
+            bookSpec: CURVE_BOOK_SPEC,
+            multiTargets: validCurveTargets,
+            currency: 'EUR',
+            includesPaper: true,
+            includesBinding: true,
+            includesFinishing: true,
+            includesPackaging: true
+        };
+
+        const curveCreateRes = await httpRequest(
+            serverUrl,
+            'POST',
+            '/api/printhouse/onboarding/pricing/calibrations',
+            tokenA,
+            curveSessionPayload
+        );
+        assert(curveCreateRes.status === 201, `Curve calibration session created with HTTP 201`, formatHttpDiagnostic('POST', '/api/printhouse/onboarding/pricing/calibrations', curveCreateRes));
+        assert(curveCreateRes.body && curveCreateRes.body.ok === true && curveCreateRes.body.data?.id, `Curve session ID received`);
+        const curveSessionId = curveCreateRes.body.data.id;
+        tracker.sessionIds.add(curveSessionId);
+        assert(curveCreateRes.body.data.status === 'DRAFT', `Curve session status is strictly DRAFT`);
+
+        // Promote Curve Session to READY (Contract: POST /:id/ready -> HTTP 200)
+        const curveReadyRes = await httpRequest(
+            serverUrl,
+            'POST',
+            `/api/printhouse/onboarding/pricing/calibrations/${curveSessionId}/ready`,
+            tokenA
+        );
+        assert(curveReadyRes.status === 200, `POST /ready on curve session returned HTTP 200`, formatHttpDiagnostic('POST', `/api/printhouse/onboarding/pricing/calibrations/${curveSessionId}/ready`, curveReadyRes));
+        assert(curveReadyRes.body?.data?.status === 'READY', `Curve session status in body.data is strictly READY`);
+
+        // Calculate Curve Run (Contract: POST /:id/calculate -> HTTP 201)
+        const curveCalcRes = await httpRequest(
+            serverUrl,
+            'POST',
+            `/api/printhouse/onboarding/pricing/calibrations/${curveSessionId}/calculate`,
+            tokenA
+        );
+        assert(curveCalcRes.status === 201, `Curve calculation returned HTTP 201`, formatHttpDiagnostic('POST', `/api/printhouse/onboarding/pricing/calibrations/${curveSessionId}/calculate`, curveCalcRes));
+        const curveRunData = curveCalcRes.body?.data;
+        assert(curveRunData && typeof curveRunData.id === 'string', `Valid curve run ID received: ${curveRunData?.id}`);
+        const curveRunId = curveRunData.id;
+        tracker.runIds.add(curveRunId);
+
+        // Verification of solver contract
+        assert(curveRunData.status === 'ACCEPTABLE_CANDIDATE' || curveRunData.status === 'SUCCEEDED' || curveRunData.status === 'CONVERGED',
+            `Curve run status is canonical acceptable status (${curveRunData.status})`);
+        assert(Array.isArray(curveRunData.pointResults) && curveRunData.pointResults.length === 8,
+            `pointResults contains 8 evaluated points`);
+
+        // Check individual point quantities, prices, residuals, and tolerances
+        for (let i = 0; i < curveRunData.pointResults.length; i++) {
+            const pt = curveRunData.pointResults[i];
+            const expQ = CURVE_QUANTITIES[i];
+            assert(pt.quantity === expQ, `Point ${i} quantity matches ${expQ}`);
+            assert(typeof pt.predictedManufacturingPrice === 'number' && pt.predictedManufacturingPrice > 0,
+                `Point ${i} (q=${expQ}) predicted manufacturing price is finite and positive: ${pt.predictedManufacturingPrice} EUR`);
+            assert(typeof pt.absoluteResidual === 'number' && pt.absoluteResidual >= 0,
+                `Point ${i} absolute residual is finite and non-negative: ${pt.absoluteResidual} EUR`);
+            assert(typeof pt.percentageResidual === 'number' && pt.percentageResidual >= 0,
+                `Point ${i} percentage residual is finite unitless ratio [0..1]: ${pt.percentageResidual}`);
+            assert(pt.withinTolerance === true, `Point ${i} (q=${expQ}) is within individual tolerance against its own target`);
+        }
+
+        // Check aggregate residuals and curve metrics
+        assert(curveRunData.curveMetrics && curveRunData.curveMetrics.pointCount === 8,
+            `curveMetrics.pointCount is 8`);
+        assert(curveRunData.curveMetrics.acceptedPointCount === 8 && curveRunData.curveMetrics.rejectedPointCount === 0,
+            `All 8 points accepted in curveMetrics`);
+        assert(typeof curveRunData.absoluteResidual === 'number' && Math.abs(curveRunData.absoluteResidual - curveRunData.curveMetrics.maxAbsoluteResidual) < 0.01,
+            `run.absolute_residual (${curveRunData.absoluteResidual}) matches curveMetrics.maxAbsoluteResidual`);
+        assert(typeof curveRunData.percentResidual === 'number' && Math.abs(curveRunData.percentResidual - curveRunData.curveMetrics.maxPercentageResidual) < 0.001,
+            `run.percent_residual (${curveRunData.percentResidual}) matches curveMetrics.maxPercentageResidual (ratio [0..1])`);
+
+        // Identifiability verification
+        assert(curveRunData.identifiabilityReport && curveRunData.identifiabilityReport.status === 'EXACTLY_DETERMINED',
+            `identifiabilityReport status is EXACTLY_DETERMINED (targetPoints=8, freeParams=8)`);
+        assert(curveRunData.identifiabilityReport.degreesOfFreedom === 0,
+            `identifiability degrees of freedom is 0`);
+
+        // Direct DB verification of run record
+        const [curveRunRows] = await directConn.query(
+            `SELECT id, calibration_session_id, tenant_id, status, point_results_json, curve_metrics_json, identifiability_json 
+             FROM printhouse_pricing_calibration_runs 
+             WHERE id = ?`,
+            [curveRunId]
+        );
+        assert(curveRunRows.length === 1, `Curve run record verified in MySQL by exact runId (${curveRunId})`);
+        assert(curveRunRows[0].calibration_session_id === curveSessionId, `Run session ID matches`);
+        assert(curveRunRows[0].tenant_id === FIXTURE_TENANT_A, `Run tenant ID matches Tenant A`);
+        assert(curveRunRows[0].point_results_json !== null, `point_results_json persisted in MySQL`);
+        assert(curveRunRows[0].curve_metrics_json !== null, `curve_metrics_json persisted in MySQL`);
+        assert(curveRunRows[0].identifiability_json !== null, `identifiability_json persisted in MySQL`);
+
+        // Governed Acceptance (Contract: POST /:id/accept -> HTTP 200)
+        const curveAcceptRes = await httpRequest(
+            serverUrl,
+            'POST',
+            `/api/printhouse/onboarding/pricing/calibrations/${curveSessionId}/accept`,
+            tokenA,
+            {
+                runId: curveRunId,
+                acceptanceNotes: 'Multi-quantity curve verified under official MySQL isolated suite',
+                acceptedBy: 'operator_connected_audit'
+            }
+        );
+        assert(curveAcceptRes.status === 200, `Curve acceptance registered with HTTP 200`, formatHttpDiagnostic('POST', `/api/printhouse/onboarding/pricing/calibrations/${curveSessionId}/accept`, curveAcceptRes));
+        assert(curveAcceptRes.body?.ok === true && curveAcceptRes.body?.data?.status === 'ACCEPTED',
+            `Curve acceptance status is strictly ACCEPTED`);
+        const curveRevId = curveAcceptRes.body.data.revisionId;
+        assert(typeof curveRevId === 'string' && curveRevId.length > 0, `Curve revision created: ${curveRevId}`);
+        tracker.revisionIds.add(curveRevId);
+        const curveAccId = curveAcceptRes.body.data.acceptanceId;
+        assert(typeof curveAccId === 'string' && curveAccId.length > 0, `Curve acceptance record created: ${curveAccId}`);
+        tracker.acceptanceIds.add(curveAccId);
+
+        // Verification of revision and acceptance in MySQL
+        const [curveRevs] = await directConn.query(
+            `SELECT id, printer_node_id, source_type, rates_json, rates_checksum 
+             FROM printhouse_pricing_revisions 
+             WHERE printer_node_id = ?`,
+            [FIXTURE_NODE_CURVE_A]
+        );
+        assert(curveRevs.length === 1, `Exactly 1 revision created for curve node`);
+        assert(curveRevs[0].id === curveRevId, `Revision ID matches accepted ID`);
+        const storedCurveRates = curveRevs[0].rates_json;
+        const expectedCurveChecksum = computeCanonicalRatesChecksum(storedCurveRates);
+        const curveChecksumIntegrity = verifyRatesChecksumIntegrity(curveRevs[0].rates_checksum, expectedCurveChecksum);
+        assert(curveChecksumIntegrity.valid === true, `Curve revision rates_checksum strictly matches canonical SHA-256`);
+
+        const [curveAccRows] = await directConn.query(
+            `SELECT id, calibration_session_id, calibration_run_id, pricing_revision_id 
+             FROM printhouse_pricing_calibration_acceptances 
+             WHERE pricing_revision_id = ?`,
+            [curveRevId]
+        );
+        assert(curveAccRows.length === 1, `Acceptance record verified in MySQL for curve revision`);
+        if (curveAccRows[0]?.id) tracker.acceptanceIds.add(curveAccRows[0].id);
+
+        // Verify curve node status and rates update in MySQL
+        const [curveNodeFinal] = await directConn.query(
+            `SELECT status, rates_json FROM printer_nodes WHERE id = ?`,
+            [FIXTURE_NODE_CURVE_A]
+        );
+        assert(curveNodeFinal[0].status === 'ACTIVE', `Curve node status preserved as ACTIVE`);
+        const finalCurveNodeChecksum = computeCanonicalRatesChecksum(curveNodeFinal[0].rates_json);
+        const finalCurveNodeIntegrity = verifyRatesChecksumIntegrity(finalCurveNodeChecksum, expectedCurveChecksum);
+        assert(finalCurveNodeIntegrity.valid === true, `Curve node rates_json updated to accepted calibrated document`);
+
+        // Assert zero commercial leakage on curve node
+        const [curveBpe] = await directConn.query(
+            `SELECT COUNT(*) as count FROM bpe_pricing_publications WHERE printer_node_id = ?`,
+            [FIXTURE_NODE_CURVE_A]
+        );
+        assert(curveBpe[0].count === 0, `Zero records in bpe_pricing_publications for curve node`);
+        const [curveGrants] = await directConn.query(
+            `SELECT COUNT(*) as count FROM printhouse_activation_grants WHERE tenant_id = ?`,
+            [FIXTURE_TENANT_A]
+        );
+        assert(curveGrants[0].count === 0, `Zero total activation grants for tenant`);
+        console.log(`\n  [SCENARIO 2 COMPLETE] Multi-Quantity Valid Curve Accepted Successfully.\n`);
+
+        // ══════════════════════════════════════════════════════════════════════════════
+        // ── SCENARIO 3 (CASO B): OUT-OF-TOLERANCE CURVE REJECTION GATE ──
+        // ══════════════════════════════════════════════════════════════════════════════
+        console.log(`\n================================================================`);
+        console.log(`  SCENARIO 3 (CASO B): OUT-OF-TOLERANCE CURVE REJECTION GATE    `);
+        console.log(`================================================================`);
+
+        const FIXTURE_NODE_REJECT_A = `node_${EXECUTION_TAG}_reject_a`;
+        await seedPrinterNode(directConn, FIXTURE_NODE_REJECT_A, FIXTURE_TENANT_A, `Node Reject ${EXECUTION_TAG}`, INITIAL_RATES_JSON_STR, nodeColSet);
+        assert(true, `Created dedicated rejection node ${FIXTURE_NODE_REJECT_A} with baseline rates`);
+
+        // Construct 8 targets with point 800 perturbed downward to 1320.00 EUR (baseline is 1364.50 EUR, q=700 is 1267.00 EUR).
+        // Total price is strictly monotonic (1320 > 1267) and unit cost is non-increasing (1320/800 = 1.65 < 1267/700 = 1.81).
+        // Solver converges to SUCCEEDED, but point 800 residual (~42.50 EUR) exceeds governance tolerance (~6.60 EUR).
+        const outOfToleranceTargets = CURVE_QUANTITIES.map(q => {
+            const fwd = pricingAdapter.evaluateForwardPrice({ ...CURVE_BOOK_SPEC, copies: q }, INITIAL_VALID_RATES, {}, {});
+            let p = Number(fwd.predictedManufacturingPrice.toFixed(2));
+            if (q === 800) {
+                p = 1320.00;
+            }
+            return {
+                quantity: q,
+                targetManufacturingPrice: p,
+                targetBasis: 'MANUFACTURING_PRICE',
+                currency: 'EUR'
+            };
+        });
+
+        const rejectSessionPayload = {
+            printerNodeId: FIXTURE_NODE_REJECT_A,
+            referenceBookName: 'Synthetic Out-of-Tolerance Curve Fixture',
+            bookSpec: CURVE_BOOK_SPEC,
+            multiTargets: outOfToleranceTargets,
+            currency: 'EUR',
+            includesPaper: true,
+            includesBinding: true,
+            includesFinishing: true,
+            includesPackaging: true
+        };
+
+        const rejectCreateRes = await httpRequest(
+            serverUrl,
+            'POST',
+            '/api/printhouse/onboarding/pricing/calibrations',
+            tokenA,
+            rejectSessionPayload
+        );
+        assert(rejectCreateRes.status === 201, `Rejection session created with HTTP 201`, formatHttpDiagnostic('POST', '/api/printhouse/onboarding/pricing/calibrations', rejectCreateRes));
+        const rejectSessionId = rejectCreateRes.body.data.id;
+        tracker.sessionIds.add(rejectSessionId);
+
+        const rejectReadyRes = await httpRequest(
+            serverUrl,
+            'POST',
+            `/api/printhouse/onboarding/pricing/calibrations/${rejectSessionId}/ready`,
+            tokenA
+        );
+        assert(rejectReadyRes.status === 200, `POST /ready on rejection session returned HTTP 200`, formatHttpDiagnostic('POST', `/api/printhouse/onboarding/pricing/calibrations/${rejectSessionId}/ready`, rejectReadyRes));
+        assert(rejectReadyRes.body?.data?.status === 'READY', `Rejection session promoted to READY`);
+
+        const rejectCalcRes = await httpRequest(
+            serverUrl,
+            'POST',
+            `/api/printhouse/onboarding/pricing/calibrations/${rejectSessionId}/calculate`,
+            tokenA
+        );
+        assert(rejectCalcRes.status === 201, `Solver calculated run for rejection session with HTTP 201`, formatHttpDiagnostic('POST', `/api/printhouse/onboarding/pricing/calibrations/${rejectSessionId}/calculate`, rejectCalcRes));
+        const rejectRunData = rejectCalcRes.body?.data;
+        assert(rejectRunData && typeof rejectRunData.id === 'string', `Valid run ID received for rejection session`);
+        const rejectRunId = rejectRunData.id;
+        tracker.runIds.add(rejectRunId);
+
+        // Assert solver status SUCCEEDED and verify point 800 is outside tolerance
+        assert(rejectRunData.status === 'SUCCEEDED', `Solver produced run with status SUCCEEDED`);
+        const pt800 = rejectRunData.pointResults?.find(p => p.quantity === 800);
+        assert(pt800 && pt800.withinTolerance === false, `Point q=800 correctly marked as withinTolerance: false by solver`);
+        assert(pt800.absoluteResidual > 20.0, `Point q=800 absolute residual (${pt800.absoluteResidual} EUR) strictly exceeds point tolerance`);
+
+        // Attempt Governed Acceptance: MUST be rejected by curve tolerance gate
+        const rejectAcceptRes = await httpRequest(
+            serverUrl,
+            'POST',
+            `/api/printhouse/onboarding/pricing/calibrations/${rejectSessionId}/accept`,
+            tokenA,
+            {
+                runId: rejectRunId,
+                acceptanceNotes: 'Unauthorized attempt to accept out-of-tolerance curve'
+            }
+        );
+        assert(rejectAcceptRes.status === 422, `Out-of-tolerance curve acceptance strictly rejected with HTTP 422`, formatHttpDiagnostic('POST', `/api/printhouse/onboarding/pricing/calibrations/${rejectSessionId}/accept`, rejectAcceptRes));
+        assert(rejectAcceptRes.body?.code === 'GOVERNANCE_CURVE_REJECTED' || rejectAcceptRes.body?.error?.code === 'GOVERNANCE_CURVE_REJECTED',
+            `Rejection code is strictly GOVERNANCE_CURVE_REJECTED`);
+
+        // Check specific rejection reasons
+        const rejectReasons = rejectAcceptRes.body?.reasons || rejectAcceptRes.body?.details?.reasons || (Array.isArray(rejectAcceptRes.body?.details) ? rejectAcceptRes.body?.details : []);
+        assert(rejectReasons.includes('POINT_OUT_OF_TOLERANCE'), `Rejection reasons strictly contain POINT_OUT_OF_TOLERANCE: [${rejectReasons.join(', ')}]`);
+        console.log(`  ✓ Sanitized Governance Diagnostic: ${formatHttpDiagnostic('POST', `/api/printhouse/onboarding/pricing/calibrations/${rejectSessionId}/accept`, rejectAcceptRes)}`);
+
+        // Verify zero revisions and zero acceptances created in MySQL
+        const [noRevs] = await directConn.query(
+            `SELECT COUNT(*) as count FROM printhouse_pricing_revisions WHERE printer_node_id = ?`,
+            [FIXTURE_NODE_REJECT_A]
+        );
+        assert(noRevs[0].count === 0, `Zero pricing revisions created following out-of-tolerance rejection`);
+
+        const [noAccs] = await directConn.query(
+            `SELECT COUNT(*) as count FROM printhouse_pricing_calibration_acceptances WHERE calibration_session_id = ?`,
+            [rejectSessionId]
+        );
+        assert(noAccs[0].count === 0, `Zero calibration acceptances created for rejected session`);
+
+        // Verify node rates remain strictly untouched and match INITIAL_RATES_CHECKSUM
+        const [nodeRejectState] = await directConn.query(
+            `SELECT rates_json FROM printer_nodes WHERE id = ?`,
+            [FIXTURE_NODE_REJECT_A]
+        );
+        const nodeRejectChecksum = computeCanonicalRatesChecksum(nodeRejectState[0].rates_json);
+        const nodeRejectIntegrity = verifyRatesChecksumIntegrity(nodeRejectChecksum, INITIAL_RATES_CHECKSUM);
+        assert(nodeRejectIntegrity.valid === true, `Rejection node rates_json remains strictly identical to baseline fixture`);
+        console.log(`\n  [SCENARIO 3 COMPLETE] Out-of-Tolerance Curve Rejected with Zero Residuals.\n`);
+
+        // ══════════════════════════════════════════════════════════════════════════════
+        // ── SCENARIO 4 (CASO C): CROSS-TENANT CURVE ISOLATION ──
+        // ══════════════════════════════════════════════════════════════════════════════
+        console.log(`\n================================================================`);
+        console.log(`  SCENARIO 4 (CASO C): CROSS-TENANT CURVE ISOLATION             `);
+        console.log(`================================================================`);
+
+        // Tenant B attempts to accept Tenant A's curve run on Tenant A's curve session
+        const crossCurveAccept = await httpRequest(
+            serverUrl,
+            'POST',
+            `/api/printhouse/onboarding/pricing/calibrations/${curveSessionId}/accept`,
+            tokenB,
+            {
+                runId: curveRunId,
+                acceptanceNotes: 'Cross-tenant unauthorized acceptance attempt on curve run'
+            }
+        );
+        assert(crossCurveAccept.status === 403 || crossCurveAccept.status === 404,
+            `Cross-tenant curve acceptance rejected with HTTP ${crossCurveAccept.status}`,
+            formatHttpDiagnostic('POST', `/api/printhouse/onboarding/pricing/calibrations/${curveSessionId}/accept`, crossCurveAccept));
+
+        // Verify zero revisions created for Tenant B
+        const [tenantBRevs] = await directConn.query(
+            `SELECT COUNT(*) as count FROM printhouse_pricing_revisions WHERE tenant_id = ?`,
+            [FIXTURE_TENANT_B]
+        );
+        assert(tenantBRevs[0].count === 0, `Zero pricing revisions created for Tenant B`);
+
+        // Verify zero acceptances created for Tenant B
+        const [tenantBAccs] = await directConn.query(
+            `SELECT COUNT(*) as count FROM printhouse_pricing_calibration_acceptances WHERE tenant_id = ?`,
+            [FIXTURE_TENANT_B]
+        );
+        assert(tenantBAccs[0].count === 0, `Zero calibration acceptances created for Tenant B`);
+        console.log(`\n  [SCENARIO 4 COMPLETE] Cross-Tenant Curve Isolation Verified with Zero Mutations.\n`);
 
     } catch (err) {
         mainError = err;
@@ -1543,16 +2121,18 @@ module.exports = {
     verifyRatesChecksumIntegrity,
     computeCanonicalRatesChecksum,
     canonicalStringify,
-    runChecksumIntegrityRegressions
+    runChecksumIntegrityRegressions,
+    runCurveHarnessRegressions
 };
 
 if (require.main === module) {
     if (isRegressionMode) {
         try {
             runChecksumIntegrityRegressions();
+            runCurveHarnessRegressions();
             process.exit(0);
         } catch (err) {
-            console.error(`\n[FATAL] Checksum regressions failed: ${err.message}`);
+            console.error(`\n[FATAL] Regressions failed: ${err.message}`);
             process.exit(1);
         }
     } else {

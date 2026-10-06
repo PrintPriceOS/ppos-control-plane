@@ -109,7 +109,7 @@ describe('Calibration Residuals & Compatibility Regressions', () => {
         test('1.1 Single-point contract: Rechaza run.percent_residual = 0.01 cuando el error real es 1 % (1.0 percentage points)', async () => {
             // Target = 100 EUR, Predicted = 101 EUR -> Absolute residual = 1.00 EUR.
             // Ratio = 0.01, Percentage points = 1.00%.
-            // Canonical solver contract produces percentage points (1.0).
+            // Canonical solver contract for single-point produces percentage points (1.0).
             // A supplied value of 0.01 claims 0.01% error (100x lower), which must be rejected as contradictory.
             setupMocks({
                 runOverrides: {
@@ -156,13 +156,30 @@ describe('Calibration Residuals & Compatibility Regressions', () => {
             expect(mockConnection.commit).toHaveBeenCalled();
         });
 
-        test('1.3 Explicit ratio discriminator: Rechaza run.percent_residual = 1.0 cuando la unidad declarada es RATIO', async () => {
+        test('1.3 Multi-quantity curve contract: Acepta run.percent_residual = 0.01 (unitless ratio) y rechaza 1.0', async () => {
+            const targets = [
+                { quantity: 100, targetManufacturingPrice: 100.0, targetBasis: 'MANUFACTURING_PRICE' },
+                { quantity: 500, targetManufacturingPrice: 500.0, targetBasis: 'MANUFACTURING_PRICE' }
+            ];
+            // Forward price: Qty 100 -> 100.0 EUR, Qty 500 -> 505.0 EUR (absRes = 5 EUR, ratio = 5/500 = 0.01)
+            // Multi-quantity solver contract defines percentResidual as max ratio [0..1] = 0.01
             setupMocks({
-                runOverrides: {
-                    absolute_residual: 1.0,
-                    percent_residual: 1.0 // Supplying percentage points when RATIO is expected
+                sessionOverrides: {
+                    multi_targets_json: JSON.stringify(targets),
+                    target_manufacturing_price: 100.0
                 },
-                forwardPriceMock: () => ({ predictedManufacturingPrice: 101.0 })
+                runOverrides: {
+                    absolute_residual: 5.0,
+                    percent_residual: 1.0, // Supplying percentage points instead of accredited ratio contract
+                    point_results_json: JSON.stringify([
+                        { quantity: 100, absoluteResidual: 0.0, percentageResidual: 0.0 },
+                        { quantity: 500, absoluteResidual: 5.0, percentageResidual: 0.01 }
+                    ])
+                },
+                forwardPriceMock: (spec) => {
+                    const q = spec.quantity || spec.copies || 100;
+                    return { predictedManufacturingPrice: q === 500 ? 505.0 : 100.0 };
+                }
             });
 
             await expect(calibrationAcceptanceService.acceptCalibrationRun(
@@ -170,34 +187,11 @@ describe('Calibration Residuals & Compatibility Regressions', () => {
                 'sess-100',
                 'run-100',
                 { id: 'usr-1', email: 'op@test.pro', role: 'ADMIN' },
-                { absoluteTolerance: 2.0, percentTolerance: 0.05, percentResidualUnit: 'RATIO' }
+                { absoluteTolerance: 10.0, percentTolerance: 0.05 }
             )).rejects.toThrow('CONTRADICTORY_SUPPLIED_RESIDUAL');
 
             expect(mockConnection.rollback).toHaveBeenCalled();
             expect(mockConnection.commit).not.toHaveBeenCalled();
-        });
-
-        test('1.4 Explicit ratio discriminator: Acepta run.percent_residual = 0.01 cuando la unidad declarada es RATIO', async () => {
-            setupMocks({
-                runOverrides: {
-                    absolute_residual: 1.0,
-                    percent_residual: 0.01,
-                    percent_residual_unit: 'RATIO'
-                },
-                forwardPriceMock: () => ({ predictedManufacturingPrice: 101.0 })
-            });
-
-            const result = await calibrationAcceptanceService.acceptCalibrationRun(
-                'tenant-1',
-                'sess-100',
-                'run-100',
-                { id: 'usr-1', email: 'op@test.pro', role: 'ADMIN' },
-                { absoluteTolerance: 2.0, percentTolerance: 0.05 }
-            );
-
-            expect(result.ok).toBe(true);
-            expect(result.status).toBe('ACCEPTED');
-            expect(mockConnection.commit).toHaveBeenCalled();
         });
     });
 
@@ -272,43 +266,114 @@ describe('Calibration Residuals & Compatibility Regressions', () => {
             expect(mockConnection.commit).not.toHaveBeenCalled();
         });
 
-        test('2.4 Justo fuera con skipCurveValidation: rechaza estrictamente con CALIBRATION_ACCEPTANCE_TOLERANCE_EXCEEDED', async () => {
+        test('2.4 Tolerancia por punto en curva: objetivos 100 y 1200 EUR con tolerancia relativa 1 %, residual punto 2 = 5 EUR (5 <= 12) supera comprobación por punto', async () => {
+            // Requisito 2:
+            // Objetivos 100 EUR y 1200 EUR, tolerancia relativa 1 % (percentTolerance = 0.01).
+            // Tolerancia para punto 1 (100 EUR): 1 % = 1.0 EUR.
+            // Tolerancia para punto 2 (1200 EUR): 1 % = 12.0 EUR.
+            // Punto 1 residual = 0.50 EUR (0.50 <= 1.0 -> dentro de tolerancia).
+            // Punto 2 residual = 5.00 EUR (5.00 <= 12.0 -> dentro de tolerancia!).
+            // NO debe compararse maxAbsoluteResidual (5.0 EUR) contra la tolerancia del primer punto (1.0 EUR).
+            const targets = [
+                { quantity: 100, targetManufacturingPrice: 100.0, targetBasis: 'MANUFACTURING_PRICE' },
+                { quantity: 2000, targetManufacturingPrice: 1200.0, targetBasis: 'MANUFACTURING_PRICE' }
+            ];
+
             setupMocks({
-                runOverrides: {
-                    absolute_residual: 0.51,
-                    percent_residual: 0.51
+                sessionOverrides: {
+                    multi_targets_json: JSON.stringify(targets),
+                    target_manufacturing_price: 100.0
                 },
-                forwardPriceMock: () => ({ predictedManufacturingPrice: 100.51 })
+                runOverrides: {
+                    absolute_residual: 5.0, // Max residual of the curve (at Qty 2000)
+                    percent_residual: Number((5.0 / 1200.0).toFixed(6)), // 0.004167 ratio
+                    point_results_json: JSON.stringify([
+                        { quantity: 100, absoluteResidual: 0.50, percentageResidual: 0.005 },
+                        { quantity: 2000, absoluteResidual: 5.00, percentageResidual: Number((5.0 / 1200.0).toFixed(6)) }
+                    ])
+                },
+                forwardPriceMock: (spec) => {
+                    const q = spec.quantity || spec.copies || 100;
+                    if (q === 100) return { predictedManufacturingPrice: 100.50 };
+                    if (q === 1050) return { predictedManufacturingPrice: 700.0 }; // midpoint probe: non-increasing unit cost
+                    if (q === 2000) return { predictedManufacturingPrice: 1205.00 };
+                    return { predictedManufacturingPrice: 100.0 };
+                }
             });
 
-            await expect(calibrationAcceptanceService.acceptCalibrationRun(
+            const result = await calibrationAcceptanceService.acceptCalibrationRun(
                 'tenant-1',
                 'sess-100',
                 'run-100',
                 { id: 'usr-1', email: 'op@test.pro', role: 'ADMIN' },
-                { absoluteTolerance: 0.50, percentTolerance: 0.005, skipCurveValidation: true }
-            )).rejects.toThrow('CALIBRATION_ACCEPTANCE_TOLERANCE_EXCEEDED');
+                { absoluteTolerance: 0.10, percentTolerance: 0.01 }
+            );
 
+            expect(result.ok).toBe(true);
+            expect(result.status).toBe('ACCEPTED');
+            expect(mockConnection.commit).toHaveBeenCalled();
+        });
+
+        test('2.5 Tolerancia por punto en curva: objetivos 100 y 1200 EUR con tolerancia relativa 1 %, residual punto 2 = 15 EUR (15 > 12) es rechazado', async () => {
+            // Caso equivalente fuera de tolerancia:
+            // Punto 1 residual = 0.50 EUR (0.50 <= 1.0 -> OK).
+            // Punto 2 residual = 15.00 EUR (15.00 > 12.0 -> EXCEDE tolerancia del segundo punto!).
+            const targets = [
+                { quantity: 100, targetManufacturingPrice: 100.0, targetBasis: 'MANUFACTURING_PRICE' },
+                { quantity: 2000, targetManufacturingPrice: 1200.0, targetBasis: 'MANUFACTURING_PRICE' }
+            ];
+
+            setupMocks({
+                sessionOverrides: {
+                    multi_targets_json: JSON.stringify(targets),
+                    target_manufacturing_price: 100.0
+                },
+                runOverrides: {
+                    absolute_residual: 15.0,
+                    percent_residual: Number((15.0 / 1200.0).toFixed(6)),
+                    point_results_json: JSON.stringify([
+                        { quantity: 100, absoluteResidual: 0.50, percentageResidual: 0.005 },
+                        { quantity: 2000, absoluteResidual: 15.00, percentageResidual: Number((15.0 / 1200.0).toFixed(6)) }
+                    ])
+                },
+                forwardPriceMock: (spec) => {
+                    const q = spec.quantity || spec.copies || 100;
+                    if (q === 100) return { predictedManufacturingPrice: 100.50 };
+                    if (q === 1050) return { predictedManufacturingPrice: 700.0 };
+                    if (q === 2000) return { predictedManufacturingPrice: 1215.00 }; // 15 EUR residual
+                    return { predictedManufacturingPrice: 100.0 };
+                }
+            });
+
+            let error = null;
+            try {
+                await calibrationAcceptanceService.acceptCalibrationRun(
+                    'tenant-1',
+                    'sess-100',
+                    'run-100',
+                    { id: 'usr-1', email: 'op@test.pro', role: 'ADMIN' },
+                    { absoluteTolerance: 0.10, percentTolerance: 0.01 }
+                );
+            } catch (err) {
+                error = err;
+            }
+
+            expect(error).not.toBeNull();
+            expect(error.code).toBe('GOVERNANCE_CURVE_REJECTED');
+            expect(error.details).toContain('POINT_OUT_OF_TOLERANCE');
             expect(mockConnection.rollback).toHaveBeenCalled();
             expect(mockConnection.commit).not.toHaveBeenCalled();
         });
     });
 
     // ── GROUP 3: Curva cuyo mayor residual esté en una tirada distinta de la primera ──
-    describe('3. Curva multi-cantidad: Mayor residual en tirada distinta de la primera', () => {
+    describe('3. Curva multi-cantidad: Mayor residual en tirada distinta de la primera y validación estricta de puntos', () => {
         const multiTargets = [
             { quantity: 100, targetManufacturingPrice: 100.0, targetBasis: 'MANUFACTURING_PRICE' },
             { quantity: 500, targetManufacturingPrice: 400.0, targetBasis: 'MANUFACTURING_PRICE' },
             { quantity: 2000, targetManufacturingPrice: 1200.0, targetBasis: 'MANUFACTURING_PRICE' }
         ];
 
-        // Forward prices:
-        // Qty 100: 100.05 EUR -> absRes = 0.05 EUR (point 0)
-        // Midpoint 300: 250.00 EUR -> structurally sound probe
-        // Qty 500: 400.40 EUR -> absRes = 0.40 EUR (point 1: MAXIMUM!)
-        // Midpoint 1250: 800.00 EUR -> structurally sound probe
-        // Qty 2000: 1200.15 EUR -> absRes = 0.15 EUR (point 2)
-        // Max absolute residual across curve is 0.40 EUR (at Qty 500, NOT Qty 100).
         const multiForwardPrices = {
             100: 100.05,
             300: 250.00,
@@ -327,9 +392,9 @@ describe('Calibration Residuals & Compatibility Regressions', () => {
                     absolute_residual: 0.40, // Max residual of the curve (Qty 500)
                     percent_residual: 0.001, // 0.40 / 400 = 0.001 (ratio)
                     point_results_json: JSON.stringify([
-                        { quantity: 100, absoluteResidual: 0.05 },
-                        { quantity: 500, absoluteResidual: 0.40 },
-                        { quantity: 2000, absoluteResidual: 0.15 }
+                        { quantity: 100, absoluteResidual: 0.05, percentageResidual: 0.0005 },
+                        { quantity: 500, absoluteResidual: 0.40, percentageResidual: 0.001 },
+                        { quantity: 2000, absoluteResidual: 0.15, percentageResidual: 0.000125 }
                     ])
                 },
                 forwardPriceMock: (spec) => {
@@ -350,7 +415,6 @@ describe('Calibration Residuals & Compatibility Regressions', () => {
             expect(result.status).toBe('ACCEPTED');
             expect(mockConnection.commit).toHaveBeenCalled();
 
-            // Verify that verification_json recorded curve evaluation and correct metrics
             const insertCalls = mockQuery.mock.calls.filter(call => call[0].includes('INSERT INTO printhouse_pricing_calibration_acceptances'));
             expect(insertCalls).toHaveLength(1);
             const verificationJson = JSON.parse(insertCalls[0][1][17]);
@@ -366,7 +430,12 @@ describe('Calibration Residuals & Compatibility Regressions', () => {
                 },
                 runOverrides: {
                     absolute_residual: 0.05, // Mistakenly supplied point 0 instead of curve maximum (0.40)
-                    percent_residual: 0.001
+                    percent_residual: 0.001,
+                    point_results_json: JSON.stringify([
+                        { quantity: 100, absoluteResidual: 0.05, percentageResidual: 0.0005 },
+                        { quantity: 500, absoluteResidual: 0.40, percentageResidual: 0.001 },
+                        { quantity: 2000, absoluteResidual: 0.15, percentageResidual: 0.000125 }
+                    ])
                 },
                 forwardPriceMock: (spec) => {
                     const q = spec.quantity || spec.copies || 100;
@@ -386,7 +455,63 @@ describe('Calibration Residuals & Compatibility Regressions', () => {
             expect(mockConnection.commit).not.toHaveBeenCalled();
         });
 
-        test('3.3 Rechaza curva si un punto individual en run.point_results_json contradice el cálculo verificado', async () => {
+        test('3.3 Rechaza curva cuando falta point_results_json en tirada multi-cantidad', async () => {
+            setupMocks({
+                sessionOverrides: {
+                    multi_targets_json: JSON.stringify(multiTargets),
+                    target_manufacturing_price: 100.0
+                },
+                runOverrides: {
+                    absolute_residual: 0.40,
+                    percent_residual: 0.001,
+                    point_results_json: null // Missing!
+                },
+                forwardPriceMock: (spec) => {
+                    const q = spec.quantity || spec.copies || 100;
+                    return { predictedManufacturingPrice: multiForwardPrices[q] || 100.0 };
+                }
+            });
+
+            await expect(calibrationAcceptanceService.acceptCalibrationRun(
+                'tenant-1',
+                'sess-100',
+                'run-100',
+                { id: 'usr-1', email: 'op@test.pro', role: 'ADMIN' },
+                { absoluteTolerance: 0.50, percentTolerance: 0.01 }
+            )).rejects.toThrow('MISSING_POINT_RESULTS_JSON');
+
+            expect(mockConnection.rollback).toHaveBeenCalled();
+        });
+
+        test('3.4 Rechaza curva cuando point_results_json es JSON malformado', async () => {
+            setupMocks({
+                sessionOverrides: {
+                    multi_targets_json: JSON.stringify(multiTargets),
+                    target_manufacturing_price: 100.0
+                },
+                runOverrides: {
+                    absolute_residual: 0.40,
+                    percent_residual: 0.001,
+                    point_results_json: '{ bad_json: true ' // Malformed
+                },
+                forwardPriceMock: (spec) => {
+                    const q = spec.quantity || spec.copies || 100;
+                    return { predictedManufacturingPrice: multiForwardPrices[q] || 100.0 };
+                }
+            });
+
+            await expect(calibrationAcceptanceService.acceptCalibrationRun(
+                'tenant-1',
+                'sess-100',
+                'run-100',
+                { id: 'usr-1', email: 'op@test.pro', role: 'ADMIN' },
+                { absoluteTolerance: 0.50, percentTolerance: 0.01 }
+            )).rejects.toThrow('MALFORMED_POINT_RESULTS_JSON');
+
+            expect(mockConnection.rollback).toHaveBeenCalled();
+        });
+
+        test('3.5 Rechaza curva cuando point_results_json tiene puntos duplicados', async () => {
             setupMocks({
                 sessionOverrides: {
                     multi_targets_json: JSON.stringify(multiTargets),
@@ -396,9 +521,105 @@ describe('Calibration Residuals & Compatibility Regressions', () => {
                     absolute_residual: 0.40,
                     percent_residual: 0.001,
                     point_results_json: JSON.stringify([
-                        { quantity: 100, absoluteResidual: 0.05 },
-                        { quantity: 500, absoluteResidual: 99.99 }, // Contradictory point residual!
-                        { quantity: 2000, absoluteResidual: 0.15 }
+                        { quantity: 100, absoluteResidual: 0.05, percentageResidual: 0.0005 },
+                        { quantity: 500, absoluteResidual: 0.40, percentageResidual: 0.001 },
+                        { quantity: 500, absoluteResidual: 0.40, percentageResidual: 0.001 } // Duplicate Qty 500!
+                    ])
+                },
+                forwardPriceMock: (spec) => {
+                    const q = spec.quantity || spec.copies || 100;
+                    return { predictedManufacturingPrice: multiForwardPrices[q] || 100.0 };
+                }
+            });
+
+            await expect(calibrationAcceptanceService.acceptCalibrationRun(
+                'tenant-1',
+                'sess-100',
+                'run-100',
+                { id: 'usr-1', email: 'op@test.pro', role: 'ADMIN' },
+                { absoluteTolerance: 0.50, percentTolerance: 0.01 }
+            )).rejects.toThrow('DUPLICATE_POINT_IN_RESULTS');
+
+            expect(mockConnection.rollback).toHaveBeenCalled();
+        });
+
+        test('3.6 Rechaza curva cuando point_results_json tiene puntos desconocidos', async () => {
+            setupMocks({
+                sessionOverrides: {
+                    multi_targets_json: JSON.stringify(multiTargets),
+                    target_manufacturing_price: 100.0
+                },
+                runOverrides: {
+                    absolute_residual: 0.40,
+                    percent_residual: 0.001,
+                    point_results_json: JSON.stringify([
+                        { quantity: 100, absoluteResidual: 0.05, percentageResidual: 0.0005 },
+                        { quantity: 500, absoluteResidual: 0.40, percentageResidual: 0.001 },
+                        { quantity: 9999, absoluteResidual: 0.15, percentageResidual: 0.000125 } // Unknown quantity 9999
+                    ])
+                },
+                forwardPriceMock: (spec) => {
+                    const q = spec.quantity || spec.copies || 100;
+                    return { predictedManufacturingPrice: multiForwardPrices[q] || 100.0 };
+                }
+            });
+
+            await expect(calibrationAcceptanceService.acceptCalibrationRun(
+                'tenant-1',
+                'sess-100',
+                'run-100',
+                { id: 'usr-1', email: 'op@test.pro', role: 'ADMIN' },
+                { absoluteTolerance: 0.50, percentTolerance: 0.01 }
+            )).rejects.toThrow('UNKNOWN_POINT_IN_RESULTS');
+
+            expect(mockConnection.rollback).toHaveBeenCalled();
+        });
+
+        test('3.7 Rechaza curva cuando faltan puntos en point_results_json', async () => {
+            setupMocks({
+                sessionOverrides: {
+                    multi_targets_json: JSON.stringify(multiTargets),
+                    target_manufacturing_price: 100.0
+                },
+                runOverrides: {
+                    absolute_residual: 0.40,
+                    percent_residual: 0.001,
+                    point_results_json: JSON.stringify([
+                        { quantity: 100, absoluteResidual: 0.05, percentageResidual: 0.0005 },
+                        { quantity: 500, absoluteResidual: 0.40, percentageResidual: 0.001 }
+                        // Missing quantity 2000!
+                    ])
+                },
+                forwardPriceMock: (spec) => {
+                    const q = spec.quantity || spec.copies || 100;
+                    return { predictedManufacturingPrice: multiForwardPrices[q] || 100.0 };
+                }
+            });
+
+            await expect(calibrationAcceptanceService.acceptCalibrationRun(
+                'tenant-1',
+                'sess-100',
+                'run-100',
+                { id: 'usr-1', email: 'op@test.pro', role: 'ADMIN' },
+                { absoluteTolerance: 0.50, percentTolerance: 0.01 }
+            )).rejects.toThrow('MISSING_POINT_IN_RESULTS');
+
+            expect(mockConnection.rollback).toHaveBeenCalled();
+        });
+
+        test('3.8 Rechaza curva si un punto individual en run.point_results_json tiene residual porcentual contradictorio', async () => {
+            setupMocks({
+                sessionOverrides: {
+                    multi_targets_json: JSON.stringify(multiTargets),
+                    target_manufacturing_price: 100.0
+                },
+                runOverrides: {
+                    absolute_residual: 0.40,
+                    percent_residual: 0.001,
+                    point_results_json: JSON.stringify([
+                        { quantity: 100, absoluteResidual: 0.05, percentageResidual: 0.0005 },
+                        { quantity: 500, absoluteResidual: 0.40, percentageResidual: 0.999 }, // Contradictory percentage residual!
+                        { quantity: 2000, absoluteResidual: 0.15, percentageResidual: 0.000125 }
                     ])
                 },
                 forwardPriceMock: (spec) => {
@@ -488,6 +709,242 @@ describe('Calibration Residuals & Compatibility Regressions', () => {
 
             const nodeUpdates = mockQuery.mock.calls.filter(c => c[0].includes('UPDATE printer_nodes'));
             expect(nodeUpdates).toHaveLength(0);
+        });
+    });
+
+    // ── GROUP 5: Resolución de tirada canónica y paridad en evaluación de gobernanza de curvas ──
+    describe('5. Resolución de tirada canónica (copies) y paridad en gobernanza de curva', () => {
+        test('5.1 Servicio real con bookSpec.copies=1500 sin quantity envía tirada 1500 a evaluación principal y a gobernanza de curva (sin mockear evaluateCurveAcceptance)', async () => {
+            const capturedSpecs = [];
+            const forwardPriceSpy = vi.fn().mockImplementation((spec) => {
+                capturedSpecs.push({ ...spec });
+                return { predictedManufacturingPrice: 1792.05 };
+            });
+
+            setupMocks({
+                sessionOverrides: {
+                    book_spec_json: JSON.stringify({
+                        copies: 1500,
+                        interior_pages: 120,
+                        interior_print: '4/4',
+                        cover_print: '4/0',
+                        binding_method: 'perfect bound'
+                    }),
+                    target_manufacturing_price: 1792.00,
+                    multi_targets_json: null
+                },
+                runOverrides: {
+                    target_price: 1792.00,
+                    absolute_residual: 0.05,
+                    percent_residual: 0.000027899,
+                    point_results_json: null
+                },
+                forwardPriceMock: forwardPriceSpy
+            });
+
+            const result = await calibrationAcceptanceService.acceptCalibrationRun(
+                'tenant-1',
+                'sess-100',
+                'run-100',
+                { id: 'usr-1', email: 'op@test.pro', role: 'ADMIN' },
+                { absoluteTolerance: 0.50, percentTolerance: 0.01 }
+            );
+
+            expect(result.ok).toBe(true);
+            expect(result.status).toBe('ACCEPTED');
+
+            // Assert that adapter.evaluateForwardPrice was called at least twice (principal evaluation + curve evaluation)
+            expect(forwardPriceSpy).toHaveBeenCalled();
+            expect(capturedSpecs.length).toBeGreaterThanOrEqual(2);
+
+            // Verify EVERY call received copies: 1500 and quantity: 1500 (NEVER default to 1)
+            for (const spec of capturedSpecs) {
+                expect(spec.copies).toBe(1500);
+                expect(spec.quantity).toBe(1500);
+                expect(spec.copies).not.toBe(1);
+                expect(spec.quantity).not.toBe(1);
+            }
+
+            expect(mockConnection.commit).toHaveBeenCalled();
+            expect(mockConnection.rollback).not.toHaveBeenCalled();
+        });
+
+        test('5.2 Rechaza bookSpec cuando copies y quantity están ausentes (MISSING_SPEC_QUANTITY), sin sustituir por 1', async () => {
+            setupMocks({
+                sessionOverrides: {
+                    book_spec_json: JSON.stringify({
+                        interior_pages: 120,
+                        interior_print: '4/4',
+                        cover_print: '4/0',
+                        binding_method: 'perfect bound'
+                    }),
+                    target_manufacturing_price: 1792.00,
+                    multi_targets_json: null
+                },
+                runOverrides: {
+                    target_price: 1792.00,
+                    absolute_residual: 0.05
+                },
+                forwardPriceMock: () => ({ predictedManufacturingPrice: 1792.05 })
+            });
+
+            let error = null;
+            try {
+                await calibrationAcceptanceService.acceptCalibrationRun(
+                    'tenant-1',
+                    'sess-100',
+                    'run-100',
+                    { id: 'usr-1', email: 'op@test.pro', role: 'ADMIN' }
+                );
+            } catch (err) {
+                error = err;
+            }
+
+            expect(error).not.toBeNull();
+            expect(error.code).toBe('MISSING_SPEC_QUANTITY');
+            expect(error.statusCode).toBe(422);
+            expect(mockConnection.rollback).toHaveBeenCalled();
+            expect(mockConnection.commit).not.toHaveBeenCalled();
+        });
+
+        test('5.3 Rechaza bookSpec con copies y quantity contradictorios (CONTRADICTORY_SPEC_QUANTITY)', async () => {
+            setupMocks({
+                sessionOverrides: {
+                    book_spec_json: JSON.stringify({
+                        copies: 1500,
+                        quantity: 1000,
+                        interior_pages: 120,
+                        binding_method: 'perfect bound'
+                    }),
+                    target_manufacturing_price: 1792.00,
+                    multi_targets_json: null
+                },
+                runOverrides: {
+                    target_price: 1792.00,
+                    absolute_residual: 0.05
+                },
+                forwardPriceMock: () => ({ predictedManufacturingPrice: 1792.05 })
+            });
+
+            let error = null;
+            try {
+                await calibrationAcceptanceService.acceptCalibrationRun(
+                    'tenant-1',
+                    'sess-100',
+                    'run-100',
+                    { id: 'usr-1', email: 'op@test.pro', role: 'ADMIN' }
+                );
+            } catch (err) {
+                error = err;
+            }
+
+            expect(error).not.toBeNull();
+            expect(error.code).toBe('CONTRADICTORY_SPEC_QUANTITY');
+            expect(error.statusCode).toBe(422);
+            expect(mockConnection.rollback).toHaveBeenCalled();
+            expect(mockConnection.commit).not.toHaveBeenCalled();
+        });
+
+        test('5.4 Rechaza bookSpec con copies inválidos o no enteros', async () => {
+            setupMocks({
+                sessionOverrides: {
+                    book_spec_json: JSON.stringify({
+                        copies: 0,
+                        interior_pages: 120,
+                        binding_method: 'perfect bound'
+                    }),
+                    target_manufacturing_price: 1792.00
+                },
+                runOverrides: {
+                    target_price: 1792.00,
+                    absolute_residual: 0.05
+                },
+                forwardPriceMock: () => ({ predictedManufacturingPrice: 1792.05 })
+            });
+
+            await expect(calibrationAcceptanceService.acceptCalibrationRun(
+                'tenant-1',
+                'sess-100',
+                'run-100',
+                { id: 'usr-1', email: 'op@test.pro', role: 'ADMIN' }
+            )).rejects.toThrow('INVALID_SPEC_COPIES');
+
+            expect(mockConnection.rollback).toHaveBeenCalled();
+        });
+
+        test('5.5 Diagnóstico de rechazo de curva incorpora razones y cantidades evaluadas sin exponer secretos', async () => {
+            // Predicción fuera de tolerancia (pred 50 vs target 1792) genera GOVERNANCE_CURVE_REJECTED
+            setupMocks({
+                sessionOverrides: {
+                    book_spec_json: JSON.stringify({
+                        copies: 1500,
+                        interior_pages: 120,
+                        interior_print: '4/4',
+                        cover_print: '4/0',
+                        binding_method: 'perfect bound'
+                    }),
+                    target_manufacturing_price: 1792.00,
+                    multi_targets_json: null
+                },
+                runOverrides: {
+                    target_price: 1792.00,
+                    absolute_residual: 1742.0,
+                    percent_residual: Number(((1742.0 / 1792.0) * 100).toFixed(4))
+                },
+                forwardPriceMock: () => ({ predictedManufacturingPrice: 50.00 })
+            });
+
+            let error = null;
+            try {
+                await calibrationAcceptanceService.acceptCalibrationRun(
+                    'tenant-1',
+                    'sess-100',
+                    'run-100',
+                    { id: 'usr-1', email: 'op@test.pro', role: 'ADMIN' },
+                    { absoluteTolerance: 0.50, percentTolerance: 0.01 }
+                );
+            } catch (err) {
+                error = err;
+            }
+
+            expect(error).not.toBeNull();
+            expect(error.code).toBe('GOVERNANCE_CURVE_REJECTED');
+            expect(error.statusCode).toBe(422);
+
+            // Rejection message and details include reasons and evaluated quantities
+            expect(error.message).toContain('GOVERNANCE_CURVE_REJECTED');
+            expect(error.message).toContain('POINT_OUT_OF_TOLERANCE');
+            expect(error.message).toContain('1500');
+
+            expect(error.reasons).toBeDefined();
+            expect(error.reasons).toContain('POINT_OUT_OF_TOLERANCE');
+            expect(error.evaluatedQuantities).toBeDefined();
+            expect(error.evaluatedQuantities).toEqual([1500]);
+
+            // No sensitive information leaked in diagnostic message or details
+            const diagStr = JSON.stringify(error.message) + JSON.stringify(error.details);
+            expect(diagStr).not.toContain('mysql');
+            expect(diagStr).not.toContain('password');
+            expect(diagStr).not.toContain('secret');
+            expect(diagStr).not.toContain('token');
+
+            expect(mockConnection.rollback).toHaveBeenCalled();
+            expect(mockConnection.commit).not.toHaveBeenCalled();
+        });
+
+        test('5.6 resolveCanonicalRunQuantity valida contrato unitariamente', () => {
+            expect(calibrationAcceptanceService.resolveCanonicalRunQuantity({ copies: 1500 })).toBe(1500);
+            expect(calibrationAcceptanceService.resolveCanonicalRunQuantity({ quantity: 1500 })).toBe(1500);
+            expect(calibrationAcceptanceService.resolveCanonicalRunQuantity({ copies: 1500, quantity: 1500 })).toBe(1500);
+            expect(calibrationAcceptanceService.resolveCanonicalRunQuantity({ copies: '1500' })).toBe(1500);
+
+            expect(() => calibrationAcceptanceService.resolveCanonicalRunQuantity({})).toThrow('MISSING_SPEC_QUANTITY');
+            expect(() => calibrationAcceptanceService.resolveCanonicalRunQuantity(null)).toThrow('MISSING_OR_INVALID_SPEC_QUANTITY');
+            expect(() => calibrationAcceptanceService.resolveCanonicalRunQuantity({ copies: 0 })).toThrow('INVALID_SPEC_COPIES');
+            expect(() => calibrationAcceptanceService.resolveCanonicalRunQuantity({ copies: -5 })).toThrow('INVALID_SPEC_COPIES');
+            expect(() => calibrationAcceptanceService.resolveCanonicalRunQuantity({ copies: 12.5 })).toThrow('INVALID_SPEC_COPIES');
+            expect(() => calibrationAcceptanceService.resolveCanonicalRunQuantity({ quantity: 'abc' })).toThrow('INVALID_SPEC_QUANTITY');
+            expect(() => calibrationAcceptanceService.resolveCanonicalRunQuantity({ copies: 1500, quantity: 500 })).toThrow('CONTRADICTORY_SPEC_QUANTITY');
         });
     });
 });
