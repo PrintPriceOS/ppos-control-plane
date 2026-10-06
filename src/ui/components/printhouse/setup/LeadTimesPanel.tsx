@@ -8,6 +8,7 @@ import React, { useState, useEffect } from 'react';
 import { getAuthToken } from '../../../lib/authStore';
 import { Clock, Calculator, Check, AlertCircle, CheckCircle } from 'lucide-react';
 import { useLocale } from '../../../i18n';
+import { normalizeUiError } from '../../../utils/errorUtils';
 
 interface LeadTimesPanelProps {
     sites: { siteId: string; siteName: string }[];
@@ -59,7 +60,7 @@ export const LeadTimesPanel: React.FC<LeadTimesPanelProps> = ({ sites, onSaved }
             const res = await fetch(`/api/printhouse/onboarding/sites/${selectedSiteId}/leadtimes`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
-            const data = await res.json();
+            const data = await res.json().catch(() => ({}));
             if (res.ok && data.ok && data.leadTimes) {
                 const lt = data.leadTimes;
                 setTimezone(lt.timezone || 'UTC');
@@ -70,6 +71,8 @@ export const LeadTimesPanel: React.FC<LeadTimesPanelProps> = ({ sites, onSaved }
                     ? JSON.parse(lt.workdays_json)
                     : lt.workdays_json || [1, 2, 3, 4, 5];
                 setWorkdays(wDays);
+            } else if (!res.ok) {
+                setError(normalizeUiError(data, t('setup.leadTimes.error.load') || 'Error loading lead times configuration'));
             } else {
                 setTimezone('UTC');
                 setCutoffTime('14:00');
@@ -77,7 +80,7 @@ export const LeadTimesPanel: React.FC<LeadTimesPanelProps> = ({ sites, onSaved }
                 setWorkdays([1, 2, 3, 4, 5]);
             }
         } catch (err: any) {
-            setError(err.message || 'Error loading lead times config');
+            setError(normalizeUiError(err, t('setup.leadTimes.error.load') || 'Error loading lead times configuration'));
         } finally {
             setLoading(false);
         }
@@ -105,15 +108,15 @@ export const LeadTimesPanel: React.FC<LeadTimesPanelProps> = ({ sites, onSaved }
                     base_lead_time_days: baseLeadDays
                 })
             });
-            const data = await res.json();
+            const data = await res.json().catch(() => ({}));
             if (res.ok && data.ok) {
-                setSuccessMsg(t('setup.leadTimes.save') ? 'OK' : 'Lead times and operational schedule saved.');
+                setSuccessMsg(t('setup.leadTimes.saved') || 'Lead times and operational schedule saved.');
                 if (onSaved) onSaved();
             } else {
-                setError(data.error || 'Failed to save lead times');
+                setError(normalizeUiError(data, t('setup.leadTimes.error.save') || 'Failed to save lead times'));
             }
         } catch (err: any) {
-            setError(err.message || 'Network error saving lead times');
+            setError(normalizeUiError(err, t('common.error.network') || 'Network error saving lead times'));
         }
     };
 
@@ -139,14 +142,14 @@ export const LeadTimesPanel: React.FC<LeadTimesPanelProps> = ({ sites, onSaved }
             const res = await fetch(`/api/printhouse/onboarding/sites/${selectedSiteId}/leadtimes/estimate?start_time=${inputDate.toISOString()}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
-            const data = await res.json();
+            const data = await res.json().catch(() => ({}));
             if (res.ok && data.ok) {
                 setSimulationResult(data.estimated_completion);
             } else {
-                setError(data.error || 'Failed to compute estimate');
+                setError(normalizeUiError(data, t('setup.leadTimes.error.simulate') || 'Failed to compute estimate'));
             }
         } catch (err: any) {
-            setError(err.message || 'Error running simulator');
+            setError(normalizeUiError(err, t('setup.leadTimes.error.simulate') || 'Error running simulator'));
         } finally {
             setSimulating(false);
         }

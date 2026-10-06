@@ -7,6 +7,7 @@ import React, { useState, useEffect } from 'react';
 import { getAuthToken } from '../../../lib/authStore';
 import { Calculator, Play, Info, AlertCircle, Sparkles, Receipt } from 'lucide-react';
 import { useLocale } from '../../../i18n';
+import { normalizeUiError } from '../../../utils/errorUtils';
 
 interface PricingPreviewProps {
     priceBookId: string;
@@ -101,11 +102,10 @@ export const PricingPreview: React.FC<PricingPreviewProps> = ({
             if (res.ok && data.ok) {
                 setPreviewResult(data.simulation);
             } else {
-                const message = typeof data.error === 'string' ? data.error : data.error?.message || data.message || 'Failed to calculate simulated price';
-                setError(message);
+                setError(normalizeUiError(data, t('setup.pricingPreview.error.simulate') || 'Failed to calculate simulated price'));
             }
         } catch (err: any) {
-            setError(err instanceof Error ? err.message : 'Error running simulation');
+            setError(normalizeUiError(err, t('setup.pricingPreview.error.simulate') || 'Error running simulation'));
         } finally {
             setLoading(false);
         }

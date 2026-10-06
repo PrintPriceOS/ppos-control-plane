@@ -8,6 +8,7 @@ import React, { useState, useEffect } from 'react';
 import { getAuthToken } from '../../../lib/authStore';
 import { useLocale } from '../../../i18n';
 import { Activity, ShieldAlert, Check, RefreshCw, AlertCircle, CheckCircle } from 'lucide-react';
+import { normalizeUiError } from '../../../utils/errorUtils';
 
 interface CapacityPanelProps {
     sites: { siteId: string; siteName: string }[];
@@ -113,11 +114,10 @@ export const CapacityPanel: React.FC<CapacityPanelProps> = ({ sites, onSaved }) 
                 setSuccessMsg(t('setup.capacity.savedSite'));
                 if (onSaved) onSaved();
             } else {
-                const message = typeof data.error === 'string' ? data.error : data.error?.message || data.message || 'Failed to save capacity';
-                setError(message);
+                setError(normalizeUiError(data, t('setup.capacity.error.saveSite') || 'Failed to save capacity'));
             }
         } catch (err: any) {
-            setError(err instanceof Error ? err.message : 'Network error');
+            setError(normalizeUiError(err, t('common.error.network') || 'Network error'));
         }
     };
 
@@ -141,11 +141,10 @@ export const CapacityPanel: React.FC<CapacityPanelProps> = ({ sites, onSaved }) 
                 setSuccessMsg(t('setup.capacity.savedMachine'));
                 fetchCapacityData();
             } else {
-                const message = typeof data.error === 'string' ? data.error : data.error?.message || data.message || 'Failed to update machine capacity';
-                setError(message);
+                setError(normalizeUiError(data, t('setup.capacity.error.saveMachine') || 'Failed to update machine capacity'));
             }
         } catch (err: any) {
-            setError(err instanceof Error ? err.message : 'Network error');
+            setError(normalizeUiError(err, t('common.error.network') || 'Network error'));
         }
     };
 

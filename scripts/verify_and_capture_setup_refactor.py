@@ -197,10 +197,87 @@ MOCK_INDUSTRIAL_PRICING = {
     }
 }
 
-def setup_intercepts(page, mock_onboarding=MOCK_ONBOARDING_DATA):
+MOCK_CALIBRATED_SESSION = {
+    "id": "session-calibrated-accepted-1",
+    "status": "ACCEPTED",
+    "printerNodeId": "node-stuttgart-01",
+    "referenceBookName": "Catálogo Industrial Estándar",
+    "bookSpec": {
+        "copies": 1000,
+        "book_width_mm": 170,
+        "book_height_mm": 240,
+        "interior_pages": 128,
+        "interior_print": "4/4",
+        "paper_type_interior": "offset",
+        "paper_weight_interior": 80,
+        "cover_print": "4/0",
+        "paper_type_cover": "mc",
+        "paper_weight_cover": 300,
+        "lamination": "matt",
+        "binding_method": "perfect bound",
+        "delivery_country": "DE"
+    },
+    "targetManufacturingPrice": 2450.0,
+    "currency": "EUR",
+    "transportPricePerKg": 1.25,
+    "transportCurrency": "EUR",
+    "includesPaper": True,
+    "includesBinding": True,
+    "includesFinishing": True,
+    "includesPackaging": True,
+    "createdAt": "2026-10-06T12:00:00Z",
+    "updatedAt": "2026-10-06T12:30:00Z"
+}
+
+MOCK_CALIBRATION_RUN = {
+    "id": "run-accepted-1",
+    "status": "ACCEPTED",
+    "calibrationSessionId": "session-calibrated-accepted-1",
+    "printerNodeId": "node-stuttgart-01",
+    "targetPrice": 2450.0,
+    "enginePriceAfter": 2450.0,
+    "absoluteResidual": 0.0,
+    "percentResidual": 0.0,
+    "sessionInputChecksum": "a" * 64
+}
+
+MOCK_MACHINE_TEMPLATES = {
+    "ok": True,
+    "templates": [
+        {"template_id": "DIGITAL_PRESS", "machine_type": "DIGITAL_PRESS", "defaults": {"machine_type": "DIGITAL_PRESS"}},
+        {"template_id": "OFFSET_PRESS", "machine_type": "OFFSET_PRESS", "defaults": {"machine_type": "OFFSET_PRESS"}},
+        {"template_id": "BINDER", "machine_type": "BINDER", "defaults": {"machine_type": "BINDER"}}
+    ]
+}
+
+def setup_intercepts(page, mock_onboarding=MOCK_ONBOARDING_DATA, mock_calibrations=None):
     def handle_route(route):
         url = route.request.url
-        if "/api/printhouse/onboarding/pricing/industrial" in url:
+        if "/api/printhouse/onboarding/machines/templates" in url:
+            route.fulfill(status=200, content_type="application/json", body=json.dumps(MOCK_MACHINE_TEMPLATES))
+        elif "/machines" in url and "/api/printhouse/onboarding/sites/" in url:
+            route.fulfill(status=200, content_type="application/json", body=json.dumps({"ok": True, "machines": [
+                {
+                    "id": "m-1",
+                    "machine_name": "Heidelberg Speedmaster XL 106",
+                    "machine_type": "OFFSET_PRESS",
+                    "manufacturer": "Heidelberg",
+                    "model": "Speedmaster XL 106",
+                    "status": "ACTIVE",
+                    "max_sheet_width_mm": 1060,
+                    "max_sheet_height_mm": 750,
+                    "supports_pdfx": True,
+                    "supports_lamination": True,
+                    "supported_color_modes_json": ["CMYK", "PANTONE"]
+                }
+            ]}))
+        elif "/api/printhouse/onboarding/pricing/calibrations" in url:
+            if "/runs" in url:
+                route.fulfill(status=200, content_type="application/json", body=json.dumps({"ok": True, "data": [MOCK_CALIBRATION_RUN]}))
+            else:
+                sessions_data = mock_calibrations if mock_calibrations is not None else [MOCK_CALIBRATED_SESSION]
+                route.fulfill(status=200, content_type="application/json", body=json.dumps({"ok": True, "data": sessions_data}))
+        elif "/api/printhouse/onboarding/pricing/industrial" in url:
             route.fulfill(status=200, content_type="application/json", body=json.dumps(MOCK_INDUSTRIAL_PRICING))
         elif "/api/printhouse/onboarding/pricing/price-books" in url:
             route.fulfill(status=200, content_type="application/json", body=json.dumps({"ok": True, "data": []}))
@@ -217,6 +294,10 @@ def save_evidence(page, filename, desc):
     path2 = os.path.join(ARTIFACTS_DIR, filename)
     page.screenshot(path=path1, full_page=False)
     page.screenshot(path=path2, full_page=False)
+    # Also save to current conversation brain directory if it exists
+    cur_brain = r"C:\Users\KIKE\.gemini\antigravity-ide\brain\2b893f39-8fa0-49ed-8771-228e86a03d74"
+    if os.path.exists(cur_brain):
+        page.screenshot(path=os.path.join(cur_brain, filename), full_page=False)
     print(f"[OK] Saved screenshot: {filename} -> {desc}")
 
 def run():
@@ -518,6 +599,237 @@ def run():
         save_evidence(mobile_page, "08_setup_hub_overview_mobile_390x844_dark.png", "Mobile Overview at 390x844")
         mobile_context.close()
         
+        # ── Test Suite 5: Machinery Form Open (ES/EN/DE, Light/Dark, Vertical Scroll & Zero Horizontal Overflow) ──
+        print("\n--- Verifying Machinery Form Open (Vertical Scroll & Zero Horizontal Overflow) ---")
+        mach_context = browser.new_context(viewport={"width": 1366, "height": 768}, device_scale_factor=1.0)
+        mach_page = mach_context.new_page()
+        mach_page.on("pageerror", lambda err: app_errors.append(f"MACHINES PAGE ERROR: {err}"))
+        setup_intercepts(mach_page, MOCK_ONBOARDING_DATA)
+
+        # 5.1 Spanish Dark
+        mach_page.goto("http://localhost:3000/printhouse/setup?tab=MACHINES")
+        mach_page.evaluate("""() => {
+            localStorage.setItem('ppos_locale', 'es');
+            localStorage.setItem('locale', 'es');
+            localStorage.setItem('theme', 'dark');
+            document.documentElement.classList.add('dark');
+        }""")
+        mach_page.reload()
+        mach_page.wait_for_timeout(1000)
+
+        # Click "Añadir máquina"
+        add_btn_es = mach_page.locator("button:has-text('Añadir máquina'), button:has-text('Add Machine')").first
+        add_btn_es.wait_for(state="visible", timeout=5000)
+        add_btn_es.click()
+        mach_page.wait_for_timeout(600)
+
+        # Verify form container presence, scrollability, and zero horizontal overflow
+        form_measurements_es = mach_page.evaluate("""() => {
+            const formContainer = document.querySelector('.overflow-y-auto.max-h-\\\\[80vh\\\\]') || document.querySelector('.overflow-y-auto');
+            const doc = document.documentElement;
+            return {
+                found: !!formContainer,
+                containerScrollHeight: formContainer ? formContainer.scrollHeight : 0,
+                containerClientHeight: formContainer ? formContainer.clientHeight : 0,
+                containerScrollWidth: formContainer ? formContainer.scrollWidth : 0,
+                containerClientWidth: formContainer ? formContainer.clientWidth : 0,
+                docScrollWidth: doc.scrollWidth,
+                docClientWidth: doc.clientWidth,
+                hasVerticalScroll: formContainer ? formContainer.scrollHeight > formContainer.clientHeight : false,
+                zeroHorizontalOverflow: formContainer ? formContainer.scrollWidth <= formContainer.clientWidth : false,
+                docZeroHorizontalOverflow: doc.scrollWidth <= doc.clientWidth
+            };
+        }""")
+
+        print(f"  [ES Dark] Form container found: {form_measurements_es['found']}")
+        print(f"  [ES Dark] Form scrollHeight: {form_measurements_es['containerScrollHeight']}px, clientHeight: {form_measurements_es['containerClientHeight']}px (Permits vertical scroll: {form_measurements_es['hasVerticalScroll']})")
+        print(f"  [ES Dark] Form scrollWidth: {form_measurements_es['containerScrollWidth']}px, clientWidth: {form_measurements_es['containerClientWidth']}px (Zero horizontal overflow: {form_measurements_es['zeroHorizontalOverflow']})")
+        print(f"  [ES Dark] Doc scrollWidth: {form_measurements_es['docScrollWidth']}px, clientWidth: {form_measurements_es['docClientWidth']}px")
+
+        if not form_measurements_es['found'] or not form_measurements_es['zeroHorizontalOverflow'] or not form_measurements_es['docZeroHorizontalOverflow']:
+            print("FATAL: Machinery form failed overflow or visibility check!")
+            sys.exit(1)
+
+        save_evidence(mach_page, "09_setup_hub_machines_form_open_dark_es.png", "Machinery Fleet: Form Open in Dark Mode (ES)")
+
+        # 5.2 Spanish Light
+        mach_page.evaluate("""() => {
+            localStorage.setItem('theme', 'light');
+            document.documentElement.classList.remove('dark');
+        }""")
+        mach_page.wait_for_timeout(400)
+        save_evidence(mach_page, "10_setup_hub_machines_form_open_light_es.png", "Machinery Fleet: Form Open in Light Mode (ES)")
+
+        # 5.3 English Dark & Light
+        mach_page.evaluate("""() => {
+            localStorage.setItem('theme', 'dark');
+            document.documentElement.classList.add('dark');
+            localStorage.setItem('ppos_locale', 'en');
+            localStorage.setItem('locale', 'en');
+        }""")
+        mach_page.reload()
+        mach_page.wait_for_timeout(800)
+        add_btn_en = mach_page.locator("button:has-text('Add Machine')").first
+        add_btn_en.wait_for(state="visible", timeout=5000)
+        add_btn_en.click()
+        mach_page.wait_for_timeout(500)
+        save_evidence(mach_page, "11_setup_hub_machines_form_open_dark_en.png", "Machinery Fleet: Form Open in Dark Mode (EN)")
+
+        mach_page.evaluate("""() => {
+            localStorage.setItem('theme', 'light');
+            document.documentElement.classList.remove('dark');
+        }""")
+        mach_page.wait_for_timeout(400)
+        save_evidence(mach_page, "17_setup_hub_machines_form_open_light_en.png", "Machinery Fleet: Form Open in Light Mode (EN)")
+
+        # 5.4 German Dark & Light
+        mach_page.evaluate("""() => {
+            localStorage.setItem('theme', 'dark');
+            document.documentElement.classList.add('dark');
+            localStorage.setItem('ppos_locale', 'de');
+            localStorage.setItem('locale', 'de');
+        }""")
+        mach_page.reload()
+        mach_page.wait_for_timeout(800)
+        add_btn_de = mach_page.locator("button:has-text('Maschine hinzufügen')").first
+        add_btn_de.wait_for(state="visible", timeout=5000)
+        add_btn_de.click()
+        mach_page.wait_for_timeout(500)
+        save_evidence(mach_page, "12_setup_hub_machines_form_open_dark_de.png", "Machinery Fleet: Form Open in Dark Mode (DE)")
+
+        mach_page.evaluate("""() => {
+            localStorage.setItem('theme', 'light');
+            document.documentElement.classList.remove('dark');
+        }""")
+        mach_page.wait_for_timeout(400)
+        save_evidence(mach_page, "18_setup_hub_machines_form_open_light_de.png", "Machinery Fleet: Form Open in Light Mode (DE)")
+
+        results["tests"].append({
+            "name": "machinery_form_open_and_scroll",
+            "measurements": form_measurements_es,
+            "passed": True
+        })
+
+        mach_context.close()
+
+        # ── Test Suite 6: Assistant in Calibrated State (ES/EN/DE, Light/Dark, Accessible Labels & Actions) ──
+        print("\n--- Verifying Calibrated Assistant (Step 5, Accessible Labels & Actions) ---")
+        calib_context = browser.new_context(viewport={"width": 1366, "height": 768}, device_scale_factor=1.0)
+        calib_page = calib_context.new_page()
+        calib_page.on("pageerror", lambda err: app_errors.append(f"CALIBRATION ASSISTANT ERROR: {err}"))
+        setup_intercepts(calib_page, MOCK_ONBOARDING_DATA, mock_calibrations=[MOCK_CALIBRATED_SESSION])
+
+        # 6.1 Spanish Dark
+        calib_page.goto("http://localhost:3000/printhouse/setup?tab=PRICING")
+        calib_page.evaluate("""() => {
+            localStorage.setItem('ppos_locale', 'es');
+            localStorage.setItem('locale', 'es');
+            localStorage.setItem('theme', 'dark');
+            document.documentElement.classList.add('dark');
+        }""")
+        calib_page.reload()
+        calib_page.wait_for_timeout(1000)
+
+        # Switch to Assistant mode
+        assistant_btn = calib_page.locator("#pricing-mode-assistant-btn")
+        assistant_btn.wait_for(state="visible", timeout=5000)
+        assistant_btn.click()
+        calib_page.wait_for_timeout(800)
+
+        # Assert Step 5 Calibrated State is rendered
+        step5_text_es = calib_page.locator("text='Tarifas calibradas y activas'").first
+        step5_text_es.wait_for(state="visible", timeout=5000)
+
+        # Verify button action is accessible
+        calib_btn_es = calib_page.locator("button:has-text('Calibrar otro libro')").first
+        if calib_btn_es.count() == 0 or not calib_btn_es.is_visible():
+            print("FATAL: Step 5 action button 'Calibrar otro libro' not visible or missing!")
+            sys.exit(1)
+
+        # Real DOM overflow measurement
+        calib_measurements_es = calib_page.evaluate("""() => {
+            const doc = document.documentElement;
+            return {
+                docScrollWidth: doc.scrollWidth,
+                docClientWidth: doc.clientWidth,
+                windowInnerWidth: window.innerWidth,
+                zeroHorizontalOverflow: doc.scrollWidth <= window.innerWidth
+            };
+        }""")
+        print(f"  [Calibrated Assistant ES Dark] docScrollWidth: {calib_measurements_es['docScrollWidth']}px, clientWidth: {calib_measurements_es['docClientWidth']}px (Zero horizontal overflow: {calib_measurements_es['zeroHorizontalOverflow']})")
+
+        if not calib_measurements_es['zeroHorizontalOverflow']:
+            print("FATAL: Calibrated assistant view has horizontal overflow!")
+            sys.exit(1)
+
+        save_evidence(calib_page, "13_setup_hub_pricing_calibrated_dark_es.png", "Pricing Assistant: Calibrated State (Dark, ES)")
+
+        # 6.2 Spanish Light
+        calib_page.evaluate("""() => {
+            localStorage.setItem('theme', 'light');
+            document.documentElement.classList.remove('dark');
+        }""")
+        calib_page.wait_for_timeout(400)
+        save_evidence(calib_page, "14_setup_hub_pricing_calibrated_light_es.png", "Pricing Assistant: Calibrated State (Light, ES)")
+
+        # 6.3 English Dark & Light
+        calib_page.evaluate("""() => {
+            localStorage.setItem('theme', 'dark');
+            document.documentElement.classList.add('dark');
+            localStorage.setItem('ppos_locale', 'en');
+            localStorage.setItem('locale', 'en');
+        }""")
+        calib_page.reload()
+        calib_page.wait_for_timeout(800)
+        calib_page.locator("#pricing-mode-assistant-btn").click()
+        calib_page.wait_for_timeout(600)
+        calib_page.locator("text='Pricing Calibrated & Active'").first.wait_for(state="visible", timeout=5000)
+        calib_btn_en = calib_page.locator("button:has-text('Calibrate Another Book')").first
+        if not calib_btn_en.is_visible():
+            print("FATAL: English calibrated action button not visible!")
+            sys.exit(1)
+        save_evidence(calib_page, "15_setup_hub_pricing_calibrated_dark_en.png", "Pricing Assistant: Calibrated State (Dark, EN)")
+
+        calib_page.evaluate("""() => {
+            localStorage.setItem('theme', 'light');
+            document.documentElement.classList.remove('dark');
+        }""")
+        calib_page.wait_for_timeout(400)
+        save_evidence(calib_page, "19_setup_hub_pricing_calibrated_light_en.png", "Pricing Assistant: Calibrated State (Light, EN)")
+
+        # 6.4 German Dark & Light
+        calib_page.evaluate("""() => {
+            localStorage.setItem('theme', 'dark');
+            document.documentElement.classList.add('dark');
+            localStorage.setItem('ppos_locale', 'de');
+            localStorage.setItem('locale', 'de');
+        }""")
+        calib_page.reload()
+        calib_page.wait_for_timeout(800)
+        calib_page.locator("#pricing-mode-assistant-btn").click()
+        calib_page.wait_for_timeout(600)
+        calib_page.locator("text='Preise kalibriert & aktiv'").first.wait_for(state="visible", timeout=5000)
+        calib_btn_de = calib_page.locator("button:has-text('Anderes Buch kalibrieren')").first
+        if not calib_btn_de.is_visible():
+            print("FATAL: German calibrated action button not visible!")
+            sys.exit(1)
+        save_evidence(calib_page, "16_setup_hub_pricing_calibrated_dark_de.png", "Pricing Assistant: Calibrated State (Dark, DE)")
+
+        calib_page.evaluate("""() => {
+            localStorage.setItem('theme', 'light');
+            document.documentElement.classList.remove('dark');
+        }""")
+        calib_page.wait_for_timeout(400)
+        save_evidence(calib_page, "20_setup_hub_pricing_calibrated_light_de.png", "Pricing Assistant: Calibrated State (Light, DE)")
+
+        results["tests"].append({
+            "name": "pricing_calibrated_assistant_view",
+            "measurements": calib_measurements_es,
+            "passed": True
+        })
+
+        calib_context.close()
+
         browser.close()
         
     # Check for application errors

@@ -8,6 +8,7 @@ import React, { useState, useEffect } from 'react';
 import { getAuthToken } from '../../../lib/authStore';
 import { useLocale } from '../../../i18n';
 import { Layers, Plus, Trash2, Link2, Unlink, AlertCircle, CheckCircle } from 'lucide-react';
+import { normalizeUiError } from '../../../utils/errorUtils';
 
 interface MaterialsPanelProps {
     sites: { siteId: string; siteName: string }[];
@@ -82,7 +83,7 @@ export const MaterialsPanel: React.FC<MaterialsPanelProps> = ({ sites, onSaved }
                 setActiveCompatibilities(compMap);
             }
         } catch (err: any) {
-            setError(err.message || 'Error fetching data');
+            setError(normalizeUiError(err, t('setup.materials.error.load') || 'Error fetching data'));
         } finally {
             setLoading(false);
         }
@@ -121,11 +122,10 @@ export const MaterialsPanel: React.FC<MaterialsPanelProps> = ({ sites, onSaved }
                 fetchMaterialsAndMachines();
                 if (onSaved) onSaved();
             } else {
-                const message = typeof data.error === 'string' ? data.error : data.error?.message || data.message || 'Failed to create material';
-                setError(message);
+                setError(normalizeUiError(data, t('setup.materials.error.create') || 'Failed to create material'));
             }
         } catch (err: any) {
-            setError(err instanceof Error ? err.message : 'Network error');
+            setError(normalizeUiError(err, t('common.error.network') || 'Network error'));
         }
     };
 
@@ -143,11 +143,10 @@ export const MaterialsPanel: React.FC<MaterialsPanelProps> = ({ sites, onSaved }
                 if (onSaved) onSaved();
             } else {
                 const data = await res.json().catch(() => ({}));
-                const message = typeof data.error === 'string' ? data.error : data.error?.message || data.message || 'Failed to archive';
-                setError(message);
+                setError(normalizeUiError(data, t('setup.materials.error.archive') || 'Failed to archive'));
             }
         } catch (err: any) {
-            setError(err instanceof Error ? err.message : 'Error deleting material');
+            setError(normalizeUiError(err, t('setup.materials.error.archive') || 'Error deleting material'));
         }
     };
 
@@ -168,11 +167,10 @@ export const MaterialsPanel: React.FC<MaterialsPanelProps> = ({ sites, onSaved }
                 setSuccessMsg('Compatibility established with provenance record.');
                 fetchMaterialsAndMachines();
             } else {
-                const message = typeof data.error === 'string' ? data.error : data.error?.message || data.message || 'Failed to link';
-                setError(message);
+                setError(normalizeUiError(data, t('setup.materials.error.link') || 'Failed to link'));
             }
         } catch (err: any) {
-            setError(err instanceof Error ? err.message : 'Error linking compatibility');
+            setError(normalizeUiError(err, t('setup.materials.error.link') || 'Error linking compatibility'));
         }
     };
 
@@ -188,11 +186,10 @@ export const MaterialsPanel: React.FC<MaterialsPanelProps> = ({ sites, onSaved }
                 fetchMaterialsAndMachines();
             } else {
                 const data = await res.json().catch(() => ({}));
-                const message = typeof data.error === 'string' ? data.error : data.error?.message || data.message || 'Failed to remove link';
-                setError(message);
+                setError(normalizeUiError(data, t('setup.materials.error.unlink') || 'Failed to remove link'));
             }
         } catch (err: any) {
-            setError(err instanceof Error ? err.message : 'Error removing link');
+            setError(normalizeUiError(err, t('setup.materials.error.unlink') || 'Error removing link'));
         }
     };
 

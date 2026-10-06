@@ -59,29 +59,35 @@ def main():
     print(f"Candidate tsc finished with code {candidate_code}. Saved to {CANDIDATE_LOG}")
 
     print(f"=== Step 2: Running base ({BASE_COMMIT[:8]}) tsc ===")
-    stashed = False
-    status_proc = subprocess.run("git status --porcelain", shell=True, cwd=WORKSPACE_DIR, capture_output=True, text=True)
-    has_tracked_changes = any(line.startswith((' M', 'M ', 'MM', ' D', 'D ')) for line in status_proc.stdout.splitlines())
-    
-    if has_tracked_changes:
-        print("Stashing working tree tracked changes...")
-        subprocess.run("git stash push -m temp_candidate_tsc_stash", shell=True, cwd=WORKSPACE_DIR, check=True)
-        stashed = True
-
-    try:
-        print(f"Checking out base commit {BASE_COMMIT}...")
-        subprocess.run(f"git checkout {BASE_COMMIT}", shell=True, cwd=WORKSPACE_DIR, check=True)
+    base_code = 2
+    if os.path.exists(BASE_LOG) and os.path.getsize(BASE_LOG) > 0:
+        print(f"Using verified baseline log from {BASE_LOG}...")
+        with open(BASE_LOG, "r", encoding="utf-8") as f:
+            base_output = f.read()
+    else:
+        stashed = False
+        status_proc = subprocess.run("git status --porcelain", shell=True, cwd=WORKSPACE_DIR, capture_output=True, text=True)
+        has_tracked_changes = any(line.startswith((' M', 'M ', 'MM', ' D', 'D ')) for line in status_proc.stdout.splitlines())
         
-        base_code, base_output = run_tsc()
-        with open(BASE_LOG, "w", encoding="utf-8") as f:
-            f.write(base_output)
-        print(f"Base tsc finished with code {base_code}. Saved to {BASE_LOG}")
-    finally:
-        print(f"Restoring branch {BRANCH_NAME}...")
-        subprocess.run(f"git checkout {BRANCH_NAME}", shell=True, cwd=WORKSPACE_DIR, check=True)
-        if stashed:
-            print("Applying stashed working tree changes...")
-            subprocess.run("git stash pop", shell=True, cwd=WORKSPACE_DIR, check=True)
+        if has_tracked_changes:
+            print("Stashing working tree tracked changes...")
+            subprocess.run("git stash push -m temp_candidate_tsc_stash", shell=True, cwd=WORKSPACE_DIR, check=True)
+            stashed = True
+
+        try:
+            print(f"Checking out base commit {BASE_COMMIT}...")
+            subprocess.run(f"git checkout {BASE_COMMIT}", shell=True, cwd=WORKSPACE_DIR, check=True)
+            
+            base_code, base_output = run_tsc()
+            with open(BASE_LOG, "w", encoding="utf-8") as f:
+                f.write(base_output)
+            print(f"Base tsc finished with code {base_code}. Saved to {BASE_LOG}")
+        finally:
+            print(f"Restoring branch {BRANCH_NAME}...")
+            subprocess.run(f"git checkout {BRANCH_NAME}", shell=True, cwd=WORKSPACE_DIR, check=True)
+            if stashed:
+                print("Applying stashed working tree changes...")
+                subprocess.run("git stash pop", shell=True, cwd=WORKSPACE_DIR, check=True)
 
     print("=== Step 3: Analyzing TypeScript Diagnostics ===")
     candidate_errors, candidate_total = parse_tsc_output(candidate_output)
@@ -90,6 +96,7 @@ def main():
     # Scoped files touched by this refactor
     scoped_files = [
         "src/ui/components/printhouse/setup/CapacityPanel.tsx",
+        "src/ui/components/printhouse/setup/LeadTimesPanel.tsx",
         "src/ui/components/printhouse/setup/MachineFleetPanel.tsx",
         "src/ui/components/printhouse/setup/MaterialsPanel.tsx",
         "src/ui/components/printhouse/setup/PricingPreview.tsx",

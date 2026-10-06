@@ -1891,6 +1891,20 @@ export const en = {
   'pricing.smoke.calculating': 'Calculating...',
   'pricing.smoke.ratesNoticeTitle': 'Production Rates Notice',
   'pricing.smoke.ratesNotConfigured': 'Active production rates have not yet been accepted and published to this printer node. Complete and accept a calibration run above to activate rates.',
+  'common.error.unexpected': 'An unexpected error occurred',
+  'common.error.network': 'Network connection error',
+  'setup.leadTimes.error.load': 'Error loading lead times configuration',
+  'setup.leadTimes.error.save': 'Failed to save lead times and operational schedule',
+  'setup.leadTimes.error.simulate': 'Failed to calculate production completion estimate',
+  'setup.leadTimes.saved': 'Lead times and operational schedule saved successfully.',
+  'setup.materials.error.load': 'Failed to load materials and machinery fleet',
+  'setup.materials.error.create': 'Failed to create substrate material',
+  'setup.materials.error.archive': 'Failed to archive substrate material',
+  'setup.materials.error.link': 'Failed to link substrate to machine',
+  'setup.materials.error.unlink': 'Failed to remove substrate machine link',
+  'setup.capacity.error.saveSite': 'Failed to save site capacity configuration',
+  'setup.capacity.error.saveMachine': 'Failed to save machine throughput limit',
+  'setup.pricingPreview.error.simulate': 'Failed to calculate simulated price',
 } as const;
 
 export type TranslationKeys = keyof typeof en;

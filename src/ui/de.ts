@@ -1891,6 +1891,20 @@ export const de = {
   'pricing.smoke.calculating': 'Berechnung läuft...',
   'pricing.smoke.ratesNoticeTitle': 'Hinweis zu Produktionstarifen',
   'pricing.smoke.ratesNotConfigured': 'Aktive Produktionstarife wurden für diesen Druckknoten noch nicht freigegeben und veröffentlicht. Führen Sie oben eine Kalibrierung durch und akzeptieren Sie diese, um Tarife zu aktivieren.',
+  'common.error.unexpected': 'Ein unerwarteter Fehler ist aufgetreten',
+  'common.error.network': 'Netzwerkverbindungsfehler',
+  'setup.leadTimes.error.load': 'Fehler beim Laden der Lieferzeitenkonfiguration',
+  'setup.leadTimes.error.save': 'Fehler beim Speichern der Lieferzeiten und des Betriebsplans',
+  'setup.leadTimes.error.simulate': 'Fehler beim Berechnen der Fertigstellungsschätzung',
+  'setup.leadTimes.saved': 'Lieferzeiten und Betriebsplan erfolgreich gespeichert.',
+  'setup.materials.error.load': 'Fehler beim Laden von Materialien und Maschinenpark',
+  'setup.materials.error.create': 'Fehler beim Erstellen des Substratmaterials',
+  'setup.materials.error.archive': 'Fehler beim Archivieren des Substratmaterials',
+  'setup.materials.error.link': 'Fehler beim Verknüpfen des Materials mit der Maschine',
+  'setup.materials.error.unlink': 'Fehler beim Aufheben der Material-Maschinen-Verknüpfung',
+  'setup.capacity.error.saveSite': 'Fehler beim Speichern der Standortkapazitätseinstellungen',
+  'setup.capacity.error.saveMachine': 'Fehler beim Speichern des Maschinendurchsatzlimits',
+  'setup.pricingPreview.error.simulate': 'Fehler beim Berechnen des simulierten Preises',
 } as const;
 
 export type TranslationKeys = keyof typeof de;

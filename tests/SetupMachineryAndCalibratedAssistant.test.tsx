@@ -303,10 +303,50 @@ describe('Machinery Form & Calibrated Assistant Localization & Error Handling Su
                 expect(screen.getByText('Substrate code conflict')).toBeInTheDocument();
             });
         });
+
+        it('LeadTimesPanel normalizes nested object errors and empty bodies with localized fallbacks', async () => {
+            const { LeadTimesPanel } = await import('../src/ui/components/printhouse/setup/LeadTimesPanel');
+            
+            // Mock failure with nested object message
+            vi.spyOn(global, 'fetch').mockImplementation(async (url: any) => {
+                if (typeof url === 'string' && url.includes('/leadtimes/estimate')) {
+                    return {
+                        ok: false,
+                        json: async () => ({ error: { message: { complex: 'DATA_UNAVAILABLE' } } })
+                    } as any;
+                }
+                return {
+                    ok: false,
+                    json: async () => ({ message: { raw_exception: 'timeout' } })
+                } as any;
+            });
+
+            render(
+                <LocaleProvider initialLocale="es">
+                    <LeadTimesPanel sites={mockSites} />
+                </LocaleProvider>
+            );
+
+            // Wait for initial fetch error to display normalized fallback
+            await waitFor(() => {
+                expect(screen.getByText('Error al cargar la configuración de plazos de entrega')).toBeInTheDocument();
+            });
+
+            // Trigger simulate completion with nested object error
+            const calcBtn = screen.getByRole('button', { name: /Calcular fecha de finalización/i });
+            fireEvent.click(calcBtn);
+
+            await waitFor(() => {
+                expect(screen.getByText('Error al calcular la estimación de finalización de producción')).toBeInTheDocument();
+            });
+        });
     });
 
     describe('4. Theme Compatibility (Light & Dark)', () => {
-        it('renders cleanly in dark mode class', () => {
+        it('renders cleanly in dark mode class', async () => {
+            vi.spyOn(global, 'fetch').mockImplementation(async () => {
+                return { ok: true, json: async () => ({ ok: true, data: [] }) } as any;
+            });
             document.documentElement.classList.add('dark');
             const { container } = render(
                 <LocaleProvider initialLocale="es">
@@ -317,7 +357,10 @@ describe('Machinery Form & Calibrated Assistant Localization & Error Handling Su
             document.documentElement.classList.remove('dark');
         });
 
-        it('renders cleanly in light mode', () => {
+        it('renders cleanly in light mode', async () => {
+            vi.spyOn(global, 'fetch').mockImplementation(async () => {
+                return { ok: true, json: async () => ({ ok: true, data: [] }) } as any;
+            });
             document.documentElement.classList.remove('dark');
             const { container } = render(
                 <LocaleProvider initialLocale="es">

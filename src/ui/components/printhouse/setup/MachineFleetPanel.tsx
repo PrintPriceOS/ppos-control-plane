@@ -10,6 +10,7 @@ import React, { useState, useEffect } from 'react';
 import { Cog, Plus, Edit2, Trash2, CheckCircle, AlertCircle, Zap, RefreshCw, Sliders, CheckSquare, Square } from 'lucide-react';
 import { getAuthToken } from '../../../lib/authStore';
 import { useLocale } from '../../../i18n';
+import { normalizeUiError } from '../../../utils/errorUtils';
 
 interface MachineData {
     id: string;
@@ -421,27 +422,14 @@ export const MachineFleetPanel: React.FC<{ sites?: SiteOption[]; onSaved?: () =>
             });
             const data = await res.json().catch(() => ({}));
             if (!res.ok) {
-                let message = t('setup.machines.error.genericSave') || 'Error saving machine to the server.';
-                if (data) {
-                    if (typeof data.error === 'string') {
-                        message = data.error;
-                    } else if (data.error && typeof data.error.message === 'string') {
-                        message = data.error.message;
-                    } else if (typeof data.message === 'string') {
-                        message = data.message;
-                    } else if (Array.isArray(data.errors) && data.errors.length > 0) {
-                        message = data.errors.map((e: any) => typeof e === 'string' ? e : e?.message || JSON.stringify(e)).join(', ');
-                    }
-                }
-                setErrorMsg(message);
+                setErrorMsg(normalizeUiError(data, t('setup.machines.error.genericSave') || 'Error saving machine to the server.'));
                 return;
             }
             setIsEditing(false);
             await fetchMachines(selectedSiteId);
             onSaved?.();
         } catch (err: any) {
-            const raw = err instanceof Error ? err.message : (typeof err === 'string' ? err : '');
-            setErrorMsg(raw || t('setup.machines.error.genericSave') || 'Error saving machine to the server.');
+            setErrorMsg(normalizeUiError(err, t('setup.machines.error.genericSave') || 'Error saving machine to the server.'));
         } finally {
             setLoading(false);
         }
@@ -457,14 +445,13 @@ export const MachineFleetPanel: React.FC<{ sites?: SiteOption[]; onSaved?: () =>
             });
             if (!res.ok) {
                 const data = await res.json().catch(() => ({}));
-                const message = typeof data.error === 'string' ? data.error : data.error?.message || data.message || 'Error archiving machine';
-                setErrorMsg(message);
+                setErrorMsg(normalizeUiError(data, 'Error archiving machine'));
                 return;
             }
             await fetchMachines(selectedSiteId);
             onSaved?.();
         } catch (err: any) {
-            setErrorMsg(err instanceof Error ? err.message : 'Error archiving machine');
+            setErrorMsg(normalizeUiError(err, 'Error archiving machine'));
         }
     };
 

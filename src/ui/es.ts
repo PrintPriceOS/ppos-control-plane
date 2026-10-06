@@ -1891,6 +1891,20 @@ export const es = {
   'pricing.smoke.calculating': 'Calculando...',
   'pricing.smoke.ratesNoticeTitle': 'Aviso sobre tarifas de producción',
   'pricing.smoke.ratesNotConfigured': 'Las tarifas de producción activas aún no se han aceptado ni publicado en este nodo de impresión. Complete y acepte una calibración arriba para activarlas.',
+  'common.error.unexpected': 'Ha ocurrido un error inesperado',
+  'common.error.network': 'Error de conexión de red',
+  'setup.leadTimes.error.load': 'Error al cargar la configuración de plazos de entrega',
+  'setup.leadTimes.error.save': 'Error al guardar los plazos de entrega y el horario operativo',
+  'setup.leadTimes.error.simulate': 'Error al calcular la estimación de finalización de producción',
+  'setup.leadTimes.saved': 'Plazos de entrega y calendario operativo guardados correctamente.',
+  'setup.materials.error.load': 'Error al cargar los materiales y la maquinaria',
+  'setup.materials.error.create': 'Error al crear el material de soporte',
+  'setup.materials.error.archive': 'Error al archivar el material de soporte',
+  'setup.materials.error.link': 'Error al vincular el material a la máquina',
+  'setup.materials.error.unlink': 'Error al desvincular el material de la máquina',
+  'setup.capacity.error.saveSite': 'Error al guardar los ajustes de capacidad de la planta',
+  'setup.capacity.error.saveMachine': 'Error al guardar el límite de rendimiento de la máquina',
+  'setup.pricingPreview.error.simulate': 'Error al calcular el precio simulado',
 } as const;
 
 export type TranslationKeys = keyof typeof es;

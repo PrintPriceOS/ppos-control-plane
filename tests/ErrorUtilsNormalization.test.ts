@@ -62,4 +62,35 @@ describe('normalizeUiError - Safe UI error formatting', () => {
     expect(result).not.toContain('db_secret_key');
     expect(result).toBe('Ha ocurrido un error inesperado');
   });
+
+  it('handles nested message objects cleanly by falling back without technical object leaks', () => {
+    // Nested message that is itself an object or dictionary
+    const nestedObjError = { error: { message: { technical: 'DB_TIMEOUT', code: 504 } } };
+    const res1 = normalizeUiError(nestedObjError, 'Error al guardar');
+    expect(typeof res1).toBe('string');
+    expect(res1).toBe('Error al guardar');
+
+    // Nested object where message is not a string
+    const objWithNonStringMsg = { message: { subCode: 400, details: [] } };
+    const res2 = normalizeUiError(objWithNonStringMsg, 'Fallback error');
+    expect(typeof res2).toBe('string');
+    expect(res2).toBe('Fallback error');
+  });
+
+  it('handles responses without a valid message (numbers, booleans, empty structures) safely', () => {
+    expect(typeof normalizeUiError(12345, 'Fallback')).toBe('string');
+    expect(normalizeUiError(12345, 'Fallback')).toBe('Fallback');
+
+    expect(typeof normalizeUiError(true, 'Fallback')).toBe('string');
+    expect(normalizeUiError(true, 'Fallback')).toBe('Fallback');
+
+    expect(typeof normalizeUiError([], 'Fallback')).toBe('string');
+    expect(normalizeUiError([], 'Fallback')).toBe('Fallback');
+
+    expect(typeof normalizeUiError({ data: null }, 'Fallback')).toBe('string');
+    expect(normalizeUiError({ data: null }, 'Fallback')).toBe('Fallback');
+
+    expect(typeof normalizeUiError({ error: {} }, 'Fallback')).toBe('string');
+    expect(normalizeUiError({ error: {} }, 'Fallback')).toBe('Fallback');
+  });
 });
