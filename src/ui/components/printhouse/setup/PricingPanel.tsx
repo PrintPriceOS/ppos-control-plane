@@ -16,8 +16,10 @@ import { QuickCalibrationPanel } from '../pricing/quick-calibration/QuickCalibra
 import { PricingWorkflowSelector, PricingWorkflow } from '../pricing/PricingWorkflowSelector';
 import { SimplifiedOnboardingJourney } from '../onboarding/SimplifiedOnboardingJourney';
 import { SetupDrawer } from './SetupDrawer';
-import { Tag, Plus, Edit, Copy, Trash2, ShieldAlert, BadgeAlert, CheckCircle, Calculator, Info, ShieldCheck, HelpCircle, Layers, ChevronDown, ChevronUp, Sparkles, Sliders } from 'lucide-react';
+import { Tag, Plus, Edit, Copy, Trash2, ShieldAlert, BadgeAlert, CheckCircle, Calculator, Info, ShieldCheck, HelpCircle, Layers, ChevronDown, ChevronUp, Sparkles, Sliders, ArrowLeft } from 'lucide-react';
 import { useLocale } from '../../../i18n';
+import { ProductFamilyId, FamilyState, FamilyStatus } from '../../../types/printhouseOnboardingTypes';
+import { BindingIcon } from '../onboarding/BindingFamilyIcons';
 
 interface PricingPanelProps {
     sites: { siteId: string; siteName: string }[];
@@ -477,6 +479,63 @@ export const PricingPanel: React.FC<PricingPanelProps> = ({ sites = [], onSaved 
         }
     };
 
+    const [familiesSummary, setFamiliesSummary] = useState<Record<ProductFamilyId, FamilyState>>({
+        HARDCOVER: { id: 'HARDCOVER', status: 'PENDING', quoteCount: 0 },
+        SOFTCOVER: { id: 'SOFTCOVER', status: 'PENDING', quoteCount: 0 },
+        WIRE_O: { id: 'WIRE_O', status: 'PENDING', quoteCount: 0 },
+        SADDLE_STITCH: { id: 'SADDLE_STITCH', status: 'PENDING', quoteCount: 0 }
+    });
+    const [activeFamilyId, setActiveFamilyId] = useState<ProductFamilyId>('HARDCOVER');
+
+    const handleFamiliesChange = React.useCallback((fams: Record<ProductFamilyId, FamilyState>, selectedId: ProductFamilyId) => {
+        setFamiliesSummary(fams);
+        setActiveFamilyId(selectedId);
+    }, []);
+
+    const getFamilyLabel = (fid: ProductFamilyId) => {
+        switch (fid) {
+            case 'HARDCOVER': return t('family.hardcover.title') || 'Tapa dura';
+            case 'SOFTCOVER': return t('family.softcover.title') || 'Rústica';
+            case 'WIRE_O': return t('family.wireO.title') || 'Wire-O';
+            case 'SADDLE_STITCH': return t('family.saddleStitch.title') || 'Grapado';
+        }
+    };
+
+    const renderFamilyStatusBadge = (status: FamilyStatus) => {
+        switch (status) {
+            case 'DATA_VALIDATED':
+                return (
+                    <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                        {t('pricing.families.status.validated') || 'Calibración aceptada'}
+                    </span>
+                );
+            case 'QUOTE_ADDED':
+                return (
+                    <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-sky-50 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800">
+                        {t('pricing.families.status.quoteAdded') || 'Presupuesto añadido'}
+                    </span>
+                );
+            case 'REQUIRES_REVIEW':
+                return (
+                    <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+                        {t('pricing.families.status.requiresReview') || 'En revisión'}
+                    </span>
+                );
+            case 'NOT_OFFERED':
+                return (
+                    <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700">
+                        {t('pricing.families.status.notOffered') || 'No ofrecido'}
+                    </span>
+                );
+            default:
+                return (
+                    <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700">
+                        {t('pricing.families.status.pending') || 'Pendiente'}
+                    </span>
+                );
+        }
+    };
+
     return (
         <div className="space-y-2.5">
             {/* Notifications */}
@@ -500,19 +559,53 @@ export const PricingPanel: React.FC<PricingPanelProps> = ({ sites = [], onSaved 
             )}
 
             {/* COMPACT SETUP & WORKFLOW TOOLBAR */}
-            <div className="bg-white dark:bg-[#18181b] border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-1 shadow-2xs flex flex-wrap items-center justify-between gap-2.5">
-                <h2 className="sr-only">Choose Your Pricing Workflow</h2>
-                {/* Left: Mode toggle */}
-                <div className="flex items-center gap-3">
+            <div className="bg-white dark:bg-[#18181b] border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-1.5 shadow-2xs flex flex-wrap items-center justify-between gap-2.5">
+                <div className="flex items-center gap-2.5 min-w-0 flex-wrap">
+                    <div className="flex items-center gap-2 shrink-0">
+                        <Tag className="text-[#dc0000] w-3.5 h-3.5" />
+                        <h2 className="text-xs sm:text-sm font-bold text-zinc-900 dark:text-white m-0">
+                            {t('pricing.workflow.chooseWorkflow') || 'Choose Your Pricing Workflow'}
+                        </h2>
+                    </div>
+                    {industrialData?.nodeId && (
+                        <span className="inline-flex items-center gap-1.5 text-[11px] text-zinc-500 font-medium px-2 py-0.5 bg-zinc-50 dark:bg-zinc-800/60 rounded-md border border-zinc-200/60 dark:border-zinc-700/60 shrink-0">
+                            <span>{t('pricing.mode.node')}</span>
+                            <strong className="text-zinc-700 dark:text-zinc-300 font-semibold">{industrialData.nodeName || industrialData.nodeId}</strong>
+                        </span>
+                    )}
+
+                    {/* Mode Segment Switcher: 3 explicit tabs */}
                     <div
                         id="pricing-mode-toggle"
-                        className="flex items-center p-0.5 bg-zinc-100 dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700"
+                        className="flex items-center p-0.5 bg-zinc-100 dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 shrink-0"
                         role="group"
                         aria-label={t('pricing.workflow.group') || 'Pricing mode selector'}
                     >
                         <button
+                            id="pricing-mode-onboarding-btn"
+                            type="button"
+                            aria-label={t('pricing.nav.productsAndQuotes') || 'Productos y presupuestos'}
+                            title={t('pricing.nav.productsAndQuotes') || 'Productos y presupuestos'}
+                            aria-pressed={selectedWorkflow === 'onboarding'}
+                            onClick={() => {
+                                setSelectedWorkflow('onboarding');
+                                setIsSecondaryExpanded(false);
+                            }}
+                            className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                                selectedWorkflow === 'onboarding'
+                                    ? 'bg-white dark:bg-zinc-900 text-[#dc0000] dark:text-red-400 shadow-2xs border border-zinc-200/80 dark:border-zinc-700'
+                                    : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'
+                            }`}
+                        >
+                            <Layers size={13} className={selectedWorkflow === 'onboarding' ? 'text-[#dc0000]' : 'text-zinc-400'} />
+                            <span>{t('pricing.nav.productsAndQuotes') || 'Productos y presupuestos'}</span>
+                        </button>
+
+                        <button
                             id="pricing-mode-assistant-btn"
                             type="button"
+                            aria-label={t('pricing.mode.assistant')}
+                            title={t('pricing.mode.assistant')}
                             aria-pressed={selectedWorkflow === 'assistant'}
                             onClick={() => {
                                 setSelectedWorkflow('assistant');
@@ -548,18 +641,10 @@ export const PricingPanel: React.FC<PricingPanelProps> = ({ sites = [], onSaved 
                             <span>{t('pricing.mode.manual')}</span>
                         </button>
                     </div>
-
-                    {/* Production Node info if available, hiding empty parenthesis */}
-                    {industrialData?.nodeId && (
-                        <span className="hidden md:inline-flex items-center gap-1.5 text-[11px] text-zinc-500 font-medium px-2 py-0.5 bg-zinc-50 dark:bg-zinc-800/60 rounded-md border border-zinc-200/60 dark:border-zinc-700/60">
-                            <span>{t('pricing.mode.node')}</span>
-                            <strong className="text-zinc-700 dark:text-zinc-300 font-semibold">{industrialData.nodeName || industrialData.nodeId}</strong>
-                        </span>
-                    )}
                 </div>
 
-                {/* Right: Labelled Secondary Menu / Drawers */}
-                <div className="flex items-center gap-2">
+                {/* Right: Commercial Price Books */}
+                <div className="flex items-center gap-2 shrink-0">
                     <button
                         type="button"
                         onClick={() => setShowCommercialPolicy(!showCommercialPolicy)}
@@ -577,6 +662,51 @@ export const PricingPanel: React.FC<PricingPanelProps> = ({ sites = [], onSaved 
                 </div>
             </div>
 
+            {/* Contextual 4-Family Ribbon (Shown inside Assistant and Manual views) */}
+            {selectedWorkflow !== 'onboarding' && (
+                <div data-testid="pricing-family-ribbon" className="bg-zinc-50 dark:bg-[#18181b] border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-2 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 shadow-2xs">
+                    <div className="flex items-center gap-2 flex-wrap min-w-0">
+                        <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider shrink-0">
+                            {t('pricing.families.coverage') || 'Familias de producto:'}
+                        </span>
+                        {(['HARDCOVER', 'SOFTCOVER', 'WIRE_O', 'SADDLE_STITCH'] as ProductFamilyId[]).map(fid => {
+                            const fam = familiesSummary[fid] || { status: 'PENDING' };
+                            return (
+                                <button
+                                    key={fid}
+                                    type="button"
+                                    onClick={() => {
+                                        setActiveFamilyId(fid);
+                                        setSelectedWorkflow('onboarding');
+                                    }}
+                                    className="px-2 py-1 rounded-md text-[11px] font-semibold border flex items-center gap-1.5 transition-colors cursor-pointer bg-white dark:bg-zinc-800/80 hover:border-zinc-400 dark:hover:border-zinc-600 text-zinc-800 dark:text-zinc-200 border-zinc-200 dark:border-zinc-700"
+                                    title={t('pricing.families.clickToConfigure') || 'Configurar familia'}
+                                >
+                                    <BindingIcon family={fid} className="w-3.5 h-3.5 text-[#dc0000]" />
+                                    <span>{getFamilyLabel(fid)}</span>
+                                    {renderFamilyStatusBadge(fam.status)}
+                                </button>
+                            );
+                        })}
+                    </div>
+
+                    <div className="flex items-center gap-2 text-[11px] text-zinc-500 dark:text-zinc-400 shrink-0">
+                        <span>
+                            {selectedWorkflow === 'assistant' 
+                                ? (t('pricing.assistant.scopeNotice') || 'El Asistente calibra tarifas del nodo a partir de presupuestos')
+                                : (t('pricing.manual.scopeNotice') || 'Tarifas de fabricación globales para todo el nodo')}
+                        </span>
+                        <button
+                            type="button"
+                            onClick={() => setSelectedWorkflow('onboarding')}
+                            className="text-[#dc0000] hover:underline font-bold whitespace-nowrap ml-1 cursor-pointer"
+                        >
+                            {t('pricing.families.returnToProducts') || '← Volver a productos y presupuestos'}
+                        </button>
+                    </div>
+                </div>
+            )}
+
             {/* PRIMARY & SECONDARY WORKFLOWS BASED ON SELECTION */}
             {/* 0. Simplified 4-Family Onboarding Journey Container */}
             <div
@@ -591,6 +721,8 @@ export const PricingPanel: React.FC<PricingPanelProps> = ({ sites = [], onSaved 
                         onSaved?.();
                     }}
                     onOpenAdvanced={() => setSelectedWorkflow('assistant')}
+                    onFamiliesStateChange={handleFamiliesChange}
+                    targetFamilyId={activeFamilyId}
                 />
             </div>
 

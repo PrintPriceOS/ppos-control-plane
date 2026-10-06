@@ -188,7 +188,7 @@ export const CanonicalIndustrialPricingEditor: React.FC<CanonicalIndustrialPrici
     onReloadRequest,
     saving = false
 }) => {
-    const { t } = useLocale();
+    const { t, locale } = useLocale();
     const [tab, setTab] = useState<FormTab>('Basic');
     const [bindingTab, setBindingTab] = useState<BindingKey>('pb');
     const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -272,8 +272,31 @@ export const CanonicalIndustrialPricingEditor: React.FC<CanonicalIndustrialPrici
     };
 
     // Styling constants
-    const inputClass = "w-full bg-white border border-zinc-300 rounded-md px-3 py-1.5 text-sm font-mono text-zinc-900 focus:outline-none focus:ring-1 focus:ring-[#dc0000] focus:border-[#dc0000] transition-colors";
-    const labelClass = "block text-xs font-semibold text-zinc-700 mb-1";
+    const inputClass = "w-full bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-md px-3 py-1.5 text-sm font-mono text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-1 focus:ring-[#dc0000] focus:border-[#dc0000] transition-colors";
+    const labelClass = "block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1";
+
+    const getLocalizedTabName = (tabName: FormTab, currentLocale?: string): string => {
+        switch (tabName) {
+            case 'Basic':
+                return currentLocale === 'es' ? 'Básico' : currentLocale === 'de' ? 'Basisdaten' : 'Basic';
+            case 'Operational':
+                return currentLocale === 'es' ? 'Operativo' : currentLocale === 'de' ? 'Betrieb' : 'Operational';
+            case 'Interior':
+                return currentLocale === 'es' ? 'Interior' : currentLocale === 'de' ? 'Innenteil' : 'Interior';
+            case 'Cover & Endpapers':
+                return currentLocale === 'es' ? 'Cubierta y Guardas' : currentLocale === 'de' ? 'Umschlag & Vorsatz' : 'Cover & Endpapers';
+            case 'Lamination & UV':
+                return currentLocale === 'es' ? 'Plastificado y UV' : currentLocale === 'de' ? 'Kaschierung & UV' : 'Lamination & UV';
+            case 'Binding':
+                return currentLocale === 'es' ? 'Encuadernación' : currentLocale === 'de' ? 'Bindung' : 'Binding';
+            case 'Paper Costs':
+                return currentLocale === 'es' ? 'Costes de Papel' : currentLocale === 'de' ? 'Papierkosten' : 'Paper Costs';
+            case 'Transport':
+                return currentLocale === 'es' ? 'Transporte' : currentLocale === 'de' ? 'Transport' : 'Transport';
+            default:
+                return tabName;
+        }
+    };
 
     const renderSuggestedBadge = (metaKey: string, onApply?: () => void) => {
         if (mode !== 'ONBOARDING') return null;
@@ -289,16 +312,16 @@ export const CanonicalIndustrialPricingEditor: React.FC<CanonicalIndustrialPrici
         const isLowSample = meta.sampleSize === 3;
 
         return (
-            <div className="mt-1 flex items-center justify-between text-[11px] bg-amber-50 border border-amber-200 text-amber-900 px-2 py-1 rounded">
+            <div className="mt-1 flex items-center justify-between text-[11px] bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 text-amber-900 dark:text-amber-300 px-2 py-1 rounded">
                 <div>
                     <span className="font-semibold">{isLowSample ? 'Suggested · low sample' : 'Suggested starting value'}</span>
-                    <span className="text-amber-700 ml-1">· Historical reference ({isLowSample ? 'n=3' : `n=${meta.sampleSize}`})</span>
+                    <span className="text-amber-700 dark:text-amber-400 ml-1">· Historical reference ({isLowSample ? 'n=3' : `n=${meta.sampleSize}`})</span>
                 </div>
                 {onApply && (
                     <button 
                         type="button" 
                         onClick={onApply}
-                        className="text-[10px] font-bold uppercase tracking-wider text-amber-800 hover:text-amber-950 underline ml-2"
+                        className="text-[10px] font-bold uppercase tracking-wider text-amber-800 dark:text-amber-300 hover:text-amber-950 dark:hover:text-amber-100 underline ml-2 cursor-pointer"
                     >
                         Apply
                     </button>
@@ -308,39 +331,45 @@ export const CanonicalIndustrialPricingEditor: React.FC<CanonicalIndustrialPrici
     };
 
     return (
-        <div className="bg-white border border-zinc-200 rounded-xl shadow-sm overflow-hidden">
+        <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-sm overflow-hidden">
             {/* Header / Intro */}
-            <div className="px-6 py-5 border-b border-zinc-200 bg-zinc-50 flex items-center justify-between">
+            <div className="px-6 py-5 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/60 flex items-center justify-between">
                 <div>
                     <div className="flex items-center gap-2">
                         <Tag className="text-[#dc0000] w-5 h-5" />
-                        <h2 className="text-lg font-bold text-zinc-900">
-                            {mode === 'ONBOARDING' ? 'Industrial Manufacturing Cost & Rate Cards' : 'Printhouse Pricing Configuration'}
+                        <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-100">
+                            {mode === 'ONBOARDING'
+                                ? (locale === 'es' ? 'Costes y Tarifas de Fabricación Industrial' : locale === 'de' ? 'Industrielle Fertigungskosten & Tarife' : 'Industrial Manufacturing Cost & Rate Cards')
+                                : (locale === 'es' ? 'Configuración de Precios de Imprenta' : locale === 'de' ? 'Druckerei-Preiskonfiguration' : 'Printhouse Pricing Configuration')}
                         </h2>
                     </div>
-                    <p className="text-xs text-zinc-500 mt-1">
-                        Configure exact production rate cards consumed by the PrintPrice OS quote engine.
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+                        {locale === 'es'
+                            ? 'Configure las tablas de tarifas exactas de producción consumidas por el motor de presupuestos de PrintPrice OS.'
+                            : locale === 'de'
+                            ? 'Konfigurieren Sie die genauen Produktionstarife, die von der PrintPrice OS-Kalkulationsengine verwendet werden.'
+                            : 'Configure exact production rate cards consumed by the PrintPrice OS quote engine.'}
                     </p>
                 </div>
                 {isUnconfigured && mode === 'ONBOARDING' && (
-                    <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 text-amber-900 px-3 py-1.5 rounded-lg text-xs font-semibold">
-                        <Sparkles size={14} className="text-amber-600 animate-pulse" />
-                        <span>Historical starting values available for review</span>
+                    <div className="flex items-center gap-2 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 text-amber-900 dark:text-amber-300 px-3 py-1.5 rounded-lg text-xs font-semibold">
+                        <Sparkles size={14} className="text-amber-600 dark:text-amber-400 animate-pulse" />
+                        <span>{locale === 'es' ? 'Valores iniciales históricos disponibles para revisión' : locale === 'de' ? 'Historische Richtwerte zur Überprüfung verfügbar' : 'Historical starting values available for review'}</span>
                     </div>
                 )}
             </div>
 
             {/* Alert Messages */}
             {successMessage && (
-                <div className="mx-6 mt-4 p-3 bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-lg text-xs flex items-center gap-2 font-medium">
-                    <CheckCircle2 size={16} className="text-emerald-600" />
+                <div className="mx-6 mt-4 p-3 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 text-emerald-900 dark:text-emerald-300 rounded-lg text-xs flex items-center gap-2 font-medium">
+                    <CheckCircle2 size={16} className="text-emerald-600 dark:text-emerald-400" />
                     <span>{successMessage}</span>
                 </div>
             )}
             {errorMessage && (
-                <div className="mx-6 mt-4 p-3 bg-red-50 border border-red-200 text-red-900 rounded-lg text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2 font-medium">
+                <div className="mx-6 mt-4 p-3 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800/60 text-red-900 dark:text-red-300 rounded-lg text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2 font-medium">
                     <div className="flex items-center gap-2">
-                        <AlertTriangle size={16} className="text-red-600 shrink-0" />
+                        <AlertTriangle size={16} className="text-red-600 dark:text-red-400 shrink-0" />
                         <span>{errorMessage}</span>
                     </div>
                     {conflictError && onReloadRequest && (
@@ -351,28 +380,28 @@ export const CanonicalIndustrialPricingEditor: React.FC<CanonicalIndustrialPrici
                                 setErrorMessage(null);
                                 setConflictError(null);
                             }}
-                            className="px-3 py-1 bg-red-700 hover:bg-red-800 text-white rounded text-xs font-semibold whitespace-nowrap transition-colors self-start sm:self-auto"
+                            className="px-3 py-1 bg-red-700 hover:bg-red-800 text-white rounded text-xs font-semibold whitespace-nowrap transition-colors self-start sm:self-auto cursor-pointer"
                         >
-                            Reload Server Rates
+                            {t('pricing.editor.reloadServerRates') || 'Reload Server Rates'}
                         </button>
                     )}
                 </div>
             )}
 
             {/* Tab Navigation */}
-            <div className="flex border-b border-zinc-200 px-6 bg-zinc-50 overflow-x-auto">
+            <div className="flex border-b border-zinc-200 dark:border-zinc-800 px-6 bg-zinc-50 dark:bg-zinc-900/80 overflow-x-auto">
                 {FORM_TABS.map(t => (
                     <button
                         key={t}
                         type="button"
                         onClick={() => setTab(t)}
-                        className={`px-4 py-3 text-xs font-bold uppercase tracking-wider border-b-2 whitespace-nowrap transition-colors ${
+                        className={`px-4 py-3 text-xs font-bold uppercase tracking-wider border-b-2 whitespace-nowrap transition-colors cursor-pointer ${
                             tab === t 
-                                ? 'border-[#dc0000] text-[#dc0000] bg-white' 
-                                : 'border-transparent text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100/50'
+                                ? 'border-[#dc0000] text-[#dc0000] dark:text-red-400 bg-white dark:bg-zinc-900' 
+                                : 'border-transparent text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 hover:bg-zinc-100/50 dark:hover:bg-zinc-800/40'
                         }`}
                     >
-                        {t}
+                        {getLocalizedTabName(t, locale)}
                     </button>
                 ))}
             </div>
@@ -384,17 +413,17 @@ export const CanonicalIndustrialPricingEditor: React.FC<CanonicalIndustrialPrici
                     <div className="space-y-6 max-w-2xl">
                         <div className="grid grid-cols-2 gap-4">
                             <div>
-                                <label className={labelClass}>Printhouse Node Slug</label>
+                                <label className={labelClass}>{t('pricing.editor.nodeSlug') || 'Printhouse Node Slug'}</label>
                                 <input 
                                     type="text" 
                                     value={form.id} 
                                     disabled={mode === 'ONBOARDING'}
                                     onChange={e => setForm(f => ({ ...f, id: e.target.value }))}
-                                    className={`${inputClass} disabled:bg-zinc-100 disabled:text-zinc-500`} 
+                                    className={`${inputClass} disabled:bg-zinc-100 dark:disabled:bg-zinc-900 disabled:text-zinc-500 dark:disabled:text-zinc-500`} 
                                 />
                             </div>
                             <div>
-                                <label className={labelClass}>Printhouse Legal/Trade Name</label>
+                                <label className={labelClass}>{t('pricing.editor.legalName') || 'Printhouse Legal/Trade Name'}</label>
                                 <input 
                                     type="text" 
                                     value={form.name} 
@@ -406,7 +435,7 @@ export const CanonicalIndustrialPricingEditor: React.FC<CanonicalIndustrialPrici
 
                         <div className="grid grid-cols-3 gap-4">
                             <div>
-                                <label className={labelClass}>Standard Signatures</label>
+                                <label className={labelClass}>{t('pricing.editor.standardSignatures') || 'Standard Signatures'}</label>
                                 <div className="flex gap-2 mt-1">
                                     {([32, 24, 16, 8] as const).map(sig => {
                                         const active = form.signatures.includes(sig);
@@ -422,10 +451,10 @@ export const CanonicalIndustrialPricingEditor: React.FC<CanonicalIndustrialPrici
                                                             : [...f.signatures, sig]
                                                     }));
                                                 }}
-                                                className={`px-3 py-1.5 rounded text-xs font-bold uppercase tracking-wider border transition-colors ${
+                                                className={`px-3 py-1.5 rounded text-xs font-bold uppercase tracking-wider border transition-colors cursor-pointer ${
                                                     active 
-                                                        ? 'bg-zinc-900 text-white border-zinc-900' 
-                                                        : 'bg-white text-zinc-600 border-zinc-300 hover:border-zinc-400'
+                                                        ? 'bg-zinc-900 dark:bg-red-700 text-white border-zinc-900 dark:border-red-700' 
+                                                        : 'bg-white dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 border-zinc-300 dark:border-zinc-700 hover:border-zinc-400 dark:hover:border-zinc-500'
                                                 }`}
                                             >
                                                 {sig}p
@@ -438,7 +467,7 @@ export const CanonicalIndustrialPricingEditor: React.FC<CanonicalIndustrialPrici
                                 </div>
                             </div>
                             <div>
-                                <label className={labelClass}>Delivery Time (Days/Text)</label>
+                                <label className={labelClass}>{t('pricing.editor.deliveryTime') || 'Delivery Time (Days/Text)'}</label>
                                 <input 
                                     type="text" 
                                     value={form.delivery_time}
@@ -450,7 +479,7 @@ export const CanonicalIndustrialPricingEditor: React.FC<CanonicalIndustrialPrici
                                 </div>
                             </div>
                             <div>
-                                <label className={labelClass}>Production Lead Days</label>
+                                <label className={labelClass}>{t('pricing.editor.productionLeadDays') || 'Production Lead Days'}</label>
                                 <input 
                                     type="number" 
                                     min={1} 
@@ -466,7 +495,7 @@ export const CanonicalIndustrialPricingEditor: React.FC<CanonicalIndustrialPrici
 
                         <div className="grid grid-cols-2 gap-4">
                             <div>
-                                <label className={labelClass}>Min Copies per Run</label>
+                                <label className={labelClass}>{t('pricing.editor.minCopies') || 'Min Copies per Run'}</label>
                                 <input 
                                     type="number" 
                                     min={1} 
@@ -476,7 +505,7 @@ export const CanonicalIndustrialPricingEditor: React.FC<CanonicalIndustrialPrici
                                 />
                             </div>
                             <div>
-                                <label className={labelClass}>Max Book Pages</label>
+                                <label className={labelClass}>{t('pricing.editor.maxPages') || 'Max Book Pages'}</label>
                                 <input 
                                     type="number" 
                                     min={1} 
@@ -494,31 +523,31 @@ export const CanonicalIndustrialPricingEditor: React.FC<CanonicalIndustrialPrici
                     <div className="space-y-6 max-w-2xl">
                         <div className="grid grid-cols-2 gap-4">
                             <div>
-                                <label className={labelClass}>Minimum Order Threshold (€)</label>
+                                <label className={labelClass}>{t('pricing.editor.minOrderThreshold') || 'Minimum Order Threshold (€)'}</label>
                                 <input 
                                     type="number" 
                                     step="0.01" 
-                                    value={form.rates.min_order || 95}
-                                    onChange={e => setRates(r => ({ ...r, min_order: parseFloat(e.target.value) || 0 }))}
+                                    value={(form.rates as any)?.min_order || 95}
+                                    onChange={e => setRates(r => ({ ...r, min_order: parseFloat(e.target.value) || 0 } as any))}
                                     className={inputClass} 
                                 />
-                                {renderSuggestedBadge('min_order', () => setRates(r => ({ ...r, min_order: 95.0 })))}
+                                {renderSuggestedBadge('min_order', () => setRates(r => ({ ...r, min_order: 95.0 } as any)))}
                             </div>
                             <div>
-                                <label className={labelClass}>Fixed Machine Setup Fee (€)</label>
+                                <label className={labelClass}>{t('pricing.editor.fixedSetupFee') || 'Fixed Machine Setup Fee (€)'}</label>
                                 <input 
                                     type="number" 
                                     step="0.01" 
-                                    value={form.rates.setup_fixed || 42}
-                                    onChange={e => setRates(r => ({ ...r, setup_fixed: parseFloat(e.target.value) || 0 }))}
+                                    value={(form.rates as any)?.setup_fixed || 42}
+                                    onChange={e => setRates(r => ({ ...r, setup_fixed: parseFloat(e.target.value) || 0 } as any))}
                                     className={inputClass} 
                                 />
-                                {renderSuggestedBadge('setup_fixed', () => setRates(r => ({ ...r, setup_fixed: 42.0 })))}
+                                {renderSuggestedBadge('setup_fixed', () => setRates(r => ({ ...r, setup_fixed: 42.0 } as any)))}
                             </div>
                         </div>
-                        <div className="p-4 bg-zinc-50 border border-zinc-200 rounded-lg">
-                            <p className="text-xs text-zinc-600 leading-relaxed">
-                                Operational thresholds establish minimum billing limits for custom bookbinding jobs before volume tier discounts apply.
+                        <div className="p-4 bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200 dark:border-zinc-800 rounded-lg">
+                            <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed">
+                                {t('pricing.editor.operationalThresholdsHelp') || 'Operational thresholds establish minimum billing limits for custom bookbinding jobs before volume tier discounts apply.'}
                             </p>
                         </div>
                     </div>
@@ -528,12 +557,12 @@ export const CanonicalIndustrialPricingEditor: React.FC<CanonicalIndustrialPrici
                 {tab === 'Interior' && (
                     <div className="space-y-8">
                         <div className="p-3 bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 rounded-lg text-xs text-zinc-600 dark:text-zinc-400">
-                            Configure base plate setup (Fixed) and run rate per 1,000 sheets (Variable) for supported signature formats.
+                            {t('pricing.editor.interiorHelp') || 'Configure base plate setup (Fixed) and run rate per 1,000 sheets (Variable) for supported signature formats.'}
                         </div>
 
                         {([
                             {
-                                label: '1 Colour (1/1)',
+                                label: locale === 'es' ? '1 Tinta (1/1)' : locale === 'de' ? '1 Farbe (1/1)' : '1 Colour (1/1)',
                                 fixedKey: 'interior_one_colour_fixed',
                                 varKey: 'interior_one_colour_var',
                                 fixedSuggestKey: 'interior_11_fixed',
@@ -543,12 +572,12 @@ export const CanonicalIndustrialPricingEditor: React.FC<CanonicalIndustrialPrici
                                 sampleText: 'Historical reference · n=13'
                             },
                             {
-                                label: '2 Colour (2/2)',
+                                label: locale === 'es' ? '2 Tintas (2/2)' : locale === 'de' ? '2 Farben (2/2)' : '2 Colour (2/2)',
                                 fixedKey: 'interior_two_colour_fixed',
                                 varKey: 'interior_two_colour_var'
                             },
                             {
-                                label: 'Full Colour (4/4 CMYK)',
+                                label: locale === 'es' ? 'Cuatricomía (4/4 CMYK)' : locale === 'de' ? 'Vierfarbig (4/4 CMYK)' : 'Full Colour (4/4 CMYK)',
                                 fixedKey: 'interior_full_colour_fixed',
                                 varKey: 'interior_full_colour_var',
                                 fixedSuggestKey: 'interior_44_fixed',
@@ -557,7 +586,7 @@ export const CanonicalIndustrialPricingEditor: React.FC<CanonicalIndustrialPrici
                                 defVar: 18.0,
                                 sampleText: 'Historical reference · n=3 · Low sample'
                             }
-                        ] as const).map(({ label, fixedKey, varKey, fixedSuggestKey, defFixed, defVar, sampleText }) => (
+                        ] as const).map(({ label, fixedKey, varKey, fixedSuggestKey, defFixed, defVar, sampleText }: any) => (
                             <div key={label} className="border border-zinc-200 dark:border-zinc-800 rounded-lg p-4 bg-white dark:bg-zinc-900 transition-colors">
                                 <div className="flex items-center justify-between mb-3">
                                     <h3 className="text-sm font-bold text-zinc-900 dark:text-white">{label}</h3>
@@ -566,9 +595,9 @@ export const CanonicalIndustrialPricingEditor: React.FC<CanonicalIndustrialPrici
                                 {fixedSuggestKey && (
                                     <div className="mb-4 p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/60 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-amber-950 dark:text-amber-200">
                                         <div>
-                                            <span className="font-bold block text-amber-900 dark:text-amber-100 mb-0.5">Suggested starting baseline</span>
-                                            <span className="mr-3">Fixed setup: <strong className="font-mono">€{defFixed?.toFixed(2)}</strong></span>
-                                            <span>Variable /1000: <strong className="font-mono">€{defVar?.toFixed(2)}</strong></span>
+                                            <span className="font-bold block text-amber-900 dark:text-amber-100 mb-0.5">{t('pricing.editor.suggestedBaseline') || 'Suggested starting baseline'}</span>
+                                            <span className="mr-3">{t('pricing.editor.fixedSetup') || 'Fixed setup:'} <strong className="font-mono">€{defFixed?.toFixed(2)}</strong></span>
+                                            <span>{t('pricing.editor.variablePer1000') || 'Variable /1000:'} <strong className="font-mono">€{defVar?.toFixed(2)}</strong></span>
                                             <span className="text-[11px] opacity-75 ml-3">({sampleText})</span>
                                         </div>
                                         <button
@@ -581,7 +610,7 @@ export const CanonicalIndustrialPricingEditor: React.FC<CanonicalIndustrialPrici
                                             }}
                                             className="px-3 py-1.5 bg-[#dc0000] hover:bg-red-700 text-white font-semibold rounded text-xs transition-colors shrink-0 shadow-xs cursor-pointer"
                                         >
-                                            Apply baseline to supported signatures
+                                            {t('pricing.editor.applyBaseline') || 'Apply baseline to supported signatures'}
                                         </button>
                                     </div>
                                 )}
@@ -590,7 +619,7 @@ export const CanonicalIndustrialPricingEditor: React.FC<CanonicalIndustrialPrici
                                     <table className="text-xs border-collapse min-w-full">
                                         <thead>
                                             <tr>
-                                                <th className="text-left text-[11px] font-bold text-zinc-500 dark:text-zinc-400 uppercase pb-2 w-28">Type</th>
+                                                <th className="text-left text-[11px] font-bold text-zinc-500 dark:text-zinc-400 uppercase pb-2 w-28">{t('pricing.editor.type') || 'Type'}</th>
                                                 {SIG_KEYS.map(k => (
                                                     <th key={k} className="text-center text-[11px] font-bold text-zinc-500 dark:text-zinc-400 uppercase pb-2 px-2 min-w-[90px]">
                                                         {k}
@@ -599,10 +628,11 @@ export const CanonicalIndustrialPricingEditor: React.FC<CanonicalIndustrialPrici
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {(['Fixed Setup (€)', 'Variable /1000 (€)'] as const).map((rowLabel, ri) => {
+                                            {([0, 1] as const).map((ri) => {
+                                                const rowLabel = ri === 0 ? (t('pricing.editor.fixedSetupCol') || 'Fixed Setup (€)') : (t('pricing.editor.varPer1000Col') || 'Variable /1000 (€)');
                                                 const key = ri === 0 ? fixedKey : varKey;
                                                 return (
-                                                    <tr key={rowLabel} className="border-t border-zinc-100 dark:border-zinc-800">
+                                                    <tr key={ri} className="border-t border-zinc-100 dark:border-zinc-800">
                                                         <td className="text-xs font-semibold text-zinc-700 dark:text-zinc-300 py-2 pr-3">{rowLabel}</td>
                                                         {SIG_KEYS.map(k => {
                                                             const rawVal = (form.rates[key] as any)?.[k];
@@ -642,29 +672,30 @@ export const CanonicalIndustrialPricingEditor: React.FC<CanonicalIndustrialPrici
                 {tab === 'Cover & Endpapers' && (
                     <div className="space-y-8">
                         {([
-                            { label: 'Cover Printing', fixedKey: 'cover_fixed_by_colours', varKey: 'cover_var_per_1000_by_colours', hasSuggest: true },
-                            { label: 'Endpaper Printing', fixedKey: 'endpaper_fixed_by_colours', varKey: 'endpaper_var_per_1000_by_colours', hasSuggest: false }
+                            { label: t('pricing.editor.coverPrinting') || 'Cover Printing', fixedKey: 'cover_fixed_by_colours', varKey: 'cover_var_per_1000_by_colours', hasSuggest: true },
+                            { label: t('pricing.editor.endpaperPrinting') || 'Endpaper Printing', fixedKey: 'endpaper_fixed_by_colours', varKey: 'endpaper_var_per_1000_by_colours', hasSuggest: false }
                         ] as const).map(({ label, fixedKey, varKey, hasSuggest }) => (
-                            <div key={label} className="border border-zinc-200 rounded-lg p-4 bg-white">
-                                <h3 className="text-sm font-bold text-zinc-900 mb-3">{label}</h3>
+                            <div key={label} className="border border-zinc-200 dark:border-zinc-800 rounded-lg p-4 bg-white dark:bg-zinc-900 transition-colors">
+                                <h3 className="text-sm font-bold text-zinc-900 dark:text-white mb-3">{label}</h3>
                                 <div className="overflow-x-auto">
                                     <table className="text-xs border-collapse min-w-full">
                                         <thead>
                                             <tr>
-                                                <th className="text-left text-[11px] font-bold text-zinc-500 uppercase pb-2 w-28">Type</th>
+                                                <th className="text-left text-[11px] font-bold text-zinc-500 dark:text-zinc-400 uppercase pb-2 w-28">{t('pricing.editor.type') || 'Type'}</th>
                                                 {COLOUR_KEYS.map(k => (
-                                                    <th key={k} className="text-center text-[11px] font-bold text-zinc-500 uppercase pb-2 px-2 min-w-[90px]">
-                                                        {k} colour{k !== '1' ? 's' : ''}
+                                                    <th key={k} className="text-center text-[11px] font-bold text-zinc-500 dark:text-zinc-400 uppercase pb-2 px-2 min-w-[90px]">
+                                                        {k} {locale === 'es' ? 'tinta' + (k !== '1' ? 's' : '') : locale === 'de' ? 'Farbe' + (k !== '1' ? 'n' : '') : 'colour' + (k !== '1' ? 's' : '')}
                                                     </th>
                                                 ))}
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {(['Fixed (€)', 'Variable /1000 (€)'] as const).map((rowLabel, ri) => {
+                                            {([0, 1] as const).map((ri) => {
+                                                const rowLabel = ri === 0 ? (t('pricing.editor.fixedSetupCol') || 'Fixed (€)') : (t('pricing.editor.varPer1000Col') || 'Variable /1000 (€)');
                                                 const key = ri === 0 ? fixedKey : varKey;
                                                 return (
-                                                    <tr key={rowLabel} className="border-t border-zinc-100">
-                                                        <td className="text-xs font-semibold text-zinc-700 py-2 pr-3">{rowLabel}</td>
+                                                    <tr key={ri} className="border-t border-zinc-100 dark:border-zinc-800">
+                                                        <td className="text-xs font-semibold text-zinc-700 dark:text-zinc-300 py-2 pr-3">{rowLabel}</td>
                                                         {COLOUR_KEYS.map(k => (
                                                             <td key={k} className="px-1 py-1">
                                                                 <input
@@ -683,9 +714,9 @@ export const CanonicalIndustrialPricingEditor: React.FC<CanonicalIndustrialPrici
                                     </table>
                                 </div>
                                 {hasSuggest && (
-                                    <div className="mt-3 text-xs text-zinc-500 flex gap-4">
-                                        <span>Suggested 1-col: 40 € / 8 € (n=3)</span>
-                                        <span>Suggested 4-col: 66 € / 12.50 € (n=3)</span>
+                                    <div className="mt-3 text-xs text-zinc-500 dark:text-zinc-400 flex gap-4">
+                                        <span>{t('pricing.editor.suggested1Col') || 'Suggested 1-col: 40 € / 8 € (n=3)'}</span>
+                                        <span>{t('pricing.editor.suggested4Col') || 'Suggested 4-col: 66 € / 12.50 € (n=3)'}</span>
                                     </div>
                                 )}
                             </div>
@@ -697,15 +728,17 @@ export const CanonicalIndustrialPricingEditor: React.FC<CanonicalIndustrialPrici
                 {tab === 'Lamination & UV' && (
                     <div className="space-y-6 max-w-2xl">
                         {([
-                            { label: 'Lamination — Fixed Setup (€)', key: 'lam_fixed', suggestGloss: 6.0, suggestMatt: 6.0 },
-                            { label: 'Lamination — Variable /1000 sheets (€)', key: 'lam_var_per_1000', suggestGloss: 25.0, suggestMatt: 25.0 }
+                            { label: t('pricing.editor.lamFixed') || 'Lamination — Fixed Setup (€)', key: 'lam_fixed', suggestGloss: 6.0, suggestMatt: 6.0 },
+                            { label: t('pricing.editor.lamVar') || 'Lamination — Variable /1000 sheets (€)', key: 'lam_var_per_1000', suggestGloss: 25.0, suggestMatt: 25.0 }
                         ] as const).map(({ label, key, suggestGloss, suggestMatt }) => (
-                            <div key={key} className="border border-zinc-200 rounded-lg p-4 bg-white">
-                                <h3 className="text-sm font-bold text-zinc-900 mb-3">{label}</h3>
+                            <div key={key} className="border border-zinc-200 dark:border-zinc-800 rounded-lg p-4 bg-white dark:bg-zinc-900 transition-colors">
+                                <h3 className="text-sm font-bold text-zinc-900 dark:text-white mb-3">{label}</h3>
                                 <div className="grid grid-cols-3 gap-4">
                                     {(['varnish', 'gloss', 'matt'] as const).map(k => (
                                         <div key={k}>
-                                            <label className={labelClass}>{k.toUpperCase()}</label>
+                                            <label className={labelClass}>
+                                                {k === 'varnish' ? (locale === 'es' ? 'BARNIZ' : locale === 'de' ? 'LACK' : 'VARNISH') : k === 'gloss' ? (locale === 'es' ? 'BRILLO' : locale === 'de' ? 'GLANZ' : 'GLOSS') : (locale === 'es' ? 'MATE' : locale === 'de' ? 'MATT' : 'MATT')}
+                                            </label>
                                             <input
                                                 type="number"
                                                 step="0.01"
@@ -715,7 +748,7 @@ export const CanonicalIndustrialPricingEditor: React.FC<CanonicalIndustrialPrici
                                             />
                                             {k !== 'varnish' && (
                                                 <div className="mt-1 text-[10px] text-zinc-400">
-                                                    Suggested: {k === 'gloss' ? suggestGloss : suggestMatt} € (n=3)
+                                                    {locale === 'es' ? 'Sugerido: ' : locale === 'de' ? 'Empfohlen: ' : 'Suggested: '}{k === 'gloss' ? suggestGloss : suggestMatt} € (n=3)
                                                 </div>
                                             )}
                                         </div>
@@ -724,11 +757,11 @@ export const CanonicalIndustrialPricingEditor: React.FC<CanonicalIndustrialPrici
                             </div>
                         ))}
 
-                        <div className="border border-zinc-200 rounded-lg p-4 bg-white">
-                            <h3 className="text-sm font-bold text-zinc-900 mb-3">UV Varnish</h3>
+                        <div className="border border-zinc-200 dark:border-zinc-800 rounded-lg p-4 bg-white dark:bg-zinc-900 transition-colors">
+                            <h3 className="text-sm font-bold text-zinc-900 dark:text-white mb-3">{t('pricing.editor.uvVarnish') || 'UV Varnish'}</h3>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className={labelClass}>UV Fixed (€)</label>
+                                    <label className={labelClass}>{t('pricing.editor.uvFixed') || 'UV Fixed (€)'}</label>
                                     <input
                                         type="number"
                                         step="0.01"
@@ -736,10 +769,10 @@ export const CanonicalIndustrialPricingEditor: React.FC<CanonicalIndustrialPrici
                                         onChange={e => setRates(r => ({ ...r, uv_varnish: { ...r.uv_varnish, fixed: parseFloat(e.target.value) || 0 } }))}
                                         className={inputClass}
                                     />
-                                    <div className="mt-1 text-[10px] text-zinc-400 italic">Not suggested yet</div>
+                                    <div className="mt-1 text-[10px] text-zinc-400 italic">{t('pricing.editor.notSuggestedYet') || 'Not suggested yet'}</div>
                                 </div>
                                 <div>
-                                    <label className={labelClass}>UV Variable /1000 (€)</label>
+                                    <label className={labelClass}>{t('pricing.editor.uvVar') || 'UV Variable /1000 (€)'}</label>
                                     <input
                                         type="number"
                                         step="0.01"
@@ -747,7 +780,7 @@ export const CanonicalIndustrialPricingEditor: React.FC<CanonicalIndustrialPrici
                                         onChange={e => setRates(r => ({ ...r, uv_varnish: { ...r.uv_varnish, var: parseFloat(e.target.value) || 0 } }))}
                                         className={inputClass}
                                     />
-                                    <div className="mt-1 text-[10px] text-zinc-400 italic">Not suggested yet</div>
+                                    <div className="mt-1 text-[10px] text-zinc-400 italic">{t('pricing.editor.notSuggestedYet') || 'Not suggested yet'}</div>
                                 </div>
                             </div>
                         </div>
@@ -763,10 +796,10 @@ export const CanonicalIndustrialPricingEditor: React.FC<CanonicalIndustrialPrici
                                     key={b.key}
                                     type="button"
                                     onClick={() => setBindingTab(b.key)}
-                                    className={`px-3 py-1.5 rounded text-xs font-bold uppercase tracking-wider transition-colors ${
+                                    className={`px-3 py-1.5 rounded text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer ${
                                         bindingTab === b.key
-                                            ? 'bg-zinc-900 text-white'
-                                            : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
+                                            ? 'bg-zinc-900 dark:bg-red-700 text-white'
+                                            : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700'
                                     }`}
                                 >
                                     {b.label}
@@ -778,9 +811,9 @@ export const CanonicalIndustrialPricingEditor: React.FC<CanonicalIndustrialPrici
                             const fk = `binding_${b.key}_fixed_by_sections` as keyof PrinthouseRates;
                             const vk = `binding_${b.key}_var_per_1000_by_sections` as keyof PrinthouseRates;
                             return (
-                                <div key={b.key} className="border border-zinc-200 rounded-lg p-4 bg-white">
+                                <div key={b.key} className="border border-zinc-200 dark:border-zinc-800 rounded-lg p-4 bg-white dark:bg-zinc-900 transition-colors">
                                     <div className="flex items-center justify-between mb-3">
-                                        <h3 className="text-sm font-bold text-zinc-900">{b.label} Costs by Section</h3>
+                                        <h3 className="text-sm font-bold text-zinc-900 dark:text-white">{b.label} {t('pricing.editor.costsBySection') || 'Costs by Section'}</h3>
                                         {b.key === 'ts' && (
                                             <button
                                                 type="button"
@@ -791,23 +824,23 @@ export const CanonicalIndustrialPricingEditor: React.FC<CanonicalIndustrialPrici
                                                 }}
                                                 className="text-xs font-semibold text-[#dc0000] hover:underline"
                                             >
-                                                Apply Thread Sewn Section Step Means (4-24)
+                                                {t('pricing.editor.applyThreadSewnMeans') || 'Apply Thread Sewn Section Step Means (4-24)'}
                                             </button>
                                         )}
                                     </div>
                                     <div className="overflow-x-auto max-h-96">
                                         <table className="text-xs border-collapse w-full max-w-lg">
-                                            <thead className="sticky top-0 bg-zinc-50 z-10 border-b border-zinc-200">
+                                            <thead className="sticky top-0 bg-zinc-50 dark:bg-zinc-800 z-10 border-b border-zinc-200 dark:border-zinc-700">
                                                 <tr>
-                                                    <th className="text-left text-[11px] font-bold text-zinc-500 uppercase py-2 w-20">Sections</th>
-                                                    <th className="text-[11px] font-bold text-zinc-500 uppercase py-2 px-2 min-w-[120px]">Fixed Setup (€)</th>
-                                                    <th className="text-[11px] font-bold text-zinc-500 uppercase py-2 px-2 min-w-[120px]">Variable /1000 (€)</th>
+                                                    <th className="text-left text-[11px] font-bold text-zinc-500 dark:text-zinc-400 uppercase py-2 w-20">{t('pricing.editor.sections') || 'Sections'}</th>
+                                                    <th className="text-[11px] font-bold text-zinc-500 dark:text-zinc-400 uppercase py-2 px-2 min-w-[120px]">{t('pricing.editor.fixedSetupCol') || 'Fixed Setup (€)'}</th>
+                                                    <th className="text-[11px] font-bold text-zinc-500 dark:text-zinc-400 uppercase py-2 px-2 min-w-[120px]">{t('pricing.editor.varPer1000Col') || 'Variable /1000 (€)'}</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
                                                 {SECTIONS.map(s => (
-                                                    <tr key={s} className="border-t border-zinc-100">
-                                                        <td className="text-xs font-bold text-zinc-600 py-1.5 pr-3">{s} sec</td>
+                                                    <tr key={s} className="border-t border-zinc-100 dark:border-zinc-800">
+                                                        <td className="text-xs font-bold text-zinc-600 dark:text-zinc-300 py-1.5 pr-3">{s} sec</td>
                                                         <td className="px-1 py-1">
                                                             <input
                                                                 type="number"
@@ -843,12 +876,12 @@ export const CanonicalIndustrialPricingEditor: React.FC<CanonicalIndustrialPrici
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div className="border border-zinc-200 dark:border-zinc-800 rounded-lg p-4 bg-white dark:bg-zinc-900 transition-colors">
                                 <div className="flex items-center justify-between mb-3">
-                                    <h3 className="text-sm font-bold text-zinc-900 dark:text-white">Interior Paper Costs (€/kg)</h3>
+                                    <h3 className="text-sm font-bold text-zinc-900 dark:text-white">{t('pricing.editor.interiorPaperCosts') || 'Interior Paper Costs (€/kg)'}</h3>
                                 </div>
                                 
                                 <div className="mb-4 p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/60 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-amber-950 dark:text-amber-200">
                                     <div>
-                                        <span className="font-bold block text-amber-900 dark:text-amber-100 mb-0.5">Generic historical baseline</span>
+                                        <span className="font-bold block text-amber-900 dark:text-amber-100 mb-0.5">{t('pricing.editor.genericBaseline') || 'Generic historical baseline'}</span>
                                         <span className="font-mono text-sm font-bold">€1.252 / kg</span>
                                         <span className="text-[11px] opacity-75 block mt-0.5">Historical reference · n=13 · Not grade-specific</span>
                                     </div>
@@ -863,14 +896,14 @@ export const CanonicalIndustrialPricingEditor: React.FC<CanonicalIndustrialPrici
                                         }}
                                         className="px-3 py-1.5 bg-[#dc0000] hover:bg-red-700 text-white font-semibold rounded text-xs transition-colors shrink-0 shadow-xs cursor-pointer"
                                     >
-                                        Apply generic baseline
+                                        {t('pricing.editor.applyGenericBaseline') || 'Apply generic baseline'}
                                     </button>
                                 </div>
 
                                 <div className="space-y-3">
                                     {(['offset', 'mc', 'lux', 'munken', 'other'] as const).map(grade => {
                                         const rawVal = form.rates.paper_price_interior_by_kilo?.[grade];
-                                        const displayVal = (rawVal === undefined || rawVal === null || rawVal === '')
+                                        const displayVal = (rawVal === undefined || rawVal === null || (rawVal as any) === '')
                                             ? ''
                                             : rawVal === 0
                                                 ? (initialNodeData?.rates ? '0' : '')
@@ -903,12 +936,12 @@ export const CanonicalIndustrialPricingEditor: React.FC<CanonicalIndustrialPrici
 
                             <div className="border border-zinc-200 dark:border-zinc-800 rounded-lg p-4 bg-white dark:bg-zinc-900 transition-colors">
                                 <div className="flex items-center justify-between mb-3">
-                                    <h3 className="text-sm font-bold text-zinc-900 dark:text-white">Cover Paper Costs (€/kg)</h3>
+                                    <h3 className="text-sm font-bold text-zinc-900 dark:text-white">{t('pricing.editor.coverPaperCosts') || 'Cover Paper Costs (€/kg)'}</h3>
                                 </div>
 
                                 <div className="mb-4 p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/60 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-amber-950 dark:text-amber-200">
                                     <div>
-                                        <span className="font-bold block text-amber-900 dark:text-amber-100 mb-0.5">Generic historical baseline</span>
+                                        <span className="font-bold block text-amber-900 dark:text-amber-100 mb-0.5">{t('pricing.editor.genericBaseline') || 'Generic historical baseline'}</span>
                                         <span className="font-mono text-sm font-bold">€2.515 / kg</span>
                                         <span className="text-[11px] opacity-75 block mt-0.5">Historical reference · n=13 · Not grade-specific</span>
                                     </div>
@@ -923,14 +956,14 @@ export const CanonicalIndustrialPricingEditor: React.FC<CanonicalIndustrialPrici
                                         }}
                                         className="px-3 py-1.5 bg-[#dc0000] hover:bg-red-700 text-white font-semibold rounded text-xs transition-colors shrink-0 shadow-xs cursor-pointer"
                                     >
-                                        Apply generic baseline
+                                        {t('pricing.editor.applyGenericBaseline') || 'Apply generic baseline'}
                                     </button>
                                 </div>
 
                                 <div className="space-y-3">
                                     {(['mc', 'artboard', 'offset', 'wfmc', 'other'] as const).map(grade => {
                                         const rawVal = form.rates.paper_price_cover_by_kilo?.[grade];
-                                        const displayVal = (rawVal === undefined || rawVal === null || rawVal === '')
+                                        const displayVal = (rawVal === undefined || rawVal === null || (rawVal as any) === '')
                                             ? ''
                                             : rawVal === 0
                                                 ? (initialNodeData?.rates ? '0' : '')
@@ -970,9 +1003,9 @@ export const CanonicalIndustrialPricingEditor: React.FC<CanonicalIndustrialPrici
                         <div className="border border-zinc-200 dark:border-zinc-800 rounded-lg p-5 bg-white dark:bg-zinc-900 shadow-xs">
                             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4 border-b border-zinc-100 dark:border-zinc-800 pb-3">
                                 <div>
-                                    <h3 className="text-sm font-bold text-zinc-900 dark:text-white">Country-Specific Shipping (€/kg)</h3>
+                                    <h3 className="text-sm font-bold text-zinc-900 dark:text-white">{t('pricing.editor.countryShipping') || 'Country-Specific Shipping (€/kg)'}</h3>
                                     <p className="text-xs text-zinc-500 mt-0.5">
-                                        Configure destination transport rates per kilogram across all canonical global destinations.
+                                        {t('pricing.editor.countryShippingHelp') || 'Configure destination transport rates per kilogram across all canonical global destinations.'}
                                     </p>
                                 </div>
                                 <div className="text-xs text-zinc-500 font-medium">
@@ -983,7 +1016,7 @@ export const CanonicalIndustrialPricingEditor: React.FC<CanonicalIndustrialPrici
                             {/* Add Country Control */}
                             <div className="mb-5 p-3.5 bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700 rounded-xl space-y-2">
                                 <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300">
-                                    Add Destination Country Rate
+                                    {t('pricing.editor.addDestinationCountry') || 'Add Destination Country Rate'}
                                 </label>
                                 <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center">
                                     <div className="flex-1">
@@ -1003,7 +1036,7 @@ export const CanonicalIndustrialPricingEditor: React.FC<CanonicalIndustrialPrici
                                                     }
                                                 }));
                                             }}
-                                            placeholder="Search canonical catalog to add country (e.g. Poland, Sweden, Japan)..."
+                                            placeholder={t('pricing.editor.searchCatalogCountry') || 'Search canonical catalog to add country (e.g. Poland, Sweden, Japan)...'}
                                         />
                                     </div>
                                 </div>
@@ -1013,7 +1046,7 @@ export const CanonicalIndustrialPricingEditor: React.FC<CanonicalIndustrialPrici
                             <div className="space-y-3">
                                 {Object.keys(form.rates.transport_costs || {}).length === 0 ? (
                                     <div className="py-8 text-center text-xs text-zinc-400 border border-dashed border-zinc-200 dark:border-zinc-800 rounded-lg">
-                                        No country transport rates configured. Use the selector above to add countries.
+                                        {t('pricing.editor.noCountryConfigured') || 'No country transport rates configured. Use the selector above to add countries.'}
                                     </div>
                                 ) : (
                                     Object.entries(form.rates.transport_costs || {}).map(([rawCode, val]) => {
@@ -1109,19 +1142,19 @@ export const CanonicalIndustrialPricingEditor: React.FC<CanonicalIndustrialPrici
                 )}
 
                 {/* Bottom Actions */}
-                <div className="mt-8 pt-5 border-t border-zinc-200 flex items-center justify-between">
-                    <div className="text-xs text-zinc-500">
+                <div className="mt-8 pt-5 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
+                    <div className="text-xs text-zinc-500 dark:text-zinc-400">
                         {mode === 'ONBOARDING' 
-                            ? 'Review starting values across all 8 tabs before saving.'
-                            : 'Updates are immediately effective for quote calculation.'}
+                            ? (locale === 'es' ? 'Revise los valores iniciales en las 8 pestañas antes de guardar.' : locale === 'de' ? 'Überprüfen Sie die Richtwerte in allen 8 Reitern vor dem Speichern.' : 'Review starting values across all 8 tabs before saving.')
+                            : (locale === 'es' ? 'Las actualizaciones son inmediatamente efectivas para el cálculo de presupuestos.' : locale === 'de' ? 'Aktualisierungen sind sofort für die Angebotsberechnung wirksam.' : 'Updates are immediately effective for quote calculation.')}
                     </div>
                     <button
                         type="submit"
                         disabled={saving}
-                        className="bg-[#dc0000] hover:bg-red-700 text-white font-semibold px-6 py-2.5 rounded-lg text-sm transition-colors shadow-sm disabled:opacity-50 flex items-center gap-2"
+                        className="bg-[#dc0000] hover:bg-red-700 text-white font-semibold px-6 py-2.5 rounded-lg text-sm transition-colors shadow-sm disabled:opacity-50 flex items-center gap-2 cursor-pointer"
                     >
                         {saving && <RefreshCw size={14} className="animate-spin" />}
-                        <span>Save Industrial Pricing Rates</span>
+                        <span>{t('pricing.editor.saveRates') || 'Save Industrial Pricing Rates'}</span>
                     </button>
                 </div>
             </form>

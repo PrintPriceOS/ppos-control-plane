@@ -76,6 +76,7 @@ export interface ProgressiveSpecState {
     quoteDate?: string;
     evidenceId?: string;
     selectedVariantKey?: string;
+    selectedVariantId?: string;
     hasAmbiguity?: boolean;
     ambiguityDetails?: string;
     ambiguityNote?: string;

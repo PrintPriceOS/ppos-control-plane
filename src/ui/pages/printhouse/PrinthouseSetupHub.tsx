@@ -192,38 +192,31 @@ export const PrinthouseSetupHub: React.FC = () => {
     const accountBlockers = (readiness?.accountSetup?.blockingIssues || []).concat(readiness?.accountSetup?.advisories || []);
     const opsBlockers = (opsConfig.blockingIssues || []).concat(opsConfig.advisories || []);
 
-    const companyMissing = accountBlockers
-        .filter((b: any) => b.module === 'COMPANY_PROFILE')
-        .map((b: any) => b.message || b.code);
+    const extractBlockers = (directBlockers: any, generalBlockers: any[], moduleName?: string) => {
+        const direct = Array.isArray(directBlockers) 
+            ? directBlockers.map((b: any) => typeof b === 'string' ? b : (b.message || b.code))
+            : [];
+        const general = moduleName
+            ? generalBlockers
+                .filter((b: any) => b.module === moduleName)
+                .map((b: any) => b.message || b.code)
+            : [];
+        return direct.concat(general).filter(Boolean);
+    };
 
-    const sitesMissing = accountBlockers
-        .filter((b: any) => b.module === 'PRODUCTION_SITES')
-        .map((b: any) => b.message || b.code);
-
-    const machinesMissing = opsBlockers
-        .filter((b: any) => b.module === 'MACHINES')
-        .map((b: any) => b.message || b.code);
-
-    const capabilitiesMissing = opsBlockers
-        .filter((b: any) => b.module === 'CAPABILITIES')
-        .map((b: any) => b.message || b.code);
-
-    const materialsMissing = opsBlockers
-        .filter((b: any) => b.module === 'MATERIALS')
-        .map((b: any) => b.message || b.code);
-
-    const capacityMissing = opsBlockers
-        .filter((b: any) => b.module === 'CAPACITY')
-        .map((b: any) => b.message || b.code);
-
-    const leadTimesMissing = opsBlockers
-        .filter((b: any) => b.module === 'LEAD_TIMES')
-        .map((b: any) => b.message || b.code);
+    const companyMissing = extractBlockers(readiness?.company?.blockers, accountBlockers, 'COMPANY_PROFILE');
+    const sitesMissing = extractBlockers(readiness?.sites?.blockers, accountBlockers, 'PRODUCTION_SITES');
+    const machinesMissing = extractBlockers(readiness?.machines?.blockers, opsBlockers, 'MACHINES');
+    const capabilitiesMissing = extractBlockers(readiness?.capabilities?.blockers, opsBlockers, 'CAPABILITIES');
+    const materialsMissing = extractBlockers(readiness?.materials?.blockers || readiness?.substrates?.blockers, opsBlockers, 'MATERIALS');
+    const capacityMissing = extractBlockers(readiness?.capacity?.blockers, opsBlockers, 'CAPACITY');
+    const leadTimesMissing = extractBlockers(readiness?.leadTimes?.blockers, opsBlockers, 'LEAD_TIMES');
 
     const pricingBlockers = (readiness?.pricingReadiness?.blockingIssues || []).concat(readiness?.pricingReadiness?.advisories || []);
-    const pricingMissing = readiness?.pricingReadiness?.status !== 'COMPLETE'
-        ? (pricingBlockers.length > 0 
-            ? pricingBlockers.map((b: any) => b.message || b.code) 
+    const pricingDirect = extractBlockers(readiness?.pricing?.blockers, pricingBlockers);
+    const pricingMissing = readiness?.pricingReadiness?.status !== 'COMPLETE' && readiness?.pricing?.status !== 'COMPLETE'
+        ? (pricingDirect.length > 0 
+            ? pricingDirect 
             : ['Configure and save industrial manufacturing rates'])
         : [];
 
@@ -420,15 +413,15 @@ export const PrinthouseSetupHub: React.FC = () => {
 
             {/* Contextual Action Banner (Next Incomplete Task) */}
             {activeTab === 'OVERVIEW' && nextStep && (
-                <div className="bg-gradient-to-r from-red-50/70 to-zinc-50 dark:from-red-950/30 dark:to-zinc-900/40 border border-red-200 dark:border-red-900/50 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    <div className="space-y-1">
-                        <span className="text-[10px] font-black uppercase tracking-wider text-[#dc0000] dark:text-red-400">
+                <div className="bg-gradient-to-r from-red-50/70 via-white to-zinc-50 dark:from-red-950/30 dark:via-[#18181b] dark:to-zinc-900/40 border border-red-200 dark:border-red-900/50 rounded-xl px-3 py-1.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 shadow-2xs">
+                    <div className="flex items-center gap-2 min-w-0 flex-wrap">
+                        <span className="text-[10px] font-black uppercase tracking-wider text-[#dc0000] dark:text-red-400 bg-red-100 dark:bg-red-950 px-2 py-0.5 rounded border border-red-200 dark:border-red-800 shrink-0">
                             {t('onboarding.nextAction') || 'Recommended Action'}
                         </span>
-                        <h4 className="text-sm font-bold text-zinc-900 dark:text-white m-0">
+                        <h4 className="text-xs font-bold text-zinc-900 dark:text-white m-0 shrink-0">
                             {nextStep.label}
                         </h4>
-                        <p className="text-xs text-zinc-600 dark:text-zinc-400 m-0">
+                        <p className="text-xs text-zinc-600 dark:text-zinc-400 m-0 truncate">
                             {nextStep.reason}
                         </p>
                     </div>
@@ -436,24 +429,24 @@ export const PrinthouseSetupHub: React.FC = () => {
                     <button
                         type="button"
                         onClick={() => handleSelectTab(nextStep.tab)}
-                        className="px-4 py-2 bg-[#dc0000] hover:bg-red-700 text-white font-bold rounded-xl text-xs transition-colors flex items-center gap-2 self-start sm:self-auto shadow-xs cursor-pointer"
+                        className="px-3.5 py-1.5 bg-[#dc0000] hover:bg-red-700 text-white font-bold rounded-lg text-xs transition-colors flex items-center gap-1.5 shrink-0 shadow-xs cursor-pointer"
                     >
                         <span>{nextStep.actionLabel || t('onboarding.continueSetup') || 'Continue Setup'}</span>
-                        <ArrowRight size={14} />
+                        <ArrowRight size={13} />
                     </button>
                 </div>
             )}
 
             {/* Error Notification */}
             {fetchError && (
-                <div className="bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 text-red-900 dark:text-red-200 p-3.5 sm:px-4 rounded-xl flex items-center justify-between gap-3 shadow-xs">
+                <div className="bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 text-red-900 dark:text-red-200 p-2.5 sm:px-3 rounded-xl flex items-center justify-between gap-3 shadow-xs">
                     <div className="flex items-center gap-2">
-                        <AlertTriangle size={18} className="text-red-600 dark:text-red-400 shrink-0" />
+                        <AlertTriangle size={16} className="text-red-600 dark:text-red-400 shrink-0" />
                         <span className="text-xs font-medium">{fetchError}</span>
                     </div>
                     <button
                         onClick={fetchOnboardingData}
-                        className="bg-[#dc0000] hover:bg-red-700 text-white font-semibold px-3 py-1.5 rounded-lg text-xs transition-colors shrink-0 shadow-xs cursor-pointer"
+                        className="bg-[#dc0000] hover:bg-red-700 text-white font-semibold px-2.5 py-1 rounded-lg text-xs transition-colors shrink-0 shadow-xs cursor-pointer"
                     >
                         {t('setup.error.retryLoading')}
                     </button>
@@ -468,43 +461,43 @@ export const PrinthouseSetupHub: React.FC = () => {
             {/* Active Workspace View: Mounted cleanly without vertical stacking */}
             <main className="min-w-0" id="onboarding-main-content">
                 {activeTab === 'OVERVIEW' && (
-                    <div className="space-y-4">
-                        <h2 className="text-base font-bold text-zinc-900 dark:text-white">
+                    <div>
+                        <h2 className="text-xs font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-1.5">
                             {t('setup.overview.modulesHeading')}
                         </h2>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <div data-testid="setup-modules-grid" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-2.5">
                             <SetupModuleCard
+                                moduleNumber={1}
                                 title={t('setup.overview.module1.title')}
-                                icon={<Building2 size={16} />}
+                                icon={<Building2 size={32} className="w-8 h-8 shrink-0" />}
                                 description={t('setup.overview.module1.desc')}
                                 status={companyStatus}
                                 isActionable={true}
                                 isRecommended={nextStep.tab === 'COMPANY'}
-                                ctaLabel={nextStep.tab === 'COMPANY' ? nextStep.actionLabel : undefined}
                                 missingRequirements={companyMissing}
                                 onAction={() => handleSelectTab('COMPANY')}
                             />
 
                             <SetupModuleCard
+                                moduleNumber={2}
                                 title={t('setup.overview.module2.title')}
-                                icon={<Factory size={16} />}
+                                icon={<Factory size={32} className="w-8 h-8 shrink-0" />}
                                 description={t('setup.overview.module2.desc')}
                                 status={sitesStatus}
                                 isActionable={true}
                                 isRecommended={nextStep.tab === 'SITES'}
-                                ctaLabel={nextStep.tab === 'SITES' ? nextStep.actionLabel : undefined}
                                 missingRequirements={sitesMissing}
                                 onAction={() => handleSelectTab('SITES')}
                             />
 
                             <SetupModuleCard
+                                moduleNumber={3}
                                 title={t('setup.overview.module3.title')}
-                                icon={<Cog size={16} />}
+                                icon={<Cog size={32} className="w-8 h-8 shrink-0" />}
                                 description={t('setup.overview.module3.desc')}
                                 status={machinesStatus}
                                 isActionable={hasSites}
                                 isRecommended={nextStep.tab === 'MACHINES'}
-                                ctaLabel={nextStep.tab === 'MACHINES' ? nextStep.actionLabel : undefined}
                                 dependencyHint={t('setup.module.requiresSites')}
                                 missingRequirements={machinesMissing}
                                 onAction={() => handleSelectTab('MACHINES')}
@@ -512,13 +505,13 @@ export const PrinthouseSetupHub: React.FC = () => {
                             />
 
                             <SetupModuleCard
+                                moduleNumber={4}
                                 title={t('setup.overview.module4.title')}
-                                icon={<Shield size={16} />}
+                                icon={<Shield size={32} className="w-8 h-8 shrink-0" />}
                                 description={t('setup.overview.module4.desc')}
                                 status={capabilitiesStatus}
                                 isActionable={hasSites && hasMachines}
                                 isRecommended={nextStep.tab === 'CAPABILITIES'}
-                                ctaLabel={nextStep.tab === 'CAPABILITIES' ? nextStep.actionLabel : undefined}
                                 dependencyHint={!hasSites ? t('setup.module.requiresSites') : t('setup.module.requiresMachines')}
                                 missingRequirements={capabilitiesMissing}
                                 onAction={() => handleSelectTab('CAPABILITIES')}
@@ -526,13 +519,13 @@ export const PrinthouseSetupHub: React.FC = () => {
                             />
 
                             <SetupModuleCard
+                                moduleNumber={5}
                                 title={t('setup.overview.module5.title')}
-                                icon={<Layers size={16} />}
+                                icon={<Layers size={32} className="w-8 h-8 shrink-0" />}
                                 description={t('setup.overview.module5.desc')}
                                 status={materialsStatus}
                                 isActionable={hasSites}
                                 isRecommended={nextStep.tab === 'MATERIALS'}
-                                ctaLabel={nextStep.tab === 'MATERIALS' ? nextStep.actionLabel : undefined}
                                 dependencyHint={t('setup.module.requiresSites')}
                                 missingRequirements={materialsMissing}
                                 onAction={() => handleSelectTab('MATERIALS')}
@@ -540,13 +533,13 @@ export const PrinthouseSetupHub: React.FC = () => {
                             />
 
                             <SetupModuleCard
+                                moduleNumber={6}
                                 title={t('setup.overview.module6.title')}
-                                icon={<Activity size={16} />}
+                                icon={<Activity size={32} className="w-8 h-8 shrink-0" />}
                                 description={t('setup.overview.module6.desc')}
                                 status={capacityStatus}
                                 isActionable={hasSites}
                                 isRecommended={nextStep.tab === 'CAPACITY'}
-                                ctaLabel={nextStep.tab === 'CAPACITY' ? nextStep.actionLabel : undefined}
                                 dependencyHint={t('setup.module.requiresSites')}
                                 missingRequirements={capacityMissing}
                                 onAction={() => handleSelectTab('CAPACITY')}
@@ -554,13 +547,13 @@ export const PrinthouseSetupHub: React.FC = () => {
                             />
 
                             <SetupModuleCard
+                                moduleNumber={7}
                                 title={t('setup.overview.module7.title')}
-                                icon={<Clock size={16} />}
+                                icon={<Clock size={32} className="w-8 h-8 shrink-0" />}
                                 description={t('setup.overview.module7.desc')}
                                 status={leadTimesStatus}
                                 isActionable={hasSites}
                                 isRecommended={nextStep.tab === 'LEAD_TIMES'}
-                                ctaLabel={nextStep.tab === 'LEAD_TIMES' ? nextStep.actionLabel : undefined}
                                 dependencyHint={t('setup.module.requiresSites')}
                                 missingRequirements={leadTimesMissing}
                                 onAction={() => handleSelectTab('LEAD_TIMES')}
@@ -568,13 +561,13 @@ export const PrinthouseSetupHub: React.FC = () => {
                             />
 
                             <SetupModuleCard
+                                moduleNumber={8}
                                 title={t('setup.overview.module8.title')}
-                                icon={<Tag size={16} />}
+                                icon={<Tag size={32} className="w-8 h-8 shrink-0" />}
                                 description={t('setup.overview.module8.desc')}
                                 status={pricingStatus}
                                 isActionable={hasSites}
                                 isRecommended={nextStep.tab === 'PRICING'}
-                                ctaLabel={nextStep.tab === 'PRICING' ? nextStep.actionLabel : undefined}
                                 dependencyHint={t('setup.module.requiresSites')}
                                 missingRequirements={pricingMissing}
                                 onAction={() => handleSelectTab('PRICING')}
