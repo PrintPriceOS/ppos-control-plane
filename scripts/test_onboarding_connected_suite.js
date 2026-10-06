@@ -509,6 +509,52 @@ function runChecksumIntegrityRegressions() {
     console.log('[REGRESSION] All 6 Checksum Integrity & Connection Scope Regression Suites Passed Successfully (Zero Leakage Verified).');
 }
 
+/**
+ * Safely parses and validates point_results_json returned by MySQL or API.
+ * MySQL/mysql2 may return JSON columns as a parsed JavaScript object/array or as a raw JSON string.
+ *
+ * Requirements:
+ * - Accepts both raw JSON string and native JavaScript Array.
+ * - Explicitly validates that the resolved value is an Array (Array.isArray).
+ * - Rejects null, undefined, invalid JSON strings, and non-array types (objects, numbers, etc.)
+ * - Rejection produces contextual diagnostic with contextDescription, received type, and error reason.
+ * - Zero silent catch.
+ *
+ * @param {any} raw
+ * @param {string} contextDescription
+ * @returns {Array<object>}
+ */
+function parseAndValidatePointResultsJson(raw, contextDescription = 'point_results_json') {
+    if (raw === null || raw === undefined) {
+        throw new Error(`[POINT_RESULTS_VALIDATION_ERROR] ${contextDescription}: Value is null or undefined`);
+    }
+
+    if (Array.isArray(raw)) {
+        return raw;
+    }
+
+    if (typeof raw === 'string') {
+        const trimmed = raw.trim();
+        if (trimmed.length === 0) {
+            throw new Error(`[POINT_RESULTS_VALIDATION_ERROR] ${contextDescription}: Empty string received`);
+        }
+        let parsed;
+        try {
+            parsed = JSON.parse(trimmed);
+        } catch (jsonErr) {
+            throw new Error(`[POINT_RESULTS_VALIDATION_ERROR] ${contextDescription}: Malformed JSON string (${jsonErr.message})`);
+        }
+        if (!Array.isArray(parsed)) {
+            const receivedType = parsed === null ? 'null' : typeof parsed;
+            throw new Error(`[POINT_RESULTS_VALIDATION_ERROR] ${contextDescription}: Parsed JSON root is not an array (received: ${receivedType})`);
+        }
+        return parsed;
+    }
+
+    const valType = typeof raw;
+    throw new Error(`[POINT_RESULTS_VALIDATION_ERROR] ${contextDescription}: Expected string or array, received unsupported type ${valType}`);
+}
+
 function deepMergeRates(target, source) {
     const out = JSON.parse(JSON.stringify(target || {}));
     for (const key of Object.keys(source || {})) {
@@ -715,6 +761,77 @@ function runCurveHarnessRegressions() {
     }
     if (formattedDiag.includes('super_secret_db_password_123') || formattedDiag.includes('Bearer eyJhbGciOi')) {
         throw new Error(`Regression 10b failed: Formatted diagnostic leaked secrets or tokens`);
+    }
+
+    // Suite 11: parseAndValidatePointResultsJson regressions (string JSON, array nativo, JSON malformado, objeto no array, null)
+    const validArrayFixture = [{ quantity: 100, targetManufacturingPrice: 50.0, predictedManufacturingPrice: 50.0, withinTolerance: true }];
+    const validJsonStrFixture = JSON.stringify(validArrayFixture);
+
+    // 11.1 String JSON: parses correctly to array
+    const resStringJson = parseAndValidatePointResultsJson(validJsonStrFixture, 'Regression 11.1');
+    if (!Array.isArray(resStringJson) || resStringJson.length !== 1 || resStringJson[0].quantity !== 100) {
+        throw new Error('Regression 11.1 failed: Valid JSON string must parse to expected array');
+    }
+
+    // 11.2 Array nativo: returns directly without re-parsing
+    const resNativeArray = parseAndValidatePointResultsJson(validArrayFixture, 'Regression 11.2');
+    if (!Array.isArray(resNativeArray) || resNativeArray !== validArrayFixture) {
+        throw new Error('Regression 11.2 failed: Native array must be returned directly');
+    }
+
+    // 11.3 JSON malformado: throws contextual error
+    let malformedCaught = false;
+    try {
+        parseAndValidatePointResultsJson('[{"quantity": 100, broken', 'Regression 11.3');
+    } catch (e) {
+        malformedCaught = true;
+        if (!e.message.includes('Malformed JSON string')) {
+            throw new Error(`Regression 11.3 failed: Unexpected error message: ${e.message}`);
+        }
+    }
+    if (!malformedCaught) {
+        throw new Error('Regression 11.3 failed: Malformed JSON string must throw contextual error');
+    }
+
+    // 11.4 Objeto no array (tanto en string JSON como objeto nativo)
+    let nonArrayObjCaught1 = false;
+    try {
+        parseAndValidatePointResultsJson('{"quantity": 100}', 'Regression 11.4a');
+    } catch (e) {
+        nonArrayObjCaught1 = true;
+        if (!e.message.includes('Parsed JSON root is not an array')) {
+            throw new Error(`Regression 11.4a failed: Unexpected error message: ${e.message}`);
+        }
+    }
+    if (!nonArrayObjCaught1) {
+        throw new Error('Regression 11.4a failed: Non-array JSON object string must throw contextual error');
+    }
+
+    let nonArrayObjCaught2 = false;
+    try {
+        parseAndValidatePointResultsJson({ quantity: 100 }, 'Regression 11.4b');
+    } catch (e) {
+        nonArrayObjCaught2 = true;
+        if (!e.message.includes('unsupported type object')) {
+            throw new Error(`Regression 11.4b failed: Unexpected error message: ${e.message}`);
+        }
+    }
+    if (!nonArrayObjCaught2) {
+        throw new Error('Regression 11.4b failed: Non-array native object must throw contextual error');
+    }
+
+    // 11.5 Null y undefined: throws contextual error
+    let nullCaught = false;
+    try {
+        parseAndValidatePointResultsJson(null, 'Regression 11.5');
+    } catch (e) {
+        nullCaught = true;
+        if (!e.message.includes('null or undefined')) {
+            throw new Error(`Regression 11.5 failed: Unexpected error message: ${e.message}`);
+        }
+    }
+    if (!nullCaught) {
+        throw new Error('Regression 11.5 failed: Null must throw contextual error');
     }
 
     console.log('[REGRESSION] All Curve Harness & Solver Contract Regressions Passed Successfully.');
@@ -1917,18 +2034,30 @@ async function runConnectedSuite() {
         assert(curveRunRows[0].curve_metrics_json !== null, `curve_metrics_json persisted in MySQL`);
         assert(curveRunRows[0].identifiability_json !== null, `identifiability_json persisted in MySQL`);
 
-        const dbPointResults = JSON.parse(curveRunRows[0].point_results_json);
+        const dbPointResults = parseAndValidatePointResultsJson(curveRunRows[0].point_results_json, 'Scenario 2 curveRunRows[0].point_results_json');
         assert(Array.isArray(dbPointResults) && dbPointResults.length === 8,
             `Persisted point_results_json contains exactly 8 points`);
         for (let i = 0; i < dbPointResults.length; i++) {
             const dbPt = dbPointResults[i];
             const expQ = CURVE_QUANTITIES[i];
+            const expTarget = validCurveTargets[i].targetManufacturingPrice;
             const httpPt = curveRunData.pointResults[i];
+            const httpTarget = httpPt.targetManufacturingPrice ?? httpPt.targetPrice;
+            const dbTarget = dbPt.targetManufacturingPrice ?? dbPt.targetPrice;
+            const httpRatio = httpPt.percentageResidual !== undefined ? httpPt.percentageResidual : httpPt.percentResidual;
+            const dbRatio = dbPt.percentageResidual !== undefined ? dbPt.percentageResidual : dbPt.percentResidual;
+
             assert(dbPt.quantity === expQ, `MySQL Point ${i} quantity matches ${expQ}`);
+            assert(Number.isFinite(dbTarget) && Math.abs(dbTarget - expTarget) < 0.01,
+                `MySQL Point ${i} target price is finite and matches expected ${expTarget} EUR`);
+            assert(Number.isFinite(dbTarget) && Math.abs(dbTarget - httpTarget) < 0.01,
+                `MySQL Point ${i} target price matches HTTP response (${httpTarget} EUR)`);
             assert(Number.isFinite(dbPt.predictedManufacturingPrice) && Math.abs(dbPt.predictedManufacturingPrice - httpPt.predictedManufacturingPrice) < 0.001,
                 `MySQL Point ${i} predicted price matches HTTP response`);
             assert(Number.isFinite(dbPt.absoluteResidual) && Math.abs(dbPt.absoluteResidual - httpPt.absoluteResidual) < 0.001,
                 `MySQL Point ${i} absolute residual matches HTTP response`);
+            assert(Number.isFinite(dbRatio) && Math.abs(dbRatio - httpRatio) < 0.0001,
+                `MySQL Point ${i} percentage residual ratio matches HTTP response`);
             assert(dbPt.withinTolerance === true, `MySQL Point ${i} withinTolerance is true`);
         }
 
@@ -2268,12 +2397,46 @@ async function runConnectedSuite() {
             `SELECT id, status, point_results_json FROM printhouse_pricing_calibration_runs WHERE id = ?`,
             [rejectRunId]
         );
-        assert(rejectRunRows.length === 1, `Perturbed run record verified in MySQL by exact ID`);
-        const dbRejectPts = JSON.parse(rejectRunRows[0].point_results_json);
+        const dbRejectPts = parseAndValidatePointResultsJson(rejectRunRows[0].point_results_json, 'Scenario 3 rejectRunRows[0].point_results_json');
+        assert(Array.isArray(dbRejectPts) && dbRejectPts.length === 8,
+            `Persisted perturbed point_results_json contains exactly 8 points`);
+
+        // Contrast each point between MySQL and HTTP for perturbed run
+        for (let i = 0; i < dbRejectPts.length; i++) {
+            const dbPt = dbRejectPts[i];
+            const httpPt = rejectRunData.pointResults?.find(p => p.quantity === dbPt.quantity);
+            assert(httpPt !== undefined, `MySQL perturbed point q=${dbPt.quantity} found in HTTP response`);
+
+            const dbTarget = dbPt.targetManufacturingPrice ?? dbPt.targetPrice;
+            const httpTarget = httpPt.targetManufacturingPrice ?? httpPt.targetPrice;
+            const dbRatio = dbPt.percentageResidual !== undefined ? dbPt.percentageResidual : dbPt.percentResidual;
+            const httpRatio = httpPt.percentageResidual !== undefined ? httpPt.percentageResidual : httpPt.percentResidual;
+
+            assert(Number.isFinite(dbTarget) && Math.abs(dbTarget - httpTarget) < 0.01,
+                `MySQL perturbed point q=${dbPt.quantity} target price matches HTTP response (${httpTarget} EUR)`);
+            assert(Number.isFinite(dbPt.predictedManufacturingPrice) && Math.abs(dbPt.predictedManufacturingPrice - httpPt.predictedManufacturingPrice) < 0.001,
+                `MySQL perturbed point q=${dbPt.quantity} predicted price matches HTTP response`);
+            assert(Number.isFinite(dbPt.absoluteResidual) && Math.abs(dbPt.absoluteResidual - httpPt.absoluteResidual) < 0.001,
+                `MySQL perturbed point q=${dbPt.quantity} absolute residual matches HTTP response`);
+            assert(Number.isFinite(dbRatio) && Math.abs(dbRatio - httpRatio) < 0.0001,
+                `MySQL perturbed point q=${dbPt.quantity} percentage residual ratio matches HTTP response`);
+            assert(dbPt.withinTolerance === httpPt.withinTolerance,
+                `MySQL perturbed point q=${dbPt.quantity} withinTolerance matches HTTP response`);
+        }
+
         const dbPt800 = dbRejectPts.find(p => p.quantity === 800);
         assert(dbPt800 && dbPt800.withinTolerance === false, `MySQL persisted point q=800 has withinTolerance: false`);
+        const dbPt800Target = dbPt800.targetManufacturingPrice ?? dbPt800.targetPrice;
+        assert(Number.isFinite(dbPt800Target) && Math.abs(dbPt800Target - 1320.00) < 0.01,
+            `MySQL persisted point q=800 target price is finite 1320.00 EUR`);
         assert(Math.abs(dbPt800.predictedManufacturingPrice - pt800.predictedManufacturingPrice) < 0.001,
             `MySQL persisted point q=800 predicted price matches HTTP response`);
+        assert(Math.abs(dbPt800.absoluteResidual - pt800.absoluteResidual) < 0.001,
+            `MySQL persisted point q=800 absolute residual matches HTTP response`);
+        const dbPt800Ratio = dbPt800.percentageResidual !== undefined ? dbPt800.percentageResidual : dbPt800.percentResidual;
+        const httpPt800Ratio = pt800.percentageResidual !== undefined ? pt800.percentageResidual : pt800.percentResidual;
+        assert(Number.isFinite(dbPt800Ratio) && Math.abs(dbPt800Ratio - httpPt800Ratio) < 0.0001,
+            `MySQL persisted point q=800 percentage residual ratio matches HTTP response`);
 
         // Attempt Governed Acceptance: MUST be rejected by curve tolerance gate with HTTP 422
         // Contract: wrapHandler serializes err.statusCode=422, error=err.code ('GOVERNANCE_CURVE_REJECTED'), message=err.message
@@ -2430,6 +2593,7 @@ module.exports = {
     verifyRatesChecksumIntegrity,
     computeCanonicalRatesChecksum,
     canonicalStringify,
+    parseAndValidatePointResultsJson,
     runChecksumIntegrityRegressions,
     runCurveHarnessRegressions
 };
