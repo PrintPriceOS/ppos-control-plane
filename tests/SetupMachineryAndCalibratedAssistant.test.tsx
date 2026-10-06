@@ -254,6 +254,66 @@ describe('Machinery Form & Calibrated Assistant Localization & Error Handling Su
             expect(screen.getByText(/Ihre Fertigungstarife sind kalibriert und durch Server-Verifizierung aktiv bestätigt/i)).toBeInTheDocument();
             expect(screen.getByText('Anderes Buch kalibrieren')).toBeInTheDocument();
         });
+
+        it('renders GovernedQuoteSmokeTest form in Spanish with localized fields and button', () => {
+            render(
+                <LocaleProvider initialLocale="es">
+                    <GovernedQuoteSmokeTest
+                        printerNodeId="node-1"
+                        printerNodeName="Planta Sur"
+                        initialSpec={defaultDraftSpec}
+                    />
+                </LocaleProvider>
+            );
+
+            expect(screen.getByText('Calcular presupuesto de prueba')).toBeInTheDocument();
+            expect(screen.getByText('Cantidad (Ejemplares)')).toBeInTheDocument();
+            expect(screen.getByText('Formato final (An × Al mm)')).toBeInTheDocument();
+            expect(screen.getByText('Páginas interiores')).toBeInTheDocument();
+            expect(screen.getByText('Impresión interior')).toBeInTheDocument();
+            expect(screen.getByText('Papel interior')).toBeInTheDocument();
+            expect(screen.getByText('Cubierta (Impresión / g/m²)')).toBeInTheDocument();
+            expect(screen.getByText('Encuadernación / Acabado')).toBeInTheDocument();
+            expect(screen.getByText(/Destino/i)).toBeInTheDocument();
+        });
+
+        it('renders GovernedQuoteSmokeTest form in German with localized fields and button', () => {
+            render(
+                <LocaleProvider initialLocale="de">
+                    <GovernedQuoteSmokeTest
+                        printerNodeId="node-1"
+                        printerNodeName="Planta Sur"
+                        initialSpec={defaultDraftSpec}
+                    />
+                </LocaleProvider>
+            );
+
+            expect(screen.getByText('Testangebot berechnen')).toBeInTheDocument();
+            expect(screen.getByText('Auflage (Exemplare)')).toBeInTheDocument();
+            expect(screen.getByText('Endformat (B × H mm)')).toBeInTheDocument();
+            expect(screen.getByText('Innenseiten')).toBeInTheDocument();
+            expect(screen.getByText('Innendruck')).toBeInTheDocument();
+            expect(screen.getByText('Innenpapier')).toBeInTheDocument();
+            expect(screen.getByText('Umschlag (Druck / g/m²)')).toBeInTheDocument();
+            expect(screen.getByText('Bindung / Veredelung')).toBeInTheDocument();
+            expect(screen.getByText(/Bestimmungsort/i)).toBeInTheDocument();
+        });
+
+        it('renders QuickCalibrationPanel target header localized in German', async () => {
+            const { QuickCalibrationPanel } = await import('../src/ui/components/printhouse/pricing/quick-calibration/QuickCalibrationPanel');
+            render(
+                <LocaleProvider initialLocale="de">
+                    <QuickCalibrationPanel
+                        printerNodeId="node-stuttgart-01"
+                        printerNodeName="Werk Stuttgart"
+                        session={{ id: 'sess-1', status: 'ACCEPTED' } as any}
+                    />
+                </LocaleProvider>
+            );
+
+            expect(screen.getByText(/Kalibrierungsziel:/i)).toBeInTheDocument();
+            expect(screen.getByText('Werk Stuttgart')).toBeInTheDocument();
+        });
     });
 
     describe('3. CapacityPanel & MaterialsPanel Error Normalization', () => {

@@ -1461,7 +1461,7 @@ describe('GovernedQuoteSmokeTest — Real React Component Unit & Integration Sui
             </LocaleProvider>
         );
 
-        const calcBtn = screen.getByRole('button', { name: /Calculate Test Quote/i });
+        const calcBtn = screen.getByRole('button', { name: /Calcular presupuesto de prueba/i });
         fireEvent.click(calcBtn);
 
         await waitFor(() => {

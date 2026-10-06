@@ -229,7 +229,7 @@ export const GovernedQuoteSmokeTest: React.FC<GovernedQuoteSmokeTestProps> = ({
                     className="px-4 py-2.5 bg-zinc-900 hover:bg-black dark:bg-white dark:hover:bg-zinc-100 text-white dark:text-zinc-900 text-xs font-bold rounded-xl transition-all shadow-sm flex items-center justify-center gap-2 disabled:opacity-50"
                 >
                     {loading ? <RefreshCw size={14} className="animate-spin" /> : <Calculator size={14} />}
-                    <span>Calculate Test Quote</span>
+                    <span>{loading ? (t('pricing.smoke.calculating') || 'Calculating...') : (t('pricing.smoke.calculateBtn') || 'Calculate Test Quote')}</span>
                 </button>
             </div>
 
@@ -237,9 +237,9 @@ export const GovernedQuoteSmokeTest: React.FC<GovernedQuoteSmokeTestProps> = ({
                 <div className="p-4 bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 rounded-xl text-xs text-amber-900 dark:text-amber-200 flex items-start gap-3">
                     <AlertTriangle size={18} className="text-amber-600 mt-0.5 shrink-0" />
                     <div>
-                        <p className="font-bold">Complex Specification Limitation Notice</p>
+                        <p className="font-bold">{t('pricing.smoke.complexNoticeTitle') || 'Complex Specification Limitation Notice'}</p>
                         <p className="mt-0.5 leading-relaxed">
-                            Original reference quotation contains complex features (e.g. Mixed Interior 1+1/4+4, Hardcover Board, Spot UV, or Endpapers). The canonical BPE test pricing preview evaluates standard single-interior configurations ({spec.interior_print}, {spec.binding_method}). Original extracted specifications are preserved without artificial rate padding.
+                            {t('pricing.smoke.complexNoticeDesc') || `Original reference quotation contains complex features (e.g. Mixed Interior 1+1/4+4, Hardcover Board, Spot UV, or Endpapers). The canonical BPE test pricing preview evaluates standard single-interior configurations (${spec.interior_print}, ${spec.binding_method}). Original extracted specifications are preserved without artificial rate padding.`}
                         </p>
                     </div>
                 </div>
@@ -264,7 +264,7 @@ export const GovernedQuoteSmokeTest: React.FC<GovernedQuoteSmokeTestProps> = ({
                 {/* Quantity */}
                 <div>
                     <label htmlFor="input-copies" className="block text-[11px] font-bold text-zinc-600 dark:text-zinc-400 uppercase tracking-wider mb-1.5">
-                        Quantity (Copies)
+                        {t('pricing.smoke.field.quantity') || 'Quantity (Copies)'}
                     </label>
                     <input
                         id="input-copies"
@@ -280,7 +280,7 @@ export const GovernedQuoteSmokeTest: React.FC<GovernedQuoteSmokeTestProps> = ({
                 {/* Dimensions */}
                 <div>
                     <label htmlFor="input-book-width" className="block text-[11px] font-bold text-zinc-600 dark:text-zinc-400 uppercase tracking-wider mb-1.5">
-                        Trim Size (W × H mm)
+                        {t('pricing.smoke.field.trimSize') || 'Trim Size (W × H mm)'}
                     </label>
                     <div className="flex items-center gap-1.5">
                         <input
@@ -311,7 +311,7 @@ export const GovernedQuoteSmokeTest: React.FC<GovernedQuoteSmokeTestProps> = ({
                 {/* Pages */}
                 <div>
                     <label htmlFor="input-interior-pages" className="block text-[11px] font-bold text-zinc-600 dark:text-zinc-400 uppercase tracking-wider mb-1.5">
-                        Interior Pages
+                        {t('pricing.smoke.field.interiorPages') || 'Interior Pages'}
                     </label>
                     <input
                         id="input-interior-pages"
@@ -327,7 +327,7 @@ export const GovernedQuoteSmokeTest: React.FC<GovernedQuoteSmokeTestProps> = ({
                 {/* Interior Print Mode */}
                 <div>
                     <label htmlFor="select-interior-print" className="block text-[11px] font-bold text-zinc-600 dark:text-zinc-400 uppercase tracking-wider mb-1.5">
-                        Interior Print
+                        {t('pricing.smoke.field.interiorPrint') || 'Interior Print'}
                     </label>
                     <select
                         id="select-interior-print"
@@ -335,16 +335,16 @@ export const GovernedQuoteSmokeTest: React.FC<GovernedQuoteSmokeTestProps> = ({
                         onChange={e => updateSpecField('interior_print', e.target.value)}
                         className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white font-medium focus:ring-2 focus:ring-[#dc0000]/20 focus:outline-none"
                     >
-                        <option value="4/4">4/4 Full Colour</option>
-                        <option value="1/1">1/1 Black & White</option>
-                        <option value="2/2">2/2 Two Colours</option>
+                        <option value="4/4">{t('pricing.smoke.print.4_4') || '4/4 Full Colour'}</option>
+                        <option value="1/1">{t('pricing.smoke.print.1_1') || '1/1 Black & White'}</option>
+                        <option value="2/2">{t('pricing.smoke.print.2_2') || '2/2 Two Colours'}</option>
                     </select>
                 </div>
 
                 {/* Interior Paper */}
                 <div>
                     <label htmlFor="select-paper-type" className="block text-[11px] font-bold text-zinc-600 dark:text-zinc-400 uppercase tracking-wider mb-1.5">
-                        Interior Paper
+                        {t('pricing.smoke.field.interiorPaper') || 'Interior Paper'}
                     </label>
                     <div className="flex items-center gap-1.5">
                         <select
@@ -353,9 +353,9 @@ export const GovernedQuoteSmokeTest: React.FC<GovernedQuoteSmokeTestProps> = ({
                             onChange={e => updateSpecField('paper_type_interior', e.target.value)}
                             className="w-2/3 px-2 py-2 bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white font-medium focus:ring-2 focus:ring-[#dc0000]/20 focus:outline-none"
                         >
-                            <option value="offset">Offset</option>
-                            <option value="mc">Coated MC</option>
-                            <option value="munken">Munken</option>
+                            <option value="offset">{t('pricing.smoke.paper.offset') || 'Offset'}</option>
+                            <option value="mc">{t('pricing.smoke.paper.mc') || 'Coated MC'}</option>
+                            <option value="munken">{t('pricing.smoke.paper.munken') || 'Munken'}</option>
                         </select>
                         <input
                             id="input-paper-weight"
@@ -374,7 +374,7 @@ export const GovernedQuoteSmokeTest: React.FC<GovernedQuoteSmokeTestProps> = ({
                 {/* Cover Spec */}
                 <div>
                     <label htmlFor="select-cover-print" className="block text-[11px] font-bold text-zinc-600 dark:text-zinc-400 uppercase tracking-wider mb-1.5">
-                        Cover (Print / GSM)
+                        {t('pricing.smoke.field.cover') || 'Cover (Print / GSM)'}
                     </label>
                     <div className="flex items-center gap-1.5">
                         <select
@@ -383,9 +383,9 @@ export const GovernedQuoteSmokeTest: React.FC<GovernedQuoteSmokeTestProps> = ({
                             onChange={e => updateSpecField('cover_print', e.target.value)}
                             className="w-1/2 px-2 py-2 bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white font-medium focus:ring-2 focus:ring-[#dc0000]/20 focus:outline-none"
                         >
-                            <option value="4/0">4/0 Front</option>
-                            <option value="4/4">4/4 Both</option>
-                            <option value="1/0">1/0 B&W</option>
+                            <option value="4/0">{t('pricing.smoke.coverPrint.4_0') || '4/0 Front'}</option>
+                            <option value="4/4">{t('pricing.smoke.coverPrint.4_4') || '4/4 Both'}</option>
+                            <option value="1/0">{t('pricing.smoke.coverPrint.1_0') || '1/0 B&W'}</option>
                         </select>
                         <input
                             id="input-cover-weight"
@@ -404,7 +404,7 @@ export const GovernedQuoteSmokeTest: React.FC<GovernedQuoteSmokeTestProps> = ({
                 {/* Binding & Lamination */}
                 <div>
                     <label htmlFor="select-binding-method" className="block text-[11px] font-bold text-zinc-600 dark:text-zinc-400 uppercase tracking-wider mb-1.5">
-                        Binding / Finish
+                        {t('pricing.smoke.field.binding') || 'Binding / Finish'}
                     </label>
                     <div className="flex items-center gap-1.5">
                         <select
@@ -413,12 +413,12 @@ export const GovernedQuoteSmokeTest: React.FC<GovernedQuoteSmokeTestProps> = ({
                             onChange={e => updateSpecField('binding_method', e.target.value)}
                             className="w-1/2 px-2 py-2 bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white font-medium focus:ring-2 focus:ring-[#dc0000]/20 focus:outline-none"
                         >
-                            <option value="hardcover">Hardcover</option>
-                            <option value="thread sewn">Thread Sewn</option>
-                            <option value="perfect bound">Perfect Bound</option>
-                            <option value="saddle stitch">Saddle Stitch</option>
-                            <option value="wire-o">Wire-O</option>
-                            <option value="spiral">Spiral</option>
+                            <option value="hardcover">{t('pricing.smoke.binding.hardcover') || 'Hardcover'}</option>
+                            <option value="thread sewn">{t('pricing.smoke.binding.threadSewn') || 'Thread Sewn'}</option>
+                            <option value="perfect bound">{t('pricing.smoke.binding.perfectBound') || 'Perfect Bound'}</option>
+                            <option value="saddle stitch">{t('pricing.smoke.binding.saddleStitch') || 'Saddle Stitch'}</option>
+                            <option value="wire-o">{t('pricing.smoke.binding.wireO') || 'Wire-O'}</option>
+                            <option value="spiral">{t('pricing.smoke.binding.spiral') || 'Spiral'}</option>
                         </select>
                         <select
                             id="select-lamination"
@@ -427,9 +427,9 @@ export const GovernedQuoteSmokeTest: React.FC<GovernedQuoteSmokeTestProps> = ({
                             onChange={e => updateSpecField('lamination', e.target.value)}
                             className="w-1/2 px-2 py-2 bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white font-medium focus:ring-2 focus:ring-[#dc0000]/20 focus:outline-none"
                         >
-                            <option value="matt">Matt</option>
-                            <option value="gloss">Gloss</option>
-                            <option value="">None</option>
+                            <option value="matt">{t('pricing.smoke.lamination.matt') || 'Matt'}</option>
+                            <option value="gloss">{t('pricing.smoke.lamination.gloss') || 'Gloss'}</option>
+                            <option value="">{t('pricing.smoke.lamination.none') || 'None'}</option>
                         </select>
                     </div>
                 </div>
@@ -437,7 +437,7 @@ export const GovernedQuoteSmokeTest: React.FC<GovernedQuoteSmokeTestProps> = ({
                 {/* Destination Region & Country */}
                 <div>
                     <label htmlFor="select-delivery-country" className="block text-[11px] font-bold text-zinc-600 dark:text-zinc-400 uppercase tracking-wider mb-1.5">
-                        Destination ({availableDestinations.length} configured)
+                        {t('pricing.smoke.field.destination') || 'Destination'} ({availableDestinations.length})
                     </label>
                     <select
                         id="select-delivery-country"
@@ -447,7 +447,7 @@ export const GovernedQuoteSmokeTest: React.FC<GovernedQuoteSmokeTestProps> = ({
                     >
                         {!availableDestinations.some(d => d.code === spec.delivery_country) && spec.delivery_country && (
                             <option value={spec.delivery_country}>
-                                {getCountryDisplayName(spec.delivery_country)} ({spec.delivery_country}) — Reference Job Destination
+                                {getCountryName(spec.delivery_country, 'en')} ({spec.delivery_country}) — {t('pricing.smoke.refDestination') || 'Reference Job Destination'}
                             </option>
                         )}
                         {availableDestinations.map(d => (
@@ -491,7 +491,11 @@ export const GovernedQuoteSmokeTest: React.FC<GovernedQuoteSmokeTestProps> = ({
                                 {quoteResult.isValidCommercialQuote !== false && quoteResult.quoteStatus !== 'INVALID_INCOMPLETE_RATES' ? t('customerPriceBeforeTax') : t('partialDiagnosticSubtotalTitle')}
                             </h3>
                             <p className="text-xs text-zinc-500 mt-1">
-                                For {quoteResult.quantity.toLocaleString()} copies ({spec.book_width_mm}×{spec.book_height_mm}mm, {spec.interior_pages} pages) • Tax calculated at checkout
+                                {(t('pricing.smoke.forCopies') || 'For {copies} copies ({width}×{height}mm, {pages} pages)')
+                                    .replace('{copies}', quoteResult.quantity.toLocaleString())
+                                    .replace('{width}', String(spec.book_width_mm))
+                                    .replace('{height}', String(spec.book_height_mm))
+                                    .replace('{pages}', String(spec.interior_pages))} • {t('pricing.smoke.taxCalculatedAtCheckout') || 'Tax calculated at checkout'}
                             </p>
                         </div>
 
@@ -525,12 +529,12 @@ export const GovernedQuoteSmokeTest: React.FC<GovernedQuoteSmokeTestProps> = ({
                     <div className="flex flex-wrap items-center gap-4 text-xs font-medium text-zinc-600 dark:text-zinc-400 bg-white dark:bg-zinc-800/60 p-3.5 rounded-xl border border-zinc-200/60 dark:border-zinc-700/60">
                         <div className="flex items-center gap-2">
                             <Layers size={15} className="text-zinc-500" />
-                            <span>Estimated Production: <strong className="text-zinc-800 dark:text-zinc-200">{quoteResult.productionLeadDays} business days</strong></span>
+                            <span>{t('pricing.smoke.estimatedProduction') || 'Estimated Production:'} <strong className="text-zinc-800 dark:text-zinc-200">{quoteResult.productionLeadDays} {t('pricing.smoke.businessDays') || 'business days'}</strong></span>
                         </div>
                         <div className="h-3.5 w-px bg-zinc-200 dark:bg-zinc-700" />
                         <div className="flex items-center gap-2">
                             <Truck size={15} className="text-zinc-500" />
-                            <span>Estimated Transit: <strong className="text-zinc-800 dark:text-zinc-200">{quoteResult.estimatedDeliveryDays} days ({quoteResult.shippingStatus})</strong></span>
+                            <span>{t('pricing.smoke.estimatedTransit') || 'Estimated Transit:'} <strong className="text-zinc-800 dark:text-zinc-200">{quoteResult.estimatedDeliveryDays} {t('pricing.smoke.days') || 'days'} ({quoteResult.shippingStatus})</strong></span>
                         </div>
                     </div>
 
@@ -554,12 +558,12 @@ export const GovernedQuoteSmokeTest: React.FC<GovernedQuoteSmokeTestProps> = ({
                             className="text-xs font-bold text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white flex items-center gap-1.5 transition-colors"
                         >
                             {showTrace ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                            <span>How was this price calculated?</span>
+                            <span>{t('pricing.smoke.howCalculated') || 'How was this price calculated?'}</span>
                         </button>
 
                         {showTrace && (
                             <div className="mt-3 p-4 bg-white dark:bg-zinc-800/90 border border-zinc-200/80 dark:border-zinc-700 rounded-xl space-y-2 text-xs text-zinc-600 dark:text-zinc-300">
-                                <p className="font-bold text-zinc-900 dark:text-white mb-2">Canonical Configuration Trace:</p>
+                                <p className="font-bold text-zinc-900 dark:text-white mb-2">{t('pricing.smoke.traceTitle') || 'Canonical Configuration Trace:'}</p>
                                 <ul className="space-y-1.5">
                                     {quoteResult.configurationTrace.map((line: string, i: number) => (
                                         <li key={i} className="flex items-center gap-2">

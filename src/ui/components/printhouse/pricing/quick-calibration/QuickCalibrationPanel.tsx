@@ -735,7 +735,7 @@ export const QuickCalibrationPanel: React.FC<QuickCalibrationPanelProps> = ({
                 {/* Node info if available, no empty parentheses */}
                 {printerNodeId ? (
                     <span className="text-[11px] text-zinc-500 font-medium">
-                        Calibration Target: <strong className="text-zinc-700 dark:text-zinc-300 font-semibold">{printerNodeName && printerNodeName !== 'Production Node' ? printerNodeName : printerNodeId}</strong>
+                        {t('pricing.calibration.target') || 'Calibration Target'}: <strong className="text-zinc-700 dark:text-zinc-300 font-semibold">{printerNodeName && printerNodeName !== 'Production Node' ? printerNodeName : printerNodeId}</strong>
                     </span>
                 ) : <span />}
 

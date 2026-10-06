@@ -65,6 +65,7 @@ SOURCES_TO_PACKAGE = [
     "src/ui/components/printhouse/pricing/CanonicalIndustrialPricingEditor.tsx",
     "src/ui/components/printhouse/pricing/quick-calibration/GovernedQuoteSmokeTest.tsx",
     "src/ui/components/printhouse/pricing/quick-calibration/GuidedCalibrationWizard.tsx",
+    "src/ui/components/printhouse/pricing/quick-calibration/QuickCalibrationPanel.tsx",
     "src/ui/components/printhouse/setup/PricingPanel.tsx",
     "src/ui/components/printhouse/setup/SetupModuleCard.tsx",
     "src/ui/components/printhouse/setup/SetupProgressSummary.tsx",
