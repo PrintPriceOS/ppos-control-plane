@@ -229,9 +229,10 @@ def package():
       - Verificación en base de datos: cero revisiones, cero aceptaciones y tarifas del nodo inalteradas.
     - **Escenario 4 (Caso C - Aislamiento Post-Aceptación y de Revisiones):**
       - Intento de lectura no autorizada de la revisión de Tenant A (`GET /pricing/revisions/:id`) e intento de aceptación posterior desde Tenant B: rechazo con HTTP 403/404 y verificación de cero mutaciones globales para Tenant B.
-    - **Acreditación de Regresiones en Vitest (36 pruebas en `onboarding_checksum_integrity_regression.test.js`, 333 tests totales):**
+    - **Acreditación de Regresiones en Vitest (39 pruebas en `onboarding_checksum_integrity_regression.test.js`, 336 tests totales):**
       - Suite 8 (`runCurveHarnessRegressions`) valida en modo aislado: contrato del solver con `CANONICAL_ACCEPTABLE_RUN_STATUSES` y `EXACTLY_DETERMINED`, compuerta de gobernanza con tolerancias oficiales (`POINT_OUT_OF_TOLERANCE`) y sanitización estricta de diagnósticos de error HTTP wrapHandler sin filtración de secretos.
       - Suite 9 (`parseAndValidatePointResultsJson`) valida exhaustivamente: admisión de string JSON y array nativo de MySQL, validación explícita de `Array.isArray`, y rechazo contextual estricto (sin catch silencioso) de JSON malformado, objeto no array y valores null/undefined.
+      - Suite 10 (`curveMetrics Phase-Specific Contract & Sanitized Diagnostic Regressions`): valida que `/calculate` produce exclusivamente métricas agregadas del solver sin conteos de gobernanza, que `evaluateCurveAcceptance` produce `acceptedPointCount` / `rejectedPointCount`, y que `formatCurveMetricsDiagnostic` sanitiza y formatea diagnósticos sin fugar secretos.
 
 18. **Cierre de Hallazgos de Entrega 9eaf975 (Dual Parsing de `point_results_json`, Contraste Completo y Regeneración Real de Logs):**
     - **Dual Parsing & Validación Estricta de `point_results_json`:**
@@ -253,9 +254,20 @@ def package():
         - `absoluteResidual`: finite number, contraste contra respuesta HTTP.
         - `percentageResidual` / `percentResidual`: finite number (ratio `[0..1]`), contraste contra respuesta HTTP.
         - `withinTolerance`: booleano de compuerta de tolerancia, contrastado contra respuesta HTTP.
+
+19. **Alineación de Contrato de `curveMetrics` según Fases y Diagnóstico Sanitizado:**
+    - **Auditoría de Responsabilidades entre Fases:**
+      - **Fase de Cálculo (`POST /calculate` / Solver Inverso / `calibrationRunService`):** Produce exclusivamente las métricas agregadas del ajuste numérico (`pointCount`, `meanAbsoluteResidual`, `maxAbsoluteResidual`, `meanPercentageResidual`, `maxPercentageResidual`, `objectiveValue`). No produce ni contiene `acceptedPointCount` ni `rejectedPointCount`, dado que la aceptación comercial de la curva es competencia exclusiva de la gobernanza.
+      - **Fase de Aceptación (`POST /accept` / `evaluateCurveAcceptance` / `calibrationAcceptanceService`):** Realiza la evaluación gobernada de la curva punto a punto y persiste en `printhouse_pricing_calibration_acceptances.curve_acceptance_json` los campos de gobernanza: `acceptedPointCount` (8), `rejectedPointCount` (0) y `allPointsWithinTolerance` (true).
+    - **Corrección de Aserciones del Harness:**
+      - En `POST /calculate`, se eliminó la aserción indebida de `acceptedPointCount` y se verifican estrictamente las métricas agregadas que el solver produce, comprobando explícitamente que los conteos de gobernanza permanezcan indefinidos.
+      - En `POST /accept`, se consulta `curve_acceptance_json` de la tabla `printhouse_pricing_calibration_acceptances` y se comprueban `acceptedPointCount === 8`, `rejectedPointCount === 0` y `allPointsWithinTolerance === true`.
+      - Se implementó `formatCurveMetricsDiagnostic(metrics)` como tercer argumento de las aserciones, proporcionando diagnóstico contextual sanitizado en caso de discrepancia sin exponer tokens ni contraseñas.
+    - **Regresiones de Contrato:**
+      - Suite 12 en `test_onboarding_connected_suite.js` y Suite 10 en `tests/onboarding_checksum_integrity_regression.test.js` (39 tests en la suite, 336 tests totales en Vitest).
     - **Regeneración Genuina de Logs Crudos (`raw_vitest_output.log` y `raw_build_output.log`):**
-      - `raw_vitest_output.log`: Ejecutado realmente sobre el código final con captura integral de stdout, stderr y código de salida 0 (23 suites de prueba, 333 tests pasando, 0 fallidos, duración 13.55s).
-      - `raw_build_output.log`: Ejecutado realmente sobre el código final con captura integral de stdout, stderr y código de salida 0 (Vite v6.4.2 building for production, 3557 modules transformed, dist/ generado en 14.36s).
+      - `raw_vitest_output.log`: Ejecutado realmente sobre el código final con captura integral de stdout, stderr y código de salida 0 (23 suites de prueba, 336 tests pasando, 0 fallidos).
+      - `raw_build_output.log`: Ejecutado realmente sobre el código final con captura integral de stdout, stderr y código de salida 0 (Vite v6.4.2 building for production, dist/ generado limpiamente).
     - **Distinción Rigurosa de Commits:**
       - **Commit de Código:** Modificaciones en el código fuente del harness (`scripts/test_onboarding_connected_suite.js`), pruebas de regresión (`tests/onboarding_checksum_integrity_regression.test.js`), listado de suites (`vitest_discovered_suites.txt`) y logs crudos genuinos (`raw_vitest_output.log`, `raw_build_output.log`).
       - **Commit Documental y de Empaquetado:** Actualización del manifiesto (`MANIFEST.md`), sumas criptográficas (`SHA256SUMS.txt`), diff unificado (`git_diff_review.diff`) y paquete ZIP (`review_artifacts_onboarding_simplified.zip`).
@@ -267,8 +279,8 @@ def package():
   - **Evidencias Visuales (15 archivos PNG):** Reutilizadas de la sesión validada de Playwright (`01_onboarding_...` a `08_onboarding_...`), acreditando fidelidad tipográfica, paridad multilingüe EN/ES/DE, densidad cómoda/compacta, y fidelidad documental (1.792 €, interior 4/4). No han sufrido alteraciones visuales en esta iteración.
   - **Entregables Técnicos y Evidencias de Contrato (13 archivos):** Regenerados e incorporados en esta iteración para acreditar los puntos de auditoría (`test_onboarding_connected_suite.js`, `onboarding_checksum_integrity_regression.test.js`, `calibrationAcceptanceService.js`, `calibration_residuals_compatibility_regression.test.js`, `printhouseOnboardingRoutes.js`, `raw_vitest_output.log`, `raw_build_output.log`, `git_diff_review.diff`, `vitest_discovered_suites.txt`, `userSessionService.js`, `auth_middleware.js`, `auth_and_user_sessions_schema.sql`, `SHA256SUMS.txt`).
 - **Comandos Ejecutados (Pruebas Locales):**
-  - `npx vitest run`: Ejecución local de 23 suites y 333 tests unitarios y de integración (333 pasados, 0 fallidos, exit code 0).
-  - `npm run build`: Compilación local de producción Vite (dist generado limpiamente en 14.36s, exit code 0).
+  - `npx vitest run`: Ejecución local de 23 suites y 336 tests unitarios y de integración (336 pasados, 0 fallidos, exit code 0).
+  - `npm run build`: Compilación local de producción Vite (dist generado limpiamente, exit code 0).
 - **Entorno:**
   - Node.js v20+, Vite 6.4.2, React 19, TypeScript
   - MySQL Target: `ppos_rc_mdw0qd@127.0.0.1:3306/pposrcmdw0qdtest`

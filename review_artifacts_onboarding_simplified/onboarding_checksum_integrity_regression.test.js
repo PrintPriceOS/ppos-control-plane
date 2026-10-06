@@ -10,6 +10,7 @@ const {
     getDirectMysqlConnectionConfig,
     REQUIRED_MYSQL,
     parseAndValidatePointResultsJson,
+    formatCurveMetricsDiagnostic,
     runCurveHarnessRegressions
 } = require('../scripts/test_onboarding_connected_suite');
 
@@ -452,6 +453,126 @@ describe('Onboarding Harness Checksum Integrity & Normalization Regressions', ()
             expect(() => parseAndValidatePointResultsJson(undefined, 'Test 9.5b Undefined Value')).toThrowError(
                 /\[POINT_RESULTS_VALIDATION_ERROR\] Test 9.5b Undefined Value: Value is null or undefined/
             );
+        });
+    });
+
+    describe('10. curveMetrics Phase-Specific Contract & Sanitized Diagnostic Regressions', () => {
+        test('10.1 Solver /calculate produce métricas agregadas y NO incluye acceptedPointCount ni rejectedPointCount', () => {
+            const deterministicSolver = require('../src/api/services/deterministicInversePricingSolver');
+            const BOOK_SPEC = {
+                format: '148x210',
+                pages: 72,
+                runWastePercentage: 0.05,
+                copies: 1500,
+                colorsFront: 4,
+                colorsBack: 4,
+                paper: 'offset',
+                paperGsm: 90,
+                coverColorsFront: 4,
+                coverColorsBack: 0,
+                coverPaper: 'mc',
+                coverGsm: 250,
+                lamination: 'matt',
+                binding: 'pb'
+            };
+            const TARGETS = [
+                { quantity: 100, targetManufacturingPrice: 50.0 },
+                { quantity: 200, targetManufacturingPrice: 80.0 }
+            ];
+            const rates = {
+                interior_full_colour_fixed: { '16p': 100 },
+                interior_full_colour_var: { '16p': 50 },
+                cover_fixed_by_colours: { '4': 40 },
+                cover_var_per_1000_by_colours: { '4': 30 },
+                lam_fixed: { matt: 20 },
+                lam_var_per_1000: { matt: 15 },
+                binding_pb_fixed_by_sections: { '5': 25 },
+                binding_pb_var_per_1000_by_sections: { '5': 10 },
+                paper_interior_fixed_by_colours: 50,
+                paper_interior_var_per_1000_by_colours: 20,
+                paper_cover_fixed_by_colours: 30,
+                paper_cover_var_per_1000_by_colours: 15,
+                paper_waste_for_binding: { pb: 0.04 },
+                paper_price_interior_by_kilo: { offset: 1.2 },
+                paper_price_cover_by_kilo: { mc: 1.5 }
+            };
+
+            const solverRes = deterministicSolver.solveMultiQuantity({
+                bookSpec: BOOK_SPEC,
+                currentRatesSnapshot: rates,
+                multiTargets: TARGETS
+            });
+
+            expect(solverRes.curveMetrics).toBeDefined();
+            expect(solverRes.curveMetrics.pointCount).toBe(2);
+            expect(typeof solverRes.curveMetrics.meanAbsoluteResidual).toBe('number');
+            expect(typeof solverRes.curveMetrics.maxAbsoluteResidual).toBe('number');
+            expect(typeof solverRes.curveMetrics.meanPercentageResidual).toBe('number');
+            expect(typeof solverRes.curveMetrics.maxPercentageResidual).toBe('number');
+            expect(typeof solverRes.curveMetrics.objectiveValue).toBe('number');
+
+            // Crucial: acceptance counts are strictly undefined in solver /calculate phase
+            expect(solverRes.curveMetrics.acceptedPointCount).toBeUndefined();
+            expect(solverRes.curveMetrics.rejectedPointCount).toBeUndefined();
+        });
+
+        test('10.2 evaluateCurveAcceptance produce métricas de aceptación de gobernanza', () => {
+            const acceptanceService = require('../src/api/services/calibrationAcceptanceService');
+            const session = {
+                book_spec_json: { copies: 100 },
+                multi_targets_json: [{ quantity: 100, targetManufacturingPrice: 50.0 }],
+                target_manufacturing_price: 50.0
+            };
+            const run = { identifiability_json: { status: 'EXACTLY_DETERMINED' } };
+            const rates = {
+                interior_full_colour_fixed: { '16p': 100 },
+                interior_full_colour_var: { '16p': 50 },
+                cover_fixed_by_colours: { '4': 40 },
+                cover_var_per_1000_by_colours: { '4': 30 },
+                lam_fixed: { matt: 20 },
+                lam_var_per_1000: { matt: 15 },
+                binding_pb_fixed_by_sections: { '5': 25 },
+                binding_pb_var_per_1000_by_sections: { '5': 10 },
+                paper_interior_fixed_by_colours: 50,
+                paper_interior_var_per_1000_by_colours: 20,
+                paper_cover_fixed_by_colours: 30,
+                paper_cover_var_per_1000_by_colours: 15,
+                paper_waste_for_binding: { pb: 0.04 },
+                paper_price_interior_by_kilo: { offset: 1.2 },
+                paper_price_cover_by_kilo: { mc: 1.5 }
+            };
+            const bookSpec = { copies: 100, pages: 16 };
+            const nodeConfig = { signatures: null, production_lead_days: 7, delivery_time: 2 };
+
+            const govRes = acceptanceService.evaluateCurveAcceptance(session, run, rates, bookSpec, nodeConfig);
+            expect(govRes.curveMetrics).toBeDefined();
+            expect(typeof govRes.curveMetrics.acceptedPointCount).toBe('number');
+            expect(typeof govRes.curveMetrics.rejectedPointCount).toBe('number');
+            expect(typeof govRes.curveMetrics.allPointsWithinTolerance).toBe('boolean');
+        });
+
+        test('10.3 formatCurveMetricsDiagnostic sanitiza claves conocidas sin fugar secretos ni anidamientos no autorizados', () => {
+            const rawMetrics = {
+                pointCount: 8,
+                meanAbsoluteResidual: 0.042,
+                maxAbsoluteResidual: 0.125,
+                acceptedPointCount: 8,
+                rejectedPointCount: 0,
+                secretPassword: 'super_secret_db_pass',
+                bearerToken: 'Bearer eyJhbGciOiJIUzI1Ni...'
+            };
+
+            const diag = formatCurveMetricsDiagnostic(rawMetrics);
+            expect(diag).toContain('"pointCount":8');
+            expect(diag).toContain('"maxAbsoluteResidual":0.125');
+            expect(diag).toContain('"acceptedPointCount":8');
+            expect(diag).not.toContain('super_secret_db_pass');
+            expect(diag).not.toContain('Bearer eyJhbGciOiJIUzI1Ni');
+
+            // Handles non-object values safely
+            expect(formatCurveMetricsDiagnostic(null)).toContain('null or not an object');
+            expect(formatCurveMetricsDiagnostic(undefined)).toContain('null or not an object');
+            expect(formatCurveMetricsDiagnostic('string_val')).toContain('null or not an object');
         });
     });
 });

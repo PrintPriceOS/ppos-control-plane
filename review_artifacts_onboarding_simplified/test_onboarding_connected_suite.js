@@ -555,6 +555,38 @@ function parseAndValidatePointResultsJson(raw, contextDescription = 'point_resul
     throw new Error(`[POINT_RESULTS_VALIDATION_ERROR] ${contextDescription}: Expected string or array, received unsupported type ${valType}`);
 }
 
+/**
+ * Formats a sanitized, safe diagnostic string representing curveMetrics.
+ * Extracts only recognized numerical and boolean metric attributes, excluding
+ * nested secrets, tokens, or arbitrary objects.
+ *
+ * @param {any} metrics
+ * @returns {string}
+ */
+function formatCurveMetricsDiagnostic(metrics) {
+    if (!metrics || typeof metrics !== 'object') {
+        return `curveMetrics is null or not an object (received: ${metrics === null ? 'null' : typeof metrics})`;
+    }
+    const safeKeys = [
+        'pointCount',
+        'meanAbsoluteResidual',
+        'maxAbsoluteResidual',
+        'meanPercentageResidual',
+        'maxPercentageResidual',
+        'objectiveValue',
+        'acceptedPointCount',
+        'rejectedPointCount',
+        'allPointsWithinTolerance'
+    ];
+    const sanitized = {};
+    for (const key of safeKeys) {
+        if (key in metrics) {
+            sanitized[key] = metrics[key];
+        }
+    }
+    return JSON.stringify(sanitized);
+}
+
 function deepMergeRates(target, source) {
     const out = JSON.parse(JSON.stringify(target || {}));
     for (const key of Object.keys(source || {})) {
@@ -832,6 +864,46 @@ function runCurveHarnessRegressions() {
     }
     if (!nullCaught) {
         throw new Error('Regression 11.5 failed: Null must throw contextual error');
+    }
+
+    // Suite 12: curveMetrics contract differentiation & diagnostic sanitization
+    // 12.1 Solver curveMetrics strictly contains aggregate metrics and NO acceptance counts
+    if (solverRes.curveMetrics.pointCount !== 8) {
+        throw new Error(`Regression 12.1a failed: solverRes.curveMetrics.pointCount must be 8`);
+    }
+    if (!Number.isFinite(solverRes.curveMetrics.meanAbsoluteResidual) || !Number.isFinite(solverRes.curveMetrics.maxAbsoluteResidual)) {
+        throw new Error(`Regression 12.1b failed: solverRes.curveMetrics residuals must be finite numbers`);
+    }
+    if (solverRes.curveMetrics.acceptedPointCount !== undefined || solverRes.curveMetrics.rejectedPointCount !== undefined) {
+        throw new Error(`Regression 12.1c failed: solverRes.curveMetrics must not contain acceptedPointCount or rejectedPointCount`);
+    }
+
+    // 12.2 evaluateCurveAcceptance strictly produces acceptance counts
+    if (validGovernance.curveMetrics.acceptedPointCount !== 8 || validGovernance.curveMetrics.rejectedPointCount !== 0) {
+        throw new Error(`Regression 12.2 failed: evaluateCurveAcceptance must produce acceptedPointCount=8 and rejectedPointCount=0`);
+    }
+    if (validGovernance.curveMetrics.allPointsWithinTolerance !== true) {
+        throw new Error(`Regression 12.3 failed: evaluateCurveAcceptance must produce allPointsWithinTolerance=true`);
+    }
+
+    // 12.3 formatCurveMetricsDiagnostic produces sanitized JSON without secret leakage
+    const dirtyMetrics = {
+        pointCount: 8,
+        meanAbsoluteResidual: 0.12,
+        acceptedPointCount: 8,
+        rejectedPointCount: 0,
+        unauthorizedPassword: 'db_secret_leak_123',
+        token: 'Bearer eyJsecret'
+    };
+    const formattedMetricsDiag = formatCurveMetricsDiagnostic(dirtyMetrics);
+    if (!formattedMetricsDiag.includes('"pointCount":8') || !formattedMetricsDiag.includes('"acceptedPointCount":8')) {
+        throw new Error(`Regression 12.4a failed: formatCurveMetricsDiagnostic missing expected keys`);
+    }
+    if (formattedMetricsDiag.includes('db_secret_leak_123') || formattedMetricsDiag.includes('eyJsecret')) {
+        throw new Error(`Regression 12.4b failed: formatCurveMetricsDiagnostic leaked unauthorized secrets`);
+    }
+    if (!formatCurveMetricsDiagnostic(null).includes('null or not an object')) {
+        throw new Error(`Regression 12.5 failed: formatCurveMetricsDiagnostic must handle null safely`);
     }
 
     console.log('[REGRESSION] All Curve Harness & Solver Contract Regressions Passed Successfully.');
@@ -2003,15 +2075,43 @@ async function runConnectedSuite() {
                 `Point ${i} (q=${expQ}) withinTolerance flag is true and verified against governance tolerance`);
         }
 
-        // Check aggregate residuals and curve metrics
-        assert(curveRunData.curveMetrics && curveRunData.curveMetrics.pointCount === 8,
-            `curveMetrics.pointCount is 8`);
-        assert(curveRunData.curveMetrics.acceptedPointCount === 8 && curveRunData.curveMetrics.rejectedPointCount === 0,
-            `All 8 points accepted in curveMetrics`);
-        assert(typeof curveRunData.absoluteResidual === 'number' && Math.abs(curveRunData.absoluteResidual - curveRunData.curveMetrics.maxAbsoluteResidual) < 0.01,
-            `run.absolute_residual (${curveRunData.absoluteResidual}) matches curveMetrics.maxAbsoluteResidual`);
-        assert(typeof curveRunData.percentResidual === 'number' && Math.abs(curveRunData.percentResidual - curveRunData.curveMetrics.maxPercentageResidual) < 0.001,
-            `run.percent_residual (${curveRunData.percentResidual}) matches curveMetrics.maxPercentageResidual (ratio [0..1])`);
+        // Check aggregate residuals and curve metrics strictly according to /calculate solver contract
+        const calcMetrics = curveRunData.curveMetrics;
+        const metricsDiag = formatCurveMetricsDiagnostic(calcMetrics);
+
+        assert(calcMetrics && typeof calcMetrics === 'object',
+            `curveRunData.curveMetrics object present in /calculate response`,
+            metricsDiag);
+        assert(calcMetrics.pointCount === 8,
+            `curveMetrics.pointCount is 8 in /calculate response`,
+            metricsDiag);
+        assert(Number.isFinite(calcMetrics.meanAbsoluteResidual) && calcMetrics.meanAbsoluteResidual >= 0,
+            `curveMetrics.meanAbsoluteResidual is finite non-negative number`,
+            metricsDiag);
+        assert(Number.isFinite(calcMetrics.maxAbsoluteResidual) && calcMetrics.maxAbsoluteResidual >= 0,
+            `curveMetrics.maxAbsoluteResidual is finite non-negative number`,
+            metricsDiag);
+        assert(Number.isFinite(calcMetrics.meanPercentageResidual) && calcMetrics.meanPercentageResidual >= 0,
+            `curveMetrics.meanPercentageResidual is finite non-negative number`,
+            metricsDiag);
+        assert(Number.isFinite(calcMetrics.maxPercentageResidual) && calcMetrics.maxPercentageResidual >= 0,
+            `curveMetrics.maxPercentageResidual is finite non-negative number`,
+            metricsDiag);
+        assert(Number.isFinite(calcMetrics.objectiveValue) && calcMetrics.objectiveValue >= 0,
+            `curveMetrics.objectiveValue is finite non-negative number`,
+            metricsDiag);
+
+        // Acceptance counts belong strictly to governance/acceptance phase, verify absence in solver /calculate phase
+        assert(calcMetrics.acceptedPointCount === undefined && calcMetrics.rejectedPointCount === undefined,
+            `Solver /calculate curveMetrics strictly does not produce acceptance counts (governance responsibility)`,
+            metricsDiag);
+
+        assert(typeof curveRunData.absoluteResidual === 'number' && Math.abs(curveRunData.absoluteResidual - calcMetrics.maxAbsoluteResidual) < 0.01,
+            `run.absolute_residual (${curveRunData.absoluteResidual}) matches curveMetrics.maxAbsoluteResidual`,
+            metricsDiag);
+        assert(typeof curveRunData.percentResidual === 'number' && Math.abs(curveRunData.percentResidual - calcMetrics.maxPercentageResidual) < 0.001,
+            `run.percent_residual (${curveRunData.percentResidual}) matches curveMetrics.maxPercentageResidual (ratio [0..1])`,
+            metricsDiag);
 
         // Solver diagnostic state: EXACTLY_DETERMINED reported when targetPoints === freeParams === 8 (dof = 0)
         // Does not assert mathematical proof of matrix rank or global identifiability.
@@ -2236,13 +2336,37 @@ async function runConnectedSuite() {
         assert(curveChecksumIntegrity.valid === true, `Curve revision rates_checksum strictly matches canonical SHA-256`);
 
         const [curveAccRows] = await directConn.query(
-            `SELECT id, calibration_session_id, calibration_run_id, pricing_revision_id 
+            `SELECT id, calibration_session_id, calibration_run_id, pricing_revision_id, curve_acceptance_json 
              FROM printhouse_pricing_calibration_acceptances 
              WHERE pricing_revision_id = ?`,
             [curveRevId]
         );
         assert(curveAccRows.length === 1, `Acceptance record verified in MySQL for curve revision`);
         if (curveAccRows[0]?.id) tracker.acceptanceIds.add(curveAccRows[0].id);
+
+        // Verification of acceptance-phase curve metrics: evaluateCurveAcceptance persists acceptedPointCount & rejectedPointCount
+        const rawCurveAccJson = curveAccRows[0].curve_acceptance_json;
+        assert(rawCurveAccJson !== null && rawCurveAccJson !== undefined,
+            `curve_acceptance_json persisted in printhouse_pricing_calibration_acceptances`);
+        const parsedCurveAcc = typeof rawCurveAccJson === 'string' ? JSON.parse(rawCurveAccJson) : rawCurveAccJson;
+        const govMetrics = parsedCurveAcc?.curveMetrics;
+        const govMetricsDiag = formatCurveMetricsDiagnostic(govMetrics);
+
+        assert(govMetrics && typeof govMetrics === 'object',
+            `curveMetrics present in persisted curve_acceptance_json`,
+            govMetricsDiag);
+        assert(govMetrics.pointCount === 8,
+            `Governance curveMetrics.pointCount is 8 in acceptance record`,
+            govMetricsDiag);
+        assert(govMetrics.acceptedPointCount === 8,
+            `All 8 points accepted in acceptance-phase curveMetrics (acceptedPointCount === 8)`,
+            govMetricsDiag);
+        assert(govMetrics.rejectedPointCount === 0,
+            `Zero points rejected in acceptance-phase curveMetrics (rejectedPointCount === 0)`,
+            govMetricsDiag);
+        assert(govMetrics.allPointsWithinTolerance === true,
+            `allPointsWithinTolerance is true in acceptance-phase curveMetrics`,
+            govMetricsDiag);
 
         // Verify curve node status and rates update in MySQL
         const [curveNodeFinal] = await directConn.query(
@@ -2594,6 +2718,7 @@ module.exports = {
     computeCanonicalRatesChecksum,
     canonicalStringify,
     parseAndValidatePointResultsJson,
+    formatCurveMetricsDiagnostic,
     runChecksumIntegrityRegressions,
     runCurveHarnessRegressions
 };
