@@ -149,6 +149,12 @@ const printhouseOnboardingRoutes = require('../src/api/routes/printhouseOnboardi
 const pricingAdapter = require('../src/api/services/buildPriceCalibrationAdapter');
 const deterministicSolver = require('../src/api/services/deterministicInversePricingSolver');
 const calibrationAcceptanceService = require('../src/api/services/calibrationAcceptanceService');
+const {
+    DEFAULT_ACCEPTANCE_TOLERANCE_ABSOLUTE,
+    DEFAULT_ACCEPTANCE_TOLERANCE_PERCENT,
+    CANONICAL_ACCEPTABLE_RUN_STATUSES,
+    computeGovernanceTolerance
+} = require('../src/api/services/calibrationGovernanceTolerances');
 
 // ── 2. CANONICAL STRINGIFY & CHECKSUM UTILITIES ──
 function canonicalStringify(obj) {
@@ -579,11 +585,14 @@ function runCurveHarnessRegressions() {
         multiTargets: syntheticTargets
     };
     const solverRes = deterministicSolver.solveMultiQuantity(solverSession);
-    if (solverRes.status !== 'ACCEPTABLE_CANDIDATE' && solverRes.status !== 'SUCCEEDED') {
-        throw new Error(`Regression 8a failed: Expected ACCEPTABLE_CANDIDATE or SUCCEEDED solver status, got: ${solverRes.status}`);
+    if (!CANONICAL_ACCEPTABLE_RUN_STATUSES.includes(solverRes.status)) {
+        throw new Error(`Regression 8a failed: Expected status in CANONICAL_ACCEPTABLE_RUN_STATUSES (${CANONICAL_ACCEPTABLE_RUN_STATUSES.join(', ')}), got: ${solverRes.status}`);
+    }
+    if (solverRes.status !== 'ACCEPTABLE_CANDIDATE') {
+        throw new Error(`Regression 8a.2 failed: Expected ACCEPTABLE_CANDIDATE solver status for baseline-derived synthetic curve, got: ${solverRes.status}`);
     }
     if (!solverRes.identifiabilityReport || solverRes.identifiabilityReport.status !== 'EXACTLY_DETERMINED') {
-        throw new Error(`Regression 8b failed: Identifiability status must be EXACTLY_DETERMINED, got: ${solverRes.identifiabilityReport?.status}`);
+        throw new Error(`Regression 8b failed: Identifiability status reported by solver must be EXACTLY_DETERMINED, got: ${solverRes.identifiabilityReport?.status}`);
     }
     if (solverRes.identifiabilityReport.freeParameterCount !== 8 || solverRes.identifiabilityReport.targetPointCount !== 8) {
         throw new Error(`Regression 8c failed: Expected 8 free parameters and 8 targets`);
@@ -591,12 +600,34 @@ function runCurveHarnessRegressions() {
     if (!Array.isArray(solverRes.pointResults) || solverRes.pointResults.length !== 8) {
         throw new Error(`Regression 8d failed: pointResults must be array of 8 points`);
     }
-    for (const pt of solverRes.pointResults) {
-        if (typeof pt.absoluteResidual !== 'number' || pt.absoluteResidual < 0) throw new Error(`Regression 8e failed: Absolute residual must be non-negative`);
-        if (typeof pt.percentageResidual !== 'number' || pt.percentageResidual < 0 || pt.percentageResidual > 1.0) {
-            throw new Error(`Regression 8f failed: Percentage residual in pointResults must be unitless ratio [0..1]`);
+    for (let i = 0; i < solverRes.pointResults.length; i++) {
+        const pt = solverRes.pointResults[i];
+        const expQ = CURVE_QUANTITIES[i];
+        const expTargetPrice = syntheticTargets[i].targetManufacturingPrice;
+
+        if (!Number.isInteger(pt.quantity) || pt.quantity !== expQ) {
+            throw new Error(`Regression 8e.1 failed: Point ${i} quantity must match expected ${expQ}`);
         }
-        if (pt.withinTolerance !== true) throw new Error(`Regression 8g failed: Synthetic point at q=${pt.quantity} must be within tolerance`);
+        if (!Number.isFinite(pt.targetManufacturingPrice) || Math.abs(pt.targetManufacturingPrice - expTargetPrice) > 0.01) {
+            throw new Error(`Regression 8e.2 failed: Point ${i} target price must match expected ${expTargetPrice}`);
+        }
+        if (!Number.isFinite(pt.predictedManufacturingPrice) || pt.predictedManufacturingPrice <= 0) {
+            throw new Error(`Regression 8e.3 failed: Point ${i} predicted price must be finite and positive`);
+        }
+
+        const unroundedAbsRes = Math.abs(pt.predictedManufacturingPrice - pt.targetManufacturingPrice);
+        const unroundedRatioRes = pt.targetManufacturingPrice > 0 ? unroundedAbsRes / pt.targetManufacturingPrice : 0;
+        const effTol = computeGovernanceTolerance(pt.targetManufacturingPrice, DEFAULT_ACCEPTANCE_TOLERANCE_ABSOLUTE, DEFAULT_ACCEPTANCE_TOLERANCE_PERCENT);
+
+        if (Math.abs(pt.absoluteResidual - unroundedAbsRes) > 0.001) {
+            throw new Error(`Regression 8e.4 failed: Point ${i} absolute residual (${pt.absoluteResidual}) contradicts recalculated (${unroundedAbsRes})`);
+        }
+        if (Math.abs(pt.percentageResidual - unroundedRatioRes) > 0.0001) {
+            throw new Error(`Regression 8e.5 failed: Point ${i} percentage residual ratio (${pt.percentageResidual}) contradicts recalculated (${unroundedRatioRes})`);
+        }
+        if (pt.withinTolerance !== (pt.absoluteResidual <= effTol)) {
+            throw new Error(`Regression 8e.6 failed: Point ${i} withinTolerance flag contradicts official tolerance check`);
+        }
     }
     if (solverRes.absoluteResidual !== solverRes.curveMetrics.maxAbsoluteResidual) {
         throw new Error(`Regression 8h failed: solver absoluteResidual must match curveMetrics.maxAbsoluteResidual`);
@@ -641,8 +672,8 @@ function runCurveHarnessRegressions() {
         currentRatesSnapshot: INITIAL_VALID_RATES,
         multiTargets: perturbedTargets
     });
-    if (perturbedSolverRes.status !== 'SUCCEEDED') {
-        throw new Error(`Regression 9c failed: Expected perturbed solver to produce SUCCEEDED run, got: ${perturbedSolverRes.status}`);
+    if (!CANONICAL_ACCEPTABLE_RUN_STATUSES.includes(perturbedSolverRes.status) || perturbedSolverRes.status !== 'SUCCEEDED') {
+        throw new Error(`Regression 9c failed: Expected perturbed solver to produce SUCCEEDED run in CANONICAL_ACCEPTABLE_RUN_STATUSES, got: ${perturbedSolverRes.status}`);
     }
     const pt800Solver = perturbedSolverRes.pointResults.find(p => p.quantity === 800);
     if (!pt800Solver || pt800Solver.withinTolerance !== false) {
@@ -667,22 +698,20 @@ function runCurveHarnessRegressions() {
     }
 
     // Suite 10: Sanitized diagnostic formatting and zero secret leakage
-    const testDiagRes = {
+    // Test with real Express wrapHandler error response shape: { ok: false, error: '...', message: '...' }
+    const testDiagResReal = {
         status: 422,
         body: {
-            code: 'GOVERNANCE_CURVE_REJECTED',
-            details: {
-                reasons: ['POINT_OUT_OF_TOLERANCE'],
-                evaluatedQuantities: [100, 200, 300, 400, 500, 600, 700, 800],
-                pointCount: 8
-            },
+            ok: false,
+            error: 'GOVERNANCE_CURVE_REJECTED',
+            message: 'GOVERNANCE_CURVE_REJECTED: [POINT_OUT_OF_TOLERANCE] (quantities: [100, 200, 300, 400, 500, 600, 700, 800])',
             unauthorizedSecret: 'super_secret_db_password_123',
             authorizationHeader: 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9'
         }
     };
-    const formattedDiag = formatHttpDiagnostic('POST', '/api/printhouse/onboarding/pricing/calibrations/cal-test/accept', testDiagRes);
+    const formattedDiag = formatHttpDiagnostic('POST', '/api/printhouse/onboarding/pricing/calibrations/cal-test/accept', testDiagResReal);
     if (!formattedDiag.includes('HTTP 422') || !formattedDiag.includes('GOVERNANCE_CURVE_REJECTED') || !formattedDiag.includes('POINT_OUT_OF_TOLERANCE')) {
-        throw new Error(`Regression 10a failed: Formatted diagnostic must contain HTTP 422, error code, and reasons`);
+        throw new Error(`Regression 10a failed: Formatted diagnostic must contain HTTP 422, error code, and extracted reason POINT_OUT_OF_TOLERANCE`);
     }
     if (formattedDiag.includes('super_secret_db_password_123') || formattedDiag.includes('Bearer eyJhbGciOi')) {
         throw new Error(`Regression 10b failed: Formatted diagnostic leaked secrets or tokens`);
@@ -745,6 +774,17 @@ const INITIAL_VALID_RATES = {
 };
 const INITIAL_RATES_JSON_STR = canonicalStringify(INITIAL_VALID_RATES);
 const INITIAL_RATES_CHECKSUM = computeCanonicalRatesChecksum(INITIAL_VALID_RATES);
+
+// Dedicated fixture for Tenant B to verify cross-tenant isolation and node integrity
+const TENANT_B_INITIAL_RATES = {
+    ...INITIAL_VALID_RATES,
+    interior_full_colour_fixed: { '32p': 92, '16p': 56, '8p': 32, '4p': 18 },
+    interior_full_colour_var: { '32p': 38, '16p': 22, '8p': 13, '4p': 7 },
+    cover_fixed_by_colours: { '1': 28, '2': 40, '3': 56, '4': 72, '5': 88 },
+    cover_var_per_1000_by_colours: { '1': 11, '2': 15, '3': 22, '4': 28, '5': 35 }
+};
+const TENANT_B_INITIAL_RATES_JSON_STR = canonicalStringify(TENANT_B_INITIAL_RATES);
+const TENANT_B_RATES_CHECKSUM = computeCanonicalRatesChecksum(TENANT_B_INITIAL_RATES);
 
 const EXECUTION_TAG = 'test_onb_' + Date.now().toString(36) + '_' + crypto.randomBytes(3).toString('hex');
 const tracker = {
@@ -880,7 +920,13 @@ function formatHttpDiagnostic(method, path, res) {
     const status = res.status;
     const body = res.body || {};
     // Extract sanitized error fields, strictly suppressing any Authorization headers or tokens
-    const reasons = body.reasons || body.details?.reasons || (Array.isArray(body.details) ? body.details : undefined);
+    let reasons = body.reasons || body.details?.reasons || (Array.isArray(body.details) ? body.details : undefined);
+    if (!reasons && typeof body.message === 'string') {
+        const match = body.message.match(/\[([A-Z0-9_, ]+)\]/);
+        if (match) {
+            reasons = match[1].split(',').map(s => s.trim());
+        }
+    }
     const evaluatedQuantities = body.evaluatedQuantities || body.details?.evaluatedQuantities || undefined;
     const pointCount = body.details?.pointCount || undefined;
     const sanitized = {
@@ -1686,24 +1732,41 @@ async function runConnectedSuite() {
         console.log(`\n  [SCENARIO 1 COMPLETE] Single-Point Validated Onboarding Flow Passed Successfully (57 Assertions).\n`);
 
         // ══════════════════════════════════════════════════════════════════════════════
-        // ── SCENARIO 2 (CASO A): MULTI-QUANTITY VALID CURVE ACCEPTANCE ──
+        // ══════════════════════════════════════════════════════════════════════════════
+        // ── SCENARIO 2 (CASO A): MULTI-QUANTITY VALID CURVE ACCEPTANCE & CROSS-TENANT ISOLATION ──
         // ══════════════════════════════════════════════════════════════════════════════
         console.log(`\n================================================================`);
-        console.log(`  SCENARIO 2 (CASO A): MULTI-QUANTITY VALID CURVE ACCEPTANCE    `);
+        console.log(`  SCENARIO 2 (CASO A): MULTI-QUANTITY VALID CURVE & ISOLATION    `);
         console.log(`================================================================`);
 
         const FIXTURE_NODE_CURVE_A = `node_${EXECUTION_TAG}_curve_a`;
-        await seedPrinterNode(directConn, FIXTURE_NODE_CURVE_A, FIXTURE_TENANT_A, `Node Curve ${EXECUTION_TAG}`, INITIAL_RATES_JSON_STR, nodeColSet);
+        await seedPrinterNode(directConn, FIXTURE_NODE_CURVE_A, FIXTURE_TENANT_A, `Node Curve A ${EXECUTION_TAG}`, INITIAL_RATES_JSON_STR, nodeColSet);
         assert(true, `Created dedicated curve node ${FIXTURE_NODE_CURVE_A} seeded with initial valid rates baseline`);
 
+        // Seed dedicated printer node for Tenant B using Tenant B's own fixture
+        const FIXTURE_NODE_CURVE_B = `node_${EXECUTION_TAG}_curve_b`;
+        await seedPrinterNode(directConn, FIXTURE_NODE_CURVE_B, FIXTURE_TENANT_B, `Node Curve B ${EXECUTION_TAG}`, TENANT_B_INITIAL_RATES_JSON_STR, nodeColSet);
+        assert(true, `Created dedicated curve node ${FIXTURE_NODE_CURVE_B} for Tenant B seeded with dedicated rates fixture`);
+
         // Baseline rates check on FIXTURE_NODE_CURVE_A
-        const [curveNodeBaseline] = await directConn.query(
-            `SELECT rates_json FROM printer_nodes WHERE id = ?`,
+        const [curveNodeBaselineA] = await directConn.query(
+            `SELECT status, rates_json FROM printer_nodes WHERE id = ?`,
             [FIXTURE_NODE_CURVE_A]
         );
-        const curveNodeChecksum = computeCanonicalRatesChecksum(curveNodeBaseline[0].rates_json);
-        const curveNodeIntegrity = verifyRatesChecksumIntegrity(curveNodeChecksum, INITIAL_RATES_CHECKSUM);
-        assert(curveNodeIntegrity.valid === true, `Curve node initialized with baseline rates checksum`);
+        assert(curveNodeBaselineA[0].status === 'ACTIVE', `Curve node A status initialized as ACTIVE`);
+        const curveNodeChecksumA = computeCanonicalRatesChecksum(curveNodeBaselineA[0].rates_json);
+        const curveNodeIntegrityA = verifyRatesChecksumIntegrity(curveNodeChecksumA, INITIAL_RATES_CHECKSUM);
+        assert(curveNodeIntegrityA.valid === true, `Curve node A initialized with baseline rates checksum`);
+
+        // Baseline rates check on FIXTURE_NODE_CURVE_B
+        const [curveNodeBaselineB] = await directConn.query(
+            `SELECT status, rates_json FROM printer_nodes WHERE id = ?`,
+            [FIXTURE_NODE_CURVE_B]
+        );
+        assert(curveNodeBaselineB[0].status === 'ACTIVE', `Curve node B status initialized as ACTIVE`);
+        const curveNodeChecksumB = computeCanonicalRatesChecksum(curveNodeBaselineB[0].rates_json);
+        const curveNodeIntegrityB = verifyRatesChecksumIntegrity(curveNodeChecksumB, TENANT_B_RATES_CHECKSUM);
+        assert(curveNodeIntegrityB.valid === true, `Curve node B initialized with dedicated Tenant B rates checksum`);
 
         // Canonical Industrial Book Spec (identical across all 8 points)
         const CURVE_BOOK_SPEC = {
@@ -1723,6 +1786,7 @@ async function runConnectedSuite() {
 
         // Generate synthetic multi-targets for 8 distinct print runs from baseline rates
         // Requirements: >= 3 distinct print runs, exact forward evaluation parity
+        // Synthetic integration fixture: validates end-to-end integration and invariants, not accuracy against independent external quotes.
         const CURVE_QUANTITIES = [100, 200, 300, 400, 500, 600, 700, 800];
         const validCurveTargets = CURVE_QUANTITIES.map(q => {
             const fwd = pricingAdapter.evaluateForwardPrice({ ...CURVE_BOOK_SPEC, copies: q }, INITIAL_VALID_RATES, {}, {});
@@ -1786,24 +1850,40 @@ async function runConnectedSuite() {
         const curveRunId = curveRunData.id;
         tracker.runIds.add(curveRunId);
 
-        // Verification of solver contract
-        assert(curveRunData.status === 'ACCEPTABLE_CANDIDATE' || curveRunData.status === 'SUCCEEDED' || curveRunData.status === 'CONVERGED',
-            `Curve run status is canonical acceptable status (${curveRunData.status})`);
+        // Verification of solver contract: replace permissive list with canonical contract
+        assert(CANONICAL_ACCEPTABLE_RUN_STATUSES.includes(curveRunData.status),
+            `Curve run status (${curveRunData.status}) is in CANONICAL_ACCEPTABLE_RUN_STATUSES`);
+        assert(curveRunData.status === 'ACCEPTABLE_CANDIDATE',
+            `Curve run status for baseline-derived synthetic curve is strictly ACCEPTABLE_CANDIDATE`);
         assert(Array.isArray(curveRunData.pointResults) && curveRunData.pointResults.length === 8,
             `pointResults contains 8 evaluated points`);
 
-        // Check individual point quantities, prices, residuals, and tolerances
+        // Check individual point quantities, prices, residuals, and tolerances against official policy
         for (let i = 0; i < curveRunData.pointResults.length; i++) {
             const pt = curveRunData.pointResults[i];
             const expQ = CURVE_QUANTITIES[i];
-            assert(pt.quantity === expQ, `Point ${i} quantity matches ${expQ}`);
-            assert(typeof pt.predictedManufacturingPrice === 'number' && pt.predictedManufacturingPrice > 0,
+            const expTarget = validCurveTargets[i].targetManufacturingPrice;
+            const ptTarget = pt.targetManufacturingPrice ?? pt.targetPrice;
+
+            assert(Number.isInteger(pt.quantity) && pt.quantity === expQ, `Point ${i} quantity matches expected ${expQ}`);
+            assert(Number.isFinite(ptTarget) && Math.abs(ptTarget - expTarget) < 0.01,
+                `Point ${i} (q=${expQ}) target price is finite and matches expected ${expTarget} EUR`);
+            assert(Number.isFinite(pt.predictedManufacturingPrice) && pt.predictedManufacturingPrice > 0,
                 `Point ${i} (q=${expQ}) predicted manufacturing price is finite and positive: ${pt.predictedManufacturingPrice} EUR`);
-            assert(typeof pt.absoluteResidual === 'number' && pt.absoluteResidual >= 0,
-                `Point ${i} absolute residual is finite and non-negative: ${pt.absoluteResidual} EUR`);
-            assert(typeof pt.percentageResidual === 'number' && pt.percentageResidual >= 0,
-                `Point ${i} percentage residual is finite unitless ratio [0..1]: ${pt.percentageResidual}`);
-            assert(pt.withinTolerance === true, `Point ${i} (q=${expQ}) is within individual tolerance against its own target`);
+
+            // Recalculate unrounded absolute residual and ratio residual
+            const recalculatedAbsRes = Math.abs(pt.predictedManufacturingPrice - ptTarget);
+            const recalculatedRatioRes = ptTarget > 0 ? recalculatedAbsRes / ptTarget : 0;
+            const effTol = computeGovernanceTolerance(ptTarget, DEFAULT_ACCEPTANCE_TOLERANCE_ABSOLUTE, DEFAULT_ACCEPTANCE_TOLERANCE_PERCENT);
+
+            assert(Number.isFinite(pt.absoluteResidual) && Math.abs(pt.absoluteResidual - recalculatedAbsRes) < 0.01,
+                `Point ${i} absolute residual (${pt.absoluteResidual} EUR) verified against recalculated (${recalculatedAbsRes.toFixed(4)} EUR)`);
+            assert(Number.isFinite(pt.percentageResidual) && Math.abs(pt.percentageResidual - recalculatedRatioRes) < 0.001,
+                `Point ${i} percentage residual ratio (${pt.percentageResidual}) verified against recalculated (${recalculatedRatioRes.toFixed(6)})`);
+            assert(recalculatedAbsRes <= effTol,
+                `Point ${i} (q=${expQ}) absolute residual (${recalculatedAbsRes.toFixed(4)}) is within effective tolerance (${effTol.toFixed(4)} EUR)`);
+            assert(pt.withinTolerance === true,
+                `Point ${i} (q=${expQ}) withinTolerance flag is true and verified against governance tolerance`);
         }
 
         // Check aggregate residuals and curve metrics
@@ -1816,13 +1896,14 @@ async function runConnectedSuite() {
         assert(typeof curveRunData.percentResidual === 'number' && Math.abs(curveRunData.percentResidual - curveRunData.curveMetrics.maxPercentageResidual) < 0.001,
             `run.percent_residual (${curveRunData.percentResidual}) matches curveMetrics.maxPercentageResidual (ratio [0..1])`);
 
-        // Identifiability verification
+        // Solver diagnostic state: EXACTLY_DETERMINED reported when targetPoints === freeParams === 8 (dof = 0)
+        // Does not assert mathematical proof of matrix rank or global identifiability.
         assert(curveRunData.identifiabilityReport && curveRunData.identifiabilityReport.status === 'EXACTLY_DETERMINED',
-            `identifiabilityReport status is EXACTLY_DETERMINED (targetPoints=8, freeParams=8)`);
+            `identifiabilityReport status reported by solver is EXACTLY_DETERMINED (targetPoints=8, freeParams=8)`);
         assert(curveRunData.identifiabilityReport.degreesOfFreedom === 0,
             `identifiability degrees of freedom is 0`);
 
-        // Direct DB verification of run record
+        // Direct DB verification of run record and contrast persisted point_results_json
         const [curveRunRows] = await directConn.query(
             `SELECT id, calibration_session_id, tenant_id, status, point_results_json, curve_metrics_json, identifiability_json 
              FROM printhouse_pricing_calibration_runs 
@@ -1836,7 +1917,160 @@ async function runConnectedSuite() {
         assert(curveRunRows[0].curve_metrics_json !== null, `curve_metrics_json persisted in MySQL`);
         assert(curveRunRows[0].identifiability_json !== null, `identifiability_json persisted in MySQL`);
 
-        // Governed Acceptance (Contract: POST /:id/accept -> HTTP 200)
+        const dbPointResults = JSON.parse(curveRunRows[0].point_results_json);
+        assert(Array.isArray(dbPointResults) && dbPointResults.length === 8,
+            `Persisted point_results_json contains exactly 8 points`);
+        for (let i = 0; i < dbPointResults.length; i++) {
+            const dbPt = dbPointResults[i];
+            const expQ = CURVE_QUANTITIES[i];
+            const httpPt = curveRunData.pointResults[i];
+            assert(dbPt.quantity === expQ, `MySQL Point ${i} quantity matches ${expQ}`);
+            assert(Number.isFinite(dbPt.predictedManufacturingPrice) && Math.abs(dbPt.predictedManufacturingPrice - httpPt.predictedManufacturingPrice) < 0.001,
+                `MySQL Point ${i} predicted price matches HTTP response`);
+            assert(Number.isFinite(dbPt.absoluteResidual) && Math.abs(dbPt.absoluteResidual - httpPt.absoluteResidual) < 0.001,
+                `MySQL Point ${i} absolute residual matches HTTP response`);
+            assert(dbPt.withinTolerance === true, `MySQL Point ${i} withinTolerance is true`);
+        }
+
+        // ──────────────────────────────────────────────────────────────────────────
+        // ── CROSS-TENANT ATTEMPT ON UNACCEPTED VALID CURVE CANDIDATE ──
+        // ──────────────────────────────────────────────────────────────────────────
+        console.log(`\n  [AUDIT BEFORE CROSS-TENANT ATTEMPT] Verifying exact IDs before unauthorized attempt`);
+
+        // 1. Owner node A: status and baseline rates untouched
+        const [preNodeA] = await directConn.query(
+            `SELECT status, rates_json FROM printer_nodes WHERE id = ?`,
+            [FIXTURE_NODE_CURVE_A]
+        );
+        assert(preNodeA[0].status === 'ACTIVE', `Pre-attempt: Owner node A status is ACTIVE`);
+        const preChecksumA = computeCanonicalRatesChecksum(preNodeA[0].rates_json);
+        const preIntegrityA = verifyRatesChecksumIntegrity(preChecksumA, INITIAL_RATES_CHECKSUM);
+        assert(preIntegrityA.valid === true, `Pre-attempt: Owner node A rates remain untouched baseline`);
+
+        // 2. Tenant B node: status and dedicated rates untouched
+        const [preNodeB] = await directConn.query(
+            `SELECT status, rates_json FROM printer_nodes WHERE id = ?`,
+            [FIXTURE_NODE_CURVE_B]
+        );
+        assert(preNodeB[0].status === 'ACTIVE', `Pre-attempt: Tenant B node status is ACTIVE`);
+        const preChecksumB = computeCanonicalRatesChecksum(preNodeB[0].rates_json);
+        const preIntegrityB = verifyRatesChecksumIntegrity(preChecksumB, TENANT_B_RATES_CHECKSUM);
+        assert(preIntegrityB.valid === true, `Pre-attempt: Tenant B node rates match dedicated fixture`);
+
+        // 3. Revisions and acceptances for both tenants: zero on curve node and session
+        const [preRevsCurveA] = await directConn.query(
+            `SELECT COUNT(*) as count FROM printhouse_pricing_revisions WHERE printer_node_id = ?`,
+            [FIXTURE_NODE_CURVE_A]
+        );
+        assert(preRevsCurveA[0].count === 0, `Pre-attempt: Zero pricing revisions on curve node A`);
+
+        const [preAccsCurveA] = await directConn.query(
+            `SELECT COUNT(*) as count FROM printhouse_pricing_calibration_acceptances WHERE calibration_session_id = ?`,
+            [curveSessionId]
+        );
+        assert(preAccsCurveA[0].count === 0, `Pre-attempt: Zero calibration acceptances for curve session`);
+
+        const [preRevsTenantB] = await directConn.query(
+            `SELECT COUNT(*) as count FROM printhouse_pricing_revisions WHERE tenant_id = ?`,
+            [FIXTURE_TENANT_B]
+        );
+        assert(preRevsTenantB[0].count === 0, `Pre-attempt: Zero pricing revisions for Tenant B`);
+
+        const [preAccsTenantB] = await directConn.query(
+            `SELECT COUNT(*) as count FROM printhouse_pricing_calibration_acceptances WHERE tenant_id = ?`,
+            [FIXTURE_TENANT_B]
+        );
+        assert(preAccsTenantB[0].count === 0, `Pre-attempt: Zero calibration acceptances for Tenant B`);
+
+        // 4. Absence of BPE publications and activation grants
+        const [preBpe] = await directConn.query(
+            `SELECT COUNT(*) as count FROM bpe_pricing_publications WHERE tenant_id IN (?, ?) OR printer_node_id IN (?, ?)`,
+            [FIXTURE_TENANT_A, FIXTURE_TENANT_B, FIXTURE_NODE_CURVE_A, FIXTURE_NODE_CURVE_B]
+        );
+        assert(preBpe[0].count === 0, `Pre-attempt: Zero BPE publications across tenants and curve nodes`);
+
+        const [preGrants] = await directConn.query(
+            `SELECT COUNT(*) as count FROM printhouse_activation_grants WHERE tenant_id IN (?, ?)`,
+            [FIXTURE_TENANT_A, FIXTURE_TENANT_B]
+        );
+        assert(preGrants[0].count === 0, `Pre-attempt: Zero activation grants across both tenants`);
+
+        // 5. Execute cross-tenant acceptance attempt by Tenant B on Tenant A's unaccepted curve run
+        console.log(`\n  [CROSS-TENANT EXECUTION] Tenant B attempting to accept Tenant A's unaccepted curve candidate`);
+        const crossTenantAttemptRes = await httpRequest(
+            serverUrl,
+            'POST',
+            `/api/printhouse/onboarding/pricing/calibrations/${curveSessionId}/accept`,
+            tokenB,
+            {
+                runId: curveRunId,
+                acceptanceNotes: 'Unauthorized cross-tenant attempt on unaccepted curve candidate'
+            }
+        );
+        assert(crossTenantAttemptRes.status === 403 || crossTenantAttemptRes.status === 404,
+            `Cross-tenant curve acceptance strictly rejected with HTTP ${crossTenantAttemptRes.status}`,
+            formatHttpDiagnostic('POST', `/api/printhouse/onboarding/pricing/calibrations/${curveSessionId}/accept`, crossTenantAttemptRes));
+
+        // 6. Post-attempt audit by exact IDs: verify zero mutations
+        console.log(`\n  [AUDIT AFTER CROSS-TENANT ATTEMPT] Verifying zero mutations by exact IDs`);
+        const [postNodeA] = await directConn.query(
+            `SELECT status, rates_json FROM printer_nodes WHERE id = ?`,
+            [FIXTURE_NODE_CURVE_A]
+        );
+        assert(postNodeA[0].status === 'ACTIVE', `Post-attempt: Owner node A status preserved as ACTIVE`);
+        const postChecksumA = computeCanonicalRatesChecksum(postNodeA[0].rates_json);
+        const postIntegrityA = verifyRatesChecksumIntegrity(postChecksumA, INITIAL_RATES_CHECKSUM);
+        assert(postIntegrityA.valid === true, `Post-attempt: Owner node A rates strictly unmutated`);
+
+        const [postNodeB] = await directConn.query(
+            `SELECT status, rates_json FROM printer_nodes WHERE id = ?`,
+            [FIXTURE_NODE_CURVE_B]
+        );
+        assert(postNodeB[0].status === 'ACTIVE', `Post-attempt: Tenant B node status preserved as ACTIVE`);
+        const postChecksumB = computeCanonicalRatesChecksum(postNodeB[0].rates_json);
+        const postIntegrityB = verifyRatesChecksumIntegrity(postChecksumB, TENANT_B_RATES_CHECKSUM);
+        assert(postIntegrityB.valid === true, `Post-attempt: Tenant B node rates strictly unmutated`);
+
+        const [postRevsCurveA] = await directConn.query(
+            `SELECT COUNT(*) as count FROM printhouse_pricing_revisions WHERE printer_node_id = ?`,
+            [FIXTURE_NODE_CURVE_A]
+        );
+        assert(postRevsCurveA[0].count === 0, `Post-attempt: Zero pricing revisions created on curve node A`);
+
+        const [postAccsCurveA] = await directConn.query(
+            `SELECT COUNT(*) as count FROM printhouse_pricing_calibration_acceptances WHERE calibration_session_id = ?`,
+            [curveSessionId]
+        );
+        assert(postAccsCurveA[0].count === 0, `Post-attempt: Zero calibration acceptances created for curve session`);
+
+        const [postRevsTenantB] = await directConn.query(
+            `SELECT COUNT(*) as count FROM printhouse_pricing_revisions WHERE tenant_id = ?`,
+            [FIXTURE_TENANT_B]
+        );
+        assert(postRevsTenantB[0].count === 0, `Post-attempt: Zero pricing revisions created for Tenant B`);
+
+        const [postAccsTenantB] = await directConn.query(
+            `SELECT COUNT(*) as count FROM printhouse_pricing_calibration_acceptances WHERE tenant_id = ?`,
+            [FIXTURE_TENANT_B]
+        );
+        assert(postAccsTenantB[0].count === 0, `Post-attempt: Zero calibration acceptances created for Tenant B`);
+
+        const [postBpe] = await directConn.query(
+            `SELECT COUNT(*) as count FROM bpe_pricing_publications WHERE tenant_id IN (?, ?) OR printer_node_id IN (?, ?)`,
+            [FIXTURE_TENANT_A, FIXTURE_TENANT_B, FIXTURE_NODE_CURVE_A, FIXTURE_NODE_CURVE_B]
+        );
+        assert(postBpe[0].count === 0, `Post-attempt: Zero BPE publications persisted`);
+
+        const [postGrants] = await directConn.query(
+            `SELECT COUNT(*) as count FROM printhouse_activation_grants WHERE tenant_id IN (?, ?)`,
+            [FIXTURE_TENANT_A, FIXTURE_TENANT_B]
+        );
+        assert(postGrants[0].count === 0, `Post-attempt: Zero activation grants created`);
+
+        // ──────────────────────────────────────────────────────────────────────────
+        // ── LEGITIMATE ACCEPTANCE BY TENANT A ──
+        // ──────────────────────────────────────────────────────────────────────────
+        console.log(`\n  [LEGITIMATE ACCEPTANCE] Tenant A accepting valid curve run`);
         const curveAcceptRes = await httpRequest(
             serverUrl,
             'POST',
@@ -1858,14 +2092,14 @@ async function runConnectedSuite() {
         assert(typeof curveAccId === 'string' && curveAccId.length > 0, `Curve acceptance record created: ${curveAccId}`);
         tracker.acceptanceIds.add(curveAccId);
 
-        // Verification of revision and acceptance in MySQL
+        // Post-acceptance audit by exact IDs in MySQL
         const [curveRevs] = await directConn.query(
             `SELECT id, printer_node_id, source_type, rates_json, rates_checksum 
              FROM printhouse_pricing_revisions 
              WHERE printer_node_id = ?`,
             [FIXTURE_NODE_CURVE_A]
         );
-        assert(curveRevs.length === 1, `Exactly 1 revision created for curve node`);
+        assert(curveRevs.length === 1, `Exactly 1 revision created for curve node A`);
         assert(curveRevs[0].id === curveRevId, `Revision ID matches accepted ID`);
         const storedCurveRates = curveRevs[0].rates_json;
         const expectedCurveChecksum = computeCanonicalRatesChecksum(storedCurveRates);
@@ -1886,23 +2120,47 @@ async function runConnectedSuite() {
             `SELECT status, rates_json FROM printer_nodes WHERE id = ?`,
             [FIXTURE_NODE_CURVE_A]
         );
-        assert(curveNodeFinal[0].status === 'ACTIVE', `Curve node status preserved as ACTIVE`);
+        assert(curveNodeFinal[0].status === 'ACTIVE', `Curve node A status preserved as ACTIVE`);
         const finalCurveNodeChecksum = computeCanonicalRatesChecksum(curveNodeFinal[0].rates_json);
         const finalCurveNodeIntegrity = verifyRatesChecksumIntegrity(finalCurveNodeChecksum, expectedCurveChecksum);
-        assert(finalCurveNodeIntegrity.valid === true, `Curve node rates_json updated to accepted calibrated document`);
+        assert(finalCurveNodeIntegrity.valid === true, `Curve node A rates_json updated to accepted calibrated document`);
 
-        // Assert zero commercial leakage on curve node
+        // Verify Tenant B node rates remain strictly untouched and match dedicated fixture
+        const [curveNodeBFinal] = await directConn.query(
+            `SELECT status, rates_json FROM printer_nodes WHERE id = ?`,
+            [FIXTURE_NODE_CURVE_B]
+        );
+        assert(curveNodeBFinal[0].status === 'ACTIVE', `Tenant B node status preserved as ACTIVE`);
+        const finalCurveNodeBChecksum = computeCanonicalRatesChecksum(curveNodeBFinal[0].rates_json);
+        const finalCurveNodeBIntegrity = verifyRatesChecksumIntegrity(finalCurveNodeBChecksum, TENANT_B_RATES_CHECKSUM);
+        assert(finalCurveNodeBIntegrity.valid === true, `Tenant B node rates strictly preserved following Tenant A acceptance`);
+
+        // Verify zero revisions and zero acceptances created for Tenant B
+        const [tenantBRevsAfter] = await directConn.query(
+            `SELECT COUNT(*) as count FROM printhouse_pricing_revisions WHERE tenant_id = ?`,
+            [FIXTURE_TENANT_B]
+        );
+        assert(tenantBRevsAfter[0].count === 0, `Zero pricing revisions created for Tenant B after legitimate acceptance`);
+
+        const [tenantBAccsAfter] = await directConn.query(
+            `SELECT COUNT(*) as count FROM printhouse_pricing_calibration_acceptances WHERE tenant_id = ?`,
+            [FIXTURE_TENANT_B]
+        );
+        assert(tenantBAccsAfter[0].count === 0, `Zero calibration acceptances created for Tenant B after legitimate acceptance`);
+
+        // Assert zero commercial leakage on curve nodes and tenants
         const [curveBpe] = await directConn.query(
-            `SELECT COUNT(*) as count FROM bpe_pricing_publications WHERE printer_node_id = ?`,
-            [FIXTURE_NODE_CURVE_A]
+            `SELECT COUNT(*) as count FROM bpe_pricing_publications WHERE printer_node_id IN (?, ?)`,
+            [FIXTURE_NODE_CURVE_A, FIXTURE_NODE_CURVE_B]
         );
-        assert(curveBpe[0].count === 0, `Zero records in bpe_pricing_publications for curve node`);
+        assert(curveBpe[0].count === 0, `Zero records in bpe_pricing_publications for curve nodes`);
+
         const [curveGrants] = await directConn.query(
-            `SELECT COUNT(*) as count FROM printhouse_activation_grants WHERE tenant_id = ?`,
-            [FIXTURE_TENANT_A]
+            `SELECT COUNT(*) as count FROM printhouse_activation_grants WHERE tenant_id IN (?, ?)`,
+            [FIXTURE_TENANT_A, FIXTURE_TENANT_B]
         );
-        assert(curveGrants[0].count === 0, `Zero total activation grants for tenant`);
-        console.log(`\n  [SCENARIO 2 COMPLETE] Multi-Quantity Valid Curve Accepted Successfully.\n`);
+        assert(curveGrants[0].count === 0, `Zero total activation grants for either tenant`);
+        console.log(`\n  [SCENARIO 2 COMPLETE] Multi-Quantity Valid Curve Accepted & Cross-Tenant Isolation Verified.\n`);
 
         // ══════════════════════════════════════════════════════════════════════════════
         // ── SCENARIO 3 (CASO B): OUT-OF-TOLERANCE CURVE REJECTION GATE ──
@@ -1915,7 +2173,16 @@ async function runConnectedSuite() {
         await seedPrinterNode(directConn, FIXTURE_NODE_REJECT_A, FIXTURE_TENANT_A, `Node Reject ${EXECUTION_TAG}`, INITIAL_RATES_JSON_STR, nodeColSet);
         assert(true, `Created dedicated rejection node ${FIXTURE_NODE_REJECT_A} with baseline rates`);
 
-        // Construct 8 targets with point 800 perturbed downward to 1320.00 EUR (baseline is 1364.50 EUR, q=700 is 1267.00 EUR).
+        // Baseline rates check on FIXTURE_NODE_REJECT_A
+        const [rejectNodeBaseline] = await directConn.query(
+            `SELECT rates_json FROM printer_nodes WHERE id = ?`,
+            [FIXTURE_NODE_REJECT_A]
+        );
+        const rejectNodeChecksum = computeCanonicalRatesChecksum(rejectNodeBaseline[0].rates_json);
+        const rejectNodeIntegrity = verifyRatesChecksumIntegrity(rejectNodeChecksum, INITIAL_RATES_CHECKSUM);
+        assert(rejectNodeIntegrity.valid === true, `Rejection node initialized with baseline rates checksum`);
+
+        // Construct 8 targets with point 800 perturbed downward to 1320.00 EUR (baseline is ~1364.50 EUR, q=700 is 1267.00 EUR).
         // Total price is strictly monotonic (1320 > 1267) and unit cost is non-increasing (1320/800 = 1.65 < 1267/700 = 1.81).
         // Solver converges to SUCCEEDED, but point 800 residual (~42.50 EUR) exceeds governance tolerance (~6.60 EUR).
         const outOfToleranceTargets = CURVE_QUANTITIES.map(q => {
@@ -1976,13 +2243,40 @@ async function runConnectedSuite() {
         const rejectRunId = rejectRunData.id;
         tracker.runIds.add(rejectRunId);
 
-        // Assert solver status SUCCEEDED and verify point 800 is outside tolerance
-        assert(rejectRunData.status === 'SUCCEEDED', `Solver produced run with status SUCCEEDED`);
-        const pt800 = rejectRunData.pointResults?.find(p => p.quantity === 800);
-        assert(pt800 && pt800.withinTolerance === false, `Point q=800 correctly marked as withinTolerance: false by solver`);
-        assert(pt800.absoluteResidual > 20.0, `Point q=800 absolute residual (${pt800.absoluteResidual} EUR) strictly exceeds point tolerance`);
+        // Assert solver status SUCCEEDED (canonical status contract) and verify point 800 is outside tolerance
+        assert(CANONICAL_ACCEPTABLE_RUN_STATUSES.includes(rejectRunData.status),
+            `Perturbed run status (${rejectRunData.status}) is in CANONICAL_ACCEPTABLE_RUN_STATUSES`);
+        assert(rejectRunData.status === 'SUCCEEDED', `Perturbed solver produced run with status SUCCEEDED`);
 
-        // Attempt Governed Acceptance: MUST be rejected by curve tolerance gate
+        const pt800 = rejectRunData.pointResults?.find(p => p.quantity === 800);
+        assert(pt800 !== undefined, `Point q=800 present in solver pointResults`);
+        assert(Number.isInteger(pt800.quantity) && pt800.quantity === 800, `Point q=800 quantity is integer 800`);
+        const pt800Target = pt800.targetManufacturingPrice ?? pt800.targetPrice;
+        assert(Number.isFinite(pt800Target) && pt800Target === 1320.00, `Point q=800 target price is finite 1320.00 EUR`);
+        assert(Number.isFinite(pt800.predictedManufacturingPrice) && pt800.predictedManufacturingPrice > 0,
+            `Point q=800 predicted price is finite: ${pt800.predictedManufacturingPrice} EUR`);
+
+        // Recalculate unrounded residual and effective tolerance using official policy
+        const pt800AbsRes = Math.abs(pt800.predictedManufacturingPrice - 1320.00);
+        const pt800EffTol = computeGovernanceTolerance(1320.00, DEFAULT_ACCEPTANCE_TOLERANCE_ABSOLUTE, DEFAULT_ACCEPTANCE_TOLERANCE_PERCENT);
+        assert(pt800AbsRes > 20.0, `Point q=800 recalculated absolute residual (${pt800AbsRes.toFixed(4)} EUR) strictly exceeds 20.00 EUR`);
+        assert(pt800AbsRes > pt800EffTol, `Point q=800 absolute residual strictly exceeds effective tolerance (${pt800EffTol.toFixed(4)} EUR)`);
+        assert(pt800.withinTolerance === false, `Point q=800 correctly marked as withinTolerance: false by solver`);
+
+        // Direct DB verification of perturbed run record in MySQL
+        const [rejectRunRows] = await directConn.query(
+            `SELECT id, status, point_results_json FROM printhouse_pricing_calibration_runs WHERE id = ?`,
+            [rejectRunId]
+        );
+        assert(rejectRunRows.length === 1, `Perturbed run record verified in MySQL by exact ID`);
+        const dbRejectPts = JSON.parse(rejectRunRows[0].point_results_json);
+        const dbPt800 = dbRejectPts.find(p => p.quantity === 800);
+        assert(dbPt800 && dbPt800.withinTolerance === false, `MySQL persisted point q=800 has withinTolerance: false`);
+        assert(Math.abs(dbPt800.predictedManufacturingPrice - pt800.predictedManufacturingPrice) < 0.001,
+            `MySQL persisted point q=800 predicted price matches HTTP response`);
+
+        // Attempt Governed Acceptance: MUST be rejected by curve tolerance gate with HTTP 422
+        // Contract: wrapHandler serializes err.statusCode=422, error=err.code ('GOVERNANCE_CURVE_REJECTED'), message=err.message
         const rejectAcceptRes = await httpRequest(
             serverUrl,
             'POST',
@@ -1994,12 +2288,17 @@ async function runConnectedSuite() {
             }
         );
         assert(rejectAcceptRes.status === 422, `Out-of-tolerance curve acceptance strictly rejected with HTTP 422`, formatHttpDiagnostic('POST', `/api/printhouse/onboarding/pricing/calibrations/${rejectSessionId}/accept`, rejectAcceptRes));
-        assert(rejectAcceptRes.body?.code === 'GOVERNANCE_CURVE_REJECTED' || rejectAcceptRes.body?.error?.code === 'GOVERNANCE_CURVE_REJECTED',
-            `Rejection code is strictly GOVERNANCE_CURVE_REJECTED`);
 
-        // Check specific rejection reasons
-        const rejectReasons = rejectAcceptRes.body?.reasons || rejectAcceptRes.body?.details?.reasons || (Array.isArray(rejectAcceptRes.body?.details) ? rejectAcceptRes.body?.details : []);
-        assert(rejectReasons.includes('POINT_OUT_OF_TOLERANCE'), `Rejection reasons strictly contain POINT_OUT_OF_TOLERANCE: [${rejectReasons.join(', ')}]`);
+        // Assert error code from real Express wrapHandler serialization: body.error or body.code
+        const receivedErrorCode = rejectAcceptRes.body?.error || rejectAcceptRes.body?.code;
+        assert(receivedErrorCode === 'GOVERNANCE_CURVE_REJECTED',
+            `Rejection error code is strictly GOVERNANCE_CURVE_REJECTED (received: ${receivedErrorCode})`);
+
+        // Verify specific reason POINT_OUT_OF_TOLERANCE from response message or parsed reasons
+        const responseMsg = typeof rejectAcceptRes.body?.message === 'string' ? rejectAcceptRes.body.message : '';
+        const parsedReasons = rejectAcceptRes.body?.reasons || (responseMsg.match(/\[([A-Z0-9_, ]+)\]/)?.[1]?.split(',').map(s => s.trim())) || [];
+        const hasPointOutOfTol = parsedReasons.includes('POINT_OUT_OF_TOLERANCE') || responseMsg.includes('POINT_OUT_OF_TOLERANCE');
+        assert(hasPointOutOfTol === true, `Rejection diagnostic strictly contains POINT_OUT_OF_TOLERANCE: "${responseMsg}"`);
         console.log(`  ✓ Sanitized Governance Diagnostic: ${formatHttpDiagnostic('POST', `/api/printhouse/onboarding/pricing/calibrations/${rejectSessionId}/accept`, rejectAcceptRes)}`);
 
         // Verify zero revisions and zero acceptances created in MySQL
@@ -2026,13 +2325,23 @@ async function runConnectedSuite() {
         console.log(`\n  [SCENARIO 3 COMPLETE] Out-of-Tolerance Curve Rejected with Zero Residuals.\n`);
 
         // ══════════════════════════════════════════════════════════════════════════════
-        // ── SCENARIO 4 (CASO C): CROSS-TENANT CURVE ISOLATION ──
+        // ── SCENARIO 4 (CASO C): CROSS-TENANT POST-ACCEPTANCE & REVISION ISOLATION ──
         // ══════════════════════════════════════════════════════════════════════════════
         console.log(`\n================================================================`);
-        console.log(`  SCENARIO 4 (CASO C): CROSS-TENANT CURVE ISOLATION             `);
+        console.log(`  SCENARIO 4 (CASO C): CROSS-TENANT REVISION & AUDIT ISOLATION  `);
         console.log(`================================================================`);
 
-        // Tenant B attempts to accept Tenant A's curve run on Tenant A's curve session
+        // Tenant B attempts to read Tenant A's revision via GET /pricing/revisions/:revisionId
+        const crossRevRead = await httpRequest(
+            serverUrl,
+            'GET',
+            `/api/printhouse/onboarding/pricing/revisions/${curveRevId}`,
+            tokenB
+        );
+        assert(crossRevRead.status === 403 || crossRevRead.status === 404,
+            `Cross-tenant read of Tenant A revision strictly rejected with HTTP ${crossRevRead.status}`);
+
+        // Tenant B attempts to accept already-accepted session
         const crossCurveAccept = await httpRequest(
             serverUrl,
             'POST',
@@ -2044,22 +2353,22 @@ async function runConnectedSuite() {
             }
         );
         assert(crossCurveAccept.status === 403 || crossCurveAccept.status === 404,
-            `Cross-tenant curve acceptance rejected with HTTP ${crossCurveAccept.status}`,
+            `Cross-tenant curve acceptance on accepted session rejected with HTTP ${crossCurveAccept.status}`,
             formatHttpDiagnostic('POST', `/api/printhouse/onboarding/pricing/calibrations/${curveSessionId}/accept`, crossCurveAccept));
 
-        // Verify zero revisions created for Tenant B
-        const [tenantBRevs] = await directConn.query(
+        // Verify zero revisions created for Tenant B across all scenarios
+        const [finalTenantBRevs] = await directConn.query(
             `SELECT COUNT(*) as count FROM printhouse_pricing_revisions WHERE tenant_id = ?`,
             [FIXTURE_TENANT_B]
         );
-        assert(tenantBRevs[0].count === 0, `Zero pricing revisions created for Tenant B`);
+        assert(finalTenantBRevs[0].count === 0, `Zero pricing revisions created for Tenant B across all scenarios`);
 
-        // Verify zero acceptances created for Tenant B
-        const [tenantBAccs] = await directConn.query(
+        // Verify zero acceptances created for Tenant B across all scenarios
+        const [finalTenantBAccs] = await directConn.query(
             `SELECT COUNT(*) as count FROM printhouse_pricing_calibration_acceptances WHERE tenant_id = ?`,
             [FIXTURE_TENANT_B]
         );
-        assert(tenantBAccs[0].count === 0, `Zero calibration acceptances created for Tenant B`);
+        assert(finalTenantBAccs[0].count === 0, `Zero calibration acceptances created for Tenant B across all scenarios`);
         console.log(`\n  [SCENARIO 4 COMPLETE] Cross-Tenant Curve Isolation Verified with Zero Mutations.\n`);
 
     } catch (err) {
