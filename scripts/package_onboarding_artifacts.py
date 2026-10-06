@@ -127,7 +127,7 @@ def package():
       - Promoción (`POST /pricing/calibrations/:id/ready`): HTTP 200 estricto, comprobación explícita de `body.data.status === 'READY'` (eliminando fallbacks permisivos `ok === true`).
       - Cancelación (`POST /pricing/calibrations/:id/reject`): HTTP 200 estricto, comprobación de `body.data.status === 'REJECTED'`.
       - Aceptación (`POST /pricing/calibrations/:id/accept`): HTTP 200 estricto, validación de `body.data.status === 'ACCEPTED'`, `revisionId` y `acceptanceId`.
-    - **Diagnóstico HTTP Sanitizado:** En caso de discrepancia, `formatHttpDiagnostic` reporta método, ruta, status HTTP y campos de error `{ code, message, details }` sin registrar headers, cookies ni tokens de autorización.
+    - **Diagnóstico HTTP Sanitizado:** En caso de discrepancia, `formatHttpDiagnostic` reporta método, ruta, status HTTP y campos de error `{{ code, message, details }}` sin registrar headers, cookies ni tokens de autorización.
     - **Verificación Directa de `runId` en MySQL:** Tras `POST /calculate`, el identificador `realRunId` (`calcRes.body.data.id`) se verifica directamente en `printhouse_pricing_calibration_runs` por `WHERE id = ?`, asegurando coincidencia de `calibration_session_id` y `tenant_id`.
 
 ---
