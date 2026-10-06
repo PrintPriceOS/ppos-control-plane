@@ -3,28 +3,31 @@
  *
  * Step 4: Compare Engine Calculations vs Original Quoted Offer.
  *
- * Displays:
- * - Side-by-side comparison between Original Target and Calculated Engine Price.
- * - Absolute residual (€) and percentage residual (%).
- * - Explanation of which parameters are backed by evidence and which coverage is missing.
+ * Requirements:
+ * - Real comparison between declared job cost and deterministic inverse solver calculation.
+ * - Strict separation of missing/absent data vs legitimate 0.
+ * - If engine response is missing, incomplete, or malformed, display explicit failed/incomplete state.
+ * - NEVER show 0 vs 0 as "calibrado dentro de tolerancia".
+ * - BLOCK advancing to proposal (disabled button) whenever comparison is incomplete, missing, or failed.
  * - Zero auto-persistence: rates are NOT mutated until explicit governed acceptance in Step 5.
  */
 import React from 'react';
 import { useLocale } from '../../../i18n';
 import { 
     Calculator, CheckCircle2, AlertTriangle, ArrowRight, 
-    ArrowLeft, ShieldCheck, RefreshCw, Info, Layers 
+    ArrowLeft, RefreshCw, Info, Layers, XCircle 
 } from 'lucide-react';
+import { ProductFamilyId } from '../../../types/printhouseOnboardingTypes';
 
 interface CalculationComparisonViewProps {
-    targetPrice?: number;
-    predictedPrice?: number;
-    residualAbs?: number;
-    residualPercent?: number;
-    originalPrice?: number;
-    enginePrice?: number;
-    difference?: number;
-    residual?: number;
+    targetPrice?: number | null;
+    predictedPrice?: number | null;
+    residualAbs?: number | null;
+    residualPercent?: number | null;
+    originalPrice?: number | null;
+    enginePrice?: number | null;
+    difference?: number | null;
+    residual?: number | null;
     spec?: any;
     engineVersion?: string;
     variantsUsed?: (string | number)[];
@@ -37,6 +40,7 @@ interface CalculationComparisonViewProps {
     isCalculated?: boolean;
     calculating?: boolean;
     isCalculating?: boolean;
+    calculationError?: string | null;
     onCalculate?: () => Promise<void> | void;
     onRunSolver?: () => Promise<void> | void;
     onProceedToAccept?: () => void;
@@ -66,6 +70,7 @@ export const CalculationComparisonView: React.FC<CalculationComparisonViewProps>
     isCalculated: explicitIsCalculated,
     calculating: explicitCalculating,
     isCalculating,
+    calculationError,
     onCalculate,
     onRunSolver,
     onProceedToAccept,
@@ -75,30 +80,66 @@ export const CalculationComparisonView: React.FC<CalculationComparisonViewProps>
 }) => {
     const { t } = useLocale();
 
-    // Determine target price and variants
-    const targetPrice = explicitTargetPrice ?? originalPrice ?? (
-        comparisonMode === 'manufacturing' 
-            ? (spec?.runs?.[0]?.manufacturingPrice || spec?.runs?.[0]?.quotedTotalPrice || 0)
-            : (spec?.runs?.[0]?.quotedTotalPrice || spec?.runs?.[0]?.totalPrice || 0)
-    );
-    const predictedPrice = explicitPredictedPrice ?? enginePrice ?? (targetPrice > 0 ? targetPrice - 28 : 0);
-    const residualAbs = explicitResidualAbs ?? difference ?? (targetPrice - predictedPrice);
-    const residualPercent = explicitResidualPercent ?? (targetPrice > 0 ? ((residualAbs / targetPrice) * 100) : 0);
-    const isCalculated = explicitIsCalculated ?? true;
-    const calculating = explicitCalculating ?? isCalculating ?? false;
+    // 1. Rigorous target price resolution: must be a positive number
+    let resolvedTarget: number | null = null;
+    if (typeof explicitTargetPrice === 'number' && explicitTargetPrice > 0) {
+        resolvedTarget = explicitTargetPrice;
+    } else if (typeof originalPrice === 'number' && originalPrice > 0) {
+        resolvedTarget = originalPrice;
+    } else if (spec?.runs && spec.runs.length > 0) {
+        const firstRun = spec.runs[0];
+        if (comparisonMode === 'manufacturing') {
+            if (typeof firstRun.manufacturingPrice === 'number' && firstRun.manufacturingPrice > 0) {
+                resolvedTarget = firstRun.manufacturingPrice;
+            } else if (firstRun.hasEquivalentBreakdown !== false && typeof firstRun.quotedTotalPrice === 'number' && firstRun.quotedTotalPrice > 0) {
+                resolvedTarget = firstRun.quotedTotalPrice;
+            }
+        } else {
+            if (typeof firstRun.quotedTotalPrice === 'number' && firstRun.quotedTotalPrice > 0) {
+                resolvedTarget = firstRun.quotedTotalPrice;
+            } else if (typeof firstRun.totalPrice === 'number' && firstRun.totalPrice > 0) {
+                resolvedTarget = firstRun.totalPrice;
+            }
+        }
+    }
 
-    // Variants used in this calculation
+    // 2. Rigorous engine price resolution: must be a positive number from solver
+    let resolvedEnginePrice: number | null = null;
+    if (typeof explicitPredictedPrice === 'number' && explicitPredictedPrice > 0) {
+        resolvedEnginePrice = explicitPredictedPrice;
+    } else if (typeof enginePrice === 'number' && enginePrice > 0) {
+        resolvedEnginePrice = enginePrice;
+    }
+
+    const calculating = explicitCalculating ?? isCalculating ?? false;
+    const hasValidTarget = resolvedTarget !== null && resolvedTarget > 0;
+    const hasValidEnginePrice = resolvedEnginePrice !== null && resolvedEnginePrice > 0;
+    
+    // Explicit comparison validity: requires BOTH positive declared cost AND positive engine calculation
+    const isComparisonValid = hasValidTarget && hasValidEnginePrice && hasEquivalentBreakdown && !calculationError;
+
+    // 3. Mathematical residual calculation (strictly blocked if data is missing or incomplete)
+    let residualAbs: number | null = null;
+    let residualPercent: number | null = null;
+    let isWellFitted = false;
+
+    if (isComparisonValid) {
+        residualAbs = explicitResidualAbs ?? difference ?? (resolvedTarget! - resolvedEnginePrice!);
+        residualPercent = explicitResidualPercent ?? ((residualAbs! / resolvedTarget!) * 100);
+        isWellFitted = Math.abs(residualPercent!) <= 5.0;
+    }
+
+    // Variants analyzed
     const variantsUsed = explicitVariantsUsed || (spec?.runs?.map((r: any) => `${r.quantity} ej. (${r.paperVariant || 'estándar'})`) || []);
 
     const handleCalculate = onRunSolver || onCalculate || (() => {});
     const handleProceed = onProceedToAcceptance || onProceedToAccept || (() => {});
     const handleBack = onBackToReview || onBack || (() => {});
 
-    const isWellFitted = Math.abs(residualPercent) <= 5.0;
-
     return (
         <div className="space-y-4 text-xs">
             <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 shadow-2xs space-y-4">
+                {/* Header */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-100 dark:border-zinc-800 pb-3">
                     <div className="flex items-start gap-2.5">
                         <div className="p-1.5 rounded-lg bg-red-50 dark:bg-red-950/40 text-[#dc0000] shrink-0 mt-0.5">
@@ -119,17 +160,16 @@ export const CalculationComparisonView: React.FC<CalculationComparisonViewProps>
                         </div>
                     </div>
 
-                    {!isCalculated && (
-                        <button
-                            type="button"
-                            onClick={handleCalculate}
-                            disabled={calculating}
-                            className="px-4 py-2 bg-[#dc0000] hover:bg-red-700 disabled:bg-zinc-400 text-white font-bold rounded-xl text-xs flex items-center gap-2 transition-colors cursor-pointer self-start sm:self-auto"
-                        >
-                            <RefreshCw size={13} className={calculating ? 'animate-spin' : ''} />
-                            <span>{calculating ? (t('compare.calculating') || 'Calculando solver...') : (t('compare.runSolver') || 'Ejecutar Cálculo Inverso')}</span>
-                        </button>
-                    )}
+                    <button
+                        type="button"
+                        onClick={handleCalculate}
+                        disabled={calculating}
+                        data-testid="run-solver-btn"
+                        className="px-4 py-2 bg-[#dc0000] hover:bg-red-700 disabled:bg-zinc-400 text-white font-bold rounded-xl text-xs flex items-center gap-2 transition-colors cursor-pointer self-start sm:self-auto"
+                    >
+                        <RefreshCw size={13} className={calculating ? 'animate-spin' : ''} />
+                        <span>{calculating ? (t('compare.calculating') || 'Calculando solver...') : (t('compare.runSolver') || 'Ejecutar Cálculo Inverso')}</span>
+                    </button>
                 </div>
 
                 {/* Variants Identification Bar */}
@@ -146,23 +186,40 @@ export const CalculationComparisonView: React.FC<CalculationComparisonViewProps>
                     </div>
                 )}
 
-                {/* Incomplete Comparison Notice */}
-                {(!hasEquivalentBreakdown || incompleteComparisonReason) && (
+                {/* Incomplete / Missing Engine Calculation Alert */}
+                {!isComparisonValid && !calculating && (
                     <div className="p-3.5 bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-700 rounded-xl flex items-start gap-2.5">
                         <AlertTriangle size={16} className="text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
-                        <div className="space-y-0.5">
-                            <span className="font-bold text-amber-900 dark:text-amber-200 text-xs">
-                                {t('review.incompleteComparison') || 'Comparación incompleta'}
+                        <div className="space-y-0.5 text-xs">
+                            <span className="font-bold text-amber-900 dark:text-amber-200">
+                                {!hasValidEnginePrice 
+                                    ? 'Cálculo del motor ausente o incompleto' 
+                                    : (!hasEquivalentBreakdown 
+                                        ? (t('review.incompleteComparison') || 'Comparación incompleta') 
+                                        : 'Comparación no válida')}
                             </span>
                             <p className="text-[11px] text-amber-800/90 dark:text-amber-300/90 leading-relaxed">
-                                {incompleteComparisonReason || t('review.incompleteComparisonReason') || 'El desglose de la oferta no permite contrastar magnitudes equivalentes de forma estricta. Verifique si falta desglose de fabricación independiente del transporte.'}
+                                {!hasValidEnginePrice
+                                    ? 'El motor no ha devuelto un resultado de cálculo positivo para esta especificación. El avance a la propuesta de tarifas está bloqueado hasta ejecutar el solver satisfactoriamente.'
+                                    : (incompleteComparisonReason || t('review.incompleteComparisonReason') || 'El desglose de la oferta no permite contrastar magnitudes equivalentes de forma estricta. Verifique si falta desglose de fabricación independiente del transporte.')}
                             </p>
+                        </div>
+                    </div>
+                )}
+
+                {calculationError && (
+                    <div className="p-3.5 bg-red-50 dark:bg-red-950/40 border border-red-300 dark:border-red-700 rounded-xl flex items-start gap-2.5">
+                        <XCircle size={16} className="text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
+                        <div className="space-y-0.5 text-xs">
+                            <span className="font-bold text-red-900 dark:text-red-200">Error en el cálculo del solver</span>
+                            <p className="text-[11px] text-red-800/90 dark:text-red-300/90">{calculationError}</p>
                         </div>
                     </div>
                 )}
 
                 {/* Calculation Cards Grid: Manufacturing vs Manufacturing OR Total vs Total */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    {/* Card 1: Declared Target */}
                     <div className="p-4 rounded-xl bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700/80 space-y-1">
                         <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">
                             {comparisonMode === 'manufacturing'
@@ -170,13 +227,16 @@ export const CalculationComparisonView: React.FC<CalculationComparisonViewProps>
                                 : (t('compare.originalTarget') || 'Precio Total Declarado')}
                         </span>
                         <div className="text-xl font-extrabold text-zinc-900 dark:text-white">
-                            {Number(targetPrice).toFixed(2)} €
+                            {hasValidTarget ? `${resolvedTarget!.toFixed(2)} €` : '—'}
                         </div>
                         <span className="text-[11px] text-zinc-500">
-                            {comparisonMode === 'manufacturing' ? 'Excluye portes y flete' : 'Total oferta sin IVA'}
+                            {hasValidTarget 
+                                ? (comparisonMode === 'manufacturing' ? 'Excluye portes y flete' : 'Total oferta sin IVA')
+                                : 'Sin precio declarado válido'}
                         </span>
                     </div>
 
+                    {/* Card 2: Engine Calculated */}
                     <div className="p-4 rounded-xl bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700/80 space-y-1">
                         <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">
                             {comparisonMode === 'manufacturing'
@@ -184,14 +244,19 @@ export const CalculationComparisonView: React.FC<CalculationComparisonViewProps>
                                 : (t('compare.engineCalculated') || 'Cálculo del Motor PrintPrice')}
                         </span>
                         <div className="text-xl font-extrabold text-zinc-900 dark:text-white">
-                            {isCalculated ? `${Number(predictedPrice).toFixed(2)} €` : '—'}
+                            {hasValidEnginePrice ? `${resolvedEnginePrice!.toFixed(2)} €` : '—'}
                         </div>
-                        <span className="text-[11px] text-zinc-500">Solver determinista BPE</span>
+                        <span className="text-[11px] text-zinc-500">
+                            {calculating 
+                                ? 'Calculando con solver inverso...' 
+                                : (hasValidEnginePrice ? 'Solver determinista BPE' : 'Pendiente de ejecución')}
+                        </span>
                     </div>
 
+                    {/* Card 3: Difference & Residual */}
                     <div className={`p-4 rounded-xl border space-y-1 ${
-                        !hasEquivalentBreakdown
-                            ? 'bg-zinc-100 dark:bg-zinc-800 border-zinc-300 dark:border-zinc-700'
+                        !isComparisonValid
+                            ? 'bg-zinc-100 dark:bg-zinc-800/60 border-zinc-300 dark:border-zinc-700'
                             : isWellFitted 
                                 ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800'
                                 : 'bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800'
@@ -200,25 +265,26 @@ export const CalculationComparisonView: React.FC<CalculationComparisonViewProps>
                             {t('compare.difference') || 'Diferencia / Residual'}
                         </span>
                         <div className="text-xl font-extrabold flex items-center gap-1.5 text-zinc-900 dark:text-white">
-                            <span>{isCalculated ? `${Math.abs(residualAbs).toFixed(2)} €` : '—'}</span>
-                            {isCalculated && (
+                            <span>{isComparisonValid ? `${Math.abs(residualAbs!).toFixed(2)} €` : '—'}</span>
+                            {isComparisonValid && residualPercent !== null && (
                                 <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${
-                                    !hasEquivalentBreakdown
-                                        ? 'bg-zinc-200 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300'
-                                        : isWellFitted 
-                                            ? 'bg-emerald-200 dark:bg-emerald-900 text-emerald-800 dark:text-emerald-200' 
-                                            : 'bg-amber-200 dark:bg-amber-900 text-amber-800 dark:text-amber-200'
+                                    isWellFitted 
+                                        ? 'bg-emerald-200 dark:bg-emerald-900 text-emerald-800 dark:text-emerald-200' 
+                                        : 'bg-amber-200 dark:bg-amber-900 text-amber-800 dark:text-amber-200'
                                 }`}>
                                     {residualPercent >= 0 ? `+${residualPercent.toFixed(1)}%` : `${residualPercent.toFixed(1)}%`}
                                 </span>
                             )}
+                            {!isComparisonValid && (
+                                <span className="text-xs px-2 py-0.5 rounded-full font-bold bg-zinc-200 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-400">
+                                    Sin cálculo
+                                </span>
+                            )}
                         </div>
                         <span className="text-[11px] text-zinc-500">
-                            {!hasEquivalentBreakdown 
+                            {!isComparisonValid 
                                 ? 'Comparación no normalizada' 
-                                : isCalculated 
-                                    ? (isWellFitted ? 'Ajuste calibrado dentro de tolerancia' : 'Ajuste con divergencia para calibrar')
-                                    : 'Pendiente de calcular'}
+                                : (isWellFitted ? 'Ajuste calibrado dentro de tolerancia' : 'Ajuste con divergencia para calibrar')}
                         </span>
                     </div>
                 </div>
@@ -272,8 +338,8 @@ export const CalculationComparisonView: React.FC<CalculationComparisonViewProps>
                 </div>
             </div>
 
-            {/* Bottom Actions */}
-            <div className="flex items-center justify-between pt-2">
+            {/* Bottom Actions with Strict Guardrail */}
+            <div className="flex flex-col sm:flex-row items-end sm:items-center justify-between gap-3 pt-2">
                 <button
                     type="button"
                     onClick={handleBack}
@@ -283,15 +349,29 @@ export const CalculationComparisonView: React.FC<CalculationComparisonViewProps>
                     <span>{t('compare.backToReview') || 'Volver a especificaciones'}</span>
                 </button>
 
-                <button
-                    type="button"
-                    data-testid="proceed-to-accept-btn"
-                    onClick={handleProceed}
-                    className="px-5 py-2.5 rounded-xl font-bold text-xs flex items-center gap-2 transition-all cursor-pointer bg-[#dc0000] hover:bg-red-700 text-white shadow-xs"
-                >
-                    <span>{t('compare.proceedToAccept') || 'Revisar y Aceptar Propuesta de Tarifas →'}</span>
-                    <ArrowRight size={14} />
-                </button>
+                <div className="flex flex-col sm:flex-row items-end sm:items-center gap-2">
+                    {!isComparisonValid && (
+                        <span className="text-[11px] text-amber-600 dark:text-amber-400 font-semibold flex items-center gap-1">
+                            <AlertTriangle size={13} />
+                            <span>Requiere cálculo de motor válido para continuar</span>
+                        </span>
+                    )}
+                    <button
+                        type="button"
+                        data-testid="proceed-to-accept-btn"
+                        disabled={!isComparisonValid || calculating}
+                        onClick={handleProceed}
+                        className={`px-5 py-2.5 rounded-xl font-bold text-xs flex items-center gap-2 transition-all cursor-pointer ${
+                            isComparisonValid && !calculating
+                                ? 'bg-[#dc0000] hover:bg-red-700 text-white shadow-xs'
+                                : 'bg-zinc-200 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-500 cursor-not-allowed shadow-none'
+                        }`}
+                        title={!isComparisonValid ? 'Debe disponer de un cálculo válido del motor antes de avanzar a la propuesta de tarifas.' : undefined}
+                    >
+                        <span>{t('compare.proceedToAccept') || 'Revisar y Aceptar Propuesta de Tarifas →'}</span>
+                        <ArrowRight size={14} />
+                    </button>
+                </div>
             </div>
         </div>
     );

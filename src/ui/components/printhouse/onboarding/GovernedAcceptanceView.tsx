@@ -158,9 +158,6 @@ export const GovernedAcceptanceView: React.FC<GovernedAcceptanceViewProps> = ({
                                                     <div className="font-semibold text-zinc-900 dark:text-white">
                                                         {info.label}
                                                     </div>
-                                                    <span className="text-[10px] text-zinc-400 font-mono">
-                                                        {key}
-                                                    </span>
                                                 </td>
                                                 <td className="p-3 text-zinc-600 dark:text-zinc-400 font-medium">
                                                     {info.unit}
@@ -185,48 +182,48 @@ export const GovernedAcceptanceView: React.FC<GovernedAcceptanceViewProps> = ({
                 </div>
 
                 {/* Governance Invariants Notice */}
-                <div className="p-4 bg-zinc-50 dark:bg-zinc-850 border border-zinc-200 dark:border-zinc-800 rounded-xl space-y-3">
-                    <div className="flex items-center gap-2 font-bold text-zinc-900 dark:text-white text-xs">
+                <div className="p-4 bg-zinc-50 dark:bg-zinc-900/90 border border-zinc-200 dark:border-zinc-800 rounded-xl space-y-3">
+                    <div className="flex items-center gap-2 font-bold text-zinc-900 dark:text-zinc-100 text-xs">
                         <Lock size={14} className="text-[#dc0000]" />
                         <span>{t('accept.governanceNoticeTitle') || 'Garantías Operativas y Límites de Publicación'}</span>
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
-                        <div className="p-2.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 flex items-center gap-2">
+                        <div className="p-2.5 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 flex items-center gap-2 shadow-2xs">
                             <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
                             <div>
-                                <div className="font-bold text-[11px] text-zinc-900 dark:text-white">Activación Comercial Inalterada</div>
-                                <div className="text-[10px] text-zinc-500">Sin permisos implícitos de Marketplace</div>
+                                <div className="font-bold text-[11px] text-zinc-900 dark:text-zinc-100">Activación Comercial Inalterada</div>
+                                <div className="text-[10px] text-zinc-500 dark:text-zinc-400">Sin permisos implícitos de Marketplace</div>
                             </div>
                         </div>
-                        <div className="p-2.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 flex items-center gap-2">
+                        <div className="p-2.5 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 flex items-center gap-2 shadow-2xs">
                             <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
                             <div>
-                                <div className="font-bold text-[11px] text-zinc-900 dark:text-white">Sin Quoting ni Routing Público</div>
-                                <div className="text-[10px] text-zinc-500">Despacho vivo bloqueado</div>
+                                <div className="font-bold text-[11px] text-zinc-900 dark:text-zinc-100">Sin Quoting ni Routing Público</div>
+                                <div className="text-[10px] text-zinc-500 dark:text-zinc-400">Despacho vivo bloqueado</div>
                             </div>
                         </div>
-                        <div className="p-2.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 flex items-center gap-2">
+                        <div className="p-2.5 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 flex items-center gap-2 shadow-2xs">
                             <span className="w-2 h-2 rounded-full bg-blue-500 shrink-0" />
                             <div>
-                                <div className="font-bold text-[11px] text-zinc-900 dark:text-white">Aislamiento Estricto de Tenant</div>
-                                <div className="text-[10px] text-zinc-500">Sin fugas cross-tenant</div>
+                                <div className="font-bold text-[11px] text-zinc-900 dark:text-zinc-100">Aislamiento Estricto de Tenant</div>
+                                <div className="text-[10px] text-zinc-500 dark:text-zinc-400">Sin fugas cross-tenant</div>
                             </div>
                         </div>
-                        <div className="p-2.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 flex items-center gap-2">
+                        <div className="p-2.5 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 flex items-center gap-2 shadow-2xs">
                             <span className="w-2 h-2 rounded-full bg-purple-500 shrink-0" />
                             <div>
-                                <div className="font-bold text-[11px] text-zinc-900 dark:text-white">Revisiones Inmutables</div>
-                                <div className="text-[10px] text-zinc-500">Historial no sobreescribible</div>
+                                <div className="font-bold text-[11px] text-zinc-900 dark:text-zinc-100">Revisiones Inmutables</div>
+                                <div className="text-[10px] text-zinc-500 dark:text-zinc-400">Historial no sobreescribible</div>
                             </div>
                         </div>
                     </div>
 
-                    <ul className="text-[11px] text-zinc-600 dark:text-zinc-400 space-y-1 list-disc list-inside">
-                        <li>La aceptación guarda una nueva revisión inmutable en el historial (<code className="font-mono text-[10px] text-zinc-500">pricing_revisions</code>).</li>
-                        <li><strong>No concede permisos de Marketplace</strong>, quoting comercial ni routing de pedidos como efecto implícito de este recorrido.</li>
+                    <ul className="text-[11px] text-zinc-600 dark:text-zinc-300 space-y-1 list-disc list-inside">
+                        <li>La aceptación guarda una nueva revisión inmutable en el registro de auditoría del nodo.</li>
+                        <li><strong>No concede permisos de Marketplace</strong>, cotización comercial pública ni enrutamiento de pedidos como efecto implícito de este recorrido.</li>
                         <li>Mantiene rigurosamente separados los conceptos y cálculos de fabricación y transporte.</li>
-                        <li>Las sesiones de calibración históricas previas se conservan sin sobreescritura.</li>
+                        <li>Las sesiones de calibración históricas previas se conservan íntegras sin sobreescritura.</li>
                     </ul>
                 </div>
             </div>
@@ -295,7 +292,7 @@ export const GovernedAcceptanceView: React.FC<GovernedAcceptanceViewProps> = ({
                                     {t('accept.modalTitle') || 'Confirmar Aceptación de Tarifas'}
                                 </h3>
                                 <p className="text-xs text-slate-600 dark:text-zinc-400 leading-relaxed">
-                                    {t('accept.modalDescription') || 'Está a punto de aceptar la propuesta de calibración de tarifas para esta familia de productos. Se registrará una revisión inmutable de auditoría en pricing_revisions. La aceptación no activa Marketplace, quoting ni permisos comerciales, los cuales permanecen inalterados.'}
+                                    {t('accept.modalDescription') || 'Esta acción registra de forma inmutable los parámetros industriales de fabricación calculados en el registro de auditoría de este taller. No activa el taller en Marketplace, ni autoriza enrutamiento automático de pedidos, cotización comercial pública ni despacho en vivo, los cuales requieren autorizaciones operativas independientes.'}
                                 </p>
                             </div>
                         </div>

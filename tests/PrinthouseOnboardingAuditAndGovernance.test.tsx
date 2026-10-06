@@ -216,6 +216,76 @@ describe('Printhouse Calibration Onboarding - Audit, Fidelity and Governance Sui
     });
 
     // ─────────────────────────────────────────────────────────────────────────
+    // 3b. Calculation Comparison Rigor & Absence Regression (Blockers 1 & 2)
+    // ─────────────────────────────────────────────────────────────────────────
+    describe('3b. Calculation Comparison Rigor & Negative Regression', () => {
+        it('3b.1 Positive target price with ABSENT engine calculation never shows calibrated status and blocks acceptance advance', () => {
+            renderWithLocale(
+                <CalculationComparisonView
+                    targetPrice={4321}
+                    predictedPrice={null}
+                    enginePrice={null}
+                    comparisonMode="manufacturing"
+                />
+            );
+
+            // Shows incomplete alert
+            expect(screen.getByText(/Cálculo del motor ausente o incompleto/i)).toBeInTheDocument();
+            // Never displays calibrated status
+            expect(screen.queryByText(/Ajuste calibrado dentro de tolerancia/i)).not.toBeInTheDocument();
+            // Displays fallback 'Sin cálculo' badge
+            expect(screen.getByText('Sin cálculo')).toBeInTheDocument();
+            // The proceed button is strictly disabled
+            const proceedBtn = screen.getByTestId('proceed-to-accept-btn');
+            expect(proceedBtn).toBeDisabled();
+        });
+
+        it('3b.2 Positive target price with MALFORMED or ZERO engine calculation is NOT coerced to 0% residual and blocks acceptance', () => {
+            renderWithLocale(
+                <CalculationComparisonView
+                    targetPrice={1792}
+                    enginePrice={0}
+                    predictedPrice={0}
+                    comparisonMode="manufacturing"
+                />
+            );
+
+            expect(screen.getByText(/Cálculo del motor ausente o incompleto/i)).toBeInTheDocument();
+            expect(screen.queryByText(/Ajuste calibrado dentro de tolerancia/i)).not.toBeInTheDocument();
+            const proceedBtn = screen.getByTestId('proceed-to-accept-btn');
+            expect(proceedBtn).toBeDisabled();
+        });
+
+        it('3b.3 Positive target price with solver calculation error renders error banner and blocks acceptance', () => {
+            renderWithLocale(
+                <CalculationComparisonView
+                    targetPrice={1283}
+                    enginePrice={null}
+                    calculationError="Connection timeout to PPOS BPE solver"
+                />
+            );
+
+            expect(screen.getByText(/Connection timeout to PPOS BPE solver/i)).toBeInTheDocument();
+            const proceedBtn = screen.getByTestId('proceed-to-accept-btn');
+            expect(proceedBtn).toBeDisabled();
+        });
+
+        it('3b.4 Valid positive target and valid positive engine calculation within 5% enables acceptance advance', () => {
+            renderWithLocale(
+                <CalculationComparisonView
+                    targetPrice={4321}
+                    enginePrice={4310}
+                    comparisonMode="manufacturing"
+                />
+            );
+
+            expect(screen.getByText(/Ajuste calibrado dentro de tolerancia/i)).toBeInTheDocument();
+            const proceedBtn = screen.getByTestId('proceed-to-accept-btn');
+            expect(proceedBtn).not.toBeDisabled();
+        });
+    });
+
+    // ─────────────────────────────────────────────────────────────────────────
     // 4. Governed Acceptance & Tenant Isolation
     // ─────────────────────────────────────────────────────────────────────────
     describe('4. Governed Acceptance & Tenant Isolation', () => {
@@ -302,6 +372,45 @@ describe('Printhouse Calibration Onboarding - Audit, Fidelity and Governance Sui
             expect(listSpy).toHaveBeenCalledWith('plant-de-01');
             expect(revisions).toHaveLength(1);
             expect(revisions[0].revisionId).toBe('rev-audit-rev-999');
+        });
+
+        it('4.3 GovernedAcceptanceView modal clearly specifies what is saved and excludes database table names and raw parameter keys', () => {
+            renderWithLocale(
+                <GovernedAcceptanceView
+                    family="HARDCOVER"
+                    proposedPatch={{
+                        machine_hourly_rate: 68.5,
+                        plate_cost: 9.8
+                    }}
+                />
+            );
+
+            // Parameter table does NOT expose raw database keys
+            expect(screen.queryByText('machine_hourly_rate')).not.toBeInTheDocument();
+            expect(screen.getByText(/Coste hora máquina impresión offset/i)).toBeInTheDocument();
+
+            // Open acceptance modal
+            const openModalBtn = screen.getByRole('button', { name: /Aceptar y Registrar Propuesta de Tarifas/i });
+            fireEvent.click(openModalBtn);
+
+            // Modal does NOT expose database table name 'pricing_revisions'
+            expect(screen.queryByText(/pricing_revisions/i)).not.toBeInTheDocument();
+
+            // Modal describes what is saved and what requires independent authorization
+            expect(screen.getByText(/parámetros industriales de fabricación/i)).toBeInTheDocument();
+            expect(screen.getByText(/autorizaciones operativas independientes/i)).toBeInTheDocument();
+        });
+
+        it('4.4 ProductFamilyCard renders En configuración instead of ambiguous ACTIVO badge', () => {
+            renderWithLocale(
+                <SimplifiedOnboardingJourney initialStep={1} />
+            );
+
+            // Selected family should show "En configuración"
+            expect(screen.getByText('En configuración')).toBeInTheDocument();
+            // Should NOT have an ambiguous standalone "Activo" or "ACTIVO" badge next to Pending
+            expect(screen.queryByText('Activo')).not.toBeInTheDocument();
+            expect(screen.queryByText('ACTIVO')).not.toBeInTheDocument();
         });
     });
 

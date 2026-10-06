@@ -133,30 +133,27 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
     const [calculatingSolver, setCalculatingSolver] = useState<boolean>(false);
     const [isSubmittingAcceptance, setIsSubmittingAcceptance] = useState<boolean>(false);
 
-    const [comparisonData, setComparisonData] = useState<any>({
-        originalPrice: 0,
-        enginePrice: 0,
-        difference: 0,
-        residual: 0,
-        supportedParameters: [
-            'Formatos y costes fijos/variables para el producto aportado',
-            'Impresión y pliegos interiores declarados',
-            'Montaje de encuadernación declarada'
-        ],
-        coverageGaps: [
-            'No acredita encuadernación Wire-O ni grapado al caballete si no están en esta oferta',
-            'No acredita estampación en caliente ni barniz UV',
-            'No acredita comparación controlada entre cosido y encolado'
-        ]
+    const [comparisonData, setComparisonData] = useState<{
+        originalPrice: number | null;
+        enginePrice: number | null;
+        difference: number | null;
+        residual: number | null;
+        isCalculated: boolean;
+        calculationError?: string | null;
+        supportedParameters: string[];
+        coverageGaps: string[];
+    }>({
+        originalPrice: null,
+        enginePrice: null,
+        difference: null,
+        residual: null,
+        isCalculated: false,
+        calculationError: null,
+        supportedParameters: [],
+        coverageGaps: []
     });
 
-    const [proposedPatch, setProposedPatch] = useState<any>({
-        machine_hourly_rate: 68.50,
-        plate_cost: 9.80,
-        sewing_cost_per_sig: 0.042,
-        casing_in_rate: 0.38,
-        freight_pallet_rate: 162.50
-    });
+    const [proposedPatch, setProposedPatch] = useState<Record<string, any>>({});
 
     const updateFamilyStatus = (id: ProductFamilyId, status: FamilyStatus, quoteCount?: number) => {
         setFamilies(prev => ({
@@ -325,60 +322,119 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
     };
 
     // ── Step 4 Deterministic Inverse Solver Calculation ──
-    const handleRunSolver = async () => {
+    const handleRunSolver = async (specToUse?: ProgressiveSpecState) => {
+        const offer = specToUse || currentOffer;
         setCalculatingSolver(true);
         try {
-            if (printerNodeId && currentOffer.runs.length > 0) {
+            const firstRun = offer.runs && offer.runs.length > 0 ? offer.runs[0] : null;
+            if (!firstRun) {
+                setComparisonData(prev => ({
+                    ...prev,
+                    originalPrice: null,
+                    enginePrice: null,
+                    difference: null,
+                    residual: null,
+                    isCalculated: false,
+                    calculationError: 'No hay variantes de presupuesto configuradas para calcular.'
+                }));
+                return;
+            }
+
+            const targetManufacturing = typeof firstRun.manufacturingPrice === 'number' && firstRun.manufacturingPrice > 0
+                ? firstRun.manufacturingPrice
+                : (typeof firstRun.quotedTotalPrice === 'number' && firstRun.quotedTotalPrice > 0 ? firstRun.quotedTotalPrice : null);
+
+            if (targetManufacturing === null) {
+                setComparisonData(prev => ({
+                    ...prev,
+                    originalPrice: null,
+                    enginePrice: null,
+                    difference: null,
+                    residual: null,
+                    isCalculated: false,
+                    calculationError: 'La variante no especifica un importe positivo válido para contrastar.'
+                }));
+                return;
+            }
+
+            let runResult: any = null;
+            let runError: string | null = null;
+
+            if (printerNodeId) {
                 try {
                     let sess = sessionId ? await printhouseCalibrationApi.getSession(sessionId) : null;
                     if (!sess) {
                         sess = await printhouseCalibrationApi.createSession({
                             printerNodeId,
-                            referenceBookName: currentOffer.productTitle || 'Oferta Calibración',
-                            bookSpec: currentOffer,
-                            targetManufacturingPrice: currentOffer.runs[0]?.manufacturingPrice || currentOffer.runs[0]?.quotedTotalPrice
+                            referenceBookName: offer.productTitle || 'Oferta Calibración',
+                            bookSpec: offer,
+                            targetManufacturingPrice: targetManufacturing
                         });
-                        setSessionId(sess.id);
+                        if (sess?.id) setSessionId(sess.id);
                     }
-                    await printhouseCalibrationApi.markSessionReady(sess.id);
-                    const run = await printhouseCalibrationApi.calculateCalibration(sess.id);
-                    if (run) {
-                        setActiveRun(run);
-                        if (run.proposed_patch_json) {
-                            setProposedPatch(run.proposed_patch_json);
-                        }
+                    if (sess?.id) {
+                        await printhouseCalibrationApi.markSessionReady(sess.id);
+                        runResult = await printhouseCalibrationApi.calculateCalibration(sess.id);
                     }
-                } catch (e) {
-                    // Graceful fallback to deterministically derived values
+                } catch (e: any) {
+                    runError = e.message || 'Error en la llamada al motor de cálculo';
                 }
             }
 
-            const targetManufacturing = currentOffer.runs[0]?.manufacturingPrice;
-            const targetTotal = currentOffer.runs[0]?.quotedTotalPrice || currentOffer.runs[0]?.totalPrice || 0;
-            const baseTarget = targetManufacturing !== undefined ? targetManufacturing : targetTotal;
-            const engineBase = baseTarget > 0 ? (baseTarget * 0.993) : 0;
-            const diff = baseTarget - engineBase;
+            const hasValidEnginePrice = runResult && typeof runResult.enginePriceAfter === 'number' && runResult.enginePriceAfter > 0;
 
-            setComparisonData({
-                originalPrice: baseTarget,
-                enginePrice: engineBase,
-                difference: diff,
-                residual: baseTarget > 0 ? (diff / baseTarget) : 0,
-                supportedParameters: [
-                    `Formato cerrado ${currentOffer.widthMm || 148} × ${currentOffer.heightMm || 210} mm`,
-                    `${currentOffer.pageCount || 64} páginas ${currentOffer.interiorPaper || 'Offset'}`,
-                    `Tintas interior ${currentOffer.interiorColors || '1/1'}`,
-                    `Cubierta ${currentOffer.coverPaper || 'Papel estucado'} ${currentOffer.coverColors || '4/0'}`,
-                    currentOffer.family === 'HARDCOVER' ? `Cartón Graupappe ${currentOffer.boardThicknessMm || 2.0} mm` : 'Encuadernación de taller',
-                    currentOffer.runs.length > 0 ? `Tiradas analizadas: ${currentOffer.runs.map(r => r.quantity).join(', ')} ejemplares` : 'Tirada estándar',
-                    `Entrega en ${currentOffer.deliveryCity || currentOffer.deliveryCountry || 'Alemania'}`
-                ],
-                coverageGaps: [
-                    'No acredita encuadernación Wire-O ni grapado al caballete si no están en esta oferta',
-                    'No acredita acabados de estampación en caliente ni barniz UV sectorizado',
-                    'No acredita comparación controlada entre cosido y encolado sin presupuesto adicional'
-                ]
-            });
+            if (hasValidEnginePrice) {
+                setActiveRun(runResult);
+                const patch = runResult.proposedPatch || runResult.proposed_patch_json || {};
+                setProposedPatch(patch);
+
+                const enginePrice = runResult.enginePriceAfter;
+                const orig = typeof runResult.targetPrice === 'number' && runResult.targetPrice > 0 ? runResult.targetPrice : targetManufacturing;
+                const diff = typeof runResult.absoluteResidual === 'number' ? runResult.absoluteResidual : (orig - enginePrice);
+                const res = typeof runResult.percentResidual === 'number' ? (runResult.percentResidual / 100) : (diff / orig);
+
+                setComparisonData({
+                    originalPrice: orig,
+                    enginePrice: enginePrice,
+                    difference: diff,
+                    residual: res,
+                    isCalculated: true,
+                    calculationError: null,
+                    supportedParameters: [
+                        `Formato cerrado ${offer.widthMm || 148} × ${offer.heightMm || 210} mm`,
+                        `${offer.pageCount || 64} páginas ${offer.interiorPaper || 'Offset'}`,
+                        `Tintas interior ${offer.interiorColors || '1/1'}`,
+                        `Cubierta ${offer.coverPaper || 'Papel estucado'} ${offer.coverColors || '4/0'}`,
+                        offer.family === 'HARDCOVER' ? `Cartón Graupappe ${offer.boardThicknessMm || 2.0} mm` : 'Encuadernación de taller',
+                        offer.runs.length > 0 ? `Tiradas analizadas: ${offer.runs.map(r => r.quantity).join(', ')} ejemplares` : 'Tirada estándar',
+                        `Entrega en ${offer.deliveryCity || offer.deliveryCountry || 'Alemania'}`
+                    ],
+                    coverageGaps: [
+                        'No acredita encuadernación Wire-O ni grapado al caballete si no están en esta oferta',
+                        'No acredita acabados de estampación en caliente ni barniz UV sectorizado',
+                        'No acredita comparación controlada entre cosido y encolado sin presupuesto adicional'
+                    ]
+                });
+            } else {
+                // Strict: NO silent fallback, NO 0.993 artificial match, NO fake zeros!
+                setActiveRun(null);
+                setProposedPatch({});
+                setComparisonData({
+                    originalPrice: targetManufacturing,
+                    enginePrice: null,
+                    difference: null,
+                    residual: null,
+                    isCalculated: false,
+                    calculationError: runError || (printerNodeId ? 'El motor de cálculo no devolvió un resultado numérico positivo.' : 'Pendiente de cálculo por el motor PrintPrice OS.'),
+                    supportedParameters: [
+                        `Formato cerrado ${offer.widthMm || 148} × ${offer.heightMm || 210} mm`,
+                        `${offer.pageCount || 64} páginas ${offer.interiorPaper || 'Offset'}`
+                    ],
+                    coverageGaps: [
+                        'Cálculo pendiente de respuesta válida del motor de cálculo'
+                    ]
+                });
+            }
         } finally {
             setCalculatingSolver(false);
         }
@@ -447,6 +503,19 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
                             </button>
                         );
                     })}
+                </div>
+                {/* Mobile Step Identifier */}
+                <div className="md:hidden mt-2 pt-2 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-between text-xs px-1">
+                    <span className="font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-[#dc0000] shrink-0" />
+                        <span>Paso {currentStep} de 5: {
+                            currentStep === 1 ? (t('wizard.step1') || 'Qué productos fabricas') :
+                            currentStep === 2 ? (t('wizard.step2') || 'Añadir presupuestos') :
+                            currentStep === 3 ? (t('wizard.step3') || 'Revisar especificaciones') :
+                            currentStep === 4 ? (t('wizard.step4') || 'Comparar cálculos') :
+                            (t('wizard.step5') || 'Aceptar propuesta')
+                        }</span>
+                    </span>
                 </div>
             </div>
 
@@ -530,30 +599,30 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
                         </div>
 
                         {/* Dual Entry Tabs */}
-                        <div className="flex items-center p-1 bg-zinc-100 dark:bg-zinc-800 rounded-xl border border-zinc-200 dark:border-zinc-700 self-start sm:self-center">
+                        <div className="grid grid-cols-2 sm:flex items-center p-1 bg-zinc-100 dark:bg-zinc-800 rounded-xl border border-zinc-200 dark:border-zinc-700 w-full sm:w-auto">
                             <button
                                 type="button"
                                 onClick={() => setEntryMode('UPLOAD_PDF')}
-                                className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+                                className={`px-2.5 sm:px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 sm:gap-2 cursor-pointer ${
                                     entryMode === 'UPLOAD_PDF'
                                         ? 'bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white shadow-xs'
                                         : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'
                                 }`}
                             >
-                                <Upload size={14} className="text-[#dc0000]" />
-                                <span>{t('entry.tabUploadPdf') || 'Subir presupuesto PDF'}</span>
+                                <Upload size={14} className="text-[#dc0000] shrink-0" />
+                                <span className="truncate">{t('entry.tabUploadPdf') || 'Subir presupuesto PDF'}</span>
                             </button>
                             <button
                                 type="button"
                                 onClick={() => setEntryMode('MANUAL_FORM')}
-                                className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+                                className={`px-2.5 sm:px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 sm:gap-2 cursor-pointer ${
                                     entryMode === 'MANUAL_FORM'
                                         ? 'bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white shadow-xs'
                                         : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'
                                 }`}
                             >
-                                <FileText size={14} className="text-[#dc0000]" />
-                                <span>{t('entry.tabManualOffer') || 'Introducir oferta manualmente'}</span>
+                                <FileText size={14} className="text-[#dc0000] shrink-0" />
+                                <span className="truncate">{t('entry.tabManualOffer') || 'Introducir oferta manualmente'}</span>
                             </button>
                         </div>
                     </div>
@@ -662,11 +731,12 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
                     <div className="flex items-center justify-between">
                         <button
                             type="button"
+                            data-testid="back-to-step2-btn"
                             onClick={() => setCurrentStep(2)}
                             className="px-3 py-1.5 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-200 rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer"
                         >
                             <ArrowLeft size={14} />
-                            <span>{t('entry.tabManualOffer') || 'Volver a añadir presupuestos'}</span>
+                            <span>{t('wizard.backToStep2') || 'Volver a añadir presupuestos'}</span>
                         </button>
                     </div>
 
@@ -678,7 +748,12 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
                         }}
                         onApplyComputedUnit={handleApplyComputedUnit}
                         onConfirmBinding={handleConfirmBindingResolution}
-                        onProceedToCalculation={() => setCurrentStep(4)}
+                        onProceedToCalculation={() => {
+                            setCurrentStep(4);
+                            if (!comparisonData.isCalculated) {
+                                handleRunSolver(currentOffer);
+                            }
+                        }}
                     />
                 </div>
             )}
@@ -694,7 +769,9 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
                         residual={comparisonData.residual}
                         supportedParameters={comparisonData.supportedParameters}
                         coverageGaps={comparisonData.coverageGaps}
-                        onRunSolver={handleRunSolver}
+                        isCalculated={comparisonData.isCalculated}
+                        calculationError={comparisonData.calculationError}
+                        onRunSolver={() => handleRunSolver(currentOffer)}
                         isCalculating={calculatingSolver}
                         onProceedToAcceptance={() => setCurrentStep(5)}
                         onBackToReview={() => setCurrentStep(3)}
@@ -710,6 +787,7 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
                         printerNodeName={printerNodeName}
                         isAccepted={families[selectedFamilyId].status === 'DATA_VALIDATED'}
                         proposedPatch={proposedPatch}
+                        activeRun={activeRun}
                         onAcceptProposal={handleAcceptProposal}
                         onBackToCompare={() => setCurrentStep(4)}
                     />

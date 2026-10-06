@@ -145,12 +145,11 @@ export const ProductFamilyCard: React.FC<ProductFamilyCardProps> = ({
                     </div>
                 </div>
 
-                {/* Title & Description */}
                 <h3 className="text-base font-bold text-zinc-900 dark:text-white flex items-center gap-1.5 mb-1">
                     <span>{title}</span>
                     {isSelected && (
-                        <span className="inline-flex items-center text-[10px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-[#dc0000] text-white">
-                            {t('family.activeLabel') || 'Activo'}
+                        <span className="inline-flex items-center text-[10px] font-semibold px-2 py-0.5 rounded-md bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700">
+                            {t('family.activeLabel') || 'En configuración'}
                         </span>
                     )}
                 </h3>
