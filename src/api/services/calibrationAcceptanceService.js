@@ -108,10 +108,80 @@ function isComplexSpec(specOrEvidence) {
     return false;
 }
 
+/**
+ * Resolves the canonical print run quantity from a book specification object.
+ * Canonical contract in bookSpec is `copies` (positive integer).
+ * Supports documented backwards compatibility with `quantity`.
+ * Strictly rejects missing, invalid (<=0, NaN, non-integer) or contradictory values.
+ * Never defaults an absent run quantity to 1.
+ *
+ * @param {Object} spec - Book specification object
+ * @returns {number} Strictly validated positive integer run quantity
+ * @throws {Error} If quantity is missing, non-positive, non-integer, or contradictory
+ */
+function resolveCanonicalRunQuantity(spec) {
+    if (!spec || typeof spec !== 'object') {
+        const err = new Error('MISSING_OR_INVALID_SPEC_QUANTITY');
+        err.code = 'MISSING_OR_INVALID_SPEC_QUANTITY';
+        err.statusCode = 422;
+        err.details = 'Book specification is absent or invalid. Run quantity cannot be resolved.';
+        throw err;
+    }
+
+    const hasCopies = spec.copies !== undefined && spec.copies !== null && spec.copies !== '';
+    const hasQuantity = spec.quantity !== undefined && spec.quantity !== null && spec.quantity !== '';
+
+    if (!hasCopies && !hasQuantity) {
+        const err = new Error('MISSING_SPEC_QUANTITY');
+        err.code = 'MISSING_SPEC_QUANTITY';
+        err.statusCode = 422;
+        err.details = 'Book specification is missing run quantity (both copies and quantity are absent). Acceptance blocked.';
+        throw err;
+    }
+
+    let parsedCopies = null;
+    if (hasCopies) {
+        parsedCopies = Number(spec.copies);
+        if (!Number.isInteger(parsedCopies) || parsedCopies <= 0) {
+            const err = new Error('INVALID_SPEC_COPIES');
+            err.code = 'INVALID_SPEC_COPIES';
+            err.statusCode = 422;
+            err.details = `Invalid bookSpec.copies: ${spec.copies}. Must be a strictly positive integer.`;
+            throw err;
+        }
+    }
+
+    let parsedQuantity = null;
+    if (hasQuantity) {
+        parsedQuantity = Number(spec.quantity);
+        if (!Number.isInteger(parsedQuantity) || parsedQuantity <= 0) {
+            const err = new Error('INVALID_SPEC_QUANTITY');
+            err.code = 'INVALID_SPEC_QUANTITY';
+            err.statusCode = 422;
+            err.details = `Invalid bookSpec.quantity: ${spec.quantity}. Must be a strictly positive integer.`;
+            throw err;
+        }
+    }
+
+    if (hasCopies && hasQuantity && parsedCopies !== parsedQuantity) {
+        const err = new Error('CONTRADICTORY_SPEC_QUANTITY');
+        err.code = 'CONTRADICTORY_SPEC_QUANTITY';
+        err.statusCode = 422;
+        err.details = `Contradictory bookSpec run quantities: copies=${parsedCopies} vs quantity=${parsedQuantity}. Acceptance blocked.`;
+        throw err;
+    }
+
+    return parsedCopies !== null ? parsedCopies : parsedQuantity;
+}
+
 class CalibrationAcceptanceService {
 
     isComplexSpec(specOrEvidence) {
         return isComplexSpec(specOrEvidence);
+    }
+
+    resolveCanonicalRunQuantity(spec) {
+        return resolveCanonicalRunQuantity(spec);
     }
 
     /**
@@ -366,7 +436,10 @@ class CalibrationAcceptanceService {
                 shipping_days: printerNode.delivery_time || 2
             };
 
+            // Requirement 1 & 2: Ensure principal evaluation and curve governance evaluation use the identical run quantity
             let primarySpec = { ...bookSpec };
+            let referenceQuantity;
+
             if (session.multi_targets_json) {
                 try {
                     const parsedTargets = typeof session.multi_targets_json === 'string'
@@ -374,14 +447,22 @@ class CalibrationAcceptanceService {
                         : session.multi_targets_json;
                     if (Array.isArray(parsedTargets) && parsedTargets.length > 0) {
                         const sorted = [...parsedTargets].sort((a, b) => Number(a.quantity) - Number(b.quantity));
-                        const refQ = Number(sorted[0].quantity);
-                        primarySpec.quantity = refQ;
-                        primarySpec.copies = refQ;
+                        referenceQuantity = Number(sorted[0].quantity);
                     }
                 } catch (e) {
-                    // Fallback to bookSpec
+                    referenceQuantity = resolveCanonicalRunQuantity(bookSpec);
                 }
+            } else if (Array.isArray(options.calibrationTargets) && options.calibrationTargets.length > 0) {
+                const sorted = [...options.calibrationTargets].sort((a, b) => Number(a.quantity) - Number(b.quantity));
+                referenceQuantity = Number(sorted[0].quantity);
             }
+
+            if (referenceQuantity === undefined || referenceQuantity === null || !Number.isInteger(referenceQuantity) || referenceQuantity <= 0) {
+                referenceQuantity = resolveCanonicalRunQuantity(bookSpec);
+            }
+
+            primarySpec.quantity = referenceQuantity;
+            primarySpec.copies = referenceQuantity;
 
             const forwardResult = adapter.evaluateForwardPrice(primarySpec, resultingRates, {}, nodeConfig);
             if (!forwardResult || forwardResult.predictedManufacturingPrice === null || forwardResult.predictedManufacturingPrice === undefined) {
@@ -641,19 +722,37 @@ class CalibrationAcceptanceService {
             );
 
             if (curveEvaluation.status === 'REJECTED' && !options.skipCurveValidation) {
-                const err = new Error('GOVERNANCE_CURVE_REJECTED');
+                const evaluatedQuantities = (curveEvaluation.pointResults || []).map(p => Number(p.quantity));
+                const reasons = curveEvaluation.reasons || [];
+                const err = new Error(`GOVERNANCE_CURVE_REJECTED: [${reasons.join(', ')}] (quantities: [${evaluatedQuantities.join(', ')}])`);
                 err.code = 'GOVERNANCE_CURVE_REJECTED';
                 err.statusCode = 422;
-                err.details = curveEvaluation.reasons;
+                const details = [...reasons];
+                details.reasons = reasons;
+                details.evaluatedQuantities = evaluatedQuantities;
+                details.pointCount = curveEvaluation.curveMetrics?.pointCount || evaluatedQuantities.length;
+                details.message = `Governance curve rejected: [${reasons.join(', ')}] for evaluated quantities: [${evaluatedQuantities.join(', ')}]`;
+                err.details = details;
+                err.reasons = reasons;
+                err.evaluatedQuantities = evaluatedQuantities;
                 err.curveEvaluation = curveEvaluation;
                 throw err;
             }
 
             if (curveEvaluation.status === 'REQUIRES_REVIEW' && !options.allowReviewOverride && !options.skipCurveValidation) {
-                const err = new Error('GOVERNANCE_CURVE_REQUIRES_REVIEW');
+                const evaluatedQuantities = (curveEvaluation.pointResults || []).map(p => Number(p.quantity));
+                const reasons = curveEvaluation.reasons || [];
+                const err = new Error(`GOVERNANCE_CURVE_REQUIRES_REVIEW: [${reasons.join(', ')}] (quantities: [${evaluatedQuantities.join(', ')}])`);
                 err.code = 'GOVERNANCE_CURVE_REQUIRES_REVIEW';
                 err.statusCode = 422;
-                err.details = curveEvaluation.reasons;
+                const details = [...reasons];
+                details.reasons = reasons;
+                details.evaluatedQuantities = evaluatedQuantities;
+                details.pointCount = curveEvaluation.curveMetrics?.pointCount || evaluatedQuantities.length;
+                details.message = `Governance curve requires review: [${reasons.join(', ')}] for evaluated quantities: [${evaluatedQuantities.join(', ')}]`;
+                err.details = details;
+                err.reasons = reasons;
+                err.evaluatedQuantities = evaluatedQuantities;
                 err.curveEvaluation = curveEvaluation;
                 throw err;
             }
@@ -1006,8 +1105,9 @@ class CalibrationAcceptanceService {
         } else if (Array.isArray(options.calibrationTargets)) {
             targets = options.calibrationTargets;
         } else if (session.target_manufacturing_price) {
+            const canonicalRunQ = resolveCanonicalRunQuantity(bookSpec);
             targets = [{
-                quantity: Number(bookSpec?.quantity || 1),
+                quantity: canonicalRunQ,
                 targetManufacturingPrice: Number(session.target_manufacturing_price),
                 currency: session.currency || 'EUR',
                 targetBasis: 'MANUFACTURING_PRICE',

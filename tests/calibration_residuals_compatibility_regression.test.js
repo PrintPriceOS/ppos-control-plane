@@ -711,4 +711,240 @@ describe('Calibration Residuals & Compatibility Regressions', () => {
             expect(nodeUpdates).toHaveLength(0);
         });
     });
+
+    // ── GROUP 5: Resolución de tirada canónica y paridad en evaluación de gobernanza de curvas ──
+    describe('5. Resolución de tirada canónica (copies) y paridad en gobernanza de curva', () => {
+        test('5.1 Servicio real con bookSpec.copies=1500 sin quantity envía tirada 1500 a evaluación principal y a gobernanza de curva (sin mockear evaluateCurveAcceptance)', async () => {
+            const capturedSpecs = [];
+            const forwardPriceSpy = vi.fn().mockImplementation((spec) => {
+                capturedSpecs.push({ ...spec });
+                return { predictedManufacturingPrice: 1792.05 };
+            });
+
+            setupMocks({
+                sessionOverrides: {
+                    book_spec_json: JSON.stringify({
+                        copies: 1500,
+                        interior_pages: 120,
+                        interior_print: '4/4',
+                        cover_print: '4/0',
+                        binding_method: 'perfect bound'
+                    }),
+                    target_manufacturing_price: 1792.00,
+                    multi_targets_json: null
+                },
+                runOverrides: {
+                    target_price: 1792.00,
+                    absolute_residual: 0.05,
+                    percent_residual: 0.000027899,
+                    point_results_json: null
+                },
+                forwardPriceMock: forwardPriceSpy
+            });
+
+            const result = await calibrationAcceptanceService.acceptCalibrationRun(
+                'tenant-1',
+                'sess-100',
+                'run-100',
+                { id: 'usr-1', email: 'op@test.pro', role: 'ADMIN' },
+                { absoluteTolerance: 0.50, percentTolerance: 0.01 }
+            );
+
+            expect(result.ok).toBe(true);
+            expect(result.status).toBe('ACCEPTED');
+
+            // Assert that adapter.evaluateForwardPrice was called at least twice (principal evaluation + curve evaluation)
+            expect(forwardPriceSpy).toHaveBeenCalled();
+            expect(capturedSpecs.length).toBeGreaterThanOrEqual(2);
+
+            // Verify EVERY call received copies: 1500 and quantity: 1500 (NEVER default to 1)
+            for (const spec of capturedSpecs) {
+                expect(spec.copies).toBe(1500);
+                expect(spec.quantity).toBe(1500);
+                expect(spec.copies).not.toBe(1);
+                expect(spec.quantity).not.toBe(1);
+            }
+
+            expect(mockConnection.commit).toHaveBeenCalled();
+            expect(mockConnection.rollback).not.toHaveBeenCalled();
+        });
+
+        test('5.2 Rechaza bookSpec cuando copies y quantity están ausentes (MISSING_SPEC_QUANTITY), sin sustituir por 1', async () => {
+            setupMocks({
+                sessionOverrides: {
+                    book_spec_json: JSON.stringify({
+                        interior_pages: 120,
+                        interior_print: '4/4',
+                        cover_print: '4/0',
+                        binding_method: 'perfect bound'
+                    }),
+                    target_manufacturing_price: 1792.00,
+                    multi_targets_json: null
+                },
+                runOverrides: {
+                    target_price: 1792.00,
+                    absolute_residual: 0.05
+                },
+                forwardPriceMock: () => ({ predictedManufacturingPrice: 1792.05 })
+            });
+
+            let error = null;
+            try {
+                await calibrationAcceptanceService.acceptCalibrationRun(
+                    'tenant-1',
+                    'sess-100',
+                    'run-100',
+                    { id: 'usr-1', email: 'op@test.pro', role: 'ADMIN' }
+                );
+            } catch (err) {
+                error = err;
+            }
+
+            expect(error).not.toBeNull();
+            expect(error.code).toBe('MISSING_SPEC_QUANTITY');
+            expect(error.statusCode).toBe(422);
+            expect(mockConnection.rollback).toHaveBeenCalled();
+            expect(mockConnection.commit).not.toHaveBeenCalled();
+        });
+
+        test('5.3 Rechaza bookSpec con copies y quantity contradictorios (CONTRADICTORY_SPEC_QUANTITY)', async () => {
+            setupMocks({
+                sessionOverrides: {
+                    book_spec_json: JSON.stringify({
+                        copies: 1500,
+                        quantity: 1000,
+                        interior_pages: 120,
+                        binding_method: 'perfect bound'
+                    }),
+                    target_manufacturing_price: 1792.00,
+                    multi_targets_json: null
+                },
+                runOverrides: {
+                    target_price: 1792.00,
+                    absolute_residual: 0.05
+                },
+                forwardPriceMock: () => ({ predictedManufacturingPrice: 1792.05 })
+            });
+
+            let error = null;
+            try {
+                await calibrationAcceptanceService.acceptCalibrationRun(
+                    'tenant-1',
+                    'sess-100',
+                    'run-100',
+                    { id: 'usr-1', email: 'op@test.pro', role: 'ADMIN' }
+                );
+            } catch (err) {
+                error = err;
+            }
+
+            expect(error).not.toBeNull();
+            expect(error.code).toBe('CONTRADICTORY_SPEC_QUANTITY');
+            expect(error.statusCode).toBe(422);
+            expect(mockConnection.rollback).toHaveBeenCalled();
+            expect(mockConnection.commit).not.toHaveBeenCalled();
+        });
+
+        test('5.4 Rechaza bookSpec con copies inválidos o no enteros', async () => {
+            setupMocks({
+                sessionOverrides: {
+                    book_spec_json: JSON.stringify({
+                        copies: 0,
+                        interior_pages: 120,
+                        binding_method: 'perfect bound'
+                    }),
+                    target_manufacturing_price: 1792.00
+                },
+                runOverrides: {
+                    target_price: 1792.00,
+                    absolute_residual: 0.05
+                },
+                forwardPriceMock: () => ({ predictedManufacturingPrice: 1792.05 })
+            });
+
+            await expect(calibrationAcceptanceService.acceptCalibrationRun(
+                'tenant-1',
+                'sess-100',
+                'run-100',
+                { id: 'usr-1', email: 'op@test.pro', role: 'ADMIN' }
+            )).rejects.toThrow('INVALID_SPEC_COPIES');
+
+            expect(mockConnection.rollback).toHaveBeenCalled();
+        });
+
+        test('5.5 Diagnóstico de rechazo de curva incorpora razones y cantidades evaluadas sin exponer secretos', async () => {
+            // Predicción fuera de tolerancia (pred 50 vs target 1792) genera GOVERNANCE_CURVE_REJECTED
+            setupMocks({
+                sessionOverrides: {
+                    book_spec_json: JSON.stringify({
+                        copies: 1500,
+                        interior_pages: 120,
+                        interior_print: '4/4',
+                        cover_print: '4/0',
+                        binding_method: 'perfect bound'
+                    }),
+                    target_manufacturing_price: 1792.00,
+                    multi_targets_json: null
+                },
+                runOverrides: {
+                    target_price: 1792.00,
+                    absolute_residual: 1742.0,
+                    percent_residual: Number(((1742.0 / 1792.0) * 100).toFixed(4))
+                },
+                forwardPriceMock: () => ({ predictedManufacturingPrice: 50.00 })
+            });
+
+            let error = null;
+            try {
+                await calibrationAcceptanceService.acceptCalibrationRun(
+                    'tenant-1',
+                    'sess-100',
+                    'run-100',
+                    { id: 'usr-1', email: 'op@test.pro', role: 'ADMIN' },
+                    { absoluteTolerance: 0.50, percentTolerance: 0.01 }
+                );
+            } catch (err) {
+                error = err;
+            }
+
+            expect(error).not.toBeNull();
+            expect(error.code).toBe('GOVERNANCE_CURVE_REJECTED');
+            expect(error.statusCode).toBe(422);
+
+            // Rejection message and details include reasons and evaluated quantities
+            expect(error.message).toContain('GOVERNANCE_CURVE_REJECTED');
+            expect(error.message).toContain('POINT_OUT_OF_TOLERANCE');
+            expect(error.message).toContain('1500');
+
+            expect(error.reasons).toBeDefined();
+            expect(error.reasons).toContain('POINT_OUT_OF_TOLERANCE');
+            expect(error.evaluatedQuantities).toBeDefined();
+            expect(error.evaluatedQuantities).toEqual([1500]);
+
+            // No sensitive information leaked in diagnostic message or details
+            const diagStr = JSON.stringify(error.message) + JSON.stringify(error.details);
+            expect(diagStr).not.toContain('mysql');
+            expect(diagStr).not.toContain('password');
+            expect(diagStr).not.toContain('secret');
+            expect(diagStr).not.toContain('token');
+
+            expect(mockConnection.rollback).toHaveBeenCalled();
+            expect(mockConnection.commit).not.toHaveBeenCalled();
+        });
+
+        test('5.6 resolveCanonicalRunQuantity valida contrato unitariamente', () => {
+            expect(calibrationAcceptanceService.resolveCanonicalRunQuantity({ copies: 1500 })).toBe(1500);
+            expect(calibrationAcceptanceService.resolveCanonicalRunQuantity({ quantity: 1500 })).toBe(1500);
+            expect(calibrationAcceptanceService.resolveCanonicalRunQuantity({ copies: 1500, quantity: 1500 })).toBe(1500);
+            expect(calibrationAcceptanceService.resolveCanonicalRunQuantity({ copies: '1500' })).toBe(1500);
+
+            expect(() => calibrationAcceptanceService.resolveCanonicalRunQuantity({})).toThrow('MISSING_SPEC_QUANTITY');
+            expect(() => calibrationAcceptanceService.resolveCanonicalRunQuantity(null)).toThrow('MISSING_OR_INVALID_SPEC_QUANTITY');
+            expect(() => calibrationAcceptanceService.resolveCanonicalRunQuantity({ copies: 0 })).toThrow('INVALID_SPEC_COPIES');
+            expect(() => calibrationAcceptanceService.resolveCanonicalRunQuantity({ copies: -5 })).toThrow('INVALID_SPEC_COPIES');
+            expect(() => calibrationAcceptanceService.resolveCanonicalRunQuantity({ copies: 12.5 })).toThrow('INVALID_SPEC_COPIES');
+            expect(() => calibrationAcceptanceService.resolveCanonicalRunQuantity({ quantity: 'abc' })).toThrow('INVALID_SPEC_QUANTITY');
+            expect(() => calibrationAcceptanceService.resolveCanonicalRunQuantity({ copies: 1500, quantity: 500 })).toThrow('CONTRADICTORY_SPEC_QUANTITY');
+        });
+    });
 });
