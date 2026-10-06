@@ -161,9 +161,60 @@ function normalizeSha256Hex(checksum) {
 }
 
 /**
+ * Generates sanitized diagnostic metadata for invalid checksum inputs.
+ * NEVER echoes or inspects substrings of the input value to prevent secret leakage.
+ * Displays exclusively:
+ * - origen: stored o computed
+ * - tipo recibido
+ * - longitud (si es string)
+ * - motivo del rechazo
+ *
+ * @param {'stored'|'computed'} origin
+ * @param {any} val
+ * @returns {string}
+ */
+function describeInvalidChecksum(origin, val) {
+    const valType = val === null ? 'null' : typeof val;
+    if (valType !== 'string') {
+        return `[origen: ${origin}] [tipo: ${valType}] [motivo: Valor ausente o tipo no string]`;
+    }
+
+    const len = val.length;
+    const trimmed = val.trim();
+    if (trimmed.length === 0) {
+        return `[origen: ${origin}] [tipo: string] [longitud: ${len}] [motivo: Cadena vacía o solo espacios en blanco]`;
+    }
+
+    let reason = 'Formato SHA-256 no conforme';
+    if (/^sha256:/i.test(trimmed)) {
+        const withoutPrefix = trimmed.replace(/^sha256:/i, '');
+        if (withoutPrefix.length !== 64) {
+            reason = `Longitud inválida tras prefijo sha256: (esperado 64 hex chars, recibido ${withoutPrefix.length})`;
+        } else if (!/^[0-9a-fA-F]{64}$/.test(withoutPrefix)) {
+            reason = 'Caracteres no hexadecimales tras prefijo sha256:';
+        } else {
+            reason = 'Prefijo malformado';
+        }
+    } else {
+        if (trimmed.length !== 64) {
+            reason = `Longitud inválida para digest hexadecimal puro (esperado 64, recibido ${trimmed.length})`;
+        } else if (!/^[0-9a-fA-F]{64}$/.test(trimmed)) {
+            reason = 'Caracteres no hexadecimales en digest';
+        }
+    }
+
+    return `[origen: ${origin}] [tipo: string] [longitud: ${len}] [motivo: ${reason}]`;
+}
+
+/**
  * Compares stored and computed checksums with strict equality of normalized digests.
- * In case of failure, provides detailed diagnostic containing only the stored and computed
- * checksums (no rates, credentials, tokens or personal data).
+ * Displays normalized digests ONLY when they have passed strict SHA-256 validation.
+ * In case of failure, provides detailed diagnostic containing exclusively:
+ * - origin (stored / computed)
+ * - received type
+ * - length (if string)
+ * - rejection reason
+ * NEVER echoes raw rates, credentials, tokens, or personal data.
  *
  * @param {any} stored
  * @param {any} computed
@@ -178,7 +229,7 @@ function verifyRatesChecksumIntegrity(stored, computed) {
             valid: false,
             storedNormalized: null,
             computedNormalized: computedNorm,
-            error: `Stored rates_checksum has invalid format or length (got: ${typeof stored === 'string' ? JSON.stringify(stored.length > 80 ? stored.slice(0, 80) + '...' : stored) : typeof stored})`
+            error: describeInvalidChecksum('stored', stored)
         };
     }
 
@@ -187,7 +238,7 @@ function verifyRatesChecksumIntegrity(stored, computed) {
             valid: false,
             storedNormalized: storedNorm,
             computedNormalized: null,
-            error: `Computed rates checksum has invalid format or length (got: ${typeof computed === 'string' ? JSON.stringify(computed.length > 80 ? computed.slice(0, 80) + '...' : computed) : typeof computed})`
+            error: describeInvalidChecksum('computed', computed)
         };
     }
 
@@ -214,6 +265,7 @@ function verifyRatesChecksumIntegrity(stored, computed) {
  * 2. Formato sha256:<hash> equivalente (pure vs sha256: prefix, both prefixed, prefix casing).
  * 3. Hash válido pero diferente (rejects mismatch, sanitizes output without rates/secrets).
  * 4. Formatos inválidos y valores ausentes (null, undefined, non-strings, lengths != 64, non-hex chars, bad prefixes).
+ * 5. Sanitización estricta de diagnósticos: verifica que tokens, contraseñas y JSON ficticios nunca aparezcan en el error.
  */
 function runChecksumIntegrityRegressions() {
     console.log('[REGRESSION] Running Checksum Integrity Normalization Regressions...');
@@ -293,7 +345,41 @@ function runChecksumIntegrityRegressions() {
         }
     }
 
-    console.log('[REGRESSION] All 4 Checksum Integrity Regression Suites Passed Successfully.');
+    // 5. Cero filtración de datos sensibles en diagnósticos de formato inválido
+    const sensitiveInputs = [
+        { label: 'fake Bearer token', val: 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.doNotLeakThisSecretSignature', leakSubstrings: ['Bearer', 'eyJ', 'doNotLeakThisSecretSignature'] },
+        { label: 'fake password credential', val: 'SuperSecretAdminPassword123!#%&_database_root_credential', leakSubstrings: ['SuperSecretAdminPassword', 'database_root', 'credential'] },
+        { label: 'fake JSON rates payload', val: JSON.stringify({ secretApiKey: 'sk-live-1234567890abcdef', rates: { price: 9999, discount: 'secret' } }), leakSubstrings: ['secretApiKey', 'sk-live', 'price', '9999'] },
+        { label: 'fake prefixed token', val: 'sha256:Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.invalidTokenWithSensitiveContent', leakSubstrings: ['Bearer', 'invalidTokenWithSensitiveContent'] }
+    ];
+
+    for (const item of sensitiveInputs) {
+        // Test as stored
+        const resStored = verifyRatesChecksumIntegrity(item.val, hashA);
+        if (resStored.valid !== false) throw new Error(`Expected invalid for ${item.label} as stored`);
+        if (!resStored.error.includes('[origen: stored]') || !resStored.error.includes('[tipo: string]') || !resStored.error.includes(`[longitud: ${item.val.length}]`)) {
+            throw new Error(`Diagnostic metadata missing origin, type, or length for ${item.label}`);
+        }
+        for (const sub of item.leakSubstrings) {
+            if (resStored.error.includes(sub)) {
+                throw new Error(`LEAK DETECTED: diagnostic error for ${item.label} exposed sensitive substring "${sub}"`);
+            }
+        }
+
+        // Test as computed
+        const resComputed = verifyRatesChecksumIntegrity(hashA, item.val);
+        if (resComputed.valid !== false) throw new Error(`Expected invalid for ${item.label} as computed`);
+        if (!resComputed.error.includes('[origen: computed]') || !resComputed.error.includes('[tipo: string]') || !resComputed.error.includes(`[longitud: ${item.val.length}]`)) {
+            throw new Error(`Diagnostic metadata missing origin, type, or length for ${item.label}`);
+        }
+        for (const sub of item.leakSubstrings) {
+            if (resComputed.error.includes(sub)) {
+                throw new Error(`LEAK DETECTED: diagnostic error for ${item.label} exposed sensitive substring "${sub}"`);
+            }
+        }
+    }
+
+    console.log('[REGRESSION] All 5 Checksum Integrity Regression Suites Passed Successfully (Zero Leakage Verified).');
 }
 
 // ── 3. CANONICAL INDUSTRIAL RATES FIXTURE & CONSUMED KEYS DOCUMENTATION ──
@@ -929,7 +1015,9 @@ async function runConnectedSuite() {
         const baselineIntegrity = verifyRatesChecksumIntegrity(baselineChecksum, INITIAL_RATES_CHECKSUM);
         assert(
             baselineIntegrity.valid === true,
-            `Baseline rates strictly match initial valid rates fixture (stored: "${baselineIntegrity.storedNormalized}", expected: "${baselineIntegrity.computedNormalized}")`
+            baselineIntegrity.valid
+                ? `Baseline rates strictly match initial valid rates fixture (stored: "${baselineIntegrity.storedNormalized}", expected: "${baselineIntegrity.computedNormalized}")`
+                : `Baseline rates checksum verification failed: ${baselineIntegrity.error}`
         );
 
         // ── STEP 3: CREATE CALIBRATION SESSION ──
@@ -1081,7 +1169,9 @@ async function runConnectedSuite() {
         const postCrossIntegrity = verifyRatesChecksumIntegrity(postCrossChecksum, INITIAL_RATES_CHECKSUM);
         assert(
             postCrossIntegrity.valid === true,
-            `Printer node rates strictly unchanged and identical to initial baseline after cross-tenant attempt (stored: "${postCrossIntegrity.storedNormalized}", expected: "${postCrossIntegrity.computedNormalized}")`
+            postCrossIntegrity.valid
+                ? `Printer node rates strictly unchanged and identical to initial baseline after cross-tenant attempt (stored: "${postCrossIntegrity.storedNormalized}", expected: "${postCrossIntegrity.computedNormalized}")`
+                : `Post cross-tenant rates checksum verification failed: ${postCrossIntegrity.error}`
         );
 
         // ── STEP 7: REAL CANCELLATION FLOW (POST /reject) VS ABANDONMENT ──
@@ -1165,7 +1255,9 @@ async function runConnectedSuite() {
         const cancelledIntegrity = verifyRatesChecksumIntegrity(cancelledChecksum, INITIAL_RATES_CHECKSUM);
         assert(
             cancelledIntegrity.valid === true,
-            `Node rates_json remains strictly identical to baseline fixture after cancellation (stored: "${cancelledIntegrity.storedNormalized}", expected: "${cancelledIntegrity.computedNormalized}")`
+            cancelledIntegrity.valid
+                ? `Node rates_json remains strictly identical to baseline fixture after cancellation (stored: "${cancelledIntegrity.storedNormalized}", expected: "${cancelledIntegrity.computedNormalized}")`
+                : `Cancelled session rates checksum verification failed: ${cancelledIntegrity.error}`
         );
 
         // ── STEP 8: GOVERNED ACCEPTANCE ON PRIMARY SESSION ──
@@ -1216,7 +1308,9 @@ async function runConnectedSuite() {
         const checksumIntegrity = verifyRatesChecksumIntegrity(finalRevs[0].rates_checksum, expectedChecksum);
         assert(
             checksumIntegrity.valid === true,
-            `rates_checksum strictly matches canonical SHA-256 (stored: "${checksumIntegrity.storedNormalized || finalRevs[0].rates_checksum}", calculated: "${checksumIntegrity.computedNormalized || expectedChecksum}"): ${checksumIntegrity.error || 'OK'}`
+            checksumIntegrity.valid
+                ? `rates_checksum strictly matches canonical SHA-256 (stored: "${checksumIntegrity.storedNormalized}", calculated: "${checksumIntegrity.computedNormalized}")`
+                : `rates_checksum integrity verification failed: ${checksumIntegrity.error}`
         );
 
         // Verify that acceptances record is persisted in MySQL
@@ -1268,7 +1362,9 @@ async function runConnectedSuite() {
         const finalNodeIntegrity = verifyRatesChecksumIntegrity(finalNodeChecksum, expectedChecksum);
         assert(
             finalNodeIntegrity.valid === true,
-            `Node rates_json updated with calibrated document checksum (stored: "${finalNodeIntegrity.storedNormalized}", expected: "${finalNodeIntegrity.computedNormalized}")`
+            finalNodeIntegrity.valid
+                ? `Node rates_json updated with calibrated document checksum (stored: "${finalNodeIntegrity.storedNormalized}", expected: "${finalNodeIntegrity.computedNormalized}")`
+                : `Final node rates checksum verification failed: ${finalNodeIntegrity.error}`
         );
         assert(
             finalNodeIntegrity.storedNormalized !== normalizeSha256Hex(INITIAL_RATES_CHECKSUM),
@@ -1328,6 +1424,7 @@ module.exports = {
     runConnectedSuite,
     REQUIRED_MYSQL,
     normalizeSha256Hex,
+    describeInvalidChecksum,
     verifyRatesChecksumIntegrity,
     computeCanonicalRatesChecksum,
     canonicalStringify,

@@ -2,6 +2,7 @@ import { describe, test, expect } from 'vitest';
 const calibrationSessionService = require('../src/api/services/calibrationSessionService');
 const {
     normalizeSha256Hex,
+    describeInvalidChecksum,
     verifyRatesChecksumIntegrity,
     computeCanonicalRatesChecksum,
     canonicalStringify
@@ -109,12 +110,22 @@ describe('Onboarding Harness Checksum Integrity & Normalization Regressions', ()
             const resNull = verifyRatesChecksumIntegrity(null, HASH_A);
             expect(resNull.valid).toBe(false);
             expect(resNull.storedNormalized).toBeNull();
-            expect(resNull.error).toMatch(/invalid format or length/i);
+            expect(resNull.error).toBe('[origen: stored] [tipo: null] [motivo: Valor ausente o tipo no string]');
 
             const resUndef = verifyRatesChecksumIntegrity(HASH_A, undefined);
             expect(resUndef.valid).toBe(false);
             expect(resUndef.computedNormalized).toBeNull();
-            expect(resUndef.error).toMatch(/invalid format or length/i);
+            expect(resUndef.error).toBe('[origen: computed] [tipo: undefined] [motivo: Valor ausente o tipo no string]');
+
+            const resEmpty = verifyRatesChecksumIntegrity('', HASH_A);
+            expect(resEmpty.valid).toBe(false);
+            expect(resEmpty.storedNormalized).toBeNull();
+            expect(resEmpty.error).toBe('[origen: stored] [tipo: string] [longitud: 0] [motivo: Cadena vacía o solo espacios en blanco]');
+
+            const resSpaces = verifyRatesChecksumIntegrity(HASH_A, '   ');
+            expect(resSpaces.valid).toBe(false);
+            expect(resSpaces.computedNormalized).toBeNull();
+            expect(resSpaces.error).toBe('[origen: computed] [tipo: string] [longitud: 3] [motivo: Cadena vacía o solo espacios en blanco]');
         });
 
         test('4.2 Rechaza tipos no string (números, booleanos, objetos, arrays)', () => {
@@ -125,6 +136,13 @@ describe('Onboarding Harness Checksum Integrity & Normalization Regressions', ()
 
             const resNum = verifyRatesChecksumIntegrity(12345, HASH_A);
             expect(resNum.valid).toBe(false);
+            expect(resNum.storedNormalized).toBeNull();
+            expect(resNum.error).toBe('[origen: stored] [tipo: number] [motivo: Valor ausente o tipo no string]');
+
+            const resObj = verifyRatesChecksumIntegrity(HASH_A, {});
+            expect(resObj.valid).toBe(false);
+            expect(resObj.computedNormalized).toBeNull();
+            expect(resObj.error).toBe('[origen: computed] [tipo: object] [motivo: Valor ausente o tipo no string]');
         });
 
         test('4.3 Rechaza longitudes incorrectas (distintas de exactamente 64 hex chars)', () => {
@@ -141,6 +159,13 @@ describe('Onboarding Harness Checksum Integrity & Normalization Regressions', ()
 
             const resShort = verifyRatesChecksumIntegrity(short63, HASH_A);
             expect(resShort.valid).toBe(false);
+            expect(resShort.storedNormalized).toBeNull();
+            expect(resShort.error).toBe('[origen: stored] [tipo: string] [longitud: 63] [motivo: Longitud inválida para digest hexadecimal puro (esperado 64, recibido 63)]');
+
+            const resLong = verifyRatesChecksumIntegrity(HASH_A, `sha256:${long65}`);
+            expect(resLong.valid).toBe(false);
+            expect(resLong.computedNormalized).toBeNull();
+            expect(resLong.error).toBe('[origen: computed] [tipo: string] [longitud: 72] [motivo: Longitud inválida tras prefijo sha256: (esperado 64 hex chars, recibido 65)]');
         });
 
         test('4.4 Rechaza caracteres no hexadecimales y corrupción de digest', () => {
@@ -153,6 +178,16 @@ describe('Onboarding Harness Checksum Integrity & Normalization Regressions', ()
             expect(normalizeSha256Hex(specialChars)).toBeNull();
 
             expect(normalizeSha256Hex(`sha256:${nonHexChar}`)).toBeNull();
+
+            const resNonHex = verifyRatesChecksumIntegrity(nonHexChar, HASH_A);
+            expect(resNonHex.valid).toBe(false);
+            expect(resNonHex.storedNormalized).toBeNull();
+            expect(resNonHex.error).toBe('[origen: stored] [tipo: string] [longitud: 64] [motivo: Caracteres no hexadecimales en digest]');
+
+            const resNonHexPrefixed = verifyRatesChecksumIntegrity(HASH_A, `sha256:${nonHexCharZ}`);
+            expect(resNonHexPrefixed.valid).toBe(false);
+            expect(resNonHexPrefixed.computedNormalized).toBeNull();
+            expect(resNonHexPrefixed.error).toBe('[origen: computed] [tipo: string] [longitud: 71] [motivo: Caracteres no hexadecimales tras prefijo sha256:]');
         });
 
         test('4.5 Rechaza prefijos inválidos, duplicados o aislados sin digest (sin stripping indiscriminado)', () => {
@@ -164,6 +199,9 @@ describe('Onboarding Harness Checksum Integrity & Normalization Regressions', ()
 
             const resDouble = verifyRatesChecksumIntegrity(`sha256:sha256:${HASH_A}`, HASH_A);
             expect(resDouble.valid).toBe(false);
+            expect(resDouble.storedNormalized).toBeNull();
+            expect(resDouble.error).toContain('[origen: stored]');
+            expect(resDouble.error).toContain('[tipo: string]');
         });
     });
 
@@ -189,5 +227,60 @@ describe('Onboarding Harness Checksum Integrity & Normalization Regressions', ()
             expect(integrity.storedNormalized).toBe(serviceHex);
             expect(integrity.computedNormalized).toBe(serviceHex);
         });
+    });
+
+    describe('6. Diagnósticos sanitizados sin filtración de datos sensibles (Zero Secret Leakage)', () => {
+        const sensitiveCases = [
+            {
+                label: 'token Bearer ficticio',
+                val: 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkFkbWluIn0.superSecretSignatureDoNotLeak',
+                leakSubstrings: ['Bearer', 'eyJ', 'superSecretSignatureDoNotLeak', 'Admin']
+            },
+            {
+                label: 'contraseña ficticia de administración',
+                val: 'SuperSecretAdminPassword123!#%&_database_root_master_pass',
+                leakSubstrings: ['SuperSecretAdminPassword', 'database_root', 'master_pass']
+            },
+            {
+                label: 'contenido JSON ficticio con tarifas y claves de API',
+                val: JSON.stringify({ secretApiKey: 'sk-live-1234567890abcdef', rates: { price: 9999, discount: 'superSecretDiscount' } }),
+                leakSubstrings: ['secretApiKey', 'sk-live', 'superSecretDiscount', '9999', 'price', 'rates']
+            },
+            {
+                label: 'token con prefijo sha256: pero contenido sensible no hex',
+                val: 'sha256:Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.invalidTokenWithSensitiveContent',
+                leakSubstrings: ['Bearer', 'invalidTokenWithSensitiveContent']
+            }
+        ];
+
+        for (const item of sensitiveCases) {
+            test(`6.X Diagnóstico no filtra ${item.label} cuando actúa como stored`, () => {
+                const res = verifyRatesChecksumIntegrity(item.val, HASH_A);
+                expect(res.valid).toBe(false);
+                expect(res.storedNormalized).toBeNull();
+                expect(res.computedNormalized).toBe(HASH_A);
+                expect(res.error).toContain('[origen: stored]');
+                expect(res.error).toContain('[tipo: string]');
+                expect(res.error).toContain(`[longitud: ${item.val.length}]`);
+                expect(res.error).toContain('[motivo:');
+                for (const sub of item.leakSubstrings) {
+                    expect(res.error).not.toContain(sub);
+                }
+            });
+
+            test(`6.X Diagnóstico no filtra ${item.label} cuando actúa como computed`, () => {
+                const res = verifyRatesChecksumIntegrity(HASH_A, item.val);
+                expect(res.valid).toBe(false);
+                expect(res.storedNormalized).toBe(HASH_A);
+                expect(res.computedNormalized).toBeNull();
+                expect(res.error).toContain('[origen: computed]');
+                expect(res.error).toContain('[tipo: string]');
+                expect(res.error).toContain(`[longitud: ${item.val.length}]`);
+                expect(res.error).toContain('[motivo:');
+                for (const sub of item.leakSubstrings) {
+                    expect(res.error).not.toContain(sub);
+                }
+            });
+        }
     });
 });
