@@ -343,15 +343,39 @@ describe('Onboarding Harness Checksum Integrity & Normalization Regressions', ()
             expect(caught.message).toContain('PPOS_TEST_MYSQL_PASSWORD');
         });
 
-        test('7.4 Rechaza regression_mode_placeholder en preparación de conexión directa', () => {
+        test('7.4 PPOS_TEST_MYSQL_PASSWORD ausente + MYSQL_PASSWORD configurada rechaza con MISSING_TEST_PASSWORD (cero fallback)', () => {
             delete process.env.PPOS_TEST_MYSQL_PASSWORD;
-            process.env.MYSQL_PASSWORD = 'regression_mode_placeholder';
+            process.env.MYSQL_PASSWORD = 'unauthorized_inherited_db_secret';
+
+            let caught = null;
+            try {
+                resolveConnectedMysqlPassword();
+            } catch (e) {
+                caught = e;
+            }
+
+            expect(caught).not.toBeNull();
+            expect(caught.message).toContain('MISSING_TEST_PASSWORD');
+            expect(caught.message).toContain('PPOS_TEST_MYSQL_PASSWORD');
+            expect(caught.message).not.toContain('unauthorized_inherited_db_secret');
+        });
+
+        test('7.5 Rechaza cadena vacía o solo espacios en PPOS_TEST_MYSQL_PASSWORD', () => {
+            process.env.PPOS_TEST_MYSQL_PASSWORD = '   ';
+            delete process.env.MYSQL_PASSWORD;
+
+            expect(() => resolveConnectedMysqlPassword()).toThrowError(/MISSING_TEST_PASSWORD/);
+        });
+
+        test('7.6 Rechaza regression_mode_placeholder en preparación de conexión directa', () => {
+            process.env.PPOS_TEST_MYSQL_PASSWORD = 'regression_mode_placeholder';
+            delete process.env.MYSQL_PASSWORD;
 
             expect(() => resolveConnectedMysqlPassword()).toThrowError(/MISSING_TEST_PASSWORD/);
             expect(() => getDirectMysqlConnectionConfig()).toThrowError(/MISSING_TEST_PASSWORD/);
         });
 
-        test('7.5 Verificación estática: scripts/test_onboarding_connected_suite.js no contiene referencias no declaradas a mysqlPassword', () => {
+        test('7.7 Verificación estática: scripts/test_onboarding_connected_suite.js no contiene referencias no declaradas ni fallback a MYSQL_PASSWORD', () => {
             const fs = require('fs');
             const path = require('path');
             const harnessPath = path.resolve(__dirname, '../scripts/test_onboarding_connected_suite.js');
@@ -362,6 +386,13 @@ describe('Onboarding Harness Checksum Integrity & Normalization Regressions', ()
             const body = runConnectedSuiteMatch[0];
             expect(body).not.toMatch(/password:\s*mysqlPassword\b/);
             expect(body).toContain('getDirectMysqlConnectionConfig');
+
+            // resolveConnectedMysqlPassword must NOT fall back to MYSQL_PASSWORD or sharedMysqlPassword
+            const resolveMatch = harnessCode.match(/function resolveConnectedMysqlPassword\(\)[\s\S]*?\n\}/);
+            expect(resolveMatch).not.toBeNull();
+            const resolveBody = resolveMatch[0];
+            expect(resolveBody).not.toContain('sharedMysqlPassword');
+            expect(resolveBody).not.toMatch(/process\.env\.MYSQL_PASSWORD/);
         });
     });
 });

@@ -59,8 +59,6 @@ const configuredMysqlPort = parseInt(process.env.PPOS_TEST_MYSQL_PORT || String(
 const configuredMysqlUser = process.env.PPOS_TEST_MYSQL_USER || REQUIRED_MYSQL.user;
 const configuredMysqlDb = process.env.PPOS_TEST_MYSQL_DATABASE || REQUIRED_MYSQL.database;
 
-let sharedMysqlPassword = process.env.PPOS_TEST_MYSQL_PASSWORD || null;
-
 if (require.main === module && !isRegressionMode) {
     if (configuredMysqlHost !== REQUIRED_MYSQL.host ||
         configuredMysqlPort !== REQUIRED_MYSQL.port ||
@@ -75,7 +73,8 @@ if (require.main === module && !isRegressionMode) {
         process.exit(1);
     }
 
-    if (!sharedMysqlPassword) {
+    const testPassword = process.env.PPOS_TEST_MYSQL_PASSWORD;
+    if (!testPassword || typeof testPassword !== 'string' || testPassword.trim() === '') {
         console.error('\n[FATAL] Missing required environment variable: PPOS_TEST_MYSQL_PASSWORD');
         console.error('Explicit test password must be supplied via PPOS_TEST_MYSQL_PASSWORD.');
         process.exit(1);
@@ -85,27 +84,28 @@ if (require.main === module && !isRegressionMode) {
     process.env.MYSQL_HOST = REQUIRED_MYSQL.host;
     process.env.MYSQL_PORT = String(REQUIRED_MYSQL.port);
     process.env.MYSQL_USER = REQUIRED_MYSQL.user;
-    process.env.MYSQL_PASSWORD = sharedMysqlPassword;
+    process.env.MYSQL_PASSWORD = testPassword;
     process.env.MYSQL_DATABASE = REQUIRED_MYSQL.database;
 } else {
     // Standalone regression mode or unit test require
     process.env.MYSQL_HOST = process.env.MYSQL_HOST || REQUIRED_MYSQL.host;
     process.env.MYSQL_PORT = process.env.MYSQL_PORT || String(REQUIRED_MYSQL.port);
     process.env.MYSQL_USER = process.env.MYSQL_USER || REQUIRED_MYSQL.user;
-    process.env.MYSQL_PASSWORD = sharedMysqlPassword || process.env.MYSQL_PASSWORD || 'regression_mode_placeholder';
+    process.env.MYSQL_PASSWORD = process.env.PPOS_TEST_MYSQL_PASSWORD || 'regression_mode_placeholder';
     process.env.MYSQL_DATABASE = process.env.MYSQL_DATABASE || REQUIRED_MYSQL.database;
 }
 
 /**
  * Resolves the explicit test MySQL password with verified scope.
- * Reads strictly from process.env.PPOS_TEST_MYSQL_PASSWORD (or shared module scope/MYSQL_PASSWORD),
- * and validates its presence and non-placeholder value before any connection attempt.
+ * Reads EXCLUSIVELY from process.env.PPOS_TEST_MYSQL_PASSWORD without fallbacks.
+ * Validates presence, non-empty, and non-placeholder value before any connection attempt.
+ * Never prints or leaks credentials.
  *
  * @returns {string} Explicit password for isolated test MySQL
  */
 function resolveConnectedMysqlPassword() {
-    const candidate = process.env.PPOS_TEST_MYSQL_PASSWORD || sharedMysqlPassword || process.env.MYSQL_PASSWORD;
-    if (!candidate || candidate === 'regression_mode_placeholder') {
+    const candidate = process.env.PPOS_TEST_MYSQL_PASSWORD;
+    if (typeof candidate !== 'string' || candidate.trim() === '' || candidate === 'regression_mode_placeholder') {
         throw new Error('MISSING_TEST_PASSWORD: Explicit test password must be supplied via PPOS_TEST_MYSQL_PASSWORD before creating MySQL connections.');
     }
     return candidate;
@@ -451,8 +451,36 @@ function runChecksumIntegrityRegressions() {
             throw new Error(`Regression 6c failed: Expected MISSING_TEST_PASSWORD diagnostic, got: ${missingPassError.message}`);
         }
 
-        // C. Con placeholder de regresión: también debe ser rechazado deterministamente
-        process.env.MYSQL_PASSWORD = 'regression_mode_placeholder';
+        // C. PPOS_TEST_MYSQL_PASSWORD ausente + MYSQL_PASSWORD configurada: debe rechazar estrictamente con MISSING_TEST_PASSWORD (cero fallback)
+        delete process.env.PPOS_TEST_MYSQL_PASSWORD;
+        process.env.MYSQL_PASSWORD = 'unauthorized_inherited_db_secret_pass';
+        let fallbackError = null;
+        try {
+            resolveConnectedMysqlPassword();
+        } catch (err) {
+            fallbackError = err;
+        }
+        if (!fallbackError || !fallbackError.message.includes('MISSING_TEST_PASSWORD')) {
+            throw new Error('Regression 6d failed: resolveConnectedMysqlPassword must reject without falling back to MYSQL_PASSWORD');
+        }
+        if (fallbackError.message.includes('unauthorized_inherited_db_secret_pass')) {
+            throw new Error('Regression 6d failed: Credential content leaked in error message');
+        }
+
+        // D. Cadena vacía o solo espacios en PPOS_TEST_MYSQL_PASSWORD: debe rechazar con MISSING_TEST_PASSWORD
+        process.env.PPOS_TEST_MYSQL_PASSWORD = '   ';
+        let emptyError = null;
+        try {
+            resolveConnectedMysqlPassword();
+        } catch (err) {
+            emptyError = err;
+        }
+        if (!emptyError || !emptyError.message.includes('MISSING_TEST_PASSWORD')) {
+            throw new Error('Regression 6e failed: Expected empty string to be rejected with MISSING_TEST_PASSWORD');
+        }
+
+        // E. Con placeholder de regresión en PPOS_TEST_MYSQL_PASSWORD: también debe ser rechazado deterministamente
+        process.env.PPOS_TEST_MYSQL_PASSWORD = 'regression_mode_placeholder';
         let placeholderError = null;
         try {
             resolveConnectedMysqlPassword();
@@ -460,7 +488,7 @@ function runChecksumIntegrityRegressions() {
             placeholderError = err;
         }
         if (!placeholderError || placeholderError instanceof ReferenceError || !placeholderError.message.includes('MISSING_TEST_PASSWORD')) {
-            throw new Error('Regression 6d failed: Expected placeholder to be rejected with MISSING_TEST_PASSWORD');
+            throw new Error('Regression 6f failed: Expected placeholder to be rejected with MISSING_TEST_PASSWORD');
         }
     } finally {
         if (savedPposPass !== undefined) process.env.PPOS_TEST_MYSQL_PASSWORD = savedPposPass;
