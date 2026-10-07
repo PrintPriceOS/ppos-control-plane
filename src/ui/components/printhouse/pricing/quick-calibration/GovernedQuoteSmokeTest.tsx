@@ -31,7 +31,21 @@ export const GovernedQuoteSmokeTest: React.FC<GovernedQuoteSmokeTestProps> = ({
     printerNodeName = 'Production Node',
     initialSpec
 }) => {
-    const { t } = useLocale();
+    const { t, locale } = useLocale();
+
+    // Helper to format country name respecting the real 1-argument signature of getCountryName
+    // while adapting to the presentation language (locale) via standard Intl.DisplayNames
+    const formatCountryLabel = (countryCode: string): string => {
+        const fallbackName = getCountryName(countryCode);
+        try {
+            if (typeof Intl !== 'undefined' && (Intl as any).DisplayNames) {
+                const dn = new (Intl as any).DisplayNames([locale || 'en'], { type: 'region' });
+                const localized = dn.of(countryCode.toUpperCase().trim());
+                if (localized) return localized;
+            }
+        } catch (_) {}
+        return fallbackName;
+    };
     const normalizeBinding = (b?: string) => {
         if (!b) return 'perfect bound';
         const s = String(b).toLowerCase().trim();
@@ -447,7 +461,7 @@ export const GovernedQuoteSmokeTest: React.FC<GovernedQuoteSmokeTestProps> = ({
                     >
                         {!availableDestinations.some(d => d.code === spec.delivery_country) && spec.delivery_country && (
                             <option value={spec.delivery_country}>
-                                {getCountryName(spec.delivery_country, 'en')} ({spec.delivery_country}) — {t('pricing.smoke.refDestination') || 'Reference Job Destination'}
+                                {formatCountryLabel(spec.delivery_country)} ({spec.delivery_country}) — {t('pricing.smoke.refDestination') || 'Reference Job Destination'}
                             </option>
                         )}
                         {availableDestinations.map(d => (

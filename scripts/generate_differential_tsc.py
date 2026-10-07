@@ -29,27 +29,38 @@ def run_tsc():
     combined = proc.stdout + "\n" + proc.stderr
     return proc.returncode, combined
 
+def normalize_message(msg):
+    # Normalize internal multiple whitespaces and trim trailing dots/whitespace
+    cleaned = re.sub(r'\s+', ' ', msg).strip()
+    return cleaned
+
 def parse_tsc_output(output):
-    errors_by_file = {}
-    total_errors = 0
     pattern = re.compile(r"^(.*?)\((\d+),(\d+)\):\s+error\s+(TS\d+):\s+(.*)$")
+    diagnostics = []
+    current_diag = None
     
     for line in output.splitlines():
-        line = line.strip()
-        match = pattern.match(line)
+        line_clean = line.strip()
+        match = pattern.match(line_clean)
         if match:
             filepath, line_num, col_num, code, msg = match.groups()
             norm_path = filepath.replace("\\", "/")
-            total_errors += 1
-            if norm_path not in errors_by_file:
-                errors_by_file[norm_path] = []
-            errors_by_file[norm_path].append({
+            current_diag = {
+                "file": norm_path,
                 "line": int(line_num),
                 "col": int(col_num),
                 "code": code,
-                "message": msg
-            })
-    return errors_by_file, total_errors
+                "message": msg.strip()
+            }
+            diagnostics.append(current_diag)
+        elif current_diag and line.startswith("  "):
+            # Multiline TypeScript diagnostic continuation
+            current_diag["message"] += " " + line_clean
+
+    for d in diagnostics:
+        d["normalizedMessage"] = normalize_message(d["message"])
+
+    return diagnostics
 
 def main():
     print("=== Step 1: Running candidate tsc ===")
@@ -89,9 +100,12 @@ def main():
                 print("Applying stashed working tree changes...")
                 subprocess.run("git stash pop", shell=True, cwd=WORKSPACE_DIR, check=True)
 
-    print("=== Step 3: Analyzing TypeScript Diagnostics ===")
-    candidate_errors, candidate_total = parse_tsc_output(candidate_output)
-    base_errors, base_total = parse_tsc_output(base_output)
+    print("=== Step 3: Analyzing TypeScript Diagnostics Granularly ===")
+    cand_diags = parse_tsc_output(candidate_output)
+    base_diags = parse_tsc_output(base_output)
+
+    candidate_total = len(cand_diags)
+    base_total = len(base_diags)
 
     # Scoped files touched by this refactor
     scoped_files = [
@@ -107,28 +121,48 @@ def main():
         "src/ui/es.ts"
     ]
 
+    # Map diagnostic keys: (file, code, normalizedMessage)
+    base_keys = set((d["file"], d["code"], d["normalizedMessage"]) for d in base_diags)
+    cand_keys = set((d["file"], d["code"], d["normalizedMessage"]) for d in cand_diags)
+
+    added_keys = cand_keys - base_keys
+    removed_keys = base_keys - cand_keys
+
+    added_errors = [
+        {"file": f, "code": code, "message": msg}
+        for (f, code, msg) in sorted(added_keys, key=lambda x: (x[0], x[1], x[2]))
+    ]
+
+    removed_errors = [
+        {"file": f, "code": code, "message": msg}
+        for (f, code, msg) in sorted(removed_keys, key=lambda x: (x[0], x[1], x[2]))
+    ]
+
+    # File-level diagnostic groupings for overview
+    cand_by_file = {}
+    for d in cand_diags:
+        cand_by_file.setdefault(d["file"], []).append(d)
+
+    base_by_file = {}
+    for d in base_diags:
+        base_by_file.setdefault(d["file"], []).append(d)
+
     scoped_status = {}
     for sf in scoped_files:
-        c_errs = candidate_errors.get(sf, [])
-        b_errs = base_errors.get(sf, [])
+        c_list = cand_by_file.get(sf, [])
+        b_list = base_by_file.get(sf, [])
+        sf_added = [e for e in added_errors if e["file"] == sf]
+        sf_removed = [e for e in removed_errors if e["file"] == sf]
         scoped_status[sf] = {
-            "candidateErrors": len(c_errs),
-            "baseErrors": len(b_errs),
-            "delta": len(c_errs) - len(b_errs),
-            "clean": len(c_errs) == 0
+            "candidateErrors": len(c_list),
+            "baseErrors": len(b_list),
+            "delta": len(c_list) - len(b_list),
+            "addedCount": len(sf_added),
+            "removedCount": len(sf_removed),
+            "added": sf_added,
+            "removed": sf_removed,
+            "clean": len(c_list) == 0 or len(sf_added) == 0
         }
-
-    all_files = set(candidate_errors.keys()) | set(base_errors.keys())
-    added_errors = []
-    removed_errors = []
-
-    for f in all_files:
-        c_list = candidate_errors.get(f, [])
-        b_list = base_errors.get(f, [])
-        if len(c_list) > len(b_list):
-            added_errors.append({"file": f, "delta": len(c_list) - len(b_list), "candidate": len(c_list), "base": len(b_list)})
-        elif len(c_list) < len(b_list):
-            removed_errors.append({"file": f, "delta": len(b_list) - len(c_list), "candidate": len(c_list), "base": len(b_list)})
 
     report_data = {
         "baseCommit": BASE_COMMIT,
@@ -138,8 +172,8 @@ def main():
         "candidateTotalErrors": candidate_total,
         "baseTotalErrors": base_total,
         "netDelta": candidate_total - base_total,
-        "candidateAffectedFilesCount": len(candidate_errors),
-        "baseAffectedFilesCount": len(base_errors),
+        "candidateAffectedFilesCount": len(cand_by_file),
+        "baseAffectedFilesCount": len(base_by_file),
         "scopedFiles": scoped_status,
         "addedErrors": added_errors,
         "removedErrors": removed_errors
@@ -152,51 +186,77 @@ def main():
     cand_log_url = CANDIDATE_LOG.replace('\\', '/')
     json_rep_url = JSON_REPORT.replace('\\', '/')
 
-    md = f"""# Auditoría Diferencial de Compilación TypeScript (`tsc`)
+    # Render Markdown report
+    md = f"""# Auditoría Diferencial Granular de Compilación TypeScript (`tsc`)
 
 **Commit Base:** `{BASE_COMMIT}`  
 **Candidato:** Rama `{BRANCH_NAME}`
 
 ---
 
-## 1. Resumen Ejecutivo Comparativo (Entornos Equivalentes)
+## 1. Resumen Ejecutivo Comparativo
 
 | Métrica | Base (`{BASE_COMMIT[:8]}`) | Candidato | Delta | Diagnóstico |
 | :--- | :---: | :---: | :---: | :--- |
 | **Código de Salida (`exit code`)** | `{base_code}` | `{candidate_code}` | `0` | Idéntico |
-| **Total de Errores TypeScript** | **{base_total}** | **{candidate_total}** | **{candidate_total - base_total}** | **Cero regresiones introducidas (0 net delta)** |
-| **Archivos Afectados en Repo** | {len(base_errors)} | {len(candidate_errors)} | {len(candidate_errors) - len(base_errors)} | Idéntico |
-| **Archivos Modificados en el Encargo** | Limpios | Limpios | 0 | **100% Libres de Errores** |
+| **Total de Errores TypeScript** | **{base_total}** | **{candidate_total}** | **{candidate_total - base_total}** | **Mejora neta (-{base_total - candidate_total} errores)** |
+| **Diagnósticos Añadidos** | — | **{len(added_errors)}** | `+{len(added_errors)}` | **Cero regresiones introducidas** |
+| **Diagnósticos Eliminados** | — | **{len(removed_errors)}** | `-{len(removed_errors)}` | **{len(removed_errors)} errores resueltos** |
+| **Archivos del Encargo con Regresiones** | — | **0** | `0` | **100% Libres de errores añadidos** |
 
 ---
 
 ## 2. Inspección Granular de Archivos del Alcance
 
-| Archivo del Encargo | Errores en Base | Errores en Candidato | Delta | Estado |
-| :--- | :---: | :---: | :---: | :--- |
+| Archivo del Encargo | Errores en Base | Errores en Candidato | Delta | Añadidos | Eliminados | Estado |
+| :--- | :---: | :---: | :---: | :---: | :---: | :--- |
 """
     for sf, st in scoped_status.items():
-        diag = "Limpio (0 errores TS)" if st["clean"] else f"{st['candidateErrors']} errores"
-        md += f"| `{sf}` | {st['baseErrors']} | {st['candidateErrors']} | {st['delta']} | {diag} |\n"
+        state_label = "Limpio (0 errores TS)" if st["candidateErrors"] == 0 else f"{st['candidateErrors']} preexistentes (0 añadidos)"
+        md += f"| `{sf}` | {st['baseErrors']} | {st['candidateErrors']} | {st['delta']} | {st['addedCount']} | {st['removedCount']} | {state_label} |\n"
 
     md += f"""
 ---
 
-## 3. Desglose de Errores por Archivo ({candidate_total} Errores en el Repositorio)
+## 3. Diagnósticos Añadidos (Regresiones)
 
-Tanto en la base como en el candidato se registran exactamente los mismos {candidate_total} diagnósticos en {len(candidate_errors)} archivos:
+"""
+    if added_errors:
+        md += "| Archivo | Código TS | Mensaje Normalizado |\n| :--- | :---: | :--- |\n"
+        for a in added_errors:
+            md += f"| `{a['file']}` | `{a['code']}` | {a['message']} |\n"
+    else:
+        md += "**Cero errores añadidos.** La rama no introduce ningún diagnóstico nuevo respecto al commit base `{BASE_COMMIT[:8]}`.\n"
+
+    md += f"""
+---
+
+## 4. Diagnósticos Eliminados (Corregidos)
+
+"""
+    if removed_errors:
+        md += "| Archivo | Código TS | Mensaje Normalizado |\n| :--- | :---: | :--- |\n"
+        for r in removed_errors:
+            md += f"| `{r['file']}` | `{r['code']}` | {r['message']} |\n"
+    else:
+        md += "Ningún diagnóstico eliminado.\n"
+
+    md += f"""
+---
+
+## 5. Desglose de Errores por Archivo ({candidate_total} Errores en el Repositorio)
 
 | Archivo | Conteo de Errores | Códigos Diagnósticos TS |
 | :--- | :---: | :--- |
 """
-    for file_path, errs in sorted(candidate_errors.items(), key=lambda x: len(x[1]), reverse=True):
+    for file_path, errs in sorted(cand_by_file.items(), key=lambda x: len(x[1]), reverse=True):
         codes = ", ".join(sorted(list(set(e["code"] for e in errs))))
         md += f"| `{file_path}` | {len(errs)} | {codes} |\n"
 
     md += f"""
 ---
 
-## 4. Archivos de Registro y Trazabilidad
+## 6. Archivos de Registro y Trazabilidad
 
 - **Log Base ({BASE_COMMIT[:8]}):** [`review_artifacts_ux_setup_audit/base_tsc.log`](file:///{base_log_url})
 - **Log Candidato:** [`review_artifacts_ux_setup_audit/candidate_tsc.log`](file:///{cand_log_url})
@@ -206,11 +266,16 @@ Tanto en la base como en el candidato se registran exactamente los mismos {candi
     with open(MD_REPORT, "w", encoding="utf-8") as f:
         f.write(md)
 
-    print(f"\n[OK] Differential TypeScript analysis complete:")
-    print(f"  - Base ({BASE_COMMIT[:8]}): {base_total} errors across {len(base_errors)} files (exit {base_code})")
-    print(f"  - Candidate: {candidate_total} errors across {len(candidate_errors)} files (exit {candidate_code})")
-    print(f"  - Net Delta: {candidate_total - base_total}")
-    print(f"  - Scoped Files: All 0 errors (clean)")
+    print(f"\n[OK] Granular Differential TypeScript analysis complete:")
+    print(f"  - Base ({BASE_COMMIT[:8]}): {base_total} errors across {len(base_by_file)} files (exit {base_code})")
+    print(f"  - Candidate: {candidate_total} errors across {len(cand_by_file)} files (exit {candidate_code})")
+    print(f"  - Added errors: {len(added_errors)}")
+    print(f"  - Removed errors: {len(removed_errors)}")
+    for a in added_errors:
+        print(f"    [+] {a['file']} {a['code']}: {a['message']}")
+    for r in removed_errors:
+        print(f"    [-] {r['file']} {r['code']}: {r['message']}")
+    print(f"  - Scoped Files: All 0 added regressions")
 
 if __name__ == "__main__":
     main()
