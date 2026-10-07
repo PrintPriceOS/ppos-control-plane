@@ -16,7 +16,7 @@ import { QuickCalibrationPanel } from '../pricing/quick-calibration/QuickCalibra
 import { PricingWorkflowSelector, PricingWorkflow } from '../pricing/PricingWorkflowSelector';
 import { SimplifiedOnboardingJourney } from '../onboarding/SimplifiedOnboardingJourney';
 import { SetupDrawer } from './SetupDrawer';
-import { Tag, Plus, Edit, Copy, Trash2, ShieldAlert, BadgeAlert, CheckCircle, Calculator, Info, ShieldCheck, HelpCircle, Layers, ChevronDown, ChevronUp, Sparkles, Sliders, ArrowLeft } from 'lucide-react';
+import { Tag, Plus, Edit, Copy, Trash2, ShieldAlert, BadgeAlert, CheckCircle, CheckCircle2, Calculator, Info, ShieldCheck, HelpCircle, Layers, ChevronDown, ChevronUp, Sparkles, Sliders, ArrowLeft } from 'lucide-react';
 import { useLocale } from '../../../i18n';
 import { ProductFamilyId, FamilyState, FamilyStatus } from '../../../types/printhouseOnboardingTypes';
 import { BindingIcon } from '../onboarding/BindingFamilyIcons';
@@ -558,106 +558,170 @@ export const PricingPanel: React.FC<PricingPanelProps> = ({ sites = [], onSaved 
                 </div>
             )}
 
-            {/* COMPACT SETUP & WORKFLOW TOOLBAR */}
-            <div className="bg-white dark:bg-[#18181b] border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-1.5 shadow-2xs flex flex-wrap items-center justify-between gap-2.5">
-                <div className="flex items-center gap-2.5 min-w-0 flex-wrap">
-                    <div className="flex items-center gap-2 shrink-0">
-                        <Tag className="text-[#dc0000] w-3.5 h-3.5" />
+            {/* INDUSTRIAL PRICING WORKFLOW SELECTOR & COMMERCIAL POLICY */}
+            <div className="bg-white dark:bg-[#18181b] border border-zinc-200 dark:border-zinc-800 rounded-2xl p-3 sm:p-4 shadow-2xs space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2.5">
+                    <div className="flex items-center gap-2">
+                        <Tag className="text-[#dc0000] w-4 h-4" />
                         <h2 className="text-xs sm:text-sm font-bold text-zinc-900 dark:text-white m-0">
                             {t('pricing.workflow.chooseWorkflow') || 'Choose Your Pricing Workflow'}
                         </h2>
+                        {industrialData?.nodeId && (
+                            <span className="inline-flex items-center gap-1 text-[11px] text-zinc-500 font-medium px-2 py-0.5 bg-zinc-50 dark:bg-zinc-800/60 rounded-md border border-zinc-200/60 dark:border-zinc-700/60 shrink-0">
+                                <span>{t('pricing.mode.node')}</span>
+                                <strong className="text-zinc-700 dark:text-zinc-300 font-semibold">{industrialData.nodeName || industrialData.nodeId}</strong>
+                            </span>
+                        )}
                     </div>
-                    {industrialData?.nodeId && (
-                        <span className="inline-flex items-center gap-1.5 text-[11px] text-zinc-500 font-medium px-2 py-0.5 bg-zinc-50 dark:bg-zinc-800/60 rounded-md border border-zinc-200/60 dark:border-zinc-700/60 shrink-0">
-                            <span>{t('pricing.mode.node')}</span>
-                            <strong className="text-zinc-700 dark:text-zinc-300 font-semibold">{industrialData.nodeName || industrialData.nodeId}</strong>
-                        </span>
-                    )}
 
-                    {/* Mode Segment Switcher: 3 explicit tabs */}
-                    <div
-                        id="pricing-mode-toggle"
-                        className="flex items-center p-0.5 bg-zinc-100 dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 shrink-0"
-                        role="group"
-                        aria-label={t('pricing.workflow.group') || 'Pricing mode selector'}
-                    >
+                    {/* Right: Commercial Price Books - Visually distinct commercial action */}
+                    <div className="flex items-center gap-2 shrink-0">
                         <button
-                            id="pricing-mode-onboarding-btn"
+                            id="pricing-price-books-btn"
                             type="button"
-                            aria-label={t('pricing.nav.productsAndQuotes') || 'Productos y presupuestos'}
-                            title={t('pricing.nav.productsAndQuotes') || 'Productos y presupuestos'}
-                            aria-pressed={selectedWorkflow === 'onboarding'}
-                            onClick={() => {
-                                setSelectedWorkflow('onboarding');
-                                setIsSecondaryExpanded(false);
-                            }}
-                            className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                                selectedWorkflow === 'onboarding'
-                                    ? 'bg-white dark:bg-zinc-900 text-[#dc0000] dark:text-red-400 shadow-2xs border border-zinc-200/80 dark:border-zinc-700'
-                                    : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'
+                            onClick={() => setShowCommercialPolicy(!showCommercialPolicy)}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all flex items-center gap-2 cursor-pointer shadow-2xs ${
+                                showCommercialPolicy
+                                    ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 border-zinc-900 dark:border-white ring-2 ring-[#dc0000]/20'
+                                    : 'bg-zinc-50 dark:bg-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-700 border-zinc-300 dark:border-zinc-600 text-zinc-800 dark:text-zinc-200'
                             }`}
+                            title={t('pricing.workflow.priceBooksBtn') || 'Commercial quantity tiers and client price books'}
+                            aria-label={t('pricing.workflow.priceBooksBtn') || 'Commercial quantity tiers and client price books'}
                         >
-                            <Layers size={13} className={selectedWorkflow === 'onboarding' ? 'text-[#dc0000]' : 'text-zinc-400'} />
-                            <span>{t('pricing.nav.productsAndQuotes') || 'Productos y presupuestos'}</span>
-                        </button>
-
-                        <button
-                            id="pricing-mode-assistant-btn"
-                            type="button"
-                            aria-label={t('pricing.mode.assistant')}
-                            title={t('pricing.mode.assistant')}
-                            aria-pressed={selectedWorkflow === 'assistant'}
-                            onClick={() => {
-                                setSelectedWorkflow('assistant');
-                                setIsSecondaryExpanded(false);
-                            }}
-                            className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                                selectedWorkflow === 'assistant'
-                                    ? 'bg-white dark:bg-zinc-900 text-[#dc0000] dark:text-red-400 shadow-2xs border border-zinc-200/80 dark:border-zinc-700'
-                                    : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'
-                            }`}
-                        >
-                            <Sparkles size={13} className={selectedWorkflow === 'assistant' ? 'text-[#dc0000]' : 'text-zinc-400'} />
-                            <span>{t('pricing.mode.assistant')}</span>
-                        </button>
-
-                        <button
-                            id="pricing-mode-manual-btn"
-                            type="button"
-                            aria-label={t('pricing.mode.manual')}
-                            title={t('pricing.mode.manual')}
-                            aria-pressed={selectedWorkflow === 'manual'}
-                            onClick={() => {
-                                setSelectedWorkflow('manual');
-                                setIsSecondaryExpanded(false);
-                            }}
-                            className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                                selectedWorkflow === 'manual'
-                                    ? 'bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white shadow-2xs border border-zinc-200/80 dark:border-zinc-700'
-                                    : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'
-                            }`}
-                        >
-                            <Calculator size={13} className={selectedWorkflow === 'manual' ? 'text-zinc-900 dark:text-white' : 'text-zinc-400'} />
-                            <span>{t('pricing.mode.manual')}</span>
+                            <Tag size={13} className={showCommercialPolicy ? 'text-[#dc0000]' : 'text-zinc-500'} />
+                            <span>{t('pricing.mode.priceBooks')}</span>
                         </button>
                     </div>
                 </div>
 
-                {/* Right: Commercial Price Books */}
-                <div className="flex items-center gap-2 shrink-0">
+                {/* 3 Compact Selectable Workflow Cards */}
+                <div
+                    id="pricing-mode-toggle"
+                    className="grid grid-cols-1 md:grid-cols-3 gap-2.5"
+                    role="group"
+                    aria-label={t('pricing.workflow.group') || 'Pricing mode selector'}
+                >
+                    {/* Card 1: Products & Quotes */}
                     <button
+                        id="pricing-mode-onboarding-btn"
                         type="button"
-                        onClick={() => setShowCommercialPolicy(!showCommercialPolicy)}
-                        className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition-colors flex items-center gap-1.5 cursor-pointer ${
-                            showCommercialPolicy
-                                ? 'bg-zinc-100 dark:bg-zinc-800 border-zinc-300 dark:border-zinc-600 text-zinc-900 dark:text-white'
-                                : 'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300'
+                        aria-label={t('pricing.nav.productsAndQuotes') || 'Productos y presupuestos'}
+                        title={t('pricing.nav.productsAndQuotes') || 'Productos y presupuestos'}
+                        aria-pressed={selectedWorkflow === 'onboarding'}
+                        onClick={() => {
+                            setSelectedWorkflow('onboarding');
+                            setIsSecondaryExpanded(false);
+                        }}
+                        className={`text-left p-3 rounded-xl border transition-all cursor-pointer flex items-start gap-3 relative ${
+                            selectedWorkflow === 'onboarding'
+                                ? 'bg-red-50/60 dark:bg-red-950/25 border-[#dc0000] ring-1 ring-[#dc0000]/30 shadow-2xs'
+                                : 'bg-zinc-50/50 dark:bg-zinc-800/40 hover:bg-zinc-100/70 dark:hover:bg-zinc-800/80 border-zinc-200 dark:border-zinc-700/80'
                         }`}
-                        title={t('pricing.workflow.priceBooksBtn') || 'Commercial quantity tiers and client price books'}
-                        aria-label={t('pricing.workflow.priceBooksBtn') || 'Commercial quantity tiers and client price books'}
                     >
-                        <Tag size={13} className="text-zinc-500" />
-                        <span>{t('pricing.mode.priceBooks')}</span>
+                        <div className={`p-2 rounded-lg shrink-0 mt-0.5 ${
+                            selectedWorkflow === 'onboarding'
+                                ? 'bg-[#dc0000] text-white shadow-2xs'
+                                : 'bg-zinc-200/70 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-300'
+                        }`}>
+                            <Layers size={18} />
+                        </div>
+                        <div className="min-w-0 flex-1 pr-5">
+                            <div className="flex items-center gap-1.5">
+                                <span className={`text-xs font-bold leading-tight ${
+                                    selectedWorkflow === 'onboarding' ? 'text-[#dc0000] dark:text-red-400' : 'text-zinc-900 dark:text-white'
+                                }`}>
+                                    {t('pricing.nav.productsAndQuotes') || 'Productos y presupuestos'}
+                                </span>
+                            </div>
+                            <p className="text-[11px] text-zinc-500 dark:text-zinc-400 leading-snug mt-0.5 m-0 line-clamp-2">
+                                {t('pricing.nav.productsAndQuotesDesc') || '4 product families, PDF upload & quote calibration'}
+                            </p>
+                        </div>
+                        {selectedWorkflow === 'onboarding' && (
+                            <CheckCircle2 size={16} className="text-[#dc0000] dark:text-red-400 absolute top-3 right-3 shrink-0" />
+                        )}
+                    </button>
+
+                    {/* Card 2: AI Assistant */}
+                    <button
+                        id="pricing-mode-assistant-btn"
+                        type="button"
+                        aria-label={t('pricing.mode.assistant')}
+                        title={t('pricing.mode.assistant')}
+                        aria-pressed={selectedWorkflow === 'assistant'}
+                        onClick={() => {
+                            setSelectedWorkflow('assistant');
+                            setIsSecondaryExpanded(false);
+                        }}
+                        className={`text-left p-3 rounded-xl border transition-all cursor-pointer flex items-start gap-3 relative ${
+                            selectedWorkflow === 'assistant'
+                                ? 'bg-red-50/60 dark:bg-red-950/25 border-[#dc0000] ring-1 ring-[#dc0000]/30 shadow-2xs'
+                                : 'bg-zinc-50/50 dark:bg-zinc-800/40 hover:bg-zinc-100/70 dark:hover:bg-zinc-800/80 border-zinc-200 dark:border-zinc-700/80'
+                        }`}
+                    >
+                        <div className={`p-2 rounded-lg shrink-0 mt-0.5 ${
+                            selectedWorkflow === 'assistant'
+                                ? 'bg-[#dc0000] text-white shadow-2xs'
+                                : 'bg-zinc-200/70 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-300'
+                        }`}>
+                            <Sparkles size={18} />
+                        </div>
+                        <div className="min-w-0 flex-1 pr-5">
+                            <div className="flex items-center gap-1.5">
+                                <span className={`text-xs font-bold leading-tight ${
+                                    selectedWorkflow === 'assistant' ? 'text-[#dc0000] dark:text-red-400' : 'text-zinc-900 dark:text-white'
+                                }`}>
+                                    {t('pricing.mode.assistant')}
+                                </span>
+                            </div>
+                            <p className="text-[11px] text-zinc-500 dark:text-zinc-400 leading-snug mt-0.5 m-0 line-clamp-2">
+                                {t('pricing.nav.assistantDesc') || 'Natural language & quote solving for production nodes'}
+                            </p>
+                        </div>
+                        {selectedWorkflow === 'assistant' && (
+                            <CheckCircle2 size={16} className="text-[#dc0000] dark:text-red-400 absolute top-3 right-3 shrink-0" />
+                        )}
+                    </button>
+
+                    {/* Card 3: Manual Rate Cards */}
+                    <button
+                        id="pricing-mode-manual-btn"
+                        type="button"
+                        aria-label={t('pricing.mode.manual')}
+                        title={t('pricing.mode.manual')}
+                        aria-pressed={selectedWorkflow === 'manual'}
+                        onClick={() => {
+                            setSelectedWorkflow('manual');
+                            setIsSecondaryExpanded(false);
+                        }}
+                        className={`text-left p-3 rounded-xl border transition-all cursor-pointer flex items-start gap-3 relative ${
+                            selectedWorkflow === 'manual'
+                                ? 'bg-red-50/60 dark:bg-red-950/25 border-[#dc0000] ring-1 ring-[#dc0000]/30 shadow-2xs'
+                                : 'bg-zinc-50/50 dark:bg-zinc-800/40 hover:bg-zinc-100/70 dark:hover:bg-zinc-800/80 border-zinc-200 dark:border-zinc-700/80'
+                        }`}
+                    >
+                        <div className={`p-2 rounded-lg shrink-0 mt-0.5 ${
+                            selectedWorkflow === 'manual'
+                                ? 'bg-[#dc0000] text-white shadow-2xs'
+                                : 'bg-zinc-200/70 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-300'
+                        }`}>
+                            <Calculator size={18} />
+                        </div>
+                        <div className="min-w-0 flex-1 pr-5">
+                            <div className="flex items-center gap-1.5">
+                                <span className={`text-xs font-bold leading-tight ${
+                                    selectedWorkflow === 'manual' ? 'text-[#dc0000] dark:text-red-400' : 'text-zinc-900 dark:text-white'
+                                }`}>
+                                    {t('pricing.mode.manual')}
+                                </span>
+                            </div>
+                            <p className="text-[11px] text-zinc-500 dark:text-zinc-400 leading-snug mt-0.5 m-0 line-clamp-2">
+                                {t('pricing.nav.manualDesc') || 'Direct configuration of printing, click, paper and finishing tables'}
+                            </p>
+                        </div>
+                        {selectedWorkflow === 'manual' && (
+                            <CheckCircle2 size={16} className="text-[#dc0000] dark:text-red-400 absolute top-3 right-3 shrink-0" />
+                        )}
                     </button>
                 </div>
             </div>

@@ -787,13 +787,18 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
                 <div className="md:hidden mt-2 pt-2 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-between text-xs px-1">
                     <span className="font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5">
                         <span className="w-2 h-2 rounded-full bg-[#dc0000] shrink-0" />
-                        <span>Paso {currentStep} de 5: {
-                            currentStep === 1 ? (t('wizard.step1') || 'Qué productos fabricas') :
-                            currentStep === 2 ? (t('wizard.step2') || 'Añadir presupuestos') :
-                            currentStep === 3 ? (t('wizard.step3') || 'Revisar especificaciones') :
-                            currentStep === 4 ? (t('wizard.step4') || 'Comparar cálculos') :
-                            (t('wizard.step5') || 'Aceptar propuesta')
-                        }</span>
+                        <span>
+                            {(t('wizard.stepIndicator') || 'Paso {step} de {total}: {title}')
+                                .replace('{step}', String(currentStep))
+                                .replace('{total}', '5')
+                                .replace('{title}', 
+                                    currentStep === 1 ? (t('wizard.step1') || 'Qué productos fabricas') :
+                                    currentStep === 2 ? (t('wizard.step2') || 'Añadir presupuestos') :
+                                    currentStep === 3 ? (t('wizard.step3') || 'Revisar especificaciones') :
+                                    currentStep === 4 ? (t('wizard.step4') || 'Comparar cálculos') :
+                                    (t('wizard.step5') || 'Aceptar propuesta')
+                                )}
+                        </span>
                     </span>
                 </div>
             </div>
@@ -809,7 +814,7 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
                                     <span>{t('wizard.step1') || 'Qué productos fabricas'}</span>
                                 </h2>
                                 <p className="text-xs sm:text-sm text-zinc-500 dark:text-zinc-400 mt-1 max-w-3xl">
-                                    Selecciona las familias de encuadernación que produce tu imprenta. Puedes aportar presupuestos reales existentes o introducir ofertas manualmente para calibrar las tarifas de tu taller. Cuatro familias son un marco de cobertura, no una obligación de cuatro documentos.
+                                    {t('wizard.step1Desc') || 'Selecciona las familias de encuadernación que produce tu imprenta. Puedes aportar presupuestos reales existentes o introducir ofertas manualmente para calibrar las tarifas de tu taller. Cuatro familias son un marco de cobertura, no una obligación de cuatro documentos.'}
                                 </p>
                             </div>
                             {onOpenAdvanced && (
@@ -818,7 +823,7 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
                                     onClick={onOpenAdvanced}
                                     className="px-3 py-1.5 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-200 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5 self-start shrink-0 cursor-pointer"
                                 >
-                                    <span>Modo Técnico Avanzado</span>
+                                    <span>{t('wizard.advancedTechnicalMode') || 'Modo Técnico Avanzado'}</span>
                                 </button>
                             )}
                         </div>
@@ -841,8 +846,8 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
                     <div className="p-4 bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 rounded-2xl flex items-start gap-3">
                         <Info size={18} className="text-[#dc0000] shrink-0 mt-0.5" />
                         <div className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed">
-                            <span className="font-bold text-zinc-900 dark:text-zinc-200">Garantía de Calibración Segura: </span>
-                            Cargar un presupuesto no equivale a validar ni calibrar una familia. El sistema exige la revisión explícita de las especificaciones y la aceptación gobernada antes de registrar cualquier revisión de tarifas. El marketplace y el enrutamiento público permanecen completamente inalterados durante este proceso.
+                            <span className="font-bold text-zinc-900 dark:text-zinc-200">{t('wizard.safeCalibrationGuarantee') || 'Garantía de Calibración Segura:'} </span>
+                            {t('wizard.safeCalibrationDesc') || 'Cargar un presupuesto no equivale a validar ni calibrar una familia. El sistema exige la revisión explícita de las especificaciones y la aceptación gobernada antes de registrar cualquier revisión de tarifas. El marketplace y el enrutamiento público permanecen completamente inalterados durante este proceso.'}
                         </div>
                     </div>
                 </div>
@@ -858,7 +863,8 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
                                 type="button"
                                 onClick={handleReturnToFamilySelector}
                                 className="p-2 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-200 rounded-xl transition-colors cursor-pointer"
-                                aria-label="Volver al selector de familias"
+                                aria-label={t('wizard.backToFamilySelector') || 'Volver al selector de familias'}
+                                title={t('wizard.backToFamilySelector') || 'Volver al selector de familias'}
                             >
                                 <ArrowLeft size={16} />
                             </button>
@@ -948,7 +954,7 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
                                 </div>
 
                                 <label className="px-5 py-2.5 bg-[#dc0000] hover:bg-[#b50000] text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer">
-                                    <span>Examinar archivo PDF</span>
+                                    <span>{t('entry.browsePdf') || 'Examinar archivo PDF'}</span>
                                     <input
                                         id="onboarding-pdf-upload-input"
                                         data-testid="onboarding-pdf-upload-input"
@@ -981,13 +987,13 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
                                         {t('form.quoteRef') || 'Referencia o Identificador del Presupuesto (Opcional)'}
                                     </label>
                                     <p className="text-[11px] text-zinc-500">
-                                        Puedes especificar el número o referencia interna del documento para su posterior trazabilidad y auditoría.
+                                        {t('form.quoteRefHelp') || 'Puedes especificar el número o referencia interna del documento para su posterior trazabilidad y auditoría.'}
                                     </p>
                                     <input
                                         type="text"
                                         value={currentOffer.quoteRef || ''}
                                         onChange={(e) => setCurrentOffer(prev => ({ ...prev, quoteRef: e.target.value }))}
-                                        placeholder="Ej: OFERTA-2026-001"
+                                        placeholder={t('form.quoteRefPlaceholder') || 'Ej: OFERTA-2026-001'}
                                         className="w-full px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-white font-medium text-xs"
                                     />
                                 </div>

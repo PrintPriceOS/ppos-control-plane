@@ -383,16 +383,18 @@ export const PrinthouseSetupHub: React.FC = () => {
                         <span>{t('onboarding.findSettingOrHelp') || 'Find a setting / Help'}</span>
                     </button>
 
-                    {/* Optional Guided Tutorial */}
-                    <button
-                        id="setup-guide-me-btn"
-                        type="button"
-                        onClick={() => setIsTutorialOpen(true)}
-                        className="px-3 py-1.5 bg-red-50 hover:bg-red-100 dark:bg-red-950/40 dark:hover:bg-red-900/60 text-[#dc0000] dark:text-red-400 border border-red-200 dark:border-red-800 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
-                    >
-                        <Compass size={14} />
-                        <span>{t('onboarding.guideMe') || 'Guide Me'}</span>
-                    </button>
+                    {/* Optional Guided Tutorial - Scoped strictly to Industrial Pricing */}
+                    {activeTab === 'PRICING' && (
+                        <button
+                            id="setup-guide-me-btn"
+                            type="button"
+                            onClick={() => setIsTutorialOpen(true)}
+                            className="px-3 py-1.5 bg-red-50 hover:bg-red-100 dark:bg-red-950/40 dark:hover:bg-red-900/60 text-[#dc0000] dark:text-red-400 border border-red-200 dark:border-red-800 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+                        >
+                            <Compass size={14} />
+                            <span>{t('onboarding.guidePricing') || t('onboarding.guideMe') || 'Guide Pricing'}</span>
+                        </button>
+                    )}
 
                     {/* Language Switcher (EN -> ES -> DE) */}
                     <button

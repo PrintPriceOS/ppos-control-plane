@@ -208,38 +208,54 @@ export const GovernedAcceptanceView: React.FC<GovernedAcceptanceViewProps> = ({
                         <div className="p-2.5 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 flex items-center gap-2 shadow-2xs">
                             <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
                             <div>
-                                <div className="font-bold text-[11px] text-zinc-900 dark:text-zinc-100">Activación Comercial Inalterada</div>
-                                <div className="text-[10px] text-zinc-500 dark:text-zinc-400">Sin permisos implícitos de Marketplace</div>
+                                <div className="font-bold text-[11px] text-zinc-900 dark:text-zinc-100">
+                                    {t('accept.commercialNoticeTitle') || 'Activación Comercial Inalterada'}
+                                </div>
+                                <div className="text-[10px] text-zinc-500 dark:text-zinc-400">
+                                    {t('accept.commercialNoticeDesc') || 'Sin permisos implícitos de Marketplace'}
+                                </div>
                             </div>
                         </div>
                         <div className="p-2.5 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 flex items-center gap-2 shadow-2xs">
                             <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
                             <div>
-                                <div className="font-bold text-[11px] text-zinc-900 dark:text-zinc-100">Sin Quoting ni Routing Público</div>
-                                <div className="text-[10px] text-zinc-500 dark:text-zinc-400">Despacho vivo bloqueado</div>
+                                <div className="font-bold text-[11px] text-zinc-900 dark:text-zinc-100">
+                                    {t('accept.noPublicRoutingTitle') || 'Sin Quoting ni Routing Público'}
+                                </div>
+                                <div className="text-[10px] text-zinc-500 dark:text-zinc-400">
+                                    {t('accept.noPublicRoutingDesc') || 'Despacho vivo bloqueado'}
+                                </div>
                             </div>
                         </div>
                         <div className="p-2.5 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 flex items-center gap-2 shadow-2xs">
                             <span className="w-2 h-2 rounded-full bg-blue-500 shrink-0" />
                             <div>
-                                <div className="font-bold text-[11px] text-zinc-900 dark:text-zinc-100">Aislamiento Estricto de Tenant</div>
-                                <div className="text-[10px] text-zinc-500 dark:text-zinc-400">Sin fugas cross-tenant</div>
+                                <div className="font-bold text-[11px] text-zinc-900 dark:text-zinc-100">
+                                    {t('accept.tenantIsolationTitle') || 'Aislamiento Estricto de Tenant'}
+                                </div>
+                                <div className="text-[10px] text-zinc-500 dark:text-zinc-400">
+                                    {t('accept.tenantIsolationDesc') || 'Sin fugas cross-tenant'}
+                                </div>
                             </div>
                         </div>
                         <div className="p-2.5 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 flex items-center gap-2 shadow-2xs">
                             <span className="w-2 h-2 rounded-full bg-purple-500 shrink-0" />
                             <div>
-                                <div className="font-bold text-[11px] text-zinc-900 dark:text-zinc-100">Revisiones Inmutables</div>
-                                <div className="text-[10px] text-zinc-500 dark:text-zinc-400">Historial no sobreescribible</div>
+                                <div className="font-bold text-[11px] text-zinc-900 dark:text-zinc-100">
+                                    {t('accept.immutableRevisionTitle') || 'Revisiones Inmutables'}
+                                </div>
+                                <div className="text-[10px] text-zinc-500 dark:text-zinc-400">
+                                    {t('accept.immutableRevisionDesc') || 'Historial no sobreescribible'}
+                                </div>
                             </div>
                         </div>
                     </div>
 
                     <ul className="text-[11px] text-zinc-600 dark:text-zinc-300 space-y-1 list-disc list-inside">
-                        <li>La aceptación guarda una nueva revisión inmutable en el registro de auditoría del nodo.</li>
-                        <li><strong>No concede permisos de Marketplace</strong>, cotización comercial pública ni enrutamiento de pedidos como efecto implícito de este recorrido.</li>
-                        <li>Mantiene rigurosamente separados los conceptos y cálculos de fabricación y transporte.</li>
-                        <li>Las sesiones de calibración históricas previas se conservan íntegras sin sobreescritura.</li>
+                        <li>{t('accept.governancePoint1') || 'La aceptación guarda una nueva revisión inmutable en el registro de auditoría del nodo.'}</li>
+                        <li>{t('accept.governancePoint2') || 'No concede permisos de Marketplace, cotización comercial pública ni enrutamiento de pedidos como efecto implícito de este recorrido.'}</li>
+                        <li>{t('accept.governancePoint3') || 'Mantiene rigurosamente separados los conceptos y cálculos de fabricación y transporte.'}</li>
+                        <li>{t('accept.governancePoint4') || 'Las sesiones de calibración históricas previas se conservan íntegras sin sobreescritura.'}</li>
                     </ul>
                 </div>
             </div>

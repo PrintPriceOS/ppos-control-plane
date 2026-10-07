@@ -34,6 +34,10 @@ SCREENSHOTS = [
     "18_setup_hub_machines_form_open_light_de.png",
     "19_setup_hub_pricing_calibrated_light_en.png",
     "20_setup_hub_pricing_calibrated_light_de.png",
+    "21_setup_hub_company_profile_no_guide_light.png",
+    "22_setup_hub_pricing_add_quotes_dark.png",
+    "23_setup_hub_pricing_add_quotes_light.png",
+    "24_setup_hub_pricing_mobile_390x844_dark.png",
 ]
 
 SRC_SCREENSHOTS_DIR = os.path.abspath("review_artifacts_ux_setup_audit")

@@ -580,8 +580,62 @@ def run():
             
         save_evidence(pricing_page, "07_setup_hub_pricing_manual_rates_dark.png", "Pricing Tab: Manual Rate Editor in Dark Mode")
             
+        # View D: Add Quotes Step (Step 2) in Dark and Light themes
+        products_btn = pricing_page.query_selector("#pricing-mode-onboarding-btn")
+        if products_btn:
+            products_btn.click()
+            pricing_page.wait_for_timeout(400)
+            # Click Softcover to enter Step 2 (Add quotes)
+            softcover_card = pricing_page.locator("button:has-text('Aportar presupuesto'), button:has-text('Provide quote'), button:has-text('Configurar familia'), [aria-label*='Rústica'], [aria-label*='Softcover']").first
+            if softcover_card and softcover_card.count() > 0:
+                softcover_card.click()
+                pricing_page.wait_for_timeout(600)
+                save_evidence(pricing_page, "22_setup_hub_pricing_add_quotes_dark.png", "Pricing Tab: Add Quotes Step in Dark Mode")
+                
+                # Light theme
+                pricing_page.evaluate("""() => {
+                    localStorage.setItem('theme', 'light');
+                    document.documentElement.classList.remove('dark');
+                }""")
+                pricing_page.wait_for_timeout(400)
+                save_evidence(pricing_page, "23_setup_hub_pricing_add_quotes_light.png", "Pricing Tab: Add Quotes Step in Light Mode")
+                
+                # Restore dark theme for subsequent tests
+                pricing_page.evaluate("""() => {
+                    localStorage.setItem('theme', 'dark');
+                    document.documentElement.classList.add('dark');
+                }""")
+                pricing_page.wait_for_timeout(400)
+            else:
+                print("WARNING: softcover_card not found for Add Quotes capture!")
+
         pricing_context.close()
         
+        # ── Test Suite 3B: Company Profile View (Verify Guide Button Absence) ──
+        print("\n--- Verifying Company Profile View (Contextual Guide Scope) ---")
+        company_context = browser.new_context(viewport={"width": 1366, "height": 768}, device_scale_factor=1.0)
+        company_page = company_context.new_page()
+        company_page.on("pageerror", lambda err: app_errors.append(f"COMPANY PAGE ERROR: {err}"))
+        setup_intercepts(company_page, MOCK_ONBOARDING_DATA)
+        company_page.goto("http://localhost:3000/printhouse/setup?tab=COMPANY")
+        company_page.evaluate("""() => {
+            localStorage.setItem('ppos_locale', 'en');
+            localStorage.setItem('locale', 'en');
+            localStorage.setItem('theme', 'light');
+            document.documentElement.classList.remove('dark');
+        }""")
+        company_page.reload()
+        company_page.wait_for_timeout(1000)
+        
+        # Assert Guide Pricing button #setup-guide-me-btn is NOT present in Company Profile
+        guide_btn_company = company_page.query_selector("#setup-guide-me-btn")
+        if guide_btn_company and guide_btn_company.is_visible():
+            print("FATAL: Guide button #setup-guide-me-btn was found in Company Profile tab!")
+            sys.exit(1)
+        print("  [OK] Confirmed #setup-guide-me-btn is NOT visible in Company Profile tab.")
+        save_evidence(company_page, "21_setup_hub_company_profile_no_guide_light.png", "Company Profile: No Guide Button in Header (Light)")
+        company_context.close()
+
         # ── Test Suite 4: Mobile Responsiveness (390x844) ──
         print("\n--- Capturing Mobile Responsiveness (390x844) ---")
         mobile_context = browser.new_context(viewport={"width": 390, "height": 844}, is_mobile=True)
@@ -597,6 +651,23 @@ def run():
         mobile_page.reload()
         mobile_page.wait_for_timeout(1000)
         save_evidence(mobile_page, "08_setup_hub_overview_mobile_390x844_dark.png", "Mobile Overview at 390x844")
+        
+        # Also check mobile pricing tab to ensure no horizontal overflow
+        mobile_page.goto("http://localhost:3000/printhouse/setup?tab=PRICING")
+        mobile_page.wait_for_timeout(1000)
+        mob_overflow = mobile_page.evaluate("""() => {
+            const doc = document.documentElement;
+            return {
+                scrollWidth: doc.scrollWidth,
+                clientWidth: doc.clientWidth,
+                zeroHorizontalOverflow: doc.scrollWidth <= doc.clientWidth
+            };
+        }""")
+        print(f"  [Mobile 390x844 Pricing] scrollWidth={mob_overflow['scrollWidth']}, clientWidth={mob_overflow['clientWidth']} (Zero horizontal overflow: {mob_overflow['zeroHorizontalOverflow']})")
+        if not mob_overflow['zeroHorizontalOverflow']:
+            print("FATAL: Mobile Pricing view has horizontal overflow!")
+            sys.exit(1)
+        save_evidence(mobile_page, "24_setup_hub_pricing_mobile_390x844_dark.png", "Mobile Pricing View at 390x844")
         mobile_context.close()
         
         # ── Test Suite 5: Machinery Form Open (ES/EN/DE, Light/Dark, Vertical Scroll & Zero Horizontal Overflow) ──

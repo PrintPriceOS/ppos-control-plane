@@ -109,6 +109,10 @@ def main():
 
     # Scoped files touched by this refactor
     scoped_files = [
+        "src/ui/pages/printhouse/PrinthouseSetupHub.tsx",
+        "src/ui/components/printhouse/setup/PricingPanel.tsx",
+        "src/ui/components/printhouse/onboarding/SimplifiedOnboardingJourney.tsx",
+        "src/ui/components/printhouse/onboarding/GovernedAcceptanceView.tsx",
         "src/ui/components/printhouse/setup/CapacityPanel.tsx",
         "src/ui/components/printhouse/setup/LeadTimesPanel.tsx",
         "src/ui/components/printhouse/setup/MachineFleetPanel.tsx",

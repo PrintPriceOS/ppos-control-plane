@@ -289,11 +289,11 @@ describe('Printhouse Onboarding Redesign & Regression Tests', () => {
 
         // Compact header elements
         expect(screen.getByText(/Find a setting or get help/i)).toBeInTheDocument();
-        const guideMeBtn = screen.getByRole('button', { name: /Guide me/i });
-        expect(guideMeBtn).toBeInTheDocument();
+        const guidePricingBtn = screen.getByRole('button', { name: /(Guide Pricing|Guide me)/i });
+        expect(guidePricingBtn).toBeInTheDocument();
 
         // 1. Open Guide Me tutorial overlay
-        fireEvent.click(guideMeBtn);
+        fireEvent.click(guidePricingBtn);
         const tutorialDialog = screen.getByRole('dialog', { name: /Interactive Guided Tutorial/i });
         expect(tutorialDialog).toBeInTheDocument();
 
@@ -370,7 +370,7 @@ describe('Printhouse Onboarding Redesign & Regression Tests', () => {
         expect(screen.queryByRole('dialog', { name: /Interactive Guided Tutorial/i })).not.toBeInTheDocument();
 
         // Re-open and verify Exit via X button
-        fireEvent.click(guideMeBtn);
+        fireEvent.click(guidePricingBtn);
         expect(screen.getByRole('dialog', { name: /Interactive Guided Tutorial/i })).toBeInTheDocument();
         const exitBtn = screen.getByRole('button', { name: /Exit tutorial/i });
         fireEvent.click(exitBtn);
@@ -380,6 +380,14 @@ describe('Printhouse Onboarding Redesign & Regression Tests', () => {
         const helpBtn = screen.getByRole('button', { name: /Find a setting or get help/i });
         fireEvent.click(helpBtn);
         expect(screen.getByLabelText(/Search settings and help documentation/i)).toBeInTheDocument();
+        fireEvent.keyDown(window, { key: 'Escape' });
+
+        // Verify contextual scoping: Switch to Company Profile tab -> Guide Pricing MUST NOT be rendered
+        const moduleSwitcherBtn = screen.getByRole('button', { name: /Setup Sections/i });
+        fireEvent.click(moduleSwitcherBtn);
+        const companySectionBtn = screen.getByRole('button', { name: /Company Profile/i });
+        fireEvent.click(companySectionBtn);
+        expect(screen.queryByRole('button', { name: /(Guide Pricing|Guide me)/i })).not.toBeInTheDocument();
     });
 
     it('9. Pricing container state preservation: draft, conversation, evidenceId, and variant survive mode toggling and drawer actions', async () => {

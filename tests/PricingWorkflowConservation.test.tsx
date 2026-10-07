@@ -208,7 +208,7 @@ describe('Pricing Workflow Navigation & State Conservation Regressions', () => {
         expect(screen.getByText(/Softcover \/ Paperback/i)).toBeInTheDocument();
 
         // 2. Edit quote reference on the Softcover offer
-        const quoteRefInput = screen.getByPlaceholderText(/OFERTA-2026-001/i);
+        const quoteRefInput = screen.getByPlaceholderText(/(OFERTA-2026-001|QUOTE-2026-001|ANGEBOT-2026-001)/i);
         await act(async () => {
             fireEvent.change(quoteRefInput, { target: { value: 'OFERTA-SOFTCOVER-42' } });
         });
@@ -736,7 +736,7 @@ describe('Pricing Workflow Navigation & State Conservation Regressions', () => {
         });
 
         // Edit quote reference
-        const quoteRefInput = screen.getByPlaceholderText(/OFERTA-2026-001/i);
+        const quoteRefInput = screen.getByPlaceholderText(/(OFERTA-2026-001|QUOTE-2026-001|ANGEBOT-2026-001)/i);
         await act(async () => {
             fireEvent.change(quoteRefInput, { target: { value: 'OFERTA-PRESERVED-SAME-FAMILY' } });
         });
