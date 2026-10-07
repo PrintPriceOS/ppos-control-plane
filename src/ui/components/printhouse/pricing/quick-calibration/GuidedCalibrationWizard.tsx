@@ -505,12 +505,14 @@ export const GuidedCalibrationWizard: React.FC<GuidedCalibrationWizardProps> = (
                 <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 shadow-sm space-y-6">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-100 dark:border-zinc-800 pb-4">
                         <div>
-                            <span className="text-[11px] font-bold uppercase tracking-wider text-[#dc0000] dark:text-red-400">Step 2 of 5</span>
+                            <span className="text-[11px] font-bold uppercase tracking-wider text-[#dc0000] dark:text-red-400">
+                                {(t('pricing.wizard.step') || 'Step {step} of {total}').replace('{step}', '2').replace('{total}', '5')}
+                            </span>
                             <h3 className="text-lg font-bold text-zinc-900 dark:text-white mt-0.5">
-                                Review & Edit Specification
+                                {t('pricing.wizard.step2.title') || 'Review & Edit Specification'}
                             </h3>
                             <p className="text-xs text-zinc-500 mt-0.5">
-                                PrintPriceOS extracted these specifications. You can adjust any field directly below without calling the assistant again.
+                                {t('pricing.wizard.step2.subtitle') || 'PrintPriceOS extracted these specifications. You can adjust any field directly below without calling the assistant again.'}
                             </p>
                         </div>
                     </div>
@@ -519,7 +521,7 @@ export const GuidedCalibrationWizard: React.FC<GuidedCalibrationWizardProps> = (
                         {/* Quantity */}
                         <div className="p-3.5 bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200 dark:border-zinc-700/80 rounded-xl space-y-1.5">
                             <label className="block text-[11px] font-bold text-zinc-700 dark:text-zinc-300">
-                                Quantity (Copies) *
+                                {t('pricing.wizard.step2.quantity') || 'Quantity (Copies) *'}
                             </label>
                             <input
                                 type="number"
@@ -537,7 +539,7 @@ export const GuidedCalibrationWizard: React.FC<GuidedCalibrationWizardProps> = (
                         {/* Trim Dimensions */}
                         <div className="p-3.5 bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200 dark:border-zinc-700/80 rounded-xl space-y-1.5">
                             <label className="block text-[11px] font-bold text-zinc-700 dark:text-zinc-300">
-                                Trim Dimensions (W × H mm) *
+                                {t('pricing.wizard.step2.trimSize') || 'Trim Dimensions (W × H mm) *'}
                             </label>
                             <div className="flex items-center gap-2">
                                 <input
@@ -571,7 +573,7 @@ export const GuidedCalibrationWizard: React.FC<GuidedCalibrationWizardProps> = (
                         {/* Interior Pages & Print */}
                         <div className="p-3.5 bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200 dark:border-zinc-700/80 rounded-xl space-y-1.5">
                             <label className="block text-[11px] font-bold text-zinc-700 dark:text-zinc-300">
-                                Interior Pages & Print *
+                                {t('pricing.wizard.step2.interiorPagesPrint') || 'Interior Pages & Print *'}
                             </label>
                             <div className="flex items-center gap-2">
                                 <input
@@ -590,9 +592,9 @@ export const GuidedCalibrationWizard: React.FC<GuidedCalibrationWizardProps> = (
                                     onChange={e => setDraftSpec((p: any) => ({ ...p, interior_print: e.target.value }))}
                                     className="w-1/2 px-2 py-2 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg text-zinc-900 dark:text-white font-medium text-xs focus:ring-2 focus:ring-[#dc0000]/20 focus:outline-none"
                                 >
-                                    <option value="4/4">4/4 Full Colour</option>
-                                    <option value="1/1">1/1 Black</option>
-                                    <option value="2/2">2/2 Two Colour</option>
+                                    <option value="4/4">{t('pricing.smoke.print.4_4') || '4/4 Full Colour'}</option>
+                                    <option value="1/1">{t('pricing.smoke.print.1_1') || '1/1 Black'}</option>
+                                    <option value="2/2">{t('pricing.smoke.print.2_2') || '2/2 Two Colour'}</option>
                                 </select>
                             </div>
                         </div>
@@ -600,7 +602,7 @@ export const GuidedCalibrationWizard: React.FC<GuidedCalibrationWizardProps> = (
                         {/* Interior Paper */}
                         <div className="p-3.5 bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200 dark:border-zinc-700/80 rounded-xl space-y-1.5">
                             <label className="block text-[11px] font-bold text-zinc-700 dark:text-zinc-300">
-                                Interior Paper *
+                                {t('pricing.wizard.step2.interiorPaper') || 'Interior Paper *'}
                             </label>
                             <div className="flex items-center gap-2">
                                 <input
@@ -620,11 +622,11 @@ export const GuidedCalibrationWizard: React.FC<GuidedCalibrationWizardProps> = (
                                     onChange={e => setDraftSpec((p: any) => ({ ...p, paper_type_interior: e.target.value || undefined }))}
                                     className="w-1/2 px-2 py-2 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg text-zinc-900 dark:text-white font-medium text-xs focus:ring-2 focus:ring-[#dc0000]/20 focus:outline-none"
                                 >
-                                    <option value="">Select Paper</option>
-                                    <option value="offset">Offset</option>
-                                    <option value="mc">Coated (MC)</option>
+                                    <option value="">{t('pricing.wizard.step2.selectPaper') || 'Select Paper'}</option>
+                                    <option value="offset">{t('pricing.smoke.paper.offset') || 'Offset'}</option>
+                                    <option value="mc">{t('pricing.smoke.paper.mc') || 'Coated (MC)'}</option>
                                     <option value="lux">Lux Paper</option>
-                                    <option value="munken">Munken</option>
+                                    <option value="munken">{t('pricing.smoke.paper.munken') || 'Munken'}</option>
                                     <option value="other">Other</option>
                                 </select>
                             </div>
@@ -633,7 +635,7 @@ export const GuidedCalibrationWizard: React.FC<GuidedCalibrationWizardProps> = (
                         {/* Cover Specification */}
                         <div className="p-3.5 bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200 dark:border-zinc-700/80 rounded-xl space-y-1.5">
                             <label className="block text-[11px] font-bold text-zinc-700 dark:text-zinc-300">
-                                Cover Weight & Paper *
+                                {t('pricing.wizard.step2.coverPaper') || 'Cover Weight & Paper *'}
                             </label>
                             <div className="flex items-center gap-2">
                                 <input
@@ -653,10 +655,10 @@ export const GuidedCalibrationWizard: React.FC<GuidedCalibrationWizardProps> = (
                                     onChange={e => setDraftSpec((p: any) => ({ ...p, paper_type_cover: e.target.value || undefined }))}
                                     className="w-1/2 px-2 py-2 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg text-zinc-900 dark:text-white font-medium text-xs focus:ring-2 focus:ring-[#dc0000]/20 focus:outline-none"
                                 >
-                                    <option value="">Select Cover Paper</option>
-                                    <option value="mc">Coated (MC)</option>
+                                    <option value="">{t('pricing.wizard.step2.selectCoverPaper') || 'Select Cover Paper'}</option>
+                                    <option value="mc">{t('pricing.smoke.paper.mc') || 'Coated (MC)'}</option>
                                     <option value="artboard">Artboard</option>
-                                    <option value="offset">Offset</option>
+                                    <option value="offset">{t('pricing.smoke.paper.offset') || 'Offset'}</option>
                                     <option value="wfmc">WFMC</option>
                                     <option value="other">Other</option>
                                 </select>
@@ -666,7 +668,7 @@ export const GuidedCalibrationWizard: React.FC<GuidedCalibrationWizardProps> = (
                         {/* Cover Print & Lamination */}
                         <div className="p-3.5 bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200 dark:border-zinc-700/80 rounded-xl space-y-1.5">
                             <label className="block text-[11px] font-bold text-zinc-700 dark:text-zinc-300">
-                                Cover Print & Finishing
+                                {t('pricing.wizard.step2.coverPrintFinish') || 'Cover Print & Finishing'}
                             </label>
                             <div className="flex items-center gap-2">
                                 <select
@@ -674,10 +676,10 @@ export const GuidedCalibrationWizard: React.FC<GuidedCalibrationWizardProps> = (
                                     onChange={e => setDraftSpec((p: any) => ({ ...p, cover_print: e.target.value || undefined }))}
                                     className="w-1/2 px-2 py-2 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg text-zinc-900 dark:text-white font-medium text-xs focus:ring-2 focus:ring-[#dc0000]/20 focus:outline-none"
                                 >
-                                    <option value="">Select Cover Print *</option>
-                                    <option value="4/0">4/0 Front Only</option>
-                                    <option value="4/4">4/4 Both Sides</option>
-                                    <option value="1/0">1/0 Front Black</option>
+                                    <option value="">{t('pricing.wizard.step2.selectCoverPrint') || 'Select Cover Print *'}</option>
+                                    <option value="4/0">{t('pricing.smoke.coverPrint.4_0') || '4/0 Front Only'}</option>
+                                    <option value="4/4">{t('pricing.smoke.coverPrint.4_4') || '4/4 Both Sides'}</option>
+                                    <option value="1/0">{t('pricing.smoke.coverPrint.1_0') || '1/0 Front Black'}</option>
                                     <option value="1/1">1/1 Black Both</option>
                                 </select>
                                 <select
@@ -685,9 +687,9 @@ export const GuidedCalibrationWizard: React.FC<GuidedCalibrationWizardProps> = (
                                     onChange={e => setDraftSpec((p: any) => ({ ...p, lamination: e.target.value || null }))}
                                     className="w-1/2 px-2 py-2 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg text-zinc-900 dark:text-white font-medium text-xs focus:ring-2 focus:ring-[#dc0000]/20 focus:outline-none"
                                 >
-                                    <option value="">No Lamination</option>
-                                    <option value="matt">Matt Lam</option>
-                                    <option value="gloss">Gloss Lam</option>
+                                    <option value="">{t('pricing.smoke.lamination.none') || 'No Lamination'}</option>
+                                    <option value="matt">{t('pricing.smoke.lamination.matt') || 'Matt Lam'}</option>
+                                    <option value="gloss">{t('pricing.smoke.lamination.gloss') || 'Gloss Lam'}</option>
                                     <option value="varnish">Varnish</option>
                                 </select>
                             </div>
@@ -696,38 +698,38 @@ export const GuidedCalibrationWizard: React.FC<GuidedCalibrationWizardProps> = (
                         {/* Binding Method */}
                         <div className="p-3.5 bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200 dark:border-zinc-700/80 rounded-xl space-y-1.5">
                             <label className="block text-[11px] font-bold text-zinc-700 dark:text-zinc-300">
-                                Binding Method *
+                                {t('pricing.wizard.step2.binding') || 'Binding Method *'}
                             </label>
                             <select
                                 value={draftSpec.binding_method || 'perfect bound'}
                                 onChange={e => setDraftSpec((p: any) => ({ ...p, binding_method: e.target.value }))}
                                 className="w-full px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-lg text-zinc-900 dark:text-white font-medium text-xs focus:ring-2 focus:ring-[#dc0000]/20 focus:outline-none"
                             >
-                                <option value="perfect bound">Perfect Bound (Paperback)</option>
-                                <option value="saddle stitch">Saddle Stitch (Booklet)</option>
-                                <option value="thread sewn">Thread Sewn</option>
-                                <option value="hardcover">Hardcover (Case Bound)</option>
-                                <option value="wire-o">Wire-O</option>
-                                <option value="spiral">Spiral</option>
+                                <option value="perfect bound">{t('pricing.smoke.binding.perfectBound') || 'Perfect Bound (Paperback)'}</option>
+                                <option value="saddle stitch">{t('pricing.smoke.binding.saddleStitch') || 'Saddle Stitch (Booklet)'}</option>
+                                <option value="thread sewn">{t('pricing.smoke.binding.threadSewn') || 'Thread Sewn'}</option>
+                                <option value="hardcover">{t('pricing.smoke.binding.hardcover') || 'Hardcover (Case Bound)'}</option>
+                                <option value="wire-o">{t('pricing.smoke.binding.wireO') || 'Wire-O'}</option>
+                                <option value="spiral">{t('pricing.smoke.binding.spiral') || 'Spiral'}</option>
                             </select>
                         </div>
 
                         {/* Destination Country */}
                         <div className="p-3.5 bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200 dark:border-zinc-700/80 rounded-xl space-y-1.5">
                             <label className="block text-[11px] font-bold text-zinc-700 dark:text-zinc-300">
-                                Destination Region / Country
+                                {t('pricing.wizard.step2.destination') || 'Destination Region / Country'}
                             </label>
                             <CountrySelect
                                 value={draftSpec.delivery_country || ''}
                                 onChange={(code) => setDraftSpec((p: any) => ({ ...p, delivery_country: code || undefined }))}
-                                placeholder="Select destination (e.g. Poland, Japan)..."
+                                placeholder={t('pricing.wizard.step2.selectDestinationPlaceholder') || 'Select destination (e.g. Poland, Japan)...'}
                             />
                         </div>
                     </div>
 
                     {!isStep1Complete && (
                         <div className="p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-xl text-xs text-amber-900 dark:text-amber-200 flex items-center justify-between">
-                            <span className="font-semibold">Fill in the required fields marked with (*) above to continue.</span>
+                            <span className="font-semibold">{t('pricing.wizard.step2.requiredNotice') || 'Fill in the required fields marked with (*) above to continue.'}</span>
                         </div>
                     )}
 
@@ -738,7 +740,7 @@ export const GuidedCalibrationWizard: React.FC<GuidedCalibrationWizardProps> = (
                             className="px-4 py-2 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 text-xs font-semibold flex items-center gap-1.5"
                         >
                             <ArrowLeft size={14} />
-                            <span>Redo AI Description</span>
+                            <span>{t('pricing.wizard.step2.redoAi') || 'Redo AI Description'}</span>
                         </button>
 
                         <button
@@ -753,7 +755,7 @@ export const GuidedCalibrationWizard: React.FC<GuidedCalibrationWizardProps> = (
                             disabled={!isStep1Complete}
                             className="px-5 py-2.5 bg-[#dc0000] hover:bg-[#b00000] disabled:bg-zinc-300 dark:disabled:bg-zinc-800 text-white text-xs font-bold rounded-xl transition-colors flex items-center gap-2 shadow-sm disabled:cursor-not-allowed"
                         >
-                            <span>Confirm Specification & Continue</span>
+                            <span>{t('pricing.wizard.step2.confirmContinue') || 'Confirm Specification & Continue'}</span>
                             <ArrowRight size={14} />
                         </button>
                     </div>
@@ -764,12 +766,14 @@ export const GuidedCalibrationWizard: React.FC<GuidedCalibrationWizardProps> = (
             {step === 3 && (
                 <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 shadow-sm space-y-6">
                     <div>
-                        <span className="text-[11px] font-bold uppercase tracking-wider text-[#dc0000] dark:text-red-400">Step 3 of 5</span>
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-[#dc0000] dark:text-red-400">
+                            {(t('pricing.wizard.step') || 'Step {step} of {total}').replace('{step}', '3').replace('{total}', '5')}
+                        </span>
                         <h3 className="text-lg font-bold text-zinc-900 dark:text-white mt-1">
-                            What did this job cost you to manufacture?
+                            {t('pricing.wizard.step3.title') || 'What did this job cost you to manufacture?'}
                         </h3>
                         <p className="text-xs text-zinc-500 mt-1">
-                            Provide your known internal production cost and verify which components were covered.
+                            {t('pricing.wizard.step3.subtitle') || 'Provide your known internal production cost and verify which components were covered.'}
                         </p>
                     </div>
 
@@ -778,7 +782,7 @@ export const GuidedCalibrationWizard: React.FC<GuidedCalibrationWizardProps> = (
                         <div className="p-5 bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200 dark:border-zinc-700/80 rounded-xl space-y-4">
                             <div>
                                 <label className="block text-xs font-bold text-zinc-800 dark:text-zinc-200 mb-1.5">
-                                    Known Manufacturing Cost (€)
+                                    {t('pricing.wizard.step3.knownCost') || 'Known Manufacturing Cost (€)'}
                                 </label>
                                 <div className="relative">
                                     <span className="absolute left-3.5 top-2.5 text-zinc-400 font-bold">€</span>
@@ -796,13 +800,13 @@ export const GuidedCalibrationWizard: React.FC<GuidedCalibrationWizardProps> = (
                                     />
                                 </div>
                                 <p className="text-[11px] text-zinc-500 mt-1.5">
-                                    Total net internal cost to produce the {draftSpec.copies?.toLocaleString() || 1000} copies.
+                                    {(t('pricing.wizard.step3.costHelp') || 'Total net internal cost to produce the {copies} copies.').replace('{copies}', (draftSpec.copies?.toLocaleString() || '1000'))}
                                 </p>
                             </div>
 
                             <div>
                                 <label className="block text-xs font-bold text-zinc-800 dark:text-zinc-200 mb-1.5">
-                                    Transport Cost Reference (€ / kg) — Optional
+                                    {t('pricing.wizard.step3.transportRef') || 'Transport Cost Reference (€ / kg) — Optional'}
                                 </label>
                                 <div className="relative">
                                     <span className="absolute left-3.5 top-2.5 text-zinc-400 font-bold">€</span>
@@ -820,7 +824,7 @@ export const GuidedCalibrationWizard: React.FC<GuidedCalibrationWizardProps> = (
                                     />
                                 </div>
                                 <p className="text-[11px] text-zinc-500 mt-1">
-                                    External reference only. Transport is not mixed into manufacturing rates.
+                                    {t('pricing.wizard.step3.transportHelp') || 'External reference only. Transport is not mixed into manufacturing rates.'}
                                 </p>
                             </div>
                         </div>
@@ -828,14 +832,14 @@ export const GuidedCalibrationWizard: React.FC<GuidedCalibrationWizardProps> = (
                         {/* Inclusions Checklist */}
                         <div className="p-5 bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200 dark:border-zinc-700/80 rounded-xl space-y-3">
                             <span className="text-xs font-bold text-zinc-800 dark:text-zinc-200 block">
-                                What was included in this € amount?
+                                {t('pricing.wizard.step3.inclusionsTitle') || 'What was included in this € amount?'}
                             </span>
 
                             {[
-                                { key: 'includesPaper', label: 'Paper Stock / Substrates' },
-                                { key: 'includesBinding', label: 'Binding & Stitching Operations' },
-                                { key: 'includesFinishing', label: 'Lamination / Surface Finishing' },
-                                { key: 'includesPackaging', label: 'Boxes & Pallet Packaging' }
+                                { key: 'includesPaper', label: t('pricing.wizard.step3.includePaper') || 'Paper Stock / Substrates' },
+                                { key: 'includesBinding', label: t('pricing.wizard.step3.includeBinding') || 'Binding & Stitching Operations' },
+                                { key: 'includesFinishing', label: t('pricing.wizard.step3.includeFinishing') || 'Lamination / Surface Finishing' },
+                                { key: 'includesPackaging', label: t('pricing.wizard.step3.includePackaging') || 'Boxes & Pallet Packaging' }
                             ].map(item => (
                                 <label key={item.key} className="flex items-center gap-3 p-2.5 bg-white dark:bg-zinc-800 rounded-xl border border-zinc-200/60 dark:border-zinc-700/60 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-700/50 transition-colors">
                                     <input
@@ -860,7 +864,7 @@ export const GuidedCalibrationWizard: React.FC<GuidedCalibrationWizardProps> = (
                             className="px-4 py-2 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 text-xs font-semibold flex items-center gap-1.5"
                         >
                             <ArrowLeft size={14} />
-                            <span>Back</span>
+                            <span>{t('pricing.wizard.back') || 'Back'}</span>
                         </button>
 
                         <button
@@ -876,7 +880,7 @@ export const GuidedCalibrationWizard: React.FC<GuidedCalibrationWizardProps> = (
                             disabled={!isStep3Complete}
                             className="px-6 py-2.5 bg-[#dc0000] hover:bg-[#b00000] disabled:bg-zinc-300 dark:disabled:bg-zinc-800 text-white text-xs font-bold rounded-xl transition-colors flex items-center gap-2 shadow-sm cursor-pointer disabled:cursor-not-allowed"
                         >
-                            <span>Use this job to calibrate my pricing</span>
+                            <span>{t('pricing.wizard.step3.calibrateBtn') || 'Use this job to calibrate my pricing'}</span>
                             <ArrowRight size={14} />
                         </button>
                     </div>
@@ -887,12 +891,14 @@ export const GuidedCalibrationWizard: React.FC<GuidedCalibrationWizardProps> = (
             {step === 4 && (
                 <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 shadow-sm space-y-6">
                     <div>
-                        <span className="text-[11px] font-bold uppercase tracking-wider text-[#dc0000] dark:text-red-400">Step 4 of 5</span>
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-[#dc0000] dark:text-red-400">
+                            {(t('pricing.wizard.step') || 'Step {step} of {total}').replace('{step}', '4').replace('{total}', '5')}
+                        </span>
                         <h3 className="text-lg font-bold text-zinc-900 dark:text-white mt-1">
-                            Calibrate & Apply Starting Pricing
+                            {t('pricing.wizard.step4.title') || 'Calibrate & Apply Starting Pricing'}
                         </h3>
                         <p className="text-xs text-zinc-500 mt-1">
-                            Align your base printing, paper, and binding rates to match this reference job.
+                            {t('pricing.wizard.step4.subtitle') || 'Align your base printing, paper, and binding rates to match this reference job.'}
                         </p>
                     </div>
 
@@ -915,7 +921,7 @@ export const GuidedCalibrationWizard: React.FC<GuidedCalibrationWizardProps> = (
                                         : (t('pricing.calibration.setupIncomplete') || 'Calibration Setup Incomplete')}
                                 </span>
                                 <p className="text-xs text-zinc-500 mt-0.5">
-                                    Target Price: <strong className="text-zinc-800 dark:text-zinc-200">€ {draftCommercials.targetManufacturingPrice}</strong> for {draftSpec.copies?.toLocaleString()} copies.
+                                    {t('pricing.wizard.step4.targetPrice') || 'Target Price:'} <strong className="text-zinc-800 dark:text-zinc-200">€ {draftCommercials.targetManufacturingPrice}</strong> {(t('pricing.wizard.step4.forCopies') || 'for {copies} copies.').replace('{copies}', (draftSpec.copies?.toLocaleString() || '1000'))}
                                 </p>
                             </div>
 
@@ -928,7 +934,7 @@ export const GuidedCalibrationWizard: React.FC<GuidedCalibrationWizardProps> = (
                                         className="px-5 py-2.5 bg-[#dc0000] hover:bg-[#b00000] disabled:bg-zinc-400 text-white rounded-xl text-xs font-bold transition-colors flex items-center gap-2 shadow-sm"
                                     >
                                         <Calculator size={15} />
-                                        <span>{calculating ? 'Running Calibration...' : (activeRun && !isRunAcceptanceEligible) ? 'Re-run Pricing Calibration' : 'Run Pricing Calibration'}</span>
+                                        <span>{calculating ? (t('pricing.wizard.step4.runningBtn') || 'Running Calibration...') : (activeRun && !isRunAcceptanceEligible) ? (t('pricing.wizard.step4.rerunBtn') || 'Re-run Pricing Calibration') : (t('pricing.wizard.step4.runBtn') || 'Run Pricing Calibration')}</span>
                                     </button>
                                 )}
 
@@ -939,7 +945,7 @@ export const GuidedCalibrationWizard: React.FC<GuidedCalibrationWizardProps> = (
                                         className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-colors flex items-center gap-2 shadow-sm"
                                     >
                                         <ShieldCheck size={16} />
-                                        <span>Accept Pricing Revision</span>
+                                        <span>{t('pricing.wizard.step4.acceptBtn') || 'Accept Pricing Revision'}</span>
                                     </button>
                                 )}
                             </div>
@@ -948,39 +954,39 @@ export const GuidedCalibrationWizard: React.FC<GuidedCalibrationWizardProps> = (
                         {/* Candidate Diagnostics / Informational Note */}
                         {activeRun?.status === 'ACCEPTABLE_CANDIDATE' && isCalculated && !isAccepted && (
                             <div className="p-3.5 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 rounded-xl text-xs text-blue-900 dark:text-blue-200 font-medium">
-                                The optimizer did not reach its strict numerical convergence threshold, but the best deterministic candidate is within the governed publishing tolerance and can be reviewed for acceptance.
+                                {t('pricing.wizard.step4.candidateNotice') || 'The optimizer did not reach its strict numerical convergence threshold, but the best deterministic candidate is within the governed publishing tolerance and can be reviewed for acceptance.'}
                             </div>
                         )}
 
                         {/* Diagnostics & Outcome Message */}
                         {activeRun && !isRunAcceptanceEligible && (
                             <div className="p-3.5 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-xl text-xs text-amber-900 dark:text-amber-200 font-medium">
-                                Calibration could not produce an acceptance-eligible solution within governed tolerances. You can adjust the reference job specifications or inspect rates.
+                                {t('pricing.wizard.step4.notConvergedNotice') || 'Calibration could not produce an acceptance-eligible solution within governed tolerances. You can adjust the reference job specifications or inspect rates.'}
                             </div>
                         )}
 
                         {activeRun && (
                             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-3 border-t border-zinc-200/60 dark:border-zinc-700/60 text-xs">
                                 <div>
-                                    <span className="text-zinc-500 text-[11px]">Target Price</span>
+                                    <span className="text-zinc-500 text-[11px]">{t('pricing.wizard.step4.targetPriceCol') || 'Target Price'}</span>
                                     <div className="font-bold text-zinc-900 dark:text-white">
                                         € {Number(activeRun.targetPrice ?? activeRun.target_price ?? draftCommercials.targetManufacturingPrice ?? 0).toFixed(2)}
                                     </div>
                                 </div>
                                 <div>
-                                    <span className="text-zinc-500 text-[11px]">Predicted Cost</span>
+                                    <span className="text-zinc-500 text-[11px]">{t('pricing.wizard.step4.predictedCostCol') || 'Predicted Cost'}</span>
                                     <div className={`font-bold ${!isRunAcceptanceEligible ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
                                         € {Number(activeRun.enginePriceAfter ?? activeRun.predicted_manufacturing_price ?? 0).toFixed(2)}
                                     </div>
                                 </div>
                                 <div>
-                                    <span className="text-zinc-500 text-[11px]">Residual</span>
+                                    <span className="text-zinc-500 text-[11px]">{t('pricing.wizard.step4.residualCol') || 'Residual'}</span>
                                     <div className="font-bold text-zinc-900 dark:text-white">
                                         € {Number(activeRun.absoluteResidual ?? activeRun.absolute_residual ?? 0).toFixed(2)} ({Number(activeRun.percentResidual ?? activeRun.percent_residual ?? 0).toFixed(2)}%)
                                     </div>
                                 </div>
                                 <div>
-                                    <span className="text-zinc-500 text-[11px]">Status</span>
+                                    <span className="text-zinc-500 text-[11px]">{t('pricing.wizard.step4.statusCol') || 'Status'}</span>
                                     <div className={`font-bold ${!isRunAcceptanceEligible ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
                                         {activeRun.status ? activeRun.status : 'UNKNOWN_STATUS'}
                                     </div>
@@ -996,7 +1002,7 @@ export const GuidedCalibrationWizard: React.FC<GuidedCalibrationWizardProps> = (
                             className="px-4 py-2 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 text-xs font-semibold flex items-center gap-1.5"
                         >
                             <ArrowLeft size={14} />
-                            <span>Back</span>
+                            <span>{t('pricing.wizard.back') || 'Back'}</span>
                         </button>
 
                         {isAccepted && (

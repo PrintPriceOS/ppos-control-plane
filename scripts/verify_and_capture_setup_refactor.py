@@ -746,22 +746,30 @@ def run():
             print("FATAL: Step 5 action button 'Calibrar otro libro' not visible or missing!")
             sys.exit(1)
 
-        # Scroll to bring GovernedQuoteSmokeTest form into clear view
-        calib_page.evaluate("window.scrollTo(0, 320)")
-        calib_page.wait_for_timeout(300)
+        # Scroll the real container (main) to bring the lower form elements into clear view
+        calib_page.evaluate("""() => {
+            const main = document.querySelector('main');
+            if (main) {
+                main.scrollTop = main.scrollHeight;
+            }
+        }""")
+        calib_page.wait_for_timeout(400)
 
-        # Assert Spanish form elements
-        calib_page.locator("text='Calcular presupuesto de prueba'").first.wait_for(state="visible", timeout=5000)
-        calib_page.locator("text='Cantidad (Ejemplares)'").first.wait_for(state="visible", timeout=5000)
+        # Assert lower form elements and action controls are visible
+        calib_page.locator("#select-binding-method").wait_for(state="visible", timeout=5000)
+        calib_page.locator("#select-lamination").wait_for(state="visible", timeout=5000)
+        calib_page.locator("#select-delivery-country").wait_for(state="visible", timeout=5000)
+        calib_page.locator("button:has-text('Calcular presupuesto de prueba')").first.wait_for(state="visible", timeout=5000)
 
         # Real DOM overflow measurement
         calib_measurements_es = calib_page.evaluate("""() => {
             const doc = document.documentElement;
+            const main = document.querySelector('main');
             return {
                 docScrollWidth: doc.scrollWidth,
                 docClientWidth: doc.clientWidth,
                 windowInnerWidth: window.innerWidth,
-                zeroHorizontalOverflow: doc.scrollWidth <= window.innerWidth
+                zeroHorizontalOverflow: doc.scrollWidth <= window.innerWidth && (!main || main.scrollWidth <= main.clientWidth)
             };
         }""")
         print(f"  [Calibrated Assistant ES Dark] docScrollWidth: {calib_measurements_es['docScrollWidth']}px, clientWidth: {calib_measurements_es['docClientWidth']}px (Zero horizontal overflow: {calib_measurements_es['zeroHorizontalOverflow']})")
@@ -776,10 +784,10 @@ def run():
         calib_page.evaluate("""() => {
             localStorage.setItem('theme', 'light');
             document.documentElement.classList.remove('dark');
+            const main = document.querySelector('main');
+            if (main) main.scrollTop = main.scrollHeight;
         }""")
         calib_page.wait_for_timeout(400)
-        calib_page.evaluate("window.scrollTo(0, 320)")
-        calib_page.wait_for_timeout(200)
         save_evidence(calib_page, "14_setup_hub_pricing_calibrated_light_es.png", "Pricing Assistant: Calibrated State (Light, ES)")
 
         # 6.3 English Dark & Light
@@ -798,17 +806,25 @@ def run():
         if not calib_btn_en.is_visible():
             print("FATAL: English calibrated action button not visible!")
             sys.exit(1)
-        calib_page.evaluate("window.scrollTo(0, 320)")
-        calib_page.wait_for_timeout(300)
+        
+        # Scroll container to show lower form elements
+        calib_page.evaluate("""() => {
+            const main = document.querySelector('main');
+            if (main) main.scrollTop = main.scrollHeight;
+        }""")
+        calib_page.wait_for_timeout(400)
+        calib_page.locator("#select-binding-method").wait_for(state="visible", timeout=5000)
+        calib_page.locator("#select-delivery-country").wait_for(state="visible", timeout=5000)
+        calib_page.locator("button:has-text('Calculate Test Quote')").first.wait_for(state="visible", timeout=5000)
         save_evidence(calib_page, "15_setup_hub_pricing_calibrated_dark_en.png", "Pricing Assistant: Calibrated State (Dark, EN)")
 
         calib_page.evaluate("""() => {
             localStorage.setItem('theme', 'light');
             document.documentElement.classList.remove('dark');
+            const main = document.querySelector('main');
+            if (main) main.scrollTop = main.scrollHeight;
         }""")
         calib_page.wait_for_timeout(400)
-        calib_page.evaluate("window.scrollTo(0, 320)")
-        calib_page.wait_for_timeout(200)
         save_evidence(calib_page, "19_setup_hub_pricing_calibrated_light_en.png", "Pricing Assistant: Calibrated State (Light, EN)")
 
         # 6.4 German Dark & Light
@@ -828,13 +844,19 @@ def run():
             print("FATAL: German calibrated action button not visible!")
             sys.exit(1)
 
-        calib_page.evaluate("window.scrollTo(0, 320)")
-        calib_page.wait_for_timeout(300)
+        # Scroll container to show lower form elements
+        calib_page.evaluate("""() => {
+            const main = document.querySelector('main');
+            if (main) main.scrollTop = main.scrollHeight;
+        }""")
+        calib_page.wait_for_timeout(400)
 
         # Assert localized German texts in GovernedQuoteSmokeTest and QuickCalibrationPanel:
         calib_page.locator("text='Testangebot berechnen'").first.wait_for(state="visible", timeout=5000)
         calib_page.locator("text='Auflage (Exemplare)'").first.wait_for(state="visible", timeout=5000)
         calib_page.locator("text='Kalibrierungsziel:'").first.wait_for(state="visible", timeout=5000)
+        calib_page.locator("#select-binding-method").wait_for(state="visible", timeout=5000)
+        calib_page.locator("#select-delivery-country").wait_for(state="visible", timeout=5000)
 
         # Verify that English strings do NOT appear in the German view
         page_html_de = calib_page.content()
@@ -848,10 +870,10 @@ def run():
         calib_page.evaluate("""() => {
             localStorage.setItem('theme', 'light');
             document.documentElement.classList.remove('dark');
+            const main = document.querySelector('main');
+            if (main) main.scrollTop = main.scrollHeight;
         }""")
         calib_page.wait_for_timeout(400)
-        calib_page.evaluate("window.scrollTo(0, 320)")
-        calib_page.wait_for_timeout(200)
         save_evidence(calib_page, "20_setup_hub_pricing_calibrated_light_de.png", "Pricing Assistant: Calibrated State (Light, DE)")
 
         results["tests"].append({

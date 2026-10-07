@@ -112,36 +112,32 @@ for src in SOURCES_TO_PACKAGE:
         shutil.copy2(src, dst)
         print(f"Copied source: {src}")
 
-# 4. Vitest Execution Log
+# 4. Vitest Execution Log (Always run fresh on candidate)
 vitest_log_path = os.path.join(TARGET_DIR, "vitest.log")
-if os.path.exists(vitest_log_path) and os.path.getsize(vitest_log_path) > 0:
-    print("Reusing existing verified Vitest execution log...", flush=True)
-    with open(vitest_log_path, "r", encoding="utf-8") as f:
-        vitest_output = f.read()
-    vitest_returncode = 0
-else:
-    print("Packaging verified Vitest execution log...", flush=True)
-    vitest_res = subprocess.run(["npx", "vitest", "run"], capture_output=True, text=True, encoding="utf-8", shell=True)
-    vitest_output = vitest_res.stdout + "\n" + vitest_res.stderr
-    vitest_returncode = vitest_res.returncode
-    with open(vitest_log_path, "w", encoding="utf-8") as f:
-        f.write(vitest_output)
+print("Executing Vitest suite to capture live test logs...", flush=True)
+vitest_res = subprocess.run(["npx", "vitest", "run"], capture_output=True, text=True, encoding="utf-8", shell=True)
+vitest_output = vitest_res.stdout + "\n" + vitest_res.stderr
+vitest_returncode = vitest_res.returncode
+with open(vitest_log_path, "w", encoding="utf-8") as f:
+    f.write(vitest_output)
+# Also copy to SRC_SCREENSHOTS_DIR for consistency
+audit_vitest_log = os.path.join(SRC_SCREENSHOTS_DIR, "vitest.log")
+with open(audit_vitest_log, "w", encoding="utf-8") as f:
+    f.write(vitest_output)
 print(f"Vitest exited with code: {vitest_returncode}")
 
-# 5. Build Execution Log
+# 5. Build Execution Log (Always run fresh on candidate)
 build_log_path = os.path.join(TARGET_DIR, "build.log")
-if os.path.exists(build_log_path) and os.path.getsize(build_log_path) > 0:
-    print("Reusing existing verified Build execution log...", flush=True)
-    with open(build_log_path, "r", encoding="utf-8") as f:
-        build_output = f.read()
-    build_returncode = 0
-else:
-    print("Running npm run build...", flush=True)
-    build_res = subprocess.run(["npm", "run", "build"], capture_output=True, text=True, encoding="utf-8", shell=True)
-    build_output = build_res.stdout + "\n" + build_res.stderr
-    build_returncode = build_res.returncode
-    with open(build_log_path, "w", encoding="utf-8") as f:
-        f.write(build_output)
+print("Running fresh npm run build...", flush=True)
+build_res = subprocess.run(["npm", "run", "build"], capture_output=True, text=True, encoding="utf-8", shell=True)
+build_output = build_res.stdout + "\n" + build_res.stderr
+build_returncode = build_res.returncode
+with open(build_log_path, "w", encoding="utf-8") as f:
+    f.write(build_output)
+# Also copy to SRC_SCREENSHOTS_DIR for consistency
+audit_build_log = os.path.join(SRC_SCREENSHOTS_DIR, "build.log")
+with open(audit_build_log, "w", encoding="utf-8") as f:
+    f.write(build_output)
 print(f"Build exited with code: {build_returncode}")
 
 # Extract exact build duration and vitest summary
