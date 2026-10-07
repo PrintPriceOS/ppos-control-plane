@@ -315,13 +315,13 @@ export const PrinthouseSetupHub: React.FC = () => {
     return (
         <div className="w-full max-w-[1440px] mx-auto py-2 px-3 sm:px-5 text-zinc-900 dark:text-zinc-100 transition-colors space-y-2">
             {/* 1. Setup Toolbar (One Compact Toolbar) */}
-            <div className="bg-white dark:bg-[#18181b] border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-1.5 shadow-2xs flex items-center justify-between gap-3">
+            <div className="bg-white dark:bg-[#18181b] border border-zinc-200 dark:border-zinc-800 rounded-xl p-2 sm:px-3 sm:py-1.5 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3">
                 <div className="flex items-center gap-2 min-w-0">
                     <span className="text-[11px] font-bold uppercase tracking-wider text-[#dc0000] dark:text-red-400 shrink-0">
                         {t('onboarding.title') || 'Setup'}
                     </span>
                     <ChevronRight size={13} className="text-zinc-400 shrink-0" />
-                    <h1 className="text-xs sm:text-sm font-bold text-zinc-900 dark:text-white leading-tight break-words m-0">
+                    <h1 className="text-xs sm:text-sm font-bold text-zinc-900 dark:text-white leading-tight break-words m-0 truncate">
                         {activeDef.label}
                     </h1>
                     {activeDef.status === 'COMPLETE' && (
@@ -332,21 +332,21 @@ export const PrinthouseSetupHub: React.FC = () => {
                 </div>
 
                 {/* Header Action Controls */}
-                <div className="flex items-center gap-2.5 shrink-0 flex-wrap">
+                <div className="flex items-center gap-1.5 sm:gap-2.5 flex-wrap w-full sm:w-auto justify-start sm:justify-end">
                     {/* Setup Sections Switcher for Mobile & Collapsed Sidebar */}
                     <div className="relative">
                         <button
                             id="setup-module-switcher"
                             type="button"
                             onClick={() => setSectionsDropdownOpen(!sectionsDropdownOpen)}
-                            className="px-3 py-1.5 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 border border-zinc-200 dark:border-zinc-700 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                            className="px-2.5 sm:px-3 py-1.5 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 border border-zinc-200 dark:border-zinc-700 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
                         >
                             <span>{t('onboarding.sections') || 'Setup Sections'}</span>
                             <ChevronDown size={14} className={sectionsDropdownOpen ? 'rotate-180 transition-transform' : 'transition-transform'} />
                         </button>
 
                         {sectionsDropdownOpen && (
-                            <div id="setup-sections-menu" className="absolute right-0 top-full mt-1.5 w-60 bg-white dark:bg-[#18181b] border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-2xl z-[65] p-1 space-y-0.5 animate-in zoom-in-95 duration-100">
+                            <div id="setup-sections-menu" className="absolute left-0 sm:left-auto sm:right-0 top-full mt-1.5 w-60 bg-white dark:bg-[#18181b] border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-2xl z-[65] p-1 space-y-0.5 animate-in zoom-in-95 duration-100">
                                 {tabDefs.map(tab => (
                                     <button
                                         key={tab.key}
@@ -377,7 +377,7 @@ export const PrinthouseSetupHub: React.FC = () => {
                         id="setup-help-search-btn"
                         type="button"
                         onClick={() => setIsHelpOpen(true)}
-                        className="px-3 py-1.5 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-200 border border-zinc-200 dark:border-zinc-700 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                        className="px-2.5 sm:px-3 py-1.5 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-200 border border-zinc-200 dark:border-zinc-700 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
                     >
                         <Search size={14} className="text-[#dc0000]" />
                         <span>{t('onboarding.findSettingOrHelp') || 'Find a setting / Help'}</span>
@@ -389,7 +389,7 @@ export const PrinthouseSetupHub: React.FC = () => {
                             id="setup-guide-me-btn"
                             type="button"
                             onClick={() => setIsTutorialOpen(true)}
-                            className="px-3 py-1.5 bg-red-50 hover:bg-red-100 dark:bg-red-950/40 dark:hover:bg-red-900/60 text-[#dc0000] dark:text-red-400 border border-red-200 dark:border-red-800 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+                            className="px-2.5 sm:px-3 py-1.5 bg-red-50 hover:bg-red-100 dark:bg-red-950/40 dark:hover:bg-red-900/60 text-[#dc0000] dark:text-red-400 border border-red-200 dark:border-red-800 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
                         >
                             <Compass size={14} />
                             <span>{t('onboarding.guidePricing') || t('onboarding.guideMe') || 'Guide Pricing'}</span>

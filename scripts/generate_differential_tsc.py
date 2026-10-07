@@ -8,7 +8,7 @@ WORKSPACE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 REVIEW_DIR = os.path.join(WORKSPACE_DIR, "review_artifacts_ux_setup_audit")
 os.makedirs(REVIEW_DIR, exist_ok=True)
 
-BASE_COMMIT = "8cd5d85c5215b42ead69d36aa28b440ef6ba9ce9"
+BASE_COMMIT = "c2e89d797f6df517b39a682b3f94c99397a46cbf"
 BRANCH_NAME = "phase-39.2-tenant-management-console"
 
 CANDIDATE_LOG = os.path.join(REVIEW_DIR, "candidate_tsc.log")

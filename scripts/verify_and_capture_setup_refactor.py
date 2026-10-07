@@ -295,9 +295,12 @@ def save_evidence(page, filename, desc):
     page.screenshot(path=path1, full_page=False)
     page.screenshot(path=path2, full_page=False)
     # Also save to current conversation brain directory if it exists
-    cur_brain = r"C:\Users\KIKE\.gemini\antigravity-ide\brain\2b893f39-8fa0-49ed-8771-228e86a03d74"
-    if os.path.exists(cur_brain):
-        page.screenshot(path=os.path.join(cur_brain, filename), full_page=False)
+    for b_dir in [
+        r"C:\Users\KIKE\.gemini\antigravity-ide\brain\2b893f39-8fa0-49ed-8771-228e86a03d74",
+        r"C:\Users\KIKE\.gemini\antigravity-ide\brain\1075afdf-2f3f-48e0-b1bb-29c0ac7f1bb8"
+    ]:
+        if os.path.exists(b_dir):
+            page.screenshot(path=os.path.join(b_dir, filename), full_page=False)
     print(f"[OK] Saved screenshot: {filename} -> {desc}")
 
 def run():
@@ -354,7 +357,8 @@ def run():
             document.documentElement.classList.add('dark');
         }""")
         page.reload()
-        page.wait_for_timeout(1000)
+        page.wait_for_selector("[data-module-card='true']", timeout=10000)
+        page.wait_for_timeout(500)
         
         # 1. Measure and Assert Page Height & Scroll Container Overflow
         measurements = page.evaluate("""() => {
@@ -585,34 +589,118 @@ def run():
         if products_btn:
             products_btn.click()
             pricing_page.wait_for_timeout(400)
-            # Click Softcover to enter Step 2 (Add quotes)
-            softcover_card = pricing_page.locator("button:has-text('Aportar presupuesto'), button:has-text('Provide quote'), button:has-text('Configurar familia'), [aria-label*='Rústica'], [aria-label*='Softcover']").first
-            if softcover_card and softcover_card.count() > 0:
-                softcover_card.click()
+            
+            # 1. Select Softcover family via stable selector
+            softcover_selector = "[data-testid='family-card-select-softcover']"
+            softcover_btn = pricing_page.wait_for_selector(softcover_selector, state="visible", timeout=5000)
+            if not softcover_btn:
+                print("FATAL: Stable selector [data-testid='family-card-select-softcover'] not found!")
+                sys.exit(1)
+            softcover_btn.click()
+            pricing_page.wait_for_timeout(600)
+            
+            # Assert that Step 2 is active before capturing
+            # Verification: #onboarding-pdf-upload-input is present or Step 2 indicator is active
+            upload_input = pricing_page.query_selector("#onboarding-pdf-upload-input")
+            if not upload_input:
+                print("FATAL: Step 2 'Add Quotes' is not active after selecting Softcover family!")
+                sys.exit(1)
+            print("  [OK] Confirmed Step 2 'Add Quotes' is active.")
+            
+            # Verify in EN and DE: PDF button, placeholder, and help text
+            # Switch to EN
+            pricing_page.evaluate("""() => {
+                localStorage.setItem('ppos_locale', 'en');
+                localStorage.setItem('locale', 'en');
+            }""")
+            pricing_page.reload()
+            pricing_page.wait_for_timeout(800)
+            
+            # If reload reset step to 1, click softcover again
+            if not pricing_page.query_selector("#onboarding-pdf-upload-input"):
+                sc = pricing_page.wait_for_selector(softcover_selector, state="visible", timeout=5000)
+                sc.click()
                 pricing_page.wait_for_timeout(600)
-                save_evidence(pricing_page, "22_setup_hub_pricing_add_quotes_dark.png", "Pricing Tab: Add Quotes Step in Dark Mode")
+            
+            # Assert EN labels
+            en_browse_btn = pricing_page.locator("text='Browse PDF File'")
+            if en_browse_btn.count() == 0:
+                print("FATAL: EN 'Browse PDF File' button not found in Step 2!")
+                sys.exit(1)
+            en_placeholder = pricing_page.get_attribute("input[placeholder='e.g. QUOTE-2026-001']", "placeholder")
+            if en_placeholder != "e.g. QUOTE-2026-001":
+                print(f"FATAL: EN placeholder 'e.g. QUOTE-2026-001' not found, got '{en_placeholder}'!")
+                sys.exit(1)
+            en_help = pricing_page.locator("text='Specify an internal quote number or reference for audit and traceability.'")
+            if en_help.count() == 0:
+                print("FATAL: EN help text not found in Step 2!")
+                sys.exit(1)
+            print("  [OK] Confirmed Step 2 Add Quotes in English (PDF button, placeholder, help text).")
+            
+            # Switch to DE
+            pricing_page.evaluate("""() => {
+                localStorage.setItem('ppos_locale', 'de');
+                localStorage.setItem('locale', 'de');
+            }""")
+            pricing_page.reload()
+            pricing_page.wait_for_timeout(800)
+            if not pricing_page.query_selector("#onboarding-pdf-upload-input"):
+                sc = pricing_page.wait_for_selector(softcover_selector, state="visible", timeout=5000)
+                sc.click()
+                pricing_page.wait_for_timeout(600)
                 
-                # Light theme
-                pricing_page.evaluate("""() => {
-                    localStorage.setItem('theme', 'light');
-                    document.documentElement.classList.remove('dark');
-                }""")
-                pricing_page.wait_for_timeout(400)
-                save_evidence(pricing_page, "23_setup_hub_pricing_add_quotes_light.png", "Pricing Tab: Add Quotes Step in Light Mode")
+            de_browse_btn = pricing_page.locator("text='PDF-Datei durchsuchen'")
+            if de_browse_btn.count() == 0:
+                print("FATAL: DE 'PDF-Datei durchsuchen' button not found in Step 2!")
+                sys.exit(1)
+            de_placeholder = pricing_page.get_attribute("input[placeholder='z.B. ANGEBOT-2026-001']", "placeholder")
+            if de_placeholder != "z.B. ANGEBOT-2026-001":
+                print(f"FATAL: DE placeholder 'z.B. ANGEBOT-2026-001' not found, got '{de_placeholder}'!")
+                sys.exit(1)
+            de_help = pricing_page.locator("text='Geben Sie eine interne Angebotsnummer oder Referenz zur Rückverfolgbarkeit an.'")
+            if de_help.count() == 0:
+                print("FATAL: DE help text not found in Step 2!")
+                sys.exit(1)
+            print("  [OK] Confirmed Step 2 Add Quotes in German (PDF button, placeholder, help text).")
+            
+            # Return to ES for evidence capture in dark and light
+            pricing_page.evaluate("""() => {
+                localStorage.setItem('ppos_locale', 'es');
+                localStorage.setItem('locale', 'es');
+                localStorage.setItem('theme', 'dark');
+                localStorage.setItem('ppos-theme', 'dark');
+                document.documentElement.classList.add('dark');
+            }""")
+            pricing_page.reload()
+            pricing_page.wait_for_timeout(800)
+            if not pricing_page.query_selector("#onboarding-pdf-upload-input"):
+                sc = pricing_page.wait_for_selector(softcover_selector, state="visible", timeout=5000)
+                sc.click()
+                pricing_page.wait_for_timeout(600)
                 
-                # Restore dark theme for subsequent tests
-                pricing_page.evaluate("""() => {
-                    localStorage.setItem('theme', 'dark');
-                    document.documentElement.classList.add('dark');
-                }""")
-                pricing_page.wait_for_timeout(400)
-            else:
-                print("WARNING: softcover_card not found for Add Quotes capture!")
+            save_evidence(pricing_page, "22_setup_hub_pricing_add_quotes_dark.png", "Pricing Tab: Add Quotes Step in Dark Mode")
+            
+            # Light theme
+            pricing_page.evaluate("""() => {
+                localStorage.setItem('theme', 'light');
+                localStorage.setItem('ppos-theme', 'light');
+                document.documentElement.classList.remove('dark');
+            }""")
+            pricing_page.wait_for_timeout(400)
+            save_evidence(pricing_page, "23_setup_hub_pricing_add_quotes_light.png", "Pricing Tab: Add Quotes Step in Light Mode")
+            
+            # Restore dark theme for subsequent tests
+            pricing_page.evaluate("""() => {
+                localStorage.setItem('theme', 'dark');
+                localStorage.setItem('ppos-theme', 'dark');
+                document.documentElement.classList.add('dark');
+            }""")
+            pricing_page.wait_for_timeout(400)
 
         pricing_context.close()
         
-        # ── Test Suite 3B: Company Profile View (Verify Guide Button Absence) ──
-        print("\n--- Verifying Company Profile View (Contextual Guide Scope) ---")
+        # ── Test Suite 3B: Company Profile View (Verify Guide Button Absence & Theme Verification) ──
+        print("\n--- Verifying Company Profile View (Contextual Guide Scope & Light Theme) ---")
         company_context = browser.new_context(viewport={"width": 1366, "height": 768}, device_scale_factor=1.0)
         company_page = company_context.new_page()
         company_page.on("pageerror", lambda err: app_errors.append(f"COMPANY PAGE ERROR: {err}"))
@@ -622,17 +710,34 @@ def run():
             localStorage.setItem('ppos_locale', 'en');
             localStorage.setItem('locale', 'en');
             localStorage.setItem('theme', 'light');
+            localStorage.setItem('ppos-theme', 'light');
             document.documentElement.classList.remove('dark');
         }""")
         company_page.reload()
         company_page.wait_for_timeout(1000)
         
-        # Assert Guide Pricing button #setup-guide-me-btn is NOT present in Company Profile
+        # Verify effective theme after reload before capturing
+        theme_verification = company_page.evaluate("""() => {
+            const hasDarkClass = document.documentElement.classList.contains('dark');
+            const storedTheme = localStorage.getItem('theme') || localStorage.getItem('ppos-theme');
+            const bg = window.getComputedStyle(document.body).backgroundColor;
+            return {
+                isEffectiveLight: !hasDarkClass,
+                storedTheme: storedTheme,
+                backgroundColor: bg
+            };
+        }""")
+        print(f"  [Company Profile Theme] effectiveLight={theme_verification['isEffectiveLight']}, storedTheme={theme_verification['storedTheme']}, bg={theme_verification['backgroundColor']}")
+        if not theme_verification['isEffectiveLight']:
+            print("FATAL: Company Profile is still rendering in dark theme after reload!")
+            sys.exit(1)
+        
+        # Confirm absence of the pricing guide button (#setup-guide-me-btn)
         guide_btn_company = company_page.query_selector("#setup-guide-me-btn")
         if guide_btn_company and guide_btn_company.is_visible():
-            print("FATAL: Guide button #setup-guide-me-btn was found in Company Profile tab!")
+            print("FATAL: Guide button #setup-guide-me-btn was found and visible in Company Profile tab!")
             sys.exit(1)
-        print("  [OK] Confirmed #setup-guide-me-btn is NOT visible in Company Profile tab.")
+        print("  [OK] Confirmed #setup-guide-me-btn is absent / not visible in Company Profile tab.")
         save_evidence(company_page, "21_setup_hub_company_profile_no_guide_light.png", "Company Profile: No Guide Button in Header (Light)")
         company_context.close()
 
@@ -646,10 +751,79 @@ def run():
             localStorage.setItem('ppos_locale', 'es');
             localStorage.setItem('locale', 'es');
             localStorage.setItem('theme', 'dark');
+            localStorage.setItem('ppos-theme', 'dark');
             document.documentElement.classList.add('dark');
         }""")
         mobile_page.reload()
         mobile_page.wait_for_timeout(1000)
+        
+        # Assert each control's bounding box and visibility at 390x844 (avoid overlap & clipping)
+        header_controls_eval = mobile_page.evaluate("""() => {
+            const viewportWidth = 390;
+            const controls = [
+                { id: 'setup-module-switcher', name: 'Module Switcher' },
+                { id: 'setup-help-search-btn', name: 'Help / Search Button' },
+                { id: 'setup-lang-switcher', name: 'Language Switcher' }
+            ];
+            
+            const results = [];
+            for (const c of controls) {
+                const el = document.getElementById(c.id);
+                if (!el) {
+                    results.push({ id: c.id, name: c.name, found: false, error: 'Element not found' });
+                    continue;
+                }
+                const rect = el.getBoundingClientRect();
+                const style = window.getComputedStyle(el);
+                const isVisible = style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0';
+                const fitsInViewport = rect.left >= 0 && rect.right <= viewportWidth + 1; // 1px rounding tolerance
+                const hasValidDimensions = rect.width > 0 && rect.height > 0;
+                
+                results.push({
+                    id: c.id,
+                    name: c.name,
+                    found: true,
+                    isVisible,
+                    fitsInViewport,
+                    hasValidDimensions,
+                    rect: { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom, width: rect.width, height: rect.height }
+                });
+            }
+            
+            // Check bounding box overlap between controls
+            const overlaps = [];
+            for (let i = 0; i < results.length; i++) {
+                for (let j = i + 1; j < results.length; j++) {
+                    const a = results[i].rect;
+                    const b = results[j].rect;
+                    if (!a || !b) continue;
+                    const overlapX = Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left));
+                    const overlapY = Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top));
+                    if (overlapX > 0 && overlapY > 0) {
+                        overlaps.push({ a: results[i].name, b: results[j].name, overlapX, overlapY });
+                    }
+                }
+            }
+            
+            return {
+                controls: results,
+                overlaps: overlaps,
+                zeroOverlap: overlaps.length === 0,
+                allVisibleAndContained: results.every(r => r.found && r.isVisible && r.fitsInViewport && r.hasValidDimensions)
+            };
+        }""")
+        
+        print("  [Mobile 390x844 Header Controls Validation]:")
+        for c in header_controls_eval['controls']:
+            print(f"    - {c['name']} (#{c['id']}): visible={c.get('isVisible')}, contained={c.get('fitsInViewport')}, rect={c.get('rect')}")
+        if not header_controls_eval['allVisibleAndContained']:
+            print("FATAL: Header controls are clipped or exceed mobile viewport limits at 390x844!")
+            sys.exit(1)
+        if not header_controls_eval['zeroOverlap']:
+            print(f"FATAL: Header controls overlap on mobile: {header_controls_eval['overlaps']}!")
+            sys.exit(1)
+        print("  [OK] All mobile header controls are strictly visible, within bounds, and non-overlapping.")
+        
         save_evidence(mobile_page, "08_setup_hub_overview_mobile_390x844_dark.png", "Mobile Overview at 390x844")
         
         # Also check mobile pricing tab to ensure no horizontal overflow

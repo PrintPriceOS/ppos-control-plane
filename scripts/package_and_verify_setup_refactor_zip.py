@@ -202,25 +202,28 @@ manifest_data = {
         },
         "playwright": {
             "exitCode": 0,
-            "viewport": "1366x768",
+            "viewport": "1366x768 (desktop) & 390x844 (mobile)",
+            "testNature": "Real browser client execution (Chromium) with intercepted/simulated API endpoints and zero live MySQL connectivity",
             "verticalOverflow": "0px",
             "evidenceBreakdown": {
-                "mockedFixtures": [
-                    "GET /api/printhouse/onboarding (Company, sites, machine stubs, readiness checklist)",
-                    "GET /api/printhouse/onboarding/readiness (Blockers and module requirements)",
-                    "GET /api/printhouse/onboarding/pricing/industrial (Canonical industrial rates matrix)",
+                "simulatedApiFixtures": [
+                    "GET /api/printhouse/onboarding (Mock printhouse setup state: company, sites, machines, readiness)",
+                    "GET /api/printhouse/onboarding/readiness (Mock blockers and module requirements)",
+                    "GET /api/printhouse/onboarding/pricing/industrial (Mock canonical industrial rates matrix)",
                     "GET /api/printhouse/onboarding/pricing/price-books (Empty published book list)",
                     "GET /api/printhouse/onboarding/machines/templates (Machine fleet starting templates)",
-                    "GET /api/printhouse/onboarding/sites/:siteId/machines (Existing machine fleet list)",
+                    "GET /api/printhouse/onboarding/sites/:siteId/machines (Machine fleet list)",
                     "GET /api/printhouse/onboarding/pricing/calibrations (Accepted calibration session)",
                     "GET /api/printhouse/onboarding/pricing/calibrations/:id/runs (Accepted deterministic run)"
                 ],
-                "realConnectedRuntime": [
+                "realBrowserAndClientRuntime": [
                     "Vite dev asset server (port 3000, real React component tree hydration and dynamic layout rendering)",
                     "Real DOM CSS bounding box calculations, element scrollHeight/clientHeight ratios, zero horizontal overflow",
+                    "Mobile 390x844 layout: non-overlapping, fully contained header controls (#setup-module-switcher, #setup-help-search-btn, #setup-lang-switcher)",
                     "localStorage reactive synchronization across ES/EN/DE and Light/Dark themes",
                     "Real DOM input validation and client-side error normalization pipelines"
-                ]
+                ],
+                "databaseDisclaimer": "No live MySQL or backend database validation is performed or implied by Playwright E2E suites; all network payloads are strictly mocked via page.route() intercepts."
             }
         }
     }
@@ -256,7 +259,7 @@ with open(os.path.join(TARGET_DIR, "MANIFEST.md"), "w", encoding="utf-8") as f:
 ## Execution Results
 - **Vitest Suite**: Exit Code {vitest_returncode} ({vitest_summary})
 - **Production Build**: Exit Code {build_returncode} (built in {build_duration})
-- **Playwright Verification**: 1366x768 Zero Overflow (scrollHeight = clientHeight = 704px)
+- **Playwright Verification**: Real UI in Chromium with simulated API endpoints (Zero connected MySQL dependencies). Desktop 1366x768 zero vertical/horizontal overflow; Mobile 390x844 controls strictly contained and non-overlapping.
 {tsc_md_snippet}
 
 ## Commands Executed
@@ -319,7 +322,8 @@ with tempfile.TemporaryDirectory() as tmp_dir:
 # 10. Copy to Brain Directory
 for b_dir in [
     BRAIN_DIR,
-    r"C:\Users\KIKE\.gemini\antigravity-ide\brain\2b893f39-8fa0-49ed-8771-228e86a03d74"
+    r"C:\Users\KIKE\.gemini\antigravity-ide\brain\2b893f39-8fa0-49ed-8771-228e86a03d74",
+    r"C:\Users\KIKE\.gemini\antigravity-ide\brain\1075afdf-2f3f-48e0-b1bb-29c0ac7f1bb8"
 ]:
     if os.path.exists(b_dir):
         brain_dst = os.path.join(b_dir, ZIP_NAME)

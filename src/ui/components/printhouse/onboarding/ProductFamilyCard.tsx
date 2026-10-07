@@ -164,6 +164,7 @@ export const ProductFamilyCard: React.FC<ProductFamilyCardProps> = ({
                     type="button"
                     onClick={() => onSelect(familyId)}
                     disabled={isNotOffered}
+                    data-testid={`family-card-select-${familyId.toLowerCase()}`}
                     className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                         isSelected
                             ? 'bg-[#dc0000] text-white shadow-xs'
@@ -189,6 +190,7 @@ export const ProductFamilyCard: React.FC<ProductFamilyCardProps> = ({
                 <button
                     type="button"
                     onClick={() => onToggleNotOffered(familyId)}
+                    data-testid={`family-card-toggle-${familyId.toLowerCase()}`}
                     className="text-[11px] text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200 underline underline-offset-2 transition-colors cursor-pointer py-1 text-center"
                     aria-label={isNotOffered ? `${t('family.enableProduct') || 'Habilitar'} ${title}` : `${t('family.markNotOffered') || 'No ofrecemos'} ${title}`}
                 >
