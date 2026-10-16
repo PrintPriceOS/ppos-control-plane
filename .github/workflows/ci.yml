@@ -44,6 +44,11 @@ jobs:
         find src/api scripts -name "*.js" -type f -print0 | xargs -0 -n1 node -c
     - name: Production Build
       run: npm run build
+    - name: Bootstrap Canonical Ephemeral Database
+      env:
+        PPOS_MIGRATION_EXECUTION: 'true'
+        PPOS_ENABLE_SCHEMA_MUTATION: 'true'
+      run: node scripts/bootstrap_canonical_schema.js
     - name: Execute Database Migrations (Ephemeral CI)
       env:
         PPOS_MIGRATION_EXECUTION: 'true'
