@@ -24,13 +24,15 @@ interface GuidedStepCompanyProps {
     onSaveAndContinue: (data: CompanyDraftData) => Promise<void>;
     onBackToWelcome: () => void;
     onOpenFullSetup?: () => void;
+    onDraftChange?: (data: CompanyDraftData) => void;
 }
 
 export const GuidedStepCompany: React.FC<GuidedStepCompanyProps> = ({
     initialCompany,
     onSaveAndContinue,
     onBackToWelcome,
-    onOpenFullSetup
+    onOpenFullSetup,
+    onDraftChange
 }) => {
     const { t } = useLocale();
     const [form, setForm] = useState<CompanyDraftData>(initialCompany);
@@ -46,11 +48,13 @@ export const GuidedStepCompany: React.FC<GuidedStepCompanyProps> = ({
         setForm(prev => {
             const currentEdited = prev.userEditedFields || [];
             const userEditedFields = currentEdited.includes(field) ? currentEdited : [...currentEdited, field];
-            return {
+            const nextForm: CompanyDraftData = {
                 ...prev,
                 [field]: value,
                 userEditedFields
             };
+            onDraftChange?.(nextForm);
+            return nextForm;
         });
         setSavedNotice(false);
         setErrorMsg(null);

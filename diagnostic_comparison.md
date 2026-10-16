@@ -3,19 +3,17 @@
 ## 1. Metadata & Reproducibility
 - **Target Remote Commit SHA for Traceability:** 3601d6da2a5113beb463528f04daaeaee354c5eb
 - **Baseline Commit for Diagnostic Comparison:** d50d473a54a14800ffd7026763bb3a0cf928d37d
-- **Branch:** eat/onboarding-guided-restructure
-- **Diagnostic Command:** 
-px tsc --noEmit
+- **Branch:** feat/onboarding-guided-restructure
+- **Diagnostic Command:** `npx tsc --noEmit`
 - **Timestamp:** 2026-10-16
-- **Vitest Suite Result:** 27 test files passed, 388/388 tests passed (0 failures)
-- **Vite Build Result:** 
-pm run build completed cleanly (0 errors, 3564 modules transformed)
+- **Vitest Suite Result:** 27 test files passed, 391/391 tests passed (0 failures)
+- **Vite Build Result:** `npm run build` completed cleanly (0 errors, 3564 modules transformed)
 
 ---
 
 ## 2. Executive Summary
 - **Total Workspace Baseline Errors:** 193 errors across 37 files.
-- **Errors in Restructured Guided Onboarding Files:** **0** (All 11 files are 100% clean).
+- **Errors in Restructured Guided Onboarding Files:** **0** (All files are 100% clean).
 - **Added Regressions:** 0
 - **Deleted / Suppressed Valid Errors:** 0
 - **Net TypeScript Delta in Onboarding Scope:** 0 added errors. Strict type safety preserved across all props, draft schemas, API payloads, and i18n dictionaries.
@@ -31,12 +29,15 @@ pm run build completed cleanly (0 errors, 3564 modules transformed)
 | src/ui/components/printhouse/onboarding/GuidedStepProducts.tsx | Clean | 0 | None |
 | src/ui/components/printhouse/onboarding/GuidedStepReview.tsx | Clean | 0 | None |
 | src/ui/components/printhouse/onboarding/SimplifiedOnboardingJourney.tsx | Clean | 0 | None |
+| src/ui/components/printhouse/onboarding/CalculationComparisonView.tsx | Clean | 0 | None |
+| src/ui/components/printhouse/onboarding/VariantSpecTable.tsx | Clean | 0 | None |
 | src/ui/pages/printhouse/GuidedOnboardingPage.tsx | Clean | 0 | None |
 | src/ui/lib/onboardingDraftStore.ts | Clean | 0 | None |
 | src/ui/es.ts | Clean | 0 | None |
 | src/ui/en.ts | Clean | 0 | None |
 | src/ui/de.ts | Clean | 0 | None |
 | tests/GuidedPrinthouseJourney.test.tsx | Clean | 0 | None |
+| tests/PrinthouseOnboardingAuditAndGovernance.test.tsx | Clean | 0 | None |
 
 ---
 

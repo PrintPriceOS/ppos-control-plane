@@ -72,6 +72,15 @@ export const GuidedPrinthouseJourney: React.FC<GuidedPrinthouseJourneyProps> = (
     const [isRefreshingReadiness, setIsRefreshingReadiness] = useState<boolean>(false);
     const [readinessError, setReadinessError] = useState<string | null>(null);
 
+    // Track mounted state to safely discard background updates after unmount
+    const isMountedRef = useRef<boolean>(true);
+    useEffect(() => {
+        isMountedRef.current = true;
+        return () => {
+            isMountedRef.current = false;
+        };
+    }, []);
+
     // Track active tenant to discard out-of-order / delayed responses from previous identities
     const activeTenantRef = useRef<string>(tenantId);
     activeTenantRef.current = tenantId;
@@ -203,24 +212,32 @@ export const GuidedPrinthouseJourney: React.FC<GuidedPrinthouseJourneyProps> = (
 
                     const reconciledCompany: CompanyDraftData = {
                         ...prev.company,
-                        legalName: editedFields.has('legalName') && prev.company.legalName ? prev.company.legalName : (serverLegalName || prev.company.legalName),
-                        tradingName: editedFields.has('tradingName') && prev.company.tradingName ? prev.company.tradingName : (serverTrading || prev.company.tradingName),
-                        country: editedFields.has('country') && prev.company.country ? prev.company.country : (serverCountry || prev.company.country),
-                        city: editedFields.has('city') && prev.company.city ? prev.company.city : (serverCity || prev.company.city),
-                        address: editedFields.has('address') && prev.company.address ? prev.company.address : (serverAddress || prev.company.address),
-                        postalCode: editedFields.has('postalCode') && prev.company.postalCode ? prev.company.postalCode : (serverPostalCode || prev.company.postalCode),
-                        phone: editedFields.has('phone') && prev.company.phone ? prev.company.phone : (serverPhone || prev.company.phone),
-                        website: editedFields.has('website') && prev.company.website ? prev.company.website : (serverWebsite || prev.company.website),
-                        contactName: editedFields.has('contactName') && prev.company.contactName ? prev.company.contactName : (serverContact || prev.company.contactName),
-                        taxId: editedFields.has('taxId') && prev.company.taxId ? prev.company.taxId : (serverTaxId || prev.company.taxId),
-                        siteName: editedFields.has('siteName') && prev.company.siteName ? prev.company.siteName : (serverSiteName || prev.company.siteName || 'Planta Principal'),
-                        siteTimezone: editedFields.has('siteTimezone') && prev.company.siteTimezone ? prev.company.siteTimezone : (serverSiteTimezone || prev.company.siteTimezone),
+                        legalName: editedFields.has('legalName') ? prev.company.legalName : (serverLegalName || prev.company.legalName),
+                        tradingName: editedFields.has('tradingName') ? prev.company.tradingName : (serverTrading || prev.company.tradingName),
+                        country: editedFields.has('country') ? prev.company.country : (serverCountry || prev.company.country),
+                        city: editedFields.has('city') ? prev.company.city : (serverCity || prev.company.city),
+                        address: editedFields.has('address') ? prev.company.address : (serverAddress || prev.company.address),
+                        postalCode: editedFields.has('postalCode') ? prev.company.postalCode : (serverPostalCode || prev.company.postalCode),
+                        phone: editedFields.has('phone') ? prev.company.phone : (serverPhone || prev.company.phone),
+                        website: editedFields.has('website') ? prev.company.website : (serverWebsite || prev.company.website),
+                        contactName: editedFields.has('contactName') ? prev.company.contactName : (serverContact || prev.company.contactName),
+                        taxId: editedFields.has('taxId') ? prev.company.taxId : (serverTaxId || prev.company.taxId),
+                        siteName: editedFields.has('siteName') ? prev.company.siteName : (serverSiteName || prev.company.siteName || 'Planta Principal'),
+                        siteTimezone: editedFields.has('siteTimezone') ? prev.company.siteTimezone : (serverSiteTimezone || prev.company.siteTimezone),
                         primarySiteId: prev.company.primarySiteId || serverPrimarySiteId,
                         acknowledgedServerValues: {
                             ...ackValues,
                             legalName: serverLegalName,
+                            tradingName: serverTrading,
                             country: serverCountry,
                             city: serverCity,
+                            address: serverAddress,
+                            postalCode: serverPostalCode,
+                            phone: serverPhone,
+                            website: serverWebsite,
+                            contactName: serverContact,
+                            taxId: serverTaxId,
+                            siteName: serverSiteName,
                             siteTimezone: serverSiteTimezone
                         }
                     };
@@ -253,6 +270,7 @@ export const GuidedPrinthouseJourney: React.FC<GuidedPrinthouseJourneyProps> = (
 
     // Stable continuity and family handlers for SimplifiedOnboardingJourney:
     // Preserves changes to activeRun, proposedPatch, offer, and comparisonData without introducing render loops.
+    // Comprehensive comparison ensures every meaningful offer change (runs, prices, quantities, paper, finishes) is preserved.
     const handlePricingContinuityChange = useCallback((famId: ProductFamilyId, famDraft: any) => {
         updateDraft(prev => {
             const existing = prev.pricingContinuity?.[famId];
@@ -267,25 +285,25 @@ export const GuidedPrinthouseJourney: React.FC<GuidedPrinthouseJourneyProps> = (
                 const sameRun = (existing.activeRun === famDraft.activeRun) ||
                     (existing.activeRun?.id === famDraft.activeRun?.id && 
                      existing.activeRun?.status === famDraft.activeRun?.status &&
-                     existing.activeRun?.revisionId === famDraft.activeRun?.revisionId);
+                     existing.activeRun?.revisionId === famDraft.activeRun?.revisionId &&
+                     JSON.stringify(existing.activeRun || null) === JSON.stringify(famDraft.activeRun || null));
 
                 // Compare proposedPatch
                 const samePatch = (existing.proposedPatch === famDraft.proposedPatch) ||
                     (JSON.stringify(existing.proposedPatch || {}) === JSON.stringify(famDraft.proposedPatch || {}));
 
-                // Compare comparisonData key fields
+                // Compare comparisonData key fields and deep structure
                 const sameComp = (existing.comparisonData === famDraft.comparisonData) ||
                     (existing.comparisonData?.enginePrice === famDraft.comparisonData?.enginePrice &&
                      existing.comparisonData?.originalPrice === famDraft.comparisonData?.originalPrice &&
                      existing.comparisonData?.difference === famDraft.comparisonData?.difference &&
-                     existing.comparisonData?.isCalculated === famDraft.comparisonData?.isCalculated);
+                     existing.comparisonData?.isCalculated === famDraft.comparisonData?.isCalculated &&
+                     JSON.stringify(existing.comparisonData || null) === JSON.stringify(famDraft.comparisonData || null));
 
-                // Compare offer title, ref, dimensions
+                // Comprehensive offer comparison: preserve every meaningful offer change including
+                // runs, quantities, prices, paper, pages, binding, finishes, and dimensions
                 const sameOffer = (existing.offer === famDraft.offer) ||
-                    (existing.offer?.productTitle === famDraft.offer?.productTitle &&
-                     existing.offer?.quoteRef === famDraft.offer?.quoteRef &&
-                     existing.offer?.widthMm === famDraft.offer?.widthMm &&
-                     existing.offer?.heightMm === famDraft.offer?.heightMm);
+                    (JSON.stringify(existing.offer || null) === JSON.stringify(famDraft.offer || null));
 
                 if (sameSession && sameVariant && sameStep && sameEntry && sameFile && sameRun && samePatch && sameComp && sameOffer) {
                     return prev;
@@ -314,7 +332,9 @@ export const GuidedPrinthouseJourney: React.FC<GuidedPrinthouseJourneyProps> = (
     };
 
     // ── STAGE A HANDLER: Guardar datos de empresa y sede ──
+    // Guarded against identity changes and unmount across all asynchronous boundaries.
     const handleSaveCompany = async (companyData: CompanyDraftData) => {
+        const initiatingTenantId = activeTenantRef.current || tenantId;
         const token = getAuthToken();
 
         // 1. Update company profile
@@ -338,6 +358,11 @@ export const GuidedPrinthouseJourney: React.FC<GuidedPrinthouseJourneyProps> = (
                 taxId: companyData.taxId
             })
         });
+
+        // Async Boundary 1 Check: Verify initiating identity before processing result or issuing next request
+        if (!isMountedRef.current || activeTenantRef.current !== initiatingTenantId) {
+            return;
+        }
 
         if (!compRes.ok) {
             let errJson: any = null;
@@ -372,6 +397,12 @@ export const GuidedPrinthouseJourney: React.FC<GuidedPrinthouseJourneyProps> = (
                 },
                 body: JSON.stringify(sitePayload)
             });
+
+            // Async Boundary 2 Check
+            if (!isMountedRef.current || activeTenantRef.current !== initiatingTenantId) {
+                return;
+            }
+
             if (!siteRes.ok) {
                 let errJson: any = null;
                 try {
@@ -389,6 +420,12 @@ export const GuidedPrinthouseJourney: React.FC<GuidedPrinthouseJourneyProps> = (
                 },
                 body: JSON.stringify(sitePayload)
             });
+
+            // Async Boundary 2 Check
+            if (!isMountedRef.current || activeTenantRef.current !== initiatingTenantId) {
+                return;
+            }
+
             if (!siteRes.ok) {
                 let errJson: any = null;
                 try {
@@ -403,12 +440,33 @@ export const GuidedPrinthouseJourney: React.FC<GuidedPrinthouseJourneyProps> = (
             } catch (_) {}
         }
 
-        // 3. Update persistent draft and advance to Stage B
+        // Final verification before updating draft or refreshing server state
+        if (!isMountedRef.current || activeTenantRef.current !== initiatingTenantId) {
+            return;
+        }
+
+        // 3. Update persistent draft and advance to Stage B. Clear dirty fields and set acknowledgedServerValues.
         updateDraft(prev => ({
             ...prev,
             company: {
                 ...companyData,
-                primarySiteId: resolvedSiteId || prev.company.primarySiteId
+                primarySiteId: resolvedSiteId || prev.company.primarySiteId,
+                userEditedFields: [],
+                acknowledgedServerValues: {
+                    ...(prev.company.acknowledgedServerValues || {}),
+                    legalName: companyData.legalName,
+                    tradingName: companyData.tradingName,
+                    country: companyData.country,
+                    city: companyData.city,
+                    address: companyData.address,
+                    postalCode: companyData.postalCode,
+                    phone: companyData.phone,
+                    website: companyData.website,
+                    contactName: companyData.contactName,
+                    taxId: companyData.taxId,
+                    siteName: companyData.siteName || 'Planta Principal',
+                    siteTimezone: companyData.siteTimezone
+                }
             },
             completedStages: {
                 ...prev.completedStages,
@@ -417,7 +475,7 @@ export const GuidedPrinthouseJourney: React.FC<GuidedPrinthouseJourneyProps> = (
             currentStage: 'PRODUCTS'
         }));
 
-        await fetchServerState();
+        await fetchServerState(initiatingTenantId);
     };
 
     // ── STAGE B HANDLERS: Qué produces ──
@@ -704,6 +762,12 @@ export const GuidedPrinthouseJourney: React.FC<GuidedPrinthouseJourneyProps> = (
                     <GuidedStepCompany
                         initialCompany={draft.company}
                         onSaveAndContinue={handleSaveCompany}
+                        onDraftChange={(nextCompany) => {
+                            updateDraft(prev => ({
+                                ...prev,
+                                company: nextCompany
+                            }));
+                        }}
                         onBackToWelcome={() => setStage('WELCOME')}
                         onOpenFullSetup={() => onOpenFullSetup('COMPANY')}
                     />
@@ -773,6 +837,7 @@ export const GuidedPrinthouseJourney: React.FC<GuidedPrinthouseJourneyProps> = (
                             printerNodeId={printerNodeId}
                             printerNodeName={printerNodeName}
                             initialStep={2}
+                            isGuidedMode={true}
                             targetFamilyId={draft.selectedFamilyId}
                             initialPricingDrafts={draft.pricingContinuity}
                             onPricingContinuityChange={handlePricingContinuityChange}

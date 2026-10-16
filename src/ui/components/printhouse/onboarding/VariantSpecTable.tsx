@@ -107,7 +107,7 @@ export const VariantSpecTable: React.FC<VariantSpecTableProps> = ({
                             )}
                         </h4>
                         <p className="text-[11px] text-zinc-500 mt-0.5">
-                            {t('review.tableSubtitle') || 'Verifica las tiradas, precios desglosados y opciones logísticas aportadas.'}
+                            {documentTitle ? `${documentTitle} · ` : ''}{t('review.tableSubtitle') || 'Verifica las tiradas, precios desglosados y opciones logísticas aportadas.'}
                         </p>
                     </div>
                     <button

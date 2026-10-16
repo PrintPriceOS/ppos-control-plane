@@ -1013,5 +1013,265 @@ describe('Guided Printhouse Onboarding Journey Suite', () => {
             expect(screen.getByText(/Una sede o planta física no sustituye a una máquina o nodo de impresión/i)).toBeInTheDocument();
         });
     });
+
+    it('19. Pricing draft continuity: preserves runs, quantities, prices, and paper specifications across navigation', async () => {
+        const tenantId = 'tenant-pricing-continuity';
+        (getAuthUser as any).mockReturnValue({
+            tenantId,
+            role: 'PRINTHOUSE_OPERATOR',
+            printhouseId: 'node-test-1'
+        });
+
+        // Initialize draft directly with a customized offer (run price, quantity, paper specification)
+        const initialDraft = loadGuidedOnboardingDraft(tenantId);
+        initialDraft.currentStage = 'PRICING';
+        initialDraft.selectedFamilyId = 'HARDCOVER';
+        initialDraft.completedStages = { WELCOME: true, COMPANY: true, PRODUCTS: true, PRICING: true, REVIEW: false };
+        initialDraft.company = {
+            ...initialDraft.company,
+            legalName: 'Test Printhouse',
+            city: 'Valencia',
+            country: 'ES'
+        };
+        initialDraft.pricingContinuity = {
+            HARDCOVER: {
+                sessionId: 'session-continuity-1',
+                activeRun: { id: 'run-custom-1', status: 'READY' },
+                selectedVariantId: 'run-custom-1',
+                proposedPatch: { baseClickRate: 0.045 },
+                entryMode: 'MANUAL_FORM',
+                uploadedFileName: null,
+                step: 3,
+                offer: {
+                    family: 'HARDCOVER',
+                    productTitle: 'Libro de Fotografía Gran Formato',
+                    quoteRef: 'PHOTO-2026-X',
+                    widthMm: 240,
+                    heightMm: 300,
+                    interiorPaper: 'couché_semi_mate_premium',
+                    interiorPages: 128,
+                    interiorColors: '4/4',
+                    coverPaper: 'tela_editorial_guaflex',
+                    bindingMethod: 'thread_sewn',
+                    finishes: ['stamping_gold', 'headband_burgundy'],
+                    runs: [
+                        {
+                            id: 'run-custom-1',
+                            quantity: 750,
+                            manufacturingPrice: 4890.50,
+                            totalPrice: 5120.00,
+                            paperVariant: 'Estucado 170g',
+                            validationStatus: 'CONSISTENT'
+                        }
+                    ]
+                },
+                comparisonData: {
+                    originalPrice: 4890.50,
+                    enginePrice: 4820.00,
+                    difference: 70.50,
+                    residual: 0.0144,
+                    isCalculated: true
+                }
+            }
+        };
+        saveGuidedOnboardingDraft(initialDraft);
+
+        const { unmount } = renderWithProviders(
+            <GuidedPrinthouseJourney onOpenFullSetup={vi.fn()} printerNodeId="node-test-1" />,
+            'es'
+        );
+
+        // Verify stage C rendered with continuity data
+        await waitFor(() => {
+            expect(screen.getByText(/Libro de Fotografía Gran Formato/i)).toBeInTheDocument();
+            expect(screen.getByText('750')).toBeInTheDocument();
+        });
+
+        // Simulate navigating away to Stage A (Company)
+        fireEvent.click(screen.getByRole('button', { name: /Tu imprenta/i }));
+
+        await waitFor(() => {
+            expect(screen.getByText('Datos básicos de tu empresa y taller')).toBeInTheDocument();
+        });
+
+        // Unmount and remount to verify cross-navigation and reload storage persistence
+        unmount();
+
+        const reloadedDraft = loadGuidedOnboardingDraft(tenantId);
+        expect(reloadedDraft.pricingContinuity?.HARDCOVER?.offer?.runs?.[0]?.quantity).toBe(750);
+        expect(reloadedDraft.pricingContinuity?.HARDCOVER?.offer?.runs?.[0]?.manufacturingPrice).toBe(4890.50);
+        expect(reloadedDraft.pricingContinuity?.HARDCOVER?.offer?.runs?.[0]?.paperVariant).toBe('Estucado 170g');
+        expect(reloadedDraft.pricingContinuity?.HARDCOVER?.offer?.interiorPaper).toBe('couché_semi_mate_premium');
+        expect(reloadedDraft.pricingContinuity?.HARDCOVER?.offer?.coverPaper).toBe('tela_editorial_guaflex');
+        expect(reloadedDraft.pricingContinuity?.HARDCOVER?.offer?.finishes).toContain('stamping_gold');
+    });
+
+    it('20. Identity guards: tenant A delayed response after switching to tenant B causes no mutations or requests for tenant B', async () => {
+        let resolveTenantACompanyProfile: (value: any) => void;
+        const tenantAPromise = new Promise(resolve => {
+            resolveTenantACompanyProfile = resolve;
+        });
+
+        let siteRequestsMade = 0;
+        global.fetch = vi.fn().mockImplementation((url: string, opts?: any) => {
+            if (url.includes('/api/printhouse/onboarding/company-profile') && opts?.method === 'PATCH') {
+                return tenantAPromise;
+            }
+            if (url.includes('/api/printhouse/onboarding/sites')) {
+                siteRequestsMade++;
+                return Promise.resolve({
+                    ok: true,
+                    json: () => Promise.resolve({ ok: true, data: { siteId: 'site-leak' } })
+                });
+            }
+            if (url.includes('/api/printhouse/onboarding')) {
+                return Promise.resolve({
+                    ok: true,
+                    json: () => Promise.resolve({ ok: true, data: { company: null, sites: [] } })
+                });
+            }
+            return Promise.resolve({ ok: true, json: () => Promise.resolve({ ok: true, data: {} }) });
+        });
+
+        const tenantA = 'tenant-alpha';
+        (getAuthUser as any).mockReturnValue({
+            tenantId: tenantA,
+            role: 'PRINTHOUSE_OPERATOR',
+            printhouseId: 'node-a'
+        });
+
+        const { rerender } = renderWithProviders(
+            <GuidedPrinthouseJourney onOpenFullSetup={vi.fn()} printerNodeId="node-a" />,
+            'es'
+        );
+
+        // Navigate to Stage A
+        const startBtn = await screen.findByRole('button', { name: /Comenzar configuración|Continuar configuración/i });
+        fireEvent.click(startBtn);
+
+        await waitFor(() => {
+            expect(screen.getByText('Datos básicos de tu empresa y taller')).toBeInTheDocument();
+        });
+
+        // Fill form as tenant A
+        fireEvent.change(screen.getByLabelText(/Razón Social|Nombre legal/i), { target: { value: 'Alpha Print S.L.' } });
+        fireEvent.change(screen.getByLabelText(/Ciudad \/ Municipio/i), { target: { value: 'Alicante' } });
+
+        // Submit form (PATCH /company-profile starts and hangs in flight)
+        const formEl = screen.getByRole('button', { name: /Guardar y elegir qué produces/i }).closest('form')!;
+        fireEvent.submit(formEl);
+
+        // Switch to tenant B while tenant A's request is still in-flight
+        const tenantB = 'tenant-beta';
+        (getAuthUser as any).mockReturnValue({
+            tenantId: tenantB,
+            role: 'PRINTHOUSE_OPERATOR',
+            printhouseId: 'node-b'
+        });
+
+        rerender(
+            <MemoryRouter>
+                <LocaleProvider initialLocale={'es' as any}>
+                    <GuidedPrinthouseJourney onOpenFullSetup={vi.fn()} printerNodeId="node-b" />
+                </LocaleProvider>
+            </MemoryRouter>
+        );
+
+        // Now resolve tenant A's delayed company profile response
+        resolveTenantACompanyProfile!({
+            ok: true,
+            json: () => Promise.resolve({ ok: true, data: { companyName: 'Alpha Print S.L.' } })
+        });
+
+        // Wait a tick for microtasks to flush
+        await new Promise(r => setTimeout(r, 50));
+
+        // Verification: Site request was NOT made for tenant B, and tenant B draft was not corrupted with tenant A data
+        expect(siteRequestsMade).toBe(0);
+        const draftB = loadGuidedOnboardingDraft(tenantB);
+        expect(draftB.company.legalName).not.toBe('Alpha Print S.L.');
+    });
+
+    it('21. Company draft lifecycle: preserves unsaved edits and intentional empty values across stage navigation and adopts server values for clean fields', async () => {
+        const tenantId = 'tenant-draft-lifecycle';
+        (getAuthUser as any).mockReturnValue({
+            tenantId,
+            role: 'PRINTHOUSE_OPERATOR',
+            printhouseId: 'node-lifecycle'
+        });
+
+        global.fetch = vi.fn().mockImplementation((url: string) => {
+            if (url.includes('/api/printhouse/onboarding')) {
+                return Promise.resolve({
+                    ok: true,
+                    json: () => Promise.resolve({
+                        ok: true,
+                        data: {
+                            company: {
+                                legalName: 'Server Legal Name Corp',
+                                tradingName: 'Server Trading Name',
+                                website: 'https://server-updated.com',
+                                taxId: 'B99999999',
+                                country: 'ES',
+                                city: 'Madrid'
+                            },
+                            sites: [{
+                                siteId: 'site-madrid',
+                                siteName: 'Sede Central',
+                                country: 'ES',
+                                city: 'Madrid',
+                                timezone: 'Europe/Madrid'
+                            }]
+                        }
+                    })
+                });
+            }
+            return Promise.resolve({ ok: true, json: () => Promise.resolve({ ok: true, data: {} }) });
+        });
+
+        renderWithProviders(
+            <GuidedPrinthouseJourney onOpenFullSetup={vi.fn()} printerNodeId="node-lifecycle" />,
+            'es'
+        );
+
+        // Go to Stage A
+        const startBtn = await screen.findByRole('button', { name: /Comenzar configuración|Continuar configuración/i });
+        fireEvent.click(startBtn);
+
+        await waitFor(() => {
+            expect(screen.getByText('Datos básicos de tu empresa y taller')).toBeInTheDocument();
+        });
+
+        // The user intentionally clears trading name to empty string "" and modifies phone
+        const tradingInput = screen.getByLabelText(/Nombre comercial|Nombre Comercial \/ Público/i);
+        fireEvent.change(tradingInput, { target: { value: '' } });
+
+        const phoneInput = screen.getByLabelText(/Teléfono directo|Teléfono Oficial/i);
+        fireEvent.change(phoneInput, { target: { value: '+34 600 000 000' } });
+
+        // Navigate away to Welcome screen via button
+        fireEvent.click(screen.getByRole('button', { name: /Volver a bienvenida/i }));
+
+        await waitFor(() => {
+            expect(screen.getByText('Preparemos tu imprenta')).toBeInTheDocument();
+        });
+
+        // Navigate back to Stage A: verify unsaved intentional empty string and edited phone are preserved
+        fireEvent.click(screen.getByRole('button', { name: /Comenzar configuración|Continuar configuración/i }));
+
+        await waitFor(() => {
+            expect(screen.getByText('Datos básicos de tu empresa y taller')).toBeInTheDocument();
+        });
+
+        const tradingInputAfter = screen.getByLabelText(/Nombre comercial|Nombre Comercial \/ Público/i) as HTMLInputElement;
+        expect(tradingInputAfter.value).toBe('');
+
+        const phoneInputAfter = screen.getByLabelText(/Teléfono directo|Teléfono Oficial/i) as HTMLInputElement;
+        expect(phoneInputAfter.value).toBe('+34 600 000 000');
+
+        // Check that clean fields (like website) adopted the updated server value
+        const websiteInput = screen.getByLabelText(/Sitio web|Sitio Web de la Empresa/i) as HTMLInputElement;
+        expect(websiteInput.value).toBe('https://server-updated.com');
+    });
 });
 

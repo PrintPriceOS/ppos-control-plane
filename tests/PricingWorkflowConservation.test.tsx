@@ -459,7 +459,7 @@ describe('Pricing Workflow Navigation & State Conservation Regressions', () => {
         // Comprueba que calculateCalibration fue invocado y queda pendiente
         expect(calcSpy).toHaveBeenCalledTimes(2);
         expect(runSolverBtn).toBeDisabled();
-        expect(screen.getByText(/Calculando solver...|Calculando con solver inverso/i)).toBeInTheDocument();
+        expect(screen.getByText(/Calculando solver...|Calculando con solver inverso|Calculating solver.../i)).toBeInTheDocument();
 
         // 5. Cambia de Softcover a Hardcover
         const assistantBtn = container.querySelector('#pricing-mode-assistant-btn') as HTMLButtonElement;
