@@ -1364,6 +1364,198 @@ describe('Guided Printhouse Onboarding Journey Suite', () => {
         const updatedDraft = loadGuidedOnboardingDraft(tenantId);
         expect(updatedDraft.company.tradingName).toBe('');
     });
+
+    it('23. Empty server-value reconciliation: explicit null/empty company phone and website clear clean fields and do not fall back to non-empty site values', async () => {
+        const tenantId = 'tenant-phone-website-cleared';
+        (getAuthUser as any).mockReturnValue({
+            tenantId,
+            role: 'PRINTHOUSE_OPERATOR',
+            printhouseId: 'node-cleared'
+        });
+
+        // 1. Initial draft has phone and website populated from prior session, untouched in current session (userEditedFields = [])
+        saveGuidedOnboardingDraft({
+            schemaVersion: 2,
+            tenantId,
+            currentStage: 'WELCOME',
+            selectedFamilyId: 'HARDCOVER',
+            enabledFamilies: { HARDCOVER: true, SOFTCOVER: true, WIRE_O: false, SADDLE_STITCH: false },
+            company: {
+                legalName: 'Alpha Corp S.L.',
+                tradingName: 'Alpha Print',
+                country: 'ES',
+                city: 'Sevilla',
+                address: 'Calle Mayor 1',
+                postalCode: '41001',
+                phone: '+34 954 111 222',
+                website: 'https://alpha-print.com',
+                contactName: 'Carlos Admin',
+                taxId: 'B87654321',
+                siteName: 'Planta Principal',
+                siteTimezone: 'Europe/Madrid',
+                primarySiteId: 'site-sevilla-1',
+                userEditedFields: [], // Clean, not locally edited
+                acknowledgedServerValues: {}
+            },
+            offerDrafts: {},
+            lastSavedTimestamp: Date.now(),
+            completedStages: { WELCOME: false, COMPANY: false, PRODUCTS: false, PRICING: false, REVIEW: false }
+        });
+
+        // 2. The server returns explicit empty strings / nulls for company phone and website,
+        // while the primarySite object still carries the legacy site phone and website.
+        global.fetch = vi.fn().mockImplementation((url: string) => {
+            if (url.includes('/api/printhouse/onboarding')) {
+                return Promise.resolve({
+                    ok: true,
+                    json: () => Promise.resolve({
+                        ok: true,
+                        data: {
+                            company: {
+                                legalName: 'Alpha Corp S.L.',
+                                tradingName: 'Alpha Print',
+                                country: 'ES',
+                                city: 'Sevilla',
+                                phone: '', // Explicitly cleared by company
+                                website: null // Explicit null returned for website
+                            },
+                            sites: [{
+                                siteId: 'site-sevilla-1',
+                                siteName: 'Planta Principal',
+                                country: 'ES',
+                                city: 'Sevilla',
+                                phone: '+34 954 999 999', // Non-empty site phone (must NOT override explicit empty company phone)
+                                website: 'https://site-fallback.com', // Non-empty site website (must NOT override explicit null company website)
+                                timezone: 'Europe/Madrid'
+                            }]
+                        }
+                    })
+                });
+            }
+            return Promise.resolve({ ok: true, json: () => Promise.resolve({ ok: true, data: {} }) });
+        });
+
+        renderWithProviders(
+            <GuidedPrinthouseJourney onOpenFullSetup={vi.fn()} printerNodeId="node-cleared" />,
+            'es'
+        );
+
+        // Enter Stage A (Tu imprenta)
+        const startBtn = await screen.findByRole('button', { name: /Comenzar configuración|Continuar configuración/i });
+        fireEvent.click(startBtn);
+
+        await waitFor(() => {
+            expect(screen.getByText('Datos básicos de tu empresa y taller')).toBeInTheDocument();
+        });
+
+        // Verify phone and website are cleared (empty string) and NOT resurrected by site fallback
+        const phoneInput = screen.getByLabelText(/Teléfono directo|Teléfono Oficial/i) as HTMLInputElement;
+        expect(phoneInput.value).toBe('');
+
+        const websiteInput = screen.getByLabelText(/Sitio web|Sitio Web de la Empresa/i) as HTMLInputElement;
+        expect(websiteInput.value).toBe('');
+
+        // Persisted draft also confirms clean empty strings
+        const updatedDraft = loadGuidedOnboardingDraft(tenantId);
+        expect(updatedDraft.company.phone).toBe('');
+        expect(updatedDraft.company.website).toBe('');
+    });
+
+    it('24. Dirty local field preservation: user-edited phone and website are preserved even when server returns explicit empty/null', async () => {
+        const tenantId = 'tenant-phone-website-dirty';
+        (getAuthUser as any).mockReturnValue({
+            tenantId,
+            role: 'PRINTHOUSE_OPERATOR',
+            printhouseId: 'node-dirty'
+        });
+
+        // Initial draft where user locally edited phone and website
+        saveGuidedOnboardingDraft({
+            schemaVersion: 2,
+            tenantId,
+            currentStage: 'WELCOME',
+            selectedFamilyId: 'HARDCOVER',
+            enabledFamilies: { HARDCOVER: true, SOFTCOVER: true, WIRE_O: false, SADDLE_STITCH: false },
+            company: {
+                legalName: 'Alpha Corp S.L.',
+                tradingName: 'Alpha Print',
+                country: 'ES',
+                city: 'Sevilla',
+                address: 'Calle Mayor 1',
+                postalCode: '41001',
+                phone: '+34 600 111 222',
+                website: 'https://locally-edited.com',
+                contactName: 'Carlos Admin',
+                taxId: 'B87654321',
+                siteName: 'Planta Principal',
+                siteTimezone: 'Europe/Madrid',
+                primarySiteId: 'site-sevilla-1',
+                userEditedFields: ['phone', 'website'], // Dirty: locally edited by user
+                acknowledgedServerValues: {}
+            },
+            offerDrafts: {},
+            lastSavedTimestamp: Date.now(),
+            completedStages: { WELCOME: false, COMPANY: false, PRODUCTS: false, PRICING: false, REVIEW: false }
+        });
+
+        // Server returns explicit empty strings / nulls
+        global.fetch = vi.fn().mockImplementation((url: string) => {
+            if (url.includes('/api/printhouse/onboarding')) {
+                return Promise.resolve({
+                    ok: true,
+                    json: () => Promise.resolve({
+                        ok: true,
+                        data: {
+                            company: {
+                                legalName: 'Alpha Corp S.L.',
+                                tradingName: 'Alpha Print',
+                                country: 'ES',
+                                city: 'Sevilla',
+                                phone: '', // Explicit empty on server
+                                website: null // Explicit null on server
+                            },
+                            sites: [{
+                                siteId: 'site-sevilla-1',
+                                siteName: 'Planta Principal',
+                                country: 'ES',
+                                city: 'Sevilla',
+                                phone: '+34 954 999 999',
+                                website: 'https://site-fallback.com',
+                                timezone: 'Europe/Madrid'
+                            }]
+                        }
+                    })
+                });
+            }
+            return Promise.resolve({ ok: true, json: () => Promise.resolve({ ok: true, data: {} }) });
+        });
+
+        renderWithProviders(
+            <GuidedPrinthouseJourney onOpenFullSetup={vi.fn()} printerNodeId="node-dirty" />,
+            'es'
+        );
+
+        // Enter Stage A (Tu imprenta)
+        const startBtn = await screen.findByRole('button', { name: /Comenzar configuración|Continuar configuración/i });
+        fireEvent.click(startBtn);
+
+        await waitFor(() => {
+            expect(screen.getByText('Datos básicos de tu empresa y taller')).toBeInTheDocument();
+        });
+
+        // Verify locally edited phone and website are PRESERVED and not wiped by server empty/null
+        const phoneInput = screen.getByLabelText(/Teléfono directo|Teléfono Oficial/i) as HTMLInputElement;
+        expect(phoneInput.value).toBe('+34 600 111 222');
+
+        const websiteInput = screen.getByLabelText(/Sitio web|Sitio Web de la Empresa/i) as HTMLInputElement;
+        expect(websiteInput.value).toBe('https://locally-edited.com');
+
+        // Persisted draft also preserves the dirty values
+        const updatedDraft = loadGuidedOnboardingDraft(tenantId);
+        expect(updatedDraft.company.phone).toBe('+34 600 111 222');
+        expect(updatedDraft.company.website).toBe('https://locally-edited.com');
+    });
 });
+
 
 

@@ -232,8 +232,21 @@ export const GuidedPrinthouseJourney: React.FC<GuidedPrinthouseJourneyProps> = (
 
                     const serverAddress = serverCompany?.address !== undefined && serverCompany?.address !== null ? String(serverCompany.address) : (serverCompany && 'address' in serverCompany ? '' : undefined);
                     const serverPostalCode = serverCompany?.postalCode !== undefined && serverCompany?.postalCode !== null ? String(serverCompany.postalCode) : (serverCompany && 'postalCode' in serverCompany ? '' : undefined);
-                    const serverPhone = serverCompany?.phone !== undefined && serverCompany?.phone !== null ? String(serverCompany.phone) : (primarySite?.phone !== undefined && primarySite?.phone !== null ? String(primarySite.phone) : (serverCompany && 'phone' in serverCompany ? '' : undefined));
-                    const serverWebsite = serverCompany?.website !== undefined && serverCompany?.website !== null ? String(serverCompany.website) : (primarySite?.website !== undefined && primarySite?.website !== null ? String(primarySite.website) : (serverCompany && 'website' in serverCompany ? '' : undefined));
+                    // For company phone & website: an authoritative field explicitly set to '' or null must clear the clean field.
+                    // Fallback to primarySite values ONLY when the company field is truly absent (undefined).
+                    let serverPhone: string | undefined = undefined;
+                    if (serverCompany && 'phone' in serverCompany) {
+                        serverPhone = serverCompany.phone !== undefined && serverCompany.phone !== null ? String(serverCompany.phone) : '';
+                    } else if (primarySite?.phone !== undefined && primarySite?.phone !== null) {
+                        serverPhone = String(primarySite.phone);
+                    }
+
+                    let serverWebsite: string | undefined = undefined;
+                    if (serverCompany && 'website' in serverCompany) {
+                        serverWebsite = serverCompany.website !== undefined && serverCompany.website !== null ? String(serverCompany.website) : '';
+                    } else if (primarySite?.website !== undefined && primarySite?.website !== null) {
+                        serverWebsite = String(primarySite.website);
+                    }
                     const serverContact = serverCompany?.contactName !== undefined && serverCompany?.contactName !== null ? String(serverCompany.contactName) : (serverCompany && 'contactName' in serverCompany ? '' : undefined);
                     const serverTaxId = serverCompany?.taxId !== undefined && serverCompany?.taxId !== null ? String(serverCompany.taxId) : (serverCompany && 'taxId' in serverCompany ? '' : undefined);
                     const serverSiteName = primarySite?.siteName !== undefined && primarySite?.siteName !== null ? String(primarySite.siteName) : (primarySite && 'siteName' in primarySite ? '' : undefined);

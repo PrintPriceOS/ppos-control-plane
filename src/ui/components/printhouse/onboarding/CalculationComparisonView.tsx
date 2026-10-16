@@ -224,18 +224,18 @@ export const CalculationComparisonView: React.FC<CalculationComparisonViewProps>
                         <div className="space-y-0.5 text-xs">
                             <span className="font-bold text-amber-900 dark:text-amber-200">
                                 {resolvedTarget === null && spec?.runs && spec.runs.length > 0
-                                    ? 'Selección de variante requerida o no válida'
+                                    ? (t('compare.variantSelectionRequired') || 'Selección de variante requerida o no válida')
                                     : (!hasValidEnginePrice 
-                                        ? 'Cálculo del motor ausente o incompleto' 
+                                        ? (t('compare.engineCalculationMissing') || 'Cálculo del motor ausente o incompleto') 
                                         : (!hasEquivalentBreakdown 
                                             ? (t('review.incompleteComparison') || 'Comparación incompleta') 
-                                            : 'Comparación no válida'))}
+                                            : (t('compare.unnormalized') || 'Comparación no válida')))}
                             </span>
                             <p className="text-[11px] text-amber-800/90 dark:text-amber-300/90 leading-relaxed">
                                 {resolvedIncompleteReason
                                     ? resolvedIncompleteReason
                                     : (!hasValidEnginePrice
-                                        ? 'El motor no ha devuelto un resultado de cálculo positivo para esta especificación. El avance a la propuesta de tarifas está bloqueado hasta ejecutar el cálculo satisfactoriamente.'
+                                        ? (t('compare.pendingExecution') || 'El motor no ha devuelto un resultado de cálculo positivo para esta especificación. El avance a la propuesta de tarifas está bloqueado hasta ejecutar el cálculo satisfactoriamente.')
                                         : (incompleteComparisonReason || t('review.incompleteComparisonReason') || 'El desglose de la oferta no permite contrastar magnitudes equivalentes de forma estricta. Verifique si falta desglose de fabricación independiente del transporte.'))}
                             </p>
                         </div>
@@ -246,7 +246,7 @@ export const CalculationComparisonView: React.FC<CalculationComparisonViewProps>
                     <div className="p-3.5 bg-red-50 dark:bg-red-950/40 border border-red-300 dark:border-red-700 rounded-xl flex items-start gap-2.5">
                         <XCircle size={16} className="text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
                         <div className="space-y-0.5 text-xs">
-                            <span className="font-bold text-red-900 dark:text-red-200">Error en el cálculo</span>
+                            <span className="font-bold text-red-900 dark:text-red-200">{t('compare.calculationErrorTitle') || 'Error en el cálculo'}</span>
                             <p className="text-[11px] text-red-800/90 dark:text-red-300/90">{calculationError}</p>
                         </div>
                     </div>
@@ -266,8 +266,8 @@ export const CalculationComparisonView: React.FC<CalculationComparisonViewProps>
                         </div>
                         <span className="text-[11px] text-zinc-500">
                             {hasValidTarget 
-                                ? (comparisonMode === 'manufacturing' ? 'Excluye portes y flete' : 'Total oferta sin IVA')
-                                : 'Sin precio declarado válido'}
+                                ? (comparisonMode === 'manufacturing' ? (t('compare.excludesFreight') || 'Excluye portes y flete') : (t('compare.totalExVat') || 'Total oferta sin IVA'))
+                                : (t('compare.noValidTarget') || 'Sin precio declarado válido')}
                         </span>
                     </div>
 
@@ -283,8 +283,8 @@ export const CalculationComparisonView: React.FC<CalculationComparisonViewProps>
                         </div>
                         <span className="text-[11px] text-zinc-500">
                             {calculating 
-                                ? 'Calculando precios...' 
-                                : (hasValidEnginePrice ? 'Cálculo del motor BPE' : 'Pendiente de ejecución')}
+                                ? (t('compare.calculatingPrices') || 'Calculando precios...') 
+                                : (hasValidEnginePrice ? (t('compare.bpeEngineCalc') || 'Cálculo del motor BPE') : (t('compare.pendingExecution') || 'Pendiente de ejecución'))}
                         </span>
                     </div>
 
@@ -312,14 +312,14 @@ export const CalculationComparisonView: React.FC<CalculationComparisonViewProps>
                             )}
                             {!isComparisonValid && (
                                 <span className="text-xs px-2 py-0.5 rounded-full font-bold bg-zinc-200 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-400">
-                                    Sin cálculo
+                                    {t('compare.noCalculation') || 'Sin cálculo'}
                                 </span>
                             )}
                         </div>
                         <span className="text-[11px] text-zinc-500">
                             {!isComparisonValid 
-                                ? 'Comparación no normalizada' 
-                                : (isWellFitted ? 'Ajuste calibrado dentro de tolerancia' : 'Ajuste con divergencia para calibrar')}
+                                ? (t('compare.unnormalized') || 'Comparación no normalizada') 
+                                : (isWellFitted ? (t('compare.withinTolerance') || 'Ajuste calibrado dentro de tolerancia') : (t('compare.withDivergence') || 'Ajuste con divergencia para calibrar'))}
                         </span>
                     </div>
                 </div>
@@ -343,7 +343,7 @@ export const CalculationComparisonView: React.FC<CalculationComparisonViewProps>
                             </span>
                             {residualAbs !== null && (
                                 <span className="font-mono text-[10px]">
-                                    Residual numérico: {residualAbs.toFixed(4)} € ({residualPercent !== null ? `${residualPercent.toFixed(2)}%` : '—'})
+                                    {t('compare.numericResidual') || 'Residual numérico'}: {residualAbs.toFixed(4)} € ({residualPercent !== null ? `${residualPercent.toFixed(2)}%` : '—'})
                                 </span>
                             )}
                         </div>
@@ -372,7 +372,7 @@ export const CalculationComparisonView: React.FC<CalculationComparisonViewProps>
                             <div className="p-3.5 bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700/80 rounded-xl space-y-1.5">
                                 <span className="font-bold text-amber-700 dark:text-amber-400 text-xs flex items-center gap-1.5">
                                     <Info size={13} />
-                                    <span>Cobertura Faltante (Sin Evidencia en este Documento)</span>
+                                    <span>{t('compare.missingCoverageTitle') || 'Cobertura Faltante (Sin Evidencia en este Documento)'}</span>
                                 </span>
                                 <ul className="text-[11px] text-zinc-600 dark:text-zinc-400 space-y-1 list-disc list-inside">
                                     {(coverageGaps && coverageGaps.length > 0) ? (
@@ -406,7 +406,7 @@ export const CalculationComparisonView: React.FC<CalculationComparisonViewProps>
                     {!isComparisonValid && (
                         <span className="text-[11px] text-amber-600 dark:text-amber-400 font-semibold flex items-center gap-1">
                             <AlertTriangle size={13} />
-                            <span>{resolvedIncompleteReason || 'Requiere cálculo de motor válido para continuar'}</span>
+                            <span>{resolvedIncompleteReason || t('compare.validEngineRequired') || 'Requiere cálculo de motor válido para continuar'}</span>
                         </span>
                     )}
                     <button
