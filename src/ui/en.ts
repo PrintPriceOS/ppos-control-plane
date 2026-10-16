@@ -2093,6 +2093,13 @@ export const en = {
   'guided.review.status.in_progress': 'In progress',
   'guided.review.status.failed': 'Action required',
 
+  'guided.storage.saved': 'Draft saved',
+  'guided.storage.saving': 'Saving draft...',
+  'guided.storage.unsaved': 'Unsaved changes',
+  'guided.storage.unavailable': 'Storage unavailable',
+  'guided.review.refreshError': 'Failed to refresh readiness status. Please check your connection and retry.',
+  'guided.review.refreshBtn': 'Refresh status',
+  'guided.review.refreshing': 'Refreshing status...',
   'guided.action.openGuided': 'Guided Setup',
   'guided.action.openFullSetup': 'Open Full Setup',
   'guided.action.back': 'Back to welcome',

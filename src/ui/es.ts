@@ -2093,6 +2093,13 @@ export const es = {
   'guided.review.status.in_progress': 'En progreso',
   'guided.review.status.failed': 'Requiere atención',
 
+  'guided.storage.saved': 'Borrador guardado',
+  'guided.storage.saving': 'Guardando borrador...',
+  'guided.storage.unsaved': 'Cambios sin guardar',
+  'guided.storage.unavailable': 'Almacenamiento no disponible',
+  'guided.review.refreshError': 'Error al actualizar el estado de preparación. Comprueba la conexión e inténtalo de nuevo.',
+  'guided.review.refreshBtn': 'Actualizar estado',
+  'guided.review.refreshing': 'Actualizando estado...',
   'guided.action.openGuided': 'Alta Guiada',
   'guided.action.openFullSetup': 'Abrir configuración completa',
   'guided.action.back': 'Volver a bienvenida',

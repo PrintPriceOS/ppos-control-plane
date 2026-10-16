@@ -2093,6 +2093,13 @@ export const de = {
   'guided.review.status.in_progress': 'In Bearbeitung',
   'guided.review.status.failed': 'Handlung erforderlich',
 
+  'guided.storage.saved': 'Entwurf gespeichert',
+  'guided.storage.saving': 'Entwurf wird gespeichert...',
+  'guided.storage.unsaved': 'Nicht gespeicherte Änderungen',
+  'guided.storage.unavailable': 'Speicher nicht verfügbar',
+  'guided.review.refreshError': 'Fehler beim Aktualisieren des Bereitschaftsstatus. Bitte Verbindung prüfen und erneut versuchen.',
+  'guided.review.refreshBtn': 'Status aktualisieren',
+  'guided.review.refreshing': 'Status wird aktualisiert...',
   'guided.action.openGuided': 'Geführte Einrichtung',
   'guided.action.openFullSetup': 'Vollständige Konfiguration öffnen',
   'guided.action.back': 'Zurück zum Willkommen',

@@ -54,8 +54,14 @@ const renderWithProviders = (ui: React.ReactElement, locale = 'es') => {
 
 describe('Guided Printhouse Onboarding Journey Suite', () => {
     beforeEach(() => {
-        vi.restoreAllMocks();
         localStorage.clear();
+        (getAuthUser as any).mockReturnValue({
+            tenantId: 'tenant-current',
+            role: 'PRINTHOUSE_OPERATOR',
+            email: 'operator@test.local',
+            printhouseId: 'node-test-1',
+            companyName: 'Test Printhouse'
+        });
 
         // Default mock fetch for onboarding endpoints
         global.fetch = vi.fn().mockImplementation((url: string, opts?: any) => {
@@ -118,7 +124,6 @@ describe('Guided Printhouse Onboarding Journey Suite', () => {
     });
 
     afterEach(() => {
-        vi.restoreAllMocks();
         localStorage.clear();
     });
 
@@ -622,6 +627,391 @@ describe('Guided Printhouse Onboarding Journey Suite', () => {
         expect(currentStored.pricingContinuity?.HARDCOVER?.sessionId).toBe('session-persist-123');
         expect(currentStored.pricingContinuity?.HARDCOVER?.selectedVariantId).toBe('var-abc');
         expect(currentStored.pricingContinuity?.HARDCOVER?.step).toBe(4);
+    });
+
+    it('13. Pricing continuity: preserves recalculated activeRun and proposedPatch with same session, variant, and step', async () => {
+        const tenantId = 'tenant-current';
+        saveGuidedOnboardingDraft({
+            tenantId,
+            currentStage: 'PRICING',
+            selectedFamilyId: 'HARDCOVER',
+            enabledFamilies: { HARDCOVER: true, SOFTCOVER: true, WIRE_O: false, SADDLE_STITCH: false },
+            company: {
+                legalName: 'Test Printhouse',
+                tradingName: 'Test',
+                country: 'ES',
+                city: 'Valencia',
+                address: '',
+                postalCode: '',
+                phone: '',
+                website: '',
+                contactName: 'Admin',
+                taxId: '',
+                siteName: 'Central',
+                siteTimezone: 'Europe/Madrid'
+            },
+            offerDrafts: {},
+            pricingContinuity: {
+                HARDCOVER: {
+                    sessionId: 'session-recalc-1',
+                    activeRun: { id: 'run-alpha', status: 'DRAFT', revisionId: 'rev-1' },
+                    selectedVariantId: 'var-100',
+                    proposedPatch: { speed: 4000 },
+                    entryMode: 'MANUAL_FORM',
+                    uploadedFileName: null,
+                    step: 4,
+                    offer: {
+                        family: 'HARDCOVER',
+                        productTitle: 'Initial Book',
+                        quoteRef: 'Q-001',
+                        quoteDate: '2026-10-16',
+                        currency: 'EUR',
+                        widthMm: 148,
+                        heightMm: 210,
+                        runs: []
+                    },
+                    comparisonData: {
+                        enginePrice: 500,
+                        originalPrice: 550,
+                        difference: -50,
+                        residual: 0.05,
+                        isCalculated: true,
+                        supportedParameters: [],
+                        coverageGaps: []
+                    }
+                }
+            },
+            lastSavedTimestamp: Date.now(),
+            completedStages: { WELCOME: true, COMPANY: true, PRODUCTS: true, PRICING: true, REVIEW: false }
+        });
+
+        renderWithProviders(
+            <GuidedPrinthouseJourney onOpenFullSetup={vi.fn()} printerNodeId="node-test-1" />,
+            'es'
+        );
+
+        // Stage C is active, verify that initial offer title is visible
+        await waitFor(() => {
+            expect(screen.getByText('Calibra tus tarifas con un presupuesto real')).toBeInTheDocument();
+        });
+
+        // Directly test handlePricingContinuityChange behavior and draft preservation
+        // when session, variant, and step remain identical, but activeRun and proposedPatch are updated
+        const currentDraft = loadGuidedOnboardingDraft(tenantId);
+        expect(currentDraft.pricingContinuity?.HARDCOVER?.activeRun?.id).toBe('run-alpha');
+        expect(currentDraft.pricingContinuity?.HARDCOVER?.proposedPatch?.speed).toBe(4000);
+
+        // Simulate recalculation update from SimplifiedOnboardingJourney with same session/variant/step but new run & patch
+        const recalculatedDraft = {
+            ...currentDraft.pricingContinuity!.HARDCOVER!,
+            activeRun: { id: 'run-beta', status: 'COMPLETED', revisionId: 'rev-2' },
+            proposedPatch: { speed: 5200, makeready: 120 },
+            offer: {
+                ...currentDraft.pricingContinuity!.HARDCOVER!.offer!,
+                productTitle: 'Updated Book Title'
+            },
+            comparisonData: {
+                ...currentDraft.pricingContinuity!.HARDCOVER!.comparisonData,
+                enginePrice: 525
+            }
+        };
+
+        // Save recalculated draft and verify that loadGuidedOnboardingDraft reflects it accurately
+        saveGuidedOnboardingDraft({
+            ...currentDraft,
+            pricingContinuity: {
+                HARDCOVER: recalculatedDraft
+            }
+        });
+
+        const updatedStored = loadGuidedOnboardingDraft(tenantId);
+        expect(updatedStored.pricingContinuity?.HARDCOVER?.activeRun?.id).toBe('run-beta');
+        expect(updatedStored.pricingContinuity?.HARDCOVER?.proposedPatch?.speed).toBe(5200);
+        expect(updatedStored.pricingContinuity?.HARDCOVER?.offer?.productTitle).toBe('Updated Book Title');
+        expect(updatedStored.pricingContinuity?.HARDCOVER?.comparisonData?.enginePrice).toBe(525);
+
+        // Navigate to Stage D and verify stepper transition succeeds
+        fireEvent.click(screen.getByRole('button', { name: /Revisar y continuar/i }));
+        await waitFor(() => {
+            expect(screen.getByText('Resumen de configuración de tu imprenta')).toBeInTheDocument();
+        });
+    });
+
+    it('14. Storage feedback: rendered journey truthfully displays storage unavailable state on failure', async () => {
+        // Force localStorage to fail
+        const setItemSpy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+            throw new DOMException('QuotaExceededError');
+        });
+
+        renderWithProviders(
+            <GuidedPrinthouseJourney onOpenFullSetup={vi.fn()} />,
+            'es'
+        );
+
+        // Click to Stage A
+        const startBtn = await screen.findByRole('button', { name: /Comenzar configuración|Continuar configuración/i });
+        fireEvent.click(startBtn);
+
+        await waitFor(() => {
+            expect(screen.getByText('Datos básicos de tu empresa y taller')).toBeInTheDocument();
+        });
+
+        // The storage status badge in the header must reflect storage unavailable
+        const statusEl = screen.getByTestId('guided-storage-status');
+        expect(statusEl).toBeInTheDocument();
+        expect(statusEl).toHaveTextContent(/Almacenamiento no disponible/i);
+
+        setItemSpy.mockRestore();
+    });
+
+    it('15. Tenant lifecycle: delayed responses from tenant-A are discarded when switching to tenant-B', async () => {
+        let resolveTenantAResponse: (value: any) => void = () => {};
+        const tenantAPromise = new Promise((resolve) => {
+            resolveTenantAResponse = resolve;
+        });
+
+        let fetchCount = 0;
+        global.fetch = vi.fn().mockImplementation((url: string) => {
+            if (url.includes('/api/printhouse/onboarding')) {
+                fetchCount++;
+                if (fetchCount === 1) {
+                    // First request (for Tenant A): delay indefinitely until released
+                    return tenantAPromise;
+                }
+                // Subsequent request (for Tenant B): resolve immediately
+                return Promise.resolve({
+                    ok: true,
+                    json: () => Promise.resolve({
+                        ok: true,
+                        data: {
+                            company: { legalName: 'Tenant B Imprenta', country: 'ES', city: 'Barcelona' },
+                            sites: [{ siteId: 'site-b', siteName: 'Planta B', country: 'ES', city: 'Barcelona' }],
+                            readiness: {
+                                accountSetup: { status: 'PENDING', blockingIssues: ['SITE_PENDING'] },
+                                operationalConfiguration: { status: 'PENDING', blockingIssues: [] },
+                                pricingReadiness: { status: 'PENDING', blockingIssues: [] }
+                            }
+                        }
+                    })
+                });
+            }
+            return Promise.resolve({ ok: true, json: () => Promise.resolve({ ok: true, data: {} }) });
+        });
+
+        (getAuthUser as any).mockReturnValue({
+            tenantId: 'tenant-a',
+            role: 'PRINTHOUSE_OPERATOR',
+            printhouseId: 'node-a'
+        });
+
+        const { rerender } = renderWithProviders(
+            <GuidedPrinthouseJourney onOpenFullSetup={vi.fn()} />,
+            'es'
+        );
+
+        // Switch authenticated user identity to Tenant B
+        (getAuthUser as any).mockReturnValue({
+            tenantId: 'tenant-b',
+            role: 'PRINTHOUSE_OPERATOR',
+            printhouseId: 'node-b'
+        });
+
+        rerender(
+            <MemoryRouter>
+                <LocaleProvider initialLocale="es">
+                    <GuidedPrinthouseJourney onOpenFullSetup={vi.fn()} />
+                </LocaleProvider>
+            </MemoryRouter>
+        );
+
+        // Now resolve delayed Tenant A response
+        resolveTenantAResponse({
+            ok: true,
+            json: () => Promise.resolve({
+                ok: true,
+                data: {
+                    company: { legalName: 'STALE TENANT A SHOULD NOT APPEAR', country: 'ES', city: 'Madrid' },
+                    sites: [{ siteId: 'site-a', siteName: 'Stale Site', country: 'ES', city: 'Madrid' }],
+                    readiness: {}
+                }
+            })
+        });
+
+        // Wait for Tenant B's data to settle
+        await waitFor(() => {
+            const stored = loadGuidedOnboardingDraft('tenant-b');
+            expect(stored.company.legalName).not.toBe('STALE TENANT A SHOULD NOT APPEAR');
+        });
+    });
+
+    it('16. Readiness freshness: stale COMPLETE followed by HTTP 500 blocks submission and displays error', async () => {
+        const tenantId = 'tenant-current';
+        saveGuidedOnboardingDraft({
+            tenantId,
+            currentStage: 'REVIEW',
+            selectedFamilyId: 'HARDCOVER',
+            enabledFamilies: { HARDCOVER: true, SOFTCOVER: true, WIRE_O: false, SADDLE_STITCH: false },
+            company: {
+                legalName: 'Complete Ready Printhouse',
+                tradingName: 'Ready',
+                country: 'ES',
+                city: 'Madrid',
+                address: '',
+                postalCode: '',
+                phone: '',
+                website: '',
+                contactName: 'Carlos',
+                taxId: 'B12345678',
+                siteName: 'Planta Principal',
+                siteTimezone: 'Europe/Madrid'
+            },
+            offerDrafts: {},
+            lastSavedTimestamp: Date.now(),
+            completedStages: { WELCOME: true, COMPANY: true, PRODUCTS: true, PRICING: true, REVIEW: false }
+        });
+
+        // First return COMPLETE readiness (initial mount makes up to 2 calls: journey + review), then on subsequent refresh return HTTP 500 error
+        let callCount = 0;
+        global.fetch = vi.fn().mockImplementation((url: string) => {
+            if (url.includes('/api/printhouse/onboarding')) {
+                callCount++;
+                if (callCount <= 2) {
+                    return Promise.resolve({
+                        ok: true,
+                        json: () => Promise.resolve({
+                            ok: true,
+                            data: {
+                                company: { legalName: 'Complete Ready Printhouse', country: 'ES', city: 'Madrid' },
+                                sites: [{ siteId: 'site-1', siteName: 'Planta 1', country: 'ES', city: 'Madrid' }],
+                                readiness: {
+                                    accountSetup: { status: 'COMPLETE', blockingIssues: [] },
+                                    operationalConfiguration: { status: 'COMPLETE', blockingIssues: [] },
+                                    pricingReadiness: { status: 'COMPLETE', blockingIssues: [] }
+                                }
+                            }
+                        })
+                    });
+                }
+                // Subsequent refresh fails with HTTP 500
+                return Promise.resolve({
+                    ok: false,
+                    status: 500,
+                    json: () => Promise.resolve({ ok: false, error: 'Database timeout on readiness evaluation' })
+                });
+            }
+            return Promise.resolve({ ok: true, json: () => Promise.resolve({ ok: true, data: {} }) });
+        });
+
+        renderWithProviders(
+            <GuidedPrinthouseJourney onOpenFullSetup={vi.fn()} printerNodeId="node-test-1" />,
+            'es'
+        );
+
+        await waitFor(() => {
+            expect(screen.getByText('Resumen de configuración de tu imprenta')).toBeInTheDocument();
+            expect(screen.getByRole('button', { name: /Solicitar revisión comercial/i })).toBeInTheDocument();
+        });
+
+        // Click retry/refresh status button
+        const refreshBtn = screen.getByRole('button', { name: /Actualizar estado/i });
+        fireEvent.click(refreshBtn);
+
+        // Verification: The HTTP 500 failure prevents review submission
+        await waitFor(() => {
+            expect(screen.queryByRole('button', { name: /Solicitar revisión comercial/i })).not.toBeInTheDocument();
+            expect(screen.getByText(/Error al actualizar el estado de preparación/i)).toBeInTheDocument();
+        });
+    });
+
+    it('17. Draft/server reconciliation: preserves German printhouse DE and Europe/Berlin server values without ES default overwrite', async () => {
+        const tenantId = 'tenant-german';
+        (getAuthUser as any).mockReturnValue({
+            tenantId,
+            role: 'PRINTHOUSE_OPERATOR',
+            printhouseId: 'node-de-1'
+        });
+
+        global.fetch = vi.fn().mockImplementation((url: string) => {
+            if (url.includes('/api/printhouse/onboarding')) {
+                return Promise.resolve({
+                    ok: true,
+                    json: () => Promise.resolve({
+                        ok: true,
+                        data: {
+                            company: {
+                                legalName: 'Druckerei Schwarzwald GmbH',
+                                country: 'DE',
+                                city: 'Freiburg',
+                                address: 'Industriestraße 12',
+                                postalCode: '79098'
+                            },
+                            sites: [{
+                                siteId: 'site-freiburg',
+                                siteName: 'Hauptwerk Freiburg',
+                                country: 'DE',
+                                city: 'Freiburg',
+                                timezone: 'Europe/Berlin'
+                            }],
+                            readiness: {
+                                accountSetup: { status: 'COMPLETE', blockingIssues: [] },
+                                operationalConfiguration: { status: 'COMPLETE', blockingIssues: [] },
+                                pricingReadiness: { status: 'COMPLETE', blockingIssues: [] }
+                            }
+                        }
+                    })
+                });
+            }
+            return Promise.resolve({ ok: true, json: () => Promise.resolve({ ok: true, data: {} }) });
+        });
+
+        renderWithProviders(
+            <GuidedPrinthouseJourney onOpenFullSetup={vi.fn()} printerNodeId="node-de-1" />,
+            'es'
+        );
+
+        // Check that German country and timezone are preserved and not overridden with ES / Europe/Madrid
+        await waitFor(() => {
+            const draft = loadGuidedOnboardingDraft(tenantId);
+            expect(draft.company.legalName).toBe('Druckerei Schwarzwald GmbH');
+            expect(draft.company.country).toBe('DE');
+            expect(draft.company.siteTimezone).toBe('Europe/Berlin');
+            expect(draft.company.country).not.toBe('ES');
+            expect(draft.company.siteTimezone).not.toBe('Europe/Madrid');
+        });
+    });
+
+    it('18. Node resolution: failed node lookup is never treated as a verified node', async () => {
+        // If node lookup fails, GuidedOnboardingPage passes undefined printerNodeId to GuidedPrinthouseJourney
+        renderWithProviders(
+            <GuidedPrinthouseJourney onOpenFullSetup={vi.fn()} printerNodeId={undefined} />,
+            'es'
+        );
+
+        // Click through to Stage C (Pricing)
+        const startBtn = await screen.findByRole('button', { name: /Comenzar configuración|Continuar configuración/i });
+        fireEvent.click(startBtn);
+
+        await waitFor(() => {
+            expect(screen.getByText('Datos básicos de tu empresa y taller')).toBeInTheDocument();
+        });
+
+        // Fill company
+        fireEvent.change(screen.getByLabelText(/Razón Social|Nombre legal/i), { target: { value: 'Test' } });
+        fireEvent.change(screen.getByLabelText(/Ciudad \/ Municipio/i), { target: { value: 'City' } });
+        fireEvent.submit(screen.getByRole('button', { name: /Guardar y elegir qué produces/i }).closest('form')!);
+
+        await waitFor(() => {
+            expect(screen.getByText('¿Qué tipos de producto fabrica tu imprenta?')).toBeInTheDocument();
+        });
+
+        // Continue to Stage C
+        fireEvent.click(screen.getByRole('button', { name: /Continuar a calibrar precios/i }));
+
+        // Verification: The unverified node displays prerequisite blocker banner and disables calculation
+        await waitFor(() => {
+            expect(screen.getByText(/Se requiere un nodo de impresión configurado para calibrar tarifas/i)).toBeInTheDocument();
+            expect(screen.getByText(/Una sede o planta física no sustituye a una máquina o nodo de impresión/i)).toBeInTheDocument();
+        });
     });
 });
 

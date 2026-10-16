@@ -28,6 +28,10 @@ export interface CompanyDraftData {
     siteName: string;
     siteTimezone: string;
     primarySiteId?: string | null;
+    /** Tracks fields explicitly touched/edited by the user in this draft session */
+    userEditedFields?: string[];
+    /** Tracks server values that were acknowledged/loaded to avoid overriding with defaults */
+    acknowledgedServerValues?: Partial<Record<string, string | null>>;
 }
 
 export const VALID_GUIDED_STAGES: ReadonlySet<GuidedStage> = new Set([
@@ -67,7 +71,7 @@ export interface GuidedOnboardingDraft {
 const STORAGE_PREFIX = 'ppos_guided_onboarding_draft_';
 export const CURRENT_SCHEMA_VERSION = 2;
 
-export const createDefaultCompanyDraft = (initialCountry = 'ES'): CompanyDraftData => ({
+export const createDefaultCompanyDraft = (initialCountry = ''): CompanyDraftData => ({
     legalName: '',
     tradingName: '',
     country: initialCountry,
@@ -79,8 +83,10 @@ export const createDefaultCompanyDraft = (initialCountry = 'ES'): CompanyDraftDa
     contactName: '',
     taxId: '',
     siteName: '',
-    siteTimezone: 'Europe/Madrid',
-    primarySiteId: null
+    siteTimezone: '',
+    primarySiteId: null,
+    userEditedFields: [],
+    acknowledgedServerValues: {}
 });
 
 export const createDefaultDraft = (tenantId: string): GuidedOnboardingDraft => ({
@@ -182,10 +188,13 @@ export function loadGuidedOnboardingDraft(tenantId: string): GuidedOnboardingDra
 
         // Validate company fields
         const rawComp = parsed.company || {};
+        const rawEdited = Array.isArray(rawComp.userEditedFields) ? rawComp.userEditedFields.filter((f: any) => typeof f === 'string') : [];
+        const rawAck = typeof rawComp.acknowledgedServerValues === 'object' && rawComp.acknowledgedServerValues !== null ? rawComp.acknowledgedServerValues : {};
+
         const company: CompanyDraftData = {
             legalName: typeof rawComp.legalName === 'string' ? rawComp.legalName : '',
             tradingName: typeof rawComp.tradingName === 'string' ? rawComp.tradingName : '',
-            country: typeof rawComp.country === 'string' && rawComp.country.trim() ? rawComp.country.trim() : 'ES',
+            country: typeof rawComp.country === 'string' ? rawComp.country.trim() : '',
             city: typeof rawComp.city === 'string' ? rawComp.city : '',
             address: typeof rawComp.address === 'string' ? rawComp.address : '',
             postalCode: typeof rawComp.postalCode === 'string' ? rawComp.postalCode : '',
@@ -194,8 +203,10 @@ export function loadGuidedOnboardingDraft(tenantId: string): GuidedOnboardingDra
             contactName: typeof rawComp.contactName === 'string' ? rawComp.contactName : '',
             taxId: typeof rawComp.taxId === 'string' ? rawComp.taxId : '',
             siteName: typeof rawComp.siteName === 'string' ? rawComp.siteName : '',
-            siteTimezone: typeof rawComp.siteTimezone === 'string' && rawComp.siteTimezone.trim() ? rawComp.siteTimezone.trim() : 'Europe/Madrid',
-            primarySiteId: typeof rawComp.primarySiteId === 'string' ? rawComp.primarySiteId : null
+            siteTimezone: typeof rawComp.siteTimezone === 'string' ? rawComp.siteTimezone.trim() : '',
+            primarySiteId: typeof rawComp.primarySiteId === 'string' ? rawComp.primarySiteId : null,
+            userEditedFields: rawEdited,
+            acknowledgedServerValues: rawAck
         };
 
         return {

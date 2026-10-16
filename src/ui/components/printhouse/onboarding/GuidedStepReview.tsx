@@ -29,6 +29,8 @@ interface GuidedStepReviewProps {
     families: Record<ProductFamilyId, FamilyState>;
     enabledFamilies: Record<ProductFamilyId, boolean>;
     readinessData?: any;
+    isRefreshingReadiness?: boolean;
+    refreshError?: string | null;
     onBackToPricing: () => void;
     onOpenFullSetup: (targetTab?: string) => void;
     onRefreshReadiness?: () => Promise<void>;
@@ -39,6 +41,8 @@ export const GuidedStepReview: React.FC<GuidedStepReviewProps> = ({
     families,
     enabledFamilies,
     readinessData,
+    isRefreshingReadiness = false,
+    refreshError = null,
     onBackToPricing,
     onOpenFullSetup,
     onRefreshReadiness
@@ -64,8 +68,9 @@ export const GuidedStepReview: React.FC<GuidedStepReviewProps> = ({
         ...(pricingReadiness?.blockingIssues || [])
     ];
 
-    // Explicit readiness check: readinessData must exist and all required categories must be COMPLETE with 0 blockers
-    const isReadinessLoaded = Boolean(readinessData && (accountReadiness || opsReadiness || pricingReadiness));
+    // Explicit readiness freshness check:
+    // Stale COMPLETE data must NEVER enable submission while refreshing or if that refresh failed.
+    const isReadinessLoaded = Boolean(!isRefreshingReadiness && !refreshError && readinessData && (accountReadiness || opsReadiness || pricingReadiness));
     const isAccountComplete = accountReadiness?.status === 'COMPLETE';
     const isOpsComplete = opsReadiness?.status === 'COMPLETE';
     const isPricingComplete = pricingReadiness?.status === 'COMPLETE';
@@ -123,13 +128,58 @@ export const GuidedStepReview: React.FC<GuidedStepReviewProps> = ({
                 <span className="text-[11px] font-black uppercase tracking-widest text-[#dc0000]">
                     {t('guided.stageD.badge') || 'Etapa 4 de 4 · Revisar y continuar'}
                 </span>
-                <h2 className="text-2xl sm:text-3xl font-black text-zinc-900 dark:text-zinc-100 tracking-tight">
-                    {t('guided.stageD.title') || 'Resumen de configuración de tu imprenta'}
-                </h2>
-                <p className="text-sm text-zinc-600 dark:text-zinc-400">
-                    {t('guided.stageD.subtitle') || 'Comprueba la información guardada, los productos configurados y los siguientes pasos reales de tu cuenta.'}
-                </p>
+                <div className="flex items-center justify-between">
+                    <div>
+                        <h2 className="text-2xl sm:text-3xl font-black text-zinc-900 dark:text-zinc-100 tracking-tight">
+                            {t('guided.stageD.title') || 'Resumen de configuración de tu imprenta'}
+                        </h2>
+                        <p className="text-sm text-zinc-600 dark:text-zinc-400">
+                            {t('guided.stageD.subtitle') || 'Comprueba la información guardada, los productos configurados y los siguientes pasos reales de tu cuenta.'}
+                        </p>
+                    </div>
+                    {onRefreshReadiness && (
+                        <button
+                            type="button"
+                            onClick={() => onRefreshReadiness()}
+                            disabled={isRefreshingReadiness}
+                            className="px-3 py-1.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-xs font-bold text-zinc-700 dark:text-zinc-300 transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                        >
+                            <RefreshCw size={13} className={isRefreshingReadiness ? 'animate-spin' : ''} />
+                            <span>{t('guided.review.refreshBtn') || 'Actualizar estado'}</span>
+                        </button>
+                    )}
+                </div>
             </div>
+
+            {/* Refreshing readiness indicator */}
+            {isRefreshingReadiness && (
+                <div role="status" className="p-3.5 rounded-xl bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 text-blue-800 dark:text-blue-300 flex items-center gap-2.5 text-xs font-semibold">
+                    <RefreshCw size={15} className="animate-spin text-blue-600 shrink-0" />
+                    <span>{t('guided.review.refreshing') || 'Actualizando estado...'}</span>
+                </div>
+            )}
+
+            {/* Refresh error alert */}
+            {refreshError && (
+                <div role="alert" className="p-4 rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 text-red-800 dark:text-red-300 flex items-start justify-between gap-3 text-xs font-medium">
+                    <div className="flex items-start gap-2.5">
+                        <AlertTriangle size={18} className="text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
+                        <div className="space-y-0.5">
+                            <span className="font-bold">{t('guided.review.refreshError') || 'Error al actualizar el estado de preparación. Comprueba la conexión e inténtalo de nuevo.'}</span>
+                            <div className="text-[11px] opacity-80">{refreshError}</div>
+                        </div>
+                    </div>
+                    {onRefreshReadiness && (
+                        <button
+                            type="button"
+                            onClick={() => onRefreshReadiness()}
+                            className="px-2.5 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg text-[11px] font-bold shrink-0 transition-colors cursor-pointer"
+                        >
+                            {t('guided.review.refreshBtn') || 'Actualizar estado'}
+                        </button>
+                    )}
+                </div>
+            )}
 
             {/* Submission alert if triggered */}
             {submissionResult && (

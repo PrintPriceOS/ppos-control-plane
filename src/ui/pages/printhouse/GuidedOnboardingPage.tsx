@@ -9,15 +9,20 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { GuidedPrinthouseJourney } from '../../components/printhouse/onboarding/GuidedPrinthouseJourney';
-import { getAuthToken, getUserPrinthouseId } from '../../lib/authStore';
+import { getAuthToken, getUserPrinthouseId, getAuthUser } from '../../lib/authStore';
 
 export const GuidedOnboardingPage: React.FC = () => {
     const navigate = useNavigate();
     const [resolvedNodeId, setResolvedNodeId] = useState<string | null>(null);
     const [resolvedNodeName, setResolvedNodeName] = useState<string | null>(null);
+    const authUser = getAuthUser();
+    const tenantId = authUser?.tenantId || '';
 
     useEffect(() => {
         let isMounted = true;
+        setResolvedNodeId(null);
+        setResolvedNodeName(null);
+
         const resolveNode = async () => {
             const token = getAuthToken();
             const preferredNodeId = getUserPrinthouseId();
@@ -38,23 +43,20 @@ export const GuidedOnboardingPage: React.FC = () => {
                 console.debug('[GuidedOnboardingPage] Could not resolve node via industrial pricing endpoint:', err);
             }
 
+            // Do not treat a failed or non-existent node lookup as a successfully verified node
             if (isMounted) {
-                // If user claims provide a printhouseId / printerNodeId, use it; otherwise null (do NOT fall back to siteId)
-                if (preferredNodeId) {
-                    setResolvedNodeId(preferredNodeId);
-                    setResolvedNodeName('Production Node');
-                } else {
-                    setResolvedNodeId(null);
-                    setResolvedNodeName(null);
-                }
+                setResolvedNodeId(null);
+                setResolvedNodeName(null);
             }
         };
 
-        resolveNode();
+        if (tenantId) {
+            resolveNode();
+        }
         return () => {
             isMounted = false;
         };
-    }, []);
+    }, [tenantId]);
 
     const handleOpenFullSetup = (targetTab?: string) => {
         const query = targetTab && targetTab !== 'OVERVIEW' ? `?tab=${targetTab}` : '';

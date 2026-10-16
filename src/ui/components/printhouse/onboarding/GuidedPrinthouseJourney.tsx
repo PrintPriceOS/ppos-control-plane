@@ -16,11 +16,11 @@
  * 4. Zero false claims of "live marketplace" or "order dispatch ready".
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { 
     Building2, Layers, Tag, CheckCircle2, ArrowRight, 
     Sparkles, Shield, ArrowLeft, RefreshCw, AlertCircle, 
-    HelpCircle, Sliders, FileText, ChevronRight 
+    HelpCircle, Sliders, FileText, ChevronRight, Check, AlertTriangle
 } from 'lucide-react';
 import { useLocale } from '../../../i18n';
 import { getAuthToken, getAuthUser } from '../../../lib/authStore';
@@ -31,7 +31,8 @@ import {
     FamilyPricingSessionDraft,
     loadGuidedOnboardingDraft, 
     saveGuidedOnboardingDraft,
-    clearGuidedOnboardingDraft 
+    clearGuidedOnboardingDraft,
+    createDefaultDraft
 } from '../../../lib/onboardingDraftStore';
 import { ProductFamilyId, FamilyState } from '../../../types/printhouseOnboardingTypes';
 import { normalizeUiError } from '../../../utils/errorUtils';
@@ -47,6 +48,8 @@ interface GuidedPrinthouseJourneyProps {
     onComplete?: () => void;
 }
 
+export type DraftStorageStatus = 'saved' | 'saving' | 'unsaved' | 'storage_unavailable';
+
 export const GuidedPrinthouseJourney: React.FC<GuidedPrinthouseJourneyProps> = ({
     printerNodeId,
     printerNodeName = 'Planta de Producción',
@@ -55,17 +58,49 @@ export const GuidedPrinthouseJourney: React.FC<GuidedPrinthouseJourneyProps> = (
 }) => {
     const { t, locale, setLocale } = useLocale();
     const user = getAuthUser();
-    const tenantId = user?.tenantId || 'tenant-current';
+    // Do not fall back to shared 'tenant-current'. Use the authenticated user's tenantId directly.
+    const tenantId = (user?.tenantId || '').trim();
 
     // ── Persistent Draft State ──
     const [draft, setDraft] = useState<GuidedOnboardingDraft>(() => loadGuidedOnboardingDraft(tenantId));
     const [loadingData, setLoadingData] = useState<boolean>(true);
     const [serverData, setServerData] = useState<any>(null);
     const [networkError, setNetworkError] = useState<string | null>(null);
+    const [storageStatus, setStorageStatus] = useState<DraftStorageStatus>('saved');
 
-    // Sync draft if tenantId changes
+    // ── Readiness Refresh Freshness State ──
+    const [isRefreshingReadiness, setIsRefreshingReadiness] = useState<boolean>(false);
+    const [readinessError, setReadinessError] = useState<string | null>(null);
+
+    // Track active tenant to discard out-of-order / delayed responses from previous identities
+    const activeTenantRef = useRef<string>(tenantId);
+    activeTenantRef.current = tenantId;
+    const prevTenantRef = useRef<string>(tenantId);
+
+    // Initial server fetch on mount
     useEffect(() => {
-        setDraft(loadGuidedOnboardingDraft(tenantId));
+        fetchServerState(tenantId);
+    }, []);
+
+    // Reset all internal state and reload draft whenever the authenticated tenant changes
+    useEffect(() => {
+        if (prevTenantRef.current === tenantId) {
+            return;
+        }
+        prevTenantRef.current = tenantId;
+        setServerData(null);
+        setNetworkError(null);
+        setReadinessError(null);
+        setFamilies({
+            HARDCOVER: { id: 'HARDCOVER', titleKey: 'family.hardcover.title', descKey: 'family.hardcover.desc', status: 'PENDING', quoteCount: 0 },
+            SOFTCOVER: { id: 'SOFTCOVER', titleKey: 'family.softcover.title', descKey: 'family.softcover.desc', status: 'PENDING', quoteCount: 0 },
+            WIRE_O: { id: 'WIRE_O', titleKey: 'family.wireO.title', descKey: 'family.wireO.desc', status: 'PENDING', quoteCount: 0 },
+            SADDLE_STITCH: { id: 'SADDLE_STITCH', titleKey: 'family.saddleStitch.title', descKey: 'family.saddleStitch.desc', status: 'PENDING', quoteCount: 0 }
+        });
+        const freshDraft = loadGuidedOnboardingDraft(tenantId);
+        setDraft(freshDraft);
+        setStorageStatus('saved');
+        fetchServerState(tenantId);
     }, [tenantId]);
 
     // ── 4 Families State ──
@@ -100,83 +135,161 @@ export const GuidedPrinthouseJourney: React.FC<GuidedPrinthouseJourneyProps> = (
         }
     });
 
+    // Helper to persist draft and consume the boolean result from saveGuidedOnboardingDraft
+    const persistDraft = useCallback((nextDraft: GuidedOnboardingDraft) => {
+        const ok = saveGuidedOnboardingDraft(nextDraft);
+        setStorageStatus(ok ? 'saved' : 'storage_unavailable');
+        return ok;
+    }, []);
+
+    // Sync draft updates to localStorage and state
+    const updateDraft = useCallback((updater: (prev: GuidedOnboardingDraft) => GuidedOnboardingDraft) => {
+        setDraft(prev => {
+            const next = updater(prev);
+            persistDraft(next);
+            return next;
+        });
+    }, [persistDraft]);
+
     // Fetch live onboarding data from server and reconcile with draft
-    const fetchServerState = async () => {
+    const fetchServerState = async (targetTenantId = tenantId) => {
+        if (!targetTenantId) {
+            setLoadingData(false);
+            return;
+        }
         setLoadingData(true);
+        setIsRefreshingReadiness(true);
         setNetworkError(null);
+        setReadinessError(null);
+
         try {
             const token = getAuthToken();
             const res = await fetch('/api/printhouse/onboarding', {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             const data = await res.json();
+
+            // Discard responses from previous identities if tenant switched while request was in-flight
+            if (activeTenantRef.current !== targetTenantId) {
+                return;
+            }
+
             if (res.ok && data.ok) {
                 setServerData(data.data);
                 const serverCompany = data.data?.company;
                 const serverSites = data.data?.sites || [];
                 const primarySite = serverSites[0];
 
-                // Reconcile draft with server reality (server truth fills empty fields, preserves user edits)
+                // Reconcile draft with server truth:
+                // Distinguish untouched defaults vs locally edited fields vs acknowledged values.
+                // Defaults such as ES and Europe/Madrid must NEVER override actual server values.
                 setDraft(prev => {
+                    const editedFields = new Set(prev.company.userEditedFields || []);
+                    const ackValues = prev.company.acknowledgedServerValues || {};
+
+                    const serverLegalName = serverCompany?.legalName || serverCompany?.companyName || '';
+                    const serverTrading = serverCompany?.tradingName || '';
+                    const serverCountry = serverCompany?.country || primarySite?.country || '';
+                    const serverCity = (primarySite?.city && primarySite.city !== 'Pending Setup') ? primarySite.city : (serverCompany?.city || '');
+                    const serverAddress = serverCompany?.address || '';
+                    const serverPostalCode = serverCompany?.postalCode || '';
+                    const serverPhone = serverCompany?.phone || primarySite?.phone || '';
+                    const serverWebsite = serverCompany?.website || primarySite?.website || '';
+                    const serverContact = serverCompany?.contactName || '';
+                    const serverTaxId = serverCompany?.taxId || '';
+                    const serverSiteName = primarySite?.siteName || '';
+                    const serverSiteTimezone = primarySite?.timezone || '';
+                    const serverPrimarySiteId = primarySite?.siteId || null;
+
                     const reconciledCompany: CompanyDraftData = {
                         ...prev.company,
-                        legalName: prev.company.legalName || serverCompany?.legalName || serverCompany?.companyName || '',
-                        tradingName: prev.company.tradingName || serverCompany?.tradingName || '',
-                        country: prev.company.country || serverCompany?.country || primarySite?.country || 'ES',
-                        city: prev.company.city || (primarySite?.city !== 'Pending Setup' ? primarySite?.city : '') || serverCompany?.city || '',
-                        address: prev.company.address || serverCompany?.address || '',
-                        postalCode: prev.company.postalCode || serverCompany?.postalCode || '',
-                        phone: prev.company.phone || serverCompany?.phone || primarySite?.phone || '',
-                        website: prev.company.website || serverCompany?.website || primarySite?.website || '',
-                        contactName: prev.company.contactName || serverCompany?.contactName || '',
-                        taxId: prev.company.taxId || serverCompany?.taxId || '',
-                        siteName: prev.company.siteName || primarySite?.siteName || 'Planta Principal',
-                        siteTimezone: prev.company.siteTimezone || primarySite?.timezone || 'Europe/Madrid',
-                        primarySiteId: prev.company.primarySiteId || primarySite?.siteId || null
+                        legalName: editedFields.has('legalName') && prev.company.legalName ? prev.company.legalName : (serverLegalName || prev.company.legalName),
+                        tradingName: editedFields.has('tradingName') && prev.company.tradingName ? prev.company.tradingName : (serverTrading || prev.company.tradingName),
+                        country: editedFields.has('country') && prev.company.country ? prev.company.country : (serverCountry || prev.company.country),
+                        city: editedFields.has('city') && prev.company.city ? prev.company.city : (serverCity || prev.company.city),
+                        address: editedFields.has('address') && prev.company.address ? prev.company.address : (serverAddress || prev.company.address),
+                        postalCode: editedFields.has('postalCode') && prev.company.postalCode ? prev.company.postalCode : (serverPostalCode || prev.company.postalCode),
+                        phone: editedFields.has('phone') && prev.company.phone ? prev.company.phone : (serverPhone || prev.company.phone),
+                        website: editedFields.has('website') && prev.company.website ? prev.company.website : (serverWebsite || prev.company.website),
+                        contactName: editedFields.has('contactName') && prev.company.contactName ? prev.company.contactName : (serverContact || prev.company.contactName),
+                        taxId: editedFields.has('taxId') && prev.company.taxId ? prev.company.taxId : (serverTaxId || prev.company.taxId),
+                        siteName: editedFields.has('siteName') && prev.company.siteName ? prev.company.siteName : (serverSiteName || prev.company.siteName || 'Planta Principal'),
+                        siteTimezone: editedFields.has('siteTimezone') && prev.company.siteTimezone ? prev.company.siteTimezone : (serverSiteTimezone || prev.company.siteTimezone),
+                        primarySiteId: prev.company.primarySiteId || serverPrimarySiteId,
+                        acknowledgedServerValues: {
+                            ...ackValues,
+                            legalName: serverLegalName,
+                            country: serverCountry,
+                            city: serverCity,
+                            siteTimezone: serverSiteTimezone
+                        }
                     };
+
                     const updated: GuidedOnboardingDraft = {
                         ...prev,
                         company: reconciledCompany
                     };
-                    saveGuidedOnboardingDraft(updated);
+                    persistDraft(updated);
                     return updated;
                 });
             } else {
-                setNetworkError(normalizeUiError(data, 'No se pudieron recuperar los datos de la imprenta.'));
+                const errMsg = normalizeUiError(data, t('guided.review.refreshError') || 'No se pudieron recuperar los datos de la imprenta.');
+                setNetworkError(errMsg);
+                setReadinessError(errMsg);
             }
         } catch (err: any) {
-            setNetworkError(normalizeUiError(err, 'Error de red al conectar con el servidor.'));
+            if (activeTenantRef.current === targetTenantId) {
+                const errMsg = normalizeUiError(err, t('guided.review.refreshError') || 'Error de red al conectar con el servidor.');
+                setNetworkError(errMsg);
+                setReadinessError(errMsg);
+            }
         } finally {
-            setLoadingData(false);
+            if (activeTenantRef.current === targetTenantId) {
+                setLoadingData(false);
+                setIsRefreshingReadiness(false);
+            }
         }
     };
 
-    useEffect(() => {
-        fetchServerState();
-    }, []);
-
-    // Sync draft updates to localStorage
-    const updateDraft = useCallback((updater: (prev: GuidedOnboardingDraft) => GuidedOnboardingDraft) => {
-        setDraft(prev => {
-            const next = updater(prev);
-            saveGuidedOnboardingDraft(next);
-            return next;
-        });
-    }, []);
-
-    // Stable continuity and family handlers for SimplifiedOnboardingJourney
+    // Stable continuity and family handlers for SimplifiedOnboardingJourney:
+    // Preserves changes to activeRun, proposedPatch, offer, and comparisonData without introducing render loops.
     const handlePricingContinuityChange = useCallback((famId: ProductFamilyId, famDraft: any) => {
         updateDraft(prev => {
             const existing = prev.pricingContinuity?.[famId];
-            if (
-                existing &&
-                existing.sessionId === famDraft.sessionId &&
-                existing.selectedVariantId === famDraft.selectedVariantId &&
-                existing.step === famDraft.step &&
-                existing.entryMode === famDraft.entryMode &&
-                existing.uploadedFileName === famDraft.uploadedFileName
-            ) {
-                return prev;
+            if (existing) {
+                const sameSession = existing.sessionId === famDraft.sessionId;
+                const sameVariant = existing.selectedVariantId === famDraft.selectedVariantId;
+                const sameStep = existing.step === famDraft.step;
+                const sameEntry = existing.entryMode === famDraft.entryMode;
+                const sameFile = existing.uploadedFileName === famDraft.uploadedFileName;
+                
+                // Compare activeRun by identity and status/revision
+                const sameRun = (existing.activeRun === famDraft.activeRun) ||
+                    (existing.activeRun?.id === famDraft.activeRun?.id && 
+                     existing.activeRun?.status === famDraft.activeRun?.status &&
+                     existing.activeRun?.revisionId === famDraft.activeRun?.revisionId);
+
+                // Compare proposedPatch
+                const samePatch = (existing.proposedPatch === famDraft.proposedPatch) ||
+                    (JSON.stringify(existing.proposedPatch || {}) === JSON.stringify(famDraft.proposedPatch || {}));
+
+                // Compare comparisonData key fields
+                const sameComp = (existing.comparisonData === famDraft.comparisonData) ||
+                    (existing.comparisonData?.enginePrice === famDraft.comparisonData?.enginePrice &&
+                     existing.comparisonData?.originalPrice === famDraft.comparisonData?.originalPrice &&
+                     existing.comparisonData?.difference === famDraft.comparisonData?.difference &&
+                     existing.comparisonData?.isCalculated === famDraft.comparisonData?.isCalculated);
+
+                // Compare offer title, ref, dimensions
+                const sameOffer = (existing.offer === famDraft.offer) ||
+                    (existing.offer?.productTitle === famDraft.offer?.productTitle &&
+                     existing.offer?.quoteRef === famDraft.offer?.quoteRef &&
+                     existing.offer?.widthMm === famDraft.offer?.widthMm &&
+                     existing.offer?.heightMm === famDraft.offer?.heightMm);
+
+                if (sameSession && sameVariant && sameStep && sameEntry && sameFile && sameRun && samePatch && sameComp && sameOffer) {
+                    return prev;
+                }
             }
             return {
                 ...prev,
@@ -245,7 +358,7 @@ export const GuidedPrinthouseJourney: React.FC<GuidedPrinthouseJourneyProps> = (
             country: companyData.country,
             city: companyData.city,
             phone: companyData.phone,
-            timezone: companyData.siteTimezone || 'Europe/Madrid'
+            timezone: companyData.siteTimezone || (companyData.country === 'DE' ? 'Europe/Berlin' : companyData.country === 'GB' ? 'Europe/London' : 'Europe/Madrid')
         };
 
         let resolvedSiteId = knownSiteId || null;
@@ -365,6 +478,43 @@ export const GuidedPrinthouseJourney: React.FC<GuidedPrinthouseJourneyProps> = (
                 </div>
 
                 <div className="flex items-center gap-3">
+                    {/* Storage Feedback Indicator */}
+                    <div 
+                        data-testid="guided-storage-status"
+                        className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-colors ${
+                            storageStatus === 'saved'
+                                ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
+                                : storageStatus === 'storage_unavailable'
+                                    ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 border-amber-300 dark:border-amber-800'
+                                    : storageStatus === 'saving'
+                                        ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800'
+                                        : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border-zinc-200 dark:border-zinc-700'
+                        }`}
+                        title={storageStatus === 'storage_unavailable' ? t('guided.storage.unavailable') || 'Almacenamiento no disponible' : undefined}
+                    >
+                        {storageStatus === 'saved' && (
+                            <>
+                                <Check size={12} className="text-emerald-600 dark:text-emerald-400" />
+                                <span>{t('guided.storage.saved') || 'Borrador guardado'}</span>
+                            </>
+                        )}
+                        {storageStatus === 'saving' && (
+                            <>
+                                <RefreshCw size={12} className="animate-spin text-blue-600" />
+                                <span>{t('guided.storage.saving') || 'Guardando...'}</span>
+                            </>
+                        )}
+                        {storageStatus === 'unsaved' && (
+                            <span>{t('guided.storage.unsaved') || 'Cambios sin guardar'}</span>
+                        )}
+                        {storageStatus === 'storage_unavailable' && (
+                            <>
+                                <AlertTriangle size={12} className="text-amber-600 dark:text-amber-400" />
+                                <span>{t('guided.storage.unavailable') || 'Almacenamiento no disponible'}</span>
+                            </>
+                        )}
+                    </div>
+
                     {/* Language Switcher */}
                     <button
                         type="button"
@@ -640,9 +790,11 @@ export const GuidedPrinthouseJourney: React.FC<GuidedPrinthouseJourneyProps> = (
                         families={families}
                         enabledFamilies={draft.enabledFamilies}
                         readinessData={serverData?.readiness}
+                        isRefreshingReadiness={isRefreshingReadiness}
+                        refreshError={readinessError}
                         onBackToPricing={() => setStage('PRICING')}
                         onOpenFullSetup={onOpenFullSetup}
-                        onRefreshReadiness={fetchServerState}
+                        onRefreshReadiness={() => fetchServerState()}
                     />
                 )}
             </main>

@@ -43,10 +43,15 @@ export const GuidedStepCompany: React.FC<GuidedStepCompanyProps> = ({
     }, [initialCompany]);
 
     const handleChange = (field: keyof CompanyDraftData, value: string) => {
-        setForm(prev => ({
-            ...prev,
-            [field]: value
-        }));
+        setForm(prev => {
+            const currentEdited = prev.userEditedFields || [];
+            const userEditedFields = currentEdited.includes(field) ? currentEdited : [...currentEdited, field];
+            return {
+                ...prev,
+                [field]: value,
+                userEditedFields
+            };
+        });
         setSavedNotice(false);
         setErrorMsg(null);
     };
