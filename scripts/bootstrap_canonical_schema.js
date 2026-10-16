@@ -87,7 +87,7 @@ async function runBootstrap() {
                 id INT AUTO_INCREMENT PRIMARY KEY,
                 email VARCHAR(255) UNIQUE NOT NULL,
                 password_hash VARCHAR(255) NOT NULL,
-                role ENUM('SUPER_ADMIN', 'OPS_ADMIN', 'TENANT_ADMIN', 'PRINTHOUSE_ADMIN', 'PRINTHOUSE_OPERATOR', 'VIEWER', 'super_admin', 'ops_admin', 'tenant_admin', 'viewer') DEFAULT 'VIEWER',
+                role ENUM('SUPER_ADMIN', 'OPS_ADMIN', 'TENANT_ADMIN', 'PRINTHOUSE_ADMIN', 'PRINTHOUSE_OPERATOR', 'VIEWER') DEFAULT 'VIEWER',
                 tenant_id VARCHAR(64) NOT NULL DEFAULT 'ppos-production',
                 printhouse_id VARCHAR(64) NULL,
                 status ENUM('ACTIVE', 'SUSPENDED', 'DELETED') DEFAULT 'ACTIVE',
