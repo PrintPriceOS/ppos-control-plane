@@ -61,6 +61,9 @@ async function runBootstrap() {
     const db = mysqlClient.getPool();
 
     try {
+        // Enforce canonical database collation for ephemeral CI instance
+        await db.query(`ALTER DATABASE \`${database}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;`);
+
         console.log('[1/7] Ensuring foundational tenancy and identity tables...');
         // From docs/migrations/printhouse_onboarding.sql & src/api/services/controlPlaneSchemaService.js
         await db.query(`
@@ -78,7 +81,7 @@ async function runBootstrap() {
                 metadata_json JSON NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-            ) ENGINE=InnoDB;
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
         `);
 
         // From docs/migrations/control_users.sql & src/api/services/controlPlaneSchemaService.js
@@ -97,7 +100,7 @@ async function runBootstrap() {
                 INDEX idx_email (email),
                 INDEX idx_tenant (tenant_id),
                 INDEX idx_printhouse (printhouse_id)
-            ) ENGINE=InnoDB;
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
         `);
 
         console.log('[2/7] Ensuring printer_nodes baseline table (precondition for migration 002)...');
@@ -119,7 +122,7 @@ async function runBootstrap() {
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                 INDEX idx_tenant (tenant_id),
                 INDEX idx_status (status)
-            ) ENGINE=InnoDB;
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
         `);
 
         console.log('[3/7] Ensuring jobs and metrics telemetry tables (preconditions for migration 002)...');
@@ -140,7 +143,7 @@ async function runBootstrap() {
                 INDEX idx_printhouse (printhouse_id),
                 INDEX idx_status (status),
                 INDEX idx_created (created_at)
-            ) ENGINE=InnoDB;
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
         `);
 
         await db.query(`
@@ -162,7 +165,7 @@ async function runBootstrap() {
                 INDEX idx_tenant (tenant_id),
                 INDEX idx_printhouse (printhouse_id),
                 INDEX idx_created (created_at)
-            ) ENGINE=InnoDB;
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
         `);
 
         console.log('[4/7] Ensuring manufacturing_dispatches and federation_factories (preconditions for migration 002)...');
@@ -188,7 +191,7 @@ async function runBootstrap() {
                 INDEX idx_status (status),
                 INDEX idx_printer (assigned_printer_tenant_id),
                 INDEX idx_source_job (source_job_id)
-            ) ENGINE=InnoDB;
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
         `);
 
         await db.query(`
@@ -231,7 +234,7 @@ async function runBootstrap() {
                 INDEX idx_sender (sender_tenant_id),
                 INDEX idx_receiver (receiver_tenant_id),
                 INDEX idx_status (status)
-            ) ENGINE=InnoDB;
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
         `);
 
         // From src/migrations/phase184g_industrial_provisioning_schema.js
@@ -251,7 +254,7 @@ async function runBootstrap() {
                 federation_state VARCHAR(32) DEFAULT 'ACTIVE',
                 last_heartbeat TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            ) ENGINE=InnoDB;
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
         `);
 
         console.log('[5/7] Ensuring order intake and quote foundation tables (preconditions for migrations 010 & 136)...');
@@ -267,7 +270,7 @@ async function runBootstrap() {
                 status VARCHAR(64) NOT NULL DEFAULT 'DRAFT',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-            ) ENGINE=InnoDB;
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
         `);
 
         await db.query(`
@@ -280,7 +283,7 @@ async function runBootstrap() {
                 revision INT NOT NULL DEFAULT 1,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-            ) ENGINE=InnoDB;
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
         `);
 
         console.log('[6/7] Ensuring supporting node and audit log tables...');
@@ -308,7 +311,7 @@ async function runBootstrap() {
                 INDEX idx_status (status),
                 INDEX idx_license (license_status),
                 INDEX idx_heartbeat (last_heartbeat_at)
-            ) ENGINE=InnoDB;
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
         `);
 
         // Legacy api_audit_log compatibility table (from docs/migrations/printhouse_hardening.sql)
@@ -320,7 +323,7 @@ async function runBootstrap() {
                 metadata_json JSON NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 INDEX idx_tenant (tenant_id)
-            ) ENGINE=InnoDB;
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
         `);
 
         console.log('[7/7] Canonical Ephemeral Database Bootstrap completed successfully.');
