@@ -403,10 +403,11 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
                     formData.append('printerNodeId', printerNodeId);
                 }
 
-                const res = await fetch('/api/printhouse/onboarding/quote-evidence/upload', {
+                const token = localStorage.getItem('token') || (typeof window !== 'undefined' ? (window as any).__AUTH_TOKEN__ : null);
+                const res = await fetch('/api/printhouse/onboarding/pricing/quote-evidence/upload', {
                     method: 'POST',
                     headers: {
-                        ...(localStorage.getItem('token') ? { 'Authorization': `Bearer ${localStorage.getItem('token')}` } : {})
+                        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
                     },
                     body: formData
                 });

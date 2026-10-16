@@ -270,7 +270,7 @@ describe('Pricing Workflow Navigation & State Conservation Regressions', () => {
         });
 
         fetchMock.mockImplementation((url: string, opts?: any) => {
-            if (url.includes('/api/printhouse/onboarding/quote-evidence/upload')) {
+            if (url.includes('/api/printhouse/onboarding/pricing/quote-evidence/upload') || url.includes('/api/printhouse/onboarding/quote-evidence/upload')) {
                 return uploadPromise.then((data) => ({
                     ok: true,
                     json: () => Promise.resolve({ ok: true, data })

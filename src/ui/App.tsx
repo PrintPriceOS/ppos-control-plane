@@ -161,6 +161,7 @@ import ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenRed
 
 import { PrinthouseActivationPage } from './pages/PrinthouseActivationPage';
 import { PrinthouseSetupHub } from './pages/printhouse/PrinthouseSetupHub';
+import { GuidedOnboardingPage } from './pages/printhouse/GuidedOnboardingPage';
 
 export const App: React.FC = () => {
     return (
@@ -175,6 +176,7 @@ export const App: React.FC = () => {
             <Route path="/auth/activate" element={<PrinthouseActivationPage />} />
             <Route path="/printhouse/register" element={<PrinthouseRegistrationPage />} />
             <Route path="/public/preflight/human-report/:token" element={<PublicHumanReportPage />} />
+            <Route path="/printhouse/onboarding-guided" element={<AuthGuard><GuidedOnboardingPage /></AuthGuard>} />
             
             <Route element={<AuthGuard><MachineDrawerProvider><Layout /></MachineDrawerProvider></AuthGuard>}>
                 <Route path="/" element={<Navigate to="/dashboard" replace />} />

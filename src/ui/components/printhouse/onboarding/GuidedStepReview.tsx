@@ -1,0 +1,350 @@
+/**
+ * src/ui/components/printhouse/onboarding/GuidedStepReview.tsx
+ *
+ * Stage D: "Revisar y continuar"
+ *
+ * Responsibilities:
+ * - Summary of saved company profile and primary production site.
+ * - Summary of selected binding product families and calibrated rates.
+ * - Server-derived readiness status and blocking issues.
+ * - Next genuine action (e.g. submit for platform review or open full advanced setup).
+ * - Clear explanation: "Completing setup does NOT automatically activate live marketplace or routing".
+ */
+
+import React, { useState } from 'react';
+import { 
+    CheckCircle2, Clock, AlertTriangle, ArrowLeft, 
+    Layers, Building2, Tag, ArrowRight, ShieldCheck, 
+    ExternalLink, RefreshCw, Send
+} from 'lucide-react';
+import { useLocale } from '../../../i18n';
+import { ProductFamilyId, FamilyState } from '../../../types/printhouseOnboardingTypes';
+import { BindingIcon } from './BindingFamilyIcons';
+import { CompanyDraftData } from '../../../lib/onboardingDraftStore';
+import { getAuthToken } from '../../../lib/authStore';
+
+interface GuidedStepReviewProps {
+    company: CompanyDraftData;
+    families: Record<ProductFamilyId, FamilyState>;
+    enabledFamilies: Record<ProductFamilyId, boolean>;
+    readinessData?: any;
+    onBackToPricing: () => void;
+    onOpenFullSetup: (targetTab?: string) => void;
+    onRefreshReadiness?: () => Promise<void>;
+}
+
+export const GuidedStepReview: React.FC<GuidedStepReviewProps> = ({
+    company,
+    families,
+    enabledFamilies,
+    readinessData,
+    onBackToPricing,
+    onOpenFullSetup,
+    onRefreshReadiness
+}) => {
+    const { t } = useLocale();
+    const [submittingReview, setSubmittingReview] = useState(false);
+    const [submissionResult, setSubmissionResult] = useState<{ ok: boolean; message: string } | null>(null);
+
+    const accountReadiness = readinessData?.accountSetup;
+    const opsReadiness = readinessData?.operationalConfiguration || readinessData?.operationalReadiness;
+    const pricingReadiness = readinessData?.pricingReadiness;
+
+    const blockingIssues: any[] = [
+        ...(accountReadiness?.blockingIssues || []),
+        ...(opsReadiness?.blockingIssues || []),
+        ...(pricingReadiness?.blockingIssues || [])
+    ];
+
+    const canRequestReview = blockingIssues.length === 0;
+
+    const handleSubmitForReview = async () => {
+        setSubmittingReview(true);
+        setSubmissionResult(null);
+        try {
+            const token = getAuthToken();
+            const res = await fetch('/api/printhouse/onboarding/submit-for-review', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    declaredBy: 'PRINTHOUSE_OPERATOR',
+                    notes: 'Submitted via Guided Printhouse Onboarding'
+                })
+            });
+            const data = await res.json();
+            if (res.ok && (data.success || data.ok)) {
+                setSubmissionResult({
+                    ok: true,
+                    message: t('guided.review.submittedSuccess') || 'Tu solicitud de revisión comercial ha sido enviada al equipo de PrintPrice Pro.'
+                });
+                if (onRefreshReadiness) await onRefreshReadiness();
+            } else {
+                setSubmissionResult({
+                    ok: false,
+                    message: data.error || data.message || 'No se pudo enviar la solicitud. Revisa los requisitos pendientes.'
+                });
+            }
+        } catch (err: any) {
+            setSubmissionResult({
+                ok: false,
+                message: err.message || 'Error de conexión al enviar la revisión.'
+            });
+        } finally {
+            setSubmittingReview(false);
+        }
+    };
+
+    return (
+        <div className="max-w-4xl mx-auto space-y-6">
+            {/* Header */}
+            <div className="space-y-1">
+                <span className="text-[11px] font-black uppercase tracking-widest text-[#dc0000]">
+                    {t('guided.stageD.badge') || 'Etapa 4 de 4 · Revisar y continuar'}
+                </span>
+                <h2 className="text-2xl sm:text-3xl font-black text-zinc-900 dark:text-zinc-100 tracking-tight">
+                    {t('guided.stageD.title') || 'Resumen de configuración de tu imprenta'}
+                </h2>
+                <p className="text-sm text-zinc-600 dark:text-zinc-400">
+                    {t('guided.stageD.subtitle') || 'Comprueba la información guardada, los productos configurados y los siguientes pasos reales de tu cuenta.'}
+                </p>
+            </div>
+
+            {/* Submission alert if triggered */}
+            {submissionResult && (
+                <div 
+                    role="alert" 
+                    className={`p-4 rounded-xl border flex items-start gap-3 text-xs font-medium ${
+                        submissionResult.ok
+                            ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300'
+                            : 'bg-red-50 dark:bg-red-950/40 border-red-200 dark:border-red-800 text-red-800 dark:text-red-300'
+                    }`}
+                >
+                    {submissionResult.ok ? (
+                        <CheckCircle2 size={18} className="text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+                    ) : (
+                        <AlertTriangle size={18} className="text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
+                    )}
+                    <div>{submissionResult.message}</div>
+                </div>
+            )}
+
+            {/* Grid of 3 Main Summary Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {/* 1. Empresa & Sede */}
+                <div className="bg-white dark:bg-[#18181b] border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 shadow-2xs flex flex-col justify-between">
+                    <div className="space-y-3">
+                        <div className="flex items-center justify-between text-zinc-900 dark:text-zinc-100">
+                            <div className="flex items-center gap-2">
+                                <Building2 size={16} className="text-[#dc0000]" />
+                                <h3 className="text-xs font-bold uppercase tracking-wider">
+                                    {t('guided.review.companySection') || 'Tu imprenta'}
+                                </h3>
+                            </div>
+                            <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded border border-emerald-200 dark:border-emerald-900">
+                                {t('common.saved') || 'Guardado'}
+                            </span>
+                        </div>
+                        <div>
+                            <div className="font-extrabold text-sm text-zinc-900 dark:text-zinc-100">
+                                {company.legalName || 'Imprenta'}
+                            </div>
+                            {company.tradingName && company.tradingName !== company.legalName && (
+                                <div className="text-xs text-zinc-500">
+                                    {company.tradingName}
+                                </div>
+                            )}
+                            <div className="text-xs text-zinc-600 dark:text-zinc-400 mt-2 space-y-0.5">
+                                <div>📍 {company.city}, {company.country}</div>
+                                {company.contactName && <div>👤 {company.contactName}</div>}
+                                {company.taxId && <div>🆔 {company.taxId}</div>}
+                            </div>
+                        </div>
+                    </div>
+
+                    <button
+                        type="button"
+                        onClick={() => onOpenFullSetup('COMPANY')}
+                        className="mt-4 pt-3 border-t border-zinc-100 dark:border-zinc-800 text-[11px] font-bold text-zinc-600 dark:text-zinc-400 hover:text-[#dc0000] flex items-center justify-between cursor-pointer"
+                    >
+                        <span>{t('guided.review.editCompany') || 'Editar en configuración'}</span>
+                        <ArrowRight size={13} />
+                    </button>
+                </div>
+
+                {/* 2. Productos & Familias */}
+                <div className="bg-white dark:bg-[#18181b] border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 shadow-2xs flex flex-col justify-between">
+                    <div className="space-y-3">
+                        <div className="flex items-center justify-between text-zinc-900 dark:text-zinc-100">
+                            <div className="flex items-center gap-2">
+                                <Layers size={16} className="text-[#dc0000]" />
+                                <h3 className="text-xs font-bold uppercase tracking-wider">
+                                    {t('guided.review.productsSection') || 'Familias activas'}
+                                </h3>
+                            </div>
+                            <span className="text-[10px] font-bold text-zinc-700 dark:text-zinc-300 bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 rounded">
+                                {Object.values(enabledFamilies).filter(Boolean).length} / 4
+                            </span>
+                        </div>
+                        <div className="space-y-1.5">
+                            {(['HARDCOVER', 'SOFTCOVER', 'WIRE_O', 'SADDLE_STITCH'] as ProductFamilyId[]).map(fid => {
+                                const isEnabled = enabledFamilies[fid];
+                                const familyState = families[fid];
+                                return (
+                                    <div 
+                                        key={fid}
+                                        className={`flex items-center justify-between p-1.5 rounded-lg text-xs ${
+                                            isEnabled 
+                                                ? 'bg-zinc-50 dark:bg-zinc-900/60 text-zinc-800 dark:text-zinc-200' 
+                                                : 'text-zinc-400 line-through opacity-60'
+                                        }`}
+                                    >
+                                        <div className="flex items-center gap-2 truncate">
+                                            <BindingIcon family={fid} size={14} />
+                                            <span className="truncate">{t(familyState.titleKey)}</span>
+                                        </div>
+                                        {isEnabled && (
+                                            <span className="text-[10px] font-semibold text-zinc-500">
+                                                {familyState.status === 'DATA_VALIDATED' ? '✓ Calibrado' : 'Configurado'}
+                                            </span>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+
+                    <button
+                        type="button"
+                        onClick={() => onOpenFullSetup('CAPABILITIES')}
+                        className="mt-4 pt-3 border-t border-zinc-100 dark:border-zinc-800 text-[11px] font-bold text-zinc-600 dark:text-zinc-400 hover:text-[#dc0000] flex items-center justify-between cursor-pointer"
+                    >
+                        <span>{t('guided.review.editCapabilities') || 'Capacidades de taller'}</span>
+                        <ArrowRight size={13} />
+                    </button>
+                </div>
+
+                {/* 3. Precios y Calibración */}
+                <div className="bg-white dark:bg-[#18181b] border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 shadow-2xs flex flex-col justify-between">
+                    <div className="space-y-3">
+                        <div className="flex items-center justify-between text-zinc-900 dark:text-zinc-100">
+                            <div className="flex items-center gap-2">
+                                <Tag size={16} className="text-[#dc0000]" />
+                                <h3 className="text-xs font-bold uppercase tracking-wider">
+                                    {t('guided.review.pricingSection') || 'Precios y Tarifas'}
+                                </h3>
+                            </div>
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
+                                pricingReadiness?.status === 'COMPLETE'
+                                    ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800'
+                                    : 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800'
+                            }`}>
+                                {pricingReadiness?.status === 'COMPLETE' ? 'Calibrado' : 'En progreso'}
+                            </span>
+                        </div>
+                        <div className="text-xs text-zinc-600 dark:text-zinc-400 space-y-2">
+                            <p>
+                                {pricingReadiness?.status === 'COMPLETE'
+                                    ? 'Tus tarifas base de fabricación han sido resueltas y consolidadas por el servidor.'
+                                    : 'Puedes seguir aportando presupuestos para afinar el ajuste de tus máquinas.'}
+                            </p>
+                            <div className="p-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-100 dark:border-zinc-800 flex items-center gap-2">
+                                <ShieldCheck size={16} className="text-[#dc0000] shrink-0" />
+                                <span className="text-[11px] leading-tight">
+                                    Tarifas resueltas exclusivamente por el motor de cálculo.
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button
+                        type="button"
+                        onClick={() => onOpenFullSetup('PRICING')}
+                        className="mt-4 pt-3 border-t border-zinc-100 dark:border-zinc-800 text-[11px] font-bold text-zinc-600 dark:text-zinc-400 hover:text-[#dc0000] flex items-center justify-between cursor-pointer"
+                    >
+                        <span>{t('guided.review.openPricing') || 'Ver tarifas completas'}</span>
+                        <ArrowRight size={13} />
+                    </button>
+                </div>
+            </div>
+
+            {/* Governed Action & Clear Next Steps */}
+            <div className="p-5 sm:p-6 bg-white dark:bg-[#18181b] border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xs space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div className="space-y-1">
+                        <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+                            <ShieldCheck size={18} className="text-[#dc0000]" />
+                            <span>{t('guided.review.nextActionTitle') || 'Siguiente acción disponible'}</span>
+                        </h3>
+                        <p className="text-xs text-zinc-500 dark:text-zinc-400 max-w-xl">
+                            {canRequestReview
+                                ? (t('guided.review.canSubmitDesc') || 'Has completado los requisitos esenciales. Puedes solicitar la revisión de tu cuenta para su posterior activación en la red.')
+                                : (t('guided.review.cannotSubmitDesc') || 'Aún quedan requisitos operativos o de tarifas por completar antes de solicitar la revisión comercial formal.')}
+                        </p>
+                    </div>
+
+                    {canRequestReview ? (
+                        <button
+                            type="button"
+                            disabled={submittingReview}
+                            onClick={handleSubmitForReview}
+                            className="px-5 py-2.5 bg-[#dc0000] hover:bg-[#b50000] text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-2 shrink-0 cursor-pointer disabled:opacity-50"
+                        >
+                            {submittingReview ? (
+                                <>
+                                    <RefreshCw size={14} className="animate-spin" />
+                                    <span>{t('common.submitting') || 'Enviando...'}</span>
+                                </>
+                            ) : (
+                                <>
+                                    <Send size={14} />
+                                    <span>{t('guided.review.submitBtn') || 'Solicitar revisión comercial'}</span>
+                                </>
+                            )}
+                        </button>
+                    ) : (
+                        <button
+                            type="button"
+                            onClick={() => onOpenFullSetup('OVERVIEW')}
+                            className="px-4 py-2 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 rounded-xl text-xs font-bold transition-colors flex items-center justify-center gap-1.5 shrink-0 cursor-pointer"
+                        >
+                            <span>{t('guided.review.viewPendingBtn') || 'Ver requisitos pendientes'}</span>
+                            <ArrowRight size={14} />
+                        </button>
+                    )}
+                </div>
+
+                {/* Important Governance Note: NO false marketplace promises */}
+                <div className="p-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 text-[11px] text-zinc-600 dark:text-zinc-400 leading-relaxed">
+                    <span className="font-bold text-zinc-900 dark:text-zinc-200">
+                        {t('guided.review.governanceNoteTitle') || 'Nota de gobernanza y activación'}:
+                    </span>{' '}
+                    {t('guided.review.governanceNoteText') || 'Completar esta configuración inicial no equivale a activar el marketplace, publicar precios al público, ni habilitar la cotización o enrutamiento automático de pedidos en vivo. La activación de producción requiere la revisión y autorización comercial independiente de la plataforma.'}
+                </div>
+            </div>
+
+            {/* Footer Navigation */}
+            <div className="flex items-center justify-between pt-2">
+                <button
+                    type="button"
+                    onClick={onBackToPricing}
+                    className="px-4 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-bold transition-colors flex items-center gap-2 cursor-pointer"
+                >
+                    <ArrowLeft size={15} />
+                    <span>{t('guided.action.backToPricing') || 'Volver a precios y calibración'}</span>
+                </button>
+
+                <button
+                    type="button"
+                    onClick={() => onOpenFullSetup('OVERVIEW')}
+                    className="px-4 py-2.5 rounded-xl bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 text-xs font-bold transition-colors flex items-center gap-2 cursor-pointer"
+                >
+                    <span>{t('guided.action.openFullSetup') || 'Abrir configuración completa'}</span>
+                    <ExternalLink size={14} />
+                </button>
+            </div>
+        </div>
+    );
+};

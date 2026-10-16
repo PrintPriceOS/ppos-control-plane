@@ -33,7 +33,7 @@ import { useLocale } from '../../i18n';
 import {
     Building2, Factory, Cog, Shield, RefreshCw, Layers, Activity,
     Clock, Tag, Truck, Cpu, CheckCircle2, AlertTriangle, Search,
-    Compass, ArrowRight, HelpCircle, ChevronRight, Sliders, ChevronDown
+    Compass, ArrowRight, HelpCircle, ChevronRight, Sliders, ChevronDown, Sparkles
 } from 'lucide-react';
 
 export type TabKey = 'OVERVIEW' | 'COMPANY' | 'SITES' | 'MACHINES' | 'CAPABILITIES' | 'MATERIALS' | 'CAPACITY' | 'LEAD_TIMES' | 'PRICING' | 'SHIPPING' | 'INTEGRATIONS' | 'MARKETPLACE';
@@ -371,6 +371,16 @@ export const PrinthouseSetupHub: React.FC = () => {
                             </div>
                         )}
                     </div>
+
+                    {/* Guided Onboarding Entry Button */}
+                    <a
+                        id="setup-guided-journey-btn"
+                        href="/printhouse/onboarding-guided"
+                        className="px-2.5 sm:px-3 py-1.5 bg-red-50 hover:bg-red-100 dark:bg-red-950/40 dark:hover:bg-red-900/60 text-[#dc0000] dark:text-red-400 border border-red-200 dark:border-red-900/60 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                    >
+                        <Sparkles size={13} className="text-[#dc0000]" />
+                        <span>{t('guided.action.openGuided') || 'Alta Guiada'}</span>
+                    </a>
 
                     {/* Find Setting / Contextual Help */}
                     <button
