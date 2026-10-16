@@ -2,9 +2,9 @@ name: PPOS Control Plane CI
 
 on:
   push:
-    branches: [ main, v1.9.0, release/*, phase-10-intelligence-layer ]
+    branches: [ main, v1.9.0, release/*, phase-10-intelligence-layer, phase-39.2-tenant-management-console ]
   pull_request:
-    branches: [ main, v1.9.0, phase-10-intelligence-layer ]
+    branches: [ main, v1.9.0, phase-10-intelligence-layer, phase-39.2-tenant-management-console ]
 
 jobs:
   build:
@@ -26,3 +26,19 @@ jobs:
       run: npm run build
     - name: Schema Integrity Check
       run: node scripts/verify-industrial-schema.js
+    - name: Automated Tests Execution (Vitest)
+      env:
+        HEAD_REF: ${{ github.head_ref }}
+        REF_NAME: ${{ github.ref_name }}
+      run: |
+        npx vitest run tests/PricingWorkflowConservation.test.tsx tests/PrinthouseOnboardingAuditAndGovernance.test.tsx tests/backend_tenant_security.test.js tests/calibration_residuals_compatibility_regression.test.js tests/onboarding_checksum_integrity_regression.test.js
+        if [ -f tests/GuidedPrinthouseJourney.test.tsx ]; then
+          echo "Running mandatory Guided Onboarding v4 journey suite..."
+          npx vitest run tests/GuidedPrinthouseJourney.test.tsx
+        elif [[ "$HEAD_REF" == *"onboarding"* ]] || [[ "$REF_NAME" == *"onboarding"* ]]; then
+          echo "ERROR: Mandatory GuidedPrinthouseJourney.test.tsx not found on onboarding branch!"
+          exit 1
+        fi
+
+
+
