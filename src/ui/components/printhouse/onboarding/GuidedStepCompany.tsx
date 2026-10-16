@@ -17,6 +17,7 @@ import { useLocale } from '../../../i18n';
 import { CountrySelect } from '../../common/CountrySelect';
 import { getAuthToken } from '../../../lib/authStore';
 import { CompanyDraftData } from '../../../lib/onboardingDraftStore';
+import { normalizeUiError } from '../../../utils/errorUtils';
 
 interface GuidedStepCompanyProps {
     initialCompany: CompanyDraftData;
@@ -75,7 +76,7 @@ export const GuidedStepCompany: React.FC<GuidedStepCompanyProps> = ({
             await onSaveAndContinue(form);
             setSavedNotice(true);
         } catch (err: any) {
-            setErrorMsg(err.message || t('guided.company.errSave') || 'Hubo un error al guardar los datos de tu imprenta.');
+            setErrorMsg(normalizeUiError(err, t('guided.company.errSave') || 'Hubo un error al guardar los datos de tu imprenta.'));
         } finally {
             setSaving(false);
         }

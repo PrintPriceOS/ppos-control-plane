@@ -34,15 +34,19 @@ import { CalculationComparisonView } from './CalculationComparisonView';
 import { GovernedAcceptanceView } from './GovernedAcceptanceView';
 import { BindingIcon } from './BindingFamilyIcons';
 import { printhouseCalibrationApi } from '../../../lib/printhouseCalibrationApi';
+import { normalizeUiError } from '../../../utils/errorUtils';
+import { FamilyPricingSessionDraft } from '../../../lib/onboardingDraftStore';
 
 export interface SimplifiedOnboardingJourneyProps {
     printerNodeId?: string;
     printerNodeName?: string;
     initialSpec?: ProgressiveSpecState;
     initialStep?: 1 | 2 | 3 | 4 | 5;
+    initialPricingDrafts?: Partial<Record<ProductFamilyId, FamilyPricingSessionDraft>>;
     onCompleted?: () => void;
     onOpenAdvanced?: () => void;
     onFamiliesStateChange?: (families: Record<ProductFamilyId, FamilyState>, selectedFamilyId: ProductFamilyId) => void;
+    onPricingContinuityChange?: (familyId: ProductFamilyId, draft: FamilyPricingSessionDraft) => void;
     targetFamilyId?: ProductFamilyId;
 }
 
@@ -77,12 +81,21 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
     onCompleted,
     onOpenAdvanced,
     onFamiliesStateChange,
-    targetFamilyId
+    targetFamilyId,
+    initialPricingDrafts,
+    onPricingContinuityChange
 }) => {
     const { t } = useLocale();
 
+    // ── Initial State Hydration from pricing continuity ──
+    const targetFam: ProductFamilyId = initialSpec?.family || targetFamilyId || 'HARDCOVER';
+    const initPricingForTarget = initialPricingDrafts?.[targetFam];
+
     // ── Wizard Step (1..5) ──
-    const [currentStep, setCurrentStep] = useState<1 | 2 | 3 | 4 | 5>(initialStep);
+    const [currentStep, setCurrentStep] = useState<1 | 2 | 3 | 4 | 5>(() => {
+        if (initPricingForTarget?.step) return initPricingForTarget.step;
+        return initialStep;
+    });
 
     // ── 4 Product Families State ──
     const [families, setFamilies] = useState<Record<ProductFamilyId, FamilyState>>({
@@ -116,7 +129,7 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
         }
     });
 
-    const [selectedFamilyId, setSelectedFamilyId] = useState<ProductFamilyId>(initialSpec?.family || targetFamilyId || 'HARDCOVER');
+    const [selectedFamilyId, setSelectedFamilyId] = useState<ProductFamilyId>(targetFam);
 
     // Notify parent whenever families or selectedFamilyId changes
     React.useEffect(() => {
@@ -124,22 +137,34 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
     }, [families, selectedFamilyId, onFamiliesStateChange]);
 
     // ── Step 2 Entry Mode: 'UPLOAD_PDF' | 'MANUAL_FORM' ──
-    const [entryMode, setEntryMode] = useState<'UPLOAD_PDF' | 'MANUAL_FORM'>('UPLOAD_PDF');
+    const [entryMode, setEntryMode] = useState<'UPLOAD_PDF' | 'MANUAL_FORM'>(() => {
+        return initPricingForTarget?.entryMode || 'UPLOAD_PDF';
+    });
     const [dragActive, setDragActive] = useState<boolean>(false);
     const [uploadingPdf, setUploadingPdf] = useState<boolean>(false);
     const [uploadError, setUploadError] = useState<string | null>(null);
-    const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
+    const [uploadedFileName, setUploadedFileName] = useState<string | null>(() => {
+        return initPricingForTarget?.uploadedFileName || null;
+    });
 
     // ── Active Job Offer / Spec State (Clean default without hardcoded 3rd party PII) ──
     const [currentOffer, setCurrentOffer] = useState<ProgressiveSpecState>(() => {
+        if (initPricingForTarget?.offer) return initPricingForTarget.offer;
         if (initialSpec) return initialSpec;
         return createDefaultOffer('HARDCOVER');
     });
 
     // ── Session & Calibration Integration State ──
-    const [sessionId, setSessionId] = useState<string | null>(null);
-    const [activeRun, setActiveRun] = useState<any>(null);
+    const [sessionId, setSessionId] = useState<string | null>(() => {
+        return initPricingForTarget?.sessionId || null;
+    });
+    const [activeRun, setActiveRun] = useState<any>(() => {
+        return initPricingForTarget?.activeRun || null;
+    });
     const [selectedVariantId, setSelectedVariantId] = useState<string | null>(() => {
+        if (initPricingForTarget?.selectedVariantId !== undefined) {
+            return initPricingForTarget.selectedVariantId;
+        }
         if (initialSpec?.selectedVariantId !== undefined) {
             return initialSpec.selectedVariantId;
         }
@@ -161,20 +186,27 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
         calculationError?: string | null;
         supportedParameters: string[];
         coverageGaps: string[];
-    }>({
-        originalPrice: null,
-        enginePrice: null,
-        difference: null,
-        residual: null,
-        isCalculated: false,
-        hasEquivalentBreakdown: true,
-        incompleteComparisonReason: null,
-        calculationError: null,
-        supportedParameters: [],
-        coverageGaps: []
+    }>(() => {
+        if (initPricingForTarget?.comparisonData) {
+            return initPricingForTarget.comparisonData;
+        }
+        return {
+            originalPrice: null,
+            enginePrice: null,
+            difference: null,
+            residual: null,
+            isCalculated: false,
+            hasEquivalentBreakdown: true,
+            incompleteComparisonReason: null,
+            calculationError: null,
+            supportedParameters: [],
+            coverageGaps: []
+        };
     });
 
-    const [proposedPatch, setProposedPatch] = useState<Record<string, any>>({});
+    const [proposedPatch, setProposedPatch] = useState<Record<string, any>>(() => {
+        return initPricingForTarget?.proposedPatch || {};
+    });
 
     // ── Family Draft Persistence & Coherent Ribbon/Card Switching ──
     interface FamilyDraftState {
@@ -189,7 +221,41 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
         proposedPatch: Record<string, any>;
     }
 
-    const familyDraftsRef = useRef<Partial<Record<ProductFamilyId, FamilyDraftState>>>({});
+    const familyDraftsRef = useRef<Partial<Record<ProductFamilyId, FamilyDraftState>>>(
+        (() => {
+            const initialMap: Partial<Record<ProductFamilyId, FamilyDraftState>> = {};
+            if (initialPricingDrafts) {
+                (Object.keys(initialPricingDrafts) as ProductFamilyId[]).forEach(fid => {
+                    const item = initialPricingDrafts[fid];
+                    if (item) {
+                        initialMap[fid] = {
+                            offer: item.offer || createDefaultOffer(fid),
+                            step: item.step || 1,
+                            sessionId: item.sessionId || null,
+                            activeRun: item.activeRun || null,
+                            selectedVariantId: item.selectedVariantId || null,
+                            comparisonData: item.comparisonData || {
+                                originalPrice: null,
+                                enginePrice: null,
+                                difference: null,
+                                residual: null,
+                                isCalculated: false,
+                                hasEquivalentBreakdown: true,
+                                incompleteComparisonReason: null,
+                                calculationError: null,
+                                supportedParameters: [],
+                                coverageGaps: []
+                            },
+                            entryMode: item.entryMode || 'UPLOAD_PDF',
+                            uploadedFileName: item.uploadedFileName || null,
+                            proposedPatch: item.proposedPatch || {}
+                        };
+                    }
+                });
+            }
+            return initialMap;
+        })()
+    );
     const selectedFamilyIdRef = useRef(selectedFamilyId);
     selectedFamilyIdRef.current = selectedFamilyId;
     const currentOfferRef = useRef(currentOffer);
@@ -210,6 +276,36 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
     uploadedFileNameRef.current = uploadedFileName;
     const proposedPatchRef = useRef(proposedPatch);
     proposedPatchRef.current = proposedPatch;
+
+    // Notify parent about current family pricing continuity whenever relevant state changes
+    React.useEffect(() => {
+        if (!onPricingContinuityChange) return;
+        const currentFam = selectedFamilyId;
+        onPricingContinuityChange(currentFam, {
+            sessionId,
+            activeRun,
+            selectedVariantId,
+            proposedPatch,
+            entryMode,
+            uploadedFileName,
+            step: currentStep,
+            offer: currentOffer,
+            comparisonData,
+            lastSavedTimestamp: Date.now()
+        });
+    }, [
+        selectedFamilyId,
+        sessionId,
+        activeRun,
+        selectedVariantId,
+        proposedPatch,
+        entryMode,
+        uploadedFileName,
+        currentStep,
+        currentOffer,
+        comparisonData,
+        onPricingContinuityChange
+    ]);
 
     // Unified family transition: invoked both from ribbon and card selections
     const transitionToFamily = (targetId: ProductFamilyId, options?: { stepOverride?: 1 | 2 | 3 | 4 | 5; defaultStepForNewFamily?: 1 | 2 | 3 | 4 | 5 }) => {
@@ -475,7 +571,7 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
             setCurrentStep(3);
         } catch (err: any) {
             if (uploadRequestIdRef.current === thisUploadId && selectedFamilyIdRef.current === uploadFamilyId) {
-                setUploadError(err.message || 'Error al procesar el presupuesto PDF');
+                setUploadError(normalizeUiError(err, 'Error al procesar el presupuesto PDF'));
             }
         } finally {
             if (uploadRequestIdRef.current === thisUploadId) {
@@ -603,38 +699,54 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
 
             const targetManufacturing = targetRun.manufacturingPrice;
 
+            if (!printerNodeId) {
+                setActiveRun(null);
+                setProposedPatch({});
+                setComparisonData({
+                    originalPrice: targetManufacturing,
+                    enginePrice: null,
+                    difference: null,
+                    residual: null,
+                    isCalculated: false,
+                    hasEquivalentBreakdown: false,
+                    incompleteComparisonReason: t('guided.pricing.prerequisiteNodeRequired') || 'Se requiere un nodo de impresión configurado para calibrar tarifas.',
+                    calculationError: t('guided.pricing.prerequisiteNodeRequired') || 'Se requiere un nodo de impresión configurado para calibrar tarifas. Configura tu maquinaria en la configuración completa.',
+                    supportedParameters: [],
+                    coverageGaps: []
+                });
+                return;
+            }
+
             let runResult: any = null;
             let runError: string | null = null;
 
-            if (printerNodeId) {
-                try {
-                    let sess = sessionId ? await printhouseCalibrationApi.getSession(sessionId) : null;
-                    if (calculationRequestIdRef.current !== thisReqId || selectedFamilyIdRef.current !== calcFamilyId) return;
+            try {
+                let sess = sessionId ? await printhouseCalibrationApi.getSession(sessionId) : null;
+                if (calculationRequestIdRef.current !== thisReqId || selectedFamilyIdRef.current !== calcFamilyId) return;
 
-                    if (!sess) {
-                        sess = await printhouseCalibrationApi.createSession({
-                            printerNodeId,
-                            referenceBookName: offer.productTitle || 'Oferta Calibración',
-                            bookSpec: {
-                                ...offer,
-                                evidenceId: offer.quoteRef || uploadedFileName || 'evidence-quote-doc',
-                                selectedVariantId: targetRun.id || targetRun.variantKey
-                            },
-                            targetManufacturingPrice: targetManufacturing
-                        });
-                        if (calculationRequestIdRef.current !== thisReqId || selectedFamilyIdRef.current !== calcFamilyId) return;
-                        if (sess?.id) setSessionId(sess.id);
-                    }
-                    if (sess?.id) {
-                        await printhouseCalibrationApi.markSessionReady(sess.id);
-                        if (calculationRequestIdRef.current !== thisReqId || selectedFamilyIdRef.current !== calcFamilyId) return;
-                        runResult = await printhouseCalibrationApi.calculateCalibration(sess.id);
-                        if (calculationRequestIdRef.current !== thisReqId || selectedFamilyIdRef.current !== calcFamilyId) return;
-                    }
-                } catch (e: any) {
+                if (!sess) {
+                    sess = await printhouseCalibrationApi.createSession({
+                        printerNodeId,
+                        referenceBookName: offer.productTitle || 'Oferta Calibración',
+                        bookSpec: {
+                            ...offer,
+                            evidenceId: offer.quoteRef || uploadedFileName || 'evidence-quote-doc',
+                            selectedVariantId: targetRun.id || targetRun.variantKey
+                        },
+                        targetManufacturingPrice: targetManufacturing
+                    });
                     if (calculationRequestIdRef.current !== thisReqId || selectedFamilyIdRef.current !== calcFamilyId) return;
-                    runError = e.message || 'Error en la llamada al motor de cálculo';
+                    if (sess?.id) setSessionId(sess.id);
                 }
+                if (sess?.id) {
+                    await printhouseCalibrationApi.markSessionReady(sess.id);
+                    if (calculationRequestIdRef.current !== thisReqId || selectedFamilyIdRef.current !== calcFamilyId) return;
+                    runResult = await printhouseCalibrationApi.calculateCalibration(sess.id);
+                    if (calculationRequestIdRef.current !== thisReqId || selectedFamilyIdRef.current !== calcFamilyId) return;
+                }
+            } catch (e: any) {
+                if (calculationRequestIdRef.current !== thisReqId || selectedFamilyIdRef.current !== calcFamilyId) return;
+                runError = normalizeUiError(e, 'Error en la llamada al motor de cálculo');
             }
 
             // Check if calculation is still valid and not superseded by another family/document/variant

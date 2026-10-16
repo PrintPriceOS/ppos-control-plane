@@ -177,6 +177,7 @@ export const App: React.FC = () => {
             <Route path="/printhouse/register" element={<PrinthouseRegistrationPage />} />
             <Route path="/public/preflight/human-report/:token" element={<PublicHumanReportPage />} />
             <Route path="/printhouse/onboarding-guided" element={<AuthGuard><GuidedOnboardingPage /></AuthGuard>} />
+            <Route path="/printhouse/onboarding" element={<AuthGuard><GuidedOnboardingPage /></AuthGuard>} />
             
             <Route element={<AuthGuard><MachineDrawerProvider><Layout /></MachineDrawerProvider></AuthGuard>}>
                 <Route path="/" element={<Navigate to="/dashboard" replace />} />

@@ -16,7 +16,7 @@
  * 4. Zero false claims of "live marketplace" or "order dispatch ready".
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
     Building2, Layers, Tag, CheckCircle2, ArrowRight, 
     Sparkles, Shield, ArrowLeft, RefreshCw, AlertCircle, 
@@ -28,11 +28,13 @@ import {
     GuidedStage, 
     CompanyDraftData, 
     GuidedOnboardingDraft, 
+    FamilyPricingSessionDraft,
     loadGuidedOnboardingDraft, 
     saveGuidedOnboardingDraft,
     clearGuidedOnboardingDraft 
 } from '../../../lib/onboardingDraftStore';
 import { ProductFamilyId, FamilyState } from '../../../types/printhouseOnboardingTypes';
+import { normalizeUiError } from '../../../utils/errorUtils';
 import { GuidedStepCompany } from './GuidedStepCompany';
 import { GuidedStepProducts } from './GuidedStepProducts';
 import { GuidedStepReview } from './GuidedStepReview';
@@ -114,59 +116,36 @@ export const GuidedPrinthouseJourney: React.FC<GuidedPrinthouseJourneyProps> = (
                 const serverSites = data.data?.sites || [];
                 const primarySite = serverSites[0];
 
-                // Reconcile draft with server reality (server truth wins for non-empty fields)
+                // Reconcile draft with server reality (server truth fills empty fields, preserves user edits)
                 setDraft(prev => {
                     const reconciledCompany: CompanyDraftData = {
                         ...prev.company,
-                        legalName: serverCompany?.legalName || serverCompany?.companyName || prev.company.legalName,
-                        tradingName: serverCompany?.tradingName || prev.company.tradingName,
-                        country: serverCompany?.country || primarySite?.country || prev.company.country || 'ES',
-                        city: serverCompany?.city || (primarySite?.city !== 'Pending Setup' ? primarySite?.city : '') || prev.company.city,
-                        address: serverCompany?.address || prev.company.address,
-                        postalCode: serverCompany?.postalCode || prev.company.postalCode,
-                        phone: serverCompany?.phone || primarySite?.phone || prev.company.phone,
-                        website: serverCompany?.website || primarySite?.website || prev.company.website,
-                        contactName: serverCompany?.contactName || prev.company.contactName,
-                        taxId: serverCompany?.taxId || prev.company.taxId,
-                        siteName: primarySite?.siteName || prev.company.siteName || 'Planta Principal',
-                        siteTimezone: primarySite?.timezone || prev.company.siteTimezone || 'Europe/Madrid'
+                        legalName: prev.company.legalName || serverCompany?.legalName || serverCompany?.companyName || '',
+                        tradingName: prev.company.tradingName || serverCompany?.tradingName || '',
+                        country: prev.company.country || serverCompany?.country || primarySite?.country || 'ES',
+                        city: prev.company.city || (primarySite?.city !== 'Pending Setup' ? primarySite?.city : '') || serverCompany?.city || '',
+                        address: prev.company.address || serverCompany?.address || '',
+                        postalCode: prev.company.postalCode || serverCompany?.postalCode || '',
+                        phone: prev.company.phone || serverCompany?.phone || primarySite?.phone || '',
+                        website: prev.company.website || serverCompany?.website || primarySite?.website || '',
+                        contactName: prev.company.contactName || serverCompany?.contactName || '',
+                        taxId: prev.company.taxId || serverCompany?.taxId || '',
+                        siteName: prev.company.siteName || primarySite?.siteName || 'Planta Principal',
+                        siteTimezone: prev.company.siteTimezone || primarySite?.timezone || 'Europe/Madrid',
+                        primarySiteId: prev.company.primarySiteId || primarySite?.siteId || null
                     };
                     const updated: GuidedOnboardingDraft = {
                         ...prev,
-                        currentStage: prev.currentStage,
-                        selectedFamilyId: prev.selectedFamilyId,
-                        enabledFamilies: prev.enabledFamilies,
-                        completedStages: prev.completedStages,
                         company: reconciledCompany
                     };
                     saveGuidedOnboardingDraft(updated);
                     return updated;
                 });
             } else {
-                // If DEV bypass on localhost, provide clean defaults
-                if (import.meta.env?.DEV && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
-                    setServerData({
-                        company: { companyName: draft.company.legalName || 'Imprenta Local', country: 'ES', city: 'Madrid' },
-                        sites: [{ siteId: 'site-local-1', name: 'Planta Principal', city: 'Madrid' }],
-                        readiness: {
-                            accountSetup: { status: 'COMPLETE' },
-                            operationalReadiness: { machineCount: 1 },
-                            pricingReadiness: { status: 'NOT_STARTED' }
-                        }
-                    });
-                } else {
-                    setNetworkError(data.error?.message || 'No se pudieron recuperar los datos de la imprenta.');
-                }
+                setNetworkError(normalizeUiError(data, 'No se pudieron recuperar los datos de la imprenta.'));
             }
         } catch (err: any) {
-            if (import.meta.env?.DEV && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
-                setServerData({
-                    company: { companyName: draft.company.legalName || 'Imprenta Local', country: 'ES', city: 'Madrid' },
-                    sites: [{ siteId: 'site-local-1', name: 'Planta Principal', city: 'Madrid' }]
-                });
-            } else {
-                setNetworkError('Error de red al conectar con el servidor.');
-            }
+            setNetworkError(normalizeUiError(err, 'Error de red al conectar con el servidor.'));
         } finally {
             setLoadingData(false);
         }
@@ -177,13 +156,41 @@ export const GuidedPrinthouseJourney: React.FC<GuidedPrinthouseJourneyProps> = (
     }, []);
 
     // Sync draft updates to localStorage
-    const updateDraft = (updater: (prev: GuidedOnboardingDraft) => GuidedOnboardingDraft) => {
+    const updateDraft = useCallback((updater: (prev: GuidedOnboardingDraft) => GuidedOnboardingDraft) => {
         setDraft(prev => {
             const next = updater(prev);
             saveGuidedOnboardingDraft(next);
             return next;
         });
-    };
+    }, []);
+
+    // Stable continuity and family handlers for SimplifiedOnboardingJourney
+    const handlePricingContinuityChange = useCallback((famId: ProductFamilyId, famDraft: any) => {
+        updateDraft(prev => {
+            const existing = prev.pricingContinuity?.[famId];
+            if (
+                existing &&
+                existing.sessionId === famDraft.sessionId &&
+                existing.selectedVariantId === famDraft.selectedVariantId &&
+                existing.step === famDraft.step &&
+                existing.entryMode === famDraft.entryMode &&
+                existing.uploadedFileName === famDraft.uploadedFileName
+            ) {
+                return prev;
+            }
+            return {
+                ...prev,
+                pricingContinuity: {
+                    ...prev.pricingContinuity,
+                    [famId]: famDraft
+                }
+            };
+        });
+    }, [updateDraft]);
+
+    const handleFamiliesStateChange = useCallback((newFamilies: Record<ProductFamilyId, FamilyState>) => {
+        setFamilies(newFamilies);
+    }, []);
 
     // Stage Navigation
     const setStage = (stage: GuidedStage) => {
@@ -220,11 +227,11 @@ export const GuidedPrinthouseJourney: React.FC<GuidedPrinthouseJourneyProps> = (
         });
 
         if (!compRes.ok) {
-            let errorMsg = 'Error al guardar los datos de empresa.';
+            let errJson: any = null;
             try {
-                const errJson = await compRes.json();
-                errorMsg = errJson.error || errJson.message || errorMsg;
+                errJson = await compRes.json();
             } catch (_) {}
+            const errorMsg = normalizeUiError(errJson, `Error ${compRes.status}: Error al guardar los datos de empresa.`);
             throw new Error(errorMsg);
         }
 
@@ -253,11 +260,11 @@ export const GuidedPrinthouseJourney: React.FC<GuidedPrinthouseJourneyProps> = (
                 body: JSON.stringify(sitePayload)
             });
             if (!siteRes.ok) {
-                let errorMsg = 'Error al actualizar la sede de producción.';
+                let errJson: any = null;
                 try {
-                    const errJson = await siteRes.json();
-                    errorMsg = errJson.error || errJson.message || errorMsg;
+                    errJson = await siteRes.json();
                 } catch (_) {}
+                const errorMsg = normalizeUiError(errJson, `Error ${siteRes.status}: Error al actualizar la sede de producción.`);
                 throw new Error(errorMsg);
             }
         } else {
@@ -270,11 +277,11 @@ export const GuidedPrinthouseJourney: React.FC<GuidedPrinthouseJourneyProps> = (
                 body: JSON.stringify(sitePayload)
             });
             if (!siteRes.ok) {
-                let errorMsg = 'Error al registrar la sede de producción.';
+                let errJson: any = null;
                 try {
-                    const errJson = await siteRes.json();
-                    errorMsg = errJson.error || errJson.message || errorMsg;
+                    errJson = await siteRes.json();
                 } catch (_) {}
+                const errorMsg = normalizeUiError(errJson, `Error ${siteRes.status}: Error al registrar la sede de producción.`);
                 throw new Error(errorMsg);
             }
             try {
@@ -588,15 +595,40 @@ export const GuidedPrinthouseJourney: React.FC<GuidedPrinthouseJourneyProps> = (
                             </button>
                         </div>
 
-                        {/* Reused Production Component: SimplifiedOnboardingJourney (starts at step 2 because products were selected in Stage B) */}
+                        {!printerNodeId && (
+                            <div role="alert" className="p-4 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 text-amber-900 dark:text-amber-200 text-xs font-medium flex items-start justify-between gap-3">
+                                <div className="flex items-start gap-2.5">
+                                    <AlertCircle size={18} className="text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                                    <div className="space-y-1">
+                                        <div className="font-bold">
+                                            {t('guided.pricing.prerequisiteNodeRequired') || 'Se requiere un nodo de impresión configurado para calibrar tarifas.'}
+                                        </div>
+                                        <p className="text-[11px] text-amber-800 dark:text-amber-300">
+                                            Una sede o planta física no sustituye a una máquina o nodo de impresión. Configura tu maquinaria en la consola avanzada para habilitar el cálculo inverso.
+                                        </p>
+                                    </div>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => onOpenFullSetup('MACHINES')}
+                                    className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg text-xs shrink-0 transition-colors"
+                                >
+                                    {t('guided.pricing.prerequisiteNodeLink') || 'Configurar maquinaria y nodos'}
+                                </button>
+                            </div>
+                        )}
+
+                        {/* Reused Production Component: SimplifiedOnboardingJourney */}
                         <SimplifiedOnboardingJourney
-                            printerNodeId={printerNodeId || serverData?.sites?.[0]?.siteId}
-                            printerNodeName={printerNodeName || serverData?.sites?.[0]?.name}
+                            printerNodeId={printerNodeId}
+                            printerNodeName={printerNodeName}
                             initialStep={2}
                             targetFamilyId={draft.selectedFamilyId}
+                            initialPricingDrafts={draft.pricingContinuity}
+                            onPricingContinuityChange={handlePricingContinuityChange}
                             onCompleted={() => setStage('REVIEW')}
                             onOpenAdvanced={() => onOpenFullSetup('PRICING')}
-                            onFamiliesStateChange={(newFamilies) => setFamilies(newFamilies)}
+                            onFamiliesStateChange={handleFamiliesStateChange}
                         />
                     </div>
                 )}

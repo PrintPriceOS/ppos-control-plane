@@ -11,7 +11,7 @@
  * - Clear explanation: "Completing setup does NOT automatically activate live marketplace or routing".
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
     CheckCircle2, Clock, AlertTriangle, ArrowLeft, 
     Layers, Building2, Tag, ArrowRight, ShieldCheck, 
@@ -22,6 +22,7 @@ import { ProductFamilyId, FamilyState } from '../../../types/printhouseOnboardin
 import { BindingIcon } from './BindingFamilyIcons';
 import { CompanyDraftData } from '../../../lib/onboardingDraftStore';
 import { getAuthToken } from '../../../lib/authStore';
+import { normalizeUiError } from '../../../utils/errorUtils';
 
 interface GuidedStepReviewProps {
     company: CompanyDraftData;
@@ -46,6 +47,13 @@ export const GuidedStepReview: React.FC<GuidedStepReviewProps> = ({
     const [submittingReview, setSubmittingReview] = useState(false);
     const [submissionResult, setSubmissionResult] = useState<{ ok: boolean; message: string } | null>(null);
 
+    // Refresh readiness on mount to ensure fresh state
+    useEffect(() => {
+        if (onRefreshReadiness) {
+            onRefreshReadiness().catch(() => {});
+        }
+    }, []);
+
     const accountReadiness = readinessData?.accountSetup;
     const opsReadiness = readinessData?.operationalConfiguration || readinessData?.operationalReadiness;
     const pricingReadiness = readinessData?.pricingReadiness;
@@ -56,9 +64,15 @@ export const GuidedStepReview: React.FC<GuidedStepReviewProps> = ({
         ...(pricingReadiness?.blockingIssues || [])
     ];
 
-    const canRequestReview = blockingIssues.length === 0;
+    // Explicit readiness check: readinessData must exist and all required categories must be COMPLETE with 0 blockers
+    const isReadinessLoaded = Boolean(readinessData && (accountReadiness || opsReadiness || pricingReadiness));
+    const isAccountComplete = accountReadiness?.status === 'COMPLETE';
+    const isOpsComplete = opsReadiness?.status === 'COMPLETE';
+    const isPricingComplete = pricingReadiness?.status === 'COMPLETE';
+    const canRequestReview = isReadinessLoaded && isAccountComplete && isOpsComplete && isPricingComplete && blockingIssues.length === 0;
 
     const handleSubmitForReview = async () => {
+        if (!canRequestReview || submittingReview) return;
         setSubmittingReview(true);
         setSubmissionResult(null);
         try {
@@ -74,23 +88,28 @@ export const GuidedStepReview: React.FC<GuidedStepReviewProps> = ({
                     notes: 'Submitted via Guided Printhouse Onboarding'
                 })
             });
-            const data = await res.json();
-            if (res.ok && (data.success || data.ok)) {
+            let data: any = null;
+            try {
+                data = await res.json();
+            } catch (_) {}
+
+            if (res.ok && (data?.success || data?.ok)) {
                 setSubmissionResult({
                     ok: true,
                     message: t('guided.review.submittedSuccess') || 'Tu solicitud de revisión comercial ha sido enviada al equipo de PrintPrice Pro.'
                 });
                 if (onRefreshReadiness) await onRefreshReadiness();
             } else {
+                const normErr = normalizeUiError(data, `Error HTTP ${res.status}: Revisa los requisitos pendientes.`);
                 setSubmissionResult({
                     ok: false,
-                    message: data.error || data.message || 'No se pudo enviar la solicitud. Revisa los requisitos pendientes.'
+                    message: normErr
                 });
             }
         } catch (err: any) {
             setSubmissionResult({
                 ok: false,
-                message: err.message || 'Error de conexión al enviar la revisión.'
+                message: normalizeUiError(err, 'Error de conexión al enviar la revisión.')
             });
         } finally {
             setSubmittingReview(false);
