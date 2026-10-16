@@ -9,6 +9,26 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: ci_test_password
+          MYSQL_DATABASE: ppos_control_plane_ci
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost -pci_test_password"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+    env:
+      MYSQL_HOST: 127.0.0.1
+      MYSQL_PORT: 3306
+      MYSQL_USER: root
+      MYSQL_PASSWORD: ci_test_password
+      MYSQL_DATABASE: ppos_control_plane_ci
+      DATABASE_URL: mysql://root:ci_test_password@127.0.0.1:3306/ppos_control_plane_ci
     steps:
     - uses: actions/checkout@v3
     - name: Use Node.js
@@ -24,6 +44,11 @@ jobs:
         find src/api scripts -name "*.js" -type f -print0 | xargs -0 -n1 node -c
     - name: Production Build
       run: npm run build
+    - name: Execute Database Migrations (Ephemeral CI)
+      env:
+        PPOS_MIGRATION_EXECUTION: 'true'
+        PPOS_ENABLE_SCHEMA_MUTATION: 'true'
+      run: node scripts/run_control_plane_migrations.js
     - name: Schema Integrity Check
       run: node scripts/verify-industrial-schema.js
     - name: Automated Tests Execution (Vitest)
