@@ -1,22 +1,26 @@
 # TypeScript Diagnostic Comparison Report (diagnostic_comparison.md)
 
 ## 1. Metadata & Reproducibility
-- **Target Remote Commit SHA for Traceability:** 3601d6da2a5113beb463528f04daaeaee354c5eb
-- **Baseline Commit for Diagnostic Comparison:** d50d473a54a14800ffd7026763bb3a0cf928d37d
-- **Branch:** feat/onboarding-guided-restructure
+- **Target Remote Branch:** `feat/onboarding-guided-restructure`
+- **Initial Baseline Commit for Structural Comparison:** `d50d473a54a14800ffd7026763bb3a0cf928d37d`
+- **Prior Verified Checkpoint Commit:** `3601d6da2a5113beb463528f04daaeaee354c5eb`
+- **Preceding Verified Remote Commit:** `a5dcfca5d4a497e146c9261e60376f31ca408ec7`
 - **Diagnostic Command:** `npx tsc --noEmit`
 - **Timestamp:** 2026-10-16
-- **Vitest Suite Result:** 27 test files passed, 391/391 tests passed (0 failures)
+- **Vitest Suite Result:** 27 test files passed, 392/392 tests passed (0 failures)
 - **Vite Build Result:** `npm run build` completed cleanly (0 errors, 3564 modules transformed)
 
 ---
 
 ## 2. Executive Summary
 - **Total Workspace Baseline Errors:** 193 errors across 37 files.
-- **Errors in Restructured Guided Onboarding Files:** **0** (All files are 100% clean).
+- **Errors in Restructured Guided Onboarding Files:** **0** (All onboarding components are 100% clean).
 - **Added Regressions:** 0
 - **Deleted / Suppressed Valid Errors:** 0
 - **Net TypeScript Delta in Onboarding Scope:** 0 added errors. Strict type safety preserved across all props, draft schemas, API payloads, and i18n dictionaries.
+- **Evidence Provenance & Distinction:**
+  - *Historical Evidence (v2 / v3 baseline):* Archived in `historical_baseline_evidence/` (labeled as historical mock evidence for stage navigation and error normalization).
+  - *Final Candidate Evidence (v4 fresh):* Captured live in `fresh_pricing_ui_evidence/` directly against the candidate source on port 5179, covering compact substep navigation, price comparison cards, collapsed/expanded technical details, light/dark themes, and ES/EN/DE multilingual rendering with mocked API data labeled.
 
 ---
 

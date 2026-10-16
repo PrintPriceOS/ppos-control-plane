@@ -1273,5 +1273,97 @@ describe('Guided Printhouse Onboarding Journey Suite', () => {
         const websiteInput = screen.getByLabelText(/Sitio web|Sitio Web de la Empresa/i) as HTMLInputElement;
         expect(websiteInput.value).toBe('https://server-updated.com');
     });
+
+    it('22. Empty server-value reconciliation: clearing an optional field in full setup adopts empty string on guided onboarding without resurrecting stale draft', async () => {
+        const tenantId = 'tenant-clean-field-empty';
+        (getAuthUser as any).mockReturnValue({
+            tenantId,
+            role: 'PRINTHOUSE_OPERATOR',
+            printhouseId: 'node-clean-field'
+        });
+
+        // 1. Initial draft has an old tradingName and phone from a prior session, with userEditedFields empty (clean)
+        saveGuidedOnboardingDraft({
+            schemaVersion: 2,
+            tenantId,
+            currentStage: 'WELCOME',
+            selectedFamilyId: 'HARDCOVER',
+            enabledFamilies: { HARDCOVER: true, SOFTCOVER: true, WIRE_O: false, SADDLE_STITCH: false },
+            company: {
+                legalName: 'Original Legal Corp',
+                tradingName: 'Stale Trading Brand',
+                country: 'ES',
+                city: 'Valencia',
+                address: '',
+                postalCode: '',
+                phone: '+34 960 000 000',
+                website: '',
+                contactName: '',
+                taxId: 'B12345678',
+                siteName: 'Planta Principal',
+                siteTimezone: 'Europe/Madrid',
+                primarySiteId: 'site-val-1',
+                userEditedFields: [], // Not dirty
+                acknowledgedServerValues: {
+                    tradingName: 'Stale Trading Brand',
+                    phone: '+34 960 000 000'
+                }
+            },
+            offerDrafts: {},
+            lastSavedTimestamp: Date.now(),
+            completedStages: { WELCOME: false, COMPANY: false, PRODUCTS: false, PRICING: false, REVIEW: false }
+        });
+
+        // 2. The server now returns an explicitly cleared (empty string) tradingName from full setup
+        global.fetch = vi.fn().mockImplementation((url: string) => {
+            if (url.includes('/api/printhouse/onboarding')) {
+                return Promise.resolve({
+                    ok: true,
+                    json: () => Promise.resolve({
+                        ok: true,
+                        data: {
+                            company: {
+                                legalName: 'Original Legal Corp',
+                                tradingName: '', // Intentionally cleared on server
+                                phone: '+34 960 000 000',
+                                country: 'ES',
+                                city: 'Valencia'
+                            },
+                            sites: [{
+                                siteId: 'site-val-1',
+                                siteName: 'Planta Principal',
+                                country: 'ES',
+                                city: 'Valencia',
+                                timezone: 'Europe/Madrid'
+                            }]
+                        }
+                    })
+                });
+            }
+            return Promise.resolve({ ok: true, json: () => Promise.resolve({ ok: true, data: {} }) });
+        });
+
+        renderWithProviders(
+            <GuidedPrinthouseJourney onOpenFullSetup={vi.fn()} printerNodeId="node-clean-field" />,
+            'es'
+        );
+
+        // Enter Stage A (Tu imprenta)
+        const startBtn = await screen.findByRole('button', { name: /Comenzar configuración|Continuar configuración/i });
+        fireEvent.click(startBtn);
+
+        await waitFor(() => {
+            expect(screen.getByText('Datos básicos de tu empresa y taller')).toBeInTheDocument();
+        });
+
+        // Verify that tradingName adopts the server's intentional empty string and does NOT restore the stale "Stale Trading Brand"
+        const tradingInput = screen.getByLabelText(/Nombre comercial|Nombre Comercial \/ Público/i) as HTMLInputElement;
+        expect(tradingInput.value).toBe('');
+
+        // The persisted draft must also reflect the clean empty value
+        const updatedDraft = loadGuidedOnboardingDraft(tenantId);
+        expect(updatedDraft.company.tradingName).toBe('');
+    });
 });
+
 

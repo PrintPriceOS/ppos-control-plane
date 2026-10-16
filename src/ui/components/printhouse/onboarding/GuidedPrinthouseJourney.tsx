@@ -196,49 +196,79 @@ export const GuidedPrinthouseJourney: React.FC<GuidedPrinthouseJourneyProps> = (
                     const editedFields = new Set(prev.company.userEditedFields || []);
                     const ackValues = prev.company.acknowledgedServerValues || {};
 
-                    const serverLegalName = serverCompany?.legalName || serverCompany?.companyName || '';
-                    const serverTrading = serverCompany?.tradingName || '';
-                    const serverCountry = serverCompany?.country || primarySite?.country || '';
-                    const serverCity = (primarySite?.city && primarySite.city !== 'Pending Setup') ? primarySite.city : (serverCompany?.city || '');
-                    const serverAddress = serverCompany?.address || '';
-                    const serverPostalCode = serverCompany?.postalCode || '';
-                    const serverPhone = serverCompany?.phone || primarySite?.phone || '';
-                    const serverWebsite = serverCompany?.website || primarySite?.website || '';
-                    const serverContact = serverCompany?.contactName || '';
-                    const serverTaxId = serverCompany?.taxId || '';
-                    const serverSiteName = primarySite?.siteName || '';
-                    const serverSiteTimezone = primarySite?.timezone || '';
+                    // Reconcile field: if user locally touched it, keep local draft.
+                    // If clean (untouched), adopt server value if the key exists on server (even if '' or null).
+                    // Only fallback to prev.company[field] if the server payload completely omitted the key (undefined).
+                    const resolveField = (
+                        field: keyof CompanyDraftData,
+                        serverVal: string | null | undefined,
+                        fallbackDefault: string = ''
+                    ): string => {
+                        if (editedFields.has(field)) {
+                            return (prev.company[field] as string) ?? '';
+                        }
+                        if (serverVal !== undefined && serverVal !== null) {
+                            return String(serverVal);
+                        }
+                        if (serverVal === null) {
+                            return '';
+                        }
+                        return (prev.company[field] as string) || fallbackDefault;
+                    };
+
+                    const rawLegal = serverCompany?.legalName !== undefined ? serverCompany?.legalName : serverCompany?.companyName;
+                    const serverLegalName = rawLegal !== undefined && rawLegal !== null ? String(rawLegal) : undefined;
+                    const serverTrading = serverCompany?.tradingName !== undefined && serverCompany?.tradingName !== null ? String(serverCompany.tradingName) : (serverCompany && 'tradingName' in serverCompany ? '' : undefined);
+                    const serverCountry = serverCompany?.country !== undefined && serverCompany?.country !== null ? String(serverCompany.country) : (primarySite?.country !== undefined && primarySite?.country !== null ? String(primarySite.country) : undefined);
+                    
+                    let serverCity: string | undefined = undefined;
+                    if (primarySite?.city !== undefined && primarySite?.city !== null && primarySite.city !== 'Pending Setup') {
+                        serverCity = String(primarySite.city);
+                    } else if (serverCompany?.city !== undefined && serverCompany?.city !== null) {
+                        serverCity = String(serverCompany.city);
+                    } else if (serverCompany && 'city' in serverCompany) {
+                        serverCity = '';
+                    }
+
+                    const serverAddress = serverCompany?.address !== undefined && serverCompany?.address !== null ? String(serverCompany.address) : (serverCompany && 'address' in serverCompany ? '' : undefined);
+                    const serverPostalCode = serverCompany?.postalCode !== undefined && serverCompany?.postalCode !== null ? String(serverCompany.postalCode) : (serverCompany && 'postalCode' in serverCompany ? '' : undefined);
+                    const serverPhone = serverCompany?.phone !== undefined && serverCompany?.phone !== null ? String(serverCompany.phone) : (primarySite?.phone !== undefined && primarySite?.phone !== null ? String(primarySite.phone) : (serverCompany && 'phone' in serverCompany ? '' : undefined));
+                    const serverWebsite = serverCompany?.website !== undefined && serverCompany?.website !== null ? String(serverCompany.website) : (primarySite?.website !== undefined && primarySite?.website !== null ? String(primarySite.website) : (serverCompany && 'website' in serverCompany ? '' : undefined));
+                    const serverContact = serverCompany?.contactName !== undefined && serverCompany?.contactName !== null ? String(serverCompany.contactName) : (serverCompany && 'contactName' in serverCompany ? '' : undefined);
+                    const serverTaxId = serverCompany?.taxId !== undefined && serverCompany?.taxId !== null ? String(serverCompany.taxId) : (serverCompany && 'taxId' in serverCompany ? '' : undefined);
+                    const serverSiteName = primarySite?.siteName !== undefined && primarySite?.siteName !== null ? String(primarySite.siteName) : (primarySite && 'siteName' in primarySite ? '' : undefined);
+                    const serverSiteTimezone = primarySite?.timezone !== undefined && primarySite?.timezone !== null ? String(primarySite.timezone) : (primarySite && 'timezone' in primarySite ? '' : undefined);
                     const serverPrimarySiteId = primarySite?.siteId || null;
 
                     const reconciledCompany: CompanyDraftData = {
                         ...prev.company,
-                        legalName: editedFields.has('legalName') ? prev.company.legalName : (serverLegalName || prev.company.legalName),
-                        tradingName: editedFields.has('tradingName') ? prev.company.tradingName : (serverTrading || prev.company.tradingName),
-                        country: editedFields.has('country') ? prev.company.country : (serverCountry || prev.company.country),
-                        city: editedFields.has('city') ? prev.company.city : (serverCity || prev.company.city),
-                        address: editedFields.has('address') ? prev.company.address : (serverAddress || prev.company.address),
-                        postalCode: editedFields.has('postalCode') ? prev.company.postalCode : (serverPostalCode || prev.company.postalCode),
-                        phone: editedFields.has('phone') ? prev.company.phone : (serverPhone || prev.company.phone),
-                        website: editedFields.has('website') ? prev.company.website : (serverWebsite || prev.company.website),
-                        contactName: editedFields.has('contactName') ? prev.company.contactName : (serverContact || prev.company.contactName),
-                        taxId: editedFields.has('taxId') ? prev.company.taxId : (serverTaxId || prev.company.taxId),
-                        siteName: editedFields.has('siteName') ? prev.company.siteName : (serverSiteName || prev.company.siteName || 'Planta Principal'),
-                        siteTimezone: editedFields.has('siteTimezone') ? prev.company.siteTimezone : (serverSiteTimezone || prev.company.siteTimezone),
+                        legalName: resolveField('legalName', serverLegalName, prev.company.legalName),
+                        tradingName: resolveField('tradingName', serverTrading),
+                        country: resolveField('country', serverCountry, prev.company.country),
+                        city: resolveField('city', serverCity, prev.company.city),
+                        address: resolveField('address', serverAddress),
+                        postalCode: resolveField('postalCode', serverPostalCode),
+                        phone: resolveField('phone', serverPhone),
+                        website: resolveField('website', serverWebsite),
+                        contactName: resolveField('contactName', serverContact),
+                        taxId: resolveField('taxId', serverTaxId),
+                        siteName: resolveField('siteName', serverSiteName, prev.company.siteName || 'Planta Principal'),
+                        siteTimezone: resolveField('siteTimezone', serverSiteTimezone, prev.company.siteTimezone),
                         primarySiteId: prev.company.primarySiteId || serverPrimarySiteId,
                         acknowledgedServerValues: {
                             ...ackValues,
-                            legalName: serverLegalName,
-                            tradingName: serverTrading,
-                            country: serverCountry,
-                            city: serverCity,
-                            address: serverAddress,
-                            postalCode: serverPostalCode,
-                            phone: serverPhone,
-                            website: serverWebsite,
-                            contactName: serverContact,
-                            taxId: serverTaxId,
-                            siteName: serverSiteName,
-                            siteTimezone: serverSiteTimezone
+                            ...(serverLegalName !== undefined ? { legalName: serverLegalName } : {}),
+                            ...(serverTrading !== undefined ? { tradingName: serverTrading } : {}),
+                            ...(serverCountry !== undefined ? { country: serverCountry } : {}),
+                            ...(serverCity !== undefined ? { city: serverCity } : {}),
+                            ...(serverAddress !== undefined ? { address: serverAddress } : {}),
+                            ...(serverPostalCode !== undefined ? { postalCode: serverPostalCode } : {}),
+                            ...(serverPhone !== undefined ? { phone: serverPhone } : {}),
+                            ...(serverWebsite !== undefined ? { website: serverWebsite } : {}),
+                            ...(serverContact !== undefined ? { contactName: serverContact } : {}),
+                            ...(serverTaxId !== undefined ? { taxId: serverTaxId } : {}),
+                            ...(serverSiteName !== undefined ? { siteName: serverSiteName } : {}),
+                            ...(serverSiteTimezone !== undefined ? { siteTimezone: serverSiteTimezone } : {})
                         }
                     };
 
