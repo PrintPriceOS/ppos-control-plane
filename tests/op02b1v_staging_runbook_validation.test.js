@@ -75,4 +75,85 @@ describe('OP-02B.1V: Staging Runbook, Configuration Contracts & Secret Resolutio
             expect(dockerfileContent).toContain('CMD ["node", "server.js"]');
         });
     });
+
+    describe('4. Persistent Bootstrap Environment Guards & Anti-Production Constraints', () => {
+        const { checkStagingPersistentGuards } = require('../scripts/bootstrap_staging_persistent_schema');
+
+        it('rejects execution when NODE_ENV is production', () => {
+            expect(() => {
+                checkStagingPersistentGuards({
+                    nodeEnv: 'production',
+                    bootstrapFlag: 'true',
+                    targetDb: 'ppos_control_staging'
+                });
+            }).toThrow(/Strictly forbidden in production/);
+        });
+
+        it('rejects execution without explicit PPOS_STAGING_PERSISTENT_BOOTSTRAP=true flag', () => {
+            expect(() => {
+                checkStagingPersistentGuards({
+                    nodeEnv: 'staging',
+                    bootstrapFlag: 'false',
+                    targetDb: 'ppos_control_staging'
+                });
+            }).toThrow(/PPOS_STAGING_PERSISTENT_BOOTSTRAP=true is required/);
+        });
+
+        it('strictly rejects production database targets', () => {
+            expect(() => {
+                checkStagingPersistentGuards({
+                    nodeEnv: 'staging',
+                    bootstrapFlag: 'true',
+                    targetDb: 'ppos_control_plane'
+                });
+            }).toThrow(/Forbidden target database/);
+
+            expect(() => {
+                checkStagingPersistentGuards({
+                    nodeEnv: 'staging',
+                    bootstrapFlag: 'true',
+                    targetDb: 'production_db'
+                });
+            }).toThrow(/Forbidden target database/);
+        });
+
+        it('accepts explicitly authorized staging or sandbox target databases', () => {
+            expect(() => {
+                checkStagingPersistentGuards({
+                    nodeEnv: 'staging',
+                    bootstrapFlag: 'true',
+                    targetDb: 'ppos_control_staging'
+                });
+            }).not.toThrow();
+
+            expect(() => {
+                checkStagingPersistentGuards({
+                    nodeEnv: 'test',
+                    bootstrapFlag: 'true',
+                    targetDb: 'ppos_sandbox_drill'
+                });
+            }).not.toThrow();
+        });
+    });
+
+    describe('5. Backup & Restore Security Constraints', () => {
+        it('verifies staging_backup_snapshot.sh does not expose password on CLI and uses UUID and SHA256', () => {
+            const backupScript = fs.readFileSync(path.join(__dirname, '../scripts/staging_backup_snapshot.sh'), 'utf8');
+            expect(backupScript).toContain('env:BACKUP_PASSPHRASE');
+            expect(backupScript).toContain('file:${BACKUP_PASSPHRASE_FILE}');
+            expect(backupScript).not.toContain('pass:${BACKUP_PASSPHRASE}');
+            expect(backupScript).toContain('BACKUP_UUID');
+            expect(backupScript).toContain('sha256sum');
+            expect(backupScript).toContain('pipefail');
+        });
+
+        it('verifies staging_restore_drill.sh strictly rejects production databases and requires sha256', () => {
+            const restoreScript = fs.readFileSync(path.join(__dirname, '../scripts/staging_restore_drill.sh'), 'utf8');
+            expect(restoreScript).toContain('*prod*|*production*|*live*|*master*');
+            expect(restoreScript).toContain('SHA-256 checksum file (${SHA_FILE}) is missing');
+            expect(restoreScript).toContain('env:BACKUP_PASSPHRASE');
+            expect(restoreScript).not.toContain('pass:${PASSPHRASE}');
+            expect(restoreScript).toContain('ELAPSED_MS');
+        });
+    });
 });
