@@ -67,13 +67,13 @@ jobs:
           mysqld --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci --default-authentication-plugin=mysql_native_password
 
         echo "Waiting for Origin MySQL (port 3306) to be healthy..."
-        until docker exec -e MYSQL_PWD="$ORIGIN_ROOT_PW" mysql-origin mysqladmin ping -u root --silent; do
+        until MYSQL_PWD="$ORIGIN_ROOT_PW" mysqladmin -h 127.0.0.1 -P 3306 -u root ping --silent; do
           sleep 2
         done
         echo "✓ Origin MySQL (port 3306) is online."
 
         echo "Waiting for Sandbox MySQL (port 3307) to be healthy..."
-        until docker exec -e MYSQL_PWD="$SANDBOX_ROOT_PW" mysql-sandbox mysqladmin ping -u root --silent; do
+        until MYSQL_PWD="$SANDBOX_ROOT_PW" mysqladmin -h 127.0.0.1 -P 3307 -u root ping --silent; do
           sleep 2
         done
         echo "✓ Sandbox MySQL (port 3307) is online."
@@ -85,21 +85,21 @@ jobs:
         SANDBOX_ROOT_PW=$(cat "$SECRETS_DIR/mysql_sandbox_root.txt")
         SANDBOX_RESTORE_PW=$(cat "$SECRETS_DIR/mysql_sandbox_restore.txt")
 
-        # On Origin: create database and origin user
-        docker exec -i -e MYSQL_PWD="$ORIGIN_ROOT_PW" mysql-origin mysql -u root <<SQL
+        # On Origin (port 3306): create database and origin user
+        MYSQL_PWD="$ORIGIN_ROOT_PW" mysql -h 127.0.0.1 -P 3306 -u root <<SQL
           CREATE DATABASE ppos_control_staging CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
           CREATE USER 'ppos_staging_usr'@'%' IDENTIFIED WITH mysql_native_password BY '${ORIGIN_USR_PW}';
           GRANT ALL PRIVILEGES ON ppos_control_staging.* TO 'ppos_staging_usr'@'%';
           FLUSH PRIVILEGES;
-        SQL
+SQL
 
-        # On Sandbox: create database and dedicated restore user (initially empty sandbox)
-        docker exec -i -e MYSQL_PWD="$SANDBOX_ROOT_PW" mysql-sandbox mysql -u root <<SQL
+        # On Sandbox (port 3307): create database and dedicated restore user (initially empty sandbox)
+        MYSQL_PWD="$SANDBOX_ROOT_PW" mysql -h 127.0.0.1 -P 3307 -u root <<SQL
           CREATE DATABASE ppos_control_sandbox CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
           CREATE USER 'ppos_restore_usr'@'%' IDENTIFIED WITH mysql_native_password BY '${SANDBOX_RESTORE_PW}';
           GRANT ALL PRIVILEGES ON ppos_control_sandbox.* TO 'ppos_restore_usr'@'%';
           FLUSH PRIVILEGES;
-        SQL
+SQL
 
         echo "✓ STG-01: Independent instances, separate storage volumes, and non-overlapping users configured."
 
