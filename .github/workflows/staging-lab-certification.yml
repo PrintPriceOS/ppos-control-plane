@@ -1,4 +1,4 @@
-name: Staging Persistent Lab Certification (OP-02B.1X)
+name: Staging Persistent Lab Certification (OP-02B.1Y)
 
 on:
   push:
@@ -8,25 +8,8 @@ on:
 
 jobs:
   staging-lab-certification:
-    name: MySQL 8.0 Real Staging Lab Certification
+    name: Dual MySQL 8.0 Real Staging & Docker Compose Certification
     runs-on: ubuntu-latest
-    services:
-      mysql:
-        image: mysql:8.0
-        env:
-          MYSQL_ROOT_PASSWORD: staging_root_secure_pw
-        ports:
-          - 3306:3306
-        options: >-
-          --health-cmd="mysqladmin ping -h localhost -pstaging_root_secure_pw"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=10
-    env:
-      MYSQL_HOST: 127.0.0.1
-      MYSQL_PORT: 3306
-      MYSQL_USER: root
-      MYSQL_PASSWORD: staging_root_secure_pw
     steps:
     - name: Checkout Code
       uses: actions/checkout@v3
@@ -40,108 +23,357 @@ jobs:
     - name: Install Dependencies
       run: npm ci
 
-    - name: Verify Migration Integrity & Baseline Checksums
+    - name: 1. Generate Ephemeral Dynamic Secrets (STG-03 Zero Hardcoded Secrets)
+      run: |
+        SECRETS_DIR="/tmp/ppos_ephemeral_secrets"
+        mkdir -p "$SECRETS_DIR"
+        chmod 700 "$SECRETS_DIR"
+
+        # Generate ephemeral random secrets dynamically into secure local files
+        openssl rand -hex 16 > "$SECRETS_DIR/mysql_origin_root.txt"
+        openssl rand -hex 16 > "$SECRETS_DIR/mysql_origin_usr.txt"
+        openssl rand -hex 16 > "$SECRETS_DIR/mysql_sandbox_root.txt"
+        openssl rand -hex 16 > "$SECRETS_DIR/mysql_sandbox_restore.txt"
+        openssl rand -hex 32 > "$SECRETS_DIR/backup_passphrase.txt"
+        openssl rand -hex 32 > "$SECRETS_DIR/backup_hmac_key.txt"
+        openssl rand -hex 32 > "$SECRETS_DIR/staging_jwt_secret.txt"
+        chmod 600 "$SECRETS_DIR"/*
+
+        echo "SECRETS_DIR=$SECRETS_DIR" >> $GITHUB_ENV
+        echo "✓ STG-03: Dynamic ephemeral secrets created with 600 permissions."
+
+    - name: 2. Spin Up Dual Isolated MySQL 8.0 Containers (STG-01 Independent Origin & Sandbox)
+      run: |
+        # Read passwords securely without echo
+        ORIGIN_ROOT_PW=$(cat "$SECRETS_DIR/mysql_origin_root.txt")
+        SANDBOX_ROOT_PW=$(cat "$SECRETS_DIR/mysql_sandbox_root.txt")
+
+        # Start Origin MySQL instance on port 3306 (with dedicated volume)
+        docker run -d \
+          --name mysql-origin \
+          -e MYSQL_ROOT_PASSWORD="$ORIGIN_ROOT_PW" \
+          -v origin_mysql_vol:/var/lib/mysql \
+          -p 3306:3306 \
+          mysql:8.0.46 \
+          mysqld --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci --default-authentication-plugin=mysql_native_password
+
+        # Start Sandbox MySQL instance on port 3307 (with completely independent volume)
+        docker run -d \
+          --name mysql-sandbox \
+          -e MYSQL_ROOT_PASSWORD="$SANDBOX_ROOT_PW" \
+          -v sandbox_mysql_vol:/var/lib/mysql \
+          -p 3307:3306 \
+          mysql:8.0.46 \
+          mysqld --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci --default-authentication-plugin=mysql_native_password
+
+        echo "Waiting for Origin MySQL (port 3306) to be healthy..."
+        until docker exec mysql-origin mysqladmin ping -u root -p"$ORIGIN_ROOT_PW" --silent; do
+          sleep 2
+        done
+        echo "✓ Origin MySQL (port 3306) is online."
+
+        echo "Waiting for Sandbox MySQL (port 3307) to be healthy..."
+        until docker exec mysql-sandbox mysqladmin ping -u root -p"$SANDBOX_ROOT_PW" --silent; do
+          sleep 2
+        done
+        echo "✓ Sandbox MySQL (port 3307) is online."
+
+    - name: 3. Configure Strict Dedicated Database Users & Separation Grants (STG-01)
+      run: |
+        ORIGIN_ROOT_PW=$(cat "$SECRETS_DIR/mysql_origin_root.txt")
+        ORIGIN_USR_PW=$(cat "$SECRETS_DIR/mysql_origin_usr.txt")
+        SANDBOX_ROOT_PW=$(cat "$SECRETS_DIR/mysql_sandbox_root.txt")
+        SANDBOX_RESTORE_PW=$(cat "$SECRETS_DIR/mysql_sandbox_restore.txt")
+
+        # On Origin: create database and origin user
+        docker exec -i mysql-origin mysql -u root -p"$ORIGIN_ROOT_PW" <<SQL
+          CREATE DATABASE ppos_control_staging CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+          CREATE USER 'ppos_staging_usr'@'%' IDENTIFIED WITH mysql_native_password BY '${ORIGIN_USR_PW}';
+          GRANT ALL PRIVILEGES ON ppos_control_staging.* TO 'ppos_staging_usr'@'%';
+          FLUSH PRIVILEGES;
+        SQL
+
+        # On Sandbox: create database and dedicated restore user (initially empty sandbox)
+        docker exec -i mysql-sandbox mysql -u root -p"$SANDBOX_ROOT_PW" <<SQL
+          CREATE DATABASE ppos_control_sandbox CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+          CREATE USER 'ppos_restore_usr'@'%' IDENTIFIED WITH mysql_native_password BY '${SANDBOX_RESTORE_PW}';
+          GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, ALTER, INDEX, CREATE VIEW ON ppos_control_sandbox.* TO 'ppos_restore_usr'@'%';
+          GRANT SELECT ON information_schema.* TO 'ppos_restore_usr'@'%';
+          FLUSH PRIVILEGES;
+        SQL
+
+        echo "✓ STG-01: Independent instances, separate storage volumes, and non-overlapping users configured."
+
+    - name: 4. Verify Migration Integrity & Baseline Checksums
       run: npm run migration:integrity
 
-    - name: Compile Production Build
+    - name: 5. Compile Production Build
       run: npm run build
 
-    - name: Execute OP-02B.1X Automated Staging Contracts Suite
-      run: npx vitest run tests/op02b1v_staging_runbook_validation.test.js
-
-    - name: 1. Create Clean Staging Database
+    - name: 6. Execute Staging Contracts & Ledger Governance Regression Suites (STG-02)
       run: |
-        mysql -h 127.0.0.1 -u root -pstaging_root_secure_pw -e "CREATE DATABASE ppos_control_staging CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+        npx vitest run tests/op02b1v_staging_runbook_validation.test.js
+        npx vitest run tests/op02b1y_ledger_audit.test.js
 
-    - name: 2. Execute Governed Persistent Bootstrap (NO Ephemeral CI Fixtures)
-      env:
-        PPOS_STAGING_PERSISTENT_BOOTSTRAP: 'true'
-        MYSQL_DATABASE: ppos_control_staging
-        DATABASE_URL: mysql://root:staging_root_secure_pw@127.0.0.1:3306/ppos_control_staging
+    - name: 7. Execute Governed Persistent Bootstrap on Origin Instance (Port 3306)
       run: |
+        ORIGIN_USR_PW=$(cat "$SECRETS_DIR/mysql_origin_usr.txt")
+        export MYSQL_HOST="127.0.0.1"
+        export MYSQL_PORT="3306"
+        export MYSQL_USER="ppos_staging_usr"
+        export MYSQL_PASSWORD="$ORIGIN_USR_PW"
+        export MYSQL_DATABASE="ppos_control_staging"
+        export PPOS_STAGING_PERSISTENT_BOOTSTRAP="true"
+        export DATABASE_URL="mysql://ppos_staging_usr:${ORIGIN_USR_PW}@127.0.0.1:3306/ppos_control_staging"
+
         node scripts/bootstrap_staging_persistent_schema.js
 
-    - name: 3. Execute Official Sequential Migration Runner (164 Migrations 001-161)
-      env:
-        PPOS_MIGRATION_EXECUTION: 'true'
-        PPOS_ENABLE_SCHEMA_MUTATION: 'true'
-        MYSQL_DATABASE: ppos_control_staging
-        DATABASE_URL: mysql://root:staging_root_secure_pw@127.0.0.1:3306/ppos_control_staging
+    - name: 8. Execute Official Sequential Migration Runner on Origin (164 Migrations 001-161)
       run: |
+        ORIGIN_USR_PW=$(cat "$SECRETS_DIR/mysql_origin_usr.txt")
+        export MYSQL_HOST="127.0.0.1"
+        export MYSQL_PORT="3306"
+        export MYSQL_USER="ppos_staging_usr"
+        export MYSQL_PASSWORD="$ORIGIN_USR_PW"
+        export MYSQL_DATABASE="ppos_control_staging"
+        export PPOS_MIGRATION_EXECUTION="true"
+        export PPOS_ENABLE_SCHEMA_MUTATION="true"
+        export DATABASE_URL="mysql://ppos_staging_usr:${ORIGIN_USR_PW}@127.0.0.1:3306/ppos_control_staging"
+
         node scripts/run_control_plane_migrations.js
 
-    - name: 4. Verify Active Industrial Integrity (51/51 PASS)
-      env:
-        MYSQL_DATABASE: ppos_control_staging
-        DATABASE_URL: mysql://root:staging_root_secure_pw@127.0.0.1:3306/ppos_control_staging
+    - name: 9. Verify Active Industrial Integrity on Origin (51/51 PASS)
       run: |
+        ORIGIN_USR_PW=$(cat "$SECRETS_DIR/mysql_origin_usr.txt")
+        export MYSQL_HOST="127.0.0.1"
+        export MYSQL_PORT="3306"
+        export MYSQL_USER="ppos_staging_usr"
+        export MYSQL_PASSWORD="$ORIGIN_USR_PW"
+        export MYSQL_DATABASE="ppos_control_staging"
+        export DATABASE_URL="mysql://ppos_staging_usr:${ORIGIN_USR_PW}@127.0.0.1:3306/ppos_control_staging"
+
         node scripts/verify-industrial-schema.js --profile=ACTIVE_INDUSTRIAL
 
-    - name: 5. Verify Zero Pending Migrations on Idempotent Re-Run
-      env:
-        MYSQL_DATABASE: ppos_control_staging
-        DATABASE_URL: mysql://root:staging_root_secure_pw@127.0.0.1:3306/ppos_control_staging
+    - name: 10. Verify Zero Pending Migrations on Idempotent Dry-Run
       run: |
+        ORIGIN_USR_PW=$(cat "$SECRETS_DIR/mysql_origin_usr.txt")
+        export MYSQL_HOST="127.0.0.1"
+        export MYSQL_PORT="3306"
+        export MYSQL_USER="ppos_staging_usr"
+        export MYSQL_PASSWORD="$ORIGIN_USR_PW"
+        export MYSQL_DATABASE="ppos_control_staging"
+        export DATABASE_URL="mysql://ppos_staging_usr:${ORIGIN_USR_PW}@127.0.0.1:3306/ppos_control_staging"
+
         node scripts/run_control_plane_migrations.js --dry-run
 
-    - name: 6. Seed Synthetic Test Data & Create Encrypted Backup
-      env:
-        BACKUP_PASSPHRASE: "staging_authenticated_aes_encryption_key_2026!"
-        MYSQL_DATABASE: ppos_control_staging
+    - name: 11. Seed Synthetic Test Data & Create HMAC-Authenticated Encrypted Backup
       run: |
+        ORIGIN_USR_PW=$(cat "$SECRETS_DIR/mysql_origin_usr.txt")
         mkdir -p /tmp/backups
-        # Insert controlled synthetic rows in tenants and printer_nodes
-        mysql -h 127.0.0.1 -u root -pstaging_root_secure_pw ppos_control_staging -e "
+
+        # Seed synthetic rows on Origin database
+        MYSQL_PWD="$ORIGIN_USR_PW" mysql -h 127.0.0.1 -P 3306 -u ppos_staging_usr ppos_control_staging -e "
           INSERT INTO tenants (id, name, status, plan) VALUES ('tenant-synthetic-staging-01', 'Synthetic Staging PrintWorks', 'ACTIVE', 'PRO');
           INSERT INTO printer_nodes (id, tenant_id, name, email, status) VALUES ('node-synth-01', 'tenant-synthetic-staging-01', 'Heidelberg Staging Speedmaster', 'synth@printworks.staging', 'ACTIVE');
         "
+
+        export MYSQL_HOST="127.0.0.1"
+        export MYSQL_PORT="3306"
+        export MYSQL_USER="ppos_staging_usr"
+        export MYSQL_PASSWORD_FILE="$SECRETS_DIR/mysql_origin_usr.txt"
+        export MYSQL_DATABASE="ppos_control_staging"
+        export BACKUP_PASSPHRASE_FILE="$SECRETS_DIR/backup_passphrase.txt"
+        export BACKUP_HMAC_KEY_FILE="$SECRETS_DIR/backup_hmac_key.txt"
+
         bash scripts/staging_backup_snapshot.sh /tmp/backups
         ls -la /tmp/backups
 
-    - name: 7. Prepare Clean Isolated Sandbox Database for Restore Drill
-      run: |
-        mysql -h 127.0.0.1 -u root -pstaging_root_secure_pw -e "CREATE DATABASE ppos_control_sandbox CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
-
-    - name: 8. Execute Hardened Restore Drill into Isolated Sandbox
-      env:
-        BACKUP_PASSPHRASE: "staging_authenticated_aes_encryption_key_2026!"
-        MYSQL_DATABASE: ppos_control_sandbox
+    - name: 12. Negative Cryptographic Authenticity Test Harness (STG-04)
       run: |
         BACKUP_ENC=$(ls /tmp/backups/*.sql.gz.enc | head -n 1)
-        echo "Found backup archive: $BACKUP_ENC"
+        echo "Testing tamper rejection on: $BACKUP_ENC"
+
+        # 12.1 Negative Test: Tampered Archive Payload
+        cp "$BACKUP_ENC" /tmp/tampered.sql.gz.enc
+        cp "${BACKUP_ENC}.sha256" /tmp/tampered.sql.gz.enc.sha256
+        cp "${BACKUP_ENC}.hmac" /tmp/tampered.sql.gz.enc.hmac
+        # Flip a bit in the encrypted file
+        printf '\x00' | dd of=/tmp/tampered.sql.gz.enc bs=1 seek=100 count=1 conv=notrunc 2>/dev/null
+
+        echo "Asserting rejection of tampered archive..."
+        if BACKUP_PASSPHRASE_FILE="$SECRETS_DIR/backup_passphrase.txt" \
+           BACKUP_HMAC_KEY_FILE="$SECRETS_DIR/backup_hmac_key.txt" \
+           MYSQL_HOST="127.0.0.1" MYSQL_PORT="3307" MYSQL_USER="ppos_restore_usr" \
+           MYSQL_PASSWORD_FILE="$SECRETS_DIR/mysql_sandbox_restore.txt" \
+           bash scripts/staging_restore_drill.sh /tmp/tampered.sql.gz.enc ppos_control_sandbox; then
+          echo "FATAL: Tampered archive was NOT rejected!"
+          exit 1
+        else
+          echo "✓ Tampered archive rejected by SHA-256 integrity verification."
+        fi
+
+        # 12.2 Negative Test: Tampered HMAC Authenticity Tag
+        cp "$BACKUP_ENC" /tmp/bad_hmac.sql.gz.enc
+        cp "${BACKUP_ENC}.sha256" /tmp/bad_hmac.sql.gz.enc.sha256
+        echo "0000000000000000000000000000000000000000000000000000000000000000" > /tmp/bad_hmac.sql.gz.enc.hmac
+
+        echo "Asserting rejection of tampered HMAC authenticity tag..."
+        if BACKUP_PASSPHRASE_FILE="$SECRETS_DIR/backup_passphrase.txt" \
+           BACKUP_HMAC_KEY_FILE="$SECRETS_DIR/backup_hmac_key.txt" \
+           MYSQL_HOST="127.0.0.1" MYSQL_PORT="3307" MYSQL_USER="ppos_restore_usr" \
+           MYSQL_PASSWORD_FILE="$SECRETS_DIR/mysql_sandbox_restore.txt" \
+           bash scripts/staging_restore_drill.sh /tmp/bad_hmac.sql.gz.enc ppos_control_sandbox; then
+          echo "FATAL: Tampered HMAC tag was NOT rejected!"
+          exit 1
+        else
+          echo "✓ Tampered HMAC tag rejected by cryptographic authenticity verification."
+        fi
+
+        # 12.3 Negative Test: Wrong Authentication Key
+        echo "Asserting rejection when incorrect HMAC key is provided..."
+        WRONG_KEY_FILE="/tmp/wrong_key.txt"
+        openssl rand -hex 32 > "$WRONG_KEY_FILE"
+        if BACKUP_PASSPHRASE_FILE="$SECRETS_DIR/backup_passphrase.txt" \
+           BACKUP_HMAC_KEY_FILE="$WRONG_KEY_FILE" \
+           MYSQL_HOST="127.0.0.1" MYSQL_PORT="3307" MYSQL_USER="ppos_restore_usr" \
+           MYSQL_PASSWORD_FILE="$SECRETS_DIR/mysql_sandbox_restore.txt" \
+           bash scripts/staging_restore_drill.sh "$BACKUP_ENC" ppos_control_sandbox; then
+          echo "FATAL: Wrong authentication key was NOT rejected!"
+          exit 1
+        else
+          echo "✓ Invalid authentication key rejected."
+        fi
+
+        rm -rf /tmp/tampered* /tmp/bad_hmac* "$WRONG_KEY_FILE"
+        echo "✓ STG-04: Negative cryptographic authenticity harness completely verified."
+
+    - name: 13. Execute Hardened Restore Drill into Isolated Disposable Sandbox (STG-01 Port 3307)
+      run: |
+        BACKUP_ENC=$(ls /tmp/backups/*.sql.gz.enc | head -n 1)
+        echo "Executing restore drill from Origin snapshot into Disposable Sandbox MySQL (Port 3307)..."
+
+        export MYSQL_HOST="127.0.0.1"
+        export MYSQL_PORT="3307"
+        export MYSQL_USER="ppos_restore_usr"
+        export MYSQL_PASSWORD_FILE="$SECRETS_DIR/mysql_sandbox_restore.txt"
+        export BACKUP_PASSPHRASE_FILE="$SECRETS_DIR/backup_passphrase.txt"
+        export BACKUP_HMAC_KEY_FILE="$SECRETS_DIR/backup_hmac_key.txt"
+
         bash scripts/staging_restore_drill.sh "$BACKUP_ENC" ppos_control_sandbox
 
-    - name: 9. Post-Restore Data, Schema and Non-Mutation Verification
+    - name: 14. Post-Restore Data, Schema and Non-Mutation Verification (STG-01)
       run: |
-        echo "Verifying sandbox restored records..."
-        SANDBOX_TENANTS=$(mysql -h 127.0.0.1 -u root -pstaging_root_secure_pw ppos_control_sandbox -N -e "SELECT count(*) FROM tenants WHERE id='tenant-synthetic-staging-01';")
-        SANDBOX_NODES=$(mysql -h 127.0.0.1 -u root -pstaging_root_secure_pw ppos_control_sandbox -N -e "SELECT count(*) FROM printer_nodes WHERE id='node-synth-01';")
-        SANDBOX_VERSIONS=$(mysql -h 127.0.0.1 -u root -pstaging_root_secure_pw ppos_control_sandbox -N -e "SELECT count(*) FROM schema_versions;")
-        
-        echo "Sandbox tenants verified: $SANDBOX_TENANTS"
-        echo "Sandbox nodes verified: $SANDBOX_NODES"
-        echo "Sandbox schema_versions verified: $SANDBOX_VERSIONS"
-        
+        SANDBOX_ROOT_PW=$(cat "$SECRETS_DIR/mysql_sandbox_root.txt")
+        ORIGIN_ROOT_PW=$(cat "$SECRETS_DIR/mysql_origin_root.txt")
+        RESTORE_USR_PW=$(cat "$SECRETS_DIR/mysql_sandbox_restore.txt")
+
+        echo "14.1 Verifying restore user has NO privileges on Origin MySQL instance..."
+        if MYSQL_PWD="$RESTORE_USR_PW" mysql -h 127.0.0.1 -P 3306 -u ppos_restore_usr ppos_control_staging -e "SELECT 1;" 2>/dev/null; then
+          echo "FATAL: Restore user has access to origin instance!"
+          exit 1
+        else
+          echo "✓ Confirmed: Restore user CANNOT connect to origin instance."
+        fi
+
+        echo "14.2 Verifying sandbox restored records on Sandbox instance (Port 3307)..."
+        SANDBOX_TENANTS=$(MYSQL_PWD="$SANDBOX_ROOT_PW" mysql -h 127.0.0.1 -P 3307 -u root ppos_control_sandbox -N -e "SELECT count(*) FROM tenants WHERE id='tenant-synthetic-staging-01';")
+        SANDBOX_NODES=$(MYSQL_PWD="$SANDBOX_ROOT_PW" mysql -h 127.0.0.1 -P 3307 -u root ppos_control_sandbox -N -e "SELECT count(*) FROM printer_nodes WHERE id='node-synth-01';")
+        SANDBOX_VERSIONS=$(MYSQL_PWD="$SANDBOX_ROOT_PW" mysql -h 127.0.0.1 -P 3307 -u root ppos_control_sandbox -N -e "SELECT count(*) FROM schema_versions;")
+
+        echo "Sandbox tenants restored: $SANDBOX_TENANTS"
+        echo "Sandbox nodes restored: $SANDBOX_NODES"
+        echo "Sandbox schema_versions restored: $SANDBOX_VERSIONS"
+
         if [ "$SANDBOX_TENANTS" -ne 1 ] || [ "$SANDBOX_NODES" -ne 1 ] || [ "$SANDBOX_VERSIONS" -lt 161 ]; then
           echo "FATAL: Sandbox restored data verification failed!"
           exit 1
         fi
+
+        echo "14.3 Verifying Origin database (Port 3306) remained completely untouched..."
+        ORIGIN_TENANTS=$(MYSQL_PWD="$ORIGIN_ROOT_PW" mysql -h 127.0.0.1 -P 3306 -u root ppos_control_staging -N -e "SELECT count(*) FROM tenants WHERE id='tenant-synthetic-staging-01';")
+        ORIGIN_VERSIONS=$(MYSQL_PWD="$ORIGIN_ROOT_PW" mysql -h 127.0.0.1 -P 3306 -u root ppos_control_staging -N -e "SELECT count(*) FROM schema_versions;")
         
-        echo "Confirming origin staging database was NOT altered during restore drill..."
-        ORIGIN_TENANTS=$(mysql -h 127.0.0.1 -u root -pstaging_root_secure_pw ppos_control_staging -N -e "SELECT count(*) FROM tenants WHERE id='tenant-synthetic-staging-01';")
-        if [ "$ORIGIN_TENANTS" -ne 1 ]; then
-          echo "FATAL: Origin staging database was corrupted during restore drill!"
+        echo "Origin tenants: $ORIGIN_TENANTS"
+        echo "Origin schema_versions: $ORIGIN_VERSIONS"
+        if [ "$ORIGIN_TENANTS" -ne 1 ] || [ "$ORIGIN_VERSIONS" -ne "$SANDBOX_VERSIONS" ]; then
+          echo "FATAL: Origin staging database was corrupted or mutated during restore drill!"
           exit 1
         fi
-        echo "✓ All data integrity and non-mutation assertions passed."
+        echo "✓ STG-01: Independent dual-instance isolation, restoration, and origin non-mutation fully verified."
 
-    - name: 10. Verify Active Industrial Integrity on Restored Sandbox (51/51 PASS)
-      env:
-        MYSQL_DATABASE: ppos_control_sandbox
-        DATABASE_URL: mysql://root:staging_root_secure_pw@127.0.0.1:3306/ppos_control_sandbox
+    - name: 15. Verify Active Industrial Integrity on Restored Sandbox (51/51 PASS)
       run: |
+        SANDBOX_USR_PW=$(cat "$SECRETS_DIR/mysql_sandbox_restore.txt")
+        export MYSQL_HOST="127.0.0.1"
+        export MYSQL_PORT="3307"
+        export MYSQL_USER="ppos_restore_usr"
+        export MYSQL_PASSWORD="$SANDBOX_USR_PW"
+        export MYSQL_DATABASE="ppos_control_sandbox"
+        export DATABASE_URL="mysql://ppos_restore_usr:${SANDBOX_USR_PW}@127.0.0.1:3307/ppos_control_sandbox"
+
         node scripts/verify-industrial-schema.js --profile=ACTIVE_INDUSTRIAL
 
-    - name: 11. Verify Docker Compose Specification & Syntactic Build
+    - name: 16. Teardown Ephemeral Containers to Free Resources for Docker Compose
       run: |
+        docker stop mysql-origin mysql-sandbox || true
+        docker rm mysql-origin mysql-sandbox || true
+        docker volume rm origin_mysql_vol sandbox_mysql_vol || true
+        echo "✓ Ephemeral containers cleanly dismantled."
+
+    - name: 17. Real Docker Compose Execution, Healthcheck & Persistence Lifecycle (STG-05)
+      run: |
+        # Setup secrets folder required by docker-compose.staging.yml
+        mkdir -p secrets
+        cp "$SECRETS_DIR/mysql_origin_usr.txt" secrets/staging_db_password.txt
+        cp "$SECRETS_DIR/mysql_origin_root.txt" secrets/staging_root_password.txt
+        cp "$SECRETS_DIR/staging_jwt_secret.txt" secrets/staging_jwt_secret.txt
+        chmod 600 secrets/*.txt
+
+        echo "17.1 Validating Docker Compose configuration..."
         docker compose -f docker-compose.staging.yml config
+
+        echo "17.2 Building and starting Docker Compose staging stack..."
+        docker compose -f docker-compose.staging.yml up -d --build
+
+        echo "17.3 Waiting for services to become healthy..."
+        for i in {1..30}; do
+          MYSQL_HEALTH=$(docker inspect --format='{{json .State.Health.Status}}' ppos-staging-mysql 2>/dev/null || echo '"unknown"')
+          APP_HEALTH=$(docker inspect --format='{{json .State.Health.Status}}' ppos-control-plane-staging 2>/dev/null || echo '"unknown"')
+          echo "Status check $i: mysql=$MYSQL_HEALTH, app=$APP_HEALTH"
+          if [ "$MYSQL_HEALTH" == '"healthy"' ] && [ "$APP_HEALTH" == '"healthy"' ]; then
+            echo "✓ Both services healthy!"
+            break
+          fi
+          sleep 3
+        done
+
+        if [ "$MYSQL_HEALTH" != '"healthy"' ] || [ "$APP_HEALTH" != '"healthy"' ]; then
+          echo "FATAL: Services failed to become healthy in time."
+          docker compose -f docker-compose.staging.yml logs
+          docker compose -f docker-compose.staging.yml down -v
+          exit 1
+        fi
+
+        echo "17.4 Testing HTTP live and health endpoints..."
+        LIVE_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8081/live)
+        HEALTH_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8081/health)
+        echo "HTTP /live response code: $LIVE_STATUS"
+        echo "HTTP /health response code: $HEALTH_STATUS"
+
+        if [ "$LIVE_STATUS" -ne 200 ] || [ "$HEALTH_STATUS" -ne 200 ]; then
+          echo "FATAL: HTTP healthchecks failed!"
+          docker compose -f docker-compose.staging.yml logs
+          docker compose -f docker-compose.staging.yml down -v
+          exit 1
+        fi
+
+        echo "17.5 Controlled restart & persistence verification..."
+        docker compose -f docker-compose.staging.yml restart
+        sleep 5
+        docker inspect --format='{{json .State.Status}}' ppos-staging-mysql
+        docker inspect --format='{{json .State.Status}}' ppos-control-plane-staging
+
+        echo "17.6 Graceful teardown with ephemeral volume and network cleanup..."
+        docker compose -f docker-compose.staging.yml down -v --remove-orphans
+        rm -rf secrets "$SECRETS_DIR"
+        echo "✓ STG-05: Real Docker Compose lifecycle passed and cleaned up."

@@ -18,10 +18,29 @@ DEST_BASE="${BACKUP_DIR}/${DB_NAME}_${TIMESTAMP}_${BACKUP_UUID}"
 FINAL_ENC_ARCHIVE="${DEST_BASE}.sql.gz.enc"
 SHA_FILE="${FINAL_ENC_ARCHIVE}.sha256"
 
-# 1. Verification of Encryption Key
+HMAC_FILE="${FINAL_ENC_ARCHIVE}.hmac"
+
+# 1. Verification of Encryption Key & Dedicated Authentication Key
 if [ -z "${BACKUP_PASSPHRASE:-}" ] && [ -z "${BACKUP_PASSPHRASE_FILE:-}" ]; then
   echo "[FATAL] Neither BACKUP_PASSPHRASE nor BACKUP_PASSPHRASE_FILE is configured." >&2
   exit 1
+fi
+
+ENC_PASS=""
+if [ -n "${BACKUP_PASSPHRASE_FILE:-}" ] && [ -f "$BACKUP_PASSPHRASE_FILE" ]; then
+  ENC_PASS=$(cat "$BACKUP_PASSPHRASE_FILE" | tr -d '\r\n')
+else
+  ENC_PASS="${BACKUP_PASSPHRASE:-}"
+fi
+
+# Dedicated authentication key (managed separately or derived via HKDF/PBKDF2/SHA256)
+AUTH_KEY="${BACKUP_HMAC_KEY:-}"
+if [ -z "$AUTH_KEY" ] && [ -n "${BACKUP_HMAC_KEY_FILE:-}" ] && [ -f "$BACKUP_HMAC_KEY_FILE" ]; then
+  AUTH_KEY=$(cat "$BACKUP_HMAC_KEY_FILE" | tr -d '\r\n')
+fi
+if [ -z "$AUTH_KEY" ]; then
+  # Deterministically derive separate authentication key from salt and passphrase if not provided independently
+  AUTH_KEY=$(printf "%s:auth-tag:ppos-backup-v2" "$ENC_PASS" | openssl dgst -sha256 | awk '{print $NF}')
 fi
 
 mkdir -p "$BACKUP_DIR"
@@ -42,19 +61,11 @@ cleanup() {
   rm -rf "$TMP_DIR"
   if [ $exit_code -ne 0 ]; then
     echo "[BACKUP FAILED] Cleaned up temporary files. Exit code: $exit_code" >&2
-    rm -f "$FINAL_ENC_ARCHIVE" "$SHA_FILE"
+    rm -f "$FINAL_ENC_ARCHIVE" "$SHA_FILE" "$HMAC_FILE"
   fi
   exit $exit_code
 }
 trap cleanup EXIT INT TERM
-
-PASS_ARG=()
-if [ -n "${BACKUP_PASSPHRASE_FILE:-}" ] && [ -f "$BACKUP_PASSPHRASE_FILE" ]; then
-  PASS_ARG=(-pass "file:${BACKUP_PASSPHRASE_FILE}")
-else
-  # Using env variable reference without leaking passphrase on command line args
-  PASS_ARG=(-pass "env:BACKUP_PASSPHRASE")
-fi
 
 echo "[1/4] Dumping database '${DB_NAME}' via single-transaction stream..."
 # Using pipefail to ensure any failure in mysqldump or gzip aborts the process
@@ -75,19 +86,27 @@ gzip -9 -c "$RAW_PIPE" > "${TMP_DIR}/dump.sql.gz"
 rm -f "$RAW_PIPE"
 
 echo "[3/4] Encrypting archive with OpenSSL AES-256-CBC (PBKDF2, 100,000 iterations)..."
-openssl enc -aes-256-cbc -salt -pbkdf2 -iter 100000 \
+# Passphrase provided securely via stdin/env to openssl
+printf "%s" "$ENC_PASS" | openssl enc -aes-256-cbc -salt -pbkdf2 -iter 100000 \
   -in "${TMP_DIR}/dump.sql.gz" \
   -out "${TMP_DIR}/final.enc" \
-  "${PASS_ARG[@]}"
+  -pass stdin
 
 rm -f "${TMP_DIR}/dump.sql.gz"
 
-echo "[4/4] Finalizing immutable snapshot and cryptographic SHA-256..."
+echo "[4/4] Computing HMAC-SHA256 authenticity tag and SHA-256 integrity digest..."
 mv "${TMP_DIR}/final.enc" "$FINAL_ENC_ARCHIVE"
 chmod 600 "$FINAL_ENC_ARCHIVE"
 
+# 1. SHA-256 integrity manifest
 sha256sum "$FINAL_ENC_ARCHIVE" > "$SHA_FILE"
 chmod 600 "$SHA_FILE"
 
-echo "✓ Snapshot created: ${FINAL_ENC_ARCHIVE}"
-echo "✓ Checksum: $(cat "$SHA_FILE")"
+# 2. Cryptographic Authenticity: HMAC-SHA256 with dedicated authentication key
+HMAC_TAG=$(openssl dgst -sha256 -hmac "$AUTH_KEY" "$FINAL_ENC_ARCHIVE" | awk '{print $NF}')
+echo "$HMAC_TAG" > "$HMAC_FILE"
+chmod 600 "$HMAC_FILE"
+
+echo "✓ Authenticated Encrypted Snapshot created: ${FINAL_ENC_ARCHIVE}"
+echo "✓ Integrity Digest: $(cat "$SHA_FILE")"
+echo "✓ Authenticity HMAC Tag: ${HMAC_TAG}"

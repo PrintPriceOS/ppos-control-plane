@@ -43,22 +43,51 @@ if [ -z "${BACKUP_PASSPHRASE:-}" ] && [ -z "${BACKUP_PASSPHRASE_FILE:-}" ]; then
   exit 1
 fi
 
-PASS_ARG=()
+ENC_PASS=""
 if [ -n "${BACKUP_PASSPHRASE_FILE:-}" ] && [ -f "$BACKUP_PASSPHRASE_FILE" ]; then
-  PASS_ARG=(-pass "file:${BACKUP_PASSPHRASE_FILE}")
+  ENC_PASS=$(cat "$BACKUP_PASSPHRASE_FILE" | tr -d '\r\n')
 else
-  PASS_ARG=(-pass "env:BACKUP_PASSPHRASE")
+  ENC_PASS="${BACKUP_PASSPHRASE:-}"
 fi
 
-# 3. Mandatory SHA-256 Checksum Verification Before Decryption
+# Dedicated authentication key (managed separately or derived via HKDF/PBKDF2/SHA256)
+AUTH_KEY="${BACKUP_HMAC_KEY:-}"
+if [ -z "$AUTH_KEY" ] && [ -n "${BACKUP_HMAC_KEY_FILE:-}" ] && [ -f "$BACKUP_HMAC_KEY_FILE" ]; then
+  AUTH_KEY=$(cat "$BACKUP_HMAC_KEY_FILE" | tr -d '\r\n')
+fi
+if [ -z "$AUTH_KEY" ]; then
+  AUTH_KEY=$(printf "%s:auth-tag:ppos-backup-v2" "$ENC_PASS" | openssl dgst -sha256 | awk '{print $NF}')
+fi
+
+# 3. Mandatory SHA-256 Checksum & HMAC Authenticity Verification Before Decryption
 SHA_FILE="${ENCRYPTED_FILE}.sha256"
 if [ ! -f "$SHA_FILE" ]; then
   echo "[FATAL] SHA-256 checksum file (${SHA_FILE}) is missing. Restore drill aborted to prevent tampering or corrupted recovery." >&2
   exit 1
 fi
 
-echo "[1/5] Verifying SHA-256 cryptographic integrity before decryption..."
-sha256sum -c "$SHA_FILE"
+HMAC_FILE="${ENCRYPTED_FILE}.hmac"
+if [ ! -f "$HMAC_FILE" ]; then
+  echo "[FATAL] HMAC authenticity file (${HMAC_FILE}) is missing. Restore drill aborted: unauthenticated backup rejected." >&2
+  exit 1
+fi
+
+echo "[1/5] Verifying cryptographic integrity and HMAC authenticity before decryption..."
+# 3.1 Verify integrity digest
+if ! sha256sum -c "$SHA_FILE"; then
+  echo "[FATAL] SHA-256 integrity checksum verification failed. Snapshot is corrupted or modified." >&2
+  exit 1
+fi
+
+# 3.2 Verify HMAC authenticity tag
+EXPECTED_HMAC=$(cat "$HMAC_FILE" | tr -d '[:space:]')
+CALCULATED_HMAC=$(openssl dgst -sha256 -hmac "$AUTH_KEY" "$ENCRYPTED_FILE" | awk '{print $NF}')
+
+if [ "$EXPECTED_HMAC" != "$CALCULATED_HMAC" ]; then
+  echo "[FATAL] HMAC-SHA256 authenticity verification failed. Snapshot authenticity compromised or incorrect auth key." >&2
+  exit 1
+fi
+echo "✓ Cryptographic authenticity and integrity verified successfully."
 
 # 4. Isolated Temporary Workspace with Guaranteed Cleanup
 WORK_DIR=$(mktemp -d)
@@ -78,10 +107,13 @@ DECRYPTED_GZ="${WORK_DIR}/restore.sql.gz"
 DECRYPTED_SQL="${WORK_DIR}/restore.sql"
 
 echo "[2/5] Decrypting AES-256-CBC authenticated archive..."
-openssl enc -d -aes-256-cbc -pbkdf2 -iter 100000 \
+if ! printf "%s" "$ENC_PASS" | openssl enc -d -aes-256-cbc -pbkdf2 -iter 100000 \
   -in "$ENCRYPTED_FILE" \
   -out "$DECRYPTED_GZ" \
-  "${PASS_ARG[@]}"
+  -pass stdin 2>/dev/null; then
+  echo "[FATAL] Archive decryption failed. Corrupted payload or invalid passphrase." >&2
+  exit 1
+fi
 
 echo "[3/5] Decompressing snapshot and verifying SQL integrity..."
 gunzip -c "$DECRYPTED_GZ" > "$DECRYPTED_SQL"
@@ -129,6 +161,13 @@ if [ -n "${DATABASE_URL:-}" ]; then
 fi
 
 # Confirm server identity and target schema existence before writing
+SERVER_IDENTITY=$(MYSQL_PWD="${DB_PASS}" mysql --host="${DB_HOST}" --port="${DB_PORT}" --user="${DB_USER}" -N -e "SELECT CONCAT('HOST=', @@hostname, ';UUID=', @@server_uuid, ';VER=', @@version);" 2>/dev/null || true)
+if [ -z "$SERVER_IDENTITY" ]; then
+  echo "[FATAL] Failed to verify destination MySQL server identity at '${DB_HOST}:${DB_PORT}'. Connection failed or user '${DB_USER}' rejected." >&2
+  exit 1
+fi
+echo "✓ Destination Server Identity Confirmed: ${SERVER_IDENTITY} at ${DB_HOST}:${DB_PORT}"
+
 CONFIRM_SCHEMA=$(MYSQL_PWD="${DB_PASS}" mysql --host="${DB_HOST}" --port="${DB_PORT}" --user="${DB_USER}" -N -e "SELECT SCHEMA_NAME FROM information_schema.SCHEMATA WHERE SCHEMA_NAME='${TARGET_DB}';" 2>/dev/null || true)
 if [ -z "$CONFIRM_SCHEMA" ]; then
   echo "[FATAL] Target database '${TARGET_DB}' does not exist on target MySQL host '${DB_HOST}:${DB_PORT}' or user '${DB_USER}' lacks SELECT grants. Aborting." >&2

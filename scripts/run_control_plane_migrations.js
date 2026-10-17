@@ -202,19 +202,21 @@ async function run() {
           const match = baselineMap.get(fileKey);
           const canonicalPath = match.path || match.relativePath;
           const canonicalChecksum = match.canonicalSha256 || match.sha256;
+          // Preserve existing non-empty checksum to respect forensic integrity, fallback to canonical
+          const effectiveChecksum = row.checksum && row.checksum.trim() !== '' ? row.checksum : canonicalChecksum;
 
           await dbConn.query(`
             UPDATE schema_versions
             SET
               record_type = 'MIGRATION',
               migration_path = ?,
-              checksum = ?,
+              checksum = COALESCE(NULLIF(checksum, ''), ?),
               state = COALESCE(NULLIF(state, ''), 'APPLIED'),
               execution_id = COALESCE(execution_id, '00000000-0000-0000-0000-000000000000'),
               started_at = COALESCE(started_at, applied_at, NOW(3)),
               applied_at = CASE WHEN state = 'APPLIED' OR state IS NULL OR state = '' THEN COALESCE(applied_at, NOW(3)) ELSE applied_at END
             WHERE version = ? OR description = ?
-          `, [canonicalPath, canonicalChecksum, row.version, row.description]);
+          `, [canonicalPath, effectiveChecksum, row.version, row.description]);
           backfilledCount++;
           continue;
         }

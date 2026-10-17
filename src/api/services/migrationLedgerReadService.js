@@ -13,20 +13,22 @@ class MigrationLedgerReadService {
   async evaluateLedgerStatus(baseline, staleTimeoutMinutes = 30) {
     try {
       // 1. Verify table exists. If not, ledger is empty/not ready
-      const [tableCheck] = await db.query(`
+      const tableCheckRows = await db.query(`
         SELECT TABLE_NAME FROM information_schema.TABLES
         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'schema_versions'
       `);
+      const tableCheck = Array.isArray(tableCheckRows) ? tableCheckRows[0] : tableCheckRows;
       if (!tableCheck) {
         return { status: 'MIGRATION_LEDGER_INCOMPATIBLE', reason: 'Table schema_versions does not exist' };
       }
 
       // 2. Fetch all ledger entries
       // Handle fallback schema structure if Phase 185 upgrade has not run yet.
-      const columns = await db.query(`
+      const columnsRows = await db.query(`
         SELECT COLUMN_NAME FROM information_schema.COLUMNS
         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'schema_versions'
       `);
+      const columns = Array.isArray(columnsRows) ? columnsRows : [];
       const hasGovColumns = columns.some(c => c.COLUMN_NAME === 'state');
 
       if (!hasGovColumns) {
