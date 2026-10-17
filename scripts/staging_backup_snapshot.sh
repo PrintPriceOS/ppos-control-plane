@@ -33,14 +33,14 @@ else
   ENC_PASS="${BACKUP_PASSPHRASE:-}"
 fi
 
-# Dedicated authentication key (managed separately or derived via HKDF/PBKDF2/SHA256)
+# Dedicated independent HMAC authentication key (must be provided separately; silent derivation fallback strictly prohibited)
 AUTH_KEY="${BACKUP_HMAC_KEY:-}"
 if [ -z "$AUTH_KEY" ] && [ -n "${BACKUP_HMAC_KEY_FILE:-}" ] && [ -f "$BACKUP_HMAC_KEY_FILE" ]; then
   AUTH_KEY=$(cat "$BACKUP_HMAC_KEY_FILE" | tr -d '\r\n')
 fi
 if [ -z "$AUTH_KEY" ]; then
-  # Deterministically derive separate authentication key from salt and passphrase if not provided independently
-  AUTH_KEY=$(printf "%s:auth-tag:ppos-backup-v2" "$ENC_PASS" | openssl dgst -sha256 | awk '{print $NF}')
+  echo "[FATAL] BACKUP_HMAC_KEY or BACKUP_HMAC_KEY_FILE is mandatory. Fallback key derivation from passphrase is forbidden for cryptographic independence." >&2
+  exit 1
 fi
 
 mkdir -p "$BACKUP_DIR"

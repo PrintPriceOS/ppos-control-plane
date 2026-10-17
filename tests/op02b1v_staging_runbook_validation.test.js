@@ -156,6 +156,8 @@ describe('OP-02B.1V: Staging Runbook, Configuration Contracts & Secret Resolutio
             expect(backupScript).toContain('sha256sum');
             expect(backupScript).toContain('HMAC-SHA256');
             expect(backupScript).toContain('pipefail');
+            expect(backupScript).toContain('BACKUP_HMAC_KEY or BACKUP_HMAC_KEY_FILE is mandatory');
+            expect(backupScript).not.toContain('auth-tag:ppos-backup-v2'); // No silent derivation fallback
         });
 
         it('verifies staging_restore_drill.sh strictly rejects production databases, requires sha256 and HMAC authenticity tag, and confirms destination server identity', () => {
@@ -166,6 +168,9 @@ describe('OP-02B.1V: Staging Runbook, Configuration Contracts & Secret Resolutio
             expect(restoreScript).not.toContain('pass:${PASSPHRASE}');
             expect(restoreScript).toContain('SERVER_IDENTITY');
             expect(restoreScript).toContain('ELAPSED_MS');
+            expect(restoreScript).toContain('BACKUP_HMAC_KEY or BACKUP_HMAC_KEY_FILE is mandatory');
+            expect(restoreScript).not.toContain('auth-tag:ppos-backup-v2'); // No silent derivation fallback
+            expect(restoreScript).toContain('HMAC_CHECK'); // Secure comparison
         });
 
         it('negative test: rejects dumps containing CREATE DATABASE or USE statements', () => {

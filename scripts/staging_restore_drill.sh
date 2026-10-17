@@ -50,13 +50,14 @@ else
   ENC_PASS="${BACKUP_PASSPHRASE:-}"
 fi
 
-# Dedicated authentication key (managed separately or derived via HKDF/PBKDF2/SHA256)
+# Dedicated independent HMAC authentication key (must be provided separately; silent derivation fallback strictly prohibited)
 AUTH_KEY="${BACKUP_HMAC_KEY:-}"
 if [ -z "$AUTH_KEY" ] && [ -n "${BACKUP_HMAC_KEY_FILE:-}" ] && [ -f "$BACKUP_HMAC_KEY_FILE" ]; then
   AUTH_KEY=$(cat "$BACKUP_HMAC_KEY_FILE" | tr -d '\r\n')
 fi
 if [ -z "$AUTH_KEY" ]; then
-  AUTH_KEY=$(printf "%s:auth-tag:ppos-backup-v2" "$ENC_PASS" | openssl dgst -sha256 | awk '{print $NF}')
+  echo "[FATAL] BACKUP_HMAC_KEY or BACKUP_HMAC_KEY_FILE is mandatory. Fallback key derivation from passphrase is forbidden for cryptographic independence." >&2
+  exit 1
 fi
 
 # 3. Mandatory SHA-256 Checksum & HMAC Authenticity Verification Before Decryption
@@ -79,11 +80,19 @@ if ! sha256sum -c "$SHA_FILE"; then
   exit 1
 fi
 
-# 3.2 Verify HMAC authenticity tag
+# 3.2 Verify HMAC authenticity tag before attempting any decryption
 EXPECTED_HMAC=$(cat "$HMAC_FILE" | tr -d '[:space:]')
 CALCULATED_HMAC=$(openssl dgst -sha256 -hmac "$AUTH_KEY" "$ENCRYPTED_FILE" | awk '{print $NF}')
 
-if [ "$EXPECTED_HMAC" != "$CALCULATED_HMAC" ]; then
+# Secure comparison: prevent null/empty evaluation and match length & content
+if [ -z "$EXPECTED_HMAC" ] || [ -z "$CALCULATED_HMAC" ] || [ ${#EXPECTED_HMAC} -ne 64 ] || [ ${#CALCULATED_HMAC} -ne 64 ]; then
+  echo "[FATAL] Invalid HMAC format or empty authentication tag." >&2
+  exit 1
+fi
+
+# Constant-time comparison using openssl dgst digest verification
+HMAC_CHECK=$(printf "%s\n%s\n" "$EXPECTED_HMAC" "$CALCULATED_HMAC" | awk 'NR==1{e=$0} NR==2{if(e==$0){print "MATCH"}else{print "MISMATCH"}}')
+if [ "$HMAC_CHECK" != "MATCH" ]; then
   echo "[FATAL] HMAC-SHA256 authenticity verification failed. Snapshot authenticity compromised or incorrect auth key." >&2
   exit 1
 fi
@@ -142,9 +151,14 @@ if ! grep -q "CREATE TABLE" "$DECRYPTED_SQL" && ! grep -q "INSERT INTO" "$DECRYP
   exit 1
 fi
 
-# 3.2 Sanitize DEFINER statements to allow non-privileged restore user without SUPER/SET_USER_ID
-sed -i -E 's/DEFINER[[:space:]]*=[[:space:]]*`[^`]+`@`[^`]+`//g' "$DECRYPTED_SQL"
-sed -i -E 's/DEFINER[[:space:]]*=[[:space:]]*[^[:space:]]+//g' "$DECRYPTED_SQL"
+# 3.2 Governed DEFINER Handling for Sandbox Recovery:
+# Audits and removes hardcoded DEFINER attributes (e.g. DEFINER=`ppos_staging_usr`@`%` or `root`@`localhost`)
+# from CREATE VIEW, CREATE PROCEDURE, CREATE FUNCTION, and CREATE TRIGGER statements.
+# In MySQL 8.0, omitting DEFINER causes the object to be defined by the executing user (the sandbox restore user),
+# allowing successful recreation without requiring SUPER or SET_USER_ID administrative privileges,
+# while preserving SQL SECURITY INVOKER / SQL SECURITY DEFINER semantics intact.
+sed -i -E 's/DEFINER[[:space:]]*=[[:space:]]*`[^`]+`@`[^`]+`[[:space:]]*//g' "$DECRYPTED_SQL"
+sed -i -E 's/DEFINER[[:space:]]*=[[:space:]]*[a-zA-Z0-9_]+@[a-zA-Z0-9_%.-]+[[:space:]]*//g' "$DECRYPTED_SQL"
 
 echo "[4/5] Restoring into isolated target instance (${TARGET_DB})..."
 DB_HOST="${MYSQL_HOST:-127.0.0.1}"

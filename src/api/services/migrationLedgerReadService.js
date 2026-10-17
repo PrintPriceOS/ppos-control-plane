@@ -48,19 +48,37 @@ class MigrationLedgerReadService {
       `);
 
       const failedRecords = entries.filter(e => e.state === 'FAILED');
+      // Governed reconciliation allowlist for persistent staging: only migrations with certified idempotent recovery hooks
+      const GOVERNED_RECONCILIATION_MIGRATIONS = new Set([
+        'migrations/092_phase144_governed_high_risk_cohort_intervention_approval_gate.sql',
+        'migrations/140_phase191e_materials_capacity_leadtimes.sql',
+        'migrations/161_phase184g_industrial_persistence_ledger.sql'
+      ]);
+
       for (const failedRecord of failedRecords) {
+        // Enforce fail-closed security: accidental env var cannot retry general migrations
         const allowRetryEnv = process.env.PPOS_ALLOW_MIGRATION_RETRY === 'true';
         let eligible = false;
-        if (allowRetryEnv) {
-          const baselineEntry = baseline.migrations.find(m => (m.path || m.relativePath) === failedRecord.migration_path);
-          if (baselineEntry) {
-            const expectedChecksum = baselineEntry.canonicalSha256 || baselineEntry.sha256;
-            if (expectedChecksum === failedRecord.checksum) {
-              const hasApplied = entries.some(e => e.migration_path === failedRecord.migration_path && e.state === 'APPLIED');
-              if (!hasApplied) {
-                eligible = true;
+
+        if (allowRetryEnv && failedRecord.migration_path) {
+          const isGovernedMigration = GOVERNED_RECONCILIATION_MIGRATIONS.has(failedRecord.migration_path);
+          if (isGovernedMigration) {
+            const baselineEntry = baseline.migrations.find(m => (m.path || m.relativePath) === failedRecord.migration_path);
+            if (baselineEntry) {
+              const expectedChecksum = baselineEntry.canonicalSha256 || baselineEntry.sha256;
+              if (expectedChecksum === failedRecord.checksum) {
+                const hasApplied = entries.some(e => e.migration_path === failedRecord.migration_path && e.state === 'APPLIED');
+                if (!hasApplied) {
+                  eligible = true;
+                }
               }
             }
+          } else {
+            logger.warn({
+              event: 'migration_retry_rejected_ungoverned',
+              migration_path: failedRecord.migration_path,
+              message: 'General migration retry rejected: no certified physical schema reconciliation hook exists for this migration'
+            });
           }
         }
 

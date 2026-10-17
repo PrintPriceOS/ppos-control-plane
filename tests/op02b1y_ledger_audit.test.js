@@ -113,11 +113,12 @@ describe('STG-02: Historical Ledger Governance, Forensic Invariants & State Mach
     expect(result.status).toBe('READY');
   });
 
-  it('3. Never unlocks automatically on FAILED migration unless PPOS_ALLOW_MIGRATION_RETRY is explicit and checksum matches', async () => {
-    const failedMigration = baseline.migrations[0];
-    const pathKey = failedMigration.path || failedMigration.relativePath;
-    const expectedHash = failedMigration.canonicalSha256 || failedMigration.sha256;
-    const fname = pathKey.split('/').pop();
+  it('3. Never unlocks automatically on FAILED migration unless PPOS_ALLOW_MIGRATION_RETRY is explicit, checksum matches, and migration is in governed allowlist', async () => {
+    // 3a: Non-governed migration: fails closed even with PPOS_ALLOW_MIGRATION_RETRY=true
+    const nonGovernedMigration = baseline.migrations[0]; // e.g. 001_initial_schema
+    const nonGovPathKey = nonGovernedMigration.path || nonGovernedMigration.relativePath;
+    const nonGovExpectedHash = nonGovernedMigration.canonicalSha256 || nonGovernedMigration.sha256;
+    const nonGovFname = nonGovPathKey.split('/').pop();
 
     vi.spyOn(db, 'query').mockImplementation(async (sql) => {
       if (sql.includes('information_schema.COLUMNS')) {
@@ -129,11 +130,11 @@ describe('STG-02: Historical Ledger Governance, Forensic Invariants & State Mach
       if (sql.includes('SELECT version, description')) {
         return [
           {
-            version: fname.replace(/\.sql$/, ''),
-            description: fname,
+            version: nonGovFname.replace(/\.sql$/, ''),
+            description: nonGovFname,
             record_type: 'MIGRATION',
-            migration_path: pathKey,
-            checksum: expectedHash,
+            migration_path: nonGovPathKey,
+            checksum: nonGovExpectedHash,
             state: 'FAILED',
             failure_code: 'ER_SYNTAX_ERROR',
             started_at: '2026-01-01 00:00:00'
@@ -149,21 +150,57 @@ describe('STG-02: Historical Ledger Governance, Forensic Invariants & State Mach
     expect(blockedResult.status).toBe('MIGRATION_FAILED');
     expect(blockedResult.reason).toContain('Migration failed');
 
-    // Tampered checksum: even with retry flag, rejects if checksum diverged
+    // General migration: even with retry flag set to true, rejects because no governed physical reconciliation exists
     process.env.PPOS_ALLOW_MIGRATION_RETRY = 'true';
+    const blockedGeneralResult = await ledgerReadService.evaluateLedgerStatus(baseline);
+    expect(blockedGeneralResult.status).toBe('MIGRATION_FAILED');
+
+    // 3b: Governed reconciliation migration (140) with valid checksum: eligible when explicit retry flag is true
+    const governed140 = baseline.migrations.find(m => (m.path || m.relativePath).includes('140_phase191e'));
+    expect(governed140).toBeDefined();
+    const gov140Path = governed140.path || governed140.relativePath;
+    const gov140Hash = governed140.canonicalSha256 || governed140.sha256;
+    const gov140Fname = gov140Path.split('/').pop();
+
     vi.spyOn(db, 'query').mockImplementation(async (sql) => {
       if (sql.includes('information_schema.COLUMNS')) return [{ COLUMN_NAME: 'state' }, { COLUMN_NAME: 'record_type' }];
       if (sql.includes('information_schema.TABLES')) return [{ TABLE_NAME: 'schema_versions' }];
       if (sql.includes('SELECT version, description')) {
         return [
           {
-            version: fname.replace(/\.sql$/, ''),
-            description: fname,
+            version: gov140Fname.replace(/\.sql$/, ''),
+            description: gov140Fname,
             record_type: 'MIGRATION',
-            migration_path: pathKey,
+            migration_path: gov140Path,
+            checksum: gov140Hash,
+            state: 'FAILED',
+            failure_code: 'ER_FK_INCOMPATIBLE_COLUMNS',
+            started_at: '2026-01-01 00:00:00'
+          }
+        ];
+      }
+      return [];
+    });
+
+    process.env.PPOS_ALLOW_MIGRATION_RETRY = 'true';
+    const governedEligibleResult = await ledgerReadService.evaluateLedgerStatus(baseline);
+    // When eligible, it logs eligibility and does not fail on that failed record (returns PENDING_MIGRATIONS because 140 is not applied)
+    expect(governedEligibleResult.status).toBe('PENDING_MIGRATIONS');
+
+    // 3c: Governed reconciliation migration with tampered checksum: strictly blocked
+    vi.spyOn(db, 'query').mockImplementation(async (sql) => {
+      if (sql.includes('information_schema.COLUMNS')) return [{ COLUMN_NAME: 'state' }, { COLUMN_NAME: 'record_type' }];
+      if (sql.includes('information_schema.TABLES')) return [{ TABLE_NAME: 'schema_versions' }];
+      if (sql.includes('SELECT version, description')) {
+        return [
+          {
+            version: gov140Fname.replace(/\.sql$/, ''),
+            description: gov140Fname,
+            record_type: 'MIGRATION',
+            migration_path: gov140Path,
             checksum: 'tampered_deadbeef_invalid_hash',
             state: 'FAILED',
-            failure_code: 'ER_SYNTAX_ERROR',
+            failure_code: 'ER_FK_INCOMPATIBLE_COLUMNS',
             started_at: '2026-01-01 00:00:00'
           }
         ];
