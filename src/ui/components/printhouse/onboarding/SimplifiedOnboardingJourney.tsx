@@ -34,16 +34,21 @@ import { CalculationComparisonView } from './CalculationComparisonView';
 import { GovernedAcceptanceView } from './GovernedAcceptanceView';
 import { BindingIcon } from './BindingFamilyIcons';
 import { printhouseCalibrationApi } from '../../../lib/printhouseCalibrationApi';
+import { normalizeUiError } from '../../../utils/errorUtils';
+import { FamilyPricingSessionDraft } from '../../../lib/onboardingDraftStore';
 
 export interface SimplifiedOnboardingJourneyProps {
     printerNodeId?: string;
     printerNodeName?: string;
     initialSpec?: ProgressiveSpecState;
     initialStep?: 1 | 2 | 3 | 4 | 5;
+    initialPricingDrafts?: Partial<Record<ProductFamilyId, FamilyPricingSessionDraft>>;
     onCompleted?: () => void;
     onOpenAdvanced?: () => void;
     onFamiliesStateChange?: (families: Record<ProductFamilyId, FamilyState>, selectedFamilyId: ProductFamilyId) => void;
+    onPricingContinuityChange?: (familyId: ProductFamilyId, draft: FamilyPricingSessionDraft) => void;
     targetFamilyId?: ProductFamilyId;
+    isGuidedMode?: boolean;
 }
 
 const createDefaultOffer = (family: ProductFamilyId): ProgressiveSpecState => ({
@@ -77,12 +82,22 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
     onCompleted,
     onOpenAdvanced,
     onFamiliesStateChange,
-    targetFamilyId
+    targetFamilyId,
+    initialPricingDrafts,
+    onPricingContinuityChange,
+    isGuidedMode = false
 }) => {
     const { t } = useLocale();
 
+    // ── Initial State Hydration from pricing continuity ──
+    const targetFam: ProductFamilyId = initialSpec?.family || targetFamilyId || 'HARDCOVER';
+    const initPricingForTarget = initialPricingDrafts?.[targetFam];
+
     // ── Wizard Step (1..5) ──
-    const [currentStep, setCurrentStep] = useState<1 | 2 | 3 | 4 | 5>(initialStep);
+    const [currentStep, setCurrentStep] = useState<1 | 2 | 3 | 4 | 5>(() => {
+        if (initPricingForTarget?.step) return initPricingForTarget.step;
+        return initialStep;
+    });
 
     // ── 4 Product Families State ──
     const [families, setFamilies] = useState<Record<ProductFamilyId, FamilyState>>({
@@ -116,7 +131,7 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
         }
     });
 
-    const [selectedFamilyId, setSelectedFamilyId] = useState<ProductFamilyId>(initialSpec?.family || targetFamilyId || 'HARDCOVER');
+    const [selectedFamilyId, setSelectedFamilyId] = useState<ProductFamilyId>(targetFam);
 
     // Notify parent whenever families or selectedFamilyId changes
     React.useEffect(() => {
@@ -124,22 +139,34 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
     }, [families, selectedFamilyId, onFamiliesStateChange]);
 
     // ── Step 2 Entry Mode: 'UPLOAD_PDF' | 'MANUAL_FORM' ──
-    const [entryMode, setEntryMode] = useState<'UPLOAD_PDF' | 'MANUAL_FORM'>('UPLOAD_PDF');
+    const [entryMode, setEntryMode] = useState<'UPLOAD_PDF' | 'MANUAL_FORM'>(() => {
+        return initPricingForTarget?.entryMode || 'UPLOAD_PDF';
+    });
     const [dragActive, setDragActive] = useState<boolean>(false);
     const [uploadingPdf, setUploadingPdf] = useState<boolean>(false);
     const [uploadError, setUploadError] = useState<string | null>(null);
-    const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
+    const [uploadedFileName, setUploadedFileName] = useState<string | null>(() => {
+        return initPricingForTarget?.uploadedFileName || null;
+    });
 
     // ── Active Job Offer / Spec State (Clean default without hardcoded 3rd party PII) ──
     const [currentOffer, setCurrentOffer] = useState<ProgressiveSpecState>(() => {
+        if (initPricingForTarget?.offer) return initPricingForTarget.offer;
         if (initialSpec) return initialSpec;
         return createDefaultOffer('HARDCOVER');
     });
 
     // ── Session & Calibration Integration State ──
-    const [sessionId, setSessionId] = useState<string | null>(null);
-    const [activeRun, setActiveRun] = useState<any>(null);
+    const [sessionId, setSessionId] = useState<string | null>(() => {
+        return initPricingForTarget?.sessionId || null;
+    });
+    const [activeRun, setActiveRun] = useState<any>(() => {
+        return initPricingForTarget?.activeRun || null;
+    });
     const [selectedVariantId, setSelectedVariantId] = useState<string | null>(() => {
+        if (initPricingForTarget?.selectedVariantId !== undefined) {
+            return initPricingForTarget.selectedVariantId;
+        }
         if (initialSpec?.selectedVariantId !== undefined) {
             return initialSpec.selectedVariantId;
         }
@@ -161,20 +188,27 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
         calculationError?: string | null;
         supportedParameters: string[];
         coverageGaps: string[];
-    }>({
-        originalPrice: null,
-        enginePrice: null,
-        difference: null,
-        residual: null,
-        isCalculated: false,
-        hasEquivalentBreakdown: true,
-        incompleteComparisonReason: null,
-        calculationError: null,
-        supportedParameters: [],
-        coverageGaps: []
+    }>(() => {
+        if (initPricingForTarget?.comparisonData) {
+            return initPricingForTarget.comparisonData;
+        }
+        return {
+            originalPrice: null,
+            enginePrice: null,
+            difference: null,
+            residual: null,
+            isCalculated: false,
+            hasEquivalentBreakdown: true,
+            incompleteComparisonReason: null,
+            calculationError: null,
+            supportedParameters: [],
+            coverageGaps: []
+        };
     });
 
-    const [proposedPatch, setProposedPatch] = useState<Record<string, any>>({});
+    const [proposedPatch, setProposedPatch] = useState<Record<string, any>>(() => {
+        return initPricingForTarget?.proposedPatch || {};
+    });
 
     // ── Family Draft Persistence & Coherent Ribbon/Card Switching ──
     interface FamilyDraftState {
@@ -189,7 +223,41 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
         proposedPatch: Record<string, any>;
     }
 
-    const familyDraftsRef = useRef<Partial<Record<ProductFamilyId, FamilyDraftState>>>({});
+    const familyDraftsRef = useRef<Partial<Record<ProductFamilyId, FamilyDraftState>>>(
+        (() => {
+            const initialMap: Partial<Record<ProductFamilyId, FamilyDraftState>> = {};
+            if (initialPricingDrafts) {
+                (Object.keys(initialPricingDrafts) as ProductFamilyId[]).forEach(fid => {
+                    const item = initialPricingDrafts[fid];
+                    if (item) {
+                        initialMap[fid] = {
+                            offer: item.offer || createDefaultOffer(fid),
+                            step: item.step || 1,
+                            sessionId: item.sessionId || null,
+                            activeRun: item.activeRun || null,
+                            selectedVariantId: item.selectedVariantId || null,
+                            comparisonData: item.comparisonData || {
+                                originalPrice: null,
+                                enginePrice: null,
+                                difference: null,
+                                residual: null,
+                                isCalculated: false,
+                                hasEquivalentBreakdown: true,
+                                incompleteComparisonReason: null,
+                                calculationError: null,
+                                supportedParameters: [],
+                                coverageGaps: []
+                            },
+                            entryMode: item.entryMode || 'UPLOAD_PDF',
+                            uploadedFileName: item.uploadedFileName || null,
+                            proposedPatch: item.proposedPatch || {}
+                        };
+                    }
+                });
+            }
+            return initialMap;
+        })()
+    );
     const selectedFamilyIdRef = useRef(selectedFamilyId);
     selectedFamilyIdRef.current = selectedFamilyId;
     const currentOfferRef = useRef(currentOffer);
@@ -210,6 +278,36 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
     uploadedFileNameRef.current = uploadedFileName;
     const proposedPatchRef = useRef(proposedPatch);
     proposedPatchRef.current = proposedPatch;
+
+    // Notify parent about current family pricing continuity whenever relevant state changes
+    React.useEffect(() => {
+        if (!onPricingContinuityChange) return;
+        const currentFam = selectedFamilyId;
+        onPricingContinuityChange(currentFam, {
+            sessionId,
+            activeRun,
+            selectedVariantId,
+            proposedPatch,
+            entryMode,
+            uploadedFileName,
+            step: currentStep,
+            offer: currentOffer,
+            comparisonData,
+            lastSavedTimestamp: Date.now()
+        });
+    }, [
+        selectedFamilyId,
+        sessionId,
+        activeRun,
+        selectedVariantId,
+        proposedPatch,
+        entryMode,
+        uploadedFileName,
+        currentStep,
+        currentOffer,
+        comparisonData,
+        onPricingContinuityChange
+    ]);
 
     // Unified family transition: invoked both from ribbon and card selections
     const transitionToFamily = (targetId: ProductFamilyId, options?: { stepOverride?: 1 | 2 | 3 | 4 | 5; defaultStepForNewFamily?: 1 | 2 | 3 | 4 | 5 }) => {
@@ -403,10 +501,11 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
                     formData.append('printerNodeId', printerNodeId);
                 }
 
-                const res = await fetch('/api/printhouse/onboarding/quote-evidence/upload', {
+                const token = localStorage.getItem('token') || (typeof window !== 'undefined' ? (window as any).__AUTH_TOKEN__ : null);
+                const res = await fetch('/api/printhouse/onboarding/pricing/quote-evidence/upload', {
                     method: 'POST',
                     headers: {
-                        ...(localStorage.getItem('token') ? { 'Authorization': `Bearer ${localStorage.getItem('token')}` } : {})
+                        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
                     },
                     body: formData
                 });
@@ -474,7 +573,7 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
             setCurrentStep(3);
         } catch (err: any) {
             if (uploadRequestIdRef.current === thisUploadId && selectedFamilyIdRef.current === uploadFamilyId) {
-                setUploadError(err.message || 'Error al procesar el presupuesto PDF');
+                setUploadError(normalizeUiError(err, 'Error al procesar el presupuesto PDF'));
             }
         } finally {
             if (uploadRequestIdRef.current === thisUploadId) {
@@ -602,38 +701,54 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
 
             const targetManufacturing = targetRun.manufacturingPrice;
 
+            if (!printerNodeId) {
+                setActiveRun(null);
+                setProposedPatch({});
+                setComparisonData({
+                    originalPrice: targetManufacturing,
+                    enginePrice: null,
+                    difference: null,
+                    residual: null,
+                    isCalculated: false,
+                    hasEquivalentBreakdown: false,
+                    incompleteComparisonReason: t('guided.pricing.prerequisiteNodeRequired') || 'Se requiere un nodo de impresión configurado para calibrar tarifas.',
+                    calculationError: t('guided.pricing.prerequisiteNodeRequired') || 'Se requiere un nodo de impresión configurado para calibrar tarifas. Configura tu maquinaria en la configuración completa.',
+                    supportedParameters: [],
+                    coverageGaps: []
+                });
+                return;
+            }
+
             let runResult: any = null;
             let runError: string | null = null;
 
-            if (printerNodeId) {
-                try {
-                    let sess = sessionId ? await printhouseCalibrationApi.getSession(sessionId) : null;
-                    if (calculationRequestIdRef.current !== thisReqId || selectedFamilyIdRef.current !== calcFamilyId) return;
+            try {
+                let sess = sessionId ? await printhouseCalibrationApi.getSession(sessionId) : null;
+                if (calculationRequestIdRef.current !== thisReqId || selectedFamilyIdRef.current !== calcFamilyId) return;
 
-                    if (!sess) {
-                        sess = await printhouseCalibrationApi.createSession({
-                            printerNodeId,
-                            referenceBookName: offer.productTitle || 'Oferta Calibración',
-                            bookSpec: {
-                                ...offer,
-                                evidenceId: offer.quoteRef || uploadedFileName || 'evidence-quote-doc',
-                                selectedVariantId: targetRun.id || targetRun.variantKey
-                            },
-                            targetManufacturingPrice: targetManufacturing
-                        });
-                        if (calculationRequestIdRef.current !== thisReqId || selectedFamilyIdRef.current !== calcFamilyId) return;
-                        if (sess?.id) setSessionId(sess.id);
-                    }
-                    if (sess?.id) {
-                        await printhouseCalibrationApi.markSessionReady(sess.id);
-                        if (calculationRequestIdRef.current !== thisReqId || selectedFamilyIdRef.current !== calcFamilyId) return;
-                        runResult = await printhouseCalibrationApi.calculateCalibration(sess.id);
-                        if (calculationRequestIdRef.current !== thisReqId || selectedFamilyIdRef.current !== calcFamilyId) return;
-                    }
-                } catch (e: any) {
+                if (!sess) {
+                    sess = await printhouseCalibrationApi.createSession({
+                        printerNodeId,
+                        referenceBookName: offer.productTitle || 'Oferta Calibración',
+                        bookSpec: {
+                            ...offer,
+                            evidenceId: offer.quoteRef || uploadedFileName || 'evidence-quote-doc',
+                            selectedVariantId: targetRun.id || targetRun.variantKey
+                        },
+                        targetManufacturingPrice: targetManufacturing
+                    });
                     if (calculationRequestIdRef.current !== thisReqId || selectedFamilyIdRef.current !== calcFamilyId) return;
-                    runError = e.message || 'Error en la llamada al motor de cálculo';
+                    if (sess?.id) setSessionId(sess.id);
                 }
+                if (sess?.id) {
+                    await printhouseCalibrationApi.markSessionReady(sess.id);
+                    if (calculationRequestIdRef.current !== thisReqId || selectedFamilyIdRef.current !== calcFamilyId) return;
+                    runResult = await printhouseCalibrationApi.calculateCalibration(sess.id);
+                    if (calculationRequestIdRef.current !== thisReqId || selectedFamilyIdRef.current !== calcFamilyId) return;
+                }
+            } catch (e: any) {
+                if (calculationRequestIdRef.current !== thisReqId || selectedFamilyIdRef.current !== calcFamilyId) return;
+                runError = normalizeUiError(e, 'Error en la llamada al motor de cálculo');
             }
 
             // Check if calculation is still valid and not superseded by another family/document/variant
@@ -743,65 +858,119 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
 
     return (
         <div className="w-full max-w-[1440px] mx-auto space-y-5 animate-in fade-in duration-200">
-            {/* ── Stepper Navigation Bar (1 to 5) ── */}
-            <div className="bg-white dark:bg-[#18181b] border border-zinc-200 dark:border-zinc-800 rounded-2xl p-3 sm:p-4 shadow-2xs">
-                <div className="flex items-center justify-between gap-2 overflow-x-auto pb-1 sm:pb-0">
-                    {[
-                        { num: 1, label: t('wizard.step1') || 'Qué productos fabricas', icon: Layers },
-                        { num: 2, label: t('wizard.step2') || 'Añadir presupuestos', icon: Upload },
-                        { num: 3, label: t('wizard.step3') || 'Revisar especificaciones', icon: FileText },
-                        { num: 4, label: t('wizard.step4') || 'Comparar cálculos', icon: Calculator },
-                        { num: 5, label: t('wizard.step5') || 'Aceptar propuesta', icon: ShieldCheck }
-                    ].map(st => {
-                        const Icon = st.icon;
-                        const isActive = currentStep === st.num;
-                        const isDone = currentStep > st.num;
-                        return (
-                            <button
-                                key={st.num}
-                                type="button"
-                                onClick={() => {
-                                    if (st.num <= currentStep || (st.num === 2 && currentStep >= 1)) {
-                                        setCurrentStep(st.num as any);
-                                    }
-                                }}
-                                className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
-                                    isActive
-                                        ? 'bg-[#dc0000] text-white shadow-xs'
-                                        : isDone
-                                            ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
-                                            : 'bg-zinc-100 dark:bg-zinc-800/60 text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200'
-                                }`}
-                            >
-                                <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[11px] font-black ${
-                                    isActive ? 'bg-white text-[#dc0000]' : isDone ? 'bg-emerald-600 text-white' : 'bg-zinc-300 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300'
-                                }`}>
-                                    {isDone ? '✓' : st.num}
-                                </span>
-                                <span className="hidden md:inline">{st.label}</span>
-                            </button>
-                        );
-                    })}
-                </div>
-                {/* Mobile Step Identifier */}
-                <div className="md:hidden mt-2 pt-2 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-between text-xs px-1">
-                    <span className="font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5">
-                        <span className="w-2 h-2 rounded-full bg-[#dc0000] shrink-0" />
-                        <span>
-                            {(t('wizard.stepIndicator') || 'Paso {step} de {total}: {title}')
-                                .replace('{step}', String(currentStep))
-                                .replace('{total}', '5')
-                                .replace('{title}', 
-                                    currentStep === 1 ? (t('wizard.step1') || 'Qué productos fabricas') :
-                                    currentStep === 2 ? (t('wizard.step2') || 'Añadir presupuestos') :
-                                    currentStep === 3 ? (t('wizard.step3') || 'Revisar especificaciones') :
-                                    currentStep === 4 ? (t('wizard.step4') || 'Comparar cálculos') :
-                                    (t('wizard.step5') || 'Aceptar propuesta')
-                                )}
+            {/* ── Stepper Navigation Bar: Full 5-step in standard mode vs Compact Contextual Substep in Guided Mode ── */}
+            {isGuidedMode ? (
+                <div className="bg-white dark:bg-[#18181b] border border-zinc-200 dark:border-zinc-800 rounded-2xl p-3 px-4 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                    <div className="flex items-center gap-2">
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300">
+                            <span className="w-2 h-2 rounded-full bg-[#dc0000]" />
+                            <span>
+                                {currentStep === 2 ? (t('guided.pricing.substepAdd') || '1. Añadir oferta') :
+                                 currentStep === 3 ? (t('guided.pricing.substepReview') || '2. Revisar especificación') :
+                                 currentStep === 4 ? (t('guided.pricing.substepCompare') || '3. Comparar precios') :
+                                 (t('guided.pricing.substepAccept') || '4. Aceptar propuesta')}
+                            </span>
                         </span>
-                    </span>
+                        <span className="text-xs text-zinc-500 font-medium">
+                            {currentStep === 2 ? (t('guided.pricing.substepAddDesc') || 'Aporta un presupuesto de referencia') :
+                             currentStep === 3 ? (t('guided.pricing.substepReviewDesc') || 'Verifica tiradas y formatos') :
+                             currentStep === 4 ? (t('guided.pricing.substepCompareDesc') || 'Calcula y compara con el motor') :
+                             (t('guided.pricing.substepAcceptDesc') || 'Confirma tus tarifas industriales')}
+                        </span>
+                    </div>
+
+                    <div className="flex items-center gap-1.5">
+                        {[
+                            { num: 2, label: t('guided.pricing.substepAddShort') || 'Oferta' },
+                            { num: 3, label: t('guided.pricing.substepReviewShort') || 'Revisión' },
+                            { num: 4, label: t('guided.pricing.substepCompareShort') || 'Cálculo' },
+                            { num: 5, label: t('guided.pricing.substepAcceptShort') || 'Aceptación' }
+                        ].map(st => {
+                            const isCur = currentStep === st.num;
+                            const isDone = currentStep > st.num;
+                            return (
+                                <button
+                                    key={st.num}
+                                    type="button"
+                                    onClick={() => {
+                                        if (st.num <= currentStep || (st.num === 2)) {
+                                            setCurrentStep(st.num as any);
+                                        }
+                                    }}
+                                    className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                                        isCur
+                                            ? 'bg-[#dc0000] text-white shadow-2xs'
+                                            : isDone
+                                                ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
+                                                : 'bg-zinc-100 dark:bg-zinc-800/60 text-zinc-400 dark:text-zinc-500 hover:text-zinc-700'
+                                    }`}
+                                >
+                                    <span>{isDone ? '✓ ' : ''}{st.label}</span>
+                                </button>
+                            );
+                        })}
+                    </div>
                 </div>
-            </div>
+            ) : (
+                <div className="bg-white dark:bg-[#18181b] border border-zinc-200 dark:border-zinc-800 rounded-2xl p-3 sm:p-4 shadow-2xs">
+                    <div className="flex items-center justify-between gap-2 overflow-x-auto pb-1 sm:pb-0">
+                        {[
+                            { num: 1, label: t('wizard.step1') || 'Qué productos fabricas', icon: Layers },
+                            { num: 2, label: t('wizard.step2') || 'Añadir presupuestos', icon: Upload },
+                            { num: 3, label: t('wizard.step3') || 'Revisar especificaciones', icon: FileText },
+                            { num: 4, label: t('wizard.step4') || 'Comparar cálculos', icon: Calculator },
+                            { num: 5, label: t('wizard.step5') || 'Aceptar propuesta', icon: ShieldCheck }
+                        ].map(st => {
+                            const Icon = st.icon;
+                            const isActive = currentStep === st.num;
+                            const isDone = currentStep > st.num;
+                            return (
+                                <button
+                                    key={st.num}
+                                    type="button"
+                                    onClick={() => {
+                                        if (st.num <= currentStep || (st.num === 2 && currentStep >= 1)) {
+                                            setCurrentStep(st.num as any);
+                                        }
+                                    }}
+                                    className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
+                                        isActive
+                                            ? 'bg-[#dc0000] text-white shadow-xs'
+                                            : isDone
+                                                ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
+                                                : 'bg-zinc-100 dark:bg-zinc-800/60 text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200'
+                                    }`}
+                                >
+                                    <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[11px] font-black ${
+                                        isActive ? 'bg-white text-[#dc0000]' : isDone ? 'bg-emerald-600 text-white' : 'bg-zinc-300 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300'
+                                    }`}>
+                                        {isDone ? '✓' : st.num}
+                                    </span>
+                                    <span className="hidden md:inline">{st.label}</span>
+                                </button>
+                            );
+                        })}
+                    </div>
+                    {/* Mobile Step Identifier */}
+                    <div className="md:hidden mt-2 pt-2 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-between text-xs px-1">
+                        <span className="font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full bg-[#dc0000] shrink-0" />
+                            <span>
+                                {(t('wizard.stepIndicator') || 'Paso {step} de {total}: {title}')
+                                    .replace('{step}', String(currentStep))
+                                    .replace('{total}', '5')
+                                    .replace('{title}', 
+                                        currentStep === 1 ? (t('wizard.step1') || 'Qué productos fabricas') :
+                                        currentStep === 2 ? (t('wizard.step2') || 'Añadir presupuestos') :
+                                        currentStep === 3 ? (t('wizard.step3') || 'Revisar especificaciones') :
+                                        currentStep === 4 ? (t('wizard.step4') || 'Comparar cálculos') :
+                                        (t('wizard.step5') || 'Aceptar propuesta')
+                                    )}
+                            </span>
+                        </span>
+                    </div>
+                </div>
+            )}
 
             {/* ── STEP 1: Qué productos fabricas ── */}
             {currentStep === 1 && (

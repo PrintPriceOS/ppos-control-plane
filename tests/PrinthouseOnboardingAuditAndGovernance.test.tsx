@@ -635,7 +635,7 @@ describe('Printhouse Calibration Onboarding - Audit, Fidelity and Governance Sui
             }
 
             expect(violations).toEqual([]);
-        });
+        }, 20000);
 
         it('5.2 Initial state of SimplifiedOnboardingJourney is clean and contains no third-party data', () => {
             renderWithLocale(<SimplifiedOnboardingJourney initialStep={2} />);

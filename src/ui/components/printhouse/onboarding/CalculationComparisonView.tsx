@@ -15,7 +15,7 @@ import React from 'react';
 import { useLocale } from '../../../i18n';
 import { 
     Calculator, CheckCircle2, AlertTriangle, ArrowRight, 
-    ArrowLeft, RefreshCw, Info, Layers, XCircle 
+    ArrowLeft, RefreshCw, Info, Layers, XCircle, ChevronDown, ChevronUp 
 } from 'lucide-react';
 import { ProductFamilyId } from '../../../types/printhouseOnboardingTypes';
 
@@ -182,14 +182,11 @@ export const CalculationComparisonView: React.FC<CalculationComparisonViewProps>
                         <div>
                             <div className="flex items-center gap-2 flex-wrap">
                                 <h4 className="text-sm font-bold text-zinc-900 dark:text-white">
-                                    {t('compare.title') || 'Comparación de Cálculos: Presupuesto vs Motor PrintPrice OS'}
+                                    {t('compare.title') || t('compare.comparePrices') || 'Comparación de Cálculos: Presupuesto vs Motor PrintPrice OS'}
                                 </h4>
-                                <span className="px-2 py-0.5 rounded-md font-mono text-[10px] font-bold bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700">
-                                    {t('compare.engineVersion') || 'Motor'}: {engineVersion}
-                                </span>
                             </div>
                             <p className="text-[11px] text-zinc-500 mt-0.5">
-                                {t('compare.subtitle') || 'El solver inverso evalúa la coherencia de tarifas sin mutar valores de producción.'}
+                                {t('compare.subtitle') || 'El cálculo evalúa la coherencia de tarifas sin mutar valores de producción.'}
                             </p>
                         </div>
                     </div>
@@ -202,7 +199,7 @@ export const CalculationComparisonView: React.FC<CalculationComparisonViewProps>
                         className="px-4 py-2 bg-[#dc0000] hover:bg-red-700 disabled:bg-zinc-400 text-white font-bold rounded-xl text-xs flex items-center gap-2 transition-colors cursor-pointer self-start sm:self-auto"
                     >
                         <RefreshCw size={13} className={calculating ? 'animate-spin' : ''} />
-                        <span>{calculating ? (t('compare.calculating') || 'Calculando solver...') : (t('compare.runSolver') || 'Ejecutar Cálculo Inverso')}</span>
+                        <span>{calculating ? (t('compare.calculating') || 'Calculando precios...') : (t('compare.calculatePrices') || t('compare.runSolver') || 'Calcular precios')}</span>
                     </button>
                 </div>
 
@@ -227,18 +224,18 @@ export const CalculationComparisonView: React.FC<CalculationComparisonViewProps>
                         <div className="space-y-0.5 text-xs">
                             <span className="font-bold text-amber-900 dark:text-amber-200">
                                 {resolvedTarget === null && spec?.runs && spec.runs.length > 0
-                                    ? 'Selección de variante requerida o no válida'
+                                    ? (t('compare.variantSelectionRequired') || 'Selección de variante requerida o no válida')
                                     : (!hasValidEnginePrice 
-                                        ? 'Cálculo del motor ausente o incompleto' 
+                                        ? (t('compare.engineCalculationMissing') || 'Cálculo del motor ausente o incompleto') 
                                         : (!hasEquivalentBreakdown 
                                             ? (t('review.incompleteComparison') || 'Comparación incompleta') 
-                                            : 'Comparación no válida'))}
+                                            : (t('compare.unnormalized') || 'Comparación no válida')))}
                             </span>
                             <p className="text-[11px] text-amber-800/90 dark:text-amber-300/90 leading-relaxed">
                                 {resolvedIncompleteReason
                                     ? resolvedIncompleteReason
                                     : (!hasValidEnginePrice
-                                        ? 'El motor no ha devuelto un resultado de cálculo positivo para esta especificación. El avance a la propuesta de tarifas está bloqueado hasta ejecutar el solver satisfactoriamente.'
+                                        ? (t('compare.pendingExecution') || 'El motor no ha devuelto un resultado de cálculo positivo para esta especificación. El avance a la propuesta de tarifas está bloqueado hasta ejecutar el cálculo satisfactoriamente.')
                                         : (incompleteComparisonReason || t('review.incompleteComparisonReason') || 'El desglose de la oferta no permite contrastar magnitudes equivalentes de forma estricta. Verifique si falta desglose de fabricación independiente del transporte.'))}
                             </p>
                         </div>
@@ -249,7 +246,7 @@ export const CalculationComparisonView: React.FC<CalculationComparisonViewProps>
                     <div className="p-3.5 bg-red-50 dark:bg-red-950/40 border border-red-300 dark:border-red-700 rounded-xl flex items-start gap-2.5">
                         <XCircle size={16} className="text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
                         <div className="space-y-0.5 text-xs">
-                            <span className="font-bold text-red-900 dark:text-red-200">Error en el cálculo del solver</span>
+                            <span className="font-bold text-red-900 dark:text-red-200">{t('compare.calculationErrorTitle') || 'Error en el cálculo'}</span>
                             <p className="text-[11px] text-red-800/90 dark:text-red-300/90">{calculationError}</p>
                         </div>
                     </div>
@@ -269,8 +266,8 @@ export const CalculationComparisonView: React.FC<CalculationComparisonViewProps>
                         </div>
                         <span className="text-[11px] text-zinc-500">
                             {hasValidTarget 
-                                ? (comparisonMode === 'manufacturing' ? 'Excluye portes y flete' : 'Total oferta sin IVA')
-                                : 'Sin precio declarado válido'}
+                                ? (comparisonMode === 'manufacturing' ? (t('compare.excludesFreight') || 'Excluye portes y flete') : (t('compare.totalExVat') || 'Total oferta sin IVA'))
+                                : (t('compare.noValidTarget') || 'Sin precio declarado válido')}
                         </span>
                     </div>
 
@@ -286,8 +283,8 @@ export const CalculationComparisonView: React.FC<CalculationComparisonViewProps>
                         </div>
                         <span className="text-[11px] text-zinc-500">
                             {calculating 
-                                ? 'Calculando con solver inverso...' 
-                                : (hasValidEnginePrice ? 'Solver determinista BPE' : 'Pendiente de ejecución')}
+                                ? (t('compare.calculatingPrices') || 'Calculando precios...') 
+                                : (hasValidEnginePrice ? (t('compare.bpeEngineCalc') || 'Cálculo del motor BPE') : (t('compare.pendingExecution') || 'Pendiente de ejecución'))}
                         </span>
                     </div>
 
@@ -300,7 +297,7 @@ export const CalculationComparisonView: React.FC<CalculationComparisonViewProps>
                                 : 'bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800'
                     }`}>
                         <span className="text-[11px] font-bold text-zinc-600 dark:text-zinc-300 uppercase tracking-wider">
-                            {t('compare.difference') || 'Diferencia / Residual'}
+                            {t('compare.difference') || 'Diferencia'}
                         </span>
                         <div className="text-xl font-extrabold flex items-center gap-1.5 text-zinc-900 dark:text-white">
                             <span>{isComparisonValid ? `${Math.abs(residualAbs!).toFixed(2)} €` : '—'}</span>
@@ -315,65 +312,83 @@ export const CalculationComparisonView: React.FC<CalculationComparisonViewProps>
                             )}
                             {!isComparisonValid && (
                                 <span className="text-xs px-2 py-0.5 rounded-full font-bold bg-zinc-200 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-400">
-                                    Sin cálculo
+                                    {t('compare.noCalculation') || 'Sin cálculo'}
                                 </span>
                             )}
                         </div>
                         <span className="text-[11px] text-zinc-500">
                             {!isComparisonValid 
-                                ? 'Comparación no normalizada' 
-                                : (isWellFitted ? 'Ajuste calibrado dentro de tolerancia' : 'Ajuste con divergencia para calibrar')}
+                                ? (t('compare.unnormalized') || 'Comparación no normalizada') 
+                                : (isWellFitted ? (t('compare.withinTolerance') || 'Ajuste calibrado dentro de tolerancia') : (t('compare.withDivergence') || 'Ajuste con divergencia para calibrar'))}
                         </span>
                     </div>
                 </div>
 
-                {/* Backed vs Unbacked Parameters Analysis */}
-                <div className="space-y-3 pt-2">
-                    <h5 className="font-bold text-zinc-900 dark:text-white text-xs flex items-center gap-1.5">
-                        <Layers size={14} className="text-[#dc0000]" />
-                        <span>{t('compare.parametersTitle') || 'Parámetros Respaldados por el Presupuesto y Cobertura'}</span>
-                    </h5>
+                {/* Optional Collapsible Technical Details: Engine version, solver terminology, raw parameter keys, coverage gaps */}
+                <details className="group pt-2 border-t border-zinc-100 dark:border-zinc-800">
+                    <summary className="font-bold text-zinc-600 dark:text-zinc-400 text-xs flex items-center justify-between cursor-pointer py-1.5 hover:text-zinc-900 dark:hover:text-zinc-200 list-none">
+                        <span className="flex items-center gap-1.5">
+                            <Layers size={14} className="text-[#dc0000]" />
+                            <span>{t('compare.technicalDetails') || 'Detalles técnicos y parámetros del motor'}</span>
+                        </span>
+                        <span className="text-[11px] font-normal text-zinc-400 group-open:rotate-180 transition-transform">
+                            ▼
+                        </span>
+                    </summary>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        {/* Supported */}
-                        <div className="p-3.5 bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900/60 rounded-xl space-y-1.5">
-                            <span className="font-bold text-emerald-800 dark:text-emerald-300 text-xs flex items-center gap-1.5">
-                                <CheckCircle2 size={13} />
-                                <span>Parámetros Respaldados con Evidencia Directa</span>
+                    <div className="space-y-3 pt-3">
+                        <div className="flex items-center gap-2 flex-wrap text-[11px] text-zinc-500">
+                            <span className="px-2 py-0.5 rounded-md font-mono text-[10px] font-bold bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700">
+                                {t('compare.engineVersion') || 'Motor'}: {engineVersion}
                             </span>
-                            <ul className="text-[11px] text-zinc-600 dark:text-zinc-400 space-y-1 list-disc list-inside">
-                                {(supportedParameters && supportedParameters.length > 0) ? (
-                                    supportedParameters.map((param, i) => <li key={i}>{param}</li>)
-                                ) : (
-                                    <>
-                                        <li>Tiradas y costes fijos/variables para el formato aportado.</li>
-                                        <li>Coste de pliegos e impresión interior declarados.</li>
-                                        <li>Mano de obra y montaje de la encuadernación declarada.</li>
-                                    </>
-                                )}
-                            </ul>
+                            {residualAbs !== null && (
+                                <span className="font-mono text-[10px]">
+                                    {t('compare.numericResidual') || 'Residual numérico'}: {residualAbs.toFixed(4)} € ({residualPercent !== null ? `${residualPercent.toFixed(2)}%` : '—'})
+                                </span>
+                            )}
                         </div>
 
-                        {/* Missing Coverage */}
-                        <div className="p-3.5 bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700/80 rounded-xl space-y-1.5">
-                            <span className="font-bold text-amber-700 dark:text-amber-400 text-xs flex items-center gap-1.5">
-                                <Info size={13} />
-                                <span>Cobertura Faltante (Sin Evidencia en este Documento)</span>
-                            </span>
-                            <ul className="text-[11px] text-zinc-600 dark:text-zinc-400 space-y-1 list-disc list-inside">
-                                {(coverageGaps && coverageGaps.length > 0) ? (
-                                    coverageGaps.map((gap, i) => <li key={i}>{gap}</li>)
-                                ) : (
-                                    <>
-                                        <li>Wire-O y grapado al caballete no están acreditados por esta oferta.</li>
-                                        <li>Sin datos de comparación controlada entre cosido y encolado.</li>
-                                        <li>Estampación, golpe en seco y plastificados especiales no incluidos.</li>
-                                    </>
-                                )}
-                            </ul>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            {/* Supported */}
+                            <div className="p-3.5 bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900/60 rounded-xl space-y-1.5">
+                                <span className="font-bold text-emerald-800 dark:text-emerald-300 text-xs flex items-center gap-1.5">
+                                    <CheckCircle2 size={13} />
+                                    <span>{t('compare.parametersTitle') || 'Parámetros Respaldados por el Presupuesto y Cobertura'}</span>
+                                </span>
+                                <ul className="text-[11px] text-zinc-600 dark:text-zinc-400 space-y-1 list-disc list-inside">
+                                    {(supportedParameters && supportedParameters.length > 0) ? (
+                                        supportedParameters.map((param, i) => <li key={i}>{param}</li>)
+                                    ) : (
+                                        <>
+                                            <li>Tiradas y costes fijos/variables para el formato aportado.</li>
+                                            <li>Coste de pliegos e impresión interior declarados.</li>
+                                            <li>Mano de obra y montaje de la encuadernación declarada.</li>
+                                        </>
+                                    )}
+                                </ul>
+                            </div>
+
+                            {/* Missing Coverage */}
+                            <div className="p-3.5 bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700/80 rounded-xl space-y-1.5">
+                                <span className="font-bold text-amber-700 dark:text-amber-400 text-xs flex items-center gap-1.5">
+                                    <Info size={13} />
+                                    <span>{t('compare.missingCoverageTitle') || 'Cobertura Faltante (Sin Evidencia en este Documento)'}</span>
+                                </span>
+                                <ul className="text-[11px] text-zinc-600 dark:text-zinc-400 space-y-1 list-disc list-inside">
+                                    {(coverageGaps && coverageGaps.length > 0) ? (
+                                        coverageGaps.map((gap, i) => <li key={i}>{gap}</li>)
+                                    ) : (
+                                        <>
+                                            <li>Wire-O y grapado al caballete no están acreditados por esta oferta.</li>
+                                            <li>Sin datos de comparación controlada entre cosido y encolado.</li>
+                                            <li>Estampación, golpe en seco y plastificados especiales no incluidos.</li>
+                                        </>
+                                    )}
+                                </ul>
+                            </div>
                         </div>
                     </div>
-                </div>
+                </details>
             </div>
 
             {/* Bottom Actions with Strict Guardrail */}
@@ -391,7 +406,7 @@ export const CalculationComparisonView: React.FC<CalculationComparisonViewProps>
                     {!isComparisonValid && (
                         <span className="text-[11px] text-amber-600 dark:text-amber-400 font-semibold flex items-center gap-1">
                             <AlertTriangle size={13} />
-                            <span>{resolvedIncompleteReason || 'Requiere cálculo de motor válido para continuar'}</span>
+                            <span>{resolvedIncompleteReason || t('compare.validEngineRequired') || 'Requiere cálculo de motor válido para continuar'}</span>
                         </span>
                     )}
                     <button
