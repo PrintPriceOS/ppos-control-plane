@@ -17,6 +17,7 @@ const migrationIntegrity = require('../../../scripts/lib/migrationIntegrity');
 const ledgerRead = require('./migrationLedgerReadService');
 const ledgerWrite = require('./migrationLedgerWriteService');
 const { parseMigrationSql } = require('./migrationSqlParser');
+const { handleLegacyPhaseMarkerStatement } = require('./legacyPhaseMarkerAdapter');
 
 async function ensurePreviousFailuresColumn(connOrDb) {
   try {
@@ -931,9 +932,12 @@ class MigrationService {
                               WHERE execution_id = ?
                             `, [executionId]);
                             
-                            // Execute statement
+                            // Execute statement (with strict compatibility adapter for legacy phase markers)
                             try {
-                                await connection.query(lastSql);
+                                const handledMarker = await handleLegacyPhaseMarkerStatement(connection, lastSql, m.filename);
+                                if (!handledMarker) {
+                                    await connection.query(lastSql);
+                                }
                             } catch (err) {
                                 // Idempotency: skip duplicates, table exists, or trigger exists
                                 const ignoreCodes = ['ER_DUP_FIELDNAME', 'ER_DUP_KEYNAME', 'ER_TABLE_EXISTS_ERROR', 'ER_DUP_INDEX', 'ER_TRG_ALREADY_EXISTS'];
@@ -1025,5 +1029,6 @@ const migrationService = new MigrationService();
 module.exports = {
     MigrationService,
     migrationService,
-    runMigration140PreRemediation
+    runMigration140PreRemediation,
+    handleLegacyPhaseMarkerStatement
 };
