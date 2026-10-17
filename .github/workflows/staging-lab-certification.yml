@@ -86,20 +86,22 @@ jobs:
         SANDBOX_RESTORE_PW=$(cat "$SECRETS_DIR/mysql_sandbox_restore.txt")
 
         # On Origin (port 3306): create database and origin user
-        MYSQL_PWD="$ORIGIN_ROOT_PW" mysql -h 127.0.0.1 -P 3306 -u root <<SQL
-          CREATE DATABASE ppos_control_staging CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-          CREATE USER 'ppos_staging_usr'@'%' IDENTIFIED WITH mysql_native_password BY '${ORIGIN_USR_PW}';
+        MYSQL_PWD="$ORIGIN_ROOT_PW" mysql -h 127.0.0.1 -P 3306 -u root -e "
+          CREATE DATABASE IF NOT EXISTS ppos_control_staging CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+          CREATE USER IF NOT EXISTS 'ppos_staging_usr'@'%' IDENTIFIED WITH mysql_native_password BY '${ORIGIN_USR_PW}';
+          ALTER USER 'ppos_staging_usr'@'%' IDENTIFIED WITH mysql_native_password BY '${ORIGIN_USR_PW}';
           GRANT ALL PRIVILEGES ON ppos_control_staging.* TO 'ppos_staging_usr'@'%';
           FLUSH PRIVILEGES;
-SQL
+        "
 
         # On Sandbox (port 3307): create database and dedicated restore user (initially empty sandbox)
-        MYSQL_PWD="$SANDBOX_ROOT_PW" mysql -h 127.0.0.1 -P 3307 -u root <<SQL
-          CREATE DATABASE ppos_control_sandbox CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-          CREATE USER 'ppos_restore_usr'@'%' IDENTIFIED WITH mysql_native_password BY '${SANDBOX_RESTORE_PW}';
+        MYSQL_PWD="$SANDBOX_ROOT_PW" mysql -h 127.0.0.1 -P 3307 -u root -e "
+          CREATE DATABASE IF NOT EXISTS ppos_control_sandbox CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+          CREATE USER IF NOT EXISTS 'ppos_restore_usr'@'%' IDENTIFIED WITH mysql_native_password BY '${SANDBOX_RESTORE_PW}';
+          ALTER USER 'ppos_restore_usr'@'%' IDENTIFIED WITH mysql_native_password BY '${SANDBOX_RESTORE_PW}';
           GRANT ALL PRIVILEGES ON ppos_control_sandbox.* TO 'ppos_restore_usr'@'%';
           FLUSH PRIVILEGES;
-SQL
+        "
 
         echo "✓ STG-01: Independent instances, separate storage volumes, and non-overlapping users configured."
 
