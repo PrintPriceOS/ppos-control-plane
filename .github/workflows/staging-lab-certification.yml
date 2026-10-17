@@ -67,13 +67,13 @@ jobs:
           mysqld --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci --default-authentication-plugin=mysql_native_password
 
         echo "Waiting for Origin MySQL (port 3306) to be healthy..."
-        until docker exec mysql-origin mysqladmin ping -u root -p"$ORIGIN_ROOT_PW" --silent; do
+        until docker exec -e MYSQL_PWD="$ORIGIN_ROOT_PW" mysql-origin mysqladmin ping -u root --silent; do
           sleep 2
         done
         echo "✓ Origin MySQL (port 3306) is online."
 
         echo "Waiting for Sandbox MySQL (port 3307) to be healthy..."
-        until docker exec mysql-sandbox mysqladmin ping -u root -p"$SANDBOX_ROOT_PW" --silent; do
+        until docker exec -e MYSQL_PWD="$SANDBOX_ROOT_PW" mysql-sandbox mysqladmin ping -u root --silent; do
           sleep 2
         done
         echo "✓ Sandbox MySQL (port 3307) is online."
@@ -86,7 +86,7 @@ jobs:
         SANDBOX_RESTORE_PW=$(cat "$SECRETS_DIR/mysql_sandbox_restore.txt")
 
         # On Origin: create database and origin user
-        docker exec -i mysql-origin mysql -u root -p"$ORIGIN_ROOT_PW" <<SQL
+        docker exec -i -e MYSQL_PWD="$ORIGIN_ROOT_PW" mysql-origin mysql -u root <<SQL
           CREATE DATABASE ppos_control_staging CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
           CREATE USER 'ppos_staging_usr'@'%' IDENTIFIED WITH mysql_native_password BY '${ORIGIN_USR_PW}';
           GRANT ALL PRIVILEGES ON ppos_control_staging.* TO 'ppos_staging_usr'@'%';
@@ -94,7 +94,7 @@ jobs:
         SQL
 
         # On Sandbox: create database and dedicated restore user (initially empty sandbox)
-        docker exec -i mysql-sandbox mysql -u root -p"$SANDBOX_ROOT_PW" <<SQL
+        docker exec -i -e MYSQL_PWD="$SANDBOX_ROOT_PW" mysql-sandbox mysql -u root <<SQL
           CREATE DATABASE ppos_control_sandbox CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
           CREATE USER 'ppos_restore_usr'@'%' IDENTIFIED WITH mysql_native_password BY '${SANDBOX_RESTORE_PW}';
           GRANT ALL PRIVILEGES ON ppos_control_sandbox.* TO 'ppos_restore_usr'@'%';
