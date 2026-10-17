@@ -64,7 +64,7 @@ mysqldump \
   --triggers \
   --events \
   --hex-blob \
-  --databases "${DB_NAME}" > "$RAW_PIPE"
+  "${DB_NAME}" > "$RAW_PIPE"
 
 echo "[2/4] Compressing snapshot..."
 gzip -9 -c "$RAW_PIPE" > "${TMP_DIR}/dump.sql.gz"

@@ -92,7 +92,19 @@ if [ ! -s "$DECRYPTED_SQL" ]; then
   exit 1
 fi
 
-# Verify SQL structure contains required header/table definitions
+# 3.1 Strict SQL AST/Pattern Audit: Reject CREATE DATABASE and USE statements
+# Protect against cross-database pollution or unauthorized database recreation
+if grep -iE '^[[:space:]]*CREATE[[:space:]]+DATABASE' "$DECRYPTED_SQL" >/dev/null; then
+  echo "[FATAL] Decrypted SQL contains prohibited 'CREATE DATABASE' statement. Restore aborted to protect target database boundary." >&2
+  exit 1
+fi
+
+if grep -iE '^[[:space:]]*USE[[:space:]]+' "$DECRYPTED_SQL" >/dev/null; then
+  echo "[FATAL] Decrypted SQL contains prohibited 'USE <database>' statement. Restore aborted to prevent switching away from target '${TARGET_DB}'." >&2
+  exit 1
+fi
+
+# Verify SQL structure contains expected standard DDL/DML markers
 if ! grep -q "CREATE TABLE" "$DECRYPTED_SQL" && ! grep -q "INSERT INTO" "$DECRYPTED_SQL"; then
   echo "[FATAL] Decrypted SQL dump lacks standard DDL/DML markers." >&2
   exit 1
@@ -102,6 +114,22 @@ echo "[4/5] Restoring into isolated target instance (${TARGET_DB})..."
 DB_HOST="${MYSQL_HOST:-127.0.0.1}"
 DB_PORT="${MYSQL_PORT:-3306}"
 DB_USER="${MYSQL_USER:-ppos_staging_usr}"
+
+# If DATABASE_URL is defined, assert that it does NOT contradict the target
+if [ -n "${DATABASE_URL:-}" ]; then
+  URL_DB=$(echo "$DATABASE_URL" | sed -E 's/.*\/\/([^@]+@)?[^\/]+\/([^?]+).*/\2/')
+  if [ -n "$URL_DB" ] && [ "$URL_DB" != "$TARGET_DB" ]; then
+    echo "[FATAL] DATABASE_URL database ('${URL_DB}') contradicts explicit TARGET_DB ('${TARGET_DB}'). Aborting restore drill." >&2
+    exit 1
+  fi
+fi
+
+# Confirm server identity and target schema existence before writing
+CONFIRM_SCHEMA=$(mysql --host="${DB_HOST}" --port="${DB_PORT}" --user="${DB_USER}" -N -e "SELECT SCHEMA_NAME FROM information_schema.SCHEMATA WHERE SCHEMA_NAME='${TARGET_DB}';" 2>/dev/null || true)
+if [ -z "$CONFIRM_SCHEMA" ]; then
+  echo "[FATAL] Target database '${TARGET_DB}' does not exist on target MySQL host '${DB_HOST}:${DB_PORT}' or user '${DB_USER}' lacks SELECT grants. Aborting." >&2
+  exit 1
+fi
 
 START_TIME=$(date +%s%N 2>/dev/null || date +%s)
 

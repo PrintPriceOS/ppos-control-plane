@@ -23,11 +23,13 @@ const mysqlClient = require('../src/api/services/mysqlClient');
 function checkStagingPersistentGuards(envOrOpts = process.env) {
     const nodeEnv = envOrOpts.nodeEnv !== undefined ? envOrOpts.nodeEnv : (envOrOpts.NODE_ENV || process.env.NODE_ENV);
     const bootstrapFlag = envOrOpts.bootstrapFlag !== undefined ? envOrOpts.bootstrapFlag : (envOrOpts.PPOS_STAGING_PERSISTENT_BOOTSTRAP || process.env.PPOS_STAGING_PERSISTENT_BOOTSTRAP);
-    let database = envOrOpts.targetDb !== undefined ? envOrOpts.targetDb : (envOrOpts.MYSQL_DATABASE || process.env.MYSQL_DATABASE || '');
-    let host = envOrOpts.host !== undefined ? envOrOpts.host : (envOrOpts.MYSQL_HOST || process.env.MYSQL_HOST || 'localhost');
 
-    const dbUrl = envOrOpts.DATABASE_URL || process.env.DATABASE_URL;
-    if (dbUrl && !database) {
+    // Explicit DATABASE_URL precedence over MYSQL_* variables
+    let database = '';
+    let host = '';
+    const dbUrl = envOrOpts.DATABASE_URL || (envOrOpts.targetDb === undefined ? process.env.DATABASE_URL : null);
+
+    if (dbUrl) {
         try {
             const parsed = new URL(dbUrl);
             host = parsed.hostname;
@@ -37,12 +39,35 @@ function checkStagingPersistentGuards(envOrOpts = process.env) {
         }
     }
 
+    if (envOrOpts.targetDb !== undefined) {
+        database = envOrOpts.targetDb;
+    } else if (!database) {
+        database = envOrOpts.MYSQL_DATABASE || process.env.MYSQL_DATABASE || '';
+    }
+
+    if (envOrOpts.host !== undefined) {
+        host = envOrOpts.host;
+    } else if (!host) {
+        host = envOrOpts.MYSQL_HOST || process.env.MYSQL_HOST || 'localhost';
+    }
+
     if (nodeEnv === 'production') {
         throw new Error('Strictly forbidden in production environment (NODE_ENV=production)');
     }
 
     if (bootstrapFlag !== 'true') {
         throw new Error('PPOS_STAGING_PERSISTENT_BOOTSTRAP=true is required to execute persistent bootstrap');
+    }
+
+    // Host inspection: Strictly reject known or suspected production endpoints even if database is named staging
+    const hostLower = (host || '').toLowerCase();
+    const FORBIDDEN_HOST_PATTERNS = [
+        'prod', 'production', 'live', 'rds.amazonaws.com', 'azure.com', 'googlecloud', 'printpriceos.com'
+    ];
+    for (const pattern of FORBIDDEN_HOST_PATTERNS) {
+        if (hostLower.includes(pattern) && !hostLower.includes('staging') && !hostLower.includes('test')) {
+            throw new Error(`Forbidden production host identifier '${host}': execution against production infrastructure is strictly rejected`);
+        }
     }
 
     const FORBIDDEN_DB_NAMES = [
@@ -64,14 +89,31 @@ function checkStagingPersistentGuards(envOrOpts = process.env) {
 }
 
 async function verifyTargetDatabaseIsClean(db) {
-    const [tables] = await db.query(`
-        SELECT TABLE_NAME
+    const [allTables] = await db.query(`
+        SELECT TABLE_NAME, TABLE_ROWS
         FROM information_schema.TABLES
-        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN ('schema_versions', 'tenants', 'control_users', 'printer_nodes')
+        WHERE TABLE_SCHEMA = DATABASE()
     `);
 
-    const tableNames = new Set(tables.map(t => t.TABLE_NAME));
+    if (!allTables || allTables.length === 0) {
+        // Completely pristine, empty database
+        return { ok: true, tableCount: 0 };
+    }
 
+    const tableNames = new Set(allTables.map(t => t.TABLE_NAME));
+    const ALLOWED_FOUNDATION_TABLES = new Set(Object.keys(STAGING_FOUNDATION_DDL));
+
+    // 1. Check for unexpected or alien pre-existing tables
+    for (const name of tableNames) {
+        if (!ALLOWED_FOUNDATION_TABLES.has(name) && name !== 'schema_versions') {
+            return {
+                ok: false,
+                reason: `Database contains unexpected pre-existing table '${name}'. Persistent bootstrap requires a clean dedicated schema.`
+            };
+        }
+    }
+
+    // 2. If schema_versions exists, it MUST have 0 rows
     if (tableNames.has('schema_versions')) {
         const [rows] = await db.query(`SELECT COUNT(*) as count FROM schema_versions`);
         if (rows && rows[0] && rows[0].count > 0) {
@@ -79,6 +121,7 @@ async function verifyTargetDatabaseIsClean(db) {
         }
     }
 
+    // 3. If tenants exists, it MUST have 0 rows
     if (tableNames.has('tenants')) {
         const [rows] = await db.query(`SELECT COUNT(*) as count FROM tenants`);
         if (rows && rows[0] && rows[0].count > 0) {
@@ -86,7 +129,15 @@ async function verifyTargetDatabaseIsClean(db) {
         }
     }
 
-    return { ok: true };
+    // 4. If control_users exists, it MUST have 0 rows
+    if (tableNames.has('control_users')) {
+        const [rows] = await db.query(`SELECT COUNT(*) as count FROM control_users`);
+        if (rows && rows[0] && rows[0].count > 0) {
+            return { ok: false, reason: `Database already contains ${rows[0].count} records in control_users table. Cannot bootstrap populated database.` };
+        }
+    }
+
+    return { ok: true, tableCount: allTables.length };
 }
 
 // Canonical Pre-002 Foundations: Essential tables required before migration 002
@@ -115,7 +166,7 @@ const STAGING_FOUNDATION_DDL = {
             email VARCHAR(255) UNIQUE NOT NULL,
             password_hash VARCHAR(255) NOT NULL,
             role ENUM('SUPER_ADMIN', 'OPS_ADMIN', 'TENANT_ADMIN', 'PRINTHOUSE_ADMIN', 'PRINTHOUSE_OPERATOR', 'VIEWER') DEFAULT 'VIEWER',
-            tenant_id VARCHAR(64) NOT NULL DEFAULT 'ppos-production',
+            tenant_id VARCHAR(64) NOT NULL DEFAULT 'ppos-staging',
             printhouse_id VARCHAR(64) NULL,
             status ENUM('ACTIVE', 'SUSPENDED', 'DELETED') DEFAULT 'ACTIVE',
             last_login_at TIMESTAMP NULL,

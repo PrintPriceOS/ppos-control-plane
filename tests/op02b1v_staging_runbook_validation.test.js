@@ -117,6 +117,16 @@ describe('OP-02B.1V: Staging Runbook, Configuration Contracts & Secret Resolutio
             }).toThrow(/Forbidden target database/);
         });
 
+        it('gives DATABASE_URL precedence and rejects production host even if DB is named staging', () => {
+            expect(() => {
+                checkStagingPersistentGuards({
+                    nodeEnv: 'staging',
+                    bootstrapFlag: 'true',
+                    DATABASE_URL: 'mysql://usr:pwd@production-cluster.rds.amazonaws.com:3306/ppos_staging'
+                });
+            }).toThrow(/Forbidden production host identifier/);
+        });
+
         it('accepts explicitly authorized staging or sandbox target databases', () => {
             expect(() => {
                 checkStagingPersistentGuards({
@@ -137,8 +147,9 @@ describe('OP-02B.1V: Staging Runbook, Configuration Contracts & Secret Resolutio
     });
 
     describe('5. Backup & Restore Security Constraints', () => {
-        it('verifies staging_backup_snapshot.sh does not expose password on CLI and uses UUID and SHA256', () => {
+        it('verifies staging_backup_snapshot.sh does not use --databases flag, does not expose password on CLI, and uses UUID and SHA256', () => {
             const backupScript = fs.readFileSync(path.join(__dirname, '../scripts/staging_backup_snapshot.sh'), 'utf8');
+            expect(backupScript).not.toContain('--databases');
             expect(backupScript).toContain('env:BACKUP_PASSPHRASE');
             expect(backupScript).toContain('file:${BACKUP_PASSPHRASE_FILE}');
             expect(backupScript).not.toContain('pass:${BACKUP_PASSPHRASE}');
@@ -154,6 +165,13 @@ describe('OP-02B.1V: Staging Runbook, Configuration Contracts & Secret Resolutio
             expect(restoreScript).toContain('env:BACKUP_PASSPHRASE');
             expect(restoreScript).not.toContain('pass:${PASSPHRASE}');
             expect(restoreScript).toContain('ELAPSED_MS');
+        });
+
+        it('negative test: rejects dumps containing CREATE DATABASE or USE statements', () => {
+            const restoreScript = fs.readFileSync(path.join(__dirname, '../scripts/staging_restore_drill.sh'), 'utf8');
+            expect(restoreScript).toContain('CREATE DATABASE');
+            expect(restoreScript).toContain('USE');
+            expect(restoreScript).toContain('target database boundary');
         });
     });
 });
