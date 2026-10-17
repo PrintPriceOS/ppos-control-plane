@@ -55,7 +55,7 @@ jobs:
           -v origin_mysql_vol:/var/lib/mysql \
           -p 3306:3306 \
           mysql:8.0.46 \
-          mysqld --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci --default-authentication-plugin=mysql_native_password
+          mysqld --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci --default-authentication-plugin=mysql_native_password --log-bin-trust-function-creators=1
 
         # Start Sandbox MySQL instance on port 3307 (with completely independent volume)
         docker run -d \
@@ -64,7 +64,7 @@ jobs:
           -v sandbox_mysql_vol:/var/lib/mysql \
           -p 3307:3306 \
           mysql:8.0.46 \
-          mysqld --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci --default-authentication-plugin=mysql_native_password
+          mysqld --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci --default-authentication-plugin=mysql_native_password --log-bin-trust-function-creators=1
 
         echo "Waiting for Origin MySQL (port 3306) to be healthy..."
         until MYSQL_PWD="$ORIGIN_ROOT_PW" mysqladmin -h 127.0.0.1 -P 3306 -u root ping --silent; do
