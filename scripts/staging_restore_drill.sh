@@ -114,6 +114,10 @@ echo "[4/5] Restoring into isolated target instance (${TARGET_DB})..."
 DB_HOST="${MYSQL_HOST:-127.0.0.1}"
 DB_PORT="${MYSQL_PORT:-3306}"
 DB_USER="${MYSQL_USER:-ppos_staging_usr}"
+DB_PASS="${MYSQL_PASSWORD:-}"
+if [ -z "$DB_PASS" ] && [ -n "${MYSQL_PASSWORD_FILE:-}" ] && [ -f "$MYSQL_PASSWORD_FILE" ]; then
+  DB_PASS=$(cat "$MYSQL_PASSWORD_FILE" | tr -d '\r\n')
+fi
 
 # If DATABASE_URL is defined, assert that it does NOT contradict the target
 if [ -n "${DATABASE_URL:-}" ]; then
@@ -125,7 +129,7 @@ if [ -n "${DATABASE_URL:-}" ]; then
 fi
 
 # Confirm server identity and target schema existence before writing
-CONFIRM_SCHEMA=$(mysql --host="${DB_HOST}" --port="${DB_PORT}" --user="${DB_USER}" -N -e "SELECT SCHEMA_NAME FROM information_schema.SCHEMATA WHERE SCHEMA_NAME='${TARGET_DB}';" 2>/dev/null || true)
+CONFIRM_SCHEMA=$(MYSQL_PWD="${DB_PASS}" mysql --host="${DB_HOST}" --port="${DB_PORT}" --user="${DB_USER}" -N -e "SELECT SCHEMA_NAME FROM information_schema.SCHEMATA WHERE SCHEMA_NAME='${TARGET_DB}';" 2>/dev/null || true)
 if [ -z "$CONFIRM_SCHEMA" ]; then
   echo "[FATAL] Target database '${TARGET_DB}' does not exist on target MySQL host '${DB_HOST}:${DB_PORT}' or user '${DB_USER}' lacks SELECT grants. Aborting." >&2
   exit 1
@@ -133,7 +137,7 @@ fi
 
 START_TIME=$(date +%s%N 2>/dev/null || date +%s)
 
-mysql --host="${DB_HOST}" --port="${DB_PORT}" --user="${DB_USER}" --database="${TARGET_DB}" < "$DECRYPTED_SQL"
+MYSQL_PWD="${DB_PASS}" mysql --host="${DB_HOST}" --port="${DB_PORT}" --user="${DB_USER}" --database="${TARGET_DB}" < "$DECRYPTED_SQL"
 
 END_TIME=$(date +%s%N 2>/dev/null || date +%s)
 

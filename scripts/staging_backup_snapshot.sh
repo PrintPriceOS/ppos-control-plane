@@ -8,6 +8,10 @@ DB_NAME="${MYSQL_DATABASE:-ppos_control_staging}"
 DB_HOST="${MYSQL_HOST:-127.0.0.1}"
 DB_PORT="${MYSQL_PORT:-3306}"
 DB_USER="${MYSQL_USER:-ppos_staging_usr}"
+DB_PASS="${MYSQL_PASSWORD:-}"
+if [ -z "$DB_PASS" ] && [ -n "${MYSQL_PASSWORD_FILE:-}" ] && [ -f "$MYSQL_PASSWORD_FILE" ]; then
+  DB_PASS=$(cat "$MYSQL_PASSWORD_FILE" | tr -d '\r\n')
+fi
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
 BACKUP_UUID=$(cat /proc/sys/kernel/random/uuid 2>/dev/null || openssl rand -hex 16)
 DEST_BASE="${BACKUP_DIR}/${DB_NAME}_${TIMESTAMP}_${BACKUP_UUID}"
@@ -54,7 +58,7 @@ fi
 
 echo "[1/4] Dumping database '${DB_NAME}' via single-transaction stream..."
 # Using pipefail to ensure any failure in mysqldump or gzip aborts the process
-mysqldump \
+MYSQL_PWD="${DB_PASS}" mysqldump \
   --host="${DB_HOST}" \
   --port="${DB_PORT}" \
   --user="${DB_USER}" \
