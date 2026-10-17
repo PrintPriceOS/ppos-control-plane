@@ -2,7 +2,7 @@ const fs = require('fs');
 
 let jobsCode = fs.readFileSync('src/api/routes/adminPreflightJobs.js', 'utf8');
 
-const targetSectionOld = \`
+const targetSectionOld = `
         const safeParseLocal = str => {
             if (!str) return null;
             if (typeof str !== 'string') return str;
@@ -82,9 +82,9 @@ const targetSectionOld = \`
             Array.isArray(rawCanonical?.failedFixes) ? rawCanonical.failedFixes.length : 0,
             Array.isArray(rawCanonical?.failed_fixes) ? rawCanonical.failed_fixes.length : 0
         );
-\`;
+`;
 
-const targetSectionNew = \`
+const targetSectionNew = `
         const safeParseLocal = str => {
             if (!str) return null;
             if (typeof str !== 'string') return str;
@@ -166,7 +166,7 @@ const targetSectionNew = \`
             Array.isArray(jobPayload?.failedFixes) ? jobPayload.failedFixes.length : 0,
             Array.isArray(jobPayload?.failed_fixes) ? jobPayload.failed_fixes.length : 0
         );
-\`;
+`;
 
 jobsCode = jobsCode.replace(targetSectionOld, targetSectionNew);
 fs.writeFileSync('src/api/routes/adminPreflightJobs.js', jobsCode);

@@ -17,6 +17,8 @@ const migrationIntegrity = require('../../../scripts/lib/migrationIntegrity');
 const ledgerRead = require('./migrationLedgerReadService');
 const ledgerWrite = require('./migrationLedgerWriteService');
 const { parseMigrationSql } = require('./migrationSqlParser');
+const { handleLegacyPhaseMarkerStatement } = require('./legacyPhaseMarkerAdapter');
+const { runMigration092PreRemediation } = require('./migration092ReconciliationService');
 
 async function ensurePreviousFailuresColumn(connOrDb) {
   try {
@@ -87,12 +89,10 @@ async function runMigration140PreRemediation(connOrDb) {
 
     // printhouse_machines
     { table: 'printhouse_machines', columns: ['id'], uniqueRequired: true },
-    { table: 'printhouse_machines', columns: ['id', 'tenant_id'], uniqueRequired: true },
     { table: 'printhouse_machines', columns: ['printhouse_id', 'tenant_id'], uniqueRequired: false },
 
     // materials_catalog
     { table: 'materials_catalog', columns: ['id'], uniqueRequired: true },
-    { table: 'materials_catalog', columns: ['id', 'tenant_id'], uniqueRequired: true },
     { table: 'materials_catalog', columns: ['tenant_id'], uniqueRequired: false },
 
     // Child FK supporting indexes
@@ -742,6 +742,178 @@ async function runMigration140PreRemediation(connOrDb) {
   logger.info({ event: 'migration_remediation_140_success', message: 'Schema normalization pre-remediation completed (RC7/RC11/RC12)' });
 }
 
+/**
+ * CI-02K.2: Post-validation for Migration 140.
+ * Must execute IMMEDIATELY after all SQL statements of migration 140 succeed
+ * and BEFORE marking the state as APPLIED in the schema_versions ledger.
+ *
+ * Verifies via INFORMATION_SCHEMA:
+ * 1. Existence of printhouse_machines, materials_catalog, and printhouse_machine_materials.
+ * 2. UNIQUE index on printhouse_machines with ordered leftmost columns (id, tenant_id), full column indexing.
+ * 3. UNIQUE index on materials_catalog with ordered leftmost columns (id, tenant_id), full column indexing.
+ * 4. Composite FK fk_mm_machine on printhouse_machine_materials(machine_id, tenant_id) -> printhouse_machines(id, tenant_id) [CASCADE/CASCADE].
+ * 5. Composite FK fk_mm_material on printhouse_machine_materials(material_catalog_id, tenant_id) -> materials_catalog(id, tenant_id) [CASCADE/CASCADE].
+ */
+async function validateMigration140PostConditions(connOrDb) {
+  logger.info({ event: 'migration_140_post_validation_start', message: 'Verifying post-conditions for migration 140' });
+
+  // 1. Verify required tables exist
+  const expectedTables = ['printhouse_machines', 'materials_catalog', 'printhouse_machine_materials'];
+  const [tableRows] = await connOrDb.query(`
+    SELECT TABLE_NAME
+    FROM information_schema.TABLES
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN ('printhouse_machines', 'materials_catalog', 'printhouse_machine_materials')
+  `);
+  const existingTables = new Set((tableRows || []).map(r => r.TABLE_NAME));
+  for (const t of expectedTables) {
+    if (!existingTables.has(t)) {
+      throw new Error(`POSTCONDITION FAILED: Migration 140 did not result in expected table '${t}'`);
+    }
+  }
+
+  // 2. Verify UNIQUE indexes on printhouse_machines(id, tenant_id) and materials_catalog(id, tenant_id)
+  const [statRows] = await connOrDb.query(`
+    SELECT TABLE_NAME, INDEX_NAME, NON_UNIQUE, SEQ_IN_INDEX, COLUMN_NAME, SUB_PART
+    FROM information_schema.STATISTICS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN ('printhouse_machines', 'materials_catalog')
+    ORDER BY TABLE_NAME, INDEX_NAME, SEQ_IN_INDEX
+  `);
+
+  const tableIndexes = new Map();
+  for (const row of statRows || []) {
+    const tableName = row.TABLE_NAME;
+    const indexName = row.INDEX_NAME;
+    if (!tableIndexes.has(tableName)) {
+      tableIndexes.set(tableName, new Map());
+    }
+    const idxMap = tableIndexes.get(tableName);
+    if (!idxMap.has(indexName)) {
+      idxMap.set(indexName, {
+        nonUnique: Number(row.NON_UNIQUE) === 1,
+        columns: []
+      });
+    }
+    idxMap.get(indexName).columns.push({
+      name: row.COLUMN_NAME,
+      subPart: row.SUB_PART != null ? Number(row.SUB_PART) : null
+    });
+  }
+
+  const requiredUniqueIndexes = [
+    { table: 'printhouse_machines', columns: ['id', 'tenant_id'] },
+    { table: 'materials_catalog', columns: ['id', 'tenant_id'] }
+  ];
+
+  for (const req of requiredUniqueIndexes) {
+    const idxMap = tableIndexes.get(req.table);
+    let satisfied = false;
+    if (idxMap) {
+      for (const [idxName, idxDef] of idxMap.entries()) {
+        if (idxDef.nonUnique) continue; // Must be UNIQUE
+        if (idxDef.columns.length < req.columns.length) continue;
+
+        let colsMatch = true;
+        for (let i = 0; i < req.columns.length; i++) {
+          const colDef = idxDef.columns[i];
+          if (colDef.name.toLowerCase() !== req.columns[i].toLowerCase() || colDef.subPart !== null) {
+            colsMatch = false;
+            break;
+          }
+        }
+        if (colsMatch) {
+          satisfied = true;
+          break;
+        }
+      }
+    }
+
+    if (!satisfied) {
+      throw new Error(`POSTCONDITION FAILED: Migration 140 did not establish valid UNIQUE index on ${req.table}(${req.columns.join(', ')})`);
+    }
+  }
+
+  // 3. Verify Composite Foreign Keys on printhouse_machine_materials
+  const [fkRows] = await connOrDb.query(`
+    SELECT
+      k.CONSTRAINT_NAME,
+      k.COLUMN_NAME,
+      k.ORDINAL_POSITION,
+      k.REFERENCED_TABLE_NAME,
+      k.REFERENCED_COLUMN_NAME,
+      rc.UPDATE_RULE,
+      rc.DELETE_RULE
+    FROM information_schema.KEY_COLUMN_USAGE k
+    JOIN information_schema.REFERENTIAL_CONSTRAINTS rc
+      ON k.CONSTRAINT_NAME = rc.CONSTRAINT_NAME AND k.CONSTRAINT_SCHEMA = rc.CONSTRAINT_SCHEMA
+    WHERE k.TABLE_SCHEMA = DATABASE()
+      AND k.TABLE_NAME = 'printhouse_machine_materials'
+      AND k.REFERENCED_TABLE_NAME IS NOT NULL
+    ORDER BY k.CONSTRAINT_NAME, k.ORDINAL_POSITION
+  `);
+
+  const fksByName = new Map();
+  for (const row of fkRows || []) {
+    if (!fksByName.has(row.CONSTRAINT_NAME)) {
+      fksByName.set(row.CONSTRAINT_NAME, {
+        childCols: [],
+        parentTable: row.REFERENCED_TABLE_NAME,
+        parentCols: [],
+        updateRule: row.UPDATE_RULE,
+        deleteRule: row.DELETE_RULE
+      });
+    }
+    const fkDef = fksByName.get(row.CONSTRAINT_NAME);
+    fkDef.childCols.push(row.COLUMN_NAME);
+    fkDef.parentCols.push(row.REFERENCED_COLUMN_NAME);
+  }
+
+  const expectedMachineMaterialsFks = [
+    {
+      expectedParent: 'printhouse_machines',
+      childCols: ['machine_id', 'tenant_id'],
+      parentCols: ['id', 'tenant_id'],
+      updateRule: 'CASCADE',
+      deleteRule: 'CASCADE'
+    },
+    {
+      expectedParent: 'materials_catalog',
+      childCols: ['material_catalog_id', 'tenant_id'],
+      parentCols: ['id', 'tenant_id'],
+      updateRule: 'CASCADE',
+      deleteRule: 'CASCADE'
+    }
+  ];
+
+  for (const reqFk of expectedMachineMaterialsFks) {
+    let matched = false;
+    for (const [name, fk] of fksByName.entries()) {
+      if (fk.parentTable.toLowerCase() !== reqFk.expectedParent.toLowerCase()) continue;
+      if (fk.updateRule.toUpperCase() !== reqFk.updateRule || fk.deleteRule.toUpperCase() !== reqFk.deleteRule) continue;
+      if (fk.childCols.length !== reqFk.childCols.length) continue;
+
+      let colsMatch = true;
+      for (let i = 0; i < reqFk.childCols.length; i++) {
+        if (fk.childCols[i].toLowerCase() !== reqFk.childCols[i].toLowerCase() ||
+            fk.parentCols[i].toLowerCase() !== reqFk.parentCols[i].toLowerCase()) {
+          colsMatch = false;
+          break;
+        }
+      }
+
+      if (colsMatch) {
+        matched = true;
+        break;
+      }
+    }
+
+    if (!matched) {
+      throw new Error(`POSTCONDITION FAILED: Migration 140 did not establish valid composite foreign key to ${reqFk.expectedParent}(${reqFk.parentCols.join(', ')}) on [${reqFk.childCols.join(', ')}] with CASCADE/CASCADE`);
+    }
+  }
+
+  logger.info({ event: 'migration_140_post_validation_success', message: 'Migration 140 post-conditions verified successfully' });
+}
+
 class MigrationService {
     constructor() {
         this.migrationsPath = path.join(__dirname, '../../../migrations');
@@ -847,6 +1019,10 @@ class MigrationService {
                     const canonicalHash = migrationIntegrity.calculateFileChecksum(m.absolutePath);
                     const content = fs.readFileSync(m.absolutePath, 'utf8');
 
+                    if (relPath === 'migrations/092_phase144_governed_high_risk_cohort_intervention_approval_gate.sql') {
+                        await runMigration092PreRemediation(connection);
+                    }
+
                     if (relPath === 'migrations/140_phase191e_materials_capacity_leadtimes.sql') {
                         await runMigration140PreRemediation(connection);
                     }
@@ -931,9 +1107,12 @@ class MigrationService {
                               WHERE execution_id = ?
                             `, [executionId]);
                             
-                            // Execute statement
+                            // Execute statement (with strict compatibility adapter for legacy phase markers)
                             try {
-                                await connection.query(lastSql);
+                                const handledMarker = await handleLegacyPhaseMarkerStatement(connection, lastSql, m.filename);
+                                if (!handledMarker) {
+                                    await connection.query(lastSql);
+                                }
                             } catch (err) {
                                 // Idempotency: skip duplicates, table exists, or trigger exists
                                 const ignoreCodes = ['ER_DUP_FIELDNAME', 'ER_DUP_KEYNAME', 'ER_TABLE_EXISTS_ERROR', 'ER_DUP_INDEX', 'ER_TRG_ALREADY_EXISTS'];
@@ -942,6 +1121,11 @@ class MigrationService {
                                 }
                                 throw err;
                             }
+                        }
+
+                        // CI-02K.2: Governed post-validation for migration 140 prior to APPLIED certification
+                        if (relPath === 'migrations/140_phase191e_materials_capacity_leadtimes.sql') {
+                            await validateMigration140PostConditions(connection);
                         }
 
                         // Success: mark as APPLIED
@@ -1025,5 +1209,8 @@ const migrationService = new MigrationService();
 module.exports = {
     MigrationService,
     migrationService,
-    runMigration140PreRemediation
+    runMigration140PreRemediation,
+    validateMigration140PostConditions,
+    runMigration092PreRemediation,
+    handleLegacyPhaseMarkerStatement
 };

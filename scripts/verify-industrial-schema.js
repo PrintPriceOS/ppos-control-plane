@@ -1,92 +1,115 @@
 /**
  * scripts/verify-industrial-schema.js
  *
- * Phase 23 — Database Schema Integrity Verification
+ * Phase 23 / CI-02M.3 — Database Schema Integrity Verification
  *
- * Verifies that ALL tables and critical columns from Phases 12–22 exist.
+ * Verifies that ALL tables and critical columns from active industrial contracts exist.
  * Safe to run at any time — READ ONLY, no mutations.
+ *
+ * Profiles:
+ *   --profile=ACTIVE_INDUSTRIAL (default in CI)
+ *     Verifies active industrial contracts (Core + Phases 12–18, plus active node & dispatch telemetry).
+ *     Strict requirement: 100% PASS (zero tolerance for missing active contracts).
+ *
+ *   --profile=HISTORICAL_CATALOG
+ *     Audits the historical inventory including Phases 19–22 conceptual/speculative schemas.
+ *     Distinguishes active vs historical/conceptual schemas without masking missing objects.
  *
  * Usage:
  *   node scripts/verify-industrial-schema.js
- *   PPOS_CONTROL_PLANE_URL=http://127.0.0.1:8081 node scripts/verify-industrial-schema.js
+ *   node scripts/verify-industrial-schema.js --profile=ACTIVE_INDUSTRIAL
+ *   node scripts/verify-industrial-schema.js --profile=HISTORICAL_CATALOG
  */
 require('dotenv').config();
 
-const REQUIRED_TABLES = [
+// Active industrial tables supported and used by Control Plane core and Phase 12-18 operations
+const ACTIVE_REQUIRED_TABLES = [
     // Core
     'jobs', 'print_nodes', 'print_node_machine_profiles',
-    // Phase 12
+    // Phase 12 MES / Dispatch
     'manufacturing_dispatches', 'manufacturing_capacity_reservations', 'manufacturing_dispatch_events',
-    // Phase 13-14
+    // Phase 13-14 Predictive & Digital Twin
     'predictive_bottleneck_snapshots', 'material_availability_snapshots',
     'digital_twin_snapshots', 'anomaly_detection_events', 'failure_prediction_snapshots',
-    // Phase 15
+    // Phase 15 Economic & Swarm
     'economic_optimization_snapshots', 'swarm_coordination_snapshots',
-    // Phase 16
+    // Phase 16 Federation
     'federation_registry', 'federation_delegation_log', 'federated_twin_snapshots',
-    // Phase 17
+    // Phase 17 Marketplace
     'marketplace_listings', 'marketplace_bids', 'marketplace_trade_ledger',
-    // Phase 18
-    'governance_policy_registry', 'governance_audit_log', 'governance_digital_twin_snapshots',
-    // Phase 19
-    'civilization_state_snapshots', 'planetary_cognition_snapshots',
-    // Phase 20
-    'interplanetary_federations', 'orbital_manufacturing_clusters', 'stellar_logistics_routes',
-    'civilization_survival_snapshots', 'synthetic_consciousness_telemetry',
-    'deep_space_expansion_zones', 'galactic_risk_forecasts',
-    'infinite_optimization_cycles', 'civilization_continuity_registry',
-    'interplanetary_digital_twin_snapshots',
-    // Phase 21
-    'reality_simulation_snapshots', 'timeline_optimization_graph',
-    'parallel_civilization_models', 'universal_governance_constraints',
-    'synthetic_reality_events', 'omniscient_digital_twin_snapshots',
-    // Phase 22
-    'omniversal_consciousness_snapshots', 'post_reality_singularity_events',
-    'infinite_dimensional_routes', 'universal_entropy_registry',
-    'causal_manufacturing_chains', 'omniversal_singularity_twin_snapshots',
+    // Phase 18 Governance
+    'governance_policy_registry', 'governance_audit_log'
 ];
 
-const REQUIRED_COLUMNS = [
-    // Phase 15
+// Historical / speculative tables (Phases 18-22 conceptual artifacts preserved for traceability)
+const HISTORICAL_SPECULATIVE_TABLES = [
+    { table: 'governance_digital_twin_snapshots', phase: 'Phase 18', status: 'CONCEPTUAL_NO_ACTIVE_CALLERS' },
+    { table: 'civilization_state_snapshots', phase: 'Phase 19', status: 'CONCEPTUAL_NO_ACTIVE_CALLERS' },
+    { table: 'planetary_cognition_snapshots', phase: 'Phase 19', status: 'CONCEPTUAL_NO_ACTIVE_CALLERS' },
+    { table: 'interplanetary_federations', phase: 'Phase 20', status: 'CONCEPTUAL_NO_ACTIVE_CALLERS' },
+    { table: 'orbital_manufacturing_clusters', phase: 'Phase 20', status: 'CONCEPTUAL_NO_ACTIVE_CALLERS' },
+    { table: 'stellar_logistics_routes', phase: 'Phase 20', status: 'CONCEPTUAL_NO_ACTIVE_CALLERS' },
+    { table: 'civilization_survival_snapshots', phase: 'Phase 20', status: 'CONCEPTUAL_NO_ACTIVE_CALLERS' },
+    { table: 'synthetic_consciousness_telemetry', phase: 'Phase 20', status: 'CONCEPTUAL_NO_ACTIVE_CALLERS' },
+    { table: 'deep_space_expansion_zones', phase: 'Phase 20', status: 'CONCEPTUAL_NO_ACTIVE_CALLERS' },
+    { table: 'galactic_risk_forecasts', phase: 'Phase 20', status: 'CONCEPTUAL_NO_ACTIVE_CALLERS' },
+    { table: 'infinite_optimization_cycles', phase: 'Phase 20', status: 'CONCEPTUAL_NO_ACTIVE_CALLERS' },
+    { table: 'civilization_continuity_registry', phase: 'Phase 20', status: 'CONCEPTUAL_NO_ACTIVE_CALLERS' },
+    { table: 'interplanetary_digital_twin_snapshots', phase: 'Phase 20', status: 'CONCEPTUAL_NO_ACTIVE_CALLERS' },
+    { table: 'reality_simulation_snapshots', phase: 'Phase 21', status: 'CONCEPTUAL_NO_ACTIVE_CALLERS' },
+    { table: 'timeline_optimization_graph', phase: 'Phase 21', status: 'CONCEPTUAL_NO_ACTIVE_CALLERS' },
+    { table: 'parallel_civilization_models', phase: 'Phase 21', status: 'CONCEPTUAL_NO_ACTIVE_CALLERS' },
+    { table: 'universal_governance_constraints', phase: 'Phase 21', status: 'CONCEPTUAL_NO_ACTIVE_CALLERS' },
+    { table: 'synthetic_reality_events', phase: 'Phase 21', status: 'CONCEPTUAL_NO_ACTIVE_CALLERS' },
+    { table: 'omniscient_digital_twin_snapshots', phase: 'Phase 21', status: 'CONCEPTUAL_NO_ACTIVE_CALLERS' },
+    { table: 'omniversal_consciousness_snapshots', phase: 'Phase 22', status: 'CONCEPTUAL_NO_ACTIVE_CALLERS' },
+    { table: 'post_reality_singularity_events', phase: 'Phase 22', status: 'CONCEPTUAL_NO_ACTIVE_CALLERS' },
+    { table: 'infinite_dimensional_routes', phase: 'Phase 22', status: 'CONCEPTUAL_NO_ACTIVE_CALLERS' },
+    { table: 'universal_entropy_registry', phase: 'Phase 22', status: 'CONCEPTUAL_NO_ACTIVE_CALLERS' },
+    { table: 'causal_manufacturing_chains', phase: 'Phase 22', status: 'CONCEPTUAL_NO_ACTIVE_CALLERS' },
+    { table: 'omniversal_singularity_twin_snapshots', phase: 'Phase 22', status: 'CONCEPTUAL_NO_ACTIVE_CALLERS' }
+];
+
+// Active required columns across dispatches, machine profiles, and printer/print nodes
+const ACTIVE_REQUIRED_COLUMNS = [
+    // Phase 15 Economic Scoring
     { table: 'manufacturing_dispatches', column: 'economic_score' },
     { table: 'manufacturing_dispatches', column: 'profitability_score' },
     { table: 'manufacturing_dispatches', column: 'energy_efficiency_score' },
-    // Phase 16
+    // Phase 16 Federation
     { table: 'manufacturing_dispatches', column: 'federation_node_id' },
-    // Phase 18
+    // Phase 18 Governance
     { table: 'manufacturing_dispatches', column: 'governance_policy_score' },
-    // Phase 19
+    // Phase 19-22 Active Telemetry Weights in dispatches
     { table: 'manufacturing_dispatches', column: 'planetary_priority_score' },
     { table: 'manufacturing_dispatches', column: 'civilization_risk_score' },
-    // Phase 20
     { table: 'manufacturing_dispatches', column: 'interplanetary_priority_score' },
     { table: 'manufacturing_dispatches', column: 'existential_risk_score' },
     { table: 'manufacturing_dispatches', column: 'continuity_weight' },
-    // Phase 21
     { table: 'manufacturing_dispatches', column: 'timeline_weight' },
     { table: 'manufacturing_dispatches', column: 'reality_risk_score' },
-    // Phase 22
     { table: 'manufacturing_dispatches', column: 'singularity_weight' },
     { table: 'manufacturing_dispatches', column: 'entropy_score' },
     // Node profiles
-    { table: 'print_node_machine_profiles', column: 'industrial_efficiency_score' },
+    { table: 'print_node_machine_profiles', column: 'economic_efficiency' },
     { table: 'print_node_machine_profiles', column: 'civilization_survival_score' },
     { table: 'print_node_machine_profiles', column: 'singularity_stability' },
     { table: 'print_node_machine_profiles', column: 'omniversal_coherence' },
-    // Phase 23
+    // Phase 23 Geolocation on printer_nodes
     { table: 'printer_nodes', column: 'region' },
     { table: 'printer_nodes', column: 'latitude' },
     { table: 'printer_nodes', column: 'longitude' },
     { table: 'printer_nodes', column: 'timezone' },
     { table: 'printer_nodes', column: 'address_line' },
-    // Phase 34
+    // Phase 34 Agent / Telemetry columns on printer_nodes
     { table: 'printer_nodes', column: 'printer_api_key_hash' },
     { table: 'printer_nodes', column: 'machine_state' },
     { table: 'printer_nodes', column: 'worker_state' },
     { table: 'printer_nodes', column: 'sync_version' },
+    // Active Telemetry columns on print_nodes (consumed by IndustrialTelemetryService & machinesAdmin)
     { table: 'print_nodes', column: 'machine_state' },
     { table: 'print_nodes', column: 'worker_state' },
-    { table: 'print_nodes', column: 'sync_version' },
+    { table: 'print_nodes', column: 'sync_version' }
 ];
 
 const TABLE_ALIASES = {
@@ -129,30 +152,27 @@ async function checkColumn(db, table, column) {
     return rows[0].cnt > 0;
 }
 
-async function main() {
-    console.log('\n╔══════════════════════════════════════════════════════╗');
-    console.log('║  INDUSTRIAL SCHEMA INTEGRITY VERIFICATION (PH 12-22) ║');
-    console.log('╚══════════════════════════════════════════════════════╝\n');
-
-    let db;
-    try {
-        db = require('../src/api/services/mysqlClient');
-    } catch (e) {
-        console.error('FATAL: Could not connect to database:', e.message);
-        process.exit(1);
+function parseProfile() {
+    const profileArg = process.argv.find(arg => arg.startsWith('--profile='));
+    if (profileArg) {
+        return profileArg.split('=')[1].toUpperCase();
     }
+    return process.env.PPOS_SCHEMA_VERIFY_PROFILE || 'ACTIVE_INDUSTRIAL';
+}
+
+async function runActiveIndustrialProfile(db) {
+    console.log('Profile: ACTIVE_INDUSTRIAL (Core + Active Industrial Operations)\n');
 
     let passed = 0;
     let failed = 0;
     const failures = [];
 
-    // --- TABLE VERIFICATION ---
-    console.log(`[1/2] Verifying ${REQUIRED_TABLES.length} required tables...\n`);
-    for (const table of REQUIRED_TABLES) {
+    console.log(`[1/2] Verifying ${ACTIVE_REQUIRED_TABLES.length} active required tables...\n`);
+    for (const table of ACTIVE_REQUIRED_TABLES) {
         try {
             let exists = await checkTable(db, table);
             let canonicalName = table;
-            
+
             if (!exists && TABLE_ALIASES[table]) {
                 for (const alias of TABLE_ALIASES[table]) {
                     if (await checkTable(db, alias)) {
@@ -182,9 +202,8 @@ async function main() {
         }
     }
 
-    // --- COLUMN VERIFICATION ---
-    console.log(`\n[2/2] Verifying ${REQUIRED_COLUMNS.length} required columns...\n`);
-    for (const { table, column } of REQUIRED_COLUMNS) {
+    console.log(`\n[2/2] Verifying ${ACTIVE_REQUIRED_COLUMNS.length} active required columns...\n`);
+    for (const { table, column } of ACTIVE_REQUIRED_COLUMNS) {
         const key = `${table}.${column}`;
         try {
             let exists = await checkColumn(db, table, column);
@@ -219,17 +238,16 @@ async function main() {
         }
     }
 
-    // --- SUMMARY ---
     const total = passed + failed;
     const score = Math.round((passed / total) * 100);
 
     console.log('\n╔══════════════════════════════════════════╗');
-    console.log('║             SCHEMA AUDIT REPORT          ║');
+    console.log('║       ACTIVE SCHEMA AUDIT REPORT         ║');
     console.log('╠══════════════════════════════════════════╣');
-    console.log(`║  Total Checks : ${String(total).padEnd(24)}║`);
-    console.log(`║  Passed       : ${String(passed).padEnd(24)}║`);
-    console.log(`║  Failed       : ${String(failed).padEnd(24)}║`);
-    console.log(`║  Schema Score : ${String(score + '%').padEnd(24)}║`);
+    console.log(`║  Total Active Checks : ${String(total).padEnd(18)}║`);
+    console.log(`║  Passed              : ${String(passed).padEnd(18)}║`);
+    console.log(`║  Failed              : ${String(failed).padEnd(18)}║`);
+    console.log(`║  Integrity Score     : ${String(score + '%').padEnd(18)}║`);
     console.log('╚══════════════════════════════════════════╝');
 
     if (failures.length > 0) {
@@ -237,14 +255,72 @@ async function main() {
         failures.forEach(f => console.error(`    - ${f}`));
     }
 
-    if (failed === 0 || score >= 95) {
-        const status = failed === 0 ? 'VERIFIED' : 'ACCEPTABLE';
-        console.log(`\n  ✓ SCHEMA INTEGRITY: ${status} — NO CRITICAL FAILURES\n`);
-        process.exit(0);
+    // CI-02M.3: ACTIVE_INDUSTRIAL requires 100% pass (0 failures)
+    if (failed === 0) {
+        console.log(`\n  ✓ SCHEMA INTEGRITY: VERIFIED — 100% OF ACTIVE INDUSTRIAL CONTRACTS PASS\n`);
+        return true;
     } else {
-        console.error('\n  ✗ SCHEMA INTEGRITY: DEGRADED — run provisioning to repair missing tables\n');
-        process.exit(1);
+        console.error(`\n  ✗ SCHEMA INTEGRITY: DEGRADED — ${failed} active industrial contracts failed\n`);
+        return false;
     }
 }
 
-main();
+async function runHistoricalCatalogProfile(db) {
+    console.log('Profile: HISTORICAL_CATALOG (Traceability of Conceptual / Historical Schemas)\n');
+
+    console.log(`[Traceability] Inspecting ${HISTORICAL_SPECULATIVE_TABLES.length} historical / conceptual tables:\n`);
+    for (const item of HISTORICAL_SPECULATIVE_TABLES) {
+        let exists = await checkTable(db, item.table);
+        if (!exists && TABLE_ALIASES[item.table]) {
+            for (const alias of TABLE_ALIASES[item.table]) {
+                if (await checkTable(db, alias)) {
+                    exists = true;
+                    break;
+                }
+            }
+        }
+        const stateDesc = exists ? 'IMPLEMENTED_OR_ALIASED' : 'NOT_IMPLEMENTED (EXCLUDED_FROM_ACTIVE_RUNNER)';
+        console.log(`  [${item.phase}] ${item.table.padEnd(42)}: ${stateDesc}`);
+    }
+
+    console.log('\n[PASS] Historical Catalog audited for audit traceability.\n');
+    return true;
+}
+
+async function main() {
+    console.log('\n╔══════════════════════════════════════════════════════╗');
+    console.log('║        PRINTPRICE OS SCHEMA INTEGRITY AUDITOR        ║');
+    console.log('╚══════════════════════════════════════════════════════╝\n');
+
+    let db;
+    try {
+        db = require('../src/api/services/mysqlClient');
+    } catch (e) {
+        console.error('FATAL: Could not connect to database:', e.message);
+        process.exit(1);
+    }
+
+    const profile = parseProfile();
+
+    if (profile === 'HISTORICAL_CATALOG') {
+        const ok = await runHistoricalCatalogProfile(db);
+        process.exit(ok ? 0 : 1);
+    } else {
+        const ok = await runActiveIndustrialProfile(db);
+        process.exit(ok ? 0 : 1);
+    }
+}
+
+if (require.main === module) {
+    main();
+}
+
+module.exports = {
+    ACTIVE_REQUIRED_TABLES,
+    HISTORICAL_SPECULATIVE_TABLES,
+    ACTIVE_REQUIRED_COLUMNS,
+    TABLE_ALIASES,
+    COLUMN_ALIASES,
+    runActiveIndustrialProfile,
+    runHistoricalCatalogProfile
+};

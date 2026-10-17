@@ -2,7 +2,7 @@ const fs = require('fs');
 
 let jobsCode = fs.readFileSync('src/api/routes/adminPreflightJobs.js', 'utf8');
 
-const targetSectionOld = \`
+const targetSectionOld = `
         const fixCoverage = rawCanonical?.fix_coverage || rawCanonical?.result?.fix_coverage || null;
 
         const currentStatus = rawCanonical?.job?.status || rawCanonical?.status || localRecord?.status || 'UNKNOWN';
@@ -70,9 +70,9 @@ const targetSectionOld = \`
             Array.isArray(rawCanonical?.failedFixes) ? rawCanonical.failedFixes.length : 0,
             Array.isArray(rawCanonical?.failed_fixes) ? rawCanonical.failed_fixes.length : 0
         );
-\`;
+`;
 
-const targetSectionNew = \`
+const targetSectionNew = `
         const jobPayload = rawCanonical?.job || rawCanonical;
 
         const fixCoverage = jobPayload?.fix_coverage || jobPayload?.result?.fix_coverage || null;
@@ -142,7 +142,7 @@ const targetSectionNew = \`
             Array.isArray(jobPayload?.failedFixes) ? jobPayload.failedFixes.length : 0,
             Array.isArray(jobPayload?.failed_fixes) ? jobPayload.failed_fixes.length : 0
         );
-\`;
+`;
 
 if (jobsCode.includes(targetSectionOld)) {
     jobsCode = jobsCode.replace(targetSectionOld, targetSectionNew);

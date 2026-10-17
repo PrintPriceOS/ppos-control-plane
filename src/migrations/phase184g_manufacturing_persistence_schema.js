@@ -596,12 +596,20 @@ async function up(db) {
     ) ENGINE=InnoDB
   `);
 
-  try {
-    await db.query("ALTER TABLE manufacturing_dispatches ADD COLUMN production_package_id VARCHAR(64) NULL");
-  } catch (e) {}
-  try {
-    await db.query("ALTER TABLE manufacturing_dispatches ADD COLUMN print_node_id VARCHAR(64) NULL");
-  } catch (e) {}
+  // Hardened idempotent ALTER TABLE operations
+  const ensureDispatchCol = async (colName, colDef) => {
+    const rows = await db.query(
+      `SELECT COLUMN_NAME FROM information_schema.columns
+       WHERE table_schema = DATABASE() AND table_name = 'manufacturing_dispatches' AND column_name = ?`,
+      [colName]
+    );
+    if (rows.length === 0) {
+      await db.query(`ALTER TABLE manufacturing_dispatches ADD COLUMN ${colName} ${colDef}`);
+    }
+  };
+
+  await ensureDispatchCol('production_package_id', 'VARCHAR(64) NULL');
+  await ensureDispatchCol('print_node_id', 'VARCHAR(64) NULL');
 }
 
 module.exports = { up };

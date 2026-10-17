@@ -199,6 +199,9 @@ async function up(db) {
     { table: 'print_nodes', column: 'cluster_id',    type: 'VARCHAR(64) NULL' },
     { table: 'print_nodes', column: 'latitude',      type: 'DECIMAL(10, 8) NULL' },
     { table: 'print_nodes', column: 'longitude',     type: 'DECIMAL(11, 8) NULL' },
+    { table: 'print_nodes', column: 'machine_state', type: 'VARCHAR(64) NULL' },
+    { table: 'print_nodes', column: 'worker_state',  type: 'VARCHAR(64) NULL' },
+    { table: 'print_nodes', column: 'sync_version',  type: 'VARCHAR(32) NULL' },
     // Phase 1 Industrial Integration columns
     { table: 'printer_nodes', column: 'supported_products',   type: 'JSON NULL' },
     { table: 'printer_nodes', column: 'binding_capabilities', type: 'JSON NULL' },
