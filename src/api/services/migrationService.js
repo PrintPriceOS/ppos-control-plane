@@ -19,6 +19,7 @@ const ledgerWrite = require('./migrationLedgerWriteService');
 const { parseMigrationSql } = require('./migrationSqlParser');
 const { handleLegacyPhaseMarkerStatement } = require('./legacyPhaseMarkerAdapter');
 const { runMigration092PreRemediation } = require('./migration092ReconciliationService');
+const { runMigration161PreRemediation } = require('./migration161ReconciliationService');
 
 async function ensurePreviousFailuresColumn(connOrDb) {
   try {
@@ -1027,6 +1028,10 @@ class MigrationService {
                         await runMigration140PreRemediation(connection);
                     }
 
+                    if (relPath === 'migrations/161_phase184g_industrial_persistence_ledger.sql') {
+                        await runMigration161PreRemediation(connection);
+                    }
+
                     logger.info({ event: 'migration_applying', file: m.filename, path: relPath });
 
                     const executionId = uuidv4();
@@ -1212,5 +1217,6 @@ module.exports = {
     runMigration140PreRemediation,
     validateMigration140PostConditions,
     runMigration092PreRemediation,
+    runMigration161PreRemediation,
     handleLegacyPhaseMarkerStatement
 };
