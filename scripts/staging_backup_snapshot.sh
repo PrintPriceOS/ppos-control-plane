@@ -103,7 +103,13 @@ sha256sum "$FINAL_ENC_ARCHIVE" > "$SHA_FILE"
 chmod 600 "$SHA_FILE"
 
 # 2. Cryptographic Authenticity: HMAC-SHA256 with dedicated authentication key
-HMAC_TAG=$(openssl dgst -sha256 -hmac "$AUTH_KEY" "$FINAL_ENC_ARCHIVE" | awk '{print $NF}')
+# Executed via node backupHmacUtil.js to avoid exposing HMAC secret in command-line arguments (ps aux)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+HMAC_TAG=$(BACKUP_HMAC_KEY="$AUTH_KEY" node "${SCRIPT_DIR}/lib/backupHmacUtil.js" compute "$FINAL_ENC_ARCHIVE")
+if [ -z "$HMAC_TAG" ] || [ ${#HMAC_TAG} -ne 64 ]; then
+  echo "[FATAL] Failed to compute valid HMAC-SHA256 tag." >&2
+  exit 1
+fi
 echo "$HMAC_TAG" > "$HMAC_FILE"
 chmod 600 "$HMAC_FILE"
 

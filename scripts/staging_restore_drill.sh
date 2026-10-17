@@ -81,22 +81,13 @@ if ! sha256sum -c "$SHA_FILE"; then
 fi
 
 # 3.2 Verify HMAC authenticity tag before attempting any decryption
-EXPECTED_HMAC=$(cat "$HMAC_FILE" | tr -d '[:space:]')
-CALCULATED_HMAC=$(openssl dgst -sha256 -hmac "$AUTH_KEY" "$ENCRYPTED_FILE" | awk '{print $NF}')
-
-# Secure comparison: prevent null/empty evaluation and match length & content
-if [ -z "$EXPECTED_HMAC" ] || [ -z "$CALCULATED_HMAC" ] || [ ${#EXPECTED_HMAC} -ne 64 ] || [ ${#CALCULATED_HMAC} -ne 64 ]; then
-  echo "[FATAL] Invalid HMAC format or empty authentication tag." >&2
+# Executed via node backupHmacUtil.js: consumes key securely via env/file and uses crypto.timingSafeEqual()
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if ! BACKUP_HMAC_KEY="$AUTH_KEY" node "${SCRIPT_DIR}/lib/backupHmacUtil.js" verify "$ENCRYPTED_FILE" "$HMAC_FILE"; then
+  echo "[FATAL] HMAC-SHA256 authenticity verification failed. Snapshot authenticity compromised, corrupted tag, or incorrect auth key." >&2
   exit 1
 fi
-
-# Constant-time comparison using openssl dgst digest verification
-HMAC_CHECK=$(printf "%s\n%s\n" "$EXPECTED_HMAC" "$CALCULATED_HMAC" | awk 'NR==1{e=$0} NR==2{if(e==$0){print "MATCH"}else{print "MISMATCH"}}')
-if [ "$HMAC_CHECK" != "MATCH" ]; then
-  echo "[FATAL] HMAC-SHA256 authenticity verification failed. Snapshot authenticity compromised or incorrect auth key." >&2
-  exit 1
-fi
-echo "✓ Cryptographic authenticity and integrity verified successfully."
+echo "✓ Cryptographic authenticity (HMAC-SHA256 timingSafeEqual) and integrity verified successfully."
 
 # 4. Isolated Temporary Workspace with Guaranteed Cleanup
 WORK_DIR=$(mktemp -d)
@@ -154,9 +145,13 @@ fi
 # 3.2 Governed DEFINER Handling for Sandbox Recovery:
 # Audits and removes hardcoded DEFINER attributes (e.g. DEFINER=`ppos_staging_usr`@`%` or `root`@`localhost`)
 # from CREATE VIEW, CREATE PROCEDURE, CREATE FUNCTION, and CREATE TRIGGER statements.
-# In MySQL 8.0, omitting DEFINER causes the object to be defined by the executing user (the sandbox restore user),
-# allowing successful recreation without requiring SUPER or SET_USER_ID administrative privileges,
-# while preserving SQL SECURITY INVOKER / SQL SECURITY DEFINER semantics intact.
+# IMPORTANT SECURITY CONSTRAINTS & LIMITS:
+# - In MySQL 8.0, omitting DEFINER causes the object to be defined by CURRENT_USER (the sandbox restore user).
+# - This substitution modifies the effective execution identity of DEFINER objects.
+# - It is VALID ONLY for isolated sandbox/staging drill environments with controlled privileges to avoid
+#   requiring SUPER or SET_USER_ID administrative privileges.
+# - This transformation is STRICTLY FORBIDDEN and NOT authorized for production restores.
+# - Unrecognized or incompatible SQL structures must result in immediate rejection.
 sed -i -E 's/DEFINER[[:space:]]*=[[:space:]]*`[^`]+`@`[^`]+`[[:space:]]*//g' "$DECRYPTED_SQL"
 sed -i -E 's/DEFINER[[:space:]]*=[[:space:]]*[a-zA-Z0-9_]+@[a-zA-Z0-9_%.-]+[[:space:]]*//g' "$DECRYPTED_SQL"
 

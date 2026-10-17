@@ -113,12 +113,12 @@ describe('STG-02: Historical Ledger Governance, Forensic Invariants & State Mach
     expect(result.status).toBe('READY');
   });
 
-  it('3. Never unlocks automatically on FAILED migration unless PPOS_ALLOW_MIGRATION_RETRY is explicit, checksum matches, and migration is in governed allowlist', async () => {
-    // 3a: Non-governed migration: fails closed even with PPOS_ALLOW_MIGRATION_RETRY=true
-    const nonGovernedMigration = baseline.migrations[0]; // e.g. 001_initial_schema
-    const nonGovPathKey = nonGovernedMigration.path || nonGovernedMigration.relativePath;
-    const nonGovExpectedHash = nonGovernedMigration.canonicalSha256 || nonGovernedMigration.sha256;
-    const nonGovFname = nonGovPathKey.split('/').pop();
+  it('3. Strictly blocks FAILED migrations fail-closed without unauthenticated or accidental automatic retry', async () => {
+    // 3a: FAILED migration with default environment: strictly blocks
+    const testMigration = baseline.migrations[0];
+    const pathKey = testMigration.path || testMigration.relativePath;
+    const expectedHash = testMigration.canonicalSha256 || testMigration.sha256;
+    const fname = pathKey.split('/').pop();
 
     vi.spyOn(db, 'query').mockImplementation(async (sql) => {
       if (sql.includes('information_schema.COLUMNS')) {
@@ -130,11 +130,11 @@ describe('STG-02: Historical Ledger Governance, Forensic Invariants & State Mach
       if (sql.includes('SELECT version, description')) {
         return [
           {
-            version: nonGovFname.replace(/\.sql$/, ''),
-            description: nonGovFname,
+            version: fname.replace(/\.sql$/, ''),
+            description: fname,
             record_type: 'MIGRATION',
-            migration_path: nonGovPathKey,
-            checksum: nonGovExpectedHash,
+            migration_path: pathKey,
+            checksum: expectedHash,
             state: 'FAILED',
             failure_code: 'ER_SYNTAX_ERROR',
             started_at: '2026-01-01 00:00:00'
@@ -145,17 +145,18 @@ describe('STG-02: Historical Ledger Governance, Forensic Invariants & State Mach
     });
 
     // Default: fail-closed, does NOT auto-unlock
-    process.env.PPOS_ALLOW_MIGRATION_RETRY = 'false';
+    delete process.env.PPOS_ALLOW_MIGRATION_RETRY;
     const blockedResult = await ledgerReadService.evaluateLedgerStatus(baseline);
     expect(blockedResult.status).toBe('MIGRATION_FAILED');
     expect(blockedResult.reason).toContain('Migration failed');
 
-    // General migration: even with retry flag set to true, rejects because no governed physical reconciliation exists
+    // Accidental env var PPOS_ALLOW_MIGRATION_RETRY=true: STILL strictly blocks without governed physical reconciliation
     process.env.PPOS_ALLOW_MIGRATION_RETRY = 'true';
-    const blockedGeneralResult = await ledgerReadService.evaluateLedgerStatus(baseline);
-    expect(blockedGeneralResult.status).toBe('MIGRATION_FAILED');
+    const blockedWithEnvResult = await ledgerReadService.evaluateLedgerStatus(baseline);
+    expect(blockedWithEnvResult.status).toBe('MIGRATION_FAILED');
+    expect(blockedWithEnvResult.reason).toContain('Migration failed');
 
-    // 3b: Governed reconciliation migration (140) with valid checksum: eligible when explicit retry flag is true
+    // 3b: Even if checksum matches, FAILED state remains strictly blocking until resolved
     const governed140 = baseline.migrations.find(m => (m.path || m.relativePath).includes('140_phase191e'));
     expect(governed140).toBeDefined();
     const gov140Path = governed140.path || governed140.relativePath;
@@ -182,12 +183,10 @@ describe('STG-02: Historical Ledger Governance, Forensic Invariants & State Mach
       return [];
     });
 
-    process.env.PPOS_ALLOW_MIGRATION_RETRY = 'true';
-    const governedEligibleResult = await ledgerReadService.evaluateLedgerStatus(baseline);
-    // When eligible, it logs eligibility and does not fail on that failed record (returns PENDING_MIGRATIONS because 140 is not applied)
-    expect(governedEligibleResult.status).toBe('PENDING_MIGRATIONS');
+    const governedBlocked = await ledgerReadService.evaluateLedgerStatus(baseline);
+    expect(governedBlocked.status).toBe('MIGRATION_FAILED');
 
-    // 3c: Governed reconciliation migration with tampered checksum: strictly blocked
+    // 3c: Tampered checksum: strictly blocked
     vi.spyOn(db, 'query').mockImplementation(async (sql) => {
       if (sql.includes('information_schema.COLUMNS')) return [{ COLUMN_NAME: 'state' }, { COLUMN_NAME: 'record_type' }];
       if (sql.includes('information_schema.TABLES')) return [{ TABLE_NAME: 'schema_versions' }];
@@ -208,8 +207,8 @@ describe('STG-02: Historical Ledger Governance, Forensic Invariants & State Mach
       return [];
     });
 
-    const tamperedRetryResult = await ledgerReadService.evaluateLedgerStatus(baseline);
-    expect(tamperedRetryResult.status).toBe('MIGRATION_FAILED');
+    const tamperedResult = await ledgerReadService.evaluateLedgerStatus(baseline);
+    expect(tamperedResult.status).toBe('MIGRATION_FAILED');
   });
 
   it('4. Detects and blocks active or stale STARTED migrations', async () => {
@@ -319,5 +318,41 @@ describe('STG-02: Historical Ledger Governance, Forensic Invariants & State Mach
     const result = await ledgerReadService.evaluateLedgerStatus(baseline);
     expect(result.status).toBe('MIGRATION_LEDGER_INCOMPATIBLE');
     expect(result.reason).toContain('Unknown applied migration in database');
+  });
+
+  it('7. Rejects FAILED migration retry with zero mutations or ledger alterations', async () => {
+    const failedMigration = baseline.migrations[2];
+    const pathKey = failedMigration.path || failedMigration.relativePath;
+    const expectedHash = failedMigration.canonicalSha256 || failedMigration.sha256;
+    const fname = pathKey.split('/').pop();
+
+    let mutationAttempted = false;
+    vi.spyOn(db, 'query').mockImplementation(async (sql) => {
+      if (sql.includes('information_schema.COLUMNS')) return [{ COLUMN_NAME: 'state' }, { COLUMN_NAME: 'record_type' }];
+      if (sql.includes('information_schema.TABLES')) return [{ TABLE_NAME: 'schema_versions' }];
+      if (sql.includes('INSERT') || sql.includes('UPDATE') || sql.includes('DELETE') || sql.includes('ALTER')) {
+        mutationAttempted = true;
+      }
+      if (sql.includes('SELECT version, description')) {
+        return [
+          {
+            version: fname.replace(/\.sql$/, ''),
+            description: fname,
+            record_type: 'MIGRATION',
+            migration_path: pathKey,
+            checksum: expectedHash,
+            state: 'FAILED',
+            failure_code: 'ER_FK_INCOMPATIBLE_COLUMNS',
+            started_at: '2026-01-01 00:00:00'
+          }
+        ];
+      }
+      return [];
+    });
+
+    process.env.PPOS_ALLOW_MIGRATION_RETRY = 'true';
+    const result = await ledgerReadService.evaluateLedgerStatus(baseline);
+    expect(result.status).toBe('MIGRATION_FAILED');
+    expect(mutationAttempted).toBe(false);
   });
 });

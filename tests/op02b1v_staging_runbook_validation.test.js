@@ -170,7 +170,8 @@ describe('OP-02B.1V: Staging Runbook, Configuration Contracts & Secret Resolutio
             expect(restoreScript).toContain('ELAPSED_MS');
             expect(restoreScript).toContain('BACKUP_HMAC_KEY or BACKUP_HMAC_KEY_FILE is mandatory');
             expect(restoreScript).not.toContain('auth-tag:ppos-backup-v2'); // No silent derivation fallback
-            expect(restoreScript).toContain('HMAC_CHECK'); // Secure comparison
+            expect(restoreScript).toContain('backupHmacUtil.js'); // Uses dedicated utility without arg exposure
+            expect(restoreScript).toContain('timingSafeEqual'); // Uses constant-time comparison
         });
 
         it('negative test: rejects dumps containing CREATE DATABASE or USE statements', () => {

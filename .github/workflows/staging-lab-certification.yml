@@ -115,6 +115,7 @@ jobs:
       run: |
         npx vitest run tests/op02b1v_staging_runbook_validation.test.js
         npx vitest run tests/op02b1y_ledger_audit.test.js
+        npx vitest run tests/backup_hmac_util.test.js
 
     - name: 7. Execute Governed Persistent Bootstrap on Origin Instance (Port 3306)
       run: |
