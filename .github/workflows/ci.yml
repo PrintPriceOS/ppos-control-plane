@@ -48,6 +48,7 @@ jobs:
       env:
         PPOS_MIGRATION_EXECUTION: 'true'
         PPOS_ENABLE_SCHEMA_MUTATION: 'true'
+        PPOS_CI_EPHEMERAL_FIXTURES: 'true'
       run: node scripts/bootstrap_canonical_schema.js
     - name: Execute Database Migrations (Ephemeral CI)
       env:
@@ -61,7 +62,7 @@ jobs:
         HEAD_REF: ${{ github.head_ref }}
         REF_NAME: ${{ github.ref_name }}
       run: |
-        npx vitest run tests/PricingWorkflowConservation.test.tsx tests/PrinthouseOnboardingAuditAndGovernance.test.tsx tests/backend_tenant_security.test.js tests/calibration_residuals_compatibility_regression.test.js tests/onboarding_checksum_integrity_regression.test.js tests/legacy_phase_marker_adapter.test.js tests/migration_092_reconciliation.test.js
+        npx vitest run tests/PricingWorkflowConservation.test.tsx tests/PrinthouseOnboardingAuditAndGovernance.test.tsx tests/backend_tenant_security.test.js tests/calibration_residuals_compatibility_regression.test.js tests/onboarding_checksum_integrity_regression.test.js tests/legacy_phase_marker_adapter.test.js tests/migration_092_reconciliation.test.js tests/migration_140_ephemeral_fixtures.test.js
         if [ -f tests/GuidedPrinthouseJourney.test.tsx ]; then
           echo "Running mandatory Guided Onboarding v4 journey suite..."
           npx vitest run tests/GuidedPrinthouseJourney.test.tsx

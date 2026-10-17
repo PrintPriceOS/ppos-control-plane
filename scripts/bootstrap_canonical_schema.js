@@ -18,6 +18,348 @@
 
 const mysqlClient = require('../src/api/services/mysqlClient');
 
+/**
+ * Verification of ephemeral isolation guards.
+ * Returns { ok: boolean, reason?: string, host: string, database: string }
+ */
+function checkEphemeralIsolation(env = process.env) {
+    if (env.NODE_ENV === 'production') {
+        return { ok: false, reason: 'Strictly FORBIDDEN in NODE_ENV=production' };
+    }
+
+    if (env.PPOS_CI_EPHEMERAL_FIXTURES !== 'true') {
+        return { ok: false, reason: 'PPOS_CI_EPHEMERAL_FIXTURES flag is not enabled' };
+    }
+
+    // CI-02J.6: Must be verified as running within an accredited CI environment (GitHub Actions or CI runner)
+    // Operators cannot arbitrarily enable fixtures in arbitrary local terminals without accredited CI environment context
+    const isCiEnvironment = env.GITHUB_ACTIONS === 'true' || env.CI === 'true';
+    if (!isCiEnvironment) {
+        return { ok: false, reason: 'Execution rejected: PPOS_CI_EPHEMERAL_FIXTURES requires accredited CI container environment (GITHUB_ACTIONS=true or CI=true)' };
+    }
+
+    let host = env.MYSQL_HOST || 'localhost';
+    let database = env.MYSQL_DATABASE || '';
+
+    if (env.DATABASE_URL) {
+        try {
+            const parsed = new URL(env.DATABASE_URL);
+            host = parsed.hostname;
+            database = parsed.pathname.replace(/^\//, '');
+        } catch (e) {
+            return { ok: false, reason: 'Invalid DATABASE_URL format' };
+        }
+    }
+
+    const isLocal = host === 'localhost' || host === '127.0.0.1' || host === '::1';
+    if (!isLocal) {
+        return { ok: false, reason: `Rejected non-local host: ${host}` };
+    }
+
+    const FORBIDDEN_DB_NAMES = ['ppos_production', 'ppos_prod', 'printpriceos', 'printpriceos_prod', 'production', 'prod'];
+    const dbLower = (database || '').toLowerCase();
+    if (!dbLower || FORBIDDEN_DB_NAMES.includes(dbLower)) {
+        return { ok: false, reason: `Database name '${database}' is empty or blocked as production` };
+    }
+
+    // Positive assertion of disposable / test database identity:
+    // Must contain 'ci', 'test', 'ephemeral', or 'tmp' to prevent connecting to persistent local DBs via tunnel or local daemon
+    const isDisposable = dbLower.includes('ci') || dbLower.includes('test') || dbLower.includes('ephemeral') || dbLower.includes('tmp');
+    if (!isDisposable) {
+        return { ok: false, reason: `Database '${database}' does not match disposable ephemeral naming pattern ('ci', 'test', 'ephemeral', 'tmp')` };
+    }
+
+    return { ok: true, host, database };
+}
+
+/**
+ * CI-02J.6: Verifies that the connected database is an unpolluted ephemeral instance.
+ * Rejects if user/application data already exists in core tables prior to bootstrap,
+ * preventing execution against persistent databases that happen to match naming conventions.
+ */
+async function checkDatabaseEphemeralState(db) {
+    // 1. Check if schema_versions has unexpected migration records prior to clean bootstrap
+    try {
+        const [tables] = await db.query(`
+            SELECT TABLE_NAME
+            FROM information_schema.TABLES
+            WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN ('schema_versions', 'tenants', 'control_users', 'printer_nodes')
+        `);
+        const tableNames = new Set(tables.map(t => t.TABLE_NAME));
+
+        if (tableNames.has('schema_versions')) {
+            const [rows] = await db.query(`SELECT COUNT(*) as count FROM schema_versions`);
+            if (rows && rows[0] && rows[0].count > 0) {
+                return { ok: false, reason: `Database is NOT clean/disposable: schema_versions contains ${rows[0].count} prior recorded migrations` };
+            }
+        }
+
+        // If core business tables exist, check that they contain zero production/live tenant records
+        if (tableNames.has('tenants')) {
+            const [rows] = await db.query(`SELECT COUNT(*) as count FROM tenants`);
+            if (rows && rows[0] && rows[0].count > 0) {
+                return { ok: false, reason: `Database contains pre-existing persistent data in tenants table (${rows[0].count} records)` };
+            }
+        }
+    } catch (err) {
+        // Query failure on information_schema or count check
+        return { ok: false, reason: `Failed to verify ephemeral database state: ${err.message}` };
+    }
+
+    return { ok: true };
+}
+
+// Contract specifications for each of the 9 ephemeral dependency tables.
+// Used for structural verification of pre-existing tables to guarantee non-divergence without destruction.
+const FIXTURE_CONTRACT_SPECS = {
+    printer_machines: {
+        requiredColumns: ['id', 'printer_id', 'nickname', 'type', 'status'],
+        requiredFks: [{ name: 'printer_machines_ibfk_1', col: 'printer_id', parent: 'printer_nodes', refCol: 'id' }]
+    },
+    printhouse_capabilities: {
+        requiredColumns: ['id', 'printhouse_id', 'tenant_id'],
+        requiredFks: [{ name: 'printhouse_capabilities_ibfk_1', col: 'printhouse_id', parent: 'printer_nodes', refCol: 'id' }]
+    },
+    routing_history: {
+        requiredColumns: ['id', 'printer_id', 'job_id', 'action', 'details_json'],
+        requiredFks: [{ name: 'routing_history_ibfk_1', col: 'printer_id', parent: 'printer_nodes', refCol: 'id' }]
+    },
+    printer_capacity: {
+        requiredColumns: ['id', 'printer_id', 'date', 'capacity_total', 'capacity_available', 'lead_time_days'],
+        requiredFks: [{ name: 'printer_capacity_ibfk_1', col: 'printer_id', parent: 'printer_nodes', refCol: 'id' }]
+    },
+    job_outcomes: {
+        requiredColumns: ['id', 'printer_id', 'job_id', 'outcome'],
+        requiredFks: [{ name: 'job_outcomes_ibfk_1', col: 'printer_id', parent: 'printer_nodes', refCol: 'id' }]
+    },
+    printer_contacts: {
+        requiredColumns: ['id', 'printer_id', 'contact_name', 'email', 'phone'],
+        requiredFks: [{ name: 'printer_contacts_ibfk_1', col: 'printer_id', parent: 'printer_nodes', refCol: 'id' }]
+    },
+    printer_papers: {
+        requiredColumns: ['id', 'printer_id', 'paper_type'],
+        requiredFks: [{ name: 'printer_papers_ibfk_1', col: 'printer_id', parent: 'printer_nodes', refCol: 'id' }]
+    },
+    printer_performance: {
+        requiredColumns: ['id', 'printer_id', 'metric_name', 'metric_value'],
+        requiredFks: [{ name: 'printer_performance_ibfk_1', col: 'printer_id', parent: 'printer_nodes', refCol: 'id' }]
+    },
+    printer_service_regions: {
+        requiredColumns: ['id', 'printer_id', 'region_code'],
+        requiredFks: [{ name: 'printer_service_regions_ibfk_1', col: 'printer_id', parent: 'printer_nodes', refCol: 'id' }]
+    }
+};
+
+/**
+ * CI-02J.6: Structural idempotency verification.
+ * For each table:
+ * - If table does not exist: creates it using canonical/anchor DDL.
+ * - If table exists: audits existing columns and foreign keys against FIXTURE_CONTRACT_SPECS.
+ * - If incompatible: aborts with error without dropping, altering, or modifying data.
+ * - Never disables FOREIGN_KEY_CHECKS.
+ */
+async function verifyOrApplyStructuralFixtures(db, fixtureDdls = MIGRATION_140_FIXTURE_DDL, specs = FIXTURE_CONTRACT_SPECS) {
+    const [existingTableRows] = await db.query(`
+        SELECT TABLE_NAME
+        FROM information_schema.TABLES
+        WHERE TABLE_SCHEMA = DATABASE()
+    `);
+    const existingTableNames = new Set(existingTableRows.map(r => r.TABLE_NAME));
+
+    for (const [tableName, ddl] of Object.entries(fixtureDdls)) {
+        if (!existingTableNames.has(tableName)) {
+            // Safe creation of missing table
+            await db.query(ddl);
+            continue;
+        }
+
+        // Table pre-exists: Verify structural contract compatibility without destructive alterations
+        const spec = specs[tableName];
+        if (!spec) {
+            continue;
+        }
+
+        // Check required columns
+        const [colRows] = await db.query(`
+            SELECT COLUMN_NAME
+            FROM information_schema.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?
+        `, [tableName]);
+        const existingCols = new Set(colRows.map(c => c.COLUMN_NAME.toLowerCase()));
+
+        for (const reqCol of spec.requiredColumns) {
+            if (!existingCols.has(reqCol.toLowerCase())) {
+                throw new Error(
+                    `STRUCTURAL IDEMPOTENCY DIVERGENCE: Pre-existing table '${tableName}' is missing required contract column '${reqCol}'. Aborting bootstrap without mutation.`
+                );
+            }
+        }
+
+        // Check required foreign keys
+        if (spec.requiredFks && spec.requiredFks.length > 0) {
+            const [fkRows] = await db.query(`
+                SELECT CONSTRAINT_NAME, COLUMN_NAME, REFERENCED_TABLE_NAME, REFERENCED_COLUMN_NAME
+                FROM information_schema.KEY_COLUMN_USAGE
+                WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND REFERENCED_TABLE_NAME IS NOT NULL
+            `, [tableName]);
+
+            for (const reqFk of spec.requiredFks) {
+                const matchingFk = fkRows.find(k =>
+                    k.COLUMN_NAME.toLowerCase() === reqFk.col.toLowerCase() &&
+                    k.REFERENCED_TABLE_NAME.toLowerCase() === reqFk.parent.toLowerCase() &&
+                    k.REFERENCED_COLUMN_NAME.toLowerCase() === reqFk.refCol.toLowerCase()
+                );
+                if (!matchingFk) {
+                    throw new Error(
+                        `STRUCTURAL IDEMPOTENCY DIVERGENCE: Pre-existing table '${tableName}' does not satisfy required foreign key referencing ${reqFk.parent}(${reqFk.refCol}) on column '${reqFk.col}'. Aborting bootstrap without mutation.`
+                    );
+                }
+            }
+        }
+    }
+}
+
+// Canonical and Relational Anchor DDL definitions for Migration 140 pre-remediation dependencies
+const MIGRATION_140_FIXTURE_DDL = {
+    // 1. printer_machines (Historical contract from docs/migrations/printhouse_pricing_restore.sql)
+    printer_machines: `
+        CREATE TABLE IF NOT EXISTS printer_machines (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            printer_id VARCHAR(64) NOT NULL,
+            nickname VARCHAR(255) NOT NULL,
+            type VARCHAR(64) NULL,
+            status VARCHAR(64) DEFAULT 'ACTIVE',
+            INDEX idx_pm_printer (printer_id),
+            CONSTRAINT printer_machines_ibfk_1 FOREIGN KEY (printer_id) REFERENCES printer_nodes(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `,
+
+    // 2. printhouse_capabilities (Historical contract from docs/migrations/printhouse_hardening.sql)
+    printhouse_capabilities: `
+        CREATE TABLE IF NOT EXISTS printhouse_capabilities (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            printhouse_id VARCHAR(64) NOT NULL,
+            tenant_id VARCHAR(64) NOT NULL,
+            min_quantity INT DEFAULT 1,
+            max_quantity INT DEFAULT 1000000,
+            hardcover_support BOOLEAN DEFAULT FALSE,
+            softcover_support BOOLEAN DEFAULT FALSE,
+            sewing_support BOOLEAN DEFAULT FALSE,
+            lamination_support BOOLEAN DEFAULT FALSE,
+            uv_support BOOLEAN DEFAULT FALSE,
+            foil_support BOOLEAN DEFAULT FALSE,
+            max_sheet_size_width DECIMAL(10,2),
+            max_sheet_size_height DECIMAL(10,2),
+            supported_countries JSON,
+            lead_times_json JSON,
+            certifications_json JSON,
+            sustainability_score INT DEFAULT 0,
+            preferred_job_types JSON,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            UNIQUE KEY uk_printhouse_cap (printhouse_id),
+            INDEX idx_pc_printhouse (printhouse_id),
+            CONSTRAINT printhouse_capabilities_ibfk_1 FOREIGN KEY (printhouse_id) REFERENCES printer_nodes(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `,
+
+    // 3. routing_history (Historical contract from src/migrations/phase184g_industrial_provisioning_schema.js)
+    routing_history: `
+        CREATE TABLE IF NOT EXISTS routing_history (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            printer_id VARCHAR(64) NOT NULL,
+            job_id VARCHAR(64) NULL,
+            action VARCHAR(128) NULL,
+            details_json JSON NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_rh_printer (printer_id),
+            CONSTRAINT routing_history_ibfk_1 FOREIGN KEY (printer_id) REFERENCES printer_nodes(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `,
+
+    // 4. printer_capacity (Canonical partial contract from printerSyncService.js / smoke_phase192j)
+    printer_capacity: `
+        CREATE TABLE IF NOT EXISTS printer_capacity (
+            id VARCHAR(64) PRIMARY KEY,
+            printer_id VARCHAR(64) NOT NULL,
+            date DATE NOT NULL,
+            capacity_total INT DEFAULT 0,
+            capacity_available INT DEFAULT 0,
+            lead_time_days INT DEFAULT 0,
+            source VARCHAR(32) DEFAULT 'MANUAL',
+            sync_id VARCHAR(64) NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_printer_date (printer_id, date),
+            CONSTRAINT printer_capacity_ibfk_1 FOREIGN KEY (printer_id) REFERENCES printer_nodes(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `,
+
+    // CI-ONLY EXTERNAL SCHEMA FIXTURES — NOT PRODUCTION CANONICAL DDL
+    // 5. job_outcomes
+    job_outcomes: `
+        CREATE TABLE IF NOT EXISTS job_outcomes (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            printer_id VARCHAR(64) NOT NULL,
+            job_id VARCHAR(64) NULL,
+            outcome VARCHAR(64) NOT NULL DEFAULT 'COMPLETED',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_jo_printer (printer_id),
+            CONSTRAINT job_outcomes_ibfk_1 FOREIGN KEY (printer_id) REFERENCES printer_nodes(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `,
+
+    // 6. printer_contacts
+    printer_contacts: `
+        CREATE TABLE IF NOT EXISTS printer_contacts (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            printer_id VARCHAR(64) NOT NULL,
+            contact_name VARCHAR(255) NULL,
+            email VARCHAR(255) NULL,
+            phone VARCHAR(64) NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_pcon_printer (printer_id),
+            CONSTRAINT printer_contacts_ibfk_1 FOREIGN KEY (printer_id) REFERENCES printer_nodes(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `,
+
+    // 7. printer_papers
+    printer_papers: `
+        CREATE TABLE IF NOT EXISTS printer_papers (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            printer_id VARCHAR(64) NOT NULL,
+            paper_type VARCHAR(128) NOT NULL DEFAULT 'STANDARD',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_ppap_printer (printer_id),
+            CONSTRAINT printer_papers_ibfk_1 FOREIGN KEY (printer_id) REFERENCES printer_nodes(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `,
+
+    // 8. printer_performance
+    printer_performance: `
+        CREATE TABLE IF NOT EXISTS printer_performance (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            printer_id VARCHAR(64) NOT NULL,
+            metric_name VARCHAR(64) NOT NULL DEFAULT 'LATENCY',
+            metric_value DECIMAL(10,2) DEFAULT 0.00,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_pperf_printer (printer_id),
+            CONSTRAINT printer_performance_ibfk_1 FOREIGN KEY (printer_id) REFERENCES printer_nodes(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `,
+
+    // 9. printer_service_regions
+    printer_service_regions: `
+        CREATE TABLE IF NOT EXISTS printer_service_regions (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            printer_id VARCHAR(64) NOT NULL,
+            region_code VARCHAR(64) NOT NULL DEFAULT 'DEFAULT_REGION',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_psr_printer (printer_id),
+            CONSTRAINT printer_service_regions_ibfk_1 FOREIGN KEY (printer_id) REFERENCES printer_nodes(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `
+};
+
 async function runBootstrap() {
     console.log('\n=== Canonical Ephemeral Database Bootstrap (Phase CI-02D) ===\n');
 
@@ -326,6 +668,31 @@ async function runBootstrap() {
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
         `);
 
+        // =========================================================================
+        // [7.1/7] Phase CI-02J: Industrial Ephemeral Dependencies for Migration 140
+        // =========================================================================
+        // Activated EXCLUSIVELY under strict CI ephemeral execution gates.
+        if (process.env.PPOS_CI_EPHEMERAL_FIXTURES === 'true') {
+            console.log('[Phase CI-02J] Ensuring industrial dependencies for Migration 140 pre-remediation...');
+
+            // Strict Isolation Check 1: Must verify disposable ephemeral CI instance
+            const isolationCheck = checkEphemeralIsolation(process.env);
+            if (!isolationCheck.ok) {
+                throw new Error(`SECURITY VIOLATION: Ephemeral fixtures rejected: ${isolationCheck.reason}`);
+            }
+
+            // Strict Isolation Check 2: Must verify database state has zero persistent tenant/migration pollution
+            const dbStateCheck = await checkDatabaseEphemeralState(db);
+            if (!dbStateCheck.ok) {
+                throw new Error(`SECURITY VIOLATION: Database state check failed: ${dbStateCheck.reason}`);
+            }
+
+            // Structural Idempotency Verification: Audit pre-existing tables, create only missing, never mutate incompatibly
+            await verifyOrApplyStructuralFixtures(db, MIGRATION_140_FIXTURE_DDL, FIXTURE_CONTRACT_SPECS);
+
+            console.log('✓ Phase CI-02J ephemeral dependencies successfully initialized.');
+        }
+
         console.log('[7/7] Canonical Ephemeral Database Bootstrap completed successfully.');
         console.log('✓ Foundational tables prepared. Database is now ready for sequential migration execution.\n');
     } catch (err) {
@@ -340,4 +707,11 @@ if (require.main === module) {
     runBootstrap();
 }
 
-module.exports = { runBootstrap };
+module.exports = {
+    runBootstrap,
+    checkEphemeralIsolation,
+    checkDatabaseEphemeralState,
+    verifyOrApplyStructuralFixtures,
+    FIXTURE_CONTRACT_SPECS,
+    MIGRATION_140_FIXTURE_DDL
+};
