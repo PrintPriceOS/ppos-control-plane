@@ -212,8 +212,7 @@ describe('CI-02G: Legacy Phase Marker Compatibility Adapter', () => {
       .toThrow('UNAUTHORIZED_SCHEMA_VERSIONS_INSERT_FORMAT');
   });
 
-  it('13. Preserves ON DUPLICATE KEY UPDATE protection against arbitrary state override', async () => {
-    // Check SQL generation safety in adapter
+  it('13. Uses plain INSERT without ON DUPLICATE KEY UPDATE to prevent overwriting existing rows', async () => {
     const meta = LEGACY_PHASE_MARKERS['081'];
     const sql = `INSERT INTO schema_versions (version, applied_at, description) VALUES ('081', NOW(), '${meta.description}') ON DUPLICATE KEY UPDATE applied_at = NOW(), description = '${meta.description}';`;
 
@@ -227,8 +226,153 @@ describe('CI-02G: Legacy Phase Marker Compatibility Adapter', () => {
     };
 
     await handleLegacyPhaseMarkerStatement(mockConn, sql, meta.file);
-    expect(executedInsert).toContain("record_type = IF(record_type = 'MIGRATION', 'MIGRATION', 'PHASE_MARKER')");
-    expect(executedInsert).toContain("checksum = IF(record_type = 'MIGRATION', checksum, '')");
-    expect(executedInsert).toContain("state = IF(record_type = 'MIGRATION', state, 'APPLIED')");
+    expect(executedInsert).not.toContain('ON DUPLICATE KEY UPDATE');
+    expect(executedInsert).toContain("VALUES (?, ?, 'PHASE_MARKER', '', 'APPLIED'");
+  });
+
+  it('14. Correctly recognizes statements preceded by SQL line comments (-- Registry insert)', async () => {
+    const meta = LEGACY_PHASE_MARKERS['080'];
+    const sql = `-- Registry insert\nINSERT INTO schema_versions (version, applied_at, description) \nVALUES ('080', NOW(), '${meta.description}');`;
+
+    const mockConn = {
+      query: vi.fn(async (q) => {
+        if (q.startsWith('SELECT')) return [[]];
+        return [{ affectedRows: 1 }];
+      })
+    };
+
+    const handled = await handleLegacyPhaseMarkerStatement(mockConn, sql, meta.file);
+    expect(handled).toBe(true);
+    expect(mockConn.query).toHaveBeenCalledTimes(2);
+  });
+
+  it('15. Correctly recognizes markers 081-091 preceded by multiple comments', async () => {
+    const meta = LEGACY_PHASE_MARKERS['085'];
+    const sql = `-- Line 1 comment\n-- Line 2 comment with SQL words SELECT INSERT UPDATE\nINSERT INTO schema_versions (version, applied_at, description)\nVALUES ('085', NOW(), '${meta.description}')\nON DUPLICATE KEY UPDATE applied_at = NOW(), description = '${meta.description}';`;
+
+    const mockConn = {
+      query: vi.fn(async (q) => {
+        if (q.startsWith('SELECT')) return [[]];
+        return [{ affectedRows: 1 }];
+      })
+    };
+
+    const handled = await handleLegacyPhaseMarkerStatement(mockConn, sql, meta.file);
+    expect(handled).toBe(true);
+  });
+
+  it('16. Rejects attempts to append a second SQL statement', async () => {
+    const meta = LEGACY_PHASE_MARKERS['080'];
+    const sql = `INSERT INTO schema_versions (version, applied_at, description) VALUES ('080', NOW(), '${meta.description}'); DROP TABLE schema_versions;`;
+
+    const mockConn = { query: vi.fn() };
+
+    await expect(handleLegacyPhaseMarkerStatement(mockConn, sql, meta.file))
+      .rejects
+      .toThrow('UNAUTHORIZED_SCHEMA_VERSIONS_INSERT_FORMAT');
+  });
+
+  it('17. Handles concurrent collision (ER_DUP_ENTRY) safely when existing row is identical', async () => {
+    const meta = LEGACY_PHASE_MARKERS['080'];
+    const sql = `INSERT INTO schema_versions (version, applied_at, description) VALUES ('080', NOW(), '${meta.description}');`;
+
+    let callCount = 0;
+    const mockConn = {
+      query: vi.fn(async (q) => {
+        callCount++;
+        if (callCount === 1) {
+          // Pre-check returns empty (race condition: another thread inserts right after this)
+          return [[]];
+        }
+        if (callCount === 2) {
+          // INSERT throws ER_DUP_ENTRY
+          const dupErr = new Error("Duplicate entry '080' for key 'schema_versions.version'");
+          dupErr.code = 'ER_DUP_ENTRY';
+          dupErr.errno = 1062;
+          throw dupErr;
+        }
+        if (callCount === 3) {
+          // Post-collision inspection returns valid identical PHASE_MARKER row
+          return [[{
+            version: '080',
+            description: meta.description,
+            record_type: 'PHASE_MARKER',
+            checksum: '',
+            state: 'APPLIED'
+          }]];
+        }
+        return [[]];
+      })
+    };
+
+    const handled = await handleLegacyPhaseMarkerStatement(mockConn, sql, meta.file);
+    expect(handled).toBe(true);
+    expect(callCount).toBe(3);
+  });
+
+  it('18. Rejects concurrent collision (ER_DUP_ENTRY) when race row is a MIGRATION', async () => {
+    const meta = LEGACY_PHASE_MARKERS['080'];
+    const sql = `INSERT INTO schema_versions (version, applied_at, description) VALUES ('080', NOW(), '${meta.description}');`;
+
+    let callCount = 0;
+    const mockConn = {
+      query: vi.fn(async (q) => {
+        callCount++;
+        if (callCount === 1) return [[]];
+        if (callCount === 2) {
+          const dupErr = new Error("Duplicate entry '080' for key 'schema_versions.version'");
+          dupErr.code = 'ER_DUP_ENTRY';
+          dupErr.errno = 1062;
+          throw dupErr;
+        }
+        if (callCount === 3) {
+          return [[{
+            version: '080',
+            description: meta.description,
+            record_type: 'MIGRATION',
+            checksum: 'some_canonical_hash',
+            state: 'APPLIED'
+          }]];
+        }
+        return [[]];
+      })
+    };
+
+    await expect(handleLegacyPhaseMarkerStatement(mockConn, sql, meta.file))
+      .rejects
+      .toThrow('COLLISION_WITH_REAL_MIGRATION');
+  });
+
+  it('19. Rejects concurrent collision (ER_DUP_ENTRY) when race row is an incompatible PHASE_MARKER', async () => {
+    const meta = LEGACY_PHASE_MARKERS['080'];
+    const sql = `INSERT INTO schema_versions (version, applied_at, description) VALUES ('080', NOW(), '${meta.description}');`;
+
+    let callCount = 0;
+    const mockConn = {
+      query: vi.fn(async (q) => {
+        callCount++;
+        if (callCount === 1) return [[]];
+        if (callCount === 2) {
+          const dupErr = new Error("Duplicate entry '080' for key 'schema_versions.version'");
+          dupErr.code = 'ER_DUP_ENTRY';
+          dupErr.errno = 1062;
+          throw dupErr;
+        }
+        if (callCount === 3) {
+          return [[{
+            version: '080',
+            description: 'Conflict description from race',
+            record_type: 'PHASE_MARKER',
+            checksum: '',
+            state: 'APPLIED'
+          }]];
+        }
+        return [[]];
+      })
+    };
+
+    await expect(handleLegacyPhaseMarkerStatement(mockConn, sql, meta.file))
+      .rejects
+      .toThrow('INCOMPATIBLE_EXISTING_PHASE_MARKER');
   });
 });

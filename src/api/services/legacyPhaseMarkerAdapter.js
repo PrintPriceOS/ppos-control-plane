@@ -82,13 +82,58 @@ const LEGACY_PHASE_MARKERS = Object.freeze({
 const LEGACY_MARKER_REGEX = /^\s*INSERT\s+INTO\s+`?schema_versions`?\s*\(\s*`?version`?\s*,\s*`?applied_at`?\s*,\s*`?description`?\s*\)\s*VALUES\s*\(\s*'(\d{3})'\s*,\s*NOW\(\)\s*,\s*'([^']+)'\s*\)(?:\s+ON\s+DUPLICATE\s+KEY\s+UPDATE\s+[\s\S]*?)?\s*;?\s*$/i;
 
 /**
+ * Strips only valid leading SQL line comments (-- ...) and preceding/following whitespace.
+ * Preserves the rest of the SQL string unchanged.
+ * @param {string} sql
+ * @returns {string}
+ */
+function stripLeadingSqlComments(sql) {
+  if (!sql || typeof sql !== 'string') return '';
+  let s = sql.trimStart();
+  while (s.startsWith('--')) {
+    const newlineIndex = s.indexOf('\n');
+    if (newlineIndex === -1) {
+      return '';
+    }
+    s = s.slice(newlineIndex + 1).trimStart();
+  }
+  return s;
+}
+
+/**
  * Checks if a SQL statement attempts to insert into schema_versions.
  * @param {string} sql
  * @returns {boolean}
  */
 function isSchemaVersionsInsert(sql) {
   if (!sql || typeof sql !== 'string') return false;
-  return /^\s*INSERT\s+INTO\s+`?schema_versions`?/i.test(sql);
+  const stripped = stripLeadingSqlComments(sql);
+  return /^\s*INSERT\s+INTO\s+`?schema_versions`?/i.test(stripped);
+}
+
+/**
+ * Validates whether an existing row in schema_versions matches the authorized phase marker specification.
+ *
+ * @param {object} existing - Existing row from schema_versions
+ * @param {string} rawVersion - Version string ('080'..'091')
+ * @param {string} expectedDescription - Canonical description string
+ * @throws {Error} If the existing row collides with a MIGRATION or has incompatible state/data
+ */
+function validateExistingPhaseMarkerRow(existing, rawVersion, expectedDescription) {
+  if (!existing) return;
+
+  if (existing.record_type === 'MIGRATION') {
+    throw new Error(`COLLISION_WITH_REAL_MIGRATION: Version '${rawVersion}' is already registered as a real MIGRATION`);
+  }
+
+  const sameDescription = (existing.description === expectedDescription);
+  const sameType = (existing.record_type === 'PHASE_MARKER');
+  const sameChecksum = (existing.checksum === '');
+  const isApplied = (existing.state === 'APPLIED');
+
+  if (!sameDescription || !sameType || !sameChecksum || !isApplied) {
+    throw new Error(`INCOMPATIBLE_EXISTING_PHASE_MARKER: Version '${rawVersion}' exists with conflicting state (record_type=${existing.record_type}, checksum=${existing.checksum}, state=${existing.state}, description=${existing.description})`);
+  }
 }
 
 /**
@@ -103,7 +148,9 @@ function isSchemaVersionsInsert(sql) {
 async function handleLegacyPhaseMarkerStatement(connection, sql, currentMigrationFilename) {
   if (!sql || typeof sql !== 'string') return false;
 
-  const match = sql.match(LEGACY_MARKER_REGEX);
+  const normalizedSql = stripLeadingSqlComments(sql);
+  const match = normalizedSql.match(LEGACY_MARKER_REGEX);
+
   if (!match) {
     // If it's attempting to insert into schema_versions inside 080-091 but does not match the exact syntax, reject explicitly
     if (isSchemaVersionsInsert(sql) && currentMigrationFilename) {
@@ -134,54 +181,50 @@ async function handleLegacyPhaseMarkerStatement(connection, sql, currentMigratio
     throw new Error(`LEGACY_PHASE_MARKER_DESCRIPTION_MISMATCH: Expected '${authorized.description}' but got '${rawDescription}' in ${currentMigrationFilename}`);
   }
 
-  // 4. Concurrency & collision check: inspect existing row for this version
+  // 4. Concurrency & collision check: inspect existing row for this version before insert
   const [existingRows] = await connection.query(
     'SELECT version, description, record_type, checksum, state FROM schema_versions WHERE version = ?',
     [rawVersion]
   );
 
   if (existingRows && existingRows.length > 0) {
-    const existing = existingRows[0];
-    
-    // Never allow a PHASE_MARKER to overwrite or collide with a real MIGRATION
-    if (existing.record_type === 'MIGRATION') {
-      throw new Error(`COLLISION_WITH_REAL_MIGRATION: Version '${rawVersion}' is already registered as a real MIGRATION`);
-    }
-
-    // Idempotency: verify identical phase marker
-    const sameDescription = (existing.description === authorized.description);
-    const sameType = (existing.record_type === 'PHASE_MARKER');
-    const sameChecksum = (existing.checksum === '');
-    const isApplied = (existing.state === 'APPLIED');
-
-    if (sameDescription && sameType && sameChecksum && isApplied) {
-      // Exactly identical: idempotent no-op
-      return true;
-    }
-
-    throw new Error(`INCOMPATIBLE_EXISTING_PHASE_MARKER: Version '${rawVersion}' exists with conflicting state (record_type=${existing.record_type}, checksum=${existing.checksum}, state=${existing.state}, description=${existing.description})`);
+    validateExistingPhaseMarkerRow(existingRows[0], rawVersion, authorized.description);
+    // Exactly identical: idempotent no-op
+    return true;
   }
 
   // 5. Safe insert with strict record_type='PHASE_MARKER' and checksum=''
-  // Using INSERT ... ON DUPLICATE KEY UPDATE to guarantee safe behavior under concurrency
-  await connection.query(`
-    INSERT INTO schema_versions (
-      version,
-      description,
-      record_type,
-      checksum,
-      state,
-      execution_id,
-      runner_id,
-      started_at,
-      applied_at
-    ) VALUES (?, ?, 'PHASE_MARKER', '', 'APPLIED', '00000000-0000-0000-0000-000000000000', 'legacy-adapter', NOW(3), NOW(3))
-    ON DUPLICATE KEY UPDATE
-      description = VALUES(description),
-      record_type = IF(record_type = 'MIGRATION', 'MIGRATION', 'PHASE_MARKER'),
-      checksum = IF(record_type = 'MIGRATION', checksum, ''),
-      state = IF(record_type = 'MIGRATION', state, 'APPLIED')
-  `, [rawVersion, authorized.description]);
+  // Uses plain INSERT without ON DUPLICATE KEY UPDATE to prevent overwriting existing rows.
+  // In the event of a race/concurrent insert triggering ER_DUP_ENTRY, inspect existing row safely.
+  try {
+    await connection.query(`
+      INSERT INTO schema_versions (
+        version,
+        description,
+        record_type,
+        checksum,
+        state,
+        execution_id,
+        runner_id,
+        started_at,
+        applied_at
+      ) VALUES (?, ?, 'PHASE_MARKER', '', 'APPLIED', '00000000-0000-0000-0000-000000000000', 'legacy-adapter', NOW(3), NOW(3))
+    `, [rawVersion, authorized.description]);
+  } catch (err) {
+    // If a unique key collision occurs concurrently, verify that the existing row is fully valid and compatible
+    if (err.code === 'ER_DUP_ENTRY' || err.errno === 1062) {
+      const [raceRows] = await connection.query(
+        'SELECT version, description, record_type, checksum, state FROM schema_versions WHERE version = ?',
+        [rawVersion]
+      );
+      if (raceRows && raceRows.length > 0) {
+        validateExistingPhaseMarkerRow(raceRows[0], rawVersion, authorized.description);
+        return true;
+      }
+    }
+    // Propagate all other database errors unmodified
+    throw err;
+  }
 
   return true;
 }
@@ -189,6 +232,7 @@ async function handleLegacyPhaseMarkerStatement(connection, sql, currentMigratio
 module.exports = {
   LEGACY_PHASE_MARKERS,
   LEGACY_MARKER_REGEX,
+  stripLeadingSqlComments,
   isSchemaVersionsInsert,
   handleLegacyPhaseMarkerStatement
 };
