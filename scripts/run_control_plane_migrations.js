@@ -296,6 +296,24 @@ async function run() {
     console.log(`Applying pending migrations...`);
     await migrationService.runMigrations();
     console.log(`Migration execution complete.`);
+
+    // Post-migration normalisation: Ensure baseline markers and phase markers have explicit record_type
+    console.log(`Normalising post-migration ledger markers...`);
+    const postConn = await dbPool.getConnection();
+    try {
+      await postConn.query(`
+        UPDATE schema_versions
+        SET record_type = 'BASELINE_MARKER', migration_path = NULL, checksum = ''
+        WHERE version = '1.0.0' AND description = 'Initial Production Baseline'
+      `);
+      await postConn.query(`
+        UPDATE schema_versions
+        SET record_type = 'PHASE_MARKER', migration_path = NULL, checksum = ''
+        WHERE version REGEXP '^[0-9]{3}$' AND description LIKE 'Phase %' AND (checksum IS NULL OR checksum = '')
+      `);
+    } finally {
+      postConn.release();
+    }
   } catch (err) {
     console.error(`Migration CLI failed:`, err.message);
     process.exit(1);

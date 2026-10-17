@@ -40,7 +40,7 @@ class MigrationLedgerReadService {
 
       // 3. Process evolved ledger state machine checks
       const entries = await db.query(`
-        SELECT record_type, migration_path, checksum, state, started_at, heartbeat_at, failure_code
+        SELECT version, description, record_type, migration_path, checksum, state, started_at, heartbeat_at, failure_code
         FROM schema_versions
         ORDER BY started_at ASC
       `);
@@ -94,14 +94,57 @@ class MigrationLedgerReadService {
 
       // 4. Verify checksum matching and unknown migrations
       const baselineMap = new Map();
+      const filenameMap = new Map();
       for (const m of baseline.migrations) {
-        baselineMap.set(m.path || m.relativePath, m.canonicalSha256 || m.sha256);
+        const p = m.path || m.relativePath;
+        const c = m.canonicalSha256 || m.sha256;
+        baselineMap.set(p, c);
+        const fname = p.split('/').pop();
+        filenameMap.set(fname, p);
       }
 
-      // Validate only MIGRATION records
-      const applied = entries.filter(e => e.state === 'APPLIED' && (!e.record_type || e.record_type === 'MIGRATION'));
+      // Filter and normalize applied records (ignoring baseline and phase markers)
+      const applied = [];
+      for (const entry of entries) {
+        if (entry.state !== 'APPLIED') continue;
+
+        // Skip explicit non-migration markers
+        if (entry.record_type === 'BASELINE_MARKER' || entry.record_type === 'PHASE_MARKER') {
+          continue;
+        }
+
+        // Skip legacy 1.0.0 initial baseline row even if typed as MIGRATION
+        if (entry.version === '1.0.0' && entry.description === 'Initial Production Baseline') {
+          continue;
+        }
+
+        // Skip legacy phase markers
+        if (/^\d{3}$/.test(entry.version) && /^Phase \d+:/.test(entry.description || '') && !entry.checksum) {
+          continue;
+        }
+
+        // Only evaluate MIGRATION records (or legacy untyped records)
+        if (entry.record_type && entry.record_type !== 'MIGRATION') {
+          continue;
+        }
+
+        // Derive migration_path if null from description or version
+        let derivedPath = entry.migration_path;
+        if (!derivedPath) {
+          const fileKey = entry.description && entry.description.endsWith('.sql')
+            ? entry.description
+            : `${entry.version}.sql`;
+          if (filenameMap.has(fileKey)) {
+            derivedPath = filenameMap.get(fileKey);
+            entry.migration_path = derivedPath;
+          }
+        }
+
+        applied.push(entry);
+      }
+
       for (const entry of applied) {
-        if (!baselineMap.has(entry.migration_path)) {
+        if (!entry.migration_path || !baselineMap.has(entry.migration_path)) {
           return { status: 'MIGRATION_LEDGER_INCOMPATIBLE', reason: `Unknown applied migration in database: ${entry.migration_path}` };
         }
         const expectedChecksum = baselineMap.get(entry.migration_path);
