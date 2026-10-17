@@ -366,7 +366,7 @@ jobs:
 
         # Verify trigger execution on restored sandbox
         MYSQL_PWD="$RESTORE_USR_PW" mysql -h 127.0.0.1 -P 3307 -u ppos_restore_usr ppos_control_sandbox -e "
-          INSERT INTO tenants (id, name, status, plan) VALUES ('tenant-trigger-test-01', 'Trigger Test', 'ACTIVE', 'STANDARD');
+          INSERT INTO tenants (id, name, status, plan) VALUES ('tenant-trigger-test-01', 'Trigger Test', 'ACTIVE', 'ENTERPRISE');
         "
         TRIGGER_AUDIT_COUNT=$(MYSQL_PWD="$SANDBOX_ROOT_PW" mysql -h 127.0.0.1 -P 3307 -u root ppos_control_sandbox -N -e "SELECT count(*) FROM synth_audit_log WHERE action_desc LIKE '%tenant-trigger-test-01%';")
         echo "Sandbox trigger audit log count: $TRIGGER_AUDIT_COUNT"
