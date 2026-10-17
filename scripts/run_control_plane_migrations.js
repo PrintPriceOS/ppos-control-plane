@@ -202,19 +202,21 @@ async function run() {
           const match = baselineMap.get(fileKey);
           const canonicalPath = match.path || match.relativePath;
           const canonicalChecksum = match.canonicalSha256 || match.sha256;
+          // Preserve existing non-empty checksum to respect forensic integrity, fallback to canonical
+          const effectiveChecksum = row.checksum && row.checksum.trim() !== '' ? row.checksum : canonicalChecksum;
 
           await dbConn.query(`
             UPDATE schema_versions
             SET
               record_type = 'MIGRATION',
               migration_path = ?,
-              checksum = ?,
+              checksum = COALESCE(NULLIF(checksum, ''), ?),
               state = COALESCE(NULLIF(state, ''), 'APPLIED'),
               execution_id = COALESCE(execution_id, '00000000-0000-0000-0000-000000000000'),
               started_at = COALESCE(started_at, applied_at, NOW(3)),
               applied_at = CASE WHEN state = 'APPLIED' OR state IS NULL OR state = '' THEN COALESCE(applied_at, NOW(3)) ELSE applied_at END
             WHERE version = ? OR description = ?
-          `, [canonicalPath, canonicalChecksum, row.version, row.description]);
+          `, [canonicalPath, effectiveChecksum, row.version, row.description]);
           backfilledCount++;
           continue;
         }
@@ -296,6 +298,24 @@ async function run() {
     console.log(`Applying pending migrations...`);
     await migrationService.runMigrations();
     console.log(`Migration execution complete.`);
+
+    // Post-migration normalisation: Ensure baseline markers and phase markers have explicit record_type
+    console.log(`Normalising post-migration ledger markers...`);
+    const postConn = await dbPool.getConnection();
+    try {
+      await postConn.query(`
+        UPDATE schema_versions
+        SET record_type = 'BASELINE_MARKER', migration_path = NULL, checksum = ''
+        WHERE version = '1.0.0' AND description = 'Initial Production Baseline'
+      `);
+      await postConn.query(`
+        UPDATE schema_versions
+        SET record_type = 'PHASE_MARKER', migration_path = NULL, checksum = ''
+        WHERE version REGEXP '^[0-9]{3}$' AND description LIKE 'Phase %' AND (checksum IS NULL OR checksum = '')
+      `);
+    } finally {
+      postConn.release();
+    }
   } catch (err) {
     console.error(`Migration CLI failed:`, err.message);
     process.exit(1);

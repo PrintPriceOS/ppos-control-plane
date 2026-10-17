@@ -13,20 +13,22 @@ class MigrationLedgerReadService {
   async evaluateLedgerStatus(baseline, staleTimeoutMinutes = 30) {
     try {
       // 1. Verify table exists. If not, ledger is empty/not ready
-      const [tableCheck] = await db.query(`
+      const tableCheckRows = await db.query(`
         SELECT TABLE_NAME FROM information_schema.TABLES
         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'schema_versions'
       `);
+      const tableCheck = Array.isArray(tableCheckRows) ? tableCheckRows[0] : tableCheckRows;
       if (!tableCheck) {
         return { status: 'MIGRATION_LEDGER_INCOMPATIBLE', reason: 'Table schema_versions does not exist' };
       }
 
       // 2. Fetch all ledger entries
       // Handle fallback schema structure if Phase 185 upgrade has not run yet.
-      const columns = await db.query(`
+      const columnsRows = await db.query(`
         SELECT COLUMN_NAME FROM information_schema.COLUMNS
         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'schema_versions'
       `);
+      const columns = Array.isArray(columnsRows) ? columnsRows : [];
       const hasGovColumns = columns.some(c => c.COLUMN_NAME === 'state');
 
       if (!hasGovColumns) {
@@ -40,36 +42,26 @@ class MigrationLedgerReadService {
 
       // 3. Process evolved ledger state machine checks
       const entries = await db.query(`
-        SELECT record_type, migration_path, checksum, state, started_at, heartbeat_at, failure_code
+        SELECT version, description, record_type, migration_path, checksum, state, started_at, heartbeat_at, failure_code
         FROM schema_versions
         ORDER BY started_at ASC
       `);
 
       const failedRecords = entries.filter(e => e.state === 'FAILED');
+      // In persistent environments, FAILED migrations represent a halted state requiring forensic analysis
+      // and explicit schema verification. Automatic unblocking or unauthenticated retry via environment variable
+      // is strictly forbidden to prevent compounding physical schema mutations.
       for (const failedRecord of failedRecords) {
-        const allowRetryEnv = process.env.PPOS_ALLOW_MIGRATION_RETRY === 'true';
-        let eligible = false;
-        if (allowRetryEnv) {
-          const baselineEntry = baseline.migrations.find(m => (m.path || m.relativePath) === failedRecord.migration_path);
-          if (baselineEntry) {
-            const expectedChecksum = baselineEntry.canonicalSha256 || baselineEntry.sha256;
-            if (expectedChecksum === failedRecord.checksum) {
-              const hasApplied = entries.some(e => e.migration_path === failedRecord.migration_path && e.state === 'APPLIED');
-              if (!hasApplied) {
-                eligible = true;
-              }
-            }
-          }
-        }
-
-        if (eligible) {
-          logger.info({ event: 'migration_retry_eligible', migration_path: failedRecord.migration_path, message: 'Failed migration eligible for governed retry' });
-        } else {
-          return { 
-            status: 'MIGRATION_FAILED', 
-            reason: `Migration failed: ${failedRecord.migration_path || 'unknown'}. Error: ${failedRecord.failure_code}`
-          };
-        }
+        logger.error({
+          event: 'migration_failed_blocked',
+          migration_path: failedRecord.migration_path,
+          failure_code: failedRecord.failure_code,
+          message: 'Migration execution halted: ledger contains FAILED migration record requiring explicit governed resolution'
+        });
+        return {
+          status: 'MIGRATION_FAILED',
+          reason: `Migration failed: ${failedRecord.migration_path || 'unknown'}. Error: ${failedRecord.failure_code}`
+        };
       }
 
       // Stale STARTED detection (only for real migrations)
@@ -94,14 +86,57 @@ class MigrationLedgerReadService {
 
       // 4. Verify checksum matching and unknown migrations
       const baselineMap = new Map();
+      const filenameMap = new Map();
       for (const m of baseline.migrations) {
-        baselineMap.set(m.path || m.relativePath, m.canonicalSha256 || m.sha256);
+        const p = m.path || m.relativePath;
+        const c = m.canonicalSha256 || m.sha256;
+        baselineMap.set(p, c);
+        const fname = p.split('/').pop();
+        filenameMap.set(fname, p);
       }
 
-      // Validate only MIGRATION records
-      const applied = entries.filter(e => e.state === 'APPLIED' && (!e.record_type || e.record_type === 'MIGRATION'));
+      // Filter and normalize applied records (ignoring baseline and phase markers)
+      const applied = [];
+      for (const entry of entries) {
+        if (entry.state !== 'APPLIED') continue;
+
+        // Skip explicit non-migration markers
+        if (entry.record_type === 'BASELINE_MARKER' || entry.record_type === 'PHASE_MARKER') {
+          continue;
+        }
+
+        // Skip legacy 1.0.0 initial baseline row even if typed as MIGRATION
+        if (entry.version === '1.0.0' && entry.description === 'Initial Production Baseline') {
+          continue;
+        }
+
+        // Skip legacy phase markers
+        if (/^\d{3}$/.test(entry.version) && /^Phase \d+:/.test(entry.description || '') && !entry.checksum) {
+          continue;
+        }
+
+        // Only evaluate MIGRATION records (or legacy untyped records)
+        if (entry.record_type && entry.record_type !== 'MIGRATION') {
+          continue;
+        }
+
+        // Derive migration_path if null from description or version
+        let derivedPath = entry.migration_path;
+        if (!derivedPath) {
+          const fileKey = entry.description && entry.description.endsWith('.sql')
+            ? entry.description
+            : `${entry.version}.sql`;
+          if (filenameMap.has(fileKey)) {
+            derivedPath = filenameMap.get(fileKey);
+            entry.migration_path = derivedPath;
+          }
+        }
+
+        applied.push(entry);
+      }
+
       for (const entry of applied) {
-        if (!baselineMap.has(entry.migration_path)) {
+        if (!entry.migration_path || !baselineMap.has(entry.migration_path)) {
           return { status: 'MIGRATION_LEDGER_INCOMPATIBLE', reason: `Unknown applied migration in database: ${entry.migration_path}` };
         }
         const expectedChecksum = baselineMap.get(entry.migration_path);
