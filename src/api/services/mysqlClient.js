@@ -8,11 +8,21 @@ let pool = null;
 function getPool() {
     if (pool) return pool;
 
+    let password = process.env.MYSQL_PASSWORD;
+    if (!password && process.env.MYSQL_PASSWORD_FILE) {
+        try {
+            const fs = require('fs');
+            if (fs.existsSync(process.env.MYSQL_PASSWORD_FILE)) {
+                password = fs.readFileSync(process.env.MYSQL_PASSWORD_FILE, 'utf8').trim();
+            }
+        } catch (e) {}
+    }
+
     const config = {
         host: process.env.MYSQL_HOST,
         port: parseInt(process.env.MYSQL_PORT || '3306'),
         user: process.env.MYSQL_USER,
-        password: process.env.MYSQL_PASSWORD,
+        password: password,
         database: process.env.MYSQL_DATABASE,
         waitForConnections: true,
         connectionLimit: parseInt(process.env.DB_POOL_LIMIT || '25'),
