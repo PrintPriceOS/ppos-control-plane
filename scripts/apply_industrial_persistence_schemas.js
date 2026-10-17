@@ -23,6 +23,8 @@ const mysqlClient = require('../src/api/services/mysqlClient');
 const mfgSchema = require('../src/migrations/phase184g_manufacturing_persistence_schema');
 const provSchema = require('../src/migrations/phase184g_industrial_provisioning_schema');
 
+const { ACTIVE_REQUIRED_TABLES, ACTIVE_REQUIRED_COLUMNS } = require('./verify-industrial-schema');
+
 /**
  * Verification of ephemeral isolation guards.
  */
@@ -73,40 +75,50 @@ function checkEphemeralIsolation(env = process.env) {
 }
 
 /**
- * Validates postconditions: critical tables must exist after 184G application.
+ * Database adapter wrapping a raw mysql2 connection.
+ * Normalizes query results to return directly `rows` (matching mysqlClient.query contract)
+ * rather than native mysql2 tuple `[rows, fields]`.
+ * Preserves the exact same connection across all operations and propagates SQL errors intact.
+ */
+function createDbAdapter(rawConn) {
+    if (!rawConn || typeof rawConn.query !== 'function') {
+        throw new Error('ADAPTER_ERROR: Invalid raw connection');
+    }
+
+    return {
+        async query(sql, params = []) {
+            const [rows] = await rawConn.query(sql, params);
+            return rows;
+        }
+    };
+}
+
+/**
+ * Validates postconditions: all 21 active industrial tables and 29 active columns
+ * must exist in information_schema after 184G application.
  */
 async function verifyPostconditions(db) {
-    const requiredTables = [
-        'print_nodes',
-        'node_heartbeats',
-        'print_node_machine_profiles',
-        'manufacturing_packages',
-        'manufacturing_dispatches',
-        'manufacturing_capacity_reservations',
-        'manufacturing_dispatch_events',
-        'federation_factories',
-        'live_capacity_snapshots'
-    ];
-
-    for (const table of requiredTables) {
+    // 1. Verify all 21 ACTIVE_REQUIRED_TABLES
+    for (const table of ACTIVE_REQUIRED_TABLES) {
         const rows = await db.query(
-            'SELECT COUNT(*) as cnt FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?',
+            'SELECT COUNT(*) AS cnt FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?',
             [table]
         );
-        if (rows[0].cnt === 0) {
-            throw new Error(`POSTCONDITION_FAILED: Required industrial table '${table}' was not created by 184G schemas.`);
+        const count = rows && rows[0] ? (rows[0].cnt !== undefined ? rows[0].cnt : rows[0].CNT) : 0;
+        if (Number(count) === 0) {
+            throw new Error(`POSTCONDITION_FAILED: Required active industrial table '${table}' was not found in database.`);
         }
     }
 
-    // Verify critical columns on print_nodes
-    const requiredPrintNodeCols = ['machine_state', 'worker_state', 'sync_version'];
-    for (const col of requiredPrintNodeCols) {
+    // 2. Verify all 29 ACTIVE_REQUIRED_COLUMNS
+    for (const { table, column } of ACTIVE_REQUIRED_COLUMNS) {
         const rows = await db.query(
-            'SELECT COUNT(*) as cnt FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = "print_nodes" AND column_name = ?',
-            [col]
+            'SELECT COUNT(*) AS cnt FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = ? AND column_name = ?',
+            [table, column]
         );
-        if (rows[0].cnt === 0) {
-            throw new Error(`POSTCONDITION_FAILED: Critical column 'print_nodes.${col}' was not added.`);
+        const count = rows && rows[0] ? (rows[0].cnt !== undefined ? rows[0].cnt : rows[0].CNT) : 0;
+        if (Number(count) === 0) {
+            throw new Error(`POSTCONDITION_FAILED: Required active column '${table}.${column}' was not found in database.`);
         }
     }
 }
@@ -132,17 +144,19 @@ async function main() {
     const conn = await pool.getConnection();
 
     try {
+        const dbAdapter = createDbAdapter(conn);
+
         console.log('[1/3] Executing phase184g_manufacturing_persistence_schema.up()...');
-        await mfgSchema.up(conn);
+        await mfgSchema.up(dbAdapter);
         console.log('  -> Success.');
 
         console.log('[2/3] Executing phase184g_industrial_provisioning_schema.up()...');
-        await provSchema.up(conn);
+        await provSchema.up(dbAdapter);
         console.log('  -> Success.');
 
-        console.log('[3/3] Verifying 184G postconditions...');
-        await verifyPostconditions(conn);
-        console.log('  -> All postconditions satisfied.');
+        console.log('[3/3] Verifying 184G postconditions (21 tables & 29 columns)...');
+        await verifyPostconditions(dbAdapter);
+        console.log('  -> All postconditions satisfied (100% active schema integrity).');
 
         console.log('\n[PASS] Phase 184G Industrial Persistence Schemas successfully applied.\n');
     } catch (err) {
@@ -161,5 +175,6 @@ if (require.main === module) {
 
 module.exports = {
     checkEphemeralIsolation,
+    createDbAdapter,
     verifyPostconditions
 };

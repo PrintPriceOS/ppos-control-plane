@@ -1,7 +1,8 @@
 'use strict';
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { checkEphemeralIsolation, verifyPostconditions } from '../scripts/apply_industrial_persistence_schemas';
+import { checkEphemeralIsolation, createDbAdapter, verifyPostconditions } from '../scripts/apply_industrial_persistence_schemas';
+import provSchema from '../src/migrations/phase184g_industrial_provisioning_schema';
 import { ACTIVE_REQUIRED_TABLES, ACTIVE_REQUIRED_COLUMNS, HISTORICAL_SPECULATIVE_TABLES, runActiveIndustrialProfile, runHistoricalCatalogProfile } from '../scripts/verify-industrial-schema';
 
 describe('CI-02M.3: Phase 184G Industrial Persistence & Schema Integrity', () => {
@@ -104,30 +105,179 @@ describe('CI-02M.3: Phase 184G Industrial Persistence & Schema Integrity', () =>
         });
     });
 
+    describe('CI-02M.6: MySQL Connection Adapter Hardening (createDbAdapter)', () => {
+        it('throws an error if invalid raw connection is provided', () => {
+            expect(() => createDbAdapter(null)).toThrow('ADAPTER_ERROR');
+            expect(() => createDbAdapter({})).toThrow('ADAPTER_ERROR');
+            expect(() => createDbAdapter({ query: 'not a function' })).toThrow('ADAPTER_ERROR');
+        });
+
+        it('correctly returns 0 rows (empty array) from native [rows, fields] tuple', async () => {
+            const mockRawRows = [];
+            const mockFields = [{ name: 'id' }];
+            const mockRawConn = {
+                query: vi.fn().mockResolvedValue([mockRawRows, mockFields])
+            };
+
+            const adapter = createDbAdapter(mockRawConn);
+            const result = await adapter.query('SELECT * FROM empty_table');
+
+            expect(result).toBe(mockRawRows);
+            expect(Array.isArray(result)).toBe(true);
+            expect(result.length).toBe(0);
+        });
+
+        it('correctly returns 1 row from native [rows, fields] tuple', async () => {
+            const mockRawRows = [{ id: 1, name: 'single_row' }];
+            const mockFields = [{ name: 'id' }, { name: 'name' }];
+            const mockRawConn = {
+                query: vi.fn().mockResolvedValue([mockRawRows, mockFields])
+            };
+
+            const adapter = createDbAdapter(mockRawConn);
+            const result = await adapter.query('SELECT * FROM test WHERE id = ?', [1]);
+
+            expect(result).toBe(mockRawRows);
+            expect(Array.isArray(result)).toBe(true);
+            expect(result.length).toBe(1);
+            expect(result[0].name).toBe('single_row');
+        });
+
+        it('correctly returns exactly 2 rows without ambiguity or mistaking for tuple', async () => {
+            // CRITICAL TEST: Validates that an array of exactly 2 row objects is returned directly as rows,
+            // never truncated, mistranslated, or confused with [rows, fields].
+            const mockRawRows = [
+                { id: 1, code: 'ROW_A' },
+                { id: 2, code: 'ROW_B' }
+            ];
+            const mockFields = [{ name: 'id' }, { name: 'code' }];
+            const mockRawConn = {
+                query: vi.fn().mockResolvedValue([mockRawRows, mockFields])
+            };
+
+            const adapter = createDbAdapter(mockRawConn);
+            const result = await adapter.query('SELECT * FROM dual_rows');
+
+            expect(result).toBe(mockRawRows);
+            expect(Array.isArray(result)).toBe(true);
+            expect(result.length).toBe(2);
+            expect(result[0].code).toBe('ROW_A');
+            expect(result[1].code).toBe('ROW_B');
+        });
+
+        it('correctly returns multiple rows (3+ rows)', async () => {
+            const mockRawRows = [{ id: 1 }, { id: 2 }, { id: 3 }, { id: 4 }];
+            const mockFields = [{ name: 'id' }];
+            const mockRawConn = {
+                query: vi.fn().mockResolvedValue([mockRawRows, mockFields])
+            };
+
+            const adapter = createDbAdapter(mockRawConn);
+            const result = await adapter.query('SELECT * FROM multi_rows');
+
+            expect(result).toBe(mockRawRows);
+            expect(Array.isArray(result)).toBe(true);
+            expect(result.length).toBe(4);
+        });
+
+        it('correctly returns command execution result for INSERT, UPDATE or ALTER TABLE', async () => {
+            // mysql2 returns [OkPacket/ResultSetHeader, undefined] for mutations
+            const mockHeader = { affectedRows: 1, insertId: 42, changedRows: 0 };
+            const mockRawConn = {
+                query: vi.fn().mockResolvedValue([mockHeader, undefined])
+            };
+
+            const adapter = createDbAdapter(mockRawConn);
+            const result = await adapter.query('ALTER TABLE print_nodes ADD COLUMN test_col INT');
+
+            expect(result).toBe(mockHeader);
+            expect(result.affectedRows).toBe(1);
+            expect(result.insertId).toBe(42);
+        });
+
+        it('propagates database and driver errors intact without masking or rewriting', async () => {
+            const dbError = new Error('ER_DUP_FIELDNAME: Duplicate column name');
+            dbError.code = 'ER_DUP_FIELDNAME';
+            dbError.errno = 1060;
+            const mockRawConn = {
+                query: vi.fn().mockRejectedValue(dbError)
+            };
+
+            const adapter = createDbAdapter(mockRawConn);
+            await expect(adapter.query('ALTER TABLE test ADD COLUMN dup INT')).rejects.toThrow('ER_DUP_FIELDNAME');
+            expect(mockRawConn.query).toHaveBeenCalledWith('ALTER TABLE test ADD COLUMN dup INT', []);
+        });
+
+        it('reproduces and fixes the phase184g column omission bug', async () => {
+            // Under raw mysql2: connection.query returns [rows, fields].
+            // If rows is empty, raw mysql2 returns [[], [fields]].
+            // Without adapter: [ [], [fields] ].length === 2, so rows.length === 0 is FALSE!
+            const executedQueriesWithoutAdapter = [];
+            const rawMysql2Conn = {
+                query: vi.fn().mockImplementation(async (sql) => {
+                    executedQueriesWithoutAdapter.push(sql);
+                    if (sql.includes('information_schema.columns')) {
+                        // Empty result in native mysql2 tuple format
+                        return [[], [{ name: 'COLUMN_NAME' }]];
+                    }
+                    return [[], []];
+                })
+            };
+
+            process.env.PPOS_MIGRATION_EXECUTION = 'true';
+
+            // When run with raw connection, ALTER TABLE is never executed because length is 2!
+            await provSchema.up(rawMysql2Conn);
+            const alterStatementsWithoutAdapter = executedQueriesWithoutAdapter.filter(q => q.startsWith('ALTER TABLE'));
+            expect(alterStatementsWithoutAdapter.length).toBe(0); // BUG REPRODUCED: 0 columns added!
+
+            // Now run with the CI-02M.6 adapter:
+            const executedQueriesWithAdapter = [];
+            const rawMysql2ConnForAdapter = {
+                query: vi.fn().mockImplementation(async (sql) => {
+                    executedQueriesWithAdapter.push(sql);
+                    if (sql.includes('information_schema.columns')) {
+                        return [[], [{ name: 'COLUMN_NAME' }]];
+                    }
+                    return [[], []];
+                })
+            };
+
+            const adapter = createDbAdapter(rawMysql2ConnForAdapter);
+            await provSchema.up(adapter);
+            const alterStatementsWithAdapter = executedQueriesWithAdapter.filter(q => q.startsWith('ALTER TABLE'));
+            // ALTER TABLE statements are now executed for all column additions!
+            expect(alterStatementsWithAdapter.length).toBeGreaterThan(0);
+            expect(alterStatementsWithAdapter.some(q => q.includes('print_nodes ADD COLUMN machine_state'))).toBe(true);
+            expect(alterStatementsWithAdapter.some(q => q.includes('printer_nodes ADD COLUMN machine_state'))).toBe(true);
+        });
+    });
+
     describe('Postcondition Verification', () => {
-        it('throws an error if a required industrial table is missing after execution', async () => {
+        it('throws an error if a required active industrial table is missing after execution', async () => {
             const mockDb = {
                 query: vi.fn().mockImplementation(async (sql, params) => {
                     const table = params?.[0];
-                    if (table === 'manufacturing_packages') {
-                        return [{ cnt: 0 }]; // Table missing
+                    if (table === 'manufacturing_dispatches') {
+                        return [{ cnt: 0 }]; // Active table missing
                     }
                     return [{ cnt: 1 }];
                 })
             };
 
-            await expect(verifyPostconditions(mockDb)).rejects.toThrow('POSTCONDITION_FAILED');
+            await expect(verifyPostconditions(mockDb)).rejects.toThrow("Required active industrial table 'manufacturing_dispatches' was not found");
         });
 
-        it('throws an error if active telemetry column is missing on print_nodes', async () => {
+        it('throws an error if any required active column is missing', async () => {
             const mockDb = {
                 query: vi.fn().mockImplementation(async (sql, params) => {
                     if (sql.includes('information_schema.tables')) {
                         return [{ cnt: 1 }];
                     }
                     if (sql.includes('information_schema.columns')) {
-                        const col = params?.[0];
-                        if (col === 'machine_state') {
+                        const table = params?.[0];
+                        const col = params?.[1];
+                        if (table === 'print_nodes' && col === 'machine_state') {
                             return [{ cnt: 0 }]; // Column missing
                         }
                     }
@@ -135,10 +285,10 @@ describe('CI-02M.3: Phase 184G Industrial Persistence & Schema Integrity', () =>
                 })
             };
 
-            await expect(verifyPostconditions(mockDb)).rejects.toThrow("Critical column 'print_nodes.machine_state' was not added");
+            await expect(verifyPostconditions(mockDb)).rejects.toThrow("Required active column 'print_nodes.machine_state' was not found");
         });
 
-        it('succeeds when all tables and telemetry columns exist', async () => {
+        it('succeeds when all 21 active tables and 29 active columns exist', async () => {
             const mockDb = {
                 query: vi.fn().mockResolvedValue([{ cnt: 1 }])
             };
