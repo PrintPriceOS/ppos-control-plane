@@ -6,13 +6,17 @@ import {
   FIXTURE_CONTRACT_SPECS,
   MIGRATION_140_FIXTURE_DDL
 } from '../scripts/bootstrap_canonical_schema';
-import { runMigration140PreRemediation } from '../src/api/services/migrationService';
+import {
+  runMigration140PreRemediation,
+  validateMigration140PostConditions
+} from '../src/api/services/migrationService';
 
 /**
- * CI-02J.6: Direct contract certification and real-code test suite for
- * Migration 140 ephemeral fixtures, safety isolation gates, and structural idempotency.
+ * CI-02K.2: Direct contract certification and real-code test suite for
+ * Migration 140 ephemeral fixtures, safety isolation gates, pre-remediation,
+ * and governed post-validation.
  */
-describe('CI-02J.6: Migration 140 Real Bootstrap Contract & Ephemeral Isolation Suite', () => {
+describe('CI-02K.2: Migration 140 Real Bootstrap Contract & Ephemeral Isolation Suite', () => {
   const originalEnv = { ...process.env };
 
   beforeEach(() => {
@@ -427,10 +431,10 @@ describe('CI-02J.6: Migration 140 Real Bootstrap Contract & Ephemeral Isolation 
       addIdx('printer_nodes', 'uk_pn_id_tenant', false, ['id', 'tenant_id']);
       addIdx('printer_nodes', 'idx_pn_tenant', true, ['tenant_id']);
       addIdx('printhouse_machines', 'PRIMARY', false, ['id']);
-      addIdx('printhouse_machines', 'uk_pm_id_tenant', false, ['id', 'tenant_id']);
+      // Notice: printhouse_machines has idx_pm_printhouse_tenant, but NOT (id, tenant_id) UNIQUE
       addIdx('printhouse_machines', 'idx_pm_printhouse_tenant', true, ['printhouse_id', 'tenant_id']);
       addIdx('materials_catalog', 'PRIMARY', false, ['id']);
-      addIdx('materials_catalog', 'uk_mc_id_tenant', false, ['id', 'tenant_id']);
+      // Notice: materials_catalog has PRIMARY(id) and idx_mc_tenant, but NOT (id, tenant_id) UNIQUE
       addIdx('materials_catalog', 'idx_mc_tenant', true, ['tenant_id']);
       addIdx('printhouse_media', 'idx_media_p_t', true, ['printhouse_id', 'tenant_id']);
       addIdx('printhouse_policy_profiles', 'idx_pol_p_t', true, ['printhouse_id', 'tenant_id']);
@@ -445,28 +449,168 @@ describe('CI-02J.6: Migration 140 Real Bootstrap Contract & Ephemeral Isolation 
       addIdx('printhouse_capabilities', 'idx_pc_printhouse', true, ['printhouse_id']);
       addIdx('routing_history', 'idx_rh_printer', true, ['printer_id']);
 
-      // 4 tenant-aware FKs
-      mockDb.foreignKeys.push(
-        { name: 'fk_machines_printer_node', childTable: 'printhouse_machines', childCols: ['printhouse_id', 'tenant_id'], parentTable: 'printer_nodes', parentCols: ['id', 'tenant_id'], onUpdate: 'CASCADE', onDelete: 'CASCADE' },
-        { name: 'fk_media_printer_node', childTable: 'printhouse_media', childCols: ['printhouse_id', 'tenant_id'], parentTable: 'printer_nodes', parentCols: ['id', 'tenant_id'], onUpdate: 'CASCADE', onDelete: 'CASCADE' },
-        { name: 'fk_policies_printer_node', childTable: 'printhouse_policy_profiles', childCols: ['printhouse_id', 'tenant_id'], parentTable: 'printer_nodes', parentCols: ['id', 'tenant_id'], onUpdate: 'CASCADE', onDelete: 'CASCADE' },
-        { name: 'fk_sla_printer_node', childTable: 'printhouse_sla_profiles', childCols: ['printhouse_id', 'tenant_id'], parentTable: 'printer_nodes', parentCols: ['id', 'tenant_id'], onUpdate: 'CASCADE', onDelete: 'CASCADE' }
-      );
+      // Add the 13 required FKs exactly as defined in EXPECTED_FKS
+      const requiredFks = [
+        { name: 'fk_machines_printer_node', child: 'printhouse_machines', cols: ['printhouse_id', 'tenant_id'], parent: 'printer_nodes', refCols: ['id', 'tenant_id'], onUpdate: 'CASCADE', onDelete: 'CASCADE' },
+        { name: 'fk_media_printer_node', child: 'printhouse_media', cols: ['printhouse_id', 'tenant_id'], parent: 'printer_nodes', refCols: ['id', 'tenant_id'], onUpdate: 'CASCADE', onDelete: 'CASCADE' },
+        { name: 'fk_policies_printer_node', child: 'printhouse_policy_profiles', cols: ['printhouse_id', 'tenant_id'], parent: 'printer_nodes', refCols: ['id', 'tenant_id'], onUpdate: 'CASCADE', onDelete: 'CASCADE' },
+        { name: 'fk_sla_printer_node', child: 'printhouse_sla_profiles', cols: ['printhouse_id', 'tenant_id'], parent: 'printer_nodes', refCols: ['id', 'tenant_id'], onUpdate: 'CASCADE', onDelete: 'CASCADE' },
+        { name: 'job_outcomes_ibfk_1', child: 'job_outcomes', cols: ['printer_id'], parent: 'printer_nodes', refCols: ['id'], onUpdate: 'NO ACTION', onDelete: 'CASCADE' },
+        { name: 'printer_capacity_ibfk_1', child: 'printer_capacity', cols: ['printer_id'], parent: 'printer_nodes', refCols: ['id'], onUpdate: 'NO ACTION', onDelete: 'CASCADE' },
+        { name: 'printer_contacts_ibfk_1', child: 'printer_contacts', cols: ['printer_id'], parent: 'printer_nodes', refCols: ['id'], onUpdate: 'NO ACTION', onDelete: 'CASCADE' },
+        { name: 'printer_machines_ibfk_1', child: 'printer_machines', cols: ['printer_id'], parent: 'printer_nodes', refCols: ['id'], onUpdate: 'NO ACTION', onDelete: 'CASCADE' },
+        { name: 'printer_papers_ibfk_1', child: 'printer_papers', cols: ['printer_id'], parent: 'printer_nodes', refCols: ['id'], onUpdate: 'NO ACTION', onDelete: 'CASCADE' },
+        { name: 'printer_performance_ibfk_1', child: 'printer_performance', cols: ['printer_id'], parent: 'printer_nodes', refCols: ['id'], onUpdate: 'NO ACTION', onDelete: 'CASCADE' },
+        { name: 'printer_service_regions_ibfk_1', child: 'printer_service_regions', cols: ['printer_id'], parent: 'printer_nodes', refCols: ['id'], onUpdate: 'NO ACTION', onDelete: 'CASCADE' },
+        { name: 'printhouse_capabilities_ibfk_1', child: 'printhouse_capabilities', cols: ['printhouse_id'], parent: 'printer_nodes', refCols: ['id'], onUpdate: 'NO ACTION', onDelete: 'CASCADE' },
+        { name: 'routing_history_ibfk_1', child: 'routing_history', cols: ['printer_id'], parent: 'printer_nodes', refCols: ['id'], onUpdate: 'NO ACTION', onDelete: 'CASCADE' }
+      ];
 
-      // 9 direct FKs (all referencing printer_nodes(id))
-      mockDb.foreignKeys.push(
-        { name: 'job_outcomes_ibfk_1', childTable: 'job_outcomes', childCols: ['printer_id'], parentTable: 'printer_nodes', parentCols: ['id'], onUpdate: 'NO ACTION', onDelete: 'CASCADE' },
-        { name: 'printer_capacity_ibfk_1', childTable: 'printer_capacity', childCols: ['printer_id'], parentTable: 'printer_nodes', parentCols: ['id'], onUpdate: 'NO ACTION', onDelete: 'CASCADE' },
-        { name: 'printer_contacts_ibfk_1', childTable: 'printer_contacts', childCols: ['printer_id'], parentTable: 'printer_nodes', parentCols: ['id'], onUpdate: 'NO ACTION', onDelete: 'CASCADE' },
-        { name: 'printer_machines_ibfk_1', childTable: 'printer_machines', childCols: ['printer_id'], parentTable: 'printer_nodes', parentCols: ['id'], onUpdate: 'NO ACTION', onDelete: 'CASCADE' },
-        { name: 'printer_papers_ibfk_1', childTable: 'printer_papers', childCols: ['printer_id'], parentTable: 'printer_nodes', parentCols: ['id'], onUpdate: 'NO ACTION', onDelete: 'CASCADE' },
-        { name: 'printer_performance_ibfk_1', childTable: 'printer_performance', childCols: ['printer_id'], parentTable: 'printer_nodes', parentCols: ['id'], onUpdate: 'NO ACTION', onDelete: 'CASCADE' },
-        { name: 'printer_service_regions_ibfk_1', childTable: 'printer_service_regions', childCols: ['printer_id'], parentTable: 'printer_nodes', parentCols: ['id'], onUpdate: 'NO ACTION', onDelete: 'CASCADE' },
-        { name: 'printhouse_capabilities_ibfk_1', childTable: 'printhouse_capabilities', childCols: ['printhouse_id'], parentTable: 'printer_nodes', parentCols: ['id'], onUpdate: 'NO ACTION', onDelete: 'CASCADE' },
-        { name: 'routing_history_ibfk_1', childTable: 'routing_history', childCols: ['printer_id'], parentTable: 'printer_nodes', parentCols: ['id'], onUpdate: 'NO ACTION', onDelete: 'CASCADE' }
-      );
+      for (const fk of requiredFks) {
+        mockDb.foreignKeys.push({
+          name: fk.name,
+          childTable: fk.child,
+          childCols: fk.cols,
+          parentTable: fk.parent,
+          parentCols: fk.refCols,
+          onUpdate: fk.onUpdate,
+          onDelete: fk.onDelete
+        });
+      }
 
+      // Pre-remediation MUST succeed without printhouse_machines(id, tenant_id) and materials_catalog(id, tenant_id)
       await expect(runMigration140PreRemediation(mockDb)).resolves.not.toThrow();
+    });
+  });
+
+  // =========================================================================
+  // 3.1 GOVERNED POST-VALIDATION FOR MIGRATION 140 (validateMigration140PostConditions)
+  // =========================================================================
+  describe('3.1 Governed Post-Validation for Migration 140 (validateMigration140PostConditions)', () => {
+    class MockPostDb {
+      constructor() {
+        this.tables = new Set(['printhouse_machines', 'materials_catalog', 'printhouse_machine_materials']);
+        this.indexes = [];
+        this.fks = [];
+      }
+
+      addIndex(table, name, nonUnique, cols) {
+        cols.forEach((col, seq) => {
+          this.indexes.push({
+            TABLE_NAME: table,
+            INDEX_NAME: name,
+            NON_UNIQUE: nonUnique ? 1 : 0,
+            SEQ_IN_INDEX: seq + 1,
+            COLUMN_NAME: col.name || col,
+            SUB_PART: col.subPart || null
+          });
+        });
+      }
+
+      addFk(constraintName, childTable, childCols, parentTable, parentCols, updateRule, deleteRule) {
+        childCols.forEach((col, idx) => {
+          this.fks.push({
+            CONSTRAINT_NAME: constraintName,
+            TABLE_NAME: childTable,
+            COLUMN_NAME: col,
+            ORDINAL_POSITION: idx + 1,
+            REFERENCED_TABLE_NAME: parentTable,
+            REFERENCED_COLUMN_NAME: parentCols[idx],
+            UPDATE_RULE: updateRule,
+            DELETE_RULE: deleteRule
+          });
+        });
+      }
+
+      async query(sql, params = []) {
+        const s = sql.trim().toUpperCase();
+        if (s.includes('FROM INFORMATION_SCHEMA.TABLES')) {
+          return [Array.from(this.tables).map(t => ({ TABLE_NAME: t }))];
+        }
+        if (s.includes('FROM INFORMATION_SCHEMA.STATISTICS')) {
+          return [this.indexes];
+        }
+        if (s.includes('FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE')) {
+          return [this.fks];
+        }
+        return [[]];
+      }
+    }
+
+    it('rejects post-validation when printhouse_machine_materials table was not created', async () => {
+      const db = new MockPostDb();
+      db.tables.delete('printhouse_machine_materials');
+
+      await expect(validateMigration140PostConditions(db)).rejects.toThrow(
+        /POSTCONDITION FAILED: Migration 140 did not result in expected table 'printhouse_machine_materials'/
+      );
+    });
+
+    it('rejects post-validation when printhouse_machines is missing UNIQUE (id, tenant_id)', async () => {
+      const db = new MockPostDb();
+      // Only non-unique index
+      db.addIndex('printhouse_machines', 'idx_pm_id_tenant', true, ['id', 'tenant_id']);
+      db.addIndex('materials_catalog', 'uk_mat_cat_id_tenant', false, ['id', 'tenant_id']);
+
+      await expect(validateMigration140PostConditions(db)).rejects.toThrow(
+        /POSTCONDITION FAILED: Migration 140 did not establish valid UNIQUE index on printhouse_machines\(id, tenant_id\)/
+      );
+    });
+
+    it('rejects post-validation when materials_catalog index uses inverted column order (tenant_id, id)', async () => {
+      const db = new MockPostDb();
+      db.addIndex('printhouse_machines', 'uk_pm_id_tenant', false, ['id', 'tenant_id']);
+      // Inverted order!
+      db.addIndex('materials_catalog', 'uk_mat_cat_wrong_order', false, ['tenant_id', 'id']);
+
+      await expect(validateMigration140PostConditions(db)).rejects.toThrow(
+        /POSTCONDITION FAILED: Migration 140 did not establish valid UNIQUE index on materials_catalog\(id, tenant_id\)/
+      );
+    });
+
+    it('rejects post-validation when unique index has partial prefix indexing (subPart)', async () => {
+      const db = new MockPostDb();
+      db.addIndex('printhouse_machines', 'uk_pm_id_tenant', false, [{ name: 'id', subPart: 32 }, { name: 'tenant_id', subPart: null }]);
+      db.addIndex('materials_catalog', 'uk_mat_cat_id_tenant', false, ['id', 'tenant_id']);
+
+      await expect(validateMigration140PostConditions(db)).rejects.toThrow(
+        /POSTCONDITION FAILED: Migration 140 did not establish valid UNIQUE index on printhouse_machines\(id, tenant_id\)/
+      );
+    });
+
+    it('rejects post-validation when composite foreign key fk_mm_machine is missing', async () => {
+      const db = new MockPostDb();
+      db.addIndex('printhouse_machines', 'uk_pm_id_tenant', false, ['id', 'tenant_id']);
+      db.addIndex('materials_catalog', 'uk_mat_cat_id_tenant', false, ['id', 'tenant_id']);
+      // Only material FK is added
+      db.addFk('fk_mm_material', 'printhouse_machine_materials', ['material_catalog_id', 'tenant_id'], 'materials_catalog', ['id', 'tenant_id'], 'CASCADE', 'CASCADE');
+
+      await expect(validateMigration140PostConditions(db)).rejects.toThrow(
+        /POSTCONDITION FAILED: Migration 140 did not establish valid composite foreign key to printhouse_machines/
+      );
+    });
+
+    it('rejects post-validation when FK has invalid referential action (e.g. NO ACTION instead of CASCADE)', async () => {
+      const db = new MockPostDb();
+      db.addIndex('printhouse_machines', 'uk_pm_id_tenant', false, ['id', 'tenant_id']);
+      db.addIndex('materials_catalog', 'uk_mat_cat_id_tenant', false, ['id', 'tenant_id']);
+      // Wrong referential action!
+      db.addFk('fk_mm_machine', 'printhouse_machine_materials', ['machine_id', 'tenant_id'], 'printhouse_machines', ['id', 'tenant_id'], 'NO ACTION', 'CASCADE');
+      db.addFk('fk_mm_material', 'printhouse_machine_materials', ['material_catalog_id', 'tenant_id'], 'materials_catalog', ['id', 'tenant_id'], 'CASCADE', 'CASCADE');
+
+      await expect(validateMigration140PostConditions(db)).rejects.toThrow(
+        /POSTCONDITION FAILED: Migration 140 did not establish valid composite foreign key to printhouse_machines/
+      );
+    });
+
+    it('passes post-validation when all 3 tables, both UNIQUE (id, tenant_id) indexes, and both CASCADE/CASCADE composite FKs are verified', async () => {
+      const db = new MockPostDb();
+      db.addIndex('printhouse_machines', 'uk_pm_id_tenant', false, ['id', 'tenant_id']);
+      db.addIndex('materials_catalog', 'uk_mat_cat_id_tenant', false, ['id', 'tenant_id']);
+      db.addFk('fk_mm_machine', 'printhouse_machine_materials', ['machine_id', 'tenant_id'], 'printhouse_machines', ['id', 'tenant_id'], 'CASCADE', 'CASCADE');
+      db.addFk('fk_mm_material', 'printhouse_machine_materials', ['material_catalog_id', 'tenant_id'], 'materials_catalog', ['id', 'tenant_id'], 'CASCADE', 'CASCADE');
+
+      await expect(validateMigration140PostConditions(db)).resolves.not.toThrow();
     });
   });
 
