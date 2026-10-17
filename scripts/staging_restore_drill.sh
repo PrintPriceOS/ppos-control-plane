@@ -150,7 +150,7 @@ fi
 
 echo "[5/5] Performing post-restore integrity and sample verification..."
 # Verify table presence and sample row check
-SCHEMA_COUNT=$(mysql --host="${DB_HOST}" --port="${DB_PORT}" --user="${DB_USER}" --database="${TARGET_DB}" -N -e "SELECT count(*) FROM information_schema.tables WHERE table_schema='${TARGET_DB}';")
+SCHEMA_COUNT=$(MYSQL_PWD="${DB_PASS}" mysql --host="${DB_HOST}" --port="${DB_PORT}" --user="${DB_USER}" --database="${TARGET_DB}" -N -e "SELECT count(*) FROM information_schema.tables WHERE table_schema='${TARGET_DB}';")
 echo "✓ Total tables restored in target DB '${TARGET_DB}': ${SCHEMA_COUNT}"
 
 if [ "${SCHEMA_COUNT}" -eq 0 ]; then
