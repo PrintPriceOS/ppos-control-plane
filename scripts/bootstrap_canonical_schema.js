@@ -445,6 +445,47 @@ async function runBootstrap() {
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
         `);
 
+        // Canonical contract from src/api/services/controlPlaneSchemaService.js (precondition for migration 156)
+        // Audit pre-existing table to prevent silent divergence
+        const [tnpExists] = await db.query(`
+            SELECT TABLE_NAME FROM information_schema.TABLES
+            WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'tenant_notification_preferences'
+        `);
+        if (tnpExists && tnpExists.length > 0) {
+            const [tnpCols] = await db.query(`
+                SELECT COLUMN_NAME FROM information_schema.COLUMNS
+                WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'tenant_notification_preferences'
+            `);
+            const existingColNames = new Set((tnpCols || []).map(c => c.COLUMN_NAME.toLowerCase()));
+            const requiredTnpCols = [
+                'tenant_id', 'email_enabled', 'webhook_enabled',
+                'email_order_alerts', 'email_qc_alerts', 'email_sla_alerts',
+                'email_recipients_json', 'webhook_endpoint', 'webhook_url', 'updated_at'
+            ];
+            for (const col of requiredTnpCols) {
+                if (!existingColNames.has(col.toLowerCase())) {
+                    throw new Error(
+                        `STRUCTURAL IDEMPOTENCY DIVERGENCE: Pre-existing table 'tenant_notification_preferences' is missing required canonical column '${col}'. Aborting bootstrap.`
+                    );
+                }
+            }
+        } else {
+            await db.query(`
+                CREATE TABLE tenant_notification_preferences (
+                    tenant_id VARCHAR(64) PRIMARY KEY,
+                    email_enabled BOOLEAN DEFAULT TRUE,
+                    webhook_enabled BOOLEAN DEFAULT FALSE,
+                    email_order_alerts TINYINT(1) DEFAULT 1,
+                    email_qc_alerts TINYINT(1) DEFAULT 1,
+                    email_sla_alerts TINYINT(1) DEFAULT 1,
+                    email_recipients_json JSON NULL,
+                    webhook_endpoint VARCHAR(512) NULL,
+                    webhook_url VARCHAR(512) NULL,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+            `);
+        }
+
         console.log('[2/7] Ensuring printer_nodes baseline table (precondition for migration 002)...');
         // From docs/migrations/printhouse_onboarding.sql
         await db.query(`
