@@ -55,6 +55,8 @@ jobs:
         PPOS_MIGRATION_EXECUTION: 'true'
         PPOS_ENABLE_SCHEMA_MUTATION: 'true'
       run: node scripts/run_control_plane_migrations.js
+    - name: Autonomous Industrial Schema Integrity Check (Post-Migration 161)
+      run: node scripts/verify-industrial-schema.js --profile=ACTIVE_INDUSTRIAL
     - name: Apply Phase 184G Industrial Schemas
       env:
         PPOS_MIGRATION_EXECUTION: 'true'

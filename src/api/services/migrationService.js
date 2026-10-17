@@ -19,7 +19,7 @@ const ledgerWrite = require('./migrationLedgerWriteService');
 const { parseMigrationSql } = require('./migrationSqlParser');
 const { handleLegacyPhaseMarkerStatement } = require('./legacyPhaseMarkerAdapter');
 const { runMigration092PreRemediation } = require('./migration092ReconciliationService');
-const { runMigration161PreRemediation } = require('./migration161ReconciliationService');
+const { runMigration161PreRemediation, validateMigration161PostConditions } = require('./migration161ReconciliationService');
 
 async function ensurePreviousFailuresColumn(connOrDb) {
   try {
@@ -1131,6 +1131,11 @@ class MigrationService {
                         // CI-02K.2: Governed post-validation for migration 140 prior to APPLIED certification
                         if (relPath === 'migrations/140_phase191e_materials_capacity_leadtimes.sql') {
                             await validateMigration140PostConditions(connection);
+                        }
+
+                        // OP-01U: Governed post-validation for migration 161 prior to APPLIED certification
+                        if (relPath === 'migrations/161_phase184g_industrial_persistence_ledger.sql') {
+                            await validateMigration161PostConditions(connection);
                         }
 
                         // Success: mark as APPLIED

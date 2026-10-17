@@ -5,7 +5,8 @@ const {
   RECONCILIATION_COLUMNS,
   assertColumnCompatibility,
   assertTableIndexCompatibility,
-  runMigration161PreRemediation
+  runMigration161PreRemediation,
+  validateMigration161PostConditions
 } = require('../src/api/services/migration161ReconciliationService');
 const { runMigration161PreRemediation: exportedFromMigrationService } = require('../src/api/services/migrationService');
 
@@ -285,4 +286,62 @@ describe('OP-01T: Migration 161 Governed Industrial Persistence Suite', () => {
     expect(allSql).toContain('CREATE TABLE IF NOT EXISTS routing_history');
     expect(allSql).toContain('CREATE OR REPLACE VIEW production_packages');
   });
+
+  // 11. OP-01U: validateMigration161PostConditions throws if any active table is missing
+  it('11. validateMigration161PostConditions throws if an active industrial table is missing', async () => {
+    const mockConn = {
+      query: vi.fn(async (q, params) => {
+        if (q.includes('information_schema.tables')) {
+          if (params && params[0] === 'print_node_machine_profiles') {
+            return [[]]; // Table missing!
+          }
+          return [[{ cnt: 1 }]];
+        }
+        return [[{ cnt: 1 }]];
+      })
+    };
+
+    await expect(validateMigration161PostConditions(mockConn))
+      .rejects
+      .toThrow("POSTCONDITION FAILED: Required active industrial table 'print_node_machine_profiles' missing after migration 161.");
+  });
+
+  // 12. OP-01U: validateMigration161PostConditions throws if any active column is missing
+  it('12. validateMigration161PostConditions throws if an active column is missing', async () => {
+    const mockConn = {
+      query: vi.fn(async (q, params) => {
+        if (q.includes('information_schema.tables')) {
+          return [[{ cnt: 1 }]];
+        }
+        if (q.includes('information_schema.columns')) {
+          if (params && params[1] === 'economic_efficiency' && params[0] === 'print_node_machine_profiles') {
+            return [[]]; // Column missing!
+          }
+          return [[{ cnt: 1 }]];
+        }
+        return [[{ cnt: 1 }]];
+      })
+    };
+
+    await expect(validateMigration161PostConditions(mockConn))
+      .rejects
+      .toThrow("POSTCONDITION FAILED: Required active column 'print_node_machine_profiles.economic_efficiency' missing after migration 161.");
+  });
+
+  // 13. OP-01U: validateMigration161PostConditions passes when all 21 tables & 30 columns are present (51/51)
+  it('13. validateMigration161PostConditions passes 51/51 checks when all tables and columns exist', async () => {
+    const mockConn = {
+      query: vi.fn(async (q) => {
+        if (q.includes('information_schema.tables') || q.includes('information_schema.columns')) {
+          return [[{ cnt: 1 }]];
+        }
+        return [[]];
+      })
+    };
+
+    await expect(validateMigration161PostConditions(mockConn)).resolves.toBeUndefined();
+    // 21 tables + 30 columns = 51 checks
+    expect(mockConn.query).toHaveBeenCalledTimes(51);
+  });
 });
+
