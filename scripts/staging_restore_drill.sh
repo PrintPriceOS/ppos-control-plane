@@ -142,6 +142,10 @@ if ! grep -q "CREATE TABLE" "$DECRYPTED_SQL" && ! grep -q "INSERT INTO" "$DECRYP
   exit 1
 fi
 
+# 3.2 Sanitize DEFINER statements to allow non-privileged restore user without SUPER/SET_USER_ID
+sed -i -E 's/DEFINER[[:space:]]*=[[:space:]]*`[^`]+`@`[^`]+`//g' "$DECRYPTED_SQL"
+sed -i -E 's/DEFINER[[:space:]]*=[[:space:]]*[^[:space:]]+//g' "$DECRYPTED_SQL"
+
 echo "[4/5] Restoring into isolated target instance (${TARGET_DB})..."
 DB_HOST="${MYSQL_HOST:-127.0.0.1}"
 DB_PORT="${MYSQL_PORT:-3306}"
