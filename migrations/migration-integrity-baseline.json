@@ -2165,6 +2165,19 @@
       "statementTypes": [
         "CREATE_TABLE"
       ]
+    },
+    {
+      "path": "migrations/161_phase184g_industrial_persistence_ledger.sql",
+      "prefix": "161",
+      "canonicalSha256": "f27c3228674648272c9cfe45556df17da707b6aa8556142b39a4768a5f2b1415",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 24767,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
     }
   ]
 }
