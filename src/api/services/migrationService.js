@@ -18,6 +18,7 @@ const ledgerRead = require('./migrationLedgerReadService');
 const ledgerWrite = require('./migrationLedgerWriteService');
 const { parseMigrationSql } = require('./migrationSqlParser');
 const { handleLegacyPhaseMarkerStatement } = require('./legacyPhaseMarkerAdapter');
+const { runMigration092PreRemediation } = require('./migration092ReconciliationService');
 
 async function ensurePreviousFailuresColumn(connOrDb) {
   try {
@@ -848,6 +849,10 @@ class MigrationService {
                     const canonicalHash = migrationIntegrity.calculateFileChecksum(m.absolutePath);
                     const content = fs.readFileSync(m.absolutePath, 'utf8');
 
+                    if (relPath === 'migrations/092_phase144_governed_high_risk_cohort_intervention_approval_gate.sql') {
+                        await runMigration092PreRemediation(connection);
+                    }
+
                     if (relPath === 'migrations/140_phase191e_materials_capacity_leadtimes.sql') {
                         await runMigration140PreRemediation(connection);
                     }
@@ -1030,5 +1035,6 @@ module.exports = {
     MigrationService,
     migrationService,
     runMigration140PreRemediation,
+    runMigration092PreRemediation,
     handleLegacyPhaseMarkerStatement
 };
