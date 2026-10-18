@@ -45,7 +45,7 @@ const RECONCILIATION_COLUMNS = Object.freeze({
     { name: 'sync_version', definition: 'VARCHAR(32) NULL', expectedDataType: 'varchar', minCharacterLength: 32, allowNullable: true },
     { name: 'queue_depth', definition: 'INT DEFAULT 0', expectedDataType: 'int', allowNullable: true },
     { name: 'active_jobs', definition: 'INT DEFAULT 0', expectedDataType: 'int', allowNullable: true },
-    { name: 'capacity_utilization_pct', definition: 'INT DEFAULT 0', expectedDataType: 'int', allowNullable: true },
+    { name: 'capacity_utilization_pct', definition: 'INT DEFAULT 0', expectedDataType: 'int', alternateDataType: 'decimal', allowNullable: true },
     { name: 'company_name', definition: 'VARCHAR(255) NULL', expectedDataType: 'varchar', minCharacterLength: 255, allowNullable: true },
     { name: 'primary_contact_name', definition: 'VARCHAR(255) NULL', expectedDataType: 'varchar', minCharacterLength: 255, allowNullable: true },
     { name: 'primary_contact_email', definition: 'VARCHAR(255) NULL', expectedDataType: 'varchar', minCharacterLength: 255, allowNullable: true },

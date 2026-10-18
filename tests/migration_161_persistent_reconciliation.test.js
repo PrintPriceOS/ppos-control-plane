@@ -343,5 +343,86 @@ describe('OP-01T: Migration 161 Governed Industrial Persistence Suite', () => {
     // 21 tables + 30 columns = 51 checks
     expect(mockConn.query).toHaveBeenCalledTimes(51);
   });
+
+  // 14. OP-02B.2B: Accepts existing DECIMAL(5,2) for printer_nodes.capacity_utilization_pct
+  it('14. Accepts existing DECIMAL data type for printer_nodes.capacity_utilization_pct without alterations', async () => {
+    const existingCols = [
+      { COLUMN_NAME: 'id', DATA_TYPE: 'varchar', CHARACTER_MAXIMUM_LENGTH: 64, IS_NULLABLE: 'NO', COLUMN_DEFAULT: null },
+      ...RECONCILIATION_COLUMNS.printer_nodes.map(c => {
+        if (c.name === 'capacity_utilization_pct') {
+          return {
+            COLUMN_NAME: 'capacity_utilization_pct',
+            DATA_TYPE: 'decimal',
+            CHARACTER_MAXIMUM_LENGTH: null,
+            IS_NULLABLE: 'YES',
+            COLUMN_DEFAULT: null
+          };
+        }
+        return {
+          COLUMN_NAME: c.name,
+          DATA_TYPE: c.expectedDataType,
+          CHARACTER_MAXIMUM_LENGTH: c.minCharacterLength || null,
+          IS_NULLABLE: c.allowNullable ? 'YES' : 'NO',
+          COLUMN_DEFAULT: c.expectedDefault || null
+        };
+      })
+    ];
+
+    let alterCount = 0;
+    const mockConn = {
+      query: vi.fn(async (q) => {
+        if (q.includes('INFORMATION_SCHEMA.TABLES')) {
+          return [[{ TABLE_NAME: 'printer_nodes' }]];
+        }
+        if (q.includes('INFORMATION_SCHEMA.STATISTICS')) {
+          return [[]];
+        }
+        if (q.includes('INFORMATION_SCHEMA.COLUMNS')) {
+          return [existingCols];
+        }
+        if (q.startsWith('ALTER TABLE')) {
+          alterCount++;
+          return [{ affectedRows: 0 }];
+        }
+        return [[]];
+      })
+    };
+
+    await expect(runMigration161PreRemediation(mockConn)).resolves.toBeUndefined();
+    expect(alterCount).toBe(0);
+  });
+
+  // 15. OP-02B.2B: Accepts INT data type for printer_nodes.capacity_utilization_pct (greenfield / new installs)
+  it('15. Accepts standard INT data type for printer_nodes.capacity_utilization_pct on greenfield installs', async () => {
+    const existingCols = [
+      { COLUMN_NAME: 'id', DATA_TYPE: 'varchar', CHARACTER_MAXIMUM_LENGTH: 64, IS_NULLABLE: 'NO', COLUMN_DEFAULT: null },
+      { COLUMN_NAME: 'capacity_utilization_pct', DATA_TYPE: 'int', CHARACTER_MAXIMUM_LENGTH: null, IS_NULLABLE: 'YES', COLUMN_DEFAULT: '0' }
+    ];
+
+    const targetDef = RECONCILIATION_COLUMNS.printer_nodes.find(c => c.name === 'capacity_utilization_pct');
+    expect(() => assertColumnCompatibility('printer_nodes', existingCols[1], targetDef)).not.toThrow();
+  });
+
+  // 16. OP-02B.2B: Rejects incompatible types (e.g. VARCHAR) for printer_nodes.capacity_utilization_pct
+  it('16. Rejects incompatible data types like VARCHAR for printer_nodes.capacity_utilization_pct', async () => {
+    const badCol = { COLUMN_NAME: 'capacity_utilization_pct', DATA_TYPE: 'varchar', CHARACTER_MAXIMUM_LENGTH: 32, IS_NULLABLE: 'YES', COLUMN_DEFAULT: null };
+    const targetDef = RECONCILIATION_COLUMNS.printer_nodes.find(c => c.name === 'capacity_utilization_pct');
+    expect(() => assertColumnCompatibility('printer_nodes', badCol, targetDef))
+      .toThrow("INCOMPATIBLE_COLUMN_DEFINITION: Column 'capacity_utilization_pct' in table 'printer_nodes' has data type 'varchar', expected 'int'");
+  });
+
+  // 17. OP-02B.2B: Confirms exception does not leak to other INT columns (e.g. queue_depth, active_jobs)
+  it('17. Confirms other INT columns strictly reject DECIMAL type (no indiscriminate widening)', async () => {
+    const queueDepthDef = RECONCILIATION_COLUMNS.printer_nodes.find(c => c.name === 'queue_depth');
+    const activeJobsDef = RECONCILIATION_COLUMNS.printer_nodes.find(c => c.name === 'active_jobs');
+
+    const decimalCol = { COLUMN_NAME: 'test', DATA_TYPE: 'decimal', IS_NULLABLE: 'YES', COLUMN_DEFAULT: null };
+
+    expect(() => assertColumnCompatibility('printer_nodes', { ...decimalCol, COLUMN_NAME: 'queue_depth' }, queueDepthDef))
+      .toThrow("INCOMPATIBLE_COLUMN_DEFINITION: Column 'queue_depth' in table 'printer_nodes' has data type 'decimal', expected 'int'");
+
+    expect(() => assertColumnCompatibility('printer_nodes', { ...decimalCol, COLUMN_NAME: 'active_jobs' }, activeJobsDef))
+      .toThrow("INCOMPATIBLE_COLUMN_DEFINITION: Column 'active_jobs' in table 'printer_nodes' has data type 'decimal', expected 'int'");
+  });
 });
 

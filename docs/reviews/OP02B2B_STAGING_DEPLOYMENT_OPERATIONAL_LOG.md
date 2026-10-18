@@ -118,14 +118,16 @@ El archivo `docker-compose.staging.yml` desplegado **no conserva el hash del Com
 
 Para dar inicio a las pruebas funcionales del flujo **Guided Onboarding v4** en staging, sin repetir la inicialización de la BD ni reabrir auditorías generales:
 
-1. **Acceso Seguro por Túnel SSH:**
-   - Establecer el túnel SSH hacia el puerto del contenedor staging:
+1. **Acceso Seguro por Túnel SSH Combinado:**
+   - Establecer el túnel SSH hacia el frontend y la bandeja de Mailpit:
      ```bash
-     ssh -L 18081:127.0.0.1:18081 root@212.227.79.67
+     ssh -N -o ExitOnForwardFailure=yes -o ServerAliveInterval=30 -L 127.0.0.1:18081:127.0.0.1:18081 -L 127.0.0.1:18025:127.0.0.1:18025 printprice.pro_a2w0fsu9yw9@212.227.79.67
      ```
-   - El acceso al frontend se realiza estrictamente a través de `http://127.0.0.1:18081` local tunelizado.
+   - Frontend de la aplicación: `http://127.0.0.1:18081`
+   - Bandeja de correo Mailpit: `http://127.0.0.1:18025`
 2. **Tenant Sintético de Prueba:**
-   - Crear o verificar un tenant sintético de demostración (`id: 'tenant_demo_faehrmann'`) en `tenants` y su usuario en `control_users`.
+   - Registro autogestionado mediante el flujo real de la aplicación en `/api/auth/printhouse/start`.
+   - Activación completa recibida e inspeccionada en la bandeja Mailpit sin envíos SMTP externos ni SQL manual.
 3. **Nodo de Impresión y Esquema de Maquinaria (`printhouse_machines`):**
    - *Nota de distinción metodológica:* La estructura DDL aquí descrita ha sido deducida del análisis del código fuente y migraciones en el repositorio local (`migrations/015`, `migrations/139`, `migrations/140`), no de una inspección introspectiva directa de la base de datos desplegada:
      - Tabla principal de flota: `printhouse_machines` (creada en migración `015`, ajustada con FK a `printer_nodes(id, tenant_id)` en `139`, capacidad y clave única compuesta `(id, tenant_id)` en `140`).
@@ -133,3 +135,24 @@ Para dar inicio a las pruebas funcionales del flujo **Guided Onboarding v4** en 
    - En el piloto, la creación del nodo y la máquina debe realizarse a través de los flujos de la interfaz/API de la aplicación para validar los contratos en tiempo de ejecución, evitando la inserción manual directa por SQL.
 4. **Ensayo de Subida Preflight:**
    - Probar la carga de un PDF sintético de presupuesto en la Etapa C para validar la escritura en `/opt/printprice-os/staging-storage/preflight`.
+
+---
+
+## 7. Adaptación de Captura Local de Correos (Mailpit)
+
+Para habilitar el flujo completo de registro y activación sin SMTP productivo ni riesgo de entrega externa:
+
+- **Servicio añadido:** `staging-mailpit` (`axllent/mailpit:v1.22.3`).
+- **Red:** Exclusivamente conectado a `ppos_staging_net`.
+- **Puerto SMTP (1025):** Accesible exclusivamente entre contenedores de la red Docker staging; sin publicación al host.
+- **Bandeja Web UI (8025):** Publicada exclusivamente en loopback local del host `127.0.0.1:18025:8025`.
+- **Configuración de la Aplicación en Staging:**
+  - `EMAIL_PROVIDER`: `SMTP`
+  - `SMTP_HOST`: `staging-mailpit`
+  - `SMTP_PORT`: `1025`
+  - `SMTP_SECURE`: `false`
+  - `SMTP_USER` / `SMTP_PASS`: credenciales sintéticas internas.
+  - `EMAIL_FROM`: `no-reply@staging.printprice.pro`
+  - `PUBLIC_APP_URL` / `APP_BASE_URL`: `http://127.0.0.1:18081`
+- **Recepción confirmada:** Comprobada recepción de correo sintético mediante el endpoint `/api/auth/printhouse/start` con `MessageId` registrado en logs de aplicación y visible en `http://127.0.0.1:18025`.
+
