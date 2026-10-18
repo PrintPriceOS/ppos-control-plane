@@ -2083,36 +2083,10 @@ export const de = {
 
   // ── Stage C Method Explanations ──
   'guided.pricing.methodsTitle': 'Wie möchten Sie Ihre Preise konfigurieren?',
-  'guided.pricing.methodsSubtitle': 'Wählen Sie den Ansatz, der am besten zu Ihrem Betrieb passt. Sie können verschiedenen Bindearten unterschiedliche Methoden zuweisen, ohne vorherige Arbeit zu verlieren.',
-  'guided.pricing.methodTemplateTitle': '1. Mit einer Vorlage starten',
-  'guided.pricing.methodTemplateBadge': 'Schnellste Einrichtung',
-  'guided.pricing.methodTemplateWhatIs': 'Was es ist: Vorbelegte industrielle Tariftabellen basierend auf Marktdurchschnitten der Buchherstellung.',
-  'guided.pricing.methodTemplateForWhom': 'Für wen nützlich: Druckereien, die sofort starten möchten und kein vorbereitetes PDF zur Hand haben.',
-  'guided.pricing.methodTemplateInitializes': 'Was initialisiert wird: Feste Rüstkosten, Fortdruckkosten pro 1.000 und Standard-Papierzuschläge.',
   'guided.pricing.methodTemplateToReview': 'Was Sie prüfen sollten: Übliche Margen, reale Papiereinkaufspreise und Frachtkosten.',
   'guided.pricing.methodTemplatePending': 'Was unkonfiguriert bleibt: Spezielle Sonderveredelungen und maßgeschneiderte Maschinenregeln.',
   'guided.pricing.methodTemplateConfirmed': 'Was gespeichert wird: Ein Basis-Tarifblatt, das nach Bestätigung auf Ihrer Maschine gespeichert wird.',
-  'guided.pricing.methodTemplateBtn': 'Basisvorlage verwenden',
-
-  'guided.pricing.methodAiTitle': '2. KI-Kalibrierungsassistent',
-  'guided.pricing.methodAiBadge': 'Empfohlen',
-  'guided.pricing.methodAiWhatIs': 'Was es ist: Intelligente Belegerfassung, die Ihre realen PDF-Angebote liest, um Ihre Maschinenformeln zu kalibrieren.',
-  'guided.pricing.methodAiForWhom': 'Für wen nützlich: Druckereien mit bestehenden Angeboten, die Tarife exakt an reale Aufträge anpassen möchten.',
-  'guided.pricing.methodAiInput': 'Was Sie bereitstellen: Ein echtes Angebots-PDF mit Aufschlüsselung von Auflagen, Seiten, Papier und separater Fracht.',
-  'guided.pricing.methodAiOutput': 'Was extrahiert wird: Bindespezifikationen, Auflagen, Fertigungssummen und Transportkosten.',
-  'guided.pricing.methodAiReview': 'Was Sie prüfen: Vergleich der Motor-Berechnung mit Ihrem Angebot und Freigabe der berechneten Tarife.',
   'guided.pricing.methodAiFallback': 'Falls kein PDF verfügbar: Sie können Angebotspositionen manuell in diesem Assistenten erfassen.',
-  'guided.pricing.methodAiBtn': 'Kalibrierungsassistent verwenden',
-
-  'guided.pricing.methodManualTitle': '3. Manuelle Tarifeingabe',
-  'guided.pricing.methodManualBadge': 'Volle technische Kontrolle',
-  'guided.pricing.methodManualWhatIs': 'Was es ist: Direkte Bearbeitung industrieller Tarife: Klickkosten, Bogen, Rüstzeiten und Kilopreise.',
-  'guided.pricing.methodManualForWhom': 'Für wen nützlich: Kalkulatoren mit bereits berechneten Standard-Kostenmatrizen.',
-  'guided.pricing.methodManualInput': 'Welche Daten benötigt werden: Plattenkosten, Rüstzeiten, Fortdruckkosten pro 1.000 und Makulatur-Prozentsätze.',
-  'guided.pricing.methodManualDifference': 'Wichtig: Direkte Tarifeingabe unterscheidet sich von der Angebotserfassung. Es ist kein Referenzauftrag erforderlich.',
-  'guided.pricing.methodManualBtn': 'Tarife manuell konfigurieren',
-
-  'guided.pricing.changeMethod': 'Methode wechseln',
   'guided.pricing.activeMethod': 'Aktive Methode',
   'guided.pricing.changeProducts': 'Produkte ändern',
 
@@ -2188,6 +2162,124 @@ export const de = {
   'guided.action.continueToPricing': 'Weiter zur Preiskalibrierung',
   'guided.action.skipToReview': 'Zur Abschlussübersicht',
   'guided.action.backToPricing': 'Zurück zu Preisen & Kalibrierung',
+
+  // Common UI Controls
+  'common.show': 'Anzeigen',
+  'common.hide': 'Ausblenden',
+  'common.resolve': 'Beheben',
+  'common.goToPricing': 'Zu Preisen gehen',
+  'common.notSpecified': 'Nicht angegeben',
+
+  // Binding methods
+  'binding.sewn': 'Fadenheftung (Fadenheftung)',
+  'binding.glued': 'Klebebindung / Fräsbindung',
+  'binding.pur': 'PUR-Klebebindung',
+  'binding.sewnSoftcover': 'Fadengeheftete Broschur',
+  'binding.wireO': 'Wire-O-Doppelringdrahtbindung',
+  'binding.saddleStitch': 'Rückstichheftung (Drahtklammern)',
+
+  // Spine shapes
+  'spine.square': 'Gerader Rücken (gerader Rücken)',
+  'spine.round': 'Runder Rücken (runder Rücken)',
+
+  // Lamination & finishes
+  'lamination.none': 'Ohne Kaschierung',
+  'lamination.matte': 'Mattfolienkaschierung',
+  'lamination.gloss': 'Glanzfolienkaschierung',
+  'lamination.softTouch': 'Soft-Touch-Kaschierung',
+
+  // Staples & wire
+  'staple.flat': 'Standard-Flachklammer',
+  'staple.omega': 'Ringklammer (Omega-Ösenheftung)',
+  'wirePitch.3to1': 'Teilung 3:1 (3 Löcher pro Zoll)',
+  'wirePitch.2to1': 'Teilung 2:1 (2 Löcher pro Zoll)',
+
+  // Product Family Hints (localized technical definition)
+  'family.hardcover.hint': 'Feste Einbanddecke mit Graupappe (ca. 2,0 - 2,5 mm), Vorsatzpapier und Einhängen des Buchblocks.',
+  'family.softcover.hint': 'Flexibler gerillter Umschlag mit PUR-Klebebindung oder Fadenheftung.',
+  'family.wireO.hint': 'Gestanzter Buchblock mit Doppelring-Wire-O-Metallspirale für 360° flaches Aufschlagen.',
+  'family.saddleStitch.hint': 'Ineinandergesteckte gefalzte Bogen, im Bund mit zwei Drahtklammern geheftet.',
+
+  // Guided Stage C: Neutral Titles & Methods
+  'guided.stageC.titleNeutral': 'Richten Sie Ihre Fertigungstarife und Preise ein',
+  'guided.stageC.subtitleNeutral': 'Wählen Sie, wie Sie Ihre Tarife konfigurieren möchten. Sie können mit einer Industrievorlage starten, mit einem echten Angebot kalibrieren oder Ihre Kostenmatrizen direkt eingeben.',
+  'guided.pricing.methodsSubtitle': 'Wählen Sie die Methode, die am besten zu Ihrer Druckerei passt. Sie können für unterschiedliche Produktfamilien unterschiedliche Methoden wählen, ohne bisherige Arbeit zu verlieren.',
+  'guided.pricing.methodTemplateBadge': 'Schnellstart',
+  'guided.pricing.methodTemplateTitle': '1. Von einer Vorlage ausgehen',
+  'guided.pricing.methodTemplateWhatIs': 'Was es ist:',
+  'guided.pricing.methodTemplateWhatIsDesc': 'Vorausgefüllte industrielle Tarifmatrizen auf Basis von Marktdurchschnittswerten.',
+  'guided.pricing.methodTemplateForWhom': 'Für wen:',
+  'guided.pricing.methodTemplateForWhomDesc': 'Druckereien ohne greifbares Vergleichsangebot, die sofort kalkulieren möchten.',
+  'guided.pricing.methodTemplateInits': 'Was initialisiert wird:',
+  'guided.pricing.methodTemplateInitsDesc': 'Feste Rüstkosten, Fortdruckpreise, Klickkosten und Basiszuschläge.',
+  'guided.pricing.methodTemplateReview': 'Was Sie prüfen müssen:',
+  'guided.pricing.methodTemplateReviewDesc': 'Handelsmargen, reale Papiereinkaufspreise und Frachtkosten.',
+  'guided.pricing.methodTemplateBtn': 'Basisvorlage verwenden',
+
+  'guided.pricing.methodAiBadge': 'Empfohlen',
+  'guided.pricing.methodAiTitle': '2. KI-Kalibrierungsassistent',
+  'guided.pricing.methodAiWhatIs': 'Was es ist:',
+  'guided.pricing.methodAiWhatIsDesc': 'Intelligente Erfassung echter PDF-Angebote zur Kalibrierung Ihrer Maschinenformeln.',
+  'guided.pricing.methodAiProvides': 'Was Sie bereitstellen:',
+  'guided.pricing.methodAiProvidesDesc': 'Ein PDF mit Mengen, Seiten, Papier und Fracht (oder manuelle Zeileneingabe).',
+  'guided.pricing.methodAiExtracts': 'Was extrahiert wird:',
+  'guided.pricing.methodAiExtractsDesc': 'Technische Spezifikationen, Auflagenskalen und Fertigungspreise.',
+  'guided.pricing.methodAiReview': 'Was Sie prüfen:',
+  'guided.pricing.methodAiReviewDesc': 'Vergleichen Sie die Motorberechnung mit Ihrem Originalangebot und bestätigen Sie die Kalibrierung.',
+  'guided.pricing.methodAiBtn': 'Kalibrierungsassistent nutzen',
+
+  'guided.pricing.methodManualBadge': 'Volle technische Kontrolle',
+  'guided.pricing.methodManualTitle': '3. Manuelle Tarife',
+  'guided.pricing.methodManualWhatIs': 'Was es ist:',
+  'guided.pricing.methodManualWhatIsDesc': 'Direkte Bearbeitung der Industriematrizen: Klick, Druckplatten, Bogen, Bindung und Papierpreis/kg.',
+  'guided.pricing.methodManualForWhom': 'Für wen:',
+  'guided.pricing.methodManualForWhomDesc': 'Kalkulatoren und Betriebsleiter mit bereits vorliegenden Kostenmatrizen.',
+  'guided.pricing.methodManualRequires': 'Erforderliche Angaben:',
+  'guided.pricing.methodManualRequiresDesc': 'Druckplatten, Rüstzeiten, Tausendertauschtakt und Makulaturzuschläge.',
+  'guided.pricing.methodManualDiff': 'Hauptunterschied:',
+  'guided.pricing.methodManualDiffDesc': 'Die direkte Tarifeingabe benötigt keinerlei Referenzangebot.',
+  'guided.pricing.methodManualBtn': 'Tarife manuell konfigurieren',
+
+  // Guided Stage C Active Modes
+  'guided.pricing.modeTemplate': 'Referenzvorlage',
+  'guided.pricing.modeAi': 'KI-Kalibrierungsassistent',
+  'guided.pricing.modeManual': 'Manuelle Tarifkonfiguration',
+  'guided.pricing.templateAppliedTitle': 'Ausgangswerte auf {family} angewendet',
+  'guided.pricing.templateAppliedDesc': 'Grundlegende industrielle Fertigungskosten wurden für diese Familie eingerichtet. Margen und Kosten können Sie jederzeit im vollständigen Setup anpassen.',
+  'guided.pricing.templateSaveBtn': 'Vorlage speichern und fortfahren',
+  'guided.pricing.manualModeBadge': 'Manueller Tarifmodus',
+  'guided.pricing.manualModeTitle': 'Tarifmatrix für {family} bearbeiten',
+  'guided.pricing.changeMethod': 'Methode wechseln',
+
+  // Guided Stage D Review Status Badges & Per-Family Breakdown
+  'guided.review.statusValidated': 'Kalibriert',
+  'guided.review.statusDraft': 'Entwurf in Bearbeitung',
+  'guided.review.statusDeclared': 'Deklariert',
+  'guided.review.statusCalibrated': 'Kalibriert',
+  'guided.review.statusInProgress': 'In Bearbeitung',
+  'guided.review.statusPendingSetup': 'Konfiguration ausstehend',
+  'guided.review.serverConsolidated': 'Ihre Basisfertigungstarife wurden vom Server berechnet und konsolidiert.',
+  'guided.review.serverInProgress': 'Sie können weitere Angebote hochladen, um Ihre Maschinenformeln weiter zu verfeinern.',
+  'guided.review.engineNotice': 'Tarife ausschließlich über den Kalkulationsmotor berechnet.',
+  'guided.review.perFamilyPricingTitle': 'Tarife & Kalibrierung nach Produktfamilie',
+  'guided.review.pendingRequirementsTitle': 'Konkret ausstehende Anforderungen:',
+  'guided.review.missingCompanyData': 'Unternehmensdaten oder Hauptproduktionsstätte unvollständig.',
+  'guided.review.missingOpsData': 'Zuweisung von Maschinen, Druckknoten oder Werkstattkapazitäten ausstehend.',
+  'guided.review.missingPricingData': 'Kalibrierung oder Bestätigung der Fertigungstarife unbestätigt.',
+  'guided.review.fieldMissing': 'Pflichtfeld fehlt: {field}',
+  'guided.review.field.legalName': 'Offizieller Firmenname',
+  'guided.review.field.country': 'Hauptbetriebsland',
+  'guided.review.field.city': 'Stadt / Standort der Produktionsstätte',
+  'guided.review.field.site': 'Hauptproduktionsstätte',
+  'guided.review.field.taxId': 'Steuernummer / USt-IdNr.',
+
+  // Offer validation & navigation explanations
+  'form.missing.title': 'Buchtitel oder Projektbezeichnung',
+  'guided.pricing.stepLockedQuoteRequired': 'Bitte laden Sie ein PDF-Angebot hoch oder erfassen Sie ein Angebot manuell, um zur Spezifikationsprüfung zu gelangen.',
+  'guided.pricing.stepLockedReviewRequired': 'Bitte prüfen und bestätigen Sie die Angebotsspezifikationen, bevor Sie die Berechnung starten.',
+  'guided.pricing.stepLockedCalcRequired': 'Vor der Annahme des Tarifvorschlags ist eine Berechnung durch den Kalkulationsmotor erforderlich.',
+  'guided.storage.savedLocal': 'Entwurf lokal gespeichert'
 } as const;
 
 export type TranslationKeys = keyof typeof de;
+

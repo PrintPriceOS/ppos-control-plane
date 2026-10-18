@@ -691,9 +691,9 @@ describe('Guided Printhouse Onboarding Journey Suite', () => {
             'es'
         );
 
-        // Stage C is active, verify that initial offer title is visible
+        // Stage C is active, verify that neutral pricing title is visible
         await waitFor(() => {
-            expect(screen.getByText('Calibra tus tarifas con un presupuesto real')).toBeInTheDocument();
+            expect(screen.getByText('Configura tus tarifas y precios de fabricación')).toBeInTheDocument();
         });
 
         // Directly test handlePricingContinuityChange behavior and draft preservation
@@ -1556,7 +1556,141 @@ describe('Guided Printhouse Onboarding Journey Suite', () => {
         expect(updatedDraft.company.phone).toBe('+34 600 111 222');
         expect(updatedDraft.company.website).toBe('https://locally-edited.com');
     });
+
+    it('25. Stepper indicator checkmarks: show checkmark ONLY when stage is completed, not merely past', async () => {
+        const tenantId = 'tenant-current';
+        // Stage is PRICING, but only COMPANY was completed (PRODUCTS is incomplete/skipped)
+        saveGuidedOnboardingDraft({
+            tenantId,
+            currentStage: 'PRICING',
+            selectedFamilyId: 'HARDCOVER',
+            enabledFamilies: { HARDCOVER: true, SOFTCOVER: false, WIRE_O: false, SADDLE_STITCH: false },
+            company: {
+                legalName: 'Checkmark Printhouse',
+                tradingName: 'Check',
+                country: 'ES',
+                city: 'Madrid',
+                address: '',
+                postalCode: '',
+                phone: '',
+                website: '',
+                contactName: 'Admin',
+                taxId: '',
+                siteName: 'Planta 1',
+                siteTimezone: 'Europe/Madrid'
+            },
+            offerDrafts: {},
+            lastSavedTimestamp: Date.now(),
+            completedStages: {
+                WELCOME: true,
+                COMPANY: true,
+                PRODUCTS: false, // NOT completed
+                PRICING: false,
+                REVIEW: false
+            }
+        });
+
+        renderWithProviders(
+            <GuidedPrinthouseJourney onOpenFullSetup={vi.fn()} printerNodeId="node-stepper" />,
+            'es'
+        );
+
+        await waitFor(() => {
+            expect(screen.getByText('Configura tus tarifas y precios de fabricación')).toBeInTheDocument();
+        });
+
+        // Button 1 (COMPANY) has completedStages.COMPANY === true -> shows '✓'
+        const companyStepBtn = screen.getByRole('button', { name: /Tu imprenta/i });
+        expect(companyStepBtn.textContent).toContain('✓');
+
+        // Button 2 (PRODUCTS) has completedStages.PRODUCTS === false -> MUST NOT show '✓', shows '2'
+        const productsStepBtn = screen.getByRole('button', { name: /Qué produces/i });
+        expect(productsStepBtn.textContent).not.toContain('✓');
+        expect(productsStepBtn.textContent).toContain('2');
+    });
+
+    it('26. ManualOfferForm: validates missing product title and prevents submit until resolved', async () => {
+        const { ManualOfferForm } = await import('../src/ui/components/printhouse/onboarding/ManualOfferForm');
+        const onSubmitSpec = vi.fn();
+
+        renderWithProviders(
+            <ManualOfferForm
+                familyId="HARDCOVER"
+                onSubmitSpec={onSubmitSpec}
+                initialSpec={{
+                    productTitle: '', // Empty title
+                    formatWidthMm: 148,
+                    formatHeightMm: 210,
+                    interiorPages: 120,
+                    interiorPaperWeightGsm: 90,
+                    boardThicknessMm: 2.0,
+                    deliveryCountry: 'DE',
+                    runs: [{
+                        id: 'run-1',
+                        quantity: 500,
+                        manufacturingPrice: 1200,
+                        transportPrice: 100,
+                        totalPrice: 1300,
+                        unitPrice: 2.60,
+                        validationStatus: 'CONSISTENT'
+                    }]
+                } as any}
+            />,
+            'es'
+        );
+
+        // Submit button should be disabled because productTitle is empty
+        const submitBtn = screen.getByRole('button', { name: /Revisar especificaciones y precios/i });
+        expect(submitBtn).toBeDisabled();
+
+        // Missing fields banner highlights the missing title
+        expect(screen.getByText(/Título del libro o trabajo/i)).toBeInTheDocument();
+
+        // Now enter product title
+        const titleInput = screen.getByPlaceholderText(/Manual de usuario, Catálogo técnico/i);
+        fireEvent.change(titleInput, { target: { value: 'Libro de Arte Contemporáneo' } });
+
+        // Submit button should now become enabled
+        await waitFor(() => {
+            expect(submitBtn).not.toBeDisabled();
+        });
+    });
+
+    it('27. Clean dropdowns: canonical payload values preserved while rendering localized labels', async () => {
+        const { ManualOfferForm } = await import('../src/ui/components/printhouse/onboarding/ManualOfferForm');
+
+        renderWithProviders(
+            <ManualOfferForm
+                familyId="HARDCOVER"
+                initialSpec={{
+                    productTitle: 'Sample Book',
+                    formatWidthMm: 148,
+                    formatHeightMm: 210,
+                    interiorPages: 120,
+                    interiorPaperWeightGsm: 90,
+                    boardThicknessMm: 2.0,
+                    deliveryCountry: 'DE',
+                    bindingMethod: 'SEWN',
+                    spineType: 'SQUARE',
+                    lamination: 'MATTE',
+                    runs: []
+                } as any}
+            />,
+            'en'
+        );
+
+        // Options must render translated human labels in EN, not raw internal keys
+        expect(screen.getByText('Thread sewn / Smyth sewn (Fadenheftung)')).toBeInTheDocument();
+        expect(screen.getByText('Square spine (gerader Rücken)')).toBeInTheDocument();
+        expect(screen.getByText('Matte lamination')).toBeInTheDocument();
+
+        // Raw internal dot-keys must not be visible in DOM text
+        expect(screen.queryByText('binding.sewn')).not.toBeInTheDocument();
+        expect(screen.queryByText('spine.square')).not.toBeInTheDocument();
+        expect(screen.queryByText('lamination.matte')).not.toBeInTheDocument();
+    });
 });
+
 
 
 

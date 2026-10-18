@@ -881,28 +881,51 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
 
                     <div className="flex items-center gap-1.5">
                         {[
-                            { num: 2, label: t('guided.pricing.substepAddShort') || 'Oferta' },
-                            { num: 3, label: t('guided.pricing.substepReviewShort') || 'Revisión' },
-                            { num: 4, label: t('guided.pricing.substepCompareShort') || 'Cálculo' },
-                            { num: 5, label: t('guided.pricing.substepAcceptShort') || 'Aceptación' }
+                            { 
+                                num: 2, 
+                                label: t('guided.pricing.substepAddShort') || 'Oferta',
+                                lockedReason: ''
+                            },
+                            { 
+                                num: 3, 
+                                label: t('guided.pricing.substepReviewShort') || 'Revisión',
+                                lockedReason: t('guided.pricing.stepLockedQuoteRequired') || 'Aporta primero un presupuesto en PDF o introduce los datos manualmente para revisar especificaciones'
+                            },
+                            { 
+                                num: 4, 
+                                label: t('guided.pricing.substepCompareShort') || 'Cálculo',
+                                lockedReason: t('guided.pricing.stepLockedReviewRequired') || 'Revisa y valida las especificaciones antes de comparar cálculos'
+                            },
+                            { 
+                                num: 5, 
+                                label: t('guided.pricing.substepAcceptShort') || 'Aceptación',
+                                lockedReason: t('guided.pricing.stepLockedCalcRequired') || 'Compara los precios con el motor de cálculo antes de aceptar la propuesta'
+                            }
                         ].map(st => {
                             const isCur = currentStep === st.num;
                             const isDone = currentStep > st.num;
+                            const isAccessible = st.num <= currentStep || (st.num === 2);
+
                             return (
                                 <button
                                     key={st.num}
                                     type="button"
+                                    disabled={!isAccessible}
+                                    title={!isAccessible ? st.lockedReason : undefined}
+                                    aria-disabled={!isAccessible}
                                     onClick={() => {
-                                        if (st.num <= currentStep || (st.num === 2)) {
+                                        if (isAccessible) {
                                             setCurrentStep(st.num as any);
                                         }
                                     }}
-                                    className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                                    className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all ${
                                         isCur
-                                            ? 'bg-[#dc0000] text-white shadow-2xs'
+                                            ? 'bg-[#dc0000] text-white shadow-2xs cursor-default'
                                             : isDone
-                                                ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
-                                                : 'bg-zinc-100 dark:bg-zinc-800/60 text-zinc-400 dark:text-zinc-500 hover:text-zinc-700'
+                                                ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 cursor-pointer'
+                                                : isAccessible
+                                                    ? 'bg-zinc-100 dark:bg-zinc-800/60 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 cursor-pointer'
+                                                    : 'bg-zinc-100 dark:bg-zinc-800/40 text-zinc-400 dark:text-zinc-600 opacity-60 cursor-not-allowed'
                                     }`}
                                 >
                                     <span>{isDone ? '✓ ' : ''}{st.label}</span>

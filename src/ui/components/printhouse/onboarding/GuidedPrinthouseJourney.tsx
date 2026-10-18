@@ -798,11 +798,7 @@ export const GuidedPrinthouseJourney: React.FC<GuidedPrinthouseJourneyProps> = (
                         {stageItems.map((item, idx) => {
                             const Icon = item.icon;
                             const isActive = draft.currentStage === item.key;
-                            const isPast = (
-                                (item.key === 'COMPANY' && ['PRODUCTS', 'PRICING', 'REVIEW'].includes(draft.currentStage)) ||
-                                (item.key === 'PRODUCTS' && ['PRICING', 'REVIEW'].includes(draft.currentStage)) ||
-                                (item.key === 'PRICING' && draft.currentStage === 'REVIEW')
-                            );
+                            const isCompleted = Boolean(draft.completedStages?.[item.key as keyof typeof draft.completedStages]);
 
                             return (
                                 <React.Fragment key={item.key}>
@@ -812,7 +808,7 @@ export const GuidedPrinthouseJourney: React.FC<GuidedPrinthouseJourneyProps> = (
                                         className={`flex items-center gap-2 text-xs font-bold transition-all cursor-pointer ${
                                             isActive
                                                 ? 'text-[#dc0000]'
-                                                : isPast
+                                                : isCompleted
                                                     ? 'text-zinc-700 dark:text-zinc-300 hover:text-zinc-900'
                                                     : 'text-zinc-400 dark:text-zinc-600'
                                         }`}
@@ -820,11 +816,11 @@ export const GuidedPrinthouseJourney: React.FC<GuidedPrinthouseJourneyProps> = (
                                         <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-black transition-colors ${
                                             isActive
                                                 ? 'bg-[#dc0000] text-white shadow-2xs'
-                                                : isPast
+                                                : isCompleted
                                                     ? 'bg-emerald-600 text-white'
                                                     : 'bg-zinc-200 dark:bg-zinc-800 text-zinc-500'
                                         }`}>
-                                            {isPast ? '✓' : item.num}
+                                            {isCompleted ? '✓' : item.num}
                                         </div>
                                         <span className="hidden sm:inline">{item.label}</span>
                                     </button>
@@ -1057,19 +1053,23 @@ export const GuidedPrinthouseJourney: React.FC<GuidedPrinthouseJourneyProps> = (
                                         {t('guided.stageC.badge') || 'Etapa 3 de 4 · Tus precios'}
                                     </span>
                                     <h2 className="text-2xl font-black text-zinc-900 dark:text-zinc-100 tracking-tight">
-                                        {t('guided.stageC.title') || 'Calibra tus tarifas con un presupuesto real'}
+                                        {t('guided.stageC.titleNeutral') || 'Configura tus tarifas y precios de fabricación'}
                                     </h2>
-                                    {activeMethod && (
-                                        <p className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 mt-0.5">
-                                            {t(families[effectiveActiveFamilyId]?.titleKey || 'family.hardcover.title')} · {
-                                                activeMethod === 'TEMPLATE'
-                                                    ? 'Plantilla de referencia'
-                                                    : activeMethod === 'ASSISTANT'
-                                                        ? 'Asistente de calibración IA'
-                                                        : 'Configuración manual de tarifas'
-                                            }
-                                        </p>
-                                    )}
+                                    <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+                                        {activeMethod ? (
+                                            <>
+                                                {t(families[effectiveActiveFamilyId]?.titleKey || 'family.hardcover.title')} · {
+                                                    activeMethod === 'TEMPLATE'
+                                                        ? (t('guided.pricing.methodTemplateBadge') || 'Plantilla de referencia')
+                                                        : activeMethod === 'ASSISTANT'
+                                                            ? (t('guided.pricing.methodAiBadge') || 'Asistente de calibración IA')
+                                                            : (t('guided.pricing.methodManualBadge') || 'Configuración manual de tarifas')
+                                                }
+                                            </>
+                                        ) : (
+                                            t('guided.stageC.subtitleNeutral') || 'Elige cómo definir tus costes por familia de producto: plantilla estándar, asistente IA con presupuesto o tarifas manuales.'
+                                        )}
+                                    </p>
 
                                 </div>
                                 <div className="flex items-center gap-2 shrink-0">
@@ -1184,16 +1184,16 @@ export const GuidedPrinthouseJourney: React.FC<GuidedPrinthouseJourneyProps> = (
 
                                                 <div className="space-y-2 text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed">
                                                     <p>
-                                                        <strong className="text-zinc-800 dark:text-zinc-200">Qué es:</strong> Cuadros de tarifas industriales prellenados con medias de mercado de referencia.
+                                                        <strong className="text-zinc-800 dark:text-zinc-200">{t('guided.pricing.methodTemplateWhatIs') || 'Qué es:'}</strong> {t('guided.pricing.methodTemplateWhatIsDesc') || 'Cuadros de tarifas industriales prellenados con medias de mercado de referencia.'}
                                                     </p>
                                                     <p>
-                                                        <strong className="text-zinc-800 dark:text-zinc-200">Para quién:</strong> Imprentas que arrancan sin presupuesto a mano y quieren empezar a cotizar de inmediato.
+                                                        <strong className="text-zinc-800 dark:text-zinc-200">{t('guided.pricing.methodTemplateForWhom') || 'Para quién:'}</strong> {t('guided.pricing.methodTemplateForWhomDesc') || 'Imprentas que arrancan sin presupuesto a mano y quieren empezar a cotizar de inmediato.'}
                                                     </p>
                                                     <p>
-                                                        <strong className="text-zinc-800 dark:text-zinc-200">Qué inicializa:</strong> Puestas en máquina fijas, costes de tirada y recargos base.
+                                                        <strong className="text-zinc-800 dark:text-zinc-200">{t('guided.pricing.methodTemplateInits') || 'Qué inicializa:'}</strong> {t('guided.pricing.methodTemplateInitsDesc') || 'Puestas en máquina fijas, costes de tirada y recargos base.'}
                                                     </p>
                                                     <p>
-                                                        <strong className="text-zinc-800 dark:text-zinc-200">Qué debes revisar:</strong> Márgenes comerciales, compra real de papel y portes.
+                                                        <strong className="text-zinc-800 dark:text-zinc-200">{t('guided.pricing.methodTemplateReview') || 'Qué debes revisar:'}</strong> {t('guided.pricing.methodTemplateReviewDesc') || 'Márgenes comerciales, compra real de papel y portes.'}
                                                     </p>
                                                 </div>
                                             </div>
@@ -1226,16 +1226,16 @@ export const GuidedPrinthouseJourney: React.FC<GuidedPrinthouseJourneyProps> = (
 
                                                 <div className="space-y-2 text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed">
                                                     <p>
-                                                        <strong className="text-zinc-800 dark:text-zinc-200">Qué es:</strong> Ingesta inteligente que lee presupuestos reales en PDF para calibrar las fórmulas de tus máquinas.
+                                                        <strong className="text-zinc-800 dark:text-zinc-200">{t('guided.pricing.methodAiWhatIs') || 'Qué es:'}</strong> {t('guided.pricing.methodAiWhatIsDesc') || 'Ingesta inteligente que lee presupuestos reales en PDF para calibrar las fórmulas de tus máquinas.'}
                                                     </p>
                                                     <p>
-                                                        <strong className="text-zinc-800 dark:text-zinc-200">Qué aportas:</strong> Un PDF con cantidades, páginas, papel y portes desglosados (o entrada manual línea a línea).
+                                                        <strong className="text-zinc-800 dark:text-zinc-200">{t('guided.pricing.methodAiProvides') || 'Qué aportas:'}</strong> {t('guided.pricing.methodAiProvidesDesc') || 'Un PDF con cantidades, páginas, papel y portes desglosados (o entrada manual línea a línea).'}
                                                     </p>
                                                     <p>
-                                                        <strong className="text-zinc-800 dark:text-zinc-200">Qué extrae:</strong> Especificaciones, escalados de tirada y costes de fabricación.
+                                                        <strong className="text-zinc-800 dark:text-zinc-200">{t('guided.pricing.methodAiExtracts') || 'Qué extrae:'}</strong> {t('guided.pricing.methodAiExtractsDesc') || 'Especificaciones, escalados de tirada y costes de fabricación.'}
                                                     </p>
                                                     <p>
-                                                        <strong className="text-zinc-800 dark:text-zinc-200">Qué revisas:</strong> Comparas el cálculo del motor con tu oferta original y confirmas la calibración.
+                                                        <strong className="text-zinc-800 dark:text-zinc-200">{t('guided.pricing.methodAiReview') || 'Qué revisas:'}</strong> {t('guided.pricing.methodAiReviewDesc') || 'Comparas el cálculo del motor con tu oferta original y confirmas la calibración.'}
                                                     </p>
                                                 </div>
                                             </div>
@@ -1268,16 +1268,16 @@ export const GuidedPrinthouseJourney: React.FC<GuidedPrinthouseJourneyProps> = (
 
                                                 <div className="space-y-2 text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed">
                                                     <p>
-                                                        <strong className="text-zinc-800 dark:text-zinc-200">Qué es:</strong> Edición directa de las matrices industriales: clic, pliego, encuadernación y coste/kg.
+                                                        <strong className="text-zinc-800 dark:text-zinc-200">{t('guided.pricing.methodManualWhatIs') || 'Qué es:'}</strong> {t('guided.pricing.methodManualWhatIsDesc') || 'Edición directa de las matrices industriales: clic, pliego, encuadernación y coste/kg.'}
                                                     </p>
                                                     <p>
-                                                        <strong className="text-zinc-800 dark:text-zinc-200">Para quién:</strong> Presupuestadores y jefes de taller con matrices de costes ya calculadas.
+                                                        <strong className="text-zinc-800 dark:text-zinc-200">{t('guided.pricing.methodManualForWhom') || 'Para quién:'}</strong> {t('guided.pricing.methodManualForWhomDesc') || 'Presupuestadores y jefes de taller con matrices de costes ya calculadas.'}
                                                     </p>
                                                     <p>
-                                                        <strong className="text-zinc-800 dark:text-zinc-200">Qué información requiere:</strong> Plancha, puesta a punto, tiro por millar y mermas.
+                                                        <strong className="text-zinc-800 dark:text-zinc-200">{t('guided.pricing.methodManualRequires') || 'Qué información requiere:'}</strong> {t('guided.pricing.methodManualRequiresDesc') || 'Plancha, puesta a punto, tiro por millar y mermas.'}
                                                     </p>
                                                     <p>
-                                                        <strong className="text-zinc-800 dark:text-zinc-200">Diferencia clave:</strong> Introducir tarifas directamente no requiere ningún presupuesto de referencia.
+                                                        <strong className="text-zinc-800 dark:text-zinc-200">{t('guided.pricing.methodManualDiff') || 'Diferencia clave:'}</strong> {t('guided.pricing.methodManualDiffDesc') || 'Introducir tarifas directamente no requiere ningún presupuesto de referencia.'}
                                                     </p>
                                                 </div>
                                             </div>

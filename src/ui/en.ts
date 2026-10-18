@@ -2083,36 +2083,10 @@ export const en = {
 
   // ── Stage C Method Explanations ──
   'guided.pricing.methodsTitle': 'How would you like to configure your prices?',
-  'guided.pricing.methodsSubtitle': 'Select the approach that best fits your workflow. You can apply different methods to different binding families without losing prior progress.',
-  'guided.pricing.methodTemplateTitle': '1. Start from a baseline template',
-  'guided.pricing.methodTemplateBadge': 'Fastest setup',
-  'guided.pricing.methodTemplateWhatIs': 'What it is: Pre-populated industrial rate cards based on typical book manufacturing market averages.',
-  'guided.pricing.methodTemplateForWhom': 'Who it is for: Printhouses starting fresh without ready quote documents who want working baseline rates immediately.',
-  'guided.pricing.methodTemplateInitializes': 'What it initializes: Fixed setup charges, variable run costs per 1,000, and standard paper surcharges.',
   'guided.pricing.methodTemplateToReview': 'What you must review: Verify margins, your specific paper markups, and local shipping costs.',
   'guided.pricing.methodTemplatePending': 'What remains unconfigured: Custom special finishings and bespoke equipment rules.',
   'guided.pricing.methodTemplateConfirmed': 'What is saved: Baseline rate card saved to your active production node upon confirmation.',
-  'guided.pricing.methodTemplateBtn': 'Use baseline template',
-
-  'guided.pricing.methodAiTitle': '2. AI calibration assistant',
-  'guided.pricing.methodAiBadge': 'Recommended',
-  'guided.pricing.methodAiWhatIs': 'What it is: Smart quote ingestion that reads your actual PDF quotes or structured orders to calibrate your machines.',
-  'guided.pricing.methodAiForWhom': 'Who it is for: Printhouses with past job quotes who want mathematically fitted rates matching real commercial jobs.',
-  'guided.pricing.methodAiInput': 'What you provide: A real quotation PDF with itemized quantities, page counts, paper, and separate transport.',
-  'guided.pricing.methodAiOutput': 'What it extracts: Binding specifications, exact quantities, manufacturing totals, and shipping costs.',
-  'guided.pricing.methodAiReview': 'What you review: Compare the engine calculation against your quote and approve the solved rates.',
   'guided.pricing.methodAiFallback': 'If no PDF is available: You can enter quote lines manually within this calibration path.',
-  'guided.pricing.methodAiBtn': 'Use calibration assistant',
-
-  'guided.pricing.methodManualTitle': '3. Manual rate card entry',
-  'guided.pricing.methodManualBadge': 'Full technical control',
-  'guided.pricing.methodManualWhatIs': 'What it is: Direct industrial rate editing for clicks, signatures, machine setups, and paper costs per kg.',
-  'guided.pricing.methodManualForWhom': 'Who it is for: Estimators and production managers with established cost matrices who want full parameter control.',
-  'guided.pricing.methodManualInput': 'What information is needed: Platemaking costs, make-ready time, impression run charges, and waste percentages.',
-  'guided.pricing.methodManualDifference': 'Important: Directly configuring rates is different from entering a quote. No sample job or quote is required.',
-  'guided.pricing.methodManualBtn': 'Configure rates manually',
-
-  'guided.pricing.changeMethod': 'Change method',
   'guided.pricing.activeMethod': 'Active method',
   'guided.pricing.changeProducts': 'Change products',
 
@@ -2188,6 +2162,124 @@ export const en = {
   'guided.action.continueToPricing': 'Continue to calibrate pricing',
   'guided.action.skipToReview': 'Go to final summary',
   'guided.action.backToPricing': 'Back to pricing & calibration',
+
+  // Common UI Controls
+  'common.show': 'Show',
+  'common.hide': 'Hide',
+  'common.resolve': 'Resolve',
+  'common.goToPricing': 'Go to pricing',
+  'common.notSpecified': 'Not specified',
+
+  // Binding methods
+  'binding.sewn': 'Thread sewn / Smyth sewn (Fadenheftung)',
+  'binding.glued': 'Glued / Perfect bound',
+  'binding.pur': 'Perfect bound / PUR glue',
+  'binding.sewnSoftcover': 'Smyth sewn paperback',
+  'binding.wireO': 'Twin loop Wire-O',
+  'binding.saddleStitch': 'Saddle stitched (wire staples)',
+
+  // Spine shapes
+  'spine.square': 'Square spine (gerader Rücken)',
+  'spine.round': 'Round spine (runder Rücken)',
+
+  // Lamination & finishes
+  'lamination.none': 'No lamination',
+  'lamination.matte': 'Matte lamination',
+  'lamination.gloss': 'Gloss lamination',
+  'lamination.softTouch': 'Soft-touch lamination',
+
+  // Staples & wire
+  'staple.flat': 'Standard flat staple',
+  'staple.omega': 'Omega loop staple (for ring binders)',
+  'wirePitch.3to1': 'Pitch 3:1 (3 holes per inch)',
+  'wirePitch.2to1': 'Pitch 2:1 (2 holes per inch)',
+
+  // Product Family Hints (localized technical definition)
+  'family.hardcover.hint': 'Hardcover case binding with rigid greyboard (approx. 2.0 - 2.5 mm), endpapers, and casing in.',
+  'family.softcover.hint': 'Flexible scored cover with PUR adhesive milling or Smyth-sewn book block.',
+  'family.wireO.hint': 'Punched book block with double-loop Wire-O metal spiral for 360° flat opening.',
+  'family.saddleStitch.hint': 'Nested folded signatures fastened along the spine with two wire staples.',
+
+  // Guided Stage C: Neutral Titles & Methods
+  'guided.stageC.titleNeutral': 'Set up your manufacturing rates and prices',
+  'guided.stageC.subtitleNeutral': 'Choose how you want to configure your rates. You can start with an industry template, calibrate with an actual quote, or enter your cost matrices directly.',
+  'guided.pricing.methodsSubtitle': 'Choose the method that best fits your print shop. You can use different methods for different product families without losing previous work.',
+  'guided.pricing.methodTemplateBadge': 'Quick start',
+  'guided.pricing.methodTemplateTitle': '1. Start from a baseline template',
+  'guided.pricing.methodTemplateWhatIs': 'What it is:',
+  'guided.pricing.methodTemplateWhatIsDesc': 'Pre-filled industrial rate matrices calibrated to market reference averages.',
+  'guided.pricing.methodTemplateForWhom': 'For whom:',
+  'guided.pricing.methodTemplateForWhomDesc': 'Print shops starting without a past quote at hand who want to begin quoting immediately.',
+  'guided.pricing.methodTemplateInits': 'What it initializes:',
+  'guided.pricing.methodTemplateInitsDesc': 'Fixed machine make-readies, run costs, click rates, and baseline surcharges.',
+  'guided.pricing.methodTemplateReview': 'What you must review:',
+  'guided.pricing.methodTemplateReviewDesc': 'Commercial markups, real paper purchase costs, and freight tables.',
+  'guided.pricing.methodTemplateBtn': 'Use baseline template',
+
+  'guided.pricing.methodAiBadge': 'Recommended',
+  'guided.pricing.methodAiTitle': '2. AI Calibration Assistant',
+  'guided.pricing.methodAiWhatIs': 'What it is:',
+  'guided.pricing.methodAiWhatIsDesc': 'Intelligent ingestion reading real PDF quotes to calibrate your machine formulas.',
+  'guided.pricing.methodAiProvides': 'What you provide:',
+  'guided.pricing.methodAiProvidesDesc': 'A PDF quote with itemized quantities, pages, paper, and shipping (or line-by-line manual entry).',
+  'guided.pricing.methodAiExtracts': 'What it extracts:',
+  'guided.pricing.methodAiExtractsDesc': 'Technical specifications, run ladders, and manufacturing prices.',
+  'guided.pricing.methodAiReview': 'What you review:',
+  'guided.pricing.methodAiReviewDesc': 'Compare the engine calculation against your original quote and confirm calibration.',
+  'guided.pricing.methodAiBtn': 'Use calibration assistant',
+
+  'guided.pricing.methodManualBadge': 'Full technical control',
+  'guided.pricing.methodManualTitle': '3. Manual rate matrices',
+  'guided.pricing.methodManualWhatIs': 'What it is:',
+  'guided.pricing.methodManualWhatIsDesc': 'Direct editing of industrial matrices: click, plates, sheets, binding, and paper cost per kg.',
+  'guided.pricing.methodManualForWhom': 'For whom:',
+  'guided.pricing.methodManualForWhomDesc': 'Estimators and production managers with pre-calculated cost matrices.',
+  'guided.pricing.methodManualRequires': 'What it requires:',
+  'guided.pricing.methodManualRequiresDesc': 'Plate costs, make-ready times, run rate per thousand, and spoilage allowances.',
+  'guided.pricing.methodManualDiff': 'Key difference:',
+  'guided.pricing.methodManualDiffDesc': 'Configuring rates directly does not require any reference quote or past customer order.',
+  'guided.pricing.methodManualBtn': 'Configure rate matrices manually',
+
+  // Guided Stage C Active Modes
+  'guided.pricing.modeTemplate': 'Reference Template',
+  'guided.pricing.modeAi': 'AI Calibration Assistant',
+  'guided.pricing.modeManual': 'Manual Rate Configuration',
+  'guided.pricing.templateAppliedTitle': 'Initial template values applied to {family}',
+  'guided.pricing.templateAppliedDesc': 'Baseline industrial costs have been populated for this family. You can adjust margins and costs in full setup at any time.',
+  'guided.pricing.templateSaveBtn': 'Save template and continue',
+  'guided.pricing.manualModeBadge': 'Manual Rates Mode',
+  'guided.pricing.manualModeTitle': 'Editing rate matrix for {family}',
+  'guided.pricing.changeMethod': 'Change method',
+
+  // Guided Stage D Review Status Badges & Per-Family Breakdown
+  'guided.review.statusValidated': 'Calibrated',
+  'guided.review.statusDraft': 'Draft in progress',
+  'guided.review.statusDeclared': 'Declared',
+  'guided.review.statusCalibrated': 'Calibrated',
+  'guided.review.statusInProgress': 'In progress',
+  'guided.review.statusPendingSetup': 'Pending configuration',
+  'guided.review.serverConsolidated': 'Your base manufacturing rates have been solved and consolidated by the server.',
+  'guided.review.serverInProgress': 'You can provide additional quotes to fine-tune your machinery formulas.',
+  'guided.review.engineNotice': 'Rates solved exclusively by the pricing engine.',
+  'guided.review.perFamilyPricingTitle': 'Rates & Calibration by Family',
+  'guided.review.pendingRequirementsTitle': 'Specific pending requirements:',
+  'guided.review.missingCompanyData': 'Company profile or primary production facility incomplete.',
+  'guided.review.missingOpsData': 'Machinery, printing nodes, or workshop capabilities pending assignment.',
+  'guided.review.missingPricingData': 'Manufacturing rates calibration or pricing matrix unconfirmed.',
+  'guided.review.fieldMissing': 'Missing required field: {field}',
+  'guided.review.field.legalName': 'Legal company name',
+  'guided.review.field.country': 'Primary country of operation',
+  'guided.review.field.city': 'City / Facility location',
+  'guided.review.field.site': 'Primary production facility',
+  'guided.review.field.taxId': 'Tax ID / CIF / VAT number',
+
+  // Offer validation & navigation explanations
+  'form.missing.title': 'Book title or project reference',
+  'guided.pricing.stepLockedQuoteRequired': 'Please upload a PDF quote or enter an offer manually to proceed to specification review.',
+  'guided.pricing.stepLockedReviewRequired': 'Please verify and confirm the offer specifications before proceeding to calculation.',
+  'guided.pricing.stepLockedCalcRequired': 'Calculation with the pricing engine is required before accepting the rate proposal.',
+  'guided.storage.savedLocal': 'Draft saved locally'
 } as const;
 
 export type TranslationKeys = keyof typeof en;
+

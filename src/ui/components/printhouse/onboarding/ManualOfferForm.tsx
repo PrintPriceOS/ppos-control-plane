@@ -249,6 +249,9 @@ export const ManualOfferForm: React.FC<ManualOfferFormProps> = ({
     // Calculate completion and missing requirements
     const missingItems = useMemo(() => {
         const missing: string[] = [];
+        if (!spec.productTitle || !spec.productTitle.trim()) {
+            missing.push(t('form.missing.title') || 'Título del libro o trabajo');
+        }
         if (!spec.formatWidthMm || !spec.formatHeightMm) {
             missing.push(t('form.missing.dimensions') || 'Dimensiones en mm');
         }
@@ -299,13 +302,13 @@ export const ManualOfferForm: React.FC<ManualOfferFormProps> = ({
                         </h4>
                     </div>
                     <span className="text-[11px] font-semibold text-zinc-500">
-                        {collapsedSections.product ? 'Mostrar' : 'Ocultar'}
+                        {collapsedSections.product ? (t('common.show') || 'Mostrar') : (t('common.hide') || 'Ocultar')}
                     </span>
                 </div>
 
                 {!collapsedSections.product && (
                     <div className="space-y-3 pt-1">
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                             <div className="space-y-1">
                                 <label className="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300">
                                     {t('form.productTitle') || 'Título del Libro / Trabajo'} *
@@ -315,20 +318,9 @@ export const ManualOfferForm: React.FC<ManualOfferFormProps> = ({
                                     value={spec.productTitle}
                                     onChange={(e) => updateField('productTitle', e.target.value)}
                                     placeholder="Ej: Manual de usuario, Catálogo técnico..."
-                                    className="w-full px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-white font-medium"
-                                />
-                            </div>
-
-                            <div className="space-y-1">
-                                <label className="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300">
-                                    {t('form.quoteRef') || 'Referencia de Presupuesto (Opcional)'}
-                                </label>
-                                <input
-                                    type="text"
-                                    value={spec.quoteRef || ''}
-                                    onChange={(e) => updateField('quoteRef', e.target.value)}
-                                    placeholder="Ej: PRE-2026-001"
-                                    className="w-full px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-white font-medium"
+                                    className={`w-full px-3 py-2 rounded-xl border bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-white font-medium ${
+                                        !spec.productTitle?.trim() ? 'border-amber-300 dark:border-amber-600 focus:border-[#dc0000]' : 'border-zinc-200 dark:border-zinc-700'
+                                    }`}
                                 />
                             </div>
 
@@ -406,8 +398,11 @@ export const ManualOfferForm: React.FC<ManualOfferFormProps> = ({
                                 </label>
                                 <input
                                     type="text"
-                                    value={spec.quoteReference || ''}
-                                    onChange={(e) => updateField('quoteReference', e.target.value)}
+                                    value={spec.quoteReference || spec.quoteRef || ''}
+                                    onChange={(e) => {
+                                        const val = e.target.value;
+                                        emitChange({ ...spec, quoteRef: val, quoteReference: val });
+                                    }}
                                     placeholder="Ej: OF-2026-904"
                                     className="w-full px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-white font-medium"
                                 />
@@ -443,7 +438,7 @@ export const ManualOfferForm: React.FC<ManualOfferFormProps> = ({
                         </h4>
                     </div>
                     <span className="text-[11px] font-semibold text-zinc-500">
-                        {collapsedSections.interior ? 'Mostrar' : 'Ocultar'}
+                        {collapsedSections.interior ? (t('common.show') || 'Mostrar') : (t('common.hide') || 'Ocultar')}
                     </span>
                 </div>
 
@@ -546,7 +541,7 @@ export const ManualOfferForm: React.FC<ManualOfferFormProps> = ({
                         </h4>
                     </div>
                     <span className="text-[11px] font-semibold text-zinc-500">
-                        {collapsedSections.cover ? 'Mostrar' : 'Ocultar'}
+                        {collapsedSections.cover ? (t('common.show') || 'Mostrar') : (t('common.hide') || 'Ocultar')}
                     </span>
                 </div>
 
@@ -675,7 +670,7 @@ export const ManualOfferForm: React.FC<ManualOfferFormProps> = ({
                         </h4>
                     </div>
                     <span className="text-[11px] font-semibold text-zinc-500">
-                        {collapsedSections.binding ? 'Mostrar' : 'Ocultar'}
+                        {collapsedSections.binding ? (t('common.show') || 'Mostrar') : (t('common.hide') || 'Ocultar')}
                     </span>
                 </div>
 
@@ -755,8 +750,8 @@ export const ManualOfferForm: React.FC<ManualOfferFormProps> = ({
                                             onChange={(e) => updateField('wirePitch', e.target.value)}
                                             className="w-full px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-white font-medium"
                                         >
-                                            <option value="3:1">Paso 3:1 (3 agujeros por pulgada)</option>
-                                            <option value="2:1">Paso 2:1 (2 agujeros por pulgada)</option>
+                                            <option value="3:1">{t('wirePitch.3to1') || 'Paso 3:1 (3 agujeros por pulgada)'}</option>
+                                            <option value="2:1">{t('wirePitch.2to1') || 'Paso 2:1 (2 agujeros por pulgada)'}</option>
                                         </select>
                                     </div>
                                     <div className="space-y-1">
@@ -823,7 +818,7 @@ export const ManualOfferForm: React.FC<ManualOfferFormProps> = ({
                         </h4>
                     </div>
                     <span className="text-[11px] font-semibold text-zinc-500">
-                        {collapsedSections.finishing ? 'Mostrar' : 'Ocultar'}
+                        {collapsedSections.finishing ? (t('common.show') || 'Mostrar') : (t('common.hide') || 'Ocultar')}
                     </span>
                 </div>
 
@@ -1046,7 +1041,7 @@ export const ManualOfferForm: React.FC<ManualOfferFormProps> = ({
                         </h4>
                     </div>
                     <span className="text-[11px] font-semibold text-zinc-500">
-                        {collapsedSections.delivery ? 'Mostrar' : 'Ocultar'}
+                        {collapsedSections.delivery ? (t('common.show') || 'Mostrar') : (t('common.hide') || 'Ocultar')}
                     </span>
                 </div>
 

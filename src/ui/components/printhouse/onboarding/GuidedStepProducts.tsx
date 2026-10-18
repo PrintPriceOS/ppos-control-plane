@@ -32,31 +32,31 @@ const FAMILY_DEFINITIONS: Array<{
     id: ProductFamilyId;
     titleKey: string;
     descKey: string;
-    capabilitiesHint: string;
+    hintKey: string;
 }> = [
     {
         id: 'HARDCOVER',
         titleKey: 'family.hardcover.title',
         descKey: 'family.hardcover.desc',
-        capabilitiesHint: 'Encuadernación en tapa dura con cartón rígido (alrededor de 2.0 - 2.5 mm), guardas y montaje.'
+        hintKey: 'family.hardcover.hint'
     },
     {
         id: 'SOFTCOVER',
         titleKey: 'family.softcover.title',
         descKey: 'family.softcover.desc',
-        capabilitiesHint: 'Cubierta flexible hendida con encolado fresado PUR o cosido con hilo vegetal.'
+        hintKey: 'family.softcover.hint'
     },
     {
         id: 'WIRE_O',
         titleKey: 'family.wireO.title',
         descKey: 'family.wireO.desc',
-        capabilitiesHint: 'Perforado de hojas y encuadernación con doble anilla metálica Wire-O para apertura plana 360°.'
+        hintKey: 'family.wireO.hint'
     },
     {
         id: 'SADDLE_STITCH',
         titleKey: 'family.saddleStitch.title',
         descKey: 'family.saddleStitch.desc',
-        capabilitiesHint: 'Plegado de pliegos encartados y cosido con dos grapas de alambre al caballete.'
+        hintKey: 'family.saddleStitch.hint'
     }
 ];
 
@@ -149,7 +149,7 @@ export const GuidedStepProducts: React.FC<GuidedStepProductsProps> = ({
                             {/* Additional human guidance on capabilities */}
                             <div className="mt-4 pt-3 border-t border-zinc-100 dark:border-zinc-800/80">
                                 <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
-                                    {def.capabilitiesHint}
+                                    {t(def.hintKey)}
                                 </p>
                             </div>
                         </div>

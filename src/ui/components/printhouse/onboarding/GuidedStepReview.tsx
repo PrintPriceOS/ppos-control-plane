@@ -283,10 +283,10 @@ export const GuidedStepReview: React.FC<GuidedStepReviewProps> = ({
                                                         : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400'
                                             }`}>
                                                 {familyState.status === 'DATA_VALIDATED'
-                                                    ? '✓ Calibrada'
+                                                    ? (t('guided.review.statusValidated') || '✓ Calibrada')
                                                     : familyState.status === 'QUOTE_ADDED' || familyState.status === 'REQUIRES_REVIEW'
-                                                        ? 'Borrador en curso'
-                                                        : 'Declarada'}
+                                                        ? (t('guided.review.statusDraft') || 'Borrador en curso')
+                                                        : (t('guided.review.statusDeclared') || 'Declarada')}
                                             </span>
                                         )}
                                     </div>
@@ -317,23 +317,70 @@ export const GuidedStepReview: React.FC<GuidedStepReviewProps> = ({
                                 </h3>
                             </div>
                             <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
-                                pricingReadiness?.status === 'COMPLETE'
+                                isPricingComplete
                                     ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800'
                                     : 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800'
                             }`}>
-                                {pricingReadiness?.status === 'COMPLETE' ? 'Calibrado' : 'En progreso'}
+                                {isPricingComplete 
+                                    ? (t('guided.review.statusValidated') || 'Calibrado') 
+                                    : (t('guided.review.statusDraft') || 'En progreso')}
                             </span>
                         </div>
-                        <div className="text-xs text-zinc-600 dark:text-zinc-400 space-y-2">
-                            <p>
-                                {pricingReadiness?.status === 'COMPLETE'
-                                    ? 'Tus tarifas base de fabricación han sido resueltas y consolidadas por el servidor.'
-                                    : 'Puedes seguir aportando presupuestos para afinar el ajuste de tus máquinas.'}
-                            </p>
+
+                        {/* Per-family pricing status breakdown */}
+                        <div className="space-y-2">
+                            <div className="text-[11px] font-semibold text-zinc-500 dark:text-zinc-400">
+                                {t('guided.review.perFamilyPricingTitle') || 'Preparación por familia seleccionada'}:
+                            </div>
+                            <div className="space-y-1.5">
+                                {(['HARDCOVER', 'SOFTCOVER', 'WIRE_O', 'SADDLE_STITCH'] as ProductFamilyId[])
+                                    .filter(fid => enabledFamilies[fid])
+                                    .map(fid => {
+                                        const fam = families[fid];
+                                        const quoteCount = fam?.quotes?.length || 0;
+                                        const isFamilyCalibrated = fam?.status === 'DATA_VALIDATED';
+                                        const hasActiveDraft = quoteCount > 0 || fam?.status === 'QUOTE_ADDED' || fam?.status === 'REQUIRES_REVIEW';
+
+                                        return (
+                                            <div 
+                                                key={fid}
+                                                className="flex items-center justify-between p-2 rounded-xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-100 dark:border-zinc-800 text-xs"
+                                            >
+                                                <div className="flex items-center gap-2 truncate">
+                                                    <BindingIcon family={fid} size={14} />
+                                                    <span className="font-semibold truncate">{t(fam?.titleKey || fid)}</span>
+                                                </div>
+                                                <div className="flex items-center gap-1.5 shrink-0">
+                                                    {quoteCount > 0 && (
+                                                        <span className="text-[10px] text-zinc-500 font-medium">
+                                                            {quoteCount} {quoteCount === 1 ? 'oferta' : 'ofertas'}
+                                                        </span>
+                                                    )}
+                                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                                        isFamilyCalibrated
+                                                            ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400'
+                                                            : hasActiveDraft
+                                                                ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300'
+                                                                : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400'
+                                                    }`}>
+                                                        {isFamilyCalibrated
+                                                            ? (t('guided.review.statusValidated') || 'Calibrada')
+                                                            : hasActiveDraft
+                                                                ? (t('guided.review.statusDraft') || 'Borrador')
+                                                                : (t('guided.review.statusDeclared') || 'Declarada')}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                            </div>
+                        </div>
+
+                        <div className="text-xs text-zinc-600 dark:text-zinc-400 space-y-2 pt-1">
                             <div className="p-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-100 dark:border-zinc-800 flex items-center gap-2">
                                 <ShieldCheck size={16} className="text-[#dc0000] shrink-0" />
                                 <span className="text-[11px] leading-tight">
-                                    Tarifas resueltas exclusivamente por el motor de cálculo.
+                                    {t('guided.review.pricingStrictNotice') || 'Tarifas y matrices resueltas exclusivamente por el motor de cálculo del servidor.'}
                                 </span>
                             </div>
                         </div>
@@ -403,42 +450,66 @@ export const GuidedStepReview: React.FC<GuidedStepReviewProps> = ({
                     <div className="p-4 rounded-xl bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/60 space-y-2">
                         <div className="text-xs font-bold text-amber-900 dark:text-amber-200 flex items-center gap-1.5">
                             <AlertTriangle size={14} className="text-amber-600 dark:text-amber-400" />
-                            <span>Requisitos pendientes concretos:</span>
+                            <span>{t('guided.review.pendingSectionTitle') || 'Requisitos pendientes concretos'}:</span>
                         </div>
-                        <ul className="text-xs text-amber-800 dark:text-amber-300 space-y-1.5 list-disc list-inside">
+                        <ul className="text-xs text-amber-800 dark:text-amber-300 space-y-2 list-none p-0">
                             {!isAccountComplete && (
-                                <li className="flex items-center justify-between">
-                                    <span>Datos de empresa o primera planta de producción incompletos.</span>
-                                    <button
-                                        type="button"
-                                        onClick={() => onOpenFullSetup('COMPANY')}
-                                        className="text-[11px] font-bold text-amber-900 dark:text-amber-100 underline ml-2"
-                                    >
-                                        Resolver
-                                    </button>
+                                <li className="space-y-1">
+                                    <div className="flex items-center justify-between font-semibold">
+                                        <span>{t('guided.review.pendingAccount') || 'Datos de empresa o primera planta de producción incompletos'}:</span>
+                                        <button
+                                            type="button"
+                                            onClick={() => onOpenFullSetup('COMPANY')}
+                                            className="text-[11px] font-bold text-amber-900 dark:text-amber-100 underline ml-2 cursor-pointer"
+                                        >
+                                            {t('common.resolve') || 'Resolver'}
+                                        </button>
+                                    </div>
+                                    <div className="pl-3 flex flex-wrap gap-1.5 text-[11px]">
+                                        {!company?.legalName?.trim() && (
+                                            <span className="px-2 py-0.5 rounded bg-amber-100 dark:bg-amber-900/50 text-amber-900 dark:text-amber-200">
+                                                {t('guided.review.fieldMissing') || 'Falta'}: {t('guided.review.field.legalName') || 'Razón social'}
+                                            </span>
+                                        )}
+                                        {!company?.country?.trim() && (
+                                            <span className="px-2 py-0.5 rounded bg-amber-100 dark:bg-amber-900/50 text-amber-900 dark:text-amber-200">
+                                                {t('guided.review.fieldMissing') || 'Falta'}: {t('guided.review.field.country') || 'País'}
+                                            </span>
+                                        )}
+                                        {!company?.city?.trim() && (
+                                            <span className="px-2 py-0.5 rounded bg-amber-100 dark:bg-amber-900/50 text-amber-900 dark:text-amber-200">
+                                                {t('guided.review.fieldMissing') || 'Falta'}: {t('guided.review.field.city') || 'Ciudad'}
+                                            </span>
+                                        )}
+                                        {!company?.siteName?.trim() && (
+                                            <span className="px-2 py-0.5 rounded bg-amber-100 dark:bg-amber-900/50 text-amber-900 dark:text-amber-200">
+                                                {t('guided.review.fieldMissing') || 'Falta'}: {t('guided.review.field.siteName') || 'Nombre de planta'}
+                                            </span>
+                                        )}
+                                    </div>
                                 </li>
                             )}
                             {!isOpsComplete && (
                                 <li className="flex items-center justify-between">
-                                    <span>Asignación de maquinaria, capacidades o nodos de impresión pendiente.</span>
+                                    <span>{t('guided.review.pendingMachines') || 'Asignación de maquinaria, capacidades o nodos de impresión pendiente.'}</span>
                                     <button
                                         type="button"
                                         onClick={() => onOpenFullSetup('MACHINES')}
-                                        className="text-[11px] font-bold text-amber-900 dark:text-amber-100 underline ml-2"
+                                        className="text-[11px] font-bold text-amber-900 dark:text-amber-100 underline ml-2 cursor-pointer"
                                     >
-                                        Resolver
+                                        {t('common.resolve') || 'Resolver'}
                                     </button>
                                 </li>
                             )}
                             {!isPricingComplete && (
                                 <li className="flex items-center justify-between">
-                                    <span>Calibración o configuración de tarifas de fabricación sin confirmar.</span>
+                                    <span>{t('guided.review.pendingPricing') || 'Calibración o configuración de tarifas de fabricación sin confirmar.'}</span>
                                     <button
                                         type="button"
                                         onClick={onBackToPricing}
-                                        className="text-[11px] font-bold text-amber-900 dark:text-amber-100 underline ml-2"
+                                        className="text-[11px] font-bold text-amber-900 dark:text-amber-100 underline ml-2 cursor-pointer"
                                     >
-                                        Ir a precios
+                                        {t('common.goToPricing') || 'Ir a precios'}
                                     </button>
                                 </li>
                             )}
@@ -448,9 +519,9 @@ export const GuidedStepReview: React.FC<GuidedStepReviewProps> = ({
                                     <button
                                         type="button"
                                         onClick={() => onOpenFullSetup(issue.targetTab || 'OVERVIEW')}
-                                        className="text-[11px] font-bold text-amber-900 dark:text-amber-100 underline ml-2"
+                                        className="text-[11px] font-bold text-amber-900 dark:text-amber-100 underline ml-2 cursor-pointer"
                                     >
-                                        Resolver
+                                        {t('common.resolve') || 'Resolver'}
                                     </button>
                                 </li>
                             ))}

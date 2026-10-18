@@ -2082,36 +2082,10 @@ export const es = {
 
   // ── Stage C Method Explanations ──
   'guided.pricing.methodsTitle': '¿Cómo prefieres configurar tus precios?',
-  'guided.pricing.methodsSubtitle': 'Selecciona el método que mejor se adapte a tu taller. Puedes aplicar métodos distintos a familias distintas sin perder el trabajo previo.',
-  'guided.pricing.methodTemplateTitle': '1. Partir de una plantilla',
-  'guided.pricing.methodTemplateBadge': 'Configuración rápida',
-  'guided.pricing.methodTemplateWhatIs': 'Qué es: Cuadros de tarifas industriales prellenados con medias de mercado para producción editorial.',
-  'guided.pricing.methodTemplateForWhom': 'Para quién resulta útil: Imprentas que empiezan de cero y no tienen un presupuesto a mano, para arrancar al instante.',
-  'guided.pricing.methodTemplateInitializes': 'Qué inicializa: Puestas en máquina fijas, costes de tirada por millar y recargos estándar de papel.',
   'guided.pricing.methodTemplateToReview': 'Qué debe revisar: Tus márgenes habituales, precios reales de compra de papel y portes de transporte.',
   'guided.pricing.methodTemplatePending': 'Qué queda sin configurar: Acabados especiales y personalizaciones específicas de maquinaria.',
   'guided.pricing.methodTemplateConfirmed': 'Qué se guardará: Un pliego de tarifas base registrado en tu máquina o nodo de producción activo.',
-  'guided.pricing.methodTemplateBtn': 'Usar plantilla base',
-
-  'guided.pricing.methodAiTitle': '2. Asistente IA de calibración',
-  'guided.pricing.methodAiBadge': 'Recomendado',
-  'guided.pricing.methodAiWhatIs': 'Qué es: Ingesta inteligente que lee tus presupuestos reales en PDF para calibrar las fórmulas de tu maquinaria.',
-  'guided.pricing.methodAiForWhom': 'Para quién resulta útil: Imprentas con presupuestos previos emitidos que quieren ajustar tarifas a trabajos reales.',
-  'guided.pricing.methodAiInput': 'Qué necesitas aportar: Un PDF de presupuesto real con desglose de cantidades, páginas, papel y transporte separado.',
-  'guided.pricing.methodAiOutput': 'Qué extrae o propone: Especificaciones de encuadernación, cantidades, total de fabricación y portes.',
-  'guided.pricing.methodAiReview': 'Qué debes revisar: Comparar el cálculo del motor con tu oferta original y aceptar las tarifas resueltas.',
   'guided.pricing.methodAiFallback': 'Si no dispones de PDF: Puedes introducir las líneas del presupuesto de forma manual en este mismo asistente.',
-  'guided.pricing.methodAiBtn': 'Usar asistente de calibración',
-
-  'guided.pricing.methodManualTitle': '3. Configuración manual de tarifas',
-  'guided.pricing.methodManualBadge': 'Control técnico total',
-  'guided.pricing.methodManualWhatIs': 'Qué es: Edición directa de tarifas industriales: costes de clic, pliego, encuadernación, puesta a punto y coste/kg.',
-  'guided.pricing.methodManualForWhom': 'Para quién resulta útil: Responsables de costes y presupuestadores con matrices industriales ya calculadas.',
-  'guided.pricing.methodManualInput': 'Qué información se necesita: Coste de plancha, tiempo de preparación, tiro por millar y porcentajes de merma.',
-  'guided.pricing.methodManualDifference': 'Importante: Configurar tarifas directamente es distinto de introducir un presupuesto. No requiere ningún trabajo de referencia.',
-  'guided.pricing.methodManualBtn': 'Configurar tarifas manualmente',
-
-  'guided.pricing.changeMethod': 'Cambiar método',
   'guided.pricing.activeMethod': 'Método activo',
   'guided.pricing.changeProducts': 'Cambiar productos',
 
@@ -2187,6 +2161,124 @@ export const es = {
   'guided.action.continueToPricing': 'Continuar a calibrar precios',
   'guided.action.skipToReview': 'Ir a resumen final',
   'guided.action.backToPricing': 'Volver a precios y calibración',
+
+  // Common UI Controls
+  'common.show': 'Mostrar',
+  'common.hide': 'Ocultar',
+  'common.resolve': 'Resolver',
+  'common.goToPricing': 'Ir a precios',
+  'common.notSpecified': 'No especificado',
+
+  // Binding methods
+  'binding.sewn': 'Cosido con hilo (Fadenheftung)',
+  'binding.glued': 'Encolado / Fresado',
+  'binding.pur': 'Fresado / Cola PUR',
+  'binding.sewnSoftcover': 'Cosido con hilo rústica',
+  'binding.wireO': 'Espiral doble Wire-O',
+  'binding.saddleStitch': 'Grapado al caballete',
+
+  // Spine shapes
+  'spine.square': 'Lomo recto (gerader Rücken)',
+  'spine.round': 'Lomo redondo',
+
+  // Lamination & finishes
+  'lamination.none': 'Sin plastificar',
+  'lamination.matte': 'Plastificado mate',
+  'lamination.gloss': 'Plastificado brillo',
+  'lamination.softTouch': 'Plastificado Soft-touch',
+
+  // Staples & wire
+  'staple.flat': 'Grapa plana estándar',
+  'staple.omega': 'Grapa omega (para archivar)',
+  'wirePitch.3to1': 'Paso 3:1 (3 agujeros por pulgada)',
+  'wirePitch.2to1': 'Paso 2:1 (2 agujeros por pulgada)',
+
+  // Product Family Hints (localized technical definition)
+  'family.hardcover.hint': 'Encuadernación en tapa dura con cartón rígido (alrededor de 2.0 - 2.5 mm), guardas y montaje.',
+  'family.softcover.hint': 'Cubierta flexible hendida con encolado fresado PUR o cosido con hilo vegetal.',
+  'family.wireO.hint': 'Perforado de hojas y encuadernación con doble anilla metálica Wire-O para apertura plana 360°.',
+  'family.saddleStitch.hint': 'Plegado de pliegos encartados y cosido con dos grapas de alambre al caballete.',
+
+  // Guided Stage C: Neutral Titles & Methods
+  'guided.stageC.titleNeutral': 'Configura tus tarifas y precios de fabricación',
+  'guided.stageC.subtitleNeutral': 'Elige cómo quieres configurar tus tarifas. Puedes partir de una plantilla industrial, calibrar con un presupuesto real o introducir tus matrices de costes directamente.',
+  'guided.pricing.methodsSubtitle': 'Selecciona el método que mejor se adapte a tu taller. Puedes aplicar métodos distintos a familias distintas sin perder el trabajo previo.',
+  'guided.pricing.methodTemplateBadge': 'Configuración rápida',
+  'guided.pricing.methodTemplateTitle': '1. Partir de una plantilla',
+  'guided.pricing.methodTemplateWhatIs': 'Qué es:',
+  'guided.pricing.methodTemplateWhatIsDesc': 'Cuadros de tarifas industriales prellenados con medias de mercado de referencia.',
+  'guided.pricing.methodTemplateForWhom': 'Para quién:',
+  'guided.pricing.methodTemplateForWhomDesc': 'Imprentas que arrancan sin presupuesto a mano y quieren empezar a cotizar de inmediato.',
+  'guided.pricing.methodTemplateInits': 'Qué inicializa:',
+  'guided.pricing.methodTemplateInitsDesc': 'Puestas en máquina fijas, costes de tirada y recargos base.',
+  'guided.pricing.methodTemplateReview': 'Qué debes revisar:',
+  'guided.pricing.methodTemplateReviewDesc': 'Márgenes comerciales, compra real de papel y costes de transporte.',
+  'guided.pricing.methodTemplateBtn': 'Usar plantilla base',
+
+  'guided.pricing.methodAiBadge': 'Recomendado',
+  'guided.pricing.methodAiTitle': '2. Asistente IA de calibración',
+  'guided.pricing.methodAiWhatIs': 'Qué es:',
+  'guided.pricing.methodAiWhatIsDesc': 'Ingesta inteligente que lee presupuestos reales en PDF para calibrar las fórmulas de tus máquinas.',
+  'guided.pricing.methodAiProvides': 'Qué aportas:',
+  'guided.pricing.methodAiProvidesDesc': 'Un PDF con cantidades, páginas, papel y portes desglosados (o entrada manual línea a línea).',
+  'guided.pricing.methodAiExtracts': 'Qué extrae:',
+  'guided.pricing.methodAiExtractsDesc': 'Especificaciones técnicas, escalados de tirada y precios de fabricación.',
+  'guided.pricing.methodAiReview': 'Qué revisas:',
+  'guided.pricing.methodAiReviewDesc': 'Comparas el cálculo del motor con tu oferta original y confirmas la calibración.',
+  'guided.pricing.methodAiBtn': 'Usar asistente de calibración',
+
+  'guided.pricing.methodManualBadge': 'Control técnico total',
+  'guided.pricing.methodManualTitle': '3. Tarifas manuales',
+  'guided.pricing.methodManualWhatIs': 'Qué es:',
+  'guided.pricing.methodManualWhatIsDesc': 'Edición directa de las matrices industriales: clic, planchas, pliegos, encuadernación y coste/kg.',
+  'guided.pricing.methodManualForWhom': 'Para quién:',
+  'guided.pricing.methodManualForWhomDesc': 'Presupuestadores y jefes de taller con matrices de costes ya calculadas.',
+  'guided.pricing.methodManualRequires': 'Qué información requiere:',
+  'guided.pricing.methodManualRequiresDesc': 'Planchas, puesta a punto, tiro por millar y porcentajes de merma.',
+  'guided.pricing.methodManualDiff': 'Diferencia clave:',
+  'guided.pricing.methodManualDiffDesc': 'Introducir tarifas directamente no requiere ningún presupuesto de referencia.',
+  'guided.pricing.methodManualBtn': 'Configurar tarifas manualmente',
+
+  // Guided Stage C Active Modes
+  'guided.pricing.modeTemplate': 'Plantilla de Referencia',
+  'guided.pricing.modeAi': 'Asistente IA de Calibración',
+  'guided.pricing.modeManual': 'Configuración Manual de Tarifas',
+  'guided.pricing.templateAppliedTitle': 'Valores iniciales aplicados a {family}',
+  'guided.pricing.templateAppliedDesc': 'Se han establecido los costes base industriales para esta familia. Puedes ajustar márgenes y costes en la configuración avanzada en cualquier momento.',
+  'guided.pricing.templateSaveBtn': 'Guardar plantilla y continuar',
+  'guided.pricing.manualModeBadge': 'Modo Tarifas Manuales',
+  'guided.pricing.manualModeTitle': 'Editando matriz para {family}',
+  'guided.pricing.changeMethod': 'Cambiar método',
+
+  // Guided Stage D Review Status Badges & Per-Family Breakdown
+  'guided.review.statusValidated': 'Calibrada',
+  'guided.review.statusDraft': 'Borrador en curso',
+  'guided.review.statusDeclared': 'Declarada',
+  'guided.review.statusCalibrated': 'Calibrado',
+  'guided.review.statusInProgress': 'En progreso',
+  'guided.review.statusPendingSetup': 'Pendiente de configuración',
+  'guided.review.serverConsolidated': 'Tus tarifas base de fabricación han sido resueltas y consolidadas por el servidor.',
+  'guided.review.serverInProgress': 'Puedes seguir aportando presupuestos para afinar el ajuste de tus máquinas.',
+  'guided.review.engineNotice': 'Tarifas resueltas exclusivamente por el motor de cálculo.',
+  'guided.review.perFamilyPricingTitle': 'Tarifas y Calibración por Familia',
+  'guided.review.pendingRequirementsTitle': 'Requisitos pendientes concretos:',
+  'guided.review.missingCompanyData': 'Datos de empresa o primera planta de producción incompletos.',
+  'guided.review.missingOpsData': 'Asignación de maquinaria, capacidades o nodos de impresión pendiente.',
+  'guided.review.missingPricingData': 'Calibración o configuración de tarifas de fabricación sin confirmar.',
+  'guided.review.fieldMissing': 'Campo obligatorio pendiente: {field}',
+  'guided.review.field.legalName': 'Razón social de la empresa',
+  'guided.review.field.country': 'País principal de operaciones',
+  'guided.review.field.city': 'Ciudad / Ubicación de planta',
+  'guided.review.field.site': 'Planta de producción principal',
+  'guided.review.field.taxId': 'NIF / CIF / Identificación fiscal',
+
+  // Offer validation & navigation explanations
+  'form.missing.title': 'Título del libro o trabajo',
+  'guided.pricing.stepLockedQuoteRequired': 'Sube un presupuesto PDF o introduce una oferta manualmente para pasar a la revisión de especificaciones.',
+  'guided.pricing.stepLockedReviewRequired': 'Revisa y confirma las especificaciones de la oferta antes de pasar al cálculo.',
+  'guided.pricing.stepLockedCalcRequired': 'Es necesario ejecutar el cálculo con el motor antes de aceptar la propuesta de tarifas.',
+  'guided.storage.savedLocal': 'Borrador guardado localmente'
 } as const;
 
 export type TranslationKeys = keyof typeof es;
+

@@ -281,7 +281,7 @@ describe('GuidedPrinthouseJourney Mount & Runtime Reconciliation Integration Sui
 
         // Mounts and advances to PRICING
         await waitFor(() => {
-            expect(screen.getByText(/Calibra tus tarifas con un presupuesto real/i)).toBeInTheDocument();
+            expect(screen.getByText(/Configura tus tarifas y precios de fabricación/i)).toBeInTheDocument();
         });
         expect(screen.getByRole('button', { name: /Usar asistente de calibración/i })).toBeInTheDocument();
     });
@@ -448,7 +448,7 @@ describe('GuidedPrinthouseJourney Mount & Runtime Reconciliation Integration Sui
 
         // Step 4 requirement: UI reconstructs enabledFamilies and opens at the correct pending stage (PRICING)
         await waitFor(() => {
-            expect(screen.getByText(/Calibra tus tarifas con un presupuesto real/i)).toBeInTheDocument();
+            expect(screen.getByText(/Configura tus tarifas y precios de fabricación/i)).toBeInTheDocument();
         });
         expect(screen.getByRole('button', { name: /Usar asistente de calibración/i })).toBeInTheDocument();
 
