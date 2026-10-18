@@ -2275,6 +2275,12 @@ export const en = {
 
   // Offer validation & navigation explanations
   'form.missing.title': 'Book title or project reference',
+  'guided.review.methodTemplate': 'Base template',
+  'guided.review.methodAssistant': 'AI assistant',
+  'guided.review.methodManual': 'Manual rates',
+  'guided.review.methodNotConfigured': 'No method assigned',
+  'guided.review.quoteEvidence': '{count} {count, plural, one {quote} other {quotes}}',
+  'guided.review.sessionEvidence': 'Session: {id}',
   'guided.pricing.stepLockedQuoteRequired': 'Please upload a PDF quote or enter an offer manually to proceed to specification review.',
   'guided.pricing.stepLockedReviewRequired': 'Please verify and confirm the offer specifications before proceeding to calculation.',
   'guided.pricing.stepLockedCalcRequired': 'Calculation with the pricing engine is required before accepting the rate proposal.',

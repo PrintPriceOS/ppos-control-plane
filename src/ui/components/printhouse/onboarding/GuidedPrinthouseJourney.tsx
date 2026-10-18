@@ -327,10 +327,18 @@ export const GuidedPrinthouseJourney: React.FC<GuidedPrinthouseJourneyProps> = (
                         };
                     }
 
+                    // Authoritative server reconciliation for completedStages:
+                    // A local draft alone never certifies completion; server facts are primary truth.
+                    const isAccountCompleteOnServer = data.data?.readiness?.accountSetup?.status === 'COMPLETE';
+                    const isPricingCompleteOnServer = data.data?.readiness?.pricingReadiness?.status === 'COMPLETE';
+                    const isOpsCompleteOnServer = data.data?.readiness?.operationalConfiguration?.status === 'COMPLETE' || data.data?.readiness?.operationalReadiness?.status === 'COMPLETE';
+
                     const reconciledCompletedStages = {
-                        ...prev.completedStages,
-                        COMPANY: prev.completedStages?.COMPANY || data.data?.readiness?.accountSetup?.status === 'COMPLETE',
-                        PRODUCTS: serverProductsConfirmed || prev.completedStages?.PRODUCTS || false
+                        WELCOME: true,
+                        COMPANY: isAccountCompleteOnServer || Boolean(prev.completedStages?.COMPANY),
+                        PRODUCTS: serverProductsConfirmed || Boolean(prev.completedStages?.PRODUCTS),
+                        PRICING: isPricingCompleteOnServer || Boolean(prev.completedStages?.PRICING),
+                        REVIEW: Boolean(isAccountCompleteOnServer && isPricingCompleteOnServer && isOpsCompleteOnServer)
                     };
 
                     // Runtime Reconciliation of First Pending Guided Stage:
@@ -1426,6 +1434,7 @@ export const GuidedPrinthouseJourney: React.FC<GuidedPrinthouseJourneyProps> = (
                         company={draft.company}
                         families={families}
                         enabledFamilies={draft.enabledFamilies}
+                        pricingContinuity={draft.pricingContinuity}
                         readinessData={serverData?.readiness}
                         isRefreshingReadiness={isRefreshingReadiness}
                         refreshError={readinessError}

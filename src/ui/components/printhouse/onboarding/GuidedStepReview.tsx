@@ -20,7 +20,7 @@ import {
 import { useLocale } from '../../../i18n';
 import { ProductFamilyId, FamilyState } from '../../../types/printhouseOnboardingTypes';
 import { BindingIcon } from './BindingFamilyIcons';
-import { CompanyDraftData } from '../../../lib/onboardingDraftStore';
+import { CompanyDraftData, FamilyPricingSessionDraft } from '../../../lib/onboardingDraftStore';
 import { getAuthToken } from '../../../lib/authStore';
 import { normalizeUiError } from '../../../utils/errorUtils';
 
@@ -28,6 +28,7 @@ interface GuidedStepReviewProps {
     company: CompanyDraftData;
     families: Record<ProductFamilyId, FamilyState>;
     enabledFamilies: Record<ProductFamilyId, boolean>;
+    pricingContinuity?: Partial<Record<ProductFamilyId, FamilyPricingSessionDraft>>;
     readinessData?: any;
     isRefreshingReadiness?: boolean;
     refreshError?: string | null;
@@ -40,6 +41,7 @@ export const GuidedStepReview: React.FC<GuidedStepReviewProps> = ({
     company,
     families,
     enabledFamilies,
+    pricingContinuity,
     readinessData,
     isRefreshingReadiness = false,
     refreshError = null,
@@ -337,23 +339,47 @@ export const GuidedStepReview: React.FC<GuidedStepReviewProps> = ({
                                     .filter(fid => enabledFamilies[fid])
                                     .map(fid => {
                                         const fam = families[fid];
-                                        const quoteCount = fam?.quotes?.length || 0;
-                                        const isFamilyCalibrated = fam?.status === 'DATA_VALIDATED';
-                                        const hasActiveDraft = quoteCount > 0 || fam?.status === 'QUOTE_ADDED' || fam?.status === 'REQUIRES_REVIEW';
+                                        const continuity = pricingContinuity?.[fid];
+                                        const quoteCount = (fam?.quotes?.length || 0) + (continuity?.offer?.runs?.length ? 1 : 0);
+                                        const isFamilyCalibrated = fam?.status === 'DATA_VALIDATED' || isPricingComplete;
+                                        const hasActiveDraft = quoteCount > 0 || fam?.status === 'QUOTE_ADDED' || fam?.status === 'REQUIRES_REVIEW' || Boolean(continuity?.sessionId || continuity?.activeRun || continuity?.uploadedFileName);
+
+                                        // Resolve genuine method applied to this family
+                                        const methodChoice = continuity?.pricingMethod;
+                                        const methodLabel = methodChoice === 'TEMPLATE'
+                                            ? (t('guided.review.methodTemplate') || 'Plantilla base')
+                                            : methodChoice === 'ASSISTANT' || continuity?.entryMode === 'MANUAL_FORM' || continuity?.uploadedFileName
+                                                ? (t('guided.review.methodAssistant') || 'Asistente IA')
+                                                : methodChoice === 'MANUAL'
+                                                    ? (t('guided.review.methodManual') || 'Tarifas manuales')
+                                                    : (t('guided.review.methodNotConfigured') || 'Sin método');
+
+                                        const evidenceLabel = continuity?.uploadedFileName 
+                                            ? continuity.uploadedFileName 
+                                            : continuity?.sessionId 
+                                                ? `ID: ${continuity.sessionId.slice(0, 8)}`
+                                                : quoteCount > 0
+                                                    ? `${quoteCount} ${quoteCount === 1 ? 'oferta' : 'ofertas'}`
+                                                    : null;
 
                                         return (
                                             <div 
                                                 key={fid}
-                                                className="flex items-center justify-between p-2 rounded-xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-100 dark:border-zinc-800 text-xs"
+                                                className="flex flex-col sm:flex-row sm:items-center justify-between p-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-100 dark:border-zinc-800 text-xs gap-2"
                                             >
                                                 <div className="flex items-center gap-2 truncate">
-                                                    <BindingIcon family={fid} size={14} />
-                                                    <span className="font-semibold truncate">{t(fam?.titleKey || fid)}</span>
+                                                    <BindingIcon family={fid} size={15} />
+                                                    <div className="truncate">
+                                                        <span className="font-semibold">{t(fam?.titleKey || fid)}</span>
+                                                        <span className="text-[10px] text-zinc-500 dark:text-zinc-400 ml-2 font-normal">
+                                                            · {methodLabel}
+                                                        </span>
+                                                    </div>
                                                 </div>
-                                                <div className="flex items-center gap-1.5 shrink-0">
-                                                    {quoteCount > 0 && (
-                                                        <span className="text-[10px] text-zinc-500 font-medium">
-                                                            {quoteCount} {quoteCount === 1 ? 'oferta' : 'ofertas'}
+                                                <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+                                                    {evidenceLabel && (
+                                                        <span className="text-[10px] text-zinc-500 font-medium truncate max-w-[120px]" title={evidenceLabel}>
+                                                            📎 {evidenceLabel}
                                                         </span>
                                                     )}
                                                     <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
@@ -366,7 +392,7 @@ export const GuidedStepReview: React.FC<GuidedStepReviewProps> = ({
                                                         {isFamilyCalibrated
                                                             ? (t('guided.review.statusValidated') || 'Calibrada')
                                                             : hasActiveDraft
-                                                                ? (t('guided.review.statusDraft') || 'Borrador')
+                                                                ? (t('guided.review.statusDraft') || 'Borrador en curso')
                                                                 : (t('guided.review.statusDeclared') || 'Declarada')}
                                                     </span>
                                                 </div>

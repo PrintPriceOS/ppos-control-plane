@@ -2274,6 +2274,12 @@ export const es = {
 
   // Offer validation & navigation explanations
   'form.missing.title': 'Título del libro o trabajo',
+  'guided.review.methodTemplate': 'Plantilla base',
+  'guided.review.methodAssistant': 'Asistente IA',
+  'guided.review.methodManual': 'Tarifas manuales',
+  'guided.review.methodNotConfigured': 'Sin método asignado',
+  'guided.review.quoteEvidence': '{count} {count, plural, one {oferta} other {ofertas}}',
+  'guided.review.sessionEvidence': 'Sesión: {id}',
   'guided.pricing.stepLockedQuoteRequired': 'Sube un presupuesto PDF o introduce una oferta manualmente para pasar a la revisión de especificaciones.',
   'guided.pricing.stepLockedReviewRequired': 'Revisa y confirma las especificaciones de la oferta antes de pasar al cálculo.',
   'guided.pricing.stepLockedCalcRequired': 'Es necesario ejecutar el cálculo con el motor antes de aceptar la propuesta de tarifas.',

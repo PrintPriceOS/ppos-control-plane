@@ -143,6 +143,7 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
         return initPricingForTarget?.entryMode || 'UPLOAD_PDF';
     });
     const [dragActive, setDragActive] = useState<boolean>(false);
+    const [lockedStepNotice, setLockedStepNotice] = useState<string | null>(null);
     const [uploadingPdf, setUploadingPdf] = useState<boolean>(false);
     const [uploadError, setUploadError] = useState<string | null>(null);
     const [uploadedFileName, setUploadedFileName] = useState<string | null>(() => {
@@ -910,12 +911,15 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
                                 <button
                                     key={st.num}
                                     type="button"
-                                    disabled={!isAccessible}
                                     title={!isAccessible ? st.lockedReason : undefined}
                                     aria-disabled={!isAccessible}
                                     onClick={() => {
                                         if (isAccessible) {
+                                            setLockedStepNotice(null);
                                             setCurrentStep(st.num as any);
+                                        } else {
+                                            // Provide immediate accessible touch/click feedback on mobile
+                                            setLockedStepNotice(st.lockedReason || null);
                                         }
                                     }}
                                     className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all ${
@@ -933,6 +937,23 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
                             );
                         })}
                     </div>
+                    {/* Accessible touch notice for locked steps on mobile/tablet */}
+                    {lockedStepNotice && (
+                        <div 
+                            role="status" 
+                            aria-live="polite"
+                            className="mt-2.5 p-2 rounded-xl bg-amber-50 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-800 text-amber-900 dark:text-amber-200 text-xs flex items-center justify-between gap-2"
+                        >
+                            <span>ℹ️ {lockedStepNotice}</span>
+                            <button
+                                type="button"
+                                onClick={() => setLockedStepNotice(null)}
+                                className="text-amber-700 dark:text-amber-300 font-bold text-[11px] px-1.5 py-0.5 rounded hover:bg-amber-200/50"
+                            >
+                                ✕
+                            </button>
+                        </div>
+                    )}
                 </div>
             ) : (
                 <div className="bg-white dark:bg-[#18181b] border border-zinc-200 dark:border-zinc-800 rounded-2xl p-3 sm:p-4 shadow-2xs">

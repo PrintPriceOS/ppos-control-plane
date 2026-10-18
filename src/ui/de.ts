@@ -2275,6 +2275,12 @@ export const de = {
 
   // Offer validation & navigation explanations
   'form.missing.title': 'Buchtitel oder Projektbezeichnung',
+  'guided.review.methodTemplate': 'Basisvorlage',
+  'guided.review.methodAssistant': 'KI-Assistent',
+  'guided.review.methodManual': 'Manuelle Tarife',
+  'guided.review.methodNotConfigured': 'Keine Methode zugewiesen',
+  'guided.review.quoteEvidence': '{count} {count, plural, one {Angebot} other {Angebote}}',
+  'guided.review.sessionEvidence': 'Sitzung: {id}',
   'guided.pricing.stepLockedQuoteRequired': 'Bitte laden Sie ein PDF-Angebot hoch oder erfassen Sie ein Angebot manuell, um zur Spezifikationsprüfung zu gelangen.',
   'guided.pricing.stepLockedReviewRequired': 'Bitte prüfen und bestätigen Sie die Angebotsspezifikationen, bevor Sie die Berechnung starten.',
   'guided.pricing.stepLockedCalcRequired': 'Vor der Annahme des Tarifvorschlags ist eine Berechnung durch den Kalkulationsmotor erforderlich.',
