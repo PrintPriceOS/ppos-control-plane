@@ -86,7 +86,7 @@ services:
 
   # Application Service — Control Plane (Pre-built Image Deployment Only - Zero Host Build)
   control-plane-staging:
-    image: ppos-control-plane:staging-c9a1e44
+    image: ppos-control-plane:staging-1557452
     container_name: ppos-control-plane-staging
     restart: unless-stopped
     depends_on:
