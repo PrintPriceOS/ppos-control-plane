@@ -295,7 +295,7 @@ jobs:
 
         # 11.4 Verify fail-closed behavior for unactivated tenant (NOT_ACTIVATED -> all false)
         MYSQL_PWD="$ORIGIN_USR_PW" mysql -h 127.0.0.1 -P 3306 -u ppos_staging_usr ppos_control_staging -e "
-          INSERT INTO tenants (id, name, status, plan) VALUES ('tenant-unactivated-staging-02', 'Unactivated Staging PrintWorks', 'ACTIVE', 'BASIC');
+          INSERT INTO tenants (id, name, status, plan) VALUES ('tenant-unactivated-staging-02', 'Unactivated Staging PrintWorks', 'ACTIVE', 'PRO');
         "
         UNACTIVATED_GRANTS_COUNT=$(MYSQL_PWD="$ORIGIN_USR_PW" mysql -h 127.0.0.1 -P 3306 -u ppos_staging_usr ppos_control_staging -N -e "
           SELECT count(*) FROM printhouse_activation_grants WHERE tenant_id = 'tenant-unactivated-staging-02';
@@ -418,15 +418,17 @@ jobs:
         fi
 
         echo "14.2 Verifying sandbox restored records on Sandbox instance (Port 3307)..."
-        SANDBOX_TENANTS=$(MYSQL_PWD="$SANDBOX_ROOT_PW" mysql -h 127.0.0.1 -P 3307 -u root ppos_control_sandbox -N -e "SELECT count(*) FROM tenants WHERE id='tenant-synthetic-staging-01';")
+        SANDBOX_SYNTH_TENANT=$(MYSQL_PWD="$SANDBOX_ROOT_PW" mysql -h 127.0.0.1 -P 3307 -u root ppos_control_sandbox -N -e "SELECT count(*) FROM tenants WHERE id='tenant-synthetic-staging-01';")
+        SANDBOX_UNACT_TENANT=$(MYSQL_PWD="$SANDBOX_ROOT_PW" mysql -h 127.0.0.1 -P 3307 -u root ppos_control_sandbox -N -e "SELECT count(*) FROM tenants WHERE id='tenant-unactivated-staging-02';")
+        SANDBOX_TOTAL_TENANTS=$(MYSQL_PWD="$SANDBOX_ROOT_PW" mysql -h 127.0.0.1 -P 3307 -u root ppos_control_sandbox -N -e "SELECT count(*) FROM tenants;")
         SANDBOX_NODES=$(MYSQL_PWD="$SANDBOX_ROOT_PW" mysql -h 127.0.0.1 -P 3307 -u root ppos_control_sandbox -N -e "SELECT count(*) FROM printer_nodes WHERE id='node-synth-01';")
         SANDBOX_VERSIONS=$(MYSQL_PWD="$SANDBOX_ROOT_PW" mysql -h 127.0.0.1 -P 3307 -u root ppos_control_sandbox -N -e "SELECT count(*) FROM schema_versions;")
 
-        echo "Sandbox tenants restored: $SANDBOX_TENANTS"
+        echo "Sandbox synth tenant: $SANDBOX_SYNTH_TENANT, unact tenant: $SANDBOX_UNACT_TENANT, total: $SANDBOX_TOTAL_TENANTS"
         echo "Sandbox nodes restored: $SANDBOX_NODES"
         echo "Sandbox schema_versions restored: $SANDBOX_VERSIONS"
 
-        if [ "$SANDBOX_TENANTS" -ne 1 ] || [ "$SANDBOX_NODES" -ne 1 ] || [ "$SANDBOX_VERSIONS" -lt 161 ]; then
+        if [ "$SANDBOX_SYNTH_TENANT" -ne 1 ] || [ "$SANDBOX_UNACT_TENANT" -ne 1 ] || [ "$SANDBOX_TOTAL_TENANTS" -ne 2 ] || [ "$SANDBOX_NODES" -ne 1 ] || [ "$SANDBOX_VERSIONS" -lt 161 ]; then
           echo "FATAL: Sandbox restored data verification failed!"
           exit 1
         fi
