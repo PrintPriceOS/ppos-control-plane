@@ -5,3 +5,8 @@ dist
 *.log
 scratch/
 .gemini/
+*.tar
+*.tar.gz
+*.sql.gz
+review_artifacts*/
+

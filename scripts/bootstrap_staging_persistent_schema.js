@@ -192,6 +192,20 @@ const STAGING_FOUNDATION_DDL = {
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
     `,
 
+    api_keys: `
+        CREATE TABLE IF NOT EXISTS api_keys (
+            id VARCHAR(64) PRIMARY KEY,
+            tenant_id VARCHAR(64) NOT NULL,
+            key_value VARCHAR(128) UNIQUE NOT NULL,
+            name VARCHAR(128) NULL,
+            revoked BOOLEAN DEFAULT FALSE,
+            last_used_at TIMESTAMP NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_tenant (tenant_id),
+            INDEX idx_key (key_value)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `,
+
     tenant_notification_preferences: `
         CREATE TABLE IF NOT EXISTS tenant_notification_preferences (
             tenant_id VARCHAR(64) PRIMARY KEY,

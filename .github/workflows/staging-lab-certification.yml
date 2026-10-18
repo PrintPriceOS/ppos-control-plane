@@ -563,6 +563,10 @@ jobs:
         docker compose -f docker-compose.staging.yml exec -T \
           control-plane-staging node scripts/verify-industrial-schema.js --profile=ACTIVE_INDUSTRIAL
 
+        echo "17.6.1 Restarting application service so running process re-initializes on fully migrated database..."
+        docker compose -f docker-compose.staging.yml restart control-plane-staging
+        sleep 5
+
         echo "17.7 Testing HTTP /ready endpoint to verify real schema compatibility..."
         READY_RES=$(curl -sS -w "\nHTTP_STATUS:%{http_code}\n" http://127.0.0.1:18081/ready)
         echo "Ready response: $READY_RES"
