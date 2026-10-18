@@ -672,6 +672,10 @@ if [ "$1" == "inspect" ]; then
   exit 0
 fi
 if [ "$1" == "compose" ]; then
+  if [[ "$*" == *"up -d"* ]]; then
+    # Sentinel exit 73: Controlled mock termination at compose up -d
+    exit 73
+  fi
   exit 0
 fi
 exit 0
@@ -693,11 +697,11 @@ exit 0
             const env = setupTestEnv({ omitFile: '.env.staging.example' });
             try {
                 const res = spawnSync(bashBinary, [env.testRunbookPath], {
+                    timeout: 10000,
                     env: {
                         ...process.env,
                         PATH: `${env.binDir}${path.delimiter}${process.env.PATH}`,
-                        STAGING_DEPLOY_DIR: env.tempDir,
-                        RUNBOOK_DRY_RUN: 'true'
+                        STAGING_DEPLOY_DIR: env.tempDir
                     },
                     encoding: 'utf8'
                 });
@@ -717,11 +721,11 @@ exit 0
             const env = setupTestEnv({ corruptChecksum: true });
             try {
                 const res = spawnSync(bashBinary, [env.testRunbookPath], {
+                    timeout: 10000,
                     env: {
                         ...process.env,
                         PATH: `${env.binDir}${path.delimiter}${process.env.PATH}`,
-                        STAGING_DEPLOY_DIR: env.tempDir,
-                        RUNBOOK_DRY_RUN: 'true'
+                        STAGING_DEPLOY_DIR: env.tempDir
                     },
                     encoding: 'utf8'
                 });
@@ -740,11 +744,11 @@ exit 0
             const env = setupTestEnv({ mockInspectId: 'sha256:mismatched_image_id_000000000000' });
             try {
                 const res = spawnSync(bashBinary, [env.testRunbookPath], {
+                    timeout: 10000,
                     env: {
                         ...process.env,
                         PATH: `${env.binDir}${path.delimiter}${process.env.PATH}`,
-                        STAGING_DEPLOY_DIR: env.tempDir,
-                        RUNBOOK_DRY_RUN: 'true'
+                        STAGING_DEPLOY_DIR: env.tempDir
                     },
                     encoding: 'utf8'
                 });
@@ -766,16 +770,17 @@ exit 0
             const env = setupTestEnv({ mockInspectId: expectedId });
             try {
                 const res = spawnSync(bashBinary, [env.testRunbookPath], {
+                    timeout: 10000,
                     env: {
                         ...process.env,
                         PATH: `${env.binDir}${path.delimiter}${process.env.PATH}`,
-                        STAGING_DEPLOY_DIR: env.tempDir,
-                        RUNBOOK_DRY_RUN: 'true'
+                        STAGING_DEPLOY_DIR: env.tempDir
                     },
                     encoding: 'utf8'
                 });
 
-                expect(res.status).toBe(0);
+                // Sentinel exit code 73 represents controlled mock termination at compose up -d
+                expect(res.status).toBe(73);
                 // The output will confirm the strict image check passed:
                 expect(res.stdout).toContain('Docker Image ID strictly verified (sha256:c4f3395002f63d7a5b44854a9bac77d374e402876bb0c6eaa9dd8a6be5327462)');
 

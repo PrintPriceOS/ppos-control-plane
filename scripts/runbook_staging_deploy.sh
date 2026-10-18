@@ -79,11 +79,6 @@ echo "=== [5/7] Starting Isolated Staging Stack with Compose ==="
 docker compose -f "$COMPOSE_FILE" config --quiet
 docker compose -f "$COMPOSE_FILE" up -d
 
-if [ "${RUNBOOK_DRY_RUN:-false}" == "true" ]; then
-  echo "✓ RUNBOOK_DRY_RUN enabled: Compose deployment started successfully. Halting before live container exec."
-  exit 0
-fi
-
 echo "=== [6/7] Running Canonical Bootstrap & Migrations Inside Container ==="
 echo "Waiting for staging-mysql container to be healthy..."
 for i in {1..30}; do
