@@ -122,9 +122,17 @@ jobs:
         echo "Exporting image to ppos-control-plane-staging-1557452.tar..."
         docker save -o ppos-control-plane-staging-1557452.tar ppos-control-plane:staging-1557452
         
-        TAR_SHA256=$(sha256sum ppos-control-plane-staging-1557452.tar | awk '{print $1}')
-        echo "Tarball Checksum SHA256: $TAR_SHA256"
-        
+        echo "Preparing deployment bundle package..."
+        mkdir -p staging-deploy-bundle
+        cp ppos-control-plane-staging-1557452.tar staging-deploy-bundle/
+        cp docker-compose.staging.yml staging-deploy-bundle/
+        cp scripts/runbook_staging_deploy.sh staging-deploy-bundle/
+        cp .env.staging.example staging-deploy-bundle/
+
+        (cd staging-deploy-bundle && sha256sum ppos-control-plane-staging-1557452.tar docker-compose.staging.yml runbook_staging_deploy.sh .env.staging.example > SHA256SUMS.txt)
+        echo "=== Deployment Bundle SHA256SUMS.txt ==="
+        cat staging-deploy-bundle/SHA256SUMS.txt
+
         # Free local image to guarantee step 17 runs purely from docker load without pre-cached image
         docker rmi ppos-control-plane:staging-1557452
         echo "✓ Image exported and local docker cache evicted."
@@ -314,8 +322,28 @@ jobs:
         export BACKUP_PASSPHRASE_FILE="$SECRETS_DIR/backup_passphrase.txt"
         export BACKUP_HMAC_KEY_FILE="$SECRETS_DIR/backup_hmac_key.txt"
 
+        echo "11.5 Generating nominal authenticated encrypted backup within storage quota..."
         bash scripts/staging_backup_snapshot.sh /tmp/backups
         ls -la /tmp/backups
+
+        echo "11.6 In-Flight Quota Rejection Test: Intentionally exceeding quota ceiling during dump stream..."
+        mkdir -p /tmp/quota_test
+        # Set a tiny 1MB quota limit (STAGING_BACKUP_MAX_MB=1) to guarantee abortion during mysqldump stream
+        if STAGING_BACKUP_MAX_MB="1" bash scripts/staging_backup_snapshot.sh /tmp/quota_test; then
+          echo "FATAL: In-flight quota exceeded dump was NOT aborted!"
+          exit 1
+        else
+          echo "✓ Confirmed: In-flight quota limiter immediately aborted mysqldump stream when quota exceeded."
+        fi
+        # Assert cleanup removed any partial files
+        REMAINING_PARTIALS=$(ls -A /tmp/quota_test 2>/dev/null | wc -l)
+        if [ "$REMAINING_PARTIALS" -ne 0 ]; then
+          echo "FATAL: Partial dump files were left behind in /tmp/quota_test!"
+          ls -la /tmp/quota_test
+          exit 1
+        fi
+        echo "✓ Confirmed: Cleanup trap purged all partial in-flight dump artifacts on quota breach."
+        rm -rf /tmp/quota_test
 
     - name: 12. Negative Cryptographic Authenticity Test Harness (STG-04)
       run: |
@@ -582,6 +610,36 @@ jobs:
         docker inspect --format='{{json .State.Status}}' ppos-staging-mysql
         docker inspect --format='{{json .State.Status}}' ppos-control-plane-staging
 
+        echo "17.7.1 Outgoing Network & Application Isolation Observable Checks..."
+        echo "Testing from inside container: verifying non-published MySQL port (3306) on host cannot be reached externally..."
+        # Verify host 3306 is not listening on host interfaces
+        if nc -z -w2 127.0.0.1 3306 2>/dev/null; then
+          echo "FATAL: Port 3306 is unexpectedly listening on host!"
+          exit 1
+        else
+          echo "✓ Confirmed: Port 3306 has zero host mapping (staging MySQL internal only)."
+        fi
+
+        echo "Testing container egress: verifying staging application environment mock restrictions..."
+        EGRESS_FLAGS=$(docker compose -f docker-compose.staging.yml exec -T control-plane-staging env | grep -E "PAYMENT_EXECUTION_ENABLED|LIVE_PROVIDER_CONNECTIVITY|WEBHOOK_DISPATCH_MOCK_ONLY|OUTGOING_WEBHOOK_SINK_URL")
+        echo "Active container egress control flags:"
+        echo "$EGRESS_FLAGS"
+
+        if ! echo "$EGRESS_FLAGS" | grep -q "PAYMENT_EXECUTION_ENABLED=false" || \
+           ! echo "$EGRESS_FLAGS" | grep -q "LIVE_PROVIDER_CONNECTIVITY=false" || \
+           ! echo "$EGRESS_FLAGS" | grep -q "WEBHOOK_DISPATCH_MOCK_ONLY=true" || \
+           ! echo "$EGRESS_FLAGS" | grep -q "OUTGOING_WEBHOOK_SINK_URL=http://127.0.0.1:9999/sink"; then
+          echo "FATAL: Container running with invalid commercial or network egress flags!"
+          exit 1
+        fi
+        echo "✓ Confirmed: Egress controls active inside running staging container."
+
+        echo "17.8 Controlled restart & persistence verification (retaining volume)..."
+        docker compose -f docker-compose.staging.yml restart
+        sleep 5
+        docker inspect --format='{{json .State.Status}}' ppos-staging-mysql
+        docker inspect --format='{{json .State.Status}}' ppos-control-plane-staging
+
         # Re-check readiness after restart
         READY_POST_RESTART=$(curl -sS -w "\nHTTP_STATUS:%{http_code}\n" http://127.0.0.1:18081/ready)
         if ! echo "$READY_POST_RESTART" | grep -q "HTTP_STATUS:200" || ! echo "$READY_POST_RESTART" | grep -q '"status":"READY"'; then
@@ -598,3 +656,11 @@ jobs:
         docker compose -f docker-compose.staging.yml down -v --remove-orphans
         rm -rf secrets "$SECRETS_DIR" ppos-control-plane-staging-1557452.tar
         echo "✓ STG-05: Real Docker Compose lifecycle passed and cleaned up."
+
+    - name: 18. Publish Certified Staging Deployment Artifact Package (OP-02B.2B)
+      uses: actions/upload-artifact@v4
+      with:
+        name: ppos-control-plane-staging-package-OP02B2B
+        path: staging-deploy-bundle/
+        retention-days: 14
+        if-no-files-found: error

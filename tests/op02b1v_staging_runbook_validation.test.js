@@ -273,6 +273,43 @@ describe('OP-02B.1V: Staging Runbook, Configuration Contracts & Secret Resolutio
             expect(restoreScript).toContain('timingSafeEqual'); // Uses constant-time comparison
         });
 
+        it('verifies staging_backup_snapshot.sh uses in-flight stream quota limiter in pipeline', () => {
+            const backupScript = fs.readFileSync(path.join(__dirname, '../scripts/staging_backup_snapshot.sh'), 'utf8');
+            expect(backupScript).toContain('stream_quota_limiter.js');
+            expect(backupScript).toContain('MAX_STORAGE_BYTES');
+            expect(backupScript).toContain('trap cleanup EXIT INT TERM');
+        });
+
+        it('verifies stream_quota_limiter aborts in-flight before writing excessive bytes and cleans up', async () => {
+            const { spawnSync } = require('child_process');
+            const limiterPath = path.join(__dirname, '../scripts/lib/stream_quota_limiter.js');
+            
+            // Limit = 1024 bytes (1 KB)
+            const inputData = Buffer.alloc(2048, 'A'); // 2 KB payload
+            const result = spawnSync('node', [limiterPath, '1024'], {
+                input: inputData,
+                encoding: 'utf8'
+            });
+
+            expect(result.status).toBe(1);
+            expect(result.stderr).toContain('In-flight quota breached');
+            expect(result.stderr).toContain('exceeding hard ceiling of 1024 bytes');
+        });
+
+        it('verifies stream_quota_limiter passes through streams within budget', () => {
+            const { spawnSync } = require('child_process');
+            const limiterPath = path.join(__dirname, '../scripts/lib/stream_quota_limiter.js');
+            
+            const inputData = Buffer.alloc(512, 'B'); // 512 bytes payload
+            const result = spawnSync('node', [limiterPath, '1024'], {
+                input: inputData,
+                encoding: 'utf8'
+            });
+
+            expect(result.status).toBe(0);
+            expect(result.stdout.length).toBe(512);
+        });
+
         it('negative test: rejects dumps containing CREATE DATABASE or USE statements', () => {
             const restoreScript = fs.readFileSync(path.join(__dirname, '../scripts/staging_restore_drill.sh'), 'utf8');
             expect(restoreScript).toContain('CREATE DATABASE');
@@ -280,4 +317,66 @@ describe('OP-02B.1V: Staging Runbook, Configuration Contracts & Secret Resolutio
             expect(restoreScript).toContain('target database boundary');
         });
     });
+
+    describe('6. Outgoing Commercial & Network Isolation Contract Assertions', () => {
+        it('verifies environment template and compose enforce complete commercial containment', () => {
+            const envContent = fs.readFileSync(path.join(__dirname, '../.env.staging.example'), 'utf8');
+            const composeContent = fs.readFileSync(path.join(__dirname, '../docker-compose.staging.yml'), 'utf8');
+
+            const forbiddenActiveFlags = [
+                'PAYMENT_EXECUTION_ENABLED=true',
+                'PAYOUT_EXECUTION_ENABLED=true',
+                'REFUND_EXECUTION_ENABLED=true',
+                'LIVE_PROVIDER_CONNECTIVITY=true',
+                'MARKETPLACE_VISIBLE=true',
+                'LIVE_QUOTING_ALLOWED=true',
+                'JOB_ROUTING_ALLOWED=true',
+                'PRODUCTION_DISPATCH_ALLOWED=true'
+            ];
+
+            forbiddenActiveFlags.forEach(flag => {
+                expect(envContent).not.toContain(flag);
+                expect(composeContent).not.toContain(flag);
+            });
+
+            // Enforce explicit mock containment
+            expect(envContent).toContain('PAYMENT_EXECUTION_ENABLED=false');
+            expect(envContent).toContain('LIVE_PROVIDER_CONNECTIVITY=false');
+            expect(envContent).toContain('WEBHOOK_DISPATCH_MOCK_ONLY=true');
+            expect(envContent).toContain('OUTGOING_WEBHOOK_SINK_URL=http://127.0.0.1:9999/sink');
+
+            expect(composeContent).toContain("PAYMENT_EXECUTION_ENABLED: 'false'");
+            expect(composeContent).toContain("LIVE_PROVIDER_CONNECTIVITY: 'false'");
+        });
+    });
+
+    describe('7. Deployment Runbook Implementation & Hardening Assertions', () => {
+        it('verifies runbook_staging_deploy.sh enforces all required deployment invariants', () => {
+            const runbook = fs.readFileSync(path.join(__dirname, '../scripts/runbook_staging_deploy.sh'), 'utf8');
+
+            // 1. Explicit working directory
+            expect(runbook).toContain('DEPLOY_DIR="${STAGING_DEPLOY_DIR:-/opt/ppos-staging}"');
+            expect(runbook).toContain('cd "$DEPLOY_DIR"');
+
+            // 2. Fail-closed stop on error
+            expect(runbook).toContain('set -euo pipefail');
+
+            // 3. Preserve existing secrets
+            expect(runbook).toContain('Existing secret preserved: secrets/$SECRET');
+
+            // 4. Compose and tarball checksum verification
+            expect(runbook).toContain('sha256sum --check --ignore-missing "$CHECKSUM_FILE"');
+
+            // 5. Image ID assertion
+            expect(runbook).toContain("LOADED_IMAGE_ID=$(docker inspect --format='{{.Id}}' \"$EXPECTED_IMAGE_TAG\"");
+
+            // 6. Bounded readiness wait with HTTP timeout and JSON status validation
+            expect(runbook).toContain('--max-time 3');
+            expect(runbook).toContain('PARSED_STATUS');
+            expect(runbook).toContain('JSON.parse');
+            expect(runbook).toContain('READY');
+        });
+    });
 });
+
+

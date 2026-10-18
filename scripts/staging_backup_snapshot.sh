@@ -84,8 +84,11 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
-echo "[1/4] Dumping database '${DB_NAME}' via single-transaction stream..."
-# Using pipefail to ensure any failure in mysqldump or gzip aborts the process
+MAX_STORAGE_BYTES=$((MAX_STORAGE_MB * 1024 * 1024))
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+echo "[1/4] Dumping database '${DB_NAME}' via single-transaction stream (with active in-flight quota limiter: ${MAX_STORAGE_MB} MB)..."
+# Using pipefail to ensure that if stream_quota_limiter breaches limit, the entire pipeline immediately aborts and triggers cleanup trap
 MYSQL_PWD="${DB_PASS}" mysqldump \
   --host="${DB_HOST}" \
   --port="${DB_PORT}" \
@@ -96,9 +99,9 @@ MYSQL_PWD="${DB_PASS}" mysqldump \
   --triggers \
   --events \
   --hex-blob \
-  "${DB_NAME}" > "$RAW_PIPE"
+  "${DB_NAME}" | node "${SCRIPT_DIR}/lib/stream_quota_limiter.js" "$MAX_STORAGE_BYTES" > "$RAW_PIPE"
 
-# Intermediate quota enforcement during operation: ensure raw dump does not exceed quota
+# Post-dump safety verification: ensure raw dump file exists and adheres to storage quota
 RAW_DUMP_KB=$(du -sk "$RAW_PIPE" 2>/dev/null | awk '{print $1}')
 RAW_DUMP_MB=$((RAW_DUMP_KB / 1024))
 if [ "$RAW_DUMP_MB" -ge "$MAX_STORAGE_MB" ]; then
