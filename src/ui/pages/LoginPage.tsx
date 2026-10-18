@@ -25,9 +25,24 @@ import { setAuthToken, setAuthUser } from '../lib/authStore';
 import { AuthShell, AuthInput, AuthButton } from '../components/auth/AuthShell';
 import { AuthToastContainer, useAuthToast } from '../components/auth/AuthToast';
 
+import { checkServerOnboardingStatus } from '../lib/onboardingDraftStore';
+
 // ─────────────────────────────────────────────────────────────────────────────
 
-function getRedirectPath(search: string, fallback?: string): string | null {
+export const PRINTHOUSE_ROLES: ReadonlySet<string> = new Set([
+    'PRINTHOUSE_ADMIN',
+    'PRINTHOUSE_OPERATOR',
+    'PRINTHOUSE_USER',
+    'printhouse_admin',
+    'printhouse_operator',
+    'printhouse_user'
+]);
+
+export function isPrinthouseRole(role: any): boolean {
+    return typeof role === 'string' && PRINTHOUSE_ROLES.has(role.trim());
+}
+
+export function getRedirectPath(search: string, fallback?: string): string | null {
     const params = new URLSearchParams(search);
     const redirect = params.get('redirect');
     if (!redirect) return fallback || null;
@@ -39,19 +54,32 @@ function getRedirectPath(search: string, fallback?: string): string | null {
     return fallback || null;
 }
 
-function resolveUserDestination(user: any, explicitRedirect: string | null): string {
+export async function resolveUserDestination(user: any, explicitRedirect: string | null, token?: string): Promise<string> {
     if (explicitRedirect && explicitRedirect !== '/dashboard') {
         return explicitRedirect;
     }
-    // Printhouse user roles: if onboarding is not completed or new account, route to guided onboarding
-    const role = user?.role || user?.declaredBy;
-    if (role === 'PRINTHOUSE_OPERATOR' || role === 'PRINTHOUSE_USER' || role === 'printhouse_operator') {
-        const isCompleted = Boolean(user?.onboardingCompleted || user?.isActivated);
-        if (!isCompleted) {
+
+    const role = (user?.role || user?.declaredBy || '').toString().trim();
+
+    // Printhouse user roles: PRINTHOUSE_ADMIN, PRINTHOUSE_OPERATOR, PRINTHOUSE_USER
+    if (isPrinthouseRole(role)) {
+        // Query authoritative server readiness. Never infer onboarding completion from isActivated.
+        // If query fails or returns incomplete, strictly route to Guided Onboarding.
+        if (token) {
+            const isCompletedOnServer = await checkServerOnboardingStatus(token);
+            if (isCompletedOnServer) {
+                return '/printhouse/setup';
+            }
             return '/printhouse/onboarding-guided';
         }
-        return '/printhouse/setup';
+
+        // Fallback if token not provided synchronously: check explicit boolean on user record if server provided it
+        if (user?.onboardingCompleted === true) {
+            return '/printhouse/setup';
+        }
+        return '/printhouse/onboarding-guided';
     }
+
     // Platform operators and admins preserve /dashboard
     return explicitRedirect || '/dashboard';
 }
@@ -136,7 +164,7 @@ export const LoginPage: React.FC = () => {
             setAuthToken(data.token);
             setAuthUser(data.user);
 
-            const destination = resolveUserDestination(data.user, redirectTo);
+            const destination = await resolveUserDestination(data.user, redirectTo, data.token);
             addToast('success', 'Access authorized!', 'Redirecting to control panel…');
             setTimeout(() => navigate(destination, { replace: true }), 800);
         } catch (err: any) {
@@ -190,7 +218,7 @@ export const LoginPage: React.FC = () => {
             setAuthToken(data.token);
             setAuthUser(data.user);
 
-            const destination = resolveUserDestination(data.user, redirectTo);
+            const destination = await resolveUserDestination(data.user, redirectTo, data.token);
             addToast('success', 'Access authorized!', 'Two-factor verified. Redirecting…');
             setTimeout(() => navigate(destination, { replace: true }), 800);
 

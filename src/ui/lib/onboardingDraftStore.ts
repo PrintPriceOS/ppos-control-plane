@@ -265,3 +265,120 @@ export function clearGuidedOnboardingDraft(tenantId: string): void {
     }
 }
 
+/**
+ * Derives the canonical stage from server-side truth (readiness report).
+ * Server truth ALWAYS supersedes local navigation or draft caches:
+ * 1. Account Setup incomplete -> COMPANY (Stage A)
+ * 2. Operational / Machinery incomplete -> PRODUCTS or PRICING
+ * 3. Pricing incomplete -> PRICING (Stage C)
+ * 4. All modules complete and ready for review -> REVIEW (Stage D)
+ */
+export function deriveServerStage(serverReadiness: any, draftStage?: GuidedStage): GuidedStage {
+    if (!serverReadiness) {
+        return draftStage || 'WELCOME';
+    }
+
+    const accountSetup = serverReadiness.accountSetup;
+    const opsReadiness = serverReadiness.operationalConfiguration || serverReadiness.operationalReadiness;
+    const pricingReadiness = serverReadiness.pricingReadiness;
+
+    const isAccountComplete = accountSetup?.status === 'COMPLETE';
+    if (!isAccountComplete) {
+        // If not even company name or country is set, and user is in WELCOME, keep WELCOME until started
+        if (draftStage === 'WELCOME' && (!accountSetup?.completedRequirements || accountSetup.completedRequirements === 0)) {
+            return 'WELCOME';
+        }
+        return 'COMPANY';
+    }
+
+    // Account setup is complete. Next verify operational & pricing
+    const isOpsComplete = opsReadiness?.status === 'COMPLETE';
+    const isPricingComplete = pricingReadiness?.status === 'COMPLETE';
+
+    if (isAccountComplete && isOpsComplete && isPricingComplete) {
+        return 'REVIEW';
+    }
+
+    if (isAccountComplete && !isPricingComplete) {
+        // If draft is on PRODUCTS, allow reviewing products before jumping to pricing
+        if (draftStage === 'PRODUCTS') {
+            return 'PRODUCTS';
+        }
+        return 'PRICING';
+    }
+
+    return draftStage || 'COMPANY';
+}
+
+/**
+ * Checks if the printhouse has genuinely completed the onboarding process
+ * based strictly on authoritative server-side facts.
+ * Never defaults to true on errors or missing data.
+ */
+export function isPrinthouseOnboardingFullyComplete(serverReadiness: any): boolean {
+    if (!serverReadiness || typeof serverReadiness !== 'object') {
+        return false;
+    }
+    const accountComplete = serverReadiness.accountSetup?.status === 'COMPLETE';
+    const opsComplete = (serverReadiness.operationalConfiguration?.status === 'COMPLETE' || serverReadiness.operationalReadiness?.status === 'COMPLETE');
+    const pricingComplete = serverReadiness.pricingReadiness?.status === 'COMPLETE';
+    const hasBlockers = (serverReadiness.accountSetup?.blockingIssues?.length > 0) ||
+        (serverReadiness.operationalConfiguration?.blockingIssues?.length > 0) ||
+        (serverReadiness.pricingReadiness?.blockingIssues?.length > 0);
+
+    return Boolean(accountComplete && opsComplete && pricingComplete && !hasBlockers);
+}
+
+/**
+ * Asynchronously queries the server to determine whether the authenticated tenant
+ * has genuinely completed onboarding.
+ * Strict fail-closed: on network error, non-200, or missing token, returns false.
+ */
+export async function checkServerOnboardingStatus(token: string): Promise<boolean> {
+    if (!token || typeof token !== 'string') {
+        return false;
+    }
+    try {
+        const res = await fetch('/api/printhouse/onboarding', {
+            headers: { 'Authorization': `Bearer ${token.trim()}` }
+        });
+        if (!res.ok) {
+            return false;
+        }
+        const json = await res.json();
+        if (!json || !json.ok || !json.data?.readiness) {
+            return false;
+        }
+        return isPrinthouseOnboardingFullyComplete(json.data.readiness);
+    } catch (e) {
+        // Network or server error: fail-safe to onboarding not declared complete
+        return false;
+    }
+}
+
+/**
+ * Reconciles and returns the pending guided stage from authoritative server readiness.
+ * Allows a user logging in from a fresh browser or without local storage to seamlessly
+ * resume exactly where their printhouse setup left off.
+ */
+export async function resumePendingGuidedStage(token: string, tenantId: string): Promise<GuidedStage> {
+    const localDraft = loadGuidedOnboardingDraft(tenantId);
+    if (!token || typeof token !== 'string') {
+        return localDraft.currentStage || 'WELCOME';
+    }
+    try {
+        const res = await fetch('/api/printhouse/onboarding', {
+            headers: { 'Authorization': `Bearer ${token.trim()}` }
+        });
+        if (!res.ok) {
+            return localDraft.currentStage || 'WELCOME';
+        }
+        const json = await res.json();
+        if (!json || !json.ok || !json.data?.readiness) {
+            return localDraft.currentStage || 'WELCOME';
+        }
+        return deriveServerStage(json.data.readiness, localDraft.currentStage);
+    } catch (e) {
+        return localDraft.currentStage || 'WELCOME';
+    }
+}
