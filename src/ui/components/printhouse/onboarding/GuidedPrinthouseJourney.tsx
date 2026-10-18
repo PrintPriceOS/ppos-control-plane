@@ -32,10 +32,12 @@ import {
     GuidedOnboardingDraft, 
     FamilyPricingSessionDraft,
     PricingMethodChoice,
+    StageDerivationContext,
     loadGuidedOnboardingDraft, 
     saveGuidedOnboardingDraft,
     clearGuidedOnboardingDraft,
-    createDefaultDraft
+    createDefaultDraft,
+    deriveServerStage
 } from '../../../lib/onboardingDraftStore';
 import { ProductFamilyId, FamilyState } from '../../../types/printhouseOnboardingTypes';
 import { normalizeUiError } from '../../../utils/errorUtils';
@@ -100,10 +102,14 @@ export const GuidedPrinthouseJourney: React.FC<GuidedPrinthouseJourneyProps> = (
     const activeTenantRef = useRef<string>(tenantId);
     activeTenantRef.current = tenantId;
     const prevTenantRef = useRef<string>(tenantId);
+    // Track whether initial mount stage reconciliation has executed
+    const hasReconciledStageRef = useRef<boolean>(false);
+    // Track if user explicitly navigated stages during the session
+    const hasUserNavigatedRef = useRef<boolean>(false);
 
     // Initial server fetch on mount
     useEffect(() => {
-        fetchServerState(tenantId);
+        fetchServerState(tenantId, true);
     }, []);
 
     // Reset all internal state and reload draft whenever the authenticated tenant changes
@@ -121,10 +127,12 @@ export const GuidedPrinthouseJourney: React.FC<GuidedPrinthouseJourneyProps> = (
             WIRE_O: { id: 'WIRE_O', titleKey: 'family.wireO.title', descKey: 'family.wireO.desc', status: 'PENDING', quoteCount: 0 },
             SADDLE_STITCH: { id: 'SADDLE_STITCH', titleKey: 'family.saddleStitch.title', descKey: 'family.saddleStitch.desc', status: 'PENDING', quoteCount: 0 }
         });
+        hasReconciledStageRef.current = false;
+        hasUserNavigatedRef.current = false;
         const freshDraft = loadGuidedOnboardingDraft(tenantId);
         setDraft(freshDraft);
         setStorageStatus('saved');
-        fetchServerState(tenantId);
+        fetchServerState(tenantId, true);
     }, [tenantId]);
 
     // ── 4 Families State ──
@@ -176,7 +184,7 @@ export const GuidedPrinthouseJourney: React.FC<GuidedPrinthouseJourneyProps> = (
     }, [persistDraft]);
 
     // Fetch live onboarding data from server and reconcile with draft
-    const fetchServerState = async (targetTenantId = tenantId) => {
+    const fetchServerState = async (targetTenantId = tenantId, isMountReconcile = false) => {
         if (!targetTenantId) {
             setLoadingData(false);
             return;
@@ -300,9 +308,54 @@ export const GuidedPrinthouseJourney: React.FC<GuidedPrinthouseJourneyProps> = (
                         }
                     };
 
-                    const updated: GuidedOnboardingDraft = {
+                    const updatedCompanyDraft = {
                         ...prev,
                         company: reconciledCompany
+                    };
+
+                    // Runtime Reconciliation of First Pending Guided Stage:
+                    // Only reconcile stage on initial mount when user hasn't explicitly navigated,
+                    // or if current stage is unstarted/out-of-sync with authoritative server facts.
+                    const hasPricingContinuity = Boolean(
+                        prev.pricingContinuity && 
+                        Object.values(prev.pricingContinuity).some((p: any) => p && (p.sessionId || p.offer || p.uploadedFileName || p.pricingMethod))
+                    );
+
+                    const derivationCtx: StageDerivationContext = {
+                        draftStage: prev.currentStage,
+                        completedStages: prev.completedStages,
+                        enabledFamilies: prev.enabledFamilies,
+                        hasPricingContinuity
+                    };
+
+                    const serverDerivedStage = deriveServerStage(data.data?.readiness, derivationCtx);
+
+                    const isAccountComplete = data.data?.readiness?.accountSetup?.status === 'COMPLETE';
+                    let reconciledStage = prev.currentStage;
+                    // If this is initial mount or resuming a pending session, and user has not manually navigated:
+                    if (isMountReconcile && !hasUserNavigatedRef.current && !hasReconciledStageRef.current) {
+                        hasReconciledStageRef.current = true;
+                        if (prev.currentStage === 'WELCOME') {
+                            // Keep WELCOME screen so novel/returning users see welcoming overview
+                            reconciledStage = 'WELCOME';
+                        } else if (prev.currentStage === 'COMPANY') {
+                            // If user was on COMPANY, but server shows accountSetup is COMPLETE, advance to first pending stage
+                            reconciledStage = serverDerivedStage;
+                        } else if (prev.currentStage === 'PRODUCTS' && prev.completedStages?.PRODUCTS) {
+                            // If user completed PRODUCTS, advance to first pending stage (PRICING)
+                            reconciledStage = serverDerivedStage;
+                        } else if (!isAccountComplete) {
+                            // If draft says PRODUCTS/PRICING/REVIEW but server says account setup is incomplete, pull back to COMPANY
+                            reconciledStage = 'COMPANY';
+                        } else {
+                            // User already has an in-progress stage (PRODUCTS, PRICING, or REVIEW) with complete accountSetup
+                            reconciledStage = prev.currentStage;
+                        }
+                    }
+
+                    const updated: GuidedOnboardingDraft = {
+                        ...updatedCompanyDraft,
+                        currentStage: reconciledStage
                     };
                     persistDraft(updated);
                     return updated;
@@ -383,6 +436,7 @@ export const GuidedPrinthouseJourney: React.FC<GuidedPrinthouseJourneyProps> = (
 
     // Stage Navigation
     const setStage = (stage: GuidedStage) => {
+        hasUserNavigatedRef.current = true;
         updateDraft(prev => ({
             ...prev,
             currentStage: stage
@@ -818,7 +872,7 @@ export const GuidedPrinthouseJourney: React.FC<GuidedPrinthouseJourneyProps> = (
                                 className="px-8 py-3.5 bg-[#dc0000] hover:bg-[#b50000] text-white text-sm font-black rounded-2xl shadow-xs hover:shadow-md transition-all inline-flex items-center gap-2.5 cursor-pointer"
                             >
                                 <span>
-                                    {draft.completedStages.COMPANY 
+                                    {draft.completedStages.COMPANY || serverData?.readiness?.accountSetup?.status === 'COMPLETE'
                                         ? (t('guided.welcome.ctaContinue') || 'Continuar configuración') 
                                         : (t('guided.welcome.ctaStart') || 'Comenzar configuración')}
                                 </span>
@@ -867,7 +921,16 @@ export const GuidedPrinthouseJourney: React.FC<GuidedPrinthouseJourneyProps> = (
                         selectedFamilyId={draft.selectedFamilyId}
                         onToggleFamily={handleToggleFamily}
                         onSelectActiveFamily={handleSelectActiveFamily}
-                        onContinueToPricing={() => setStage('PRICING')}
+                        onContinueToPricing={() => {
+                            updateDraft(prev => ({
+                                ...prev,
+                                completedStages: {
+                                    ...prev.completedStages,
+                                    PRODUCTS: true
+                                },
+                                currentStage: 'PRICING'
+                            }));
+                        }}
                         onBackToCompany={() => setStage('COMPANY')}
                         onOpenFullSetup={() => onOpenFullSetup('CAPABILITIES')}
                     />
@@ -1181,7 +1244,16 @@ export const GuidedPrinthouseJourney: React.FC<GuidedPrinthouseJourneyProps> = (
                                     targetFamilyId={effectiveActiveFamilyId}
                                     initialPricingDrafts={draft.pricingContinuity}
                                     onPricingContinuityChange={handlePricingContinuityChange}
-                                    onCompleted={() => setStage('REVIEW')}
+                                    onCompleted={() => {
+                                        updateDraft(prev => ({
+                                            ...prev,
+                                            completedStages: {
+                                                ...prev.completedStages,
+                                                PRICING: true
+                                            },
+                                            currentStage: 'REVIEW'
+                                        }));
+                                    }}
                                     onOpenAdvanced={() => onOpenFullSetup('PRICING')}
                                     onFamiliesStateChange={handleFamiliesStateChange}
                                 />
@@ -1232,7 +1304,16 @@ export const GuidedPrinthouseJourney: React.FC<GuidedPrinthouseJourneyProps> = (
                                         </button>
                                         <button
                                             type="button"
-                                            onClick={() => setStage('REVIEW')}
+                                            onClick={() => {
+                                                updateDraft(prev => ({
+                                                    ...prev,
+                                                    completedStages: {
+                                                        ...prev.completedStages,
+                                                        PRICING: true
+                                                    },
+                                                    currentStage: 'REVIEW'
+                                                }));
+                                            }}
                                             className="px-6 py-2.5 rounded-xl bg-[#dc0000] hover:bg-[#b50000] text-white text-xs font-bold transition-all shadow-xs flex items-center gap-2 cursor-pointer"
                                         >
                                             <span>Guardar plantilla y continuar</span>
@@ -1263,7 +1344,14 @@ export const GuidedPrinthouseJourney: React.FC<GuidedPrinthouseJourneyProps> = (
                                         mode="ONBOARDING"
                                         initialNodeData={printerNodeId ? { id: printerNodeId, name: printerNodeName } : undefined}
                                         onSave={async () => {
-                                            setStage('REVIEW');
+                                            updateDraft(prev => ({
+                                                ...prev,
+                                                completedStages: {
+                                                    ...prev.completedStages,
+                                                    PRICING: true
+                                                },
+                                                currentStage: 'REVIEW'
+                                            }));
                                         }}
                                     />
                                 </div>

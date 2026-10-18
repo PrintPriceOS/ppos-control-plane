@@ -207,6 +207,58 @@ describe('User Destination & Onboarding Authority Regression Suite', () => {
             });
 
             const resumedStage = await resumePendingGuidedStage('jwt-token-123', tenantId);
+            // Requirement 2: Do NOT skip straight to PRICING exclusively based on machinery or operational readiness.
+            // With products unconfirmed and no pricing continuity, the first pending stage is PRODUCTS.
+            expect(resumedStage).toBe('PRODUCTS');
+        });
+
+        it('derives PRICING stage when products are confirmed and pricing is incomplete', async () => {
+            const tenantId = 'tenant-products-confirmed-pricing-pending';
+            // Save draft where Stage B (PRODUCTS) was confirmed
+            saveGuidedOnboardingDraft({
+                schemaVersion: 2,
+                tenantId,
+                currentStage: 'PRODUCTS',
+                selectedFamilyId: 'HARDCOVER',
+                enabledFamilies: { HARDCOVER: true, SOFTCOVER: true, WIRE_O: false, SADDLE_STITCH: false },
+                company: {
+                    legalName: 'Imprenta Test S.L.',
+                    tradingName: 'Test Print',
+                    country: 'ES',
+                    city: 'Madrid',
+                    address: '',
+                    postalCode: '',
+                    phone: '',
+                    website: '',
+                    contactName: '',
+                    taxId: '',
+                    siteName: 'Sede Central',
+                    siteTimezone: 'Europe/Madrid',
+                    primarySiteId: 'site-1',
+                    userEditedFields: [],
+                    acknowledgedServerValues: {}
+                },
+                offerDrafts: {},
+                pricingContinuity: {},
+                lastSavedTimestamp: Date.now(),
+                completedStages: { WELCOME: true, COMPANY: true, PRODUCTS: true, PRICING: false, REVIEW: false }
+            });
+
+            global.fetch = vi.fn().mockResolvedValue({
+                ok: true,
+                json: () => Promise.resolve({
+                    ok: true,
+                    data: {
+                        readiness: {
+                            accountSetup: { status: 'COMPLETE', blockingIssues: [] },
+                            operationalConfiguration: { status: 'COMPLETE', blockingIssues: [] },
+                            pricingReadiness: { status: 'NOT_STARTED', blockingIssues: ['MISSING_PRICING'] }
+                        }
+                    }
+                })
+            });
+
+            const resumedStage = await resumePendingGuidedStage('jwt-token-123', tenantId);
             expect(resumedStage).toBe('PRICING');
         });
 

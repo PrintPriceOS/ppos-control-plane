@@ -265,15 +265,32 @@ export function clearGuidedOnboardingDraft(tenantId: string): void {
     }
 }
 
+export interface StageDerivationContext {
+    draftStage?: GuidedStage;
+    completedStages?: Partial<Record<GuidedStage, boolean>>;
+    enabledFamilies?: Partial<Record<ProductFamilyId, boolean>>;
+    hasPricingContinuity?: boolean;
+}
+
 /**
  * Derives the canonical stage from server-side truth (readiness report).
  * Server truth ALWAYS supersedes local navigation or draft caches:
  * 1. Account Setup incomplete -> COMPANY (Stage A)
- * 2. Operational / Machinery incomplete -> PRODUCTS or PRICING
- * 3. Pricing incomplete -> PRICING (Stage C)
+ * 2. Account Setup complete, but products pending / unconfirmed -> PRODUCTS (Stage B)
+ *    (Never jumps to PRICING exclusively based on machine readiness or operational readiness)
+ * 3. Products confirmed and pricing incomplete -> PRICING (Stage C)
  * 4. All modules complete and ready for review -> REVIEW (Stage D)
  */
-export function deriveServerStage(serverReadiness: any, draftStage?: GuidedStage): GuidedStage {
+export function deriveServerStage(
+    serverReadiness: any, 
+    contextOrStage?: GuidedStage | StageDerivationContext
+): GuidedStage {
+    const context: StageDerivationContext = typeof contextOrStage === 'string'
+        ? { draftStage: contextOrStage }
+        : (contextOrStage || {});
+
+    const draftStage = context.draftStage;
+
     if (!serverReadiness) {
         return draftStage || 'WELCOME';
     }
@@ -295,19 +312,40 @@ export function deriveServerStage(serverReadiness: any, draftStage?: GuidedStage
     const isOpsComplete = opsReadiness?.status === 'COMPLETE';
     const isPricingComplete = pricingReadiness?.status === 'COMPLETE';
 
+    const hasProductsCompleted = Boolean(context.completedStages?.PRODUCTS);
+    const hasPricingCompleted = Boolean(context.completedStages?.PRICING);
+    const hasActivePricing = Boolean(context.hasPricingContinuity);
+
+    // If draftStage is already on an in-progress stage, keep it unless prerequisites fail.
+    // e.g. If user is in PRODUCTS (and PRODUCTS is not completed), stay in PRODUCTS.
+    if (draftStage === 'PRODUCTS' && !hasProductsCompleted) {
+        return 'PRODUCTS';
+    }
+
+    // e.g. If user is in PRICING (and PRICING is not completed), stay in PRICING.
+    if (draftStage === 'PRICING' && !hasPricingCompleted) {
+        return 'PRICING';
+    }
+
+    // If all modules are complete on server (account, operational/machinery, and pricing),
+    // and no blockers exist, the printhouse is ready for Stage D (REVIEW)
     if (isAccountComplete && isOpsComplete && isPricingComplete) {
         return 'REVIEW';
     }
 
-    if (isAccountComplete && !isPricingComplete) {
-        // If draft is on PRODUCTS, allow reviewing products before jumping to pricing
-        if (draftStage === 'PRODUCTS') {
-            return 'PRODUCTS';
+    // Account setup is complete, but pricing is not.
+    // Invariant: Do NOT deduce Stage B completion exclusively from machinery or operational readiness.
+    // Explicit confirmation of products or presence of active pricing continuity is required to advance to PRICING.
+    const isExplicitlyOnPricingOrReview = draftStage === 'PRICING' || draftStage === 'REVIEW';
+
+    // If products were explicitly confirmed or there is active pricing continuity, user is ready for PRICING
+    if (hasProductsCompleted || hasActivePricing || isExplicitlyOnPricingOrReview) {
+        if (isAccountComplete && !isPricingComplete) {
+            return 'PRICING';
         }
-        return 'PRICING';
     }
 
-    return draftStage || 'COMPANY';
+    return 'PRODUCTS';
 }
 
 /**
@@ -363,6 +401,18 @@ export async function checkServerOnboardingStatus(token: string): Promise<boolea
  */
 export async function resumePendingGuidedStage(token: string, tenantId: string): Promise<GuidedStage> {
     const localDraft = loadGuidedOnboardingDraft(tenantId);
+    const hasPricingContinuity = Boolean(
+        localDraft.pricingContinuity && 
+        Object.values(localDraft.pricingContinuity).some((p: any) => p && (p.sessionId || p.offer || p.uploadedFileName || p.pricingMethod))
+    );
+
+    const derivationContext: StageDerivationContext = {
+        draftStage: localDraft.currentStage,
+        completedStages: localDraft.completedStages,
+        enabledFamilies: localDraft.enabledFamilies,
+        hasPricingContinuity
+    };
+
     if (!token || typeof token !== 'string') {
         return localDraft.currentStage || 'WELCOME';
     }
@@ -377,7 +427,7 @@ export async function resumePendingGuidedStage(token: string, tenantId: string):
         if (!json || !json.ok || !json.data?.readiness) {
             return localDraft.currentStage || 'WELCOME';
         }
-        return deriveServerStage(json.data.readiness, localDraft.currentStage);
+        return deriveServerStage(json.data.readiness, derivationContext);
     } catch (e) {
         return localDraft.currentStage || 'WELCOME';
     }
