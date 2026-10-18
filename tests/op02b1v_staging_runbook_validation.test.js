@@ -351,24 +351,32 @@ describe('OP-02B.1V: Staging Runbook, Configuration Contracts & Secret Resolutio
             expect(composeContent).toContain("OUTGOING_WEBHOOK_SINK_URL: 'http://127.0.0.1:9999/sink'");
         });
 
-        it('behavioral test: outgoingWebhookService intercepts dispatch under WEBHOOK_DISPATCH_MOCK_ONLY with zero external network traffic', async () => {
+        it('behavioral test: outgoingWebhookService intercepts dispatch under WEBHOOK_DISPATCH_MOCK_ONLY with zero external network traffic (instrumenting http, https, and axios)', async () => {
             const outgoingWebhookService = require('../src/api/services/outgoingWebhookService');
             const mysql = require('../src/api/services/mysqlClient');
+            const http = require('http');
+            const https = require('https');
+            const axios = require('axios');
             const vi = (await import('vitest')).vi;
 
             process.env.WEBHOOK_DISPATCH_MOCK_ONLY = 'true';
             process.env.OUTGOING_WEBHOOK_SINK_URL = 'http://127.0.0.1:9999/sink';
 
-            let externalHttpCalled = false;
-            // Spy on http/https request to prove zero external network calls are attempted
-            const http = require('http');
-            const originalHttpRequest = http.request;
-            const httpSpy = vi.spyOn(http, 'request').mockImplementation((...args) => {
-                externalHttpCalled = true;
-                throw new Error('EXTERNAL_NETWORK_CALL_FORBIDDEN');
+            let externalNetworkCallAttempted = false;
+            const httpSpy = vi.spyOn(http, 'request').mockImplementation(() => {
+                externalNetworkCallAttempted = true;
+                throw new Error('EXTERNAL_HTTP_FORBIDDEN');
+            });
+            const httpsSpy = vi.spyOn(https, 'request').mockImplementation(() => {
+                externalNetworkCallAttempted = true;
+                throw new Error('EXTERNAL_HTTPS_FORBIDDEN');
+            });
+            const axiosPostSpy = vi.spyOn(axios, 'post').mockImplementation(() => {
+                externalNetworkCallAttempted = true;
+                throw new Error('EXTERNAL_AXIOS_FORBIDDEN');
             });
 
-            // Mock DB delivery row
+            // Mock DB delivery row pointing to HTTPS production destination
             vi.spyOn(mysql, 'query').mockImplementation(async (sql, params) => {
                 if (sql.includes('FROM webhook_deliveries')) {
                     return [{
@@ -398,9 +406,11 @@ describe('OP-02B.1V: Staging Runbook, Configuration Contracts & Secret Resolutio
             expect(result.status).toBe('DELIVERED');
             expect(result.mocked).toBe(true);
             expect(result.statusCode).toBe(200);
-            expect(externalHttpCalled).toBe(false);
+            expect(externalNetworkCallAttempted).toBe(false);
 
             httpSpy.mockRestore();
+            httpsSpy.mockRestore();
+            axiosPostSpy.mockRestore();
         });
 
         it('behavioral test: provider connectivity service blocks live provider execution under staging invariants', async () => {
@@ -447,36 +457,117 @@ describe('OP-02B.1V: Staging Runbook, Configuration Contracts & Secret Resolutio
             expect(executedMock.response_payload_json.message).toContain('No external API was called');
         });
 
-        it('behavioral test: commercial pilot activation service strictly enforces payment_execution_disabled', async () => {
-            const ControlledBetaInviteIssuanceService = require('../src/api/services/controlledBetaInviteIssuanceService');
-            const service = new ControlledBetaInviteIssuanceService();
+        it('behavioral test: financial operations security guardrail strictly blocks live payment and provider execution', async () => {
+            const FinancialOperationsSecurityGuardrailService = require('../src/api/services/financialOperationsSecurityGuardrailService');
+            const guardrailService = new FinancialOperationsSecurityGuardrailService();
+            const actor = { role: 'SYSTEM_ADMIN', userId: 'sec_admin' };
 
-            // When payment_execution_enabled is true, invite readiness evaluation must report PAYMENT_EXECUTION_ENABLED blocker
-            service._mockState.gates.set('gate_live_payment', {
-                issuance_gate_id: 'gate_live_payment',
-                payment_execution_enabled: 1,
-                manual_approval_required: 1,
-                max_invites_allowed: 10,
-                max_invites_to_issue: 5
+            // When livePaymentEnabled is true, guardrail evaluation must return BLOCKED with explicit blocker
+            const blockedResult = await guardrailService.evaluateGuardrails({
+                config: {
+                    fullPublicEnabled: false,
+                    livePaymentEnabled: true, // Attempt live payment
+                    liveRefundEnabled: false,
+                    livePayoutEnabled: false,
+                    externalInvoiceEnabled: false,
+                    taxFilingEnabled: false,
+                    mockProviderLocalOnly: true,
+                    sandboxModeEnforced: true,
+                    dryRunModeEnforced: true,
+                    manualApprovalGatesPresent: true,
+                    auditLoggingEnabled: true
+                },
+                actor
             });
 
-            const blockedResult = await service.evaluateInviteIssuanceReadiness('gate_live_payment');
-            expect(blockedResult.readiness_status).toBe('BLOCKED');
-            expect(blockedResult.blocked_reasons).toContain('PAYMENT_EXECUTION_ENABLED');
-            expect(blockedResult.checks.payment_execution_disabled).toBe(false);
+            expect(blockedResult.status).toBe('BLOCKED');
+            expect(blockedResult.blockers).toContain('Live payment execution enabled');
 
-            // When payment_execution_enabled is 0/false (staging invariant), payment_execution_disabled check passes
-            service._mockState.gates.set('gate_safe_staging', {
-                issuance_gate_id: 'gate_safe_staging',
-                payment_execution_enabled: 0,
-                manual_approval_required: 1,
-                max_invites_allowed: 10,
-                max_invites_to_issue: 5
+            // When livePaymentEnabled is false (staging invariant), guardrails pass
+            const safeResult = await guardrailService.evaluateGuardrails({
+                config: {
+                    fullPublicEnabled: false,
+                    livePaymentEnabled: false, // Staging invariant
+                    liveRefundEnabled: false,
+                    livePayoutEnabled: false,
+                    externalInvoiceEnabled: false,
+                    taxFilingEnabled: false,
+                    mockProviderLocalOnly: true,
+                    sandboxModeEnforced: true,
+                    dryRunModeEnforced: true,
+                    manualApprovalGatesPresent: true,
+                    auditLoggingEnabled: true,
+                    partnerAccessScoped: true,
+                    tenantAccessScoped: true
+                },
+                actor
             });
 
-            const safeResult = await service.evaluateInviteIssuanceReadiness('gate_safe_staging');
-            expect(safeResult.blocked_reasons).not.toContain('PAYMENT_EXECUTION_ENABLED');
-            expect(safeResult.checks.payment_execution_disabled).toBe(true);
+            expect(safeResult.status).toBe('PASS');
+            expect(safeResult.blockers).toHaveLength(0);
+        });
+
+        it('behavioral test: financial operations review service strictly blocks on live payment or live provider connectivity', async () => {
+            const FinancialOperationsProductionActivationReviewService = require('../src/api/services/financialOperationsProductionActivationReviewService');
+            const reviewService = new FinancialOperationsProductionActivationReviewService();
+            const actor = { role: 'SYSTEM_ADMIN', userId: 'fin_admin' };
+
+            // Live payment enabled -> must be BLOCKED_BY_SECURITY
+            const blockedReview = await reviewService.aggregateReview({
+                sourceData: {
+                    readinessValidated: true,
+                    releaseGatesValidated: true,
+                    pilotModeValidated: true,
+                    partnerSandboxValidated: true,
+                    productionHardeningValidated: true,
+                    fullPublicEnabled: false,
+                    productionActivationEnabled: false,
+                    liveProviderConnectivityEnabled: false,
+                    livePaymentEnabled: true, // VIOLATION
+                    liveRefundEnabled: false,
+                    livePayoutEnabled: false,
+                    externalInvoiceEnabled: false,
+                    taxFilingEnabled: false,
+                    mutationDisabled: true,
+                    auditTimelineComplete: true,
+                    rollbackPathDocumented: true,
+                    incidentResponseReady: true,
+                    observabilityReady: true,
+                    manualApprovalsPresent: true
+                },
+                actor
+            });
+
+            expect(blockedReview.security_status).toBe('BLOCKED');
+            expect(blockedReview.blockers).toContain('BLOCKED_BY_SECURITY');
+
+            // Staging invariant: livePaymentEnabled=false, liveProviderConnectivityEnabled=false -> PASS
+            const safeReview = await reviewService.aggregateReview({
+                sourceData: {
+                    readinessValidated: true,
+                    releaseGatesValidated: true,
+                    pilotModeValidated: true,
+                    partnerSandboxValidated: true,
+                    productionHardeningValidated: true,
+                    fullPublicEnabled: false,
+                    productionActivationEnabled: false,
+                    liveProviderConnectivityEnabled: false, // STAGING
+                    livePaymentEnabled: false,             // STAGING
+                    liveRefundEnabled: false,
+                    livePayoutEnabled: false,
+                    externalInvoiceEnabled: false,
+                    taxFilingEnabled: false,
+                    mutationDisabled: true,
+                    auditTimelineComplete: true,
+                    rollbackPathDocumented: true,
+                    incidentResponseReady: true,
+                    observabilityReady: true,
+                    manualApprovalsPresent: true
+                },
+                actor
+            });
+
+            expect(safeReview.security_status).toBe('PASS');
         });
     });
 
