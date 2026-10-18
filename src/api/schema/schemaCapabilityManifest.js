@@ -21,7 +21,7 @@ module.exports = {
       required: true,
       tables: {
         preflight_jobs: {
-          columns: ['id', 'tenant_id', 'status', 'original_name']
+          columns: ['id', 'tenant_id', 'status']
         }
       }
     }
