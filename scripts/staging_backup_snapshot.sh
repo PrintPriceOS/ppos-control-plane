@@ -98,9 +98,24 @@ MYSQL_PWD="${DB_PASS}" mysqldump \
   --hex-blob \
   "${DB_NAME}" > "$RAW_PIPE"
 
+# Intermediate quota enforcement during operation: ensure raw dump does not exceed quota
+RAW_DUMP_KB=$(du -sk "$RAW_PIPE" 2>/dev/null | awk '{print $1}')
+RAW_DUMP_MB=$((RAW_DUMP_KB / 1024))
+if [ "$RAW_DUMP_MB" -ge "$MAX_STORAGE_MB" ]; then
+  echo "[FATAL] In-flight quota exceeded: Raw database dump size (${RAW_DUMP_MB} MB) exceeds maximum allowed storage limit (${MAX_STORAGE_MB} MB). Terminating backup." >&2
+  exit 1
+fi
+
 echo "[2/4] Compressing snapshot..."
 gzip -9 -c "$RAW_PIPE" > "${TMP_DIR}/dump.sql.gz"
 rm -f "$RAW_PIPE"
+
+GZ_KB=$(du -sk "${TMP_DIR}/dump.sql.gz" 2>/dev/null | awk '{print $1}')
+GZ_MB=$((GZ_KB / 1024))
+if [ "$GZ_MB" -ge "$MAX_STORAGE_MB" ]; then
+  echo "[FATAL] In-flight quota exceeded: Compressed database snapshot (${GZ_MB} MB) exceeds maximum allowed storage limit (${MAX_STORAGE_MB} MB). Terminating backup." >&2
+  exit 1
+fi
 
 echo "[3/4] Encrypting archive with OpenSSL AES-256-CBC (PBKDF2, 100,000 iterations)..."
 # Passphrase provided securely via stdin/env to openssl
@@ -154,10 +169,12 @@ if [ "$TOTAL_SNAPSHOTS" -gt "$MAX_SNAPSHOTS" ]; then
   done
 fi
 
-# Quota verification
+# Quota verification: Hard rejection if backup directory usage exceeds configured quota
 CURRENT_DIR_KB=$(du -sk "$BACKUP_DIR" 2>/dev/null | awk '{print $1}')
 CURRENT_DIR_MB=$((CURRENT_DIR_KB / 1024))
 if [ "$CURRENT_DIR_MB" -gt "$MAX_STORAGE_MB" ]; then
-  echo "[WARNING] Backup directory usage (${CURRENT_DIR_MB} MB) exceeds configured limit (${MAX_STORAGE_MB} MB)." >&2
+  echo "[FATAL] Hard quota violated: Backup directory usage (${CURRENT_DIR_MB} MB) exceeds maximum allowed storage (${MAX_STORAGE_MB} MB). Removing newly created snapshot to protect filesystem." >&2
+  rm -f "$FINAL_ENC_ARCHIVE" "$SHA_FILE" "$HMAC_FILE"
+  exit 1
 fi
-echo "✓ Retention enforced: $(ls "${BACKUP_DIR}/${DB_NAME}"_*.sql.gz.enc 2>/dev/null | wc -l) snapshot(s) retained (${CURRENT_DIR_MB} MB total)."
+echo "✓ Retention and storage quota enforced: $(ls "${BACKUP_DIR}/${DB_NAME}"_*.sql.gz.enc 2>/dev/null | wc -l) snapshot(s) retained (${CURRENT_DIR_MB} MB total, within ${MAX_STORAGE_MB} MB limit)."
