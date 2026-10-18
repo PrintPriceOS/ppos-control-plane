@@ -455,7 +455,7 @@ jobs:
         TRIGGER_AUDIT_COUNT=$(MYSQL_PWD="$SANDBOX_ROOT_PW" mysql -h 127.0.0.1 -P 3307 -u root ppos_control_sandbox -N -e "SELECT count(*) FROM synth_audit_log WHERE action_desc LIKE '%tenant-trigger-test-01%';")
         echo "Sandbox trigger audit log count: $TRIGGER_AUDIT_COUNT"
 
-        if [ "$SANDBOX_V_TENANTS" -ne 1 ] || [ "$SANDBOX_FN_RES" != "ACTIVE" ] || [ "$SANDBOX_SP_RES" -ne 1 ] || [ "$TRIGGER_AUDIT_COUNT" -ne 1 ]; then
+        if [ "$SANDBOX_V_TENANTS" -ne 2 ] || [ "$SANDBOX_FN_RES" != "ACTIVE" ] || [ "$SANDBOX_SP_RES" -ne 2 ] || [ "$TRIGGER_AUDIT_COUNT" -ne 1 ]; then
           echo "FATAL: Sandbox synthetic DEFINER SQL objects verification failed!"
           exit 1
         fi
