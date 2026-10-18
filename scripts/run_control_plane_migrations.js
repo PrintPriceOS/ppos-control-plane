@@ -101,6 +101,26 @@ async function run() {
         }
       }
 
+      if (process.env.PPOS_ALLOW_FALSE_APPLIED_140_REPAIR === 'true') {
+        const { repairFalseAppliedMigration140 } = require('../src/api/services/migrationRepairService');
+        const repConn = await mysqlClient.getPool().getConnection();
+        try {
+          await repairFalseAppliedMigration140(repConn);
+        } finally {
+          repConn.release();
+        }
+      }
+
+      if (process.env.PPOS_ALLOW_FAILED_161_RETRY === 'true') {
+        const { repairFailedMigration161 } = require('../src/api/services/migrationRepairService');
+        const repConn = await mysqlClient.getPool().getConnection();
+        try {
+          await repairFailedMigration161(repConn);
+        } finally {
+          repConn.release();
+        }
+      }
+
       const status = await ledgerRead.evaluateLedgerStatus(baseline);
 
       console.log(`=== Dry-Run Ledger Diagnostic ===`);
@@ -302,6 +322,17 @@ async function run() {
       const repairConn = await dbPool.getConnection();
       try {
         await repairFalseAppliedMigration140(repairConn);
+      } finally {
+        repairConn.release();
+      }
+    }
+
+    if (process.env.PPOS_ALLOW_FAILED_161_RETRY === 'true') {
+      console.log(`Executing governed repair for FAILED migration 161...`);
+      const { repairFailedMigration161 } = require('../src/api/services/migrationRepairService');
+      const repairConn = await dbPool.getConnection();
+      try {
+        await repairFailedMigration161(repairConn);
       } finally {
         repairConn.release();
       }

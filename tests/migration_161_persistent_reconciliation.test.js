@@ -340,8 +340,8 @@ describe('OP-01T: Migration 161 Governed Industrial Persistence Suite', () => {
     };
 
     await expect(validateMigration161PostConditions(mockConn)).resolves.toBeUndefined();
-    // 21 tables + 30 columns = 51 checks
-    expect(mockConn.query).toHaveBeenCalledTimes(51);
+    // 21 tables + 30 columns + 7 compatibility table checks + 7 readability checks = 65 checks
+    expect(mockConn.query).toHaveBeenCalledTimes(65);
   });
 
   // 14. OP-02B.2B: Accepts existing DECIMAL(5,2) for printer_nodes.capacity_utilization_pct
@@ -423,6 +423,149 @@ describe('OP-01T: Migration 161 Governed Industrial Persistence Suite', () => {
 
     expect(() => assertColumnCompatibility('printer_nodes', { ...decimalCol, COLUMN_NAME: 'active_jobs' }, activeJobsDef))
       .toThrow("INCOMPATIBLE_COLUMN_DEFINITION: Column 'active_jobs' in table 'printer_nodes' has data type 'decimal', expected 'int'");
+  });
+
+  // 18. OP-02B.2C: compatibilityViewAdapter handles ER_WRONG_OBJECT for legacy BASE TABLE
+  it('18. compatibilityViewAdapter handles ER_WRONG_OBJECT when target is an existing readable BASE TABLE', async () => {
+    const { handleCompatibilityViewError, inspectCompatibilityViewStatement } = require('../src/api/services/compatibilityViewAdapter');
+
+    const sql = 'CREATE OR REPLACE VIEW production_packages AS SELECT * FROM manufacturing_packages;';
+    const inspect = inspectCompatibilityViewStatement(sql);
+    expect(inspect.isCompatView).toBe(true);
+    expect(inspect.viewName).toBe('production_packages');
+
+    const mockConn = {
+      query: vi.fn(async (q, params) => {
+        if (q.includes('INFORMATION_SCHEMA.TABLES')) {
+          expect(params[0]).toBe('production_packages');
+          return [[{ TABLE_TYPE: 'BASE TABLE' }]];
+        }
+        if (q.includes('SELECT 1 FROM `production_packages`')) {
+          return [[{ 1: 1 }]];
+        }
+        return [[]];
+      })
+    };
+
+    const err = new Error("'Control.production_packages' is not VIEW");
+    err.code = 'ER_WRONG_OBJECT';
+    err.errno = 1347;
+
+    const handled = await handleCompatibilityViewError(mockConn, sql, err);
+    expect(handled).toBe(true);
+    expect(mockConn.query).toHaveBeenCalledTimes(2);
+  });
+
+  // 19. OP-02B.2C: compatibilityViewAdapter does not handle unreadable BASE TABLE or unauthorized views
+  it('19. compatibilityViewAdapter does not handle unreadable BASE TABLE or unauthorized views', async () => {
+    const { handleCompatibilityViewError } = require('../src/api/services/compatibilityViewAdapter');
+
+    const mockConn = {
+      query: vi.fn(async (q) => {
+        if (q.includes('INFORMATION_SCHEMA.TABLES')) {
+          return [[{ TABLE_TYPE: 'BASE TABLE' }]];
+        }
+        if (q.includes('SELECT 1 FROM')) {
+          throw new Error('Table corrupted');
+        }
+        return [[]];
+      })
+    };
+
+    const err = new Error('Wrong object');
+    err.code = 'ER_WRONG_OBJECT';
+    err.errno = 1347;
+
+    // Readable check fails
+    const handledCorrupt = await handleCompatibilityViewError(
+      mockConn,
+      'CREATE OR REPLACE VIEW production_packages AS SELECT * FROM manufacturing_packages;',
+      err
+    );
+    expect(handledCorrupt).toBe(false);
+
+    // Non-authorized view name
+    const handledUnknown = await handleCompatibilityViewError(
+      mockConn,
+      'CREATE OR REPLACE VIEW unknown_custom_view AS SELECT * FROM other;',
+      err
+    );
+    expect(handledUnknown).toBe(false);
+  });
+
+  // 20. OP-02B.2C: repairFailedMigration161 requires explicit environment flag
+  it('20. repairFailedMigration161 requires explicit flag and validates preconditions', async () => {
+    const {
+      detectFailedMigration161,
+      repairFailedMigration161
+    } = require('../src/api/services/migrationRepairService');
+
+    const mockRow = {
+      version: '161_phase184g_industrial_persistence_ledger',
+      description: '161_phase184g_industrial_persistence_ledger.sql',
+      checksum: 'f27c3228674648272c9cfe45556df17da707b6aa8556142b39a4768a5f2b1415',
+      state: 'FAILED',
+      failure_code: 'ER_WRONG_OBJECT',
+      failed_statement_index: 44,
+      previous_failures: null,
+      execution_id: 'exec-161-test'
+    };
+
+    const mockConn = {
+      query: vi.fn(async (q) => {
+        if (q.includes('SELECT version, description, checksum, state')) {
+          return [[mockRow]];
+        }
+        if (q.includes('SELECT version, description, checksum, record_type')) {
+          return [[mockRow]];
+        }
+        if (q.includes('UPDATE schema_versions')) {
+          return [{ affectedRows: 1 }];
+        }
+        return [[]];
+      })
+    };
+
+    // Detection
+    const detection = await detectFailedMigration161(mockConn);
+    expect(detection.detected).toBe(true);
+
+    // Fails without flag
+    delete process.env.PPOS_ALLOW_FAILED_161_RETRY;
+    await expect(repairFailedMigration161(mockConn))
+      .rejects
+      .toThrow('GOVERNED_REPAIR_REQUIRED');
+
+    // Succeeds with flag
+    process.env.PPOS_ALLOW_FAILED_161_RETRY = 'true';
+    const result = await repairFailedMigration161(mockConn);
+    expect(result.repaired).toBe(true);
+    expect(result.state).toBe('STARTED');
+    expect(result.auditMarker.action).toBe('FAILED_161_REPAIR_RETRY');
+    expect(result.auditMarker.failure_code).toBe('ER_WRONG_OBJECT');
+    expect(result.auditMarker.failed_statement_index).toBe(44);
+
+    delete process.env.PPOS_ALLOW_FAILED_161_RETRY;
+  });
+
+  // 21. OP-02B.2C: validateMigration161PostConditions asserts legacy compatibility objects exist and are queryable
+  it('21. validateMigration161PostConditions checks all 7 legacy compatibility objects', async () => {
+    const mockConn = {
+      query: vi.fn(async (q) => {
+        if (q.includes('FROM information_schema.tables')) {
+          return [[{ cnt: 1, TABLE_TYPE: 'BASE TABLE' }]];
+        }
+        if (q.includes('FROM information_schema.columns')) {
+          return [[{ cnt: 1 }]];
+        }
+        if (q.startsWith('SELECT 1 FROM')) {
+          return [[{ 1: 1 }]];
+        }
+        return [[]];
+      })
+    };
+
+    await expect(validateMigration161PostConditions(mockConn)).resolves.toBeUndefined();
   });
 });
 

@@ -480,9 +480,37 @@ async function validateMigration161PostConditions(connOrDb) {
     }
   }
 
+  // 3. Verify 7 legacy compatibility objects (production_packages, production_events, etc.)
+  // Each must exist as either a BASE TABLE or a VIEW, and be queryable.
+  const COMPATIBILITY_OBJECTS = [
+    'production_packages',
+    'production_events',
+    'production_notifications',
+    'capacity_reservations',
+    'production_dispatches',
+    'production_offers',
+    'production_offer_events'
+  ];
+
+  for (const obj of COMPATIBILITY_OBJECTS) {
+    const [rows] = await connOrDb.query(
+      `SELECT TABLE_TYPE FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?`,
+      [obj]
+    );
+    if (!rows || rows.length === 0) {
+      throw new Error(`POSTCONDITION FAILED: Legacy compatibility object '${obj}' missing after migration 161.`);
+    }
+
+    try {
+      await connOrDb.query(`SELECT 1 FROM \`${obj}\` LIMIT 1`);
+    } catch (readErr) {
+      throw new Error(`POSTCONDITION FAILED: Legacy compatibility object '${obj}' (${rows[0].TABLE_TYPE}) is unreadable: ${readErr.message}`);
+    }
+  }
+
   logger.info({
     event: 'migration_161_post_validation_complete',
-    message: 'Post-conditions for migration 161 verified successfully (51/51 active schema integrity checks passed).'
+    message: 'Post-conditions for migration 161 verified successfully (51/51 active schema integrity checks and 7/7 compatibility objects passed).'
   });
 }
 

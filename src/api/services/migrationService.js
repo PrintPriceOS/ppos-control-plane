@@ -18,6 +18,7 @@ const ledgerRead = require('./migrationLedgerReadService');
 const ledgerWrite = require('./migrationLedgerWriteService');
 const { parseMigrationSql } = require('./migrationSqlParser');
 const { handleLegacyPhaseMarkerStatement } = require('./legacyPhaseMarkerAdapter');
+const { handleCompatibilityViewError } = require('./compatibilityViewAdapter');
 const { runMigration092PreRemediation } = require('./migration092ReconciliationService');
 const { runMigration161PreRemediation, validateMigration161PostConditions } = require('./migration161ReconciliationService');
 
@@ -962,6 +963,12 @@ class MigrationService {
                     await repairFalseAppliedMigration140(connection);
                 }
 
+                // If explicit FAILED 161 repair retry is requested, execute governed repair
+                if (process.env.PPOS_ALLOW_FAILED_161_RETRY === 'true') {
+                    const { repairFailedMigration161 } = require('./migrationRepairService');
+                    await repairFailedMigration161(connection);
+                }
+
                 // Load local migrations to match against database
                 const { migrations } = migrationIntegrity.discoverMigrations(this.migrationsPath);
                 const baselineData = JSON.parse(fs.readFileSync(this.baselinePath, 'utf8'));
@@ -1119,6 +1126,12 @@ class MigrationService {
                                     await connection.query(lastSql);
                                 }
                             } catch (err) {
+                                // Governed handler for ER_WRONG_OBJECT on legacy compatibility views
+                                const handledView = await handleCompatibilityViewError(connection, lastSql, err);
+                                if (handledView) {
+                                    continue;
+                                }
+
                                 // Idempotency: skip duplicates, table exists, or trigger exists
                                 const ignoreCodes = ['ER_DUP_FIELDNAME', 'ER_DUP_KEYNAME', 'ER_TABLE_EXISTS_ERROR', 'ER_DUP_INDEX', 'ER_TRG_ALREADY_EXISTS'];
                                 if (ignoreCodes.includes(err.code) || err.errno === 1060 || err.errno === 1061 || err.errno === 1050 || err.errno === 1359) {
