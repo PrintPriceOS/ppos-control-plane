@@ -89,7 +89,15 @@ if ! BACKUP_HMAC_KEY="$AUTH_KEY" node "${SCRIPT_DIR}/lib/backupHmacUtil.js" veri
 fi
 echo "✓ Cryptographic authenticity (HMAC-SHA256 timingSafeEqual) and integrity verified successfully."
 
-# 4. Isolated Temporary Workspace with Guaranteed Cleanup
+# 4. Isolated Temporary Workspace with Guaranteed Cleanup and Storage Boundary Guard
+AVAIL_RESTORE_KB=$(df -k /tmp 2>/dev/null | tail -n 1 | awk '{print $4}')
+AVAIL_RESTORE_MB=$((AVAIL_RESTORE_KB / 1024))
+MIN_RESTORE_DISK_MB="${STAGING_MIN_RESTORE_DISK_MB:-512}"
+if [ "$AVAIL_RESTORE_MB" -lt "$MIN_RESTORE_DISK_MB" ]; then
+  echo "[FATAL] Insufficient temporary workspace disk space: only ${AVAIL_RESTORE_MB} MB available, required minimum is ${MIN_RESTORE_DISK_MB} MB. Restore aborted to protect host." >&2
+  exit 1
+fi
+
 WORK_DIR=$(mktemp -d)
 chmod 700 "$WORK_DIR"
 

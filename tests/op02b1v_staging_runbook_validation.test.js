@@ -156,6 +156,16 @@ describe('OP-02B.1V: Staging Runbook, Configuration Contracts & Secret Resolutio
             expect(composeContent).toContain('WEBHOOK_DISPATCH_MOCK_ONLY');
         });
 
+        it('verifies deployment compose has zero build directive and consumes pre-built image, while lab compose contains build context', () => {
+            const deployCompose = fs.readFileSync(path.join(__dirname, '../docker-compose.staging.yml'), 'utf8');
+            expect(deployCompose).not.toContain('build:');
+            expect(deployCompose).toContain('image: ppos-control-plane:staging-');
+
+            const labCompose = fs.readFileSync(path.join(__dirname, '../docker-compose.staging.lab.yml'), 'utf8');
+            expect(labCompose).toContain('build:');
+            expect(labCompose).toContain('dockerfile: Dockerfile');
+        });
+
         it('verifies Dockerfile exists and builds via multistage runner pattern', () => {
             const dockerfileContent = fs.readFileSync(path.join(__dirname, '../Dockerfile'), 'utf8');
             expect(dockerfileContent).toContain('FROM node:22-bookworm-slim AS builder');

@@ -46,6 +46,23 @@ fi
 mkdir -p "$BACKUP_DIR"
 chmod 700 "$BACKUP_DIR"
 
+# Pre-execution strict storage quota and available disk space enforcement
+MAX_STORAGE_MB="${STAGING_BACKUP_MAX_MB:-500}"
+CURRENT_DIR_KB=$(du -sk "$BACKUP_DIR" 2>/dev/null | awk '{print $1}')
+CURRENT_DIR_MB=$((CURRENT_DIR_KB / 1024))
+if [ "$CURRENT_DIR_MB" -ge "$MAX_STORAGE_MB" ]; then
+  echo "[FATAL] Pre-backup quota check failed: backup directory '${BACKUP_DIR}' currently uses ${CURRENT_DIR_MB} MB, exceeding hard limit of ${MAX_STORAGE_MB} MB. Backup aborted to protect filesystem." >&2
+  exit 1
+fi
+
+AVAIL_DISK_KB=$(df -k "$BACKUP_DIR" 2>/dev/null | tail -n 1 | awk '{print $4}')
+AVAIL_DISK_MB=$((AVAIL_DISK_KB / 1024))
+MIN_FREE_DISK_MB="${STAGING_MIN_FREE_DISK_MB:-1024}"
+if [ "$AVAIL_DISK_MB" -lt "$MIN_FREE_DISK_MB" ]; then
+  echo "[FATAL] Insufficient filesystem disk space: only ${AVAIL_DISK_MB} MB available in '${BACKUP_DIR}', required minimum is ${MIN_FREE_DISK_MB} MB. Backup aborted to prevent disk exhaustion." >&2
+  exit 1
+fi
+
 if [ -f "$FINAL_ENC_ARCHIVE" ]; then
   echo "[FATAL] Destination archive ${FINAL_ENC_ARCHIVE} already exists. Overwrite strictly forbidden." >&2
   exit 1

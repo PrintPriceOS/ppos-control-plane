@@ -84,12 +84,9 @@ services:
         max-size: "10m"
         max-file: "3"
 
-  # Application Service — Control Plane
+  # Application Service — Control Plane (Pre-built Image Deployment Only - Zero Host Build)
   control-plane-staging:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: ppos-control-plane:staging-a8e3179
+    image: ppos-control-plane:staging-c9a1e44
     container_name: ppos-control-plane-staging
     restart: unless-stopped
     depends_on:

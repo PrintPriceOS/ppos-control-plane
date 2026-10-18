@@ -225,6 +225,28 @@ jobs:
             INSERT INTO synth_audit_log (action_desc) VALUES (CONCAT('Inserted tenant: ', NEW.id));
         "
 
+        # Seed synthetic printhouse activation grants to verify the 4 commercial capability grants on real MySQL
+        MYSQL_PWD="$ORIGIN_USR_PW" mysql -h 127.0.0.1 -P 3306 -u ppos_staging_usr ppos_control_staging -e "
+          INSERT INTO printhouse_marketplace_reviews (id, tenant_id, reviewer_id, review_status, review_notes)
+          VALUES ('rev-synth-01', 'tenant-synthetic-staging-01', 'admin-01', 'APPROVED', 'Certified staging lab test');
+
+          INSERT INTO printhouse_activation_grants (id, review_id, tenant_id, site_id, granted_by_json, marketplace_visible, live_quoting_allowed, job_routing_allowed, production_dispatch_allowed, status)
+          VALUES ('grant-synth-01', 'rev-synth-01', 'tenant-synthetic-staging-01', NULL, '{\"actor\": \"admin\"}', 1, 1, 1, 1, 'ACTIVE');
+        "
+
+        # Verify real database queries return all 4 grants active
+        echo "Verifying 4 commercial capability grants directly against real MySQL instance..."
+        REAL_GRANTS=$(MYSQL_PWD="$ORIGIN_USR_PW" mysql -h 127.0.0.1 -P 3306 -u ppos_staging_usr ppos_control_staging -N -e "
+          SELECT CONCAT(marketplace_visible, ':', live_quoting_allowed, ':', job_routing_allowed, ':', production_dispatch_allowed, ':', status)
+          FROM printhouse_activation_grants WHERE tenant_id = 'tenant-synthetic-staging-01';
+        ")
+        echo "Real DB Grants result: $REAL_GRANTS"
+        if [ "$REAL_GRANTS" != "1:1:1:1:ACTIVE" ]; then
+          echo "FATAL: Commercial activation grants in real MySQL failed to return expected 1:1:1:1:ACTIVE!"
+          exit 1
+        fi
+        echo "✓ Real MySQL 8.0 commercial capability grants verified (all 4 grants 100% active and queryable)."
+
         export MYSQL_HOST="127.0.0.1"
         export MYSQL_PORT="3306"
         export MYSQL_USER="ppos_staging_usr"
@@ -421,10 +443,10 @@ jobs:
         chmod 600 secrets/*.txt
 
         echo "17.1 Validating Docker Compose configuration..."
-        docker compose -f docker-compose.staging.yml config
+        docker compose -f docker-compose.staging.lab.yml config
 
-        echo "17.2 Building and starting Docker Compose staging stack..."
-        docker compose -f docker-compose.staging.yml up -d --build
+        echo "17.2 Building and starting Docker Compose staging stack from dedicated lab compose..."
+        docker compose -f docker-compose.staging.lab.yml up -d --build
 
         echo "17.3 Waiting for services to become healthy..."
         for i in {1..30}; do
@@ -440,31 +462,26 @@ jobs:
 
         if [ "$MYSQL_HEALTH" != '"healthy"' ] || [ "$APP_HEALTH" != '"healthy"' ]; then
           echo "FATAL: Services failed to become healthy in time."
-          docker compose -f docker-compose.staging.yml logs
-          docker compose -f docker-compose.staging.yml down -v
+          docker compose -f docker-compose.staging.lab.yml logs
+          docker compose -f docker-compose.staging.lab.yml down -v
           exit 1
         fi
 
-        echo "17.4 Testing HTTP live and health endpoints on adapted port 18081..."
-        LIVE_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:18081/live)
-        HEALTH_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:18081/health)
-        echo "HTTP /live response code: $LIVE_STATUS"
-        echo "HTTP /health response code: $HEALTH_STATUS"
+        echo "17.4 Testing HTTP live and health endpoints on adapted port 18081 with curl --fail --show-error..."
+        curl --fail --show-error http://127.0.0.1:18081/live
+        curl --fail --show-error http://127.0.0.1:18081/health
 
-        if [ "$LIVE_STATUS" -ne 200 ] || [ "$HEALTH_STATUS" -ne 200 ]; then
-          echo "FATAL: HTTP healthchecks failed!"
-          docker compose -f docker-compose.staging.yml logs
-          docker compose -f docker-compose.staging.yml down -v
-          exit 1
-        fi
-
-        echo "17.5 Controlled restart & persistence verification..."
-        docker compose -f docker-compose.staging.yml restart
+        echo "17.5 Controlled restart & persistence verification (retaining volume)..."
+        docker compose -f docker-compose.staging.lab.yml restart
         sleep 5
         docker inspect --format='{{json .State.Status}}' ppos-staging-mysql
         docker inspect --format='{{json .State.Status}}' ppos-control-plane-staging
 
-        echo "17.6 Graceful teardown with ephemeral volume and network cleanup..."
-        docker compose -f docker-compose.staging.yml down -v --remove-orphans
+        echo "17.6 Non-destructive stop (preserving data volumes)..."
+        docker compose -f docker-compose.staging.lab.yml down
+        echo "✓ Services stopped cleanly while preserving persistent named volumes."
+
+        echo "17.7 Ephemeral cleanup for runner teardown..."
+        docker compose -f docker-compose.staging.lab.yml down -v --remove-orphans
         rm -rf secrets "$SECRETS_DIR"
         echo "✓ STG-05: Real Docker Compose lifecycle passed and cleaned up."
