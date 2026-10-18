@@ -28,24 +28,17 @@ cd "$DEPLOY_DIR"
 echo "Working directory: $(pwd)"
 
 echo "=== [2/7] Verifying Package Integrity (SHA-256) ==="
-if [ ! -f "$CHECKSUM_FILE" ]; then
-  echo "[FATAL] Checksum file '$CHECKSUM_FILE' not found in $DEPLOY_DIR" >&2
-  exit 1
-fi
+MANDATORY_FILES=("$CHECKSUM_FILE" "$COMPOSE_FILE" "$TAR_FILE" ".env.staging.example")
+for file in "${MANDATORY_FILES[@]}"; do
+  if [ ! -f "$file" ]; then
+    echo "[FATAL] Mandatory deployment file '$file' is missing in $DEPLOY_DIR" >&2
+    exit 1
+  fi
+done
 
-if [ ! -f "$COMPOSE_FILE" ]; then
-  echo "[FATAL] Compose file '$COMPOSE_FILE' not found in $DEPLOY_DIR" >&2
-  exit 1
-fi
-
-if [ ! -f "$TAR_FILE" ]; then
-  echo "[FATAL] Tarball '$TAR_FILE' not found in $DEPLOY_DIR" >&2
-  exit 1
-fi
-
-echo "Verifying SHA-256 checksums..."
-sha256sum --check --ignore-missing "$CHECKSUM_FILE"
-echo "✓ Checksums verified for deployment bundle."
+echo "Verifying strict SHA-256 checksums (all files required; zero missing permitted)..."
+sha256sum --check --strict "$CHECKSUM_FILE"
+echo "✓ Strict checksum verification passed for all deployment bundle artifacts."
 
 echo "=== [3/7] Managing High-Entropy Secrets (Preserving Existing Secrets) ==="
 mkdir -p secrets

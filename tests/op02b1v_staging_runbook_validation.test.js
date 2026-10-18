@@ -347,6 +347,136 @@ describe('OP-02B.1V: Staging Runbook, Configuration Contracts & Secret Resolutio
 
             expect(composeContent).toContain("PAYMENT_EXECUTION_ENABLED: 'false'");
             expect(composeContent).toContain("LIVE_PROVIDER_CONNECTIVITY: 'false'");
+            expect(composeContent).toContain("WEBHOOK_DISPATCH_MOCK_ONLY: 'true'");
+            expect(composeContent).toContain("OUTGOING_WEBHOOK_SINK_URL: 'http://127.0.0.1:9999/sink'");
+        });
+
+        it('behavioral test: outgoingWebhookService intercepts dispatch under WEBHOOK_DISPATCH_MOCK_ONLY with zero external network traffic', async () => {
+            const outgoingWebhookService = require('../src/api/services/outgoingWebhookService');
+            const mysql = require('../src/api/services/mysqlClient');
+            const vi = (await import('vitest')).vi;
+
+            process.env.WEBHOOK_DISPATCH_MOCK_ONLY = 'true';
+            process.env.OUTGOING_WEBHOOK_SINK_URL = 'http://127.0.0.1:9999/sink';
+
+            let externalHttpCalled = false;
+            // Spy on http/https request to prove zero external network calls are attempted
+            const http = require('http');
+            const originalHttpRequest = http.request;
+            const httpSpy = vi.spyOn(http, 'request').mockImplementation((...args) => {
+                externalHttpCalled = true;
+                throw new Error('EXTERNAL_NETWORK_CALL_FORBIDDEN');
+            });
+
+            // Mock DB delivery row
+            vi.spyOn(mysql, 'query').mockImplementation(async (sql, params) => {
+                if (sql.includes('FROM webhook_deliveries')) {
+                    return [{
+                        id: 'del_staging_test_01',
+                        tenant_id: 'tenant_staging_01',
+                        subscription_id: 'sub_01',
+                        endpoint_id: 'ep_01',
+                        event_type: 'ORDER_PLACED',
+                        event_id: 'evt_01',
+                        url: 'https://production-partner.printprice.pro/webhook',
+                        payload_json: { test: 'staging_event' },
+                        signature: 'sig_mock_123',
+                        attempt_count: 0,
+                        max_attempts: 3,
+                        status: 'PENDING'
+                    }];
+                }
+                if (sql.includes('UPDATE webhook_deliveries')) {
+                    return { affectedRows: 1 };
+                }
+                return [];
+            });
+
+            const result = await outgoingWebhookService.deliverSingleWebhook('del_staging_test_01');
+
+            expect(result.ok).toBe(true);
+            expect(result.status).toBe('DELIVERED');
+            expect(result.mocked).toBe(true);
+            expect(result.statusCode).toBe(200);
+            expect(externalHttpCalled).toBe(false);
+
+            httpSpy.mockRestore();
+        });
+
+        it('behavioral test: provider connectivity service blocks live provider execution under staging invariants', async () => {
+            const FinancialOperationsProviderSandboxService = require('../src/api/services/financialOperationsProviderSandboxService');
+            const FinancialOperationsProviderConnectivityTestService = require('../src/api/services/financialOperationsProviderConnectivityTestService');
+
+            const sbSvc = new FinancialOperationsProviderSandboxService();
+            const testSvc = new FinancialOperationsProviderConnectivityTestService(sbSvc);
+            const actorAdmin = { role: 'SYSTEM_ADMIN', userId: 'admin_test' };
+
+            // 1. Create provider sandbox config
+            const sb = await sbSvc.createSandboxConfig({
+                tenantId: 'tenant_staging_01',
+                providerKey: 'stripe_mock',
+                providerType: 'PAYMENT_PROVIDER',
+                providerName: 'Stripe Staging Mock',
+                allowedOperations: ['PAYMENT_AUTH_TEST'],
+                blockedOperations: []
+            }, actorAdmin);
+
+            await sbSvc.requestReview(sb.provider_sandbox_id, actorAdmin);
+            await sbSvc.activateSandbox(sb.provider_sandbox_id, actorAdmin);
+
+            // 2. Behavioral verification: When live provider connectivity is forced to true, creation must be BLOCKED
+            sb.live_provider_connectivity_enabled = true;
+            const blockedLiveTest = await testSvc.createTest(sb.provider_sandbox_id, {
+                connectivityMode: 'MOCK_PROVIDER',
+                operationType: 'PAYMENT_AUTH_TEST'
+            }, actorAdmin);
+
+            expect(blockedLiveTest.test_status).toBe('BLOCKED');
+            expect(blockedLiveTest.blockers_json.some(b => b.includes('Live provider connectivity is enabled'))).toBe(true);
+
+            // 3. Behavioral verification: In safe staging mode (live_provider_connectivity_enabled = false), mock test completes purely locally
+            sb.live_provider_connectivity_enabled = false;
+            const safeTest = await testSvc.createTest(sb.provider_sandbox_id, {
+                connectivityMode: 'MOCK_PROVIDER',
+                operationType: 'PAYMENT_AUTH_TEST'
+            }, actorAdmin);
+
+            expect(safeTest.test_status).toBe('READY_FOR_TEST');
+            const executedMock = await testSvc.executeMockTest(safeTest.connection_test_id, actorAdmin);
+            expect(executedMock.test_status).toBe('MOCK_COMPLETED');
+            expect(executedMock.response_payload_json.message).toContain('No external API was called');
+        });
+
+        it('behavioral test: commercial pilot activation service strictly enforces payment_execution_disabled', async () => {
+            const ControlledBetaInviteIssuanceService = require('../src/api/services/controlledBetaInviteIssuanceService');
+            const service = new ControlledBetaInviteIssuanceService();
+
+            // When payment_execution_enabled is true, invite readiness evaluation must report PAYMENT_EXECUTION_ENABLED blocker
+            service._mockState.gates.set('gate_live_payment', {
+                issuance_gate_id: 'gate_live_payment',
+                payment_execution_enabled: 1,
+                manual_approval_required: 1,
+                max_invites_allowed: 10,
+                max_invites_to_issue: 5
+            });
+
+            const blockedResult = await service.evaluateInviteIssuanceReadiness('gate_live_payment');
+            expect(blockedResult.readiness_status).toBe('BLOCKED');
+            expect(blockedResult.blocked_reasons).toContain('PAYMENT_EXECUTION_ENABLED');
+            expect(blockedResult.checks.payment_execution_disabled).toBe(false);
+
+            // When payment_execution_enabled is 0/false (staging invariant), payment_execution_disabled check passes
+            service._mockState.gates.set('gate_safe_staging', {
+                issuance_gate_id: 'gate_safe_staging',
+                payment_execution_enabled: 0,
+                manual_approval_required: 1,
+                max_invites_allowed: 10,
+                max_invites_to_issue: 5
+            });
+
+            const safeResult = await service.evaluateInviteIssuanceReadiness('gate_safe_staging');
+            expect(safeResult.blocked_reasons).not.toContain('PAYMENT_EXECUTION_ENABLED');
+            expect(safeResult.checks.payment_execution_disabled).toBe(true);
         });
     });
 
@@ -364,8 +494,9 @@ describe('OP-02B.1V: Staging Runbook, Configuration Contracts & Secret Resolutio
             // 3. Preserve existing secrets
             expect(runbook).toContain('Existing secret preserved: secrets/$SECRET');
 
-            // 4. Compose and tarball checksum verification
-            expect(runbook).toContain('sha256sum --check --ignore-missing "$CHECKSUM_FILE"');
+            // 4. Compose and tarball checksum verification (strict with mandatory files check)
+            expect(runbook).toContain('MANDATORY_FILES=');
+            expect(runbook).toContain('sha256sum --check --strict "$CHECKSUM_FILE"');
 
             // 5. Image ID assertion
             expect(runbook).toContain("LOADED_IMAGE_ID=$(docker inspect --format='{{.Id}}' \"$EXPECTED_IMAGE_TAG\"");
