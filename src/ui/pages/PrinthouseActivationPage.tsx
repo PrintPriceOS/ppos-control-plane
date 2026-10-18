@@ -84,8 +84,9 @@ export const PrinthouseActivationPage: React.FC = () => {
                 if (data.user) setAuthUser(data.user);
 
                 setTimeout(() => {
-                    navigate('/printhouse/setup', { replace: true });
+                    navigate('/printhouse/onboarding-guided', { replace: true });
                 }, 1500);
+
             } else {
                 setStatus('ERROR');
                 setErrorMessage(data.error?.message || 'Activation failed. Please try again or request a new link.');

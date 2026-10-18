@@ -38,10 +38,22 @@ export const GuidedStepCompany: React.FC<GuidedStepCompanyProps> = ({
     const [form, setForm] = useState<CompanyDraftData>(initialCompany);
     const [saving, setSaving] = useState(false);
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
+    const [fieldErrors, setFieldErrors] = useState<{ legalName?: string; country?: string; city?: string }>({});
     const [savedNotice, setSavedNotice] = useState(false);
 
+    // Track initial props to avoid re-triggering form reset on local keystroke re-renders.
+    // If incoming initialCompany matches current local form values, do NOT reset local form state.
+    const lastInitialCompanyRef = React.useRef(initialCompany);
     useEffect(() => {
-        setForm(initialCompany);
+        if (JSON.stringify(lastInitialCompanyRef.current) !== JSON.stringify(initialCompany)) {
+            lastInitialCompanyRef.current = initialCompany;
+            // Only update form if initialCompany was changed by an external source (e.g. backend sync),
+            // not because of a keystroke in this component that updated the parent draft
+            setForm(current => {
+                const isSame = JSON.stringify(current) === JSON.stringify(initialCompany);
+                return isSame ? current : initialCompany;
+            });
+        }
     }, [initialCompany]);
 
     const handleChange = (field: keyof CompanyDraftData, value: string) => {
@@ -58,25 +70,31 @@ export const GuidedStepCompany: React.FC<GuidedStepCompanyProps> = ({
         });
         setSavedNotice(false);
         setErrorMsg(null);
+        setFieldErrors(prev => ({ ...prev, [field]: undefined }));
     };
+
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setErrorMsg(null);
+        const errors: { legalName?: string; country?: string; city?: string } = {};
 
-        // Validation: Company legal name and city are strictly required by the backend
+        // Validation: Company legal name, country and city are strictly required by the backend
         if (!form.legalName.trim()) {
-            setErrorMsg(t('guided.company.errLegalName') || 'Por favor, introduce el nombre legal o razón social de tu imprenta.');
-            return;
+            errors.legalName = t('guided.company.errLegalName') || 'Por favor, introduce el nombre legal o razón social de tu imprenta.';
         }
 
         if (!form.country.trim()) {
-            setErrorMsg(t('guided.company.errCountry') || 'Por favor, selecciona el país principal de producción.');
-            return;
+            errors.country = t('guided.company.errCountry') || 'Por favor, selecciona el país principal de producción.';
         }
 
         if (!form.city.trim()) {
-            setErrorMsg(t('guided.company.errCity') || 'Por favor, introduce la ciudad de tu primera planta.');
+            errors.city = t('guided.company.errCity') || 'Por favor, introduce la ciudad de tu primera planta.';
+        }
+
+        if (Object.keys(errors).length > 0) {
+            setFieldErrors(errors);
+            setErrorMsg(errors.legalName || errors.country || errors.city || null);
             return;
         }
 
@@ -90,6 +108,7 @@ export const GuidedStepCompany: React.FC<GuidedStepCompanyProps> = ({
             setSaving(false);
         }
     };
+
 
     return (
         <div className="max-w-3xl mx-auto space-y-6">
@@ -122,7 +141,7 @@ export const GuidedStepCompany: React.FC<GuidedStepCompanyProps> = ({
                 </div>
             )}
 
-            <form onSubmit={handleSubmit} className="space-y-6">
+            <form onSubmit={handleSubmit} noValidate className="space-y-6">
                 {/* Card 1: Identidad Legal y Comercial */}
                 <div className="bg-white dark:bg-[#18181b] border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 sm:p-6 shadow-2xs space-y-4">
                     <div className="flex items-center gap-2.5 pb-3 border-b border-zinc-100 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100">
@@ -144,8 +163,17 @@ export const GuidedStepCompany: React.FC<GuidedStepCompanyProps> = ({
                                 value={form.legalName}
                                 onChange={(e) => handleChange('legalName', e.target.value)}
                                 placeholder="Ej: Artes Gráficas del Norte S.L."
-                                className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-900/80 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-[#dc0000]/30 focus:border-[#dc0000] transition-colors"
+                                className={`w-full px-3.5 py-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-900/80 border text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-[#dc0000]/30 transition-colors ${
+                                    fieldErrors.legalName
+                                        ? 'border-red-500 focus:border-red-500'
+                                        : 'border-zinc-300 dark:border-zinc-700 focus:border-[#dc0000]'
+                                }`}
                             />
+                            {fieldErrors.legalName && (
+                                <p className="text-[11px] text-red-600 dark:text-red-400 font-medium mt-1">
+                                    {fieldErrors.legalName}
+                                </p>
+                            )}
                             <p className="text-[11px] text-zinc-500 mt-1">
                                 {t('guided.company.legalNameHint') || 'Figura en contratos y albaranes oficiales.'}
                             </p>
@@ -199,6 +227,11 @@ export const GuidedStepCompany: React.FC<GuidedStepCompanyProps> = ({
                                 value={form.country}
                                 onChange={(code) => handleChange('country', code)}
                             />
+                            {fieldErrors.country && (
+                                <p className="text-[11px] text-red-600 dark:text-red-400 font-medium mt-1">
+                                    {fieldErrors.country}
+                                </p>
+                            )}
                         </div>
 
                         <div>
@@ -212,9 +245,19 @@ export const GuidedStepCompany: React.FC<GuidedStepCompanyProps> = ({
                                 value={form.city}
                                 onChange={(e) => handleChange('city', e.target.value)}
                                 placeholder="Ej: Valencia o Frankfurt"
-                                className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-900/80 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-[#dc0000]/30 focus:border-[#dc0000] transition-colors"
+                                className={`w-full px-3.5 py-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-900/80 border text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-[#dc0000]/30 transition-colors ${
+                                    fieldErrors.city
+                                        ? 'border-red-500 focus:border-red-500'
+                                        : 'border-zinc-300 dark:border-zinc-700 focus:border-[#dc0000]'
+                                }`}
                             />
+                            {fieldErrors.city && (
+                                <p className="text-[11px] text-red-600 dark:text-red-400 font-medium mt-1">
+                                    {fieldErrors.city}
+                                </p>
+                            )}
                         </div>
+
 
                         <div>
                             <label htmlFor="company-site-name" className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1">

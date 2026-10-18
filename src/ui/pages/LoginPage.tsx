@@ -27,22 +27,40 @@ import { AuthToastContainer, useAuthToast } from '../components/auth/AuthToast';
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-function getRedirectPath(search: string, fallback = '/dashboard'): string {
+function getRedirectPath(search: string, fallback?: string): string | null {
     const params = new URLSearchParams(search);
     const redirect = params.get('redirect');
-    if (!redirect) return fallback;
+    if (!redirect) return fallback || null;
     // Only allow relative paths (prevent open redirect)
     try {
         const url = new URL(redirect, window.location.origin);
         if (url.origin === window.location.origin) return url.pathname + url.search;
     } catch {}
-    return fallback;
+    return fallback || null;
+}
+
+function resolveUserDestination(user: any, explicitRedirect: string | null): string {
+    if (explicitRedirect && explicitRedirect !== '/dashboard') {
+        return explicitRedirect;
+    }
+    // Printhouse user roles: if onboarding is not completed or new account, route to guided onboarding
+    const role = user?.role || user?.declaredBy;
+    if (role === 'PRINTHOUSE_OPERATOR' || role === 'PRINTHOUSE_USER' || role === 'printhouse_operator') {
+        const isCompleted = Boolean(user?.onboardingCompleted || user?.isActivated);
+        if (!isCompleted) {
+            return '/printhouse/onboarding-guided';
+        }
+        return '/printhouse/setup';
+    }
+    // Platform operators and admins preserve /dashboard
+    return explicitRedirect || '/dashboard';
 }
 
 function isDark() {
     if (typeof document === 'undefined') return true;
     return document.documentElement.classList.contains('dark');
 }
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -118,8 +136,9 @@ export const LoginPage: React.FC = () => {
             setAuthToken(data.token);
             setAuthUser(data.user);
 
+            const destination = resolveUserDestination(data.user, redirectTo);
             addToast('success', 'Access authorized!', 'Redirecting to control panel…');
-            setTimeout(() => navigate(redirectTo, { replace: true }), 800);
+            setTimeout(() => navigate(destination, { replace: true }), 800);
         } catch (err: any) {
             addToast('error', 'Connection error', 'Cannot reach the server. Please check your internet connection.');
         } finally {
@@ -171,8 +190,10 @@ export const LoginPage: React.FC = () => {
             setAuthToken(data.token);
             setAuthUser(data.user);
 
+            const destination = resolveUserDestination(data.user, redirectTo);
             addToast('success', 'Access authorized!', 'Two-factor verified. Redirecting…');
-            setTimeout(() => navigate(redirectTo, { replace: true }), 800);
+            setTimeout(() => navigate(destination, { replace: true }), 800);
+
         } catch (err: any) {
             addToast('error', 'Connection error', 'Cannot reach the server. Please try again.');
         } finally {

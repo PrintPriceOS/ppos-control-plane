@@ -141,10 +141,11 @@ describe('Guided Printhouse Onboarding Journey Suite', () => {
         expect(screen.getByText(/Cuéntanos qué produces y utiliza tus presupuestos/i)).toBeInTheDocument();
         expect(screen.getByRole('button', { name: /Comenzar configuración|Continuar configuración/i })).toBeInTheDocument();
 
-        // 3 Key highlights
-        expect(screen.getByText('1. Tu taller')).toBeInTheDocument();
-        expect(screen.getByText('2. Tus productos')).toBeInTheDocument();
-        expect(screen.getByText('3. Tu primer presupuesto')).toBeInTheDocument();
+        // 4 Key highlights
+        expect(screen.getByText('1. Tu imprenta')).toBeInTheDocument();
+        expect(screen.getByText('2. Qué produces')).toBeInTheDocument();
+        expect(screen.getByText('3. Cómo configurar tus precios')).toBeInTheDocument();
+        expect(screen.getByText('4. Revisar y próximos pasos')).toBeInTheDocument();
     });
 
     it('2. Navigates from Welcome to Stage A (Tu imprenta) and displays form', async () => {
@@ -187,7 +188,7 @@ describe('Guided Printhouse Onboarding Journey Suite', () => {
         fireEvent.submit(submitBtn.closest('form')!);
 
         await waitFor(() => {
-            expect(screen.getByText(/introduce el nombre legal o razón social/i)).toBeInTheDocument();
+            expect(screen.getAllByText(/introduce el nombre legal o razón social/i).length).toBeGreaterThanOrEqual(1);
         });
     });
 

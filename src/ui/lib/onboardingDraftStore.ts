@@ -42,6 +42,8 @@ export const VALID_PRODUCT_FAMILIES: ReadonlySet<ProductFamilyId> = new Set([
     'HARDCOVER', 'SOFTCOVER', 'WIRE_O', 'SADDLE_STITCH'
 ]);
 
+export type PricingMethodChoice = 'TEMPLATE' | 'ASSISTANT' | 'MANUAL';
+
 export interface FamilyPricingSessionDraft {
     sessionId: string | null;
     activeRun: any;
@@ -53,7 +55,9 @@ export interface FamilyPricingSessionDraft {
     offer?: ProgressiveSpecState;
     comparisonData?: any;
     lastSavedTimestamp?: number;
+    pricingMethod?: PricingMethodChoice;
 }
+
 
 export interface GuidedOnboardingDraft {
     schemaVersion: number;

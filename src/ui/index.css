@@ -146,11 +146,10 @@
   box-shadow: none;
 }
 
-/* Force sharp edges globally */
 *, *::before, *::after {
   box-sizing: border-box;
-  border-radius: 0 !important;
 }
+
 
 html, body, #root {
   height: 100%;
