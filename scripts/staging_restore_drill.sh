@@ -75,7 +75,9 @@ fi
 
 echo "[1/5] Verifying cryptographic integrity and HMAC authenticity before decryption..."
 # 3.1 Verify integrity digest
-if ! sha256sum -c "$SHA_FILE"; then
+EXPECTED_SHA=$(awk '{print $1}' "$SHA_FILE")
+ACTUAL_SHA=$(sha256sum "$ENCRYPTED_FILE" | awk '{print $1}')
+if [ -z "$EXPECTED_SHA" ] || [ "$EXPECTED_SHA" != "$ACTUAL_SHA" ]; then
   echo "[FATAL] SHA-256 integrity checksum verification failed. Snapshot is corrupted or modified." >&2
   exit 1
 fi
