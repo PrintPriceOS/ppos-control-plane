@@ -10,7 +10,7 @@ class MigrationLedgerReadService {
    * @param {Object} baseline - Phase 183 baseline object.
    * @param {number} staleTimeoutMinutes - Minutes after which a STARTED migration is stale.
    */
-  async evaluateLedgerStatus(baseline, staleTimeoutMinutes = 30) {
+  async evaluateLedgerStatus(baseline, staleTimeoutMinutes = 30, options = {}) {
     try {
       // 1. Verify table exists. If not, ledger is empty/not ready
       const tableCheckRows = await db.query(`
@@ -68,6 +68,16 @@ class MigrationLedgerReadService {
       const startedRecords = entries.filter(e => e.state === 'STARTED' && (!e.record_type || e.record_type === 'MIGRATION'));
       const now = Date.now();
       for (const record of startedRecords) {
+        // Governed exception: if this specific migration path is authorized to retry under runner lock
+        if (options && options.authorizedMigrationPath && (record.migration_path === options.authorizedMigrationPath || record.description === options.authorizedMigrationPath.split('/').pop())) {
+          logger.info({
+            event: 'authorized_migration_retry_bypass',
+            migration_path: record.migration_path,
+            message: 'Bypassing MIGRATION_IN_PROGRESS check for explicitly authorized retry path under runner lock'
+          });
+          continue;
+        }
+
         const referenceTime = new Date(record.heartbeat_at || record.started_at).getTime();
         const durationMinutes = (now - referenceTime) / (1000 * 60);
 

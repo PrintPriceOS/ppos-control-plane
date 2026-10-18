@@ -196,7 +196,11 @@ async function repairFalseAppliedMigration140(connOrDb) {
 const TARGET_MIGRATION_161_PATH = 'migrations/161_phase184g_industrial_persistence_ledger.sql';
 
 /**
- * Inspects whether migration 161 is in the failed compatibility view state.
+ * Inspects whether migration 161 is in the failed compatibility view state./**
+ * Detects whether migration 161 is in a state requiring governed repair:
+ * 1. Historical FAILED state at statement 44 (ER_WRONG_OBJECT / 1347).
+ * 2. Orphaned STARTED state where repairFailedMigration161 previously ran (FAILED_161_REPAIR_RETRY)
+ *    but execution aborted before applying statements.
  */
 async function detectFailedMigration161(connOrDb) {
   const [rows] = await connOrDb.query(`
@@ -211,34 +215,56 @@ async function detectFailedMigration161(connOrDb) {
   }
 
   const row = rows[0];
-  if (row.state !== 'FAILED') {
-    return { detected: false, state: row.state, reason: 'STATE_NOT_FAILED' };
+
+  // Case 1: FAILED state with ER_WRONG_OBJECT at statement 44
+  if (row.state === 'FAILED') {
+    const isWrongObj = row.failure_code === 'ER_WRONG_OBJECT' || row.failure_code === '1347';
+    const isStmt44 = Number(row.failed_statement_index) === 44;
+    if (isWrongObj && isStmt44) {
+      return { detected: true, state: 'FAILED', row };
+    }
+    return { detected: false, state: row.state, reason: 'FAILURE_EVIDENCE_NOT_MATCHED' };
   }
 
-  const isWrongObj = row.failure_code === 'ER_WRONG_OBJECT' || row.failure_code === '1347';
-  const isStmt44 = Number(row.failed_statement_index) === 44;
+  // Case 2: Orphaned STARTED state after a prior repair retry attempt
+  if (row.state === 'STARTED') {
+    let prevFailures = [];
+    try {
+      prevFailures = typeof row.previous_failures === 'string'
+        ? JSON.parse(row.previous_failures)
+        : (row.previous_failures || []);
+    } catch (e) {
+      prevFailures = [];
+    }
 
-  if (isWrongObj && isStmt44) {
-    return { detected: true, row };
+    const hasRepairMarker = prevFailures.some(f => f && f.action === 'FAILED_161_REPAIR_RETRY');
+    if (hasRepairMarker) {
+      return { detected: true, state: 'STARTED', orphanedRetry: true, row };
+    }
+    return { detected: false, state: row.state, reason: 'STARTED_WITHOUT_REPAIR_MARKER' };
   }
 
-  return { detected: false, reason: 'FAILURE_EVIDENCE_NOT_MATCHED' };
+  return { detected: false, state: row.state, reason: `STATE_${row.state}` };
 }
 
 /**
- * Governed repair service for Failed Migration 161 (Phase 184G).
+ * Governed repair service for Failed / Orphaned Migration 161 (Phase 184G).
  *
  * Preconditions:
  * 1. Explicit opt-in via PPOS_ALLOW_FAILED_161_RETRY='true'.
- * 2. Migration 161 row in schema_versions has state = 'FAILED'.
- * 3. Failure evidence matches ER_WRONG_OBJECT (or 1347) at statement index 44.
- * 4. Checksum matches canonical baseline in migration-integrity-baseline.json.
+ * 2. Migration 161 row in schema_versions has state = 'FAILED' (with ER_WRONG_OBJECT at stmt 44)
+ *    OR state = 'STARTED' with a prior 'FAILED_161_REPAIR_RETRY' audit marker.
+ * 3. Checksum matches canonical baseline in migration-integrity-baseline.json.
  *
  * Action:
- * - Appends audit marker FAILED_161_REPAIR_RETRY to previous_failures JSON array.
- * - Transitions row from FAILED to STARTED with fresh heartbeat, allowing the migration runner
- *   to resume execution safely through the compatibilityViewAdapter without blocking the ledger.
- * - Completely idempotent: if already repaired or state is no longer FAILED, no-ops cleanly.
+ * - If state == 'FAILED':
+ *     Appends audit marker FAILED_161_REPAIR_RETRY to previous_failures JSON array.
+ *     Transitions row from FAILED to STARTED with fresh heartbeat.
+ * - If state == 'STARTED' (orphaned retry recovery):
+ *     Appends audit marker ORPHANED_STARTED_161_RECOVERY to previous_failures.
+ *     Refreshes heartbeat_at = NOW(3).
+ * - If state == 'APPLIED':
+ *     Completely idempotent no-op cleanly.
  */
 async function repairFailedMigration161(connOrDb) {
   const enabled = process.env.PPOS_ALLOW_FAILED_161_RETRY === 'true';
@@ -268,30 +294,13 @@ async function repairFailedMigration161(connOrDb) {
     prevFailures = [];
   }
 
-  const alreadyRepaired = prevFailures.some(f => f && f.action === 'FAILED_161_REPAIR_RETRY');
-  if (row.state !== 'FAILED' && alreadyRepaired) {
-    logger.info({ event: 'migration_161_repair_already_completed', message: 'Migration 161 already repaired (idempotent no-op)' });
-    return { repaired: true, idempotent: true, state: row.state };
+  // Idempotency: if already APPLIED and contains audit history
+  if (row.state === 'APPLIED') {
+    logger.info({ event: 'migration_161_repair_already_applied', message: 'Migration 161 already APPLIED (idempotent no-op)' });
+    return { repaired: true, idempotent: true, state: 'APPLIED' };
   }
 
-  if (row.state !== 'FAILED') {
-    return { repaired: false, reason: `STATE_IS_${row.state}_NOT_FAILED` };
-  }
-
-  if (!enabled) {
-    const errorMsg = 'GOVERNED_REPAIR_REQUIRED: Migration 161 is in FAILED state at statement 44. Set PPOS_ALLOW_FAILED_161_RETRY=true to authorize repair.';
-    logger.warn({ event: 'migration_161_failed_detected_flag_missing', message: errorMsg });
-    throw new Error(errorMsg);
-  }
-
-  logger.info({ event: 'migration_161_repair_start', message: 'Verifying strict preconditions for migration 161 failed recovery...' });
-
-  const isWrongObj = row.failure_code === 'ER_WRONG_OBJECT' || row.failure_code === '1347';
-  const isStmt44 = Number(row.failed_statement_index) === 44;
-  if (!isWrongObj || !isStmt44) {
-    throw new Error(`REPAIR_PRECONDITION_FAILED: Migration 161 failure evidence mismatch (observed code='${row.failure_code}', statement_index=${row.failed_statement_index}, expected 'ER_WRONG_OBJECT' index 44)`);
-  }
-
+  // Check canonical checksum baseline
   const baselinePath = path.join(__dirname, '../../../migrations/migration-integrity-baseline.json');
   const baseline = JSON.parse(fs.readFileSync(baselinePath, 'utf8'));
   const baselineEntry = baseline.migrations.find(m => (m.path || m.relativePath) === TARGET_MIGRATION_161_PATH);
@@ -303,40 +312,100 @@ async function repairFailedMigration161(connOrDb) {
     throw new Error(`REPAIR_PRECONDITION_FAILED: Checksum mismatch (observed='${row.checksum}', expected='${canonicalChecksum}')`);
   }
 
-  // Precondition met: Record failure into audit history and transition state to allow rerun
-  const auditMarker = {
-    action: 'FAILED_161_REPAIR_RETRY',
-    repaired_at: new Date().toISOString(),
-    previous_state: 'FAILED',
-    failure_code: row.failure_code,
-    failed_statement_index: row.failed_statement_index,
-    failure_message: row.failure_message,
-    execution_id: row.execution_id,
-    new_state: 'STARTED',
-    reason: 'Governed unblock for migration 161 compatibility views base table conflict'
-  };
-  prevFailures.push(auditMarker);
+  // Handle case: row.state === 'FAILED'
+  if (row.state === 'FAILED') {
+    if (!enabled) {
+      const errorMsg = 'GOVERNED_REPAIR_REQUIRED: Migration 161 is in FAILED state at statement 44. Set PPOS_ALLOW_FAILED_161_RETRY=true to authorize repair.';
+      logger.warn({ event: 'migration_161_failed_detected_flag_missing', message: errorMsg });
+      throw new Error(errorMsg);
+    }
 
-  await connOrDb.query(`
-    UPDATE schema_versions
-    SET
-      state = 'STARTED',
-      failure_code = NULL,
-      failure_message = NULL,
-      failed_statement_index = NULL,
-      failed_at = NULL,
-      heartbeat_at = NOW(3),
-      previous_failures = ?
-    WHERE migration_path = ? OR description = '161_phase184g_industrial_persistence_ledger.sql'
-       OR version = '161_phase184g_industrial_persistence_ledger'
-  `, [JSON.stringify(prevFailures), TARGET_MIGRATION_161_PATH]);
+    logger.info({ event: 'migration_161_repair_start', message: 'Verifying strict preconditions for migration 161 failed recovery...' });
 
-  logger.info({
-    event: 'migration_161_repair_success',
-    message: 'Governed repair completed: migration 161 state transitioned from FAILED to STARTED with audit marker FAILED_161_REPAIR_RETRY.'
-  });
+    const isWrongObj = row.failure_code === 'ER_WRONG_OBJECT' || row.failure_code === '1347';
+    const isStmt44 = Number(row.failed_statement_index) === 44;
+    if (!isWrongObj || !isStmt44) {
+      throw new Error(`REPAIR_PRECONDITION_FAILED: Migration 161 failure evidence mismatch (observed code='${row.failure_code}', statement_index=${row.failed_statement_index}, expected 'ER_WRONG_OBJECT' index 44)`);
+    }
 
-  return { repaired: true, state: 'STARTED', auditMarker };
+    const auditMarker = {
+      action: 'FAILED_161_REPAIR_RETRY',
+      repaired_at: new Date().toISOString(),
+      previous_state: 'FAILED',
+      failure_code: row.failure_code,
+      failed_statement_index: row.failed_statement_index,
+      failure_message: row.failure_message,
+      execution_id: row.execution_id,
+      new_state: 'STARTED',
+      reason: 'Governed unblock for migration 161 compatibility views base table conflict'
+    };
+    prevFailures.push(auditMarker);
+
+    await connOrDb.query(`
+      UPDATE schema_versions
+      SET
+        state = 'STARTED',
+        failure_code = NULL,
+        failure_message = NULL,
+        failed_statement_index = NULL,
+        failed_at = NULL,
+        heartbeat_at = NOW(3),
+        previous_failures = ?
+      WHERE migration_path = ? OR description = '161_phase184g_industrial_persistence_ledger.sql'
+         OR version = '161_phase184g_industrial_persistence_ledger'
+    `, [JSON.stringify(prevFailures), TARGET_MIGRATION_161_PATH]);
+
+    logger.info({
+      event: 'migration_161_repair_success',
+      message: 'Governed repair completed: migration 161 state transitioned from FAILED to STARTED with audit marker FAILED_161_REPAIR_RETRY.'
+    });
+
+    return { repaired: true, state: 'STARTED', auditMarker };
+  }
+
+  // Handle case: row.state === 'STARTED' (orphaned retry state)
+  if (row.state === 'STARTED') {
+    const hasRepairMarker = prevFailures.some(f => f && f.action === 'FAILED_161_REPAIR_RETRY');
+    if (!hasRepairMarker) {
+      return { repaired: false, reason: 'STATE_IS_STARTED_WITHOUT_REPAIR_MARKER' };
+    }
+
+    if (!enabled) {
+      const errorMsg = 'GOVERNED_REPAIR_REQUIRED: Migration 161 is in orphaned STARTED state from a prior repair retry. Set PPOS_ALLOW_FAILED_161_RETRY=true to authorize execution.';
+      logger.warn({ event: 'migration_161_orphaned_started_detected_flag_missing', message: errorMsg });
+      throw new Error(errorMsg);
+    }
+
+    logger.info({ event: 'migration_161_orphaned_started_recovery', message: 'Recovering orphaned STARTED migration 161 ledger record...' });
+
+    const auditMarker = {
+      action: 'ORPHANED_STARTED_161_RECOVERY',
+      repaired_at: new Date().toISOString(),
+      previous_state: 'STARTED',
+      execution_id: row.execution_id,
+      new_state: 'STARTED',
+      reason: 'Governed recovery for orphaned STARTED state after abort before statement execution'
+    };
+    prevFailures.push(auditMarker);
+
+    await connOrDb.query(`
+      UPDATE schema_versions
+      SET
+        heartbeat_at = NOW(3),
+        previous_failures = ?
+      WHERE migration_path = ? OR description = '161_phase184g_industrial_persistence_ledger.sql'
+         OR version = '161_phase184g_industrial_persistence_ledger'
+    `, [JSON.stringify(prevFailures), TARGET_MIGRATION_161_PATH]);
+
+    logger.info({
+      event: 'migration_161_orphaned_started_success',
+      message: 'Orphaned STARTED migration 161 heartbeat refreshed and audit marker appended.'
+    });
+
+    return { repaired: true, state: 'STARTED', auditMarker };
+  }
+
+  return { repaired: false, reason: `STATE_IS_${row.state}` };
 }
 
 module.exports = {

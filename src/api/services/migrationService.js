@@ -974,7 +974,12 @@ class MigrationService {
                 const baselineData = JSON.parse(fs.readFileSync(this.baselinePath, 'utf8'));
 
                 // 3. Preflight database ledger check
-                const ledgerStatus = await ledgerRead.evaluateLedgerStatus(baselineData);
+                const preflightOptions = {};
+                if (process.env.PPOS_ALLOW_FAILED_161_RETRY === 'true') {
+                    const { TARGET_MIGRATION_161_PATH } = require('./migrationRepairService');
+                    preflightOptions.authorizedMigrationPath = TARGET_MIGRATION_161_PATH;
+                }
+                const ledgerStatus = await ledgerRead.evaluateLedgerStatus(baselineData, 30, preflightOptions);
 
                 if (ledgerStatus.status === 'DATABASE_UNREACHABLE') {
                     throw new Error(`Database connection failed: ${ledgerStatus.reason}`);
@@ -1060,12 +1065,12 @@ class MigrationService {
                             try {
                                 history = typeof existing.previous_failures === 'string'
                                     ? JSON.parse(existing.previous_failures)
-                                    : existing.previous_failures;
+                                    : Array.from(existing.previous_failures);
                             } catch (e) {
-                                history = [];
+                                history = Array.isArray(existing.previous_failures) ? existing.previous_failures : [];
                             }
                         }
-                        if (existing.execution_id) {
+                        if (existing.execution_id && !history.some(h => h && h.execution_id === existing.execution_id)) {
                             history.push({
                                 execution_id: existing.execution_id,
                                 runner_id: existing.runner_id,

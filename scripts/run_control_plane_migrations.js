@@ -101,27 +101,16 @@ async function run() {
         }
       }
 
-      if (process.env.PPOS_ALLOW_FALSE_APPLIED_140_REPAIR === 'true') {
-        const { repairFalseAppliedMigration140 } = require('../src/api/services/migrationRepairService');
-        const repConn = await mysqlClient.getPool().getConnection();
-        try {
-          await repairFalseAppliedMigration140(repConn);
-        } finally {
-          repConn.release();
-        }
-      }
-
+      const dryRunOptions = {};
       if (process.env.PPOS_ALLOW_FAILED_161_RETRY === 'true') {
-        const { repairFailedMigration161 } = require('../src/api/services/migrationRepairService');
-        const repConn = await mysqlClient.getPool().getConnection();
-        try {
-          await repairFailedMigration161(repConn);
-        } finally {
-          repConn.release();
+        const { detectFailedMigration161, TARGET_MIGRATION_161_PATH } = require('../src/api/services/migrationRepairService');
+        const detection = await detectFailedMigration161(mysqlClient.getPool());
+        if (detection.detected) {
+          dryRunOptions.authorizedMigrationPath = TARGET_MIGRATION_161_PATH;
         }
       }
 
-      const status = await ledgerRead.evaluateLedgerStatus(baseline);
+      const status = await ledgerRead.evaluateLedgerStatus(baseline, 30, dryRunOptions);
 
       console.log(`=== Dry-Run Ledger Diagnostic ===`);
       console.log(`Repository migrations   : ${migrations.length}`);
@@ -140,19 +129,29 @@ async function run() {
       console.log(`=================================`);
 
 
-      if (status.status === 'DATABASE_UNREACHABLE' || status.status === 'MIGRATION_LEDGER_INCOMPATIBLE') {
+      let effectiveStatus = status.status;
+      if (status.status === 'MIGRATION_FAILED' && dryRunOptions.authorizedMigrationPath) {
+        // If the only failed migration is the authorized retry candidate, report it as PENDING for dry-run
+        const otherFailed = failedCount > 1;
+        if (!otherFailed) {
+          console.log(`[DRY-RUN] Authorized repair retry candidate detected: ${dryRunOptions.authorizedMigrationPath}`);
+          effectiveStatus = 'PENDING_MIGRATIONS';
+        }
+      }
+
+      if (effectiveStatus === 'DATABASE_UNREACHABLE' || effectiveStatus === 'MIGRATION_LEDGER_INCOMPATIBLE') {
         process.exit(5); // Code 5: Ledger unavailable or incompatible
       }
 
-      if (status.status === 'MIGRATION_FAILED' || status.status === 'MIGRATION_IN_PROGRESS') {
+      if (effectiveStatus === 'MIGRATION_FAILED' || effectiveStatus === 'MIGRATION_IN_PROGRESS') {
         process.exit(3); // Code 3: Failed/stale migration exists
       }
 
-      if (status.status === 'MIGRATION_CHECKSUM_MISMATCH') {
+      if (effectiveStatus === 'MIGRATION_CHECKSUM_MISMATCH') {
         process.exit(4); // Code 4: Checksum divergence
       }
 
-      if (status.status === 'PENDING_MIGRATIONS') {
+      if (effectiveStatus === 'PENDING_MIGRATIONS') {
         process.exit(2); // Code 2: Pending migrations exist
       }
 
@@ -193,7 +192,7 @@ async function run() {
 
     try {
       // 1. Fetch current database entries
-      const [rows] = await dbConn.query('SELECT version, description, checksum, state FROM schema_versions');
+      const [rows] = await dbConn.query('SELECT version, description, checksum, state, started_at, heartbeat_at, applied_at FROM schema_versions');
       
       const { migrations } = discoverMigrations(path.join(__dirname, '../migrations'));
       const baselinePath = path.join(__dirname, '../migrations/migration-integrity-baseline.json');
@@ -245,7 +244,7 @@ async function run() {
               checksum = COALESCE(NULLIF(checksum, ''), ?),
               state = COALESCE(NULLIF(state, ''), 'APPLIED'),
               execution_id = COALESCE(execution_id, '00000000-0000-0000-0000-000000000000'),
-              started_at = COALESCE(started_at, applied_at, NOW(3)),
+              started_at = CASE WHEN state = 'STARTED' THEN COALESCE(started_at, heartbeat_at, NOW(3)) ELSE COALESCE(started_at, applied_at, NOW(3)) END,
               applied_at = CASE WHEN state = 'APPLIED' OR state IS NULL OR state = '' THEN COALESCE(applied_at, NOW(3)) ELSE applied_at END
             WHERE version = ? OR description = ?
           `, [canonicalPath, effectiveChecksum, row.version, row.description]);

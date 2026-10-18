@@ -548,6 +548,131 @@ describe('OP-01T: Migration 161 Governed Industrial Persistence Suite', () => {
     delete process.env.PPOS_ALLOW_FAILED_161_RETRY;
   });
 
+  // 20b. Governed recovery from orphaned STARTED state
+  it('20b. repairFailedMigration161 recovers from orphaned STARTED state with FAILED_161_REPAIR_RETRY audit marker', async () => {
+    const {
+      detectFailedMigration161,
+      repairFailedMigration161
+    } = require('../src/api/services/migrationRepairService');
+
+    const orphanedRow = {
+      version: '161_phase184g_industrial_persistence_ledger',
+      description: '161_phase184g_industrial_persistence_ledger.sql',
+      checksum: 'f27c3228674648272c9cfe45556df17da707b6aa8556142b39a4768a5f2b1415',
+      state: 'STARTED',
+      failure_code: null,
+      failed_statement_index: null,
+      previous_failures: JSON.stringify([{
+        action: 'FAILED_161_REPAIR_RETRY',
+        repaired_at: '2026-10-18T10:00:00.000Z',
+        previous_state: 'FAILED',
+        failure_code: 'ER_WRONG_OBJECT',
+        failed_statement_index: 44
+      }]),
+      execution_id: 'exec-orphaned-161'
+    };
+
+    const mockConn = {
+      query: vi.fn(async (q) => {
+        if (q.includes('SELECT version, description, checksum, state')) {
+          return [[orphanedRow]];
+        }
+        if (q.includes('SELECT version, description, checksum, record_type')) {
+          return [[orphanedRow]];
+        }
+        if (q.includes('UPDATE schema_versions')) {
+          return [{ affectedRows: 1 }];
+        }
+        return [[]];
+      })
+    };
+
+    // Detection identifies orphaned retry
+    const detection = await detectFailedMigration161(mockConn);
+    expect(detection.detected).toBe(true);
+    expect(detection.state).toBe('STARTED');
+    expect(detection.orphanedRetry).toBe(true);
+
+    // Requires opt-in flag
+    delete process.env.PPOS_ALLOW_FAILED_161_RETRY;
+    await expect(repairFailedMigration161(mockConn))
+      .rejects
+      .toThrow('GOVERNED_REPAIR_REQUIRED');
+
+    // Succeeds when authorized
+    process.env.PPOS_ALLOW_FAILED_161_RETRY = 'true';
+    const result = await repairFailedMigration161(mockConn);
+    expect(result.repaired).toBe(true);
+    expect(result.state).toBe('STARTED');
+    expect(result.auditMarker.action).toBe('ORPHANED_STARTED_161_RECOVERY');
+    expect(result.auditMarker.previous_state).toBe('STARTED');
+
+    delete process.env.PPOS_ALLOW_FAILED_161_RETRY;
+  });
+
+  // 20c. evaluateLedgerStatus respects authorizedMigrationPath without globally ignoring concurrent runners
+  it('20c. evaluateLedgerStatus respects authorizedMigrationPath while blocking foreign started migrations', async () => {
+    const ledgerReadService = require('../src/api/services/migrationLedgerReadService');
+    const db = require('../src/api/services/mysqlClient');
+    const baseline = JSON.parse(fs.readFileSync(path.join(__dirname, '../migrations/migration-integrity-baseline.json'), 'utf8'));
+
+    const mockStarted161 = {
+      version: '161_phase184g_industrial_persistence_ledger',
+      description: '161_phase184g_industrial_persistence_ledger.sql',
+      record_type: 'MIGRATION',
+      migration_path: 'migrations/161_phase184g_industrial_persistence_ledger.sql',
+      checksum: 'f27c3228674648272c9cfe45556df17da707b6aa8556142b39a4768a5f2b1415',
+      state: 'STARTED',
+      started_at: new Date(Date.now() - 60000).toISOString(),
+      heartbeat_at: new Date(Date.now() - 10000).toISOString()
+    };
+
+    vi.spyOn(db, 'query').mockImplementation(async (sql) => {
+      if (sql.includes('information_schema.TABLES')) return [{ TABLE_NAME: 'schema_versions' }];
+      if (sql.includes('information_schema.COLUMNS')) return [{ COLUMN_NAME: 'state' }, { COLUMN_NAME: 'record_type' }];
+      if (sql.includes('SELECT version, description')) {
+        return [mockStarted161];
+      }
+      return [];
+    });
+
+    // Without authorization: blocked with MIGRATION_IN_PROGRESS
+    const unauthStatus = await ledgerReadService.evaluateLedgerStatus(baseline, 30);
+    expect(unauthStatus.status).toBe('MIGRATION_IN_PROGRESS');
+
+    // With authorization for 161: passes through to PENDING_MIGRATIONS (or READY if match)
+    const authStatus = await ledgerReadService.evaluateLedgerStatus(baseline, 30, {
+      authorizedMigrationPath: 'migrations/161_phase184g_industrial_persistence_ledger.sql'
+    });
+    expect(authStatus.status).toBe('PENDING_MIGRATIONS');
+
+    // If another foreign migration is started, it is STILL blocked
+    const mockForeignStarted = {
+      version: '150_some_other_migration',
+      description: '150_some_other_migration.sql',
+      record_type: 'MIGRATION',
+      migration_path: 'migrations/150_some_other_migration.sql',
+      checksum: 'abc',
+      state: 'STARTED',
+      started_at: new Date(Date.now() - 60000).toISOString(),
+      heartbeat_at: new Date(Date.now() - 10000).toISOString()
+    };
+    vi.spyOn(db, 'query').mockImplementation(async (sql) => {
+      if (sql.includes('information_schema.TABLES')) return [{ TABLE_NAME: 'schema_versions' }];
+      if (sql.includes('information_schema.COLUMNS')) return [{ COLUMN_NAME: 'state' }, { COLUMN_NAME: 'record_type' }];
+      if (sql.includes('SELECT version, description')) {
+        return [mockStarted161, mockForeignStarted];
+      }
+      return [];
+    });
+
+    const foreignStatus = await ledgerReadService.evaluateLedgerStatus(baseline, 30, {
+      authorizedMigrationPath: 'migrations/161_phase184g_industrial_persistence_ledger.sql'
+    });
+    expect(foreignStatus.status).toBe('MIGRATION_IN_PROGRESS');
+    expect(foreignStatus.reason).toContain('migrations/150_some_other_migration.sql');
+  });
+
   // 21. OP-02B.2C: validateMigration161PostConditions asserts legacy compatibility objects exist and are queryable
   it('21. validateMigration161PostConditions checks all 7 legacy compatibility objects', async () => {
     const mockConn = {
