@@ -111,16 +111,23 @@ jobs:
     - name: 5. Compile Production Build
       run: npm run build
 
-    - name: 5.1 Build and Export Certified Staging Docker Tarball (Zero-Build Artifact)
+    - name: 5.1 Retrieve Certified Staging Docker Tarball (Zero-Build Invariant)
+      env:
+        GH_TOKEN: ${{ github.token }}
       run: |
-        echo "Building Docker image ppos-control-plane:staging-1557452..."
-        docker build -t ppos-control-plane:staging-1557452 .
-        
-        IMAGE_ID=$(docker inspect --format='{{.Id}}' ppos-control-plane:staging-1557452)
-        echo "Built Image ID: $IMAGE_ID"
+        echo "Retrieving certified staging Docker tarball (digest d276a570449c000d7719e0d1943309d988cc1efb9cbd344f8020a26631642730)..."
+        gh run download 39092942437 -n ppos-control-plane-staging-package-OP02B2B -D /tmp/certified_tar_dl
+        cp /tmp/certified_tar_dl/ppos-control-plane-staging-1557452.tar ./ppos-control-plane-staging-1557452.tar
+        rm -rf /tmp/certified_tar_dl
 
-        echo "Exporting image to ppos-control-plane-staging-1557452.tar..."
-        docker save -o ppos-control-plane-staging-1557452.tar ppos-control-plane:staging-1557452
+        echo "Verifying SHA-256 of certified tarball..."
+        EXPECTED_TAR_SHA="d276a570449c000d7719e0d1943309d988cc1efb9cbd344f8020a26631642730"
+        ACTUAL_TAR_SHA=$(sha256sum ppos-control-plane-staging-1557452.tar | awk '{print $1}')
+        if [ "$ACTUAL_TAR_SHA" != "$EXPECTED_TAR_SHA" ]; then
+          echo "FATAL: Retrieved tarball SHA-256 mismatch! Expected $EXPECTED_TAR_SHA, got $ACTUAL_TAR_SHA"
+          exit 1
+        fi
+        echo "✓ Certified tarball SHA-256 confirmed: $ACTUAL_TAR_SHA"
         
         echo "Preparing deployment bundle package..."
         mkdir -p staging-deploy-bundle
@@ -132,10 +139,6 @@ jobs:
         (cd staging-deploy-bundle && sha256sum ppos-control-plane-staging-1557452.tar docker-compose.staging.yml runbook_staging_deploy.sh .env.staging.example > SHA256SUMS.txt)
         echo "=== Deployment Bundle SHA256SUMS.txt ==="
         cat staging-deploy-bundle/SHA256SUMS.txt
-
-        # Free local image to guarantee step 17 runs purely from docker load without pre-cached image
-        docker rmi ppos-control-plane:staging-1557452
-        echo "✓ Image exported and local docker cache evicted."
 
     - name: 6. Execute Staging Contracts & Ledger Governance Regression Suites (STG-02)
       run: |
@@ -711,5 +714,6 @@ jobs:
       with:
         name: ppos-control-plane-staging-package-OP02B2B
         path: staging-deploy-bundle/
+        include-hidden-files: true
         retention-days: 14
         if-no-files-found: error

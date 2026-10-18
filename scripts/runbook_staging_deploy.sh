@@ -20,6 +20,7 @@ EXPECTED_IMAGE_TAG="ppos-control-plane:staging-1557452"
 TAR_FILE="ppos-control-plane-staging-1557452.tar"
 COMPOSE_FILE="docker-compose.staging.yml"
 CHECKSUM_FILE="SHA256SUMS.txt"
+EXPECTED_IMAGE_ID="sha256:c4f3395002f63d7a5b44854a9bac77d374e402876bb0c6eaa9dd8a6be5327462"
 PORT_STAGING="18081"
 
 echo "=== [1/7] Initializing Staging Deployment Directory ==="
@@ -64,16 +65,24 @@ if [ -z "$LOADED_IMAGE_ID" ]; then
   echo "[FATAL] Failed to inspect loaded image: $EXPECTED_IMAGE_TAG" >&2
   exit 1
 fi
-echo "Loaded Image Tag: $EXPECTED_IMAGE_TAG"
-echo "Loaded Image ID:  $LOADED_IMAGE_ID"
+echo "Loaded Image Tag:   $EXPECTED_IMAGE_TAG"
+echo "Loaded Image ID:    $LOADED_IMAGE_ID"
+echo "Expected Image ID:  $EXPECTED_IMAGE_ID"
 
-if grep -q "$EXPECTED_IMAGE_TAG" "$CHECKSUM_FILE" 2>/dev/null; then
-  echo "✓ Image verified against manifest."
+if [ "$LOADED_IMAGE_ID" != "$EXPECTED_IMAGE_ID" ]; then
+  echo "[FATAL] Image ID mismatch! Expected '$EXPECTED_IMAGE_ID' but loaded image has '$LOADED_IMAGE_ID'" >&2
+  exit 1
 fi
+echo "✓ Docker Image ID strictly verified ($LOADED_IMAGE_ID)."
 
 echo "=== [5/7] Starting Isolated Staging Stack with Compose ==="
 docker compose -f "$COMPOSE_FILE" config --quiet
 docker compose -f "$COMPOSE_FILE" up -d
+
+if [ "${RUNBOOK_DRY_RUN:-false}" == "true" ]; then
+  echo "✓ RUNBOOK_DRY_RUN enabled: Compose deployment started successfully. Halting before live container exec."
+  exit 0
+fi
 
 echo "=== [6/7] Running Canonical Bootstrap & Migrations Inside Container ==="
 echo "Waiting for staging-mysql container to be healthy..."

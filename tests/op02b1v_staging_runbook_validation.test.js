@@ -589,14 +589,204 @@ describe('OP-02B.1V: Staging Runbook, Configuration Contracts & Secret Resolutio
             expect(runbook).toContain('MANDATORY_FILES=');
             expect(runbook).toContain('sha256sum --check --strict "$CHECKSUM_FILE"');
 
-            // 5. Image ID assertion
+            // 5. Image ID assertion & literal comparison
+            expect(runbook).toContain('EXPECTED_IMAGE_ID="sha256:c4f3395002f63d7a5b44854a9bac77d374e402876bb0c6eaa9dd8a6be5327462"');
             expect(runbook).toContain("LOADED_IMAGE_ID=$(docker inspect --format='{{.Id}}' \"$EXPECTED_IMAGE_TAG\"");
+            expect(runbook).toContain('if [ "$LOADED_IMAGE_ID" != "$EXPECTED_IMAGE_ID" ]; then');
+            expect(runbook).toContain('Image ID mismatch!');
+            expect(runbook).not.toContain('grep -q "$EXPECTED_IMAGE_TAG" "$CHECKSUM_FILE"');
 
             // 6. Bounded readiness wait with HTTP timeout and JSON status validation
             expect(runbook).toContain('--max-time 3');
             expect(runbook).toContain('PARSED_STATUS');
             expect(runbook).toContain('JSON.parse');
             expect(runbook).toContain('READY');
+        });
+    });
+
+    describe('8. Targeted Runbook Simulation Tests (A, B, C, D)', () => {
+        const { spawnSync } = require('child_process');
+        const os = require('os');
+
+        const runbookSource = fs.readFileSync(path.join(__dirname, '../scripts/runbook_staging_deploy.sh'), 'utf8');
+        const composeSource = fs.readFileSync(path.join(__dirname, '../docker-compose.staging.yml'), 'utf8');
+        const envSource = fs.readFileSync(path.join(__dirname, '../.env.staging.example'), 'utf8');
+
+        // Resolve suitable bash binary across Linux/macOS and Windows
+        const gitBash = 'C:\\Program Files\\Git\\bin\\bash.exe';
+        const bashBinary = (process.platform === 'win32' && fs.existsSync(gitBash)) ? gitBash : 'bash';
+
+        // Helper to setup a test deployment environment
+        // Helper to setup a test deployment environment
+        function setupTestEnv(options = {}) {
+            const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ppos-runbook-test-'));
+            const binDir = path.join(tempDir, 'mock-bin');
+            fs.mkdirSync(binDir, { recursive: true });
+
+            // Create mock files
+            const tarContent = options.tarContent || 'dummy-tarball-content-for-testing';
+            const tarName = 'ppos-control-plane-staging-1557452.tar';
+            fs.writeFileSync(path.join(tempDir, tarName), tarContent, 'utf8');
+            fs.writeFileSync(path.join(tempDir, 'docker-compose.staging.yml'), composeSource, 'utf8');
+            fs.writeFileSync(path.join(tempDir, '.env.staging.example'), envSource, 'utf8');
+
+            // Write runbook
+            const testRunbookPath = path.join(tempDir, 'runbook_staging_deploy.sh');
+            const runbookScriptToTest = fs.readFileSync(path.join(__dirname, '../scripts/runbook_staging_deploy.sh'), 'utf8');
+            fs.writeFileSync(testRunbookPath, runbookScriptToTest, { mode: 0o755 });
+
+            // Compute true SHA-256 for test files
+            const crypto = require('crypto');
+            const sha256 = (p) => crypto.createHash('sha256').update(fs.readFileSync(p)).digest('hex');
+
+            let shaContent = `${sha256(path.join(tempDir, tarName))}  ${tarName}\n` +
+                `${sha256(path.join(tempDir, 'docker-compose.staging.yml'))}  docker-compose.staging.yml\n` +
+                `${sha256(testRunbookPath)}  runbook_staging_deploy.sh\n` +
+                `${sha256(path.join(tempDir, '.env.staging.example'))}  .env.staging.example\n`;
+
+            if (options.corruptChecksum) {
+                shaContent = shaContent.replace(sha256(path.join(tempDir, tarName)), '0000000000000000000000000000000000000000000000000000000000000000');
+            }
+
+            fs.writeFileSync(path.join(tempDir, 'SHA256SUMS.txt'), shaContent, 'utf8');
+
+            if (options.omitFile) {
+                const fileToRemove = path.join(tempDir, options.omitFile);
+                if (fs.existsSync(fileToRemove)) {
+                    fs.unlinkSync(fileToRemove);
+                }
+            }
+
+            // Create mock docker executable
+            const mockInspectId = options.mockInspectId !== undefined ? options.mockInspectId : 'sha256:c4f3395002f63d7a5b44854a9bac77d374e402876bb0c6eaa9dd8a6be5327462';
+            const logFile = path.join(tempDir, 'docker_call_log.txt');
+            fs.writeFileSync(logFile, '', 'utf8');
+
+            const mockDockerScript = `#!/usr/bin/env bash
+echo "$@" >> "${logFile.replace(/\\/g, '/')}"
+if [ "$1" == "load" ]; then
+  exit 0
+fi
+if [ "$1" == "inspect" ]; then
+  echo "${mockInspectId}"
+  exit 0
+fi
+if [ "$1" == "compose" ]; then
+  exit 0
+fi
+exit 0
+`;
+            const mockDockerPath = path.join(binDir, 'docker');
+            fs.writeFileSync(mockDockerPath, mockDockerScript, { mode: 0o755 });
+
+            return { tempDir, binDir, logFile, testRunbookPath };
+        }
+
+        function cleanupEnv(tempDir) {
+            try {
+                fs.rmSync(tempDir, { recursive: true, force: true });
+            } catch (_) {}
+        }
+
+        it('Test A: Archivo obligatorio ausente: salida no cero, sin docker load ni compose up', () => {
+            // Omit .env.staging.example
+            const env = setupTestEnv({ omitFile: '.env.staging.example' });
+            try {
+                const res = spawnSync(bashBinary, [env.testRunbookPath], {
+                    env: {
+                        ...process.env,
+                        PATH: `${env.binDir}${path.delimiter}${process.env.PATH}`,
+                        STAGING_DEPLOY_DIR: env.tempDir,
+                        RUNBOOK_DRY_RUN: 'true'
+                    },
+                    encoding: 'utf8'
+                });
+
+                expect(res.status).not.toBe(0);
+                expect(res.stderr).toContain("Mandatory deployment file '.env.staging.example' is missing");
+                
+                const dockerLogs = fs.readFileSync(env.logFile, 'utf8');
+                expect(dockerLogs).not.toContain('load');
+                expect(dockerLogs).not.toContain('compose');
+            } finally {
+                cleanupEnv(env.tempDir);
+            }
+        });
+
+        it('Test B: Checksum incorrecto: salida no cero, sin docker load ni compose up', () => {
+            const env = setupTestEnv({ corruptChecksum: true });
+            try {
+                const res = spawnSync(bashBinary, [env.testRunbookPath], {
+                    env: {
+                        ...process.env,
+                        PATH: `${env.binDir}${path.delimiter}${process.env.PATH}`,
+                        STAGING_DEPLOY_DIR: env.tempDir,
+                        RUNBOOK_DRY_RUN: 'true'
+                    },
+                    encoding: 'utf8'
+                });
+
+                expect(res.status).not.toBe(0);
+                
+                const dockerLogs = fs.readFileSync(env.logFile, 'utf8');
+                expect(dockerLogs).not.toContain('load');
+                expect(dockerLogs).not.toContain('compose');
+            } finally {
+                cleanupEnv(env.tempDir);
+            }
+        });
+
+        it('Test C: Image ID distinto: salida no cero, sin compose up', () => {
+            const env = setupTestEnv({ mockInspectId: 'sha256:mismatched_image_id_000000000000' });
+            try {
+                const res = spawnSync(bashBinary, [env.testRunbookPath], {
+                    env: {
+                        ...process.env,
+                        PATH: `${env.binDir}${path.delimiter}${process.env.PATH}`,
+                        STAGING_DEPLOY_DIR: env.tempDir,
+                        RUNBOOK_DRY_RUN: 'true'
+                    },
+                    encoding: 'utf8'
+                });
+
+                expect(res.status).not.toBe(0);
+                expect(res.stderr).toContain('Image ID mismatch!');
+                expect(res.stderr).toContain('sha256:mismatched_image_id_000000000000');
+
+                const dockerLogs = fs.readFileSync(env.logFile, 'utf8');
+                expect(dockerLogs).toContain('load');
+                expect(dockerLogs).not.toContain('up');
+            } finally {
+                cleanupEnv(env.tempDir);
+            }
+        });
+
+        it('Test D: Image ID correcto: supera la comparación y permite continuar', () => {
+            const expectedId = 'sha256:c4f3395002f63d7a5b44854a9bac77d374e402876bb0c6eaa9dd8a6be5327462';
+            const env = setupTestEnv({ mockInspectId: expectedId });
+            try {
+                const res = spawnSync(bashBinary, [env.testRunbookPath], {
+                    env: {
+                        ...process.env,
+                        PATH: `${env.binDir}${path.delimiter}${process.env.PATH}`,
+                        STAGING_DEPLOY_DIR: env.tempDir,
+                        RUNBOOK_DRY_RUN: 'true'
+                    },
+                    encoding: 'utf8'
+                });
+
+                expect(res.status).toBe(0);
+                // The output will confirm the strict image check passed:
+                expect(res.stdout).toContain('Docker Image ID strictly verified (sha256:c4f3395002f63d7a5b44854a9bac77d374e402876bb0c6eaa9dd8a6be5327462)');
+
+                const dockerLogs = fs.readFileSync(env.logFile, 'utf8');
+                expect(dockerLogs).toContain('load');
+                expect(dockerLogs).toContain('inspect');
+                expect(dockerLogs).toContain('compose -f docker-compose.staging.yml config --quiet');
+                expect(dockerLogs).toContain('compose -f docker-compose.staging.yml up -d');
+            } finally {
+                cleanupEnv(env.tempDir);
+            }
         });
     });
 });
