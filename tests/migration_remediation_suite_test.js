@@ -125,7 +125,7 @@ async function runRetryTests() {
                     { COLUMN_NAME: 'previous_failures' }
                 ]];
             }
-            if (s.includes('SELECT RECORD_TYPE, MIGRATION_PATH, CHECKSUM, STATE, STARTED_AT, HEARTBEAT_AT, FAILURE_CODE')) {
+            if (s.includes('RECORD_TYPE') && s.includes('MIGRATION_PATH') && s.includes('CHECKSUM')) {
                 return [mockDbState];
             }
             if (s.includes('SELECT VERSION, DESCRIPTION, CHECKSUM, STATE FROM SCHEMA_VERSIONS')) {
@@ -159,7 +159,7 @@ async function runRetryTests() {
 
     const service = new MigrationService();
 
-    // Test B1: FAILED same path + same checksum -> explicit retry allowed
+    // Test B1: FAILED migration -> strictly blocked fail-closed (accidental env var does NOT unblock)
     process.env.PPOS_MIGRATION_EXECUTION = 'true';
     process.env.PPOS_ALLOW_MIGRATION_RETRY = 'true';
 
@@ -180,8 +180,8 @@ async function runRetryTests() {
     queryLog = [];
     const status = await ledgerRead.evaluateLedgerStatus(baseline);
     console.log('LEDGER STATUS OBJECT:', status);
-    assert.strictEqual(status.status, 'PENDING_MIGRATIONS', 'Should recognize failed migration as pending for retry');
-    console.log('✓ evaluateLedgerStatus detects eligible FAILED migration as pending retry');
+    assert.strictEqual(status.status, 'MIGRATION_FAILED', 'Must strictly block FAILED migration fail-closed');
+    console.log('✓ evaluateLedgerStatus strictly blocks FAILED migration fail-closed');
 
     // Test B2: FAILED different checksum -> rejected
     mockDbState[0].checksum = 'DIFFERENT_CHECKSUM_XYZ';

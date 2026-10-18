@@ -4,6 +4,20 @@
  * Centralized governance, visibility, and multi-region coordination.
  */
 require('dotenv').config();
+const fs = require('fs');
+
+// Resolve Docker secrets if specified via _FILE environment variables
+if (process.env.JWT_SECRET_FILE && fs.existsSync(process.env.JWT_SECRET_FILE)) {
+    try {
+        process.env.JWT_SECRET = fs.readFileSync(process.env.JWT_SECRET_FILE, 'utf8').trim();
+    } catch (e) {}
+}
+if (process.env.MYSQL_PASSWORD_FILE && fs.existsSync(process.env.MYSQL_PASSWORD_FILE)) {
+    try {
+        process.env.MYSQL_PASSWORD = fs.readFileSync(process.env.MYSQL_PASSWORD_FILE, 'utf8').trim();
+    } catch (e) {}
+}
+
 const mysqlClient = require('./src/api/services/mysqlClient');
 const fastify = require('fastify')({
     logger: {
