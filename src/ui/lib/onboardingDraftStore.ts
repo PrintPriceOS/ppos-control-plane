@@ -334,12 +334,10 @@ export function deriveServerStage(
     }
 
     // Account setup is complete, but pricing is not.
-    // Invariant: Do NOT deduce Stage B completion exclusively from machinery or operational readiness.
+    // Invariant: Do NOT deduce Stage B completion exclusively from machinery or operational readiness,
+    // nor from unconfirmed local draftStage.
     // Explicit confirmation of products or presence of active pricing continuity is required to advance to PRICING.
-    const isExplicitlyOnPricingOrReview = draftStage === 'PRICING' || draftStage === 'REVIEW';
-
-    // If products were explicitly confirmed or there is active pricing continuity, user is ready for PRICING
-    if (hasProductsCompleted || hasActivePricing || isExplicitlyOnPricingOrReview) {
+    if (hasProductsCompleted || hasActivePricing) {
         if (isAccountComplete && !isPricingComplete) {
             return 'PRICING';
         }
@@ -427,7 +425,34 @@ export async function resumePendingGuidedStage(token: string, tenantId: string):
         if (!json || !json.ok || !json.data?.readiness) {
             return localDraft.currentStage || 'WELCOME';
         }
-        return deriveServerStage(json.data.readiness, derivationContext);
+
+        const serverCompany = json.data?.company;
+        const serverFamiliesList = serverCompany?.selectedProductFamilies;
+        const serverProductsConfirmed = Boolean(serverCompany?.productsConfirmed);
+
+        let effectiveEnabled = localDraft.enabledFamilies;
+        if (Array.isArray(serverFamiliesList)) {
+            effectiveEnabled = {
+                HARDCOVER: serverFamiliesList.includes('HARDCOVER'),
+                SOFTCOVER: serverFamiliesList.includes('SOFTCOVER'),
+                WIRE_O: serverFamiliesList.includes('WIRE_O'),
+                SADDLE_STITCH: serverFamiliesList.includes('SADDLE_STITCH')
+            };
+        }
+
+        const effectiveCompletedStages = {
+            ...localDraft.completedStages,
+            PRODUCTS: serverProductsConfirmed || localDraft.completedStages?.PRODUCTS || false
+        };
+
+        const serverDerivationContext: StageDerivationContext = {
+            draftStage: localDraft.currentStage,
+            completedStages: effectiveCompletedStages,
+            enabledFamilies: effectiveEnabled,
+            hasPricingContinuity
+        };
+
+        return deriveServerStage(json.data.readiness, serverDerivationContext);
     } catch (e) {
         return localDraft.currentStage || 'WELCOME';
     }

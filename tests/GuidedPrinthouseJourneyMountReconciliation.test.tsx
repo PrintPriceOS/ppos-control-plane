@@ -410,4 +410,110 @@ describe('GuidedPrinthouseJourney Mount & Runtime Reconciliation Integration Sui
             expect(draftB.company.legalName).not.toContain('INTRUSA');
         });
     });
+
+    it('7. Cross-browser recovery: Browser B with completely empty localStorage restores persisted product families and opens at PRICING', async () => {
+        // Step 2 requirement: Browser B logs in with completely empty localStorage (NO local draft, NO cache)
+        localStorage.clear();
+
+        // Step 3 requirement: Server returns persisted selection (e.g. HARDCOVER and WIRE_O) and confirmation
+        global.fetch = vi.fn().mockImplementation((url: string) => {
+            if (url.includes('/api/printhouse/onboarding')) {
+                return Promise.resolve({
+                    ok: true,
+                    json: () => Promise.resolve({
+                        ok: true,
+                        data: {
+                            company: {
+                                legalName: 'Imprenta Cruzada S.L.',
+                                country: 'ES',
+                                city: 'Barcelona',
+                                selectedProductFamilies: ['HARDCOVER', 'WIRE_O'],
+                                productsConfirmed: true
+                            },
+                            sites: [{ siteId: 'site-cruzada-1', siteName: 'Sede Barcelona', city: 'Barcelona', country: 'ES' }],
+                            readiness: {
+                                accountSetup: { status: 'COMPLETE', blockingIssues: [] },
+                                operationalConfiguration: { status: 'COMPLETE', blockingIssues: [] },
+                                pricingReadiness: { status: 'INCOMPLETE', blockingIssues: ['NO_RATES'] }
+                            }
+                        }
+                    })
+                });
+            }
+            return Promise.resolve({ ok: true, json: () => Promise.resolve({ ok: true, data: {} }) });
+        });
+
+        // Render component directly without injecting any local draft
+        renderJourney(<GuidedPrinthouseJourney onOpenFullSetup={vi.fn()} printerNodeId="node-mount-1" />);
+
+        // Step 4 requirement: UI reconstructs enabledFamilies and opens at the correct pending stage (PRICING)
+        await waitFor(() => {
+            expect(screen.getByText(/Calibra tus tarifas con un presupuesto real/i)).toBeInTheDocument();
+        });
+        expect(screen.getByRole('button', { name: /Usar asistente de calibración/i })).toBeInTheDocument();
+
+        // Verify draft reconstructed in localStorage has the exact persisted families without inventing values
+        const reconstructedDraft = loadGuidedOnboardingDraft('tenant-mount-test');
+        expect(reconstructedDraft.enabledFamilies).toEqual({
+            HARDCOVER: true,
+            SOFTCOVER: false,
+            WIRE_O: true,
+            SADDLE_STITCH: false
+        });
+        expect(reconstructedDraft.completedStages.PRODUCTS).toBe(true);
+        expect(reconstructedDraft.currentStage).toBe('PRICING');
+    });
+
+    it('8. Cross-browser recovery: Browser B with empty localStorage opens at PRODUCTS when products are not yet confirmed', async () => {
+        // Fresh Browser B with empty localStorage
+        localStorage.clear();
+
+        // Server returns company with products unconfirmed
+        global.fetch = vi.fn().mockImplementation((url: string) => {
+            if (url.includes('/api/printhouse/onboarding')) {
+                return Promise.resolve({
+                    ok: true,
+                    json: () => Promise.resolve({
+                        ok: true,
+                        data: {
+                            company: {
+                                legalName: 'Imprenta Pendiente S.L.',
+                                country: 'ES',
+                                city: 'Zaragoza',
+                                selectedProductFamilies: ['SOFTCOVER', 'SADDLE_STITCH'],
+                                productsConfirmed: false
+                            },
+                            sites: [{ siteId: 'site-pendiente-1', siteName: 'Sede Zaragoza', city: 'Zaragoza', country: 'ES' }],
+                            readiness: {
+                                accountSetup: { status: 'COMPLETE', blockingIssues: [] },
+                                operationalConfiguration: { status: 'COMPLETE', blockingIssues: [] },
+                                pricingReadiness: { status: 'INCOMPLETE', blockingIssues: ['NO_RATES'] }
+                            }
+                        }
+                    })
+                });
+            }
+            return Promise.resolve({ ok: true, json: () => Promise.resolve({ ok: true, data: {} }) });
+        });
+
+        // Render directly without injecting draft
+        renderJourney(<GuidedPrinthouseJourney onOpenFullSetup={vi.fn()} printerNodeId="node-mount-1" />);
+
+        // Unconfirmed products must open at Stage B (PRODUCTS), not leaping to PRICING
+        await waitFor(() => {
+            expect(screen.getByText('¿Qué tipos de producto fabrica tu imprenta?')).toBeInTheDocument();
+        });
+        expect(screen.getByRole('button', { name: /Continuar a calibrar precios/i })).toBeInTheDocument();
+
+        // Verify reconstructed families in draft match server selection
+        const reconstructedDraft = loadGuidedOnboardingDraft('tenant-mount-test');
+        expect(reconstructedDraft.enabledFamilies).toEqual({
+            HARDCOVER: false,
+            SOFTCOVER: true,
+            WIRE_O: false,
+            SADDLE_STITCH: true
+        });
+        expect(reconstructedDraft.completedStages.PRODUCTS).toBe(false);
+        expect(reconstructedDraft.currentStage).toBe('PRODUCTS');
+    });
 });

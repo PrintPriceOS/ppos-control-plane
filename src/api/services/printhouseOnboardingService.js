@@ -44,6 +44,10 @@ class PrinthouseOnboardingService {
             contactName: metadata.contact_name || '',
             taxId: metadata.tax_id || '',
             companyRegistrationId: metadata.company_registration_id || '',
+            selectedProductFamilies: Array.isArray(metadata.selected_product_families)
+                ? metadata.selected_product_families
+                : null,
+            productsConfirmed: Boolean(metadata.products_confirmed),
             updatedAt: tenant.updated_at || tenant.created_at
         };
     }
@@ -64,7 +68,9 @@ class PrinthouseOnboardingService {
             website,
             contactName,
             taxId,
-            companyRegistrationId
+            companyRegistrationId,
+            selectedProductFamilies,
+            productsConfirmed
         } = payload || {};
 
         if (country !== undefined && country !== null && country !== '') {
@@ -101,6 +107,25 @@ class PrinthouseOnboardingService {
         if (contactName !== undefined) metadata.contact_name = String(contactName).trim();
         if (taxId !== undefined) metadata.tax_id = String(taxId).trim();
         if (companyRegistrationId !== undefined) metadata.company_registration_id = String(companyRegistrationId).trim();
+
+        if (selectedProductFamilies !== undefined) {
+            const ALLOWED_FAMILIES = ['HARDCOVER', 'SOFTCOVER', 'WIRE_O', 'SADDLE_STITCH'];
+            if (Array.isArray(selectedProductFamilies)) {
+                metadata.selected_product_families = selectedProductFamilies
+                    .map(f => String(f).trim().toUpperCase())
+                    .filter(f => ALLOWED_FAMILIES.includes(f));
+            } else if (selectedProductFamilies && typeof selectedProductFamilies === 'object') {
+                metadata.selected_product_families = Object.entries(selectedProductFamilies)
+                    .filter(([k, v]) => Boolean(v) && ALLOWED_FAMILIES.includes(k.toUpperCase()))
+                    .map(([k]) => k.toUpperCase());
+            } else if (selectedProductFamilies === null) {
+                metadata.selected_product_families = null;
+            }
+        }
+
+        if (productsConfirmed !== undefined) {
+            metadata.products_confirmed = Boolean(productsConfirmed);
+        }
 
         metadata.company_profile_completed = true;
 
