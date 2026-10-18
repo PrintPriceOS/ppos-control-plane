@@ -52,6 +52,80 @@ describe('OP-02B.1V: Staging Runbook, Configuration Contracts & Secret Resolutio
             expect(result.capabilities.JOB_ROUTING_ALLOWED).toBe(false);
             expect(result.capabilities.PRODUCTION_DISPATCH_ALLOWED).toBe(false);
         });
+
+        it('verifies the 4 commercial capability grants directly against database schema contracts', async () => {
+            const mysql = require('../src/api/services/mysqlClient');
+            const activationAdapter = require('../src/api/services/printhouseActivationAdapter');
+            const vi = (await import('vitest')).vi;
+
+            // Ensure mysqlClient is considered configured
+            process.env.MYSQL_HOST = 'test-staging-mysql';
+
+            // Mock DB response simulating an active grant row with all 4 capabilities enabled
+            vi.spyOn(mysql, 'query').mockImplementation(async (sql, params) => {
+                if (sql.includes('printhouse_activation_grants') && params[0] === 'tenant-commercial-test') {
+                    return [
+                        {
+                            id: 'grant-test-01',
+                            review_id: 'rev-01',
+                            tenant_id: 'tenant-commercial-test',
+                            site_id: null,
+                            marketplace_visible: 1,
+                            live_quoting_allowed: 1,
+                            job_routing_allowed: 1,
+                            production_dispatch_allowed: 1,
+                            status: 'ACTIVE',
+                            granted_at: new Date()
+                        }
+                    ];
+                }
+                if (sql.includes('printhouse_activation_grants') && params[0] === 'tenant-commercial-test-2') {
+                    return [
+                        {
+                            id: 'grant-test-02',
+                            review_id: 'rev-02',
+                            tenant_id: 'tenant-commercial-test-2',
+                            site_id: null,
+                            marketplace_visible: 1,
+                            live_quoting_allowed: 1,
+                            job_routing_allowed: 1,
+                            production_dispatch_allowed: 1,
+                            status: 'DEACTIVATED',
+                            granted_at: new Date()
+                        }
+                    ];
+                }
+                return [];
+            });
+
+            const res = await activationAdapter.getCapabilities({ tenantId: 'tenant-commercial-test' });
+            expect(res.status).toBe('ACTIVE');
+            expect(res.capabilities.MARKETPLACE_VISIBLE).toBe(true);
+            expect(res.capabilities.LIVE_QUOTING_ALLOWED).toBe(true);
+            expect(res.capabilities.JOB_ROUTING_ALLOWED).toBe(true);
+            expect(res.capabilities.PRODUCTION_DISPATCH_ALLOWED).toBe(true);
+
+            // Mock DB response simulating deactivated grant
+            vi.spyOn(mysqlClient, 'query').mockResolvedValueOnce([
+                {
+                    id: 'grant-test-02',
+                    review_id: 'rev-02',
+                    tenant_id: 'tenant-commercial-test-2',
+                    marketplace_visible: 1,
+                    live_quoting_allowed: 1,
+                    job_routing_allowed: 1,
+                    production_dispatch_allowed: 1,
+                    status: 'DEACTIVATED',
+                    granted_at: new Date()
+                }
+            ]);
+
+            const deactRes = await activationAdapter.getCapabilities({ tenantId: 'tenant-commercial-test-2' });
+            expect(deactRes.capabilities.MARKETPLACE_VISIBLE).toBe(false);
+            expect(deactRes.capabilities.LIVE_QUOTING_ALLOWED).toBe(false);
+            expect(deactRes.capabilities.JOB_ROUTING_ALLOWED).toBe(false);
+            expect(deactRes.capabilities.PRODUCTION_DISPATCH_ALLOWED).toBe(false);
+        });
     });
 
     describe('3. Docker Compose & Staging Environment Contract Completeness', () => {
@@ -65,6 +139,21 @@ describe('OP-02B.1V: Staging Runbook, Configuration Contracts & Secret Resolutio
             expect(composeContent).toContain('staging_db_password:');
             expect(composeContent).toContain('staging_root_password:');
             expect(composeContent).toContain('staging_jwt_secret:');
+        });
+
+        it('verifies docker-compose.staging.yml enforces shared-host non-invasive architecture', () => {
+            const composeContent = fs.readFileSync(path.join(__dirname, '../docker-compose.staging.yml'), 'utf8');
+            // Dedicated project name
+            expect(composeContent).toContain('name: ppos-staging');
+            // Safe non-conflicting port for app
+            expect(composeContent).toContain('127.0.0.1:18081:8081');
+            // Zero host published ports for staging-mysql (no 3306 on host)
+            expect(composeContent).not.toContain('"127.0.0.1:3306:3306"');
+            expect(composeContent).not.toContain('"3306:3306"');
+            // Authenticated MySQL healthcheck
+            expect(composeContent).toContain('SELECT 1;');
+            // Mock webhook dispatch containment
+            expect(composeContent).toContain('WEBHOOK_DISPATCH_MOCK_ONLY');
         });
 
         it('verifies Dockerfile exists and builds via multistage runner pattern', () => {

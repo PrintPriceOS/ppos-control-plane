@@ -116,3 +116,31 @@ chmod 600 "$HMAC_FILE"
 echo "✓ Authenticated Encrypted Snapshot created: ${FINAL_ENC_ARCHIVE}"
 echo "✓ Integrity Digest: $(cat "$SHA_FILE")"
 echo "✓ Authenticity HMAC Tag: ${HMAC_TAG}"
+
+# 5. Staging Storage & Snapshot Retention Enforcement (FIFO max 3 snapshots + 500MB storage ceiling)
+MAX_SNAPSHOTS="${STAGING_BACKUP_RETENTION_COUNT:-3}"
+MAX_STORAGE_MB="${STAGING_BACKUP_MAX_MB:-500}"
+
+echo "[Retention] Enforcing retention limit (max ${MAX_SNAPSHOTS} snapshots, max ${MAX_STORAGE_MB} MB storage)..."
+
+# Count current snapshots for this database pattern
+mapfile -t EXISTING_SNAPSHOTS < <(ls -t "${BACKUP_DIR}/${DB_NAME}"_*.sql.gz.enc 2>/dev/null || true)
+TOTAL_SNAPSHOTS="${#EXISTING_SNAPSHOTS[@]}"
+
+if [ "$TOTAL_SNAPSHOTS" -gt "$MAX_SNAPSHOTS" ]; then
+  EXCESS=$((TOTAL_SNAPSHOTS - MAX_SNAPSHOTS))
+  echo "Pruning ${EXCESS} older snapshot(s)..."
+  for (( i=MAX_SNAPSHOTS; i<TOTAL_SNAPSHOTS; i++ )); do
+    OLD_ARCHIVE="${EXISTING_SNAPSHOTS[$i]}"
+    echo "  Removing expired archive: ${OLD_ARCHIVE}"
+    rm -f "${OLD_ARCHIVE}" "${OLD_ARCHIVE}.sha256" "${OLD_ARCHIVE}.hmac"
+  done
+fi
+
+# Quota verification
+CURRENT_DIR_KB=$(du -sk "$BACKUP_DIR" 2>/dev/null | awk '{print $1}')
+CURRENT_DIR_MB=$((CURRENT_DIR_KB / 1024))
+if [ "$CURRENT_DIR_MB" -gt "$MAX_STORAGE_MB" ]; then
+  echo "[WARNING] Backup directory usage (${CURRENT_DIR_MB} MB) exceeds configured limit (${MAX_STORAGE_MB} MB)." >&2
+fi
+echo "✓ Retention enforced: $(ls "${BACKUP_DIR}/${DB_NAME}"_*.sql.gz.enc 2>/dev/null | wc -l) snapshot(s) retained (${CURRENT_DIR_MB} MB total)."

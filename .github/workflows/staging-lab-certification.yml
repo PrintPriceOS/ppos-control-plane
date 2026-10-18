@@ -2,7 +2,7 @@ name: Staging Persistent Lab Certification (OP-02B.1Y)
 
 on:
   push:
-    branches: [ feat/op02b1v-staging-runbook-validation ]
+    branches: [ feat/op02b1v-staging-runbook-validation, feat/op02b2b-plesk-staging-adaptation ]
   pull_request:
     branches: [ phase-39.2-tenant-management-console ]
 
@@ -445,9 +445,9 @@ jobs:
           exit 1
         fi
 
-        echo "17.4 Testing HTTP live and health endpoints..."
-        LIVE_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8081/live)
-        HEALTH_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8081/health)
+        echo "17.4 Testing HTTP live and health endpoints on adapted port 18081..."
+        LIVE_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:18081/live)
+        HEALTH_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:18081/health)
         echo "HTTP /live response code: $LIVE_STATUS"
         echo "HTTP /health response code: $HEALTH_STATUS"
 

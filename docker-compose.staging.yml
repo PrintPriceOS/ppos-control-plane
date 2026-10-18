@@ -1,18 +1,30 @@
 # docker-compose.staging.yml
-# PrintPrice OS Control Plane — Persistent Staging Topology
-# Strict isolation: dedicated bridge network, persistent named volumes, file secrets, resource limits.
+# PrintPrice OS Control Plane — Staging Topology (Shared Host Plesk Edition)
+# Non-invasive architecture:
+# 1. Dedicated project namespace (ppos-staging).
+# 2. Zero host port exposure for MySQL: strictly accessible via internal container DNS on ppos_staging_net.
+# 3. Application loopback binding only on 127.0.0.1:18081 (safe candidate port, no conflict with production).
+# 4. Strict resource constraints (1.5 CPU, 1024M RAM max per container).
+# 5. Dedicated persistent named volumes (ppos_staging_mysql_data, ppos_staging_documents_data).
+# 6. Authenticated healthchecks (MySQL verifies authentication and SELECT, App verifies /live).
 
 version: '3.8'
+
+name: ppos-staging
 
 networks:
   ppos_staging_net:
     driver: bridge
-    internal: false # Requires internal DNS resolution; external production access blocked by host firewall
+    # internal: false allows containers to establish outbound connections if required,
+    # while external traffic into containers is blocked except for explicitly published loopback ports.
+    internal: false
 
 volumes:
   staging_mysql_data:
+    name: ppos_staging_mysql_data
     driver: local
   staging_documents_data:
+    name: ppos_staging_documents_data
     driver: local
 
 secrets:
@@ -25,6 +37,7 @@ secrets:
 
 services:
   # Database Service — MySQL 8.0.46
+  # Zero Host Port Exposure: port 3306 is NOT mapped to the host to avoid any conflict with production mysqld
   staging-mysql:
     image: mysql:8.0.46
     container_name: ppos-staging-mysql
@@ -35,7 +48,7 @@ services:
       '--collation-server=utf8mb4_unicode_ci',
       '--default-authentication-plugin=mysql_native_password',
       '--log-bin-trust-function-creators=1',
-      '--innodb-buffer-pool-size=512M',
+      '--innodb-buffer-pool-size=384M',
       '--sql-mode=STRICT_TRANS_TABLES,NO_ENGINE_SUBSTITUTION'
     ]
     environment:
@@ -50,10 +63,9 @@ services:
       - staging_mysql_data:/var/lib/mysql
     networks:
       - ppos_staging_net
-    ports:
-      - "127.0.0.1:3306:3306" # Bound strictly to loopback on staging host
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      # Authenticated verification: checks that mysqld accepts connections, credentials, and executes query
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost --silent && mysql --user=ppos_staging_usr --password=$(cat /run/secrets/staging_db_password) --database=ppos_control_staging -e 'SELECT 1;' >/dev/null 2>&1"]
       interval: 10s
       timeout: 5s
       retries: 6
@@ -61,23 +73,23 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '2.0'
-          memory: 2048M
+          cpus: '1.5'
+          memory: 1024M
         reservations:
-          cpus: '0.5'
-          memory: 512M
+          cpus: '0.25'
+          memory: 384M
     logging:
       driver: "json-file"
       options:
-        max-size: "20m"
-        max-file: "5"
+        max-size: "10m"
+        max-file: "3"
 
   # Application Service — Control Plane
   control-plane-staging:
     build:
       context: .
       dockerfile: Dockerfile
-    image: ppos-control-plane:staging-c8089d6
+    image: ppos-control-plane:staging-a8e3179
     container_name: ppos-control-plane-staging
     restart: unless-stopped
     depends_on:
@@ -109,8 +121,15 @@ services:
       LIVE_QUOTING_ALLOWED: 'false'
       JOB_ROUTING_ALLOWED: 'false'
       PRODUCTION_DISPATCH_ALLOWED: 'false'
+      PAYMENT_EXECUTION_ENABLED: 'false'
+      PAYOUT_EXECUTION_ENABLED: 'false'
+      REFUND_EXECUTION_ENABLED: 'false'
+      LIVE_PROVIDER_CONNECTIVITY: 'false'
+      WEBHOOK_DISPATCH_MOCK_ONLY: 'true'
+      OUTGOING_WEBHOOK_SINK_URL: 'http://127.0.0.1:9999/sink'
     ports:
-      - "127.0.0.1:8081:8081" # Bound strictly to loopback (access via SSH tunnel / reverse proxy)
+      # Bound strictly to loopback on safe non-conflicting host port 18081
+      - "127.0.0.1:18081:8081"
     networks:
       - ppos_staging_net
     healthcheck:
@@ -122,13 +141,13 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '2.0'
-          memory: 2048M
+          cpus: '1.5'
+          memory: 1024M
         reservations:
-          cpus: '0.5'
-          memory: 512M
+          cpus: '0.25'
+          memory: 384M
     logging:
       driver: "json-file"
       options:
-        max-size: "20m"
-        max-file: "5"
+        max-size: "10m"
+        max-file: "3"

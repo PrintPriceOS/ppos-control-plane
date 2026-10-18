@@ -416,10 +416,20 @@ class OutgoingWebhookService {
         const payloadString = typeof delivery.payload_json === 'string' ? delivery.payload_json : JSON.stringify(delivery.payload_json);
         const attempt = delivery.attempt_count + 1;
 
-        // Custom transport handler for unit/integration testing
-        if (options.mockHandler) {
+        // Custom transport handler for unit/integration testing or Staging Containment Mode
+        const isMockMode = options.mockHandler || process.env.WEBHOOK_DISPATCH_MOCK_ONLY === 'true';
+        if (isMockMode) {
             try {
-                const res = await options.mockHandler({
+                const mockHandler = options.mockHandler || (async (params) => {
+                    const sinkUrl = process.env.OUTGOING_WEBHOOK_SINK_URL || 'mock://internal-sink';
+                    logger.info({
+                        event: 'webhook_dispatch_mocked',
+                        message: 'Webhook dispatch intercepted by Staging Mock Mode (no external network call)',
+                        metadata: { destinationUrl: params.url, sinkUrl, eventId: params.headers['X-PPOS-Event-Id'], tenantId: params.headers['X-PPOS-Tenant-Id'] }
+                    });
+                    return { status: 200, data: { intercepted: true, sinkUrl } };
+                });
+                const res = await mockHandler({
                     url: delivery.url,
                     payload: delivery.payload_json,
                     headers: {
@@ -430,7 +440,7 @@ class OutgoingWebhookService {
                     }
                 });
                 await db.query(`UPDATE webhook_deliveries SET status = 'DELIVERED', attempt_count = ?, last_status_code = 200, delivered_at = NOW() WHERE id = ?`, [attempt, deliveryId]);
-                return { ok: true, status: 'DELIVERED', statusCode: 200 };
+                return { ok: true, status: 'DELIVERED', statusCode: 200, mocked: true };
             } catch (err) {
                 const isExhausted = attempt >= delivery.max_attempts;
                 const nextRetry = isExhausted ? null : new Date(Date.now() + (BACKOFF_DELAYS_MS[attempt - 1] || 60000));
