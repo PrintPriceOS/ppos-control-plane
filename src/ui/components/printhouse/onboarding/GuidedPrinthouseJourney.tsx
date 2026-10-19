@@ -38,8 +38,10 @@ import {
     clearGuidedOnboardingDraft,
     createDefaultDraft,
     deriveServerStage,
-    evaluateStageCCompletion
+    evaluateStageCCompletion,
+    reconstructPricingContinuityFromServer
 } from '../../../lib/onboardingDraftStore';
+import { printhouseCalibrationApi } from '../../../lib/printhouseCalibrationApi';
 import { ProductFamilyId, FamilyState } from '../../../types/printhouseOnboardingTypes';
 import { normalizeUiError } from '../../../utils/errorUtils';
 import { BindingIcon } from './BindingFamilyIcons';
@@ -47,7 +49,7 @@ import { GuidedStepCompany } from './GuidedStepCompany';
 import { GuidedStepProducts } from './GuidedStepProducts';
 import { GuidedStepReview } from './GuidedStepReview';
 import { SimplifiedOnboardingJourney } from './SimplifiedOnboardingJourney';
-import { CanonicalIndustrialPricingEditor } from '../pricing/CanonicalIndustrialPricingEditor';
+import { CanonicalIndustrialPricingEditor, getInitialHydratedRates } from '../pricing/CanonicalIndustrialPricingEditor';
 import { SUGGESTED_RATES_METADATA } from '../pricing/printhouseSuggestedRates';
 
 
@@ -198,17 +200,24 @@ export const GuidedPrinthouseJourney: React.FC<GuidedPrinthouseJourneyProps> = (
 
         try {
             const token = getAuthToken();
-            const res = await fetch('/api/printhouse/onboarding', {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            const data = await res.json();
+            const [onboardingData, serverSessions, serverRevisions] = await Promise.all([
+                fetch('/api/printhouse/onboarding', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                }).then(async r => {
+                    const json = await r.json().catch(() => ({}));
+                    return { ok: r.ok && json.ok !== false, status: r.status, ...json };
+                }).catch((err) => ({ ok: false, error: err.message })),
+                printhouseCalibrationApi.listSessions(printerNodeId).catch(() => []),
+                printhouseCalibrationApi.listRevisions(printerNodeId).catch(() => [])
+            ]);
+            const data = onboardingData;
 
             // Discard responses from previous identities if tenant switched while request was in-flight
             if (activeTenantRef.current !== targetTenantId) {
                 return;
             }
 
-            if (res.ok && data.ok) {
+            if (data && data.ok) {
                 setServerData(data.data);
                 const serverCompany = data.data?.company;
                 const serverSites = data.data?.sites || [];
@@ -329,6 +338,28 @@ export const GuidedPrinthouseJourney: React.FC<GuidedPrinthouseJourneyProps> = (
                         };
                     }
 
+                    // Authoritative server reconciliation for pricing continuity per product family:
+                    // Hydrate templateSaved, manualRatesSaved, calibrationAccepted, and pricingMethod from server records
+                    const reconciledPricingContinuity = reconstructPricingContinuityFromServer(
+                        serverSessions,
+                        serverRevisions,
+                        prev.pricingContinuity || {}
+                    );
+
+                    // Sync family visual status from reconciled pricing continuity
+                    setFamilies(prevFam => {
+                        const nextFam = { ...prevFam };
+                        for (const fid of ['HARDCOVER', 'SOFTCOVER', 'WIRE_O', 'SADDLE_STITCH'] as ProductFamilyId[]) {
+                            const cont = reconciledPricingContinuity[fid];
+                            if (cont?.calibrationAccepted) {
+                                nextFam[fid] = { ...nextFam[fid], status: 'DATA_VALIDATED' };
+                            } else if (cont?.templateSaved || cont?.manualRatesSaved) {
+                                nextFam[fid] = { ...nextFam[fid], status: 'DATA_VALIDATED' };
+                            }
+                        }
+                        return nextFam;
+                    });
+
                     // Authoritative server reconciliation for completedStages:
                     // A local draft alone never certifies completion; server facts are primary truth.
                     const isAccountCompleteOnServer = data.data?.readiness?.accountSetup?.status === 'COMPLETE';
@@ -338,7 +369,7 @@ export const GuidedPrinthouseJourney: React.FC<GuidedPrinthouseJourneyProps> = (
                     const stageCEvalOnServer = evaluateStageCCompletion(
                         data.data?.readiness,
                         reconciledFamilies,
-                        prev.pricingContinuity || {},
+                        reconciledPricingContinuity,
                         families
                     );
 
@@ -354,8 +385,8 @@ export const GuidedPrinthouseJourney: React.FC<GuidedPrinthouseJourneyProps> = (
                     // Only reconcile stage on initial mount when user hasn't explicitly navigated,
                     // or if current stage is unstarted/out-of-sync with authoritative server facts.
                     const hasPricingContinuity = Boolean(
-                        prev.pricingContinuity && 
-                        Object.values(prev.pricingContinuity).some((p: any) => p && (p.sessionId || p.offer || p.uploadedFileName || p.pricingMethod))
+                        reconciledPricingContinuity && 
+                        Object.values(reconciledPricingContinuity).some((p: any) => p && (p.sessionId || p.offer || p.uploadedFileName || p.pricingMethod))
                     );
 
                     const derivationCtx: StageDerivationContext = {
@@ -363,7 +394,7 @@ export const GuidedPrinthouseJourney: React.FC<GuidedPrinthouseJourneyProps> = (
                         completedStages: reconciledCompletedStages,
                         enabledFamilies: reconciledFamilies,
                         hasPricingContinuity,
-                        pricingContinuity: prev.pricingContinuity,
+                        pricingContinuity: reconciledPricingContinuity,
                         familiesState: families
                     };
 
@@ -402,6 +433,7 @@ export const GuidedPrinthouseJourney: React.FC<GuidedPrinthouseJourneyProps> = (
                     const updated: GuidedOnboardingDraft = {
                         ...updatedCompanyDraft,
                         enabledFamilies: reconciledFamilies,
+                        pricingContinuity: reconciledPricingContinuity,
                         completedStages: reconciledCompletedStages,
                         currentStage: reconciledStage
                     };
@@ -1405,8 +1437,42 @@ export const GuidedPrinthouseJourney: React.FC<GuidedPrinthouseJourneyProps> = (
                                         </button>
                                         <button
                                             type="button"
-                                            onClick={() => {
+                                            onClick={async () => {
                                                 const famId = effectiveActiveFamilyId;
+                                                const token = getAuthToken();
+
+                                                // 1. Persist template rates to server if printerNodeId is available
+                                                if (printerNodeId && token) {
+                                                    try {
+                                                        const getRes = await fetch(`/api/printhouse/onboarding/pricing/industrial?nodeId=${encodeURIComponent(printerNodeId)}`, {
+                                                            headers: { 'Authorization': `Bearer ${token}` }
+                                                        });
+                                                        if (getRes.ok) {
+                                                            const getData = await getRes.json();
+                                                            const currentChecksum = getData?.data?.baselineChecksum;
+                                                            const hydratedRates = getInitialHydratedRates(getData?.data?.rates);
+                                                            if (currentChecksum) {
+                                                                await fetch('/api/printhouse/onboarding/pricing/industrial', {
+                                                                    method: 'PUT',
+                                                                    headers: {
+                                                                        'Content-Type': 'application/json',
+                                                                        'Authorization': `Bearer ${token}`
+                                                                    },
+                                                                    body: JSON.stringify({
+                                                                        nodeId: printerNodeId,
+                                                                        rates: hydratedRates,
+                                                                        expected_baseline_checksum: currentChecksum,
+                                                                        pricingMethod: 'TEMPLATE',
+                                                                        productFamily: famId
+                                                                    })
+                                                                });
+                                                            }
+                                                        }
+                                                    } catch (e) {
+                                                        console.warn('[GuidedOnboarding] Error persisting template revision to server:', e);
+                                                    }
+                                                }
+
                                                 updateDraft(prev => ({
                                                     ...prev,
                                                     pricingContinuity: {
@@ -1461,8 +1527,36 @@ export const GuidedPrinthouseJourney: React.FC<GuidedPrinthouseJourneyProps> = (
                                     <CanonicalIndustrialPricingEditor
                                         mode="ONBOARDING"
                                         initialNodeData={printerNodeId ? { id: printerNodeId, name: printerNodeName } : undefined}
-                                        onSave={async () => {
+                                        onSave={async (payload: any) => {
                                             const famId = effectiveActiveFamilyId;
+                                            const token = getAuthToken();
+                                            const targetNodeId = printerNodeId || payload?.id || payload?.nodeId;
+
+                                            if (targetNodeId && token) {
+                                                const fullPayload = {
+                                                    ...payload,
+                                                    nodeId: targetNodeId,
+                                                    pricingMethod: 'MANUAL',
+                                                    productFamily: famId
+                                                };
+                                                const res = await fetch('/api/printhouse/onboarding/pricing/industrial', {
+                                                    method: 'PUT',
+                                                    headers: {
+                                                        'Content-Type': 'application/json',
+                                                        'Authorization': `Bearer ${token}`
+                                                    },
+                                                    body: JSON.stringify(fullPayload)
+                                                });
+                                                if (!res.ok) {
+                                                    let errJson: any = null;
+                                                    try { errJson = await res.json(); } catch (_) {}
+                                                    const err: any = new Error(errJson?.error?.message || errJson?.message || 'Error al guardar tarifas industriales.');
+                                                    err.code = res.status === 409 ? 'STALE_BASELINE_CONFLICT' : 'SAVE_ERROR';
+                                                    err.status = res.status;
+                                                    throw err;
+                                                }
+                                            }
+
                                             updateDraft(prev => ({
                                                 ...prev,
                                                 pricingContinuity: {

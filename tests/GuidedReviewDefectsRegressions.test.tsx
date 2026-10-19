@@ -26,6 +26,7 @@ import {
     saveGuidedOnboardingDraft,
     loadGuidedOnboardingDraft,
     clearGuidedOnboardingDraft,
+    reconstructPricingContinuityFromServer,
     GuidedOnboardingDraft
 } from '../src/ui/lib/onboardingDraftStore';
 
@@ -674,6 +675,149 @@ describe('GuidedStepReview & ManualOfferForm Defects & Regressions', () => {
                 expect(screen.getByText(/Zusammenfassung Ihrer Druckereieinrichtung/i)).toBeInTheDocument();
                 expect(screen.getByText(/Fährmann Druckereibetriebsgemeinschaft GmbH & Co. KG/i)).toBeInTheDocument();
             });
+        });
+    });
+
+    describe('Server Contract Rehydration without localStorage (Discrepancy 1 & 3)', () => {
+        it('starts without localStorage and accurately reconstructs templateSaved, manualRatesSaved, calibrationAccepted and pending without family inheritance', () => {
+            // Guarantee localStorage is completely empty
+            if (typeof window !== 'undefined' && window.localStorage) {
+                window.localStorage.clear();
+            }
+
+            // Real server responses mimicking contract responses
+            // 1. HARDCOVER: has accepted calibration session
+            const mockServerSessions = [
+                {
+                    id: 'cal_sess_hc_001',
+                    status: 'ACCEPTED',
+                    bookSpec: {
+                        family: 'HARDCOVER',
+                        bindingMethod: 'hardcover',
+                        widthMm: 148,
+                        heightMm: 210,
+                        pageCount: 192
+                    },
+                    acceptedAt: '2026-10-19T10:00:00Z'
+                },
+                {
+                    id: 'cal_sess_draft_sc',
+                    status: 'DRAFT', // Not accepted! Must not mark Softcover as calibrated
+                    bookSpec: {
+                        family: 'SOFTCOVER',
+                        bindingMethod: 'perfect_bound'
+                    }
+                }
+            ];
+
+            // 2. SOFTCOVER: saved template revision
+            // 3. WIRE_O: saved manual rates revision
+            // 4. SADDLE_STITCH: no sessions, no revisions (strictly pending)
+            const mockServerRevisions = [
+                {
+                    id: 'rev_softcover_template',
+                    sourceType: 'MANUAL_EDIT',
+                    createdBy: {
+                        userId: 'usr_admin',
+                        email: 'admin@printhouse.local',
+                        role: 'PRINTHOUSE_ADMIN',
+                        pricingMethod: 'TEMPLATE',
+                        productFamily: 'SOFTCOVER'
+                    },
+                    ratesChecksum: 'checksum_sc_tpl'
+                },
+                {
+                    id: 'rev_wireo_manual',
+                    sourceType: 'MANUAL_EDIT',
+                    createdBy: {
+                        userId: 'usr_admin',
+                        email: 'admin@printhouse.local',
+                        role: 'PRINTHOUSE_ADMIN',
+                        pricingMethod: 'MANUAL',
+                        productFamily: 'WIRE_O'
+                    },
+                    ratesChecksum: 'checksum_wo_manual'
+                },
+                {
+                    // Generic legacy revision without family attribution: must NOT be inherited or attributed to any family
+                    id: 'rev_legacy_unattributed',
+                    sourceType: 'MANUAL_EDIT',
+                    createdBy: {
+                        userId: 'usr_legacy',
+                        email: 'legacy@printhouse.local',
+                        role: 'PRINTHOUSE_ADMIN'
+                    },
+                    ratesChecksum: 'checksum_legacy'
+                }
+            ];
+
+            const reconstructed = reconstructPricingContinuityFromServer(
+                mockServerSessions,
+                mockServerRevisions,
+                {}
+            );
+
+            // Verify HARDCOVER: Calibration Accepted
+            expect(reconstructed.HARDCOVER).toBeDefined();
+            expect(reconstructed.HARDCOVER?.calibrationAccepted).toBe(true);
+            expect(reconstructed.HARDCOVER?.pricingMethod).toBe('ASSISTANT');
+            expect(reconstructed.HARDCOVER?.sessionId).toBe('cal_sess_hc_001');
+            expect(reconstructed.HARDCOVER?.templateSaved).toBe(false);
+            expect(reconstructed.HARDCOVER?.manualRatesSaved).toBe(false);
+
+            // Verify SOFTCOVER: Template Saved
+            expect(reconstructed.SOFTCOVER).toBeDefined();
+            expect(reconstructed.SOFTCOVER?.templateSaved).toBe(true);
+            expect(reconstructed.SOFTCOVER?.pricingMethod).toBe('TEMPLATE');
+            expect(reconstructed.SOFTCOVER?.calibrationAccepted).toBe(false); // Draft session must NOT set calibrationAccepted
+            expect(reconstructed.SOFTCOVER?.manualRatesSaved).toBe(false);
+
+            // Verify WIRE_O: Manual Rates Saved
+            expect(reconstructed.WIRE_O).toBeDefined();
+            expect(reconstructed.WIRE_O?.manualRatesSaved).toBe(true);
+            expect(reconstructed.WIRE_O?.pricingMethod).toBe('MANUAL');
+            expect(reconstructed.WIRE_O?.calibrationAccepted).toBe(false);
+            expect(reconstructed.WIRE_O?.templateSaved).toBe(false);
+
+            // Verify SADDLE_STITCH: Strictly Pending (No state inherited from any other family or generic revision)
+            expect(reconstructed.SADDLE_STITCH).toBeDefined();
+            expect(reconstructed.SADDLE_STITCH?.calibrationAccepted).toBe(false);
+            expect(reconstructed.SADDLE_STITCH?.templateSaved).toBe(false);
+            expect(reconstructed.SADDLE_STITCH?.manualRatesSaved).toBe(false);
+            expect(reconstructed.SADDLE_STITCH?.pricingMethod).toBeUndefined();
+
+            // Evaluate Stage C completion with all 4 families enabled:
+            // SADDLE_STITCH is pending, so Stage C must evaluate to NOT complete
+            const enabledAll = {
+                HARDCOVER: true,
+                SOFTCOVER: true,
+                WIRE_O: true,
+                SADDLE_STITCH: true
+            };
+
+            const stageCEval = evaluateStageCCompletion(
+                { pricingReadiness: { status: 'COMPLETE' } },
+                enabledAll,
+                reconstructed,
+                {}
+            );
+
+            expect(stageCEval.isComplete).toBe(false);
+            expect(stageCEval.pendingFamilies).toEqual(['SADDLE_STITCH']);
+            expect(stageCEval.calibratedCount).toBe(1); // HARDCOVER
+            expect(stageCEval.templateCount).toBe(1);   // SOFTCOVER
+            expect(stageCEval.manualCount).toBe(1);     // WIRE_O
+            expect(stageCEval.configuredCount).toBe(3);
+
+            // If only HARDCOVER, SOFTCOVER, and WIRE_O are enabled, Stage C completes:
+            const stageC3Families = evaluateStageCCompletion(
+                { pricingReadiness: { status: 'COMPLETE' } },
+                { HARDCOVER: true, SOFTCOVER: true, WIRE_O: true, SADDLE_STITCH: false },
+                reconstructed,
+                {}
+            );
+            expect(stageC3Families.isComplete).toBe(true);
+            expect(stageC3Families.pendingFamilies).toEqual([]);
         });
     });
 });

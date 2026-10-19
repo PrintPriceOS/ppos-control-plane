@@ -100,83 +100,94 @@ class PrinthouseOnboardingService {
             }
         }
 
-        const [tenant] = await db.query('SELECT metadata_json FROM tenants WHERE id = ?', [tenantId]);
-        if (!tenant) throw new Error('ONBOARDING_PROFILE_NOT_FOUND');
-
-        let metadata = {};
-        try {
-            metadata = typeof tenant.metadata_json === 'string'
-                ? JSON.parse(tenant.metadata_json)
-                : (tenant.metadata_json || {});
-        } catch (e) {}
-
-        const updatedName = (companyName || legalName || tradingName || '').trim();
-
-        if (legalName !== undefined) metadata.legal_name = String(legalName).trim();
-        if (tradingName !== undefined) metadata.trading_name = String(tradingName).trim();
-        if (country !== undefined) {
-            metadata.country = country ? normalizeIso2Country(country) : '';
-        }
-        if (city !== undefined) metadata.city = String(city).trim();
-        if (address !== undefined) metadata.address = String(address).trim();
-        if (postalCode !== undefined) metadata.postal_code = String(postalCode).trim();
-        if (phone !== undefined) metadata.phone = String(phone).trim();
-        if (website !== undefined) metadata.website = String(website).trim();
-        if (contactName !== undefined) metadata.contact_name = String(contactName).trim();
-        if (taxId !== undefined) metadata.tax_id = String(taxId).trim();
-        if (companyRegistrationId !== undefined) metadata.company_registration_id = String(companyRegistrationId).trim();
-        if (siteTimezone !== undefined) {
-            const cleanTz = String(siteTimezone).trim();
-            metadata.timezone = cleanTz;
-        }
-
-        if (selectedProductFamilies !== undefined) {
-            const ALLOWED_FAMILIES = ['HARDCOVER', 'SOFTCOVER', 'WIRE_O', 'SADDLE_STITCH'];
-            if (Array.isArray(selectedProductFamilies)) {
-                metadata.selected_product_families = selectedProductFamilies
-                    .map(f => String(f).trim().toUpperCase())
-                    .filter(f => ALLOWED_FAMILIES.includes(f));
-            } else if (selectedProductFamilies && typeof selectedProductFamilies === 'object') {
-                metadata.selected_product_families = Object.entries(selectedProductFamilies)
-                    .filter(([k, v]) => Boolean(v) && ALLOWED_FAMILIES.includes(k.toUpperCase()))
-                    .map(([k]) => k.toUpperCase());
-            } else if (selectedProductFamilies === null) {
-                metadata.selected_product_families = null;
-            }
-        }
-
-        if (productsConfirmed !== undefined) {
-            metadata.products_confirmed = Boolean(productsConfirmed);
-        }
-
-        metadata.company_profile_completed = true;
-
-        // Perform updates atomically via db transaction or query
         const pool = db.getPool ? db.getPool() : null;
         if (pool && typeof pool.getConnection === 'function') {
             const conn = await pool.getConnection();
             try {
                 await conn.beginTransaction();
 
+                // 1. Read tenant under transaction lock
+                const [tenantRows] = await conn.query('SELECT metadata_json FROM tenants WHERE id = ? FOR UPDATE', [tenantId]);
+                if (!tenantRows || tenantRows.length === 0) {
+                    throw new Error('ONBOARDING_PROFILE_NOT_FOUND');
+                }
+                const tenant = tenantRows[0];
+
+                let metadata = {};
+                try {
+                    metadata = typeof tenant.metadata_json === 'string'
+                        ? JSON.parse(tenant.metadata_json)
+                        : (tenant.metadata_json || {});
+                } catch (e) {}
+
+                const updatedName = (companyName || legalName || tradingName || '').trim();
+
+                if (legalName !== undefined) metadata.legal_name = String(legalName).trim();
+                if (tradingName !== undefined) metadata.trading_name = String(tradingName).trim();
+                if (country !== undefined) {
+                    metadata.country = country ? normalizeIso2Country(country) : '';
+                }
+                if (city !== undefined) metadata.city = String(city).trim();
+                if (address !== undefined) metadata.address = String(address).trim();
+                if (postalCode !== undefined) metadata.postal_code = String(postalCode).trim();
+                if (phone !== undefined) metadata.phone = String(phone).trim();
+                if (website !== undefined) metadata.website = String(website).trim();
+                if (contactName !== undefined) metadata.contact_name = String(contactName).trim();
+                if (taxId !== undefined) metadata.tax_id = String(taxId).trim();
+                if (companyRegistrationId !== undefined) metadata.company_registration_id = String(companyRegistrationId).trim();
+
                 if (siteTimezone !== undefined) {
                     const cleanTz = String(siteTimezone).trim();
-                    // Locate primary printer node for tenant
+                    metadata.timezone = cleanTz;
+
+                    // 2. Query primary printer node under transaction lock
                     const [nodes] = await conn.query(
-                        'SELECT id FROM printer_nodes WHERE tenant_id = ? AND status != "DELETED" ORDER BY created_at ASC LIMIT 1 FOR UPDATE',
+                        'SELECT id, region FROM printer_nodes WHERE tenant_id = ? AND status != "DELETED" ORDER BY created_at ASC LIMIT 1 FOR UPDATE',
                         [tenantId]
                     );
+
+                    // When no printer node exists yet, timezone is safely persisted in metadata_json without error.
+                    // When printer node exists, update its region and verify rows affected or unchanged value.
                     if (Array.isArray(nodes) && nodes.length > 0) {
-                        const targetNodeId = nodes[0].id;
+                        const targetNode = nodes[0];
+                        const targetNodeId = targetNode.id;
+                        const isSameTimezone = (targetNode.region || '').trim() === cleanTz;
+
                         const [updateNodeResult] = await conn.query(
                             'UPDATE printer_nodes SET region = ? WHERE id = ? AND tenant_id = ?',
                             [cleanTz, targetNodeId, tenantId]
                         );
-                        if (updateNodeResult && updateNodeResult.affectedRows === 0) {
+
+                        // If value was already identical, MySQL returns affectedRows = 0 with changedRows = 0, which is valid.
+                        // Only fail if node existed, value was different, but zero rows were matched/updated.
+                        if (!isSameTimezone && updateNodeResult && updateNodeResult.affectedRows === 0) {
                             throw new Error(`SITE_TIMEZONE_UPDATE_FAILED: Zero rows updated for printer_node ${targetNodeId}`);
                         }
                     }
                 }
 
+                if (selectedProductFamilies !== undefined) {
+                    const ALLOWED_FAMILIES = ['HARDCOVER', 'SOFTCOVER', 'WIRE_O', 'SADDLE_STITCH'];
+                    if (Array.isArray(selectedProductFamilies)) {
+                        metadata.selected_product_families = selectedProductFamilies
+                            .map(f => String(f).trim().toUpperCase())
+                            .filter(f => ALLOWED_FAMILIES.includes(f));
+                    } else if (selectedProductFamilies && typeof selectedProductFamilies === 'object') {
+                        metadata.selected_product_families = Object.entries(selectedProductFamilies)
+                            .filter(([k, v]) => Boolean(v) && ALLOWED_FAMILIES.includes(k.toUpperCase()))
+                            .map(([k]) => k.toUpperCase());
+                    } else if (selectedProductFamilies === null) {
+                        metadata.selected_product_families = null;
+                    }
+                }
+
+                if (productsConfirmed !== undefined) {
+                    metadata.products_confirmed = Boolean(productsConfirmed);
+                }
+
+                metadata.company_profile_completed = true;
+
+                // 3. Update tenant row under same transaction
                 await conn.query(
                     'UPDATE tenants SET name = COALESCE(NULLIF(?, ""), name), metadata_json = ? WHERE id = ?',
                     [updatedName, JSON.stringify(metadata), tenantId]
@@ -191,10 +202,36 @@ class PrinthouseOnboardingService {
             }
         } else {
             // Direct query fallback for testing environments without pool wrapper
+            const [tenant] = await db.query('SELECT metadata_json FROM tenants WHERE id = ?', [tenantId]);
+            if (!tenant) throw new Error('ONBOARDING_PROFILE_NOT_FOUND');
+
+            let metadata = {};
+            try {
+                metadata = typeof tenant.metadata_json === 'string'
+                    ? JSON.parse(tenant.metadata_json)
+                    : (tenant.metadata_json || {});
+            } catch (e) {}
+
+            const updatedName = (companyName || legalName || tradingName || '').trim();
+
+            if (legalName !== undefined) metadata.legal_name = String(legalName).trim();
+            if (tradingName !== undefined) metadata.trading_name = String(tradingName).trim();
+            if (country !== undefined) {
+                metadata.country = country ? normalizeIso2Country(country) : '';
+            }
+            if (city !== undefined) metadata.city = String(city).trim();
+            if (address !== undefined) metadata.address = String(address).trim();
+            if (postalCode !== undefined) metadata.postal_code = String(postalCode).trim();
+            if (phone !== undefined) metadata.phone = String(phone).trim();
+            if (website !== undefined) metadata.website = String(website).trim();
+            if (contactName !== undefined) metadata.contact_name = String(contactName).trim();
+            if (taxId !== undefined) metadata.tax_id = String(taxId).trim();
+            if (companyRegistrationId !== undefined) metadata.company_registration_id = String(companyRegistrationId).trim();
             if (siteTimezone !== undefined) {
                 const cleanTz = String(siteTimezone).trim();
+                metadata.timezone = cleanTz;
                 const nodes = await db.query(
-                    'SELECT id FROM printer_nodes WHERE tenant_id = ? AND status != "DELETED" ORDER BY created_at ASC LIMIT 1',
+                    'SELECT id, region FROM printer_nodes WHERE tenant_id = ? AND status != "DELETED" ORDER BY created_at ASC LIMIT 1',
                     [tenantId]
                 );
                 if (Array.isArray(nodes) && nodes.length > 0) {
@@ -204,6 +241,27 @@ class PrinthouseOnboardingService {
                     );
                 }
             }
+
+            if (selectedProductFamilies !== undefined) {
+                const ALLOWED_FAMILIES = ['HARDCOVER', 'SOFTCOVER', 'WIRE_O', 'SADDLE_STITCH'];
+                if (Array.isArray(selectedProductFamilies)) {
+                    metadata.selected_product_families = selectedProductFamilies
+                        .map(f => String(f).trim().toUpperCase())
+                        .filter(f => ALLOWED_FAMILIES.includes(f));
+                } else if (selectedProductFamilies && typeof selectedProductFamilies === 'object') {
+                    metadata.selected_product_families = Object.entries(selectedProductFamilies)
+                        .filter(([k, v]) => Boolean(v) && ALLOWED_FAMILIES.includes(k.toUpperCase()))
+                        .map(([k]) => k.toUpperCase());
+                } else if (selectedProductFamilies === null) {
+                    metadata.selected_product_families = null;
+                }
+            }
+
+            if (productsConfirmed !== undefined) {
+                metadata.products_confirmed = Boolean(productsConfirmed);
+            }
+
+            metadata.company_profile_completed = true;
 
             await db.query(
                 'UPDATE tenants SET name = COALESCE(NULLIF(?, ""), name), metadata_json = ? WHERE id = ?',

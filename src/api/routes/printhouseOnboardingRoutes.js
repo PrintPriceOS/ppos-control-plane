@@ -177,7 +177,7 @@ function safeDeepMergeRates(target, source) {
 // ── PUT /api/printhouse/onboarding/pricing/industrial ──
 router.put('/pricing/industrial', requireAuth, async (req, res) => {
     const tenantId = req.user.tenantId;
-    const { nodeId: requestedNodeId, signatures, delivery_time, production_lead_days, limits, rates, expected_baseline_checksum } = req.body;
+    const { nodeId: requestedNodeId, signatures, delivery_time, production_lead_days, limits, rates, expected_baseline_checksum, pricingMethod, productFamily } = req.body;
 
     // Requirement 1 & 3: Role and write authorization check
     const writeAllowedRoles = ['PRINTHOUSE_ADMIN', 'SUPER_ADMIN'];
@@ -293,7 +293,9 @@ router.put('/pricing/industrial', requireAuth, async (req, res) => {
         const createdBy = JSON.stringify({
             userId: req.user.id || req.user.userId || 'admin',
             email: req.user.email || 'admin@printhouse.local',
-            role: req.user.role || 'PRINTHOUSE_ADMIN'
+            role: req.user.role || 'PRINTHOUSE_ADMIN',
+            ...(pricingMethod ? { pricingMethod: String(pricingMethod).trim().toUpperCase() } : {}),
+            ...(productFamily ? { productFamily: String(productFamily).trim().toUpperCase() } : {})
         });
 
         // Insert immutable pricing revision

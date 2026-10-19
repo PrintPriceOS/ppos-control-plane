@@ -271,6 +271,93 @@ export function clearGuidedOnboardingDraft(tenantId: string): void {
     }
 }
 
+/**
+ * Reconstructs pricing continuity and method attribution per family from authoritative server records:
+ * - Sessions with status === 'ACCEPTED' and matching family -> calibrationAccepted = true, method = 'ASSISTANT'
+ * - Pricing revisions with matching productFamily and pricingMethod === 'TEMPLATE' -> templateSaved = true, method = 'TEMPLATE'
+ * - Pricing revisions with matching productFamily and pricingMethod === 'MANUAL' -> manualRatesSaved = true, method = 'MANUAL'
+ *
+ * Invariants:
+ * 1. Works without localStorage (starts from pure server contracts).
+ * 2. Strict family boundary isolation: NO family ever inherits the method, session, or flags of another family.
+ * 3. Never infers TEMPLATE or a specific family from generic 'MANUAL_EDIT' without explicit attribution.
+ */
+export function reconstructPricingContinuityFromServer(
+    sessions: any[] = [],
+    revisions: any[] = [],
+    existingContinuity: Partial<Record<ProductFamilyId, FamilyPricingSessionDraft>> = {}
+): Partial<Record<ProductFamilyId, FamilyPricingSessionDraft>> {
+    const VALID_FIDS: ProductFamilyId[] = ['HARDCOVER', 'SOFTCOVER', 'WIRE_O', 'SADDLE_STITCH'];
+    const result: Partial<Record<ProductFamilyId, FamilyPricingSessionDraft>> = {
+        ...existingContinuity
+    };
+
+    for (const fid of VALID_FIDS) {
+        const prevDraft = result[fid] || {
+            sessionId: null,
+            activeRun: null,
+            selectedVariantId: null,
+            proposedPatch: {},
+            entryMode: 'UPLOAD_PDF',
+            uploadedFileName: null
+        };
+
+        let isCalibrated = Boolean(prevDraft.calibrationAccepted);
+        let isTemplate = Boolean(prevDraft.templateSaved);
+        let isManual = Boolean(prevDraft.manualRatesSaved);
+        let matchedSessionId: string | null = prevDraft.sessionId || null;
+        let method: PricingMethodChoice | undefined = prevDraft.pricingMethod;
+
+        // 1. Check calibration sessions for accepted session belonging strictly to this family
+        if (Array.isArray(sessions)) {
+            // Find most recent accepted session for this family
+            const acceptedSession = sessions.find(s => {
+                if (!s || s.status !== 'ACCEPTED') return false;
+                const bookSpec = s.bookSpec || (typeof s.book_spec_json === 'string' ? JSON.parse(s.book_spec_json || '{}') : s.book_spec_json);
+                const specFam = bookSpec?.family || (bookSpec?.bindingMethod === 'hardcover' ? 'HARDCOVER' : undefined);
+                return specFam === fid;
+            });
+            if (acceptedSession) {
+                isCalibrated = true;
+                method = 'ASSISTANT';
+                matchedSessionId = acceptedSession.id || matchedSessionId;
+            }
+        }
+
+        // 2. Check revisions for explicit provenance belonging strictly to this family
+        if (Array.isArray(revisions)) {
+            for (const rev of revisions) {
+                if (!rev) continue;
+                const createdBy = rev.createdBy || (typeof rev.created_by_json === 'string' ? JSON.parse(rev.created_by_json || '{}') : rev.created_by_json) || {};
+                const revFam = createdBy.productFamily ? String(createdBy.productFamily).toUpperCase() : null;
+                const revMethod = createdBy.pricingMethod ? String(createdBy.pricingMethod).toUpperCase() : null;
+
+                // Strict attribution: revision must explicitly name this product family
+                if (revFam === fid) {
+                    if (revMethod === 'TEMPLATE') {
+                        isTemplate = true;
+                        if (!isCalibrated) method = 'TEMPLATE';
+                    } else if (revMethod === 'MANUAL') {
+                        isManual = true;
+                        if (!isCalibrated && !isTemplate) method = 'MANUAL';
+                    }
+                }
+            }
+        }
+
+        result[fid] = {
+            ...prevDraft,
+            sessionId: matchedSessionId,
+            pricingMethod: method,
+            calibrationAccepted: isCalibrated,
+            templateSaved: isTemplate,
+            manualRatesSaved: isManual
+        };
+    }
+
+    return result;
+}
+
 export interface StageCCompletionResult {
     isComplete: boolean;
     isGlobalRatesComplete: boolean;
