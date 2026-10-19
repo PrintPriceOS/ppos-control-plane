@@ -1130,6 +1130,118 @@ describe('Simplified Printhouse Onboarding Journey Suite', () => {
         expect(screen.getByText(/Discrepancia aritmética detectada en el presupuesto/i)).toBeInTheDocument();
         expect(screen.getByText(/El precio unitario indicado difiere del cálculo/i)).toBeInTheDocument();
     });
+
+    it('31. Duplicate PDF upload returns 409, renders reopen button, and successfully reopens existing evidence', async () => {
+        global.fetch = vi.fn().mockResolvedValue({
+            ok: false,
+            status: 409,
+            json: async () => ({
+                error: 'DUPLICATE_DOCUMENT',
+                message: 'Este documento exacto ya fue subido previamente para este taller.',
+                evidenceId: 'qdoc-dup-5678',
+                documentSha256: '087a36e62ed65688a80f7623f05c8672e73094450268e21188a23f0515704b81'
+            })
+        } as any);
+
+        const { container } = renderJourney(
+            <SimplifiedOnboardingJourney initialStep={2} />,
+            'es'
+        );
+
+        const file = new File(['duplicate-bytes'], 'Hardcover_640_Seiten_19.10.2026.pdf', { type: 'application/pdf' });
+        const input = container.querySelector('input[type="file"]') as HTMLInputElement;
+        fireEvent.change(input, { target: { files: [file] } });
+
+        // Duplicate document notice and recovery button must appear
+        await waitFor(() => {
+            expect(screen.getByText(/Documento existente detectado/i)).toBeInTheDocument();
+            expect(screen.getByText(/ID: qdoc-dup-5678/i)).toBeInTheDocument();
+            expect(screen.getByTestId('reopen-existing-evidence-btn')).toBeInTheDocument();
+        });
+
+        // Mock getQuoteEvidence
+        const getEvidenceSpy = vi.spyOn(printhouseCalibrationApi, 'getQuoteEvidence').mockResolvedValue({
+            ok: true,
+            data: {
+                id: 'qdoc-dup-5678',
+                filename: 'Hardcover_640_Seiten_19.10.2026.pdf',
+                specification: {
+                    family: 'HARDCOVER',
+                    formatWidthMm: 170,
+                    formatHeightMm: 240,
+                    interiorPages: 640,
+                    interiorPaper: 'G-Print'
+                },
+                offers: [
+                    { id: 'run-1', quantity: 200, manufacturingPrice: 4399, transportPrice: 350, quotedTotalPrice: 4749, quotedUnitPrice: 23.75, validationStatus: 'CONSISTENT' },
+                    { id: 'run-2', quantity: 300, manufacturingPrice: 4765, transportPrice: 350, quotedTotalPrice: 5115, quotedUnitPrice: 17.05, validationStatus: 'CONSISTENT' }
+                ]
+            }
+        } as any);
+
+        // Click reopen button
+        const reopenBtn = screen.getByTestId('reopen-existing-evidence-btn');
+        fireEvent.click(reopenBtn);
+
+        // Advances to Step 3 with existing evidence data
+        await waitFor(() => {
+            expect(getEvidenceSpy).toHaveBeenCalledWith('qdoc-dup-5678');
+            expect(screen.getByText(/Revisión de Especificaciones y Tabla de Variantes/i)).toBeInTheDocument();
+            expect(screen.getByText('4.399,00 €')).toBeInTheDocument();
+            expect(screen.getByText('4.765,00 €')).toBeInTheDocument();
+        });
+    });
+
+    it('32. Allows clicking variant rows in VariantSpecTable to change the selectedVariantId', async () => {
+        const specWithRuns = {
+            family: 'HARDCOVER' as const,
+            productTitle: 'Multi-Run Hardcover Book',
+            widthMm: 170,
+            heightMm: 240,
+            interiorPages: 640,
+            interiorPaper: 'G-Print',
+            coverPaper: 'Silk',
+            bindingMethod: 'thread sewn',
+            runs: [
+                { id: 'run-1', variantKey: 'run-1', quantity: 200, manufacturingPrice: 4399, transportPrice: 350, quotedTotalPrice: 4749, quotedUnitPrice: 23.75, validationStatus: 'CONSISTENT' as const },
+                { id: 'run-2', variantKey: 'run-2', quantity: 300, manufacturingPrice: 4765, transportPrice: 350, quotedTotalPrice: 5115, quotedUnitPrice: 17.05, validationStatus: 'CONSISTENT' as const },
+                { id: 'run-3', variantKey: 'run-3', quantity: 500, manufacturingPrice: 5493, transportPrice: 450, quotedTotalPrice: 5943, quotedUnitPrice: 11.89, validationStatus: 'CONSISTENT' as const }
+            ]
+        };
+
+        renderJourney(
+            <SimplifiedOnboardingJourney 
+                printerNodeId="node-test-1" 
+                initialSpec={specWithRuns as any} 
+                initialStep={3} 
+            />, 
+            'es'
+        );
+
+        const radioRun1 = screen.getByRole('radio', { name: /Seleccionar tirada 200/i });
+        const radioRun2 = screen.getByRole('radio', { name: /Seleccionar tirada 300/i });
+        const radioRun3 = screen.getByRole('radio', { name: /Seleccionar tirada 500/i });
+
+        // Run 1 is selected initially
+        expect(radioRun1).toBeChecked();
+        expect(radioRun2).not.toBeChecked();
+
+        // Click row 2 (300)
+        const row2 = screen.getByTestId('variant-row-run-2');
+        fireEvent.click(row2);
+
+        // Run 2 is now selected
+        expect(radioRun1).not.toBeChecked();
+        expect(radioRun2).toBeChecked();
+        expect(radioRun3).not.toBeChecked();
+
+        // Click row 3 (500)
+        const row3 = screen.getByTestId('variant-row-run-3');
+        fireEvent.click(row3);
+
+        expect(radioRun2).not.toBeChecked();
+        expect(radioRun3).toBeChecked();
+    });
 });
 
 

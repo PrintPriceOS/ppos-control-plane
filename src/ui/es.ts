@@ -2347,7 +2347,10 @@ export const es = {
   'guided.review.statusManualSaved': 'Tarifas guardadas',
   'guided.review.statusTemplatePending': 'Plantilla sin guardar',
   'guided.review.statusManualPending': 'Tarifas sin guardar',
-  'guided.review.statusAssistantPending': 'Calibración pendiente'
+  'guided.review.statusAssistantPending': 'Calibración pendiente',
+  'onboarding.duplicateDocTitle': 'Documento existente detectado',
+  'onboarding.duplicateDocHelp': 'Este documento ya fue cargado previamente para este taller. Puedes reabrir la evidencia existente para continuar con la calibración sin duplicar el registro.',
+  'onboarding.reopenEvidence': 'Reabrir evidencia existente'
 } as const;
 
 export type TranslationKeys = keyof typeof es;

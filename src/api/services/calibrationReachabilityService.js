@@ -229,7 +229,7 @@ class CalibrationReachabilityService {
                     baseActive.uv_var = checkAndResolveRate('uv_varnish', 'var', 0.0, false);
                 }
                 if (p.endpapers && p.endpapers !== 'none') {
-                    const epPrint = String(p.endpapersPrint || '4/0');
+                    const epPrint = (p.endpapersPrint && p.endpapersPrint !== 'none' && p.endpapersPrint !== '0/0') ? String(p.endpapersPrint) : '0/0';
                     const hasSlash = epPrint.includes('/');
                     const frontCols = hasSlash ? parseInt(epPrint.split('/')[0] || '0', 10) : 0;
                     const revCols = hasSlash ? parseInt(epPrint.split('/')[1] || '0', 10) : 0;
@@ -291,7 +291,7 @@ class CalibrationReachabilityService {
                 activeRateKeyToPath.uv_var = 'uv_varnish.var';
             }
             if (p.endpapers && p.endpapers !== 'none') {
-                const epPrint = String(p.endpapersPrint || '4/0');
+                const epPrint = (p.endpapersPrint && p.endpapersPrint !== 'none' && p.endpapersPrint !== '0/0') ? String(p.endpapersPrint) : '0/0';
                 const hasSlash = epPrint.includes('/');
                 const frontCols = hasSlash ? parseInt(epPrint.split('/')[0] || '0', 10) : 0;
                 const revCols = hasSlash ? parseInt(epPrint.split('/')[1] || '0', 10) : 0;

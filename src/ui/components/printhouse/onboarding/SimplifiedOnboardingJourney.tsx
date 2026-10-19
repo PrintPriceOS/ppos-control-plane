@@ -148,6 +148,8 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
     const [lockedStepNotice, setLockedStepNotice] = useState<string | null>(null);
     const [uploadingPdf, setUploadingPdf] = useState<boolean>(false);
     const [uploadError, setUploadError] = useState<string | null>(null);
+    const [duplicateEvidence, setDuplicateEvidence] = useState<{ evidenceId: string; filename: string } | null>(null);
+    const [loadingExistingEvidence, setLoadingExistingEvidence] = useState<boolean>(false);
     const [uploadedFileName, setUploadedFileName] = useState<string | null>(() => {
         return initPricingForTarget?.uploadedFileName || null;
     });
@@ -336,6 +338,7 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
         setUploadingPdf(false);
         setCalculatingSolver(false);
         setUploadError(null);
+        setDuplicateEvidence(null);
 
         // 2. Protect unsaved draft of current family
         familyDraftsRef.current[currentActive] = {
@@ -478,6 +481,7 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
 
     const handleFileUpload = async (file: File) => {
         setUploadError(null);
+        setDuplicateEvidence(null);
         setUploadedFileName(file.name);
         setUploadingPdf(true);
 
@@ -524,6 +528,16 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
                     errPayload = await res.json();
                 } catch {
                     // Non-JSON response
+                }
+                if (res.status === 409 && (errPayload?.error === 'DUPLICATE_DOCUMENT' || errPayload?.evidenceId)) {
+                    if (uploadRequestIdRef.current === thisUploadId && selectedFamilyIdRef.current === uploadFamilyId) {
+                        setDuplicateEvidence({
+                            evidenceId: errPayload.evidenceId,
+                            filename: file.name
+                        });
+                        setUploadError(errPayload.message || 'Este documento exacto ya fue subido previamente para este taller.');
+                    }
+                    return;
                 }
                 const errorMsg = errPayload?.message || errPayload?.error || `Error ${res.status}: Fallo al procesar el archivo PDF`;
                 throw new Error(errorMsg);
@@ -626,6 +640,106 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
             if (uploadRequestIdRef.current === thisUploadId) {
                 setUploadingPdf(false);
             }
+        }
+    };
+
+    const handleReopenEvidence = async (evidenceId: string, fallbackFilename?: string) => {
+        setUploadError(null);
+        setLoadingExistingEvidence(true);
+        try {
+            const res = await printhouseCalibrationApi.getQuoteEvidence(evidenceId);
+            const extractedData = res?.data || res;
+            if (!extractedData) {
+                throw new Error('No se pudo recuperar la información del documento existente.');
+            }
+
+            const rawOffers: any[] = extractedData?.offers || [];
+            if (!Array.isArray(rawOffers) || rawOffers.length === 0) {
+                throw new Error('El documento existente no contiene ofertas legibles.');
+            }
+
+            const docFilename = extractedData?.filename || extractedData?.original_filename || fallbackFilename || 'document.pdf';
+            setUploadedFileName(docFilename);
+
+            const extractedRuns: OfferVariantRow[] = rawOffers.map((off: any, idx: number) => {
+                const q = Number(off.quantity);
+                const mfg = Number(off.manufacturingPrice);
+                const trans = Number(off.transportPrice ?? 0);
+                const total = Number(off.quotedTotalPrice ?? (mfg + trans));
+                const unit = Number(off.quotedUnitPrice ?? (total / (q || 1)));
+
+                return {
+                    id: off.id || `run-${idx + 1}`,
+                    variantKey: off.variantKey || `run-${idx + 1}`,
+                    quantity: q,
+                    manufacturingPrice: mfg,
+                    transportPrice: trans,
+                    quotedTotalPrice: total,
+                    quotedUnitPrice: unit,
+                    computedTotalPrice: off.computedTotalPrice ?? total,
+                    computedUnitPrice: off.computedUnitPrice ?? unit,
+                    validationStatus: off.validationStatus || 'CONSISTENT',
+                    paperVariant: off.variantName || off.paperVariant || extractedData?.specification?.interiorPaper || 'Papel estándar',
+                    deliveryOption: trans > 0 ? 'Con entrega' : 'Estándar',
+                    sourceText: off.sourceText,
+                    provenance: off.provenance
+                };
+            });
+
+            const initialVariantId = extractedRuns[0]?.id || extractedRuns[0]?.variantKey || 'run-1';
+            setSelectedVariantId(initialVariantId);
+
+            const spec = extractedData?.specification || {};
+            const cleanTitle = extractedData?.printhouseName || extractedData?.productTitle || docFilename.replace(/\.pdf$/i, '');
+            const generatedRef = evidenceId || `REF-${Date.now().toString().slice(-4)}`;
+
+            setCurrentOffer({
+                family: spec.family || selectedFamilyIdRef.current,
+                productTitle: cleanTitle,
+                quoteRef: generatedRef,
+                quoteReference: generatedRef,
+                evidenceId: evidenceId,
+                quoteDate: extractedData?.quoteDate || extractedData?.created_at?.split('T')[0] || new Date().toISOString().split('T')[0],
+                currency: 'EUR',
+                widthMm: spec.formatWidthMm,
+                heightMm: spec.formatHeightMm,
+                formatWidthMm: spec.formatWidthMm,
+                formatHeightMm: spec.formatHeightMm,
+                interiorPages: spec.interiorPages || extractedData?.pageCount,
+                pageCount: spec.interiorPages || extractedData?.pageCount,
+                interiorPaper: spec.interiorPaper,
+                interiorWeightGsm: spec.interiorWeightGsm,
+                interiorColors: spec.interiorColors,
+                coverPaper: spec.coverPaper,
+                coverWeightGsm: spec.coverWeightGsm,
+                coverColors: spec.coverColors,
+                boardThicknessMm: spec.boardThicknessMm,
+                bindingMethod: spec.bindingMethod,
+                spineType: spec.spineType,
+                lamination: spec.lamination,
+                hasEndpapers: spec.hasEndpapers,
+                endpaperPaper: spec.endpaperPaper,
+                endpaperWeightGsm: spec.endpaperWeightGsm,
+                endpaperColors: spec.endpaperColors,
+                hasHeadband: spec.hasHeadband,
+                headbandColor: spec.headbandColor,
+                hasRibbon: spec.hasRibbon,
+                ribbonColor: spec.ribbonColor,
+                hasAmbiguity: Boolean(extractedData?.hasInconsistentOffers || (extractedData?.warnings && extractedData?.warnings.length > 0)),
+                ambiguityDetails: extractedData?.warnings && extractedData?.warnings.length > 0 ? extractedData.warnings.join(', ') : undefined,
+                ambiguityNote: extractedData?.warnings && extractedData?.warnings.length > 0 ? extractedData.warnings.join(', ') : undefined,
+                hasDiscrepancy: Boolean(extractedData?.hasInconsistentOffers),
+                deliveryCountry: spec.deliveryCountry,
+                runs: extractedRuns
+            });
+
+            updateFamilyStatus(selectedFamilyIdRef.current, 'QUOTE_ADDED', extractedRuns.length);
+            setDuplicateEvidence(null);
+            setCurrentStep(3);
+        } catch (err: any) {
+            setUploadError(normalizeUiError(err, 'Error al reabrir la evidencia existente'));
+        } finally {
+            setLoadingExistingEvidence(false);
         }
     };
 
@@ -1338,7 +1452,44 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
                                     </div>
                                 )}
 
-                                {uploadError && (
+                                {duplicateEvidence && (
+                                    <div className="p-4 bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 rounded-xl space-y-3">
+                                        <div className="flex items-start gap-2.5">
+                                            <Info size={16} className="text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
+                                            <div className="space-y-1 text-xs">
+                                                <p className="font-semibold text-amber-900 dark:text-amber-200">
+                                                    {t('onboarding.duplicateDocTitle') || 'Documento existente detectado'}
+                                                </p>
+                                                <p className="text-amber-800/90 dark:text-amber-300/90 leading-relaxed">
+                                                    {t('onboarding.duplicateDocHelp') || 'Este documento ya fue cargado previamente para este taller. Puedes reabrir la evidencia existente para continuar con la calibración sin duplicar el registro.'}
+                                                </p>
+                                                <span className="inline-block font-mono text-[10px] text-amber-700 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/60 px-2 py-0.5 rounded">
+                                                    ID: {duplicateEvidence.evidenceId}
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <div className="flex justify-end pt-1">
+                                            <button
+                                                type="button"
+                                                data-testid="reopen-existing-evidence-btn"
+                                                onClick={() => handleReopenEvidence(duplicateEvidence.evidenceId, duplicateEvidence.filename)}
+                                                disabled={loadingExistingEvidence}
+                                                className="px-4 py-2 bg-[#dc0000] hover:bg-[#b00000] text-white text-xs font-bold rounded-lg shadow-sm transition-colors cursor-pointer flex items-center gap-2"
+                                            >
+                                                {loadingExistingEvidence ? (
+                                                    <span>{t('common.loading') || 'Cargando...'}</span>
+                                                ) : (
+                                                    <>
+                                                        <Sparkles size={14} />
+                                                        <span>{t('onboarding.reopenEvidence') || 'Reabrir evidencia existente'}</span>
+                                                    </>
+                                                )}
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {uploadError && !duplicateEvidence && (
                                     <div className="p-3 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 rounded-xl text-xs text-red-700 dark:text-red-300 flex items-center gap-2">
                                         <AlertTriangle size={14} className="shrink-0" />
                                         <span>{uploadError}</span>
@@ -1403,6 +1554,26 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
                         spec={{
                             ...currentOffer,
                             selectedVariantId: selectedVariantId ?? currentOffer.selectedVariantId ?? null
+                        }}
+                        selectedVariantId={selectedVariantId || undefined}
+                        onSelectVariant={(vid) => {
+                            setSelectedVariantId(vid);
+                            calculationRequestIdRef.current++;
+                            setActiveRun(null);
+                            setProposedPatch({});
+                            setCalibrationAccepted(false);
+                            setComparisonData({
+                                originalPrice: null,
+                                enginePrice: null,
+                                difference: null,
+                                residual: null,
+                                isCalculated: false,
+                                hasEquivalentBreakdown: true,
+                                incompleteComparisonReason: null,
+                                calculationError: null,
+                                supportedParameters: [],
+                                coverageGaps: []
+                            });
                         }}
                         onEditOffer={() => {
                             setEntryMode('MANUAL_FORM');

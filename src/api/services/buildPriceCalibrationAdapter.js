@@ -129,14 +129,18 @@ class BuildPriceCalibrationAdapter {
 
         // Endpaper semantics
         let endpapers = bookSpec.endpapers !== undefined ? bookSpec.endpapers : null;
-        let endpapersPrint = bookSpec.endpapers_print !== undefined ? bookSpec.endpapers_print : null;
+        let endpapersPrint = bookSpec.endpapers_print !== undefined ? bookSpec.endpapers_print : undefined;
         let paperTypeEndpaper = bookSpec.paper_type_endpaper || 'offset';
         let paperWeightEndpapers = Number(bookSpec.paper_weight_endpapers) || 115;
 
         // Hardcover defaults matching canonical PriceEngine / Normalizer
         if (bindingCode === 'hc') {
             if (endpapers === null || endpapers === undefined) endpapers = 'standard';
-            if (!endpapersPrint) endpapersPrint = '4/0';
+            if (endpapersPrint === undefined) {
+                endpapersPrint = '4/0';
+            } else if (endpapersPrint === null || endpapersPrint === '0/0' || endpapersPrint === 'none') {
+                endpapersPrint = '0/0';
+            }
         } else if (endpapers === null || endpapers === undefined) {
             endpapers = 'none';
             if (!endpapersPrint) endpapersPrint = 'none';

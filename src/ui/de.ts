@@ -2348,7 +2348,10 @@ export const de = {
   'guided.review.statusManualSaved': 'Tarife gespeichert',
   'guided.review.statusTemplatePending': 'Vorlage ungespeichert',
   'guided.review.statusManualPending': 'Tarife ungespeichert',
-  'guided.review.statusAssistantPending': 'Kalibrierung ausstehend'
+  'guided.review.statusAssistantPending': 'Kalibrierung ausstehend',
+  'onboarding.duplicateDocTitle': 'Bestehendes Dokument erkannt',
+  'onboarding.duplicateDocHelp': 'Dieses Dokument wurde bereits für diese Druckerei hochgeladen. Sie können den bestehenden Nachweis erneut öffnen, um die Kalibrierung fortzusetzen, ohne doppelte Datensätze anzulegen.',
+  'onboarding.reopenEvidence': 'Bestehenden Nachweis öffnen'
 } as const;
 
 export type TranslationKeys = keyof typeof de;

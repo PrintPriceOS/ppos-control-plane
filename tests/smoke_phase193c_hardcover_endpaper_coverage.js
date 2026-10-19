@@ -299,6 +299,28 @@ test('L: buildPatchFromActiveRates constructs correct nested endpaper paths', ()
     assert.strictEqual(patch.paper_price_endpaper_by_kilo.offset, 1.80);
 });
 
+// Test M: Explicit unprinted (endpapers_print: null or '0/0') must not default to 4/0
+test('M: Explicit unprinted endpapers (null or 0/0) adapt to 0/0 and omit endpaper_fixed_by_colours', () => {
+    const bookSpecNull = {
+        copies: 500,
+        interior_pages: 192,
+        binding_method: 'hardcover',
+        paper_type_interior: 'offset',
+        paper_type_cover: 'mc',
+        interior_print: '4/4',
+        cover_print: '4/0',
+        endpapers: true,
+        endpapers_print: null,
+        delivery_country: 'ES'
+    };
+    const adapted = adapter.adaptBookSpec(bookSpecNull);
+    assert.strictEqual(adapted.endpapersPrint, '0/0', 'Explicit null endpapers_print must adapt to 0/0 without defaulting to 4/0');
+
+    const paths = solver.extractActiveRatePaths(adapted, { signatureSize: 16, sectionsCount: 12 });
+    assert.ok(!paths.some(p => p.startsWith('endpaper_fixed_by_colours')), 'Must not require endpaper_fixed_by_colours for unprinted endpapers');
+    assert.ok(paths.includes('paper_endpapers_fixed_by_colours.one'));
+});
+
 console.log(`\n═══ Hardcover Endpaper Coverage Suite Results: ${passed} passed, ${failed} failed ═══\n`);
 
 if (failed > 0) {

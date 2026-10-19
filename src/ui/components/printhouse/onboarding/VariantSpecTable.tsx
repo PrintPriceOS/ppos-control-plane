@@ -20,6 +20,8 @@ import {
 interface VariantSpecTableProps {
     familyId?: ProductFamilyId;
     runs?: OfferVariantRow[];
+    selectedVariantId?: string;
+    onSelectVariant?: (variantId: string) => void;
     spec?: ProgressiveSpecState;
     documentTitle?: string;
     filename?: string;
@@ -41,6 +43,8 @@ interface VariantSpecTableProps {
 export const VariantSpecTable: React.FC<VariantSpecTableProps> = ({
     familyId: explicitFamilyId,
     runs: explicitRuns,
+    selectedVariantId,
+    onSelectVariant,
     spec,
     documentTitle: explicitDocTitle,
     filename,
@@ -462,17 +466,43 @@ export const VariantSpecTable: React.FC<VariantSpecTableProps> = ({
                                     (r.manufacturingPrice === undefined && r.transportPrice === undefined && (r.totalPrice || r.quotedTotalPrice));
 
                                 const variantKeyDisplay = r.variantKey || r.id || `var-${i + 1}`;
+                                const isSelected = selectedVariantId 
+                                    ? (r.id === selectedVariantId || r.variantKey === selectedVariantId) 
+                                    : i === 0;
 
                                 return (
-                                    <tr key={r.id || i} className={`transition-colors ${hasErr ? 'bg-amber-50/50 dark:bg-amber-950/20' : 'hover:bg-zinc-50/50 dark:hover:bg-zinc-800/30'}`}>
+                                    <tr 
+                                        key={r.id || i} 
+                                        data-testid={`variant-row-${r.id || r.variantKey || i}`}
+                                        onClick={() => onSelectVariant && onSelectVariant(r.id || r.variantKey || `run-${i + 1}`)}
+                                        className={`transition-colors cursor-pointer ${
+                                            isSelected 
+                                                ? 'bg-red-50/70 dark:bg-red-950/40 border-l-4 border-l-[#dc0000]' 
+                                                : hasErr 
+                                                    ? 'bg-amber-50/50 dark:bg-amber-950/20' 
+                                                    : 'hover:bg-zinc-50/50 dark:hover:bg-zinc-800/30'
+                                        }`}
+                                    >
                                         <td className="p-3">
-                                            <div className="font-bold text-zinc-900 dark:text-white flex items-center gap-1.5">
-                                                <span>{r.quantity >= 1000 ? r.quantity.toLocaleString('de-DE') : r.quantity}</span>
-                                                <span className="text-[10px] text-zinc-500 font-normal">ej.</span>
+                                            <div className="flex items-center gap-2.5">
+                                                <input
+                                                    type="radio"
+                                                    name="variant_selection_radio"
+                                                    checked={isSelected}
+                                                    onChange={() => onSelectVariant && onSelectVariant(r.id || r.variantKey || `run-${i + 1}`)}
+                                                    aria-label={`Seleccionar tirada ${r.quantity}`}
+                                                    className="accent-[#dc0000] cursor-pointer shrink-0"
+                                                />
+                                                <div>
+                                                    <div className="font-bold text-zinc-900 dark:text-white flex items-center gap-1.5">
+                                                        <span>{r.quantity >= 1000 ? r.quantity.toLocaleString('de-DE') : r.quantity}</span>
+                                                        <span className="text-[10px] text-zinc-500 font-normal">ej.</span>
+                                                    </div>
+                                                    <span className="text-[10px] font-mono text-zinc-400">
+                                                        {variantKeyDisplay}
+                                                    </span>
+                                                </div>
                                             </div>
-                                            <span className="text-[10px] font-mono text-zinc-400">
-                                                {variantKeyDisplay}
-                                            </span>
                                         </td>
                                         <td className="p-3 text-zinc-700 dark:text-zinc-300">
                                             {r.paperVariant || '—'}

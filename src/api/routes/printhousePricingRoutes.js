@@ -312,15 +312,48 @@ router.post('/quote-evidence', async (req, res) => {
 
 /**
  * GET /quote-evidence/:id
- * Retrieves quotation evidence document record.
+ * Retrieves quotation evidence document record enriched with interpreted offers and specification.
  */
 router.get('/quote-evidence/:id', async (req, res) => {
     try {
         const tenantId = req.user.tenantId;
         const quoteEvidenceService = require('../services/quoteEvidenceService');
+        const interpreter = require('../services/quoteDocumentInterpretationService');
         const doc = await quoteEvidenceService.getQuoteDocument(tenantId, req.params.id);
         if (!doc) return res.status(404).json({ error: 'DOCUMENT_NOT_FOUND' });
-        res.json({ ok: true, data: doc });
+
+        let offers = [];
+        let specification = null;
+        let hasInconsistentOffers = false;
+        let warnings = [];
+
+        if (doc.raw_text) {
+            try {
+                const interpretation = interpreter.interpretDocument({
+                    combinedText: doc.raw_text,
+                    filename: doc.original_filename
+                });
+                offers = interpretation.offers || [];
+                specification = interpretation.specification || null;
+                hasInconsistentOffers = Boolean(interpretation.hasInconsistentOffers);
+                warnings = interpretation.warnings || [];
+            } catch (_interpErr) {
+                // Keep raw doc if interpretation encounters non-fatal issue
+            }
+        }
+
+        res.json({
+            ok: true,
+            data: {
+                ...doc,
+                evidenceId: doc.id,
+                filename: doc.original_filename,
+                offers,
+                specification,
+                hasInconsistentOffers,
+                warnings
+            }
+        });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }

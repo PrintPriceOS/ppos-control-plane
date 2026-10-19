@@ -2348,7 +2348,10 @@ export const en = {
   'guided.review.statusManualSaved': 'Rates saved',
   'guided.review.statusTemplatePending': 'Template unsaved',
   'guided.review.statusManualPending': 'Rates unsaved',
-  'guided.review.statusAssistantPending': 'Calibration pending'
+  'guided.review.statusAssistantPending': 'Calibration pending',
+  'onboarding.duplicateDocTitle': 'Existing Document Detected',
+  'onboarding.duplicateDocHelp': 'This document has already been uploaded for this printer. You can reopen existing evidence to continue calibration without creating duplicate records.',
+  'onboarding.reopenEvidence': 'Reopen existing evidence'
 } as const;
 
 export type TranslationKeys = keyof typeof en;
