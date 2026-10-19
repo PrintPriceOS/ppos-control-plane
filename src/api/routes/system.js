@@ -72,51 +72,56 @@ router.get('/health', requireAdmin, async (req, res) => {
         const redisHealth = await checkRedisHealth(1500);
         const isOverallOk = redisHealth.isReady;
 
-        // Printhouse role: minimal sanitized contract
-        if (actor.isPrinthouseUser) {
+        // Platform Admin roles (SUPER_ADMIN, OPS_ADMIN, SYSTEM_ADMIN): full diagnostic payload
+        const isPlatformAdmin = ['SUPER_ADMIN', 'OPS_ADMIN', 'SYSTEM_ADMIN'].includes(actor.role) || actor.isSuperAdmin;
+
+        if (isPlatformAdmin) {
+            const uptimeSeconds = Math.floor(process.uptime());
+            const startTime = Date.now() - (uptimeSeconds * 1000);
+
             return res.json({
                 ok: isOverallOk,
                 status: isOverallOk ? 'HEALTHY' : 'DEGRADED',
-                services: {
-                    operational: isOverallOk
+                uptime_seconds: uptimeSeconds,
+                startTime: startTime,
+                pid: process.pid,
+                dependencies: {
+                    redis: {
+                        status: redisHealth.status,
+                        latency: redisHealth.latency
+                    }
                 },
                 timestamp: new Date().toISOString()
             });
         }
 
-        // Platform / Operator Admin roles: full diagnostic payload
-        const uptimeSeconds = Math.floor(process.uptime());
-        const startTime = Date.now() - (uptimeSeconds * 1000);
-
+        // All other authenticated roles (VIEWER, OPERATOR, TENANT_ADMIN, PRINTHOUSE_ADMIN, PRINTHOUSE_OPERATOR):
+        // minimal sanitized contract without internal process/network details
         return res.json({
             ok: isOverallOk,
             status: isOverallOk ? 'HEALTHY' : 'DEGRADED',
-            uptime_seconds: uptimeSeconds,
-            startTime: startTime,
-            pid: process.pid,
-            dependencies: {
-                redis: {
-                    status: redisHealth.status,
-                    latency: redisHealth.latency
-                }
+            services: {
+                operational: isOverallOk
             },
             timestamp: new Date().toISOString()
         });
     } catch (err) {
         // Sanitize error response: no raw stack or internal leakage
         const actor = resolveActorContext(req);
-        if (actor.isPrinthouseUser) {
+        const isPlatformAdmin = ['SUPER_ADMIN', 'OPS_ADMIN', 'SYSTEM_ADMIN'].includes(actor.role) || actor.isSuperAdmin;
+
+        if (isPlatformAdmin) {
             return res.status(500).json({
                 ok: false,
                 status: 'DEGRADED',
-                error: 'System diagnostic check failed'
+                error: 'System diagnostic check encountered an unexpected error'
             });
         }
 
         return res.status(500).json({
             ok: false,
             status: 'DEGRADED',
-            error: 'System diagnostic check encountered an unexpected error'
+            error: 'System diagnostic check failed'
         });
     }
 });

@@ -174,4 +174,86 @@ describe('System Routes Security & Health RBAC Suite', () => {
         expect(workersErr).toBeDefined();
         expect(workersErr.status).toBe(403);
     });
+
+    it('7. GET /api/system/health returns minimal contract for VIEWER and rejects /queues and /workers with 403', async () => {
+        const viewerToken = makeToken('VIEWER');
+        vi.spyOn(redisConnection, 'ping').mockResolvedValue('PONG');
+        redisConnection.status = 'ready';
+
+        const healthRes = await axios.get(`${baseUrl}/api/system/health`, {
+            headers: { Authorization: `Bearer ${viewerToken}` }
+        });
+        expect(healthRes.status).toBe(200);
+        expect(healthRes.data.ok).toBe(true);
+        expect(healthRes.data.services).toEqual({ operational: true });
+        // Must NOT leak process pid or uptime to VIEWER
+        expect(healthRes.data.pid).toBeUndefined();
+        expect(healthRes.data.uptime_seconds).toBeUndefined();
+        expect(healthRes.data.dependencies).toBeUndefined();
+
+        // VIEWER must be rejected from queues
+        let queuesErr;
+        try {
+            await axios.get(`${baseUrl}/api/system/queues`, {
+                headers: { Authorization: `Bearer ${viewerToken}` }
+            });
+        } catch (err) {
+            queuesErr = err.response;
+        }
+        expect(queuesErr.status).toBe(403);
+    });
+
+    it('8. GET /api/system/health returns full diagnostic payload for SYSTEM_ADMIN and allows /queues', async () => {
+        const sysAdminToken = makeToken('SYSTEM_ADMIN');
+        vi.spyOn(redisConnection, 'ping').mockResolvedValue('PONG');
+        redisConnection.status = 'ready';
+
+        const healthRes = await axios.get(`${baseUrl}/api/system/health`, {
+            headers: { Authorization: `Bearer ${sysAdminToken}` }
+        });
+        expect(healthRes.status).toBe(200);
+        expect(healthRes.data.ok).toBe(true);
+        expect(typeof healthRes.data.pid).toBe('number');
+        expect(typeof healthRes.data.uptime_seconds).toBe('number');
+        expect(healthRes.data.dependencies.redis).toEqual({
+            status: 'ready',
+            latency: 'OK'
+        });
+
+        // SYSTEM_ADMIN hierarchy level is 90, matching OPS_ADMIN (90)
+        const queueOperator = require('../src/api/adapters/queueOperator');
+        vi.spyOn(queueOperator, 'getAdminStats').mockResolvedValue({
+            queues: [],
+            global: { is_ready: true }
+        });
+
+        const queuesRes = await axios.get(`${baseUrl}/api/system/queues`, {
+            headers: { Authorization: `Bearer ${sysAdminToken}` }
+        });
+        expect(queuesRes.status).toBe(200);
+    });
+
+    it('9. GET /api/system/health returns minimal contract for TENANT_ADMIN and rejects /queues with 403', async () => {
+        const tenantAdminToken = makeToken('TENANT_ADMIN');
+        vi.spyOn(redisConnection, 'ping').mockResolvedValue('PONG');
+        redisConnection.status = 'ready';
+
+        const healthRes = await axios.get(`${baseUrl}/api/system/health`, {
+            headers: { Authorization: `Bearer ${tenantAdminToken}` }
+        });
+        expect(healthRes.status).toBe(200);
+        expect(healthRes.data.ok).toBe(true);
+        expect(healthRes.data.services).toEqual({ operational: true });
+        expect(healthRes.data.pid).toBeUndefined();
+
+        let queuesErr;
+        try {
+            await axios.get(`${baseUrl}/api/system/queues`, {
+                headers: { Authorization: `Bearer ${tenantAdminToken}` }
+            });
+        } catch (err) {
+            queuesErr = err.response;
+        }
+        expect(queuesErr.status).toBe(403);
+    });
 });
