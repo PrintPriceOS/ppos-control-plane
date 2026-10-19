@@ -846,10 +846,34 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
             let runError: string | null = null;
 
             try {
-                let sess = sessionId ? await printhouseCalibrationApi.getSession(sessionId) : null;
+                let sess: any = null;
+                if (sessionId) {
+                    try {
+                        sess = await printhouseCalibrationApi.getSession(sessionId);
+                    } catch {
+                        sess = null;
+                    }
+                }
                 if (calculationRequestIdRef.current !== thisReqId || selectedFamilyIdRef.current !== calcFamilyId) return;
 
-                if (!sess) {
+                const isDraft = sess && sess.status === 'DRAFT';
+
+                if (isDraft && sess?.id) {
+                    // Reuse and update an existing session ONLY when its server-confirmed status is DRAFT
+                    await printhouseCalibrationApi.updateDraftSession(sess.id, {
+                        referenceBookName: offer.productTitle || 'Oferta Calibración',
+                        bookSpec: canonicalResult.bookSpec,
+                        targetManufacturingPrice: canonicalResult.targetManufacturingPrice || targetManufacturing,
+                        includesPaper: offer.includesPaper,
+                        includesBinding: offer.includesBinding,
+                        includesFinishing: offer.includesFinishing,
+                        includesPackaging: offer.includesPackaging
+                    });
+                    if (calculationRequestIdRef.current !== thisReqId || selectedFamilyIdRef.current !== calcFamilyId) return;
+                } else {
+                    // For a non-DRAFT (e.g. CALCULATED) or absent session, create a new DRAFT session
+                    // containing the latest canonical bookSpec, selected print run, target manufacturing price and inclusion values.
+                    // This preserves the previous session and its audit history.
                     sess = await printhouseCalibrationApi.createSession({
                         printerNodeId,
                         referenceBookName: offer.productTitle || 'Oferta Calibración',
@@ -861,19 +885,10 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
                         includesPackaging: offer.includesPackaging
                     });
                     if (calculationRequestIdRef.current !== thisReqId || selectedFamilyIdRef.current !== calcFamilyId) return;
-                    if (sess?.id) setSessionId(sess.id);
-                } else {
-                    // Synchronize latest offer inclusions and bookSpec to existing session before marking READY
-                    await printhouseCalibrationApi.updateDraftSession(sess.id, {
-                        referenceBookName: offer.productTitle || 'Oferta Calibración',
-                        bookSpec: canonicalResult.bookSpec,
-                        targetManufacturingPrice: canonicalResult.targetManufacturingPrice || targetManufacturing,
-                        includesPaper: offer.includesPaper,
-                        includesBinding: offer.includesBinding,
-                        includesFinishing: offer.includesFinishing,
-                        includesPackaging: offer.includesPackaging
-                    });
-                    if (calculationRequestIdRef.current !== thisReqId || selectedFamilyIdRef.current !== calcFamilyId) return;
+                    if (sess?.id) {
+                        setSessionId(sess.id);
+                        sessionIdRef.current = sess.id;
+                    }
                 }
                 if (sess?.id) {
                     await printhouseCalibrationApi.markSessionReady(sess.id);
@@ -1418,17 +1433,22 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
                                 ...currentOffer,
                                 ...inclusions
                             };
+                            currentOfferRef.current = updatedOffer;
                             setCurrentOffer(updatedOffer);
 
-                            // Synchronize changed inclusions with the backend calibration session if active
+                            // Do not attempt background draft updates against non-DRAFT sessions.
+                            // Synchronize changed inclusions only if the server-confirmed session status is DRAFT.
                             if (sessionId) {
                                 try {
-                                    await printhouseCalibrationApi.updateDraftSession(sessionId, {
-                                        includesPaper: inclusions.includesPaper !== undefined ? inclusions.includesPaper : currentOffer.includesPaper,
-                                        includesBinding: inclusions.includesBinding !== undefined ? inclusions.includesBinding : currentOffer.includesBinding,
-                                        includesFinishing: inclusions.includesFinishing !== undefined ? inclusions.includesFinishing : currentOffer.includesFinishing,
-                                        includesPackaging: inclusions.includesPackaging !== undefined ? inclusions.includesPackaging : currentOffer.includesPackaging
-                                    });
+                                    const sess = await printhouseCalibrationApi.getSession(sessionId);
+                                    if (sess && sess.status === 'DRAFT') {
+                                        await printhouseCalibrationApi.updateDraftSession(sessionId, {
+                                            includesPaper: inclusions.includesPaper !== undefined ? inclusions.includesPaper : currentOffer.includesPaper,
+                                            includesBinding: inclusions.includesBinding !== undefined ? inclusions.includesBinding : currentOffer.includesBinding,
+                                            includesFinishing: inclusions.includesFinishing !== undefined ? inclusions.includesFinishing : currentOffer.includesFinishing,
+                                            includesPackaging: inclusions.includesPackaging !== undefined ? inclusions.includesPackaging : currentOffer.includesPackaging
+                                        });
+                                    }
                                 } catch (err) {
                                     console.warn('[SimplifiedOnboarding] Failed to sync inclusions to backend session:', err);
                                 }
@@ -1436,7 +1456,7 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
                         }}
                         onProceedToCalculation={() => {
                             setCurrentStep(4);
-                            handleRunSolver(currentOffer);
+                            handleRunSolver(currentOfferRef.current);
                         }}
                     />
                 </div>
@@ -1460,7 +1480,7 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
                         coverageGaps={comparisonData.coverageGaps}
                         isCalculated={comparisonData.isCalculated}
                         calculationError={comparisonData.calculationError}
-                        onRunSolver={() => handleRunSolver(currentOffer)}
+                        onRunSolver={() => handleRunSolver(currentOfferRef.current)}
                         isCalculating={calculatingSolver}
                         onProceedToAcceptance={() => setCurrentStep(5)}
                         onBackToReview={() => setCurrentStep(3)}

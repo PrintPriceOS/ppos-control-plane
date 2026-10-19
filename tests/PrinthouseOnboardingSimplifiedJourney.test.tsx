@@ -868,25 +868,83 @@ describe('Simplified Printhouse Onboarding Journey Suite', () => {
 
     it('27. Changing an inclusion invalidates previous calculation, synchronizes new value with backend session, and recalculates', async () => {
         const printhouseCalibrationApi = await import('../src/ui/lib/printhouseCalibrationApi');
-        const createSpy = vi.spyOn(printhouseCalibrationApi.printhouseCalibrationApi, 'createSession').mockResolvedValue({ id: 'sess-change-1', status: 'DRAFT' } as any);
-        const getSessionSpy = vi.spyOn(printhouseCalibrationApi.printhouseCalibrationApi, 'getSession').mockResolvedValue({ id: 'sess-change-1', status: 'DRAFT' } as any);
-        const updateDraftSpy = vi.spyOn(printhouseCalibrationApi.printhouseCalibrationApi, 'updateDraftSession').mockResolvedValue({ id: 'sess-change-1', status: 'DRAFT' } as any);
-        const readySpy = vi.spyOn(printhouseCalibrationApi.printhouseCalibrationApi, 'markSessionReady').mockResolvedValue({ id: 'sess-change-1', status: 'READY' } as any);
+
+        interface MockSession {
+            id: string;
+            status: 'DRAFT' | 'READY' | 'CALCULATED';
+            includesFinishing?: boolean | null;
+            [key: string]: any;
+        }
+
+        const sessions = new Map<string, MockSession>();
+        let sessionCounter = 0;
+
+        const createSpy = vi.spyOn(printhouseCalibrationApi.printhouseCalibrationApi, 'createSession')
+            .mockImplementation(async (body: any) => {
+                sessionCounter++;
+                const sess: MockSession = {
+                    id: `sess-lifecycle-${sessionCounter}`,
+                    status: 'DRAFT',
+                    ...body
+                };
+                sessions.set(sess.id, sess);
+                return sess as any;
+            });
+
+        const getSessionSpy = vi.spyOn(printhouseCalibrationApi.printhouseCalibrationApi, 'getSession')
+            .mockImplementation(async (id: string) => {
+                const sess = sessions.get(id);
+                if (!sess) throw new Error('SESSION_NOT_FOUND');
+                return sess as any;
+            });
+
+        // The mock must reject updates to non-DRAFT sessions with HTTP 409 SESSION_NOT_EDITABLE
+        const updateDraftSpy = vi.spyOn(printhouseCalibrationApi.printhouseCalibrationApi, 'updateDraftSession')
+            .mockImplementation(async (id: string, body: any) => {
+                const sess = sessions.get(id);
+                if (!sess) throw new Error('SESSION_NOT_FOUND');
+                if (sess.status !== 'DRAFT') {
+                    const err: any = new Error('SESSION_NOT_EDITABLE');
+                    err.statusCode = 409;
+                    throw err;
+                }
+                Object.assign(sess, body);
+                return sess as any;
+            });
+
+        // Only DRAFT sessions can transition to READY
+        const readySpy = vi.spyOn(printhouseCalibrationApi.printhouseCalibrationApi, 'markSessionReady')
+            .mockImplementation(async (id: string) => {
+                const sess = sessions.get(id);
+                if (!sess) throw new Error('SESSION_NOT_FOUND');
+                if (sess.status !== 'DRAFT') {
+                    const err: any = new Error('INVALID_STATE_TRANSITION');
+                    err.statusCode = 409;
+                    throw err;
+                }
+                sess.status = 'READY';
+                return sess as any;
+            });
+
+        // Calculation leaves the session in CALCULATED status
         const calcSpy = vi.spyOn(printhouseCalibrationApi.printhouseCalibrationApi, 'calculateCalibration')
-            .mockResolvedValueOnce({
-                id: 'run-calc-1',
-                enginePriceAfter: 4000,
-                targetPrice: 4200,
-                absoluteResidual: 200,
-                percentResidual: 4.7
-            } as any)
-            .mockResolvedValueOnce({
-                id: 'run-calc-2',
-                enginePriceAfter: 3500,
-                targetPrice: 4200,
-                absoluteResidual: 700,
-                percentResidual: 16.6
-            } as any);
+            .mockImplementation(async (id: string) => {
+                const sess = sessions.get(id);
+                if (!sess) throw new Error('SESSION_NOT_FOUND');
+                if (sess.status !== 'READY') {
+                    const err: any = new Error('INVALID_STATE_TRANSITION');
+                    err.statusCode = 409;
+                    throw err;
+                }
+                sess.status = 'CALCULATED';
+                return {
+                    id: `run-${id}`,
+                    enginePriceAfter: id.includes('1') ? 4000 : 3500,
+                    targetPrice: 4200,
+                    absoluteResidual: id.includes('1') ? 200 : 700,
+                    percentResidual: id.includes('1') ? 4.7 : 16.6
+                } as any;
+            });
 
         const baseSpec = {
             ...NATUR_DOCUMENT_FIXTURE.spec,
@@ -913,9 +971,12 @@ describe('Simplified Printhouse Onboarding Journey Suite', () => {
             expect(createSpy).toHaveBeenCalledWith(expect.objectContaining({
                 includesFinishing: true
             }));
-            expect(readySpy).toHaveBeenCalledWith('sess-change-1');
+            expect(readySpy).toHaveBeenCalledWith('sess-lifecycle-1');
             expect(calcSpy).toHaveBeenCalledTimes(1);
         });
+
+        // Verify session 1 is now CALCULATED
+        expect(sessions.get('sess-lifecycle-1')?.status).toBe('CALCULATED');
 
         // 2. Return to review
         const returnBtn = screen.getByRole('button', { name: /Volver a especificaciones/i });
@@ -925,23 +986,28 @@ describe('Simplified Printhouse Onboarding Journey Suite', () => {
         const finishingLabel = screen.getByText('Incluye Acabados:').parentElement!;
         fireEvent.click(within(finishingLabel).getByRole('button', { name: 'No' }));
 
-        await waitFor(() => {
-            // Must synchronize the changed inclusion to the backend draft session
-            expect(updateDraftSpy).toHaveBeenCalledWith('sess-change-1', expect.objectContaining({
-                includesFinishing: false
-            }));
-        });
+        // Because sess-lifecycle-1 is CALCULATED, no background updateDraftSession must be called on it
+        // (which would throw 409 SESSION_NOT_EDITABLE)
+        expect(updateDraftSpy).not.toHaveBeenCalledWith('sess-lifecycle-1', expect.anything());
 
         // 4. Recalculate
         const proceedBtn2 = screen.getByTestId('proceed-to-compare-btn');
         fireEvent.click(proceedBtn2);
 
         await waitFor(() => {
-            // Must have called calculateCalibration a second time (old result not reused)
+            // Must have created a new DRAFT session sess-lifecycle-2 with updated inclusion value (includesFinishing: false)
+            expect(createSpy).toHaveBeenCalledWith(expect.objectContaining({
+                includesFinishing: false
+            }));
+            expect(readySpy).toHaveBeenCalledWith('sess-lifecycle-2');
             expect(calcSpy).toHaveBeenCalledTimes(2);
-            // Must sync latest values before markSessionReady
-            expect(readySpy).toHaveBeenCalledWith('sess-change-1');
         });
+
+        // Both sessions preserved in backend history
+        expect(sessions.has('sess-lifecycle-1')).toBe(true);
+        expect(sessions.has('sess-lifecycle-2')).toBe(true);
+        expect(sessions.get('sess-lifecycle-2')?.status).toBe('CALCULATED');
+        expect(sessions.get('sess-lifecycle-2')?.includesFinishing).toBe(false);
     });
 
     it('28. Confirming Hardcover on a document with 2.0 mm board preserves 2.0 mm without overriding to 2.4 mm', async () => {
