@@ -389,7 +389,7 @@ describe('Pricing Workflow Navigation & State Conservation Regressions', () => {
         });
 
         fetchMock.mockImplementation((url: string, opts?: any) => {
-            if (url.includes('/api/printhouse/onboarding/quote-evidence/upload')) {
+            if (url.includes('/quote-evidence/upload')) {
                 return Promise.resolve({
                     ok: true,
                     json: () => Promise.resolve({
@@ -400,6 +400,28 @@ describe('Pricing Workflow Navigation & State Conservation Regressions', () => {
                             quantity: 1000,
                             manufacturingPrice: 1250,
                             totalPrice: 1400,
+                            includesPaper: true,
+                            includesBinding: true,
+                            includesFinishing: true,
+                            includesPackaging: true,
+                            specification: {
+                                formatWidthMm: 148,
+                                formatHeightMm: 210,
+                                interiorPages: 160,
+                                interiorPaper: 'Offset',
+                                interiorWeightGsm: 90,
+                                interiorColors: '1/1',
+                                coverPaper: 'MC',
+                                coverWeightGsm: 250,
+                                coverColors: '4/0',
+                                bindingMethod: 'perfect bound',
+                                lamination: 'matt',
+                                deliveryCountry: 'DE',
+                                includesPaper: true,
+                                includesBinding: true,
+                                includesFinishing: true,
+                                includesPackaging: true
+                            },
                             runs: [{ id: 'run-soft-1', quantity: 1000, manufacturingPrice: 1250, transportPrice: 150, totalPrice: 1400, quotedTotalPrice: 1400, validationStatus: 'CONSISTENT' }]
                         }
                     })
@@ -530,7 +552,7 @@ describe('Pricing Workflow Navigation & State Conservation Regressions', () => {
 
         let currentFamilyForUpload = 'SOFTCOVER';
         fetchMock.mockImplementation((url: string, opts?: any) => {
-            if (url.includes('/api/printhouse/onboarding/quote-evidence/upload')) {
+            if (url.includes('/quote-evidence/upload')) {
                 if (currentFamilyForUpload === 'SOFTCOVER') {
                     return Promise.resolve({
                         ok: true,
@@ -542,6 +564,28 @@ describe('Pricing Workflow Navigation & State Conservation Regressions', () => {
                                 quantity: 1000,
                                 manufacturingPrice: 1250,
                                 totalPrice: 1400,
+                                includesPaper: true,
+                                includesBinding: true,
+                                includesFinishing: true,
+                                includesPackaging: true,
+                                specification: {
+                                    formatWidthMm: 148,
+                                    formatHeightMm: 210,
+                                    interiorPages: 160,
+                                    interiorPaper: 'Offset',
+                                    interiorWeightGsm: 90,
+                                    interiorColors: '1/1',
+                                    coverPaper: 'MC',
+                                    coverWeightGsm: 250,
+                                    coverColors: '4/0',
+                                    bindingMethod: 'perfect bound',
+                                    lamination: 'matt',
+                                    deliveryCountry: 'DE',
+                                    includesPaper: true,
+                                    includesBinding: true,
+                                    includesFinishing: true,
+                                    includesPackaging: true
+                                },
                                 runs: [{ id: 'run-soft-1', quantity: 1000, manufacturingPrice: 1250, transportPrice: 150, totalPrice: 1400, quotedTotalPrice: 1400, validationStatus: 'CONSISTENT' }]
                             }
                         })
@@ -557,6 +601,33 @@ describe('Pricing Workflow Navigation & State Conservation Regressions', () => {
                                 quantity: 500,
                                 manufacturingPrice: 2800,
                                 totalPrice: 3000,
+                                includesPaper: true,
+                                includesBinding: true,
+                                includesFinishing: true,
+                                includesPackaging: true,
+                                specification: {
+                                    family: 'HARDCOVER',
+                                    formatWidthMm: 148,
+                                    formatHeightMm: 210,
+                                    interiorPages: 200,
+                                    interiorPaper: 'Offset',
+                                    interiorWeightGsm: 100,
+                                    interiorColors: '4/4',
+                                    coverPaper: 'MC',
+                                    coverWeightGsm: 150,
+                                    coverColors: '4/0',
+                                    boardThicknessMm: 2.0,
+                                    bindingMethod: 'thread sewn',
+                                    endpaperPaper: 'Offset',
+                                    endpaperWeightGsm: 140,
+                                    endpaperColors: '0/0',
+                                    lamination: 'matt',
+                                    deliveryCountry: 'DE',
+                                    includesPaper: true,
+                                    includesBinding: true,
+                                    includesFinishing: true,
+                                    includesPackaging: true
+                                },
                                 runs: [{ id: 'run-hard-2', quantity: 500, manufacturingPrice: 2800, transportPrice: 200, totalPrice: 3000, quotedTotalPrice: 3000, validationStatus: 'CONSISTENT' }]
                             }
                         })

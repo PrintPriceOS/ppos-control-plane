@@ -229,6 +229,8 @@ export function canonicalizeToEngineBookSpec(
         errors.push('target_manufacturing_price must be a positive value');
     }
 
+    const isHardcover = offer.family === 'HARDCOVER' || offer.product_family === 'HARDCOVER' || (offer as any).construction === 'hardcover' || bindingMethod === 'hardcover';
+
     const bookSpec: Record<string, any> = {
         copies,
         interior_pages: interiorPages,
@@ -240,7 +242,11 @@ export function canonicalizeToEngineBookSpec(
         paper_weight_interior: paperWeightInterior,
         paper_type_cover: paperTypeCover,
         paper_weight_cover: paperWeightCover,
-        binding_method: bindingMethod,
+        product_family: isHardcover ? 'HARDCOVER' : 'SOFTCOVER',
+        family: isHardcover ? 'HARDCOVER' : 'SOFTCOVER',
+        construction: isHardcover ? 'hardcover' : 'softcover',
+        block_binding_method: bindingMethod || (isHardcover ? 'thread sewn' : 'perfect bound'),
+        binding_method: isHardcover ? 'hardcover' : (bindingMethod || 'perfect bound'),
         delivery_country: deliveryCountry,
         lamination,
         endpapers: hasEndpapers,
@@ -248,7 +254,12 @@ export function canonicalizeToEngineBookSpec(
         selectedVariantId: targetRun.id || targetRun.variantKey || 'run-1'
     };
 
+    if (offer.boardThicknessMm) {
+        bookSpec.board_thickness_mm = Number(offer.boardThicknessMm);
+    }
+
     if (hasEndpapers) {
+        bookSpec.endpaper_provenance = offer.endpaperProvenance || (offer.endpaperPaper ? 'document_extracted' : 'user_supplied');
         // ZERO fallback assumptions: do NOT default to 'offset' or 140g
         if (!offer.endpaperPaper) {
             errors.push('paper_type_endpaper is required when endpapers are present');
@@ -268,13 +279,31 @@ export function canonicalizeToEngineBookSpec(
             } else {
                 bookSpec.paper_weight_endpapers = endpaperWeight;
             }
+        } else if (offer.endpaperPaper) {
+            const mWeight = String(offer.endpaperPaper).match(/\b(\d{2,3})\s*g\b/i);
+            if (mWeight) {
+                const parsedWeight = parseInt(mWeight[1], 10);
+                if (parsedWeight >= 80 && parsedWeight <= 300) {
+                    bookSpec.paper_weight_endpapers = parsedWeight;
+                }
+            }
         }
 
         // Tintas de guardas:
-        // Si se indica explícitamente 0+0 o 0/0 o 'unprinted' o 'sin imprimir', es null en la taxonomía BPE.
+        // Si se indica explícitamente 0+0 o 0/0 o 'unprinted' o 'sin imprimir', es '0/0' en la taxonomía BPE.
         // Si se indica 1/0, 1/1, 4/0, 4/4, se preserva.
         // Si está ausente o es desconocido, se solicita confirmación explícita (no convertir en 'sin imprimir').
-        const rawEndpaperColors = offer.endpaperColors ? String(offer.endpaperColors).trim().replace('+', '/') : null;
+        let rawEndpaperColors = offer.endpaperColors ? String(offer.endpaperColors).trim().replace('+', '/') : null;
+        if (!rawEndpaperColors && offer.endpaperPaper) {
+            const paperStr = String(offer.endpaperPaper).toLowerCase();
+            if (paperStr.includes('sin imprimir') || paperStr.includes('unbedruckt') || paperStr.includes('0/0') || paperStr.includes('0+0') || paperStr.includes('unprinted')) {
+                rawEndpaperColors = '0/0';
+            } else if (/\b([14]\/[014]|[14]\+[014])\b/.test(paperStr)) {
+                const m = paperStr.match(/\b([14]\/[014]|[14]\+[014])\b/);
+                if (m) rawEndpaperColors = m[1].replace('+', '/');
+            }
+        }
+
         if (!rawEndpaperColors) {
             errors.push('endpapers_print must be specified when endpapers are present (e.g. 0/0, 1/0, 1/1, 4/0, 4/4)');
         } else if (rawEndpaperColors === '0/0' || rawEndpaperColors.includes('unbedruckt') || rawEndpaperColors.includes('sin imprimir')) {

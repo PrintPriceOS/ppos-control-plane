@@ -67,6 +67,10 @@ export const ManualOfferForm: React.FC<ManualOfferFormProps> = ({
                 pageCount: base.pageCount ?? base.interiorPages ?? 160,
                 interiorPaperWeightGsm: base.interiorPaperWeightGsm ?? base.interiorWeightGsm ?? 90,
                 interiorWeightGsm: base.interiorWeightGsm ?? base.interiorPaperWeightGsm ?? 90,
+                endpaperPaper: base.endpaperPaper ?? (familyId === 'HARDCOVER' ? 'Offset' : undefined),
+                endpaperWeightGsm: base.endpaperWeightGsm ?? (familyId === 'HARDCOVER' ? 140 : undefined),
+                endpaperColors: base.endpaperColors ?? (familyId === 'HARDCOVER' ? '0/0' : undefined),
+                endpaperProvenance: base.endpaperProvenance ?? (familyId === 'HARDCOVER' ? 'user_supplied' : undefined),
                 runs: base.runs && base.runs.length > 0 ? base.runs : [
                     {
                         id: 'run-1',
@@ -100,6 +104,10 @@ export const ManualOfferForm: React.FC<ManualOfferFormProps> = ({
             coverWeightGsm: 250,
             coverColors: '4/0',
             bindingMethod: familyId === 'HARDCOVER' ? 'thread_sewn' : familyId === 'SOFTCOVER' ? 'adhesive_pur' : familyId === 'WIRE_O' ? 'wire_o' : 'saddle_stitch',
+            endpaperPaper: familyId === 'HARDCOVER' ? 'Offset' : undefined,
+            endpaperWeightGsm: familyId === 'HARDCOVER' ? 140 : undefined,
+            endpaperColors: familyId === 'HARDCOVER' ? '0/0' : undefined,
+            endpaperProvenance: familyId === 'HARDCOVER' ? 'user_supplied' : undefined,
             deliveryCountry: 'DE',
             deliveryCity: '',
             runs: [
@@ -132,6 +140,10 @@ export const ManualOfferForm: React.FC<ManualOfferFormProps> = ({
         pageCount: propSpec.pageCount ?? propSpec.interiorPages ?? 160,
         interiorPaperWeightGsm: propSpec.interiorPaperWeightGsm ?? propSpec.interiorWeightGsm ?? 90,
         interiorWeightGsm: propSpec.interiorWeightGsm ?? propSpec.interiorPaperWeightGsm ?? 90,
+        endpaperPaper: propSpec.endpaperPaper ?? (familyId === 'HARDCOVER' ? 'Offset' : undefined),
+        endpaperWeightGsm: propSpec.endpaperWeightGsm ?? (familyId === 'HARDCOVER' ? 140 : undefined),
+        endpaperColors: propSpec.endpaperColors ?? (familyId === 'HARDCOVER' ? '0/0' : undefined),
+        endpaperProvenance: propSpec.endpaperProvenance ?? (familyId === 'HARDCOVER' ? 'user_supplied' : undefined),
         runs: propSpec.runs || []
     } : internalSpec;
 
@@ -263,6 +275,8 @@ export const ManualOfferForm: React.FC<ManualOfferFormProps> = ({
         }
         if (familyId === 'HARDCOVER') {
             if (!spec.boardThicknessMm) missing.push(t('form.missing.board') || 'Grosor de cartón (Graupappe)');
+            if (!spec.endpaperPaper) missing.push(t('form.missing.endpaperPaper') || 'Papel de guardas');
+            if (!spec.endpaperColors) missing.push(t('form.missing.endpaperColors') || 'Tintas de guardas');
         }
         if (!spec.deliveryCountry || !isValidIso2Country(spec.deliveryCountry)) {
             missing.push(t('form.missing.country') || 'País de entrega');
@@ -281,7 +295,12 @@ export const ManualOfferForm: React.FC<ManualOfferFormProps> = ({
             onSubmit={(e) => { 
                 e.preventDefault(); 
                 if (isComplete) {
-                    if (onSubmitSpec) onSubmitSpec(spec);
+                    const finalSpec: ProgressiveSpecState = {
+                        ...spec,
+                        hasEndpapers: familyId === 'HARDCOVER' ? true : Boolean(spec.hasEndpapers),
+                        endpaperProvenance: spec.endpaperProvenance || 'user_supplied'
+                    };
+                    if (onSubmitSpec) onSubmitSpec(finalSpec);
                     if (onSubmit) onSubmit();
                 }
             }} 
@@ -595,18 +614,18 @@ export const ManualOfferForm: React.FC<ManualOfferFormProps> = ({
                                     <Info size={14} />
                                     <span>{t('form.hardcoverBoardTitle') || 'Especificaciones de Tapa Dura (Cartón y Guardas)'}</span>
                                 </div>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
                                     <div className="space-y-1">
                                         <label className="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300">
-                                            {t('form.boardThickness') || 'Grosor de Cartón / Graupappe (mm)'} *
+                                            {t('form.boardThickness') || 'Grosor de Cartón (mm)'} *
                                         </label>
                                         <input
                                             type="number"
                                             step="0.1"
                                             value={spec.boardThicknessMm || ''}
                                             onChange={(e) => updateField('boardThicknessMm', Number(e.target.value) || undefined)}
-                                            placeholder="Ej: 2.0, 2.4, 3.0 mm"
-                                            className="w-full px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white font-medium"
+                                            placeholder="Ej: 2.0, 2.4 mm"
+                                            className="w-full px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white font-medium text-xs"
                                         />
                                     </div>
                                     <div className="space-y-1">
@@ -617,9 +636,38 @@ export const ManualOfferForm: React.FC<ManualOfferFormProps> = ({
                                             type="text"
                                             value={spec.endpaperPaper || ''}
                                             onChange={(e) => updateField('endpaperPaper', e.target.value)}
-                                            placeholder="Ej: Offset 140g sin imprimir"
-                                            className="w-full px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white font-medium"
+                                            placeholder="Ej: Offset, Munken"
+                                            className="w-full px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white font-medium text-xs"
                                         />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300">
+                                            {t('form.endpaperWeight') || 'Gramaje Guardas (g/m²)'}
+                                        </label>
+                                        <input
+                                            type="number"
+                                            value={spec.endpaperWeightGsm || ''}
+                                            onChange={(e) => updateField('endpaperWeightGsm', Number(e.target.value) || undefined)}
+                                            placeholder="Ej: 140, 170"
+                                            className="w-full px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white font-medium text-xs"
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300">
+                                            {t('form.endpaperColors') || 'Tintas de Guardas'}
+                                        </label>
+                                        <select
+                                            value={spec.endpaperColors || ''}
+                                            onChange={(e) => updateField('endpaperColors', e.target.value || undefined)}
+                                            className="w-full px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white font-medium text-xs"
+                                        >
+                                            <option value="">{t('common.select') || 'Seleccionar...'}</option>
+                                            <option value="0/0">0/0 (Sin imprimir / Unbedruckt)</option>
+                                            <option value="1/0">1/0 (Negro 1 cara)</option>
+                                            <option value="1/1">1/1 (Negro 2 caras)</option>
+                                            <option value="4/0">4/0 (Color 1 cara)</option>
+                                            <option value="4/4">4/4 (Color 2 caras)</option>
+                                        </select>
                                     </div>
                                 </div>
                             </div>

@@ -64,6 +64,7 @@ export interface OfferVariantRow {
 export interface ProgressiveSpecState {
     // 1. Producto
     family: ProductFamilyId;
+    product_family?: ProductFamilyId;
     productTitle: string;
     formatWidthMm?: number;
     formatHeightMm?: number;
@@ -121,6 +122,7 @@ export interface ProgressiveSpecState {
     endpaperPaper?: string;
     endpaperWeightGsm?: number;
     endpaperColors?: string;
+    endpaperProvenance?: 'document_extracted' | 'user_supplied';
 
     // 4. Encuadernación
     bindingMethod: 'SEWN' | 'GLUED' | 'WIRE_O' | 'SADDLE_STITCH' | 'thread_sewn' | 'adhesive_pur' | 'wire_o' | 'saddle_stitch';

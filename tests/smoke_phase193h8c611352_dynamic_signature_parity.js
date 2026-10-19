@@ -70,6 +70,7 @@ const bookSpec2000 = {
     cover_print: '4/0',
     binding_method: 'perfect bound',
     lamination: 'gloss',
+    finishing_options: 'gloss lamination',
     delivery_country: 'ES'
 };
 
@@ -108,15 +109,15 @@ test('H8C.6.11.3.5.2-02', 'Fixture B: Node supporting max 16p derives signature=
 });
 
 // T3: Baseline Forward Parity Across All 3 Invocations
-test('H8C.6.11.3.5.2-03', 'Direct BPE, adapter, and solver evaluate identical baseline forward price (235.36 EUR for 2000 copies)', () => {
+test('H8C.6.11.3.5.2-03', 'Direct BPE, adapter, and solver evaluate identical baseline forward price (382.36 EUR for 2000 copies)', () => {
     const nodeConfig = { signatures: [16, 8, 4] };
     const directOffer = bpe.buildPrice(bookSpec2000, { rates: baseSnapshot, signatures: [16, 8, 4] });
     const adapterRes = adapter.evaluateForwardPrice(bookSpec2000, baseSnapshot, {}, nodeConfig);
     const solverRes = solver.solve(session, nodeConfig);
 
-    assert.strictEqual(directOffer.total_cost, 235.36);
-    assert.strictEqual(adapterRes.predictedManufacturingPrice, 235.36);
-    assert.strictEqual(solverRes.enginePriceBefore, 235.36);
+    assert.strictEqual(directOffer.total_cost, 382.36);
+    assert.strictEqual(adapterRes.predictedManufacturingPrice, 382.36);
+    assert.strictEqual(solverRes.enginePriceBefore, 382.36);
 });
 
 console.log(`\n═══ Phase 193H.8C.6.11.3.5.2 Results: ${passed} passed, ${failed} failed ═══\n`);

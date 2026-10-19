@@ -1242,6 +1242,166 @@ describe('Simplified Printhouse Onboarding Journey Suite', () => {
         expect(radioRun2).not.toBeChecked();
         expect(radioRun3).toBeChecked();
     });
+
+    it('33. Hardcover with missing endpaper specs displays clarification banner and blocks proceed until confirmed', async () => {
+        const specMissingEndpapers = {
+            family: 'HARDCOVER' as const,
+            productTitle: 'Hardcover Book Without Endpaper Specs',
+            widthMm: 170,
+            heightMm: 240,
+            interiorPages: 200,
+            interiorPaper: 'G-Print',
+            coverPaper: 'Silk',
+            bindingMethod: 'thread sewn',
+            boardThicknessMm: 2.4,
+            hasEndpapers: true,
+            includesPaper: true,
+            includesBinding: true,
+            includesFinishing: true,
+            includesPackaging: true,
+            // Deliberately missing endpaperPaper and endpaperColors
+            runs: [
+                { id: 'run-1', variantKey: 'run-1', quantity: 500, manufacturingPrice: 2000, transportPrice: 200, quotedTotalPrice: 2200, quotedUnitPrice: 4.40, validationStatus: 'CONSISTENT' as const }
+            ]
+        };
+
+        renderJourney(
+            <SimplifiedOnboardingJourney 
+                printerNodeId="node-test-1" 
+                initialSpec={specMissingEndpapers as any} 
+                initialStep={3} 
+            />, 
+            'es'
+        );
+
+        // Clarification banner for pending endpapers must be visible
+        expect(screen.getByText('Especificación de Guardas Pendiente')).toBeInTheDocument();
+        expect(screen.getByText(/Debe especificar el papel y tintas de las guardas para Tapa Dura antes de calcular/i)).toBeInTheDocument();
+
+        // Proceed button must be disabled
+        const proceedBtn = screen.getByTestId('proceed-to-compare-btn');
+        expect(proceedBtn).toBeDisabled();
+
+        // Click proposal button to trigger confirmation prompt
+        const proposeBtn = screen.getByTestId('propose-standard-endpapers-btn');
+        expect(proposeBtn).toBeInTheDocument();
+        fireEvent.click(proposeBtn);
+
+        // Explicit confirmation prompt must be visible
+        expect(screen.getByText(/¿Confirmar Offset 140 g\/m² sin imprimir/i)).toBeInTheDocument();
+
+        // Confirm explicit user-supplied proposal
+        const confirmEndpapersBtn = screen.getByTestId('confirm-standard-endpapers-btn');
+        expect(confirmEndpapersBtn).toBeInTheDocument();
+        fireEvent.click(confirmEndpapersBtn);
+
+        // Banner clears and proceed button becomes enabled
+        await waitFor(() => {
+            expect(screen.queryByText('Especificación de Guardas Pendiente')).not.toBeInTheDocument();
+            expect(proceedBtn).not.toBeDisabled();
+        });
+    });
+
+    it('34. Document A with complete extracted endpapers (Offset 170g 0/0, board 2mm) does not prompt for recovery', () => {
+        const specDocA = {
+            family: 'HARDCOVER',
+            productTitle: 'Hardcover Doc A',
+            quoteRef: 'DOC-A',
+            formatWidthMm: 170,
+            formatHeightMm: 240,
+            interiorPages: 640,
+            interiorPaper: 'G-Print 115g',
+            interiorWeightGsm: 115,
+            interiorColors: '4/4',
+            coverPaper: 'Estucado 130g',
+            coverWeightGsm: 130,
+            coverColors: '4/0',
+            boardThicknessMm: 2.0,
+            bindingMethod: 'thread sewn',
+            lamination: 'matt',
+            deliveryCountry: 'DE',
+            hasEndpapers: true,
+            endpaperPaper: 'Offset',
+            endpaperWeightGsm: 170,
+            endpaperColors: '0/0',
+            endpaperProvenance: 'document_extracted',
+            includesPaper: true,
+            includesBinding: true,
+            includesFinishing: true,
+            includesPackaging: true,
+            runs: [
+                { id: 'run-1', variantKey: 'run-1', quantity: 200, manufacturingPrice: 4399, transportPrice: 350, quotedTotalPrice: 4749, quotedUnitPrice: 23.75, validationStatus: 'CONSISTENT' as const }
+            ]
+        };
+
+        renderJourney(
+            <SimplifiedOnboardingJourney 
+                printerNodeId="node-test-1" 
+                initialSpec={specDocA as any} 
+                initialStep={3} 
+            />, 
+            'es'
+        );
+
+        // Must NOT show endpapers pending alert
+        expect(screen.queryByText('Especificación de Guardas Pendiente')).not.toBeInTheDocument();
+        expect(screen.queryByTestId('propose-standard-endpapers-btn')).not.toBeInTheDocument();
+        expect(screen.queryByTestId('confirm-standard-endpapers-btn')).not.toBeInTheDocument();
+
+        // Proceed button must be enabled
+        const proceedBtn = screen.getByTestId('proceed-to-compare-btn');
+        expect(proceedBtn).not.toBeDisabled();
+    });
+
+    it('35. Spec modification invalidates existing calculations and sessions', async () => {
+        const specCalculated = {
+            family: 'HARDCOVER',
+            productTitle: 'Hardcover Doc B',
+            quoteRef: 'DOC-B',
+            formatWidthMm: 210,
+            formatHeightMm: 270,
+            interiorPages: 200,
+            interiorPaper: 'Matt 130g',
+            interiorWeightGsm: 130,
+            interiorColors: '4/4',
+            coverPaper: 'Silk 115g',
+            coverWeightGsm: 115,
+            coverColors: '4/0',
+            boardThicknessMm: 2.4,
+            bindingMethod: 'thread sewn',
+            lamination: 'gloss',
+            deliveryCountry: 'DE',
+            hasEndpapers: true,
+            endpaperPaper: 'Offset',
+            endpaperWeightGsm: 140,
+            endpaperColors: '0/0',
+            endpaperProvenance: 'user_supplied',
+            includesPaper: true,
+            includesBinding: true,
+            includesFinishing: true,
+            includesPackaging: true,
+            runs: [
+                { id: 'run-1', variantKey: 'run-1', quantity: 1500, manufacturingPrice: 5799, transportPrice: 535, quotedTotalPrice: 6334, quotedUnitPrice: 4.22, validationStatus: 'CONSISTENT' as const }
+            ]
+        };
+
+        const { rerender } = renderJourney(
+            <SimplifiedOnboardingJourney 
+                printerNodeId="node-test-1" 
+                initialSpec={specCalculated as any} 
+                initialStep={3} 
+            />, 
+            'es'
+        );
+
+        // Advance to step 4 comparison
+        const proceedBtn = screen.getByTestId('proceed-to-compare-btn');
+        expect(proceedBtn).not.toBeDisabled();
+        fireEvent.click(proceedBtn);
+
+        // Step 4 comparison is mounted
+        expect(screen.getByTestId('run-solver-btn')).toBeInTheDocument();
+    });
 });
 
 

@@ -33,6 +33,7 @@ interface VariantSpecTableProps {
     onCorrectDiscrepancy?: (runIndex: number, correctedUnitPrice: number) => void;
     onApplyComputedUnit?: () => void;
     onUpdateInclusions?: (inclusions: { includesPaper?: boolean | null; includesBinding?: boolean | null; includesFinishing?: boolean | null; includesPackaging?: boolean | null }) => void;
+    onUpdateSpec?: (patch: Partial<ProgressiveSpecState>) => void;
     onProceedToCalculate?: () => void;
     onProceedToCalculation?: () => void;
     onProceedToComparison?: () => void;
@@ -56,6 +57,7 @@ export const VariantSpecTable: React.FC<VariantSpecTableProps> = ({
     onCorrectDiscrepancy,
     onApplyComputedUnit,
     onUpdateInclusions,
+    onUpdateSpec,
     onProceedToCalculate,
     onProceedToCalculation,
     onProceedToComparison,
@@ -64,6 +66,7 @@ export const VariantSpecTable: React.FC<VariantSpecTableProps> = ({
 }) => {
     const { t, locale } = useLocale();
     const [ambiguityResolved, setAmbiguityResolved] = useState<string | null>(null);
+    const [isConfirmingStandard, setIsConfirmingStandard] = useState(false);
 
     // Inclusions state: paper, binding, finishing, packaging (null = unknown/pending)
     const [includesPaper, setIncludesPaper] = useState<boolean | null>(spec?.includesPaper !== undefined ? spec.includesPaper : (spec ? null : true));
@@ -106,7 +109,10 @@ export const VariantSpecTable: React.FC<VariantSpecTableProps> = ({
     if (includesPackaging === null || includesPackaging === undefined) missingInclusions.push(t('inclusions.packaging') || 'Empaquetado');
     const hasMissingInclusions = missingInclusions.length > 0;
 
-    const canProceed = !isAmbiguityActive && !hasMissingInclusions;
+    // Endpapers pending check for Hardcover family when endpapers are unconfigured or absent from PDF
+    const isEndpaperPending = familyId === 'HARDCOVER' && spec?.hasEndpapers === true && (!spec?.endpaperPaper || !spec?.endpaperColors);
+
+    const canProceed = !isAmbiguityActive && !hasMissingInclusions && !isEndpaperPending;
 
     const handleProceed = () => {
         if (!canProceed) return;
@@ -263,6 +269,79 @@ export const VariantSpecTable: React.FC<VariantSpecTableProps> = ({
                                 {t('review.confirmSoftcover') || 'Rústica (Cubierta flexible)'}
                             </button>
                         </div>
+                    </div>
+                )}
+
+                {/* ── ENDPAPERS SPECIFICATION ALERT (DOCUMENT B CASE) ── */}
+                {isEndpaperPending && (
+                    <div className="p-4 bg-blue-50 dark:bg-blue-950/40 border-2 border-blue-300 dark:border-blue-700 rounded-xl space-y-3">
+                        <div className="flex items-start gap-2.5">
+                            <HelpCircle size={18} className="text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
+                            <div className="space-y-1">
+                                <h5 className="font-bold text-blue-900 dark:text-blue-200 text-xs">
+                                    {t('review.endpapersTitle') || 'Especificación de Guardas Pendiente'}
+                                </h5>
+                                <p className="text-[11px] text-blue-800/90 dark:text-blue-300/90 leading-relaxed">
+                                    {t('review.endpapersDesc') || 'El documento no especifica el tipo de papel o tintas para las guardas. Tapa Dura requiere definir estas características para calibrar tarifas sin suposiciones no autorizadas.'}
+                                </p>
+                            </div>
+                        </div>
+
+                        {!isConfirmingStandard ? (
+                            <div className="flex flex-wrap items-center gap-2 pt-1">
+                                <button
+                                    type="button"
+                                    data-testid="propose-standard-endpapers-btn"
+                                    onClick={() => setIsConfirmingStandard(true)}
+                                    className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg text-xs transition-colors cursor-pointer"
+                                >
+                                    {t('review.proposeStandardEndpapers') || 'Aplicar propuesta de usuario: Offset 140 g/m² sin imprimir (no consta en PDF)'}
+                                </button>
+                                <button
+                                    type="button"
+                                    data-testid="edit-endpapers-in-form-btn"
+                                    onClick={handleEdit}
+                                    className="px-3 py-1.5 bg-white dark:bg-zinc-800 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-700 hover:bg-blue-50 dark:hover:bg-zinc-700 font-semibold rounded-lg text-xs transition-colors cursor-pointer"
+                                >
+                                    {t('review.customizeEndpapers') || 'Personalizar en formulario...'}
+                                </button>
+                            </div>
+                        ) : (
+                            <div className="p-3 bg-white dark:bg-zinc-900 border border-blue-200 dark:border-blue-800 rounded-lg space-y-2">
+                                <p className="text-[11px] text-blue-950 dark:text-blue-200 font-medium">
+                                    {t('review.confirmProposalPrompt') || '¿Confirmar Offset 140 g/m² sin imprimir (0/0) como especificación aportada por el usuario? Esta característica no consta en el PDF original y quedará registrada con procedencia de usuario.'}
+                                </p>
+                                <div className="flex flex-wrap items-center gap-2 pt-1">
+                                    <button
+                                        type="button"
+                                        data-testid="confirm-standard-endpapers-btn"
+                                        onClick={() => {
+                                            if (onUpdateSpec) {
+                                                onUpdateSpec({
+                                                    hasEndpapers: true,
+                                                    endpaperPaper: 'Offset',
+                                                    endpaperWeightGsm: 140,
+                                                    endpaperColors: '0/0',
+                                                    endpaperProvenance: 'user_supplied'
+                                                });
+                                            }
+                                            setIsConfirmingStandard(false);
+                                        }}
+                                        className="px-3 py-1.5 bg-blue-700 hover:bg-blue-800 text-white font-bold rounded-lg text-xs transition-colors cursor-pointer"
+                                    >
+                                        {t('review.confirmUserSuppliedProposal') || 'Sí, confirmar propuesta de usuario'}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        data-testid="cancel-standard-endpapers-btn"
+                                        onClick={() => setIsConfirmingStandard(false)}
+                                        className="px-3 py-1.5 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 font-semibold rounded-lg text-xs transition-colors cursor-pointer"
+                                    >
+                                        {t('common.cancel') || 'Cancelar'}
+                                    </button>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 )}
 
@@ -593,6 +672,12 @@ export const VariantSpecTable: React.FC<VariantSpecTableProps> = ({
                             <span>
                                 {t('review.inclusionsBlocker', { missing: missingInclusions.join(', ') })}
                             </span>
+                        </div>
+                    )}
+                    {isEndpaperPending && (
+                        <div className="text-[11px] font-bold text-amber-600 dark:text-amber-400 flex items-center gap-1.5">
+                            <AlertTriangle size={13} />
+                            <span>{t('review.endpaperBlocker') || 'Debe especificar el papel y tintas de las guardas para Tapa Dura antes de calcular.'}</span>
                         </div>
                     )}
                 </div>

@@ -392,6 +392,27 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
         }
     };
 
+    const invalidateCalculation = () => {
+        calculationRequestIdRef.current++;
+        setActiveRun(null);
+        setProposedPatch({});
+        setCalibrationAccepted(false);
+        setSessionId(null);
+        sessionIdRef.current = null;
+        setComparisonData({
+            originalPrice: null,
+            enginePrice: null,
+            difference: null,
+            residual: null,
+            isCalculated: false,
+            hasEquivalentBreakdown: true,
+            incompleteComparisonReason: null,
+            calculationError: null,
+            supportedParameters: [],
+            coverageGaps: []
+        });
+    };
+
     // Respond to targetFamilyId changes from external toolbar/ribbon:
     React.useEffect(() => {
         if (!targetFamilyId) return;
@@ -551,7 +572,7 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
                 return;
             }
 
-            const rawOffers: any[] = extractedData?.offers || [];
+            const rawOffers: any[] = extractedData?.offers || extractedData?.runs || [];
             if (!Array.isArray(rawOffers) || rawOffers.length === 0) {
                 throw new Error('El documento PDF fue analizado pero no se encontraron ofertas comerciales legibles (cantidades y precios).');
             }
@@ -627,6 +648,10 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
                 ambiguityNote: extractedData?.warnings && extractedData?.warnings.length > 0 ? extractedData.warnings.join(', ') : undefined,
                 hasDiscrepancy: Boolean(extractedData?.hasInconsistentOffers),
                 deliveryCountry: spec.deliveryCountry,
+                includesPaper: spec.includesPaper !== undefined ? spec.includesPaper : extractedData?.includesPaper,
+                includesBinding: spec.includesBinding !== undefined ? spec.includesBinding : extractedData?.includesBinding,
+                includesFinishing: spec.includesFinishing !== undefined ? spec.includesFinishing : extractedData?.includesFinishing,
+                includesPackaging: spec.includesPackaging !== undefined ? spec.includesPackaging : extractedData?.includesPackaging,
                 runs: extractedRuns
             });
 
@@ -730,6 +755,10 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
                 ambiguityNote: extractedData?.warnings && extractedData?.warnings.length > 0 ? extractedData.warnings.join(', ') : undefined,
                 hasDiscrepancy: Boolean(extractedData?.hasInconsistentOffers),
                 deliveryCountry: spec.deliveryCountry,
+                includesPaper: spec.includesPaper !== undefined ? spec.includesPaper : extractedData?.includesPaper,
+                includesBinding: spec.includesBinding !== undefined ? spec.includesBinding : extractedData?.includesBinding,
+                includesFinishing: spec.includesFinishing !== undefined ? spec.includesFinishing : extractedData?.includesFinishing,
+                includesPackaging: spec.includesPackaging !== undefined ? spec.includesPackaging : extractedData?.includesPackaging,
                 runs: extractedRuns
             });
 
@@ -745,6 +774,7 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
 
     // ── Step 3 Discrepancy & Ambiguity Resolvers ──
     const handleApplyComputedUnit = () => {
+        invalidateCalculation();
         setCurrentOffer(prev => ({
             ...prev,
             hasDiscrepancy: false,
@@ -760,6 +790,7 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
     };
 
     const handleConfirmBindingResolution = (resolved: 'HARDCOVER' | 'SOFTCOVER') => {
+        invalidateCalculation();
         setCurrentOffer(prev => {
             // Preserve the document's original board thickness and block binding method.
             // Only assign if already known from the document/specification; do NOT invent synthetic defaults.
@@ -804,22 +835,8 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
     // ── Variant Selection & Run Invalidation ──
     const handleSelectVariant = (variantId: string) => {
         if (variantId === selectedVariantId) return;
-        calculationRequestIdRef.current++;
         setSelectedVariantId(variantId);
-        setActiveRun(null);
-        setProposedPatch({});
-        setComparisonData({
-            originalPrice: null,
-            enginePrice: null,
-            difference: null,
-            residual: null,
-            isCalculated: false,
-            hasEquivalentBreakdown: true,
-            incompleteComparisonReason: null,
-            calculationError: null,
-            supportedParameters: [],
-            coverageGaps: []
-        });
+        invalidateCalculation();
     };
 
     // ── Step 4 Deterministic Inverse Solver Calculation ──
@@ -892,6 +909,25 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
             }
 
             const targetManufacturing = targetRun.manufacturingPrice;
+
+            // Strict Hardcover requirement: Block calculation if endpaper specifications are missing
+            if (offer.family === 'HARDCOVER' && offer.hasEndpapers === true && (!offer.endpaperPaper || !offer.endpaperColors)) {
+                setActiveRun(null);
+                setProposedPatch({});
+                setComparisonData({
+                    originalPrice: targetManufacturing,
+                    enginePrice: null,
+                    difference: null,
+                    residual: null,
+                    isCalculated: false,
+                    hasEquivalentBreakdown: false,
+                    incompleteComparisonReason: t('review.endpaperBlocker') || 'Debe especificar el papel y tintas de las guardas para Tapa Dura antes de calcular.',
+                    calculationError: t('review.endpaperBlocker') || 'Debe especificar el papel y tintas de las guardas para Tapa Dura antes de calcular.',
+                    supportedParameters: [],
+                    coverageGaps: []
+                });
+                return;
+            }
 
             if (!printerNodeId) {
                 setActiveRun(null);
@@ -1523,8 +1559,14 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
                         <ManualOfferForm
                             familyId={selectedFamilyId}
                             spec={currentOffer}
-                            onChange={(updated) => setCurrentOffer(updated)}
+                            onChange={(updated) => {
+                                invalidateCalculation();
+                                currentOfferRef.current = updated;
+                                setCurrentOffer(updated);
+                            }}
                             onSubmitSpec={(submitted) => {
+                                invalidateCalculation();
+                                currentOfferRef.current = submitted;
                                 setCurrentOffer(submitted);
                                 updateFamilyStatus(selectedFamilyId, 'QUOTE_ADDED', submitted.runs.length);
                                 setCurrentStep(3);
@@ -1624,6 +1666,15 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
                                     console.warn('[SimplifiedOnboarding] Failed to sync inclusions to backend session:', err);
                                 }
                             }
+                        }}
+                        onUpdateSpec={(patch) => {
+                            invalidateCalculation();
+                            const updated = {
+                                ...currentOffer,
+                                ...patch
+                            };
+                            currentOfferRef.current = updated;
+                            setCurrentOffer(updated);
                         }}
                         onProceedToCalculation={() => {
                             setCurrentStep(4);

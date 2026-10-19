@@ -195,6 +195,13 @@ class PrinthouseQuotePreviewService {
                                 Math.trunc((pages % 24 % 16 % 12 % 8) / 4),
                             ];
                         }
+                        if (sig === 16) {
+                            return [
+                                Math.trunc(pages / 16),
+                                Math.trunc((pages % 16) / 8),
+                                Math.trunc((pages % 8) / 4),
+                            ];
+                        }
                         return [
                             Math.trunc(pages / 32),
                             Math.trunc((pages % 32) / 16),
@@ -206,7 +213,7 @@ class PrinthouseQuotePreviewService {
                     const sectArr = getSectionsArray(interiorPages, activeSig);
                     const sectionKeys = activeSig === 24
                         ? ['24p', '16p', '12p', '8p', '4p']
-                        : ['32p', '16p', '8p', '4p'];
+                        : (activeSig === 16 ? ['16p', '8p', '4p'] : ['32p', '16p', '8p', '4p']);
 
                     const fixedRatesDict = ratesSnapshot[`interior_${printModeKey}_colour_fixed`];
                     const varRatesDict = ratesSnapshot[`interior_${printModeKey}_colour_var`];
@@ -255,6 +262,23 @@ class PrinthouseQuotePreviewService {
                             }
                         }
                     }
+                }
+            }
+        }
+
+        // 5c. Endpapers paper check
+        if (jobSpec.endpapers && jobSpec.endpapers !== 'none' && jobSpec.paper_type_endpaper) {
+            const epPaperType = String(jobSpec.paper_type_endpaper).toLowerCase().trim();
+            const epPaperRates = ratesSnapshot.paper_price_endpaper_by_kilo;
+            const epKeyName = `paper_price_endpaper_by_kilo.${epPaperType}`;
+            if (!epPaperRates || !(epPaperType in epPaperRates)) {
+                uncalibratedRates.push(epKeyName);
+                rateDetails.push({ key: epKeyName, status: 'MISSING' });
+            } else {
+                const numVal = Number(epPaperRates[epPaperType]);
+                if (!Number.isFinite(numVal) || numVal === 0) {
+                    uncalibratedRates.push(epKeyName);
+                    rateDetails.push({ key: epKeyName, status: numVal === 0 ? 'EXPLICIT_ZERO' : 'NON_FINITE' });
                 }
             }
         }

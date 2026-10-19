@@ -473,6 +473,16 @@ class CalibrationAcceptanceService {
                 throw err;
             }
 
+            if (forwardResult.isCompleteEstimate === false) {
+                const err = new Error('INCOMPLETE_ESTIMATE_MISSING_RATES');
+                err.code = 'INCOMPLETE_ESTIMATE_MISSING_RATES';
+                err.statusCode = 422;
+                err.details = `Forward pricing calculation is incomplete due to missing rates for active components: ${(forwardResult.missingComponents || []).join(', ')}. Acceptance blocked.`;
+                err.missingComponents = forwardResult.missingComponents;
+                err.missingRatePaths = forwardResult.missingRatePaths;
+                throw err;
+            }
+
             const verifiedManufacturingPrice = forwardResult.predictedManufacturingPrice;
             if (typeof verifiedManufacturingPrice !== 'number' || !Number.isFinite(verifiedManufacturingPrice) || Number.isNaN(verifiedManufacturingPrice) || verifiedManufacturingPrice <= 0) {
                 const err = new Error('INVALID_VERIFIED_FORWARD_PRICE');
@@ -1139,7 +1149,8 @@ class CalibrationAcceptanceService {
             const absRes = Number(unroundedAbsRes.toFixed(6));
             const pctRes = Number(unroundedPctRes.toFixed(6));
             const effTol = computeGovernanceTolerance(targetM, configuredAbsTol, configuredPctTol);
-            const withinTol = absRes <= effTol;
+            const isComplete = evalResult.isCompleteEstimate !== false;
+            const withinTol = isComplete && absRes <= effTol;
 
             if (withinTol) acceptedCount++;
             totalAbsRes += unroundedAbsRes;
@@ -1157,6 +1168,8 @@ class CalibrationAcceptanceService {
                 percentageTolerance: configuredPctTol,
                 effectiveTolerance: effTol,
                 withinTolerance: withinTol,
+                isCompleteEstimate: isComplete,
+                missingComponents: evalResult.missingComponents || [],
                 eligibilityStatus: target.eligibilityStatus || 'ELIGIBLE',
                 sourceEvidenceId: target.sourceEvidenceId || null,
                 sourceOfferIndex: target.sourceOfferIndex ?? null

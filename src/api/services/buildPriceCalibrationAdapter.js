@@ -20,7 +20,7 @@
 let canonicalPricingEngine = null;
 const enginePackage = '@ppos/pricing-engine';
 const engineVersion = '1.0.0';
-const engineCommit = 'dba8d4874cee939de901640e9981e09d2fefdf73';
+const engineCommit = '7acac9223b2d60cae688037cc67e97cc0822b70e';
 const engineSource = 'git-pinned';
 
 try {
@@ -99,7 +99,8 @@ class BuildPriceCalibrationAdapter {
             'wire-o': 'wo',
             'spiral': 'sp'
         };
-        const bindingCode = bookSpec.bindingCode || bindingMap[bookSpec.binding_method] || 'pb';
+        const isHardcover = bookSpec.family === 'HARDCOVER' || bookSpec.product_family === 'HARDCOVER' || bookSpec.construction === 'hardcover' || bookSpec.binding_method === 'hardcover';
+        const bindingCode = bookSpec.bindingCode || (isHardcover ? 'hc' : (bindingMap[bookSpec.binding_method] || 'pb'));
 
         // Lamination
         const laminationType = bookSpec.lamination || bookSpec.laminationType || null; // 'gloss' | 'matt' | 'varnish' | null
@@ -191,6 +192,7 @@ class BuildPriceCalibrationAdapter {
         const mergedRates = applyPatchInMemory(deepClone(ratesSnapshot || {}), candidateOverrides);
 
         // 1. Build canonical BPE params from bookSpec
+        const isHardcover = bookSpec.family === 'HARDCOVER' || bookSpec.product_family === 'HARDCOVER' || bookSpec.construction === 'hardcover' || bookSpec.binding_method === 'hardcover';
         const bpeParams = {
             copies: Number(bookSpec.copies) || 1,
             interior_pages: Number(bookSpec.interior_pages) || 1,
@@ -203,13 +205,16 @@ class BuildPriceCalibrationAdapter {
             paper_type_cover: bookSpec.paper_type_cover || 'mc',
             interior_print: bookSpec.interior_print || '1/1',
             cover_print: bookSpec.cover_print || '4/0',
-            binding_method: bookSpec.binding_method || 'perfect bound',
+            product_family: isHardcover ? 'HARDCOVER' : 'SOFTCOVER',
+            construction: isHardcover ? 'hardcover' : 'softcover',
+            binding_method: isHardcover ? 'hardcover' : (bookSpec.binding_method || 'perfect bound'),
+            block_binding_method: bookSpec.block_binding_method || bookSpec.binding_method || (isHardcover ? 'thread sewn' : 'perfect bound'),
             finishing_options: bookSpec.lamination ? `${bookSpec.lamination} lamination` : 'none',
             uv_varnish: Boolean(bookSpec.uv_varnish),
-            endpapers: bookSpec.endpapers !== undefined ? bookSpec.endpapers : (bookSpec.binding_method === 'hardcover' ? 'standard' : 'none'),
-            endpapers_print: bookSpec.endpapers_print !== undefined ? bookSpec.endpapers_print : (bookSpec.binding_method === 'hardcover' ? '4/0' : 'none'),
-            paper_type_endpaper: bookSpec.paper_type_endpaper || 'offset',
-            paper_weight_endpapers: Number(bookSpec.paper_weight_endpapers) || 115,
+            endpapers: bookSpec.endpapers !== undefined ? bookSpec.endpapers : (isHardcover ? 'standard' : 'none'),
+            endpapers_print: bookSpec.endpapers_print !== undefined ? bookSpec.endpapers_print : (isHardcover ? null : 'none'),
+            paper_type_endpaper: bookSpec.paper_type_endpaper || null,
+            paper_weight_endpapers: bookSpec.paper_weight_endpapers ? Number(bookSpec.paper_weight_endpapers) : null,
             delivery_country: bookSpec.delivery_country || 'ES'
         };
 
@@ -252,6 +257,36 @@ class BuildPriceCalibrationAdapter {
             manufacturingCost = Number((c.subtotal - shippingCost).toFixed(4));
         }
 
+        // 4b. Identify active components with missing or unqualified zero rates
+        const missingComponents = [];
+        const missingRatePaths = [];
+
+        // Interior printing check:
+        const intPages = Number(bookSpec.interior_pages) || 0;
+        const intPrint = String(bookSpec.interior_print || '1/1');
+        if (intPages > 0 && intPrint !== 'none') {
+            const printModeMap = { '4/4': 'full', '2/2': 'two', '1/1': 'one' };
+            const printMode = printModeMap[intPrint] || 'one';
+            const sigKey = `${offer.signature || 16}p`;
+            const fixedRate = Number(mergedRates[`interior_${printMode}_colour_fixed`]?.[sigKey] || 0);
+            const varRate = Number(mergedRates[`interior_${printMode}_colour_var`]?.[sigKey] || 0);
+            if (fixedRate === 0 && varRate === 0) {
+                missingComponents.push('interior_print');
+                missingRatePaths.push(`interior_${printMode}_colour_fixed.${sigKey}`, `interior_${printMode}_colour_var.${sigKey}`);
+            }
+        }
+
+        // Endpaper paper check:
+        if (bpeParams.endpapers && bpeParams.endpapers !== 'none' && bpeParams.paper_type_endpaper) {
+            const epPaperRate = Number(mergedRates.paper_price_endpaper_by_kilo?.[bpeParams.paper_type_endpaper] || 0);
+            if (epPaperRate === 0) {
+                missingComponents.push('endpaper_paper');
+                missingRatePaths.push(`paper_price_endpaper_by_kilo.${bpeParams.paper_type_endpaper}`);
+            }
+        }
+
+        const isCompleteEstimate = missingComponents.length === 0;
+
         return {
             predictedManufacturingPrice: Number(manufacturingCost.toFixed(4)),
             predictedTransportPrice: Number(shippingCost.toFixed(4)),
@@ -260,6 +295,9 @@ class BuildPriceCalibrationAdapter {
             sections: offer.sections,
             lines,
             debug: offer.debug,
+            isCompleteEstimate,
+            missingComponents,
+            missingRatePaths,
             enginePackage: this.enginePackage,
             engineVersion: this.engineVersion,
             engineCommit: this.engineCommit,
