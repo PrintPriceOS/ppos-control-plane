@@ -55,6 +55,11 @@ class DeterministicInversePricingSolver {
             `paper_price_cover_by_kilo.${p.paperTypeCover}`
         ];
 
+        if (p.isHardcover && p.blockBindingCode) {
+            paths.push(`binding_${p.blockBindingCode}_fixed_by_sections.${secKey}`);
+            paths.push(`binding_${p.blockBindingCode}_var_per_1000_by_sections.${secKey}`);
+        }
+
         if (p.laminationType) {
             paths.push(`lam_fixed.${p.laminationType}`);
             paths.push(`lam_var_per_1000.${p.laminationType}`);
@@ -132,6 +137,12 @@ class DeterministicInversePricingSolver {
         const bindVarKey = `binding_${p.bindingCode}_var_per_1000_by_sections`;
         if (activeRates[bindFixedKey] !== undefined) patch[bindFixedKey] = { [secKey]: activeRates[bindFixedKey] };
         if (activeRates[bindVarKey] !== undefined) patch[bindVarKey] = { [secKey]: activeRates[bindVarKey] };
+        if (p.isHardcover && p.blockBindingCode) {
+            const blockBindFixedKey = `binding_${p.blockBindingCode}_fixed_by_sections`;
+            const blockBindVarKey = `binding_${p.blockBindingCode}_var_per_1000_by_sections`;
+            if (activeRates[blockBindFixedKey] !== undefined) patch[blockBindFixedKey] = { [secKey]: activeRates[blockBindFixedKey] };
+            if (activeRates[blockBindVarKey] !== undefined) patch[blockBindVarKey] = { [secKey]: activeRates[blockBindVarKey] };
+        }
 
         // Paper
         if (activeRates.paper_price_interior_by_kilo !== undefined) patch.paper_price_interior_by_kilo = { [p.paperTypeInterior]: activeRates.paper_price_interior_by_kilo };
@@ -255,6 +266,19 @@ class DeterministicInversePricingSolver {
             bindVarPrior = 14.7;
         }
 
+        let blockBindFixedKey = null;
+        let blockBindVarKey = null;
+        let blockFixedPrior = null;
+        let blockVarPrior = null;
+        if (p.isHardcover && p.blockBindingCode) {
+            blockBindFixedKey = `binding_${p.blockBindingCode}_fixed_by_sections`;
+            blockBindVarKey = `binding_${p.blockBindingCode}_var_per_1000_by_sections`;
+            if (p.blockBindingCode === 'pb') {
+                blockFixedPrior = 0.164;
+                blockVarPrior = 14.7;
+            }
+        }
+
         const priorsUsed = [];
         const resolveActiveRate = (pathKey, subKey, safePrior, isEssential = false) => {
             const pathString = `${pathKey}.${subKey}`;
@@ -324,6 +348,11 @@ class DeterministicInversePricingSolver {
             paper_price_cover_by_kilo: resolveActiveRate('paper_price_cover_by_kilo', p.paperTypeCover, 2.515, true)
         };
 
+        if (blockBindFixedKey) {
+            baseActive[blockBindFixedKey] = resolveActiveRate(blockBindFixedKey, secKey, blockFixedPrior, true);
+            baseActive[blockBindVarKey] = resolveActiveRate(blockBindVarKey, secKey, blockVarPrior, true);
+        }
+
         if (p.laminationType) {
             baseActive.lam_fixed = resolveActiveRate('lam_fixed', p.laminationType, 6.0, true);
             baseActive.lam_var_per_1000 = resolveActiveRate('lam_var_per_1000', p.laminationType, 25.0, true);
@@ -375,6 +404,10 @@ class DeterministicInversePricingSolver {
             paper_price_interior_by_kilo: `paper_price_interior_by_kilo.${p.paperTypeInterior}`,
             paper_price_cover_by_kilo: `paper_price_cover_by_kilo.${p.paperTypeCover}`
         };
+        if (blockBindFixedKey) {
+            activeRateKeyToPath[blockBindFixedKey] = `${blockBindFixedKey}.${secKey}`;
+            activeRateKeyToPath[blockBindVarKey] = `${blockBindVarKey}.${secKey}`;
+        }
         if (p.laminationType) {
             activeRateKeyToPath.lam_fixed = `lam_fixed.${p.laminationType}`;
             activeRateKeyToPath.lam_var_per_1000 = `lam_var_per_1000.${p.laminationType}`;
@@ -664,6 +697,19 @@ class DeterministicInversePricingSolver {
         let bindFixedPrior = p.bindingCode === 'pb' ? 0.164 : null;
         let bindVarPrior = p.bindingCode === 'pb' ? 14.7 : null;
 
+        let blockBindFixedKey = null;
+        let blockBindVarKey = null;
+        let blockFixedPrior = null;
+        let blockVarPrior = null;
+        if (p.isHardcover && p.blockBindingCode) {
+            blockBindFixedKey = `binding_${p.blockBindingCode}_fixed_by_sections`;
+            blockBindVarKey = `binding_${p.blockBindingCode}_var_per_1000_by_sections`;
+            if (p.blockBindingCode === 'pb') {
+                blockFixedPrior = 0.164;
+                blockVarPrior = 14.7;
+            }
+        }
+
         const priorsUsed = [];
         const resolveActiveRate = (pathKey, subKey, safePrior, isEssential = false) => {
             const pathString = `${pathKey}.${subKey}`;
@@ -713,6 +759,11 @@ class DeterministicInversePricingSolver {
             paper_price_cover_by_kilo: resolveActiveRate('paper_price_cover_by_kilo', p.paperTypeCover, 2.515, true)
         };
 
+        if (blockBindFixedKey) {
+            baseActive[blockBindFixedKey] = resolveActiveRate(blockBindFixedKey, secKey, blockFixedPrior, true);
+            baseActive[blockBindVarKey] = resolveActiveRate(blockBindVarKey, secKey, blockVarPrior, true);
+        }
+
         if (p.laminationType) {
             baseActive.lam_fixed = resolveActiveRate('lam_fixed', p.laminationType, 6.0, true);
             baseActive.lam_var_per_1000 = resolveActiveRate('lam_var_per_1000', p.laminationType, 25.0, true);
@@ -728,6 +779,10 @@ class DeterministicInversePricingSolver {
             paper_price_interior_by_kilo: `paper_price_interior_by_kilo.${p.paperTypeInterior}`,
             paper_price_cover_by_kilo: `paper_price_cover_by_kilo.${p.paperTypeCover}`
         };
+        if (blockBindFixedKey) {
+            activeRateKeyToPath[blockBindFixedKey] = `${blockBindFixedKey}.${secKey}`;
+            activeRateKeyToPath[blockBindVarKey] = `${blockBindVarKey}.${secKey}`;
+        }
         if (p.laminationType) {
             activeRateKeyToPath.lam_fixed = `lam_fixed.${p.laminationType}`;
             activeRateKeyToPath.lam_var_per_1000 = `lam_var_per_1000.${p.laminationType}`;

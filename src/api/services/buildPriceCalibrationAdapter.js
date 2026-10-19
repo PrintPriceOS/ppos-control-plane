@@ -101,6 +101,9 @@ class BuildPriceCalibrationAdapter {
         };
         const isHardcover = bookSpec.family === 'HARDCOVER' || bookSpec.product_family === 'HARDCOVER' || bookSpec.construction === 'hardcover' || bookSpec.binding_method === 'hardcover';
         const bindingCode = bookSpec.bindingCode || (isHardcover ? 'hc' : (bindingMap[bookSpec.binding_method] || 'pb'));
+        const rawBlockMethod = bookSpec.block_binding_method || (bookSpec.binding_method !== 'hardcover' ? bookSpec.binding_method : null);
+        const blockBindingMethod = rawBlockMethod || (isHardcover ? null : 'perfect bound');
+        const blockBindingCode = blockBindingMethod ? (bindingMap[blockBindingMethod] || 'pb') : null;
 
         // Lamination
         const laminationType = bookSpec.lamination || bookSpec.laminationType || null; // 'gloss' | 'matt' | 'varnish' | null
@@ -158,14 +161,20 @@ class BuildPriceCalibrationAdapter {
             interiorColorKey,
             coverColorKey,
             bindingCode,
+            isHardcover,
+            blockBindingMethod,
+            blockBindingCode,
             laminationType,
             uvVarnishActive,
             endpapers,
             endpapersPrint,
             paperTypeInterior: bookSpec.paper_type_interior || 'offset',
+            paperWeightInterior: Number(bookSpec.paper_weight_interior || bookSpec.interiorWeightGsm) || 80,
             paperTypeCover: bookSpec.paper_type_cover || 'mc',
+            paperWeightCover: Number(bookSpec.paper_weight_cover || bookSpec.coverWeightGsm) || 250,
             paperTypeEndpaper,
             paperWeightEndpapers,
+            endpaperProvenance: bookSpec.endpaper_provenance || bookSpec.endpaperProvenance || (bookSpec.endpapers ? 'user_supplied' : 'none'),
             deliveryCountry: countryCode,
             deliveryCountryIso: countryIsoUpper
         };
@@ -282,6 +291,44 @@ class BuildPriceCalibrationAdapter {
             if (epPaperRate === 0) {
                 missingComponents.push('endpaper_paper');
                 missingRatePaths.push(`paper_price_endpaper_by_kilo.${bpeParams.paper_type_endpaper}`);
+            }
+        }
+
+        // Binding checks:
+        const secKey = String(Math.min(24, Math.max(1, offer.sections || 1)));
+
+        // Casing check for hardcover:
+        if (isHardcover) {
+            const hcFixed = Number(mergedRates.binding_hc_fixed_by_sections?.[secKey] ?? 0);
+            const hcVar = Number(mergedRates.binding_hc_var_per_1000_by_sections?.[secKey] ?? 0);
+            if (hcFixed === 0 && hcVar === 0) {
+                missingComponents.push('hardcover_casing');
+                missingRatePaths.push(`binding_hc_fixed_by_sections.${secKey}`, `binding_hc_var_per_1000_by_sections.${secKey}`);
+            }
+        }
+
+        // Block binding check:
+        const blockMethod = bpeParams.block_binding_method;
+        if (blockMethod === 'thread sewn') {
+            const tsFixed = Number(mergedRates.binding_ts_fixed_by_sections?.[secKey] ?? 0);
+            const tsVar = Number(mergedRates.binding_ts_var_per_1000_by_sections?.[secKey] ?? 0);
+            if (tsFixed === 0 && tsVar === 0) {
+                missingComponents.push('sewing');
+                missingRatePaths.push(`binding_ts_fixed_by_sections.${secKey}`, `binding_ts_var_per_1000_by_sections.${secKey}`);
+            }
+        } else if (blockMethod === 'perfect bound' || (!isHardcover && !blockMethod)) {
+            const pbFixed = Number(mergedRates.binding_pb_fixed_by_sections?.[secKey] ?? 0);
+            const pbVar = Number(mergedRates.binding_pb_var_per_1000_by_sections?.[secKey] ?? 0);
+            if (pbFixed === 0 && pbVar === 0) {
+                missingComponents.push('perfect_bound');
+                missingRatePaths.push(`binding_pb_fixed_by_sections.${secKey}`, `binding_pb_var_per_1000_by_sections.${secKey}`);
+            }
+        } else if (blockMethod === 'saddle stitch') {
+            const ssFixed = Number(mergedRates.binding_ss_fixed_by_sections?.[secKey] ?? 0);
+            const ssVar = Number(mergedRates.binding_ss_var_per_1000_by_sections?.[secKey] ?? 0);
+            if (ssFixed === 0 && ssVar === 0) {
+                missingComponents.push('saddle_stitch');
+                missingRatePaths.push(`binding_ss_fixed_by_sections.${secKey}`, `binding_ss_var_per_1000_by_sections.${secKey}`);
             }
         }
 

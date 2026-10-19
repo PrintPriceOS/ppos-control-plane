@@ -217,6 +217,14 @@ class CalibrationReachabilityService {
                 baseActive.cover_var_per_1000_by_colours = checkAndResolveRate('cover_var_per_1000_by_colours', p.coverColorKey, 800.0, true);
                 baseActive[bindFixedKey] = checkAndResolveRate(bindFixedKey, secKey, bindFixedPrior, true);
                 baseActive[bindVarKey] = checkAndResolveRate(bindVarKey, secKey, bindVarPrior, true);
+                if (p.isHardcover && p.blockBindingCode) {
+                    const blockBindFixedKey = `binding_${p.blockBindingCode}_fixed_by_sections`;
+                    const blockBindVarKey = `binding_${p.blockBindingCode}_var_per_1000_by_sections`;
+                    let blockFixedPrior = p.blockBindingCode === 'pb' ? 0.164 : null;
+                    let blockVarPrior = p.blockBindingCode === 'pb' ? 14.7 : null;
+                    baseActive[blockBindFixedKey] = checkAndResolveRate(blockBindFixedKey, secKey, blockFixedPrior, true);
+                    baseActive[blockBindVarKey] = checkAndResolveRate(blockBindVarKey, secKey, blockVarPrior, true);
+                }
                 baseActive.paper_price_interior_by_kilo = checkAndResolveRate('paper_price_interior_by_kilo', p.paperTypeInterior, 1.252, true);
                 baseActive.paper_price_cover_by_kilo = checkAndResolveRate('paper_price_cover_by_kilo', p.paperTypeCover, 2.515, true);
 
