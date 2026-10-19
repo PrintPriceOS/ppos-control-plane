@@ -1575,6 +1575,7 @@ export const en = {
   'review.ambiguityTitle': 'Technical ambiguity detected between binding and cardboard',
   'review.confirmBinding': 'Please confirm the actual binding:',
   'review.confirmHardcover': 'Hardcover (2.4 mm greyboard)',
+  'review.confirmHardcoverDynamic': 'Hardcover ({mm} mm greyboard)',
   'review.confirmSoftcover': 'Softcover (flexible cover)',
   'review.coverageScopeTitle': 'Evidence Scope & Coverage Gap',
   'review.coverageDisclaimer': 'Technical calibration notice: This quote strictly validates the parameters contained in its lines. It does not substantiate Wire-O, saddle stitch, foil stamping, or a controlled Smyth-sewn vs glued comparison. These families retain baseline rates until specific quotes are provided.',

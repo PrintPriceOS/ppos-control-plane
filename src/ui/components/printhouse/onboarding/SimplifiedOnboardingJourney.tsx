@@ -646,14 +646,45 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
     };
 
     const handleConfirmBindingResolution = (resolved: 'HARDCOVER' | 'SOFTCOVER') => {
-        setCurrentOffer(prev => ({
-            ...prev,
-            family: resolved,
-            hasAmbiguity: false,
-            boardThicknessMm: resolved === 'HARDCOVER' ? 2.4 : undefined,
-            bindingMethod: resolved === 'HARDCOVER' ? 'thread_sewn' : 'adhesive_pur',
-            runs: prev.runs.map(r => ({ ...r, validationStatus: 'CONSISTENT' }))
-        }));
+        setCurrentOffer(prev => {
+            // Preserve the document's original board thickness and block binding method.
+            // Only assign if already known from the document/specification; do NOT invent synthetic defaults.
+            let preservedBoardThickness = prev.boardThicknessMm;
+            if (resolved === 'SOFTCOVER') {
+                preservedBoardThickness = undefined;
+            }
+
+            // Preserve explicit block-binding method from document if present (e.g. thread_sewn, adhesive_pur, etc.)
+            // If unknown, keep it undefined so canonicalizer / validation requests it separately
+            let preservedBindingMethod = prev.bindingMethod;
+
+            // Filter out only the binding contradiction / typo ambiguity warning from ambiguity details/note
+            const filterAmbiguity = (note?: string) => {
+                if (!note) return undefined;
+                const remaining = note
+                    .split(',')
+                    .map(s => s.trim())
+                    .filter(s => !s.toLowerCase().includes('softcover') && !s.toLowerCase().includes('hardcover') && !s.toLowerCase().includes('mgp') && !s.toLowerCase().includes('cartón') && !s.toLowerCase().includes('handcover'))
+                    .join(', ');
+                return remaining.length > 0 ? remaining : undefined;
+            };
+
+            const remainingNote = filterAmbiguity(prev.ambiguityNote);
+            const remainingDetails = filterAmbiguity(prev.ambiguityDetails);
+            const stillHasAmbiguity = Boolean(remainingNote || remainingDetails);
+
+            return {
+                ...prev,
+                family: resolved,
+                hasAmbiguity: stillHasAmbiguity,
+                ambiguityNote: remainingNote,
+                ambiguityDetails: remainingDetails,
+                boardThicknessMm: preservedBoardThickness,
+                bindingMethod: preservedBindingMethod,
+                // Do NOT mutate runs or erase arithmetic discrepancies (e.g. INCONSISTENT_UNIT_PRICE)
+                runs: prev.runs
+            };
+        });
     };
 
     // ── Variant Selection & Run Invalidation ──
@@ -831,6 +862,18 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
                     });
                     if (calculationRequestIdRef.current !== thisReqId || selectedFamilyIdRef.current !== calcFamilyId) return;
                     if (sess?.id) setSessionId(sess.id);
+                } else {
+                    // Synchronize latest offer inclusions and bookSpec to existing session before marking READY
+                    await printhouseCalibrationApi.updateDraftSession(sess.id, {
+                        referenceBookName: offer.productTitle || 'Oferta Calibración',
+                        bookSpec: canonicalResult.bookSpec,
+                        targetManufacturingPrice: canonicalResult.targetManufacturingPrice || targetManufacturing,
+                        includesPaper: offer.includesPaper,
+                        includesBinding: offer.includesBinding,
+                        includesFinishing: offer.includesFinishing,
+                        includesPackaging: offer.includesPackaging
+                    });
+                    if (calculationRequestIdRef.current !== thisReqId || selectedFamilyIdRef.current !== calcFamilyId) return;
                 }
                 if (sess?.id) {
                     await printhouseCalibrationApi.markSessionReady(sess.id);
@@ -1352,17 +1395,48 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
                         }}
                         onApplyComputedUnit={handleApplyComputedUnit}
                         onConfirmBinding={handleConfirmBindingResolution}
-                        onUpdateInclusions={(inclusions) => {
-                            setCurrentOffer(prev => ({
-                                ...prev,
+                        onUpdateInclusions={async (inclusions) => {
+                            // Invalidate previous calculation, proposal and comparison
+                            calculationRequestIdRef.current++;
+                            setActiveRun(null);
+                            setProposedPatch({});
+                            setCalibrationAccepted(false);
+                            setComparisonData({
+                                originalPrice: null,
+                                enginePrice: null,
+                                difference: null,
+                                residual: null,
+                                isCalculated: false,
+                                hasEquivalentBreakdown: true,
+                                incompleteComparisonReason: null,
+                                calculationError: null,
+                                supportedParameters: [],
+                                coverageGaps: []
+                            });
+
+                            const updatedOffer = {
+                                ...currentOffer,
                                 ...inclusions
-                            }));
+                            };
+                            setCurrentOffer(updatedOffer);
+
+                            // Synchronize changed inclusions with the backend calibration session if active
+                            if (sessionId) {
+                                try {
+                                    await printhouseCalibrationApi.updateDraftSession(sessionId, {
+                                        includesPaper: inclusions.includesPaper !== undefined ? inclusions.includesPaper : currentOffer.includesPaper,
+                                        includesBinding: inclusions.includesBinding !== undefined ? inclusions.includesBinding : currentOffer.includesBinding,
+                                        includesFinishing: inclusions.includesFinishing !== undefined ? inclusions.includesFinishing : currentOffer.includesFinishing,
+                                        includesPackaging: inclusions.includesPackaging !== undefined ? inclusions.includesPackaging : currentOffer.includesPackaging
+                                    });
+                                } catch (err) {
+                                    console.warn('[SimplifiedOnboarding] Failed to sync inclusions to backend session:', err);
+                                }
+                            }
                         }}
                         onProceedToCalculation={() => {
                             setCurrentStep(4);
-                            if (!comparisonData.isCalculated) {
-                                handleRunSolver(currentOffer);
-                            }
+                            handleRunSolver(currentOffer);
                         }}
                     />
                 </div>

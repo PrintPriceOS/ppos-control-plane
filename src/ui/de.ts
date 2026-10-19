@@ -1575,6 +1575,7 @@ export const de = {
   'review.ambiguityTitle': 'Technische Unklarheit zwischen Bindeart und Pappe',
   'review.confirmBinding': 'Bitte bestätigen Sie die tatsächliche Bindeart:',
   'review.confirmHardcover': 'Hardcover (2,4 mm Graupappe)',
+  'review.confirmHardcoverDynamic': 'Hardcover ({mm} mm Graupappe)',
   'review.confirmSoftcover': 'Softcover (Flexibler Umschlag)',
   'review.coverageScopeTitle': 'Geltungsbereich & Evidenzlücke',
   'review.coverageDisclaimer': 'Technischer Kalibrierungshinweis: Dieses Angebot belegt ausschließlich die in den Positionen genannten Parameter. Es belegt weder Wire-O, Rückstichheftung, Folienprägung noch einen kontrollierten Vergleich zwischen Fadenheftung und Klebebindung. Diese Familien behalten Basiswerte, bis spezifische Angebote vorliegen.',

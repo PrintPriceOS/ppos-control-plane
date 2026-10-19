@@ -1575,6 +1575,7 @@ export const es = {
   'review.ambiguityTitle': 'Ambigüedad técnica detectada entre encuadernación y cartón',
   'review.confirmBinding': 'Por favor, confirme la encuadernación real:',
   'review.confirmHardcover': 'Tapa Dura (Cartón 2,4 mm)',
+  'review.confirmHardcoverDynamic': 'Tapa Dura (Cartón {mm} mm)',
   'review.confirmSoftcover': 'Rústica (Cubierta flexible)',
   'review.coverageScopeTitle': 'Alcance y Brecha de Cobertura de Evidencias',
   'review.coverageDisclaimer': 'Aviso de calibración técnica: Este presupuesto acredita exclusivamente los parámetros contenidos en sus líneas. No acredita Wire-O, grapado al caballete, estampación ni una comparación controlada entre cosido y encolado. Estas familias conservarán tarifas base hasta que se aporten presupuestos específicos.',

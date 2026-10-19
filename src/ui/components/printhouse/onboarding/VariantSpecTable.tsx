@@ -62,10 +62,10 @@ export const VariantSpecTable: React.FC<VariantSpecTableProps> = ({
     const [ambiguityResolved, setAmbiguityResolved] = useState<string | null>(null);
 
     // Inclusions state: paper, binding, finishing, packaging (null = unknown/pending)
-    const [includesPaper, setIncludesPaper] = useState<boolean | null>(spec?.includesPaper ?? null);
-    const [includesBinding, setIncludesBinding] = useState<boolean | null>(spec?.includesBinding ?? null);
-    const [includesFinishing, setIncludesFinishing] = useState<boolean | null>(spec?.includesFinishing ?? null);
-    const [includesPackaging, setIncludesPackaging] = useState<boolean | null>(spec?.includesPackaging ?? null);
+    const [includesPaper, setIncludesPaper] = useState<boolean | null>(spec?.includesPaper !== undefined ? spec.includesPaper : (spec ? null : true));
+    const [includesBinding, setIncludesBinding] = useState<boolean | null>(spec?.includesBinding !== undefined ? spec.includesBinding : (spec ? null : true));
+    const [includesFinishing, setIncludesFinishing] = useState<boolean | null>(spec?.includesFinishing !== undefined ? spec.includesFinishing : (spec ? null : true));
+    const [includesPackaging, setIncludesPackaging] = useState<boolean | null>(spec?.includesPackaging !== undefined ? spec.includesPackaging : (spec ? null : true));
 
     const updateInclusion = (field: 'paper' | 'binding' | 'finishing' | 'packaging', value: boolean | null) => {
         let newPaper = includesPaper;
@@ -242,7 +242,10 @@ export const VariantSpecTable: React.FC<VariantSpecTableProps> = ({
                                         : 'bg-white dark:bg-zinc-800 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-700'
                                 }`}
                             >
-                                {t('review.confirmHardcover') || 'Tapa Dura (Cartón 2,4 mm)'}
+                                {spec?.boardThicknessMm 
+                                    ? t('review.confirmHardcoverDynamic', { mm: Number(spec.boardThicknessMm).toLocaleString('de-DE', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) })
+                                    : t('review.confirmHardcover')
+                                }
                             </button>
                             <button
                                 type="button"

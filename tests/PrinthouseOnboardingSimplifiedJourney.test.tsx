@@ -865,6 +865,205 @@ describe('Simplified Printhouse Onboarding Journey Suite', () => {
         const dashes = screen.getAllByText('—');
         expect(dashes.length).toBeGreaterThanOrEqual(3);
     });
+
+    it('27. Changing an inclusion invalidates previous calculation, synchronizes new value with backend session, and recalculates', async () => {
+        const printhouseCalibrationApi = await import('../src/ui/lib/printhouseCalibrationApi');
+        const createSpy = vi.spyOn(printhouseCalibrationApi.printhouseCalibrationApi, 'createSession').mockResolvedValue({ id: 'sess-change-1', status: 'DRAFT' } as any);
+        const getSessionSpy = vi.spyOn(printhouseCalibrationApi.printhouseCalibrationApi, 'getSession').mockResolvedValue({ id: 'sess-change-1', status: 'DRAFT' } as any);
+        const updateDraftSpy = vi.spyOn(printhouseCalibrationApi.printhouseCalibrationApi, 'updateDraftSession').mockResolvedValue({ id: 'sess-change-1', status: 'DRAFT' } as any);
+        const readySpy = vi.spyOn(printhouseCalibrationApi.printhouseCalibrationApi, 'markSessionReady').mockResolvedValue({ id: 'sess-change-1', status: 'READY' } as any);
+        const calcSpy = vi.spyOn(printhouseCalibrationApi.printhouseCalibrationApi, 'calculateCalibration')
+            .mockResolvedValueOnce({
+                id: 'run-calc-1',
+                enginePriceAfter: 4000,
+                targetPrice: 4200,
+                absoluteResidual: 200,
+                percentResidual: 4.7
+            } as any)
+            .mockResolvedValueOnce({
+                id: 'run-calc-2',
+                enginePriceAfter: 3500,
+                targetPrice: 4200,
+                absoluteResidual: 700,
+                percentResidual: 16.6
+            } as any);
+
+        const baseSpec = {
+            ...NATUR_DOCUMENT_FIXTURE.spec,
+            includesPaper: true,
+            includesBinding: true,
+            includesFinishing: true,
+            includesPackaging: true
+        };
+
+        renderJourney(
+            <SimplifiedOnboardingJourney 
+                printerNodeId="node-test-1" 
+                initialSpec={baseSpec as any} 
+                initialStep={3} 
+            />, 
+            'es'
+        );
+
+        // 1. Initial calculation
+        const proceedBtn = screen.getByTestId('proceed-to-compare-btn');
+        fireEvent.click(proceedBtn);
+
+        await waitFor(() => {
+            expect(createSpy).toHaveBeenCalledWith(expect.objectContaining({
+                includesFinishing: true
+            }));
+            expect(readySpy).toHaveBeenCalledWith('sess-change-1');
+            expect(calcSpy).toHaveBeenCalledTimes(1);
+        });
+
+        // 2. Return to review
+        const returnBtn = screen.getByRole('button', { name: /Volver a especificaciones/i });
+        fireEvent.click(returnBtn);
+
+        // 3. Change an inclusion (Finishing from Sí to No)
+        const finishingLabel = screen.getByText('Incluye Acabados:').parentElement!;
+        fireEvent.click(within(finishingLabel).getByRole('button', { name: 'No' }));
+
+        await waitFor(() => {
+            // Must synchronize the changed inclusion to the backend draft session
+            expect(updateDraftSpy).toHaveBeenCalledWith('sess-change-1', expect.objectContaining({
+                includesFinishing: false
+            }));
+        });
+
+        // 4. Recalculate
+        const proceedBtn2 = screen.getByTestId('proceed-to-compare-btn');
+        fireEvent.click(proceedBtn2);
+
+        await waitFor(() => {
+            // Must have called calculateCalibration a second time (old result not reused)
+            expect(calcSpy).toHaveBeenCalledTimes(2);
+            // Must sync latest values before markSessionReady
+            expect(readySpy).toHaveBeenCalledWith('sess-change-1');
+        });
+    });
+
+    it('28. Confirming Hardcover on a document with 2.0 mm board preserves 2.0 mm without overriding to 2.4 mm', async () => {
+        const specWith2mm = {
+            ...MYSTERIOSEN_STEINE_DOCUMENT_FIXTURE.spec,
+            boardThicknessMm: 2.0,
+            hasAmbiguity: true,
+            ambiguityNote: 'Contradicción documental: Softcover pero cartón 2,0 mm',
+            includesPaper: true,
+            includesBinding: true,
+            includesFinishing: true,
+            includesPackaging: true
+        };
+
+        renderJourney(
+            <SimplifiedOnboardingJourney 
+                printerNodeId="node-test-1" 
+                initialSpec={specWith2mm as any} 
+                initialStep={3} 
+            />, 
+            'es'
+        );
+
+        // Confirm button renders with dynamic 2,0 mm
+        const hardcoverBtn = screen.getByRole('button', { name: /Tapa Dura \(Cartón 2,0 mm\)/i });
+        expect(hardcoverBtn).toBeInTheDocument();
+        expect(screen.queryByText(/2,4 mm/i)).not.toBeInTheDocument();
+
+        fireEvent.click(hardcoverBtn);
+
+        // Ambiguity cleared without introducing 2.4 mm
+        expect(screen.queryByText(/Ambigüedad técnica detectada/i)).not.toBeInTheDocument();
+        expect(screen.queryByText(/2,4 mm/i)).not.toBeInTheDocument();
+    });
+
+    it('29. Document with unknown block binding method remains pending when family is confirmed', async () => {
+        const printhouseCalibrationApi = await import('../src/ui/lib/printhouseCalibrationApi');
+        const createSpy = vi.spyOn(printhouseCalibrationApi.printhouseCalibrationApi, 'createSession');
+
+        const specWithoutBindingMethod = {
+            ...MYSTERIOSEN_STEINE_DOCUMENT_FIXTURE.spec,
+            bindingMethod: undefined,
+            hasAmbiguity: true,
+            ambiguityNote: 'Ambigüedad: Softcover pero con Graupappe',
+            includesPaper: true,
+            includesBinding: true,
+            includesFinishing: true,
+            includesPackaging: true
+        };
+
+        renderJourney(
+            <SimplifiedOnboardingJourney 
+                printerNodeId="node-test-1" 
+                initialSpec={specWithoutBindingMethod as any} 
+                initialStep={3} 
+            />, 
+            'es'
+        );
+
+        // Confirm Hardcover
+        const hardcoverBtn = screen.getByRole('button', { name: /Tapa Dura/i });
+        fireEvent.click(hardcoverBtn);
+
+        // Proceed to calculate
+        const proceedBtn = screen.getByTestId('proceed-to-compare-btn');
+        fireEvent.click(proceedBtn);
+
+        // When block binding is unknown, canonicalizer rejects it and halts calculation with actionable error
+        await waitFor(() => {
+            expect(screen.getByText(/Especificación incompleta para calibración/i)).toBeInTheDocument();
+            expect(screen.getAllByText(/binding_method must be one of/i).length).toBeGreaterThanOrEqual(1);
+            expect(createSpy).not.toHaveBeenCalled();
+        });
+    });
+
+    it('30. Resolving binding clarification preserves unrelated arithmetic price discrepancies', async () => {
+        const specWithBothIssues = {
+            ...MYSTERIOSEN_STEINE_DOCUMENT_FIXTURE.spec,
+            hasDiscrepancy: true,
+            hasAmbiguity: true,
+            ambiguityNote: 'Ambigüedad: Softcover vs Graupappe',
+            includesPaper: true,
+            includesBinding: true,
+            includesFinishing: true,
+            includesPackaging: true,
+            runs: [
+                {
+                    id: 'run-disc-1',
+                    variantKey: 'run-disc-1',
+                    quantity: 1000,
+                    manufacturingPrice: 5000,
+                    transportPrice: 400,
+                    totalPrice: 5400,
+                    quotedUnitPrice: 3.50, // arithmetic discrepancy: 5400 / 1000 = 5.40 vs 3.50 quoted
+                    computedUnitPrice: 5.40,
+                    validationStatus: 'INCONSISTENT_UNIT_PRICE' as const
+                }
+            ]
+        };
+
+        renderJourney(
+            <SimplifiedOnboardingJourney 
+                printerNodeId="node-test-1" 
+                initialSpec={specWithBothIssues as any} 
+                initialStep={3} 
+            />, 
+            'es'
+        );
+
+        // Both alerts are visible
+        expect(screen.getByText(/Ambigüedad técnica detectada entre encuadernación y cartón/i)).toBeInTheDocument();
+        expect(screen.getByText(/Discrepancia aritmética detectada en el presupuesto/i)).toBeInTheDocument();
+
+        // Confirm Hardcover
+        const hardcoverBtn = screen.getByRole('button', { name: /Tapa Dura/i });
+        fireEvent.click(hardcoverBtn);
+
+        // Ambiguity alert is cleared, BUT discrepancy alert MUST still be in document!
+        expect(screen.queryByText(/Ambigüedad técnica detectada entre encuadernación y cartón/i)).not.toBeInTheDocument();
+        expect(screen.getByText(/Discrepancia aritmética detectada en el presupuesto/i)).toBeInTheDocument();
+        expect(screen.getByText(/El precio unitario indicado difiere del cálculo/i)).toBeInTheDocument();
+    });
 });
 
 
