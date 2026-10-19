@@ -12,13 +12,13 @@ const interpService = require('../src/api/services/quoteDocumentInterpretationSe
 const calibrationService = require('../src/api/services/calibrationSessionService');
 
 describe('PDF Quote Ingestion and Calibration Canonicalizer Regression Suite', () => {
-    const HARDCOVER_PDF_PATH = 'C:\\Users\\KIKE\\Downloads\\Hardcover_640_Seiten_19.10.2026.pdf';
-    const BILDBAND_PDF_PATH = 'C:\\Users\\KIKE\\Downloads\\Bildband_16.10.2026 (1).pdf';
+    const HARDCOVER_PDF_PATH = path.resolve(__dirname, 'fixtures/sample_hardcover_640p_quote.pdf');
+    const BILDBAND_PDF_PATH = path.resolve(__dirname, 'fixtures/sample_bildband_200p_quote.pdf');
 
-    it('1. Extracts 3 distinct runs and technical specification from Hardcover_640_Seiten_19.10.2026.pdf', async () => {
+    it('1. Extracts 3 distinct runs and technical specification from sample_hardcover_640p_quote.pdf', async () => {
         expect(fs.existsSync(HARDCOVER_PDF_PATH)).toBe(true);
         const buf = fs.readFileSync(HARDCOVER_PDF_PATH);
-        const extraction = await pdfService.extractPdfQuote(buf, 'Hardcover_640_Seiten_19.10.2026.pdf');
+        const extraction = await pdfService.extractPdfQuote(buf, 'sample_hardcover_640p_quote.pdf');
         expect(extraction.status).toBe('SUCCESS');
 
         const interp = interpService.interpretDocument(extraction);
@@ -59,13 +59,16 @@ describe('PDF Quote Ingestion and Calibration Canonicalizer Regression Suite', (
         expect(interp.specification.interiorWeightGsm).toBe(115);
         expect(interp.specification.interiorColors).toBe('4/4');
         expect(interp.specification.hasEndpapers).toBe(true);
+        expect(interp.specification.endpaperPaper).toContain('Offset');
+        expect(interp.specification.endpaperWeightGsm).toBe(170);
+        expect(interp.specification.endpaperColors).toBe('0/0');
         expect(interp.specification.deliveryCountry).toBe('DE');
     });
 
-    it('2. Extracts 3 distinct runs and flags "Handcover" typo as HARDCOVER warning in Bildband_16.10.2026 (1).pdf', async () => {
+    it('2. Extracts 3 distinct runs and flags "Handcover" typo as HARDCOVER warning in sample_bildband_200p_quote.pdf', async () => {
         expect(fs.existsSync(BILDBAND_PDF_PATH)).toBe(true);
         const buf = fs.readFileSync(BILDBAND_PDF_PATH);
-        const extraction = await pdfService.extractPdfQuote(buf, 'Bildband_16.10.2026 (1).pdf');
+        const extraction = await pdfService.extractPdfQuote(buf, 'sample_bildband_200p_quote.pdf');
         expect(extraction.status).toBe('SUCCESS');
 
         const interp = interpService.interpretDocument(extraction);
@@ -103,144 +106,245 @@ describe('PDF Quote Ingestion and Calibration Canonicalizer Regression Suite', (
         expect(interp.specification.deliveryCountry).toBe('DE');
     });
 
-    it('3. Adapts extracted specifications to canonical BPE bookSpec and passes calibrationSessionService.validateBookSpec', () => {
-        const sampleOffer = {
-            family: 'HARDCOVER' as const,
-            productTitle: 'Hardcover 640 Seiten',
-            quoteRef: 'REF-2026-640',
-            evidenceId: 'doc-640',
-            formatWidthMm: 170,
-            formatHeightMm: 240,
-            interiorPages: 640,
-            interiorPaper: 'G-Print 115g',
-            interiorWeightGsm: 115,
+    it('3. Encadenado Documento A: PDF -> extractor -> interpretador -> estado oferta -> canonicalizador -> validador backend', async () => {
+        expect(fs.existsSync(HARDCOVER_PDF_PATH)).toBe(true);
+        const buf = fs.readFileSync(HARDCOVER_PDF_PATH);
+        const extraction = await pdfService.extractPdfQuote(buf, 'sample_hardcover_640p_quote.pdf');
+        expect(extraction.status).toBe('SUCCESS');
+
+        const interp = interpService.interpretDocument(extraction);
+        expect(interp.ok).toBe(true);
+        expect(interp.offers).toHaveLength(3);
+
+        const spec = interp.specification;
+        // Build real offer state exactly as UI does
+        const realOfferState = {
+            family: spec.family,
+            productTitle: interp.printhouseName,
+            quoteRef: 'DOC-A-EVIDENCE',
+            evidenceId: 'DOC-A-EVIDENCE',
+            widthMm: spec.formatWidthMm,
+            heightMm: spec.formatHeightMm,
+            formatWidthMm: spec.formatWidthMm,
+            formatHeightMm: spec.formatHeightMm,
+            interiorPages: spec.interiorPages,
+            interiorPaper: spec.interiorPaper,
+            interiorWeightGsm: spec.interiorWeightGsm,
+            interiorColors: spec.interiorColors,
+            coverPaper: spec.coverPaper,
+            coverWeightGsm: spec.coverWeightGsm,
+            coverColors: spec.coverColors,
+            boardThicknessMm: spec.boardThicknessMm,
+            bindingMethod: spec.bindingMethod,
+            spineType: spec.spineType,
+            lamination: spec.lamination,
+            hasEndpapers: spec.hasEndpapers,
+            endpaperPaper: spec.endpaperPaper,
+            endpaperWeightGsm: spec.endpaperWeightGsm,
+            endpaperColors: spec.endpaperColors,
+            deliveryCountry: spec.deliveryCountry,
+            currency: 'EUR',
+            runs: interp.offers
+        };
+
+        // Test each of the three runs
+        const expectedQuantities = [200, 300, 500];
+        const expectedMfgPrices = [4399, 4765, 5493];
+        const expectedTransports = [350, 350, 450];
+
+        for (let i = 0; i < interp.offers.length; i++) {
+            const run = interp.offers[i];
+            expect(run.quantity).toBe(expectedQuantities[i]);
+            expect(run.manufacturingPrice).toBe(expectedMfgPrices[i]);
+            expect(run.transportPrice).toBe(expectedTransports[i]);
+
+            const canonical = canonicalizeToEngineBookSpec(realOfferState, run);
+            expect(canonical.valid).toBe(true);
+            expect(canonical.errors).toEqual([]);
+            expect(canonical.targetManufacturingPrice).toBe(expectedMfgPrices[i]);
+            expect(canonical.bookSpec?.copies).toBe(expectedQuantities[i]);
+            expect(canonical.bookSpec?.paper_type_endpaper).toBe('offset');
+            expect(canonical.bookSpec?.paper_weight_endpapers).toBe(170); // Preserves real 170g without 140g fallback
+            expect(canonical.bookSpec?.endpapers_print).toBe(null); // Unprinted 0/0 correctly omitted/null in taxonomy
+
+            // Run real backend validator
+            const backendCheck = calibrationService.validateBookSpec(canonical.bookSpec);
+            expect(backendCheck.valid).toBe(true);
+            expect(backendCheck.errors).toEqual([]);
+        }
+    });
+
+    it('4. Encadenado Documento B: PDF -> extractor -> interpretador -> estado oferta -> canonicalizador -> validador backend', async () => {
+        expect(fs.existsSync(BILDBAND_PDF_PATH)).toBe(true);
+        const buf = fs.readFileSync(BILDBAND_PDF_PATH);
+        const extraction = await pdfService.extractPdfQuote(buf, 'sample_bildband_200p_quote.pdf');
+        expect(extraction.status).toBe('SUCCESS');
+
+        const interp = interpService.interpretDocument(extraction);
+        expect(interp.ok).toBe(true);
+        expect(interp.offers).toHaveLength(3);
+
+        const spec = interp.specification;
+        const realOfferState = {
+            family: spec.family,
+            productTitle: interp.printhouseName,
+            quoteRef: 'DOC-B-EVIDENCE',
+            evidenceId: 'DOC-B-EVIDENCE',
+            widthMm: spec.formatWidthMm,
+            heightMm: spec.formatHeightMm,
+            formatWidthMm: spec.formatWidthMm,
+            formatHeightMm: spec.formatHeightMm,
+            interiorPages: spec.interiorPages,
+            interiorPaper: spec.interiorPaper,
+            interiorWeightGsm: spec.interiorWeightGsm,
+            interiorColors: spec.interiorColors,
+            coverPaper: spec.coverPaper,
+            coverWeightGsm: spec.coverWeightGsm,
+            coverColors: spec.coverColors,
+            boardThicknessMm: spec.boardThicknessMm,
+            bindingMethod: spec.bindingMethod,
+            spineType: spec.spineType,
+            lamination: spec.lamination,
+            deliveryCountry: spec.deliveryCountry,
+            currency: 'EUR',
+            runs: interp.offers
+        };
+
+        const expectedQuantities = [1500, 2000, 2500];
+        const expectedMfgPrices = [5799, 6886, 8042];
+        const expectedTransports = [535, 535, 635];
+
+        for (let i = 0; i < interp.offers.length; i++) {
+            const run = interp.offers[i];
+            expect(run.quantity).toBe(expectedQuantities[i]);
+            expect(run.manufacturingPrice).toBe(expectedMfgPrices[i]);
+            expect(run.transportPrice).toBe(expectedTransports[i]);
+
+            const canonical = canonicalizeToEngineBookSpec(realOfferState, run);
+            expect(canonical.valid).toBe(true);
+            expect(canonical.errors).toEqual([]);
+            expect(canonical.targetManufacturingPrice).toBe(expectedMfgPrices[i]);
+            expect(canonical.bookSpec?.copies).toBe(expectedQuantities[i]);
+
+            // Run real backend validator
+            const backendCheck = calibrationService.validateBookSpec(canonical.bookSpec);
+            expect(backendCheck.valid).toBe(true);
+            expect(backendCheck.errors).toEqual([]);
+        }
+    });
+
+    // ── Regresiones individuales de no invención por defecto ──
+    it('5. Regresión: Papel interior ausente o desconocido no se inventa como mc y produce error', () => {
+        const spec = {
+            widthMm: 170,
+            heightMm: 240,
+            interiorPages: 100,
             interiorColors: '4/4',
-            coverPaper: 'Silk 130g',
-            coverWeightGsm: 130,
+            coverColors: '4/0',
+            interiorWeightGsm: 100,
+            coverWeightGsm: 250,
+            coverPaper: 'Silk',
+            bindingMethod: 'thread sewn' as const,
+            deliveryCountry: 'DE'
+        };
+        const run = { quantity: 1000, manufacturingPrice: 2000 };
+
+        // 1. Ausente
+        const resAbsent = canonicalizeToEngineBookSpec(spec, run);
+        expect(resAbsent.valid).toBe(false);
+        expect(resAbsent.errors.some(e => e.includes('paper_type_interior is required'))).toBe(true);
+
+        // 2. Desconocido
+        const resUnknown = canonicalizeToEngineBookSpec({ ...spec, interiorPaper: 'MaterialFantasmaNoExiste' }, run);
+        expect(resUnknown.valid).toBe(false);
+        expect(resUnknown.errors.some(e => e.includes('paper_type_interior is required'))).toBe(true);
+    });
+
+    it('6. Regresión: Gramaje interior o de cubierta ausente no se inventa como 90g / 250g y produce error', () => {
+        const spec = {
+            widthMm: 170,
+            heightMm: 240,
+            interiorPages: 100,
+            interiorPaper: 'Silk',
+            interiorColors: '4/4',
+            coverPaper: 'Silk',
             coverColors: '4/0',
             bindingMethod: 'thread sewn' as const,
-            lamination: 'matt' as const,
-            boardThicknessMm: 2.0,
-            hasEndpapers: true,
-            endpaperPaper: 'Offset 170g',
-            deliveryCountry: 'DE',
-            currency: 'EUR',
-            runs: []
+            deliveryCountry: 'DE'
         };
+        const run = { quantity: 1000, manufacturingPrice: 2000 };
 
-        const targetRun = {
-            id: 'run-1',
-            quantity: 200,
-            manufacturingPrice: 4399,
-            transportPrice: 350,
-            quotedTotalPrice: 4749,
-            quotedUnitPrice: 23.75,
-            validationStatus: 'CONSISTENT' as const
-        };
-
-        const result = canonicalizeToEngineBookSpec(sampleOffer, targetRun);
-        expect(result.valid).toBe(true);
-        expect(result.errors).toEqual([]);
-        expect(result.bookSpec).toBeDefined();
-
-        // Pass directly to the REAL backend validation service
-        const backendValidation = calibrationService.validateBookSpec(result.bookSpec);
-        expect(backendValidation.valid).toBe(true);
-        expect(backendValidation.errors).toEqual([]);
-
-        // Invariants
-        expect(result.bookSpec.copies).toBe(200);
-        expect(result.bookSpec.interior_pages).toBe(640);
-        expect(result.bookSpec.book_width_mm).toBe(170);
-        expect(result.bookSpec.book_height_mm).toBe(240);
-        expect(result.bookSpec.interior_print).toBe('4/4');
-        expect(result.bookSpec.cover_print).toBe('4/0');
-        expect(result.bookSpec.paper_type_interior).toBe('mc');
-        expect(result.bookSpec.paper_weight_interior).toBe(115);
-        expect(result.bookSpec.paper_type_cover).toBe('mc');
-        expect(result.bookSpec.paper_weight_cover).toBe(130);
-        expect(result.bookSpec.binding_method).toBe('thread sewn');
-        expect(result.bookSpec.lamination).toBe('matt');
-        expect(result.bookSpec.delivery_country).toBe('DE');
-        expect(result.bookSpec.evidenceId).toBe('REF-2026-640');
-        expect(result.bookSpec.selectedVariantId).toBe('run-1');
+        // Sin gramajes
+        const res = canonicalizeToEngineBookSpec(spec, run);
+        expect(res.valid).toBe(false);
+        expect(res.errors).toContain('paper_weight_interior must be between 40 and 400');
+        expect(res.errors).toContain('paper_weight_cover must be between 100 and 600');
     });
 
-    it('4. Rejects incomplete bookSpec with explicit error list rather than failing silently', () => {
-        const incompleteOffer = {
-            family: 'HARDCOVER' as const,
-            productTitle: 'Incomplete Quote'
-        };
-        const invalidRun = {
-            id: 'run-x',
-            quantity: 0
-        };
-
-        const result = canonicalizeToEngineBookSpec(incompleteOffer, invalidRun);
-        expect(result.valid).toBe(false);
-        expect(result.errors.length).toBeGreaterThan(0);
-        expect(result.errors).toContain('copies must be a positive integer');
-        expect(result.errors).toContain('interior_pages must be a positive integer');
-    });
-
-    it('5. Strictly isolates manufacturing price from transport and never conflates or averages runs', () => {
-        const sampleOffer = {
-            family: 'SOFTCOVER' as const,
-            productTitle: 'Softcover Test',
-            widthMm: 210,
-            heightMm: 297,
-            interiorPages: 120,
-            interiorColors: '1/1',
-            coverColors: '4/0',
-            interiorPaper: 'Offset 80g',
-            interiorWeightGsm: 80,
-            coverPaper: 'Cartulina 250g',
-            coverWeightGsm: 250,
-            bindingMethod: 'perfect bound' as const,
-            deliveryCountry: 'ES',
-            runs: []
-        };
-
-        const targetRun = {
-            id: 'run-selected',
-            quantity: 1500,
-            manufacturingPrice: 5799,
-            transportPrice: 535,
-            quotedTotalPrice: 6334,
-            quotedUnitPrice: 4.22
-        };
-
-        const canonical = canonicalizeToEngineBookSpec(sampleOffer, targetRun);
-        expect(canonical.valid).toBe(true);
-        expect(canonical.targetManufacturingPrice).toBe(5799); // Manufacturing ONLY
-        expect(canonical.targetManufacturingPrice).not.toBe(6334); // NOT total
-        expect(canonical.bookSpec?.copies).toBe(1500); // Selected run quantity ONLY
-        expect(canonical.bookSpec?.copies).not.toBe(1000); // NEVER fallback 1000
-        expect(canonical.targetManufacturingPrice).not.toBe(1250); // NEVER fallback 1250
-    });
-
-    it('6. Does not invent missing mandatory fields and reports explicit error list', () => {
-        const specWithMissingDimensions = {
-            family: 'HARDCOVER' as const,
-            productTitle: 'Missing Dimensions',
-            interiorPages: 64,
-            interiorColors: '4/4',
-            coverColors: '4/0',
-            interiorWeightGsm: 90,
+    it('7. Regresión: Tintas interiores o de cubierta ausentes no se inventan como 4/4 o 4/0 y producen error', () => {
+        const spec = {
+            widthMm: 170,
+            heightMm: 240,
+            interiorPages: 100,
+            interiorPaper: 'Silk',
+            interiorWeightGsm: 115,
+            coverPaper: 'Silk',
             coverWeightGsm: 250,
             bindingMethod: 'thread sewn' as const,
             deliveryCountry: 'DE'
         };
+        const run = { quantity: 1000, manufacturingPrice: 2000 };
 
-        const run = {
-            id: 'run-1',
-            quantity: 500,
-            manufacturingPrice: 2000
+        const res = canonicalizeToEngineBookSpec(spec, run);
+        expect(res.valid).toBe(false);
+        expect(res.errors.some(e => e.includes('interior_print must be one of'))).toBe(true);
+        expect(res.errors.some(e => e.includes('cover_print must be one of'))).toBe(true);
+    });
+
+    it('8. Regresión: Encuadernación ausente no se asume por familia Hardcover ni por defecto', () => {
+        const spec = {
+            family: 'HARDCOVER' as const,
+            widthMm: 170,
+            heightMm: 240,
+            interiorPages: 100,
+            interiorPaper: 'Silk',
+            interiorWeightGsm: 115,
+            coverPaper: 'Silk',
+            coverWeightGsm: 250,
+            interiorColors: '4/4',
+            coverColors: '4/0',
+            deliveryCountry: 'DE'
+            // Sin bindingMethod explícito
         };
+        const run = { quantity: 1000, manufacturingPrice: 2000 };
 
-        const result = canonicalizeToEngineBookSpec(specWithMissingDimensions, run);
-        expect(result.valid).toBe(false);
-        expect(result.errors).toContain('book_width_mm must be between 50 and 500');
-        expect(result.errors).toContain('book_height_mm must be between 50 and 700');
+        const res = canonicalizeToEngineBookSpec(spec, run);
+        expect(res.valid).toBe(false);
+        expect(res.errors.some(e => e.includes('binding_method must be one of'))).toBe(true);
+    });
+
+    it('9. Regresión: País de entrega ausente o inválido no se asume como DE y produce error', () => {
+        const spec = {
+            widthMm: 170,
+            heightMm: 240,
+            interiorPages: 100,
+            interiorPaper: 'Silk',
+            interiorWeightGsm: 115,
+            coverPaper: 'Silk',
+            coverWeightGsm: 250,
+            interiorColors: '4/4',
+            coverColors: '4/0',
+            bindingMethod: 'thread sewn' as const
+            // Sin deliveryCountry
+        };
+        const run = { quantity: 1000, manufacturingPrice: 2000 };
+
+        const resAbsent = canonicalizeToEngineBookSpec(spec, run);
+        expect(resAbsent.valid).toBe(false);
+        expect(resAbsent.errors).toContain('delivery_country must be a valid ISO-2 uppercase country code (e.g. ES, DE, FR)');
+
+        const resInvalid = canonicalizeToEngineBookSpec({ ...spec, deliveryCountry: 'GERMANY_INVALID' }, run);
+        expect(resInvalid.valid).toBe(false);
+        expect(resInvalid.errors).toContain('delivery_country must be a valid ISO-2 uppercase country code (e.g. ES, DE, FR)');
     });
 });

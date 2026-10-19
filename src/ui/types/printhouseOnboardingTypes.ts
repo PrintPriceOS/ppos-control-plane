@@ -113,12 +113,16 @@ export interface ProgressiveSpecState {
     hasEndpapers?: boolean; // Guardas
     endpapers?: string;
     endpaperPaper?: string;
+    endpaperWeightGsm?: number;
+    endpaperColors?: string;
 
     // 4. Encuadernación
     bindingMethod: 'SEWN' | 'GLUED' | 'WIRE_O' | 'SADDLE_STITCH' | 'thread_sewn' | 'adhesive_pur' | 'wire_o' | 'saddle_stitch';
     spineType?: 'SQUARE' | 'ROUND' | 'straight' | 'round';
     hasHeadband?: boolean; // Cabezadas (Hardcover)
     headbandColor?: string;
+    hasRibbon?: boolean; // Leseband / cinta de registro (Hardcover)
+    ribbonColor?: string;
     wireColor?: string; // Wire-O
     wirePitch?: string; // e.g. "3:1", "2:1"
     stapleCount?: number; // Saddle Stitch (default 2)
