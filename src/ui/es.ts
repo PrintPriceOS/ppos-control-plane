@@ -2272,6 +2272,27 @@ export const es = {
   'guided.review.field.site': 'Planta de producción principal',
   'guided.review.field.taxId': 'NIF / CIF / Identificación fiscal',
 
+  'guided.review.pricingStrictNotice': 'Tarifas y matrices resueltas exclusivamente por el motor de cálculo del servidor.',
+  'guided.review.pendingSectionTitle': 'Requisitos pendientes concretos',
+  'guided.review.pendingAccount': 'Datos de empresa o primera planta de producción incompletos',
+  'guided.review.pendingMachines': 'Asignación de maquinaria, capacidades o nodos de impresión pendiente.',
+  'guided.review.pendingPricing': 'Calibración o configuración de tarifas de fabricación sin confirmar.',
+  'guided.review.statusMethodSelected': 'Método seleccionado',
+  'guided.review.methodAssistantDraft': 'Asistente IA (preferencia)',
+  'guided.review.field.contact': 'Persona de contacto o teléfono',
+  'guided.review.field.timezone': 'Zona horaria de la planta',
+
+  // Offer runs & variants table headers
+  'offer.column.quantity': 'Cantidad *',
+  'offer.column.paperFinishing': 'Variante Papel / Acabado',
+  'offer.column.logisticsOption': 'Opción Transporte',
+  'offer.column.turnaroundDays': 'Plazo (días)',
+  'offer.column.manufacturingPrice': 'Fabr. (€) *',
+  'offer.column.transportPrice': 'Transp. (€)',
+  'offer.column.totalPrice': 'Total (€)',
+  'offer.column.unitPrice': 'Unit. (€/ud)',
+  'common.deleteRun': 'Eliminar tirada',
+
   // Offer validation & navigation explanations
   'form.missing.title': 'Título del libro o trabajo',
   'guided.review.methodTemplate': 'Plantilla base',

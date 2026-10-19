@@ -899,14 +899,14 @@ export const ManualOfferForm: React.FC<ManualOfferFormProps> = ({
                     <table className="w-full border-collapse text-left text-xs">
                         <thead>
                             <tr className="bg-zinc-100/80 dark:bg-zinc-800/60 border-b border-zinc-200 dark:border-zinc-800 text-[11px] font-bold text-zinc-600 dark:text-zinc-400 uppercase tracking-wider">
-                                <th className="p-2.5">Cantidad *</th>
-                                <th className="p-2.5">Variante Papel / Acabado</th>
-                                <th className="p-2.5">Opción Transporte</th>
-                                <th className="p-2.5">Plazo (días)</th>
-                                <th className="p-2.5">Fabr. (€) *</th>
-                                <th className="p-2.5">Transp. (€)</th>
-                                <th className="p-2.5">Total (€)</th>
-                                <th className="p-2.5">Unit. (€/ud)</th>
+                                <th className="p-2.5">{t('offer.column.quantity') || 'Cantidad *'}</th>
+                                <th className="p-2.5">{t('offer.column.paperFinishing') || 'Variante Papel / Acabado'}</th>
+                                <th className="p-2.5">{t('offer.column.logisticsOption') || 'Opción Transporte'}</th>
+                                <th className="p-2.5">{t('offer.column.turnaroundDays') || 'Plazo (días)'}</th>
+                                <th className="p-2.5">{t('offer.column.manufacturingPrice') || 'Fabr. (€) *'}</th>
+                                <th className="p-2.5">{t('offer.column.transportPrice') || 'Transp. (€)'}</th>
+                                <th className="p-2.5">{t('offer.column.totalPrice') || 'Total (€)'}</th>
+                                <th className="p-2.5">{t('offer.column.unitPrice') || 'Unit. (€/ud)'}</th>
                                 <th className="p-2.5 w-10"></th>
                             </tr>
                         </thead>
@@ -1013,7 +1013,7 @@ export const ManualOfferForm: React.FC<ManualOfferFormProps> = ({
                                                 type="button"
                                                 onClick={() => removeRunRow(idx)}
                                                 className="p-1 rounded-md text-zinc-400 hover:text-red-600 transition-colors"
-                                                title="Eliminar tirada"
+                                                title={t('common.deleteRun') || 'Eliminar tirada'}
                                             >
                                                 <Trash2 size={14} />
                                             </button>

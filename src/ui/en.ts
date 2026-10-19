@@ -2273,6 +2273,27 @@ export const en = {
   'guided.review.field.site': 'Primary production facility',
   'guided.review.field.taxId': 'Tax ID / CIF / VAT number',
 
+  'guided.review.pricingStrictNotice': 'Rates and matrices resolved exclusively by the server pricing engine.',
+  'guided.review.pendingSectionTitle': 'Specific pending requirements',
+  'guided.review.pendingAccount': 'Company profile or primary production facility incomplete',
+  'guided.review.pendingMachines': 'Machinery, printing nodes, or workshop capabilities pending assignment.',
+  'guided.review.pendingPricing': 'Manufacturing rates calibration or pricing matrix unconfirmed.',
+  'guided.review.statusMethodSelected': 'Method selected',
+  'guided.review.methodAssistantDraft': 'AI assistant (preference)',
+  'guided.review.field.contact': 'Contact person or phone number',
+  'guided.review.field.timezone': 'Production site timezone',
+
+  // Offer runs & variants table headers
+  'offer.column.quantity': 'Quantity *',
+  'offer.column.paperFinishing': 'Paper Variant / Finishing',
+  'offer.column.logisticsOption': 'Logistics Option',
+  'offer.column.turnaroundDays': 'Turnaround (days)',
+  'offer.column.manufacturingPrice': 'Mfg. (€) *',
+  'offer.column.transportPrice': 'Ship. (€)',
+  'offer.column.totalPrice': 'Total (€)',
+  'offer.column.unitPrice': 'Unit (€/unit)',
+  'common.deleteRun': 'Delete run',
+
   // Offer validation & navigation explanations
   'form.missing.title': 'Book title or project reference',
   'guided.review.methodTemplate': 'Base template',

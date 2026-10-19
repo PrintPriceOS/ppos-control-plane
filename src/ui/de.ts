@@ -2273,6 +2273,27 @@ export const de = {
   'guided.review.field.site': 'Hauptproduktionsstätte',
   'guided.review.field.taxId': 'Steuernummer / USt-IdNr.',
 
+  'guided.review.pricingStrictNotice': 'Tarife und Matrizen ausschließlich über den Kalkulationsmotor des Servers berechnet.',
+  'guided.review.pendingSectionTitle': 'Konkret ausstehende Anforderungen',
+  'guided.review.pendingAccount': 'Unternehmensdaten oder Hauptproduktionsstätte unvollständig',
+  'guided.review.pendingMachines': 'Zuweisung von Maschinen, Druckknoten oder Werkstattkapazitäten ausstehend.',
+  'guided.review.pendingPricing': 'Kalibrierung oder Bestätigung der Fertigungstarife unbestätigt.',
+  'guided.review.statusMethodSelected': 'Methode ausgewählt',
+  'guided.review.methodAssistantDraft': 'KI-Assistent (Präferenz)',
+  'guided.review.field.contact': 'Ansprechpartner oder Telefonnummer',
+  'guided.review.field.timezone': 'Zeitzone des Produktionsstandorts',
+
+  // Offer runs & variants table headers
+  'offer.column.quantity': 'Menge *',
+  'offer.column.paperFinishing': 'Papiervariante / Veredelung',
+  'offer.column.logisticsOption': 'Versandoption',
+  'offer.column.turnaroundDays': 'Lieferzeit (Tage)',
+  'offer.column.manufacturingPrice': 'Herst. (€) *',
+  'offer.column.transportPrice': 'Vers. (€)',
+  'offer.column.totalPrice': 'Gesamt (€)',
+  'offer.column.unitPrice': 'Stück (€/Stk.)',
+  'common.deleteRun': 'Auflage löschen',
+
   // Offer validation & navigation explanations
   'form.missing.title': 'Buchtitel oder Projektbezeichnung',
   'guided.review.methodTemplate': 'Basisvorlage',

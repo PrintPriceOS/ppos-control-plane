@@ -266,18 +266,20 @@ export const GuidedStepReview: React.FC<GuidedStepReviewProps> = ({
                                 return (
                                     <div 
                                         key={fid}
-                                        className={`flex items-center justify-between p-2 rounded-xl text-xs transition-colors ${
+                                        className={`flex items-center justify-between p-2.5 rounded-xl text-xs transition-colors gap-2 ${
                                             isEnabled 
                                                 ? 'bg-zinc-50 dark:bg-zinc-900/60 text-zinc-800 dark:text-zinc-200 border border-zinc-100 dark:border-zinc-800' 
                                                 : 'text-zinc-400 line-through opacity-60'
                                         }`}
                                     >
-                                        <div className="flex items-center gap-2 truncate">
-                                            <BindingIcon family={fid} size={15} />
-                                            <span className="truncate font-semibold">{t(familyState.titleKey)}</span>
+                                        <div className="flex items-center gap-2 min-w-0">
+                                            <div className="shrink-0">
+                                                <BindingIcon family={fid} size={15} />
+                                            </div>
+                                            <span className="font-semibold break-words">{t(familyState.titleKey)}</span>
                                         </div>
                                         {isEnabled && (
-                                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${
                                                 familyState.status === 'DATA_VALIDATED'
                                                     ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400'
                                                     : familyState.status === 'QUOTE_ADDED' || familyState.status === 'REQUIRES_REVIEW'
@@ -324,8 +326,8 @@ export const GuidedStepReview: React.FC<GuidedStepReviewProps> = ({
                                     : 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800'
                             }`}>
                                 {isPricingComplete 
-                                    ? (t('guided.review.statusValidated') || 'Calibrado') 
-                                    : (t('guided.review.statusDraft') || 'En progreso')}
+                                    ? (t('guided.review.statusCalibrated') || 'Calibrado') 
+                                    : (t('guided.review.statusInProgress') || 'En progreso')}
                             </span>
                         </div>
 
@@ -340,19 +342,26 @@ export const GuidedStepReview: React.FC<GuidedStepReviewProps> = ({
                                     .map(fid => {
                                         const fam = families[fid];
                                         const continuity = pricingContinuity?.[fid];
-                                        const quoteCount = (fam?.quotes?.length || 0) + (continuity?.offer?.runs?.length ? 1 : 0);
-                                        const isFamilyCalibrated = fam?.status === 'DATA_VALIDATED' || isPricingComplete;
+                                        const quoteCount = (fam?.quoteCount ?? (fam as any)?.quotes?.length ?? 0) + (continuity?.offer?.runs?.length ? 1 : 0);
+                                        // Strict isolation: A family is ONLY calibrated if its own status is DATA_VALIDATED.
+                                        // Do NOT deduce calibration from global isPricingComplete.
+                                        const isFamilyCalibrated = fam?.status === 'DATA_VALIDATED';
                                         const hasActiveDraft = quoteCount > 0 || fam?.status === 'QUOTE_ADDED' || fam?.status === 'REQUIRES_REVIEW' || Boolean(continuity?.sessionId || continuity?.activeRun || continuity?.uploadedFileName);
 
-                                        // Resolve genuine method applied to this family
+                                        // Resolve genuine method applied vs preference
                                         const methodChoice = continuity?.pricingMethod;
+                                        const hasAssistantEvidence = Boolean(continuity?.uploadedFileName || continuity?.sessionId || quoteCount > 0);
                                         const methodLabel = methodChoice === 'TEMPLATE'
                                             ? (t('guided.review.methodTemplate') || 'Plantilla base')
-                                            : methodChoice === 'ASSISTANT' || continuity?.entryMode === 'MANUAL_FORM' || continuity?.uploadedFileName
-                                                ? (t('guided.review.methodAssistant') || 'Asistente IA')
-                                                : methodChoice === 'MANUAL'
-                                                    ? (t('guided.review.methodManual') || 'Tarifas manuales')
-                                                    : (t('guided.review.methodNotConfigured') || 'Sin método');
+                                            : methodChoice === 'ASSISTANT'
+                                                ? (hasAssistantEvidence 
+                                                    ? (t('guided.review.methodAssistant') || 'Asistente IA') 
+                                                    : (t('guided.review.methodAssistantDraft') || 'Asistente IA (preferencia)'))
+                                                : continuity?.entryMode === 'MANUAL_FORM' || continuity?.uploadedFileName
+                                                    ? (t('guided.review.methodAssistant') || 'Asistente IA')
+                                                    : methodChoice === 'MANUAL'
+                                                        ? (t('guided.review.methodManual') || 'Tarifas manuales')
+                                                        : (t('guided.review.methodNotConfigured') || 'Sin método');
 
                                         const evidenceLabel = continuity?.uploadedFileName 
                                             ? continuity.uploadedFileName 
@@ -365,35 +374,41 @@ export const GuidedStepReview: React.FC<GuidedStepReviewProps> = ({
                                         return (
                                             <div 
                                                 key={fid}
-                                                className="flex flex-col sm:flex-row sm:items-center justify-between p-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-100 dark:border-zinc-800 text-xs gap-2"
+                                                className="flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-100 dark:border-zinc-800 text-xs gap-2.5"
                                             >
-                                                <div className="flex items-center gap-2 truncate">
-                                                    <BindingIcon family={fid} size={15} />
-                                                    <div className="truncate">
-                                                        <span className="font-semibold">{t(fam?.titleKey || fid)}</span>
-                                                        <span className="text-[10px] text-zinc-500 dark:text-zinc-400 ml-2 font-normal">
+                                                <div className="flex items-start sm:items-center gap-2 min-w-0">
+                                                    <div className="shrink-0 mt-0.5 sm:mt-0">
+                                                        <BindingIcon family={fid} size={16} />
+                                                    </div>
+                                                    <div className="min-w-0">
+                                                        <span className="font-semibold text-zinc-900 dark:text-zinc-100 break-words">{t(fam?.titleKey || fid)}</span>
+                                                        <span className="text-[10px] text-zinc-500 dark:text-zinc-400 ml-1.5 font-normal inline-block">
                                                             · {methodLabel}
                                                         </span>
                                                     </div>
                                                 </div>
-                                                <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+                                                <div className="flex items-center flex-wrap gap-2 shrink-0 self-start sm:self-auto">
                                                     {evidenceLabel && (
-                                                        <span className="text-[10px] text-zinc-500 font-medium truncate max-w-[120px]" title={evidenceLabel}>
+                                                        <span className="text-[10px] text-zinc-600 dark:text-zinc-400 font-medium break-all max-w-[200px]" title={evidenceLabel}>
                                                             📎 {evidenceLabel}
                                                         </span>
                                                     )}
-                                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${
                                                         isFamilyCalibrated
                                                             ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400'
                                                             : hasActiveDraft
                                                                 ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300'
-                                                                : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400'
+                                                                : methodChoice
+                                                                    ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300'
+                                                                    : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400'
                                                     }`}>
                                                         {isFamilyCalibrated
                                                             ? (t('guided.review.statusValidated') || 'Calibrada')
                                                             : hasActiveDraft
                                                                 ? (t('guided.review.statusDraft') || 'Borrador en curso')
-                                                                : (t('guided.review.statusDeclared') || 'Declarada')}
+                                                                : methodChoice
+                                                                    ? (t('guided.review.statusMethodSelected') || 'Método seleccionado')
+                                                                    : (t('guided.review.statusDeclared') || 'Declarada')}
                                                     </span>
                                                 </div>
                                             </div>
@@ -510,6 +525,16 @@ export const GuidedStepReview: React.FC<GuidedStepReviewProps> = ({
                                         {!company?.siteName?.trim() && (
                                             <span className="px-2 py-0.5 rounded bg-amber-100 dark:bg-amber-900/50 text-amber-900 dark:text-amber-200">
                                                 {t('guided.review.fieldMissing') || 'Falta'}: {t('guided.review.field.siteName') || 'Nombre de planta'}
+                                            </span>
+                                        )}
+                                        {(!company?.contactName?.trim() && !company?.phone?.trim()) && (
+                                            <span className="px-2 py-0.5 rounded bg-amber-100 dark:bg-amber-900/50 text-amber-900 dark:text-amber-200">
+                                                {t('guided.review.fieldMissing') || 'Falta'}: {t('guided.review.field.contact') || 'Persona o teléfono de contacto'}
+                                            </span>
+                                        )}
+                                        {(!company?.siteTimezone?.trim() && (accountReadiness?.advisories || []).some((a: any) => a.code === 'ADD_SITE_TIMEZONE')) && (
+                                            <span className="px-2 py-0.5 rounded bg-amber-100 dark:bg-amber-900/50 text-amber-900 dark:text-amber-200">
+                                                {t('guided.review.fieldMissing') || 'Falta'}: {t('guided.review.field.timezone') || 'Zona horaria de la planta'}
                                             </span>
                                         )}
                                     </div>
