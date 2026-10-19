@@ -418,25 +418,35 @@ export const GuidedStepReview: React.FC<GuidedStepReviewProps> = ({
                                         return (
                                             <div 
                                                 key={fid}
-                                                className="flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-100 dark:border-zinc-800 text-xs gap-2.5"
+                                                className="flex flex-col p-3 rounded-xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-100 dark:border-zinc-800 text-xs gap-2 min-w-0"
                                             >
-                                                <div className="flex items-start sm:items-center gap-2 min-w-0">
-                                                    <div className="shrink-0 mt-0.5 sm:mt-0">
-                                                        <BindingIcon family={fid} size={16} />
+                                                {/* Top row: Icon + Family title + Method label */}
+                                                <div className="flex items-start gap-2 min-w-0">
+                                                    <div className="shrink-0 mt-0.5">
+                                                        <BindingIcon family={fid} size={15} />
                                                     </div>
-                                                    <div className="min-w-0">
-                                                        <span className="font-semibold text-zinc-900 dark:text-zinc-100 break-words">{t(fam?.titleKey || fid)}</span>
-                                                        <span className="text-[10px] text-zinc-500 dark:text-zinc-400 ml-1.5 font-normal inline-block">
-                                                            · {methodLabel}
-                                                        </span>
+                                                    <div className="min-w-0 flex-1">
+                                                        <div className="font-semibold text-zinc-900 dark:text-zinc-100 text-xs leading-snug break-words">
+                                                            {t(fam?.titleKey || fid)}
+                                                        </div>
+                                                        <div className="text-[10px] text-zinc-500 dark:text-zinc-400 font-normal leading-tight mt-0.5">
+                                                            {methodLabel}
+                                                        </div>
                                                     </div>
                                                 </div>
-                                                <div className="flex items-center flex-wrap gap-2 shrink-0 self-start sm:self-auto">
-                                                    {evidenceLabel && (
-                                                        <span className="text-[10px] text-zinc-600 dark:text-zinc-400 font-medium break-all max-w-[200px]" title={evidenceLabel}>
-                                                            📎 {evidenceLabel}
+
+                                                {/* Evidence attachment (if present) */}
+                                                {evidenceLabel && (
+                                                    <div className="flex items-center gap-1.5 text-[10px] text-zinc-600 dark:text-zinc-400 font-medium pl-6 min-w-0 max-w-full">
+                                                        <span className="shrink-0 text-zinc-400">📎</span>
+                                                        <span className="truncate max-w-full" title={evidenceLabel}>
+                                                            {evidenceLabel}
                                                         </span>
-                                                    )}
+                                                    </div>
+                                                )}
+
+                                                {/* Bottom row: Status badge + Configurar button */}
+                                                <div className="flex items-center justify-between gap-2 pt-1 border-t border-zinc-200/50 dark:border-zinc-800/60 pl-6">
                                                     <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${
                                                         isFamilyFullyReady
                                                             ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400'
@@ -466,7 +476,7 @@ export const GuidedStepReview: React.FC<GuidedStepReviewProps> = ({
                                                         <button
                                                             type="button"
                                                             onClick={() => onGoToFamilyPricing ? onGoToFamilyPricing(fid) : onBackToPricing()}
-                                                            className="text-[11px] font-bold text-[#dc0000] hover:underline cursor-pointer"
+                                                            className="text-[11px] font-bold text-[#dc0000] hover:underline cursor-pointer shrink-0"
                                                         >
                                                             {t('common.configure') || 'Configurar'}
                                                         </button>

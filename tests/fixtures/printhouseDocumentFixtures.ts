@@ -633,6 +633,10 @@ export function fixtureToSpec(fixture: DocumentFixture): ProgressiveSpecState {
         ambiguityDetails: fixture.technicalNotes.ambiguityDetails,
         ambiguityNote: fixture.technicalNotes.ambiguityDetails,
         hasDiscrepancy: fixture.technicalNotes.hasDiscrepancy,
+        includesPaper: true,
+        includesBinding: true,
+        includesFinishing: true,
+        includesPackaging: true,
         currency: 'EUR',
         deliveryCountry: 'DE',
         runs: fixture.offers.map((o, idx) => ({

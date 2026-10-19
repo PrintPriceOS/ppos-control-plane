@@ -766,6 +766,31 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
                 return;
             }
 
+            // Check required inclusion confirmations to prevent backend AMBIGUITY_PREVENTS_READY
+            const missingInclusions: string[] = [];
+            if (offer.includesPaper === null || offer.includesPaper === undefined) missingInclusions.push('papel');
+            if (offer.includesBinding === null || offer.includesBinding === undefined) missingInclusions.push('encuadernación');
+            if (offer.includesFinishing === null || offer.includesFinishing === undefined) missingInclusions.push('acabados');
+            if (offer.includesPackaging === null || offer.includesPackaging === undefined) missingInclusions.push('empaquetado');
+
+            if (missingInclusions.length > 0) {
+                setActiveRun(null);
+                setProposedPatch({});
+                setComparisonData({
+                    originalPrice: targetManufacturing,
+                    enginePrice: null,
+                    difference: null,
+                    residual: null,
+                    isCalculated: false,
+                    hasEquivalentBreakdown: false,
+                    incompleteComparisonReason: `Inclusiones pendientes de confirmación: ${missingInclusions.join(', ')}`,
+                    calculationError: `El motor de calibración requiere confirmar explícitamente si el precio incluye o excluye: ${missingInclusions.join(', ')}. Por favor confirma estas partidas en la revisión técnica.`,
+                    supportedParameters: [],
+                    coverageGaps: []
+                });
+                return;
+            }
+
             // Canonicalize and validate reference book specification
             const canonicalResult = canonicalizeToEngineBookSpec(offer, targetRun);
             if (!canonicalResult.valid) {
@@ -798,7 +823,11 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
                         printerNodeId,
                         referenceBookName: offer.productTitle || 'Oferta Calibración',
                         bookSpec: canonicalResult.bookSpec,
-                        targetManufacturingPrice: canonicalResult.targetManufacturingPrice || targetManufacturing
+                        targetManufacturingPrice: canonicalResult.targetManufacturingPrice || targetManufacturing,
+                        includesPaper: offer.includesPaper,
+                        includesBinding: offer.includesBinding,
+                        includesFinishing: offer.includesFinishing,
+                        includesPackaging: offer.includesPackaging
                     });
                     if (calculationRequestIdRef.current !== thisReqId || selectedFamilyIdRef.current !== calcFamilyId) return;
                     if (sess?.id) setSessionId(sess.id);
@@ -1323,6 +1352,12 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
                         }}
                         onApplyComputedUnit={handleApplyComputedUnit}
                         onConfirmBinding={handleConfirmBindingResolution}
+                        onUpdateInclusions={(inclusions) => {
+                            setCurrentOffer(prev => ({
+                                ...prev,
+                                ...inclusions
+                            }));
+                        }}
                         onProceedToCalculation={() => {
                             setCurrentStep(4);
                             if (!comparisonData.isCalculated) {

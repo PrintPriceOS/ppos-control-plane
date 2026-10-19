@@ -721,6 +721,150 @@ describe('Simplified Printhouse Onboarding Journey Suite', () => {
         expect(screen.getByText('2.000')).toBeInTheDocument();
         expect(screen.getByText('2.500')).toBeInTheDocument();
     });
+
+    it('24. Renders explicit Yes / No / Unknown inclusion controls, blocks calculation on unknown, and transmits confirmed booleans', async () => {
+        const printhouseCalibrationApi = await import('../src/ui/lib/printhouseCalibrationApi');
+        const createSpy = vi.spyOn(printhouseCalibrationApi.printhouseCalibrationApi, 'createSession').mockResolvedValue({ id: 'sess-inc-1', status: 'DRAFT' } as any);
+        vi.spyOn(printhouseCalibrationApi.printhouseCalibrationApi, 'markSessionReady').mockResolvedValue({ id: 'sess-inc-1', status: 'READY' } as any);
+        vi.spyOn(printhouseCalibrationApi.printhouseCalibrationApi, 'calculateCalibration').mockResolvedValue({
+            id: 'run-inc-1',
+            enginePriceAfter: 4200,
+            targetPrice: 4321,
+            absoluteResidual: 121,
+            percentResidual: 2.8
+        } as any);
+
+        // Spec with unconfirmed inclusions (null / undefined)
+        const unconfirmedSpec = {
+            ...NATUR_DOCUMENT_FIXTURE.spec,
+            includesPaper: null,
+            includesBinding: null,
+            includesFinishing: null,
+            includesPackaging: null
+        };
+
+        const { container } = renderJourney(
+            <SimplifiedOnboardingJourney 
+                printerNodeId="node-test-1" 
+                initialSpec={unconfirmedSpec as any} 
+                initialStep={3} 
+            />, 
+            'es'
+        );
+
+        // Verify inclusion cards and pending warnings are rendered
+        expect(screen.getByText(/Confirmación de Inclusiones del Presupuesto/i)).toBeInTheDocument();
+        expect(screen.getByText(/4 confirmaciones pendientes/i)).toBeInTheDocument();
+        expect(screen.getByText(/Debe confirmar las inclusiones pendientes/i)).toBeInTheDocument();
+
+        // Proceed button must be disabled while inclusions are unconfirmed (null/unknown)
+        const proceedBtn = screen.getByTestId('proceed-to-compare-btn');
+        expect(proceedBtn).toBeDisabled();
+
+        // Confirm Paper = Sí, Binding = Sí, Finishing = No (explicit false), Packaging = Sí
+        const paperLabel = screen.getByText('Incluye Papel:').parentElement!;
+        fireEvent.click(within(paperLabel).getByRole('button', { name: 'Sí' }));
+
+        const bindingLabel = screen.getByText('Incluye Encuadernación:').parentElement!;
+        fireEvent.click(within(bindingLabel).getByRole('button', { name: 'Sí' }));
+
+        const finishingLabel = screen.getByText('Incluye Acabados:').parentElement!;
+        fireEvent.click(within(finishingLabel).getByRole('button', { name: 'No' }));
+
+        const packagingLabel = screen.getByText('Incluye Empaquetado:').parentElement!;
+        fireEvent.click(within(packagingLabel).getByRole('button', { name: 'Sí' }));
+
+        // Now all confirmed!
+        expect(screen.getByText(/Inclusiones confirmadas/i)).toBeInTheDocument();
+        expect(screen.queryByText(/confirmaciones pendientes/i)).not.toBeInTheDocument();
+        expect(proceedBtn).not.toBeDisabled();
+
+        // Proceed to calculation
+        fireEvent.click(proceedBtn);
+
+        // Transmitted contract must contain confirmed values: paper=true, binding=true, finishing=false, packaging=true
+        expect(createSpy).toHaveBeenCalledWith(expect.objectContaining({
+            includesPaper: true,
+            includesBinding: true,
+            includesFinishing: false,
+            includesPackaging: true
+        }));
+    });
+
+    it('25. Resolving Handcover / binding typo ambiguity enables continuation and clears blocker', async () => {
+        const ambiguousSpec = {
+            ...MYSTERIOSEN_STEINE_DOCUMENT_FIXTURE.spec,
+            hasAmbiguity: true,
+            ambiguityNote: 'PROBABLE_TYPO_HANDCOVER: Revisar si corresponde a Hardcover',
+            includesPaper: true,
+            includesBinding: true,
+            includesFinishing: true,
+            includesPackaging: true
+        };
+
+        renderJourney(
+            <SimplifiedOnboardingJourney 
+                printerNodeId="node-test-1" 
+                initialSpec={ambiguousSpec as any} 
+                initialStep={3} 
+            />, 
+            'es'
+        );
+
+        // Ambiguity banner and blocker visible
+        expect(screen.getByText(/Ambigüedad técnica detectada entre encuadernación y cartón/i)).toBeInTheDocument();
+        expect(screen.getByText(/Debe resolver la ambigüedad técnica de encuadernación antes de continuar/i)).toBeInTheDocument();
+
+        const proceedBtn = screen.getByTestId('proceed-to-compare-btn');
+        expect(proceedBtn).toBeDisabled();
+
+        // Operator clarifies: selects Hardcover
+        const hardcoverBtn = screen.getByRole('button', { name: /Tapa Dura \(Cartón 2,4 mm\)/i });
+        fireEvent.click(hardcoverBtn);
+
+        // Ambiguity banner and blocker must be cleared
+        expect(screen.queryByText(/Ambigüedad técnica detectada/i)).not.toBeInTheDocument();
+        expect(screen.queryByText(/Debe resolver la ambigüedad técnica de encuadernación antes de continuar/i)).not.toBeInTheDocument();
+        expect(proceedBtn).not.toBeDisabled();
+    });
+
+    it('26. Does not invent lead time or finishing defaults when absent from document', async () => {
+        // Offer row with no turnaround or finishing
+        const emptyMetaSpec = {
+            family: 'HARDCOVER' as const,
+            productTitle: 'Oferta Sin Metadatos Inventados',
+            currency: 'EUR',
+            includesPaper: true,
+            includesBinding: true,
+            includesFinishing: true,
+            includesPackaging: true,
+            runs: [
+                {
+                    id: 'run-clean',
+                    variantKey: 'run-clean',
+                    quantity: 1000,
+                    manufacturingPrice: 5000,
+                    transportPrice: 400,
+                    totalPrice: 5400,
+                    validationStatus: 'CONSISTENT' as const
+                }
+            ]
+        };
+
+        renderJourney(
+            <SimplifiedOnboardingJourney 
+                printerNodeId="node-test-1" 
+                initialSpec={emptyMetaSpec as any} 
+                initialStep={3} 
+            />, 
+            'es'
+        );
+
+        // Must display '—' rather than '10 d' or 'Estándar' for unknown paper, finish or lead time
+        expect(screen.queryByText('10 d')).not.toBeInTheDocument();
+        const dashes = screen.getAllByText('—');
+        expect(dashes.length).toBeGreaterThanOrEqual(3);
+    });
 });
 
 

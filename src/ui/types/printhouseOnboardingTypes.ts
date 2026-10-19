@@ -84,6 +84,12 @@ export interface ProgressiveSpecState {
     hasDiscrepancy?: boolean;
     coverageScopeDisclaimer?: string;
 
+    // Inclusion confirmations required for calibration readiness (AMBIGUITY_PREVENTS_READY)
+    includesPaper?: boolean | null;
+    includesBinding?: boolean | null;
+    includesFinishing?: boolean | null;
+    includesPackaging?: boolean | null;
+
     // 2. Interior
     interiorPages?: number;
     pageCount?: number;
