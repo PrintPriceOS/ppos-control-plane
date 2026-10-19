@@ -92,6 +92,11 @@ export const GuidedPrinthouseJourney: React.FC<GuidedPrinthouseJourneyProps> = (
     const [readinessError, setReadinessError] = useState<string | null>(null);
     const [companyFocusField, setCompanyFocusField] = useState<string | null>(null);
 
+    // ── Stage C Pricing Verification and Save States ──
+    const [templateSaveError, setTemplateSaveError] = useState<string | null>(null);
+    const [isSavingTemplate, setIsSavingTemplate] = useState<boolean>(false);
+    const [pricingFetchError, setPricingFetchError] = useState<string | null>(null);
+
     // Track mounted state to safely discard background updates after unmount
     const isMountedRef = useRef<boolean>(true);
     useEffect(() => {
@@ -200,17 +205,42 @@ export const GuidedPrinthouseJourney: React.FC<GuidedPrinthouseJourneyProps> = (
 
         try {
             const token = getAuthToken();
-            const [onboardingData, serverSessions, serverRevisions] = await Promise.all([
+            setPricingFetchError(null);
+
+            const [onboardingData, sessionsResult, revisionsResult] = await Promise.all([
                 fetch('/api/printhouse/onboarding', {
                     headers: { 'Authorization': `Bearer ${token}` }
                 }).then(async r => {
                     const json = await r.json().catch(() => ({}));
                     return { ok: r.ok && json.ok !== false, status: r.status, ...json };
                 }).catch((err) => ({ ok: false, error: err.message })),
-                printhouseCalibrationApi.listSessions(printerNodeId).catch(() => []),
-                printhouseCalibrationApi.listRevisions(printerNodeId).catch(() => [])
+                printerNodeId
+                    ? printhouseCalibrationApi.listSessions(printerNodeId).then(
+                        data => ({ ok: true, data: Array.isArray(data) ? data : [] }),
+                        err => ({ ok: false, error: err?.message || 'Error al consultar sesiones de calibración' })
+                    )
+                    : Promise.resolve({ ok: true, data: [] }),
+                printerNodeId
+                    ? printhouseCalibrationApi.listRevisions(printerNodeId).then(
+                        data => ({ ok: true, data: Array.isArray(data) ? data : [] }),
+                        err => ({ ok: false, error: err?.message || 'Error al consultar revisiones de tarifas' })
+                    )
+                    : Promise.resolve({ ok: true, data: [] })
             ]);
             const data = onboardingData;
+
+            let serverSessions: any[] | null = null;
+            let serverRevisions: any[] | null = null;
+            if (sessionsResult.ok) {
+                serverSessions = sessionsResult.data;
+            } else {
+                setPricingFetchError(sessionsResult.error);
+            }
+            if (revisionsResult.ok) {
+                serverRevisions = revisionsResult.data;
+            } else {
+                setPricingFetchError(prev => prev ? `${prev} | ${revisionsResult.error}` : revisionsResult.error);
+            }
 
             // Discard responses from previous identities if tenant switched while request was in-flight
             if (activeTenantRef.current !== targetTenantId) {
@@ -1215,6 +1245,29 @@ export const GuidedPrinthouseJourney: React.FC<GuidedPrinthouseJourneyProps> = (
                                 </div>
                             )}
 
+                            {pricingFetchError && (
+                                <div role="alert" className="p-4 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 text-amber-900 dark:text-amber-200 text-xs font-medium flex items-start justify-between gap-3">
+                                    <div className="flex items-start gap-2.5">
+                                        <AlertCircle size={18} className="text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                                        <div className="space-y-1">
+                                            <div className="font-bold">
+                                                Estado de precios no verificable
+                                            </div>
+                                            <p className="text-[11px] text-amber-800 dark:text-amber-300">
+                                                No se pudieron recuperar las revisiones o sesiones de calibración desde el servidor ({pricingFetchError}). La etapa de precios no puede certificarse hasta que se verifique la conexión con el servidor.
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => fetchServerState(tenantId, false)}
+                                        className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg text-xs shrink-0 transition-colors cursor-pointer"
+                                    >
+                                        Reintentar consulta
+                                    </button>
+                                </div>
+                            )}
+
                             {/* ── 3-Method Cards Chooser (Shown BEFORE opening any tool) ── */}
                             {!activeMethod ? (
                                 <div className="space-y-6">
@@ -1427,6 +1480,25 @@ export const GuidedPrinthouseJourney: React.FC<GuidedPrinthouseJourneyProps> = (
                                         </div>
                                     </div>
 
+                                    {templateSaveError && (
+                                        <div role="alert" className="p-4 rounded-2xl bg-red-50 dark:bg-red-950/40 border border-red-300 dark:border-red-800 text-red-900 dark:text-red-200 text-xs flex items-start justify-between gap-3">
+                                            <div className="flex items-start gap-2.5">
+                                                <AlertCircle size={18} className="text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
+                                                <div className="space-y-1">
+                                                    <div className="font-bold">Error al guardar plantilla de tarifas</div>
+                                                    <p className="text-[11px] text-red-800 dark:text-red-300">{templateSaveError}</p>
+                                                </div>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => setTemplateSaveError(null)}
+                                                className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg text-[11px] shrink-0 transition-colors cursor-pointer"
+                                            >
+                                                Reintentar
+                                            </button>
+                                        </div>
+                                    )}
+
                                     <div className="flex items-center justify-between pt-4 border-t border-zinc-100 dark:border-zinc-800">
                                         <button
                                             type="button"
@@ -1437,70 +1509,101 @@ export const GuidedPrinthouseJourney: React.FC<GuidedPrinthouseJourneyProps> = (
                                         </button>
                                         <button
                                             type="button"
+                                            disabled={isSavingTemplate}
                                             onClick={async () => {
                                                 const famId = effectiveActiveFamilyId;
                                                 const token = getAuthToken();
+                                                setTemplateSaveError(null);
+                                                setIsSavingTemplate(true);
 
-                                                // 1. Persist template rates to server if printerNodeId is available
-                                                if (printerNodeId && token) {
-                                                    try {
-                                                        const getRes = await fetch(`/api/printhouse/onboarding/pricing/industrial?nodeId=${encodeURIComponent(printerNodeId)}`, {
-                                                            headers: { 'Authorization': `Bearer ${token}` }
-                                                        });
-                                                        if (getRes.ok) {
-                                                            const getData = await getRes.json();
-                                                            const currentChecksum = getData?.data?.baselineChecksum;
-                                                            const hydratedRates = getInitialHydratedRates(getData?.data?.rates);
-                                                            if (currentChecksum) {
-                                                                await fetch('/api/printhouse/onboarding/pricing/industrial', {
-                                                                    method: 'PUT',
-                                                                    headers: {
-                                                                        'Content-Type': 'application/json',
-                                                                        'Authorization': `Bearer ${token}`
-                                                                    },
-                                                                    body: JSON.stringify({
-                                                                        nodeId: printerNodeId,
-                                                                        rates: hydratedRates,
-                                                                        expected_baseline_checksum: currentChecksum,
-                                                                        pricingMethod: 'TEMPLATE',
-                                                                        productFamily: famId
-                                                                    })
-                                                                });
-                                                            }
-                                                        }
-                                                    } catch (e) {
-                                                        console.warn('[GuidedOnboarding] Error persisting template revision to server:', e);
+                                                try {
+                                                    // Invariant: Do not mark templateSaved or advance if printerNodeId or token is missing
+                                                    if (!printerNodeId || !token) {
+                                                        throw new Error('Falta el nodo de impresión o la sesión ha expirado.');
                                                     }
-                                                }
 
-                                                updateDraft(prev => ({
-                                                    ...prev,
-                                                    pricingContinuity: {
-                                                        ...prev.pricingContinuity,
-                                                        [famId]: {
-                                                            ...(prev.pricingContinuity?.[famId] || {
-                                                                sessionId: null,
-                                                                activeRun: null,
-                                                                selectedVariantId: null,
-                                                                proposedPatch: {},
-                                                                entryMode: 'UPLOAD_PDF',
-                                                                uploadedFileName: null
-                                                            }),
+                                                    const getRes = await fetch(`/api/printhouse/onboarding/pricing/industrial?nodeId=${encodeURIComponent(printerNodeId)}`, {
+                                                        headers: { 'Authorization': `Bearer ${token}` }
+                                                    });
+                                                    if (!getRes.ok) {
+                                                        let getErrJson: any = null;
+                                                        try { getErrJson = await getRes.json(); } catch (_) {}
+                                                        throw new Error(getErrJson?.error?.message || getErrJson?.message || `Error al obtener estado base de tarifas (HTTP ${getRes.status}).`);
+                                                    }
+
+                                                    const getData = await getRes.json();
+                                                    const currentChecksum = getData?.data?.baselineChecksum;
+                                                    if (!currentChecksum) {
+                                                        throw new Error('Checksum de referencia no disponible en el servidor.');
+                                                    }
+
+                                                    const hydratedRates = getInitialHydratedRates(getData?.data?.rates);
+                                                    const putRes = await fetch('/api/printhouse/onboarding/pricing/industrial', {
+                                                        method: 'PUT',
+                                                        headers: {
+                                                            'Content-Type': 'application/json',
+                                                            'Authorization': `Bearer ${token}`
+                                                        },
+                                                        body: JSON.stringify({
+                                                            nodeId: printerNodeId,
+                                                            rates: hydratedRates,
+                                                            expected_baseline_checksum: currentChecksum,
                                                             pricingMethod: 'TEMPLATE',
-                                                            templateSaved: true,
-                                                            lastSavedTimestamp: Date.now()
-                                                        }
-                                                    },
-                                                    completedStages: {
-                                                        ...prev.completedStages,
-                                                        PRICING: true
-                                                    },
-                                                    currentStage: 'REVIEW'
-                                                }));
+                                                            productFamily: famId
+                                                        })
+                                                    });
+
+                                                    if (!putRes.ok) {
+                                                        let putErrJson: any = null;
+                                                        try { putErrJson = await putRes.json(); } catch (_) {}
+                                                        const msg = putErrJson?.error?.message || putErrJson?.message || (putRes.status === 409 ? 'Conflicto de concurrencia: las tarifas base cambiaron en el servidor (409 Conflict).' : `Error al guardar tarifas en el servidor (HTTP ${putRes.status}).`);
+                                                        throw new Error(msg);
+                                                    }
+
+                                                    const putJson = await putRes.json().catch(() => ({}));
+                                                    if (putJson && putJson.ok === false) {
+                                                        throw new Error(putJson.error?.message || putJson.message || 'El servidor rechazó el guardado de la plantilla.');
+                                                    }
+
+                                                    // Fetch fresh server state to derive confirmation from server revision
+                                                    await fetchServerState(tenantId, false);
+
+                                                    // Update draft stage navigation
+                                                    updateDraft(prev => ({
+                                                        ...prev,
+                                                        pricingContinuity: {
+                                                            ...prev.pricingContinuity,
+                                                            [famId]: {
+                                                                ...(prev.pricingContinuity?.[famId] || {
+                                                                    sessionId: null,
+                                                                    activeRun: null,
+                                                                    selectedVariantId: null,
+                                                                    proposedPatch: {},
+                                                                    entryMode: 'UPLOAD_PDF',
+                                                                    uploadedFileName: null
+                                                                }),
+                                                                pricingMethod: 'TEMPLATE',
+                                                                templateSaved: true,
+                                                                lastSavedTimestamp: Date.now()
+                                                            }
+                                                        },
+                                                        completedStages: {
+                                                            ...prev.completedStages,
+                                                            PRICING: true
+                                                        },
+                                                        currentStage: 'REVIEW'
+                                                    }));
+                                                } catch (e: any) {
+                                                    setTemplateSaveError(e.message || 'Error al persistir la plantilla en el servidor.');
+                                                } finally {
+                                                    setIsSavingTemplate(false);
+                                                }
                                             }}
-                                            className="px-6 py-2.5 rounded-xl bg-[#dc0000] hover:bg-[#b50000] text-white text-xs font-bold transition-all shadow-xs flex items-center gap-2 cursor-pointer"
+                                            className={`px-6 py-2.5 rounded-xl bg-[#dc0000] hover:bg-[#b50000] text-white text-xs font-bold transition-all shadow-xs flex items-center gap-2 cursor-pointer ${
+                                                isSavingTemplate ? 'opacity-60 cursor-not-allowed' : ''
+                                            }`}
                                         >
-                                            <span>Guardar plantilla y continuar</span>
+                                            <span>{isSavingTemplate ? 'Guardando...' : 'Guardar plantilla y continuar'}</span>
                                             <ArrowRight size={14} />
                                         </button>
                                     </div>

@@ -878,6 +878,21 @@ describe('Guided Printhouse Onboarding Journey Suite', () => {
         // First return COMPLETE readiness (initial mount makes up to 2 calls: journey + review), then on subsequent refresh return HTTP 500 error
         let callCount = 0;
         global.fetch = vi.fn().mockImplementation((url: string) => {
+            if (url.includes('/api/printhouse/onboarding/pricing/revisions')) {
+                return Promise.resolve({
+                    ok: true,
+                    json: () => Promise.resolve({
+                        ok: true,
+                        data: [
+                            { id: 'rev-hc', createdBy: { productFamily: 'HARDCOVER', pricingMethod: 'TEMPLATE' } },
+                            { id: 'rev-sc', createdBy: { productFamily: 'SOFTCOVER', pricingMethod: 'TEMPLATE' } }
+                        ]
+                    })
+                });
+            }
+            if (url.includes('/api/printhouse/onboarding/pricing')) {
+                return Promise.resolve({ ok: true, json: () => Promise.resolve({ ok: true, data: [] }) });
+            }
             if (url.includes('/api/printhouse/onboarding')) {
                 callCount++;
                 if (callCount <= 2) {
@@ -1692,6 +1707,178 @@ describe('Guided Printhouse Onboarding Journey Suite', () => {
         expect(screen.queryByText('binding.sewn')).not.toBeInTheDocument();
         expect(screen.queryByText('spine.square')).not.toBeInTheDocument();
         expect(screen.queryByText('lamination.matte')).not.toBeInTheDocument();
+    });
+
+    it('28. Template save failure (409/500): displays error alert, does not advance stage, and allows retry', async () => {
+        const tenantId = 'tenant-current';
+        saveGuidedOnboardingDraft({
+            tenantId,
+            company: {
+                legalName: 'Editorial Beta',
+                country: 'ES',
+                city: 'Valencia',
+                address: 'Calle Mayor 10',
+                postalCode: '46001',
+                phone: '+34 963 000 000',
+                website: 'https://beta.com',
+                contactName: 'Carlos Admin',
+                taxId: 'B12345678',
+                siteName: 'Sede Valencia',
+                siteTimezone: 'Europe/Madrid'
+            },
+            offerDrafts: {},
+            lastSavedTimestamp: Date.now(),
+            currentStage: 'PRICING',
+            selectedFamilyId: 'HARDCOVER',
+            enabledFamilies: { HARDCOVER: true, SOFTCOVER: false, WIRE_O: false, SADDLE_STITCH: false },
+            pricingContinuity: {
+                HARDCOVER: {
+                    pricingMethod: 'TEMPLATE'
+                } as any
+            },
+            completedStages: { WELCOME: true, COMPANY: true, PRODUCTS: true, PRICING: false, REVIEW: false }
+        });
+
+        // Mock fetch: onboarding succeeds, industrial GET succeeds with checksum, but industrial PUT fails with 409
+        global.fetch = vi.fn().mockImplementation((url: string, opts?: any) => {
+            if (url.includes('/api/printhouse/onboarding/pricing/industrial')) {
+                if (opts?.method === 'PUT') {
+                    return Promise.resolve({
+                        ok: false,
+                        status: 409,
+                        json: () => Promise.resolve({
+                            ok: false,
+                            error: { message: 'Conflicto de concurrencia al actualizar tarifas' }
+                        })
+                    });
+                }
+                // GET
+                return Promise.resolve({
+                    ok: true,
+                    json: () => Promise.resolve({
+                        ok: true,
+                        data: {
+                            baselineChecksum: 'chk_123456',
+                            rates: {}
+                        }
+                    })
+                });
+            }
+            if (url.includes('/api/printhouse/onboarding/pricing/calibrations')) {
+                return Promise.resolve({ ok: true, json: () => Promise.resolve({ ok: true, data: [] }) });
+            }
+            if (url.includes('/api/printhouse/onboarding/pricing/revisions')) {
+                return Promise.resolve({ ok: true, json: () => Promise.resolve({ ok: true, data: [] }) });
+            }
+            if (url.includes('/api/printhouse/onboarding')) {
+                return Promise.resolve({
+                    ok: true,
+                    json: () => Promise.resolve({
+                        ok: true,
+                        data: {
+                            company: { legalName: 'Editorial Beta' },
+                            sites: [{ siteId: 'site-beta-1', siteName: 'Sede Valencia', country: 'ES', city: 'Valencia' }],
+                            readiness: {
+                                accountSetup: { status: 'COMPLETE' },
+                                pricingReadiness: { status: 'INCOMPLETE' }
+                            }
+                        }
+                    })
+                });
+            }
+            return Promise.resolve({ ok: true, json: () => Promise.resolve({ ok: true, data: [] }) });
+        });
+
+        renderWithProviders(
+            <GuidedPrinthouseJourney onOpenFullSetup={vi.fn()} printerNodeId="node-tmpl-fail" />,
+            'es'
+        );
+
+        // Wait for template view to render
+        await waitFor(() => {
+            expect(screen.getByText(/Valores iniciales aplicados a/i)).toBeInTheDocument();
+        });
+
+        const saveBtn = screen.getByRole('button', { name: /Guardar plantilla y continuar/i });
+        fireEvent.click(saveBtn);
+
+        // Error message must appear in the UI
+        await waitFor(() => {
+            expect(screen.getByText(/Error al guardar plantilla de tarifas/i)).toBeInTheDocument();
+            expect(screen.getByText(/Conflicto de concurrencia al actualizar tarifas/i)).toBeInTheDocument();
+        });
+
+        // Stage must NOT have advanced to REVIEW
+        expect(screen.queryByText('Revisión final antes de activar')).not.toBeInTheDocument();
+
+        // Retry button must be available
+        const retryBtn = screen.getByRole('button', { name: /Reintentar/i });
+        expect(retryBtn).toBeInTheDocument();
+    });
+
+    it('29. Failed pricing queries: surfaces non-verifiable pricing banner with retry button and does not certify Stage C', async () => {
+        const tenantId = 'tenant-current';
+        saveGuidedOnboardingDraft({
+            tenantId,
+            company: {
+                legalName: 'Editorial Gamma',
+                country: 'ES',
+                city: 'Bilbao',
+                address: 'Gran Via 1',
+                postalCode: '48001',
+                phone: '+34 944 000 000',
+                website: 'https://gamma.com',
+                contactName: 'Carlos Admin',
+                taxId: 'B99999999',
+                siteName: 'Sede Bilbao',
+                siteTimezone: 'Europe/Madrid'
+            },
+            offerDrafts: {},
+            lastSavedTimestamp: Date.now(),
+            currentStage: 'PRICING',
+            selectedFamilyId: 'HARDCOVER',
+            enabledFamilies: { HARDCOVER: true, SOFTCOVER: false, WIRE_O: false, SADDLE_STITCH: false },
+            completedStages: { WELCOME: true, COMPANY: true, PRODUCTS: true, PRICING: false, REVIEW: false }
+        });
+
+        // Mock calibrations failure
+        global.fetch = vi.fn().mockImplementation((url: string) => {
+            if (url.includes('/api/printhouse/onboarding/pricing/calibrations')) {
+                return Promise.reject(new Error('Network error: calibrations endpoint unreachable'));
+            }
+            if (url.includes('/api/printhouse/onboarding')) {
+                return Promise.resolve({
+                    ok: true,
+                    json: () => Promise.resolve({
+                        ok: true,
+                        data: {
+                            company: { legalName: 'Editorial Gamma' },
+                            sites: [{ siteId: 'site-gamma-1', siteName: 'Sede Bilbao', country: 'ES', city: 'Bilbao' }],
+                            readiness: {
+                                accountSetup: { status: 'COMPLETE' },
+                                pricingReadiness: { status: 'COMPLETE' }
+                            }
+                        }
+                    })
+                });
+            }
+            return Promise.resolve({ ok: true, json: () => Promise.resolve({ ok: true, data: [] }) });
+        });
+
+        renderWithProviders(
+            <GuidedPrinthouseJourney onOpenFullSetup={vi.fn()} printerNodeId="node-pricing-fail" />,
+            'es'
+        );
+
+        // Banner warning must appear
+        await waitFor(() => {
+            expect(screen.getByText(/Estado de precios no verificable/i)).toBeInTheDocument();
+            expect(screen.getByRole('button', { name: /Reintentar consulta/i })).toBeInTheDocument();
+        });
+
+        // Stage C must NOT be completed
+        const pricingStepBtn = screen.getByRole('button', { name: /Tus precios/i });
+        expect(pricingStepBtn.textContent).not.toContain('✓');
     });
 });
 

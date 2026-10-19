@@ -819,5 +819,131 @@ describe('GuidedStepReview & ManualOfferForm Defects & Regressions', () => {
             expect(stageC3Families.isComplete).toBe(true);
             expect(stageC3Families.pendingFamilies).toEqual([]);
         });
+
+        it('Regression: local flags true with empty server responses evaluates to false and does NOT certify Stage C', () => {
+            // Local draft has local true flags
+            const localDraftWithFlags: Partial<Record<ProductFamilyId, FamilyPricingSessionDraft>> = {
+                HARDCOVER: {
+                    sessionId: 'fake-local-sess',
+                    activeRun: null,
+                    selectedVariantId: null,
+                    proposedPatch: {},
+                    entryMode: 'UPLOAD_PDF',
+                    uploadedFileName: null,
+                    pricingMethod: 'ASSISTANT',
+                    calibrationAccepted: true,
+                    templateSaved: true,
+                    manualRatesSaved: true
+                }
+            };
+
+            // Server returns empty responses (no sessions, no revisions)
+            const emptySessions: any[] = [];
+            const emptyRevisions: any[] = [];
+
+            const reconstructed = reconstructPricingContinuityFromServer(
+                emptySessions,
+                emptyRevisions,
+                localDraftWithFlags
+            );
+
+            // Reconstructed confirmation flags must be strictly FALSE
+            expect(reconstructed.HARDCOVER?.calibrationAccepted).toBe(false);
+            expect(reconstructed.HARDCOVER?.templateSaved).toBe(false);
+            expect(reconstructed.HARDCOVER?.manualRatesSaved).toBe(false);
+
+            // Local unconfirmed data (entryMode) is preserved
+            expect(reconstructed.HARDCOVER?.entryMode).toBe('UPLOAD_PDF');
+
+            // Stage C completion must evaluate to FALSE
+            const evalResult = evaluateStageCCompletion(
+                { pricingReadiness: { status: 'COMPLETE' } },
+                { HARDCOVER: true },
+                reconstructed,
+                {}
+            );
+            expect(evalResult.isComplete).toBe(false);
+            expect(evalResult.pendingFamilies).toEqual(['HARDCOVER']);
+        });
+
+        it('Regression: failed queries (null / undefined / error) produce non-verifiable state and never certify Stage C', () => {
+            // Simulating server query error returning null for sessions and revisions
+            const reconstructed = reconstructPricingContinuityFromServer(
+                null,
+                undefined,
+                {
+                    SOFTCOVER: {
+                        sessionId: null,
+                        activeRun: null,
+                        selectedVariantId: null,
+                        proposedPatch: {},
+                        entryMode: 'UPLOAD_PDF',
+                        uploadedFileName: null,
+                        pricingMethod: 'TEMPLATE',
+                        templateSaved: true
+                    }
+                }
+            );
+
+            // Confirmation flags must remain false because server could not be verified
+            expect(reconstructed.SOFTCOVER?.templateSaved).toBe(false);
+            expect(reconstructed.SOFTCOVER?.calibrationAccepted).toBe(false);
+            expect(reconstructed.SOFTCOVER?.manualRatesSaved).toBe(false);
+
+            const evalResult = evaluateStageCCompletion(
+                { pricingReadiness: { status: 'COMPLETE' } },
+                { SOFTCOVER: true },
+                reconstructed,
+                {}
+            );
+            expect(evalResult.isComplete).toBe(false);
+            expect(evalResult.pendingFamilies).toEqual(['SOFTCOVER']);
+        });
+
+        it('Regression: successful save and reload without localStorage derives confirmation strictly from server', () => {
+            // User clears localStorage (simulating browser reload on clean device)
+            clearGuidedOnboardingDraft('test-tenant');
+
+            // Server returns genuine revision for SOFTCOVER TEMPLATE and session for HARDCOVER
+            const serverSessions = [
+                {
+                    id: 'cal_sess_hc_srv',
+                    status: 'ACCEPTED',
+                    bookSpec: { family: 'HARDCOVER' }
+                }
+            ];
+            const serverRevisions = [
+                {
+                    id: 'rev_softcover_srv',
+                    createdBy: {
+                        productFamily: 'SOFTCOVER',
+                        pricingMethod: 'TEMPLATE'
+                    }
+                }
+            ];
+
+            // Reconstruct without any prior localStorage continuity (empty object)
+            const reconstructed = reconstructPricingContinuityFromServer(
+                serverSessions,
+                serverRevisions,
+                {}
+            );
+
+            expect(reconstructed.HARDCOVER?.calibrationAccepted).toBe(true);
+            expect(reconstructed.HARDCOVER?.pricingMethod).toBe('ASSISTANT');
+            expect(reconstructed.SOFTCOVER?.templateSaved).toBe(true);
+            expect(reconstructed.SOFTCOVER?.pricingMethod).toBe('TEMPLATE');
+            expect(reconstructed.WIRE_O?.manualRatesSaved).toBe(false);
+
+            // If only HARDCOVER and SOFTCOVER are enabled, Stage C completes
+            const evalResult = evaluateStageCCompletion(
+                { pricingReadiness: { status: 'COMPLETE' } },
+                { HARDCOVER: true, SOFTCOVER: true },
+                reconstructed,
+                {}
+            );
+            expect(evalResult.isComplete).toBe(true);
+            expect(evalResult.pendingFamilies).toEqual([]);
+        });
     });
 });
