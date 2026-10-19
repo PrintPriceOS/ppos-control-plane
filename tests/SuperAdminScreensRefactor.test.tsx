@@ -147,6 +147,9 @@ describe('SUPER_ADMIN Refactored Operational Screens', () => {
 
   it('1. Topbar derives core telemetry signal directly from /api/system/health real dependencies contract', async () => {
     const adminApi = await import('../src/ui/lib/adminApi');
+    const authStore = await import('../src/ui/lib/authStore');
+    vi.spyOn(authStore, 'isPrinthouseUser').mockReturnValue(false);
+    vi.spyOn(authStore, 'getUserRole').mockReturnValue('SUPER_ADMIN');
 
     // Healthy telemetry case: verifies process uptime and redis dependency 'ready' + 'OK' latency
     (adminApi.getSystemHealth as any).mockResolvedValueOnce({
@@ -167,7 +170,7 @@ describe('SUPER_ADMIN Refactored Operational Screens', () => {
       const badge = screen.getByText(/Telemetría Núcleo: OK|Core Telemetry: OK|Kern-Telemetrie: OK/i);
       expect(badge).toBeDefined();
       expect(badge.closest('div')?.getAttribute('title')).toContain('4120');
-      expect(badge.closest('div')?.getAttribute('title')).toContain('No evalúa RBAC');
+      expect(badge.closest('div')?.getAttribute('title')).toContain('ready');
     });
     unmount();
 

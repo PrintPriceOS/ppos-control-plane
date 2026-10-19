@@ -13,12 +13,21 @@
 import React from 'react';
 import '@testing-library/jest-dom';
 import { render, screen } from '@testing-library/react';
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { LocaleProvider } from '../src/ui/i18n';
 import { GuidedStepReview } from '../src/ui/components/printhouse/onboarding/GuidedStepReview';
 import { ManualOfferForm } from '../src/ui/components/printhouse/onboarding/ManualOfferForm';
 import { ProductFamilyId, FamilyState } from '../src/ui/types/printhouseOnboardingTypes';
-import { CompanyDraftData, FamilyPricingSessionDraft } from '../src/ui/lib/onboardingDraftStore';
+import { 
+    CompanyDraftData, 
+    FamilyPricingSessionDraft,
+    evaluateStageCCompletion,
+    deriveServerStage,
+    saveGuidedOnboardingDraft,
+    loadGuidedOnboardingDraft,
+    clearGuidedOnboardingDraft,
+    GuidedOnboardingDraft
+} from '../src/ui/lib/onboardingDraftStore';
 
 const mockFamilies: Record<ProductFamilyId, FamilyState> = {
     HARDCOVER: {
@@ -360,16 +369,17 @@ describe('GuidedStepReview & ManualOfferForm Defects & Regressions', () => {
         expect(screen.getByText(/Tarifas industriales base \(taller\):/)).toBeInTheDocument();
         expect(screen.getByText('Configuradas')).toBeInTheDocument();
 
-        // But overall pricing card badge indicates "En progreso (2/4)" because HARDCOVER (calibrated) and SOFTCOVER (assistant quotes) are configured, but WIRE_O and SADDLE_STITCH are pending
-        expect(screen.getByText(/En progreso \(2\/4\)/)).toBeInTheDocument();
+        // But overall pricing card badge indicates "En progreso (1/4)" because ONLY HARDCOVER (calibrated) is genuinely saved/validated;
+        // SOFTCOVER has un-accepted draft quotes, WIRE_O has only selected assistant preference, and SADDLE_STITCH has no method.
+        expect(screen.getByText(/En progreso \(1\/4\)/)).toBeInTheDocument();
 
-        // Unconfigured family has a direct "Configurar" button
+        // Unconfigured families have direct "Configurar" buttons
         const configureButtons = screen.getAllByText('Configurar');
-        expect(configureButtons.length).toBeGreaterThanOrEqual(1);
+        expect(configureButtons.length).toBe(3); // SOFTCOVER, WIRE_O, SADDLE_STITCH
 
-        // Clicking "Configurar" calls onGoToFamilyPricing with specific family ID
+        // Clicking first "Configurar" calls onGoToFamilyPricing with SOFTCOVER (first unconfigured family)
         configureButtons[0].click();
-        expect(onGoToFamilyPricing).toHaveBeenCalledWith('SADDLE_STITCH');
+        expect(onGoToFamilyPricing).toHaveBeenCalledWith('SOFTCOVER');
     });
 
     it('marks Pricing stage complete only when all enabled families have configured rates or methods', () => {
@@ -400,5 +410,270 @@ describe('GuidedStepReview & ManualOfferForm Defects & Regressions', () => {
 
         // When all are DATA_VALIDATED -> "Calibrado con IA"
         expect(screen.getByText('Calibrado con IA')).toBeInTheDocument();
+    });
+
+    describe('Stage C Hardened Completion Rules & Cross-Session Draft Rehydration', () => {
+        const dummyServerComplete = {
+            pricingReadiness: { status: 'COMPLETE', blockingIssues: [] }
+        };
+
+        it('strictly rejects TEMPLATE choice if templateSaved is false or absent', () => {
+            const enabled = { HARDCOVER: true };
+            const continuityUnsaved: Partial<Record<ProductFamilyId, FamilyPricingSessionDraft>> = {
+                HARDCOVER: {
+                    sessionId: null,
+                    activeRun: null,
+                    selectedVariantId: null,
+                    proposedPatch: {},
+                    entryMode: 'UPLOAD_PDF',
+                    uploadedFileName: null,
+                    pricingMethod: 'TEMPLATE'
+                    // templateSaved is omitted / falsy
+                }
+            };
+            const resultUnsaved = evaluateStageCCompletion(dummyServerComplete, enabled, continuityUnsaved, {});
+            expect(resultUnsaved.isComplete).toBe(false);
+            expect(resultUnsaved.templateCount).toBe(0);
+            expect(resultUnsaved.pendingFamilies).toContain('HARDCOVER');
+
+            const continuitySaved: Partial<Record<ProductFamilyId, FamilyPricingSessionDraft>> = {
+                HARDCOVER: {
+                    ...continuityUnsaved.HARDCOVER!,
+                    templateSaved: true
+                }
+            };
+            const resultSaved = evaluateStageCCompletion(dummyServerComplete, enabled, continuitySaved, {});
+            expect(resultSaved.isComplete).toBe(true);
+            expect(resultSaved.templateCount).toBe(1);
+            expect(resultSaved.pendingFamilies).toEqual([]);
+        });
+
+        it('strictly rejects MANUAL choice if manualRatesSaved is false or absent (does not conflate with entering an offer)', () => {
+            const enabled = { SOFTCOVER: true };
+            const continuityOfferOnly: Partial<Record<ProductFamilyId, FamilyPricingSessionDraft>> = {
+                SOFTCOVER: {
+                    sessionId: null,
+                    activeRun: null,
+                    selectedVariantId: null,
+                    proposedPatch: {},
+                    entryMode: 'MANUAL_FORM',
+                    uploadedFileName: null,
+                    pricingMethod: 'MANUAL',
+                    step: 3,
+                    offer: { runs: [{ quantity: 500, totalPrice: 1000 }] } as any
+                    // manualRatesSaved is omitted / falsy
+                }
+            };
+            const resultOfferOnly = evaluateStageCCompletion(dummyServerComplete, enabled, continuityOfferOnly, {});
+            expect(resultOfferOnly.isComplete).toBe(false);
+            expect(resultOfferOnly.manualCount).toBe(0);
+            expect(resultOfferOnly.pendingFamilies).toContain('SOFTCOVER');
+
+            const continuityRatesSaved: Partial<Record<ProductFamilyId, FamilyPricingSessionDraft>> = {
+                SOFTCOVER: {
+                    ...continuityOfferOnly.SOFTCOVER!,
+                    manualRatesSaved: true
+                }
+            };
+            const resultRatesSaved = evaluateStageCCompletion(dummyServerComplete, enabled, continuityRatesSaved, {});
+            expect(resultRatesSaved.isComplete).toBe(true);
+            expect(resultRatesSaved.manualCount).toBe(1);
+            expect(resultRatesSaved.pendingFamilies).toEqual([]);
+        });
+
+        it('strictly rejects ASSISTANT if calibration was not accepted (quotes or runs alone do not suffice)', () => {
+            const enabled = { WIRE_O: true };
+            const continuityUnaccepted: Partial<Record<ProductFamilyId, FamilyPricingSessionDraft>> = {
+                WIRE_O: {
+                    sessionId: 'sess-wireo-123',
+                    activeRun: { id: 'run-1', status: 'COMPLETED' },
+                    selectedVariantId: 'var-1',
+                    proposedPatch: { interior_pp_bw: 0.007 },
+                    entryMode: 'UPLOAD_PDF',
+                    uploadedFileName: 'presupuesto.pdf',
+                    pricingMethod: 'ASSISTANT',
+                    step: 4
+                    // calibrationAccepted is falsy and status is not DATA_VALIDATED
+                }
+            };
+            const famStateUnaccepted = {
+                WIRE_O: { id: 'WIRE_O', status: 'QUOTE_ADDED', quotes: [{ id: 'q1' }] }
+            };
+            const resultUnaccepted = evaluateStageCCompletion(dummyServerComplete, enabled, continuityUnaccepted, famStateUnaccepted);
+            expect(resultUnaccepted.isComplete).toBe(false);
+            expect(resultUnaccepted.calibratedCount).toBe(0);
+            expect(resultUnaccepted.pendingFamilies).toContain('WIRE_O');
+
+            // With explicit calibrationAccepted: true
+            const continuityAccepted: Partial<Record<ProductFamilyId, FamilyPricingSessionDraft>> = {
+                WIRE_O: {
+                    ...continuityUnaccepted.WIRE_O!,
+                    calibrationAccepted: true
+                }
+            };
+            const resultAccepted = evaluateStageCCompletion(dummyServerComplete, enabled, continuityAccepted, famStateUnaccepted);
+            expect(resultAccepted.isComplete).toBe(true);
+            expect(resultAccepted.calibratedCount).toBe(1);
+            expect(resultAccepted.pendingFamilies).toEqual([]);
+        });
+
+        it('persists and rehydrates draft seamlessly across simulated browser reload without loss or regression', () => {
+            const testTenant = 'tenant-cross-session-audit';
+            clearGuidedOnboardingDraft(testTenant);
+
+            const sampleDraft: GuidedOnboardingDraft = {
+                schemaVersion: 2,
+                tenantId: testTenant,
+                currentStage: 'PRICING',
+                selectedFamilyId: 'HARDCOVER',
+                enabledFamilies: { HARDCOVER: true, SOFTCOVER: true, WIRE_O: false, SADDLE_STITCH: false },
+                company: {
+                    ...mockCompany5of6,
+                    phone: '+34 960 123 456',
+                    contactName: 'Carlos Impresor',
+                    siteTimezone: 'Europe/Madrid'
+                },
+                offerDrafts: {},
+                pricingContinuity: {
+                    HARDCOVER: {
+                        sessionId: 'sess-hc-rehydrated',
+                        activeRun: { id: 'run-hc-1' },
+                        selectedVariantId: 'v-1',
+                        proposedPatch: { interior_pp_bw: 0.0065 },
+                        entryMode: 'UPLOAD_PDF',
+                        uploadedFileName: 'oferta-hc.pdf',
+                        pricingMethod: 'ASSISTANT',
+                        calibrationAccepted: true,
+                        lastSavedTimestamp: 1776543210000
+                    },
+                    SOFTCOVER: {
+                        sessionId: null,
+                        activeRun: null,
+                        selectedVariantId: null,
+                        proposedPatch: {},
+                        entryMode: 'UPLOAD_PDF',
+                        uploadedFileName: null,
+                        pricingMethod: 'TEMPLATE',
+                        templateSaved: true,
+                        lastSavedTimestamp: 1776543220000
+                    }
+                },
+                lastSavedTimestamp: Date.now(),
+                completedStages: {
+                    WELCOME: true,
+                    COMPANY: true,
+                    PRODUCTS: true,
+                    PRICING: true,
+                    REVIEW: false
+                }
+            };
+
+            // Save to localStorage
+            const savedOk = saveGuidedOnboardingDraft(sampleDraft);
+            expect(savedOk).toBe(true);
+
+            // Rehydrate
+            const loaded = loadGuidedOnboardingDraft(testTenant);
+            expect(loaded.tenantId).toBe(testTenant);
+            expect(loaded.currentStage).toBe('PRICING');
+            expect(loaded.company.contactName).toBe('Carlos Impresor');
+            expect(loaded.company.siteTimezone).toBe('Europe/Madrid');
+            expect(loaded.pricingContinuity?.HARDCOVER?.calibrationAccepted).toBe(true);
+            expect(loaded.pricingContinuity?.HARDCOVER?.pricingMethod).toBe('ASSISTANT');
+            expect(loaded.pricingContinuity?.SOFTCOVER?.templateSaved).toBe(true);
+            expect(loaded.pricingContinuity?.SOFTCOVER?.pricingMethod).toBe('TEMPLATE');
+
+            // Verify Stage C evaluation on rehydrated draft
+            const stageCEval = evaluateStageCCompletion(
+                dummyServerComplete,
+                loaded.enabledFamilies,
+                loaded.pricingContinuity,
+                {}
+            );
+            expect(stageCEval.isComplete).toBe(true);
+            expect(stageCEval.allEnabledFamiliesConfigured).toBe(true);
+            expect(stageCEval.configuredCount).toBe(2);
+            expect(stageCEval.totalEnabled).toBe(2);
+
+            // Clean up
+            clearGuidedOnboardingDraft(testTenant);
+        });
+    });
+
+    describe('Responsive Typography & Container Constraints (1280x720, 1366x768, 390x844)', () => {
+        const viewports = [
+            { name: 'HD Desktop', width: 1280, height: 720 },
+            { name: 'Standard Desktop', width: 1366, height: 768 },
+            { name: 'Mobile Portrait (iPhone 12/13/14)', width: 390, height: 844 }
+        ];
+
+        viewports.forEach(vp => {
+            it(`renders GuidedStepReview safely at ${vp.name} (${vp.width}x${vp.height}) with responsive container hierarchy and without fixed-width overflows`, () => {
+                window.innerWidth = vp.width;
+                window.innerHeight = vp.height;
+
+                const { container } = render(
+                    <LocaleProvider initialLocale="de">
+                        <GuidedStepReview
+                            company={{
+                                legalName: 'Fährmann Druckereibetriebsgemeinschaft GmbH & Co. KG',
+                                tradingName: 'Fährmann Druck',
+                                country: 'DE',
+                                city: 'Frankfurt am Main',
+                                address: 'Industriestraße 45, Halle B',
+                                postalCode: '60311',
+                                phone: '+49 69 12345678',
+                                website: 'https://www.faehrmann-druck.de',
+                                contactName: 'Maximilian von Fährmann-Gutenbergschule',
+                                taxId: 'DE123456789',
+                                siteName: 'Hauptproduktionsstätte Frankfurt-Osthafen',
+                                siteTimezone: 'Europe/Berlin',
+                                primarySiteId: 'site-ffm-1',
+                                userEditedFields: [],
+                                acknowledgedServerValues: {}
+                            }}
+                            families={mockFamilies}
+                            enabledFamilies={{ HARDCOVER: true, SOFTCOVER: true, WIRE_O: true, SADDLE_STITCH: true }}
+                            pricingContinuity={{
+                                HARDCOVER: { pricingMethod: 'ASSISTANT', calibrationAccepted: true },
+                                SOFTCOVER: { pricingMethod: 'MANUAL', manualRatesSaved: true },
+                                WIRE_O: { pricingMethod: 'TEMPLATE', templateSaved: true }
+                            }}
+                            readinessData={{
+                                accountSetup: { status: 'COMPLETE', completedRequirements: 6, totalRequirements: 6, blockingIssues: [] },
+                                operationalConfiguration: { status: 'COMPLETE', completedRequirements: 5, totalRequirements: 5, blockingIssues: [] },
+                                pricingReadiness: { status: 'COMPLETE', blockingIssues: [] }
+                            }}
+                            onBackToPricing={() => {}}
+                            onOpenFullSetup={() => {}}
+                        />
+                    </LocaleProvider>
+                );
+
+                // Verify root container uses responsive max-w constraint and margin auto
+                const root = container.firstElementChild as HTMLElement;
+                expect(root).toBeDefined();
+                expect(root.className).toContain('max-w-4xl');
+                expect(root.className).toContain('mx-auto');
+
+                // Verify that no element inside container uses fixed unconstrained width style exceeding vp.width
+                const allElements = container.querySelectorAll('*');
+                let foundUnconstrainedOverflow = false;
+                allElements.forEach(el => {
+                    const style = (el as HTMLElement).style;
+                    if (style.width && style.width.endsWith('px')) {
+                        const pxVal = parseInt(style.width, 10);
+                        if (pxVal > vp.width) {
+                            foundUnconstrainedOverflow = true;
+                        }
+                    }
+                });
+                expect(foundUnconstrainedOverflow).toBe(false);
+
+                // Verify German long-word compound headers render without DOM unmount
+                expect(screen.getByText(/Zusammenfassung Ihrer Druckereieinrichtung/i)).toBeInTheDocument();
+                expect(screen.getByText(/Fährmann Druckereibetriebsgemeinschaft GmbH & Co. KG/i)).toBeInTheDocument();
+            });
+        });
     });
 });

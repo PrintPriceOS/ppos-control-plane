@@ -2322,7 +2322,12 @@ export const en = {
   'guided.pricing.stepLockedQuoteRequired': 'Please upload a PDF quote or enter an offer manually to proceed to specification review.',
   'guided.pricing.stepLockedReviewRequired': 'Please verify and confirm the offer specifications before proceeding to calculation.',
   'guided.pricing.stepLockedCalcRequired': 'Calculation with the pricing engine is required before accepting the rate proposal.',
-  'guided.storage.savedLocal': 'Draft saved locally'
+  'guided.storage.savedLocal': 'Draft saved locally',
+  'guided.review.statusTemplateSaved': 'Template saved',
+  'guided.review.statusManualSaved': 'Rates saved',
+  'guided.review.statusTemplatePending': 'Template unsaved',
+  'guided.review.statusManualPending': 'Rates unsaved',
+  'guided.review.statusAssistantPending': 'Calibration pending'
 } as const;
 
 export type TranslationKeys = keyof typeof en;

@@ -408,6 +408,13 @@ export const GuidedStepReview: React.FC<GuidedStepReviewProps> = ({
                                                     ? `${quoteCount} ${quoteCount === 1 ? 'oferta' : 'ofertas'}`
                                                     : null;
 
+                                        // Check explicit verification flags
+                                        const isTemplateSaved = methodChoice === 'TEMPLATE' && Boolean(continuity?.templateSaved);
+                                        const isManualRatesSaved = methodChoice === 'MANUAL' && Boolean(continuity?.manualRatesSaved);
+                                        const isAssistantCalibrated = isFamilyCalibrated || Boolean(continuity?.calibrationAccepted);
+
+                                        const isFamilyFullyReady = isAssistantCalibrated || isTemplateSaved || isManualRatesSaved;
+
                                         return (
                                             <div 
                                                 key={fid}
@@ -431,7 +438,7 @@ export const GuidedStepReview: React.FC<GuidedStepReviewProps> = ({
                                                         </span>
                                                     )}
                                                     <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${
-                                                        isFamilyCalibrated
+                                                        isFamilyFullyReady
                                                             ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400'
                                                             : hasActiveDraft
                                                                 ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300'
@@ -439,15 +446,23 @@ export const GuidedStepReview: React.FC<GuidedStepReviewProps> = ({
                                                                     ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300'
                                                                     : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400'
                                                     }`}>
-                                                        {isFamilyCalibrated
+                                                        {isAssistantCalibrated
                                                             ? (t('guided.review.statusValidated') || 'Calibrada')
-                                                            : hasActiveDraft
-                                                                ? (t('guided.review.statusDraft') || 'Borrador en curso')
-                                                                : methodChoice
-                                                                    ? (t('guided.review.statusMethodSelected') || 'Método seleccionado')
-                                                                    : (t('guided.review.statusDeclared') || 'Declarada')}
+                                                            : isTemplateSaved
+                                                                ? (t('guided.review.statusTemplateSaved') || 'Plantilla guardada')
+                                                                : isManualRatesSaved
+                                                                    ? (t('guided.review.statusManualSaved') || 'Tarifas guardadas')
+                                                                    : methodChoice === 'TEMPLATE'
+                                                                        ? (t('guided.review.statusTemplatePending') || 'Plantilla sin guardar')
+                                                                        : methodChoice === 'MANUAL'
+                                                                            ? (t('guided.review.statusManualPending') || 'Tarifas sin guardar')
+                                                                            : hasActiveDraft
+                                                                                ? (t('guided.review.statusDraft') || 'Borrador en curso')
+                                                                                : methodChoice
+                                                                                    ? (t('guided.review.statusMethodSelected') || 'Método seleccionado')
+                                                                                    : (t('guided.review.statusDeclared') || 'Declarada')}
                                                     </span>
-                                                    {(!isFamilyCalibrated && !methodChoice) && (
+                                                    {!isFamilyFullyReady && (
                                                         <button
                                                             type="button"
                                                             onClick={() => onGoToFamilyPricing ? onGoToFamilyPricing(fid) : onBackToPricing()}

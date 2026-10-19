@@ -115,6 +115,10 @@ db.query = async function mockQuery(sql, params = []) {
   // Site lead times query
   if (upper.includes('FROM PRINTHOUSE_SITE_LEAD_TIMES')) {
     const tenantId = params[0];
+    if (upper.includes('SELECT TIMEZONE')) {
+      const row = memoryStore.printhouse_site_lead_times.find(lt => lt.tenant_id === tenantId && lt.timezone && lt.timezone.trim() !== '');
+      return row ? [{ timezone: row.timezone }] : [];
+    }
     const cnt = memoryStore.printhouse_site_lead_times.filter(lt => {
       if (lt.tenant_id !== tenantId) return false;
       let isExplicit = false;
@@ -314,8 +318,113 @@ async function runTests() {
 
   db.query = brokenQuery;
 
+  // Test 11: Fact 6 Timezone persistence via canonical printer_nodes.region
+  resetStore();
+  const tzTenantId = 'tenant-tz-01';
+  memoryStore.tenants.push({
+    id: tzTenantId,
+    name: 'Graficas Alpine S.L.',
+    type: 'PRINTHOUSE',
+    status: 'ACTIVE',
+    metadata_json: JSON.stringify({ country: 'ES', contact_name: 'Carlos Alpine', phone: '+34912345678' })
+  });
+  memoryStore.printer_nodes.push({
+    id: 'node-tz-01',
+    tenant_id: tzTenantId,
+    name: 'Sede Central Madrid',
+    country: 'ES',
+    city: 'Madrid',
+    region: 'Europe/Madrid',
+    status: 'ACTIVE'
+  });
+
+  const tzResultCanonical = await readinessService.computeReadiness(tzTenantId);
+  assert.strictEqual(tzResultCanonical.accountSetup.completedRequirements, 6, 'Canonical printer_nodes.region satisfies Fact 6');
+  assert.strictEqual(tzResultCanonical.accountSetup.advisories.some(a => a.code === 'ADD_SITE_TIMEZONE'), false, 'Zero timezone advisories when region is set');
+  console.log('✓ Test 11: Fact 6 canonical printer_nodes.region satisfies timezone requirement and produces 6/6 requirements');
+
+  // Test 12: Fact 6 Fallback to metadata.timezone when node region is missing
+  resetStore();
+  const tzFallbackMetaId = 'tenant-tz-02';
+  memoryStore.tenants.push({
+    id: tzFallbackMetaId,
+    name: 'Graficas Alpine S.L.',
+    type: 'PRINTHOUSE',
+    status: 'ACTIVE',
+    metadata_json: JSON.stringify({ country: 'ES', contact_name: 'Carlos Alpine', phone: '+34912345678', timezone: 'Atlantic/Canary' })
+  });
+  memoryStore.printer_nodes.push({
+    id: 'node-tz-02',
+    tenant_id: tzFallbackMetaId,
+    name: 'Sede Tenerife',
+    country: 'ES',
+    city: 'Santa Cruz',
+    region: null,
+    status: 'ACTIVE'
+  });
+
+  const tzResultMeta = await readinessService.computeReadiness(tzFallbackMetaId);
+  assert.strictEqual(tzResultMeta.accountSetup.completedRequirements, 6, 'Fallback to metadata.timezone satisfies Fact 6');
+  console.log('✓ Test 12: Fact 6 fallback to metadata.timezone successfully resolves timezone when node region is null');
+
+  // Test 13: Fact 6 Fallback to printhouse_site_lead_times.timezone when node region & meta timezone are absent
+  resetStore();
+  const tzFallbackLeadId = 'tenant-tz-03';
+  memoryStore.tenants.push({
+    id: tzFallbackLeadId,
+    name: 'Graficas Alpine S.L.',
+    type: 'PRINTHOUSE',
+    status: 'ACTIVE',
+    metadata_json: JSON.stringify({ country: 'ES', contact_name: 'Carlos Alpine', phone: '+34912345678' })
+  });
+  memoryStore.printer_nodes.push({
+    id: 'node-tz-03',
+    tenant_id: tzFallbackLeadId,
+    name: 'Sede Valencia',
+    country: 'ES',
+    city: 'Valencia',
+    region: '',
+    status: 'ACTIVE'
+  });
+  memoryStore.printhouse_site_lead_times.push({
+    tenant_id: tzFallbackLeadId,
+    timezone: 'Europe/Madrid'
+  });
+
+  const tzResultLead = await readinessService.computeReadiness(tzFallbackLeadId);
+  assert.strictEqual(tzResultLead.accountSetup.completedRequirements, 6, 'Fallback to printhouse_site_lead_times satisfies Fact 6');
+  console.log('✓ Test 13: Fact 6 fallback to printhouse_site_lead_times resolves timezone when canonical and metadata are absent');
+
+  // Test 14: Fact 6 Missing timezone produces ADD_SITE_TIMEZONE advisory with targetField timezone
+  resetStore();
+  const tzMissingId = 'tenant-tz-04';
+  memoryStore.tenants.push({
+    id: tzMissingId,
+    name: 'Graficas Alpine S.L.',
+    type: 'PRINTHOUSE',
+    status: 'ACTIVE',
+    metadata_json: JSON.stringify({ country: 'ES', contact_name: 'Carlos Alpine', phone: '+34912345678' })
+  });
+  memoryStore.printer_nodes.push({
+    id: 'node-tz-04',
+    tenant_id: tzMissingId,
+    name: 'Sede Sin Zona',
+    country: 'ES',
+    city: 'Sevilla',
+    region: null,
+    status: 'ACTIVE'
+  });
+
+  const tzResultMissing = await readinessService.computeReadiness(tzMissingId);
+  assert.strictEqual(tzResultMissing.accountSetup.completedRequirements, 5, 'Missing timezone leaves account setup at 5/6');
+  const tzAdvisory = tzResultMissing.accountSetup.advisories.find(a => a.code === 'ADD_SITE_TIMEZONE');
+  assert.ok(tzAdvisory, 'ADD_SITE_TIMEZONE advisory emitted when no timezone configured');
+  assert.strictEqual(tzAdvisory.targetField, 'timezone');
+  assert.strictEqual(tzAdvisory.targetTab, 'SITES');
+  console.log('✓ Test 14: Fact 6 missing timezone emits ADD_SITE_TIMEZONE advisory pointing to SITES tab and timezone field');
+
   console.log('\n================================================================');
-  console.log('ALL PHASE 192.1 RC13 READINESS TESTS PASSED SUCCESSFULLY');
+  console.log('ALL PHASE 192.1 RC13 READINESS TESTS (INCLUDING FACT 6 TIMEZONE) PASSED SUCCESSFULLY');
   console.log('================================================================');
 }
 

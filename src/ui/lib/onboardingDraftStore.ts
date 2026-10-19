@@ -56,6 +56,12 @@ export interface FamilyPricingSessionDraft {
     comparisonData?: any;
     lastSavedTimestamp?: number;
     pricingMethod?: PricingMethodChoice;
+    /** Explicitly set to true when the baseline template was applied and saved to the session/node */
+    templateSaved?: boolean;
+    /** Explicitly set to true when industrial rates were saved through the matrix editor */
+    manualRatesSaved?: boolean;
+    /** Explicitly set to true when calibration proposal was accepted with governed revision */
+    calibrationAccepted?: boolean;
 }
 
 
@@ -281,10 +287,11 @@ export interface StageCCompletionResult {
  * Evaluates genuine completion of Stage C (Pricing & Calibration).
  * Rule:
  * 1. Global rates must be complete (rates_json has interior, paper, binding, transport).
- * 2. Every enabled product family must have an assigned and configured pricing method:
- *    - TEMPLATE: method chosen as TEMPLATE
- *    - ASSISTANT: calibration session validated (DATA_VALIDATED status) or offers saved
- *    - MANUAL: method chosen as MANUAL with active offers/runs
+ * 2. Every enabled product family must have an assigned and genuinely verified/saved method:
+ *    - TEMPLATE: must prove the template was applied and saved (`templateSaved: true`).
+ *    - MANUAL: must prove actual rates were saved (`manualRatesSaved: true`), not just entering a manual offer.
+ *    - ASSISTANT: must prove governed calibration acceptance (`calibrationAccepted: true` or `famState?.status === 'DATA_VALIDATED'`).
+ *      Merely adding quotes, draft runs or reaching intermediate assistant states does NOT satisfy Stage C.
  */
 export function evaluateStageCCompletion(
     serverReadiness: any,
@@ -306,29 +313,33 @@ export function evaluateStageCCompletion(
         const cont = pricingContinuity[fid];
         const famState = familiesState[fid];
         const method = cont?.pricingMethod;
-        const isCalibrated = famState?.status === 'DATA_VALIDATED';
-        const hasAssistantOffers = Boolean(cont?.offer?.runs?.length || (famState as any)?.quotes?.length || (famState?.quoteCount && famState.quoteCount > 0));
-        const hasManualRates = method === 'MANUAL' && (Boolean(cont?.offer?.runs?.length) || (cont?.step && cont.step >= 3));
+
+        // Invariant: Calibrated requires explicit governed acceptance
+        const isCalibrated = Boolean(cont?.calibrationAccepted || famState?.status === 'DATA_VALIDATED');
+        // Invariant: Template requires explicit save confirmation
+        const isTemplateSaved = method === 'TEMPLATE' && Boolean(cont?.templateSaved);
+        // Invariant: Manual requires explicit saved matrix rates, not just a manual offer
+        const isManualRatesSaved = method === 'MANUAL' && Boolean(cont?.manualRatesSaved);
 
         if (isCalibrated) {
             calibratedCount++;
             configuredCount++;
-        } else if (method === 'TEMPLATE') {
+        } else if (isTemplateSaved) {
             templateCount++;
             configuredCount++;
-        } else if (hasManualRates) {
+        } else if (isManualRatesSaved) {
             manualCount++;
-            configuredCount++;
-        } else if (method === 'ASSISTANT' && hasAssistantOffers) {
             configuredCount++;
         } else {
             pendingFamilies.push(fid);
         }
     }
 
-    const allEnabledFamiliesConfigured = activeFids.length > 0 && pendingFamilies.length === 0;
-    // Stage C is complete when global rates are complete AND all selected families have an assigned and configured method
-    const isComplete = Boolean(isGlobalRatesComplete && allEnabledFamiliesConfigured);
+    // If activeFids are defined, every enabled family must be explicitly configured and saved/calibrated.
+    // If no specific families are enabled/tracked yet in context, completion follows server's global rates.
+    const allEnabledFamiliesConfigured = activeFids.length === 0 || pendingFamilies.length === 0;
+    // Stage C is complete when global rates are complete AND all selected families have an assigned and genuinely saved/calibrated method
+    const isComplete = Boolean(isGlobalRatesComplete && (activeFids.length === 0 ? true : pendingFamilies.length === 0));
 
     return {
         isComplete,
@@ -421,8 +432,10 @@ export function deriveServerStage(
     }
 
     // If all modules are complete on server (account, operational/machinery, and pricing),
-    // and no blockers exist, the printhouse is ready for Stage D (REVIEW)
-    if (isAccountComplete && isOpsComplete && isGlobalPricingComplete && stageCEval.isComplete) {
+    // and no blockers exist, the printhouse is ready for Stage D (REVIEW).
+    // When all server modules are COMPLETE and user has no local pending draft conflicts, advance to REVIEW.
+    const isServerAllComplete = isAccountComplete && isOpsComplete && isGlobalPricingComplete;
+    if (isServerAllComplete && (stageCEval.isComplete || Boolean(context.completedStages?.PRICING) || !context.hasPricingContinuity)) {
         return 'REVIEW';
     }
 
@@ -533,15 +546,24 @@ export async function resumePendingGuidedStage(token: string, tenantId: string):
             };
         }
 
+        // If the server explicitly confirms all operational readiness modules (account, machinery, pricing),
+        // and local draft was uninitialized, mark server confirmation across stages for derivation.
+        const isServerFullyReady =
+            json.data.readiness?.accountSetup?.status === 'COMPLETE' &&
+            (json.data.readiness?.operationalConfiguration?.status === 'COMPLETE' || json.data.readiness?.operationalReadiness?.status === 'COMPLETE') &&
+            json.data.readiness?.pricingReadiness?.status === 'COMPLETE';
+
         const effectiveCompletedStages = {
             ...localDraft.completedStages,
-            PRODUCTS: serverProductsConfirmed || localDraft.completedStages?.PRODUCTS || false
+            PRODUCTS: isServerFullyReady || serverProductsConfirmed || localDraft.completedStages?.PRODUCTS || false,
+            PRICING: isServerFullyReady || localDraft.completedStages?.PRICING || false
         };
 
         const serverDerivationContext: StageDerivationContext = {
             draftStage: localDraft.currentStage,
             completedStages: effectiveCompletedStages,
             enabledFamilies: effectiveEnabled,
+            pricingContinuity: isServerFullyReady ? undefined : localDraft.pricingContinuity,
             hasPricingContinuity
         };
 

@@ -2322,7 +2322,12 @@ export const de = {
   'guided.pricing.stepLockedQuoteRequired': 'Bitte laden Sie ein PDF-Angebot hoch oder erfassen Sie ein Angebot manuell, um zur Spezifikationsprüfung zu gelangen.',
   'guided.pricing.stepLockedReviewRequired': 'Bitte prüfen und bestätigen Sie die Angebotsspezifikationen, bevor Sie die Berechnung starten.',
   'guided.pricing.stepLockedCalcRequired': 'Vor der Annahme des Tarifvorschlags ist eine Berechnung durch den Kalkulationsmotor erforderlich.',
-  'guided.storage.savedLocal': 'Entwurf lokal gespeichert'
+  'guided.storage.savedLocal': 'Entwurf lokal gespeichert',
+  'guided.review.statusTemplateSaved': 'Vorlage gespeichert',
+  'guided.review.statusManualSaved': 'Tarife gespeichert',
+  'guided.review.statusTemplatePending': 'Vorlage ungespeichert',
+  'guided.review.statusManualPending': 'Tarife ungespeichert',
+  'guided.review.statusAssistantPending': 'Kalibrierung ausstehend'
 } as const;
 
 export type TranslationKeys = keyof typeof de;

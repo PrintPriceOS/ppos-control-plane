@@ -222,7 +222,12 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
         entryMode: 'UPLOAD_PDF' | 'MANUAL_FORM';
         uploadedFileName: string | null;
         proposedPatch: Record<string, any>;
+        calibrationAccepted?: boolean;
     }
+
+    const [calibrationAccepted, setCalibrationAccepted] = useState<boolean>(() => {
+        return Boolean(initPricingForTarget?.calibrationAccepted);
+    });
 
     const familyDraftsRef = useRef<Partial<Record<ProductFamilyId, FamilyDraftState>>>(
         (() => {
@@ -251,7 +256,8 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
                             },
                             entryMode: item.entryMode || 'UPLOAD_PDF',
                             uploadedFileName: item.uploadedFileName || null,
-                            proposedPatch: item.proposedPatch || {}
+                            proposedPatch: item.proposedPatch || {},
+                            calibrationAccepted: Boolean(item.calibrationAccepted)
                         };
                     }
                 });
@@ -294,6 +300,7 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
             step: currentStep,
             offer: currentOffer,
             comparisonData,
+            calibrationAccepted,
             lastSavedTimestamp: Date.now()
         });
     }, [
@@ -307,6 +314,7 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
         currentStep,
         currentOffer,
         comparisonData,
+        calibrationAccepted,
         onPricingContinuityChange
     ]);
 
@@ -848,6 +856,10 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
                 } catch (e) {
                     // Handled safely
                 }
+            }
+            setCalibrationAccepted(true);
+            if (familyDraftsRef.current[selectedFamilyId]) {
+                familyDraftsRef.current[selectedFamilyId]!.calibrationAccepted = true;
             }
             updateFamilyStatus(selectedFamilyId, 'DATA_VALIDATED');
             setCurrentStep(5);

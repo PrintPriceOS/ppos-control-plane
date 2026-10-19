@@ -868,8 +868,8 @@ describe('Guided Printhouse Onboarding Journey Suite', () => {
             },
             offerDrafts: {},
             pricingContinuity: {
-                HARDCOVER: { pricingMethod: 'TEMPLATE' } as any,
-                SOFTCOVER: { pricingMethod: 'TEMPLATE' } as any
+                HARDCOVER: { pricingMethod: 'TEMPLATE', templateSaved: true } as any,
+                SOFTCOVER: { pricingMethod: 'TEMPLATE', templateSaved: true } as any
             },
             lastSavedTimestamp: Date.now(),
             completedStages: { WELCOME: true, COMPANY: true, PRODUCTS: true, PRICING: true, REVIEW: false }

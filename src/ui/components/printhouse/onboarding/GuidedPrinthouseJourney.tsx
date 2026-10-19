@@ -464,7 +464,12 @@ export const GuidedPrinthouseJourney: React.FC<GuidedPrinthouseJourneyProps> = (
                 const sameOffer = (existing.offer === famDraft.offer) ||
                     (JSON.stringify(existing.offer || null) === JSON.stringify(famDraft.offer || null));
 
-                if (sameSession && sameVariant && sameStep && sameEntry && sameFile && sameRun && samePatch && sameComp && sameOffer) {
+                const sameFlags = (existing.calibrationAccepted === famDraft.calibrationAccepted) &&
+                    (existing.templateSaved === famDraft.templateSaved) &&
+                    (existing.manualRatesSaved === famDraft.manualRatesSaved) &&
+                    (existing.pricingMethod === famDraft.pricingMethod);
+
+                if (sameSession && sameVariant && sameStep && sameEntry && sameFile && sameRun && samePatch && sameComp && sameOffer && sameFlags) {
                     return prev;
                 }
             }
@@ -1324,8 +1329,25 @@ export const GuidedPrinthouseJourney: React.FC<GuidedPrinthouseJourneyProps> = (
                                     initialPricingDrafts={draft.pricingContinuity}
                                     onPricingContinuityChange={handlePricingContinuityChange}
                                     onCompleted={() => {
+                                        const famId = effectiveActiveFamilyId;
                                         updateDraft(prev => ({
                                             ...prev,
+                                            pricingContinuity: {
+                                                ...prev.pricingContinuity,
+                                                [famId]: {
+                                                    ...(prev.pricingContinuity?.[famId] || {
+                                                        sessionId: null,
+                                                        activeRun: null,
+                                                        selectedVariantId: null,
+                                                        proposedPatch: {},
+                                                        entryMode: 'UPLOAD_PDF',
+                                                        uploadedFileName: null
+                                                    }),
+                                                    pricingMethod: 'ASSISTANT',
+                                                    calibrationAccepted: true,
+                                                    lastSavedTimestamp: Date.now()
+                                                }
+                                            },
                                             completedStages: {
                                                 ...prev.completedStages,
                                                 PRICING: true
@@ -1384,8 +1406,25 @@ export const GuidedPrinthouseJourney: React.FC<GuidedPrinthouseJourneyProps> = (
                                         <button
                                             type="button"
                                             onClick={() => {
+                                                const famId = effectiveActiveFamilyId;
                                                 updateDraft(prev => ({
                                                     ...prev,
+                                                    pricingContinuity: {
+                                                        ...prev.pricingContinuity,
+                                                        [famId]: {
+                                                            ...(prev.pricingContinuity?.[famId] || {
+                                                                sessionId: null,
+                                                                activeRun: null,
+                                                                selectedVariantId: null,
+                                                                proposedPatch: {},
+                                                                entryMode: 'UPLOAD_PDF',
+                                                                uploadedFileName: null
+                                                            }),
+                                                            pricingMethod: 'TEMPLATE',
+                                                            templateSaved: true,
+                                                            lastSavedTimestamp: Date.now()
+                                                        }
+                                                    },
                                                     completedStages: {
                                                         ...prev.completedStages,
                                                         PRICING: true
@@ -1423,8 +1462,25 @@ export const GuidedPrinthouseJourney: React.FC<GuidedPrinthouseJourneyProps> = (
                                         mode="ONBOARDING"
                                         initialNodeData={printerNodeId ? { id: printerNodeId, name: printerNodeName } : undefined}
                                         onSave={async () => {
+                                            const famId = effectiveActiveFamilyId;
                                             updateDraft(prev => ({
                                                 ...prev,
+                                                pricingContinuity: {
+                                                    ...prev.pricingContinuity,
+                                                    [famId]: {
+                                                        ...(prev.pricingContinuity?.[famId] || {
+                                                            sessionId: null,
+                                                            activeRun: null,
+                                                            selectedVariantId: null,
+                                                            proposedPatch: {},
+                                                            entryMode: 'UPLOAD_PDF',
+                                                            uploadedFileName: null
+                                                        }),
+                                                        pricingMethod: 'MANUAL',
+                                                        manualRatesSaved: true,
+                                                        lastSavedTimestamp: Date.now()
+                                                    }
+                                                },
                                                 completedStages: {
                                                     ...prev.completedStages,
                                                     PRICING: true

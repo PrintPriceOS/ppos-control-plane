@@ -128,11 +128,6 @@ class PrinthouseOnboardingService {
         if (siteTimezone !== undefined) {
             const cleanTz = String(siteTimezone).trim();
             metadata.timezone = cleanTz;
-            // Also sync to primary printer_nodes.region if available
-            await db.query(
-                'UPDATE printer_nodes SET region = ? WHERE tenant_id = ? AND status != "DELETED" ORDER BY created_at ASC LIMIT 1',
-                [cleanTz, tenantId]
-            ).catch(() => {});
         }
 
         if (selectedProductFamilies !== undefined) {
@@ -156,10 +151,65 @@ class PrinthouseOnboardingService {
 
         metadata.company_profile_completed = true;
 
-        await db.query(
-            'UPDATE tenants SET name = COALESCE(NULLIF(?, ""), name), metadata_json = ? WHERE id = ?',
-            [updatedName, JSON.stringify(metadata), tenantId]
-        );
+        // Perform updates atomically via db transaction or query
+        const pool = db.getPool ? db.getPool() : null;
+        if (pool && typeof pool.getConnection === 'function') {
+            const conn = await pool.getConnection();
+            try {
+                await conn.beginTransaction();
+
+                if (siteTimezone !== undefined) {
+                    const cleanTz = String(siteTimezone).trim();
+                    // Locate primary printer node for tenant
+                    const [nodes] = await conn.query(
+                        'SELECT id FROM printer_nodes WHERE tenant_id = ? AND status != "DELETED" ORDER BY created_at ASC LIMIT 1 FOR UPDATE',
+                        [tenantId]
+                    );
+                    if (Array.isArray(nodes) && nodes.length > 0) {
+                        const targetNodeId = nodes[0].id;
+                        const [updateNodeResult] = await conn.query(
+                            'UPDATE printer_nodes SET region = ? WHERE id = ? AND tenant_id = ?',
+                            [cleanTz, targetNodeId, tenantId]
+                        );
+                        if (updateNodeResult && updateNodeResult.affectedRows === 0) {
+                            throw new Error(`SITE_TIMEZONE_UPDATE_FAILED: Zero rows updated for printer_node ${targetNodeId}`);
+                        }
+                    }
+                }
+
+                await conn.query(
+                    'UPDATE tenants SET name = COALESCE(NULLIF(?, ""), name), metadata_json = ? WHERE id = ?',
+                    [updatedName, JSON.stringify(metadata), tenantId]
+                );
+
+                await conn.commit();
+            } catch (err) {
+                await conn.rollback().catch(() => {});
+                throw err;
+            } finally {
+                conn.release();
+            }
+        } else {
+            // Direct query fallback for testing environments without pool wrapper
+            if (siteTimezone !== undefined) {
+                const cleanTz = String(siteTimezone).trim();
+                const nodes = await db.query(
+                    'SELECT id FROM printer_nodes WHERE tenant_id = ? AND status != "DELETED" ORDER BY created_at ASC LIMIT 1',
+                    [tenantId]
+                );
+                if (Array.isArray(nodes) && nodes.length > 0) {
+                    await db.query(
+                        'UPDATE printer_nodes SET region = ? WHERE id = ? AND tenant_id = ?',
+                        [cleanTz, nodes[0].id, tenantId]
+                    );
+                }
+            }
+
+            await db.query(
+                'UPDATE tenants SET name = COALESCE(NULLIF(?, ""), name), metadata_json = ? WHERE id = ?',
+                [updatedName, JSON.stringify(metadata), tenantId]
+            );
+        }
 
         auditLogger.log({
             type: 'PRINTHOUSE_COMPANY_PROFILE_UPDATED',

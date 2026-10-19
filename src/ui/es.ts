@@ -2321,7 +2321,12 @@ export const es = {
   'guided.pricing.stepLockedQuoteRequired': 'Sube un presupuesto PDF o introduce una oferta manualmente para pasar a la revisión de especificaciones.',
   'guided.pricing.stepLockedReviewRequired': 'Revisa y confirma las especificaciones de la oferta antes de pasar al cálculo.',
   'guided.pricing.stepLockedCalcRequired': 'Es necesario ejecutar el cálculo con el motor antes de aceptar la propuesta de tarifas.',
-  'guided.storage.savedLocal': 'Borrador guardado localmente'
+  'guided.storage.savedLocal': 'Borrador guardado localmente',
+  'guided.review.statusTemplateSaved': 'Plantilla guardada',
+  'guided.review.statusManualSaved': 'Tarifas guardadas',
+  'guided.review.statusTemplatePending': 'Plantilla sin guardar',
+  'guided.review.statusManualPending': 'Tarifas sin guardar',
+  'guided.review.statusAssistantPending': 'Calibración pendiente'
 } as const;
 
 export type TranslationKeys = keyof typeof es;
