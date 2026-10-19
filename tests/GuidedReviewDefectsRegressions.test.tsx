@@ -1063,5 +1063,138 @@ describe('GuidedStepReview & ManualOfferForm Defects & Regressions', () => {
             expect(evalResult.templateCount).toBe(1);
             expect(evalResult.manualCount).toBe(1);
         });
+
+        it('Regression: ASSISTANT method - una familia confirmada en servidor y otra habilitada pendiente: etapa C incompleta', () => {
+            // Only HARDCOVER has accepted session
+            const serverSessions = [
+                { id: 'sess_hc_assistant', status: 'ACCEPTED', bookSpec: { family: 'HARDCOVER' } }
+            ];
+            const reconstructed = reconstructPricingContinuityFromServer(serverSessions, [], {});
+
+            expect(reconstructed.HARDCOVER?.calibrationAccepted).toBe(true);
+            expect(reconstructed.SOFTCOVER?.calibrationAccepted).toBe(false);
+
+            const evalResult = evaluateStageCCompletion(
+                { pricingReadiness: { status: 'COMPLETE' } },
+                { HARDCOVER: true, SOFTCOVER: true },
+                reconstructed,
+                {}
+            );
+
+            expect(evalResult.isComplete).toBe(false);
+            expect(evalResult.pendingFamilies).toEqual(['SOFTCOVER']);
+            expect(evalResult.configuredCount).toBe(1);
+            expect(evalResult.calibratedCount).toBe(1);
+        });
+
+        it('Regression: ASSISTANT method - todas las familias habilitadas confirmadas en servidor: etapa C completa', () => {
+            const serverSessions = [
+                { id: 'sess_hc_assistant', status: 'ACCEPTED', bookSpec: { family: 'HARDCOVER' } },
+                { id: 'sess_sc_assistant', status: 'ACCEPTED', bookSpec: { family: 'SOFTCOVER' } }
+            ];
+            const reconstructed = reconstructPricingContinuityFromServer(serverSessions, [], {});
+
+            expect(reconstructed.HARDCOVER?.calibrationAccepted).toBe(true);
+            expect(reconstructed.SOFTCOVER?.calibrationAccepted).toBe(true);
+
+            const evalResult = evaluateStageCCompletion(
+                { pricingReadiness: { status: 'COMPLETE' } },
+                { HARDCOVER: true, SOFTCOVER: true },
+                reconstructed,
+                {}
+            );
+
+            expect(evalResult.isComplete).toBe(true);
+            expect(evalResult.pendingFamilies).toEqual([]);
+            expect(evalResult.configuredCount).toBe(2);
+            expect(evalResult.calibratedCount).toBe(2);
+        });
+
+        it('Regression: ASSISTANT method - verificación fallida (sin sesiones aceptadas en servidor): no certifica', () => {
+            // Sessions array is empty or contains only non-accepted sessions
+            const serverSessions = [
+                { id: 'sess_hc_draft', status: 'DRAFT', bookSpec: { family: 'HARDCOVER' } }
+            ];
+            const reconstructed = reconstructPricingContinuityFromServer(serverSessions, [], {});
+
+            expect(reconstructed.HARDCOVER?.calibrationAccepted).toBe(false);
+
+            const evalResult = evaluateStageCCompletion(
+                { pricingReadiness: { status: 'COMPLETE' } },
+                { HARDCOVER: true },
+                reconstructed,
+                {}
+            );
+
+            expect(evalResult.isComplete).toBe(false);
+            expect(evalResult.pendingFamilies).toEqual(['HARDCOVER']);
+            expect(evalResult.calibratedCount).toBe(0);
+        });
+
+        it('Regression: MANUAL method - una familia confirmada con tarifas manuales y otra habilitada pendiente: etapa C incompleta', () => {
+            // Only HARDCOVER has manual rates saved revision
+            const serverRevisions = [
+                { id: 'rev_hc_manual', createdBy: { productFamily: 'HARDCOVER', pricingMethod: 'MANUAL' } }
+            ];
+            const reconstructed = reconstructPricingContinuityFromServer([], serverRevisions, {});
+
+            expect(reconstructed.HARDCOVER?.manualRatesSaved).toBe(true);
+            expect(reconstructed.SOFTCOVER?.manualRatesSaved).toBe(false);
+
+            const evalResult = evaluateStageCCompletion(
+                { pricingReadiness: { status: 'COMPLETE' } },
+                { HARDCOVER: true, SOFTCOVER: true },
+                reconstructed,
+                {}
+            );
+
+            expect(evalResult.isComplete).toBe(false);
+            expect(evalResult.pendingFamilies).toEqual(['SOFTCOVER']);
+            expect(evalResult.configuredCount).toBe(1);
+            expect(evalResult.manualCount).toBe(1);
+        });
+
+        it('Regression: MANUAL method - todas las familias habilitadas confirmadas con tarifas manuales: etapa C completa', () => {
+            const serverRevisions = [
+                { id: 'rev_hc_manual', createdBy: { productFamily: 'HARDCOVER', pricingMethod: 'MANUAL' } },
+                { id: 'rev_sc_manual', createdBy: { productFamily: 'SOFTCOVER', pricingMethod: 'MANUAL' } }
+            ];
+            const reconstructed = reconstructPricingContinuityFromServer([], serverRevisions, {});
+
+            expect(reconstructed.HARDCOVER?.manualRatesSaved).toBe(true);
+            expect(reconstructed.SOFTCOVER?.manualRatesSaved).toBe(true);
+
+            const evalResult = evaluateStageCCompletion(
+                { pricingReadiness: { status: 'COMPLETE' } },
+                { HARDCOVER: true, SOFTCOVER: true },
+                reconstructed,
+                {}
+            );
+
+            expect(evalResult.isComplete).toBe(true);
+            expect(evalResult.pendingFamilies).toEqual([]);
+            expect(evalResult.configuredCount).toBe(2);
+            expect(evalResult.manualCount).toBe(2);
+        });
+
+        it('Regression: MANUAL method - verificación fallida (sin revisiones MANUAL coincidentes): no certifica', () => {
+            const serverRevisions = [
+                { id: 'rev_other', createdBy: { productFamily: 'WIRE_O', pricingMethod: 'MANUAL' } }
+            ];
+            const reconstructed = reconstructPricingContinuityFromServer([], serverRevisions, {});
+
+            expect(reconstructed.HARDCOVER?.manualRatesSaved).toBe(false);
+
+            const evalResult = evaluateStageCCompletion(
+                { pricingReadiness: { status: 'COMPLETE' } },
+                { HARDCOVER: true },
+                reconstructed,
+                {}
+            );
+
+            expect(evalResult.isComplete).toBe(false);
+            expect(evalResult.pendingFamilies).toEqual(['HARDCOVER']);
+            expect(evalResult.manualCount).toBe(0);
+        });
     });
 });

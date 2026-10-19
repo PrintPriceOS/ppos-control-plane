@@ -25,7 +25,7 @@ import {
     saveGuidedOnboardingDraft, 
     clearGuidedOnboardingDraft 
 } from '../src/ui/lib/onboardingDraftStore';
-import { getAuthUser } from '../src/ui/lib/authStore';
+import { getAuthUser, getAuthToken } from '../src/ui/lib/authStore';
 
 vi.mock('../src/ui/lib/authStore', async () => {
     const actual = await vi.importActual('../src/ui/lib/authStore');
@@ -2044,6 +2044,705 @@ describe('Guided Printhouse Onboarding Journey Suite', () => {
 
         const finalDraft = loadGuidedOnboardingDraft(tenantId);
         expect(finalDraft.pricingContinuity?.HARDCOVER?.templateSaved).toBe(true);
+        expect(finalDraft.completedStages.PRICING).toBe(true);
+        expect(finalDraft.currentStage).toBe('REVIEW');
+    });
+
+    it('31. Regression ASSISTANT: verificación fallida en consulta de servidor: no certifica ni avanza a REVIEW', async () => {
+        const tenantId = 'tenant-current';
+        saveGuidedOnboardingDraft({
+            tenantId,
+            company: {
+                legalName: 'Editorial Assistant Fail',
+                country: 'ES',
+                city: 'Valencia',
+                address: 'Calle Mayor 1',
+                postalCode: '46001',
+                phone: '+34 960 000 001',
+                website: 'https://assistant-fail.com',
+                contactName: 'Admin',
+                taxId: 'B11111111',
+                siteName: 'Planta 1',
+                siteTimezone: 'Europe/Madrid'
+            },
+            offerDrafts: {},
+            lastSavedTimestamp: Date.now(),
+            currentStage: 'PRICING',
+            selectedFamilyId: 'HARDCOVER',
+            enabledFamilies: { HARDCOVER: true, SOFTCOVER: false, WIRE_O: false, SADDLE_STITCH: false },
+            pricingContinuity: {
+                HARDCOVER: {
+                    sessionId: 'sess_hc_assistant_fail',
+                    activeRun: { id: 'run_1' },
+                    selectedVariantId: 'var_1',
+                    proposedPatch: {},
+                    entryMode: 'UPLOAD_PDF',
+                    uploadedFileName: null,
+                    pricingMethod: 'ASSISTANT',
+                    step: 5
+                }
+            },
+            completedStages: { WELCOME: true, COMPANY: true, PRODUCTS: true, PRICING: false, REVIEW: false }
+        });
+
+        // Server returns no accepted calibrations
+        global.fetch = vi.fn().mockImplementation((url: string) => {
+            if (url.includes('/api/printhouse/onboarding/pricing/calibrations')) {
+                return Promise.resolve({
+                    ok: true,
+                    json: () => Promise.resolve({
+                        ok: true,
+                        data: [{ id: 'sess_hc_assistant_fail', status: 'DRAFT', bookSpec: { family: 'HARDCOVER' } }]
+                    })
+                });
+            }
+            if (url.includes('/api/printhouse/onboarding/pricing/revisions')) {
+                return Promise.resolve({ ok: true, json: () => Promise.resolve({ ok: true, data: [] }) });
+            }
+            if (url === '/api/printhouse/onboarding' || url.startsWith('/api/printhouse/onboarding?')) {
+                return Promise.resolve({
+                    ok: true,
+                    json: () => Promise.resolve({
+                        ok: true,
+                        data: {
+                            company: { legalName: 'Editorial Assistant Fail', selectedProductFamilies: ['HARDCOVER'], productsConfirmed: true },
+                            sites: [{ siteId: 'site-1', siteName: 'Planta 1', country: 'ES', city: 'Valencia' }],
+                            readiness: {
+                                accountSetup: { status: 'COMPLETE' },
+                                operationalConfiguration: { status: 'COMPLETE' },
+                                pricingReadiness: { status: 'COMPLETE' }
+                            }
+                        }
+                    })
+                });
+            }
+            return Promise.resolve({ ok: true, json: () => Promise.resolve({ ok: true, data: [] }) });
+        });
+
+        renderWithProviders(
+            <GuidedPrinthouseJourney onOpenFullSetup={vi.fn()} printerNodeId="node-assistant-fail" />,
+            'es'
+        );
+
+        // Click governed acceptance button in Step 5 of assistant
+        await waitFor(() => {
+            expect(screen.getByTestId('open-accept-modal-btn')).toBeInTheDocument();
+        });
+        fireEvent.click(screen.getByTestId('open-accept-modal-btn'));
+
+        await waitFor(() => {
+            expect(screen.getByTestId('confirm-accept-proposal-btn')).toBeInTheDocument();
+        });
+        fireEvent.click(screen.getByTestId('confirm-accept-proposal-btn'));
+
+        // Since server calibrations did NOT return an accepted session for HARDCOVER,
+        // onCompleted must NOT mark calibrationAccepted or advance to REVIEW
+        await waitFor(() => {
+            const draft = loadGuidedOnboardingDraft(tenantId);
+            expect(draft.pricingContinuity?.HARDCOVER?.calibrationAccepted).not.toBe(true);
+            expect(draft.completedStages.PRICING).toBe(false);
+            expect(draft.currentStage).toBe('PRICING');
+        });
+        expect(screen.queryByText('Resumen de configuración de tu imprenta')).not.toBeInTheDocument();
+    });
+
+    it('32. Regression ASSISTANT: una familia confirmada y otra pendiente: etapa C incompleta y no avanza a REVIEW', async () => {
+        const tenantId = 'tenant-current';
+        saveGuidedOnboardingDraft({
+            tenantId,
+            company: {
+                legalName: 'Editorial Assistant Partial',
+                country: 'ES',
+                city: 'Valencia',
+                address: 'Calle Mayor 2',
+                postalCode: '46001',
+                phone: '+34 960 000 002',
+                website: 'https://assistant-partial.com',
+                contactName: 'Admin',
+                taxId: 'B22222222',
+                siteName: 'Planta 2',
+                siteTimezone: 'Europe/Madrid'
+            },
+            offerDrafts: {},
+            lastSavedTimestamp: Date.now(),
+            currentStage: 'PRICING',
+            selectedFamilyId: 'HARDCOVER',
+            enabledFamilies: { HARDCOVER: true, SOFTCOVER: true, WIRE_O: false, SADDLE_STITCH: false },
+            pricingContinuity: {
+                HARDCOVER: {
+                    sessionId: 'sess_hc_assistant_partial',
+                    activeRun: { id: 'run_hc' },
+                    selectedVariantId: 'var_hc',
+                    proposedPatch: {},
+                    entryMode: 'UPLOAD_PDF',
+                    uploadedFileName: null,
+                    pricingMethod: 'ASSISTANT',
+                    step: 5
+                },
+                SOFTCOVER: {
+                    sessionId: null,
+                    activeRun: null,
+                    selectedVariantId: null,
+                    proposedPatch: {},
+                    entryMode: 'UPLOAD_PDF',
+                    uploadedFileName: null
+                }
+            },
+            completedStages: { WELCOME: true, COMPANY: true, PRODUCTS: true, PRICING: false, REVIEW: false }
+        });
+
+        // Server returns accepted session for HARDCOVER only
+        global.fetch = vi.fn().mockImplementation((url: string) => {
+            if (url.includes('/api/printhouse/onboarding/pricing/calibrations')) {
+                return Promise.resolve({
+                    ok: true,
+                    json: () => Promise.resolve({
+                        ok: true,
+                        data: [{ id: 'sess_hc_assistant_partial', status: 'ACCEPTED', bookSpec: { family: 'HARDCOVER' } }]
+                    })
+                });
+            }
+            if (url.includes('/api/printhouse/onboarding/pricing/revisions')) {
+                return Promise.resolve({ ok: true, json: () => Promise.resolve({ ok: true, data: [] }) });
+            }
+            if (url === '/api/printhouse/onboarding' || url.startsWith('/api/printhouse/onboarding?')) {
+                return Promise.resolve({
+                    ok: true,
+                    json: () => Promise.resolve({
+                        ok: true,
+                        data: {
+                            company: { legalName: 'Editorial Assistant Partial', selectedProductFamilies: ['HARDCOVER', 'SOFTCOVER'], productsConfirmed: true },
+                            sites: [{ siteId: 'site-2', siteName: 'Planta 2', country: 'ES', city: 'Valencia' }],
+                            readiness: {
+                                accountSetup: { status: 'COMPLETE' },
+                                operationalConfiguration: { status: 'COMPLETE' },
+                                pricingReadiness: { status: 'COMPLETE' }
+                            }
+                        }
+                    })
+                });
+            }
+            return Promise.resolve({ ok: true, json: () => Promise.resolve({ ok: true, data: [] }) });
+        });
+
+        renderWithProviders(
+            <GuidedPrinthouseJourney onOpenFullSetup={vi.fn()} printerNodeId="node-assistant-partial" />,
+            'es'
+        );
+
+        await waitFor(() => {
+            expect(screen.getByTestId('open-accept-modal-btn')).toBeInTheDocument();
+        });
+        fireEvent.click(screen.getByTestId('open-accept-modal-btn'));
+
+        await waitFor(() => {
+            expect(screen.getByTestId('confirm-accept-proposal-btn')).toBeInTheDocument();
+        });
+        fireEvent.click(screen.getByTestId('confirm-accept-proposal-btn'));
+
+        // HARDCOVER confirmed, but SOFTCOVER is pending -> PRICING stage remains false, currentStage is PRICING
+        await waitFor(() => {
+            const draft = loadGuidedOnboardingDraft(tenantId);
+            expect(draft.pricingContinuity?.HARDCOVER?.calibrationAccepted).toBe(true);
+            expect(draft.completedStages.PRICING).toBe(false);
+            expect(draft.currentStage).toBe('PRICING');
+        });
+        expect(screen.queryByText('Resumen de configuración de tu imprenta')).not.toBeInTheDocument();
+    });
+
+    it('33. Regression ASSISTANT: todas las familias habilitadas confirmadas: etapa C completa y avanza a REVIEW', async () => {
+        const tenantId = 'tenant-current';
+        saveGuidedOnboardingDraft({
+            tenantId,
+            company: {
+                legalName: 'Editorial Assistant All',
+                country: 'ES',
+                city: 'Valencia',
+                address: 'Calle Mayor 3',
+                postalCode: '46001',
+                phone: '+34 960 000 003',
+                website: 'https://assistant-all.com',
+                contactName: 'Admin',
+                taxId: 'B33333333',
+                siteName: 'Planta 3',
+                siteTimezone: 'Europe/Madrid'
+            },
+            offerDrafts: {},
+            lastSavedTimestamp: Date.now(),
+            currentStage: 'PRICING',
+            selectedFamilyId: 'HARDCOVER',
+            enabledFamilies: { HARDCOVER: true, SOFTCOVER: false, WIRE_O: false, SADDLE_STITCH: false },
+            pricingContinuity: {
+                HARDCOVER: {
+                    sessionId: 'sess_hc_assistant_all',
+                    activeRun: { id: 'run_hc_all' },
+                    selectedVariantId: 'var_hc_all',
+                    proposedPatch: {},
+                    entryMode: 'UPLOAD_PDF',
+                    uploadedFileName: null,
+                    pricingMethod: 'ASSISTANT',
+                    step: 5
+                }
+            },
+            completedStages: { WELCOME: true, COMPANY: true, PRODUCTS: true, PRICING: false, REVIEW: false }
+        });
+
+        // Server returns accepted session for all enabled families (HARDCOVER)
+        global.fetch = vi.fn().mockImplementation((url: string) => {
+            if (url.includes('/api/printhouse/onboarding/pricing/calibrations')) {
+                return Promise.resolve({
+                    ok: true,
+                    json: () => Promise.resolve({
+                        ok: true,
+                        data: [{ id: 'sess_hc_assistant_all', status: 'ACCEPTED', bookSpec: { family: 'HARDCOVER' } }]
+                    })
+                });
+            }
+            if (url.includes('/api/printhouse/onboarding/pricing/revisions')) {
+                return Promise.resolve({ ok: true, json: () => Promise.resolve({ ok: true, data: [] }) });
+            }
+            if (url === '/api/printhouse/onboarding' || url.startsWith('/api/printhouse/onboarding?')) {
+                return Promise.resolve({
+                    ok: true,
+                    json: () => Promise.resolve({
+                        ok: true,
+                        data: {
+                            company: { legalName: 'Editorial Assistant All', selectedProductFamilies: ['HARDCOVER'], productsConfirmed: true },
+                            sites: [{ siteId: 'site-3', siteName: 'Planta 3', country: 'ES', city: 'Valencia' }],
+                            readiness: {
+                                accountSetup: { status: 'COMPLETE' },
+                                operationalConfiguration: { status: 'COMPLETE' },
+                                pricingReadiness: { status: 'COMPLETE' }
+                            }
+                        }
+                    })
+                });
+            }
+            return Promise.resolve({ ok: true, json: () => Promise.resolve({ ok: true, data: [] }) });
+        });
+
+        renderWithProviders(
+            <GuidedPrinthouseJourney onOpenFullSetup={vi.fn()} printerNodeId="node-assistant-all" />,
+            'es'
+        );
+
+        await waitFor(() => {
+            expect(screen.getByTestId('open-accept-modal-btn')).toBeInTheDocument();
+        });
+        fireEvent.click(screen.getByTestId('open-accept-modal-btn'));
+
+        await waitFor(() => {
+            expect(screen.getByTestId('confirm-accept-proposal-btn')).toBeInTheDocument();
+        });
+        fireEvent.click(screen.getByTestId('confirm-accept-proposal-btn'));
+
+        // All enabled families confirmed -> Stage C complete, advances to REVIEW
+        await waitFor(() => {
+            expect(screen.getByText('Resumen de configuración de tu imprenta')).toBeInTheDocument();
+        });
+        const finalDraft = loadGuidedOnboardingDraft(tenantId);
+        expect(finalDraft.pricingContinuity?.HARDCOVER?.calibrationAccepted).toBe(true);
+        expect(finalDraft.completedStages.PRICING).toBe(true);
+        expect(finalDraft.currentStage).toBe('REVIEW');
+    });
+
+    it('34. Regression MANUAL: ausencia de token o nodeId: lanza error, no realiza PUT ni confirma draft', async () => {
+        const tenantId = 'tenant-current';
+        saveGuidedOnboardingDraft({
+            tenantId,
+            company: {
+                legalName: 'Editorial Manual NoAuth',
+                country: 'ES',
+                city: 'Valencia',
+                address: 'Calle Mayor 4',
+                postalCode: '46001',
+                phone: '+34 960 000 004',
+                website: 'https://manual-noauth.com',
+                contactName: 'Admin',
+                taxId: 'B44444444',
+                siteName: 'Planta 4',
+                siteTimezone: 'Europe/Madrid'
+            },
+            offerDrafts: {},
+            lastSavedTimestamp: Date.now(),
+            currentStage: 'PRICING',
+            selectedFamilyId: 'HARDCOVER',
+            enabledFamilies: { HARDCOVER: true, SOFTCOVER: false, WIRE_O: false, SADDLE_STITCH: false },
+            pricingContinuity: {
+                HARDCOVER: {
+                    sessionId: null,
+                    activeRun: null,
+                    selectedVariantId: null,
+                    proposedPatch: {},
+                    entryMode: 'UPLOAD_PDF',
+                    uploadedFileName: null,
+                    pricingMethod: 'MANUAL'
+                }
+            },
+            completedStages: { WELCOME: true, COMPANY: true, PRODUCTS: true, PRICING: false, REVIEW: false }
+        });
+
+        // Simulate missing token
+        (getAuthToken as any).mockReturnValueOnce('');
+
+        let putCalled = 0;
+        global.fetch = vi.fn().mockImplementation((url: string, opts?: any) => {
+            if (url.includes('/api/printhouse/onboarding/pricing/industrial') && opts?.method === 'PUT') {
+                putCalled++;
+                return Promise.resolve({ ok: true, json: () => Promise.resolve({ ok: true }) });
+            }
+            if (url.includes('/api/printhouse/onboarding/pricing/industrial') && (!opts || opts.method === 'GET')) {
+                return Promise.resolve({
+                    ok: true,
+                    json: () => Promise.resolve({ ok: true, data: { id: '', rates: {} } })
+                });
+            }
+            if (url === '/api/printhouse/onboarding' || url.startsWith('/api/printhouse/onboarding?')) {
+                return Promise.resolve({
+                    ok: true,
+                    json: () => Promise.resolve({
+                        ok: true,
+                        data: {
+                            company: { legalName: 'Editorial Manual NoAuth', selectedProductFamilies: ['HARDCOVER'], productsConfirmed: true },
+                            sites: [],
+                            readiness: {
+                                accountSetup: { status: 'COMPLETE' },
+                                operationalConfiguration: { status: 'COMPLETE' },
+                                pricingReadiness: { status: 'COMPLETE' }
+                            }
+                        }
+                    })
+                });
+            }
+            return Promise.resolve({ ok: true, json: () => Promise.resolve({ ok: true, data: [] }) });
+        });
+
+        renderWithProviders(
+            <GuidedPrinthouseJourney onOpenFullSetup={vi.fn()} printerNodeId="" />,
+            'es'
+        );
+
+        await waitFor(() => {
+            expect(screen.getByText('Modo Tarifas Manuales')).toBeInTheDocument();
+        });
+
+        const saveRatesBtn = screen.getByRole('button', { name: /Guardar tarifas industriales/i });
+        fireEvent.click(saveRatesBtn);
+
+        // Error banner appears in editor
+        await waitFor(() => {
+            expect(screen.getByText(/Falta el nodo de impresión o la sesión ha expirado/i)).toBeInTheDocument();
+        });
+
+        expect(putCalled).toBe(0);
+        const draft = loadGuidedOnboardingDraft(tenantId);
+        expect(draft.pricingContinuity?.HARDCOVER?.manualRatesSaved).not.toBe(true);
+        expect(draft.completedStages.PRICING).toBe(false);
+        expect(draft.currentStage).toBe('PRICING');
+        expect(screen.queryByText('Resumen de configuración de tu imprenta')).not.toBeInTheDocument();
+    });
+
+    it('35. Regression MANUAL: verificación fallida en consulta tras PUT: no certifica ni avanza a REVIEW', async () => {
+        const tenantId = 'tenant-current';
+        saveGuidedOnboardingDraft({
+            tenantId,
+            company: {
+                legalName: 'Editorial Manual VerifyFail',
+                country: 'ES',
+                city: 'Valencia',
+                address: 'Calle Mayor 5',
+                postalCode: '46001',
+                phone: '+34 960 000 005',
+                website: 'https://manual-verifyfail.com',
+                contactName: 'Admin',
+                taxId: 'B55555555',
+                siteName: 'Planta 5',
+                siteTimezone: 'Europe/Madrid'
+            },
+            offerDrafts: {},
+            lastSavedTimestamp: Date.now(),
+            currentStage: 'PRICING',
+            selectedFamilyId: 'HARDCOVER',
+            enabledFamilies: { HARDCOVER: true, SOFTCOVER: false, WIRE_O: false, SADDLE_STITCH: false },
+            pricingContinuity: {
+                HARDCOVER: {
+                    sessionId: null,
+                    activeRun: null,
+                    selectedVariantId: null,
+                    proposedPatch: {},
+                    entryMode: 'UPLOAD_PDF',
+                    uploadedFileName: null,
+                    pricingMethod: 'MANUAL'
+                }
+            },
+            completedStages: { WELCOME: true, COMPANY: true, PRODUCTS: true, PRICING: false, REVIEW: false }
+        });
+
+        let putCalled = 0;
+        global.fetch = vi.fn().mockImplementation((url: string, opts?: any) => {
+            if (url.includes('/api/printhouse/onboarding/pricing/industrial') && opts?.method === 'PUT') {
+                putCalled++;
+                return Promise.resolve({ ok: true, json: () => Promise.resolve({ ok: true, success: true }) });
+            }
+            if (url.includes('/api/printhouse/onboarding/pricing/revisions')) {
+                // Return empty revisions: server didn't register manual rates revision
+                return Promise.resolve({ ok: true, json: () => Promise.resolve({ ok: true, data: [] }) });
+            }
+            if (url.includes('/api/printhouse/onboarding/pricing/industrial') && (!opts || opts.method === 'GET')) {
+                return Promise.resolve({
+                    ok: true,
+                    json: () => Promise.resolve({ ok: true, data: { id: 'node-manual-1', rates: {} } })
+                });
+            }
+            if (url === '/api/printhouse/onboarding' || url.startsWith('/api/printhouse/onboarding?')) {
+                return Promise.resolve({
+                    ok: true,
+                    json: () => Promise.resolve({
+                        ok: true,
+                        data: {
+                            company: { legalName: 'Editorial Manual VerifyFail', selectedProductFamilies: ['HARDCOVER'], productsConfirmed: true },
+                            sites: [{ siteId: 'site-5', siteName: 'Planta 5', country: 'ES', city: 'Valencia' }],
+                            readiness: {
+                                accountSetup: { status: 'COMPLETE' },
+                                operationalConfiguration: { status: 'COMPLETE' },
+                                pricingReadiness: { status: 'COMPLETE' }
+                            }
+                        }
+                    })
+                });
+            }
+            return Promise.resolve({ ok: true, json: () => Promise.resolve({ ok: true, data: [] }) });
+        });
+
+        renderWithProviders(
+            <GuidedPrinthouseJourney onOpenFullSetup={vi.fn()} printerNodeId="node-manual-1" />,
+            'es'
+        );
+
+        await waitFor(() => {
+            expect(screen.getByText('Modo Tarifas Manuales')).toBeInTheDocument();
+        });
+
+        const saveRatesBtn = screen.getByRole('button', { name: /Guardar tarifas industriales/i });
+        fireEvent.click(saveRatesBtn);
+
+        await waitFor(() => {
+            expect(putCalled).toBe(1);
+        });
+
+        // Error surfaced in editor alert
+        await waitFor(() => {
+            expect(screen.getByText(/El servidor no devolvió la confirmación de tarifas guardadas para esta familia/i)).toBeInTheDocument();
+        });
+
+        const draft = loadGuidedOnboardingDraft(tenantId);
+        expect(draft.pricingContinuity?.HARDCOVER?.manualRatesSaved).not.toBe(true);
+        expect(draft.completedStages.PRICING).toBe(false);
+        expect(draft.currentStage).toBe('PRICING');
+        expect(screen.queryByText('Resumen de configuración de tu imprenta')).not.toBeInTheDocument();
+    });
+
+    it('36. Regression MANUAL: una familia confirmada y otra habilitada pendiente: etapa C incompleta y no avanza a REVIEW', async () => {
+        const tenantId = 'tenant-current';
+        saveGuidedOnboardingDraft({
+            tenantId,
+            company: {
+                legalName: 'Editorial Manual Partial',
+                country: 'ES',
+                city: 'Valencia',
+                address: 'Calle Mayor 6',
+                postalCode: '46001',
+                phone: '+34 960 000 006',
+                website: 'https://manual-partial.com',
+                contactName: 'Admin',
+                taxId: 'B66666666',
+                siteName: 'Planta 6',
+                siteTimezone: 'Europe/Madrid'
+            },
+            offerDrafts: {},
+            lastSavedTimestamp: Date.now(),
+            currentStage: 'PRICING',
+            selectedFamilyId: 'HARDCOVER',
+            enabledFamilies: { HARDCOVER: true, SOFTCOVER: true, WIRE_O: false, SADDLE_STITCH: false },
+            pricingContinuity: {
+                HARDCOVER: {
+                    sessionId: null,
+                    activeRun: null,
+                    selectedVariantId: null,
+                    proposedPatch: {},
+                    entryMode: 'UPLOAD_PDF',
+                    uploadedFileName: null,
+                    pricingMethod: 'MANUAL'
+                },
+                SOFTCOVER: {
+                    sessionId: null,
+                    activeRun: null,
+                    selectedVariantId: null,
+                    proposedPatch: {},
+                    entryMode: 'UPLOAD_PDF',
+                    uploadedFileName: null
+                }
+            },
+            completedStages: { WELCOME: true, COMPANY: true, PRODUCTS: true, PRICING: false, REVIEW: false }
+        });
+
+        global.fetch = vi.fn().mockImplementation((url: string, opts?: any) => {
+            if (url.includes('/api/printhouse/onboarding/pricing/industrial') && opts?.method === 'PUT') {
+                return Promise.resolve({ ok: true, json: () => Promise.resolve({ ok: true, success: true }) });
+            }
+            if (url.includes('/api/printhouse/onboarding/pricing/revisions')) {
+                // Only HARDCOVER is confirmed in revisions
+                return Promise.resolve({
+                    ok: true,
+                    json: () => Promise.resolve({
+                        ok: true,
+                        data: [{ id: 'rev_hc_manual_ok', createdBy: { productFamily: 'HARDCOVER', pricingMethod: 'MANUAL' } }]
+                    })
+                });
+            }
+            if (url.includes('/api/printhouse/onboarding/pricing/industrial') && (!opts || opts.method === 'GET')) {
+                return Promise.resolve({
+                    ok: true,
+                    json: () => Promise.resolve({ ok: true, data: { id: 'node-manual-2', rates: {} } })
+                });
+            }
+            if (url === '/api/printhouse/onboarding' || url.startsWith('/api/printhouse/onboarding?')) {
+                return Promise.resolve({
+                    ok: true,
+                    json: () => Promise.resolve({
+                        ok: true,
+                        data: {
+                            company: { legalName: 'Editorial Manual Partial', selectedProductFamilies: ['HARDCOVER', 'SOFTCOVER'], productsConfirmed: true },
+                            sites: [{ siteId: 'site-6', siteName: 'Planta 6', country: 'ES', city: 'Valencia' }],
+                            readiness: {
+                                accountSetup: { status: 'COMPLETE' },
+                                operationalConfiguration: { status: 'COMPLETE' },
+                                pricingReadiness: { status: 'COMPLETE' }
+                            }
+                        }
+                    })
+                });
+            }
+            return Promise.resolve({ ok: true, json: () => Promise.resolve({ ok: true, data: [] }) });
+        });
+
+        renderWithProviders(
+            <GuidedPrinthouseJourney onOpenFullSetup={vi.fn()} printerNodeId="node-manual-2" />,
+            'es'
+        );
+
+        await waitFor(() => {
+            expect(screen.getByText('Modo Tarifas Manuales')).toBeInTheDocument();
+        });
+
+        const saveRatesBtn = screen.getByRole('button', { name: /Guardar tarifas industriales/i });
+        fireEvent.click(saveRatesBtn);
+
+        // HARDCOVER is confirmed, but SOFTCOVER is pending -> PRICING: false, remains in PRICING
+        await waitFor(() => {
+            const draft = loadGuidedOnboardingDraft(tenantId);
+            expect(draft.pricingContinuity?.HARDCOVER?.manualRatesSaved).toBe(true);
+            expect(draft.completedStages.PRICING).toBe(false);
+            expect(draft.currentStage).toBe('PRICING');
+        });
+        expect(screen.queryByText('Resumen de configuración de tu imprenta')).not.toBeInTheDocument();
+    });
+
+    it('37. Regression MANUAL: todas las familias habilitadas confirmadas: etapa C completa y avanza a REVIEW', async () => {
+        const tenantId = 'tenant-current';
+        saveGuidedOnboardingDraft({
+            tenantId,
+            company: {
+                legalName: 'Editorial Manual All',
+                country: 'ES',
+                city: 'Valencia',
+                address: 'Calle Mayor 7',
+                postalCode: '46001',
+                phone: '+34 960 000 007',
+                website: 'https://manual-all.com',
+                contactName: 'Admin',
+                taxId: 'B77777777',
+                siteName: 'Planta 7',
+                siteTimezone: 'Europe/Madrid'
+            },
+            offerDrafts: {},
+            lastSavedTimestamp: Date.now(),
+            currentStage: 'PRICING',
+            selectedFamilyId: 'HARDCOVER',
+            enabledFamilies: { HARDCOVER: true, SOFTCOVER: false, WIRE_O: false, SADDLE_STITCH: false },
+            pricingContinuity: {
+                HARDCOVER: {
+                    sessionId: null,
+                    activeRun: null,
+                    selectedVariantId: null,
+                    proposedPatch: {},
+                    entryMode: 'UPLOAD_PDF',
+                    uploadedFileName: null,
+                    pricingMethod: 'MANUAL'
+                }
+            },
+            completedStages: { WELCOME: true, COMPANY: true, PRODUCTS: true, PRICING: false, REVIEW: false }
+        });
+
+        global.fetch = vi.fn().mockImplementation((url: string, opts?: any) => {
+            if (url.includes('/api/printhouse/onboarding/pricing/industrial') && opts?.method === 'PUT') {
+                return Promise.resolve({ ok: true, json: () => Promise.resolve({ ok: true, success: true }) });
+            }
+            if (url.includes('/api/printhouse/onboarding/pricing/revisions')) {
+                // All enabled families (HARDCOVER) confirmed in revisions
+                return Promise.resolve({
+                    ok: true,
+                    json: () => Promise.resolve({
+                        ok: true,
+                        data: [{ id: 'rev_hc_manual_all', createdBy: { productFamily: 'HARDCOVER', pricingMethod: 'MANUAL' } }]
+                    })
+                });
+            }
+            if (url.includes('/api/printhouse/onboarding/pricing/industrial') && (!opts || opts.method === 'GET')) {
+                return Promise.resolve({
+                    ok: true,
+                    json: () => Promise.resolve({ ok: true, data: { id: 'node-manual-3', rates: {} } })
+                });
+            }
+            if (url === '/api/printhouse/onboarding' || url.startsWith('/api/printhouse/onboarding?')) {
+                return Promise.resolve({
+                    ok: true,
+                    json: () => Promise.resolve({
+                        ok: true,
+                        data: {
+                            company: { legalName: 'Editorial Manual All', selectedProductFamilies: ['HARDCOVER'], productsConfirmed: true },
+                            sites: [{ siteId: 'site-7', siteName: 'Planta 7', country: 'ES', city: 'Valencia' }],
+                            readiness: {
+                                accountSetup: { status: 'COMPLETE' },
+                                operationalConfiguration: { status: 'COMPLETE' },
+                                pricingReadiness: { status: 'COMPLETE' }
+                            }
+                        }
+                    })
+                });
+            }
+            return Promise.resolve({ ok: true, json: () => Promise.resolve({ ok: true, data: [] }) });
+        });
+
+        renderWithProviders(
+            <GuidedPrinthouseJourney onOpenFullSetup={vi.fn()} printerNodeId="node-manual-3" />,
+            'es'
+        );
+
+        await waitFor(() => {
+            expect(screen.getByText('Modo Tarifas Manuales')).toBeInTheDocument();
+        });
+
+        const saveRatesBtn = screen.getByRole('button', { name: /Guardar tarifas industriales/i });
+        fireEvent.click(saveRatesBtn);
+
+        // All enabled families confirmed -> Stage C complete, advances to REVIEW
+        await waitFor(() => {
+            expect(screen.getByText('Resumen de configuración de tu imprenta')).toBeInTheDocument();
+        });
+
+        const finalDraft = loadGuidedOnboardingDraft(tenantId);
+        expect(finalDraft.pricingContinuity?.HARDCOVER?.manualRatesSaved).toBe(true);
         expect(finalDraft.completedStages.PRICING).toBe(true);
         expect(finalDraft.currentStage).toBe('REVIEW');
     });

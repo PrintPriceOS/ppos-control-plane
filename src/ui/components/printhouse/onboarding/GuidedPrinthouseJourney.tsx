@@ -1438,8 +1438,17 @@ export const GuidedPrinthouseJourney: React.FC<GuidedPrinthouseJourneyProps> = (
                                     targetFamilyId={effectiveActiveFamilyId}
                                     initialPricingDrafts={draft.pricingContinuity}
                                     onPricingContinuityChange={handlePricingContinuityChange}
-                                    onCompleted={() => {
+                                    onCompleted={async () => {
                                         const famId = effectiveActiveFamilyId;
+                                        const res = await fetchServerState(tenantId, false);
+                                        if (!res || !res.ok || !res.pricingOk) {
+                                            return;
+                                        }
+                                        const isFamilyConfirmed = Boolean(res.pricingContinuity?.[famId]?.calibrationAccepted);
+                                        if (!isFamilyConfirmed) {
+                                            return;
+                                        }
+                                        const isStageCComplete = Boolean(res.stageCEval?.isComplete);
                                         updateDraft(prev => ({
                                             ...prev,
                                             pricingContinuity: {
@@ -1460,9 +1469,9 @@ export const GuidedPrinthouseJourney: React.FC<GuidedPrinthouseJourneyProps> = (
                                             },
                                             completedStages: {
                                                 ...prev.completedStages,
-                                                PRICING: true
+                                                PRICING: isStageCComplete
                                             },
-                                            currentStage: 'REVIEW'
+                                            currentStage: isStageCComplete ? 'REVIEW' : 'PRICING'
                                         }));
                                     }}
                                     onOpenAdvanced={() => onOpenFullSetup('PRICING')}
@@ -1734,30 +1743,46 @@ export const GuidedPrinthouseJourney: React.FC<GuidedPrinthouseJourneyProps> = (
                                             const token = getAuthToken();
                                             const targetNodeId = printerNodeId || payload?.id || payload?.nodeId;
 
-                                            if (targetNodeId && token) {
-                                                const fullPayload = {
-                                                    ...payload,
-                                                    nodeId: targetNodeId,
-                                                    pricingMethod: 'MANUAL',
-                                                    productFamily: famId
-                                                };
-                                                const res = await fetch('/api/printhouse/onboarding/pricing/industrial', {
-                                                    method: 'PUT',
-                                                    headers: {
-                                                        'Content-Type': 'application/json',
-                                                        'Authorization': `Bearer ${token}`
-                                                    },
-                                                    body: JSON.stringify(fullPayload)
-                                                });
-                                                if (!res.ok) {
-                                                    let errJson: any = null;
-                                                    try { errJson = await res.json(); } catch (_) {}
-                                                    const err: any = new Error(errJson?.error?.message || errJson?.message || 'Error al guardar tarifas industriales.');
-                                                    err.code = res.status === 409 ? 'STALE_BASELINE_CONFLICT' : 'SAVE_ERROR';
-                                                    err.status = res.status;
-                                                    throw err;
-                                                }
+                                            if (!targetNodeId || !token) {
+                                                throw new Error('Falta el nodo de impresión o la sesión ha expirado.');
                                             }
+
+                                            const fullPayload = {
+                                                ...payload,
+                                                nodeId: targetNodeId,
+                                                pricingMethod: 'MANUAL',
+                                                productFamily: famId
+                                            };
+                                            const res = await fetch('/api/printhouse/onboarding/pricing/industrial', {
+                                                method: 'PUT',
+                                                headers: {
+                                                    'Content-Type': 'application/json',
+                                                    'Authorization': `Bearer ${token}`
+                                                },
+                                                body: JSON.stringify(fullPayload)
+                                            });
+                                            if (!res.ok) {
+                                                let errJson: any = null;
+                                                try { errJson = await res.json(); } catch (_) {}
+                                                const err: any = new Error(errJson?.error?.message || errJson?.message || 'Error al guardar tarifas industriales.');
+                                                err.code = res.status === 409 ? 'STALE_BASELINE_CONFLICT' : 'SAVE_ERROR';
+                                                err.status = res.status;
+                                                throw err;
+                                            }
+
+                                            // Authoritative server verification: query server state to confirm persisted rates
+                                            const refreshRes = await fetchServerState(tenantId, false);
+                                            if (!refreshRes || !refreshRes.ok || !refreshRes.pricingOk) {
+                                                throw new Error('Las tarifas se guardaron, pero no se pudo contrastar la confirmación en el servidor.');
+                                            }
+
+                                            const isFamilyConfirmed = Boolean(refreshRes.pricingContinuity?.[famId]?.manualRatesSaved);
+                                            if (!isFamilyConfirmed) {
+                                                throw new Error('El servidor no devolvió la confirmación de tarifas guardadas para esta familia.');
+                                            }
+
+                                            // Derive Stage C completion across all enabled families
+                                            const isStageCComplete = Boolean(refreshRes.stageCEval?.isComplete);
 
                                             updateDraft(prev => ({
                                                 ...prev,
@@ -1779,9 +1804,9 @@ export const GuidedPrinthouseJourney: React.FC<GuidedPrinthouseJourneyProps> = (
                                                 },
                                                 completedStages: {
                                                     ...prev.completedStages,
-                                                    PRICING: true
+                                                    PRICING: isStageCComplete
                                                 },
-                                                currentStage: 'REVIEW'
+                                                currentStage: isStageCComplete ? 'REVIEW' : 'PRICING'
                                             }));
                                         }}
                                     />
