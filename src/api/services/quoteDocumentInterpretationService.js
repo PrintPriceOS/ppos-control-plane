@@ -286,9 +286,9 @@ class QuoteDocumentInterpretationService {
         spec.bindingMethod = bindingMethod;
 
         // Spine Type
-        if (/\brunder\s*rücken\b/i.test(text) || /\bround\s*spine\b/i.test(text)) {
+        if (/\brunder\s*r(?:ü|ue)cken\b/i.test(text) || /\bround\s*spine\b/i.test(text)) {
             spec.spineType = 'round';
-        } else if (/\bgerader\s*rücken\b/i.test(text) || /\bstraight\s*spine\b/i.test(text) || /\bsquare\s*spine\b/i.test(text)) {
+        } else if (/\bgerader\s*r(?:ü|ue)cken\b/i.test(text) || /\bstraight\s*spine\b/i.test(text) || /\bsquare\s*spine\b/i.test(text)) {
             spec.spineType = 'straight';
         }
 

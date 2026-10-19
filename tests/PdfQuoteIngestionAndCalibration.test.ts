@@ -347,4 +347,95 @@ describe('PDF Quote Ingestion and Calibration Canonicalizer Regression Suite', (
         expect(resInvalid.valid).toBe(false);
         expect(resInvalid.errors).toContain('delivery_country must be a valid ISO-2 uppercase country code (e.g. ES, DE, FR)');
     });
+
+    it('10. Regresión: Guardas con papel o tintas desconocidas no se convierten silenciosamente a offset o 0/0', () => {
+        const baseSpec = {
+            widthMm: 170,
+            heightMm: 240,
+            interiorPages: 100,
+            interiorPaper: 'Silk',
+            interiorWeightGsm: 115,
+            coverPaper: 'Silk',
+            coverWeightGsm: 250,
+            interiorColors: '4/4',
+            coverColors: '4/0',
+            bindingMethod: 'thread sewn' as const,
+            deliveryCountry: 'DE',
+            lamination: 'matt',
+            hasEndpapers: true
+        };
+        const run = { quantity: 1000, manufacturingPrice: 2000 };
+
+        // Caso 1: Papel de guardas desconocido no se asume como 'offset'
+        const resUnknownEndpaper = canonicalizeToEngineBookSpec({
+            ...baseSpec,
+            endpaperPaper: 'PapelFantasiaDesconocido',
+            endpaperWeightGsm: 140,
+            endpaperColors: '0/0'
+        }, run);
+        expect(resUnknownEndpaper.valid).toBe(false);
+        expect(resUnknownEndpaper.errors.some(e => e.includes('paper_type_endpaper must be one of'))).toBe(true);
+
+        // Caso 2: Tintas de guardas desconocidas/ausentes no se asumen como 0/0 (sin imprimir)
+        const resUnknownPrint = canonicalizeToEngineBookSpec({
+            ...baseSpec,
+            endpaperPaper: 'offset',
+            endpaperWeightGsm: 140,
+            endpaperColors: 'colores_desconocidos'
+        }, run);
+        expect(resUnknownPrint.valid).toBe(false);
+        expect(resUnknownPrint.errors.some(e => e.includes('endpapers_print'))).toBe(true);
+
+        // Caso 2b: Tintas de guardas ausentes
+        const resAbsentPrint = canonicalizeToEngineBookSpec({
+            ...baseSpec,
+            endpaperPaper: 'offset',
+            endpaperWeightGsm: 140
+        }, run);
+        expect(resAbsentPrint.valid).toBe(false);
+        expect(resAbsentPrint.errors.some(e => e.includes('endpapers_print must be specified'))).toBe(true);
+
+        // Caso 3: Ausencia explícita '0/0' o 'unbedruckt' se mapea a null sin error
+        const resExplicitUnprinted = canonicalizeToEngineBookSpec({
+            ...baseSpec,
+            endpaperPaper: 'offset',
+            endpaperWeightGsm: 140,
+            endpaperColors: '0/0'
+        }, run);
+        expect(resExplicitUnprinted.valid).toBe(true);
+        expect(resExplicitUnprinted.bookSpec?.endpapers_print).toBeNull();
+    });
+
+    it('11. Regresión: Laminado ausente o desconocido no se convierte en ausencia confirmada (none/null)', () => {
+        const spec = {
+            widthMm: 170,
+            heightMm: 240,
+            interiorPages: 100,
+            interiorPaper: 'Silk',
+            interiorWeightGsm: 115,
+            coverPaper: 'Silk',
+            coverWeightGsm: 250,
+            interiorColors: '4/4',
+            coverColors: '4/0',
+            bindingMethod: 'thread sewn' as const,
+            deliveryCountry: 'DE'
+            // Sin lamination
+        };
+        const run = { quantity: 1000, manufacturingPrice: 2000 };
+
+        // Ausente -> error, no se inventa 'none' / null
+        const resAbsent = canonicalizeToEngineBookSpec(spec, run);
+        expect(resAbsent.valid).toBe(false);
+        expect(resAbsent.errors.some(e => e.includes('lamination must be explicitly specified'))).toBe(true);
+
+        // Desconocido -> error
+        const resUnknown = canonicalizeToEngineBookSpec({ ...spec, lamination: 'plastificado_extraterrestre' }, run);
+        expect(resUnknown.valid).toBe(false);
+        expect(resUnknown.errors.some(e => e.includes('lamination must be explicitly specified'))).toBe(true);
+
+        // Explícitamente 'none' o 'unlaminated' -> se valida como ausencia confirmada (null)
+        const resExplicitNone = canonicalizeToEngineBookSpec({ ...spec, lamination: 'none' }, run);
+        expect(resExplicitNone.valid).toBe(true);
+        expect(resExplicitNone.bookSpec?.lamination).toBeNull();
+    });
 });

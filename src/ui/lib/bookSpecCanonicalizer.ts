@@ -100,16 +100,22 @@ function normalizePrintColors(raw?: string): string | null {
 
 /**
  * Normalizes lamination.
- * Distinguishes explicit absence ('none', null) from unspecified.
+ * Distinguishes explicit absence ('none', 'unlaminated', null) from unspecified/unknown.
+ * Returns:
+ *   - 'gloss' | 'matt' | 'varnish' for recognized finishes
+ *   - null for explicit unlaminated / absence
+ *   - undefined for unknown or unprovided
  */
-function normalizeLamination(raw?: string): string | null {
-    if (!raw) return null;
-    const s = raw.toLowerCase().trim();
-    if (s === 'none' || s === 'null' || s === 'sin laminado' || s === 'unlaminated') return null;
+function normalizeLamination(raw?: string | null): 'gloss' | 'matt' | 'varnish' | null | undefined {
+    if (raw === null) return null;
+    if (raw === undefined) return undefined;
+    const s = String(raw).toLowerCase().trim();
+    if (!s) return undefined;
+    if (s === 'none' || s === 'null' || s === 'sin laminado' || s === 'unlaminated' || s === 'uncoated' || s === 'ohne') return null;
     if (s === 'matt' || s === 'matte' || s === 'soft_touch' || s.includes('matt')) return 'matt';
     if (s === 'gloss' || s === 'glossy' || s.includes('glanz')) return 'gloss';
     if (s === 'varnish' || s.includes('barniz')) return 'varnish';
-    return VALID_LAMINATIONS.has(s) ? s : null;
+    return undefined; // Unrecognized/unknown
 }
 
 /**
@@ -204,7 +210,15 @@ export function canonicalizeToEngineBookSpec(
     const deliveryCountry = rawCountry || '';
 
     // 8. Lamination
-    const lamination = normalizeLamination(offer.lamination);
+    // Distinguish unknown/unprovided from explicit absence (null)
+    const normLam = normalizeLamination(offer.lamination);
+    let lamination: 'gloss' | 'matt' | 'varnish' | null = null;
+    if (normLam === undefined) {
+        // If unknown or unspecified, do NOT silently assume unlaminated; require confirmation
+        errors.push(`lamination must be explicitly specified (gloss, matt, varnish, or none; received: ${offer.lamination || 'unspecified'})`);
+    } else {
+        lamination = normLam;
+    }
 
     // 9. Endpapers: Preserve real document specs (e.g. Offset 170g unprinted 0/0)
     const hasEndpapers = Boolean(offer.hasEndpapers);
@@ -235,20 +249,40 @@ export function canonicalizeToEngineBookSpec(
     };
 
     if (hasEndpapers) {
-        // Preserve actual endpaper paper and weight from document without hardcoded 140g fallback
-        const endpaperPaperType = normalizePaperTypeInterior(offer.endpaperPaper) || 'offset';
-        const endpaperWeight = offer.endpaperWeightGsm ? Number(offer.endpaperWeightGsm) : undefined;
-        bookSpec.paper_type_endpaper = endpaperPaperType;
-        if (endpaperWeight && !isNaN(endpaperWeight)) {
-            bookSpec.paper_weight_endpapers = endpaperWeight;
+        // ZERO fallback assumptions: do NOT default to 'offset' or 140g
+        if (!offer.endpaperPaper) {
+            errors.push('paper_type_endpaper is required when endpapers are present');
+        } else {
+            const endpaperPaperType = normalizePaperTypeInterior(offer.endpaperPaper);
+            if (!endpaperPaperType) {
+                errors.push(`paper_type_endpaper must be one of: offset, munken, coated_glossy, coated_matte (received: ${offer.endpaperPaper})`);
+            } else {
+                bookSpec.paper_type_endpaper = endpaperPaperType;
+            }
         }
 
-        // In BPE taxonomy, if endpapers are unprinted (0/0), endpapers_print is null/omitted.
-        // If printed, must be one of: '1/0', '1/1', '4/0', '4/4'
-        if (offer.endpaperColors && ['1/0', '1/1', '4/0', '4/4'].includes(offer.endpaperColors)) {
-            bookSpec.endpapers_print = offer.endpaperColors;
-        } else {
+        if (offer.endpaperWeightGsm !== undefined && offer.endpaperWeightGsm !== null) {
+            const endpaperWeight = Number(offer.endpaperWeightGsm);
+            if (isNaN(endpaperWeight) || endpaperWeight < 80 || endpaperWeight > 300) {
+                errors.push('paper_weight_endpapers must be between 80 and 300');
+            } else {
+                bookSpec.paper_weight_endpapers = endpaperWeight;
+            }
+        }
+
+        // Tintas de guardas:
+        // Si se indica explícitamente 0+0 o 0/0 o 'unprinted' o 'sin imprimir', es null en la taxonomía BPE.
+        // Si se indica 1/0, 1/1, 4/0, 4/4, se preserva.
+        // Si está ausente o es desconocido, se solicita confirmación explícita (no convertir en 'sin imprimir').
+        const rawEndpaperColors = offer.endpaperColors ? String(offer.endpaperColors).trim().replace('+', '/') : null;
+        if (!rawEndpaperColors) {
+            errors.push('endpapers_print must be specified when endpapers are present (e.g. 0/0, 1/0, 1/1, 4/0, 4/4)');
+        } else if (rawEndpaperColors === '0/0' || rawEndpaperColors.includes('unbedruckt') || rawEndpaperColors.includes('sin imprimir')) {
             bookSpec.endpapers_print = null;
+        } else if (['1/0', '1/1', '4/0', '4/4'].includes(rawEndpaperColors)) {
+            bookSpec.endpapers_print = rawEndpaperColors;
+        } else {
+            errors.push(`endpapers_print must be one of: 0/0, 1/0, 1/1, 4/0, 4/4 (received: ${rawEndpaperColors})`);
         }
     }
 

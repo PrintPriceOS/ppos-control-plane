@@ -628,6 +628,7 @@ export function fixtureToSpec(fixture: DocumentFixture): ProgressiveSpecState {
         coverColors: fixture.materials.coverColors,
         boardThicknessMm: fixture.materials.boardThicknessMm,
         bindingMethod: fixture.bindingFamily === 'HARDCOVER' ? 'thread_sewn' : fixture.bindingFamily === 'SOFTCOVER' ? 'adhesive_pur' : fixture.bindingFamily === 'WIRE_O' ? 'wire_o' : 'saddle_stitch',
+        lamination: fixture.finishingAndBinding.lamination ? (fixture.finishingAndBinding.lamination.toLowerCase().includes('glanz') ? 'gloss' : fixture.finishingAndBinding.lamination.toLowerCase().includes('matt') ? 'matt' : 'varnish') : undefined,
         hasAmbiguity: fixture.technicalNotes.hasTechnicalAmbiguity,
         ambiguityDetails: fixture.technicalNotes.ambiguityDetails,
         ambiguityNote: fixture.technicalNotes.ambiguityDetails,
