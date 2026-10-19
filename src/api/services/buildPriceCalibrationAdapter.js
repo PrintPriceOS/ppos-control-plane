@@ -76,19 +76,19 @@ class BuildPriceCalibrationAdapter {
         }
 
         const copies = Number(bookSpec.copies) || 1;
-        const interiorPages = Number(bookSpec.interior_pages) || 1;
-        const signatureSize = Number(options.signatureSize) || 16; // Dynamic signature from BPE evaluation or canonical 16p
-        const sectionsCount = Number(options.sectionsCount) || Math.max(1, Math.ceil(interiorPages / signatureSize));
+        const interiorPages = Number(bookSpec.interior_pages ?? bookSpec.interiorPages) || 1;
+        const signatureSize = Number(options.signatureSize ?? bookSpec.signatureSize) || 16; // Dynamic signature from BPE evaluation or canonical 16p
+        const sectionsCount = Number(options.sectionsCount ?? bookSpec.sectionsCount) || Math.max(1, Math.ceil(interiorPages / signatureSize));
 
         // Physical color mapping to internal rate selectors
-        let interiorColorKey = 'one';
+        let interiorColorKey = bookSpec.interiorColorKey || 'one';
         if (bookSpec.interior_print === '2/2') interiorColorKey = 'two';
         if (bookSpec.interior_print === '4/4') interiorColorKey = 'full';
 
         // Cover colors: '4/0' or '4/4' -> '4'; '1/0' or '1/1' -> '1'; '2/0' or '2/2' -> '2'
-        const coverPrintStr = String(bookSpec.cover_print || '4/0');
+        const coverPrintStr = String(bookSpec.cover_print || (bookSpec.coverColorKey ? `${bookSpec.coverColorKey}/0` : '4/0'));
         const frontColors = coverPrintStr.split('/')[0] || '4';
-        const coverColorKey = frontColors;
+        const coverColorKey = bookSpec.coverColorKey || frontColors;
 
         // Binding method mapping
         const bindingMap = {
@@ -99,14 +99,14 @@ class BuildPriceCalibrationAdapter {
             'wire-o': 'wo',
             'spiral': 'sp'
         };
-        const bindingCode = bindingMap[bookSpec.binding_method] || 'pb';
+        const bindingCode = bookSpec.bindingCode || bindingMap[bookSpec.binding_method] || 'pb';
 
         // Lamination
-        const laminationType = bookSpec.lamination || null; // 'gloss' | 'matt' | 'varnish' | null
-        const uvVarnishActive = Boolean(bookSpec.uv_varnish);
+        const laminationType = bookSpec.lamination || bookSpec.laminationType || null; // 'gloss' | 'matt' | 'varnish' | null
+        const uvVarnishActive = Boolean(bookSpec.uv_varnish ?? bookSpec.uvVarnishActive);
 
         // Destination country mapping: supports lowercase ISO-2 and canonical BPE country names
-        const rawCountry = String(bookSpec.delivery_country || 'ES').trim();
+        const rawCountry = String(bookSpec.delivery_country || bookSpec.deliveryCountryIso || bookSpec.deliveryCountry || 'ES').trim();
         const countryIsoUpper = rawCountry.toUpperCase();
         
         const COUNTRY_NAME_MAP = {
@@ -127,23 +127,26 @@ class BuildPriceCalibrationAdapter {
 
         const countryCode = COUNTRY_NAME_MAP[countryIsoUpper] || countryIsoUpper.toLowerCase();
 
-        // Endpaper semantics
+        // Endpaper semantics: preserve unknown versus explicitly unprinted/printed
         let endpapers = bookSpec.endpapers !== undefined ? bookSpec.endpapers : null;
-        let endpapersPrint = bookSpec.endpapers_print !== undefined ? bookSpec.endpapers_print : undefined;
-        let paperTypeEndpaper = bookSpec.paper_type_endpaper || 'offset';
-        let paperWeightEndpapers = Number(bookSpec.paper_weight_endpapers) || 115;
+        const rawEpPrint = bookSpec.endpapers_print !== undefined ? bookSpec.endpapers_print : bookSpec.endpapersPrint;
+        let endpapersPrint = (rawEpPrint !== undefined && rawEpPrint !== null)
+            ? String(rawEpPrint).trim()
+            : null;
+        let paperTypeEndpaper = bookSpec.paper_type_endpaper || bookSpec.paperTypeEndpaper || null;
+        const rawEpWeight = bookSpec.paper_weight_endpapers !== undefined ? bookSpec.paper_weight_endpapers : bookSpec.paperWeightEndpapers;
+        let paperWeightEndpapers = rawEpWeight !== undefined && rawEpWeight !== null
+            ? Number(rawEpWeight)
+            : null;
 
-        // Hardcover defaults matching canonical PriceEngine / Normalizer
+        // When binding is hardcover, presence of endpapers is standard unless explicitly set to 'none'
         if (bindingCode === 'hc') {
             if (endpapers === null || endpapers === undefined) endpapers = 'standard';
-            if (endpapersPrint === undefined) {
-                endpapersPrint = '4/0';
-            } else if (endpapersPrint === null || endpapersPrint === '0/0' || endpapersPrint === 'none') {
-                endpapersPrint = '0/0';
-            }
-        } else if (endpapers === null || endpapers === undefined) {
+            // Explicit 0/0 means unprinted; missing endpapersPrint remains null (unknown).
+            // Missing paperTypeEndpaper and paperWeightEndpapers remain null (unknown).
+        } else if (bookSpec.endpapers === false || bookSpec.endpapers === 'none') {
             endpapers = 'none';
-            if (!endpapersPrint) endpapersPrint = 'none';
+            endpapersPrint = 'none';
         }
 
         return {

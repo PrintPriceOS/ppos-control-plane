@@ -165,7 +165,7 @@ describe('PDF Quote Ingestion and Calibration Canonicalizer Regression Suite', (
             expect(canonical.bookSpec?.copies).toBe(expectedQuantities[i]);
             expect(canonical.bookSpec?.paper_type_endpaper).toBe('offset');
             expect(canonical.bookSpec?.paper_weight_endpapers).toBe(170); // Preserves real 170g without 140g fallback
-            expect(canonical.bookSpec?.endpapers_print).toBe(null); // Unprinted 0/0 correctly omitted/null in taxonomy
+            expect(canonical.bookSpec?.endpapers_print).toBe('0/0'); // Unprinted 0/0 explicitly preserved without collapsing to null
 
             // Run real backend validator
             const backendCheck = calibrationService.validateBookSpec(canonical.bookSpec);
@@ -395,7 +395,7 @@ describe('PDF Quote Ingestion and Calibration Canonicalizer Regression Suite', (
         expect(resAbsentPrint.valid).toBe(false);
         expect(resAbsentPrint.errors.some(e => e.includes('endpapers_print must be specified'))).toBe(true);
 
-        // Caso 3: Ausencia explícita '0/0' o 'unbedruckt' se mapea a null sin error
+        // Caso 3: Ausencia explícita '0/0' o 'unbedruckt' se preserva como '0/0' sin error
         const resExplicitUnprinted = canonicalizeToEngineBookSpec({
             ...baseSpec,
             endpaperPaper: 'offset',
@@ -403,7 +403,7 @@ describe('PDF Quote Ingestion and Calibration Canonicalizer Regression Suite', (
             endpaperColors: '0/0'
         }, run);
         expect(resExplicitUnprinted.valid).toBe(true);
-        expect(resExplicitUnprinted.bookSpec?.endpapers_print).toBeNull();
+        expect(resExplicitUnprinted.bookSpec?.endpapers_print).toBe('0/0');
     });
 
     it('11. Regresión: Laminado ausente o desconocido no se convierte en ausencia confirmada (none/null)', () => {

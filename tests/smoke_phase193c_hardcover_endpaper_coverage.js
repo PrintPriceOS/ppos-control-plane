@@ -29,8 +29,8 @@ console.log('\n═══ Phase 193C: Hardcover & Endpaper Calibration Coverage S
 const adapter = require('../src/api/services/buildPriceCalibrationAdapter');
 const solver = require('../src/api/services/deterministicInversePricingSolver');
 
-// Test A: Adapter hardcover defaults
-test('A: Hardcover without explicit endpaper fields resolves to standard, 4/0, offset, 115gsm', () => {
+// Test A: Adapter hardcover defaults preserve unknown fields as null without silent assumptions
+test('A: Hardcover without explicit endpaper fields preserves unknown as null without silent assumptions', () => {
     const bookSpec = {
         copies: 500,
         interior_pages: 192,
@@ -44,13 +44,13 @@ test('A: Hardcover without explicit endpaper fields resolves to standard, 4/0, o
     const adapted = adapter.adaptBookSpec(bookSpec);
     assert.strictEqual(adapted.bindingCode, 'hc');
     assert.strictEqual(adapted.endpapers, 'standard');
-    assert.strictEqual(adapted.endpapersPrint, '4/0');
-    assert.strictEqual(adapted.paperTypeEndpaper, 'offset');
-    assert.strictEqual(adapted.paperWeightEndpapers, 115);
+    assert.strictEqual(adapted.endpapersPrint, null);
+    assert.strictEqual(adapted.paperTypeEndpaper, null);
+    assert.strictEqual(adapted.paperWeightEndpapers, null);
 });
 
-// Test B: Active path extraction — standard HC
-test('B: Standard hardcover (4/0, offset) activates exactly the expected endpaper & HC paths', () => {
+// Test B: Active path extraction — explicit printed HC (4/0, offset)
+test('B: Explicit printed hardcover endpapers (4/0, offset) activate exactly the expected endpaper & HC paths', () => {
     const bookSpec = {
         copies: 500,
         interior_pages: 192,
@@ -59,6 +59,9 @@ test('B: Standard hardcover (4/0, offset) activates exactly the expected endpape
         paper_type_cover: 'mc',
         interior_print: '4/4',
         cover_print: '4/0',
+        endpapers: 'standard',
+        endpapers_print: '4/0',
+        paper_type_endpaper: 'offset',
         delivery_country: 'ES'
     };
     const paths = solver.extractActiveRatePaths(bookSpec, { signatureSize: 16, sectionsCount: 12 });
@@ -141,6 +144,9 @@ test('F: Active calibratable endpaper leaf with explicit zero and no prior FAILS
         cover_print: '4/0',
         paper_type_interior: 'offset',
         paper_type_cover: 'mc',
+        endpapers: 'standard',
+        endpapers_print: '4/0',
+        paper_type_endpaper: 'offset',
         delivery_country: 'ES'
     };
     const snapshotWithZeroEndpapers = {
@@ -274,6 +280,7 @@ test('L: buildPatchFromActiveRates constructs correct nested endpaper paths', ()
         paper_type_cover: 'mc',
         endpapers: 'standard',
         endpapers_print: '4/0',
+        paper_type_endpaper: 'offset',
         delivery_country: 'ES'
     };
     const activeRates = {
@@ -299,9 +306,35 @@ test('L: buildPatchFromActiveRates constructs correct nested endpaper paths', ()
     assert.strictEqual(patch.paper_price_endpaper_by_kilo.offset, 1.80);
 });
 
-// Test M: Explicit unprinted (endpapers_print: null or '0/0') must not default to 4/0
-test('M: Explicit unprinted endpapers (null or 0/0) adapt to 0/0 and omit endpaper_fixed_by_colours', () => {
-    const bookSpecNull = {
+// Test M: Explicit unprinted (endpapers_print: '0/0') must adapt to 0/0, omit printing rates, and retain paper waste & kilo
+test('M: Explicit unprinted endpapers (0/0) adapt to 0/0, omit endpaper_fixed_by_colours, retain paper waste & kilo', () => {
+    const bookSpec00 = {
+        copies: 500,
+        interior_pages: 192,
+        binding_method: 'hardcover',
+        paper_type_interior: 'offset',
+        paper_type_cover: 'mc',
+        interior_print: '4/4',
+        cover_print: '4/0',
+        endpapers: true,
+        endpapers_print: '0/0',
+        paper_type_endpaper: 'offset',
+        delivery_country: 'ES'
+    };
+    const adapted = adapter.adaptBookSpec(bookSpec00);
+    assert.strictEqual(adapted.endpapersPrint, '0/0', 'Explicit 0/0 must adapt to 0/0');
+
+    const paths = solver.extractActiveRatePaths(adapted, { signatureSize: 16, sectionsCount: 12 });
+    assert.ok(!paths.some(p => p.startsWith('endpaper_fixed_by_colours')), 'Must not require endpaper_fixed_by_colours for unprinted endpapers');
+    assert.ok(!paths.some(p => p.startsWith('endpaper_var_per_1000_by_colours')), 'Must not require endpaper_var_per_1000_by_colours for unprinted endpapers');
+    assert.ok(paths.includes('paper_endpapers_fixed_by_colours.one'), 'Must retain paper waste fixed for unprinted endpapers');
+    assert.ok(paths.includes('paper_endpapers_var_per_1000_by_colours.one'), 'Must retain paper waste var for unprinted endpapers');
+    assert.ok(paths.includes('paper_price_endpaper_by_kilo.offset'), 'Must retain paper price kilo for unprinted endpapers');
+});
+
+// Test N: Unknown endpapers (endpapers_print: null) must remain null and not activate endpaper print or paper paths
+test('N: Unknown endpapers (endpapers_print: null) remain null and do not activate endpaper print or paper paths', () => {
+    const bookSpecUnknown = {
         copies: 500,
         interior_pages: 192,
         binding_method: 'hardcover',
@@ -313,12 +346,15 @@ test('M: Explicit unprinted endpapers (null or 0/0) adapt to 0/0 and omit endpap
         endpapers_print: null,
         delivery_country: 'ES'
     };
-    const adapted = adapter.adaptBookSpec(bookSpecNull);
-    assert.strictEqual(adapted.endpapersPrint, '0/0', 'Explicit null endpapers_print must adapt to 0/0 without defaulting to 4/0');
+    const adapted = adapter.adaptBookSpec(bookSpecUnknown);
+    assert.strictEqual(adapted.endpapersPrint, null, 'Unknown endpapers_print must remain null');
+    assert.strictEqual(adapted.paperTypeEndpaper, null, 'Unknown paper_type_endpaper must remain null');
+    assert.strictEqual(adapted.paperWeightEndpapers, null, 'Unknown paper_weight_endpapers must remain null');
 
     const paths = solver.extractActiveRatePaths(adapted, { signatureSize: 16, sectionsCount: 12 });
-    assert.ok(!paths.some(p => p.startsWith('endpaper_fixed_by_colours')), 'Must not require endpaper_fixed_by_colours for unprinted endpapers');
-    assert.ok(paths.includes('paper_endpapers_fixed_by_colours.one'));
+    assert.ok(!paths.some(p => p.startsWith('endpaper_fixed_by_colours')), 'Must not activate endpaper print rates for unknown endpapers');
+    assert.ok(!paths.some(p => p.startsWith('paper_endpapers_fixed_by_colours')), 'Must not activate paper waste rates for unknown endpapers');
+    assert.ok(!paths.some(p => p.startsWith('paper_price_endpaper_by_kilo')), 'Must not activate paper kilo rates for unknown endpapers');
 });
 
 console.log(`\n═══ Hardcover Endpaper Coverage Suite Results: ${passed} passed, ${failed} failed ═══\n`);

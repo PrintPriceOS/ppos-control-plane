@@ -180,8 +180,8 @@ class CalibrationSessionService {
         // Endpapers validation
         if (spec.endpapers === true) {
             if (spec.endpapers_print !== undefined && spec.endpapers_print !== null &&
-                !['1/0', '1/1', '4/0', '4/4'].includes(String(spec.endpapers_print))) {
-                errors.push('endpapers_print must be one of: 1/0, 1/1, 4/0, 4/4');
+                !['0/0', '1/0', '1/1', '4/0', '4/4'].includes(String(spec.endpapers_print))) {
+                errors.push('endpapers_print must be one of: 0/0, 1/0, 1/1, 4/0, 4/4');
             }
             if (spec.paper_type_endpaper !== undefined && spec.paper_type_endpaper !== null &&
                 !VALID_PAPER_TYPE_ENDPAPER.includes(spec.paper_type_endpaper)) {

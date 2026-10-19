@@ -66,30 +66,41 @@ class DeterministicInversePricingSolver {
 
         // Endpapers (active only when endpapers is not 'none')
         if (p.endpapers && p.endpapers !== 'none') {
-            const epPrint = (p.endpapersPrint && p.endpapersPrint !== 'none' && p.endpapersPrint !== '0/0') ? String(p.endpapersPrint) : '0/0';
-            const hasSlash = epPrint.includes('/');
-            const frontCols = hasSlash ? parseInt(epPrint.split('/')[0] || '0', 10) : 0;
-            const revCols = hasSlash ? parseInt(epPrint.split('/')[1] || '0', 10) : 0;
+            const epPrint = (p.endpapersPrint && p.endpapersPrint !== 'none') ? String(p.endpapersPrint) : null;
+            if (epPrint === '0/0') {
+                // Explicitly unprinted endpapers: skip endpaper printing costs while retaining paper and processing costs
+                paths.push('paper_endpapers_fixed_by_colours.one');
+                paths.push('paper_endpapers_var_per_1000_by_colours.one');
+                if (p.paperTypeEndpaper) {
+                    paths.push(`paper_price_endpaper_by_kilo.${p.paperTypeEndpaper}`);
+                }
+            } else if (epPrint) {
+                const hasSlash = epPrint.includes('/');
+                const frontCols = hasSlash ? parseInt(epPrint.split('/')[0] || '0', 10) : 0;
+                const revCols = hasSlash ? parseInt(epPrint.split('/')[1] || '0', 10) : 0;
 
-            // Endpaper print colors (front & reverse if > 0)
-            if (frontCols >= 1 && frontCols <= 5) {
-                paths.push(`endpaper_fixed_by_colours.${frontCols}`);
-                paths.push(`endpaper_var_per_1000_by_colours.${frontCols}`);
+                // Endpaper print colors (front & reverse if > 0)
+                if (frontCols >= 1 && frontCols <= 5) {
+                    paths.push(`endpaper_fixed_by_colours.${frontCols}`);
+                    paths.push(`endpaper_var_per_1000_by_colours.${frontCols}`);
+                }
+                if (revCols >= 1 && revCols <= 5) {
+                    paths.push(`endpaper_fixed_by_colours.${revCols}`);
+                    paths.push(`endpaper_var_per_1000_by_colours.${revCols}`);
+                }
+
+                // Paper sheets print mode for endpaper paper waste
+                let printMode = 'one';
+                if (frontCols === 1) printMode = 'two';
+                else if ([2, 3, 4].includes(frontCols)) printMode = 'full';
+                else if (frontCols === 0) printMode = 'one';
+
+                paths.push(`paper_endpapers_fixed_by_colours.${printMode}`);
+                paths.push(`paper_endpapers_var_per_1000_by_colours.${printMode}`);
+                if (p.paperTypeEndpaper) {
+                    paths.push(`paper_price_endpaper_by_kilo.${p.paperTypeEndpaper}`);
+                }
             }
-            if (revCols >= 1 && revCols <= 5) {
-                paths.push(`endpaper_fixed_by_colours.${revCols}`);
-                paths.push(`endpaper_var_per_1000_by_colours.${revCols}`);
-            }
-
-            // Paper sheets print mode for endpaper paper waste
-            let printMode = 'one';
-            if (frontCols === 1) printMode = 'two';
-            else if ([2, 3, 4].includes(frontCols)) printMode = 'full';
-            else if (frontCols === 0) printMode = 'one';
-
-            paths.push(`paper_endpapers_fixed_by_colours.${printMode}`);
-            paths.push(`paper_endpapers_var_per_1000_by_colours.${printMode}`);
-            paths.push(`paper_price_endpaper_by_kilo.${p.paperTypeEndpaper || 'offset'}`);
         }
 
         return Array.from(new Set(paths)).sort(); // Deterministic deduplicated ordering
@@ -137,41 +148,45 @@ class DeterministicInversePricingSolver {
 
         // Endpapers
         if (p.endpapers && p.endpapers !== 'none') {
-            const epPrint = (p.endpapersPrint && p.endpapersPrint !== 'none' && p.endpapersPrint !== '0/0') ? String(p.endpapersPrint) : '0/0';
-            const hasSlash = epPrint.includes('/');
-            const frontCols = hasSlash ? parseInt(epPrint.split('/')[0] || '0', 10) : 0;
-            const revCols = hasSlash ? parseInt(epPrint.split('/')[1] || '0', 10) : 0;
+            const epPrint = (p.endpapersPrint && p.endpapersPrint !== 'none') ? String(p.endpapersPrint) : null;
+            if (epPrint && epPrint !== '0/0') {
+                const hasSlash = epPrint.includes('/');
+                const frontCols = hasSlash ? parseInt(epPrint.split('/')[0] || '0', 10) : 0;
+                const revCols = hasSlash ? parseInt(epPrint.split('/')[1] || '0', 10) : 0;
 
-            if (frontCols >= 1 && frontCols <= 5) {
-                if (activeRates[`endpaper_fixed_by_colours.${frontCols}`] !== undefined) {
-                    patch.endpaper_fixed_by_colours = Object.assign(patch.endpaper_fixed_by_colours || {}, { [frontCols]: activeRates[`endpaper_fixed_by_colours.${frontCols}`] });
+                if (frontCols >= 1 && frontCols <= 5) {
+                    if (activeRates[`endpaper_fixed_by_colours.${frontCols}`] !== undefined) {
+                        patch.endpaper_fixed_by_colours = Object.assign(patch.endpaper_fixed_by_colours || {}, { [frontCols]: activeRates[`endpaper_fixed_by_colours.${frontCols}`] });
+                    }
+                    if (activeRates[`endpaper_var_per_1000_by_colours.${frontCols}`] !== undefined) {
+                        patch.endpaper_var_per_1000_by_colours = Object.assign(patch.endpaper_var_per_1000_by_colours || {}, { [frontCols]: activeRates[`endpaper_var_per_1000_by_colours.${frontCols}`] });
+                    }
                 }
-                if (activeRates[`endpaper_var_per_1000_by_colours.${frontCols}`] !== undefined) {
-                    patch.endpaper_var_per_1000_by_colours = Object.assign(patch.endpaper_var_per_1000_by_colours || {}, { [frontCols]: activeRates[`endpaper_var_per_1000_by_colours.${frontCols}`] });
-                }
-            }
-            if (revCols >= 1 && revCols <= 5) {
-                if (activeRates[`endpaper_fixed_by_colours.${revCols}`] !== undefined) {
-                    patch.endpaper_fixed_by_colours = Object.assign(patch.endpaper_fixed_by_colours || {}, { [revCols]: activeRates[`endpaper_fixed_by_colours.${revCols}`] });
-                }
-                if (activeRates[`endpaper_var_per_1000_by_colours.${revCols}`] !== undefined) {
-                    patch.endpaper_var_per_1000_by_colours = Object.assign(patch.endpaper_var_per_1000_by_colours || {}, { [revCols]: activeRates[`endpaper_var_per_1000_by_colours.${revCols}`] });
+                if (revCols >= 1 && revCols <= 5) {
+                    if (activeRates[`endpaper_fixed_by_colours.${revCols}`] !== undefined) {
+                        patch.endpaper_fixed_by_colours = Object.assign(patch.endpaper_fixed_by_colours || {}, { [revCols]: activeRates[`endpaper_fixed_by_colours.${revCols}`] });
+                    }
+                    if (activeRates[`endpaper_var_per_1000_by_colours.${revCols}`] !== undefined) {
+                        patch.endpaper_var_per_1000_by_colours = Object.assign(patch.endpaper_var_per_1000_by_colours || {}, { [revCols]: activeRates[`endpaper_var_per_1000_by_colours.${revCols}`] });
+                    }
                 }
             }
 
-            let printMode = 'one';
-            if (frontCols === 1) printMode = 'two';
-            else if ([2, 3, 4].includes(frontCols)) printMode = 'full';
-            else if (frontCols === 0) printMode = 'one';
+            if (epPrint) {
+                const frontCols = epPrint.includes('/') ? parseInt(epPrint.split('/')[0] || '0', 10) : 0;
+                let printMode = 'one';
+                if (frontCols === 1) printMode = 'two';
+                else if ([2, 3, 4].includes(frontCols)) printMode = 'full';
 
-            if (activeRates.paper_endpapers_fixed_by_colours !== undefined) {
-                patch.paper_endpapers_fixed_by_colours = { [printMode]: activeRates.paper_endpapers_fixed_by_colours };
-            }
-            if (activeRates.paper_endpapers_var_per_1000_by_colours !== undefined) {
-                patch.paper_endpapers_var_per_1000_by_colours = { [printMode]: activeRates.paper_endpapers_var_per_1000_by_colours };
-            }
-            if (activeRates.paper_price_endpaper_by_kilo !== undefined) {
-                patch.paper_price_endpaper_by_kilo = { [p.paperTypeEndpaper || 'offset']: activeRates.paper_price_endpaper_by_kilo };
+                if (activeRates.paper_endpapers_fixed_by_colours !== undefined) {
+                    patch.paper_endpapers_fixed_by_colours = { [printMode]: activeRates.paper_endpapers_fixed_by_colours };
+                }
+                if (activeRates.paper_endpapers_var_per_1000_by_colours !== undefined) {
+                    patch.paper_endpapers_var_per_1000_by_colours = { [printMode]: activeRates.paper_endpapers_var_per_1000_by_colours };
+                }
+                if (activeRates.paper_price_endpaper_by_kilo !== undefined && p.paperTypeEndpaper) {
+                    patch.paper_price_endpaper_by_kilo = { [p.paperTypeEndpaper]: activeRates.paper_price_endpaper_by_kilo };
+                }
             }
         }
 
@@ -320,28 +335,34 @@ class DeterministicInversePricingSolver {
 
         // Endpaper active rates
         if (p.endpapers && p.endpapers !== 'none') {
-            const epPrint = (p.endpapersPrint && p.endpapersPrint !== 'none' && p.endpapersPrint !== '0/0') ? String(p.endpapersPrint) : '0/0';
-            const hasSlash = epPrint.includes('/');
-            const frontCols = hasSlash ? parseInt(epPrint.split('/')[0] || '0', 10) : 0;
-            const revCols = hasSlash ? parseInt(epPrint.split('/')[1] || '0', 10) : 0;
+            const epPrint = (p.endpapersPrint && p.endpapersPrint !== 'none') ? String(p.endpapersPrint) : null;
+            if (epPrint && epPrint !== '0/0') {
+                const hasSlash = epPrint.includes('/');
+                const frontCols = hasSlash ? parseInt(epPrint.split('/')[0] || '0', 10) : 0;
+                const revCols = hasSlash ? parseInt(epPrint.split('/')[1] || '0', 10) : 0;
 
-            if (frontCols >= 1 && frontCols <= 5) {
-                baseActive[`endpaper_fixed_by_colours.${frontCols}`] = resolveActiveRate('endpaper_fixed_by_colours', frontCols, null, true);
-                baseActive[`endpaper_var_per_1000_by_colours.${frontCols}`] = resolveActiveRate('endpaper_var_per_1000_by_colours', frontCols, null, true);
+                if (frontCols >= 1 && frontCols <= 5) {
+                    baseActive[`endpaper_fixed_by_colours.${frontCols}`] = resolveActiveRate('endpaper_fixed_by_colours', frontCols, null, true);
+                    baseActive[`endpaper_var_per_1000_by_colours.${frontCols}`] = resolveActiveRate('endpaper_var_per_1000_by_colours', frontCols, null, true);
+                }
+                if (revCols >= 1 && revCols <= 5) {
+                    baseActive[`endpaper_fixed_by_colours.${revCols}`] = resolveActiveRate('endpaper_fixed_by_colours', revCols, null, true);
+                    baseActive[`endpaper_var_per_1000_by_colours.${revCols}`] = resolveActiveRate('endpaper_var_per_1000_by_colours', revCols, null, true);
+                }
             }
-            if (revCols >= 1 && revCols <= 5) {
-                baseActive[`endpaper_fixed_by_colours.${revCols}`] = resolveActiveRate('endpaper_fixed_by_colours', revCols, null, true);
-                baseActive[`endpaper_var_per_1000_by_colours.${revCols}`] = resolveActiveRate('endpaper_var_per_1000_by_colours', revCols, null, true);
+
+            if (epPrint) {
+                const frontCols = epPrint.includes('/') ? parseInt(epPrint.split('/')[0] || '0', 10) : 0;
+                let printMode = 'one';
+                if (frontCols === 1) printMode = 'two';
+                else if ([2, 3, 4].includes(frontCols)) printMode = 'full';
+
+                baseActive.paper_endpapers_fixed_by_colours = resolveActiveRate('paper_endpapers_fixed_by_colours', printMode, null, true);
+                baseActive.paper_endpapers_var_per_1000_by_colours = resolveActiveRate('paper_endpapers_var_per_1000_by_colours', printMode, null, true);
+                if (p.paperTypeEndpaper) {
+                    baseActive.paper_price_endpaper_by_kilo = resolveActiveRate('paper_price_endpaper_by_kilo', p.paperTypeEndpaper, null, true);
+                }
             }
-
-            let printMode = 'one';
-            if (frontCols === 1) printMode = 'two';
-            else if ([2, 3, 4].includes(frontCols)) printMode = 'full';
-            else if (frontCols === 0) printMode = 'one';
-
-            baseActive.paper_endpapers_fixed_by_colours = resolveActiveRate('paper_endpapers_fixed_by_colours', printMode, null, true);
-            baseActive.paper_endpapers_var_per_1000_by_colours = resolveActiveRate('paper_endpapers_var_per_1000_by_colours', printMode, null, true);
-            baseActive.paper_price_endpaper_by_kilo = resolveActiveRate('paper_price_endpaper_by_kilo', p.paperTypeEndpaper || 'offset', null, true);
         }
 
         const activeRateKeyToPath = {
@@ -363,28 +384,34 @@ class DeterministicInversePricingSolver {
             activeRateKeyToPath.uv_var = 'uv_varnish.var';
         }
         if (p.endpapers && p.endpapers !== 'none') {
-            const epPrint = (p.endpapersPrint && p.endpapersPrint !== 'none' && p.endpapersPrint !== '0/0') ? String(p.endpapersPrint) : '0/0';
-            const hasSlash = epPrint.includes('/');
-            const frontCols = hasSlash ? parseInt(epPrint.split('/')[0] || '0', 10) : 0;
-            const revCols = hasSlash ? parseInt(epPrint.split('/')[1] || '0', 10) : 0;
+            const epPrint = (p.endpapersPrint && p.endpapersPrint !== 'none') ? String(p.endpapersPrint) : null;
+            if (epPrint && epPrint !== '0/0') {
+                const hasSlash = epPrint.includes('/');
+                const frontCols = hasSlash ? parseInt(epPrint.split('/')[0] || '0', 10) : 0;
+                const revCols = hasSlash ? parseInt(epPrint.split('/')[1] || '0', 10) : 0;
 
-            if (frontCols >= 1 && frontCols <= 5) {
-                activeRateKeyToPath[`endpaper_fixed_by_colours.${frontCols}`] = `endpaper_fixed_by_colours.${frontCols}`;
-                activeRateKeyToPath[`endpaper_var_per_1000_by_colours.${frontCols}`] = `endpaper_var_per_1000_by_colours.${frontCols}`;
+                if (frontCols >= 1 && frontCols <= 5) {
+                    activeRateKeyToPath[`endpaper_fixed_by_colours.${frontCols}`] = `endpaper_fixed_by_colours.${frontCols}`;
+                    activeRateKeyToPath[`endpaper_var_per_1000_by_colours.${frontCols}`] = `endpaper_var_per_1000_by_colours.${frontCols}`;
+                }
+                if (revCols >= 1 && revCols <= 5) {
+                    activeRateKeyToPath[`endpaper_fixed_by_colours.${revCols}`] = `endpaper_fixed_by_colours.${revCols}`;
+                    activeRateKeyToPath[`endpaper_var_per_1000_by_colours.${revCols}`] = `endpaper_var_per_1000_by_colours.${revCols}`;
+                }
             }
-            if (revCols >= 1 && revCols <= 5) {
-                activeRateKeyToPath[`endpaper_fixed_by_colours.${revCols}`] = `endpaper_fixed_by_colours.${revCols}`;
-                activeRateKeyToPath[`endpaper_var_per_1000_by_colours.${revCols}`] = `endpaper_var_per_1000_by_colours.${revCols}`;
+
+            if (epPrint) {
+                const frontCols = epPrint.includes('/') ? parseInt(epPrint.split('/')[0] || '0', 10) : 0;
+                let printMode = 'one';
+                if (frontCols === 1) printMode = 'two';
+                else if ([2, 3, 4].includes(frontCols)) printMode = 'full';
+
+                activeRateKeyToPath.paper_endpapers_fixed_by_colours = `paper_endpapers_fixed_by_colours.${printMode}`;
+                activeRateKeyToPath.paper_endpapers_var_per_1000_by_colours = `paper_endpapers_var_per_1000_by_colours.${printMode}`;
+                if (p.paperTypeEndpaper) {
+                    activeRateKeyToPath.paper_price_endpaper_by_kilo = `paper_price_endpaper_by_kilo.${p.paperTypeEndpaper}`;
+                }
             }
-
-            let printMode = 'one';
-            if (frontCols === 1) printMode = 'two';
-            else if ([2, 3, 4].includes(frontCols)) printMode = 'full';
-            else if (frontCols === 0) printMode = 'one';
-
-            activeRateKeyToPath.paper_endpapers_fixed_by_colours = `paper_endpapers_fixed_by_colours.${printMode}`;
-            activeRateKeyToPath.paper_endpapers_var_per_1000_by_colours = `paper_endpapers_var_per_1000_by_colours.${printMode}`;
-            activeRateKeyToPath.paper_price_endpaper_by_kilo = `paper_price_endpaper_by_kilo.${p.paperTypeEndpaper || 'offset'}`;
         }
         const isLockedActiveKey = key => lockedRatePaths.includes(activeRateKeyToPath[key]);
         for (const [key, path] of Object.entries(activeRateKeyToPath)) {

@@ -278,7 +278,7 @@ export function canonicalizeToEngineBookSpec(
         if (!rawEndpaperColors) {
             errors.push('endpapers_print must be specified when endpapers are present (e.g. 0/0, 1/0, 1/1, 4/0, 4/4)');
         } else if (rawEndpaperColors === '0/0' || rawEndpaperColors.includes('unbedruckt') || rawEndpaperColors.includes('sin imprimir')) {
-            bookSpec.endpapers_print = null;
+            bookSpec.endpapers_print = '0/0';
         } else if (['1/0', '1/1', '4/0', '4/4'].includes(rawEndpaperColors)) {
             bookSpec.endpapers_print = rawEndpaperColors;
         } else {
