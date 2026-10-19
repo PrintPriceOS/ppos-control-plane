@@ -2258,6 +2258,9 @@ export const es = {
   'guided.pricing.templateSaveBtn': 'Guardar plantilla y continuar',
   'guided.pricing.manualModeBadge': 'Modo Tarifas Manuales',
   'guided.pricing.manualModeTitle': 'Editando matriz para {family}',
+  'guided.pricing.templatePendingVerification': 'Guardado realizado; confirmación pendiente',
+  'guided.pricing.templatePendingDesc': 'La plantilla se envió al servidor, pero no se pudo contrastar la revisión de tarifas guardada. Puedes volver a consultar sin repetir el envío.',
+  'guided.pricing.templateReverifyBtn': 'Reconsultar confirmación',
   'guided.pricing.changeMethod': 'Cambiar método',
 
   // Guided Stage D Review Status Badges & Per-Family Breakdown

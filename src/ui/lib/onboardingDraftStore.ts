@@ -385,8 +385,8 @@ export interface StageCCompletionResult {
  * 2. Every enabled product family must have an assigned and genuinely verified/saved method:
  *    - TEMPLATE: must prove the template was applied and saved (`templateSaved: true`).
  *    - MANUAL: must prove actual rates were saved (`manualRatesSaved: true`), not just entering a manual offer.
- *    - ASSISTANT: must prove governed calibration acceptance (`calibrationAccepted: true` or `famState?.status === 'DATA_VALIDATED'`).
- *      Merely adding quotes, draft runs or reaching intermediate assistant states does NOT satisfy Stage C.
+ *    - ASSISTANT: must prove governed calibration acceptance (`calibrationAccepted: true`).
+ *      Merely adding quotes, draft runs, residual DATA_VALIDATED status, or reaching intermediate assistant states does NOT satisfy Stage C.
  */
 export function evaluateStageCCompletion(
     serverReadiness: any,
@@ -409,8 +409,8 @@ export function evaluateStageCCompletion(
         const famState = familiesState[fid];
         const method = cont?.pricingMethod;
 
-        // Invariant: Calibrated requires explicit governed acceptance
-        const isCalibrated = Boolean(cont?.calibrationAccepted || famState?.status === 'DATA_VALIDATED');
+        // Invariant: Calibrated requires explicit governed acceptance; residual DATA_VALIDATED never certifies
+        const isCalibrated = Boolean(cont?.calibrationAccepted);
         // Invariant: Template requires explicit save confirmation
         const isTemplateSaved = method === 'TEMPLATE' && Boolean(cont?.templateSaved);
         // Invariant: Manual requires explicit saved matrix rates, not just a manual offer

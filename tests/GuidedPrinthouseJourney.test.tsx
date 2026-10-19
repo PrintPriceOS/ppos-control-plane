@@ -1880,6 +1880,173 @@ describe('Guided Printhouse Onboarding Journey Suite', () => {
         const pricingStepBtn = screen.getByRole('button', { name: /Tus precios/i });
         expect(pricingStepBtn.textContent).not.toContain('✓');
     });
+
+    it('30. Regression: PUT correcto y consulta posterior fallida: sin confirmación ni avance automático, indica guardado realizado y confirmación pendiente con reconsulta', async () => {
+        const tenantId = 'tenant-current';
+        saveGuidedOnboardingDraft({
+            tenantId,
+            company: {
+                legalName: 'Editorial Delta',
+                country: 'ES',
+                city: 'Valencia',
+                address: 'Calle Mayor 10',
+                postalCode: '46001',
+                phone: '+34 960 000 000',
+                website: 'https://delta.com',
+                contactName: 'Laura Admin',
+                taxId: 'B11223344',
+                siteName: 'Planta Delta',
+                siteTimezone: 'Europe/Madrid'
+            },
+            offerDrafts: {},
+            lastSavedTimestamp: Date.now(),
+            currentStage: 'PRICING',
+            selectedFamilyId: 'HARDCOVER',
+            enabledFamilies: { HARDCOVER: true, SOFTCOVER: false, WIRE_O: false, SADDLE_STITCH: false },
+            pricingContinuity: {
+                HARDCOVER: {
+                    sessionId: null,
+                    activeRun: null,
+                    selectedVariantId: null,
+                    proposedPatch: {},
+                    entryMode: 'UPLOAD_PDF',
+                    uploadedFileName: null,
+                    pricingMethod: 'TEMPLATE'
+                }
+            },
+            completedStages: { WELCOME: true, COMPANY: true, PRODUCTS: true, PRICING: false, REVIEW: false }
+        });
+
+        let putCalled = 0;
+        let postPutQueryFailed = true;
+
+        global.fetch = vi.fn().mockImplementation((url: string, opts?: any) => {
+            const method = opts?.method || 'GET';
+
+            if (url.includes('/api/printhouse/onboarding/pricing/industrial') && method === 'GET') {
+                return Promise.resolve({
+                    ok: true,
+                    json: () => Promise.resolve({
+                        ok: true,
+                        data: {
+                            baselineChecksum: 'chk-baseline-delta-123',
+                            rates: {}
+                        }
+                    })
+                });
+            }
+
+            if (url.includes('/api/printhouse/onboarding/pricing/industrial') && method === 'PUT') {
+                putCalled++;
+                return Promise.resolve({
+                    ok: true,
+                    json: () => Promise.resolve({ ok: true, success: true })
+                });
+            }
+
+            if (url.includes('/api/printhouse/onboarding/pricing/revisions')) {
+                if (putCalled > 0 && !postPutQueryFailed) {
+                    return Promise.resolve({
+                        ok: true,
+                        json: () => Promise.resolve({
+                            ok: true,
+                            data: [
+                                {
+                                    id: 'rev_hc_delta_verified',
+                                    createdBy: {
+                                        productFamily: 'HARDCOVER',
+                                        pricingMethod: 'TEMPLATE'
+                                    }
+                                }
+                            ]
+                        })
+                    });
+                }
+                return Promise.resolve({ ok: true, json: () => Promise.resolve({ ok: true, data: [] }) });
+            }
+
+            if (url === '/api/printhouse/onboarding' || url.startsWith('/api/printhouse/onboarding?')) {
+                // If PUT has been called and postPutQueryFailed is active, simulate query failure
+                if (putCalled > 0 && postPutQueryFailed) {
+                    return Promise.reject(new Error('Post-PUT query network drop'));
+                }
+                return Promise.resolve({
+                    ok: true,
+                    json: () => Promise.resolve({
+                        ok: true,
+                        data: {
+                            company: {
+                                legalName: 'Editorial Delta',
+                                selectedProductFamilies: ['HARDCOVER'],
+                                productsConfirmed: true
+                            },
+                            sites: [{ siteId: 'site-delta-1', siteName: 'Planta Delta', country: 'ES', city: 'Valencia' }],
+                            readiness: {
+                                accountSetup: { status: 'COMPLETE' },
+                                operationalConfiguration: { status: 'COMPLETE' },
+                                pricingReadiness: { status: 'COMPLETE' }
+                            }
+                        }
+                    })
+                });
+            }
+
+            return Promise.resolve({ ok: true, json: () => Promise.resolve({ ok: true, data: [] }) });
+        });
+
+        renderWithProviders(
+            <GuidedPrinthouseJourney onOpenFullSetup={vi.fn()} printerNodeId="node-delta-1" />,
+            'es'
+        );
+
+        // Wait for template view to load
+        await waitFor(() => {
+            expect(screen.getByText(/Valores iniciales aplicados a/i)).toBeInTheDocument();
+        });
+
+        const saveBtn = screen.getByRole('button', { name: /Guardar plantilla y continuar/i });
+        fireEvent.click(saveBtn);
+
+        // PUT was called once
+        await waitFor(() => {
+            expect(putCalled).toBe(1);
+        });
+
+        // Banner indicates "Guardado realizado; confirmación pendiente"
+        await waitFor(() => {
+            expect(screen.getByText('Guardado realizado; confirmación pendiente')).toBeInTheDocument();
+        });
+
+        // Stage must NOT have advanced to REVIEW
+        expect(screen.queryByText('Resumen de configuración de tu imprenta')).not.toBeInTheDocument();
+
+        // Draft must NOT confirm PRICING or templateSaved unconditionally
+        const interimDraft = loadGuidedOnboardingDraft(tenantId);
+        expect(interimDraft.pricingContinuity?.HARDCOVER?.templateSaved).not.toBe(true);
+        expect(interimDraft.completedStages.PRICING).toBe(false);
+
+        // Click "Reconsultar confirmación" without repeating PUT
+        const reverifyBtn = screen.getByRole('button', { name: /Reconsultar confirmación/i });
+        expect(reverifyBtn).toBeInTheDocument();
+
+        // Fix the network for the retry query so global.fetch returns the verified revision
+        postPutQueryFailed = false;
+
+        fireEvent.click(reverifyBtn);
+
+        // PUT was NOT repeated
+        expect(putCalled).toBe(1);
+
+        // Now that server confirmed the saved revision, it advances to REVIEW
+        await waitFor(() => {
+            expect(screen.getByText('Resumen de configuración de tu imprenta')).toBeInTheDocument();
+        });
+
+        const finalDraft = loadGuidedOnboardingDraft(tenantId);
+        expect(finalDraft.pricingContinuity?.HARDCOVER?.templateSaved).toBe(true);
+        expect(finalDraft.completedStages.PRICING).toBe(true);
+        expect(finalDraft.currentStage).toBe('REVIEW');
+    });
 });
 
 

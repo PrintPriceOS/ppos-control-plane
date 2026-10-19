@@ -2259,6 +2259,9 @@ export const de = {
   'guided.pricing.templateSaveBtn': 'Vorlage speichern und fortfahren',
   'guided.pricing.manualModeBadge': 'Manueller Tarifmodus',
   'guided.pricing.manualModeTitle': 'Tarifmatrix für {family} bearbeiten',
+  'guided.pricing.templatePendingVerification': 'Guardado realizado; confirmación pendiente',
+  'guided.pricing.templatePendingDesc': 'Vorlage auf dem Server gespeichert, Verifizierungsabfrage steht jedoch noch aus. Sie können erneut abfragen, ohne erneut zu speichern.',
+  'guided.pricing.templateReverifyBtn': 'Reconsultar confirmación',
   'guided.pricing.changeMethod': 'Methode wechseln',
 
   // Guided Stage D Review Status Badges & Per-Family Breakdown

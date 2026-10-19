@@ -346,13 +346,21 @@ describe('GuidedStepReview & ManualOfferForm Defects & Regressions', () => {
         const onGoToFamilyPricing = vi.fn();
         const onGoToCompanyField = vi.fn();
 
+        const continuityWithCalibratedHardcover = {
+            ...mockPricingContinuity,
+            HARDCOVER: {
+                ...mockPricingContinuity.HARDCOVER!,
+                calibrationAccepted: true
+            }
+        };
+
         render(
             <LocaleProvider initialLocale="es">
                 <GuidedStepReview
                     company={mockCompany5of6}
                     families={mockFamilies}
                     enabledFamilies={mockEnabledFamilies}
-                    pricingContinuity={mockPricingContinuity}
+                    pricingContinuity={continuityWithCalibratedHardcover}
                     readinessData={{
                         accountSetup: { status: 'COMPLETE', blockingIssues: [], advisories: [] },
                         operationalConfiguration: { status: 'COMPLETE', blockingIssues: [] },
@@ -391,13 +399,20 @@ describe('GuidedStepReview & ManualOfferForm Defects & Regressions', () => {
             SADDLE_STITCH: { ...mockFamilies.SADDLE_STITCH, status: 'DATA_VALIDATED' }
         };
 
+        const allCalibratedContinuity: Partial<Record<ProductFamilyId, FamilyPricingSessionDraft>> = {
+            HARDCOVER: { ...mockPricingContinuity.HARDCOVER!, calibrationAccepted: true },
+            SOFTCOVER: { ...mockPricingContinuity.SOFTCOVER!, calibrationAccepted: true },
+            WIRE_O: { ...mockPricingContinuity.WIRE_O!, calibrationAccepted: true },
+            SADDLE_STITCH: { ...mockPricingContinuity.SADDLE_STITCH!, calibrationAccepted: true }
+        };
+
         render(
             <LocaleProvider initialLocale="es">
                 <GuidedStepReview
                     company={mockCompany5of6}
                     families={allConfiguredFamilies}
                     enabledFamilies={mockEnabledFamilies}
-                    pricingContinuity={mockPricingContinuity}
+                    pricingContinuity={allCalibratedContinuity}
                     readinessData={{
                         accountSetup: { status: 'COMPLETE', blockingIssues: [], advisories: [] },
                         operationalConfiguration: { status: 'COMPLETE', blockingIssues: [] },
@@ -409,7 +424,7 @@ describe('GuidedStepReview & ManualOfferForm Defects & Regressions', () => {
             </LocaleProvider>
         );
 
-        // When all are DATA_VALIDATED -> "Calibrado con IA"
+        // When all are DATA_VALIDATED and calibrationAccepted -> "Calibrado con IA"
         expect(screen.getByText('Calibrado con IA')).toBeInTheDocument();
     });
 
@@ -944,6 +959,109 @@ describe('GuidedStepReview & ManualOfferForm Defects & Regressions', () => {
             );
             expect(evalResult.isComplete).toBe(true);
             expect(evalResult.pendingFamilies).toEqual([]);
+        });
+
+        it('Regression: Plantilla confirmada para una familia y otra pendiente: etapa C incompleta', () => {
+            // HARDCOVER template is saved, but SOFTCOVER remains unconfirmed
+            const reconstructed = {
+                HARDCOVER: {
+                    sessionId: null,
+                    activeRun: null,
+                    selectedVariantId: null,
+                    proposedPatch: {},
+                    entryMode: 'UPLOAD_PDF' as const,
+                    uploadedFileName: null,
+                    pricingMethod: 'TEMPLATE' as const,
+                    templateSaved: true
+                },
+                SOFTCOVER: {
+                    sessionId: null,
+                    activeRun: null,
+                    selectedVariantId: null,
+                    proposedPatch: {},
+                    entryMode: 'UPLOAD_PDF' as const,
+                    uploadedFileName: null,
+                    pricingMethod: 'TEMPLATE' as const,
+                    templateSaved: false
+                }
+            };
+
+            const evalResult = evaluateStageCCompletion(
+                { pricingReadiness: { status: 'COMPLETE' } },
+                { HARDCOVER: true, SOFTCOVER: true },
+                reconstructed,
+                {}
+            );
+
+            expect(evalResult.isComplete).toBe(false);
+            expect(evalResult.pendingFamilies).toEqual(['SOFTCOVER']);
+            expect(evalResult.configuredCount).toBe(1);
+            expect(evalResult.templateCount).toBe(1);
+        });
+
+        it('Regression: Familia antes validada y respuesta posterior sin evidencia: pierde la confirmación y no certifica', () => {
+            // Initial server state had evidence for WIRE_O
+            const priorSessions = [
+                {
+                    id: 'cal_wireo_prior',
+                    status: 'ACCEPTED',
+                    bookSpec: { family: 'WIRE_O' }
+                }
+            ];
+            const priorContinuity = reconstructPricingContinuityFromServer(priorSessions, [], {});
+            expect(priorContinuity.WIRE_O?.calibrationAccepted).toBe(true);
+
+            // Subsequent server response lacks evidence (empty array)
+            const freshSessions: any[] = [];
+            const freshRevisions: any[] = [];
+            const freshContinuity = reconstructPricingContinuityFromServer(freshSessions, freshRevisions, priorContinuity);
+
+            // Loses confirmation: flags must be false
+            expect(freshContinuity.WIRE_O?.calibrationAccepted).toBe(false);
+            expect(freshContinuity.WIRE_O?.templateSaved).toBe(false);
+            expect(freshContinuity.WIRE_O?.manualRatesSaved).toBe(false);
+
+            // Residual DATA_VALIDATED in UI familyState must NOT substitute calibrationAccepted or certify Stage C
+            const residualFamilyState = {
+                WIRE_O: { id: 'WIRE_O', status: 'DATA_VALIDATED', quotes: [] }
+            };
+
+            const evalResult = evaluateStageCCompletion(
+                { pricingReadiness: { status: 'COMPLETE' } },
+                { WIRE_O: true },
+                freshContinuity,
+                residualFamilyState
+            );
+
+            expect(evalResult.isComplete).toBe(false);
+            expect(evalResult.pendingFamilies).toEqual(['WIRE_O']);
+            expect(evalResult.calibratedCount).toBe(0);
+        });
+
+        it('Regression: Todas las familias habilitadas confirmadas: etapa C completa', () => {
+            const serverSessions = [
+                { id: 'sess_hc', status: 'ACCEPTED', bookSpec: { family: 'HARDCOVER' } }
+            ];
+            const serverRevisions = [
+                { id: 'rev_sc', createdBy: { productFamily: 'SOFTCOVER', pricingMethod: 'TEMPLATE' } },
+                { id: 'rev_wo', createdBy: { productFamily: 'WIRE_O', pricingMethod: 'MANUAL' } }
+            ];
+
+            const reconstructed = reconstructPricingContinuityFromServer(serverSessions, serverRevisions, {});
+
+            const evalResult = evaluateStageCCompletion(
+                { pricingReadiness: { status: 'COMPLETE' } },
+                { HARDCOVER: true, SOFTCOVER: true, WIRE_O: true, SADDLE_STITCH: false },
+                reconstructed,
+                {}
+            );
+
+            expect(evalResult.isComplete).toBe(true);
+            expect(evalResult.pendingFamilies).toEqual([]);
+            expect(evalResult.configuredCount).toBe(3);
+            expect(evalResult.calibratedCount).toBe(1);
+            expect(evalResult.templateCount).toBe(1);
+            expect(evalResult.manualCount).toBe(1);
         });
     });
 });

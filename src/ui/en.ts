@@ -2259,6 +2259,9 @@ export const en = {
   'guided.pricing.templateSaveBtn': 'Save template and continue',
   'guided.pricing.manualModeBadge': 'Manual Rates Mode',
   'guided.pricing.manualModeTitle': 'Editing rate matrix for {family}',
+  'guided.pricing.templatePendingVerification': 'Guardado realizado; confirmación pendiente',
+  'guided.pricing.templatePendingDesc': 'Template was saved on the server, but confirmation query failed. You can re-verify without re-submitting.',
+  'guided.pricing.templateReverifyBtn': 'Reconsultar confirmación',
   'guided.pricing.changeMethod': 'Change method',
 
   // Guided Stage D Review Status Badges & Per-Family Breakdown

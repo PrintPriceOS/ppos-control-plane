@@ -96,6 +96,7 @@ export const GuidedPrinthouseJourney: React.FC<GuidedPrinthouseJourneyProps> = (
     const [templateSaveError, setTemplateSaveError] = useState<string | null>(null);
     const [isSavingTemplate, setIsSavingTemplate] = useState<boolean>(false);
     const [pricingFetchError, setPricingFetchError] = useState<string | null>(null);
+    const [templatePendingVerification, setTemplatePendingVerification] = useState<boolean>(false);
 
     // Track mounted state to safely discard background updates after unmount
     const isMountedRef = useRef<boolean>(true);
@@ -130,6 +131,9 @@ export const GuidedPrinthouseJourney: React.FC<GuidedPrinthouseJourneyProps> = (
         setServerData(null);
         setNetworkError(null);
         setReadinessError(null);
+        setPricingFetchError(null);
+        setTemplateSaveError(null);
+        setTemplatePendingVerification(false);
         setFamilies({
             HARDCOVER: { id: 'HARDCOVER', titleKey: 'family.hardcover.title', descKey: 'family.hardcover.desc', status: 'PENDING', quoteCount: 0 },
             SOFTCOVER: { id: 'SOFTCOVER', titleKey: 'family.softcover.title', descKey: 'family.softcover.desc', status: 'PENDING', quoteCount: 0 },
@@ -253,9 +257,57 @@ export const GuidedPrinthouseJourney: React.FC<GuidedPrinthouseJourneyProps> = (
                 const serverSites = data.data?.sites || [];
                 const primarySite = serverSites[0];
 
-                // Reconcile draft with server truth:
-                // Distinguish untouched defaults vs locally edited fields vs acknowledged values.
-                // Defaults such as ES and Europe/Madrid must NEVER override actual server values.
+                // Compute reconciled product families from server truth if persisted on server
+                const serverFamiliesList = serverCompany?.selectedProductFamilies;
+                const serverProductsConfirmed = Boolean(serverCompany?.productsConfirmed);
+
+                const currentPersistedDraft = loadGuidedOnboardingDraft(targetTenantId);
+                let reconciledFamilies = currentPersistedDraft.enabledFamilies;
+                if (Array.isArray(serverFamiliesList)) {
+                    reconciledFamilies = {
+                        HARDCOVER: serverFamiliesList.includes('HARDCOVER'),
+                        SOFTCOVER: serverFamiliesList.includes('SOFTCOVER'),
+                        WIRE_O: serverFamiliesList.includes('WIRE_O'),
+                        SADDLE_STITCH: serverFamiliesList.includes('SADDLE_STITCH')
+                    };
+                }
+
+                // Authoritative server reconciliation for pricing continuity per product family:
+                // Hydrate templateSaved, manualRatesSaved, calibrationAccepted, and pricingMethod from server records
+                const reconciledPricingContinuity = reconstructPricingContinuityFromServer(
+                    serverSessions,
+                    serverRevisions,
+                    currentPersistedDraft.pricingContinuity || {}
+                );
+
+                // Sync family visual status from reconciled pricing continuity
+                // Clean residual DATA_VALIDATED when no active server evidence exists
+                const nextFamiliesMap: Record<ProductFamilyId, FamilyState> = { ...families };
+                for (const fid of ['HARDCOVER', 'SOFTCOVER', 'WIRE_O', 'SADDLE_STITCH'] as ProductFamilyId[]) {
+                    const cont = reconciledPricingContinuity[fid];
+                    if (cont?.calibrationAccepted) {
+                        nextFamiliesMap[fid] = { ...nextFamiliesMap[fid], status: 'DATA_VALIDATED' };
+                    } else if (cont?.templateSaved || cont?.manualRatesSaved) {
+                        nextFamiliesMap[fid] = { ...nextFamiliesMap[fid], status: 'DATA_VALIDATED' };
+                    } else {
+                        // Invariant: Clean up residual DATA_VALIDATED when no active evidence exists
+                        nextFamiliesMap[fid] = { ...nextFamiliesMap[fid], status: 'PENDING' };
+                    }
+                }
+                setFamilies(nextFamiliesMap);
+
+                // Authoritative server reconciliation for completedStages:
+                // A local draft alone never certifies completion; server facts are primary truth.
+                const isAccountCompleteOnServer = data.data?.readiness?.accountSetup?.status === 'COMPLETE';
+                const isOpsCompleteOnServer = data.data?.readiness?.operationalConfiguration?.status === 'COMPLETE' || data.data?.readiness?.operationalReadiness?.status === 'COMPLETE';
+
+                const stageCEvalOnServer = evaluateStageCCompletion(
+                    data.data?.readiness,
+                    reconciledFamilies,
+                    reconciledPricingContinuity,
+                    nextFamiliesMap
+                );
+
                 setDraft(prev => {
                     const editedFields = new Set(prev.company.userEditedFields || []);
                     const ackValues = prev.company.acknowledgedServerValues || {};
@@ -354,55 +406,6 @@ export const GuidedPrinthouseJourney: React.FC<GuidedPrinthouseJourneyProps> = (
                         company: reconciledCompany
                     };
 
-                    // Reconstruct enabled product families from server truth if persisted on server
-                    const serverFamiliesList = serverCompany?.selectedProductFamilies;
-                    const serverProductsConfirmed = Boolean(serverCompany?.productsConfirmed);
-
-                    let reconciledFamilies = prev.enabledFamilies;
-                    if (Array.isArray(serverFamiliesList)) {
-                        reconciledFamilies = {
-                            HARDCOVER: serverFamiliesList.includes('HARDCOVER'),
-                            SOFTCOVER: serverFamiliesList.includes('SOFTCOVER'),
-                            WIRE_O: serverFamiliesList.includes('WIRE_O'),
-                            SADDLE_STITCH: serverFamiliesList.includes('SADDLE_STITCH')
-                        };
-                    }
-
-                    // Authoritative server reconciliation for pricing continuity per product family:
-                    // Hydrate templateSaved, manualRatesSaved, calibrationAccepted, and pricingMethod from server records
-                    const reconciledPricingContinuity = reconstructPricingContinuityFromServer(
-                        serverSessions,
-                        serverRevisions,
-                        prev.pricingContinuity || {}
-                    );
-
-                    // Sync family visual status from reconciled pricing continuity
-                    setFamilies(prevFam => {
-                        const nextFam = { ...prevFam };
-                        for (const fid of ['HARDCOVER', 'SOFTCOVER', 'WIRE_O', 'SADDLE_STITCH'] as ProductFamilyId[]) {
-                            const cont = reconciledPricingContinuity[fid];
-                            if (cont?.calibrationAccepted) {
-                                nextFam[fid] = { ...nextFam[fid], status: 'DATA_VALIDATED' };
-                            } else if (cont?.templateSaved || cont?.manualRatesSaved) {
-                                nextFam[fid] = { ...nextFam[fid], status: 'DATA_VALIDATED' };
-                            }
-                        }
-                        return nextFam;
-                    });
-
-                    // Authoritative server reconciliation for completedStages:
-                    // A local draft alone never certifies completion; server facts are primary truth.
-                    const isAccountCompleteOnServer = data.data?.readiness?.accountSetup?.status === 'COMPLETE';
-                    const isPricingCompleteOnServer = data.data?.readiness?.pricingReadiness?.status === 'COMPLETE';
-                    const isOpsCompleteOnServer = data.data?.readiness?.operationalConfiguration?.status === 'COMPLETE' || data.data?.readiness?.operationalReadiness?.status === 'COMPLETE';
-
-                    const stageCEvalOnServer = evaluateStageCCompletion(
-                        data.data?.readiness,
-                        reconciledFamilies,
-                        reconciledPricingContinuity,
-                        families
-                    );
-
                     const reconciledCompletedStages = {
                         WELCOME: true,
                         COMPANY: isAccountCompleteOnServer || Boolean(prev.completedStages?.COMPANY),
@@ -425,7 +428,7 @@ export const GuidedPrinthouseJourney: React.FC<GuidedPrinthouseJourneyProps> = (
                         enabledFamilies: reconciledFamilies,
                         hasPricingContinuity,
                         pricingContinuity: reconciledPricingContinuity,
-                        familiesState: families
+                        familiesState: nextFamiliesMap
                     };
 
                     const serverDerivedStage = deriveServerStage(data.data?.readiness, derivationCtx);
@@ -470,17 +473,39 @@ export const GuidedPrinthouseJourney: React.FC<GuidedPrinthouseJourneyProps> = (
                     persistDraft(updated);
                     return updated;
                 });
+
+                return {
+                    ok: true,
+                    pricingOk: Boolean(sessionsResult.ok && revisionsResult.ok),
+                    pricingContinuity: reconciledPricingContinuity,
+                    stageCEval: stageCEvalOnServer
+                };
             } else {
                 const errMsg = normalizeUiError(data, t('guided.review.refreshError') || 'No se pudieron recuperar los datos de la imprenta.');
                 setNetworkError(errMsg);
                 setReadinessError(errMsg);
+                return {
+                    ok: false,
+                    pricingOk: false,
+                    error: errMsg
+                };
             }
         } catch (err: any) {
             if (activeTenantRef.current === targetTenantId) {
                 const errMsg = normalizeUiError(err, t('guided.review.refreshError') || 'Error de red al conectar con el servidor.');
                 setNetworkError(errMsg);
                 setReadinessError(errMsg);
+                return {
+                    ok: false,
+                    pricingOk: false,
+                    error: errMsg
+                };
             }
+            return {
+                ok: false,
+                pricingOk: false,
+                error: 'Tenant switched during request'
+            };
         } finally {
             if (activeTenantRef.current === targetTenantId) {
                 setLoadingData(false);
@@ -1499,6 +1524,62 @@ export const GuidedPrinthouseJourney: React.FC<GuidedPrinthouseJourneyProps> = (
                                         </div>
                                     )}
 
+                                    {templatePendingVerification && (
+                                        <div role="alert" className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 text-amber-900 dark:text-amber-200 text-xs flex items-start justify-between gap-3">
+                                            <div className="flex items-start gap-2.5">
+                                                <AlertCircle size={18} className="text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                                                <div className="space-y-1">
+                                                    <div className="font-bold">{t('guided.pricing.templatePendingVerification')}</div>
+                                                    <p className="text-[11px] text-amber-800 dark:text-amber-300">
+                                                        {t('guided.pricing.templatePendingDesc')}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                disabled={isRefreshingReadiness}
+                                                onClick={async () => {
+                                                    const famId = effectiveActiveFamilyId;
+                                                    const res = await fetchServerState(tenantId, false);
+                                                    if (res && res.ok && res.pricingOk) {
+                                                        const isConfirmedOnServer = Boolean(res.pricingContinuity?.[famId]?.templateSaved);
+                                                        if (isConfirmedOnServer) {
+                                                            setTemplatePendingVerification(false);
+                                                            setTemplateSaveError(null);
+                                                            updateDraft(prev => ({
+                                                                ...prev,
+                                                                pricingContinuity: {
+                                                                    ...prev.pricingContinuity,
+                                                                    [famId]: {
+                                                                        ...(prev.pricingContinuity?.[famId] || {
+                                                                            sessionId: null,
+                                                                            activeRun: null,
+                                                                            selectedVariantId: null,
+                                                                            proposedPatch: {},
+                                                                            entryMode: 'UPLOAD_PDF',
+                                                                            uploadedFileName: null
+                                                                        }),
+                                                                        pricingMethod: 'TEMPLATE',
+                                                                        templateSaved: true,
+                                                                        lastSavedTimestamp: Date.now()
+                                                                    }
+                                                                },
+                                                                completedStages: {
+                                                                    ...prev.completedStages,
+                                                                    PRICING: Boolean(res.stageCEval?.isComplete)
+                                                                },
+                                                                currentStage: res.stageCEval?.isComplete ? 'REVIEW' : 'PRICING'
+                                                             }));
+                                                        }
+                                                    }
+                                                }}
+                                                className="px-3 py-1 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg text-[11px] shrink-0 transition-colors cursor-pointer"
+                                            >
+                                                {t('guided.pricing.templateReverifyBtn')}
+                                            </button>
+                                        </div>
+                                    )}
+
                                     <div className="flex items-center justify-between pt-4 border-t border-zinc-100 dark:border-zinc-800">
                                         <button
                                             type="button"
@@ -1514,6 +1595,7 @@ export const GuidedPrinthouseJourney: React.FC<GuidedPrinthouseJourneyProps> = (
                                                 const famId = effectiveActiveFamilyId;
                                                 const token = getAuthToken();
                                                 setTemplateSaveError(null);
+                                                setTemplatePendingVerification(false);
                                                 setIsSavingTemplate(true);
 
                                                 try {
@@ -1565,10 +1647,27 @@ export const GuidedPrinthouseJourney: React.FC<GuidedPrinthouseJourneyProps> = (
                                                         throw new Error(putJson.error?.message || putJson.message || 'El servidor rechazó el guardado de la plantilla.');
                                                     }
 
-                                                    // Fetch fresh server state to derive confirmation from server revision
-                                                    await fetchServerState(tenantId, false);
+                                                    // Fetch fresh server state to derive verifiable confirmation from server revision
+                                                    const refreshRes = await fetchServerState(tenantId, false);
 
-                                                    // Update draft stage navigation
+                                                    if (!refreshRes || !refreshRes.ok || !refreshRes.pricingOk) {
+                                                        // Subsequent query failed after successful PUT:
+                                                        // Do NOT confirm family, do NOT mark PRICING: true, do NOT advance to REVIEW
+                                                        setTemplatePendingVerification(true);
+                                                        return;
+                                                    }
+
+                                                    // Server query succeeded: check if the saved revision for this family is present
+                                                    const isFamilyConfirmed = Boolean(refreshRes.pricingContinuity?.[famId]?.templateSaved);
+                                                    if (!isFamilyConfirmed) {
+                                                        // Saved PUT did not yield a recognized saved revision for this family
+                                                        setTemplatePendingVerification(true);
+                                                        return;
+                                                    }
+
+                                                    // Family verified from server revision: derive Stage C completion across all enabled families
+                                                    const isStageCComplete = Boolean(refreshRes.stageCEval?.isComplete);
+
                                                     updateDraft(prev => ({
                                                         ...prev,
                                                         pricingContinuity: {
@@ -1589,9 +1688,9 @@ export const GuidedPrinthouseJourney: React.FC<GuidedPrinthouseJourneyProps> = (
                                                         },
                                                         completedStages: {
                                                             ...prev.completedStages,
-                                                            PRICING: true
+                                                            PRICING: isStageCComplete
                                                         },
-                                                        currentStage: 'REVIEW'
+                                                        currentStage: isStageCComplete ? 'REVIEW' : 'PRICING'
                                                     }));
                                                 } catch (e: any) {
                                                     setTemplateSaveError(e.message || 'Error al persistir la plantilla en el servidor.');
