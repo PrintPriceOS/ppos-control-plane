@@ -25,6 +25,7 @@ interface GuidedStepCompanyProps {
     onBackToWelcome: () => void;
     onOpenFullSetup?: () => void;
     onDraftChange?: (data: CompanyDraftData) => void;
+    focusField?: string | null;
 }
 
 export const GuidedStepCompany: React.FC<GuidedStepCompanyProps> = ({
@@ -32,7 +33,8 @@ export const GuidedStepCompany: React.FC<GuidedStepCompanyProps> = ({
     onSaveAndContinue,
     onBackToWelcome,
     onOpenFullSetup,
-    onDraftChange
+    onDraftChange,
+    focusField
 }) => {
     const { t } = useLocale();
     const [form, setForm] = useState<CompanyDraftData>(initialCompany);
@@ -40,6 +42,31 @@ export const GuidedStepCompany: React.FC<GuidedStepCompanyProps> = ({
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
     const [fieldErrors, setFieldErrors] = useState<{ legalName?: string; country?: string; city?: string }>({});
     const [savedNotice, setSavedNotice] = useState(false);
+
+    // Auto-focus designated field if requested (e.g. from Resolver click)
+    useEffect(() => {
+        if (!focusField) return;
+        const targetId = focusField === 'siteTimezone' || focusField === 'timezone'
+            ? 'company-site-timezone'
+            : focusField === 'legalName'
+                ? 'company-legal-name'
+                : focusField === 'country'
+                    ? 'company-country-select'
+                    : focusField === 'city'
+                        ? 'company-site-city'
+                        : focusField === 'siteName'
+                            ? 'company-site-name'
+                            : focusField === 'contactName'
+                                ? 'company-contact-name'
+                                : null;
+        if (targetId) {
+            const el = document.getElementById(targetId);
+            if (el) {
+                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                el.focus();
+            }
+        }
+    }, [focusField]);
 
     // Track initial props to avoid re-triggering form reset on local keystroke re-renders.
     // If incoming initialCompany matches current local form values, do NOT reset local form state.
@@ -273,6 +300,31 @@ export const GuidedStepCompany: React.FC<GuidedStepCompanyProps> = ({
                             />
                             <p className="text-[11px] text-zinc-500 mt-1">
                                 {t('guided.company.sitesNotice') || 'Podrás añadir plantas adicionales desde la configuración completa.'}
+                            </p>
+                        </div>
+
+                        <div>
+                            <label htmlFor="company-site-timezone" className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1">
+                                {t('setup.sites.timezone') || 'Zona horaria de producción'} <span className="text-[#dc0000]">*</span>
+                            </label>
+                            <select
+                                id="company-site-timezone"
+                                value={form.siteTimezone || (form.country === 'DE' ? 'Europe/Berlin' : form.country === 'GB' ? 'Europe/London' : 'Europe/Madrid')}
+                                onChange={(e) => handleChange('siteTimezone', e.target.value)}
+                                className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-900/80 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-[#dc0000]/30 focus:border-[#dc0000] transition-colors cursor-pointer"
+                            >
+                                <option value="Europe/Madrid">Europe/Madrid (CET/CEST)</option>
+                                <option value="Europe/Berlin">Europe/Berlin (CET/CEST)</option>
+                                <option value="Europe/London">Europe/London (GMT/BST)</option>
+                                <option value="Europe/Paris">Europe/Paris (CET/CEST)</option>
+                                <option value="Europe/Lisbon">Europe/Lisbon (WET/WEST)</option>
+                                <option value="America/New_York">America/New_York (EST/EDT)</option>
+                                <option value="America/Chicago">America/Chicago (CST/CDT)</option>
+                                <option value="America/Los_Angeles">America/Los_Angeles (PST/PDT)</option>
+                                <option value="UTC">UTC (Universal Time)</option>
+                            </select>
+                            <p className="text-[11px] text-zinc-500 mt-1">
+                                {t('guided.company.timezoneNotice') || 'Requerida para calcular los plazos de entrega y la hora de corte diario.'}
                             </p>
                         </div>
 

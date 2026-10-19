@@ -331,4 +331,74 @@ describe('GuidedStepReview & ManualOfferForm Defects & Regressions', () => {
         expect(screen.getByText('Total (€)')).toBeInTheDocument();
         expect(screen.getByText('Unit. (€/ud)')).toBeInTheDocument();
     });
+
+    it('differentiates global rates from per-family calibration with "En progreso (X/Y)" when families are uncalibrated', () => {
+        const onGoToFamilyPricing = vi.fn();
+        const onGoToCompanyField = vi.fn();
+
+        render(
+            <LocaleProvider initialLocale="es">
+                <GuidedStepReview
+                    company={mockCompany5of6}
+                    families={mockFamilies}
+                    enabledFamilies={mockEnabledFamilies}
+                    pricingContinuity={mockPricingContinuity}
+                    readinessData={{
+                        accountSetup: { status: 'COMPLETE', blockingIssues: [], advisories: [] },
+                        operationalConfiguration: { status: 'COMPLETE', blockingIssues: [] },
+                        pricingReadiness: { status: 'COMPLETE', blockingIssues: [] } // Global rates are COMPLETE
+                    }}
+                    onBackToPricing={vi.fn()}
+                    onOpenFullSetup={vi.fn()}
+                    onGoToFamilyPricing={onGoToFamilyPricing}
+                    onGoToCompanyField={onGoToCompanyField}
+                />
+            </LocaleProvider>
+        );
+
+        // Global rates banner indicates base rates configured
+        expect(screen.getByText(/Tarifas industriales base \(taller\):/)).toBeInTheDocument();
+        expect(screen.getByText('Configuradas')).toBeInTheDocument();
+
+        // But overall pricing card badge indicates "En progreso (2/4)" because HARDCOVER (calibrated) and SOFTCOVER (assistant quotes) are configured, but WIRE_O and SADDLE_STITCH are pending
+        expect(screen.getByText(/En progreso \(2\/4\)/)).toBeInTheDocument();
+
+        // Unconfigured family has a direct "Configurar" button
+        const configureButtons = screen.getAllByText('Configurar');
+        expect(configureButtons.length).toBeGreaterThanOrEqual(1);
+
+        // Clicking "Configurar" calls onGoToFamilyPricing with specific family ID
+        configureButtons[0].click();
+        expect(onGoToFamilyPricing).toHaveBeenCalledWith('SADDLE_STITCH');
+    });
+
+    it('marks Pricing stage complete only when all enabled families have configured rates or methods', () => {
+        const allConfiguredFamilies: Record<ProductFamilyId, FamilyState> = {
+            ...mockFamilies,
+            SOFTCOVER: { ...mockFamilies.SOFTCOVER, status: 'DATA_VALIDATED' },
+            WIRE_O: { ...mockFamilies.WIRE_O, status: 'DATA_VALIDATED' },
+            SADDLE_STITCH: { ...mockFamilies.SADDLE_STITCH, status: 'DATA_VALIDATED' }
+        };
+
+        render(
+            <LocaleProvider initialLocale="es">
+                <GuidedStepReview
+                    company={mockCompany5of6}
+                    families={allConfiguredFamilies}
+                    enabledFamilies={mockEnabledFamilies}
+                    pricingContinuity={mockPricingContinuity}
+                    readinessData={{
+                        accountSetup: { status: 'COMPLETE', blockingIssues: [], advisories: [] },
+                        operationalConfiguration: { status: 'COMPLETE', blockingIssues: [] },
+                        pricingReadiness: { status: 'COMPLETE', blockingIssues: [] }
+                    }}
+                    onBackToPricing={vi.fn()}
+                    onOpenFullSetup={vi.fn()}
+                />
+            </LocaleProvider>
+        );
+
+        // When all are DATA_VALIDATED -> "Calibrado con IA"
+        expect(screen.getByText('Calibrado con IA')).toBeInTheDocument();
+    });
 });

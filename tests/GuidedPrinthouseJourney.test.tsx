@@ -867,6 +867,10 @@ describe('Guided Printhouse Onboarding Journey Suite', () => {
                 siteTimezone: 'Europe/Madrid'
             },
             offerDrafts: {},
+            pricingContinuity: {
+                HARDCOVER: { pricingMethod: 'TEMPLATE' } as any,
+                SOFTCOVER: { pricingMethod: 'TEMPLATE' } as any
+            },
             lastSavedTimestamp: Date.now(),
             completedStages: { WELCOME: true, COMPANY: true, PRODUCTS: true, PRICING: true, REVIEW: false }
         });

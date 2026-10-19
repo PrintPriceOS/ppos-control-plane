@@ -37,7 +37,8 @@ import {
     saveGuidedOnboardingDraft,
     clearGuidedOnboardingDraft,
     createDefaultDraft,
-    deriveServerStage
+    deriveServerStage,
+    evaluateStageCCompletion
 } from '../../../lib/onboardingDraftStore';
 import { ProductFamilyId, FamilyState } from '../../../types/printhouseOnboardingTypes';
 import { normalizeUiError } from '../../../utils/errorUtils';
@@ -87,6 +88,7 @@ export const GuidedPrinthouseJourney: React.FC<GuidedPrinthouseJourneyProps> = (
     // ── Readiness Refresh Freshness State ──
     const [isRefreshingReadiness, setIsRefreshingReadiness] = useState<boolean>(false);
     const [readinessError, setReadinessError] = useState<string | null>(null);
+    const [companyFocusField, setCompanyFocusField] = useState<string | null>(null);
 
     // Track mounted state to safely discard background updates after unmount
     const isMountedRef = useRef<boolean>(true);
@@ -333,12 +335,19 @@ export const GuidedPrinthouseJourney: React.FC<GuidedPrinthouseJourneyProps> = (
                     const isPricingCompleteOnServer = data.data?.readiness?.pricingReadiness?.status === 'COMPLETE';
                     const isOpsCompleteOnServer = data.data?.readiness?.operationalConfiguration?.status === 'COMPLETE' || data.data?.readiness?.operationalReadiness?.status === 'COMPLETE';
 
+                    const stageCEvalOnServer = evaluateStageCCompletion(
+                        data.data?.readiness,
+                        reconciledFamilies,
+                        prev.pricingContinuity || {},
+                        families
+                    );
+
                     const reconciledCompletedStages = {
                         WELCOME: true,
                         COMPANY: isAccountCompleteOnServer || Boolean(prev.completedStages?.COMPANY),
                         PRODUCTS: serverProductsConfirmed || Boolean(prev.completedStages?.PRODUCTS),
-                        PRICING: isPricingCompleteOnServer || Boolean(prev.completedStages?.PRICING),
-                        REVIEW: Boolean(isAccountCompleteOnServer && isPricingCompleteOnServer && isOpsCompleteOnServer)
+                        PRICING: stageCEvalOnServer.isComplete,
+                        REVIEW: Boolean(isAccountCompleteOnServer && stageCEvalOnServer.isComplete && isOpsCompleteOnServer)
                     };
 
                     // Runtime Reconciliation of First Pending Guided Stage:
@@ -353,7 +362,9 @@ export const GuidedPrinthouseJourney: React.FC<GuidedPrinthouseJourneyProps> = (
                         draftStage: prev.currentStage,
                         completedStages: reconciledCompletedStages,
                         enabledFamilies: reconciledFamilies,
-                        hasPricingContinuity
+                        hasPricingContinuity,
+                        pricingContinuity: prev.pricingContinuity,
+                        familiesState: families
                     };
 
                     const serverDerivedStage = deriveServerStage(data.data?.readiness, derivationCtx);
@@ -973,6 +984,7 @@ export const GuidedPrinthouseJourney: React.FC<GuidedPrinthouseJourneyProps> = (
                 {draft.currentStage === 'COMPANY' && (
                     <GuidedStepCompany
                         initialCompany={draft.company}
+                        focusField={companyFocusField}
                         onSaveAndContinue={handleSaveCompany}
                         onDraftChange={(nextCompany) => {
                             updateDraft(prev => ({
@@ -1441,6 +1453,14 @@ export const GuidedPrinthouseJourney: React.FC<GuidedPrinthouseJourneyProps> = (
                         onBackToPricing={() => setStage('PRICING')}
                         onOpenFullSetup={onOpenFullSetup}
                         onRefreshReadiness={() => fetchServerState()}
+                        onGoToCompanyField={(field) => {
+                            setCompanyFocusField(field);
+                            setStage('COMPANY');
+                        }}
+                        onGoToFamilyPricing={(familyId) => {
+                            handleSelectActiveFamily(familyId);
+                            setStage('PRICING');
+                        }}
                     />
                 )}
             </main>

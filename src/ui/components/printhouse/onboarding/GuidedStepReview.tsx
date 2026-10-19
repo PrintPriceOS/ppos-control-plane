@@ -23,6 +23,7 @@ import { BindingIcon } from './BindingFamilyIcons';
 import { CompanyDraftData, FamilyPricingSessionDraft } from '../../../lib/onboardingDraftStore';
 import { getAuthToken } from '../../../lib/authStore';
 import { normalizeUiError } from '../../../utils/errorUtils';
+import { evaluateStageCCompletion } from '../../../lib/onboardingDraftStore';
 
 interface GuidedStepReviewProps {
     company: CompanyDraftData;
@@ -35,6 +36,8 @@ interface GuidedStepReviewProps {
     onBackToPricing: () => void;
     onOpenFullSetup: (targetTab?: string) => void;
     onRefreshReadiness?: () => Promise<void>;
+    onGoToFamilyPricing?: (familyId: ProductFamilyId) => void;
+    onGoToCompanyField?: (fieldName: string) => void;
 }
 
 export const GuidedStepReview: React.FC<GuidedStepReviewProps> = ({
@@ -47,7 +50,9 @@ export const GuidedStepReview: React.FC<GuidedStepReviewProps> = ({
     refreshError = null,
     onBackToPricing,
     onOpenFullSetup,
-    onRefreshReadiness
+    onRefreshReadiness,
+    onGoToFamilyPricing,
+    onGoToCompanyField
 }) => {
     const { t } = useLocale();
     const [submittingReview, setSubmittingReview] = useState(false);
@@ -70,13 +75,23 @@ export const GuidedStepReview: React.FC<GuidedStepReviewProps> = ({
         ...(pricingReadiness?.blockingIssues || [])
     ];
 
+    // Stage C genuine completion evaluation (Global rates + Per-family configuration)
+    const stageCEval = evaluateStageCCompletion(
+        readinessData,
+        enabledFamilies,
+        pricingContinuity || {},
+        families
+    );
+
+    const isGlobalPricingComplete = pricingReadiness?.status === 'COMPLETE';
+    const isStageCComplete = stageCEval.isComplete;
+
     // Explicit readiness freshness check:
     // Stale COMPLETE data must NEVER enable submission while refreshing or if that refresh failed.
     const isReadinessLoaded = Boolean(!isRefreshingReadiness && !refreshError && readinessData && (accountReadiness || opsReadiness || pricingReadiness));
     const isAccountComplete = accountReadiness?.status === 'COMPLETE';
     const isOpsComplete = opsReadiness?.status === 'COMPLETE';
-    const isPricingComplete = pricingReadiness?.status === 'COMPLETE';
-    const canRequestReview = isReadinessLoaded && isAccountComplete && isOpsComplete && isPricingComplete && blockingIssues.length === 0;
+    const canRequestReview = isReadinessLoaded && isAccountComplete && isOpsComplete && isStageCComplete && blockingIssues.length === 0;
 
     const handleSubmitForReview = async () => {
         if (!canRequestReview || submittingReview) return;
@@ -321,13 +336,35 @@ export const GuidedStepReview: React.FC<GuidedStepReviewProps> = ({
                                 </h3>
                             </div>
                             <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
-                                isPricingComplete
-                                    ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800'
-                                    : 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800'
+                                stageCEval.isComplete
+                                    ? (stageCEval.calibratedCount === stageCEval.totalEnabled
+                                        ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800'
+                                        : 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800')
+                                    : isGlobalPricingComplete
+                                        ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800'
+                                        : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border-zinc-200 dark:border-zinc-700'
                             }`}>
-                                {isPricingComplete 
-                                    ? (t('guided.review.statusCalibrated') || 'Calibrado') 
-                                    : (t('guided.review.statusInProgress') || 'En progreso')}
+                                {stageCEval.isComplete 
+                                    ? (stageCEval.calibratedCount === stageCEval.totalEnabled
+                                        ? (t('guided.review.statusCalibrated') || 'Calibrado con IA')
+                                        : (t('guided.review.statusRatesConfigured') || 'Tarifas configuradas'))
+                                    : isGlobalPricingComplete
+                                        ? `${t('guided.review.statusInProgress') || 'En progreso'} (${stageCEval.configuredCount}/${stageCEval.totalEnabled})`
+                                        : (t('setup.status.notStarted') || 'Sin configurar')}
+                            </span>
+                        </div>
+
+                        {/* Global Rates Status banner */}
+                        <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-100 dark:border-zinc-800 text-xs">
+                            <span className="text-[11px] font-medium text-zinc-600 dark:text-zinc-400">
+                                {t('guided.review.globalRatesStatus') || 'Tarifas industriales base (taller)'}:
+                            </span>
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+                                isGlobalPricingComplete
+                                    ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400'
+                                    : 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400'
+                            }`}>
+                                {isGlobalPricingComplete ? (t('guided.review.globalRatesConfigured') || 'Configuradas') : (t('guided.review.globalRatesPending') || 'Pendientes')}
                             </span>
                         </div>
 
@@ -410,6 +447,15 @@ export const GuidedStepReview: React.FC<GuidedStepReviewProps> = ({
                                                                     ? (t('guided.review.statusMethodSelected') || 'Método seleccionado')
                                                                     : (t('guided.review.statusDeclared') || 'Declarada')}
                                                     </span>
+                                                    {(!isFamilyCalibrated && !methodChoice) && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => onGoToFamilyPricing ? onGoToFamilyPricing(fid) : onBackToPricing()}
+                                                            className="text-[11px] font-bold text-[#dc0000] hover:underline cursor-pointer"
+                                                        >
+                                                            {t('common.configure') || 'Configurar'}
+                                                        </button>
+                                                    )}
                                                 </div>
                                             </div>
                                         );
@@ -498,44 +544,79 @@ export const GuidedStepReview: React.FC<GuidedStepReviewProps> = ({
                                 <li className="space-y-1">
                                     <div className="flex items-center justify-between font-semibold">
                                         <span>{t('guided.review.pendingAccount') || 'Datos de empresa o primera planta de producción incompletos'}:</span>
-                                        <button
-                                            type="button"
-                                            onClick={() => onOpenFullSetup('COMPANY')}
-                                            className="text-[11px] font-bold text-amber-900 dark:text-amber-100 underline ml-2 cursor-pointer"
-                                        >
-                                            {t('common.resolve') || 'Resolver'}
-                                        </button>
+                                        <div className="flex items-center gap-2">
+                                            {onGoToCompanyField && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => onGoToCompanyField('legalName')}
+                                                    className="text-[11px] font-bold text-amber-900 dark:text-amber-100 underline cursor-pointer"
+                                                >
+                                                    {t('guided.action.editInStep') || 'Editar en asistente'}
+                                                </button>
+                                            )}
+                                            <button
+                                                type="button"
+                                                onClick={() => onOpenFullSetup('COMPANY')}
+                                                className="text-[11px] font-bold text-amber-900/80 dark:text-amber-200/80 hover:underline cursor-pointer"
+                                            >
+                                                {t('guided.action.openFullSetup') || 'Configuración completa'}
+                                            </button>
+                                        </div>
                                     </div>
                                     <div className="pl-3 flex flex-wrap gap-1.5 text-[11px]">
                                         {!company?.legalName?.trim() && (
-                                            <span className="px-2 py-0.5 rounded bg-amber-100 dark:bg-amber-900/50 text-amber-900 dark:text-amber-200">
-                                                {t('guided.review.fieldMissing') || 'Falta'}: {t('guided.review.field.legalName') || 'Razón social'}
-                                            </span>
+                                            <button
+                                                type="button"
+                                                onClick={() => onGoToCompanyField ? onGoToCompanyField('legalName') : onOpenFullSetup('COMPANY')}
+                                                className="px-2 py-0.5 rounded bg-amber-100 dark:bg-amber-900/50 text-amber-900 dark:text-amber-200 hover:bg-amber-200 dark:hover:bg-amber-800 transition-colors cursor-pointer"
+                                            >
+                                                {t('guided.review.fieldMissing') || 'Falta'}: {t('guided.review.field.legalName') || 'Razón social'} ↗
+                                            </button>
                                         )}
                                         {!company?.country?.trim() && (
-                                            <span className="px-2 py-0.5 rounded bg-amber-100 dark:bg-amber-900/50 text-amber-900 dark:text-amber-200">
-                                                {t('guided.review.fieldMissing') || 'Falta'}: {t('guided.review.field.country') || 'País'}
-                                            </span>
+                                            <button
+                                                type="button"
+                                                onClick={() => onGoToCompanyField ? onGoToCompanyField('country') : onOpenFullSetup('COMPANY')}
+                                                className="px-2 py-0.5 rounded bg-amber-100 dark:bg-amber-900/50 text-amber-900 dark:text-amber-200 hover:bg-amber-200 dark:hover:bg-amber-800 transition-colors cursor-pointer"
+                                            >
+                                                {t('guided.review.fieldMissing') || 'Falta'}: {t('guided.review.field.country') || 'País'} ↗
+                                            </button>
                                         )}
                                         {!company?.city?.trim() && (
-                                            <span className="px-2 py-0.5 rounded bg-amber-100 dark:bg-amber-900/50 text-amber-900 dark:text-amber-200">
-                                                {t('guided.review.fieldMissing') || 'Falta'}: {t('guided.review.field.city') || 'Ciudad'}
-                                            </span>
+                                            <button
+                                                type="button"
+                                                onClick={() => onGoToCompanyField ? onGoToCompanyField('city') : onOpenFullSetup('SITES')}
+                                                className="px-2 py-0.5 rounded bg-amber-100 dark:bg-amber-900/50 text-amber-900 dark:text-amber-200 hover:bg-amber-200 dark:hover:bg-amber-800 transition-colors cursor-pointer"
+                                            >
+                                                {t('guided.review.fieldMissing') || 'Falta'}: {t('guided.review.field.city') || 'Ciudad'} ↗
+                                            </button>
                                         )}
                                         {!company?.siteName?.trim() && (
-                                            <span className="px-2 py-0.5 rounded bg-amber-100 dark:bg-amber-900/50 text-amber-900 dark:text-amber-200">
-                                                {t('guided.review.fieldMissing') || 'Falta'}: {t('guided.review.field.siteName') || 'Nombre de planta'}
-                                            </span>
+                                            <button
+                                                type="button"
+                                                onClick={() => onGoToCompanyField ? onGoToCompanyField('siteName') : onOpenFullSetup('SITES')}
+                                                className="px-2 py-0.5 rounded bg-amber-100 dark:bg-amber-900/50 text-amber-900 dark:text-amber-200 hover:bg-amber-200 dark:hover:bg-amber-800 transition-colors cursor-pointer"
+                                            >
+                                                {t('guided.review.fieldMissing') || 'Falta'}: {t('guided.review.field.siteName') || 'Nombre de planta'} ↗
+                                            </button>
                                         )}
                                         {(!company?.contactName?.trim() && !company?.phone?.trim()) && (
-                                            <span className="px-2 py-0.5 rounded bg-amber-100 dark:bg-amber-900/50 text-amber-900 dark:text-amber-200">
-                                                {t('guided.review.fieldMissing') || 'Falta'}: {t('guided.review.field.contact') || 'Persona o teléfono de contacto'}
-                                            </span>
+                                            <button
+                                                type="button"
+                                                onClick={() => onGoToCompanyField ? onGoToCompanyField('contactName') : onOpenFullSetup('COMPANY')}
+                                                className="px-2 py-0.5 rounded bg-amber-100 dark:bg-amber-900/50 text-amber-900 dark:text-amber-200 hover:bg-amber-200 dark:hover:bg-amber-800 transition-colors cursor-pointer"
+                                            >
+                                                {t('guided.review.fieldMissing') || 'Falta'}: {t('guided.review.field.contact') || 'Persona o teléfono de contacto'} ↗
+                                            </button>
                                         )}
                                         {(!company?.siteTimezone?.trim() && (accountReadiness?.advisories || []).some((a: any) => a.code === 'ADD_SITE_TIMEZONE')) && (
-                                            <span className="px-2 py-0.5 rounded bg-amber-100 dark:bg-amber-900/50 text-amber-900 dark:text-amber-200">
-                                                {t('guided.review.fieldMissing') || 'Falta'}: {t('guided.review.field.timezone') || 'Zona horaria de la planta'}
-                                            </span>
+                                            <button
+                                                type="button"
+                                                onClick={() => onGoToCompanyField ? onGoToCompanyField('siteTimezone') : onOpenFullSetup('SITES')}
+                                                className="px-2 py-0.5 rounded bg-amber-100 dark:bg-amber-900/50 text-amber-900 dark:text-amber-200 hover:bg-amber-200 dark:hover:bg-amber-800 transition-colors cursor-pointer"
+                                            >
+                                                {t('guided.review.fieldMissing') || 'Falta'}: {t('guided.review.field.timezone') || 'Zona horaria de la planta'} ↗
+                                            </button>
                                         )}
                                     </div>
                                 </li>
@@ -552,16 +633,36 @@ export const GuidedStepReview: React.FC<GuidedStepReviewProps> = ({
                                     </button>
                                 </li>
                             )}
-                            {!isPricingComplete && (
-                                <li className="flex items-center justify-between">
-                                    <span>{t('guided.review.pendingPricing') || 'Calibración o configuración de tarifas de fabricación sin confirmar.'}</span>
-                                    <button
-                                        type="button"
-                                        onClick={onBackToPricing}
-                                        className="text-[11px] font-bold text-amber-900 dark:text-amber-100 underline ml-2 cursor-pointer"
-                                    >
-                                        {t('common.goToPricing') || 'Ir a precios'}
-                                    </button>
+                            {!stageCEval.isComplete && (
+                                <li className="space-y-1">
+                                    <div className="flex items-center justify-between font-semibold">
+                                        <span>
+                                            {!isGlobalPricingComplete 
+                                                ? (t('guided.review.pendingGlobalPricing') || 'Tarifas industriales base del taller sin configurar')
+                                                : `${t('guided.review.pendingFamilyPricing') || 'Familias de producto con tarifas pendientes'} (${stageCEval.pendingFamilies.length})`}
+                                        </span>
+                                        <button
+                                            type="button"
+                                            onClick={onBackToPricing}
+                                            className="text-[11px] font-bold text-amber-900 dark:text-amber-100 underline ml-2 cursor-pointer"
+                                        >
+                                            {t('common.goToPricing') || 'Ir a precios'}
+                                        </button>
+                                    </div>
+                                    {stageCEval.pendingFamilies.length > 0 && (
+                                        <div className="pl-3 flex flex-wrap gap-1.5 text-[11px]">
+                                            {stageCEval.pendingFamilies.map(fid => (
+                                                <button
+                                                    key={fid}
+                                                    type="button"
+                                                    onClick={() => onGoToFamilyPricing ? onGoToFamilyPricing(fid) : onBackToPricing()}
+                                                    className="px-2 py-0.5 rounded bg-amber-100 dark:bg-amber-900/50 text-amber-900 dark:text-amber-200 hover:bg-amber-200 dark:hover:bg-amber-800 transition-colors cursor-pointer"
+                                                >
+                                                    {t(families[fid]?.titleKey || fid)}: {t('guided.review.pendingMethodOrRates') || 'Asignar método'} ↗
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
                                 </li>
                             )}
                             {blockingIssues.map((issue, idx) => (
@@ -569,7 +670,13 @@ export const GuidedStepReview: React.FC<GuidedStepReviewProps> = ({
                                     <span>{typeof issue === 'string' ? issue : (issue.message || issue.description || JSON.stringify(issue))}</span>
                                     <button
                                         type="button"
-                                        onClick={() => onOpenFullSetup(issue.targetTab || 'OVERVIEW')}
+                                        onClick={() => {
+                                            if (issue.stage === 'COMPANY' && onGoToCompanyField && issue.targetField) {
+                                                onGoToCompanyField(issue.targetField);
+                                            } else {
+                                                onOpenFullSetup(issue.targetTab || 'OVERVIEW');
+                                            }
+                                        }}
                                         className="text-[11px] font-bold text-amber-900 dark:text-amber-100 underline ml-2 cursor-pointer"
                                     >
                                         {t('common.resolve') || 'Resolver'}

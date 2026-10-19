@@ -40,9 +40,16 @@ class PrinthouseReadinessService {
 
         // 2. Fetch canonical Printer Nodes (Production Sites) for tenant
         const sites = await db.query(
-            'SELECT id, name, country, city, email, phone, website, status FROM printer_nodes WHERE tenant_id = ? AND status != "DELETED"',
+            'SELECT id, name, country, city, email, phone, website, status, region FROM printer_nodes WHERE tenant_id = ? AND status != "DELETED"',
             [tenantId]
         ).catch(() => []);
+
+        // Also query fallback timezone from printhouse_site_lead_times if legacy site has it configured there
+        const siteLeadTimeRows = await db.query(
+            'SELECT timezone FROM printhouse_site_lead_times WHERE tenant_id = ? AND timezone IS NOT NULL AND timezone != "" LIMIT 1',
+            [tenantId]
+        ).catch(() => []);
+        const fallbackLeadTimezone = siteLeadTimeRows[0]?.timezone || '';
 
         // 3. Evaluate Account Setup Facts
         const blockingIssues = [];
@@ -55,7 +62,14 @@ class PrinthouseReadinessService {
         if (companyName && !companyName.includes('Ph-') && !companyName.includes('Configuring')) {
             completedRequirements++;
         } else {
-            blockingIssues.push({ code: 'ADD_LEGAL_COMPANY_NAME', module: 'COMPANY_PROFILE', message: 'Set official legal company name' });
+            blockingIssues.push({
+                code: 'ADD_LEGAL_COMPANY_NAME',
+                module: 'COMPANY_PROFILE',
+                targetTab: 'COMPANY',
+                targetField: 'legalName',
+                stage: 'COMPANY',
+                message: 'Set official legal company name'
+            });
         }
 
         // Fact 2: Primary Country
@@ -63,7 +77,14 @@ class PrinthouseReadinessService {
         if (country && country !== 'Pending Setup') {
             completedRequirements++;
         } else {
-            blockingIssues.push({ code: 'ADD_COUNTRY', module: 'COMPANY_PROFILE', message: 'Specify primary country of operation' });
+            blockingIssues.push({
+                code: 'ADD_COUNTRY',
+                module: 'COMPANY_PROFILE',
+                targetTab: 'COMPANY',
+                targetField: 'country',
+                stage: 'COMPANY',
+                message: 'Specify primary country of operation'
+            });
         }
 
         // Fact 3: Primary Contact Info
@@ -72,7 +93,14 @@ class PrinthouseReadinessService {
         if (contactName || phone) {
             completedRequirements++;
         } else {
-            advisories.push({ code: 'ADD_PRIMARY_CONTACT', module: 'COMPANY_PROFILE', message: 'Add primary contact person and phone number' });
+            advisories.push({
+                code: 'ADD_PRIMARY_CONTACT',
+                module: 'COMPANY_PROFILE',
+                targetTab: 'COMPANY',
+                targetField: 'contactName',
+                stage: 'COMPANY',
+                message: 'Add primary contact person and phone number'
+            });
         }
 
         // Fact 4: First Production Site
@@ -80,21 +108,43 @@ class PrinthouseReadinessService {
         if (validSite) {
             completedRequirements++;
         } else {
-            blockingIssues.push({ code: 'ADD_FIRST_PRODUCTION_SITE', module: 'PRODUCTION_SITES', message: 'Configure primary production site' });
+            blockingIssues.push({
+                code: 'ADD_FIRST_PRODUCTION_SITE',
+                module: 'PRODUCTION_SITES',
+                targetTab: 'SITES',
+                targetField: 'siteName',
+                stage: 'COMPANY',
+                message: 'Configure primary production site'
+            });
         }
 
         // Fact 5: Site City / Address
         if (validSite && validSite.city && validSite.city !== 'Pending Setup') {
             completedRequirements++;
         } else {
-            blockingIssues.push({ code: 'COMPLETE_SITE_ADDRESS', module: 'PRODUCTION_SITES', message: 'Provide complete city and facility location' });
+            blockingIssues.push({
+                code: 'COMPLETE_SITE_ADDRESS',
+                module: 'PRODUCTION_SITES',
+                targetTab: 'SITES',
+                targetField: 'city',
+                stage: 'COMPANY',
+                message: 'Provide complete city and facility location'
+            });
         }
 
-        // Fact 6: Timezone / Region
-        if (validSite && (validSite.region || metadata?.timezone)) {
+        // Fact 6: Timezone / Region (canonical: printer_nodes.region; fallbacks: metadata.timezone or printhouse_site_lead_times.timezone)
+        const siteTimezone = (validSite && validSite.region) || metadata?.timezone || fallbackLeadTimezone;
+        if (validSite && siteTimezone) {
             completedRequirements++;
         } else {
-            advisories.push({ code: 'ADD_SITE_TIMEZONE', module: 'PRODUCTION_SITES', message: 'Select production site timezone' });
+            advisories.push({
+                code: 'ADD_SITE_TIMEZONE',
+                module: 'PRODUCTION_SITES',
+                targetTab: 'SITES',
+                targetField: 'timezone',
+                stage: 'COMPANY',
+                message: 'Select production site timezone'
+            });
         }
 
         const accountSetupStatus = completedRequirements === totalRequirements 
@@ -103,9 +153,9 @@ class PrinthouseReadinessService {
 
         let nextAction = null;
         if (blockingIssues.length > 0) {
-            nextAction = { code: blockingIssues[0].code, module: blockingIssues[0].module };
+            nextAction = { code: blockingIssues[0].code, module: blockingIssues[0].module, targetTab: blockingIssues[0].targetTab, stage: blockingIssues[0].stage };
         } else if (advisories.length > 0) {
-            nextAction = { code: advisories[0].code, module: advisories[0].module };
+            nextAction = { code: advisories[0].code, module: advisories[0].module, targetTab: advisories[0].targetTab, stage: advisories[0].stage };
         }
 
         // ──── Phase 191E / 191F: Operational Readiness (Standardize Terminology) ────
@@ -182,18 +232,54 @@ class PrinthouseReadinessService {
                         pricingStatus = 'COMPLETE';
                     } else {
                         pricingStatus = 'IN_PROGRESS';
-                        if (!hasInterior) pricingBlockers.push({ code: 'MISSING_INTERIOR_PRICING', module: 'PRICING', message: 'Configure interior printing sheet or run rates' });
-                        if (!hasPaper) pricingBlockers.push({ code: 'MISSING_PAPER_PRICING', module: 'PRICING', message: 'Configure paper cost per kilo' });
-                        if (!hasBinding) pricingBlockers.push({ code: 'MISSING_BINDING_PRICING', module: 'PRICING', message: 'Configure at least one binding rate' });
-                        if (!hasTransport) pricingBlockers.push({ code: 'MISSING_TRANSPORT_PRICING', module: 'PRICING', message: 'Configure destination transport cost' });
+                        if (!hasInterior) pricingBlockers.push({
+                            code: 'MISSING_INTERIOR_PRICING',
+                            module: 'PRICING',
+                            targetTab: 'PRICING',
+                            stage: 'PRICING',
+                            message: 'Configure interior printing sheet or run rates'
+                        });
+                        if (!hasPaper) pricingBlockers.push({
+                            code: 'MISSING_PAPER_PRICING',
+                            module: 'PRICING',
+                            targetTab: 'PRICING',
+                            stage: 'PRICING',
+                            message: 'Configure paper cost per kilo'
+                        });
+                        if (!hasBinding) pricingBlockers.push({
+                            code: 'MISSING_BINDING_PRICING',
+                            module: 'PRICING',
+                            targetTab: 'PRICING',
+                            stage: 'PRICING',
+                            message: 'Configure at least one binding rate'
+                        });
+                        if (!hasTransport) pricingBlockers.push({
+                            code: 'MISSING_TRANSPORT_PRICING',
+                            module: 'PRICING',
+                            targetTab: 'PRICING',
+                            stage: 'PRICING',
+                            message: 'Configure destination transport cost'
+                        });
                     }
                 } else {
                     pricingStatus = 'NOT_STARTED';
-                    pricingBlockers.push({ code: 'MISSING_INDUSTRIAL_PRICING', module: 'PRICING', message: 'Configure industrial manufacturing rates' });
+                    pricingBlockers.push({
+                        code: 'MISSING_INDUSTRIAL_PRICING',
+                        module: 'PRICING',
+                        targetTab: 'PRICING',
+                        stage: 'PRICING',
+                        message: 'Configure industrial manufacturing rates'
+                    });
                 }
             } else {
                 pricingStatus = 'NOT_STARTED';
-                pricingBlockers.push({ code: 'MISSING_PRINTER_NODE', module: 'PRICING', message: 'No printer node configured for pricing' });
+                pricingBlockers.push({
+                    code: 'MISSING_PRINTER_NODE',
+                    module: 'PRICING',
+                    targetTab: 'SITES',
+                    stage: 'COMPANY',
+                    message: 'No printer node configured for pricing'
+                });
             }
         } catch (e) {
             pricingStatus = 'NOT_STARTED';
@@ -276,6 +362,8 @@ class PrinthouseReadinessService {
                 operationalBlockers.push({
                     code: 'ADD_FIRST_MACHINE',
                     module: 'MACHINES',
+                    targetTab: 'MACHINES',
+                    stage: 'COMPANY',
                     message: 'Add at least one production machine to a site'
                 });
             }
@@ -305,6 +393,8 @@ class PrinthouseReadinessService {
                     operationalAdvisories.push({
                         code: 'CONFIGURE_MACHINE_CAPABILITIES',
                         module: 'CAPABILITIES',
+                        targetTab: 'CAPABILITIES',
+                        stage: 'PRODUCTS',
                         message: 'Configure production capabilities on at least one machine'
                     });
                 }
@@ -330,6 +420,8 @@ class PrinthouseReadinessService {
                 operationalBlockers.push({
                     code: 'ADD_FIRST_MATERIAL',
                     module: 'MATERIALS',
+                    targetTab: 'MATERIALS',
+                    stage: 'COMPANY',
                     message: 'Add at least one material to the catalog'
                 });
             }
@@ -348,6 +440,8 @@ class PrinthouseReadinessService {
                 operationalBlockers.push({
                     code: 'CONFIGURE_SITE_CAPACITY',
                     module: 'CAPACITY',
+                    targetTab: 'CAPACITY',
+                    stage: 'COMPANY',
                     message: 'Configure daily capacity limits'
                 });
             }
@@ -369,6 +463,8 @@ class PrinthouseReadinessService {
                 operationalBlockers.push({
                     code: 'CONFIGURE_SITE_LEAD_TIMES',
                     module: 'LEAD_TIMES',
+                    targetTab: 'LEAD_TIMES',
+                    stage: 'COMPANY',
                     message: 'Configure site lead times and cutoff rules'
                 });
             }

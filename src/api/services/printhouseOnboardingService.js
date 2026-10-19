@@ -30,6 +30,22 @@ class PrinthouseOnboardingService {
                 : (tenant.metadata_json || {});
         } catch (e) {}
 
+        // Canonical site lookup for primary facility timezone and legacy lead_times fallback
+        const primarySites = await db.query(
+            'SELECT id, name, region FROM printer_nodes WHERE tenant_id = ? AND status != "DELETED" ORDER BY created_at ASC LIMIT 1',
+            [tenantId]
+        ).catch(() => []);
+        const primarySite = primarySites[0];
+
+        let siteTimezone = primarySite?.region || metadata.timezone || '';
+        if (!siteTimezone) {
+            const leadTimeRows = await db.query(
+                'SELECT timezone FROM printhouse_site_lead_times WHERE tenant_id = ? AND timezone IS NOT NULL AND timezone != "" LIMIT 1',
+                [tenantId]
+            ).catch(() => []);
+            siteTimezone = leadTimeRows[0]?.timezone || '';
+        }
+
         return {
             tenantId: tenant.id,
             companyName: tenant.name,
@@ -44,6 +60,7 @@ class PrinthouseOnboardingService {
             contactName: metadata.contact_name || '',
             taxId: metadata.tax_id || '',
             companyRegistrationId: metadata.company_registration_id || '',
+            siteTimezone: siteTimezone || '',
             selectedProductFamilies: Array.isArray(metadata.selected_product_families)
                 ? metadata.selected_product_families
                 : null,
@@ -69,6 +86,7 @@ class PrinthouseOnboardingService {
             contactName,
             taxId,
             companyRegistrationId,
+            siteTimezone,
             selectedProductFamilies,
             productsConfirmed
         } = payload || {};
@@ -107,6 +125,15 @@ class PrinthouseOnboardingService {
         if (contactName !== undefined) metadata.contact_name = String(contactName).trim();
         if (taxId !== undefined) metadata.tax_id = String(taxId).trim();
         if (companyRegistrationId !== undefined) metadata.company_registration_id = String(companyRegistrationId).trim();
+        if (siteTimezone !== undefined) {
+            const cleanTz = String(siteTimezone).trim();
+            metadata.timezone = cleanTz;
+            // Also sync to primary printer_nodes.region if available
+            await db.query(
+                'UPDATE printer_nodes SET region = ? WHERE tenant_id = ? AND status != "DELETED" ORDER BY created_at ASC LIMIT 1',
+                [cleanTz, tenantId]
+            ).catch(() => {});
+        }
 
         if (selectedProductFamilies !== undefined) {
             const ALLOWED_FAMILIES = ['HARDCOVER', 'SOFTCOVER', 'WIRE_O', 'SADDLE_STITCH'];
