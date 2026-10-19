@@ -549,8 +549,9 @@ describe('Simplified Printhouse Onboarding Journey Suite', () => {
         resolveFetch({
             ok: true,
             json: async () => ({
+                ok: true,
                 productTitle: 'Hardcover Stale Quote In Flight',
-                runs: [{ id: 'run-hc-stale', quantity: 1500, manufacturingPrice: 3200 }]
+                offers: [{ id: 'run-hc-stale', quantity: 1500, manufacturingPrice: 3200, transportPrice: 200, quotedTotalPrice: 3400 }]
             })
         });
 
@@ -593,8 +594,9 @@ describe('Simplified Printhouse Onboarding Journey Suite', () => {
         resolveFetch({
             ok: true,
             json: async () => ({
+                ok: true,
                 productTitle: 'Late Abandoned Upload Spec',
-                runs: [{ id: 'run-abandoned', quantity: 1000, manufacturingPrice: 1200 }]
+                offers: [{ id: 'run-abandoned', quantity: 1000, manufacturingPrice: 1200, transportPrice: 100, quotedTotalPrice: 1300 }]
             })
         });
 
@@ -604,6 +606,120 @@ describe('Simplified Printhouse Onboarding Journey Suite', () => {
         });
         expect(screen.getAllByText(/Qué productos fabricas/i).length).toBeGreaterThan(0);
         expect(screen.queryByTestId('back-to-step2-btn')).not.toBeInTheDocument();
+    });
+
+    it('22. Eliminates 1250/150/1000 fallback on API upload error and stays on Step 2 with actionable error', async () => {
+        global.fetch = vi.fn().mockResolvedValue({
+            ok: false,
+            status: 401,
+            json: async () => ({
+                error: 'UNAUTHORIZED',
+                message: 'Sesión expirada o token de autenticación inválido'
+            })
+        } as any);
+
+        const { container } = renderJourney(
+            <SimplifiedOnboardingJourney initialStep={2} />,
+            'es'
+        );
+
+        const file = new File(['dummy-bytes'], 'Failed_Quote.pdf', { type: 'application/pdf' });
+        const input = container.querySelector('input[type="file"]') as HTMLInputElement;
+        fireEvent.change(input, { target: { files: [file] } });
+
+        // Verify actionable error is displayed
+        await waitFor(() => {
+            expect(screen.getByText(/Sesión expirada o token de autenticación inválido/i)).toBeInTheDocument();
+        });
+
+        // User must NOT advance to Step 3
+        expect(screen.queryByText(/Revisión de Especificaciones y Tabla de Variantes/i)).not.toBeInTheDocument();
+        // Fallback values MUST NOT be rendered
+        expect(screen.queryByText('1.250,00 €')).not.toBeInTheDocument();
+        expect(screen.queryByText('1.400,00 €')).not.toBeInTheDocument();
+        expect(screen.queryByText('1.000')).not.toBeInTheDocument();
+    });
+
+    it('23. Switching uploaded document resets previous calculations and variants cleanly', async () => {
+        // First upload succeeds with 3 runs
+        global.fetch = vi.fn().mockResolvedValue({
+            ok: true,
+            json: async () => ({
+                ok: true,
+                evidenceId: 'doc-first',
+                printhouseName: 'First Document Ingested',
+                specification: {
+                    family: 'HARDCOVER',
+                    formatWidthMm: 170,
+                    formatHeightMm: 240,
+                    interiorPages: 640
+                },
+                offers: [
+                    { id: 'run-1', quantity: 200, manufacturingPrice: 4399, transportPrice: 350, quotedTotalPrice: 4749, quotedUnitPrice: 23.75, validationStatus: 'CONSISTENT' },
+                    { id: 'run-2', quantity: 300, manufacturingPrice: 4765, transportPrice: 350, quotedTotalPrice: 5115, quotedUnitPrice: 17.05, validationStatus: 'CONSISTENT' },
+                    { id: 'run-3', quantity: 500, manufacturingPrice: 5493, transportPrice: 450, quotedTotalPrice: 5943, quotedUnitPrice: 11.89, validationStatus: 'CONSISTENT' }
+                ]
+            })
+        } as any);
+
+        const { container } = renderJourney(
+            <SimplifiedOnboardingJourney initialStep={2} />,
+            'es'
+        );
+
+        const file1 = new File(['pdf1'], 'First_Document.pdf', { type: 'application/pdf' });
+        const input1 = container.querySelector('input[type="file"]') as HTMLInputElement;
+        fireEvent.change(input1, { target: { files: [file1] } });
+
+        // Lands on Step 3
+        await waitFor(() => {
+            expect(screen.getByText(/First Document Ingested/i)).toBeInTheDocument();
+        });
+        expect(screen.getByText('200')).toBeInTheDocument();
+        expect(screen.getByText('300')).toBeInTheDocument();
+        expect(screen.getByText('500')).toBeInTheDocument();
+
+        // Return to Step 2
+        const backToStep2Btn = screen.getByTestId('back-to-step2-btn');
+        fireEvent.click(backToStep2Btn);
+
+        // Upload second document with different runs
+        global.fetch = vi.fn().mockResolvedValue({
+            ok: true,
+            json: async () => ({
+                ok: true,
+                evidenceId: 'doc-second',
+                printhouseName: 'Second Document Ingested',
+                specification: {
+                    family: 'HARDCOVER',
+                    formatWidthMm: 210,
+                    formatHeightMm: 270,
+                    interiorPages: 200
+                },
+                offers: [
+                    { id: 'run-a', quantity: 1500, manufacturingPrice: 5799, transportPrice: 535, quotedTotalPrice: 6334, quotedUnitPrice: 4.22, validationStatus: 'CONSISTENT' },
+                    { id: 'run-b', quantity: 2000, manufacturingPrice: 6886, transportPrice: 535, quotedTotalPrice: 7421, quotedUnitPrice: 3.71, validationStatus: 'CONSISTENT' },
+                    { id: 'run-c', quantity: 2500, manufacturingPrice: 8042, transportPrice: 635, quotedTotalPrice: 8677, quotedUnitPrice: 3.47, validationStatus: 'CONSISTENT' }
+                ]
+            })
+        } as any);
+
+        const file2 = new File(['pdf2'], 'Second_Document.pdf', { type: 'application/pdf' });
+        const input2 = container.querySelector('input[type="file"]') as HTMLInputElement;
+        fireEvent.change(input2, { target: { files: [file2] } });
+
+        // Lands on Step 3 with Second Document
+        await waitFor(() => {
+            expect(screen.getByText(/Second Document Ingested/i)).toBeInTheDocument();
+        });
+        // Previous runs are gone cleanly
+        expect(screen.queryByText('First Document Ingested')).not.toBeInTheDocument();
+        expect(screen.queryByText('200')).not.toBeInTheDocument();
+        expect(screen.queryByText('300')).not.toBeInTheDocument();
+        // New runs are present
+        expect(screen.getByText('1.500')).toBeInTheDocument();
+        expect(screen.getByText('2.000')).toBeInTheDocument();
+        expect(screen.getByText('2.500')).toBeInTheDocument();
     });
 });
 

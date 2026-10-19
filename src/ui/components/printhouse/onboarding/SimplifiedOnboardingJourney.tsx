@@ -34,6 +34,8 @@ import { CalculationComparisonView } from './CalculationComparisonView';
 import { GovernedAcceptanceView } from './GovernedAcceptanceView';
 import { BindingIcon } from './BindingFamilyIcons';
 import { printhouseCalibrationApi } from '../../../lib/printhouseCalibrationApi';
+import { getAuthToken } from '../../../lib/authStore';
+import { canonicalizeToEngineBookSpec } from '../../../lib/bookSpecCanonicalizer';
 import { normalizeUiError } from '../../../utils/errorUtils';
 import { FamilyPricingSessionDraft } from '../../../lib/onboardingDraftStore';
 
@@ -501,84 +503,118 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
         });
 
         try {
-            // Real quote evidence upload attempt if API available
-            let extractedData: any = null;
-            try {
-                const formData = new FormData();
-                formData.append('file', file);
-                if (printerNodeId) {
-                    formData.append('printerNodeId', printerNodeId);
-                }
-
-                const token = localStorage.getItem('token') || (typeof window !== 'undefined' ? (window as any).__AUTH_TOKEN__ : null);
-                const res = await fetch('/api/printhouse/onboarding/pricing/quote-evidence/upload', {
-                    method: 'POST',
-                    headers: {
-                        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-                    },
-                    body: formData
-                });
-                if (res.ok) {
-                    const data = await res.json();
-                    extractedData = data?.data || data;
-                }
-            } catch (e) {
-                // If backend is offline or mock in test, gracefully fallback
+            const formData = new FormData();
+            formData.append('file', file);
+            if (printerNodeId) {
+                formData.append('printerNodeId', printerNodeId);
             }
+
+            const token = getAuthToken();
+            const res = await fetch('/api/printhouse/onboarding/pricing/quote-evidence/upload', {
+                method: 'POST',
+                headers: {
+                    ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+                },
+                body: formData
+            });
+
+            if (!res.ok) {
+                let errPayload: any = null;
+                try {
+                    errPayload = await res.json();
+                } catch {
+                    // Non-JSON response
+                }
+                const errorMsg = errPayload?.message || errPayload?.error || `Error ${res.status}: Fallo al procesar el archivo PDF`;
+                throw new Error(errorMsg);
+            }
+
+            const data = await res.json();
+            const extractedData = data?.data || data;
 
             // Stale upload guard: discard if superseded by another upload, family switch, or user action
             if (uploadRequestIdRef.current !== thisUploadId || selectedFamilyIdRef.current !== uploadFamilyId) {
                 return;
             }
 
-            const cleanTitle = extractedData?.productTitle || file.name.replace(/\.pdf$/i, '');
-            const generatedRef = currentOffer.quoteRef || extractedData?.quoteRef || `REF-${Date.now().toString().slice(-4)}`;
+            const rawOffers: any[] = extractedData?.offers || [];
+            if (!Array.isArray(rawOffers) || rawOffers.length === 0) {
+                throw new Error('El documento PDF fue analizado pero no se encontraron ofertas comerciales legibles (cantidades y precios).');
+            }
 
-            // Build clean offer without mutating unknown fields silently
-            const defaultRuns: OfferVariantRow[] = extractedData?.runs || [
-                {
-                    id: 'run-1',
-                    variantKey: 'run-1',
-                    quantity: extractedData?.quantity || 1000,
-                    manufacturingPrice: extractedData?.manufacturingPrice ?? 1250,
-                    transportPrice: extractedData?.transportPrice ?? 150,
-                    quotedTotalPrice: extractedData?.totalPrice ?? 1400,
-                    quotedUnitPrice: extractedData?.unitPrice ?? 1.40,
-                    validationStatus: 'CONSISTENT',
-                    paperVariant: extractedData?.interiorPaper || '90g Offset',
-                    deliveryOption: 'Estándar'
-                }
-            ];
+            // Map backend offers to typed OfferVariantRow[]
+            const extractedRuns: OfferVariantRow[] = rawOffers.map((off: any, idx: number) => {
+                const q = Number(off.quantity);
+                const mfg = Number(off.manufacturingPrice);
+                const trans = Number(off.transportPrice ?? 0);
+                const total = Number(off.quotedTotalPrice ?? (mfg + trans));
+                const unit = Number(off.quotedUnitPrice ?? (total / (q || 1)));
 
-            const initialVariantId = defaultRuns[0]?.id || defaultRuns[0]?.variantKey || 'run-1';
-            setSelectedVariantId(initialVariantId);
-
-            setCurrentOffer({
-                family: uploadFamilyId,
-                productTitle: cleanTitle,
-                quoteRef: generatedRef,
-                quoteDate: extractedData?.quoteDate || new Date().toISOString().split('T')[0],
-                currency: 'EUR',
-                widthMm: extractedData?.widthMm || (uploadFamilyId === 'HARDCOVER' || uploadFamilyId === 'SOFTCOVER' ? 148 : 210),
-                heightMm: extractedData?.heightMm || (uploadFamilyId === 'HARDCOVER' || uploadFamilyId === 'SOFTCOVER' ? 210 : 297),
-                pageCount: extractedData?.pageCount || 64,
-                interiorPaper: extractedData?.interiorPaper || '90g Offset',
-                interiorWeightGsm: extractedData?.interiorWeightGsm || 90,
-                interiorColors: extractedData?.interiorColors || '1/1',
-                coverPaper: extractedData?.coverPaper || 'Cartulina 250g',
-                coverWeightGsm: extractedData?.coverWeightGsm || 250,
-                coverColors: extractedData?.coverColors || '4/0',
-                boardThicknessMm: extractedData?.boardThicknessMm,
-                bindingMethod: uploadFamilyId === 'HARDCOVER' ? 'thread_sewn' : uploadFamilyId === 'SOFTCOVER' ? 'adhesive_pur' : uploadFamilyId === 'WIRE_O' ? 'wire_o' : 'saddle_stitch',
-                hasAmbiguity: Boolean(extractedData?.hasAmbiguity),
-                ambiguityDetails: extractedData?.ambiguityDetails || extractedData?.ambiguityNote,
-                ambiguityNote: extractedData?.ambiguityDetails || extractedData?.ambiguityNote,
-                hasDiscrepancy: Boolean(extractedData?.hasDiscrepancy),
-                deliveryCountry: extractedData?.deliveryCountry || 'DE',
-                runs: defaultRuns
+                return {
+                    id: off.id || `run-${idx + 1}`,
+                    variantKey: off.variantKey || `run-${idx + 1}`,
+                    quantity: q,
+                    manufacturingPrice: mfg,
+                    transportPrice: trans,
+                    quotedTotalPrice: total,
+                    quotedUnitPrice: unit,
+                    computedTotalPrice: off.computedTotalPrice ?? total,
+                    computedUnitPrice: off.computedUnitPrice ?? unit,
+                    validationStatus: off.validationStatus || 'CONSISTENT',
+                    paperVariant: off.variantName || off.paperVariant || extractedData?.specification?.interiorPaper || 'Papel estándar',
+                    deliveryOption: trans > 0 ? 'Con entrega' : 'Estándar',
+                    sourceText: off.sourceText,
+                    provenance: off.provenance
+                };
             });
 
-            updateFamilyStatus(uploadFamilyId, 'QUOTE_ADDED', defaultRuns.length);
+            const initialVariantId = extractedRuns[0]?.id || extractedRuns[0]?.variantKey || 'run-1';
+            setSelectedVariantId(initialVariantId);
+
+            const spec = extractedData?.specification || {};
+            const cleanTitle = extractedData?.printhouseName || extractedData?.productTitle || file.name.replace(/\.pdf$/i, '');
+            const generatedRef = extractedData?.evidenceId || currentOffer.quoteRef || `REF-${Date.now().toString().slice(-4)}`;
+
+            // Build clean offer from extracted specification, zero fallback hardcoding
+            setCurrentOffer({
+                family: spec.family || uploadFamilyId,
+                productTitle: cleanTitle,
+                quoteRef: generatedRef,
+                quoteReference: generatedRef,
+                evidenceId: extractedData?.evidenceId || generatedRef,
+                quoteDate: extractedData?.quoteDate || new Date().toISOString().split('T')[0],
+                currency: 'EUR',
+                widthMm: spec.formatWidthMm || (uploadFamilyId === 'HARDCOVER' || uploadFamilyId === 'SOFTCOVER' ? 148 : 210),
+                heightMm: spec.formatHeightMm || (uploadFamilyId === 'HARDCOVER' || uploadFamilyId === 'SOFTCOVER' ? 210 : 297),
+                formatWidthMm: spec.formatWidthMm,
+                formatHeightMm: spec.formatHeightMm,
+                interiorPages: spec.interiorPages || extractedData?.pageCount || 64,
+                pageCount: spec.interiorPages || extractedData?.pageCount || 64,
+                interiorPaper: spec.interiorPaper || 'Papel Interior',
+                interiorWeightGsm: spec.interiorWeightGsm || 90,
+                interiorColors: spec.interiorColors || '4/4',
+                coverPaper: spec.coverPaper || (uploadFamilyId === 'HARDCOVER' ? 'Estucado 130g' : 'Cartulina 250g'),
+                coverWeightGsm: spec.coverWeightGsm || 250,
+                coverColors: spec.coverColors || '4/0',
+                boardThicknessMm: spec.boardThicknessMm,
+                bindingMethod: spec.bindingMethod || (uploadFamilyId === 'HARDCOVER' ? 'thread_sewn' : uploadFamilyId === 'SOFTCOVER' ? 'adhesive_pur' : uploadFamilyId === 'WIRE_O' ? 'wire_o' : 'saddle_stitch'),
+                spineType: spec.spineType,
+                lamination: spec.lamination || 'matt',
+                hasEndpapers: spec.hasEndpapers,
+                endpaperPaper: spec.endpaperPaper,
+                hasHeadband: spec.hasHeadband,
+                headbandColor: spec.headbandColor,
+                hasRibbon: spec.hasRibbon,
+                ribbonColor: spec.ribbonColor,
+                hasAmbiguity: Boolean(extractedData?.hasInconsistentOffers || (extractedData?.warnings && extractedData?.warnings.length > 0)),
+                ambiguityDetails: extractedData?.warnings && extractedData?.warnings.length > 0 ? extractedData.warnings.join(', ') : undefined,
+                ambiguityNote: extractedData?.warnings && extractedData?.warnings.length > 0 ? extractedData.warnings.join(', ') : undefined,
+                hasDiscrepancy: Boolean(extractedData?.hasInconsistentOffers),
+                deliveryCountry: spec.deliveryCountry || 'DE',
+                runs: extractedRuns
+            });
+
+            updateFamilyStatus(uploadFamilyId, 'QUOTE_ADDED', extractedRuns.length);
             setCurrentStep(3);
         } catch (err: any) {
             if (uploadRequestIdRef.current === thisUploadId && selectedFamilyIdRef.current === uploadFamilyId) {
@@ -728,6 +764,26 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
                 return;
             }
 
+            // Canonicalize and validate reference book specification
+            const canonicalResult = canonicalizeToEngineBookSpec(offer, targetRun);
+            if (!canonicalResult.valid) {
+                setActiveRun(null);
+                setProposedPatch({});
+                setComparisonData({
+                    originalPrice: targetManufacturing,
+                    enginePrice: null,
+                    difference: null,
+                    residual: null,
+                    isCalculated: false,
+                    hasEquivalentBreakdown: false,
+                    incompleteComparisonReason: `Especificación incompleta: ${canonicalResult.errors.join('; ')}`,
+                    calculationError: `Especificación incompleta para calibración: ${canonicalResult.errors.join('; ')}. Por favor revisa y confirma los campos ausentes.`,
+                    supportedParameters: [],
+                    coverageGaps: []
+                });
+                return;
+            }
+
             let runResult: any = null;
             let runError: string | null = null;
 
@@ -739,12 +795,8 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
                     sess = await printhouseCalibrationApi.createSession({
                         printerNodeId,
                         referenceBookName: offer.productTitle || 'Oferta Calibración',
-                        bookSpec: {
-                            ...offer,
-                            evidenceId: offer.quoteRef || uploadedFileName || 'evidence-quote-doc',
-                            selectedVariantId: targetRun.id || targetRun.variantKey
-                        },
-                        targetManufacturingPrice: targetManufacturing
+                        bookSpec: canonicalResult.bookSpec,
+                        targetManufacturingPrice: canonicalResult.targetManufacturingPrice || targetManufacturing
                     });
                     if (calculationRequestIdRef.current !== thisReqId || selectedFamilyIdRef.current !== calcFamilyId) return;
                     if (sess?.id) setSessionId(sess.id);

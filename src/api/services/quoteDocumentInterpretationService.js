@@ -206,6 +206,13 @@ class QuoteDocumentInterpretationService {
             validatedOffers.push(valOff);
         }
 
+        // 7. Generic Technical Book Specification Extraction
+        const specification = this.extractTechnicalSpecification(text);
+        const allWarnings = [];
+        if (specification.warnings && specification.warnings.length > 0) {
+            allWarnings.push(...specification.warnings);
+        }
+
         return {
             ok: true,
             status: 'SUCCESS',
@@ -218,10 +225,167 @@ class QuoteDocumentInterpretationService {
             normalizedTerms: translationResult.normalizedTerms,
             offerGroups,
             offers: validatedOffers,
+            specification,
+            warnings: allWarnings,
             hasInconsistentOffers: hasInconsistent,
             confidenceStatus: hasInconsistent ? 'REQUIRES_REVIEW' : 'HIGH_CONFIDENCE',
-            interpretationVersion: '2.0.0'
+            interpretationVersion: '2.1.0'
         };
+    }
+
+    /**
+     * Extracts physical and technical book specifications from quote text.
+     * ZERO hardcoded filenames or customer data.
+     *
+     * @param {string} text - Raw document text
+     * @returns {Object} Technical book specification
+     */
+    extractTechnicalSpecification(text) {
+        const spec = {};
+        const warnings = [];
+
+        // Format dimensions (e.g. "170 x 240 mm")
+        const formatMatch = text.match(/(\d+)\s*x\s*(\d+)\s*mm/i);
+        if (formatMatch) {
+            spec.formatWidthMm = parseInt(formatMatch[1], 10);
+            spec.formatHeightMm = parseInt(formatMatch[2], 10);
+        }
+
+        // Interior pages (e.g. "640 Seiten", "Inhalt: 200 Seiten")
+        const pageMatch = text.match(/(?:Inhalt\s*[\t:]*\s*)?(\d+)\s*(?:Seiten|pages|páginas)/i);
+        if (pageMatch) {
+            spec.interiorPages = parseInt(pageMatch[1], 10);
+        }
+
+        // Family & Binding Method
+        const lower = text.toLowerCase();
+        let family = 'SOFTCOVER';
+        let bindingMethod = 'perfect bound';
+
+        if (/\b(?:hardcover|festeinband)\b/i.test(text)) {
+            family = 'HARDCOVER';
+        } else if (/\bhandcover\b/i.test(text)) {
+            // Typo detection: "Handcover" -> Hardcover with explicit warning
+            family = 'HARDCOVER';
+            warnings.push('PROBABLE_TYPO_HANDCOVER');
+        } else if (/\b(?:wire-?o|spiral(?:e|bindung)?)\b/i.test(text)) {
+            family = 'WIRE_O';
+            bindingMethod = 'wire-o';
+        } else if (/\b(?:rückstich|sattelheftung|heftung|staple)\b/i.test(text) && !/fadenheftung/i.test(text)) {
+            family = 'SADDLE_STITCH';
+            bindingMethod = 'saddle stitch';
+        }
+
+        if (/\bfadenheftung\b/i.test(text) || /\bthread\s*sewn\b/i.test(text)) {
+            bindingMethod = 'thread sewn';
+        } else if (/\bklebebindung\b/i.test(text) || /\bperfect\s*bound\b/i.test(text)) {
+            bindingMethod = 'perfect bound';
+        }
+
+        spec.family = family;
+        spec.bindingMethod = bindingMethod;
+
+        // Spine Type
+        if (/\brunder\s*rücken\b/i.test(text) || /\bround\s*spine\b/i.test(text)) {
+            spec.spineType = 'round';
+        } else if (/\bgerader\s*rücken\b/i.test(text) || /\bstraight\s*spine\b/i.test(text) || /\bsquare\s*spine\b/i.test(text)) {
+            spec.spineType = 'straight';
+        }
+
+        // Board Thickness (Graupappe / MGP, e.g. "MGP 2 mm", "MGP 2,4 mm", "2.0 mm Graupappe")
+        const mgpMatch = text.match(/MGP\s*[\r\n\t:]*\s*([0-9]+(?:[.,][0-9]+)?)\s*mm/i) ||
+                         text.match(/([0-9]+(?:[.,][0-9]+)?)\s*mm\s*(?:graupappe|board|pappe)/i);
+        if (mgpMatch) {
+            spec.boardThicknessMm = parseLocaleNumber(mgpMatch[1]);
+        }
+
+        // Lamination (glanz / matt / kratzfest matt)
+        if (/\bkratzfest\s*matt\b/i.test(text) || /\bmatt\s*laminiert\b/i.test(text) || /\bmatte\s*laminat/i.test(text)) {
+            spec.lamination = 'matt';
+        } else if (/\bglanz\s*laminiert\b/i.test(text) || /\bgloss\s*laminat/i.test(text)) {
+            spec.lamination = 'gloss';
+        }
+
+        // Headband & Ribbon
+        if (/\bkapitalband\b/i.test(text) || /\bweiß\s*kapitalt\b/i.test(text) || /\bheadband\b/i.test(text)) {
+            spec.hasHeadband = true;
+            const hbMatch = text.match(/kapitalband\s*([0-9a-zA-Z_\- ]+?)(?:,|\.|\n|$)/i);
+            if (hbMatch) spec.headbandColor = hbMatch[1].trim();
+        }
+        if (/\bleseband\b/i.test(text) || /\bribbon\b/i.test(text)) {
+            spec.hasRibbon = true;
+            const rbMatch = text.match(/leseband\s*([0-9a-zA-Z_\- ]+?)(?:,|\.|\n|$)/i);
+            if (rbMatch) spec.ribbonColor = rbMatch[1].trim();
+        }
+
+        // Packaging & Samples
+        if (/\beinzeln\s*eingeschweißt\b/i.test(text) || /\bshrink-?wrapped\b/i.test(text)) {
+            spec.isShrinkWrapped = true;
+        }
+        const sampleMatch = text.match(/(\d+)\s*muster\s*an\s*verlag/i);
+        if (sampleMatch) {
+            spec.samplesNotice = `${sampleMatch[1]} Muster an Verlag`;
+        }
+
+        // Papers & Colors
+        // Look for tabular or line patterns like:
+        // Inhalt \n G-Print 115 g
+        // Vorsatz/Nachsatz \n Offset 170 g
+        // Umschlag \n Silk 130 g
+        const inhaltPaperMatch = text.match(/Inhalt\s*[\r\n]+\s*([A-Za-z0-9\-_ ]+?)\s+(\d+)\s*g\b/i);
+        if (inhaltPaperMatch) {
+            spec.interiorPaper = inhaltPaperMatch[1].trim();
+            spec.interiorWeightGsm = parseInt(inhaltPaperMatch[2], 10);
+        }
+
+        const umschlagPaperMatch = text.match(/Umschlag\s*[\r\n]+\s*([A-Za-z0-9\-_ ]+?)\s+(\d+)\s*g\b/i);
+        if (umschlagPaperMatch) {
+            spec.coverPaper = umschlagPaperMatch[1].trim();
+            spec.coverWeightGsm = parseInt(umschlagPaperMatch[2], 10);
+        }
+
+        const vorsatzPaperMatch = text.match(/Vorsatz(?:\/Nachsatz)?\s*[\r\n]+\s*([A-Za-z0-9\-_ ]+?)\s+(\d+)\s*g\b/i);
+        if (vorsatzPaperMatch) {
+            spec.hasEndpapers = true;
+            spec.endpaperPaper = vorsatzPaperMatch[1].trim();
+            spec.endpaperWeightGsm = parseInt(vorsatzPaperMatch[2], 10);
+        } else if (family === 'HARDCOVER') {
+            // Hardcovers naturally have endpapers unless explicitly omitted
+            spec.hasEndpapers = true;
+        }
+
+        // Inks (e.g. Inhalt \n 4+4, Umschlag \n 4+0, Vorsatz \n 0+0)
+        const inhaltInkMatch = text.match(/Inhalt\s*[\r\n]+\s*([0-5][+/][0-5])/i);
+        if (inhaltInkMatch) {
+            spec.interiorColors = inhaltInkMatch[1].replace('+', '/');
+        } else {
+            const genericInk = text.match(/\b([1-4]\/[1-4]|[1-4]\+[1-4])\b/);
+            if (genericInk) spec.interiorColors = genericInk[1].replace('+', '/');
+        }
+
+        const coverInkMatch = text.match(/Umschlag\s*[\r\n]+\s*([0-5][+/][0-5])/i);
+        if (coverInkMatch) {
+            spec.coverColors = coverInkMatch[1].replace('+', '/');
+        }
+
+        const vorsatzInkMatch = text.match(/Vorsatz(?:\/Nachsatz)?\s*[\r\n]+\s*([0-5][+/][0-5])/i);
+        if (vorsatzInkMatch) {
+            spec.endpaperColors = vorsatzInkMatch[1].replace('+', '/');
+        }
+
+        // Delivery Country from Lieferadresse
+        if (/Lieferadresse[^\r\n]*Germany/i.test(text) || /\bDeutschland\b/i.test(text) || /\bGermany\b/i.test(text)) {
+            spec.deliveryCountry = 'DE';
+        } else if (/Lieferadresse[^\r\n]*Spain/i.test(text) || /\bEspaña\b/i.test(text)) {
+            spec.deliveryCountry = 'ES';
+        } else if (/Lieferadresse[^\r\n]*Austria/i.test(text) || /\bÖsterreich\b/i.test(text)) {
+            spec.deliveryCountry = 'AT';
+        } else if (/Lieferadresse[^\r\n]*France/i.test(text) || /\bFrankreich\b/i.test(text)) {
+            spec.deliveryCountry = 'FR';
+        }
+
+        spec.warnings = warnings;
+        return spec;
     }
 }
 

@@ -141,6 +141,11 @@ router.post('/upload', upload.single('file'), async (req, res) => {
             detectedLanguage: interpretation.detectedLanguage
         });
 
+        const combinedWarnings = [
+            ...(extraction.extractionWarnings || []),
+            ...(interpretation.warnings || [])
+        ];
+
         return res.status(201).json({
             ok: true,
             evidenceId: documentId,
@@ -152,9 +157,10 @@ router.post('/upload', upload.single('file'), async (req, res) => {
             printhouseName: interpretation.printhouseName,
             offerGroups: interpretation.offerGroups,
             offers: interpretation.offers,
+            specification: interpretation.specification || null,
             hasInconsistentOffers: interpretation.hasInconsistentOffers,
             normalizedTerms: interpretation.normalizedTerms,
-            warnings: extraction.extractionWarnings
+            warnings: combinedWarnings
         });
 
     } catch (err) {
