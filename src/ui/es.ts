@@ -1276,8 +1276,15 @@ export const es = {
   'topbar.telemetryHealthy': 'Telemetría Núcleo: OK',
   'topbar.telemetryDegraded': 'Telemetría Degradada',
   'topbar.telemetryOffline': 'Sin Telemetría',
+  'topbar.telemetryRestricted': 'Telemetría Restringida',
   'topbar.telemetryVerifying': 'Comprobando Núcleo...',
   'topbar.telemetryVerifyingTooltip': 'Comprobando estado del proceso y dependencias en /api/system/health...',
+  'topbar.telemetryHealthyPrinthouseTooltip': 'Servicios operativos en tiempo real. Entorno de imprenta listo para producción.',
+  'topbar.telemetryHealthyAdminTooltip': 'Telemetría de infraestructura OK: Proceso Node.js (PID {pid}, {uptime}s activo), Redis en estado {redisStatus} con latencia {latency}.',
+  'topbar.telemetryDegradedTooltip': 'Telemetría degradada: dependencias evaluadas con incidencias. Verifique conectividad del sistema.',
+  'topbar.telemetryDegradedAdminTooltip': 'Telemetría degradada: Redis status=\'{redisStatus}\', latency=\'{latency}\'. Verifique conectividad del servicio.',
+  'topbar.telemetryOfflineTooltip': 'Diagnóstico no disponible: el servicio de telemetría no responde (código HTTP {code}).',
+  'topbar.telemetryRestrictedTooltip': 'Acceso no autorizado al diagnóstico de infraestructura (código HTTP {code}).',
 
   // Map Cartography Fallback
   'map.tileLoadFailed': 'Error al cargar teselas cartográficas (401/403/Red)',

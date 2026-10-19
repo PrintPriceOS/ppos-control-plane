@@ -1276,8 +1276,15 @@ export const en = {
   'topbar.telemetryHealthy': 'Core Telemetry: OK',
   'topbar.telemetryDegraded': 'Degraded Telemetry',
   'topbar.telemetryOffline': 'No Telemetry',
+  'topbar.telemetryRestricted': 'Restricted Telemetry',
   'topbar.telemetryVerifying': 'Checking Core...',
   'topbar.telemetryVerifyingTooltip': 'Checking process state and dependencies on /api/system/health...',
+  'topbar.telemetryHealthyPrinthouseTooltip': 'Live services fully operational. Print house environment ready for production.',
+  'topbar.telemetryHealthyAdminTooltip': 'Infrastructure telemetry OK: Node.js process (PID {pid}, {uptime}s uptime), Redis status \'{redisStatus}\' with latency \'{latency}\'.',
+  'topbar.telemetryDegradedTooltip': 'Degraded telemetry: evaluated dependencies reported issues. Check system connectivity.',
+  'topbar.telemetryDegradedAdminTooltip': 'Degraded telemetry: Redis status=\'{redisStatus}\', latency=\'{latency}\'. Check service connectivity.',
+  'topbar.telemetryOfflineTooltip': 'Diagnostic unavailable: telemetry service unreachable (HTTP {code}).',
+  'topbar.telemetryRestrictedTooltip': 'Unauthorized access to infrastructure telemetry (HTTP {code}).',
 
   // Map Cartography Fallback
   'map.tileLoadFailed': 'Failed to load map tiles (401/403/Network)',

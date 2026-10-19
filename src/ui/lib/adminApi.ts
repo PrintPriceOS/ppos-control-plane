@@ -899,7 +899,28 @@ export async function getHealth() {
     return adminFetch<any[]>(`/api/admin/network/health`);
 }
 
-export async function getSystemHealth(): Promise<{ ok: boolean; status?: string; dependencies?: any; uptime_seconds?: number; pid?: number }> {
+export interface SystemHealthResponse {
+    ok: boolean;
+    status?: string;
+    statusCode?: number;
+    services?: {
+        operational?: boolean;
+    };
+    dependencies?: {
+        redis?: {
+            status: string;
+            latency: string;
+        };
+        [key: string]: any;
+    };
+    uptime_seconds?: number;
+    startTime?: number;
+    pid?: number;
+    error?: string;
+    timestamp?: string;
+}
+
+export async function getSystemHealth(): Promise<SystemHealthResponse> {
     try {
         const token = getAuthToken();
         const headers: Record<string, string> = {
@@ -911,12 +932,28 @@ export async function getSystemHealth(): Promise<{ ok: boolean; status?: string;
             credentials: 'include'
         });
         if (res.status === 401) {
-            return { ok: false, status: 'UNAUTHORIZED' };
+            return { ok: false, status: 'UNAUTHORIZED', statusCode: 401 };
         }
-        if (!res.ok) return { ok: false, status: 'HTTP_ERROR' };
-        return await res.json();
+        if (res.status === 403) {
+            return { ok: false, status: 'FORBIDDEN', statusCode: 403 };
+        }
+        if (!res.ok) {
+            let errorText = 'HTTP_ERROR';
+            try {
+                const errJson = await res.json();
+                if (errJson && errJson.status) errorText = errJson.status;
+            } catch (_) {
+                // Ignore parse errors on non-200 responses
+            }
+            return { ok: false, status: errorText, statusCode: res.status };
+        }
+        const data = await res.json();
+        return {
+            ...data,
+            statusCode: res.status
+        };
     } catch (err: any) {
-        return { ok: false, status: 'UNREACHABLE' };
+        return { ok: false, status: 'UNREACHABLE', statusCode: 0 };
     }
 }
 

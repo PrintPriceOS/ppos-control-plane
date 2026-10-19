@@ -60,7 +60,7 @@ export const LocaleProvider: React.FC<{ children: ReactNode; initialLocale?: Loc
 
     if (params) {
       Object.entries(params).forEach(([k, v]) => {
-        template = template.replace(new RegExp(`{{${k}}}`, 'g'), String(v));
+        template = template.replace(new RegExp(`\\{\\{${k}\\}\\}|\\{${k}\\}`, 'g'), String(v));
       });
     }
 
@@ -87,7 +87,7 @@ export const t = (key: string, params?: Record<string, any>): string => {
   let template = (dict as any)[key] || (translations.en as any)[key] || key;
   if (params) {
     Object.entries(params).forEach(([k, v]) => {
-      template = template.replace(new RegExp(`{{${k}}}`, 'g'), String(v));
+      template = template.replace(new RegExp(`\\{\\{${k}\\}\\}|\\{${k}\\}`, 'g'), String(v));
     });
   }
   return template;

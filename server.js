@@ -360,6 +360,7 @@ const start = async () => {
             fastify.use('/api/marketplace', require('./src/api/routes/marketplacePublic'));
             fastify.use('/api/connectors/factory', require('./src/api/routes/factoryConnectorRoutes'));
             fastify.use('/api/public/preflight', require('./src/api/routes/publicPreflight'));
+            fastify.use('/api/system', require('./src/api/routes/system'));
             fastify.use('/api/federation', federationRouter);
             
             // Explicitly register route groups in Fastify's radix tree so requests route through the Express middleware bridge
@@ -384,6 +385,8 @@ const start = async () => {
             fastify.all('/api/marketplace/*', apiNotFoundFallback);
             fastify.all('/api/public/preflight', apiNotFoundFallback);
             fastify.all('/api/public/preflight/*', apiNotFoundFallback);
+            fastify.all('/api/system', apiNotFoundFallback);
+            fastify.all('/api/system/*', apiNotFoundFallback);
             fastify.all('/api/federation', apiNotFoundFallback);
             fastify.all('/api/federation/*', apiNotFoundFallback);
 

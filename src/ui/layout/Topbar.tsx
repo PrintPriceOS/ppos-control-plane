@@ -16,7 +16,7 @@ import {
 } from "@heroicons/react/24/outline";
 import { NotificationBell } from '../components/NotificationBell';
 import { clearAdminKey, getSystemHealth } from '../lib/adminApi';
-import { getAuthUser, getUserRole } from '../lib/authStore';
+import { getAuthUser, getUserRole, isPrinthouseUser } from '../lib/authStore';
 import { PrintPriceLogo } from '../components/PrintPriceLogo';
 
 
@@ -29,11 +29,11 @@ export const Topbar: React.FC<{ onMenuClick?: () => void }> = ({ onMenuClick }) 
   const { locale, setLocale, t } = useLocale();
   const [currentTheme, setCurrentThemeState] = useState(getTheme());
   const [telemetryState, setTelemetryState] = useState<{
-    status: 'VERIFYING' | 'HEALTHY' | 'DEGRADED' | 'OFFLINE';
+    status: 'VERIFYING' | 'HEALTHY' | 'DEGRADED' | 'OFFLINE' | 'RESTRICTED';
     tooltip: string;
   }>({
     status: 'VERIFYING',
-    tooltip: t('topbar.telemetryVerifyingTooltip') || 'Comprobando estado del proceso y dependencias en /api/system/health...'
+    tooltip: t('topbar.telemetryVerifyingTooltip') || 'Checking process state and dependencies on /api/system/health...'
   });
 
   const [menuOpen, setMenuOpen] = useState(false);
@@ -42,45 +42,105 @@ export const Topbar: React.FC<{ onMenuClick?: () => void }> = ({ onMenuClick }) 
 
   useEffect(() => {
     let isMounted = true;
-    getSystemHealth()
-      .then(data => {
-        if (!isMounted) return;
-        // Verify real contract of /api/system/health:
-        // Must inspect specific runtime dependencies:
-        // redis: { status: 'ready', latency: 'OK' }
-        const redisStatus = data?.dependencies?.redis?.status;
-        const redisLatency = data?.dependencies?.redis?.latency;
-        const isRedisReady = redisStatus === 'ready';
-        const isLatencyOk = redisLatency === 'OK';
-        const isUptimeValid = typeof data?.uptime_seconds === 'number' && data.uptime_seconds >= 0;
 
-        if (data?.ok === true && isRedisReady && isLatencyOk && isUptimeValid) {
-          setTelemetryState({
-            status: 'HEALTHY',
-            tooltip: `Telemetría de infraestructura OK: Proceso Node.js (PID ${data.pid || '—'}, ${data.uptime_seconds}s activo), Redis en estado 'ready' con latencia 'OK'. (No evalúa RBAC/gobernanza).`
-          });
-        } else if (data && (data.ok || isRedisReady || data.status === 'HTTP_ERROR')) {
-          setTelemetryState({
-            status: 'DEGRADED',
-            tooltip: `Telemetría degradada: Redis status='${redisStatus || 'unknown'}', latency='${redisLatency || 'unknown'}'. Verifique dependencias.`
-          });
-        } else {
-          setTelemetryState({
-            status: 'OFFLINE',
-            tooltip: 'Endpoint /api/system/health no disponible o sin respuesta. Sin evidencia de dependencias en vivo.'
-          });
-        }
-      })
-      .catch(() => {
-        if (isMounted) {
-          setTelemetryState({
-            status: 'OFFLINE',
-            tooltip: 'Fallo de conexión al consultar /api/system/health. Sin evidencia de dependencias en vivo.'
-          });
-        }
-      });
+    const fetchHealth = () => {
+      getSystemHealth()
+        .then(data => {
+          if (!isMounted) return;
+
+          // 1. Authentication or Authorization failures: Never treat as degraded infrastructure or offline server
+          if (data?.statusCode === 401 || data?.statusCode === 403 || data?.status === 'UNAUTHORIZED' || data?.status === 'FORBIDDEN') {
+            const code = data.statusCode || (data.status === 'UNAUTHORIZED' ? 401 : 403);
+            setTelemetryState({
+              status: 'RESTRICTED',
+              tooltip: t('topbar.telemetryRestrictedTooltip', { code }) || `Unauthorized access to infrastructure telemetry (HTTP ${code}).`
+            });
+            return;
+          }
+
+          // 2. Unreachable, missing endpoint (404), or generic server error without health payload
+          if (!data || data.status === 'UNREACHABLE' || data.statusCode === 404 || (data.statusCode && data.statusCode >= 500 && !data.dependencies && !data.services)) {
+            const code = data?.statusCode || 'ERR';
+            setTelemetryState({
+              status: 'OFFLINE',
+              tooltip: t('topbar.telemetryOfflineTooltip', { code }) || `Diagnostic unavailable: telemetry service unreachable (HTTP ${code}).`
+            });
+            return;
+          }
+
+          // 3. Inspect health response
+          const isPrinthouse = isPrinthouseUser();
+
+          // Printhouse payload evaluation: { ok: boolean, status: 'HEALTHY' | 'DEGRADED', services: { operational: boolean } }
+          if (isPrinthouse) {
+            if (data.ok === true && data.status === 'HEALTHY' && data.services?.operational !== false) {
+              setTelemetryState({
+                status: 'HEALTHY',
+                tooltip: t('topbar.telemetryHealthyPrinthouseTooltip') || 'Live services fully operational. Print house environment ready for production.'
+              });
+            } else {
+              setTelemetryState({
+                status: 'DEGRADED',
+                tooltip: t('topbar.telemetryDegradedTooltip') || 'Degraded telemetry: evaluated dependencies reported issues. Check system connectivity.'
+              });
+            }
+            return;
+          }
+
+          // Platform / Super Admin payload evaluation: includes dependencies, pid, uptime
+          const redisStatus = data?.dependencies?.redis?.status;
+          const redisLatency = data?.dependencies?.redis?.latency;
+          const isRedisReady = redisStatus === 'ready' && redisLatency === 'OK';
+          const isUptimeValid = typeof data?.uptime_seconds === 'number' && data.uptime_seconds >= 0;
+
+          if (data.ok === true && isRedisReady && isUptimeValid) {
+            setTelemetryState({
+              status: 'HEALTHY',
+              tooltip: t('topbar.telemetryHealthyAdminTooltip', {
+                pid: data.pid ?? '—',
+                uptime: data.uptime_seconds ?? 0,
+                redisStatus: redisStatus || 'ready',
+                latency: redisLatency || 'OK'
+              }) || `Infrastructure telemetry OK: Node.js process (PID ${data.pid ?? '—'}, ${data.uptime_seconds}s uptime), Redis status '${redisStatus}' with latency '${redisLatency}'.`
+            });
+          } else if (redisStatus || redisLatency) {
+            // Real evaluated dependency reported degraded status
+            setTelemetryState({
+              status: 'DEGRADED',
+              tooltip: t('topbar.telemetryDegradedAdminTooltip', {
+                redisStatus: redisStatus || 'unknown',
+                latency: redisLatency || 'unknown'
+              }) || `Degraded telemetry: Redis status='${redisStatus || 'unknown'}', latency='${redisLatency || 'unknown'}'. Check service connectivity.`
+            });
+          } else if (data.ok === false || data.status === 'DEGRADED') {
+            setTelemetryState({
+              status: 'DEGRADED',
+              tooltip: t('topbar.telemetryDegradedTooltip') || 'Degraded telemetry: evaluated dependencies reported issues. Check system connectivity.'
+            });
+          } else {
+            setTelemetryState({
+              status: 'OFFLINE',
+              tooltip: t('topbar.telemetryOfflineTooltip', { code: data.statusCode || 200 }) || `Diagnostic unavailable: telemetry service unreachable (HTTP ${data.statusCode || 200}).`
+            });
+          }
+        })
+        .catch(() => {
+          if (isMounted) {
+            setTelemetryState({
+              status: 'OFFLINE',
+              tooltip: t('topbar.telemetryOfflineTooltip', { code: 'NET_ERR' }) || 'Diagnostic unavailable: telemetry service unreachable (HTTP NET_ERR).'
+            });
+          }
+        });
+    };
+
+    fetchHealth();
+    // Bounded periodic refresh every 60s, cleaned up on unmount
+    const intervalId = setInterval(fetchHealth, 60000);
+
     return () => {
       isMounted = false;
+      clearInterval(intervalId);
     };
   }, [t]);
 
@@ -180,6 +240,15 @@ export const Topbar: React.FC<{ onMenuClick?: () => void }> = ({ onMenuClick }) 
             >
               <ExclamationCircleIcon className="w-3.5 h-3.5" />
               <span className="text-[9px] font-black uppercase tracking-widest">{t('topbar.telemetryOffline') || 'Sin Telemetría'}</span>
+            </div>
+          )}
+          {telemetryState.status === 'RESTRICTED' && (
+            <div
+              className="hidden md:flex items-center gap-2 px-3 py-1 bg-purple-500/10 text-purple-400 border border-purple-500/20"
+              title={telemetryState.tooltip}
+            >
+              <ExclamationCircleIcon className="w-3.5 h-3.5" />
+              <span className="text-[9px] font-black uppercase tracking-widest">{t('topbar.telemetryRestricted') || 'Telemetría Restringida'}</span>
             </div>
           )}
           {telemetryState.status === 'VERIFYING' && (

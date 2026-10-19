@@ -2,50 +2,145 @@ const express = require('express');
 const router = express.Router();
 const connection = require('../adapters/redisConnection');
 const queueOperator = require('../adapters/queueOperator');
+const { requireAdmin, requireRole, resolveActorContext } = require('../middleware/auth');
+
+/**
+ * Bounded check for Redis connectivity without side effects.
+ * Uses existing connection, bounding ping latency with a strict timeout.
+ */
+async function checkRedisHealth(timeoutMs = 1500) {
+    if (!connection) {
+        return {
+            status: 'unconfigured',
+            latency: 'UNCONFIGURED',
+            isReady: false
+        };
+    }
+
+    const currentStatus = connection.status || 'unknown';
+
+    // If connection status is already closed or end, avoid hanging ping
+    if (currentStatus === 'end' || currentStatus === 'close') {
+        return {
+            status: currentStatus,
+            latency: 'DISCONNECTED',
+            isReady: false
+        };
+    }
+
+    try {
+        const pingPromise = connection.ping();
+        const timeoutPromise = new Promise((_, reject) => {
+            const timer = setTimeout(() => {
+                reject(new Error('REDIS_PING_TIMEOUT'));
+            }, timeoutMs);
+            if (timer.unref) timer.unref();
+        });
+
+        const res = await Promise.race([pingPromise, timeoutPromise]);
+        const isReady = currentStatus === 'ready' && res === 'PONG';
+        return {
+            status: currentStatus,
+            latency: res === 'PONG' ? 'OK' : 'ERROR',
+            isReady
+        };
+    } catch (err) {
+        const isTimeout = err && err.message === 'REDIS_PING_TIMEOUT';
+        return {
+            status: currentStatus,
+            latency: isTimeout ? 'TIMEOUT' : 'ERROR',
+            isReady: false
+        };
+    }
+}
 
 /**
  * GET /api/system/health
  * Connectivity status for all runtime dependencies.
+ * 
+ * RBAC:
+ * - Requires authenticated user (requireAdmin).
+ * - Printhouse roles (PRINTHOUSE_ADMIN, PRINTHOUSE_OPERATOR):
+ *   Returns minimal sanitized health status without PID, process details,
+ *   internal network topology, queue names, or raw errors.
+ * - Platform Admin roles (SUPER_ADMIN, OPS_ADMIN, SYSTEM_ADMIN):
+ *   Returns full diagnostic payload including PID, uptime, and dependency details.
  */
-router.get('/health', async (req, res) => {
+router.get('/health', requireAdmin, async (req, res) => {
     try {
-        const redisInfo = connection.status; // 'ready', 'connect', 'reconnecting', etc.
-        const redisLatency = await connection.ping();
+        const actor = resolveActorContext(req);
+        const redisHealth = await checkRedisHealth(1500);
+        const isOverallOk = redisHealth.isReady;
+
+        // Printhouse role: minimal sanitized contract
+        if (actor.isPrinthouseUser) {
+            return res.json({
+                ok: isOverallOk,
+                status: isOverallOk ? 'HEALTHY' : 'DEGRADED',
+                services: {
+                    operational: isOverallOk
+                },
+                timestamp: new Date().toISOString()
+            });
+        }
+
+        // Platform / Operator Admin roles: full diagnostic payload
         const uptimeSeconds = Math.floor(process.uptime());
         const startTime = Date.now() - (uptimeSeconds * 1000);
-        
-        res.json({
-            ok: redisInfo === 'ready',
+
+        return res.json({
+            ok: isOverallOk,
+            status: isOverallOk ? 'HEALTHY' : 'DEGRADED',
             uptime_seconds: uptimeSeconds,
             startTime: startTime,
             pid: process.pid,
             dependencies: {
                 redis: {
-                    status: redisInfo,
-                    latency: redisLatency === 'PONG' ? 'OK' : 'ERROR'
+                    status: redisHealth.status,
+                    latency: redisHealth.latency
                 }
             },
             timestamp: new Date().toISOString()
         });
     } catch (err) {
-        res.status(500).json({ ok: false, error: err.message });
+        // Sanitize error response: no raw stack or internal leakage
+        const actor = resolveActorContext(req);
+        if (actor.isPrinthouseUser) {
+            return res.status(500).json({
+                ok: false,
+                status: 'DEGRADED',
+                error: 'System diagnostic check failed'
+            });
+        }
+
+        return res.status(500).json({
+            ok: false,
+            status: 'DEGRADED',
+            error: 'System diagnostic check encountered an unexpected error'
+        });
     }
 });
 
 /**
  * GET /api/system/queues
  * Real-time stats from BullMQ.
+ * Restricted strictly to SUPER_ADMIN / OPS_ADMIN.
  */
-router.get('/queues', async (req, res) => {
-    const stats = await queueOperator.getAdminStats();
-    res.json(stats);
+router.get('/queues', requireAdmin, requireRole('OPS_ADMIN'), async (req, res) => {
+    try {
+        const stats = await queueOperator.getAdminStats();
+        res.json(stats);
+    } catch (err) {
+        res.status(500).json({ ok: false, error: 'Failed to retrieve queue statistics' });
+    }
 });
 
 /**
  * GET /api/system/workers
  * Active nodes registered in the system.
+ * Restricted strictly to SUPER_ADMIN / OPS_ADMIN.
  */
-router.get('/workers', async (req, res) => {
+router.get('/workers', requireAdmin, requireRole('OPS_ADMIN'), async (req, res) => {
     try {
         const queueName = process.env.PPOS_QUEUE_NAME || 'preflight_async_queue';
         
@@ -92,7 +187,7 @@ router.get('/workers', async (req, res) => {
             timestamp: new Date().toISOString()
         });
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        res.status(500).json({ error: 'Failed to retrieve worker status' });
     }
 });
 

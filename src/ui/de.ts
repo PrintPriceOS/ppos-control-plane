@@ -1276,8 +1276,15 @@ export const de = {
   'topbar.telemetryHealthy': 'Kern-Telemetrie: OK',
   'topbar.telemetryDegraded': 'Degradierte Telemetrie',
   'topbar.telemetryOffline': 'Keine Telemetrie',
+  'topbar.telemetryRestricted': 'Eingeschränkte Telemetrie',
   'topbar.telemetryVerifying': 'Kern prüfen...',
   'topbar.telemetryVerifyingTooltip': 'Prozessstatus und Abhängigkeiten unter /api/system/health werden geprüft...',
+  'topbar.telemetryHealthyPrinthouseTooltip': 'Dienste in Echtzeit betriebsbereit. Druckerei-Umgebung produktionsbereit.',
+  'topbar.telemetryHealthyAdminTooltip': 'Infrastruktur-Telemetrie OK: Node.js-Prozess (PID {pid}, {uptime}s aktiv), Redis-Status \'{redisStatus}\' mit Latenz \'{latency}\'.',
+  'topbar.telemetryDegradedTooltip': 'Degradierte Telemetrie: Bewertete Abhängigkeiten melden Auffälligkeiten. Systemverbindung prüfen.',
+  'topbar.telemetryDegradedAdminTooltip': 'Degradierte Telemetrie: Redis status=\'{redisStatus}\', latency=\'{latency}\'. Dienstverbindung prüfen.',
+  'topbar.telemetryOfflineTooltip': 'Diagnose nicht verfügbar: Telemetriedienst nicht erreichbar (HTTP {code}).',
+  'topbar.telemetryRestrictedTooltip': 'Nicht autorisierter Zugriff auf die Infrastrukturdiagnose (HTTP {code}).',
 
   // Map Cartography Fallback
   'map.tileLoadFailed': 'Kartenkacheln konnten nicht geladen werden (401/403/Netzwerk)',
