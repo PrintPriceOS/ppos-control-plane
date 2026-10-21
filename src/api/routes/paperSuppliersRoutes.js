@@ -101,22 +101,43 @@ router.get('/me', requireSupplierScope('VIEWER'), async (req, res) => {
 
 /**
  * GET /api/v1/paper-suppliers/status
- * Diagnostic status endpoint for supplier hub availability.
+ * Explicit diagnostic status endpoint for supplier hub availability.
+ * Permitted to authenticated suppliers (including suspended) solely to query account status.
  */
-router.get('/status', (req, res) => {
-    const context = resolveActorContext(req);
-    res.json({
-        ok: true,
-        hub: 'PAPER_SUPPLIER_HUB',
-        version: '1.0.0',
-        actor: {
-            userId: context.userId,
-            role: context.role,
-            isSupplierUser: context.isSupplierUser,
-            isSupplierAdmin: context.isSupplierAdmin,
-            isSupplierOperator: context.isSupplierOperator
+router.get('/status', requireSupplierScope('VIEWER'), async (req, res) => {
+    try {
+        const context = resolveActorContext(req);
+        let supplierStatus = 'UNKNOWN';
+        let supplierName = null;
+
+        if (context.supplierId) {
+            const rows = await db.query('SELECT name, status FROM paper_suppliers WHERE id = ?', [context.supplierId]);
+            const supplier = Array.isArray(rows) ? (Array.isArray(rows[0]) ? rows[0][0] : rows[0]) : null;
+            if (supplier) {
+                supplierStatus = supplier.status;
+                supplierName = supplier.name;
+            }
         }
-    });
+
+        res.json({
+            ok: true,
+            hub: 'PAPER_SUPPLIER_HUB',
+            version: '1.0.0',
+            actor: {
+                userId: context.userId,
+                role: context.role,
+                supplierId: context.supplierId,
+                supplierName,
+                supplierStatus,
+                isSuspended: supplierStatus === 'SUSPENDED',
+                isSupplierUser: context.isSupplierUser,
+                isSupplierAdmin: context.isSupplierAdmin,
+                isSupplierOperator: context.isSupplierOperator
+            }
+        });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message, code: 'DATABASE_ERROR' });
+    }
 });
 
 module.exports = router;

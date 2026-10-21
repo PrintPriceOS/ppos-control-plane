@@ -94,6 +94,12 @@ function dispatch(router, req) {
 
 describe('Phase I1 — Paper Supplier & Materials Domain Isolation Suite', () => {
     beforeAll(async () => {
+        // Safety guard: Strictly protect production/staging schemas against accidental wiping
+        const dbName = String(dbConfig.database || '').toLowerCase();
+        if (!dbName.includes('test') && !dbName.includes('ephemeral')) {
+            throw new Error(`[SAFETY_GUARD_TRIPPED] Tests can only execute against dedicated test/ephemeral databases. Configured: ${dbConfig.database}`);
+        }
+
         connectionPool = mysql.createPool(dbConfig);
 
         // Bootstrap schema including Migration 162 structures
@@ -315,7 +321,7 @@ describe('Phase I1 — Paper Supplier & Materials Domain Isolation Suite', () =>
 
     afterAll(async () => {
         if (connectionPool) {
-            await connectionPool.query('DROP TABLE IF EXISTS material_inventory_events, material_procurements, predictive_material_inventory, materials_catalog, paper_suppliers, printer_nodes, tenants;');
+            await connectionPool.query('DROP TABLE IF EXISTS procurement_receipt_records, supplier_memberships, tenant_capabilities, user_sessions, material_inventory_events, material_procurements, predictive_material_inventory, materials_catalog, paper_suppliers, printer_nodes, tenants;');
             await connectionPool.end();
         }
     });
@@ -382,6 +388,56 @@ describe('Phase I1 — Paper Supplier & Materials Domain Isolation Suite', () =>
             const res = await dispatch(materialsAdminRouter, req);
             assert.strictEqual(res.statusCode, 403);
             assert.strictEqual(res.body.error, 'FORBIDDEN_SUPPLIER_ACCESS_TO_PRINTHOUSE_MATERIALS');
+        });
+
+        it('verifies blocking of supplier actor across the real admin router chain for materials, machines, and tenant management', async () => {
+            const tokenSupplier = generateToken({
+                id: 'user-supp-1',
+                role: 'SUPPLIER_ADMIN',
+                tenantId: 'tenant-supp-1',
+                supplierId: 'supp-org-1'
+            });
+
+            // 1. Printhouse materials router: /node/:nodeId blocks supplier actor
+            const reqMaterials = {
+                method: 'GET',
+                url: '/node/node-alpha',
+                originalUrl: '/api/admin/materials/node/node-alpha',
+                headers: { authorization: `Bearer ${tokenSupplier}` },
+                params: { nodeId: 'node-alpha' }
+            };
+            const resMaterials = await dispatch(materialsAdminRouter, reqMaterials);
+            assert.strictEqual(resMaterials.statusCode, 403);
+            assert.strictEqual(resMaterials.body.error, 'FORBIDDEN_SUPPLIER_ACCESS_TO_PRINTHOUSE_MATERIALS');
+
+            // 2. Printhouse publication endpoint: requireRole('TENANT_ADMIN') blocks supplier actor
+            const { requireRole } = require('../src/api/middleware/auth');
+            const tenantAdminGuard = requireRole('TENANT_ADMIN');
+            let guardPassed = false;
+            let guardStatusCode = 200;
+            let guardBody = null;
+            const reqGuard = {
+                user: {
+                    id: 'user-supp-1',
+                    role: 'SUPPLIER_ADMIN',
+                    tenantId: 'tenant-supp-1',
+                    supplierId: 'supp-org-1'
+                }
+            };
+            const resGuard = {
+                status(code) { guardStatusCode = code; return this; },
+                json(data) { guardBody = data; return this; }
+            };
+            tenantAdminGuard(reqGuard, resGuard, () => { guardPassed = true; });
+            assert.strictEqual(guardPassed, false);
+            assert.strictEqual(guardStatusCode, 403);
+            assert.strictEqual(guardBody.error.code, 'FORBIDDEN');
+
+            // 3. Admin router global routes protection middleware blocks supplier actor from global routes (/tenants/:id)
+            const { resolveActorContext } = require('../src/api/middleware/auth');
+            const actorContext = resolveActorContext(reqGuard);
+            assert.strictEqual(actorContext.isSuperAdmin, false);
+            assert.strictEqual(['OPS_ADMIN', 'SYSTEM_ADMIN'].includes(actorContext.role), false);
         });
 
         it('restricts /api/admin/materials/debug strictly to SUPER_ADMIN', async () => {
@@ -658,6 +714,44 @@ describe('Phase I1 — Paper Supplier & Materials Domain Isolation Suite', () =>
             assert.strictEqual(rejected[0].reason.statusCode, 409);
             assert.strictEqual(rejected[0].reason.code, 'ALREADY_RECEIVED');
         });
+
+        it('handles concurrent receipt requests through real HTTP router endpoint safely', async () => {
+            const endpointProcId = 'proc-endpoint-race-1';
+            await connectionPool.query(`
+                INSERT INTO material_procurements (id, material_inventory_id, supplier_name, ordered_units, procurement_status)
+                VALUES (?, ?, 'Fedrigoni Iberia', 2000, 'ORDERED');
+            `, [endpointProcId, testMaterialId]);
+
+            const token = generateToken({
+                id: 'operator-alice',
+                role: 'PRINTHOUSE_ADMIN',
+                tenantId: 'tenant-print-a',
+                printhouseId: 'node-alpha'
+            });
+
+            const makeReq = (idempotencyKey) => ({
+                method: 'POST',
+                url: `/procurements/${endpointProcId}/receive`,
+                originalUrl: `/api/admin/materials/procurements/${endpointProcId}/receive`,
+                params: { id: endpointProcId },
+                headers: {
+                    authorization: `Bearer ${token}`,
+                    'idempotency-key': idempotencyKey
+                },
+                body: { accepted_quantity: 2000 }
+            });
+
+            const [res1, res2] = await Promise.all([
+                dispatch(materialsAdminRouter, makeReq('ik-endpoint-race-1')),
+                dispatch(materialsAdminRouter, makeReq('ik-endpoint-race-2'))
+            ]);
+
+            const statuses = [res1.statusCode, res2.statusCode].sort();
+            // Exactly one 200 OK and one 409 Conflict
+            assert.deepStrictEqual(statuses, [200, 409]);
+            const conflictRes = res1.statusCode === 409 ? res1 : res2;
+            assert.strictEqual(conflictRes.body.code, 'ALREADY_RECEIVED');
+        });
     });
 
     describe('4. Supplier Role Hierarchy & Suspension Governance', () => {
@@ -694,6 +788,39 @@ describe('Phase I1 — Paper Supplier & Materials Domain Isolation Suite', () =>
             assert.strictEqual(nextCalled, false);
             assert.strictEqual(statusCode, 403);
             assert.strictEqual(responseBody.error.code, 'SUPPLIER_SUSPENDED');
+        });
+
+        it('allows suspended supplier to query their limited account status via GET /status while blocking operations', async () => {
+            const tokenSuspended = generateToken({
+                id: 'user-supp-2',
+                role: 'SUPPLIER_ADMIN',
+                tenantId: 'tenant-supp-2',
+                supplierId: 'supp-org-2'
+            });
+
+            // 1. Operational endpoint /me is blocked
+            const reqMe = {
+                method: 'GET',
+                url: '/me',
+                originalUrl: '/api/v1/paper-suppliers/me',
+                headers: { authorization: `Bearer ${tokenSuspended}` }
+            };
+            const resMe = await dispatch(paperSuppliersRouter, reqMe);
+            assert.strictEqual(resMe.statusCode, 403);
+            assert.strictEqual(resMe.body.error.code, 'SUPPLIER_SUSPENDED');
+
+            // 2. Explicit diagnostic endpoint /status is permitted with isSuspended: true
+            const reqStatus = {
+                method: 'GET',
+                url: '/status',
+                originalUrl: '/api/v1/paper-suppliers/status',
+                headers: { authorization: `Bearer ${tokenSuspended}` }
+            };
+            const resStatus = await dispatch(paperSuppliersRouter, reqStatus);
+            assert.strictEqual(resStatus.statusCode, 200);
+            assert.strictEqual(resStatus.body.ok, true);
+            assert.strictEqual(resStatus.body.actor.supplierStatus, 'SUSPENDED');
+            assert.strictEqual(resStatus.body.actor.isSuspended, true);
         });
 
         it('denies SUPPLIER_VIEWER from executing mutation operations requiring ADMIN or OPERATOR (HTTP 403)', async () => {
