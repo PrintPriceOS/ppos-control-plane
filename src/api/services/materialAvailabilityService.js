@@ -75,8 +75,9 @@ class MaterialAvailabilityService {
      * Creates a new material in the catalog and establishes initial operational inventory scope.
      */
     async createMaterial(payload, tenantId, printhouseId) {
-        const id = 'mat-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
+        const id = payload.id || ('mat-' + Date.now() + '-' + Math.floor(Math.random() * 1000));
         const matName = payload.material_name || payload.name || 'Unnamed Material';
+
         const matType = payload.material_type || payload.type || 'PAPER';
         const gsm = payload.gsm || payload.paper_gsm || null;
         const finish = payload.finish_type || payload.finish || 'UNCOATED';
@@ -273,36 +274,187 @@ class MaterialAvailabilityService {
     }
 
     /**
-     * Receives and completes a procurement order, automatically incrementing operational inventory stock.
+     * Legacy receiveProcurement method delegating to atomic implementation.
      */
     async receiveProcurement(procurementId, operatorId) {
-        let procs = [];
+        return await this.receiveProcurementAtomic(procurementId, operatorId, null, null, true, {});
+    }
+
+    /**
+     * Receives and completes a procurement order atomically and idempotently.
+     * Enforces MySQL transaction, row-level locking (FOR UPDATE), scope ownership and idempotency key checks.
+     */
+    async receiveProcurementAtomic(procurementId, operatorId, tenantId, printhouseId, isSuperAdmin = false, options = {}) {
+        const { idempotencyKey, acceptedQuantity, requestBody } = options;
+        const crypto = require('crypto');
+        const pool = db.getPool();
+        let connection = null;
+
         try {
-            procs = await db.query("SELECT * FROM material_procurements WHERE id = ?", [procurementId]);
+            connection = await pool.getConnection();
+            await connection.beginTransaction();
+
+            // 1. Lock procurement row with SELECT ... FOR UPDATE
+            const [procs] = await connection.query(
+                "SELECT * FROM material_procurements WHERE id = ? FOR UPDATE",
+                [procurementId]
+            );
+            const proc = procs && procs[0];
+            if (!proc) {
+                const err = new Error('PROCUREMENT_NOT_FOUND');
+                err.statusCode = 404;
+                throw err;
+            }
+
+            // 2. Lock inventory row with SELECT ... FOR UPDATE
+            const [mats] = await connection.query(
+                "SELECT * FROM predictive_material_inventory WHERE id = ? FOR UPDATE",
+                [proc.material_inventory_id]
+            );
+            const mat = mats && mats[0];
+            if (!mat) {
+                const err = new Error('ASSOCIATED_MATERIAL_NOT_FOUND');
+                err.statusCode = 404;
+                throw err;
+            }
+
+            // 3. Verify tenant boundary isolation
+            if (!isSuperAdmin && tenantId) {
+                const matTenant = mat.tenant_id || 'ppos-production';
+                if (matTenant !== tenantId) {
+                    const err = new Error('FORBIDDEN_CROSS_TENANT_PROCUREMENT_RECEIPT');
+                    err.statusCode = 403;
+                    throw err;
+                }
+            }
+
+            // Parse metadata for idempotency and receipt tracking
+            let procMeta = {};
+            try {
+                procMeta = typeof proc.notes === 'string' && proc.notes.startsWith('{')
+                    ? JSON.parse(proc.notes)
+                    : {};
+            } catch (_) {}
+
+            // 4. Idempotency Key validation
+            if (idempotencyKey) {
+                const incomingHash = crypto.createHash('sha256')
+                    .update(JSON.stringify(requestBody || {}))
+                    .digest('hex');
+
+                if (procMeta.idempotency_key === idempotencyKey) {
+                    // Check payload fingerprint
+                    if (procMeta.idempotency_payload_hash && procMeta.idempotency_payload_hash !== incomingHash) {
+                        const err = new Error('IDEMPOTENCY_PAYLOAD_MISMATCH');
+                        err.statusCode = 409;
+                        err.code = 'IDEMPOTENCY_PAYLOAD_MISMATCH';
+                        throw err;
+                    }
+                    // Return previous receipt result without re-incrementing stock
+                    await connection.rollback();
+                    return {
+                        received: true,
+                        procurementId,
+                        idempotentReplay: true,
+                        receivedUnits: procMeta.received_units || proc.ordered_units,
+                        status: proc.procurement_status
+                    };
+                }
+            }
+
+            // 5. Already received check
+            if (proc.procurement_status === 'RECEIVED') {
+                await connection.rollback();
+                const err = new Error('Procurement already recorded as RECEIVED in ledger');
+                err.statusCode = 409;
+                err.code = 'ALREADY_RECEIVED';
+                throw err;
+            }
+
+            // 6. Quantity determination & over-receipt guard
+            const unitsToReceive = (acceptedQuantity !== null && acceptedQuantity !== undefined)
+                ? Number(acceptedQuantity)
+                : Number(proc.ordered_units);
+
+            if (Number.isNaN(unitsToReceive) || unitsToReceive <= 0) {
+                const err = new Error('INVALID_RECEIPT_QUANTITY');
+                err.statusCode = 400;
+                throw err;
+            }
+
+            if (unitsToReceive > Number(proc.ordered_units)) {
+                const err = new Error('RECEIPT_EXCEEDS_ORDERED_QUANTITY');
+                err.statusCode = 400;
+                err.code = 'RECEIPT_EXCEEDS_ORDERED_QUANTITY';
+                throw err;
+            }
+
+            const beforeStock = Number(mat.current_stock_units) || 0;
+            const afterStock = beforeStock + unitsToReceive;
+
+            // Update procurement record
+            const updatedMeta = {
+                ...procMeta,
+                ...(idempotencyKey ? {
+                    idempotency_key: idempotencyKey,
+                    idempotency_payload_hash: crypto.createHash('sha256').update(JSON.stringify(requestBody || {})).digest('hex')
+                } : {}),
+                received_units: unitsToReceive,
+                received_by: operatorId || 'system-operator',
+                received_at: new Date().toISOString()
+            };
+
+            await connection.query(
+                "UPDATE material_procurements SET procurement_status = 'RECEIVED', notes = ? WHERE id = ?",
+                [JSON.stringify(updatedMeta), procurementId]
+            );
+
+            // Update inventory record
+            await connection.query(
+                "UPDATE predictive_material_inventory SET current_stock_units = ? WHERE id = ?",
+                [afterStock, mat.id]
+            );
+
+            // Record atomic inventory event
+            const eventId = 'evt-mat-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
+            await connection.query(`
+                INSERT INTO material_inventory_events 
+                (id, material_inventory_id, event_type, quantity_units, before_stock, after_stock, job_id, dispatch_id, operator_id, reason, metadata_json)
+                VALUES (?, ?, 'RESTOCK_RECEIVED', ?, ?, ?, NULL, NULL, ?, 'Supplier Restock Delivered to Intake Bay', ?)
+            `, [
+                eventId,
+                mat.id,
+                unitsToReceive,
+                beforeStock,
+                afterStock,
+                operatorId || 'system-operator',
+                JSON.stringify({ procurementId, idempotencyKey: idempotencyKey || null })
+            ]);
+
+            await connection.commit();
+
+            // Asynchronously recalculate status outside transaction lock
+            this.computeStateAndForecast(mat.id).catch(() => {});
+
+            return {
+                received: true,
+                procurementId,
+                unitsReceived: unitsToReceive,
+                beforeStock,
+                afterStock
+            };
         } catch (err) {
-            throw new Error('Procurements registry database error');
+            if (connection) {
+                try {
+                    await connection.rollback();
+                } catch (_) {}
+            }
+            throw err;
+        } finally {
+            if (connection) {
+                connection.release();
+            }
         }
-        const proc = procs[0];
-        if (!proc) throw new Error('Target procurement entry record not found');
-
-        if (proc.procurement_status === 'RECEIVED') {
-            throw new Error('Procurement already recorded as RECEIVED in ledger');
-        }
-
-        await db.query("UPDATE material_procurements SET procurement_status = 'RECEIVED' WHERE id = ?", [procurementId]);
-
-        const mat = await this.getMaterialById(proc.material_inventory_id);
-        if (mat) {
-            const beforeStock = mat.current_stock_units;
-            const afterStock = beforeStock + proc.ordered_units;
-            await db.query("UPDATE predictive_material_inventory SET current_stock_units = ? WHERE id = ?", [afterStock, mat.id]);
-
-            await this.logMaterialEvent(mat.id, 'RESTOCK_RECEIVED', proc.ordered_units, beforeStock, afterStock, null, null, operatorId, 'Supplier Restock Delivered to Intake Bay', { procurementId });
-
-            await this.computeStateAndForecast(mat.id);
-        }
-
-        return { received: true, procurementId };
     }
 
     /**

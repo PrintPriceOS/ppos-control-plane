@@ -16,8 +16,9 @@ import {
 } from "@heroicons/react/24/outline";
 import { NotificationBell } from '../components/NotificationBell';
 import { clearAdminKey, getSystemHealth } from '../lib/adminApi';
-import { getAuthUser, getUserRole, isPrinthouseUser } from '../lib/authStore';
+import { getAuthUser, getUserRole, isPrinthouseUser, isSupplierUser, getActiveContext, setActiveContext, isPaperSupplierHubEnabled } from '../lib/authStore';
 import { PrintPriceLogo } from '../components/PrintPriceLogo';
+
 
 
 
@@ -321,8 +322,49 @@ export const Topbar: React.FC<{ onMenuClick?: () => void }> = ({ onMenuClick }) 
 
             {/* Dropdown */}
             {menuOpen && (
-              <div className="absolute right-0 top-full mt-1 w-48 ppos-surface border ppos-border z-50 shadow-none">
+              <div className="absolute right-0 top-full mt-1 w-52 ppos-surface border ppos-border z-50 shadow-none">
                 <div className="p-0">
+                  {/* Context Switcher for Dual-Capability / Super Admin */}
+                  {isPaperSupplierHubEnabled() && (isSupplierUser() || isPrinthouseUser() || getUserRole() === 'SUPER_ADMIN') && (
+                    <div className="p-2 border-b border-white/5 bg-slate-50/50 dark:bg-zinc-900/50">
+                      <span className="block text-[9px] font-black uppercase text-zinc-500 mb-1 px-2">
+                        {t('topbar.activeContext') || 'Active Context'}
+                      </span>
+                      <div className="grid grid-cols-2 gap-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setActiveContext('printhouse');
+                            setMenuOpen(false);
+                            navigate('/dashboard');
+                          }}
+                          className={`px-2 py-1 text-[9px] font-bold uppercase rounded ${
+                            getActiveContext() === 'printhouse' || !getActiveContext()
+                              ? 'bg-[#dc0000] text-white'
+                              : 'text-zinc-400 hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5'
+                          }`}
+                        >
+                          Printhouse
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setActiveContext('supplier');
+                            setMenuOpen(false);
+                            navigate('/supplier/dashboard');
+                          }}
+                          className={`px-2 py-1 text-[9px] font-bold uppercase rounded ${
+                            getActiveContext() === 'supplier'
+                              ? 'bg-[#dc0000] text-white'
+                              : 'text-zinc-400 hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5'
+                          }`}
+                        >
+                          Supplier
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
                   <button
                     onClick={handleSettings}
                     id="topbar-menu-settings"
@@ -343,6 +385,7 @@ export const Topbar: React.FC<{ onMenuClick?: () => void }> = ({ onMenuClick }) 
                 </div>
               </div>
             )}
+
           </div>
         </div>
       </header>

@@ -279,14 +279,28 @@ function resolveActorContext(req) {
         role = 'SUPER_ADMIN';
     }
     
+    const activeContext = req.headers?.['x-active-context'] || user.activeContext || null; // 'supplier' | 'printhouse' | null
+    const supplierId = user.supplierId || user.supplier_id || req.headers?.['x-supplier-id'] || null;
+
+    const isSupplierUser = ['SUPPLIER_ADMIN', 'SUPPLIER_OPERATOR', 'SUPPLIER_VIEWER'].includes(role);
+    const isSupplierAdmin = role === 'SUPPLIER_ADMIN';
+    const isSupplierOperator = ['SUPPLIER_ADMIN', 'SUPPLIER_OPERATOR'].includes(role);
+    const isSupplierViewer = isSupplierUser;
+
     return {
         userId: user.id || 'anonymous',
         role,
         tenantId: user.tenantId,
         printhouseId: user.printhouseId,
+        supplierId,
+        activeContext,
         isSuperAdmin: role === 'SUPER_ADMIN',
         isMachine: !!user.isMachine || role === 'WORKER_AGENT',
         isPrinthouseUser: ['PRINTHOUSE_ADMIN', 'PRINTHOUSE_OPERATOR'].includes(role),
+        isSupplierUser,
+        isSupplierAdmin,
+        isSupplierOperator,
+        isSupplierViewer,
         authMode
     };
 }
@@ -298,6 +312,7 @@ function resolveActorContext(req) {
  * 
  * Hierarchy:
  * SUPER_ADMIN (100) > OPS_ADMIN / SYSTEM_ADMIN (90) > TENANT_ADMIN / PRINTHOUSE_ADMIN (50) > OPERATOR / PRINTHOUSE_OPERATOR (20) > VIEWER (10)
+ * Note: Supplier roles are explicitly orthogonal to printhouse hierarchy and have 0 inheritance.
  */
 const ROLE_HIERARCHY = {
     'SUPER_ADMIN': 100,
@@ -317,7 +332,7 @@ function requireRole(minRole) {
     
     return (req, res, next) => {
         const context = resolveActorContext(req);
-        // Fail-closed: Unknown user role defaults to level 0
+        // Fail-closed: Unknown user role defaults to level 0 (Supplier roles have level 0 here)
         const userLevel = Object.prototype.hasOwnProperty.call(ROLE_HIERARCHY, context.role) ? ROLE_HIERARCHY[context.role] : 0;
 
         if (userLevel >= minLevel && minLevel !== 999) {
@@ -358,6 +373,89 @@ function requirePrinthouseScope() {
             error: { code: 'FORBIDDEN', message: 'This route requires a Printhouse scope' } 
         });
     };
+}
+
+/**
+ * Middleware to enforce Supplier scope and capabilities.
+ * Orthogonal to printhouse roles — rejects printhouse-only users with 403.
+ */
+function requireSupplierScope(minCapability = 'VIEWER') {
+    return (req, res, next) => {
+        if (!req.user) {
+            return res.status(401).json({
+                ok: false,
+                error: { code: 'UNAUTHORIZED', message: 'Authentication required' }
+            });
+        }
+
+        const context = resolveActorContext(req);
+        if (context.isSuperAdmin) {
+            return next();
+        }
+
+        if (!context.isSupplierUser) {
+            return res.status(403).json({
+                ok: false,
+                error: { code: 'FORBIDDEN', message: 'This route requires a Paper Supplier role' }
+            });
+        }
+
+        const cap = String(minCapability || 'VIEWER').toUpperCase();
+        if (cap === 'ADMIN' && !context.isSupplierAdmin) {
+            return res.status(403).json({
+                ok: false,
+                error: { code: 'FORBIDDEN', message: 'This operation requires SUPPLIER_ADMIN role' }
+            });
+        }
+        if (cap === 'OPERATOR' && !context.isSupplierOperator) {
+            return res.status(403).json({
+                ok: false,
+                error: { code: 'FORBIDDEN', message: 'This operation requires SUPPLIER_OPERATOR or SUPPLIER_ADMIN role' }
+            });
+        }
+
+        next();
+    };
+}
+
+/**
+ * Middleware to ensure Supplier is ACTIVE/APPROVED.
+ * Prevents suspended or pending suppliers from publishing or accepting RFQs.
+ */
+async function requireApprovedSupplier(req, res, next) {
+    const context = resolveActorContext(req);
+    if (context.isSuperAdmin) return next();
+
+    try {
+        const db = require('../services/mysqlClient');
+        const [supplier] = await db.query(
+            'SELECT status FROM paper_suppliers WHERE tenant_id = ? OR id = ?',
+            [context.tenantId, context.supplierId || context.tenantId]
+        ).catch(() => []);
+
+        if (!supplier) {
+            // Check fallback in tenant metadata or assume active if table does not yet exist
+            return next();
+        }
+
+        if (supplier.status === 'SUSPENDED') {
+            return res.status(403).json({
+                ok: false,
+                error: { code: 'SUPPLIER_SUSPENDED', message: 'Supplier organization is currently suspended.' }
+            });
+        }
+        if (supplier.status === 'PENDING_REVIEW') {
+            return res.status(403).json({
+                ok: false,
+                error: { code: 'SUPPLIER_PENDING_REVIEW', message: 'Supplier account is pending review by PrintPrice administration.' }
+            });
+        }
+
+        next();
+    } catch (err) {
+        console.error('[AUTH-SUPPLIER-APPROVAL-CHECK-FAILED]', err);
+        res.status(500).json({ ok: false, error: 'Internal security check failed' });
+    }
 }
 
 /**
@@ -405,5 +503,8 @@ module.exports = {
     resolveActorContext,
     requireRole,
     requirePrinthouseScope,
-    requireApprovedPrinthouse
+    requireApprovedPrinthouse,
+    requireSupplierScope,
+    requireApprovedSupplier
 };
+

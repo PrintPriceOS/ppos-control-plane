@@ -4,7 +4,16 @@
  * Centralized navigation and module visibility by role.
  */
 
-export type Role = 'SUPER_ADMIN' | 'OPS_ADMIN' | 'TENANT_ADMIN' | 'PRINTHOUSE_ADMIN' | 'PRINTHOUSE_OPERATOR' | 'VIEWER';
+export type Role =
+    | 'SUPER_ADMIN'
+    | 'OPS_ADMIN'
+    | 'TENANT_ADMIN'
+    | 'PRINTHOUSE_ADMIN'
+    | 'PRINTHOUSE_OPERATOR'
+    | 'SUPPLIER_ADMIN'
+    | 'SUPPLIER_OPERATOR'
+    | 'SUPPLIER_VIEWER'
+    | 'VIEWER';
 
 export interface NavItem {
     id: string;
@@ -12,6 +21,8 @@ export interface NavItem {
     path: string;
     icon: string;
     roles: Role[];
+    supplierOnly?: boolean;
+    printhouseOnly?: boolean;
 }
 
 export const navigationConfig: NavItem[] = [
@@ -21,23 +32,29 @@ export const navigationConfig: NavItem[] = [
     
     // Core Dashboard (Common)
     { id: 'dashboard', label: 'Dashboard', path: '/dashboard', icon: 'HomeIcon', roles: ['SUPER_ADMIN', 'OPS_ADMIN', 'TENANT_ADMIN', 'PRINTHOUSE_ADMIN', 'PRINTHOUSE_OPERATOR', 'VIEWER'] },
-    
+
+    // Paper Supplier Hub (Exclusive to Supplier Roles & Super Admin)
+    { id: 'supplier-dashboard', label: 'Supplier Dashboard', path: '/supplier/dashboard', icon: 'HomeIcon', roles: ['SUPER_ADMIN', 'SUPPLIER_ADMIN', 'SUPPLIER_OPERATOR', 'SUPPLIER_VIEWER'], supplierOnly: true },
+    { id: 'supplier-catalog', label: 'Paper Catalog & Offers', path: '/supplier/catalog', icon: 'RectangleStackIcon', roles: ['SUPER_ADMIN', 'SUPPLIER_ADMIN', 'SUPPLIER_OPERATOR', 'SUPPLIER_VIEWER'], supplierOnly: true },
+    { id: 'supplier-orders', label: 'Procurement Orders', path: '/supplier/orders', icon: 'InboxIcon', roles: ['SUPER_ADMIN', 'SUPPLIER_ADMIN', 'SUPPLIER_OPERATOR', 'SUPPLIER_VIEWER'], supplierOnly: true },
+    { id: 'supplier-settings', label: 'Supplier Profile', path: '/supplier/settings', icon: 'Cog6ToothIcon', roles: ['SUPER_ADMIN', 'SUPPLIER_ADMIN'], supplierOnly: true },
+
     // Printhouse Operational Views
-    { id: 'printhouses', label: 'Printhouses', path: '/printhouses', icon: 'PrinterIcon', roles: ['SUPER_ADMIN', 'OPS_ADMIN', 'PRINTHOUSE_ADMIN'] },
+    { id: 'printhouses', label: 'Printhouses', path: '/printhouses', icon: 'PrinterIcon', roles: ['SUPER_ADMIN', 'OPS_ADMIN', 'PRINTHOUSE_ADMIN'], printhouseOnly: true },
     { id: 'printhouse-onboarding', label: 'Printhouse Onboarding', path: '/admin/printhouse-onboarding', icon: 'BuildingStorefrontIcon', roles: ['SUPER_ADMIN', 'OPS_ADMIN'] },
     { id: 'onboarding-observability', label: 'Onboarding Observability', path: '/admin/observability', icon: 'ChartBarSquareIcon', roles: ['SUPER_ADMIN'] },
-    { id: 'jobs', label: 'Incoming Jobs', path: '/jobs', icon: 'InboxIcon', roles: ['SUPER_ADMIN', 'TENANT_ADMIN', 'PRINTHOUSE_ADMIN', 'PRINTHOUSE_OPERATOR', 'VIEWER'] },
-    { id: 'preflight', label: 'Preflight Service', path: '/preflight/jobs', icon: 'DocumentCheckIcon', roles: ['SUPER_ADMIN', 'TENANT_ADMIN', 'PRINTHOUSE_ADMIN', 'PRINTHOUSE_OPERATOR', 'VIEWER'] },
-    { id: 'manufacturing', label: 'Manufacturing Queue', path: '/manufacturing', icon: 'CpuChipIcon', roles: ['SUPER_ADMIN', 'TENANT_ADMIN', 'PRINTHOUSE_ADMIN', 'PRINTHOUSE_OPERATOR', 'VIEWER'] },
-    { id: 'machines', label: 'Machines', path: '/machines', icon: 'WrenchScrewdriverIcon', roles: ['SUPER_ADMIN', 'TENANT_ADMIN', 'PRINTHOUSE_ADMIN'] },
-    { id: 'materials', label: 'Materials & Paper', path: '/materials', icon: 'RectangleStackIcon', roles: ['SUPER_ADMIN', 'TENANT_ADMIN', 'PRINTHOUSE_ADMIN'] },
-    { id: 'pricing', label: 'Pricing Profiles', path: '/ops/pricing', icon: 'CurrencyDollarIcon', roles: ['SUPER_ADMIN', 'TENANT_ADMIN', 'PRINTHOUSE_ADMIN'] },
+    { id: 'jobs', label: 'Incoming Jobs', path: '/jobs', icon: 'InboxIcon', roles: ['SUPER_ADMIN', 'TENANT_ADMIN', 'PRINTHOUSE_ADMIN', 'PRINTHOUSE_OPERATOR', 'VIEWER'], printhouseOnly: true },
+    { id: 'preflight', label: 'Preflight Service', path: '/preflight/jobs', icon: 'DocumentCheckIcon', roles: ['SUPER_ADMIN', 'TENANT_ADMIN', 'PRINTHOUSE_ADMIN', 'PRINTHOUSE_OPERATOR', 'VIEWER'], printhouseOnly: true },
+    { id: 'manufacturing', label: 'Manufacturing Queue', path: '/manufacturing', icon: 'CpuChipIcon', roles: ['SUPER_ADMIN', 'TENANT_ADMIN', 'PRINTHOUSE_ADMIN', 'PRINTHOUSE_OPERATOR', 'VIEWER'], printhouseOnly: true },
+    { id: 'machines', label: 'Machines', path: '/machines', icon: 'WrenchScrewdriverIcon', roles: ['SUPER_ADMIN', 'TENANT_ADMIN', 'PRINTHOUSE_ADMIN'], printhouseOnly: true },
+    { id: 'materials', label: 'Materials & Paper', path: '/materials', icon: 'RectangleStackIcon', roles: ['SUPER_ADMIN', 'TENANT_ADMIN', 'PRINTHOUSE_ADMIN'], printhouseOnly: true },
+    { id: 'pricing', label: 'Pricing Profiles', path: '/ops/pricing', icon: 'CurrencyDollarIcon', roles: ['SUPER_ADMIN', 'TENANT_ADMIN', 'PRINTHOUSE_ADMIN'], printhouseOnly: true },
     
     // Intelligence Layer (Super Admin & Ops Admin)
     { id: 'intelligence', label: 'Intelligence Layer', path: '/intelligence', icon: 'SparklesIcon', roles: ['SUPER_ADMIN', 'OPS_ADMIN', 'TENANT_ADMIN'] },
     
     // Operations & Marketplace
-    { id: 'marketplace', label: 'Marketplace', path: '/ops/marketplace', icon: 'BuildingStorefrontIcon', roles: ['SUPER_ADMIN', 'OPS_ADMIN', 'TENANT_ADMIN', 'PRINTHOUSE_ADMIN', 'PRINTHOUSE_OPERATOR'] },
+    { id: 'marketplace', label: 'Marketplace', path: '/ops/marketplace', icon: 'BuildingStorefrontIcon', roles: ['SUPER_ADMIN', 'OPS_ADMIN', 'TENANT_ADMIN', 'PRINTHOUSE_ADMIN', 'PRINTHOUSE_OPERATOR'], printhouseOnly: true },
     { id: 'financials', label: 'Financial Ops', path: '/ops/financials', icon: 'BanknotesIcon', roles: ['SUPER_ADMIN', 'OPS_ADMIN', 'TENANT_ADMIN'] },
     { id: 'billing-usage', label: 'Billing & Plans', path: '/admin/billing-usage', icon: 'CurrencyDollarIcon', roles: ['SUPER_ADMIN', 'OPS_ADMIN'] },
     { id: 'production-monitoring', label: 'Production Monitoring', path: '/admin/production-monitoring', icon: 'SignalIcon', roles: ['SUPER_ADMIN', 'OPS_ADMIN'] },
@@ -45,10 +62,7 @@ export const navigationConfig: NavItem[] = [
     { id: 'beta-runtime', label: 'Beta Runtime', path: '/admin/beta/runtime', icon: 'ShieldAlertIcon', roles: ['SUPER_ADMIN', 'OPS_ADMIN'] },
     { id: 'beta-cohorts', label: 'Beta Cohorts', path: '/admin/beta/cohorts', icon: 'UserGroupIcon', roles: ['SUPER_ADMIN', 'OPS_ADMIN'] },
     { id: 'beta-governance', label: 'Beta Governance', path: '/admin/beta/governance', icon: 'ShieldCheckIcon', roles: ['SUPER_ADMIN', 'OPS_ADMIN'] },
-    // Legacy module references retained for backwards-compatible smoke verification:
-    // beta-cohort-activation (/admin/beta/cohort-activation)
-    // beta-invite-issuance (/admin/beta/invite-issuance)
-    // beta-invite-acceptance (/admin/beta/invite-acceptance)
+    
     // System / Admin
     { id: 'tenants', label: 'Tenant Management', path: '/tenants', icon: 'BuildingOfficeIcon', roles: ['SUPER_ADMIN', 'OPS_ADMIN'] },
     { id: 'audit', label: 'Audit Logs', path: '/audit', icon: 'ClipboardDocumentListIcon', roles: ['SUPER_ADMIN', 'OPS_ADMIN', 'TENANT_ADMIN'] },
@@ -59,3 +73,4 @@ export function getVisibleModulesForRole(role: Role): NavItem[] {
     if (role === 'SUPER_ADMIN') return navigationConfig;
     return navigationConfig.filter(item => item.roles.includes(role));
 }
+

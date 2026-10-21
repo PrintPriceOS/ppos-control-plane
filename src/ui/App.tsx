@@ -80,7 +80,10 @@ import { PrinthouseRegistrationPage } from './pages/PrinthouseRegistrationPage';
 import { PrinthouseOnboardingPage } from './pages/printhouse/PrinthouseOnboardingPage';
 import { PublicHumanReportPage } from './pages/public/PublicHumanReportPage';
 import { AuthGuard } from './components/AuthGuard';
+import { SupplierRouteGuard } from './components/SupplierRouteGuard';
+import { SupplierDashboardPage } from './pages/supplier/SupplierDashboardPage';
 import { ActivationGuard } from './components/auth/ActivationGuard';
+
 import { ActivationHub } from './pages/connect/ActivationHub';
 import { OnboardingObservability } from './pages/admin/OnboardingObservability';
 import { MachineDrawerProvider } from './components/federation/MachineDrawerContext';
@@ -362,7 +365,31 @@ export const App: React.FC = () => {
                 <Route path="/forensics" element={<div className="p-8"><ForensicsTab /></div>} />
                 <Route path="/admin/industrial" element={<div className="p-8"><IndustrialOpsPage /></div>} />
                 <Route path="/settings" element={<GlobalSettingsPage />} />
+
+                {/* PAPER SUPPLIER HUB (Phase I1: Flag & Role Protected) */}
+                <Route path="/supplier" element={<Navigate to="/supplier/dashboard" replace />} />
+                <Route path="/supplier/dashboard" element={
+                    <SupplierRouteGuard>
+                        <div className="p-8"><SupplierDashboardPage /></div>
+                    </SupplierRouteGuard>
+                } />
+                <Route path="/supplier/catalog" element={
+                    <SupplierRouteGuard>
+                        <div className="p-8"><SupplierDashboardPage /></div>
+                    </SupplierRouteGuard>
+                } />
+                <Route path="/supplier/orders" element={
+                    <SupplierRouteGuard>
+                        <div className="p-8"><SupplierDashboardPage /></div>
+                    </SupplierRouteGuard>
+                } />
+                <Route path="/supplier/settings" element={
+                    <SupplierRouteGuard>
+                        <div className="p-8"><SupplierDashboardPage /></div>
+                    </SupplierRouteGuard>
+                } />
             </Route>
+
 
             {/* Fallback */}
             <Route path="*" element={<Navigate to="/dashboard" replace />} />

@@ -119,6 +119,37 @@ export function getUserPrinthouseId(): string {
     return getAuthUser()?.printhouseId || '';
 }
 
+export function getUserSupplierId(): string {
+    return getAuthUser()?.supplierId || '';
+}
+
+export function getActiveContext(): 'supplier' | 'printhouse' | null {
+    if (typeof window === 'undefined') return null;
+    const stored = localStorage.getItem('ppos_active_context');
+    if (stored === 'supplier' || stored === 'printhouse') return stored;
+    const user = getAuthUser();
+    if (user?.activeContext) return user.activeContext;
+    if (isSupplierUser()) return 'supplier';
+    if (isPrinthouseUser()) return 'printhouse';
+    return null;
+}
+
+export function setActiveContext(context: 'supplier' | 'printhouse'): void {
+    if (typeof window === 'undefined') return;
+    localStorage.setItem('ppos_active_context', context);
+    // Dispatch custom event to notify components reactively
+    window.dispatchEvent(new Event('ppos_context_changed'));
+}
+
+export function isPaperSupplierHubEnabled(): boolean {
+    if (typeof window === 'undefined') return false;
+    const envFlag = (import.meta as any).env?.VITE_PAPER_SUPPLIER_HUB_ENABLED;
+    if (envFlag === 'true' || envFlag === true) return true;
+    const storageFlag = localStorage.getItem('ppos_feature_paper_supplier_hub');
+    if (storageFlag === 'true') return true;
+    return false;
+}
+
 export function isSuperAdmin(): boolean {
     return getUserRole() === 'SUPER_ADMIN';
 }
@@ -126,3 +157,16 @@ export function isSuperAdmin(): boolean {
 export function isPrinthouseUser(): boolean {
     return ['PRINTHOUSE_ADMIN', 'PRINTHOUSE_OPERATOR'].includes(getUserRole());
 }
+
+export function isSupplierUser(): boolean {
+    return ['SUPPLIER_ADMIN', 'SUPPLIER_OPERATOR', 'SUPPLIER_VIEWER'].includes(getUserRole());
+}
+
+export function isSupplierAdmin(): boolean {
+    return getUserRole() === 'SUPPLIER_ADMIN';
+}
+
+export function isSupplierOperator(): boolean {
+    return ['SUPPLIER_ADMIN', 'SUPPLIER_OPERATOR'].includes(getUserRole());
+}
+

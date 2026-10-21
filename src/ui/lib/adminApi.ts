@@ -1,4 +1,5 @@
-import { getAuthToken, clearAuthToken, setAuthToken, getUserTenantId, getUserPrinthouseId } from './authStore';
+import { getAuthToken, clearAuthToken, setAuthToken, getUserTenantId, getUserPrinthouseId, getUserSupplierId, getActiveContext } from './authStore';
+
 
 const endpointBackoff = new Map<string, { failCount: number; nextAllowedTime: number }>();
 
@@ -146,6 +147,8 @@ export async function adminFetch<T>(path: string, options?: RequestInit & { tena
     const token = getAuthToken();
     const storedTenantId = getUserTenantId();
     const storedPrinthouseId = getUserPrinthouseId();
+    const storedSupplierId = getUserSupplierId();
+    const activeContext = getActiveContext();
 
     const isFormData = options?.body instanceof FormData;
     const headers: Record<string, string> = {
@@ -156,9 +159,12 @@ export async function adminFetch<T>(path: string, options?: RequestInit & { tena
         } : {}),
         ...(options?.tenantId || storedTenantId ? { "X-Tenant-Id": options?.tenantId || storedTenantId } : {}),
         ...(storedPrinthouseId ? { "X-Printhouse-Id": storedPrinthouseId } : {}),
+        ...(storedSupplierId ? { "X-Supplier-Id": storedSupplierId } : {}),
+        ...(activeContext ? { "X-Active-Context": activeContext } : {}),
         ...(options?.deploymentId ? { "X-Deployment-Id": options.deploymentId } : {}),
         ...(options?.headers as any || {}),
     };
+
 
     if (isFormData && headers["Content-Type"]) {
         delete headers["Content-Type"];

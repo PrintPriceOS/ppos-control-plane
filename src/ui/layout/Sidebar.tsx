@@ -46,7 +46,7 @@ import {
 } from "@heroicons/react/24/outline";
 import { useLocale } from '../i18n';
 import { navigationConfig, Role } from '../config/controlPlaneNavigation';
-import { getUserRole } from '../lib/authStore';
+import { getUserRole, getActiveContext, isSupplierUser, isPaperSupplierHubEnabled } from '../lib/authStore';
 import { getModuleReadiness } from '../config/moduleReadiness';
 
 const IconMap: Record<string, any> = {
@@ -103,6 +103,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const navigate = useNavigate();
   const location = useLocation();
   const userRole = getUserRole() as Role;
+  const isSupplier = isSupplierUser();
+  const activeCtx = getActiveContext();
+  const supplierHubActive = isPaperSupplierHubEnabled();
 
   // Local storage persistence for sidebar collapse preference
   const [isCollapsed, setIsCollapsed] = useState<boolean>(() => {
@@ -131,9 +134,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
     navigate('/login', { replace: true });
   };
 
-  const visibleModules = navigationConfig.filter(item => 
-    item.roles.includes(userRole) || userRole === 'SUPER_ADMIN'
-  );
+  const visibleModules = navigationConfig.filter(item => {
+    // If supplier-only module, requires supplier hub flag enabled AND either supplier role or Super Admin
+    if (item.supplierOnly) {
+      if (!supplierHubActive) return false;
+      return isSupplier || userRole === 'SUPER_ADMIN';
+    }
+    // If printhouse-only module, hide from supplier-only users (unless super admin)
+    if (item.printhouseOnly) {
+      if (isSupplier && activeCtx === 'supplier' && userRole !== 'SUPER_ADMIN') return false;
+    }
+    return item.roles.includes(userRole) || userRole === 'SUPER_ADMIN';
+  });
 
   const isPrinthouseSetupRoute = location.pathname.startsWith('/printhouse/setup');
   const currentTab = (new URLSearchParams(location.search).get('tab') || 'OVERVIEW').toUpperCase();
@@ -171,6 +183,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
     return item.label;
   };
 
+  const headerSubTitle = userRole === 'SUPER_ADMIN'
+    ? 'Control Plane'
+    : (isSupplier && activeCtx !== 'printhouse' ? 'Supplier Hub' : 'Printhouse Hub');
+
   return (
     <aside
       className={`${isOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 fixed lg:static z-50 ${
@@ -186,7 +202,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <div className="min-w-0">
               <h1 className="text-sm font-black text-slate-900 dark:text-white leading-none tracking-tight truncate">PrintPrice OS</h1>
               <p className="text-[9px] font-bold text-zinc-500 mt-1 uppercase tracking-widest truncate">
-                {userRole === 'SUPER_ADMIN' ? 'Control Plane' : 'Printhouse Hub'}
+                {headerSubTitle}
               </p>
             </div>
           )}
@@ -226,7 +242,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       {/* Navigation Scroll Area */}
       <nav className="flex-1 overflow-y-auto px-2 py-3 space-y-1 scrollbar-hide">
-        {/* Contextual Printhouse Setup Group */}
+        {/* Contextual Printhouse Setup Group: Only visible to Printhouse users or Super Admin */}
+        {(!isSupplier || activeCtx === 'printhouse' || userRole === 'SUPER_ADMIN') && (
         <div className="space-y-1 mb-2">
             <button
                 type="button"
@@ -284,6 +301,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 </div>
             )}
         </div>
+        )}
+
 
         {/* Regular Modules */}
         <div className="pt-2 border-t border-slate-100 dark:border-white/5 space-y-1">

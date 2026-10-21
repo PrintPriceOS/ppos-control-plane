@@ -11,26 +11,48 @@ const materialService = require('../services/materialAvailabilityService');
 const db = require('../services/mysqlClient');
 const logger = require('../services/logger').child('materials-route');
 
-const { resolveActorContext } = require('../middleware/auth');
+const { resolveActorContext, requireAdmin } = require('../middleware/auth');
+
+router.use(requireAdmin);
+
 
 // Helper to extract multi-tenant scope from request context
 function getScopeContext(req) {
     const context = resolveActorContext(req);
+    // Explicit tenant resolution: Suppliers cannot access printhouse materials admin routes
+    if (context.isSupplierUser && !context.isSuperAdmin) {
+        const err = new Error('FORBIDDEN_SUPPLIER_ACCESS_TO_PRINTHOUSE_MATERIALS');
+        err.statusCode = 403;
+        throw err;
+    }
+
     return {
         tenantId: context.isSuperAdmin ? (req.headers?.['x-tenant-id'] || req.query?.tenant_id || context.tenantId) : context.tenantId,
         printhouseId: context.isSuperAdmin ? (req.headers?.['x-printhouse-id'] || req.query?.printhouse_id || context.printhouseId) : context.printhouseId,
         operatorId: context.userId || 'operator-dashboard',
-        isSuperAdmin: context.isSuperAdmin
+        isSuperAdmin: context.isSuperAdmin,
+        isPrinthouseUser: context.isPrinthouseUser
     };
 }
 
 /**
  * GET /api/admin/materials/debug
  * Direct database introspection endpoint to diagnose driver/plugin/table availability.
+ * Restringido estrictamente a SUPER_ADMIN.
  */
-router.get('/debug', async (req, res) => {
+router.get('/debug', (req, res, next) => {
+    const context = resolveActorContext(req);
+    if (!context.isSuperAdmin) {
+        return res.status(403).json({
+            ok: false,
+            error: { code: 'FORBIDDEN', message: 'Diagnostic endpoint requires explicit SUPER_ADMIN authorization.' }
+        });
+    }
+    next();
+}, async (req, res) => {
     try {
         const unwrap = (result) => Array.isArray(result) ? (Array.isArray(result[0]) ? result[0] : result) : [];
+
 
         const tablesRaw = await db.query(`
             SELECT TABLE_NAME
@@ -202,11 +224,20 @@ router.get('/', async (req, res) => {
  * Creates a new material in the catalog and initializes base predictive inventory.
  */
 router.post('/', async (req, res) => {
-    const scope = getScopeContext(req);
     try {
-        const result = await materialService.createMaterial(req.body || {}, scope.tenantId, scope.printhouseId);
+        const scope = getScopeContext(req);
+        // Do not trust client-supplied tenantId/printhouseId in body
+        const payload = { ...req.body };
+        delete payload.tenantId;
+        delete payload.tenant_id;
+        delete payload.printhouse_id;
+
+        const result = await materialService.createMaterial(payload, scope.tenantId, scope.printhouseId);
         res.json({ ok: true, data: result });
     } catch (err) {
+        if (err.statusCode === 403 || err.message === 'FORBIDDEN_SUPPLIER_ACCESS_TO_PRINTHOUSE_MATERIALS') {
+            return res.status(403).json({ ok: false, error: err.message, code: 'FORBIDDEN' });
+        }
         console.error('[MATERIALS-API] Failed to create material:', err);
         res.status(500).json({ ok: false, error: err.message, code: 'MATERIAL_CREATE_ERROR' });
     }
@@ -214,14 +245,30 @@ router.post('/', async (req, res) => {
 
 /**
  * POST /api/admin/materials/procurements/:id/receive
- * Marks an active supplier procurement as received, auto-incrementing stock.
+ * Marks an active supplier procurement as received, auto-incrementing stock atomically and idempotently.
  */
 router.post('/procurements/:id/receive', async (req, res) => {
-    const scope = getScopeContext(req);
     try {
-        const result = await materialService.receiveProcurement(req.params.id, scope.operatorId);
+        const scope = getScopeContext(req);
+        const idempotencyKey = req.headers?.['idempotency-key'] || req.body?.idempotency_key || null;
+        const acceptedQuantity = req.body?.accepted_quantity !== undefined ? req.body.accepted_quantity : null;
+        
+        const result = await materialService.receiveProcurementAtomic(
+            req.params.id,
+            scope.operatorId,
+            scope.tenantId,
+            scope.printhouseId,
+            scope.isSuperAdmin,
+            { idempotencyKey, acceptedQuantity, requestBody: req.body }
+        );
         res.json({ ok: true, ...result });
     } catch (err) {
+        if (err.statusCode) {
+            return res.status(err.statusCode).json({ ok: false, error: err.message, code: err.code || 'PROCUREMENT_RECEIVE_ERROR' });
+        }
+        if (err.message === 'FORBIDDEN_SUPPLIER_ACCESS_TO_PRINTHOUSE_MATERIALS') {
+            return res.status(403).json({ ok: false, error: err.message, code: 'FORBIDDEN' });
+        }
         console.error('[MATERIALS-API] Failed to receive procurement:', err);
         res.status(500).json({ ok: false, error: err.message, code: 'PROCUREMENT_RECEIVE_ERROR' });
     }
@@ -232,13 +279,26 @@ router.post('/procurements/:id/receive', async (req, res) => {
  * Retrieves material catalog dedicated to a target physical printing machine/node.
  */
 router.get('/node/:nodeId', async (req, res) => {
-    const { nodeId } = req.params;
     try {
+        const scope = getScopeContext(req);
+        const { nodeId } = req.params;
+
+        // Verify that nodeId belongs to tenant unless Super Admin
+        if (!scope.isSuperAdmin) {
+            const [nodeRow] = await db.query('SELECT tenant_id FROM printer_nodes WHERE id = ?', [nodeId]).catch(() => []);
+            if (nodeRow && nodeRow.tenant_id !== scope.tenantId) {
+                return res.status(403).json({ ok: false, error: 'Cross-tenant node access forbidden', code: 'FORBIDDEN_CROSS_TENANT' });
+            }
+        }
+
         await materialService.forecastDepletion(nodeId);
         const rows = await materialService.getInventory(nodeId);
         res.json({ ok: true, data: rows });
     } catch (err) {
-        console.error(`[MATERIALS-API] Failed to fetch inventory for node [${nodeId}]:`, err);
+        if (err.statusCode === 403 || err.message === 'FORBIDDEN_SUPPLIER_ACCESS_TO_PRINTHOUSE_MATERIALS') {
+            return res.status(403).json({ ok: false, error: err.message, code: 'FORBIDDEN' });
+        }
+        console.error(`[MATERIALS-API] Failed to fetch inventory for node [${req.params.nodeId}]:`, err);
         res.status(500).json({ ok: false, error: err.message, code: 'NODE_MATERIALS_FETCH_ERROR' });
     }
 });
@@ -281,20 +341,36 @@ router.post('/release', async (req, res) => {
     }
 });
 
+// Helper to enforce material tenant ownership
+async function assertMaterialAccess(id, scope) {
+    const mat = await materialService.getMaterialById(id);
+    if (!mat) {
+        const err = new Error('MATERIAL_NOT_FOUND');
+        err.statusCode = 404;
+        throw err;
+    }
+    if (!scope.isSuperAdmin && mat.tenant_id && mat.tenant_id !== scope.tenantId) {
+        const err = new Error('FORBIDDEN_CROSS_TENANT_MATERIAL_ACCESS');
+        err.statusCode = 403;
+        throw err;
+    }
+    return mat;
+}
+
 /**
  * GET /api/admin/materials/:id
  * Retrieves granular state metrics for a solitary material unit.
  */
 router.get('/:id', async (req, res) => {
-    const { id } = req.params;
     try {
-        const mat = await materialService.getMaterialById(id);
-        if (!mat) {
-            return res.status(404).json({ ok: false, error: 'Material specification not found', code: 'MATERIAL_NOT_FOUND' });
-        }
+        const scope = getScopeContext(req);
+        const mat = await assertMaterialAccess(req.params.id, scope);
         res.json({ ok: true, data: mat });
     } catch (err) {
-        console.error(`[MATERIALS-API] Failed to fetch unit [${id}]:`, err);
+        if (err.statusCode) {
+            return res.status(err.statusCode).json({ ok: false, error: err.message, code: err.message });
+        }
+        console.error(`[MATERIALS-API] Failed to fetch unit [${req.params.id}]:`, err);
         res.status(500).json({ ok: false, error: err.message, code: 'MATERIAL_DETAIL_ERROR' });
     }
 });
@@ -304,12 +380,16 @@ router.get('/:id', async (req, res) => {
  * Operator workflow: Intake physical stock quantities.
  */
 router.post('/:id/intake', async (req, res) => {
-    const scope = getScopeContext(req);
-    const { quantity, reason, supplier_batch, expected_use } = req.body || {};
     try {
+        const scope = getScopeContext(req);
+        await assertMaterialAccess(req.params.id, scope);
+        const { quantity, reason, supplier_batch, expected_use } = req.body || {};
         const result = await materialService.intakeStock(req.params.id, quantity, reason, supplier_batch, expected_use, scope.operatorId);
         res.json({ ok: true, data: result });
     } catch (err) {
+        if (err.statusCode) {
+            return res.status(err.statusCode).json({ ok: false, error: err.message, code: err.message });
+        }
         res.status(400).json({ ok: false, error: err.message, code: 'INTAKE_STOCK_ERROR' });
     }
 });
@@ -319,12 +399,16 @@ router.post('/:id/intake', async (req, res) => {
  * Operator workflow: Manual audited physical inventory overrides.
  */
 router.post('/:id/adjust', async (req, res) => {
-    const scope = getScopeContext(req);
-    const { quantity_delta, reason, operator_note } = req.body || {};
     try {
+        const scope = getScopeContext(req);
+        await assertMaterialAccess(req.params.id, scope);
+        const { quantity_delta, reason, operator_note } = req.body || {};
         const result = await materialService.adjustStock(req.params.id, quantity_delta, reason, operator_note, scope.operatorId);
         res.json({ ok: true, data: result });
     } catch (err) {
+        if (err.statusCode) {
+            return res.status(err.statusCode).json({ ok: false, error: err.message, code: err.message });
+        }
         res.status(400).json({ ok: false, error: err.message, code: 'ADJUST_STOCK_ERROR' });
     }
 });
@@ -334,12 +418,16 @@ router.post('/:id/adjust', async (req, res) => {
  * Operator workflow: Explicit allocation reservation lock.
  */
 router.post('/:id/reserve', async (req, res) => {
-    const scope = getScopeContext(req);
-    const { job_id, dispatch_id, quantity, expiration } = req.body || {};
     try {
+        const scope = getScopeContext(req);
+        await assertMaterialAccess(req.params.id, scope);
+        const { job_id, dispatch_id, quantity, expiration } = req.body || {};
         const result = await materialService.reserveStockUnits(req.params.id, job_id, dispatch_id, quantity, expiration, scope.operatorId);
         res.json({ ok: true, data: result });
     } catch (err) {
+        if (err.statusCode) {
+            return res.status(err.statusCode).json({ ok: false, error: err.message, code: err.message });
+        }
         res.status(400).json({ ok: false, error: err.message, code: 'RESERVE_STOCK_ERROR' });
     }
 });
@@ -349,20 +437,18 @@ router.post('/:id/reserve', async (req, res) => {
  * Operator workflow: Frees explicitly allocated pool units.
  */
 router.post('/:id/release', async (req, res) => {
-    const { quantity } = req.body || {};
     try {
-        const mat = await materialService.getMaterialById(req.params.id);
-        if (!mat) return res.status(404).json({ ok: false, error: 'Material not found' });
-        
+        const scope = getScopeContext(req);
+        const mat = await assertMaterialAccess(req.params.id, scope);
+        const { quantity } = req.body || {};
         const qtyToRelease = Number(quantity || 500);
-        const newReserved = Math.max(0, mat.reserved_stock_units - qtyToRelease);
-        await materialService.computeStateAndForecast(mat.id);
-        // Release manual wrapper
         await materialService.releaseMaterials('manual-operator-release', mat.node_id, { material_id: mat.id, units: qtyToRelease });
-        
         const updated = await materialService.getMaterialById(mat.id);
         res.json({ ok: true, data: updated });
     } catch (err) {
+        if (err.statusCode) {
+            return res.status(err.statusCode).json({ ok: false, error: err.message, code: err.message });
+        }
         res.status(500).json({ ok: false, error: err.message, code: 'RELEASE_STOCK_ERROR' });
     }
 });
@@ -372,12 +458,16 @@ router.post('/:id/release', async (req, res) => {
  * Operator workflow: Depletes stock permanently post-production execution.
  */
 router.post('/:id/consume', async (req, res) => {
-    const scope = getScopeContext(req);
-    const { job_id, quantity_consumed, waste_units, reason } = req.body || {};
     try {
+        const scope = getScopeContext(req);
+        await assertMaterialAccess(req.params.id, scope);
+        const { job_id, quantity_consumed, waste_units, reason } = req.body || {};
         const result = await materialService.consumeStockUnits(req.params.id, job_id, quantity_consumed, waste_units, reason, scope.operatorId);
         res.json({ ok: true, data: result });
     } catch (err) {
+        if (err.statusCode) {
+            return res.status(err.statusCode).json({ ok: false, error: err.message, code: err.message });
+        }
         res.status(400).json({ ok: false, error: err.message, code: 'CONSUME_STOCK_ERROR' });
     }
 });
@@ -387,11 +477,16 @@ router.post('/:id/consume', async (req, res) => {
  * Operator workflow: Triggers a new supplier restock purchase order.
  */
 router.post('/:id/procurements', async (req, res) => {
-    const { supplier_name, ordered_units, expected_delivery_date, risk, notes } = req.body || {};
     try {
+        const scope = getScopeContext(req);
+        await assertMaterialAccess(req.params.id, scope);
+        const { supplier_name, ordered_units, expected_delivery_date, risk, notes } = req.body || {};
         const result = await materialService.createProcurement(req.params.id, supplier_name, ordered_units, expected_delivery_date, risk, notes);
         res.json({ ok: true, data: result });
     } catch (err) {
+        if (err.statusCode) {
+            return res.status(err.statusCode).json({ ok: false, error: err.message, code: err.message });
+        }
         res.status(400).json({ ok: false, error: err.message, code: 'CREATE_PROCUREMENT_ERROR' });
     }
 });
@@ -402,9 +497,14 @@ router.post('/:id/procurements', async (req, res) => {
  */
 router.get('/:id/events', async (req, res) => {
     try {
+        const scope = getScopeContext(req);
+        await assertMaterialAccess(req.params.id, scope);
         const timeline = await materialService.getMaterialTimeline(req.params.id);
         res.json({ ok: true, events: timeline });
     } catch (err) {
+        if (err.statusCode) {
+            return res.status(err.statusCode).json({ ok: false, error: err.message, code: err.message });
+        }
         res.status(500).json({ ok: false, error: err.message, code: 'EVENTS_TIMELINE_ERROR' });
     }
 });
@@ -415,9 +515,14 @@ router.get('/:id/events', async (req, res) => {
  */
 router.get('/:id/procurements', async (req, res) => {
     try {
+        const scope = getScopeContext(req);
+        await assertMaterialAccess(req.params.id, scope);
         const list = await materialService.getMaterialProcurements(req.params.id);
         res.json({ ok: true, procurements: list });
     } catch (err) {
+        if (err.statusCode) {
+            return res.status(err.statusCode).json({ ok: false, error: err.message, code: err.message });
+        }
         res.status(500).json({ ok: false, error: err.message, code: 'PROCUREMENTS_LIST_ERROR' });
     }
 });
@@ -428,15 +533,20 @@ router.get('/:id/procurements', async (req, res) => {
  */
 router.get('/:id/forecast', async (req, res) => {
     try {
-        const mat = await materialService.getMaterialById(req.params.id);
+        const scope = getScopeContext(req);
+        const mat = await assertMaterialAccess(req.params.id, scope);
         if (mat && mat.node_id) {
             await materialService.forecastDepletion(mat.node_id);
         }
         const updated = await materialService.getMaterialById(req.params.id);
         res.json({ ok: true, forecast: updated });
     } catch (err) {
+        if (err.statusCode) {
+            return res.status(err.statusCode).json({ ok: false, error: err.message, code: err.message });
+        }
         res.status(500).json({ ok: false, error: err.message, code: 'FORECAST_CALCULATION_ERROR' });
     }
 });
 
 module.exports = router;
+
