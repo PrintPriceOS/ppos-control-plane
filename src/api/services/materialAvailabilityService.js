@@ -361,10 +361,16 @@ class MaterialAvailabilityService {
                 }
             }
 
-            // 3.1 Verify printhouse/center boundary isolation if specified
-            if (!isSuperAdmin && printhouseId) {
-                const matCenter = mat.printhouse_id || mat.node_id;
-                if (matCenter && matCenter !== printhouseId) {
+            // 3.1 Verify printhouse/center boundary isolation if specified (Fail-closed: center cannot be unassigned)
+            const matCenter = mat.printhouse_id || mat.node_id;
+            if (!isSuperAdmin) {
+                if (!matCenter) {
+                    const err = new Error('FORBIDDEN_UNASSIGNED_CENTER_MATERIAL_ACCESS');
+                    err.statusCode = 403;
+                    err.code = 'FORBIDDEN_UNASSIGNED_CENTER_MATERIAL_ACCESS';
+                    throw err;
+                }
+                if (printhouseId && matCenter !== printhouseId) {
                     const err = new Error('FORBIDDEN_CROSS_PRINTHOUSE_PROCUREMENT_RECEIPT');
                     err.statusCode = 403;
                     err.code = 'FORBIDDEN_CROSS_PRINTHOUSE_PROCUREMENT_RECEIPT';
@@ -372,11 +378,24 @@ class MaterialAvailabilityService {
                 }
             }
 
-            // 4. Normalized incoming payload hash for idempotency validation (recursive canonical JSON)
-            const incomingPayloadNorm = requestBody ? canonicalJsonStringify(requestBody) : '{}';
+            // 4. Quantity determination & preliminary value resolution
+            const unitsToReceive = (acceptedQuantity !== null && acceptedQuantity !== undefined)
+                ? Number(acceptedQuantity)
+                : Number(proc.ordered_units);
+
+            // 5. Normalized effective command hash for idempotency validation (recursive canonical JSON)
+            // Includes procurement order, authorized tenant and center scope, effective units, and requestBody
+            const effectiveCommand = {
+                procurement_id: procurementId,
+                tenant_id: tenantId || mat.tenant_id,
+                printhouse_id: printhouseId || matCenter || null,
+                effective_quantity: unitsToReceive,
+                request_body: requestBody || {}
+            };
+            const incomingPayloadNorm = canonicalJsonStringify(effectiveCommand);
             const incomingHash = crypto.createHash('sha256').update(incomingPayloadNorm).digest('hex');
 
-            // 5. Persistent Idempotency Ledger Check (Fail-closed: NO catch swallowing errors)
+            // 6. Persistent Idempotency Ledger Check (Fail-closed: NO catch swallowing errors)
             if (idempotencyKey) {
                 const [ledgerRows] = await connection.query(
                     "SELECT * FROM procurement_receipt_records WHERE tenant_id = ? AND idempotency_key = ? FOR UPDATE",
@@ -413,20 +432,7 @@ class MaterialAvailabilityService {
                 }
             }
 
-            // 6. Already received check
-            if (proc.procurement_status === 'RECEIVED') {
-                await connection.rollback();
-                const err = new Error('Procurement already recorded as RECEIVED in ledger');
-                err.statusCode = 409;
-                err.code = 'ALREADY_RECEIVED';
-                throw err;
-            }
-
             // 7. Quantity determination & over-receipt / partial receipt guards
-            const unitsToReceive = (acceptedQuantity !== null && acceptedQuantity !== undefined)
-                ? Number(acceptedQuantity)
-                : Number(proc.ordered_units);
-
             if (Number.isNaN(unitsToReceive) || unitsToReceive <= 0) {
                 const err = new Error('INVALID_RECEIPT_QUANTITY');
                 err.statusCode = 400;
@@ -446,6 +452,15 @@ class MaterialAvailabilityService {
                 const err = new Error('PARTIAL_RECEIPT_NOT_SUPPORTED_IN_I1');
                 err.statusCode = 400;
                 err.code = 'PARTIAL_RECEIPT_NOT_SUPPORTED_IN_I1';
+                throw err;
+            }
+
+            // 7. Already received check
+            if (proc.procurement_status === 'RECEIVED') {
+                await connection.rollback();
+                const err = new Error('Procurement already recorded as RECEIVED in ledger');
+                err.statusCode = 409;
+                err.code = 'ALREADY_RECEIVED';
                 throw err;
             }
 
@@ -658,21 +673,30 @@ class MaterialAvailabilityService {
 
             const totalInventoryRows = allRows.length;
 
-            // Apply tenant filter
+            // Apply strict tenant filter (Fail-closed: Never omit filter for ppos-production or null tenant)
             let afterTenantRows = allRows;
-            if (!filters.isSuperAdmin && filters.tenantId && filters.tenantId !== 'ppos-production') {
-                afterTenantRows = allRows.filter(r => {
-                    const rTenant = r.tenant_id || 'ppos-production';
-                    return rTenant === filters.tenantId;
-                });
+            if (!filters.isSuperAdmin) {
+                if (!filters.tenantId) {
+                    afterTenantRows = [];
+                } else {
+                    afterTenantRows = allRows.filter(r => {
+                        const rTenant = r.tenant_id;
+                        return Boolean(rTenant && rTenant === filters.tenantId);
+                    });
+                }
             }
             const rowsAfterTenantFilter = afterTenantRows.length;
 
-            // Apply node/center filter
+            // Apply strict node/center filter
             let afterNodeRows = afterTenantRows;
             const targetCenter = (filters.printhouseId || filters.nodeId || '').trim();
             if (targetCenter !== '') {
-                afterNodeRows = afterTenantRows.filter(r => (r.node_id === targetCenter || r.printhouse_id === targetCenter));
+                afterNodeRows = afterTenantRows.filter(r => {
+                    const rowCenter = r.printhouse_id || r.node_id;
+                    return Boolean(rowCenter && (r.node_id === targetCenter || r.printhouse_id === targetCenter));
+                });
+            } else if (!filters.isSuperAdmin && filters.printhouseId !== undefined && filters.printhouseId === null) {
+                // If caller is non-superadmin and had an explicit null printhouseId, don't allow un-scoped center access
             }
             const rowsAfterNodeFilter = afterNodeRows.length;
 
@@ -927,15 +951,25 @@ class MaterialAvailabilityService {
             throw err;
         }
 
-        // 1. Validate Tenant Ownership
-        if (!scope.isSuperAdmin && scope.tenantId && mat.tenant_id && mat.tenant_id !== scope.tenantId) {
-            const err = new Error('FORBIDDEN_CROSS_TENANT_MATERIAL_ACCESS');
+        // 1. Validate Tenant Ownership (Fail-closed: tenant cannot be missing)
+        if (!scope.isSuperAdmin) {
+            if (!mat.tenant_id || (scope.tenantId && mat.tenant_id !== scope.tenantId)) {
+                const err = new Error('FORBIDDEN_CROSS_TENANT_MATERIAL_ACCESS');
+                err.statusCode = 403;
+                err.code = 'FORBIDDEN_CROSS_TENANT_MATERIAL_ACCESS';
+                throw err;
+            }
+        }
+
+        // 2. Validate Node / Center Alignment (Fail-closed: center cannot be missing)
+        const matCenter = mat.printhouse_id || mat.node_id;
+        if (!matCenter) {
+            const err = new Error('FORBIDDEN_UNASSIGNED_CENTER_MATERIAL_ACCESS');
             err.statusCode = 403;
-            err.code = 'FORBIDDEN_CROSS_TENANT_MATERIAL_ACCESS';
+            err.code = 'FORBIDDEN_UNASSIGNED_CENTER_MATERIAL_ACCESS';
             throw err;
         }
 
-        // 2. Validate Node / Center Alignment
         // An authorized node_id MUST NOT allow reserving a material assigned to a different node or center
         if (nodeId && mat.node_id && mat.node_id !== nodeId) {
             const err = new Error('FORBIDDEN_CROSS_CENTER_MATERIAL_ACCESS');
@@ -945,8 +979,7 @@ class MaterialAvailabilityService {
         }
 
         if (!scope.isSuperAdmin && scope.printhouseId) {
-            const targetCenter = mat.printhouse_id || mat.node_id;
-            if (targetCenter && targetCenter !== scope.printhouseId) {
+            if (matCenter !== scope.printhouseId) {
                 const err = new Error('FORBIDDEN_CROSS_CENTER_MATERIAL_ACCESS');
                 err.statusCode = 403;
                 err.code = 'FORBIDDEN_CROSS_CENTER_MATERIAL_ACCESS';
@@ -987,15 +1020,25 @@ class MaterialAvailabilityService {
             throw err;
         }
 
-        // 1. Validate Tenant Ownership
-        if (!scope.isSuperAdmin && scope.tenantId && mat.tenant_id && mat.tenant_id !== scope.tenantId) {
-            const err = new Error('FORBIDDEN_CROSS_TENANT_MATERIAL_ACCESS');
+        // 1. Validate Tenant Ownership (Fail-closed: tenant cannot be missing)
+        if (!scope.isSuperAdmin) {
+            if (!mat.tenant_id || (scope.tenantId && mat.tenant_id !== scope.tenantId)) {
+                const err = new Error('FORBIDDEN_CROSS_TENANT_MATERIAL_ACCESS');
+                err.statusCode = 403;
+                err.code = 'FORBIDDEN_CROSS_TENANT_MATERIAL_ACCESS';
+                throw err;
+            }
+        }
+
+        // 2. Validate Node / Center Alignment (Fail-closed: center cannot be missing)
+        const matCenter = mat.printhouse_id || mat.node_id;
+        if (!matCenter) {
+            const err = new Error('FORBIDDEN_UNASSIGNED_CENTER_MATERIAL_ACCESS');
             err.statusCode = 403;
-            err.code = 'FORBIDDEN_CROSS_TENANT_MATERIAL_ACCESS';
+            err.code = 'FORBIDDEN_UNASSIGNED_CENTER_MATERIAL_ACCESS';
             throw err;
         }
 
-        // 2. Validate Node / Center Alignment
         if (nodeId && mat.node_id && mat.node_id !== nodeId) {
             const err = new Error('FORBIDDEN_CROSS_CENTER_MATERIAL_ACCESS');
             err.statusCode = 403;
@@ -1004,8 +1047,7 @@ class MaterialAvailabilityService {
         }
 
         if (!scope.isSuperAdmin && scope.printhouseId) {
-            const targetCenter = mat.printhouse_id || mat.node_id;
-            if (targetCenter && targetCenter !== scope.printhouseId) {
+            if (matCenter !== scope.printhouseId) {
                 const err = new Error('FORBIDDEN_CROSS_CENTER_MATERIAL_ACCESS');
                 err.statusCode = 403;
                 err.code = 'FORBIDDEN_CROSS_CENTER_MATERIAL_ACCESS';

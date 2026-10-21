@@ -81,11 +81,12 @@ router.get('/me', requireSupplierScope('VIEWER'), async (req, res) => {
             currencies = meta.currencies || [];
         }
 
+        const effectiveRole = req.verifiedSupplierContext?.role || context.role;
         return res.json({
             ok: true,
             data: {
                 userId: context.userId,
-                role: context.role,
+                role: effectiveRole,
                 tenantId: supplier.tenant_id,
                 supplierId: supplier.id,
                 status: supplier.status,
@@ -119,20 +120,22 @@ router.get('/status', requireSupplierScope('VIEWER'), async (req, res) => {
             }
         }
 
+        const effectiveRole = req.verifiedSupplierContext?.role || context.role;
+
         res.json({
             ok: true,
             hub: 'PAPER_SUPPLIER_HUB',
             version: '1.0.0',
             actor: {
                 userId: context.userId,
-                role: context.role,
+                role: effectiveRole,
                 supplierId: context.supplierId,
                 supplierName,
                 supplierStatus,
                 isSuspended: supplierStatus === 'SUSPENDED',
                 isSupplierUser: context.isSupplierUser,
-                isSupplierAdmin: context.isSupplierAdmin,
-                isSupplierOperator: context.isSupplierOperator
+                isSupplierAdmin: effectiveRole === 'SUPPLIER_ADMIN',
+                isSupplierOperator: ['SUPPLIER_ADMIN', 'SUPPLIER_OPERATOR'].includes(effectiveRole)
             }
         });
     } catch (err) {

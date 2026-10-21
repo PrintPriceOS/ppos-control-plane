@@ -273,7 +273,8 @@ function fail(req, res, message) {
 function resolveActorContext(req) {
     const user = req.user || {};
     // Industrial Hardening: Ensure role is always a string and uppercase
-    let role = String(user.role || user.userRole || 'VIEWER').toUpperCase();
+    const verifiedSupplier = req.verifiedSupplierContext || null;
+    let role = verifiedSupplier?.role || String(user.role || user.userRole || 'VIEWER').toUpperCase();
     const email = (user.email || '').toLowerCase();
     const authMode = user.authMode || 'NONE';
 
@@ -286,7 +287,7 @@ function resolveActorContext(req) {
     const requestedContext = req.headers?.['x-active-context'] ? String(req.headers['x-active-context']).toLowerCase().trim() : null;
     const requestedSupplierId = req.headers?.['x-supplier-id'] ? String(req.headers['x-supplier-id']).trim() : null;
 
-    const baseSupplierId = user.supplierId || user.supplier_id || null;
+    const baseSupplierId = verifiedSupplier?.supplierId || user.supplierId || user.supplier_id || null;
 
     // Check if user identity has verified supplier capabilities or roles
     const hasSupplierTokenRole = ['SUPPLIER_ADMIN', 'SUPPLIER_OPERATOR', 'SUPPLIER_VIEWER'].includes(role);
@@ -295,7 +296,7 @@ function resolveActorContext(req) {
     // Context validation: Only allow 'supplier' context if user actually possesses supplier capability/role or is SUPER_ADMIN
     let effectiveActiveContext = null;
     if (requestedContext === 'supplier') {
-        if (hasSupplierTokenRole || role === 'SUPER_ADMIN' || user.hasSupplierCapability) {
+        if (hasSupplierTokenRole || role === 'SUPER_ADMIN' || user.hasSupplierCapability || verifiedSupplier) {
             effectiveActiveContext = 'supplier';
         } else {
             effectiveActiveContext = 'printhouse';
@@ -323,20 +324,21 @@ function resolveActorContext(req) {
         // If mismatched, effectiveSupplierId remains baseSupplierId; header request cannot hijack another supplier
     }
 
-    const hasVerifiedSupplierCapability = Boolean(user.hasSupplierCapability || user.has_supplier_capability);
+    const hasVerifiedSupplierCapability = Boolean(user.hasSupplierCapability || user.has_supplier_capability || verifiedSupplier);
     const inSupplierContext = effectiveActiveContext === 'supplier';
 
-    const isSupplierUser = hasSupplierTokenRole || (hasVerifiedSupplierCapability && inSupplierContext);
+    const isSupplierUser = hasSupplierTokenRole || (hasVerifiedSupplierCapability && inSupplierContext) || Boolean(verifiedSupplier);
     // Orthogonal RBAC: ZERO inheritance of ADMIN from printhouse roles.
     // Supplier roles are resolved strictly from user supplier role or supplier memberships.
-    const isSupplierAdmin = role === 'SUPPLIER_ADMIN' || user.supplierRole === 'SUPPLIER_ADMIN';
-    const isSupplierOperator = ['SUPPLIER_ADMIN', 'SUPPLIER_OPERATOR'].includes(role) || ['SUPPLIER_ADMIN', 'SUPPLIER_OPERATOR'].includes(user.supplierRole);
+    const effectiveSupplierRole = verifiedSupplier?.role || user.supplierRole || (hasSupplierTokenRole ? role : null);
+    const isSupplierAdmin = effectiveSupplierRole === 'SUPPLIER_ADMIN';
+    const isSupplierOperator = ['SUPPLIER_ADMIN', 'SUPPLIER_OPERATOR'].includes(effectiveSupplierRole);
     const isSupplierViewer = isSupplierUser;
 
-    return {
+    const actorContext = {
         userId: user.id || 'anonymous',
         role,
-        tenantId: user.tenantId,
+        tenantId: verifiedSupplier?.tenantId || user.tenantId,
         printhouseId: user.printhouseId,
         supplierId: effectiveSupplierId,
         activeContext: effectiveActiveContext,
@@ -349,6 +351,9 @@ function resolveActorContext(req) {
         isSupplierViewer,
         authMode
     };
+
+    req.actor = actorContext;
+    return actorContext;
 }
 
 
@@ -454,81 +459,101 @@ function requireSupplierScope(minCapability = 'VIEWER') {
         }
 
         // Dynamic server-side verification: Query supplier_memberships and tenant_capabilities
-        // Deactivating or degrading membership immediately affects already-issued JWTs
+        // Requires SIMULTANEOUS active membership AND active PAPER_SUPPLIER capability on the tenant.
+        // Zero catch swallowing DB errors; zero fallback to JWT role.
         try {
             const db = require('../services/mysqlClient');
             const targetSupplierId = context.supplierId;
             const targetTenantId = context.tenantId;
 
-            // 1. If supplierId exists, check active supplier membership in database
-            let effectiveSupplierRole = null;
-            if (targetSupplierId) {
-                const [membership] = await db.query(
-                    `SELECT supplier_role, is_active FROM supplier_memberships WHERE user_id = ? AND supplier_id = ?`,
-                    [context.userId, targetSupplierId]
-                ).catch(() => []);
-
-                if (membership) {
-                    if (!membership.is_active) {
-                        return res.status(403).json({
-                            ok: false,
-                            error: { code: 'FORBIDDEN_MEMBERSHIP_DEACTIVATED', message: 'Supplier membership has been deactivated on the server' }
-                        });
-                    }
-                    effectiveSupplierRole = membership.supplier_role;
-                }
-            }
-
-            // 2. If no explicit membership row found, check token role, but check tenant_capabilities
-            if (!effectiveSupplierRole) {
-                if (targetTenantId) {
-                    const [capRow] = await db.query(
-                        `SELECT is_active FROM tenant_capabilities WHERE tenant_id = ? AND capability = 'PAPER_SUPPLIER'`,
-                        [targetTenantId]
-                    ).catch(() => []);
-
-                    if (capRow && !capRow.is_active) {
-                        return res.status(403).json({
-                            ok: false,
-                            error: { code: 'FORBIDDEN_CAPABILITY_DEACTIVATED', message: 'Paper supplier capability has been deactivated for this tenant' }
-                        });
-                    }
-                }
-
-                // If user had a token supplier role, check if membership exists for that user
-                if (['SUPPLIER_ADMIN', 'SUPPLIER_OPERATOR', 'SUPPLIER_VIEWER'].includes(context.role)) {
-                    effectiveSupplierRole = context.role;
-                }
-            }
-
-            // Update request actor context with dynamically verified supplier role
-            if (effectiveSupplierRole) {
-                context.isSupplierUser = true;
-                context.isSupplierAdmin = effectiveSupplierRole === 'SUPPLIER_ADMIN';
-                context.isSupplierOperator = ['SUPPLIER_ADMIN', 'SUPPLIER_OPERATOR'].includes(effectiveSupplierRole);
-                context.isSupplierViewer = true;
-            } else if (context.isSupplierUser && !effectiveSupplierRole) {
-                // If user claimed supplier via capability or role but has no active membership/role
-                context.isSupplierUser = false;
-                context.isSupplierAdmin = false;
-                context.isSupplierOperator = false;
-                context.isSupplierViewer = false;
-            }
-
-            if (!context.isSupplierUser) {
+            if (!targetSupplierId || !targetTenantId || !context.userId || !context.isSupplierUser) {
                 return res.status(403).json({
                     ok: false,
                     error: { code: 'FORBIDDEN', message: 'This route requires a Paper Supplier role' }
                 });
             }
 
-            if (cap === 'ADMIN' && !context.isSupplierAdmin) {
+            // 1. Verify active supplier membership in database (no catch swallowing errors)
+            const membershipRows = await db.query(
+                `SELECT supplier_role, is_active, tenant_id FROM supplier_memberships WHERE user_id = ? AND supplier_id = ?`,
+                [context.userId, targetSupplierId]
+            );
+            const membership = Array.isArray(membershipRows) ? (Array.isArray(membershipRows[0]) ? membershipRows[0][0] : membershipRows[0]) : null;
+
+            if (!membership) {
+                return res.status(403).json({
+                    ok: false,
+                    error: { code: 'FORBIDDEN_MEMBERSHIP_REQUIRED', message: 'No supplier membership found for this user' }
+                });
+            }
+
+            if (!membership.is_active) {
+                return res.status(403).json({
+                    ok: false,
+                    error: { code: 'FORBIDDEN_MEMBERSHIP_DEACTIVATED', message: 'Supplier membership has been deactivated on the server' }
+                });
+            }
+
+            // Coherence check: membership tenant must match request tenant
+            if (membership.tenant_id && membership.tenant_id !== targetTenantId) {
+                return res.status(403).json({
+                    ok: false,
+                    error: { code: 'FORBIDDEN_MEMBERSHIP_TENANT_MISMATCH', message: 'Supplier membership tenant does not match request tenant' }
+                });
+            }
+
+            // 2. Verify active PAPER_SUPPLIER capability on tenant (no catch swallowing errors)
+            const capRows = await db.query(
+                `SELECT is_active FROM tenant_capabilities WHERE tenant_id = ? AND capability = 'PAPER_SUPPLIER'`,
+                [targetTenantId]
+            );
+            const capRow = Array.isArray(capRows) ? (Array.isArray(capRows[0]) ? capRows[0][0] : capRows[0]) : null;
+
+            if (!capRow) {
+                return res.status(403).json({
+                    ok: false,
+                    error: { code: 'FORBIDDEN_CAPABILITY_REQUIRED', message: 'Paper supplier capability is not configured for this tenant' }
+                });
+            }
+
+            if (!capRow.is_active) {
+                return res.status(403).json({
+                    ok: false,
+                    error: { code: 'FORBIDDEN_CAPABILITY_DEACTIVATED', message: 'Paper supplier capability has been deactivated for this tenant' }
+                });
+            }
+
+            // 3. Effective supplier role is strictly derived from DB membership
+            const effectiveSupplierRole = String(membership.supplier_role || 'SUPPLIER_VIEWER').toUpperCase();
+
+            // Persist verified context into request so subsequent handlers and resolveActorContext reuse it
+            req.verifiedSupplierContext = {
+                role: effectiveSupplierRole,
+                supplierId: targetSupplierId,
+                tenantId: targetTenantId,
+                userId: context.userId
+            };
+
+            // Mutate req.user in place to guarantee no downstream JWT recalculation
+            if (req.user) {
+                req.user.role = effectiveSupplierRole;
+                req.user.supplierRole = effectiveSupplierRole;
+                req.user.effectiveSupplierRole = effectiveSupplierRole;
+                req.user.isSupplierAdmin = effectiveSupplierRole === 'SUPPLIER_ADMIN';
+                req.user.isSupplierOperator = ['SUPPLIER_ADMIN', 'SUPPLIER_OPERATOR'].includes(effectiveSupplierRole);
+                req.user.isSupplierViewer = true;
+            }
+
+            // Re-resolve or update actor context
+            const verifiedActor = resolveActorContext(req);
+
+            if (cap === 'ADMIN' && !verifiedActor.isSupplierAdmin) {
                 return res.status(403).json({
                     ok: false,
                     error: { code: 'FORBIDDEN', message: 'This operation requires SUPPLIER_ADMIN role' }
                 });
             }
-            if (cap === 'OPERATOR' && !context.isSupplierOperator) {
+            if (cap === 'OPERATOR' && !verifiedActor.isSupplierOperator) {
                 return res.status(403).json({
                     ok: false,
                     error: { code: 'FORBIDDEN', message: 'This operation requires SUPPLIER_OPERATOR or SUPPLIER_ADMIN role' }

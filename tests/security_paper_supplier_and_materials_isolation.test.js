@@ -176,7 +176,8 @@ describe('Phase I1 — Paper Supplier & Materials Domain Isolation Suite', () =>
                 id VARCHAR(64) PRIMARY KEY,
                 tenant_id VARCHAR(64) NOT NULL,
                 name VARCHAR(128) NOT NULL,
-                status VARCHAR(32) DEFAULT 'active'
+                status VARCHAR(32) DEFAULT 'active',
+                UNIQUE KEY uk_printer_nodes_id_tenant (id, tenant_id)
             ) ENGINE=InnoDB;
 
             CREATE TABLE IF NOT EXISTS material_procurements (
@@ -229,14 +230,7 @@ describe('Phase I1 — Paper Supplier & Materials Domain Isolation Suite', () =>
                 const content = fs.readFileSync(filePath, 'utf8');
                 const parsed = parseMigrationSql(content);
                 for (const stmt of parsed.statements) {
-                    try {
-                        await connectionPool.query(stmt.sql);
-                    } catch (e) {
-                        // Ignore benign dup column / table errors if already exists
-                        if (!e.message.includes('already exists') && !e.message.includes('Duplicate column')) {
-                            // continue
-                        }
-                    }
+                    await connectionPool.query(stmt.sql);
                 }
             }
         }
@@ -275,11 +269,14 @@ describe('Phase I1 — Paper Supplier & Materials Domain Isolation Suite', () =>
                 ('cap-1', 'tenant-print-a', 'PRINTHOUSE', 1),
                 ('cap-2', 'tenant-supp-1', 'PAPER_SUPPLIER', 1),
                 ('cap-3', 'tenant-dual-org', 'PRINTHOUSE', 1),
-                ('cap-4', 'tenant-dual-org', 'PAPER_SUPPLIER', 1);
+                ('cap-4', 'tenant-dual-org', 'PAPER_SUPPLIER', 1),
+                ('cap-5', 'tenant-supp-2', 'PAPER_SUPPLIER', 1);
 
             INSERT INTO supplier_memberships (id, user_id, tenant_id, supplier_id, supplier_role, is_active) VALUES
                 ('mem-1', 'user-supp-1', 'tenant-supp-1', 'supp-org-1', 'SUPPLIER_ADMIN', 1),
-                ('mem-2', 'user-dual-admin', 'tenant-dual-org', 'supp-org-dual', 'SUPPLIER_ADMIN', 1);
+                ('mem-2', 'user-dual-admin', 'tenant-dual-org', 'supp-org-dual', 'SUPPLIER_ADMIN', 1),
+                ('mem-3', 'user-supp-2', 'tenant-supp-2', 'supp-org-2', 'SUPPLIER_ADMIN', 1),
+                ('mem-4', 'user-supp-viewer', 'tenant-supp-1', 'supp-org-1', 'SUPPLIER_VIEWER', 1);
         `);
 
         // Connect project client to ephemeral database
@@ -470,6 +467,7 @@ describe('Phase I1 — Paper Supplier & Materials Domain Isolation Suite', () =>
         let matBId = 'mat-print-b-1';
 
         beforeAll(async () => {
+            if (!isConfiguredRun) return;
             // Seed materials in Printhouse A and Printhouse B
             await materialService.createMaterial({
                 id: matAId,
@@ -537,6 +535,7 @@ describe('Phase I1 — Paper Supplier & Materials Domain Isolation Suite', () =>
         let testProcurementId = 'proc-atomic-100';
 
         beforeAll(async () => {
+            if (!isConfiguredRun) return;
             await materialService.createMaterial({
                 id: testMaterialId,
                 material_name: 'Inapa Explorer 80g',
@@ -1022,6 +1021,7 @@ describe('Phase I1 — Paper Supplier & Materials Domain Isolation Suite', () =>
         let centerMaterialB = 'mat-center-b-1';
 
         beforeAll(async () => {
+            if (!isConfiguredRun) return;
             // Setup two distinct centers (printer nodes) inside the SAME tenant (tenant-print-a)
             await connectionPool.query(`
                 INSERT INTO printer_nodes (id, tenant_id, name, status) VALUES
@@ -1648,6 +1648,7 @@ describe('Phase I1 — Paper Supplier & Materials Domain Isolation Suite', () =>
         let procOrder2 = 'proc-order-002';
 
         beforeAll(async () => {
+            if (!isConfiguredRun) return;
             await materialService.createMaterial({
                 id: matId,
                 material_name: 'Idempotency Paper 120g',
@@ -1745,6 +1746,7 @@ describe('Phase I1 — Paper Supplier & Materials Domain Isolation Suite', () =>
         let fastifyServerUrl = null;
 
         beforeAll(async () => {
+            if (!isConfiguredRun) return;
             const Fastify = require('fastify');
             testFastifyApp = Fastify({ logger: false });
 
@@ -1761,6 +1763,16 @@ describe('Phase I1 — Paper Supplier & Materials Domain Isolation Suite', () =>
                     const token = authHeader.split(' ')[1];
                     try {
                         const decoded = jwt.verify(token, JWT_SECRET, { audience: JWT_AUDIENCE, issuer: JWT_ISSUER });
+
+                        // Check server-side session revocation if jti is present (shared with production server.js)
+                        if (decoded.jti) {
+                            const userSessionService = require('../src/api/services/userSessionService');
+                            const sessionCheck = await userSessionService.validateSession(decoded.jti, decoded.tenant_id, decoded.sub);
+                            if (!sessionCheck.valid) {
+                                return reply.status(401).send({ error: 'Unauthorized: Session has been revoked or expired' });
+                            }
+                        }
+
                         request.user = {
                             id: decoded.sub,
                             email: decoded.email,
@@ -1768,6 +1780,7 @@ describe('Phase I1 — Paper Supplier & Materials Domain Isolation Suite', () =>
                             tenantId: decoded.tenant_id ? String(decoded.tenant_id) : null,
                             printhouseId: decoded.printhouse_id ? String(decoded.printhouse_id) : null,
                             supplierId: decoded.supplier_id ? String(decoded.supplier_id) : null,
+                            sessionId: decoded.jti || null,
                             hasSupplierCapability: Boolean(decoded.has_supplier_capability || decoded.hasSupplierCapability),
                             hasPrinthouseCapability: Boolean(decoded.has_printhouse_capability || decoded.hasPrinthouseCapability),
                             authMode: 'JWT'
@@ -1861,6 +1874,383 @@ describe('Phase I1 — Paper Supplier & Materials Domain Isolation Suite', () =>
             assert.strictEqual(resp.status, 403);
             const body = await resp.json();
             assert.strictEqual(body.error, 'FORBIDDEN_SUPPLIER_ACCESS_TO_PRINTHOUSE_MATERIALS');
+        });
+    });
+
+    describe('15. Dedicated I1-R2 Hardening & Regressions Verification', () => {
+        it('denies access when supplier membership is deleted/absent from DB even if JWT claims ADMIN (HTTP 403)', async () => {
+            const ghostUserId = 'user-ghost-supp';
+            const tokenGhost = generateToken({
+                id: ghostUserId,
+                role: 'SUPPLIER_ADMIN',
+                tenantId: 'tenant-supp-1',
+                supplierId: 'supp-org-1',
+                hasSupplierCapability: true
+            });
+
+            const req = {
+                method: 'GET',
+                url: '/me',
+                originalUrl: '/api/v1/paper-suppliers/me',
+                headers: { authorization: `Bearer ${tokenGhost}` }
+            };
+
+            const res = await dispatch(paperSuppliersRouter, req);
+            assert.strictEqual(res.statusCode, 403);
+            assert.strictEqual(res.body.error.code, 'FORBIDDEN_MEMBERSHIP_REQUIRED');
+        });
+
+        it('denies access when tenant capability is deactivated despite having an active membership (HTTP 403)', async () => {
+            // Tenant with active membership but deactivated PAPER_SUPPLIER capability
+            const testTenantId = 'tenant-cap-deact';
+            const testSuppId = 'supp-cap-deact';
+            const testUserId = 'user-cap-deact';
+
+            await connectionPool.query(`
+                INSERT INTO tenants (id, name) VALUES ('${testTenantId}', 'Deactivated Cap Tenant');
+                INSERT INTO paper_suppliers (id, tenant_id, name, status) VALUES ('${testSuppId}', '${testTenantId}', 'Deactivated Cap Supplier', 'ACTIVE');
+                INSERT INTO tenant_capabilities (id, tenant_id, capability, is_active) VALUES ('cap-deact-1', '${testTenantId}', 'PAPER_SUPPLIER', 0);
+                INSERT INTO supplier_memberships (id, user_id, tenant_id, supplier_id, supplier_role, is_active) VALUES ('mem-deact-1', '${testUserId}', '${testTenantId}', '${testSuppId}', 'SUPPLIER_ADMIN', 1);
+            `);
+
+            const token = generateToken({
+                id: testUserId,
+                role: 'SUPPLIER_ADMIN',
+                tenantId: testTenantId,
+                supplierId: testSuppId,
+                hasSupplierCapability: true
+            });
+
+            const req = {
+                method: 'GET',
+                url: '/me',
+                originalUrl: '/api/v1/paper-suppliers/me',
+                headers: { authorization: `Bearer ${token}` }
+            };
+
+            const res = await dispatch(paperSuppliersRouter, req);
+            assert.strictEqual(res.statusCode, 403);
+            assert.strictEqual(res.body.error.code, 'FORBIDDEN_CAPABILITY_DEACTIVATED');
+        });
+
+        it('fails controlled with HTTP 500 DATABASE_ERROR on DB query failure without granting access', async () => {
+            const token = generateToken({
+                id: 'user-supp-1',
+                role: 'SUPPLIER_ADMIN',
+                tenantId: 'tenant-supp-1',
+                supplierId: 'supp-org-1',
+                hasSupplierCapability: true
+            });
+
+            const req = {
+                method: 'GET',
+                url: '/me',
+                originalUrl: '/api/v1/paper-suppliers/me',
+                headers: { authorization: `Bearer ${token}` },
+                user: {
+                    id: 'user-supp-1',
+                    role: 'SUPPLIER_ADMIN',
+                    tenantId: 'tenant-supp-1',
+                    supplierId: 'supp-org-1',
+                    hasSupplierCapability: true
+                }
+            };
+
+            const { requireSupplierScope } = require('../src/api/middleware/auth');
+            const originalQuery = mysqlClient.query;
+            let statusCode = 200;
+            let responseBody = null;
+            let nextCalled = false;
+
+            try {
+                // Simulate controlled database outage
+                mysqlClient.query = async () => { throw new Error('SIMULATED_DB_CONN_LOST'); };
+
+                const guard = requireSupplierScope('VIEWER');
+                await guard(req, {
+                    status(c) { statusCode = c; return this; },
+                    json(d) { responseBody = d; return this; }
+                }, () => { nextCalled = true; });
+
+                assert.strictEqual(nextCalled, false);
+                assert.strictEqual(statusCode, 500);
+                assert.strictEqual(responseBody.error.code, 'DATABASE_ERROR');
+            } finally {
+                mysqlClient.query = originalQuery;
+            }
+        });
+
+        it('dynamically reflects DB role degradation immediately in /status and /me responses', async () => {
+            const degradeUserId = 'user-degrade-status';
+            const degradeSuppId = 'supp-org-1';
+            const memId = 'mem-degrade-status-1';
+
+            await connectionPool.query(`
+                INSERT INTO supplier_memberships (id, user_id, tenant_id, supplier_id, supplier_role, is_active)
+                VALUES (?, ?, 'tenant-supp-1', ?, 'SUPPLIER_ADMIN', 1);
+            `, [memId, degradeUserId, degradeSuppId]);
+
+            const token = generateToken({
+                id: degradeUserId,
+                role: 'SUPPLIER_ADMIN',
+                tenantId: 'tenant-supp-1',
+                supplierId: degradeSuppId,
+                hasSupplierCapability: true
+            });
+
+            // 1. Initial check: /status shows ADMIN
+            const reqStatus1 = {
+                method: 'GET',
+                url: '/status',
+                originalUrl: '/api/v1/paper-suppliers/status',
+                headers: { authorization: `Bearer ${token}` }
+            };
+            const resStatus1 = await dispatch(paperSuppliersRouter, reqStatus1);
+            assert.strictEqual(resStatus1.statusCode, 200);
+            assert.strictEqual(resStatus1.body.actor.role, 'SUPPLIER_ADMIN');
+            assert.strictEqual(resStatus1.body.actor.isSupplierAdmin, true);
+
+            // 2. Degrade in database from ADMIN to VIEWER
+            await connectionPool.query(`UPDATE supplier_memberships SET supplier_role = 'SUPPLIER_VIEWER' WHERE id = ?`, [memId]);
+
+            // 3. Next request with SAME JWT token immediately reflects VIEWER in /status and /me
+            const reqStatus2 = {
+                method: 'GET',
+                url: '/status',
+                originalUrl: '/api/v1/paper-suppliers/status',
+                headers: { authorization: `Bearer ${token}` }
+            };
+            const resStatus2 = await dispatch(paperSuppliersRouter, reqStatus2);
+            assert.strictEqual(resStatus2.statusCode, 200);
+            assert.strictEqual(resStatus2.body.actor.role, 'SUPPLIER_VIEWER');
+            assert.strictEqual(resStatus2.body.actor.isSupplierAdmin, false);
+
+            const reqMe2 = {
+                method: 'GET',
+                url: '/me',
+                originalUrl: '/api/v1/paper-suppliers/me',
+                headers: { authorization: `Bearer ${token}` }
+            };
+            const resMe2 = await dispatch(paperSuppliersRouter, reqMe2);
+            assert.strictEqual(resMe2.statusCode, 200);
+            assert.strictEqual(resMe2.body.data.role, 'SUPPLIER_VIEWER');
+        });
+
+        it('denies absent center access on material creation, detail, and operations fail-closed', async () => {
+            // Material creation without center for non-superadmin
+            const tokenOp = generateToken({
+                id: 'operator-no-center',
+                role: 'PRINTHOUSE_OPERATOR',
+                tenantId: 'tenant-print-a'
+                // NO printhouseId
+            });
+
+            const reqCreate = {
+                method: 'POST',
+                url: '/',
+                originalUrl: '/api/admin/materials',
+                headers: { authorization: `Bearer ${tokenOp}` },
+                body: { material_name: 'Unassigned Center Material', initial_stock: 100 }
+            };
+            const resCreate = await dispatch(materialsAdminRouter, reqCreate);
+            assert.strictEqual(resCreate.statusCode, 403);
+            assert.strictEqual(resCreate.body.code, 'FORBIDDEN_UNAUTHORIZED_CENTER_ACCESS');
+
+            // Detail on material with unassigned center
+            const unassignedMatId = 'mat-unassigned-center-1';
+            await connectionPool.query(`
+                INSERT INTO predictive_material_inventory (id, node_id, material_name, material_type, current_stock_units, tenant_id, printhouse_id)
+                VALUES ('${unassignedMatId}', '', 'Unassigned Mat', 'PAPER', 1000, 'tenant-print-a', NULL);
+            `);
+
+            const reqDetail = {
+                method: 'GET',
+                url: `/${unassignedMatId}`,
+                originalUrl: `/api/admin/materials/${unassignedMatId}`,
+                params: { id: unassignedMatId },
+                headers: { authorization: `Bearer ${tokenOp}` }
+            };
+            const resDetail = await dispatch(materialsAdminRouter, reqDetail);
+            assert.strictEqual(resDetail.statusCode, 403);
+            assert.strictEqual(resDetail.body.code, 'FORBIDDEN_UNASSIGNED_CENTER_MATERIAL_ACCESS');
+        });
+
+        it('restricts tenant ppos-production strictly to own resources without global privileges', async () => {
+            const tokenPposProd = generateToken({
+                id: 'user-ppos-prod',
+                role: 'PRINTHOUSE_ADMIN',
+                tenantId: 'ppos-production',
+                printhouseId: 'node-ppos-1'
+            });
+
+            await connectionPool.query(`
+                INSERT INTO printer_nodes (id, tenant_id, name, status) VALUES ('node-ppos-1', 'ppos-production', 'PPOS Prod Press', 'active');
+            `);
+
+            // Try to access Printhouse A material as ppos-production tenant
+            const req = {
+                method: 'GET',
+                url: '/mat-atomic-1',
+                originalUrl: '/api/admin/materials/mat-atomic-1',
+                params: { id: 'mat-atomic-1' },
+                headers: { authorization: `Bearer ${tokenPposProd}` }
+            };
+
+            const res = await dispatch(materialsAdminRouter, req);
+            assert.strictEqual(res.statusCode, 403);
+            assert.strictEqual(res.body.code, 'FORBIDDEN_CROSS_TENANT_MATERIAL_ACCESS');
+        });
+
+        it('detects idempotency mismatch when effective quantity changes with identical requestBody', async () => {
+            const procId = 'proc-diff-qty-1';
+            const matId = 'mat-diff-qty-1';
+            const idemKey = 'ik-diff-qty-test-1';
+
+            await materialService.createMaterial({
+                id: matId,
+                material_name: 'Diff Qty Sheet',
+                material_type: 'PAPER',
+                initial_stock: 500,
+                node_id: 'node-alpha'
+            }, 'tenant-print-a', 'node-alpha');
+
+            await connectionPool.query(`
+                INSERT INTO material_procurements (id, material_inventory_id, supplier_name, ordered_units, procurement_status)
+                VALUES ('${procId}', '${matId}', 'Fedrigoni', 1000, 'ORDERED');
+            `);
+
+            const sharedBody = { note: 'Delivery at dock 2' };
+
+            // 1. Initial receipt with effective quantity 1000
+            const res1 = await materialService.receiveProcurementAtomic(
+                procId,
+                'operator-alice',
+                'tenant-print-a',
+                'node-alpha',
+                false,
+                { idempotencyKey: idemKey, acceptedQuantity: 1000, requestBody: sharedBody }
+            );
+            assert.strictEqual(res1.received, true);
+            assert.strictEqual(res1.unitsReceived, 1000);
+
+            // 2. Replay with identical requestBody but different effective quantity (e.g. 500)
+            await assert.rejects(async () => {
+                await materialService.receiveProcurementAtomic(
+                    procId,
+                    'operator-alice',
+                    'tenant-print-a',
+                    'node-alpha',
+                    false,
+                    { idempotencyKey: idemKey, acceptedQuantity: 500, requestBody: sharedBody }
+                );
+            }, (err) => {
+                assert.strictEqual(err.statusCode, 409);
+                assert.strictEqual(err.code, 'IDEMPOTENCY_PAYLOAD_MISMATCH');
+                return true;
+            });
+        });
+
+        it('rolls back completely when ledger read fails and when ledger insert fails separately', async () => {
+            const matFailTest = 'mat-fail-rollback-test';
+            const procFailTest1 = 'proc-fail-read-1';
+            const procFailTest2 = 'proc-fail-write-1';
+
+            await materialService.createMaterial({
+                id: matFailTest,
+                material_name: 'Rollback Safety Substrate',
+                material_type: 'PAPER',
+                initial_stock: 1000,
+                node_id: 'node-alpha'
+            }, 'tenant-print-a', 'node-alpha');
+
+            await connectionPool.query(`
+                INSERT INTO material_procurements (id, material_inventory_id, supplier_name, ordered_units, procurement_status)
+                VALUES 
+                    ('${procFailTest1}', '${matFailTest}', 'Fedrigoni', 500, 'ORDERED'),
+                    ('${procFailTest2}', '${matFailTest}', 'Fedrigoni', 500, 'ORDERED');
+            `);
+
+            // Case A: Ledger read failure
+            const originalQuery = mysqlClient.query;
+            try {
+                // We simulate query failure specifically for procurement_receipt_records read
+                const connection = await connectionPool.getConnection();
+                const realQuery = connection.query.bind(connection);
+                connection.query = async (sql, params) => {
+                    if (typeof sql === 'string' && sql.includes('procurement_receipt_records') && sql.includes('FOR UPDATE')) {
+                        throw new Error('INJECTED_LEDGER_READ_FAILURE');
+                    }
+                    return realQuery(sql, params);
+                };
+
+                const originalGetConnection = connectionPool.getConnection.bind(connectionPool);
+                connectionPool.getConnection = async () => connection;
+
+                await assert.rejects(async () => {
+                    await materialService.receiveProcurementAtomic(
+                        procFailTest1,
+                        'operator-alice',
+                        'tenant-print-a',
+                        'node-alpha',
+                        false,
+                        { idempotencyKey: 'ik-fail-read', acceptedQuantity: 500, requestBody: {} }
+                    );
+                }, (err) => {
+                    assert.match(err.message, /INJECTED_LEDGER_READ_FAILURE/);
+                    return true;
+                });
+
+                connectionPool.getConnection = originalGetConnection;
+                connection.release();
+
+                // Verify stock remains intact at 1000 and procurement status remains ORDERED
+                const [matCheck] = await connectionPool.query('SELECT current_stock_units FROM predictive_material_inventory WHERE id = ?', [matFailTest]);
+                assert.strictEqual(matCheck[0].current_stock_units, 1000);
+                const [procCheck] = await connectionPool.query('SELECT procurement_status FROM material_procurements WHERE id = ?', [procFailTest1]);
+                assert.strictEqual(procCheck[0].procurement_status, 'ORDERED');
+            } finally {
+                mysqlClient.query = originalQuery;
+            }
+
+            // Case B: Ledger insert failure
+            try {
+                const connection = await connectionPool.getConnection();
+                const realQuery = connection.query.bind(connection);
+                connection.query = async (sql, params) => {
+                    if (typeof sql === 'string' && sql.includes('INSERT INTO procurement_receipt_records')) {
+                        throw new Error('INJECTED_LEDGER_INSERT_FAILURE');
+                    }
+                    return realQuery(sql, params);
+                };
+
+                const originalGetConnection = connectionPool.getConnection.bind(connectionPool);
+                connectionPool.getConnection = async () => connection;
+
+                await assert.rejects(async () => {
+                    await materialService.receiveProcurementAtomic(
+                        procFailTest2,
+                        'operator-alice',
+                        'tenant-print-a',
+                        'node-alpha',
+                        false,
+                        { idempotencyKey: 'ik-fail-write', acceptedQuantity: 500, requestBody: {} }
+                    );
+                }, (err) => {
+                    assert.match(err.message, /INJECTED_LEDGER_INSERT_FAILURE/);
+                    return true;
+                });
+
+                connectionPool.getConnection = originalGetConnection;
+                connection.release();
+
+                // Verify stock remains intact at 1000 and procurement status remains ORDERED
+                const [matCheck2] = await connectionPool.query('SELECT current_stock_units FROM predictive_material_inventory WHERE id = ?', [matFailTest]);
+                assert.strictEqual(matCheck2[0].current_stock_units, 1000);
+                const [procCheck2] = await connectionPool.query('SELECT procurement_status FROM material_procurements WHERE id = ?', [procFailTest2]);
+                assert.strictEqual(procCheck2[0].procurement_status, 'ORDERED');
+            } finally {
+                mysqlClient.query = originalQuery;
+            }
         });
     });
 

@@ -185,8 +185,8 @@ router.get('/', async (req, res) => {
             `;
             const params = [];
             if (!scope.isSuperAdmin) {
-                fallbackSql += ` WHERE (tenant_id = ? OR (tenant_id IS NULL AND ? = 'ppos-production'))`;
-                params.push(scope.tenantId, scope.tenantId);
+                fallbackSql += ` WHERE tenant_id = ?`;
+                params.push(scope.tenantId);
                 if (scope.printhouseId) {
                     fallbackSql += ` AND (printhouse_id = ? OR node_id = ?)`;
                     params.push(scope.printhouseId, scope.printhouseId);
@@ -300,11 +300,20 @@ router.post('/', async (req, res) => {
         delete payload.printhouse_id;
 
         const targetNodeId = payload.node_id || scope.printhouseId;
+        if (!scope.isSuperAdmin && !targetNodeId) {
+            const err = new Error('FORBIDDEN_UNAUTHORIZED_CENTER_ACCESS');
+            err.statusCode = 403;
+            err.code = 'FORBIDDEN_UNAUTHORIZED_CENTER_ACCESS';
+            throw err;
+        }
+
         if (targetNodeId) {
             await assertNodeOwnership(targetNodeId, scope);
         }
 
-        const result = await materialService.createMaterial(payload, scope.tenantId, scope.printhouseId);
+        const effectiveCenter = targetNodeId || scope.printhouseId || null;
+        payload.node_id = effectiveCenter;
+        const result = await materialService.createMaterial(payload, scope.tenantId, effectiveCenter);
         res.json({ ok: true, data: result });
     } catch (err) {
         if (err.statusCode) {
@@ -445,17 +454,24 @@ async function assertMaterialAccess(id, scope) {
         err.code = 'MATERIAL_NOT_FOUND';
         throw err;
     }
-    if (!scope.isSuperAdmin && mat.tenant_id && mat.tenant_id !== scope.tenantId) {
-        const err = new Error('FORBIDDEN_CROSS_TENANT_MATERIAL_ACCESS');
-        err.statusCode = 403;
-        err.code = 'FORBIDDEN_CROSS_TENANT_MATERIAL_ACCESS';
-        throw err;
-    }
-    // Fail-closed center isolation: If actor scope is restricted to a specific printhouseId,
-    // they cannot inspect or mutate materials of another center
-    if (!scope.isSuperAdmin && scope.printhouseId) {
+    if (!scope.isSuperAdmin) {
+        if (!mat.tenant_id || mat.tenant_id !== scope.tenantId) {
+            const err = new Error('FORBIDDEN_CROSS_TENANT_MATERIAL_ACCESS');
+            err.statusCode = 403;
+            err.code = 'FORBIDDEN_CROSS_TENANT_MATERIAL_ACCESS';
+            throw err;
+        }
+
+        // Fail-closed center isolation:
         const matCenter = mat.printhouse_id || mat.node_id;
-        if (matCenter && matCenter !== scope.printhouseId) {
+        if (!matCenter) {
+            const err = new Error('FORBIDDEN_UNASSIGNED_CENTER_MATERIAL_ACCESS');
+            err.statusCode = 403;
+            err.code = 'FORBIDDEN_UNASSIGNED_CENTER_MATERIAL_ACCESS';
+            throw err;
+        }
+
+        if (scope.printhouseId && matCenter !== scope.printhouseId) {
             const err = new Error('FORBIDDEN_CROSS_CENTER_MATERIAL_ACCESS');
             err.statusCode = 403;
             err.code = 'FORBIDDEN_CROSS_CENTER_MATERIAL_ACCESS';
