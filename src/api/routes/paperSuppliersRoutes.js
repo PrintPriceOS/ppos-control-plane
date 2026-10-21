@@ -345,6 +345,7 @@ router.post('/catalog/imports/:batchId/confirm', requireSupplierScope('OPERATOR'
         const statusCode = isNotFound ? 404 : 400;
         let errCode = 'IMPORT_CONFIRMATION_FAILED';
         if (err.message.startsWith('UNRESOLVED_ROWS_EXIST')) errCode = 'UNRESOLVED_ROWS_EXIST';
+        else if (err.message.startsWith('INCOMPLETE_ROWS_EXIST')) errCode = 'INCOMPLETE_ROWS_EXIST';
         else if (isNotFound) errCode = 'BATCH_NOT_FOUND';
 
         return res.status(statusCode).json({

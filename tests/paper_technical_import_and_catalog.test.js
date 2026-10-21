@@ -217,6 +217,37 @@ describe('Iteration I2: Paper Technical Data Sheets & Multi-format Import Engine
             expect(norm.validationStatus).toBe('VALID');
         });
 
+        // Mandatory Regressions Point 1: Normalización de dimensiones
+        it('mandatory regression 1a: columns 100x150 mm + FORMAT "100 x 150 mm" -> preserves 100x150, no contradiction', () => {
+            const rawRow = ['R1A', '', 'Small Card 100x150', '200', '', '', '100 x 150 mm', '250', '', 'Ofset', '', '', '', '100', '150', 'Ofset', 'Papyrus DEF', 'Jā'];
+            const norm = paperImportService.normalizeRowData(rawRow, dummyHeaders, 21);
+
+            expect(norm.width_mm).toBe(100);
+            expect(norm.height_mm).toBe(150);
+            expect(norm.issues.some(i => i.code === 'DIMENSION_CONTRADICTION')).toBe(false);
+            expect(norm.validationStatus).toBe('VALID');
+        });
+
+        it('mandatory regression 1b: columns 100x150 mm + FORMAT "1000 x 1500 mm" -> preserves columns and requires review for contradiction', () => {
+            const rawRow = ['R1B', '', 'Small Card Conflict', '200', '', '', '1000 x 1500 mm', '250', '', 'Ofset', '', '', '', '100', '150', 'Ofset', 'Papyrus DEF', 'Jā'];
+            const norm = paperImportService.normalizeRowData(rawRow, dummyHeaders, 22);
+
+            expect(norm.width_mm).toBe(100);
+            expect(norm.height_mm).toBe(150);
+            expect(norm.issues.some(i => i.code === 'DIMENSION_CONTRADICTION')).toBe(true);
+            expect(norm.validationStatus).toBe('WARNING');
+        });
+
+        it('mandatory regression 1c: columns 700x1000 mm + FORMAT "70 x 100 cm" -> preserves 700x1000 without contradiction as both match in mm', () => {
+            const rawRow = ['R1C', '', 'Full Sheet 700x1000', '400', '', '', '70 x 100 cm', '150', '', 'krītots', '', '', '', '700', '1000', 'Ofset', 'Papyrus DEF', 'Jā'];
+            const norm = paperImportService.normalizeRowData(rawRow, dummyHeaders, 23);
+
+            expect(norm.width_mm).toBe(700);
+            expect(norm.height_mm).toBe(1000);
+            expect(norm.issues.some(i => i.code === 'DIMENSION_CONTRADICTION')).toBe(false);
+            expect(norm.validationStatus).toBe('VALID');
+        });
+
         it('detects contradiction between declared FORMAT and dimension columns without guessing', () => {
             // FORMAT says 720 x 1040, but columns say 72 x 102 (1020 mm vs 1040 mm)
             const rawRow = ['C2', '', 'Contradictory Sheet', '300', '', '', 'B1 720 x 1040', '150', '', '', '', '', '', '72', '102', 'Matt', 'Polap DEF', 'Jā'];
@@ -299,14 +330,14 @@ describe('Iteration I2: Paper Technical Data Sheets & Multi-format Import Engine
             expect(preview.format).toBe('ODS');
             expect(preview.summary.totalRows).toBe(1573);
 
-            // Recalculated breakdown after removing arbitrary numeric threshold guessing:
-            // Valid technical rows: 860
-            // Pending review rows: 702
-            // Internal file duplicate rows: 11
+            // Recalculated breakdown after eliminating isDeciMatch and enforcing strict unit comparison:
+            // Valid technical rows: 16
+            // Pending review rows: 1544
+            // Internal file duplicate rows: 13
             // Rejected rows: 0
-            expect(preview.summary.validRows).toBe(860);
-            expect(preview.summary.pendingRows).toBe(702);
-            expect(preview.summary.duplicateRows).toBe(11);
+            expect(preview.summary.validRows).toBe(16);
+            expect(preview.summary.pendingRows).toBe(1544);
+            expect(preview.summary.duplicateRows).toBe(13);
             expect(preview.summary.rejectedRows).toBe(0);
 
             const total = preview.summary.validRows + preview.summary.pendingRows + preview.summary.duplicateRows + preview.summary.rejectedRows;
@@ -770,6 +801,148 @@ describe('Iteration I2: Paper Technical Data Sheets & Multi-format Import Engine
                     [rowId]: { decision: 'ACCEPTED', overrides: { width_mm: 5 } } // < 10
                 }
             })).rejects.toThrow(/INVALID_OVERRIDE_VALUE/);
+
+            // Mandatory Regressions Point 2: Revalidación de correcciones
+            // An empty overrides: {} or unrelated change (e.g. finish) cannot clear an issue; GSM conflict persists until resolved
+            const conflictCsv = [
+                'CODE;NAME;PRICE;GRAMS;WIDTH (MM);HEIGHT (MM);COAT;PROVISER',
+                'REV-01;Description Maxi Silk 150g;400;90;700;1000;krītots;Papyrus DEF'
+            ].join('\n');
+            const previewConflict = await paperImportService.processImportPreview({
+                buffer: Buffer.from(conflictCsv, 'utf8'),
+                fileName: 'conflict_reval.csv',
+                tenantId: 'tenant-alpha',
+                supplierId: 'supp-alpha-1',
+                createdBy: 'user-op-alpha'
+            });
+            await paperImportService.stageImportBatch(previewConflict);
+            const conflictRows = await paperImportService.getImportBatchRows({
+                batchId: previewConflict.batchId,
+                tenantId: 'tenant-alpha',
+                supplierId: 'supp-alpha-1'
+            });
+            const cRow = conflictRows.rows[0];
+            expect(cRow.validationStatus).toBe('WARNING');
+            expect(cRow.issues.some(i => i.code === 'GSM_DESCRIPTION_CONFLICT')).toBe(true);
+
+            // 2a. Empty overrides: {} with PENDING -> remains pending and confirmation blocks
+            await paperImportService.updateImportRowDecisions({
+                batchId: previewConflict.batchId,
+                tenantId: 'tenant-alpha',
+                supplierId: 'supp-alpha-1',
+                actorId: 'user-op-alpha',
+                decisions: {
+                    [cRow.id]: { decision: 'PENDING', overrides: {} }
+                }
+            });
+            await expect(paperImportService.confirmImportBatch({
+                batchId: previewConflict.batchId,
+                tenantId: 'tenant-alpha',
+                supplierId: 'supp-alpha-1',
+                actorId: 'user-op-alpha'
+            })).rejects.toThrow(/UNRESOLVED_ROWS_EXIST/);
+
+            // 2b. Changing only 'finish' does NOT eliminate the GSM conflict
+            await paperImportService.updateImportRowDecisions({
+                batchId: previewConflict.batchId,
+                tenantId: 'tenant-alpha',
+                supplierId: 'supp-alpha-1',
+                actorId: 'user-op-alpha',
+                decisions: {
+                    [cRow.id]: { decision: 'ACCEPTED', overrides: { finish: 'UNCOATED' } }
+                }
+            });
+            const afterFinishRow = (await paperImportService.getImportBatchRows({
+                batchId: previewConflict.batchId,
+                tenantId: 'tenant-alpha',
+                supplierId: 'supp-alpha-1'
+            })).rows[0];
+            expect(afterFinishRow.issues.some(i => i.code === 'GSM_DESCRIPTION_CONFLICT')).toBe(true);
+            expect(afterFinishRow.validationStatus).toBe('WARNING');
+
+            // 2c. Correcting GSM effectively recalculates the coherent result and clears the conflict
+            await paperImportService.updateImportRowDecisions({
+                batchId: previewConflict.batchId,
+                tenantId: 'tenant-alpha',
+                supplierId: 'supp-alpha-1',
+                actorId: 'user-op-alpha',
+                decisions: {
+                    [cRow.id]: { decision: 'ACCEPTED', overrides: { gsm: 150 } }
+                }
+            });
+            const afterGsmRow = (await paperImportService.getImportBatchRows({
+                batchId: previewConflict.batchId,
+                tenantId: 'tenant-alpha',
+                supplierId: 'supp-alpha-1'
+            })).rows[0];
+            expect(afterGsmRow.issues.some(i => i.code === 'GSM_DESCRIPTION_CONFLICT')).toBe(false);
+            expect(afterGsmRow.validationStatus).toBe('VALID');
+
+            // Mandatory Regressions Point 3: Confirmación de filas incompletas
+            // Technical requirements must be validated on ALL non-rejected rows, even if marked ACCEPTED.
+            // Missing gsm or dimensions blocks confirmation completely, rolls back, and keeps batch editable (PREVIEW).
+            const incompleteCsv = [
+                'CODE;NAME;PRICE;GRAMS;WIDTH (MM);HEIGHT (MM);COAT;PROVISER',
+                'INC-01;Missing Gsm Paper;400;;700;1000;krītots;Papyrus DEF'
+            ].join('\n');
+            const previewInc = await paperImportService.processImportPreview({
+                buffer: Buffer.from(incompleteCsv, 'utf8'),
+                fileName: 'incomplete_test.csv',
+                tenantId: 'tenant-alpha',
+                supplierId: 'supp-alpha-1',
+                createdBy: 'user-op-alpha'
+            });
+            await paperImportService.stageImportBatch(previewInc);
+            const incRows = await paperImportService.getImportBatchRows({
+                batchId: previewInc.batchId,
+                tenantId: 'tenant-alpha',
+                supplierId: 'supp-alpha-1'
+            });
+            const incRow = incRows.rows[0];
+            expect(incRow.normalized.gsm).toBeNull();
+
+            // Marking row as ACCEPTED without providing the missing GSM
+            await paperImportService.updateImportRowDecisions({
+                batchId: previewInc.batchId,
+                tenantId: 'tenant-alpha',
+                supplierId: 'supp-alpha-1',
+                actorId: 'user-op-alpha',
+                decisions: {
+                    [incRow.id]: { decision: 'ACCEPTED', overrides: {} }
+                }
+            });
+
+            // Confirmation MUST be rejected with INCOMPLETE_ROWS_EXIST
+            await expect(paperImportService.confirmImportBatch({
+                batchId: previewInc.batchId,
+                tenantId: 'tenant-alpha',
+                supplierId: 'supp-alpha-1',
+                actorId: 'user-op-alpha'
+            })).rejects.toThrow(/INCOMPLETE_ROWS_EXIST/);
+
+            // Verify batch status remains editable (PREVIEW) and no products inserted
+            const [incBatchState] = await connectionPool.query('SELECT status FROM paper_import_batches WHERE id = ?', [previewInc.batchId]);
+            expect(incBatchState[0].status).toBe('PREVIEW');
+
+            // Now reject the incomplete row and confirm -> succeeds, pending must be 0
+            await paperImportService.updateImportRowDecisions({
+                batchId: previewInc.batchId,
+                tenantId: 'tenant-alpha',
+                supplierId: 'supp-alpha-1',
+                actorId: 'user-op-alpha',
+                decisions: {
+                    [incRow.id]: { decision: 'REJECTED' }
+                }
+            });
+            const confInc = await paperImportService.confirmImportBatch({
+                batchId: previewInc.batchId,
+                tenantId: 'tenant-alpha',
+                supplierId: 'supp-alpha-1',
+                actorId: 'user-op-alpha'
+            });
+            expect(confInc.status).toBe('CONFIRMED');
+            expect(confInc.counts.pending).toBe(0);
+            expect(confInc.counts.rejected).toBe(1);
 
             // 3. Valid override updates normalized data, audit trail, and recomputes issues
             await paperImportService.updateImportRowDecisions({

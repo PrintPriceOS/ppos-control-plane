@@ -442,6 +442,61 @@ function parseSpreadsheetBuffer(buffer, forcedFormat = null, targetSheetName = n
  * Parse and normalize grain direction from text declaration.
  * Returns 'LONG_GRAIN' | 'SHORT_GRAIN' | 'UNKNOWN'.
  */
+/**
+ * Parse and normalize dimension string with optional explicit unit (mm, cm, m, in).
+ * If no unit in string, defaults to fallbackUnit (e.g. from header).
+ * Returns { raw, unit, mm } where mm is null if unit is unknown.
+ */
+function normalizeDimensionValue(valStr, fallbackUnit = null) {
+    if (!valStr || typeof valStr !== 'string') return null;
+    const match = valStr.trim().match(/^([0-9]+(?:[.,][0-9]+)?)\s*(mm|cm|m|in|inch|inches)?$/i);
+    if (!match) return null;
+    const num = parseFloat(match[1].replace(',', '.'));
+    if (isNaN(num) || num <= 0) return null;
+    let unit = (match[2] || '').toLowerCase() || fallbackUnit || null;
+    let mm = null;
+    if (unit === 'mm') mm = num;
+    else if (unit === 'cm') mm = num * 10;
+    else if (unit === 'm') mm = num * 1000;
+    else if (unit === 'in' || unit === 'inch' || unit === 'inches') mm = num * 25.4;
+    return { raw: num, unit, mm };
+}
+
+/**
+ * Parse FORMAT dimension string (e.g., "70 x 100 cm", "100 x 150 mm", "B1 720 x 1020").
+ * Normalizes units to mm when units are declared or inferable.
+ */
+function parseFormatDimensions(formatStr) {
+    if (!formatStr || typeof formatStr !== 'string') return null;
+    const match = formatStr.match(/([0-9]+(?:[.,][0-9]+)?)\s*(mm|cm|m|in)?\s*[xX*]\s*([0-9]+(?:[.,][0-9]+)?)\s*(mm|cm|m|in)?/i);
+    if (!match) return null;
+    const val1 = parseFloat(match[1].replace(',', '.'));
+    const unit1 = (match[2] || '').toLowerCase();
+    const val2 = parseFloat(match[3].replace(',', '.'));
+    const unit2 = (match[4] || '').toLowerCase();
+    const commonUnit = unit2 || unit1 || null;
+    const uW = unit1 || commonUnit;
+    const uH = unit2 || commonUnit;
+
+    const toMm = (val, u) => {
+        if (!u) return null;
+        if (u === 'mm') return val;
+        if (u === 'cm') return val * 10;
+        if (u === 'm') return val * 1000;
+        if (u === 'in') return val * 25.4;
+        return null;
+    };
+
+    return {
+        rawW: val1,
+        unitW: uW,
+        mmW: toMm(val1, uW),
+        rawH: val2,
+        unitH: uH,
+        mmH: toMm(val2, uH)
+    };
+}
+
 function parseGrainDirection(text) {
     if (!text) return 'UNKNOWN';
     const upper = String(text).toUpperCase();
@@ -464,7 +519,20 @@ function computeVariantFingerprint({ name, gsm, width_mm, height_mm, finish, cal
  * Shared validator for technical row attributes.
  * Recalculates issues and validationStatus consistently across import and manual review/correction.
  */
-function validateTechnicalRow({ name, gsm, width_mm, height_mm, finish, caliper_um, grain_direction, colGsm, nameGsm }) {
+function validateTechnicalRow({
+    name,
+    gsm,
+    width_mm,
+    height_mm,
+    finish,
+    caliper_um,
+    grain_direction,
+    colGsm,
+    nameGsm,
+    colW_mm,
+    colH_mm,
+    formatDimensions
+}) {
     const technicalIssues = [];
 
     if (!name) {
@@ -485,15 +553,19 @@ function validateTechnicalRow({ name, gsm, width_mm, height_mm, finish, caliper_
         });
     }
 
+    // GSM conflict evidence check
     if (colGsm && nameGsm && colGsm !== nameGsm) {
-        technicalIssues.push({
-            code: 'GSM_DESCRIPTION_CONFLICT',
-            severity: 'WARNING',
-            category: 'TECHNICAL',
-            message: `Declared grammage (${colGsm} gsm) conflicts with description (${nameGsm} gsm). Explicit review required.`
-        });
+        if (gsm !== nameGsm) {
+            technicalIssues.push({
+                code: 'GSM_DESCRIPTION_CONFLICT',
+                severity: 'WARNING',
+                category: 'TECHNICAL',
+                message: `Declared grammage (${colGsm} gsm) conflicts with description (${nameGsm} gsm). Explicit review required.`
+            });
+        }
     }
 
+    // Dimensions check
     if (!width_mm || !height_mm) {
         technicalIssues.push({
             code: 'MISSING_DIMENSIONS',
@@ -501,13 +573,43 @@ function validateTechnicalRow({ name, gsm, width_mm, height_mm, finish, caliper_
             category: 'TECHNICAL',
             message: 'Width and Height dimensions could not be parsed.'
         });
-    } else if (width_mm < 100 || height_mm < 100 || width_mm > 3000 || height_mm > 3000) {
-        technicalIssues.push({
-            code: 'AMBIGUOUS_DIMENSION_UNITS',
-            severity: 'WARNING',
-            category: 'TECHNICAL',
-            message: `Dimensions ${width_mm}x${height_mm} mm are outside standard sheet range and require review.`
-        });
+    } else {
+        // Check dimension contradiction evidence if formatDimensions and col dimensions exist
+        if (formatDimensions && colW_mm !== undefined && colH_mm !== undefined && colW_mm !== null && colH_mm !== null) {
+            const fmt = formatDimensions;
+            const fmtHasExplicitUnits = fmt.mmW !== null && fmt.mmH !== null;
+            let hasContradiction = false;
+            if (fmtHasExplicitUnits) {
+                if (Math.abs(colW_mm - fmt.mmW) > 1e-3 || Math.abs(colH_mm - fmt.mmH) > 1e-3) {
+                    hasContradiction = true;
+                }
+            } else {
+                if (Math.abs(colW_mm - fmt.rawW) > 1e-3 || Math.abs(colH_mm - fmt.rawH) > 1e-3) {
+                    hasContradiction = true;
+                }
+            }
+
+            if (hasContradiction) {
+                const isStillColValue = (Math.abs(width_mm - colW_mm) < 1e-3 && Math.abs(height_mm - colH_mm) < 1e-3);
+                if (isStillColValue) {
+                    technicalIssues.push({
+                        code: 'DIMENSION_CONTRADICTION',
+                        severity: 'WARNING',
+                        category: 'TECHNICAL',
+                        message: `Contradiction between FORMAT field and dimension columns. Preserving raw values; explicit review required.`
+                    });
+                }
+            }
+        }
+
+        if (width_mm < 100 || height_mm < 100 || width_mm > 3000 || height_mm > 3000) {
+            technicalIssues.push({
+                code: 'AMBIGUOUS_DIMENSION_UNITS',
+                severity: 'WARNING',
+                category: 'TECHNICAL',
+                message: `Dimensions ${width_mm}x${height_mm} mm are outside standard sheet range and require review.`
+            });
+        }
     }
 
     let validationStatus = 'VALID';
@@ -615,71 +717,69 @@ function normalizeRowData(rawCells, headers = [], fileRowNumber = 1) {
         });
     }
 
-    // 3. Dimensions: Respect explicit headers and detect contradictions
+    // 3. Dimensions: Respect explicit units of columns and FORMAT separately, normalize each to mm and compare.
+    // Never use numeric thresholds or coincidence as evidence of cm.
     let width_mm = null;
     let height_mm = null;
-    const rawW = parseFloat(widthStr.replace(',', '.'));
-    const rawH = parseFloat(heightStr.replace(',', '.'));
-    const hasColDims = !isNaN(rawW) && !isNaN(rawH) && rawW > 0 && rawH > 0;
 
-    let formatW = null;
-    let formatH = null;
-    if (formatStr) {
-        const dimMatch = formatStr.match(/(\d+(?:[.,]\d+)?)\s*[xX*]\s*(\d+(?:[.,]\d+)?)/);
-        if (dimMatch) {
-            formatW = parseFloat(dimMatch[1].replace(',', '.'));
-            formatH = parseFloat(dimMatch[2].replace(',', '.'));
-        }
-    }
-
-    // Look for explicit units in header labels
     const widthHeader = (headers[headerMap['WIDTH (MM)']] || headers[13] || '').toUpperCase();
-    const isExplicitMmHeader = widthHeader.includes('(MM)') || widthHeader.includes(' MM');
+    const colHeaderUnit = (widthHeader.includes('(MM)') || widthHeader.includes(' MM')) ? 'mm' : null;
 
-    if (hasColDims) {
-        if (formatW && formatH) {
-            // Check exact and decimal matches
-            const isExactMatch = (Math.abs(formatW - rawW) < 1e-3 && Math.abs(formatH - rawH) < 1e-3);
-            const isDeciMatch = (Math.abs(formatW - rawW * 10) < 1e-3 && Math.abs(formatH - rawH * 10) < 1e-3) ||
-                                (Math.abs(formatW * 10 - rawW) < 1e-3 && Math.abs(formatH * 10 - rawH) < 1e-3);
+    const parsedColW = normalizeDimensionValue(widthStr, colHeaderUnit);
+    const parsedColH = normalizeDimensionValue(heightStr, colHeaderUnit);
+    const parsedFmt = parseFormatDimensions(formatStr);
 
-            if (!isExactMatch && !isDeciMatch) {
-                // Dimensions contradict! Preserve raw values and flag for explicit review.
-                // Never use numeric thresholds or coincidence as evidence of cm.
-                width_mm = rawW;
-                height_mm = rawH;
-                technicalIssues.push({
-                    code: 'DIMENSION_CONTRADICTION',
-                    severity: 'WARNING',
-                    category: 'TECHNICAL',
-                    message: `Contradiction between FORMAT field (${formatW}x${formatH}) and dimension columns (${rawW}x${rawH}). Preserving raw values; explicit review required.`
-                });
-            } else if (isDeciMatch) {
-                // Concordant evidence that FORMAT is mm while column is cm (or vice-versa)
-                const targetW = formatW > rawW ? formatW : rawW * 10;
-                const targetH = formatH > rawH ? formatH : rawH * 10;
-                width_mm = Math.round(targetW);
-                height_mm = Math.round(targetH);
+    let colW_mm = null;
+    let colH_mm = null;
+
+    if (parsedColW && parsedColH) {
+        colW_mm = parsedColW.mm !== null ? parsedColW.mm : parsedColW.raw;
+        colH_mm = parsedColH.mm !== null ? parsedColH.mm : parsedColH.raw;
+
+        if (parsedFmt) {
+            const fmtHasExplicitUnits = (parsedFmt.mmW !== null && parsedFmt.mmH !== null);
+            if (fmtHasExplicitUnits) {
+                // Both sources normalized to mm
+                if (Math.abs(colW_mm - parsedFmt.mmW) < 1e-3 && Math.abs(colH_mm - parsedFmt.mmH) < 1e-3) {
+                    width_mm = Math.round(colW_mm);
+                    height_mm = Math.round(colH_mm);
+                } else {
+                    width_mm = colW_mm;
+                    height_mm = colH_mm;
+                    technicalIssues.push({
+                        code: 'DIMENSION_CONTRADICTION',
+                        severity: 'WARNING',
+                        category: 'TECHNICAL',
+                        message: `Contradiction between FORMAT field (${parsedFmt.rawW}${parsedFmt.unitW || ''}x${parsedFmt.rawH}${parsedFmt.unitH || ''}) and dimension columns (${colW_mm}x${colH_mm} mm). Preserving raw values; explicit review required.`
+                    });
+                }
             } else {
-                // Exact match (e.g. 100x150 mm in cols and FORMAT="100 x 150 mm")
-                width_mm = Math.round(rawW);
-                height_mm = Math.round(rawH);
+                // FORMAT has no explicit unit
+                if (Math.abs(colW_mm - parsedFmt.rawW) < 1e-3 && Math.abs(colH_mm - parsedFmt.rawH) < 1e-3) {
+                    width_mm = Math.round(colW_mm);
+                    height_mm = Math.round(colH_mm);
+                } else {
+                    width_mm = colW_mm;
+                    height_mm = colH_mm;
+                    technicalIssues.push({
+                        code: 'DIMENSION_CONTRADICTION',
+                        severity: 'WARNING',
+                        category: 'TECHNICAL',
+                        message: `Contradiction between FORMAT field (${parsedFmt.rawW}x${parsedFmt.rawH}) and dimension columns (${colW_mm}x${colH_mm} mm). Preserving raw values; explicit review required.`
+                    });
+                }
             }
-        } else if (isExplicitMmHeader) {
-            // Header explicitly states mm: NEVER convert mm to cm based on numeric threshold!
-            width_mm = rawW;
-            height_mm = rawH;
         } else {
-            width_mm = rawW;
-            height_mm = rawH;
+            width_mm = colW_mm;
+            height_mm = colH_mm;
         }
-    } else if (formatW && formatH) {
-        // Fallback to FORMAT if column dimensions missing
-        width_mm = formatW;
-        height_mm = formatH;
-        if (formatStr.toLowerCase().includes('cm')) {
-            width_mm = Math.round(formatW * 10);
-            height_mm = Math.round(formatH * 10);
+    } else if (parsedFmt) {
+        if (parsedFmt.mmW !== null && parsedFmt.mmH !== null) {
+            width_mm = Math.round(parsedFmt.mmW);
+            height_mm = Math.round(parsedFmt.mmH);
+        } else {
+            width_mm = parsedFmt.rawW;
+            height_mm = parsedFmt.rawH;
         }
     }
 
@@ -843,7 +943,14 @@ function normalizeRowData(rawCells, headers = [], fileRowNumber = 1) {
         issues: allIssues,
         technicalIssues,
         commercialIssues,
-        validationStatus
+        validationStatus,
+        evidence: {
+            colGsm,
+            nameGsm,
+            colW_mm,
+            colH_mm,
+            formatDimensions: parsedFmt
+        }
     };
 }
 
@@ -1141,6 +1248,7 @@ async function updateImportRowDecisions({ batchId, tenantId, supplierId, actorId
                 }
 
                 // Recalculate issues and validation status using shared function; NEVER force VALID simply because overrides exist!
+                const evidence = norm.evidence || {};
                 const validation = validateTechnicalRow({
                     name: norm.name,
                     gsm: norm.gsm,
@@ -1148,7 +1256,12 @@ async function updateImportRowDecisions({ batchId, tenantId, supplierId, actorId
                     height_mm: norm.height_mm,
                     finish: norm.finish,
                     caliper_um: norm.caliper_um,
-                    grain_direction: norm.grain_direction
+                    grain_direction: norm.grain_direction,
+                    colGsm: evidence.colGsm,
+                    nameGsm: evidence.nameGsm,
+                    colW_mm: evidence.colW_mm,
+                    colH_mm: evidence.colH_mm,
+                    formatDimensions: evidence.formatDimensions
                 });
 
                 norm.technicalIssues = validation.technicalIssues;
@@ -1223,9 +1336,12 @@ async function confirmImportBatch({ batchId, tenantId, supplierId, actorId, sele
             [batchId]
         );
 
-        // REQUIREMENT 3: Impide cerrar el lote mientras existan pendientes sin resolver.
-        // Unresolved if decision is PENDING and row is WARNING, DUPLICATE, REJECTED, or has issues.
+        // REQUIREMENT 3: Impide cerrar el lote mientras existan pendientes sin resolver o filas incompletas.
+        // Valida los requisitos técnicos de todas las filas no rechazadas, independientemente de que su decisión sea PENDING o ACCEPTED.
+        // ACCEPTED no sustituye un gramaje o una dimensión obligatoria ausente.
         const unresolvedRowIds = [];
+        const incompleteRowIds = [];
+
         for (const row of rows) {
             let decision = row.decision;
             if (selectedDecisions && selectedDecisions[row.id]) {
@@ -1233,16 +1349,32 @@ async function confirmImportBatch({ batchId, tenantId, supplierId, actorId, sele
                 decision = typeof dec === 'string' ? dec : dec.decision;
             }
 
+            // Exclude rejected rows from technical completeness checks
+            if (decision === 'REJECTED' || row.validation_status === 'REJECTED') {
+                continue;
+            }
+
+            const norm = typeof row.normalized_data_json === 'string' ? JSON.parse(row.normalized_data_json) : (row.normalized_data_json || {});
+
+            // Check mandatory technical attributes on all non-rejected rows
+            if (!norm.name || !norm.width_mm || !norm.height_mm || !norm.gsm) {
+                incompleteRowIds.push(row.id);
+                continue;
+            }
+
+            // A row with decision PENDING cannot be confirmed if it has warnings, duplicate or issues
             if (decision === 'PENDING') {
-                const norm = typeof row.normalized_data_json === 'string' ? JSON.parse(row.normalized_data_json) : row.normalized_data_json;
-                const hasTechWarning = (row.validation_status === 'WARNING' || row.validation_status === 'DUPLICATE' || row.validation_status === 'REJECTED' ||
-                    (norm && norm.technicalIssues && norm.technicalIssues.some(i => i.severity === 'WARNING' || i.severity === 'ERROR')) ||
-                    (!norm || !norm.name || !norm.width_mm || !norm.height_mm || !norm.gsm));
+                const hasTechWarning = (row.validation_status === 'WARNING' || row.validation_status === 'DUPLICATE' ||
+                    (norm && norm.technicalIssues && norm.technicalIssues.some(i => i.severity === 'WARNING' || i.severity === 'ERROR')));
 
                 if (hasTechWarning) {
                     unresolvedRowIds.push(row.id);
                 }
             }
+        }
+
+        if (incompleteRowIds.length > 0) {
+            throw new Error(`INCOMPLETE_ROWS_EXIST: Cannot confirm batch while ${incompleteRowIds.length} non-rejected row(s) lack mandatory technical attributes (name, gsm, width_mm, height_mm). Correct or reject them before confirmation.`);
         }
 
         if (unresolvedRowIds.length > 0) {
@@ -1388,5 +1520,7 @@ module.exports = {
     parseGrainDirection,
     computeVariantFingerprint,
     validateTechnicalRow,
+    normalizeDimensionValue,
+    parseFormatDimensions,
     NORMALIZATION_RULES_VERSION
 };
