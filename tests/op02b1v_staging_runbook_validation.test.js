@@ -604,7 +604,7 @@ describe('OP-02B.1V: Staging Runbook, Configuration Contracts & Secret Resolutio
         });
     });
 
-    describe('8. Targeted Runbook Simulation Tests (A, B, C, D)', () => {
+    describe('8. Targeted Runbook Simulation Tests (A, B, C, D)', { timeout: 30000 }, () => {
         const { spawnSync } = require('child_process');
         const os = require('os');
 

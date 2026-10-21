@@ -360,39 +360,36 @@ const MIGRATION_140_FIXTURE_DDL = {
     `
 };
 
-async function runBootstrap() {
+async function runBootstrap(options = {}) {
     console.log('\n=== Canonical Ephemeral Database Bootstrap (Phase CI-02D) ===\n');
 
     // 1. Strict Environmental Protection Gates
     if (process.env.NODE_ENV === 'production') {
-        console.error('ERROR: Canonical database bootstrap is strictly FORBIDDEN in NODE_ENV=production.');
-        process.exit(1);
+        throw new Error('ERROR: Canonical database bootstrap is strictly FORBIDDEN in NODE_ENV=production.');
     }
 
-    let host = process.env.MYSQL_HOST || 'localhost';
-    let database = process.env.MYSQL_DATABASE || '';
+    let host = options.host || process.env.TEST_MYSQL_HOST || process.env.MYSQL_HOST || 'localhost';
+    let database = options.database || process.env.TEST_MYSQL_DATABASE || process.env.MYSQL_DATABASE || '';
 
-    if (process.env.DATABASE_URL) {
+    // Inherited DATABASE_URL cannot override explicit options or TEST_MYSQL_* variables
+    if (!options.database && !process.env.TEST_MYSQL_DATABASE && process.env.DATABASE_URL) {
         try {
             const parsed = new URL(process.env.DATABASE_URL);
             host = parsed.hostname;
             database = parsed.pathname.replace(/^\//, '');
         } catch (e) {
-            console.error('ERROR: Invalid DATABASE_URL format in bootstrap script.');
-            process.exit(1);
+            throw new Error('ERROR: Invalid DATABASE_URL format in bootstrap script.');
         }
     }
 
     const isLocal = host === 'localhost' || host === '127.0.0.1' || host === '::1';
     if (!isLocal) {
-        console.error(`ERROR: Canonical database bootstrap rejected for non-local host: ${host}`);
-        process.exit(1);
+        throw new Error(`ERROR: Canonical database bootstrap rejected for non-local host: ${host}`);
     }
 
     const FORBIDDEN_DB_NAMES = ['ppos_production', 'ppos_prod', 'printpriceos', 'printpriceos_prod'];
     if (FORBIDDEN_DB_NAMES.includes(database.toLowerCase())) {
-        console.error(`ERROR: Database name '${database}' is blocked as a potential production database.`);
-        process.exit(1);
+        throw new Error(`ERROR: Database name '${database}' is blocked as a potential production database.`);
     }
 
     console.log(`[SAFETY CHECK PASSED] Target Ephemeral Host: ${host}, Database: ${database}`);
@@ -400,9 +397,18 @@ async function runBootstrap() {
     process.env.PPOS_MIGRATION_EXECUTION = 'true';
     process.env.PPOS_ENABLE_SCHEMA_MUTATION = 'true';
 
-    const db = mysqlClient.getPool();
+    const db = options.pool || mysqlClient.getPool();
 
     try {
+        // Strict Isolation Assertion: Verify connected database matches target schema EXACTLY before issuing first DDL
+        const [dbCheckRows] = await db.query('SELECT DATABASE() AS current_db');
+        const currentDb = (dbCheckRows && dbCheckRows[0] && dbCheckRows[0].current_db) || '';
+        if (!currentDb || currentDb.toLowerCase() !== database.toLowerCase()) {
+            throw new Error(
+                `SAFETY ABORT: Target database mismatch before first DDL. Expected exclusive schema '${database}', but connected pool is pointing to '${currentDb}'. Aborting bootstrap without mutation.`
+            );
+        }
+
         // Enforce canonical database collation for ephemeral CI instance
         await db.query(`ALTER DATABASE \`${database}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;`);
 
@@ -772,10 +778,15 @@ async function runBootstrap() {
         console.log('[7/7] Canonical Ephemeral Database Bootstrap completed successfully.');
         console.log('✓ Foundational tables prepared. Database is now ready for sequential migration execution.\n');
     } catch (err) {
-        console.error('FATAL: Canonical Ephemeral Database Bootstrap failed:', err);
-        process.exit(1);
+        console.error('FATAL: Canonical Ephemeral Database Bootstrap failed:', err.message || err);
+        if (require.main === module) {
+            process.exit(1);
+        }
+        throw err;
     } finally {
-        await mysqlClient.closePool();
+        if (!options.pool) {
+            await mysqlClient.closePool();
+        }
     }
 }
 

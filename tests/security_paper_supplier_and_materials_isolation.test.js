@@ -113,6 +113,8 @@ function dispatch(router, req) {
 describe('Phase I1 — Paper Supplier & Materials Domain Isolation Suite', () => {
     let isConfiguredRun = true;
 
+    const originalEnv = { ...process.env };
+
     beforeAll(async () => {
         const testDbConfig = getTestDatabaseConfig();
 
@@ -124,6 +126,9 @@ describe('Phase I1 — Paper Supplier & Materials Domain Isolation Suite', () =>
 
         // 1. Preflight validation: abort before any DDL/DML if config is not authorized
         validateTestDatabaseConfig(testDbConfig);
+
+        // Close any pre-existing mysqlClient pool to prevent leaked or shared connections
+        await mysqlClient.closePool();
 
         // 2. Connect to MySQL server to create exclusive schema
         adminPool = mysql.createPool({
@@ -147,19 +152,27 @@ describe('Phase I1 — Paper Supplier & Materials Domain Isolation Suite', () =>
             multipleStatements: true
         });
 
-        // 4. Canonical bootstrap & migration execution over exclusive execution schema
+        // 4. Strict isolation: Eradicate inherited DATABASE_URL so it cannot override TEST_MYSQL_*
+        delete process.env.DATABASE_URL;
+
         process.env.MYSQL_HOST = testDbConfig.host;
         process.env.MYSQL_PORT = String(testDbConfig.port);
         process.env.MYSQL_USER = testDbConfig.user;
         process.env.MYSQL_PASSWORD = testDbConfig.password;
         process.env.MYSQL_DATABASE = executionSchemaName;
+        process.env.TEST_MYSQL_DATABASE = executionSchemaName;
         process.env.PPOS_CI_EPHEMERAL_FIXTURES = 'true';
         process.env.CI = 'true';
         process.env.PPOS_MIGRATION_EXECUTION = 'true';
         process.env.PPOS_ENABLE_SCHEMA_MUTATION = 'true';
 
+        // Canonical bootstrap executing strictly through connectionPool bound to exclusive execution schema
         const { runBootstrap } = require('../scripts/bootstrap_canonical_schema');
-        await runBootstrap();
+        await runBootstrap({
+            host: testDbConfig.host,
+            database: executionSchemaName,
+            pool: connectionPool
+        });
 
         // Reconnect mysqlClient and apply migration ledger + phase migrations canonically
         mysqlClient = require('../src/api/services/mysqlClient');
@@ -252,16 +265,31 @@ describe('Phase I1 — Paper Supplier & Materials Domain Isolation Suite', () =>
     }, 30000);
 
     afterAll(async () => {
-        // Strict cleanup: Drop ONLY the exclusive execution schema verified to belong to this run
-        if (connectionPool) {
-            await connectionPool.end();
-        }
-        if (adminPool) {
-            // Verify schema name belongs strictly to this run before dropping
-            if (executionSchemaName.startsWith('ppos_test_i1r2_') && executionSchemaName.includes(executionRunToken)) {
-                await adminPool.query(`DROP DATABASE IF EXISTS \`${executionSchemaName}\`;`);
+        try {
+            // Strict cleanup: Drop ONLY the exclusive execution schema verified to belong to this run
+            if (connectionPool) {
+                await connectionPool.end();
             }
-            await adminPool.end();
+            if (adminPool) {
+                // Verify schema name belongs strictly to this run before dropping
+                if (executionSchemaName.startsWith('ppos_test_i1r2_') && executionSchemaName.includes(executionRunToken)) {
+                    await adminPool.query(`DROP DATABASE IF EXISTS \`${executionSchemaName}\`;`);
+                }
+                await adminPool.end();
+            }
+            if (mysqlClient && mysqlClient.closePool) {
+                await mysqlClient.closePool();
+            }
+        } finally {
+            // Point 4: Restore environment variables and pool state in finally
+            for (const key of Object.keys(process.env)) {
+                if (!(key in originalEnv)) {
+                    delete process.env[key];
+                }
+            }
+            for (const [key, value] of Object.entries(originalEnv)) {
+                process.env[key] = value;
+            }
         }
     });
 
@@ -1262,6 +1290,45 @@ describe('Phase I1 — Paper Supplier & Materials Domain Isolation Suite', () =>
                     password: 'secret'
                 });
             }, /is not an authorized test target/);
+        });
+
+        it('aborts before any DDL when DATABASE_URL conflicts with exclusive test schema without emitting DDL/DML to foreign target', async () => {
+            const { runBootstrap } = require('../scripts/bootstrap_canonical_schema');
+
+            const foreignQueries = [];
+            // Mock connection pool pointing to a conflicting or shared database
+            const mockForeignPool = {
+                query: async (sql) => {
+                    foreignQueries.push(sql);
+                    if (sql.includes('SELECT DATABASE()')) {
+                        return [[{ current_db: 'shared_test_schema' }]];
+                    }
+                    return [[]];
+                }
+            };
+
+            const targetExclusiveSchema = 'ppos_test_i1r2_exclusive_target';
+
+            // Attempt to run bootstrap with target exclusive schema but connected to foreign pool
+            await assert.rejects(async () => {
+                await runBootstrap({
+                    host: '127.0.0.1',
+                    database: targetExclusiveSchema,
+                    pool: mockForeignPool
+                });
+            }, (err) => {
+                assert.match(err.message, /SAFETY ABORT: Target database mismatch before first DDL/);
+                assert.match(err.message, /Expected exclusive schema 'ppos_test_i1r2_exclusive_target'/);
+                assert.match(err.message, /connected pool is pointing to 'shared_test_schema'/);
+                return true;
+            });
+
+            // Zero DDL (CREATE, ALTER, DROP) or DML (INSERT, UPDATE, DELETE) must have been emitted to the foreign target!
+            const mutatingQueries = foreignQueries.filter(q =>
+                /^\s*(CREATE|ALTER|DROP|INSERT|UPDATE|DELETE|TRUNCATE)\b/i.test(q)
+            );
+            assert.strictEqual(mutatingQueries.length, 0, `Expected 0 mutations against foreign pool, but found: ${mutatingQueries.join('; ')}`);
+            assert.strictEqual(foreignQueries.length, 1, 'Only SELECT DATABASE() safety check should have been issued');
         });
     });
 
