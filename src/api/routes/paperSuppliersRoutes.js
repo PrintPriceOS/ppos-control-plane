@@ -8,7 +8,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../services/mysqlClient');
-const { requireAdmin, resolveActorContext, requireSupplierScope } = require('../middleware/auth');
+const { requireAdmin, resolveActorContext, requireSupplierScope, requireApprovedSupplier } = require('../middleware/auth');
 
 // Feature Flag Middleware: Default OFF
 function requirePaperSupplierHubFlag(req, res, next) {
@@ -152,10 +152,10 @@ const upload = multer({
 /**
  * POST /api/v1/paper-suppliers/catalog/imports/preview
  * Parse uploaded ODS/XLSX/CSV file and generate technical validation preview.
- * Operator or Admin capability required.
+ * Operator or Admin capability and APPROVED supplier status required.
  * DOES NOT create commercial offers or modify inventory!
  */
-router.post('/catalog/imports/preview', requireSupplierScope('OPERATOR'), upload.single('file'), async (req, res) => {
+router.post('/catalog/imports/preview', requireSupplierScope('OPERATOR'), requireApprovedSupplier, upload.single('file'), async (req, res) => {
     try {
         const context = resolveActorContext(req);
         let fileBuffer = null;
@@ -179,16 +179,17 @@ router.post('/catalog/imports/preview', requireSupplierScope('OPERATOR'), upload
             });
         }
 
+        const targetSheetName = req.query?.sheet || null;
         const preview = await paperImportService.processImportPreview({
             buffer: fileBuffer,
             fileName,
             tenantId: context.tenantId,
             supplierId: context.supplierId,
-            createdBy: context.userId
+            createdBy: context.userId,
+            targetSheetName
         });
 
-        // Stage batch into database if stage=true query param or by default
-        const shouldStage = req.query.stage !== 'false';
+        const shouldStage = req.query?.stage !== 'false';
         let stagedInfo = null;
         if (shouldStage) {
             stagedInfo = await paperImportService.stageImportBatch(preview);
@@ -223,13 +224,97 @@ router.post('/catalog/imports/preview', requireSupplierScope('OPERATOR'), upload
 });
 
 /**
- * POST /api/v1/paper-suppliers/catalog/imports/:batchId/confirm
- * Confirms staged technical import batch.
- * Inserts validated records into paper_products and paper_variants.
- * Operator or Admin capability required.
- * STRICTLY ISOLATED: Zero commercial offer publication, zero inventory modification.
+ * GET /api/v1/paper-suppliers/catalog/imports/:batchId/rows
+ * Full paginated query of staged rows with status and decision filters.
  */
-router.post('/catalog/imports/:batchId/confirm', requireSupplierScope('OPERATOR'), async (req, res) => {
+router.get('/catalog/imports/:batchId/rows', requireSupplierScope('VIEWER'), requireApprovedSupplier, async (req, res) => {
+    try {
+        const context = resolveActorContext(req);
+        const { batchId } = req.params;
+        const page = parseInt(req.query?.page || '1', 10);
+        const limit = Math.min(parseInt(req.query?.limit || '50', 10), 200);
+        const status = req.query?.status || null;
+        const decision = req.query?.decision || null;
+
+        const result = await paperImportService.getImportBatchRows({
+            batchId,
+            tenantId: context.tenantId,
+            supplierId: context.supplierId,
+            page,
+            limit,
+            status,
+            decision
+        });
+
+        return res.json({
+            ok: true,
+            data: result
+        });
+    } catch (err) {
+        console.error('[PAPER-IMPORT][ROWS-ERROR]', err);
+        const statusCode = err.message.startsWith('BATCH_NOT_FOUND') ? 404 : 400;
+        return res.status(statusCode).json({
+            ok: false,
+            error: {
+                code: 'IMPORT_ROWS_QUERY_FAILED',
+                message: err.message
+            }
+        });
+    }
+});
+
+/**
+ * PATCH /api/v1/paper-suppliers/catalog/imports/:batchId/rows
+ * Review and correct specific staged rows before confirmation.
+ */
+router.patch('/catalog/imports/:batchId/rows', requireSupplierScope('OPERATOR'), requireApprovedSupplier, async (req, res) => {
+    try {
+        const context = resolveActorContext(req);
+        const { batchId } = req.params;
+        const { decisions } = req.body || {};
+
+        if (!decisions || typeof decisions !== 'object') {
+            return res.status(400).json({
+                ok: false,
+                error: {
+                    code: 'DECISIONS_REQUIRED',
+                    message: 'A map of row decisions is required.'
+                }
+            });
+        }
+
+        const result = await paperImportService.updateImportRowDecisions({
+            batchId,
+            tenantId: context.tenantId,
+            supplierId: context.supplierId,
+            actorId: context.userId,
+            decisions
+        });
+
+        return res.json({
+            ok: true,
+            data: result
+        });
+    } catch (err) {
+        console.error('[PAPER-IMPORT][REVIEW-ERROR]', err);
+        const statusCode = err.message.startsWith('BATCH_NOT_FOUND') ? 404 : 400;
+        return res.status(statusCode).json({
+            ok: false,
+            error: {
+                code: 'IMPORT_REVIEW_UPDATE_FAILED',
+                message: err.message
+            }
+        });
+    }
+});
+
+/**
+ * POST /api/v1/paper-suppliers/catalog/imports/:batchId/confirm
+ * Confirms staged technical import batch atomically.
+ * Bounded by tenant and supplier resolved in server.
+ * Requires APPROVED supplier status.
+ */
+router.post('/catalog/imports/:batchId/confirm', requireSupplierScope('OPERATOR'), requireApprovedSupplier, async (req, res) => {
     try {
         const context = resolveActorContext(req);
         const { batchId } = req.params;
@@ -238,6 +323,7 @@ router.post('/catalog/imports/:batchId/confirm', requireSupplierScope('OPERATOR'
         const result = await paperImportService.confirmImportBatch({
             batchId,
             tenantId: context.tenantId,
+            supplierId: context.supplierId,
             actorId: context.userId,
             selectedDecisions: decisions
         });
@@ -260,4 +346,5 @@ router.post('/catalog/imports/:batchId/confirm', requireSupplierScope('OPERATOR'
 });
 
 module.exports = router;
+
 

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-10-21T13:08:05.393Z",
+  "generatedAt": "2026-10-21T16:13:52.507Z",
   "hashAlgorithm": "sha256",
   "contentNormalization": "utf8-lf-v1",
   "approvedPrefixCollisions": {
@@ -2195,9 +2195,9 @@
     {
       "path": "migrations/163_phase196b_paper_products_and_import_staging.sql",
       "prefix": "163",
-      "canonicalSha256": "0d5cdae44fcf035e6e03019e6dbeba2edc1c1b192437efa225d5c0878ebc926d",
+      "canonicalSha256": "24d1cc22d879d2d3a2f82de5cfd8e573172d28376b1abf4e0d375f0ad0f9c847",
       "contentNormalization": "utf8-lf-v1",
-      "sizeBytes": 4056,
+      "sizeBytes": 4060,
       "containsDdl": true,
       "containsDml": true,
       "containsTransaction": false,

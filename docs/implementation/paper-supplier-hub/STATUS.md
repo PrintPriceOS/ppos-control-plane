@@ -15,7 +15,7 @@
 | **I1** | **Identidad proveedor y protección de dominio (R0)** | **SUPERSEDED** | Sustituida por ciclos de remediación I1-R1 e I1-R2. |
 | **I1-R1** | **Remediación inicial de autorización, identidad y recepción atómica** | **COMPLETED** | Implementaciones base de modelos y tablas 162; paso a I1-R2 para cierre de bloqueos de aislamiento estricto. |
 | **I1-R2** | **Remediación integral: Entorno de pruebas, Bypass nodo/material, Pertenencias reales, Centros e Idempotencia** | **COMPLETED & VERIFIED (PASS)** | Cierre total y comprobado de todos los puntos y del bloqueo funcional de actor sin centro: 1) Bloqueo Funcional (Actor sin centro): PRINTHOUSE_OPERATOR con tenant válido y `printhouseId=null` es rechazado fail-closed (HTTP 403 `FORBIDDEN_UNAUTHORIZED_CENTER_ACCESS`) en listado (`GET /`), fallback, detalle (`GET /:id`), intake/adjust/consume, creación (`POST /`), legacy reserve/release y recepción de procurement. El `node_id` enviado en el cuerpo no acredita autorización de centro. Se eliminó la rama vacía de `getAllMaterials`. 2) Aislamiento estricto del bootstrap de pruebas: tablas copiadas sustituidas por el bootstrap canónico (`scripts/bootstrap_canonical_schema.js`), el cual comprueba que `SELECT DATABASE()` coincida exactamente con el esquema exclusivo antes del primer DDL; erradicación de `DATABASE_URL` heredada para que no prevalezca sobre `TEST_MYSQL_*`; control de pools previos y restauración de variables/conexiones en `finally`. 3) Migraciones secuenciales ejecutadas: inicialización de ledgers (`phase184g` y `phase185`) seguida por las 7 migraciones seleccionadas (`001`, `007`, `015`, `139`, `140`, `158`, `162`). 4) Reutilización directa del middleware de producción `requireAdmin` (`src/api/middleware/auth.js`) en pruebas HTTP con puente Fastify/Express. 5) Suite focalizada de seguridad: 57/57 tests PASS en MySQL efímero; suite global: 44 archivos / 721 tests PASS con `TEST_MYSQL_*` (o 664 PASS / 57 SKIP limpio sin variables de BD); build de producción limpio; integridad de migraciones (165 migraciones) PASSED; y diagnósticos TypeScript comparados por contenido (cero errores nuevos añadidos). |
-| **I2** | **Fichas técnicas e importador con revisión** | **COMPLETED & VERIFIED (PASS)** | Implementación de `paper_products`, `paper_variants`, `paper_import_batches` y `paper_import_rows` (migración 163); motor de importación multi-formato ODS/XLSX/CSV con detección real (magic bytes y estructura), trazabilidad de hash SHA-256, hoja, fila, valores crudos originales y reglas v1.0.0; procesamiento del archivo original aportado (`Paper data base.ods.zip`, SHA-256 `7ffb63eb2705fa0c6faa459001ddd3db0702aa25d0bca52fa58e1a13899d4c9a`) con coincidencia exacta de los 1.573 registros (1.463 válidos, 102 con incidencias/avisos, 8 duplicados internos); gestión de incidencias de precios (96 vacíos, 3 cero) y unidades ambiguas sin inferir moneda ni base comercial; staging y confirmación técnica gobernada por RBAC (`SUPPLIER_OPERATOR`/`SUPPLIER_ADMIN`) y aislamiento de tenant; garantía estricta de separación (cero modificación de inventario, cero publicación de ofertas y cero alteración de costes de pricing); 15/15 tests PASS en `tests/paper_technical_import_and_catalog.test.js` y 57/57 tests PASS en seguridad; build Vite limpio; integridad de migraciones (166 migraciones) PASSED; y paridad TypeScript intacta (199 diagnósticos, 0 añadidos). |
+| **I2** | **Fichas técnicas e importador con revisión (Remediado)** | **COMPLETED & VERIFIED (PASS)** | Implementación remediada de `paper_products`, `paper_variants`, `paper_import_batches` y `paper_import_rows` (migración 163 con `row_number` escapado); motor de importación multi-formato ODS/XLSX/CSV con detección real (magic bytes y estructura), streaming seguro con límite de 50MB descomprimidos y soporte para CSV multilínea RFC 4180 con comillas y preservación de números de fila originales. Normalización rigurosa basada en evidencia: respeto estricto a unidades explícitas en cabecera (sin conversiones mm a cm por umbral numérico), detección de contradicción entre FORMAT y columnas de dimensión (`DIMENSION_CONTRADICTION`), coincidencia por límites de palabra en acabados para evitar clasificar `UNCOATED`/`NEKRĪTOTS` erróneamente como `COATED`/`KRĪTOTS`, detección de conflictos gramaje-descripción (`GSM_DESCRIPTION_CONFLICT`), y huella unívoca discriminando espesor/caliper (`caliper_um`) y dirección de fibra. Flujo de revisión completo con consulta paginada (`GET /catalog/imports/:batchId/rows`), corrección de filas con sobrescritura (`PATCH /catalog/imports/:batchId/rows`) y confirmación atómica transaccional (`POST /catalog/imports/:batchId/confirm`) con bloqueo `SELECT ... FOR UPDATE`, sin aceptar advertencias técnicas pendientes por defecto (exige `ACCEPTED` explícito). Autorización estricta por `tenantId` Y `supplierId` resueltos en servidor con middleware `requireApprovedSupplier` (bloqueo fail-closed de proveedores suspendidos, pendientes o pertenencias cruzadas). Desglose recalculado del archivo original aportado (`Paper data base.ods.zip`, SHA-256 `7ffb63eb2705fa0c6faa459001ddd3db0702aa25d0bca52fa58e1a13899d4c9a`): 1.106 válidos, 456 pendientes de revisión técnica/unidades, 11 duplicados internos, 0 rechazados de plano ($1.106 + 456 + 11 + 0 = 1.573$). Verificación reproducible: 17/17 tests PASS en `tests/paper_technical_import_and_catalog.test.js`, 57/57 tests PASS en suite de aislamiento de seguridad en MySQL efímero con rollback probado; `npm run build` PASS; integridad de migraciones (166 migraciones) PASSED; y paridad TypeScript intacta (199 diagnósticos preexistentes, 0 añadidos). |
 | **I3** | **Catálogo y ofertas en panel proveedor (R1)** | **NOT STARTED** | Pendiente de I2. |
 | **I4** | **Búsqueda imprenta y RFQ bidireccional (R2)** | **NOT STARTED** | Pendiente de I3. |
 | **I5** | **Pedido, expedición y recepción a inventario (R3)** | **NOT STARTED** | Pendiente de I4. |
@@ -24,25 +24,28 @@
 
 ---
 
-## Resumen de Auditoría y Verificación de Importación Técnica I2
+## Resumen de Auditoría y Verificación de Importación Técnica I2 (Remediado)
 
 ### 1. Archivo Original Aportado
 - **Ruta de origen**: `C:\Users\KIKE\Downloads\Paper data base.ods.zip`
 - **SHA-256 del archivo**: `7ffb63eb2705fa0c6faa459001ddd3db0702aa25d0bca52fa58e1a13899d4c9a`
 - **Formato detectado**: OpenDocument Spreadsheet (`application/vnd.oasis.opendocument.spreadsheet` / `ODS`)
 - **Hoja analizada**: `Sheet1`
-- **Estructura**: 1 fila de cabecera + 1.573 filas de datos (1.574 filas no vacías en total)
+- **Estructura**: 3 filas iniciales vacías, 1 fila de cabecera (fila 4) y 1.573 filas de datos (fila 5 a 1.577)
 
-### 2. Conciliación con los 1.573 Registros Documentados
-El desglose de los 1.573 registros procesados es el siguiente:
-- **Válidos (`VALID`)**: **1.463 registros** (especificación física completa: nombre, gramaje, dimensiones y acabado normalizados con alta certeza).
-- **Pendientes / Con Incidencias (`WARNING` / `NEEDS_REVIEW`)**: **102 registros**:
-  - **96 registros con precio ausente / vacío**: Marcados con código `EMPTY_PRICE` y `CURRENCY_NOT_DECLARED`.
-  - **3 registros con precio cero**: Artículos auxiliares de prueba ("Jauns ieraksts", "KLIENTA PAPĪRS", "Testa drukas papīrs") marcados con código `ZERO_PRICE`.
-  - **3 registros con dimensiones o gramaje ambiguo/incompleto**: Marcados con `AMBIGUOUS_DIMENSION_UNITS` o `MISSING_DIMENSIONS` para revisión obligatoria en mesa de validación.
-- **Duplicados Internos en el Archivo (`DUPLICATE`)**: **8 registros** (mismo fingerprint físico: nombre normalizado + gramaje + dimensiones + acabado).
-- **Rechazados de plano (`REJECTED`)**: **0 registros** (todos los registros aportan al menos nombre o identificador técnico analizable).
-- **Total Cuadrado**: $1.463 + 102 + 8 + 0 = 1.573$ registros exactos ($100\%$ trazables).
+### 2. Conciliación Recalculada con los 1.573 Registros Documentados
+Bajo las reglas estrictas de normalización basadas en evidencia (sin conversión especulativa de unidades y exigiendo revisión ante contradicciones o dimensiones no confirmadas):
+- **Válidos (`VALID`)**: **1.106 registros** (especificación física completa y unívoca: nombre, gramaje, dimensiones y acabado confirmados sin contradicción técnica).
+- **Pendientes / Con Incidencias Técnicas (`WARNING` / `NEEDS_REVIEW`)**: **456 registros** (conservan sus valores crudos originales y NO se confirman por defecto sin decisión explícita de operador):
+  - **384 registros con advertencia de unidad o dimensión ambigua (`AMBIGUOUS_DIMENSION_UNITS`)**: Medidas declaradas menores a 100 mm donde no se puede inferir con certeza si son cm o mm sin decisión de revisión.
+  - **99 registros con conflicto gramaje-descripción (`GSM_DESCRIPTION_CONFLICT`)**: Discrepancia entre el gramaje declarado en columna y el gramaje extraído del nombre comercial.
+  - **32 registros con contradicción de formato (`DIMENSION_CONTRADICTION`)**: El campo FORMAT describe un estándar y las columnas de dimensión difieren.
+  - **8 registros con gramaje no declarado (`MISSING_GSM`)**.
+  - **7 registros con dimensiones incompletas (`MISSING_DIMENSIONS`)**.
+  *(Nota: una fila puede contener más de una incidencia técnica simultáneamente)*.
+- **Duplicados Internos en el Archivo (`DUPLICATE`)**: **11 registros** (mismo fingerprint determinista considerando nombre normalizado + gramaje + dimensiones + acabado + espesor/caliper).
+- **Rechazados de plano (`REJECTED`)**: **0 registros** (todos los registros aportan datos analizables).
+- **Total Cuadrado**: $1.106 + 456 + 11 + 0 = 1.573$ registros exactos ($100\%$ trazables y conciliados).
 
 ### 3. Propuestas de Correspondencia de Proveedores
 Se identificaron 6 agrupaciones de distribuidores presentes en el archivo:

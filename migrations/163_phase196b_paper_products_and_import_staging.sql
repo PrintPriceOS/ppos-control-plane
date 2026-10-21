@@ -69,7 +69,7 @@ CREATE TABLE IF NOT EXISTS paper_import_batches (
 CREATE TABLE IF NOT EXISTS paper_import_rows (
     id VARCHAR(64) PRIMARY KEY,
     batch_id VARCHAR(64) NOT NULL,
-    row_number INT NOT NULL,
+    `row_number` INT NOT NULL,
     sheet_name VARCHAR(128) NOT NULL DEFAULT 'Sheet1',
     raw_data_json JSON NOT NULL,
     normalized_data_json JSON NULL,
@@ -79,7 +79,7 @@ CREATE TABLE IF NOT EXISTS paper_import_rows (
     mapped_product_id VARCHAR(64) NULL,
     mapped_variant_id VARCHAR(64) NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    INDEX idx_import_rows_batch (batch_id, row_number),
+    INDEX idx_import_rows_batch (batch_id, `row_number`),
     INDEX idx_import_rows_status (batch_id, validation_status),
     CONSTRAINT fk_import_row_batch FOREIGN KEY (batch_id) REFERENCES paper_import_batches(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
