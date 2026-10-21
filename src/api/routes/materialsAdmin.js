@@ -30,6 +30,7 @@ function getScopeContext(req) {
         tenantId: context.isSuperAdmin ? (req.headers?.['x-tenant-id'] || req.query?.tenant_id || context.tenantId) : context.tenantId,
         printhouseId: context.isSuperAdmin ? (req.headers?.['x-printhouse-id'] || req.query?.printhouse_id || context.printhouseId) : context.printhouseId,
         operatorId: context.userId || 'operator-dashboard',
+        role: context.role,
         isSuperAdmin: context.isSuperAdmin,
         isPrinthouseUser: context.isPrinthouseUser
     };
@@ -157,12 +158,13 @@ router.get('/', async (req, res) => {
         console.error('[MATERIALS][SERVICE_FAILED_SAFE_FALLBACK]', error);
 
         try {
-            const fallbackRowsRaw = await db.query(`
+            // Strictly scoped fallback query: NEVER return global un-scoped inventory to a tenant
+            let fallbackSql = `
                 SELECT
                     id,
                     node_id,
-                    COALESCE(tenant_id, 'ppos-production') AS tenant_id,
-                    COALESCE(printhouse_id, node_id) AS printhouse_id,
+                    tenant_id,
+                    printhouse_id,
                     material_type,
                     material_name,
                     current_stock_units,
@@ -180,9 +182,19 @@ router.get('/', async (req, res) => {
                       ELSE 'STABLE'
                     END AS status
                 FROM predictive_material_inventory
-                ORDER BY created_at DESC
-                LIMIT 500
-            `);
+            `;
+            const params = [];
+            if (!scope.isSuperAdmin) {
+                fallbackSql += ` WHERE (tenant_id = ? OR (tenant_id IS NULL AND ? = 'ppos-production'))`;
+                params.push(scope.tenantId, scope.tenantId);
+                if (scope.printhouseId) {
+                    fallbackSql += ` AND (printhouse_id = ? OR node_id = ?)`;
+                    params.push(scope.printhouseId, scope.printhouseId);
+                }
+            }
+            fallbackSql += ` ORDER BY created_at DESC LIMIT 500`;
+
+            const fallbackRowsRaw = await db.query(fallbackSql, params);
             const fallbackRows = unwrap(fallbackRowsRaw);
 
             return res.json({
@@ -219,6 +231,50 @@ router.get('/', async (req, res) => {
     }
 });
 
+// Helper to assert operator write permissions (requires OPERATOR or ADMIN role)
+function assertWritePermission(scope) {
+    if (scope.isSuperAdmin) return;
+    const actorRole = (scope.role || '').toUpperCase();
+    const canWrite = ['SUPER_ADMIN', 'OPS_ADMIN', 'SYSTEM_ADMIN', 'TENANT_ADMIN', 'PRINTHOUSE_ADMIN', 'OPERATOR', 'PRINTHOUSE_OPERATOR'].includes(actorRole);
+    if (!canWrite) {
+        const err = new Error('FORBIDDEN_WRITE_PERMISSION_REQUIRED');
+        err.statusCode = 403;
+        err.code = 'FORBIDDEN_WRITE_PERMISSION_REQUIRED';
+        throw err;
+    }
+}
+
+/**
+ * Validates that a node_id exists and belongs to the authenticated tenant.
+ * Fails closed if node does not exist or tenant does not match.
+ */
+async function assertNodeOwnership(nodeId, scope) {
+    if (!nodeId || typeof nodeId !== 'string') {
+        const err = new Error('INVALID_NODE_ID');
+        err.statusCode = 400;
+        err.code = 'INVALID_NODE_ID';
+        throw err;
+    }
+    if (scope.isSuperAdmin) return;
+
+    const rows = await db.query('SELECT id, tenant_id FROM printer_nodes WHERE id = ?', [nodeId]);
+    const node = Array.isArray(rows) ? (Array.isArray(rows[0]) ? rows[0][0] : rows[0]) : null;
+
+    if (!node) {
+        const err = new Error('PRINTER_NODE_NOT_FOUND');
+        err.statusCode = 404;
+        err.code = 'PRINTER_NODE_NOT_FOUND';
+        throw err;
+    }
+
+    if (node.tenant_id !== scope.tenantId) {
+        const err = new Error('FORBIDDEN_CROSS_TENANT_NODE_ACCESS');
+        err.statusCode = 403;
+        err.code = 'FORBIDDEN_CROSS_TENANT_NODE_ACCESS';
+        throw err;
+    }
+}
+
 /**
  * POST /api/admin/materials
  * Creates a new material in the catalog and initializes base predictive inventory.
@@ -226,16 +282,26 @@ router.get('/', async (req, res) => {
 router.post('/', async (req, res) => {
     try {
         const scope = getScopeContext(req);
+        assertWritePermission(scope);
+
         // Do not trust client-supplied tenantId/printhouseId in body
         const payload = { ...req.body };
         delete payload.tenantId;
         delete payload.tenant_id;
         delete payload.printhouse_id;
 
+        const targetNodeId = payload.node_id || scope.printhouseId;
+        if (targetNodeId) {
+            await assertNodeOwnership(targetNodeId, scope);
+        }
+
         const result = await materialService.createMaterial(payload, scope.tenantId, scope.printhouseId);
         res.json({ ok: true, data: result });
     } catch (err) {
-        if (err.statusCode === 403 || err.message === 'FORBIDDEN_SUPPLIER_ACCESS_TO_PRINTHOUSE_MATERIALS') {
+        if (err.statusCode) {
+            return res.status(err.statusCode).json({ ok: false, error: err.message, code: err.code || 'FORBIDDEN' });
+        }
+        if (err.message === 'FORBIDDEN_SUPPLIER_ACCESS_TO_PRINTHOUSE_MATERIALS') {
             return res.status(403).json({ ok: false, error: err.message, code: 'FORBIDDEN' });
         }
         console.error('[MATERIALS-API] Failed to create material:', err);
@@ -250,6 +316,8 @@ router.post('/', async (req, res) => {
 router.post('/procurements/:id/receive', async (req, res) => {
     try {
         const scope = getScopeContext(req);
+        assertWritePermission(scope);
+
         const idempotencyKey = req.headers?.['idempotency-key'] || req.body?.idempotency_key || null;
         const acceptedQuantity = req.body?.accepted_quantity !== undefined ? req.body.accepted_quantity : null;
         
@@ -283,19 +351,17 @@ router.get('/node/:nodeId', async (req, res) => {
         const scope = getScopeContext(req);
         const { nodeId } = req.params;
 
-        // Verify that nodeId belongs to tenant unless Super Admin
-        if (!scope.isSuperAdmin) {
-            const [nodeRow] = await db.query('SELECT tenant_id FROM printer_nodes WHERE id = ?', [nodeId]).catch(() => []);
-            if (nodeRow && nodeRow.tenant_id !== scope.tenantId) {
-                return res.status(403).json({ ok: false, error: 'Cross-tenant node access forbidden', code: 'FORBIDDEN_CROSS_TENANT' });
-            }
-        }
+        // Fails closed if node does not exist or fails tenant check
+        await assertNodeOwnership(nodeId, scope);
 
         await materialService.forecastDepletion(nodeId);
         const rows = await materialService.getInventory(nodeId);
         res.json({ ok: true, data: rows });
     } catch (err) {
-        if (err.statusCode === 403 || err.message === 'FORBIDDEN_SUPPLIER_ACCESS_TO_PRINTHOUSE_MATERIALS') {
+        if (err.statusCode) {
+            return res.status(err.statusCode).json({ ok: false, error: err.message, code: err.code || 'FORBIDDEN' });
+        }
+        if (err.message === 'FORBIDDEN_SUPPLIER_ACCESS_TO_PRINTHOUSE_MATERIALS') {
             return res.status(403).json({ ok: false, error: err.message, code: 'FORBIDDEN' });
         }
         console.error(`[MATERIALS-API] Failed to fetch inventory for node [${req.params.nodeId}]:`, err);
@@ -306,17 +372,27 @@ router.get('/node/:nodeId', async (req, res) => {
 /**
  * POST /api/admin/materials/reserve
  * Legacy signature: Locks capacity units for active manufacturing dispatches.
+ * Protected with tenant ownership and write permission.
  */
 router.post('/reserve', async (req, res) => {
-    const { dispatch_id, node_id, specs } = req.body || {};
-    if (!node_id || !specs) {
-        return res.status(400).json({ ok: false, error: 'Missing parameters: node_id and specs are mandatory', code: 'INVALID_RESERVATION_PAYLOAD' });
-    }
-
     try {
+        const scope = getScopeContext(req);
+        assertWritePermission(scope);
+
+        const { dispatch_id, node_id, specs } = req.body || {};
+        if (!node_id || !specs) {
+            return res.status(400).json({ ok: false, error: 'Missing parameters: node_id and specs are mandatory', code: 'INVALID_RESERVATION_PAYLOAD' });
+        }
+
+        // Enforce node authorization
+        await assertNodeOwnership(node_id, scope);
+
         const result = await materialService.reserveMaterials(dispatch_id || 'manual-override', node_id, specs);
         res.json({ ok: true, ...result });
     } catch (err) {
+        if (err.statusCode) {
+            return res.status(err.statusCode).json({ ok: false, error: err.message, code: err.code || 'FORBIDDEN' });
+        }
         console.error('[MATERIALS-API] Reservation lock failed loud:', err.message);
         res.status(409).json({ ok: false, error: err.message, code: 'MATERIAL_RESERVATION_FAILED' });
     }
@@ -325,17 +401,27 @@ router.post('/reserve', async (req, res) => {
 /**
  * POST /api/admin/materials/release
  * Legacy signature: Frees previously held inventory resources.
+ * Protected with tenant ownership and write permission.
  */
 router.post('/release', async (req, res) => {
-    const { dispatch_id, node_id, specs } = req.body || {};
-    if (!node_id || !specs) {
-        return res.status(400).json({ ok: false, error: 'Missing parameters: node_id and specs are mandatory', code: 'INVALID_RELEASE_PAYLOAD' });
-    }
-
     try {
+        const scope = getScopeContext(req);
+        assertWritePermission(scope);
+
+        const { dispatch_id, node_id, specs } = req.body || {};
+        if (!node_id || !specs) {
+            return res.status(400).json({ ok: false, error: 'Missing parameters: node_id and specs are mandatory', code: 'INVALID_RELEASE_PAYLOAD' });
+        }
+
+        // Enforce node authorization
+        await assertNodeOwnership(node_id, scope);
+
         const result = await materialService.releaseMaterials(dispatch_id || 'manual-override', node_id, specs);
         res.json({ ok: true, ...result });
     } catch (err) {
+        if (err.statusCode) {
+            return res.status(err.statusCode).json({ ok: false, error: err.message, code: err.code || 'FORBIDDEN' });
+        }
         console.error('[MATERIALS-API] Material inventory release failed:', err.message);
         res.status(500).json({ ok: false, error: err.message, code: 'MATERIAL_RELEASE_ERROR' });
     }
@@ -382,13 +468,14 @@ router.get('/:id', async (req, res) => {
 router.post('/:id/intake', async (req, res) => {
     try {
         const scope = getScopeContext(req);
+        assertWritePermission(scope);
         await assertMaterialAccess(req.params.id, scope);
         const { quantity, reason, supplier_batch, expected_use } = req.body || {};
         const result = await materialService.intakeStock(req.params.id, quantity, reason, supplier_batch, expected_use, scope.operatorId);
         res.json({ ok: true, data: result });
     } catch (err) {
         if (err.statusCode) {
-            return res.status(err.statusCode).json({ ok: false, error: err.message, code: err.message });
+            return res.status(err.statusCode).json({ ok: false, error: err.message, code: err.code || err.message });
         }
         res.status(400).json({ ok: false, error: err.message, code: 'INTAKE_STOCK_ERROR' });
     }
@@ -401,13 +488,14 @@ router.post('/:id/intake', async (req, res) => {
 router.post('/:id/adjust', async (req, res) => {
     try {
         const scope = getScopeContext(req);
+        assertWritePermission(scope);
         await assertMaterialAccess(req.params.id, scope);
         const { quantity_delta, reason, operator_note } = req.body || {};
         const result = await materialService.adjustStock(req.params.id, quantity_delta, reason, operator_note, scope.operatorId);
         res.json({ ok: true, data: result });
     } catch (err) {
         if (err.statusCode) {
-            return res.status(err.statusCode).json({ ok: false, error: err.message, code: err.message });
+            return res.status(err.statusCode).json({ ok: false, error: err.message, code: err.code || err.message });
         }
         res.status(400).json({ ok: false, error: err.message, code: 'ADJUST_STOCK_ERROR' });
     }
@@ -420,13 +508,14 @@ router.post('/:id/adjust', async (req, res) => {
 router.post('/:id/reserve', async (req, res) => {
     try {
         const scope = getScopeContext(req);
+        assertWritePermission(scope);
         await assertMaterialAccess(req.params.id, scope);
         const { job_id, dispatch_id, quantity, expiration } = req.body || {};
         const result = await materialService.reserveStockUnits(req.params.id, job_id, dispatch_id, quantity, expiration, scope.operatorId);
         res.json({ ok: true, data: result });
     } catch (err) {
         if (err.statusCode) {
-            return res.status(err.statusCode).json({ ok: false, error: err.message, code: err.message });
+            return res.status(err.statusCode).json({ ok: false, error: err.message, code: err.code || err.message });
         }
         res.status(400).json({ ok: false, error: err.message, code: 'RESERVE_STOCK_ERROR' });
     }
@@ -439,6 +528,7 @@ router.post('/:id/reserve', async (req, res) => {
 router.post('/:id/release', async (req, res) => {
     try {
         const scope = getScopeContext(req);
+        assertWritePermission(scope);
         const mat = await assertMaterialAccess(req.params.id, scope);
         const { quantity } = req.body || {};
         const qtyToRelease = Number(quantity || 500);
@@ -447,7 +537,7 @@ router.post('/:id/release', async (req, res) => {
         res.json({ ok: true, data: updated });
     } catch (err) {
         if (err.statusCode) {
-            return res.status(err.statusCode).json({ ok: false, error: err.message, code: err.message });
+            return res.status(err.statusCode).json({ ok: false, error: err.message, code: err.code || err.message });
         }
         res.status(500).json({ ok: false, error: err.message, code: 'RELEASE_STOCK_ERROR' });
     }
@@ -460,13 +550,14 @@ router.post('/:id/release', async (req, res) => {
 router.post('/:id/consume', async (req, res) => {
     try {
         const scope = getScopeContext(req);
+        assertWritePermission(scope);
         await assertMaterialAccess(req.params.id, scope);
         const { job_id, quantity_consumed, waste_units, reason } = req.body || {};
         const result = await materialService.consumeStockUnits(req.params.id, job_id, quantity_consumed, waste_units, reason, scope.operatorId);
         res.json({ ok: true, data: result });
     } catch (err) {
         if (err.statusCode) {
-            return res.status(err.statusCode).json({ ok: false, error: err.message, code: err.message });
+            return res.status(err.statusCode).json({ ok: false, error: err.message, code: err.code || err.message });
         }
         res.status(400).json({ ok: false, error: err.message, code: 'CONSUME_STOCK_ERROR' });
     }
@@ -479,13 +570,14 @@ router.post('/:id/consume', async (req, res) => {
 router.post('/:id/procurements', async (req, res) => {
     try {
         const scope = getScopeContext(req);
+        assertWritePermission(scope);
         await assertMaterialAccess(req.params.id, scope);
         const { supplier_name, ordered_units, expected_delivery_date, risk, notes } = req.body || {};
         const result = await materialService.createProcurement(req.params.id, supplier_name, ordered_units, expected_delivery_date, risk, notes);
         res.json({ ok: true, data: result });
     } catch (err) {
         if (err.statusCode) {
-            return res.status(err.statusCode).json({ ok: false, error: err.message, code: err.message });
+            return res.status(err.statusCode).json({ ok: false, error: err.message, code: err.code || err.message });
         }
         res.status(400).json({ ok: false, error: err.message, code: 'CREATE_PROCUREMENT_ERROR' });
     }

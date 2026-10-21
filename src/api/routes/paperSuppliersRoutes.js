@@ -31,35 +31,71 @@ router.use(requireAdmin);
 /**
  * GET /api/v1/paper-suppliers/me
  * Retrieves the current authenticated supplier profile and tenancy.
+ * Fails closed: does not assume ACTIVE or EUR if supplier is missing or database fails.
  */
 router.get('/me', requireSupplierScope('VIEWER'), async (req, res) => {
     try {
         const context = resolveActorContext(req);
-        const supplierId = context.supplierId || context.tenantId;
+        
+        let supplier = null;
+        if (context.supplierId) {
+            const rows = await db.query(
+                'SELECT id, tenant_id, name, status, contact_email, currencies_json, metadata_json FROM paper_suppliers WHERE id = ?',
+                [context.supplierId]
+            );
+            supplier = Array.isArray(rows) ? (Array.isArray(rows[0]) ? rows[0][0] : rows[0]) : null;
+        } else if (context.tenantId) {
+            const rows = await db.query(
+                'SELECT id, tenant_id, name, status, contact_email, currencies_json, metadata_json FROM paper_suppliers WHERE tenant_id = ?',
+                [context.tenantId]
+            );
+            supplier = Array.isArray(rows) ? (Array.isArray(rows[0]) ? rows[0][0] : rows[0]) : null;
+        }
 
-        const rows = await db.query(
-            'SELECT * FROM paper_suppliers WHERE id = ? OR tenant_id = ?',
-            [supplierId, context.tenantId]
-        ).catch(() => []);
+        if (!supplier) {
+            return res.status(404).json({
+                ok: false,
+                error: {
+                    code: 'SUPPLIER_NOT_FOUND',
+                    message: 'No registered paper supplier organization found for current authenticated actor.'
+                }
+            });
+        }
 
-        const supplier = Array.isArray(rows) ? (Array.isArray(rows[0]) ? rows[0][0] : rows[0]) : null;
+        // Suspended suppliers are forbidden from operational endpoints
+        if (supplier.status === 'SUSPENDED') {
+            return res.status(403).json({
+                ok: false,
+                error: {
+                    code: 'SUPPLIER_SUSPENDED',
+                    message: 'Supplier organization is suspended. Operational access denied.'
+                }
+            });
+        }
 
+        let currencies = [];
+        if (supplier.currencies_json) {
+            currencies = typeof supplier.currencies_json === 'string' ? JSON.parse(supplier.currencies_json) : supplier.currencies_json;
+        } else if (supplier.metadata_json) {
+            const meta = typeof supplier.metadata_json === 'string' ? JSON.parse(supplier.metadata_json) : supplier.metadata_json;
+            currencies = meta.currencies || [];
+        }
 
         return res.json({
             ok: true,
             data: {
                 userId: context.userId,
                 role: context.role,
-                tenantId: context.tenantId,
-                supplierId: supplier ? supplier.id : supplierId,
-                status: supplier ? supplier.status : 'ACTIVE',
-                name: supplier ? supplier.name : 'Authorized Paper Supplier',
-                currencies: supplier && supplier.metadata_json ? (typeof supplier.metadata_json === 'string' ? JSON.parse(supplier.metadata_json).currencies : supplier.metadata_json.currencies) : ['EUR']
+                tenantId: supplier.tenant_id,
+                supplierId: supplier.id,
+                status: supplier.status,
+                name: supplier.name,
+                currencies: Array.isArray(currencies) ? currencies : []
             }
         });
     } catch (err) {
         console.error('[PAPER-SUPPLIERS][ME-ERROR]', err);
-        return res.status(500).json({ ok: false, error: err.message, code: 'SUPPLIER_PROFILE_ERROR' });
+        return res.status(500).json({ ok: false, error: err.message, code: 'DATABASE_ERROR' });
     }
 });
 

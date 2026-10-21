@@ -211,6 +211,9 @@ async function requireAdmin(req, res, next) {
             role: (decoded.role || 'VIEWER').toUpperCase(),
             tenantId: decoded.tenant_id ? String(decoded.tenant_id) : null,
             printhouseId: decoded.printhouse_id ? String(decoded.printhouse_id) : null,
+            supplierId: decoded.supplier_id ? String(decoded.supplier_id) : null,
+            hasSupplierCapability: Boolean(decoded.has_supplier_capability || decoded.hasSupplierCapability),
+            hasPrinthouseCapability: Boolean(decoded.has_printhouse_capability || decoded.hasPrinthouseCapability),
             scopes: decoded.scopes || [],
             features: features,
             authMode: 'JWT',
@@ -279,12 +282,53 @@ function resolveActorContext(req) {
         role = 'SUPER_ADMIN';
     }
     
-    const activeContext = req.headers?.['x-active-context'] || user.activeContext || null; // 'supplier' | 'printhouse' | null
-    const supplierId = user.supplierId || user.supplier_id || req.headers?.['x-supplier-id'] || null;
+    // Header values represent client selection requests, not authoritative grants
+    const requestedContext = req.headers?.['x-active-context'] ? String(req.headers['x-active-context']).toLowerCase().trim() : null;
+    const requestedSupplierId = req.headers?.['x-supplier-id'] ? String(req.headers['x-supplier-id']).trim() : null;
 
-    const isSupplierUser = ['SUPPLIER_ADMIN', 'SUPPLIER_OPERATOR', 'SUPPLIER_VIEWER'].includes(role);
-    const isSupplierAdmin = role === 'SUPPLIER_ADMIN';
-    const isSupplierOperator = ['SUPPLIER_ADMIN', 'SUPPLIER_OPERATOR'].includes(role);
+    const baseSupplierId = user.supplierId || user.supplier_id || null;
+
+    // Check if user identity has verified supplier capabilities or roles
+    const hasSupplierTokenRole = ['SUPPLIER_ADMIN', 'SUPPLIER_OPERATOR', 'SUPPLIER_VIEWER'].includes(role);
+    const hasPrinthouseTokenRole = ['PRINTHOUSE_ADMIN', 'PRINTHOUSE_OPERATOR'].includes(role);
+
+    // Context validation: Only allow 'supplier' context if user actually possesses supplier capability/role or is SUPER_ADMIN
+    let effectiveActiveContext = null;
+    if (requestedContext === 'supplier') {
+        if (hasSupplierTokenRole || role === 'SUPER_ADMIN' || user.hasSupplierCapability) {
+            effectiveActiveContext = 'supplier';
+        } else {
+            effectiveActiveContext = 'printhouse';
+        }
+    } else if (requestedContext === 'printhouse') {
+        if (hasPrinthouseTokenRole || role === 'SUPER_ADMIN' || user.hasPrinthouseCapability) {
+            effectiveActiveContext = 'printhouse';
+        } else {
+            effectiveActiveContext = 'supplier';
+        }
+    } else {
+        effectiveActiveContext = user.activeContext || (hasSupplierTokenRole ? 'supplier' : (hasPrinthouseTokenRole ? 'printhouse' : null));
+    }
+
+    // Supplier ID validation: if header requested a supplier ID, verify it matches token or known supplier
+    let effectiveSupplierId = baseSupplierId;
+    if (requestedSupplierId) {
+        if (role === 'SUPER_ADMIN') {
+            effectiveSupplierId = requestedSupplierId;
+        } else if (baseSupplierId && requestedSupplierId === baseSupplierId) {
+            effectiveSupplierId = requestedSupplierId;
+        } else if (!baseSupplierId && hasSupplierTokenRole && user.tenantId && requestedSupplierId === user.tenantId) {
+            effectiveSupplierId = requestedSupplierId;
+        }
+        // If mismatched, effectiveSupplierId remains baseSupplierId; header request cannot hijack another supplier
+    }
+
+    const hasVerifiedSupplierCapability = Boolean(user.hasSupplierCapability || user.has_supplier_capability);
+    const inSupplierContext = effectiveActiveContext === 'supplier';
+
+    const isSupplierUser = hasSupplierTokenRole || (hasVerifiedSupplierCapability && inSupplierContext);
+    const isSupplierAdmin = role === 'SUPPLIER_ADMIN' || (hasVerifiedSupplierCapability && inSupplierContext && ['PRINTHOUSE_ADMIN', 'TENANT_ADMIN'].includes(role));
+    const isSupplierOperator = ['SUPPLIER_ADMIN', 'SUPPLIER_OPERATOR'].includes(role) || (hasVerifiedSupplierCapability && inSupplierContext && ['PRINTHOUSE_ADMIN', 'TENANT_ADMIN', 'PRINTHOUSE_OPERATOR', 'OPERATOR'].includes(role));
     const isSupplierViewer = isSupplierUser;
 
     return {
@@ -292,11 +336,11 @@ function resolveActorContext(req) {
         role,
         tenantId: user.tenantId,
         printhouseId: user.printhouseId,
-        supplierId,
-        activeContext,
+        supplierId: effectiveSupplierId,
+        activeContext: effectiveActiveContext,
         isSuperAdmin: role === 'SUPER_ADMIN',
         isMachine: !!user.isMachine || role === 'WORKER_AGENT',
-        isPrinthouseUser: ['PRINTHOUSE_ADMIN', 'PRINTHOUSE_OPERATOR'].includes(role),
+        isPrinthouseUser: hasPrinthouseTokenRole,
         isSupplierUser,
         isSupplierAdmin,
         isSupplierOperator,
@@ -375,11 +419,17 @@ function requirePrinthouseScope() {
     };
 }
 
+const KNOWN_SUPPLIER_CAPABILITIES = ['VIEWER', 'OPERATOR', 'ADMIN'];
+
 /**
  * Middleware to enforce Supplier scope and capabilities.
  * Orthogonal to printhouse roles — rejects printhouse-only users with 403.
+ * Fails closed on any unknown capability requested.
  */
 function requireSupplierScope(minCapability = 'VIEWER') {
+    const cap = String(minCapability || 'VIEWER').toUpperCase();
+    const isKnownCap = KNOWN_SUPPLIER_CAPABILITIES.includes(cap);
+
     return (req, res, next) => {
         if (!req.user) {
             return res.status(401).json({
@@ -393,6 +443,14 @@ function requireSupplierScope(minCapability = 'VIEWER') {
             return next();
         }
 
+        // Fail-closed on unknown required capability
+        if (!isKnownCap) {
+            return res.status(403).json({
+                ok: false,
+                error: { code: 'FORBIDDEN_UNKNOWN_CAPABILITY', message: `Unknown required supplier capability: ${minCapability}` }
+            });
+        }
+
         if (!context.isSupplierUser) {
             return res.status(403).json({
                 ok: false,
@@ -400,7 +458,6 @@ function requireSupplierScope(minCapability = 'VIEWER') {
             });
         }
 
-        const cap = String(minCapability || 'VIEWER').toUpperCase();
         if (cap === 'ADMIN' && !context.isSupplierAdmin) {
             return res.status(403).json({
                 ok: false,
@@ -420,22 +477,33 @@ function requireSupplierScope(minCapability = 'VIEWER') {
 
 /**
  * Middleware to ensure Supplier is ACTIVE/APPROVED.
- * Prevents suspended or pending suppliers from publishing or accepting RFQs.
+ * Fails closed if supplier record does not exist or database fails.
  */
 async function requireApprovedSupplier(req, res, next) {
     const context = resolveActorContext(req);
     if (context.isSuperAdmin) return next();
 
+    const targetSupplierId = context.supplierId;
+    if (!targetSupplierId) {
+        return res.status(403).json({
+            ok: false,
+            error: { code: 'SUPPLIER_IDENTITY_REQUIRED', message: 'No authenticated supplier identity resolved on the server.' }
+        });
+    }
+
     try {
         const db = require('../services/mysqlClient');
-        const [supplier] = await db.query(
-            'SELECT status FROM paper_suppliers WHERE tenant_id = ? OR id = ?',
-            [context.tenantId, context.supplierId || context.tenantId]
-        ).catch(() => []);
+        const rows = await db.query(
+            'SELECT id, status, tenant_id FROM paper_suppliers WHERE id = ?',
+            [targetSupplierId]
+        );
+        const supplier = Array.isArray(rows) ? (Array.isArray(rows[0]) ? rows[0][0] : rows[0]) : null;
 
         if (!supplier) {
-            // Check fallback in tenant metadata or assume active if table does not yet exist
-            return next();
+            return res.status(403).json({
+                ok: false,
+                error: { code: 'SUPPLIER_NOT_FOUND', message: 'Supplier organization record not found.' }
+            });
         }
 
         if (supplier.status === 'SUSPENDED') {
@@ -450,11 +518,17 @@ async function requireApprovedSupplier(req, res, next) {
                 error: { code: 'SUPPLIER_PENDING_REVIEW', message: 'Supplier account is pending review by PrintPrice administration.' }
             });
         }
+        if (supplier.status !== 'ACTIVE') {
+            return res.status(403).json({
+                ok: false,
+                error: { code: 'SUPPLIER_NOT_ACTIVE', message: `Supplier account status is ${supplier.status}.` }
+            });
+        }
 
         next();
     } catch (err) {
         console.error('[AUTH-SUPPLIER-APPROVAL-CHECK-FAILED]', err);
-        res.status(500).json({ ok: false, error: 'Internal security check failed' });
+        return res.status(500).json({ ok: false, error: { code: 'DATABASE_ERROR', message: 'Supplier security verification failed due to internal database error.' } });
     }
 }
 

@@ -131,13 +131,27 @@ fastify.addHook('onRequest', async (request, reply) => {
                 issuer: jwtIssuer
             });
             
+            // Check server-side session revocation if jti is present
+            if (decoded.jti) {
+                const userSessionService = require('./src/api/services/userSessionService');
+                const sessionCheck = await userSessionService.validateSession(decoded.jti, decoded.tenant_id, decoded.sub);
+                if (!sessionCheck.valid) {
+                    request.log.warn({ jti: decoded.jti, reason: sessionCheck.reason }, 'Session invalidated');
+                    return reply.status(401).send({ error: 'Unauthorized: Session has been revoked or expired' });
+                }
+            }
+
             // Populate request context for both Fastify and Express (via fastify-express)
             request.user = {
                 id: decoded.sub,
                 email: decoded.email,
                 role: (decoded.role || 'VIEWER').toUpperCase(),
-                tenantId: decoded.tenant_id,
-                printhouseId: decoded.printhouse_id,
+                tenantId: decoded.tenant_id ? String(decoded.tenant_id) : null,
+                printhouseId: decoded.printhouse_id ? String(decoded.printhouse_id) : null,
+                supplierId: decoded.supplier_id ? String(decoded.supplier_id) : null,
+                sessionId: decoded.jti || null,
+                hasSupplierCapability: Boolean(decoded.has_supplier_capability || decoded.hasSupplierCapability),
+                hasPrinthouseCapability: Boolean(decoded.has_printhouse_capability || decoded.hasPrinthouseCapability),
                 authMode: 'JWT'
             };
             request.raw.user = request.user;

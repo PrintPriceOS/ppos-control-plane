@@ -144,10 +144,7 @@ export function setActiveContext(context: 'supplier' | 'printhouse'): void {
 export function isPaperSupplierHubEnabled(): boolean {
     if (typeof window === 'undefined') return false;
     const envFlag = (import.meta as any).env?.VITE_PAPER_SUPPLIER_HUB_ENABLED;
-    if (envFlag === 'true' || envFlag === true) return true;
-    const storageFlag = localStorage.getItem('ppos_feature_paper_supplier_hub');
-    if (storageFlag === 'true') return true;
-    return false;
+    return envFlag === 'true' || envFlag === true;
 }
 
 export function isSuperAdmin(): boolean {
