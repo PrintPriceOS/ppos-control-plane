@@ -578,25 +578,31 @@ function validateTechnicalRow({
         if (formatDimensions && colW_mm !== undefined && colH_mm !== undefined && colW_mm !== null && colH_mm !== null) {
             const fmt = formatDimensions;
             const fmtHasExplicitUnits = fmt.mmW !== null && fmt.mmH !== null;
-            let hasContradiction = false;
-            if (fmtHasExplicitUnits) {
-                if (Math.abs(colW_mm - fmt.mmW) > 1e-3 || Math.abs(colH_mm - fmt.mmH) > 1e-3) {
-                    hasContradiction = true;
-                }
-            } else {
-                if (Math.abs(colW_mm - fmt.rawW) > 1e-3 || Math.abs(colH_mm - fmt.rawH) > 1e-3) {
-                    hasContradiction = true;
+            const targetFormatW = fmtHasExplicitUnits ? fmt.mmW : fmt.rawW;
+            const targetFormatH = fmtHasExplicitUnits ? fmt.mmH : fmt.rawH;
+
+            let hasOriginalContradiction = false;
+            if (targetFormatW !== null && targetFormatH !== null) {
+                if (Math.abs(colW_mm - targetFormatW) > 1e-3 || Math.abs(colH_mm - targetFormatH) > 1e-3) {
+                    hasOriginalContradiction = true;
                 }
             }
 
-            if (hasContradiction) {
-                const isStillColValue = (Math.abs(width_mm - colW_mm) < 1e-3 && Math.abs(height_mm - colH_mm) < 1e-3);
-                if (isStillColValue) {
+            if (hasOriginalContradiction) {
+                // If either current width or current height still differs from the expected format dimension,
+                // and either still matches the contradictory column value or hasn't fully resolved both dimensions,
+                // the contradiction remains active unless BOTH dimensions match format OR both are explicitly resolved.
+                const matchesFormatW = (targetFormatW !== null && Math.abs(width_mm - targetFormatW) < 1e-3);
+                const matchesFormatH = (targetFormatH !== null && Math.abs(height_mm - targetFormatH) < 1e-3);
+                const isFullyResolvedToFormat = matchesFormatW && matchesFormatH;
+
+                if (!isFullyResolvedToFormat) {
+                    // Contradiction remains if at least one dimension still carries the contradiction or discrepancy
                     technicalIssues.push({
                         code: 'DIMENSION_CONTRADICTION',
                         severity: 'WARNING',
                         category: 'TECHNICAL',
-                        message: `Contradiction between FORMAT field and dimension columns. Preserving raw values; explicit review required.`
+                        message: `Contradiction between FORMAT field (${fmt.rawW}${fmt.unitW || ''}x${fmt.rawH}${fmt.unitH || ''}) and dimension columns (${colW_mm}x${colH_mm} mm). Current dimensions (${width_mm}x${height_mm} mm) have not fully resolved the discrepancy. Explicit review required.`
                     });
                 }
             }
@@ -1185,15 +1191,21 @@ async function updateImportRowDecisions({ batchId, tenantId, supplierId, actorId
         let updatedCount = 0;
 
         for (const [rowId, dec] of Object.entries(decisions)) {
+            if (!dec || (typeof dec !== 'object' && typeof dec !== 'string')) {
+                throw new Error(`INVALID_DECISION_STRUCTURE: Decision for row '${rowId}' must be an object or string.`);
+            }
+
             const decisionValue = typeof dec === 'string' ? dec : dec.decision;
-            if (!['ACCEPTED', 'REJECTED', 'PENDING'].includes(decisionValue)) {
-                continue;
+            if (!decisionValue || !['ACCEPTED', 'REJECTED', 'PENDING'].includes(decisionValue)) {
+                throw new Error(`INVALID_DECISION: Decision value '${decisionValue}' for row '${rowId}' is not allowed. Must be one of: 'PENDING', 'ACCEPTED', 'REJECTED'.`);
             }
 
             // Fetch existing row to audit and validate
             const [existingRows] = await conn.query('SELECT * FROM paper_import_rows WHERE id = ? AND batch_id = ? FOR UPDATE', [rowId, batchId]);
             const existing = existingRows && existingRows[0];
-            if (!existing) continue;
+            if (!existing) {
+                throw new Error(`ROW_NOT_FOUND: Row '${rowId}' not found in import batch '${batchId}'.`);
+            }
 
             const norm = typeof existing.normalized_data_json === 'string' ? JSON.parse(existing.normalized_data_json) : (existing.normalized_data_json || {});
             const prevValues = {};
@@ -1336,6 +1348,29 @@ async function confirmImportBatch({ batchId, tenantId, supplierId, actorId, sele
             [batchId]
         );
 
+        // Validate selectedDecisions structure and values if provided
+        if (selectedDecisions && typeof selectedDecisions === 'object') {
+            for (const [rowId, dec] of Object.entries(selectedDecisions)) {
+                if (!dec || (typeof dec !== 'object' && typeof dec !== 'string')) {
+                    throw new Error(`INVALID_DECISION_STRUCTURE: Decision for row '${rowId}' must be an object or string.`);
+                }
+                const decVal = typeof dec === 'string' ? dec : dec.decision;
+                if (!decVal || !['ACCEPTED', 'REJECTED', 'PENDING'].includes(decVal)) {
+                    throw new Error(`INVALID_DECISION: Decision value '${decVal}' for row '${rowId}' is not allowed. Must be one of: 'PENDING', 'ACCEPTED', 'REJECTED'.`);
+                }
+            }
+        }
+
+        // Validate decisions already stored on rows in database
+        for (const r of rows) {
+            const currentDec = (selectedDecisions && selectedDecisions[r.id]) 
+                ? (typeof selectedDecisions[r.id] === 'string' ? selectedDecisions[r.id] : selectedDecisions[r.id].decision)
+                : r.decision;
+            if (!['ACCEPTED', 'REJECTED', 'PENDING'].includes(currentDec)) {
+                throw new Error(`INVALID_DECISION: Row '${r.id}' has invalid stored decision '${currentDec}'.`);
+            }
+        }
+
         // REQUIREMENT 3: Impide cerrar el lote mientras existan pendientes sin resolver o filas incompletas.
         // Valida los requisitos técnicos de todas las filas no rechazadas, independientemente de que su decisión sea PENDING o ACCEPTED.
         // ACCEPTED no sustituye un gramaje o una dimensión obligatoria ausente.
@@ -1465,6 +1500,11 @@ async function confirmImportBatch({ batchId, tenantId, supplierId, actorId, sele
                 [productId, variantId, row.id]
             );
             confirmedCount++;
+        }
+
+        // REQUIREMENT: Si pendingCount > 0, nunca permitir CONFIRMED. Aborta y revierte toda la transacción.
+        if (pendingCount > 0) {
+            throw new Error(`UNRESOLVED_ROWS_EXIST: Cannot confirm batch while ${pendingCount} row(s) remain pending. Resolve or reject them before confirmation.`);
         }
 
         // 3. Mark batch confirmed with audit metadata

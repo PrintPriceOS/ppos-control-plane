@@ -39,8 +39,9 @@ El **Paper Supplier Hub** incorpora un panel independiente para distribuidores/f
 - [x] **I2 — Fichas técnicas e importador con revisión**:
   - Tablas aditivas canónicas: `paper_products`, `paper_variants`, `paper_import_batches`, `paper_import_rows` (migración 163).
   - Parser ODS/XLSX/CSV directo con detección de formato real sin auto-publicar ni asumir moneda desconocida.
-  - Validación de los 1.573 registros del archivo original aportado (`Paper data base.ods.zip`, SHA-256 `7ffb63eb2705fa0c6faa459001ddd3db0702aa25d0bca52fa58e1a13899d4c9a`): 1.463 válidos, 102 incidencias (96 precios vacíos, 3 cero, 3 unidades ambiguas), 8 duplicados internos, 0 rechazados de plano.
+  - Validación y conciliación de los 1.573 registros del archivo original aportado (`Paper data base.ods.zip`, SHA-256 `7ffb63eb2705fa0c6faa459001ddd3db0702aa25d0bca52fa58e1a13899d4c9a`): desglose recalculado eliminando `isDeciMatch` e inferencias de ratio 10x: 16 válidos, 1.544 pendientes de revisión técnica/unidades, 13 duplicados internos, 0 rechazados de plano ($16 + 1.544 + 13 + 0 = 1.573$).
   - Separación canónica: sin ofertas comerciales, sin modificación de inventario ni costes de pricing.
+  - Endurecimiento estricto de revisión: preservación de evidencia técnica, persistencia de contradicciones ante correcciones parciales, validación cerrada de decisiones (`PENDING`, `ACCEPTED`, `REJECTED`) con HTTP 400 `INVALID_DECISION` y aborto/rollback total ante cualquier `pendingCount > 0`.
 - [ ] **I3 — Catálogo y ofertas en panel proveedor (Entrega R1)**:
   - CRUD de ofertas, visibilidad (`PRIVATE`, `APPROVED_CUSTOMERS`, `MARKETPLACE`).
   - Activación por flags y allowlist de organizaciones piloto.

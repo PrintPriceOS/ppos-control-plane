@@ -944,6 +944,200 @@ describe('Iteration I2: Paper Technical Data Sheets & Multi-format Import Engine
             expect(confInc.counts.pending).toBe(0);
             expect(confInc.counts.rejected).toBe(1);
 
+            // -------------------------------------------------------------
+            // DEFECT 1: Corrección parcial de dimensiones (600x900 mm vs FORMAT 700x1000 mm)
+            // -------------------------------------------------------------
+            const dimPartialCsv = [
+                'CODE;NAME;PRICE;GRAMS;WIDTH (MM);HEIGHT (MM);FORMAT;COAT;PROVISER',
+                'DIM-PART;Dimension Partial Board;400;250;600;900;700 x 1000 mm;krītots;Papyrus DEF'
+            ].join('\n');
+            const previewDimPartial = await paperImportService.processImportPreview({
+                buffer: Buffer.from(dimPartialCsv, 'utf8'),
+                fileName: 'dim_partial_test.csv',
+                tenantId: 'tenant-alpha',
+                supplierId: 'supp-alpha-1',
+                createdBy: 'user-op-alpha'
+            });
+            await paperImportService.stageImportBatch(previewDimPartial);
+            const dimRows = await paperImportService.getImportBatchRows({
+                batchId: previewDimPartial.batchId,
+                tenantId: 'tenant-alpha',
+                supplierId: 'supp-alpha-1'
+            });
+            const dimRow = dimRows.rows[0];
+            expect(dimRow.validationStatus).toBe('WARNING');
+            expect(dimRow.issues.some(i => i.code === 'DIMENSION_CONTRADICTION')).toBe(true);
+
+            // 1a. Patching ONLY width_mm: 700 while maintaining PENDING must CONSERVE WARNING and block confirmation
+            await paperImportService.updateImportRowDecisions({
+                batchId: previewDimPartial.batchId,
+                tenantId: 'tenant-alpha',
+                supplierId: 'supp-alpha-1',
+                actorId: 'user-op-alpha',
+                decisions: {
+                    [dimRow.id]: { decision: 'PENDING', overrides: { width_mm: 700 } }
+                }
+            });
+            const dimAfterWidth = (await paperImportService.getImportBatchRows({
+                batchId: previewDimPartial.batchId,
+                tenantId: 'tenant-alpha',
+                supplierId: 'supp-alpha-1'
+            })).rows[0];
+            expect(dimAfterWidth.issues.some(i => i.code === 'DIMENSION_CONTRADICTION')).toBe(true);
+            expect(dimAfterWidth.validationStatus).toBe('WARNING');
+
+            // Trying to confirm with partial dimension resolution MUST FAIL
+            await expect(paperImportService.confirmImportBatch({
+                batchId: previewDimPartial.batchId,
+                tenantId: 'tenant-alpha',
+                supplierId: 'supp-alpha-1',
+                actorId: 'user-op-alpha'
+            })).rejects.toThrow(/UNRESOLVED_ROWS_EXIST/);
+
+            // 1b. Changing ONLY finish must ALSO CONSERVE the contradiction
+            await paperImportService.updateImportRowDecisions({
+                batchId: previewDimPartial.batchId,
+                tenantId: 'tenant-alpha',
+                supplierId: 'supp-alpha-1',
+                actorId: 'user-op-alpha',
+                decisions: {
+                    [dimRow.id]: { decision: 'PENDING', overrides: { finish: 'UNCOATED' } }
+                }
+            });
+            const dimAfterFinish = (await paperImportService.getImportBatchRows({
+                batchId: previewDimPartial.batchId,
+                tenantId: 'tenant-alpha',
+                supplierId: 'supp-alpha-1'
+            })).rows[0];
+            expect(dimAfterFinish.issues.some(i => i.code === 'DIMENSION_CONTRADICTION')).toBe(true);
+            expect(dimAfterFinish.validationStatus).toBe('WARNING');
+
+            // 1c. Correcting ALSO height_mm: 1000 MUST RESOLVE the contradiction completely
+            await paperImportService.updateImportRowDecisions({
+                batchId: previewDimPartial.batchId,
+                tenantId: 'tenant-alpha',
+                supplierId: 'supp-alpha-1',
+                actorId: 'user-op-alpha',
+                decisions: {
+                    [dimRow.id]: { decision: 'ACCEPTED', overrides: { width_mm: 700, height_mm: 1000 } }
+                }
+            });
+            const dimAfterFull = (await paperImportService.getImportBatchRows({
+                batchId: previewDimPartial.batchId,
+                tenantId: 'tenant-alpha',
+                supplierId: 'supp-alpha-1'
+            })).rows[0];
+            expect(dimAfterFull.issues.some(i => i.code === 'DIMENSION_CONTRADICTION')).toBe(false);
+            expect(dimAfterFull.validationStatus).toBe('VALID');
+
+            // -------------------------------------------------------------
+            // DEFECT 2: Validación de decisiones y condición final de cierre
+            // -------------------------------------------------------------
+            // 2a. Reject unknown decisions ("ACCEPT", malformed object without decision)
+            // Verifies zero changes persisted and batch remains editable (PREVIEW)
+            const decValCsv = [
+                'CODE;NAME;PRICE;GRAMS;WIDTH (MM);HEIGHT (MM);COAT;PROVISER',
+                'DEC-01;Decision Val Paper;300;120;700;1000;uncoated;Polap DEF'
+            ].join('\n');
+            const previewDec = await paperImportService.processImportPreview({
+                buffer: Buffer.from(decValCsv, 'utf8'),
+                fileName: 'decision_val_test.csv',
+                tenantId: 'tenant-alpha',
+                supplierId: 'supp-alpha-1',
+                createdBy: 'user-op-alpha'
+            });
+            await paperImportService.stageImportBatch(previewDec);
+            const decRows = await paperImportService.getImportBatchRows({
+                batchId: previewDec.batchId,
+                tenantId: 'tenant-alpha',
+                supplierId: 'supp-alpha-1'
+            });
+            const decRowId = decRows.rows[0].id;
+
+            // Enviar "ACCEPT" en lugar de "ACCEPTED"
+            await expect(paperImportService.updateImportRowDecisions({
+                batchId: previewDec.batchId,
+                tenantId: 'tenant-alpha',
+                supplierId: 'supp-alpha-1',
+                actorId: 'user-op-alpha',
+                decisions: {
+                    [decRowId]: 'ACCEPT'
+                }
+            })).rejects.toThrow(/INVALID_DECISION/);
+
+            // Enviar objeto sin campo decision
+            await expect(paperImportService.updateImportRowDecisions({
+                batchId: previewDec.batchId,
+                tenantId: 'tenant-alpha',
+                supplierId: 'supp-alpha-1',
+                actorId: 'user-op-alpha',
+                decisions: {
+                    [decRowId]: { overrides: { gsm: 150 } }
+                }
+            })).rejects.toThrow(/INVALID_DECISION/);
+
+            // Repeat with rows having WARNING and DUPLICATE: cannot bypass with invalid decision
+            const warnDupCsv = [
+                'CODE;NAME;PRICE;GRAMS;WIDTH (MM);HEIGHT (MM);COAT;PROVISER',
+                'WD-01;Small Sheet Warn;300;100;50;50;uncoated;Polap DEF', // Warning
+                'WD-02;Small Sheet Warn;310;100;50;50;uncoated;Polap DEF'  // Duplicate
+            ].join('\n');
+            const previewWarnDup = await paperImportService.processImportPreview({
+                buffer: Buffer.from(warnDupCsv, 'utf8'),
+                fileName: 'warn_dup_decision.csv',
+                tenantId: 'tenant-alpha',
+                supplierId: 'supp-alpha-1',
+                createdBy: 'user-op-alpha'
+            });
+            await paperImportService.stageImportBatch(previewWarnDup);
+            const wdRows = await paperImportService.getImportBatchRows({
+                batchId: previewWarnDup.batchId,
+                tenantId: 'tenant-alpha',
+                supplierId: 'supp-alpha-1'
+            });
+            const warnId = wdRows.rows[0].id;
+            const dupId = wdRows.rows[1].id;
+
+            // Attempting invalid decisions on WARNING and DUPLICATE rows fails
+            await expect(paperImportService.updateImportRowDecisions({
+                batchId: previewWarnDup.batchId,
+                tenantId: 'tenant-alpha',
+                supplierId: 'supp-alpha-1',
+                actorId: 'user-op-alpha',
+                decisions: {
+                    [warnId]: 'ACCEPT',
+                    [dupId]: { invalid: true }
+                }
+            })).rejects.toThrow(/INVALID_DECISION/);
+
+            // Passing invalid decisions during confirmation also throws INVALID_DECISION and rolls back
+            await expect(paperImportService.confirmImportBatch({
+                batchId: previewWarnDup.batchId,
+                tenantId: 'tenant-alpha',
+                supplierId: 'supp-alpha-1',
+                actorId: 'user-op-alpha',
+                selectedDecisions: {
+                    [warnId]: 'ACCEPT'
+                }
+            })).rejects.toThrow(/INVALID_DECISION/);
+
+            // Check that batch remains in PREVIEW status (zero changes persisted)
+            const [batchPostErr] = await connectionPool.query('SELECT status FROM paper_import_batches WHERE id = ?', [previewWarnDup.batchId]);
+            expect(batchPostErr[0].status).toBe('PREVIEW');
+
+            // 2b. Never allow CONFIRMED with pending > 0:
+            // If any row remains pending, confirmImportBatch throws UNRESOLVED_ROWS_EXIST and rolls back
+            await expect(paperImportService.confirmImportBatch({
+                batchId: previewWarnDup.batchId,
+                tenantId: 'tenant-alpha',
+                supplierId: 'supp-alpha-1',
+                actorId: 'user-op-alpha'
+            })).rejects.toThrow(/UNRESOLVED_ROWS_EXIST/);
+
+            // Verify status is still PREVIEW and pendingCount remains > 0
+            const [batchStillPreview] = await connectionPool.query('SELECT status FROM paper_import_batches WHERE id = ?', [previewWarnDup.batchId]);
+            expect(batchStillPreview[0].status).toBe('PREVIEW');
+
             // 3. Valid override updates normalized data, audit trail, and recomputes issues
             await paperImportService.updateImportRowDecisions({
                 batchId: preview.batchId,

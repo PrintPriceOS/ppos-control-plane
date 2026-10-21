@@ -302,6 +302,9 @@ router.patch('/catalog/imports/:batchId/rows', requireSupplierScope('OPERATOR'),
         let errCode = 'IMPORT_REVIEW_UPDATE_FAILED';
         if (err.message.startsWith('INVALID_OVERRIDE_FIELD')) errCode = 'INVALID_OVERRIDE_FIELD';
         else if (err.message.startsWith('INVALID_OVERRIDE_VALUE')) errCode = 'INVALID_OVERRIDE_VALUE';
+        else if (err.message.startsWith('INVALID_DECISION_STRUCTURE')) errCode = 'INVALID_DECISION_STRUCTURE';
+        else if (err.message.startsWith('INVALID_DECISION')) errCode = 'INVALID_DECISION';
+        else if (err.message.startsWith('ROW_NOT_FOUND')) errCode = 'ROW_NOT_FOUND';
         else if (err.message.startsWith('BATCH_ALREADY_CONFIRMED')) errCode = 'BATCH_ALREADY_CONFIRMED';
         else if (isNotFound) errCode = 'BATCH_NOT_FOUND';
 
@@ -346,6 +349,8 @@ router.post('/catalog/imports/:batchId/confirm', requireSupplierScope('OPERATOR'
         let errCode = 'IMPORT_CONFIRMATION_FAILED';
         if (err.message.startsWith('UNRESOLVED_ROWS_EXIST')) errCode = 'UNRESOLVED_ROWS_EXIST';
         else if (err.message.startsWith('INCOMPLETE_ROWS_EXIST')) errCode = 'INCOMPLETE_ROWS_EXIST';
+        else if (err.message.startsWith('INVALID_DECISION_STRUCTURE')) errCode = 'INVALID_DECISION_STRUCTURE';
+        else if (err.message.startsWith('INVALID_DECISION')) errCode = 'INVALID_DECISION';
         else if (isNotFound) errCode = 'BATCH_NOT_FOUND';
 
         return res.status(statusCode).json({
