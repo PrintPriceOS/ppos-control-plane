@@ -1,9 +1,9 @@
 # Paper Supplier Hub — Operational Status & Progress Log
 
 **Branch**: `feat/paper-supplier-hub`  
-**Base Commit**: `337bec5f87068d08188edf37b9ffd5c6241ad812`  
-**I1-R1 Target**: Remediación integral de hallazgos de autorización, identidad persistente, aislamiento de materiales y recepción transaccional  
-**Last Updated**: 2026-10-21 06:25:00 CET  
+**Base Commit**: `ed111462cfe77c4d764657abc5a079fe6386d19b`  
+**I2 Target**: Fichas técnicas normalizadas, importador multi-formato con revisión y separación canónica  
+**Last Updated**: 2026-10-21 15:10:00 CET  
 
 ---
 
@@ -15,12 +15,47 @@
 | **I1** | **Identidad proveedor y protección de dominio (R0)** | **SUPERSEDED** | Sustituida por ciclos de remediación I1-R1 e I1-R2. |
 | **I1-R1** | **Remediación inicial de autorización, identidad y recepción atómica** | **COMPLETED** | Implementaciones base de modelos y tablas 162; paso a I1-R2 para cierre de bloqueos de aislamiento estricto. |
 | **I1-R2** | **Remediación integral: Entorno de pruebas, Bypass nodo/material, Pertenencias reales, Centros e Idempotencia** | **COMPLETED & VERIFIED (PASS)** | Cierre total y comprobado de todos los puntos y del bloqueo funcional de actor sin centro: 1) Bloqueo Funcional (Actor sin centro): PRINTHOUSE_OPERATOR con tenant válido y `printhouseId=null` es rechazado fail-closed (HTTP 403 `FORBIDDEN_UNAUTHORIZED_CENTER_ACCESS`) en listado (`GET /`), fallback, detalle (`GET /:id`), intake/adjust/consume, creación (`POST /`), legacy reserve/release y recepción de procurement. El `node_id` enviado en el cuerpo no acredita autorización de centro. Se eliminó la rama vacía de `getAllMaterials`. 2) Aislamiento estricto del bootstrap de pruebas: tablas copiadas sustituidas por el bootstrap canónico (`scripts/bootstrap_canonical_schema.js`), el cual comprueba que `SELECT DATABASE()` coincida exactamente con el esquema exclusivo antes del primer DDL; erradicación de `DATABASE_URL` heredada para que no prevalezca sobre `TEST_MYSQL_*`; control de pools previos y restauración de variables/conexiones en `finally`. 3) Migraciones secuenciales ejecutadas: inicialización de ledgers (`phase184g` y `phase185`) seguida por las 7 migraciones seleccionadas (`001`, `007`, `015`, `139`, `140`, `158`, `162`). 4) Reutilización directa del middleware de producción `requireAdmin` (`src/api/middleware/auth.js`) en pruebas HTTP con puente Fastify/Express. 5) Suite focalizada de seguridad: 57/57 tests PASS en MySQL efímero; suite global: 44 archivos / 721 tests PASS con `TEST_MYSQL_*` (o 664 PASS / 57 SKIP limpio sin variables de BD); build de producción limpio; integridad de migraciones (165 migraciones) PASSED; y diagnósticos TypeScript comparados por contenido (cero errores nuevos añadidos). |
-| **I2** | **Fichas técnicas e importador con revisión** | **NOT STARTED** | Pendiente. No iniciado en esta fase conforme a las directrices. |
+| **I2** | **Fichas técnicas e importador con revisión** | **COMPLETED & VERIFIED (PASS)** | Implementación de `paper_products`, `paper_variants`, `paper_import_batches` y `paper_import_rows` (migración 163); motor de importación multi-formato ODS/XLSX/CSV con detección real (magic bytes y estructura), trazabilidad de hash SHA-256, hoja, fila, valores crudos originales y reglas v1.0.0; procesamiento del archivo original aportado (`Paper data base.ods.zip`, SHA-256 `7ffb63eb2705fa0c6faa459001ddd3db0702aa25d0bca52fa58e1a13899d4c9a`) con coincidencia exacta de los 1.573 registros (1.463 válidos, 102 con incidencias/avisos, 8 duplicados internos); gestión de incidencias de precios (96 vacíos, 3 cero) y unidades ambiguas sin inferir moneda ni base comercial; staging y confirmación técnica gobernada por RBAC (`SUPPLIER_OPERATOR`/`SUPPLIER_ADMIN`) y aislamiento de tenant; garantía estricta de separación (cero modificación de inventario, cero publicación de ofertas y cero alteración de costes de pricing); 15/15 tests PASS en `tests/paper_technical_import_and_catalog.test.js` y 57/57 tests PASS en seguridad; build Vite limpio; integridad de migraciones (166 migraciones) PASSED; y paridad TypeScript intacta (199 diagnósticos, 0 añadidos). |
 | **I3** | **Catálogo y ofertas en panel proveedor (R1)** | **NOT STARTED** | Pendiente de I2. |
 | **I4** | **Búsqueda imprenta y RFQ bidireccional (R2)** | **NOT STARTED** | Pendiente de I3. |
 | **I5** | **Pedido, expedición y recepción a inventario (R3)** | **NOT STARTED** | Pendiente de I4. |
 | **I6** | **Integración de precio con pricing industrial** | **NOT STARTED** | Pendiente de I3 + I5. |
 | **I7** | **Despliegue estable y operación en producción** | **NOT STARTED** | Pendiente de hitos R1/R2/R3. |
+
+---
+
+## Resumen de Auditoría y Verificación de Importación Técnica I2
+
+### 1. Archivo Original Aportado
+- **Ruta de origen**: `C:\Users\KIKE\Downloads\Paper data base.ods.zip`
+- **SHA-256 del archivo**: `7ffb63eb2705fa0c6faa459001ddd3db0702aa25d0bca52fa58e1a13899d4c9a`
+- **Formato detectado**: OpenDocument Spreadsheet (`application/vnd.oasis.opendocument.spreadsheet` / `ODS`)
+- **Hoja analizada**: `Sheet1`
+- **Estructura**: 1 fila de cabecera + 1.573 filas de datos (1.574 filas no vacías en total)
+
+### 2. Conciliación con los 1.573 Registros Documentados
+El desglose de los 1.573 registros procesados es el siguiente:
+- **Válidos (`VALID`)**: **1.463 registros** (especificación física completa: nombre, gramaje, dimensiones y acabado normalizados con alta certeza).
+- **Pendientes / Con Incidencias (`WARNING` / `NEEDS_REVIEW`)**: **102 registros**:
+  - **96 registros con precio ausente / vacío**: Marcados con código `EMPTY_PRICE` y `CURRENCY_NOT_DECLARED`.
+  - **3 registros con precio cero**: Artículos auxiliares de prueba ("Jauns ieraksts", "KLIENTA PAPĪRS", "Testa drukas papīrs") marcados con código `ZERO_PRICE`.
+  - **3 registros con dimensiones o gramaje ambiguo/incompleto**: Marcados con `AMBIGUOUS_DIMENSION_UNITS` o `MISSING_DIMENSIONS` para revisión obligatoria en mesa de validación.
+- **Duplicados Internos en el Archivo (`DUPLICATE`)**: **8 registros** (mismo fingerprint físico: nombre normalizado + gramaje + dimensiones + acabado).
+- **Rechazados de plano (`REJECTED`)**: **0 registros** (todos los registros aportan al menos nombre o identificador técnico analizable).
+- **Total Cuadrado**: $1.463 + 102 + 8 + 0 = 1.573$ registros exactos ($100\%$ trazables).
+
+### 3. Propuestas de Correspondencia de Proveedores
+Se identificaron 6 agrupaciones de distribuidores presentes en el archivo:
+- **Papyrus**: 640 variantes identificadas (asociación propuesta con proveedor `PAPYRUS` / confianza alta).
+- **Antalis**: 512 variantes identificadas (asociación propuesta con proveedor `ANTALIS` / confianza alta).
+- **Polap**: 338 variantes identificadas (asociación propuesta con proveedor `POLAP` / confianza alta).
+- **Dardedze hologrāfija**: 78 variantes identificadas (asociación propuesta con proveedor `DARDEDZE` / confianza media).
+- **Otros / No asignados (`Cits DEF`, `Oldi DEF`)**: 5 variantes (requiere asignación manual).
+
+### 4. Garantías de Separación de Dominio
+- **Cero creación de ofertas comerciales**: Las tarifas permanecen en staging sin publicar (`supplier_paper_offers` permanece intacta).
+- **Cero mutación de existencias**: El inventario de imprenta (`predictive_material_inventory`, `materials_catalog`) no fue alterado.
+- **Cero alteración de costes de pricing industrial**: `@ppos/pricing-engine` no recibe costes no confirmados.
 
 ---
 

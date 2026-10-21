@@ -143,4 +143,121 @@ router.get('/status', requireSupplierScope('VIEWER'), async (req, res) => {
     }
 });
 
+const paperImportService = require('../services/paperImportService');
+const multer = require('multer');
+const upload = multer({
+    limits: { fileSize: 25 * 1024 * 1024 } // 25 MB max
+});
+
+/**
+ * POST /api/v1/paper-suppliers/catalog/imports/preview
+ * Parse uploaded ODS/XLSX/CSV file and generate technical validation preview.
+ * Operator or Admin capability required.
+ * DOES NOT create commercial offers or modify inventory!
+ */
+router.post('/catalog/imports/preview', requireSupplierScope('OPERATOR'), upload.single('file'), async (req, res) => {
+    try {
+        const context = resolveActorContext(req);
+        let fileBuffer = null;
+        let fileName = 'unknown';
+
+        if (req.file) {
+            fileBuffer = req.file.buffer;
+            fileName = req.file.originalname;
+        } else if (req.body && req.body.fileBase64) {
+            fileBuffer = Buffer.from(req.body.fileBase64, 'base64');
+            fileName = req.body.fileName || 'upload.bin';
+        }
+
+        if (!fileBuffer || fileBuffer.length === 0) {
+            return res.status(400).json({
+                ok: false,
+                error: {
+                    code: 'FILE_REQUIRED',
+                    message: 'A valid file buffer or fileBase64 payload is required for technical import.'
+                }
+            });
+        }
+
+        const preview = await paperImportService.processImportPreview({
+            buffer: fileBuffer,
+            fileName,
+            tenantId: context.tenantId,
+            supplierId: context.supplierId,
+            createdBy: context.userId
+        });
+
+        // Stage batch into database if stage=true query param or by default
+        const shouldStage = req.query.stage !== 'false';
+        let stagedInfo = null;
+        if (shouldStage) {
+            stagedInfo = await paperImportService.stageImportBatch(preview);
+        }
+
+        return res.json({
+            ok: true,
+            data: {
+                batchId: preview.batchId,
+                fileName: preview.fileName,
+                fileSha256: preview.fileSha256,
+                format: preview.format,
+                normalizationRulesVersion: preview.normalizationRulesVersion,
+                tenantId: preview.tenantId,
+                supplierId: preview.supplierId,
+                summary: preview.summary,
+                staged: Boolean(stagedInfo),
+                rowsPreview: preview.rows.slice(0, 50),
+                totalRowsCount: preview.rows.length
+            }
+        });
+    } catch (err) {
+        console.error('[PAPER-IMPORT][PREVIEW-ERROR]', err);
+        return res.status(400).json({
+            ok: false,
+            error: {
+                code: 'IMPORT_PROCESSING_FAILED',
+                message: err.message
+            }
+        });
+    }
+});
+
+/**
+ * POST /api/v1/paper-suppliers/catalog/imports/:batchId/confirm
+ * Confirms staged technical import batch.
+ * Inserts validated records into paper_products and paper_variants.
+ * Operator or Admin capability required.
+ * STRICTLY ISOLATED: Zero commercial offer publication, zero inventory modification.
+ */
+router.post('/catalog/imports/:batchId/confirm', requireSupplierScope('OPERATOR'), async (req, res) => {
+    try {
+        const context = resolveActorContext(req);
+        const { batchId } = req.params;
+        const { decisions } = req.body || {};
+
+        const result = await paperImportService.confirmImportBatch({
+            batchId,
+            tenantId: context.tenantId,
+            actorId: context.userId,
+            selectedDecisions: decisions
+        });
+
+        return res.json({
+            ok: true,
+            data: result
+        });
+    } catch (err) {
+        console.error('[PAPER-IMPORT][CONFIRM-ERROR]', err);
+        const statusCode = err.message.startsWith('BATCH_NOT_FOUND') ? 404 : 400;
+        return res.status(statusCode).json({
+            ok: false,
+            error: {
+                code: 'IMPORT_CONFIRMATION_FAILED',
+                message: err.message
+            }
+        });
+    }
+});
+
 module.exports = router;
+

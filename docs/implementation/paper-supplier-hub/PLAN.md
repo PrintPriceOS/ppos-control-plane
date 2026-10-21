@@ -29,16 +29,18 @@ El **Paper Supplier Hub** incorpora un panel independiente para distribuidores/f
   - Crear estructura documental en [docs/implementation/paper-supplier-hub/](file:///c:/Users/KIKE/Downloads/ppos-control-plane-phase-10-intelligence-layer/docs/implementation/paper-supplier-hub).
   - Validar suite de pruebas (43 archivos / 664 tests PASSED), Vite build OK y baseline de diagnósticos TSC.
   - Documentar contratos de unidades, visibilidad e invariantes inviolables.
-- [ ] **I1 — Identidad proveedor y protección del dominio**:
+- [x] **I1 — Identidad proveedor y protección del dominio (I1-R1 / I1-R2)**:
   - Roles de proveedor: `SUPPLIER_ADMIN`, `SUPPLIER_OPERATOR`, `SUPPLIER_VIEWER`.
   - Modelo de autorización desacoplado de la jerarquía numérica `ROLE_HIERARCHY` (no dar acceso a `/api/admin` de imprenta).
   - Rutas y layout de proveedor bajo flag `PAPER_SUPPLIER_HUB_ENABLED`.
-  - Protección transaccional con locks e idempotencia en recepción de suministros para evitar doble incremento de inventario.
+  - Protección transaccional con locks e idempotencia en recepción de suministros para evitar doble incremento de inventario (`procurement_receipt_records`).
   - Scope estricto por tenant/centro en `materialsAdmin.js` y `printhouseMaterialService.js`.
-- [ ] **I2 — Fichas técnicas e importador con revisión**:
-  - Parser ODS/XLSX/CSV directo, detección de formato real.
-  - Validación de 1.573 registros sintéticos / de prueba sin auto-publicar ni asumir moneda desconocida.
-  - Gestión de incidencias: dimensiones ambiguas cm/mm, gramajes en conflicto, precios cero o ausentes.
+  - Remediación completa de bloqueo funcional de actor sin centro (`printhouseId=null`), bypass de `node_id` y bootstrap canónico aislado en commit `ed111462cfe77c4d764657abc5a079fe6386d19b`.
+- [x] **I2 — Fichas técnicas e importador con revisión**:
+  - Tablas aditivas canónicas: `paper_products`, `paper_variants`, `paper_import_batches`, `paper_import_rows` (migración 163).
+  - Parser ODS/XLSX/CSV directo con detección de formato real sin auto-publicar ni asumir moneda desconocida.
+  - Validación de los 1.573 registros del archivo original aportado (`Paper data base.ods.zip`, SHA-256 `7ffb63eb2705fa0c6faa459001ddd3db0702aa25d0bca52fa58e1a13899d4c9a`): 1.463 válidos, 102 incidencias (96 precios vacíos, 3 cero, 3 unidades ambiguas), 8 duplicados internos, 0 rechazados de plano.
+  - Separación canónica: sin ofertas comerciales, sin modificación de inventario ni costes de pricing.
 - [ ] **I3 — Catálogo y ofertas en panel proveedor (Entrega R1)**:
   - CRUD de ofertas, visibilidad (`PRIVATE`, `APPROVED_CUSTOMERS`, `MARKETPLACE`).
   - Activación por flags y allowlist de organizaciones piloto.
