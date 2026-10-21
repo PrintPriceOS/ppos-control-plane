@@ -147,84 +147,43 @@ describe('Phase I1 — Paper Supplier & Materials Domain Isolation Suite', () =>
             multipleStatements: true
         });
 
-        // Bootstrap schema using real migrations and runner logic
+        // 4. Canonical bootstrap & migration execution over exclusive execution schema
+        process.env.MYSQL_HOST = testDbConfig.host;
+        process.env.MYSQL_PORT = String(testDbConfig.port);
+        process.env.MYSQL_USER = testDbConfig.user;
+        process.env.MYSQL_PASSWORD = testDbConfig.password;
+        process.env.MYSQL_DATABASE = executionSchemaName;
+        process.env.PPOS_CI_EPHEMERAL_FIXTURES = 'true';
+        process.env.CI = 'true';
+        process.env.PPOS_MIGRATION_EXECUTION = 'true';
+        process.env.PPOS_ENABLE_SCHEMA_MUTATION = 'true';
+
+        const { runBootstrap } = require('../scripts/bootstrap_canonical_schema');
+        await runBootstrap();
+
+        // Reconnect mysqlClient and apply migration ledger + phase migrations canonically
+        mysqlClient = require('../src/api/services/mysqlClient');
+        const ledgerModule = require('../src/migrations/phase184g_migration_ledger_schema');
+        await ledgerModule.up(mysqlClient);
+        const ledgerGovModule = require('../src/migrations/phase185_migration_ledger_governance_schema');
+        await ledgerGovModule.up(mysqlClient);
+
+        // Execute sequential migration suite up to phase 196a (migration 162)
         const fs = require('fs');
         const path = require('path');
         const { parseMigrationSql } = require('../src/api/services/migrationSqlParser');
-
-        // Apply real migration files in deterministic order
         const migrationsDir = path.join(__dirname, '../migrations');
-        const migrationFiles = [
+        const requiredMigrations = [
             '001_create_schema_version.sql',
             '007_mes_material_orchestration.sql',
             '015_phase76_printhouse_capabilities.sql',
+            '139_phase191d_machine_capabilities_migration.sql',
             '140_phase191e_materials_capacity_leadtimes.sql',
             '158_phase195e_auth_sessions_and_mfa.sql',
             '162_phase196a_paper_suppliers_and_procurement_idempotency.sql'
         ];
 
-        // Also ensure base core tables needed by control plane
-        await connectionPool.query(`
-            CREATE TABLE IF NOT EXISTS tenants (
-                id VARCHAR(64) PRIMARY KEY,
-                name VARCHAR(128) NOT NULL,
-                plan VARCHAR(32) DEFAULT 'growth',
-                metadata_json JSON NULL
-            ) ENGINE=InnoDB;
-
-            CREATE TABLE IF NOT EXISTS printer_nodes (
-                id VARCHAR(64) PRIMARY KEY,
-                tenant_id VARCHAR(64) NOT NULL,
-                name VARCHAR(128) NOT NULL,
-                status VARCHAR(32) DEFAULT 'active',
-                UNIQUE KEY uk_printer_nodes_id_tenant (id, tenant_id)
-            ) ENGINE=InnoDB;
-
-            CREATE TABLE IF NOT EXISTS material_procurements (
-                id VARCHAR(64) PRIMARY KEY,
-                material_inventory_id VARCHAR(64) NOT NULL,
-                supplier_name VARCHAR(128) NULL,
-                ordered_units INT NOT NULL,
-                expected_delivery_date TIMESTAMP NULL,
-                procurement_status VARCHAR(32) DEFAULT 'ORDERED',
-                procurement_risk VARCHAR(32) DEFAULT 'LOW',
-                notes TEXT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-            ) ENGINE=InnoDB;
-
-            CREATE TABLE IF NOT EXISTS predictive_material_inventory (
-                id VARCHAR(64) PRIMARY KEY,
-                node_id VARCHAR(64) NOT NULL,
-                material_catalog_id VARCHAR(64) NULL,
-                material_name VARCHAR(128) NOT NULL,
-                material_type VARCHAR(64) NOT NULL,
-                paper_gsm INT NULL,
-                finish VARCHAR(64) NULL,
-                current_stock_units INT DEFAULT 0,
-                reserved_stock_units INT DEFAULT 0,
-                available_units INT DEFAULT 0,
-                reorder_point INT DEFAULT 100,
-                replenishment_lead_days INT DEFAULT 7,
-                shortage_risk VARCHAR(32) DEFAULT 'NONE',
-                depletion_forecast_days INT DEFAULT 30,
-                operational_status VARCHAR(32) DEFAULT 'AVAILABLE',
-                status VARCHAR(32) DEFAULT 'STABLE',
-                machine_lock VARCHAR(64) NULL,
-                tenant_id VARCHAR(64) NOT NULL DEFAULT 'ppos-production',
-                printhouse_id VARCHAR(64) NULL,
-                daily_burn_rate DECIMAL(10,2) DEFAULT 0.00,
-                forecasted_depletion_date TIMESTAMP NULL,
-                procurement_risk VARCHAR(32) DEFAULT 'LOW',
-                supplier_name VARCHAR(128) NULL,
-                cost_per_unit DECIMAL(10,4) DEFAULT 0.0000,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                INDEX idx_node (node_id)
-            ) ENGINE=InnoDB;
-        `);
-
-        for (const file of migrationFiles) {
+        for (const file of requiredMigrations) {
             const filePath = path.join(migrationsDir, file);
             if (fs.existsSync(filePath)) {
                 const content = fs.readFileSync(filePath, 'utf8');
@@ -255,10 +214,10 @@ describe('Phase I1 — Paper Supplier & Materials Domain Isolation Suite', () =>
                 ('tenant-supp-2', 'Inapa Paper Supplier 2'),
                 ('tenant-dual-org', 'Dual Print and Paper Co');
 
-            INSERT INTO printer_nodes (id, tenant_id, name, status) VALUES
-                ('node-alpha', 'tenant-print-a', 'Heidelberg XL 106', 'active'),
-                ('node-beta', 'tenant-print-b', 'Komori GL 840', 'active'),
-                ('node-dual-1', 'tenant-dual-org', 'Dual Factory Press', 'active');
+            INSERT INTO printer_nodes (id, tenant_id, name, status, email) VALUES
+                ('node-alpha', 'tenant-print-a', 'Heidelberg XL 106', 'active', 'node-alpha@print-a.local'),
+                ('node-beta', 'tenant-print-b', 'Komori GL 840', 'active', 'node-beta@print-b.local'),
+                ('node-dual-1', 'tenant-dual-org', 'Dual Factory Press', 'active', 'node-dual-1@dual.local');
 
             INSERT INTO paper_suppliers (id, tenant_id, name, status, contact_email, currencies_json) VALUES
                 ('supp-org-1', 'tenant-supp-1', 'Fedrigoni Iberia', 'ACTIVE', 'orders@fedrigoni.local', '["EUR"]'),
@@ -1024,9 +983,9 @@ describe('Phase I1 — Paper Supplier & Materials Domain Isolation Suite', () =>
             if (!isConfiguredRun) return;
             // Setup two distinct centers (printer nodes) inside the SAME tenant (tenant-print-a)
             await connectionPool.query(`
-                INSERT INTO printer_nodes (id, tenant_id, name, status) VALUES
-                    ('node-center-alpha', 'tenant-print-a', 'Center Alpha Press', 'active'),
-                    ('node-center-gamma', 'tenant-print-a', 'Center Gamma Press', 'active');
+                INSERT INTO printer_nodes (id, tenant_id, name, status, email) VALUES
+                    ('node-center-alpha', 'tenant-print-a', 'Center Alpha Press', 'active', 'node-center-alpha@print-a.local'),
+                    ('node-center-gamma', 'tenant-print-a', 'Center Gamma Press', 'active', 'node-center-gamma@print-a.local');
             `);
 
             await materialService.createMaterial({
@@ -1750,51 +1709,13 @@ describe('Phase I1 — Paper Supplier & Materials Domain Isolation Suite', () =>
             const Fastify = require('fastify');
             testFastifyApp = Fastify({ logger: false });
 
-            // Security Auth Hook (as configured in production server.js)
-            testFastifyApp.addHook('onRequest', async (request, reply) => {
-                const url = request.url;
-                if (url.startsWith('/health') || url.startsWith('/live')) return;
-
-                if (url.startsWith('/api') && !url.startsWith('/api/admin')) {
-                    const authHeader = request.headers['authorization'];
-                    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-                        return reply.status(401).send({ error: 'Unauthorized: Bearer token required' });
-                    }
-                    const token = authHeader.split(' ')[1];
-                    try {
-                        const decoded = jwt.verify(token, JWT_SECRET, { audience: JWT_AUDIENCE, issuer: JWT_ISSUER });
-
-                        // Check server-side session revocation if jti is present (shared with production server.js)
-                        if (decoded.jti) {
-                            const userSessionService = require('../src/api/services/userSessionService');
-                            const sessionCheck = await userSessionService.validateSession(decoded.jti, decoded.tenant_id, decoded.sub);
-                            if (!sessionCheck.valid) {
-                                return reply.status(401).send({ error: 'Unauthorized: Session has been revoked or expired' });
-                            }
-                        }
-
-                        request.user = {
-                            id: decoded.sub,
-                            email: decoded.email,
-                            role: (decoded.role || 'VIEWER').toUpperCase(),
-                            tenantId: decoded.tenant_id ? String(decoded.tenant_id) : null,
-                            printhouseId: decoded.printhouse_id ? String(decoded.printhouse_id) : null,
-                            supplierId: decoded.supplier_id ? String(decoded.supplier_id) : null,
-                            sessionId: decoded.jti || null,
-                            hasSupplierCapability: Boolean(decoded.has_supplier_capability || decoded.hasSupplierCapability),
-                            hasPrinthouseCapability: Boolean(decoded.has_printhouse_capability || decoded.hasPrinthouseCapability),
-                            authMode: 'JWT'
-                        };
-                        request.raw.user = request.user;
-                    } catch (err) {
-                        return reply.status(401).send({ error: `Unauthorized: ${err.message}` });
-                    }
-                }
-            });
-
             // Register @fastify/express bridge
             await testFastifyApp.register(require('@fastify/express'));
             testFastifyApp.use(require('express').json());
+
+            // Reuse production authentication middleware for protected routes
+            const { requireAdmin } = require('../src/api/middleware/auth');
+            testFastifyApp.use('/api', requireAdmin);
 
             // Mount paper supplier and admin routers
             testFastifyApp.use('/api/v1/paper-suppliers', paperSuppliersRouter);
@@ -2084,7 +2005,7 @@ describe('Phase I1 — Paper Supplier & Materials Domain Isolation Suite', () =>
             });
 
             await connectionPool.query(`
-                INSERT INTO printer_nodes (id, tenant_id, name, status) VALUES ('node-ppos-1', 'ppos-production', 'PPOS Prod Press', 'active');
+                INSERT INTO printer_nodes (id, tenant_id, name, status, email) VALUES ('node-ppos-1', 'ppos-production', 'PPOS Prod Press', 'active', 'node-ppos-1@ppos.local');
             `);
 
             // Try to access Printhouse A material as ppos-production tenant
@@ -2251,6 +2172,225 @@ describe('Phase I1 — Paper Supplier & Materials Domain Isolation Suite', () =>
             } finally {
                 mysqlClient.query = originalQuery;
             }
+        });
+    });
+
+    describe('16. Functional Blocker Regressions: Actor Without Center Authorization (printhouseId = null)', () => {
+        let matCenter1 = 'mat-actor-nc-1';
+        let matCenter2 = 'mat-actor-nc-2';
+        let nodeCenter1 = 'node-alpha';
+        let nodeCenter2 = 'node-alpha-2';
+        let procOrderCenter = 'proc-actor-nc-1';
+        let operatorTokenNoCenter = null;
+
+        beforeAll(async () => {
+            if (!isConfiguredRun) return;
+
+            // Ensure a second node for tenant-print-a exists
+            await connectionPool.query(`
+                INSERT INTO printer_nodes (id, tenant_id, name, status, email)
+                VALUES ('${nodeCenter2}', 'tenant-print-a', 'Second Printhouse Center Node', 'active', 'node-center-2@print-a.local')
+                ON DUPLICATE KEY UPDATE status='active';
+            `);
+
+            // Create materials in two different centers of the same tenant (tenant-print-a)
+            await connectionPool.query(`
+                INSERT INTO predictive_material_inventory
+                    (id, node_id, material_name, material_type, current_stock_units, reserved_stock_units, available_units, tenant_id, printhouse_id, reorder_point)
+                VALUES
+                    ('${matCenter1}', '${nodeCenter1}', 'Glossy 150g Center 1', 'PAPER', 1000, 0, 1000, 'tenant-print-a', '${nodeCenter1}', 200),
+                    ('${matCenter2}', '${nodeCenter2}', 'Silk 200g Center 2', 'PAPER', 2000, 0, 2000, 'tenant-print-a', '${nodeCenter2}', 300)
+                ON DUPLICATE KEY UPDATE current_stock_units=VALUES(current_stock_units);
+            `);
+
+            // Create procurement order on matCenter1
+            await connectionPool.query(`
+                INSERT INTO material_procurements
+                    (id, material_inventory_id, supplier_name, ordered_units, procurement_status)
+                VALUES
+                    ('${procOrderCenter}', '${matCenter1}', 'Fedrigoni Iberia', 500, 'ORDERED')
+                ON DUPLICATE KEY UPDATE ordered_units=500;
+            `);
+
+            // Actor: PRINTHOUSE_OPERATOR of tenant-print-a with NO center assigned (printhouseId = null)
+            operatorTokenNoCenter = generateToken({
+                id: 'user-print-operator-no-center',
+                email: 'operator-nocenter@printhouse.local',
+                role: 'PRINTHOUSE_OPERATOR',
+                tenantId: 'tenant-print-a',
+                printhouseId: null,
+                hasPrinthouseCapability: true
+            });
+        });
+
+        it('1. GET / rejects actor without center (HTTP 403) and does NOT list materials across centers', async () => {
+            const req = {
+                method: 'GET',
+                url: '/',
+                originalUrl: '/api/admin/materials',
+                headers: { authorization: `Bearer ${operatorTokenNoCenter}` }
+            };
+
+            const res = await dispatch(materialsAdminRouter, req);
+            assert.strictEqual(res.statusCode, 403);
+            assert.strictEqual(res.body.code, 'FORBIDDEN_UNAUTHORIZED_CENTER_ACCESS');
+        });
+
+        it('2. GET /:id rejects detail query of material with center when actor lacks center (HTTP 403)', async () => {
+            const req = {
+                method: 'GET',
+                url: `/${matCenter1}`,
+                originalUrl: `/api/admin/materials/${matCenter1}`,
+                params: { id: matCenter1 },
+                headers: { authorization: `Bearer ${operatorTokenNoCenter}` }
+            };
+
+            const res = await dispatch(materialsAdminRouter, req);
+            assert.strictEqual(res.statusCode, 403);
+            assert.strictEqual(res.body.code, 'FORBIDDEN_UNAUTHORIZED_CENTER_ACCESS');
+        });
+
+        it('3. POST /:id/intake, /adjust, /consume reject actor without center without altering stock or events (HTTP 403)', async () => {
+            // A. Intake attempt
+            const reqIntake = {
+                method: 'POST',
+                url: `/${matCenter1}/intake`,
+                originalUrl: `/api/admin/materials/${matCenter1}/intake`,
+                params: { id: matCenter1 },
+                headers: { authorization: `Bearer ${operatorTokenNoCenter}` },
+                body: { quantity: 500, reason: 'unauthorized intake attempt' }
+            };
+            const resIntake = await dispatch(materialsAdminRouter, reqIntake);
+            assert.strictEqual(resIntake.statusCode, 403);
+            assert.strictEqual(resIntake.body.code, 'FORBIDDEN_UNAUTHORIZED_CENTER_ACCESS');
+
+            // B. Adjust attempt
+            const reqAdjust = {
+                method: 'POST',
+                url: `/${matCenter1}/adjust`,
+                originalUrl: `/api/admin/materials/${matCenter1}/adjust`,
+                params: { id: matCenter1 },
+                headers: { authorization: `Bearer ${operatorTokenNoCenter}` },
+                body: { quantity_delta: 200, reason: 'unauthorized adjust attempt' }
+            };
+            const resAdjust = await dispatch(materialsAdminRouter, reqAdjust);
+            assert.strictEqual(resAdjust.statusCode, 403);
+            assert.strictEqual(resAdjust.body.code, 'FORBIDDEN_UNAUTHORIZED_CENTER_ACCESS');
+
+            // C. Consume attempt
+            const reqConsume = {
+                method: 'POST',
+                url: `/${matCenter1}/consume`,
+                originalUrl: `/api/admin/materials/${matCenter1}/consume`,
+                params: { id: matCenter1 },
+                headers: { authorization: `Bearer ${operatorTokenNoCenter}` },
+                body: { quantity_consumed: 100, reason: 'unauthorized consume attempt' }
+            };
+            const resConsume = await dispatch(materialsAdminRouter, reqConsume);
+            assert.strictEqual(resConsume.statusCode, 403);
+            assert.strictEqual(resConsume.body.code, 'FORBIDDEN_UNAUTHORIZED_CENTER_ACCESS');
+
+            // Verify stock and events are 100% UNTOUCHED
+            const [matCheck] = await connectionPool.query('SELECT current_stock_units, reserved_stock_units FROM predictive_material_inventory WHERE id = ?', [matCenter1]);
+            assert.strictEqual(matCheck[0].current_stock_units, 1000);
+            assert.strictEqual(matCheck[0].reserved_stock_units, 0);
+
+            const [events] = await connectionPool.query('SELECT * FROM material_inventory_events WHERE material_inventory_id = ?', [matCenter1]);
+            assert.strictEqual(events.length, 0);
+        });
+
+        it('4. POST / rejects material creation when actor has no center even if sending valid node_id in body (HTTP 403)', async () => {
+            const req = {
+                method: 'POST',
+                url: '/',
+                originalUrl: '/api/admin/materials',
+                headers: { authorization: `Bearer ${operatorTokenNoCenter}` },
+                body: {
+                    id: 'mat-unauth-create-try-1',
+                    node_id: nodeCenter1,
+                    material_name: 'Illicit Material Creation',
+                    material_type: 'PAPER',
+                    initial_stock: 500
+                }
+            };
+
+            const res = await dispatch(materialsAdminRouter, req);
+            assert.strictEqual(res.statusCode, 403);
+            assert.strictEqual(res.body.code, 'FORBIDDEN_UNAUTHORIZED_CENTER_ACCESS');
+
+            // Verify material was NOT created
+            const [checkCreated] = await connectionPool.query('SELECT * FROM predictive_material_inventory WHERE id = ?', ['mat-unauth-create-try-1']);
+            assert.strictEqual(checkCreated.length, 0);
+        });
+
+        it('5. POST /reserve and /release legacy reject actor without center even if node_id belongs to tenant (HTTP 403)', async () => {
+            // Reserve attempt
+            const reqReserve = {
+                method: 'POST',
+                url: '/reserve',
+                originalUrl: '/api/admin/materials/reserve',
+                headers: { authorization: `Bearer ${operatorTokenNoCenter}` },
+                body: {
+                    dispatch_id: 'dispatch-nocenter-1',
+                    node_id: nodeCenter1,
+                    specs: { material_id: matCenter1, units: 100 }
+                }
+            };
+            const resReserve = await dispatch(materialsAdminRouter, reqReserve);
+            assert.strictEqual(resReserve.statusCode, 403);
+            assert.strictEqual(resReserve.body.code, 'FORBIDDEN_UNAUTHORIZED_CENTER_ACCESS');
+
+            // Release attempt
+            const reqRelease = {
+                method: 'POST',
+                url: '/release',
+                originalUrl: '/api/admin/materials/release',
+                headers: { authorization: `Bearer ${operatorTokenNoCenter}` },
+                body: {
+                    dispatch_id: 'dispatch-nocenter-1',
+                    node_id: nodeCenter1,
+                    specs: { material_id: matCenter1, units: 100 }
+                }
+            };
+            const resRelease = await dispatch(materialsAdminRouter, reqRelease);
+            assert.strictEqual(resRelease.statusCode, 403);
+            assert.strictEqual(resRelease.body.code, 'FORBIDDEN_UNAUTHORIZED_CENTER_ACCESS');
+
+            // Verify stock and reservations remain untouched
+            const [matCheck] = await connectionPool.query('SELECT current_stock_units, reserved_stock_units FROM predictive_material_inventory WHERE id = ?', [matCenter1]);
+            assert.strictEqual(matCheck[0].current_stock_units, 1000);
+            assert.strictEqual(matCheck[0].reserved_stock_units, 0);
+
+            const [resRows] = await connectionPool.query('SELECT * FROM manufacturing_material_reservations WHERE material_inventory_id = ?', [matCenter1]);
+            assert.strictEqual(resRows.length, 0);
+        });
+
+        it('6. POST /procurements/:id/receive rejects actor without center on resources with center (HTTP 403)', async () => {
+            const req = {
+                method: 'POST',
+                url: `/procurements/${procOrderCenter}/receive`,
+                originalUrl: `/api/admin/materials/procurements/${procOrderCenter}/receive`,
+                params: { id: procOrderCenter },
+                headers: {
+                    authorization: `Bearer ${operatorTokenNoCenter}`,
+                    'idempotency-key': 'ik-nocenter-receive-try'
+                },
+                body: { accepted_quantity: 500 }
+            };
+
+            const res = await dispatch(materialsAdminRouter, req);
+            assert.strictEqual(res.statusCode, 403);
+            assert.strictEqual(res.body.code, 'FORBIDDEN_UNAUTHORIZED_CENTER_ACCESS');
+
+            // Verify procurement status remains ORDERED, stock intact, zero receipt records
+            const [procCheck] = await connectionPool.query('SELECT procurement_status FROM material_procurements WHERE id = ?', [procOrderCenter]);
+            assert.strictEqual(procCheck[0].procurement_status, 'ORDERED');
+
+            const [matCheck] = await connectionPool.query('SELECT current_stock_units FROM predictive_material_inventory WHERE id = ?', [matCenter1]);
+            assert.strictEqual(matCheck[0].current_stock_units, 1000);
+
+            const [receiptRows] = await connectionPool.query('SELECT * FROM procurement_receipt_records WHERE procurement_id = ?', [procOrderCenter]);
+            assert.strictEqual(receiptRows.length, 0);
         });
     });
 

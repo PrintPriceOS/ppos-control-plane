@@ -695,8 +695,9 @@ class MaterialAvailabilityService {
                     const rowCenter = r.printhouse_id || r.node_id;
                     return Boolean(rowCenter && (r.node_id === targetCenter || r.printhouse_id === targetCenter));
                 });
-            } else if (!filters.isSuperAdmin && filters.printhouseId !== undefined && filters.printhouseId === null) {
-                // If caller is non-superadmin and had an explicit null printhouseId, don't allow un-scoped center access
+            } else if (!filters.isSuperAdmin) {
+                // If caller is non-superadmin and lacks an authorized center, deny un-scoped center access fail-closed
+                afterNodeRows = [];
             }
             const rowsAfterNodeFilter = afterNodeRows.length;
 

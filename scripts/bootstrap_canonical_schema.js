@@ -709,6 +709,41 @@ async function runBootstrap() {
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
         `);
 
+        // Foundational MES Predictive Material Inventory (from src/api/services/controlPlaneSchemaService.js)
+        await db.query(`
+            CREATE TABLE IF NOT EXISTS predictive_material_inventory (
+                id VARCHAR(64) PRIMARY KEY,
+                node_id VARCHAR(64) NOT NULL,
+                material_catalog_id VARCHAR(64) NULL,
+                material_name VARCHAR(128) NOT NULL,
+                material_type VARCHAR(64) NOT NULL,
+                paper_gsm INT NULL,
+                finish VARCHAR(64) NULL,
+                current_stock_units INT DEFAULT 0,
+                reserved_stock_units INT DEFAULT 0,
+                available_units INT DEFAULT 0,
+                reorder_point INT DEFAULT 100,
+                replenishment_lead_days INT DEFAULT 7,
+                shortage_risk VARCHAR(32) DEFAULT 'NONE',
+                depletion_forecast_days INT DEFAULT 30,
+                operational_status VARCHAR(32) DEFAULT 'AVAILABLE',
+                status VARCHAR(32) DEFAULT 'STABLE',
+                machine_lock VARCHAR(64) NULL,
+                tenant_id VARCHAR(64) NOT NULL DEFAULT 'ppos-production',
+                printhouse_id VARCHAR(64) NULL,
+                daily_burn_rate DECIMAL(10,2) DEFAULT 0.00,
+                forecasted_depletion_date TIMESTAMP NULL,
+                procurement_risk VARCHAR(32) DEFAULT 'LOW',
+                supplier_name VARCHAR(128) NULL,
+                cost_per_unit DECIMAL(10,4) DEFAULT 0.0000,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                INDEX idx_node (node_id),
+                INDEX idx_tenant (tenant_id),
+                INDEX idx_printhouse (printhouse_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        `);
+
         // =========================================================================
         // [7.1/7] Phase CI-02J: Industrial Ephemeral Dependencies for Migration 140
         // =========================================================================

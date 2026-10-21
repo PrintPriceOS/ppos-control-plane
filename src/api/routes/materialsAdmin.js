@@ -118,6 +118,15 @@ router.get('/', async (req, res) => {
     const scope = getScopeContext(req);
     const unwrap = (result) => Array.isArray(result) ? (Array.isArray(result[0]) ? result[0] : result) : [];
 
+    // Server-side center authorization: non-superadmin without authorized center is rejected immediately (HTTP 403)
+    if (!scope.isSuperAdmin && !scope.printhouseId) {
+        return res.status(403).json({
+            ok: false,
+            error: 'FORBIDDEN_UNAUTHORIZED_CENTER_ACCESS',
+            code: 'FORBIDDEN_UNAUTHORIZED_CENTER_ACCESS'
+        });
+    }
+
     try {
         const rows = await materialService.getAllMaterials({
             tenantId: scope.tenantId,
@@ -157,6 +166,15 @@ router.get('/', async (req, res) => {
     } catch (error) {
         console.error('[MATERIALS][SERVICE_FAILED_SAFE_FALLBACK]', error);
 
+        // Fail closed: do not capture authorization or validation errors to run fallback
+        if (error.statusCode) {
+            return res.status(error.statusCode).json({
+                ok: false,
+                error: error.message,
+                code: error.code || 'FORBIDDEN'
+            });
+        }
+
         try {
             // Strictly scoped fallback query: NEVER return global un-scoped inventory to a tenant
             let fallbackSql = `
@@ -185,12 +203,8 @@ router.get('/', async (req, res) => {
             `;
             const params = [];
             if (!scope.isSuperAdmin) {
-                fallbackSql += ` WHERE tenant_id = ?`;
-                params.push(scope.tenantId);
-                if (scope.printhouseId) {
-                    fallbackSql += ` AND (printhouse_id = ? OR node_id = ?)`;
-                    params.push(scope.printhouseId, scope.printhouseId);
-                }
+                fallbackSql += ` WHERE tenant_id = ? AND (printhouse_id = ? OR node_id = ?)`;
+                params.push(scope.tenantId, scope.printhouseId, scope.printhouseId);
             }
             fallbackSql += ` ORDER BY created_at DESC LIMIT 500`;
 
@@ -245,8 +259,8 @@ function assertWritePermission(scope) {
 }
 
 /**
- * Validates that a node_id exists and belongs to the authenticated tenant.
- * Fails closed if node does not exist or tenant does not match.
+ * Validates that a node_id exists and belongs to the authenticated tenant and center.
+ * Fails closed if node does not exist, tenant does not match, or actor lacks authorized center.
  */
 async function assertNodeOwnership(nodeId, scope) {
     if (!nodeId || typeof nodeId !== 'string') {
@@ -256,6 +270,15 @@ async function assertNodeOwnership(nodeId, scope) {
         throw err;
     }
     if (scope.isSuperAdmin) return;
+
+    // A node_id sent by the client does NOT grant center authorization:
+    // Actor MUST have an authorized center in scope, and node must match that center.
+    if (!scope.printhouseId) {
+        const err = new Error('FORBIDDEN_UNAUTHORIZED_CENTER_ACCESS');
+        err.statusCode = 403;
+        err.code = 'FORBIDDEN_UNAUTHORIZED_CENTER_ACCESS';
+        throw err;
+    }
 
     const rows = await db.query('SELECT id, tenant_id FROM printer_nodes WHERE id = ?', [nodeId]);
     const node = Array.isArray(rows) ? (Array.isArray(rows[0]) ? rows[0][0] : rows[0]) : null;
@@ -274,9 +297,8 @@ async function assertNodeOwnership(nodeId, scope) {
         throw err;
     }
 
-    // Fail-closed center isolation: If actor scope is restricted to a specific printhouseId,
-    // they cannot operate on nodes belonging to a different center/node.
-    if (scope.printhouseId && node.id !== scope.printhouseId) {
+    // Fail-closed center isolation: node must match the actor's authorized printhouseId
+    if (node.id !== scope.printhouseId) {
         const err = new Error('FORBIDDEN_CROSS_CENTER_NODE_ACCESS');
         err.statusCode = 403;
         err.code = 'FORBIDDEN_CROSS_CENTER_NODE_ACCESS';
@@ -293,25 +315,27 @@ router.post('/', async (req, res) => {
         const scope = getScopeContext(req);
         assertWritePermission(scope);
 
-        // Do not trust client-supplied tenantId/printhouseId in body
-        const payload = { ...req.body };
-        delete payload.tenantId;
-        delete payload.tenant_id;
-        delete payload.printhouse_id;
-
-        const targetNodeId = payload.node_id || scope.printhouseId;
-        if (!scope.isSuperAdmin && !targetNodeId) {
+        // An actor without authorized center cannot create materials
+        // Sending node_id in request body does NOT grant center authorization
+        if (!scope.isSuperAdmin && !scope.printhouseId) {
             const err = new Error('FORBIDDEN_UNAUTHORIZED_CENTER_ACCESS');
             err.statusCode = 403;
             err.code = 'FORBIDDEN_UNAUTHORIZED_CENTER_ACCESS';
             throw err;
         }
 
+        // Do not trust client-supplied tenantId/printhouseId in body
+        const payload = { ...req.body };
+        delete payload.tenantId;
+        delete payload.tenant_id;
+        delete payload.printhouse_id;
+
+        const targetNodeId = scope.printhouseId || payload.node_id;
         if (targetNodeId) {
             await assertNodeOwnership(targetNodeId, scope);
         }
 
-        const effectiveCenter = targetNodeId || scope.printhouseId || null;
+        const effectiveCenter = scope.printhouseId || targetNodeId || null;
         payload.node_id = effectiveCenter;
         const result = await materialService.createMaterial(payload, scope.tenantId, effectiveCenter);
         res.json({ ok: true, data: result });
@@ -335,6 +359,13 @@ router.post('/procurements/:id/receive', async (req, res) => {
     try {
         const scope = getScopeContext(req);
         assertWritePermission(scope);
+
+        if (!scope.isSuperAdmin && !scope.printhouseId) {
+            const err = new Error('FORBIDDEN_UNAUTHORIZED_CENTER_ACCESS');
+            err.statusCode = 403;
+            err.code = 'FORBIDDEN_UNAUTHORIZED_CENTER_ACCESS';
+            throw err;
+        }
 
         const idempotencyKey = req.headers?.['idempotency-key'] || req.body?.idempotency_key || null;
         const acceptedQuantity = req.body?.accepted_quantity !== undefined ? req.body.accepted_quantity : null;
@@ -397,6 +428,13 @@ router.post('/reserve', async (req, res) => {
         const scope = getScopeContext(req);
         assertWritePermission(scope);
 
+        if (!scope.isSuperAdmin && !scope.printhouseId) {
+            const err = new Error('FORBIDDEN_UNAUTHORIZED_CENTER_ACCESS');
+            err.statusCode = 403;
+            err.code = 'FORBIDDEN_UNAUTHORIZED_CENTER_ACCESS';
+            throw err;
+        }
+
         const { dispatch_id, node_id, specs } = req.body || {};
         if (!node_id || !specs) {
             return res.status(400).json({ ok: false, error: 'Missing parameters: node_id and specs are mandatory', code: 'INVALID_RESERVATION_PAYLOAD' });
@@ -425,6 +463,13 @@ router.post('/release', async (req, res) => {
     try {
         const scope = getScopeContext(req);
         assertWritePermission(scope);
+
+        if (!scope.isSuperAdmin && !scope.printhouseId) {
+            const err = new Error('FORBIDDEN_UNAUTHORIZED_CENTER_ACCESS');
+            err.statusCode = 403;
+            err.code = 'FORBIDDEN_UNAUTHORIZED_CENTER_ACCESS';
+            throw err;
+        }
 
         const { dispatch_id, node_id, specs } = req.body || {};
         if (!node_id || !specs) {
@@ -462,7 +507,7 @@ async function assertMaterialAccess(id, scope) {
             throw err;
         }
 
-        // Fail-closed center isolation:
+        // Fail-closed center isolation: Resource must have an assigned center
         const matCenter = mat.printhouse_id || mat.node_id;
         if (!matCenter) {
             const err = new Error('FORBIDDEN_UNASSIGNED_CENTER_MATERIAL_ACCESS');
@@ -471,7 +516,15 @@ async function assertMaterialAccess(id, scope) {
             throw err;
         }
 
-        if (scope.printhouseId && matCenter !== scope.printhouseId) {
+        // Fail closed: Actor MUST have an authorized center
+        if (!scope.printhouseId) {
+            const err = new Error('FORBIDDEN_UNAUTHORIZED_CENTER_ACCESS');
+            err.statusCode = 403;
+            err.code = 'FORBIDDEN_UNAUTHORIZED_CENTER_ACCESS';
+            throw err;
+        }
+
+        if (matCenter !== scope.printhouseId) {
             const err = new Error('FORBIDDEN_CROSS_CENTER_MATERIAL_ACCESS');
             err.statusCode = 403;
             err.code = 'FORBIDDEN_CROSS_CENTER_MATERIAL_ACCESS';
