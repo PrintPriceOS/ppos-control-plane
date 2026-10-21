@@ -6,6 +6,22 @@
  */
 const db = require('./mysqlClient');
 const logger = require('./logger').child('material-service');
+const crypto = require('crypto');
+
+/**
+ * Recursively sort object keys for deterministic canonical JSON fingerprinting.
+ */
+function canonicalJsonStringify(val) {
+    if (val === null || typeof val !== 'object') {
+        return JSON.stringify(val);
+    }
+    if (Array.isArray(val)) {
+        return '[' + val.map(item => canonicalJsonStringify(item)).join(',') + ']';
+    }
+    const sortedKeys = Object.keys(val).sort();
+    const parts = sortedKeys.map(k => JSON.stringify(k) + ':' + canonicalJsonStringify(val[k]));
+    return '{' + parts.join(',') + '}';
+}
 
 class MaterialAvailabilityService {
     /**
@@ -346,47 +362,54 @@ class MaterialAvailabilityService {
             }
 
             // 3.1 Verify printhouse/center boundary isolation if specified
-            if (!isSuperAdmin && printhouseId && mat.printhouse_id && mat.printhouse_id !== printhouseId) {
-                const err = new Error('FORBIDDEN_CROSS_PRINTHOUSE_PROCUREMENT_RECEIPT');
-                err.statusCode = 403;
-                err.code = 'FORBIDDEN_CROSS_PRINTHOUSE_PROCUREMENT_RECEIPT';
-                throw err;
+            if (!isSuperAdmin && printhouseId) {
+                const matCenter = mat.printhouse_id || mat.node_id;
+                if (matCenter && matCenter !== printhouseId) {
+                    const err = new Error('FORBIDDEN_CROSS_PRINTHOUSE_PROCUREMENT_RECEIPT');
+                    err.statusCode = 403;
+                    err.code = 'FORBIDDEN_CROSS_PRINTHOUSE_PROCUREMENT_RECEIPT';
+                    throw err;
+                }
             }
 
-            // 4. Normalized incoming payload hash for idempotency validation
-            const incomingPayloadNorm = requestBody ? JSON.stringify(requestBody, Object.keys(requestBody).sort()) : '{}';
+            // 4. Normalized incoming payload hash for idempotency validation (recursive canonical JSON)
+            const incomingPayloadNorm = requestBody ? canonicalJsonStringify(requestBody) : '{}';
             const incomingHash = crypto.createHash('sha256').update(incomingPayloadNorm).digest('hex');
 
-            // 5. Persistent Idempotency Ledger Check
+            // 5. Persistent Idempotency Ledger Check (Fail-closed: NO catch swallowing errors)
             if (idempotencyKey) {
-                try {
-                    const [ledgerRows] = await connection.query(
-                        "SELECT * FROM procurement_receipt_records WHERE tenant_id = ? AND idempotency_key = ? FOR UPDATE",
-                        [tenantId || mat.tenant_id, idempotencyKey]
-                    );
-                    const record = ledgerRows && ledgerRows[0];
-                    if (record) {
-                        if (record.payload_sha256 !== incomingHash) {
-                            const err = new Error('IDEMPOTENCY_PAYLOAD_MISMATCH');
-                            err.statusCode = 409;
-                            err.code = 'IDEMPOTENCY_PAYLOAD_MISMATCH';
-                            throw err;
-                        }
-
-                        // Replay response identical to original
-                        await connection.rollback();
-                        const parsedResponse = typeof record.response_json === 'string'
-                            ? JSON.parse(record.response_json)
-                            : record.response_json;
-
-                        return {
-                            ...parsedResponse,
-                            idempotentReplay: true
-                        };
+                const [ledgerRows] = await connection.query(
+                    "SELECT * FROM procurement_receipt_records WHERE tenant_id = ? AND idempotency_key = ? FOR UPDATE",
+                    [tenantId || mat.tenant_id, idempotencyKey]
+                );
+                const record = ledgerRows && ledgerRows[0];
+                if (record) {
+                    // Check 1: Key reused for a DIFFERENT procurement order
+                    if (record.procurement_id !== procurementId) {
+                        const err = new Error('IDEMPOTENCY_KEY_REUSED_FOR_DIFFERENT_PROCUREMENT');
+                        err.statusCode = 409;
+                        err.code = 'IDEMPOTENCY_KEY_REUSED_FOR_DIFFERENT_PROCUREMENT';
+                        throw err;
                     }
-                } catch (ledgerErr) {
-                    if (ledgerErr.statusCode) throw ledgerErr;
-                    // Table might not exist yet during unit tests without full migrations, fallback safely
+
+                    // Check 2: Payload fingerprint mismatch on same procurement
+                    if (record.payload_sha256 !== incomingHash) {
+                        const err = new Error('IDEMPOTENCY_PAYLOAD_MISMATCH');
+                        err.statusCode = 409;
+                        err.code = 'IDEMPOTENCY_PAYLOAD_MISMATCH';
+                        throw err;
+                    }
+
+                    // Replay response identical to original
+                    await connection.rollback();
+                    const parsedResponse = typeof record.response_json === 'string'
+                        ? JSON.parse(record.response_json)
+                        : record.response_json;
+
+                    return {
+                        ...parsedResponse,
+                        idempotentReplay: true
+                    };
                 }
             }
 
@@ -471,32 +494,27 @@ class MaterialAvailabilityService {
                 status: 'RECEIVED'
             };
 
-            // 11. Record in persistent idempotency ledger if key provided
+            // 11. Record in persistent idempotency ledger if key provided (Fail-closed: NO catch swallowing errors)
             if (idempotencyKey) {
-                try {
-                    const recordId = 'rec-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
-                    await connection.query(`
-                        INSERT INTO procurement_receipt_records
-                        (id, tenant_id, printhouse_id, procurement_id, material_inventory_id, idempotency_key, payload_sha256, received_units, before_stock, after_stock, operator_id, status, response_json)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'COMPLETED', ?)
-                    `, [
-                        recordId,
-                        tenantId || mat.tenant_id,
-                        printhouseId || mat.printhouse_id || null,
-                        procurementId,
-                        mat.id,
-                        idempotencyKey,
-                        incomingHash,
-                        unitsToReceive,
-                        beforeStock,
-                        afterStock,
-                        operatorId || 'system-operator',
-                        JSON.stringify(responsePayload)
-                    ]);
-                } catch (recErr) {
-                    // In environments where migration 162 is pending, proceed without crashing
-                    logger.warn({ event: 'idempotency_record_insert_warning', error: recErr.message });
-                }
+                const recordId = 'rec-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
+                await connection.query(`
+                    INSERT INTO procurement_receipt_records
+                    (id, tenant_id, printhouse_id, procurement_id, material_inventory_id, idempotency_key, payload_sha256, received_units, before_stock, after_stock, operator_id, status, response_json)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'COMPLETED', ?)
+                `, [
+                    recordId,
+                    tenantId || mat.tenant_id,
+                    printhouseId || mat.printhouse_id || null,
+                    procurementId,
+                    mat.id,
+                    idempotencyKey,
+                    incomingHash,
+                    unitsToReceive,
+                    beforeStock,
+                    afterStock,
+                    operatorId || 'system-operator',
+                    JSON.stringify(responsePayload)
+                ]);
             }
 
             // Commit all changes atomically (document, stock, event, idempotency record)
@@ -650,11 +668,11 @@ class MaterialAvailabilityService {
             }
             const rowsAfterTenantFilter = afterTenantRows.length;
 
-            // Apply node filter
+            // Apply node/center filter
             let afterNodeRows = afterTenantRows;
-            if (filters.nodeId && filters.nodeId.trim() !== "") {
-                const targetNode = filters.nodeId.trim();
-                afterNodeRows = afterTenantRows.filter(r => r.node_id === targetNode);
+            const targetCenter = (filters.printhouseId || filters.nodeId || '').trim();
+            if (targetCenter !== '') {
+                afterNodeRows = afterTenantRows.filter(r => (r.node_id === targetCenter || r.printhouse_id === targetCenter));
             }
             const rowsAfterNodeFilter = afterNodeRows.length;
 
@@ -880,9 +898,11 @@ class MaterialAvailabilityService {
     }
 
     /**
-     * Reserves materials for a new dispatch. Legacy support.
+     * Reserves materials for a new dispatch.
+     * Enforces joint tenant, center, node, material, and permission validation.
+     * Fail-closed: Own node does NOT authorize foreign material or cross-center material.
      */
-    async reserveMaterials(dispatchId, nodeId, specs) {
+    async reserveMaterials(dispatchId, nodeId, specs, scope = {}) {
         logger.info({ event: 'material_reservation_request', dispatchId, nodeId, specs });
 
         const materialId = specs.material_id;
@@ -901,16 +921,48 @@ class MaterialAvailabilityService {
         }
 
         if (!mat) {
-            throw new Error(`Material specification [${materialId || paperName || 'unknown'}] not found in node [${nodeId}] catalog.`);
+            const err = new Error(`Material specification [${materialId || paperName || 'unknown'}] not found in node [${nodeId}] catalog.`);
+            err.statusCode = 404;
+            err.code = 'MATERIAL_NOT_FOUND';
+            throw err;
         }
 
-        return await this.reserveStockUnits(mat.id, specs.job_id || null, dispatchId, unitsToReserve, null, 'dispatch-orchestration');
+        // 1. Validate Tenant Ownership
+        if (!scope.isSuperAdmin && scope.tenantId && mat.tenant_id && mat.tenant_id !== scope.tenantId) {
+            const err = new Error('FORBIDDEN_CROSS_TENANT_MATERIAL_ACCESS');
+            err.statusCode = 403;
+            err.code = 'FORBIDDEN_CROSS_TENANT_MATERIAL_ACCESS';
+            throw err;
+        }
+
+        // 2. Validate Node / Center Alignment
+        // An authorized node_id MUST NOT allow reserving a material assigned to a different node or center
+        if (nodeId && mat.node_id && mat.node_id !== nodeId) {
+            const err = new Error('FORBIDDEN_CROSS_CENTER_MATERIAL_ACCESS');
+            err.statusCode = 403;
+            err.code = 'FORBIDDEN_CROSS_CENTER_MATERIAL_ACCESS';
+            throw err;
+        }
+
+        if (!scope.isSuperAdmin && scope.printhouseId) {
+            const targetCenter = mat.printhouse_id || mat.node_id;
+            if (targetCenter && targetCenter !== scope.printhouseId) {
+                const err = new Error('FORBIDDEN_CROSS_CENTER_MATERIAL_ACCESS');
+                err.statusCode = 403;
+                err.code = 'FORBIDDEN_CROSS_CENTER_MATERIAL_ACCESS';
+                throw err;
+            }
+        }
+
+        return await this.reserveStockUnits(mat.id, specs.job_id || null, dispatchId, unitsToReserve, null, scope.operatorId || 'dispatch-orchestration');
     }
 
     /**
-     * Releases previously reserved materials. Legacy support.
+     * Releases previously reserved materials.
+     * Enforces joint tenant, center, node, material, and permission validation.
+     * Fail-closed: Own node does NOT authorize foreign material or cross-center material release.
      */
-    async releaseMaterials(dispatchId, nodeId, specs) {
+    async releaseMaterials(dispatchId, nodeId, specs, scope = {}) {
         logger.info({ event: 'material_release_request', dispatchId, nodeId, specs });
 
         const materialId = specs.material_id;
@@ -929,13 +981,42 @@ class MaterialAvailabilityService {
         }
 
         if (!mat) {
-            return { released: false, reason: 'Material not found' };
+            const err = new Error(`Material specification [${materialId || paperName || 'unknown'}] not found.`);
+            err.statusCode = 404;
+            err.code = 'MATERIAL_NOT_FOUND';
+            throw err;
+        }
+
+        // 1. Validate Tenant Ownership
+        if (!scope.isSuperAdmin && scope.tenantId && mat.tenant_id && mat.tenant_id !== scope.tenantId) {
+            const err = new Error('FORBIDDEN_CROSS_TENANT_MATERIAL_ACCESS');
+            err.statusCode = 403;
+            err.code = 'FORBIDDEN_CROSS_TENANT_MATERIAL_ACCESS';
+            throw err;
+        }
+
+        // 2. Validate Node / Center Alignment
+        if (nodeId && mat.node_id && mat.node_id !== nodeId) {
+            const err = new Error('FORBIDDEN_CROSS_CENTER_MATERIAL_ACCESS');
+            err.statusCode = 403;
+            err.code = 'FORBIDDEN_CROSS_CENTER_MATERIAL_ACCESS';
+            throw err;
+        }
+
+        if (!scope.isSuperAdmin && scope.printhouseId) {
+            const targetCenter = mat.printhouse_id || mat.node_id;
+            if (targetCenter && targetCenter !== scope.printhouseId) {
+                const err = new Error('FORBIDDEN_CROSS_CENTER_MATERIAL_ACCESS');
+                err.statusCode = 403;
+                err.code = 'FORBIDDEN_CROSS_CENTER_MATERIAL_ACCESS';
+                throw err;
+            }
         }
 
         const newReserved = Math.max(0, mat.reserved_stock_units - unitsToRelease);
         await db.query("UPDATE predictive_material_inventory SET reserved_stock_units = ? WHERE id = ?", [newReserved, mat.id]);
 
-        await this.logMaterialEvent(mat.id, 'RELEASE', unitsToRelease, mat.current_stock_units, mat.current_stock_units, specs.job_id || null, dispatchId, 'dispatch-orchestration', 'Released Unused Allocation Pool');
+        await this.logMaterialEvent(mat.id, 'RELEASE', unitsToRelease, mat.current_stock_units, mat.current_stock_units, specs.job_id || null, dispatchId, scope.operatorId || 'dispatch-orchestration', 'Released Unused Allocation Pool');
 
         await this.computeStateAndForecast(mat.id);
 

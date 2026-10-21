@@ -273,6 +273,15 @@ async function assertNodeOwnership(nodeId, scope) {
         err.code = 'FORBIDDEN_CROSS_TENANT_NODE_ACCESS';
         throw err;
     }
+
+    // Fail-closed center isolation: If actor scope is restricted to a specific printhouseId,
+    // they cannot operate on nodes belonging to a different center/node.
+    if (scope.printhouseId && node.id !== scope.printhouseId) {
+        const err = new Error('FORBIDDEN_CROSS_CENTER_NODE_ACCESS');
+        err.statusCode = 403;
+        err.code = 'FORBIDDEN_CROSS_CENTER_NODE_ACCESS';
+        throw err;
+    }
 }
 
 /**
@@ -387,7 +396,7 @@ router.post('/reserve', async (req, res) => {
         // Enforce node authorization
         await assertNodeOwnership(node_id, scope);
 
-        const result = await materialService.reserveMaterials(dispatch_id || 'manual-override', node_id, specs);
+        const result = await materialService.reserveMaterials(dispatch_id || 'manual-override', node_id, specs, scope);
         res.json({ ok: true, ...result });
     } catch (err) {
         if (err.statusCode) {
@@ -416,7 +425,7 @@ router.post('/release', async (req, res) => {
         // Enforce node authorization
         await assertNodeOwnership(node_id, scope);
 
-        const result = await materialService.releaseMaterials(dispatch_id || 'manual-override', node_id, specs);
+        const result = await materialService.releaseMaterials(dispatch_id || 'manual-override', node_id, specs, scope);
         res.json({ ok: true, ...result });
     } catch (err) {
         if (err.statusCode) {
@@ -427,18 +436,31 @@ router.post('/release', async (req, res) => {
     }
 });
 
-// Helper to enforce material tenant ownership
+// Helper to enforce material tenant and center ownership
 async function assertMaterialAccess(id, scope) {
     const mat = await materialService.getMaterialById(id);
     if (!mat) {
         const err = new Error('MATERIAL_NOT_FOUND');
         err.statusCode = 404;
+        err.code = 'MATERIAL_NOT_FOUND';
         throw err;
     }
     if (!scope.isSuperAdmin && mat.tenant_id && mat.tenant_id !== scope.tenantId) {
         const err = new Error('FORBIDDEN_CROSS_TENANT_MATERIAL_ACCESS');
         err.statusCode = 403;
+        err.code = 'FORBIDDEN_CROSS_TENANT_MATERIAL_ACCESS';
         throw err;
+    }
+    // Fail-closed center isolation: If actor scope is restricted to a specific printhouseId,
+    // they cannot inspect or mutate materials of another center
+    if (!scope.isSuperAdmin && scope.printhouseId) {
+        const matCenter = mat.printhouse_id || mat.node_id;
+        if (matCenter && matCenter !== scope.printhouseId) {
+            const err = new Error('FORBIDDEN_CROSS_CENTER_MATERIAL_ACCESS');
+            err.statusCode = 403;
+            err.code = 'FORBIDDEN_CROSS_CENTER_MATERIAL_ACCESS';
+            throw err;
+        }
     }
     return mat;
 }
@@ -454,7 +476,7 @@ router.get('/:id', async (req, res) => {
         res.json({ ok: true, data: mat });
     } catch (err) {
         if (err.statusCode) {
-            return res.status(err.statusCode).json({ ok: false, error: err.message, code: err.message });
+            return res.status(err.statusCode).json({ ok: false, error: err.message, code: err.code || err.message });
         }
         console.error(`[MATERIALS-API] Failed to fetch unit [${req.params.id}]:`, err);
         res.status(500).json({ ok: false, error: err.message, code: 'MATERIAL_DETAIL_ERROR' });
@@ -532,7 +554,7 @@ router.post('/:id/release', async (req, res) => {
         const mat = await assertMaterialAccess(req.params.id, scope);
         const { quantity } = req.body || {};
         const qtyToRelease = Number(quantity || 500);
-        await materialService.releaseMaterials('manual-operator-release', mat.node_id, { material_id: mat.id, units: qtyToRelease });
+        await materialService.releaseMaterials('manual-operator-release', mat.node_id, { material_id: mat.id, units: qtyToRelease }, scope);
         const updated = await materialService.getMaterialById(mat.id);
         res.json({ ok: true, data: updated });
     } catch (err) {

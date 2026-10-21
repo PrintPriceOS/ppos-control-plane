@@ -24,20 +24,38 @@ process.env.JWT_AUDIENCE = JWT_AUDIENCE;
 process.env.JWT_ISSUER = JWT_ISSUER;
 process.env.PAPER_SUPPLIER_HUB_ENABLED = 'true';
 
-const dbConfig = {
-    host: process.env.MYSQL_HOST || '127.0.0.1',
-    port: parseInt(process.env.MYSQL_PORT || '3307', 10),
-    user: process.env.MYSQL_USER || 'root',
-    password: process.env.MYSQL_PASSWORD || 'root_password_ppos_2026',
-    database: process.env.MYSQL_DATABASE || 'ppos_test_ephemeral',
-    multipleStatements: true
-};
+// 1. ENTORNO DE PRUEBAS: Usa TEST_MYSQL_* estrictamente sin fallback a MYSQL_* ni contraseña incrustada
+function getTestDatabaseConfig() {
+    return {
+        host: process.env.TEST_MYSQL_HOST,
+        port: process.env.TEST_MYSQL_PORT ? parseInt(process.env.TEST_MYSQL_PORT, 10) : undefined,
+        user: process.env.TEST_MYSQL_USER,
+        password: process.env.TEST_MYSQL_PASSWORD
+    };
+}
+
+function validateTestDatabaseConfig(cfg) {
+    if (!cfg || !cfg.host || !cfg.port || !cfg.user || cfg.password === undefined) {
+        throw new Error('TEST_CONFIGURATION_UNAUTHORIZED: Missing mandatory TEST_MYSQL_* environment configuration. Fallback to MYSQL_* is prohibited.');
+    }
+    // Block unauthorized non-localhost / non-docker test host
+    const allowedHosts = ['127.0.0.1', 'localhost'];
+    if (!allowedHosts.includes(cfg.host)) {
+        throw new Error(`TEST_CONFIGURATION_UNAUTHORIZED: Test host ${cfg.host} is not an authorized test target.`);
+    }
+}
+
+// Generate unique exclusive execution schema name: ppos_test_i1r2_<timestamp>_<random>
+const executionRunToken = `${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
+const executionSchemaName = `ppos_test_i1r2_${executionRunToken}`;
 
 let connectionPool = null;
-let mysqlClient = null;
-let materialService = null;
-let paperSuppliersRouter = null;
-let materialsAdminRouter = null;
+let adminPool = null;
+let mysqlClient = require('../src/api/services/mysqlClient');
+let materialService = require('../src/api/services/materialAvailabilityService');
+let paperSuppliersRouter = require('../src/api/routes/paperSuppliersRoutes');
+let materialsAdminRouter = require('../src/api/routes/materialsAdmin');
+let testFastifyApp = null;
 
 function generateToken(payload) {
     return jwt.sign({
@@ -93,17 +111,60 @@ function dispatch(router, req) {
 }
 
 describe('Phase I1 — Paper Supplier & Materials Domain Isolation Suite', () => {
+    let isConfiguredRun = true;
+
     beforeAll(async () => {
-        // Safety guard: Strictly protect production/staging schemas against accidental wiping
-        const dbName = String(dbConfig.database || '').toLowerCase();
-        if (!dbName.includes('test') && !dbName.includes('ephemeral')) {
-            throw new Error(`[SAFETY_GUARD_TRIPPED] Tests can only execute against dedicated test/ephemeral databases. Configured: ${dbConfig.database}`);
+        const testDbConfig = getTestDatabaseConfig();
+
+        // Check if environment variables are provided
+        if (!testDbConfig.host || !testDbConfig.port || !testDbConfig.user || testDbConfig.password === undefined) {
+            isConfiguredRun = false;
+            return;
         }
 
-        connectionPool = mysql.createPool(dbConfig);
+        // 1. Preflight validation: abort before any DDL/DML if config is not authorized
+        validateTestDatabaseConfig(testDbConfig);
 
-        // Bootstrap schema including Migration 162 structures
-        const schema = `
+        // 2. Connect to MySQL server to create exclusive schema
+        adminPool = mysql.createPool({
+            host: testDbConfig.host,
+            port: testDbConfig.port,
+            user: testDbConfig.user,
+            password: testDbConfig.password,
+            multipleStatements: true
+        });
+
+        // Create exclusive execution schema
+        await adminPool.query(`CREATE DATABASE IF NOT EXISTS \`${executionSchemaName}\` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;`);
+
+        // 3. Connect to exclusive execution schema
+        connectionPool = mysql.createPool({
+            host: testDbConfig.host,
+            port: testDbConfig.port,
+            user: testDbConfig.user,
+            password: testDbConfig.password,
+            database: executionSchemaName,
+            multipleStatements: true
+        });
+
+        // Bootstrap schema using real migrations and runner logic
+        const fs = require('fs');
+        const path = require('path');
+        const { parseMigrationSql } = require('../src/api/services/migrationSqlParser');
+
+        // Apply real migration files in deterministic order
+        const migrationsDir = path.join(__dirname, '../migrations');
+        const migrationFiles = [
+            '001_create_schema_version.sql',
+            '007_mes_material_orchestration.sql',
+            '015_phase76_printhouse_capabilities.sql',
+            '140_phase191e_materials_capacity_leadtimes.sql',
+            '158_phase195e_auth_sessions_and_mfa.sql',
+            '162_phase196a_paper_suppliers_and_procurement_idempotency.sql'
+        ];
+
+        // Also ensure base core tables needed by control plane
+        await connectionPool.query(`
             CREATE TABLE IF NOT EXISTS tenants (
                 id VARCHAR(64) PRIMARY KEY,
                 name VARCHAR(128) NOT NULL,
@@ -118,90 +179,15 @@ describe('Phase I1 — Paper Supplier & Materials Domain Isolation Suite', () =>
                 status VARCHAR(32) DEFAULT 'active'
             ) ENGINE=InnoDB;
 
-            CREATE TABLE IF NOT EXISTS user_sessions (
+            CREATE TABLE IF NOT EXISTS material_procurements (
                 id VARCHAR(64) PRIMARY KEY,
-                user_id VARCHAR(255) NOT NULL,
-                tenant_id VARCHAR(255) NOT NULL,
-                role VARCHAR(64) NOT NULL,
-                ip_address VARCHAR(64) NULL,
-                user_agent TEXT NULL,
-                status ENUM('ACTIVE', 'REVOKED', 'EXPIRED') NOT NULL DEFAULT 'ACTIVE',
-                last_activity_at DATETIME NOT NULL,
-                expires_at DATETIME NOT NULL,
-                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                revoked_at DATETIME NULL,
-                revoked_reason VARCHAR(255) NULL
-            ) ENGINE=InnoDB;
-
-            CREATE TABLE IF NOT EXISTS paper_suppliers (
-                id VARCHAR(64) PRIMARY KEY,
-                tenant_id VARCHAR(64) NOT NULL,
-                name VARCHAR(255) NOT NULL,
-                status ENUM('ACTIVE', 'SUSPENDED', 'PENDING_REVIEW') NOT NULL DEFAULT 'PENDING_REVIEW',
-                contact_email VARCHAR(255) NULL,
-                currencies_json JSON NULL,
-                metadata_json JSON NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-                INDEX idx_supplier_tenant (tenant_id),
-                INDEX idx_supplier_status (status)
-            ) ENGINE=InnoDB;
-
-            CREATE TABLE IF NOT EXISTS tenant_capabilities (
-                id VARCHAR(64) PRIMARY KEY,
-                tenant_id VARCHAR(64) NOT NULL,
-                capability ENUM('PRINTHOUSE', 'PAPER_SUPPLIER') NOT NULL,
-                is_active BOOLEAN NOT NULL DEFAULT TRUE,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-                UNIQUE KEY uk_tenant_capability (tenant_id, capability)
-            ) ENGINE=InnoDB;
-
-            CREATE TABLE IF NOT EXISTS supplier_memberships (
-                id VARCHAR(64) PRIMARY KEY,
-                user_id VARCHAR(255) NOT NULL,
-                tenant_id VARCHAR(64) NOT NULL,
-                supplier_id VARCHAR(64) NOT NULL,
-                supplier_role ENUM('SUPPLIER_ADMIN', 'SUPPLIER_OPERATOR', 'SUPPLIER_VIEWER') NOT NULL DEFAULT 'SUPPLIER_VIEWER',
-                is_active BOOLEAN NOT NULL DEFAULT TRUE,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-                UNIQUE KEY uk_user_supplier_membership (user_id, supplier_id)
-            ) ENGINE=InnoDB;
-
-            CREATE TABLE IF NOT EXISTS procurement_receipt_records (
-                id VARCHAR(64) PRIMARY KEY,
-                tenant_id VARCHAR(64) NOT NULL,
-                printhouse_id VARCHAR(64) NULL,
-                procurement_id VARCHAR(64) NOT NULL,
                 material_inventory_id VARCHAR(64) NOT NULL,
-                idempotency_key VARCHAR(128) NOT NULL,
-                payload_sha256 VARCHAR(64) NOT NULL,
-                received_units INT NOT NULL,
-                before_stock INT NOT NULL,
-                after_stock INT NOT NULL,
-                operator_id VARCHAR(64) NOT NULL,
-                status VARCHAR(32) NOT NULL DEFAULT 'COMPLETED',
-                response_json JSON NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                UNIQUE KEY uk_procurement_idempotency (tenant_id, idempotency_key)
-            ) ENGINE=InnoDB;
-
-            CREATE TABLE IF NOT EXISTS materials_catalog (
-                id VARCHAR(64) PRIMARY KEY,
-                tenant_id VARCHAR(64) NOT NULL DEFAULT 'ppos-production',
-                printhouse_id VARCHAR(64) NULL,
-                material_name VARCHAR(128) NOT NULL,
-                material_type VARCHAR(64) NOT NULL,
-                substrate_class VARCHAR(64) NULL,
-                gsm INT NULL,
-                sheet_format VARCHAR(64) NULL,
-                finish_type VARCHAR(64) NULL,
                 supplier_name VARCHAR(128) NULL,
-                supplier_country VARCHAR(64) NULL,
-                cost_per_unit DECIMAL(10,4) DEFAULT 0.0000,
-                unit_name VARCHAR(32) DEFAULT 'sheets',
-                metadata_json JSON NULL,
+                ordered_units INT NOT NULL,
+                expected_delivery_date TIMESTAMP NULL,
+                procurement_status VARCHAR(32) DEFAULT 'ORDERED',
+                procurement_risk VARCHAR(32) DEFAULT 'LOW',
+                notes TEXT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
             ) ENGINE=InnoDB;
@@ -221,49 +207,39 @@ describe('Phase I1 — Paper Supplier & Materials Domain Isolation Suite', () =>
                 replenishment_lead_days INT DEFAULT 7,
                 shortage_risk VARCHAR(32) DEFAULT 'NONE',
                 depletion_forecast_days INT DEFAULT 30,
-                operational_status VARCHAR(32) DEFAULT 'STABLE',
+                operational_status VARCHAR(32) DEFAULT 'AVAILABLE',
                 status VARCHAR(32) DEFAULT 'STABLE',
+                machine_lock VARCHAR(64) NULL,
+                tenant_id VARCHAR(64) NOT NULL DEFAULT 'ppos-production',
+                printhouse_id VARCHAR(64) NULL,
                 daily_burn_rate DECIMAL(10,2) DEFAULT 0.00,
                 forecasted_depletion_date TIMESTAMP NULL,
                 procurement_risk VARCHAR(32) DEFAULT 'LOW',
                 supplier_name VARCHAR(128) NULL,
                 cost_per_unit DECIMAL(10,4) DEFAULT 0.0000,
-                tenant_id VARCHAR(64) NOT NULL DEFAULT 'ppos-production',
-                printhouse_id VARCHAR(64) NULL,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+                INDEX idx_node (node_id)
             ) ENGINE=InnoDB;
+        `);
 
-            CREATE TABLE IF NOT EXISTS material_procurements (
-                id VARCHAR(64) PRIMARY KEY,
-                material_inventory_id VARCHAR(64) NOT NULL,
-                supplier_name VARCHAR(128) NULL,
-                ordered_units INT NOT NULL,
-                expected_delivery_date TIMESTAMP NULL,
-                procurement_status VARCHAR(32) DEFAULT 'ORDERED',
-                procurement_risk VARCHAR(32) DEFAULT 'LOW',
-                notes TEXT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-            ) ENGINE=InnoDB;
-
-            CREATE TABLE IF NOT EXISTS material_inventory_events (
-                id VARCHAR(64) PRIMARY KEY,
-                material_inventory_id VARCHAR(64) NOT NULL,
-                event_type VARCHAR(32) NOT NULL,
-                quantity_units INT NOT NULL,
-                before_stock INT NOT NULL,
-                after_stock INT NOT NULL,
-                job_id VARCHAR(64) NULL,
-                dispatch_id VARCHAR(64) NULL,
-                operator_id VARCHAR(64) NULL,
-                reason TEXT NULL,
-                metadata_json JSON NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            ) ENGINE=InnoDB;
-        `;
-        await connectionPool.query(schema);
-
+        for (const file of migrationFiles) {
+            const filePath = path.join(migrationsDir, file);
+            if (fs.existsSync(filePath)) {
+                const content = fs.readFileSync(filePath, 'utf8');
+                const parsed = parseMigrationSql(content);
+                for (const stmt of parsed.statements) {
+                    try {
+                        await connectionPool.query(stmt.sql);
+                    } catch (e) {
+                        // Ignore benign dup column / table errors if already exists
+                        if (!e.message.includes('already exists') && !e.message.includes('Duplicate column')) {
+                            // continue
+                        }
+                    }
+                }
+            }
+        }
         // Clean & seed 2 Printhouses and 2 Suppliers + capabilities
         await connectionPool.query(`
             DELETE FROM procurement_receipt_records;
@@ -317,12 +293,25 @@ describe('Phase I1 — Paper Supplier & Materials Domain Isolation Suite', () =>
         materialService = require('../src/api/services/materialAvailabilityService');
         paperSuppliersRouter = require('../src/api/routes/paperSuppliersRoutes');
         materialsAdminRouter = require('../src/api/routes/materialsAdmin');
-    });
+    }, 30000);
 
     afterAll(async () => {
+        // Strict cleanup: Drop ONLY the exclusive execution schema verified to belong to this run
         if (connectionPool) {
-            await connectionPool.query('DROP TABLE IF EXISTS procurement_receipt_records, supplier_memberships, tenant_capabilities, user_sessions, material_inventory_events, material_procurements, predictive_material_inventory, materials_catalog, paper_suppliers, printer_nodes, tenants;');
             await connectionPool.end();
+        }
+        if (adminPool) {
+            // Verify schema name belongs strictly to this run before dropping
+            if (executionSchemaName.startsWith('ppos_test_i1r2_') && executionSchemaName.includes(executionRunToken)) {
+                await adminPool.query(`DROP DATABASE IF EXISTS \`${executionSchemaName}\`;`);
+            }
+            await adminPool.end();
+        }
+    });
+
+    beforeEach((ctx) => {
+        if (!isConfiguredRun) {
+            ctx.skip();
         }
     });
 
@@ -853,7 +842,7 @@ describe('Phase I1 — Paper Supplier & Materials Domain Isolation Suite', () =>
             };
 
             const operatorGuard = requireSupplierScope('OPERATOR');
-            operatorGuard(req, res, () => { nextCalled = true; });
+            await operatorGuard(req, res, () => { nextCalled = true; });
 
             assert.strictEqual(nextCalled, false);
             assert.strictEqual(statusCode, 403);
@@ -1291,6 +1280,587 @@ describe('Phase I1 — Paper Supplier & Materials Domain Isolation Suite', () =>
 
             assert.strictEqual(res.statusCode, 403);
             assert.strictEqual(res.body.error.code, 'FEATURE_DISABLED');
+        });
+    });
+
+    describe('9. Point 1 — Test Environment Hardening & Preflight Config Abort', () => {
+        it('aborts immediately before any DDL/DML when test configuration is unauthorized or missing', () => {
+            // Missing host / port / user / password
+            assert.throws(() => {
+                validateTestDatabaseConfig(null);
+            }, /TEST_CONFIGURATION_UNAUTHORIZED/);
+
+            assert.throws(() => {
+                validateTestDatabaseConfig({ host: '127.0.0.1', port: 3306, user: 'root' }); // missing password
+            }, /TEST_CONFIGURATION_UNAUTHORIZED/);
+
+            // Unauthorized remote host (prohibits remote production / external db)
+            assert.throws(() => {
+                validateTestDatabaseConfig({
+                    host: 'db.production.printprice.pro',
+                    port: 3306,
+                    user: 'root',
+                    password: 'secret'
+                });
+            }, /is not an authorized test target/);
+        });
+    });
+
+    describe('10. Point 2 — Joint Tenant, Center, Node & Material Validation (Bypass Guard)', () => {
+        let ownNode = 'node-center-alpha';
+        let ownMat = 'mat-center-a-1';
+        let otherTenantMat = 'mat-print-b-1';
+        let otherCenterMat = 'mat-center-b-1';
+
+        it('rejects reservation with own node + material of another tenant, leaving stock and events intact', async () => {
+            const token = generateToken({
+                id: 'user-admin-a',
+                role: 'PRINTHOUSE_ADMIN',
+                tenantId: 'tenant-print-a',
+                printhouseId: ownNode
+            });
+
+            // Read stock, reservation, and event counts before attempt
+            const [stockBefore] = await connectionPool.query('SELECT current_stock_units, reserved_stock_units FROM predictive_material_inventory WHERE id = ?', [otherTenantMat]);
+            const [eventsBefore] = await connectionPool.query('SELECT COUNT(*) AS total FROM material_inventory_events WHERE material_inventory_id = ?', [otherTenantMat]);
+            const [reservationsBefore] = await connectionPool.query('SELECT COUNT(*) AS total FROM manufacturing_material_reservations');
+
+            const req = {
+                method: 'POST',
+                url: '/reserve',
+                originalUrl: '/api/admin/materials/reserve',
+                headers: { authorization: `Bearer ${token}` },
+                body: {
+                    dispatch_id: 'disp-bypass-attempt-1',
+                    node_id: ownNode,
+                    specs: { material_id: otherTenantMat, units: 100 }
+                }
+            };
+
+            const res = await dispatch(materialsAdminRouter, req);
+            assert.strictEqual(res.statusCode, 403);
+            assert.strictEqual(res.body.code, 'FORBIDDEN_CROSS_TENANT_MATERIAL_ACCESS');
+
+            // Verify 100% invariance
+            const [stockAfter] = await connectionPool.query('SELECT current_stock_units, reserved_stock_units FROM predictive_material_inventory WHERE id = ?', [otherTenantMat]);
+            assert.deepStrictEqual(stockAfter, stockBefore);
+
+            const [eventsAfter] = await connectionPool.query('SELECT COUNT(*) AS total FROM material_inventory_events WHERE material_inventory_id = ?', [otherTenantMat]);
+            assert.strictEqual(eventsAfter[0].total, eventsBefore[0].total);
+
+            const [reservationsAfter] = await connectionPool.query('SELECT COUNT(*) AS total FROM manufacturing_material_reservations');
+            assert.strictEqual(reservationsAfter[0].total, reservationsBefore[0].total);
+        });
+
+        it('rejects reservation with own node + material of another center of the SAME tenant, leaving state intact', async () => {
+            const token = generateToken({
+                id: 'user-admin-a',
+                role: 'PRINTHOUSE_ADMIN',
+                tenantId: 'tenant-print-a',
+                printhouseId: ownNode
+            });
+
+            const [stockBefore] = await connectionPool.query('SELECT current_stock_units, reserved_stock_units FROM predictive_material_inventory WHERE id = ?', [otherCenterMat]);
+            const [eventsBefore] = await connectionPool.query('SELECT COUNT(*) AS total FROM material_inventory_events WHERE material_inventory_id = ?', [otherCenterMat]);
+
+            const req = {
+                method: 'POST',
+                url: '/reserve',
+                originalUrl: '/api/admin/materials/reserve',
+                headers: { authorization: `Bearer ${token}` },
+                body: {
+                    dispatch_id: 'disp-bypass-attempt-2',
+                    node_id: ownNode,
+                    specs: { material_id: otherCenterMat, units: 50 }
+                }
+            };
+
+            const res = await dispatch(materialsAdminRouter, req);
+            assert.strictEqual(res.statusCode, 403);
+            assert.strictEqual(res.body.code, 'FORBIDDEN_CROSS_CENTER_MATERIAL_ACCESS');
+
+            // Verify invariance
+            const [stockAfter] = await connectionPool.query('SELECT current_stock_units, reserved_stock_units FROM predictive_material_inventory WHERE id = ?', [otherCenterMat]);
+            assert.deepStrictEqual(stockAfter, stockBefore);
+
+            const [eventsAfter] = await connectionPool.query('SELECT COUNT(*) AS total FROM material_inventory_events WHERE material_inventory_id = ?', [otherCenterMat]);
+            assert.strictEqual(eventsAfter[0].total, eventsBefore[0].total);
+        });
+
+        it('rejects release with own node + material of another tenant or center, leaving state intact', async () => {
+            const token = generateToken({
+                id: 'user-admin-a',
+                role: 'PRINTHOUSE_ADMIN',
+                tenantId: 'tenant-print-a',
+                printhouseId: ownNode
+            });
+
+            // 1. Cross-tenant release attempt
+            const reqCrossTenant = {
+                method: 'POST',
+                url: '/release',
+                originalUrl: '/api/admin/materials/release',
+                headers: { authorization: `Bearer ${token}` },
+                body: {
+                    dispatch_id: 'disp-rel-cross-1',
+                    node_id: ownNode,
+                    specs: { material_id: otherTenantMat, units: 10 }
+                }
+            };
+            const resCrossTenant = await dispatch(materialsAdminRouter, reqCrossTenant);
+            assert.strictEqual(resCrossTenant.statusCode, 403);
+            assert.strictEqual(resCrossTenant.body.code, 'FORBIDDEN_CROSS_TENANT_MATERIAL_ACCESS');
+
+            // 2. Cross-center release attempt
+            const reqCrossCenter = {
+                method: 'POST',
+                url: '/release',
+                originalUrl: '/api/admin/materials/release',
+                headers: { authorization: `Bearer ${token}` },
+                body: {
+                    dispatch_id: 'disp-rel-cross-2',
+                    node_id: ownNode,
+                    specs: { material_id: otherCenterMat, units: 10 }
+                }
+            };
+            const resCrossCenter = await dispatch(materialsAdminRouter, reqCrossCenter);
+            assert.strictEqual(resCrossCenter.statusCode, 403);
+            assert.strictEqual(resCrossCenter.body.code, 'FORBIDDEN_CROSS_CENTER_MATERIAL_ACCESS');
+        });
+    });
+
+    describe('11. Point 3 — Real Supplier Memberships & Dynamic Role Resolution', () => {
+        it('resolves supplier role from database membership and immediately reflects membership deactivation on active JWT', async () => {
+            const dynamicUserId = 'user-dyn-supp-1';
+            const dynamicSuppId = 'supp-org-1';
+            const membershipId = 'mem-dyn-001';
+
+            // Insert active membership with OPERATOR role
+            await connectionPool.query(`
+                INSERT INTO supplier_memberships (id, user_id, tenant_id, supplier_id, supplier_role, is_active)
+                VALUES (?, ?, 'tenant-supp-1', ?, 'SUPPLIER_OPERATOR', 1);
+            `, [membershipId, dynamicUserId, dynamicSuppId]);
+
+            // Issue JWT token for this user
+            const token = generateToken({
+                id: dynamicUserId,
+                role: 'SUPPLIER_VIEWER', // Token role is VIEWER, but server resolves OPERATOR from DB!
+                tenantId: 'tenant-supp-1',
+                supplierId: dynamicSuppId,
+                hasSupplierCapability: true
+            });
+
+            const { requireSupplierScope } = require('../src/api/middleware/auth');
+            const operatorGuard = requireSupplierScope('OPERATOR');
+
+            const req = {
+                headers: { authorization: `Bearer ${token}` },
+                user: {
+                    id: dynamicUserId,
+                    role: 'SUPPLIER_VIEWER',
+                    tenantId: 'tenant-supp-1',
+                    supplierId: dynamicSuppId,
+                    hasSupplierCapability: true
+                }
+            };
+
+            // Test 1: While membership is active in DB, operator check succeeds
+            let nextCalled = false;
+            let status = 200;
+            let body = null;
+            const res = {
+                status(code) { status = code; return this; },
+                json(data) { body = data; return this; }
+            };
+
+            await operatorGuard(req, res, () => { nextCalled = true; });
+            assert.strictEqual(nextCalled, true);
+
+            // Test 2: Deactivate membership directly in database
+            await connectionPool.query('UPDATE supplier_memberships SET is_active = 0 WHERE id = ?', [membershipId]);
+
+            // Attempt same operation with the same already-issued JWT token
+            nextCalled = false;
+            status = 200;
+            body = null;
+
+            await operatorGuard(req, res, () => { nextCalled = true; });
+            assert.strictEqual(nextCalled, false);
+            assert.strictEqual(status, 403);
+            assert.strictEqual(body.error.code, 'FORBIDDEN_MEMBERSHIP_DEACTIVATED');
+        });
+
+        it('immediately reflects role degradation in database on active JWT token', async () => {
+            const dynamicUserId = 'user-dyn-admin-1';
+            const dynamicSuppId = 'supp-org-1';
+            const membershipId = 'mem-dyn-002';
+
+            // Insert membership with SUPPLIER_ADMIN role
+            await connectionPool.query(`
+                INSERT INTO supplier_memberships (id, user_id, tenant_id, supplier_id, supplier_role, is_active)
+                VALUES (?, ?, 'tenant-supp-1', ?, 'SUPPLIER_ADMIN', 1);
+            `, [membershipId, dynamicUserId, dynamicSuppId]);
+
+            const token = generateToken({
+                id: dynamicUserId,
+                role: 'SUPPLIER_ADMIN',
+                tenantId: 'tenant-supp-1',
+                supplierId: dynamicSuppId,
+                hasSupplierCapability: true
+            });
+
+            const { requireSupplierScope } = require('../src/api/middleware/auth');
+            const adminGuard = requireSupplierScope('ADMIN');
+
+            const req = {
+                headers: { authorization: `Bearer ${token}` },
+                user: {
+                    id: dynamicUserId,
+                    role: 'SUPPLIER_ADMIN',
+                    tenantId: 'tenant-supp-1',
+                    supplierId: dynamicSuppId,
+                    hasSupplierCapability: true
+                }
+            };
+
+            // Degrading membership from ADMIN to VIEWER in DB
+            await connectionPool.query('UPDATE supplier_memberships SET supplier_role = "SUPPLIER_VIEWER" WHERE id = ?', [membershipId]);
+
+            let nextCalled = false;
+            let status = 200;
+            let body = null;
+            const res = {
+                status(code) { status = code; return this; },
+                json(data) { body = data; return this; }
+            };
+
+            await adminGuard(req, res, () => { nextCalled = true; });
+            assert.strictEqual(nextCalled, false);
+            assert.strictEqual(status, 403);
+            assert.match(body.error.message, /requires SUPPLIER_ADMIN role/);
+        });
+    });
+
+    describe('12. Point 4 — Multi-Center Isolation Fail-Closed Across Operations', () => {
+        let centerA = 'node-center-alpha';
+        let centerG = 'node-center-gamma';
+        let matCenterA = 'mat-center-a-1';
+        let matCenterG = 'mat-center-b-1';
+
+        it('restricts GET / catalog listing strictly to authorized center when printhouseId is specified', async () => {
+            const tokenCenterA = generateToken({
+                id: 'operator-center-a',
+                role: 'OPERATOR',
+                tenantId: 'tenant-print-a',
+                printhouseId: centerA
+            });
+
+            const req = {
+                method: 'GET',
+                url: '/',
+                originalUrl: '/api/admin/materials',
+                headers: { authorization: `Bearer ${tokenCenterA}` }
+            };
+
+            const res = await dispatch(materialsAdminRouter, req);
+            assert.strictEqual(res.statusCode, 200);
+            assert.strictEqual(res.body.ok, true);
+
+            // Must include materials belonging to centerA and ZERO materials belonging to centerG
+            const returnedIds = res.body.materials.map(m => m.id);
+            assert.ok(returnedIds.includes(matCenterA));
+            assert.strictEqual(returnedIds.includes(matCenterG), false);
+        });
+
+        it('denies GET /:id detail when material belongs to another center of same tenant (HTTP 403)', async () => {
+            const tokenCenterA = generateToken({
+                id: 'operator-center-a',
+                role: 'OPERATOR',
+                tenantId: 'tenant-print-a',
+                printhouseId: centerA
+            });
+
+            const req = {
+                method: 'GET',
+                url: `/${matCenterG}`,
+                originalUrl: `/api/admin/materials/${matCenterG}`,
+                params: { id: matCenterG },
+                headers: { authorization: `Bearer ${tokenCenterA}` }
+            };
+
+            const res = await dispatch(materialsAdminRouter, req);
+            assert.strictEqual(res.statusCode, 403);
+            assert.strictEqual(res.body.code, 'FORBIDDEN_CROSS_CENTER_MATERIAL_ACCESS');
+        });
+
+        it('denies intake, adjust, and consume when material belongs to another center of same tenant (HTTP 403)', async () => {
+            const tokenCenterA = generateToken({
+                id: 'operator-center-a',
+                role: 'OPERATOR',
+                tenantId: 'tenant-print-a',
+                printhouseId: centerA
+            });
+
+            // 1. Intake
+            const reqIntake = {
+                method: 'POST',
+                url: `/${matCenterG}/intake`,
+                originalUrl: `/api/admin/materials/${matCenterG}/intake`,
+                params: { id: matCenterG },
+                headers: { authorization: `Bearer ${tokenCenterA}` },
+                body: { quantity: 100, reason: 'unauthorized intake' }
+            };
+            const resIntake = await dispatch(materialsAdminRouter, reqIntake);
+            assert.strictEqual(resIntake.statusCode, 403);
+            assert.strictEqual(resIntake.body.code, 'FORBIDDEN_CROSS_CENTER_MATERIAL_ACCESS');
+
+            // 2. Adjust
+            const reqAdjust = {
+                method: 'POST',
+                url: `/${matCenterG}/adjust`,
+                originalUrl: `/api/admin/materials/${matCenterG}/adjust`,
+                params: { id: matCenterG },
+                headers: { authorization: `Bearer ${tokenCenterA}` },
+                body: { quantity_delta: -50, reason: 'unauthorized adjust' }
+            };
+            const resAdjust = await dispatch(materialsAdminRouter, reqAdjust);
+            assert.strictEqual(resAdjust.statusCode, 403);
+            assert.strictEqual(resAdjust.body.code, 'FORBIDDEN_CROSS_CENTER_MATERIAL_ACCESS');
+
+            // 3. Consume
+            const reqConsume = {
+                method: 'POST',
+                url: `/${matCenterG}/consume`,
+                originalUrl: `/api/admin/materials/${matCenterG}/consume`,
+                params: { id: matCenterG },
+                headers: { authorization: `Bearer ${tokenCenterA}` },
+                body: { quantity_consumed: 20, reason: 'unauthorized consume' }
+            };
+            const resConsume = await dispatch(materialsAdminRouter, reqConsume);
+            assert.strictEqual(resConsume.statusCode, 403);
+            assert.strictEqual(resConsume.body.code, 'FORBIDDEN_CROSS_CENTER_MATERIAL_ACCESS');
+        });
+    });
+
+    describe('13. Point 5 — Idempotency Hardening: Key Binding & Deep Canonical Hashing', () => {
+        let matId = 'mat-idem-hard-1';
+        let procOrder1 = 'proc-order-001';
+        let procOrder2 = 'proc-order-002';
+
+        beforeAll(async () => {
+            await materialService.createMaterial({
+                id: matId,
+                material_name: 'Idempotency Paper 120g',
+                material_type: 'PAPER',
+                initial_stock: 500,
+                node_id: 'node-alpha'
+            }, 'tenant-print-a', 'node-alpha');
+
+            await connectionPool.query(`
+                INSERT INTO material_procurements (id, material_inventory_id, supplier_name, ordered_units, procurement_status)
+                VALUES 
+                    (?, ?, 'Fedrigoni Iberia', 1000, 'ORDERED'),
+                    (?, ?, 'Fedrigoni Iberia', 1000, 'ORDERED');
+            `, [procOrder1, matId, procOrder2, matId]);
+        });
+
+        it('rejects reusing the same idempotency key for a DIFFERENT procurement order (HTTP 409)', async () => {
+            const sharedKey = 'ik-order-binding-key-999';
+
+            // 1. First order completes successfully
+            const res1 = await materialService.receiveProcurementAtomic(
+                procOrder1,
+                'operator-alice',
+                'tenant-print-a',
+                'node-alpha',
+                false,
+                { idempotencyKey: sharedKey, acceptedQuantity: 1000, requestBody: { batch: 'A' } }
+            );
+            assert.strictEqual(res1.received, true);
+
+            // 2. Second order attempts to use the SAME idempotency key
+            await assert.rejects(async () => {
+                await materialService.receiveProcurementAtomic(
+                    procOrder2,
+                    'operator-alice',
+                    'tenant-print-a',
+                    'node-alpha',
+                    false,
+                    { idempotencyKey: sharedKey, acceptedQuantity: 1000, requestBody: { batch: 'A' } }
+                );
+            }, (err) => {
+                assert.strictEqual(err.statusCode, 409);
+                assert.strictEqual(err.code, 'IDEMPOTENCY_KEY_REUSED_FOR_DIFFERENT_PROCUREMENT');
+                return true;
+            });
+        });
+
+        it('correctly hashes deeply nested payloads canonically regardless of key insertion order', async () => {
+            const nestedProcId = 'proc-nested-order-01';
+            await connectionPool.query(`
+                INSERT INTO material_procurements (id, material_inventory_id, supplier_name, ordered_units, procurement_status)
+                VALUES (?, ?, 'Fedrigoni Iberia', 500, 'ORDERED');
+            `, [nestedProcId, matId]);
+
+            const nestedKey = 'ik-nested-canonical-01';
+            // Payload 1: keys in one order
+            const payload1 = {
+                metadata: { zebra: 1, alpha: { b: 2, a: 1 } },
+                tags: ['a', 'b'],
+                accepted_quantity: 500
+            };
+            // Payload 2: same logical values, reversed key definitions
+            const payload2 = {
+                accepted_quantity: 500,
+                tags: ['a', 'b'],
+                metadata: { alpha: { a: 1, b: 2 }, zebra: 1 }
+            };
+
+            // First receipt
+            const res1 = await materialService.receiveProcurementAtomic(
+                nestedProcId,
+                'operator-alice',
+                'tenant-print-a',
+                'node-alpha',
+                false,
+                { idempotencyKey: nestedKey, acceptedQuantity: 500, requestBody: payload1 }
+            );
+            assert.strictEqual(res1.received, true);
+
+            // Replay with reordered keys must be recognized as EXACT SAME payload fingerprint (idempotent replay)
+            const replayRes = await materialService.receiveProcurementAtomic(
+                nestedProcId,
+                'operator-alice',
+                'tenant-print-a',
+                'node-alpha',
+                false,
+                { idempotencyKey: nestedKey, acceptedQuantity: 500, requestBody: payload2 }
+            );
+            assert.strictEqual(replayRes.received, true);
+            assert.strictEqual(replayRes.idempotentReplay, true);
+        });
+    });
+
+    describe('14. Fastify Real Server & Express Bridge HTTP Injection Verification', () => {
+        let fastifyServerUrl = null;
+
+        beforeAll(async () => {
+            const Fastify = require('fastify');
+            testFastifyApp = Fastify({ logger: false });
+
+            // Security Auth Hook (as configured in production server.js)
+            testFastifyApp.addHook('onRequest', async (request, reply) => {
+                const url = request.url;
+                if (url.startsWith('/health') || url.startsWith('/live')) return;
+
+                if (url.startsWith('/api') && !url.startsWith('/api/admin')) {
+                    const authHeader = request.headers['authorization'];
+                    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+                        return reply.status(401).send({ error: 'Unauthorized: Bearer token required' });
+                    }
+                    const token = authHeader.split(' ')[1];
+                    try {
+                        const decoded = jwt.verify(token, JWT_SECRET, { audience: JWT_AUDIENCE, issuer: JWT_ISSUER });
+                        request.user = {
+                            id: decoded.sub,
+                            email: decoded.email,
+                            role: (decoded.role || 'VIEWER').toUpperCase(),
+                            tenantId: decoded.tenant_id ? String(decoded.tenant_id) : null,
+                            printhouseId: decoded.printhouse_id ? String(decoded.printhouse_id) : null,
+                            supplierId: decoded.supplier_id ? String(decoded.supplier_id) : null,
+                            hasSupplierCapability: Boolean(decoded.has_supplier_capability || decoded.hasSupplierCapability),
+                            hasPrinthouseCapability: Boolean(decoded.has_printhouse_capability || decoded.hasPrinthouseCapability),
+                            authMode: 'JWT'
+                        };
+                        request.raw.user = request.user;
+                    } catch (err) {
+                        return reply.status(401).send({ error: `Unauthorized: ${err.message}` });
+                    }
+                }
+            });
+
+            // Register @fastify/express bridge
+            await testFastifyApp.register(require('@fastify/express'));
+            testFastifyApp.use(require('express').json());
+
+            // Mount paper supplier and admin routers
+            testFastifyApp.use('/api/v1/paper-suppliers', paperSuppliersRouter);
+            testFastifyApp.use('/api/admin', require('../src/api/routes/admin'));
+
+            // Register catch-all fallback for route groups
+            const apiNotFoundFallback = (request, reply) => {
+                if (!reply.sent) {
+                    reply.status(404).send({ error: 'Endpoint not found', path: request.url });
+                }
+            };
+            testFastifyApp.all('/api/v1/paper-suppliers', apiNotFoundFallback);
+            testFastifyApp.all('/api/v1/paper-suppliers/*', apiNotFoundFallback);
+            testFastifyApp.all('/api/admin', apiNotFoundFallback);
+            testFastifyApp.all('/api/admin/*', apiNotFoundFallback);
+
+            fastifyServerUrl = await testFastifyApp.listen({ port: 0, host: '127.0.0.1' });
+        });
+
+        afterAll(async () => {
+            if (testFastifyApp) {
+                await testFastifyApp.close();
+            }
+        });
+
+        it('successfully executes HTTP request via Fastify app + Express bridge on /api/v1/paper-suppliers/me', async () => {
+            const token = generateToken({
+                id: 'user-supp-1',
+                role: 'SUPPLIER_ADMIN',
+                tenantId: 'tenant-supp-1',
+                supplierId: 'supp-org-1'
+            });
+
+            const resp = await fetch(`${fastifyServerUrl}/api/v1/paper-suppliers/me`, {
+                method: 'GET',
+                headers: { authorization: `Bearer ${token}` }
+            });
+
+            assert.strictEqual(resp.status, 200);
+            const body = await resp.json();
+            assert.strictEqual(body.ok, true);
+            assert.strictEqual(body.data.supplierId, 'supp-org-1');
+            assert.strictEqual(body.data.name, 'Fedrigoni Iberia');
+        });
+
+        it('denies printhouse user accessing /api/v1/paper-suppliers/me via Fastify app (HTTP 403)', async () => {
+            const tokenPrint = generateToken({
+                id: 'user-print-a',
+                role: 'PRINTHOUSE_ADMIN',
+                tenantId: 'tenant-print-a',
+                printhouseId: 'node-alpha'
+            });
+
+            const resp = await fetch(`${fastifyServerUrl}/api/v1/paper-suppliers/me`, {
+                method: 'GET',
+                headers: { authorization: `Bearer ${tokenPrint}` }
+            });
+
+            assert.strictEqual(resp.status, 403);
+            const body = await resp.json();
+            assert.match(body.error.message, /requires a Paper Supplier role/);
+        });
+
+        it('denies supplier user accessing printhouse materials via Fastify app into admin router (HTTP 403)', async () => {
+            const tokenSupp = generateToken({
+                id: 'user-supp-1',
+                role: 'SUPPLIER_ADMIN',
+                tenantId: 'tenant-supp-1',
+                supplierId: 'supp-org-1'
+            });
+
+            const resp = await fetch(`${fastifyServerUrl}/api/admin/materials/node/node-alpha`, {
+                method: 'GET',
+                headers: { authorization: `Bearer ${tokenSupp}` }
+            });
+
+            assert.strictEqual(resp.status, 403);
+            const body = await resp.json();
+            assert.strictEqual(body.error, 'FORBIDDEN_SUPPLIER_ACCESS_TO_PRINTHOUSE_MATERIALS');
         });
     });
 

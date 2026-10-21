@@ -152,18 +152,32 @@ export function isSuperAdmin(): boolean {
 }
 
 export function isPrinthouseUser(): boolean {
-    return ['PRINTHOUSE_ADMIN', 'PRINTHOUSE_OPERATOR'].includes(getUserRole());
+    const role = getUserRole();
+    return ['PRINTHOUSE_ADMIN', 'PRINTHOUSE_OPERATOR'].includes(role);
 }
 
 export function isSupplierUser(): boolean {
-    return ['SUPPLIER_ADMIN', 'SUPPLIER_OPERATOR', 'SUPPLIER_VIEWER'].includes(getUserRole());
+    const user = getAuthUser();
+    const role = getUserRole();
+    const supplierRole = (user?.supplierRole || '').toUpperCase();
+    return ['SUPPLIER_ADMIN', 'SUPPLIER_OPERATOR', 'SUPPLIER_VIEWER'].includes(role) ||
+           ['SUPPLIER_ADMIN', 'SUPPLIER_OPERATOR', 'SUPPLIER_VIEWER'].includes(supplierRole) ||
+           Boolean(user?.isSupplierUser);
 }
 
 export function isSupplierAdmin(): boolean {
-    return getUserRole() === 'SUPPLIER_ADMIN';
+    const user = getAuthUser();
+    const role = getUserRole();
+    const supplierRole = (user?.supplierRole || '').toUpperCase();
+    return role === 'SUPPLIER_ADMIN' || supplierRole === 'SUPPLIER_ADMIN' || Boolean(user?.isSupplierAdmin);
 }
 
 export function isSupplierOperator(): boolean {
-    return ['SUPPLIER_ADMIN', 'SUPPLIER_OPERATOR'].includes(getUserRole());
+    const user = getAuthUser();
+    const role = getUserRole();
+    const supplierRole = (user?.supplierRole || '').toUpperCase();
+    return ['SUPPLIER_ADMIN', 'SUPPLIER_OPERATOR'].includes(role) ||
+           ['SUPPLIER_ADMIN', 'SUPPLIER_OPERATOR'].includes(supplierRole) ||
+           Boolean(user?.isSupplierOperator);
 }
 
