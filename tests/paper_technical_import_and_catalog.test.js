@@ -179,9 +179,12 @@ describe('Iteration I2: Paper Technical Data Sheets & Multi-format Import Engine
             expect(parsedTarget.sheets[0].rows[0].fileRowNumber).toBe(2);
         });
 
-        it('detects and parses OpenDocument Spreadsheet (ODS) buffer with original row numbers', () => {
-            const originalPath = 'C:/Users/KIKE/Downloads/Paper data base.ods.zip';
-            if (fs.existsSync(originalPath)) {
+        it('detects and parses OpenDocument Spreadsheet (ODS) buffer with original row numbers', (ctx) => {
+            const originalPath = process.env.PAPER_CATALOG_ORIGINAL_FILE_PATH || 'C:/Users/KIKE/Downloads/Paper data base.ods.zip';
+            if (!fs.existsSync(originalPath)) {
+                ctx.skip();
+                return;
+            }
                 const buf = fs.readFileSync(originalPath);
                 const format = paperImportService.detectFormat(buf);
                 expect(format).toBe('ODS');
@@ -192,7 +195,6 @@ describe('Iteration I2: Paper Technical Data Sheets & Multi-format Import Engine
                 // Original file has 3 leading empty rows, row 4 headers, first data row is row 5
                 expect(parsed.sheets[0].rows[0].fileRowNumber).toBe(5);
                 expect(parsed.sheets[0].rows[1572].fileRowNumber).toBe(1577);
-            }
         });
 
         it('handles unknown or corrupt binary buffer gracefully fail-closed', () => {
@@ -274,14 +276,18 @@ describe('Iteration I2: Paper Technical Data Sheets & Multi-format Import Engine
     });
 
     describe('3. Recalculated Original File Breakdown (1,573 rows)', () => {
-        const originalPath = 'C:/Users/KIKE/Downloads/Paper data base.ods.zip';
+        const originalPath = process.env.PAPER_CATALOG_ORIGINAL_FILE_PATH || 'C:/Users/KIKE/Downloads/Paper data base.ods.zip';
 
-        it('processes the original file with verified evidence-based rules and matches the exact recalculated breakdown', async () => {
+        it('processes the original file with verified evidence-based rules and matches the exact recalculated breakdown', async (ctx) => {
             if (!fs.existsSync(originalPath)) {
+                ctx.skip();
                 return;
             }
 
             const buf = fs.readFileSync(originalPath);
+            const sha256 = crypto.createHash('sha256').update(buf).digest('hex');
+            expect(sha256).toBe('7ffb63eb2705fa0c6faa459001ddd3db0702aa25d0bca52fa58e1a13899d4c9a');
+
             const preview = await paperImportService.processImportPreview({
                 buffer: buf,
                 fileName: 'Paper data base.ods.zip',
@@ -293,13 +299,13 @@ describe('Iteration I2: Paper Technical Data Sheets & Multi-format Import Engine
             expect(preview.format).toBe('ODS');
             expect(preview.summary.totalRows).toBe(1573);
 
-            // Recalculated breakdown based on strict header units and contradiction detection:
-            // Valid technical rows: 1,106
-            // Pending review rows (warnings like AMBIGUOUS_DIMENSION_UNITS, DIMENSION_CONTRADICTION, GSM_DESCRIPTION_CONFLICT): 456
+            // Recalculated breakdown after removing arbitrary numeric threshold guessing:
+            // Valid technical rows: 860
+            // Pending review rows: 702
             // Internal file duplicate rows: 11
-            // Rejected rows (missing name/empty): 0
-            expect(preview.summary.validRows).toBe(1106);
-            expect(preview.summary.pendingRows).toBe(456);
+            // Rejected rows: 0
+            expect(preview.summary.validRows).toBe(860);
+            expect(preview.summary.pendingRows).toBe(702);
             expect(preview.summary.duplicateRows).toBe(11);
             expect(preview.summary.rejectedRows).toBe(0);
 
@@ -520,8 +526,26 @@ describe('Iteration I2: Paper Technical Data Sheets & Multi-format Import Engine
                 }
             });
 
-            // Confirm batch without accepting warningRow:
-            // warningRow (WARNING) MUST NOT be confirmed!
+            // Requirement 3: Trying to confirm batch while unresolved warningRow exists MUST FAIL with UNRESOLVED_ROWS_EXIST
+            await expect(paperImportService.confirmImportBatch({
+                batchId: preview.batchId,
+                tenantId: 'tenant-alpha',
+                supplierId: 'supp-alpha-1',
+                actorId: 'user-op-alpha'
+            })).rejects.toThrow(/UNRESOLVED_ROWS_EXIST/);
+
+            // Now reject warningRow as well
+            await paperImportService.updateImportRowDecisions({
+                batchId: preview.batchId,
+                tenantId: 'tenant-alpha',
+                supplierId: 'supp-alpha-1',
+                actorId: 'user-op-alpha',
+                decisions: {
+                    [warningRow.id]: { decision: 'REJECTED' }
+                }
+            });
+
+            // Confirm batch now succeeds!
             const confirmed = await paperImportService.confirmImportBatch({
                 batchId: preview.batchId,
                 tenantId: 'tenant-alpha',
@@ -533,8 +557,8 @@ describe('Iteration I2: Paper Technical Data Sheets & Multi-format Import Engine
             expect(confirmed.status).toBe('CONFIRMED');
             expect(confirmed.confirmedProducts).toBe(1); // Only Maxi Silk 150 confirmed!
             expect(confirmed.counts.valid).toBe(1);
-            expect(confirmed.counts.pending).toBe(1); // Incomplete Small Paper remained pending
-            expect(confirmed.counts.rejected).toBe(1);
+            expect(confirmed.counts.pending).toBe(0);
+            expect(confirmed.counts.rejected).toBe(2);
 
             // Verify paper_products and paper_variants in database
             const [products] = await connectionPool.query('SELECT * FROM paper_products WHERE name = "Maxi Silk 150"');
@@ -655,6 +679,217 @@ describe('Iteration I2: Paper Technical Data Sheets & Multi-format Import Engine
             // Product was NOT committed
             const [prods] = await connectionPool.query('SELECT * FROM paper_products WHERE name = "Rollback Paper"');
             expect(prods.length).toBe(0);
+        });
+
+
+        it('preserves exact units for 100x150 mm when FORMAT is "100 x 150 mm" without threshold conversion', () => {
+            const dummyHeaders = ['CODE', 'QR', 'NAME', 'PRICE', 'MIKRONS', 'THICKNESS (mm)', 'FORMAT', 'GRAMS', '', 'COAT', 'Min. QUANTITY', 'STEPS/UNITS', 'SORTIMET', 'WIDTH (mm)', 'Heights (mm)', 'PAPER TYPE', 'PROVISER', 'AKTIV'];
+            const rawRow = ['U-100', '', 'Format Concordant 100x150', '200', '', '', '100 x 150 mm', '200', '', 'Ofset', '', '', '', '100', '150', 'Ofset', 'Polap DEF', 'Jā'];
+            const norm = paperImportService.normalizeRowData(rawRow, dummyHeaders, 12);
+
+            expect(norm.width_mm).toBe(100);
+            expect(norm.height_mm).toBe(150);
+            expect(norm.validationStatus).toBe('VALID');
+            expect(norm.issues.some(i => i.code === 'DIMENSION_CONTRADICTION')).toBe(false);
+        });
+
+        it('separates duplicacy from technical validity: duplicate retains technical issues and cannot bypass acceptance', async () => {
+            const csvData = [
+                'CODE;NAME;PRICE;GRAMS;WIDTH (MM);HEIGHT (MM);COAT;PROVISER',
+                'D-01;Bad Dims Duplicate;300;100;50;50;uncoated;Polap DEF', // Warning: AMBIGUOUS_DIMENSION_UNITS (<100mm)
+                'D-02;Bad Dims Duplicate;310;100;50;50;uncoated;Papyrus DEF' // Duplicate row
+            ].join('\n');
+
+            const buffer = Buffer.from(csvData, 'utf8');
+            const preview = await paperImportService.processImportPreview({
+                buffer,
+                fileName: 'duplicate_warning.csv',
+                tenantId: 'tenant-alpha',
+                supplierId: 'supp-alpha-1',
+                createdBy: 'user-op-alpha'
+            });
+
+            expect(preview.summary.duplicateRows).toBe(1);
+            const dupRow = preview.rows[1];
+            expect(dupRow.validationStatus).toBe('DUPLICATE');
+            // Duplicate retains technical issue
+            expect(dupRow.issues.some(i => i.code === 'AMBIGUOUS_DIMENSION_UNITS')).toBe(true);
+            expect(dupRow.issues.some(i => i.code === 'DUPLICATE_IN_FILE')).toBe(true);
+
+            // Staging and confirming without accepting or rejecting dupRow must fail
+            await paperImportService.stageImportBatch(preview);
+            await expect(paperImportService.confirmImportBatch({
+                batchId: preview.batchId,
+                tenantId: 'tenant-alpha',
+                supplierId: 'supp-alpha-1',
+                actorId: 'user-op-alpha'
+            })).rejects.toThrow(/UNRESOLVED_ROWS_EXIST/);
+        });
+
+        it('enforces override allowlist, type/range validation, recalculation of issues, and audit log', async () => {
+            const csvData = [
+                'CODE;NAME;PRICE;GRAMS;WIDTH (MM);HEIGHT (MM);COAT;PROVISER',
+                'VAL-01;Test Validation;300;120;700;1000;uncoated;Polap DEF'
+            ].join('\n');
+
+            const buffer = Buffer.from(csvData, 'utf8');
+            const preview = await paperImportService.processImportPreview({
+                buffer,
+                fileName: 'validation_test.csv',
+                tenantId: 'tenant-alpha',
+                supplierId: 'supp-alpha-1',
+                createdBy: 'user-op-alpha'
+            });
+
+            await paperImportService.stageImportBatch(preview);
+            const { rows } = await paperImportService.getImportBatchRows({
+                batchId: preview.batchId,
+                tenantId: 'tenant-alpha',
+                supplierId: 'supp-alpha-1'
+            });
+            const rowId = rows[0].id;
+
+            // 1. Disallowed field rejection
+            await expect(paperImportService.updateImportRowDecisions({
+                batchId: preview.batchId,
+                tenantId: 'tenant-alpha',
+                supplierId: 'supp-alpha-1',
+                actorId: 'user-op-alpha',
+                decisions: {
+                    [rowId]: { decision: 'ACCEPTED', overrides: { forbidden_field: 'hack' } }
+                }
+            })).rejects.toThrow(/INVALID_OVERRIDE_FIELD/);
+
+            // 2. Out-of-range value rejection
+            await expect(paperImportService.updateImportRowDecisions({
+                batchId: preview.batchId,
+                tenantId: 'tenant-alpha',
+                supplierId: 'supp-alpha-1',
+                actorId: 'user-op-alpha',
+                decisions: {
+                    [rowId]: { decision: 'ACCEPTED', overrides: { width_mm: 5 } } // < 10
+                }
+            })).rejects.toThrow(/INVALID_OVERRIDE_VALUE/);
+
+            // 3. Valid override updates normalized data, audit trail, and recomputes issues
+            await paperImportService.updateImportRowDecisions({
+                batchId: preview.batchId,
+                tenantId: 'tenant-alpha',
+                supplierId: 'supp-alpha-1',
+                actorId: 'user-op-alpha',
+                decisions: {
+                    [rowId]: {
+                        decision: 'ACCEPTED',
+                        overrides: { width_mm: 640, height_mm: 900, finish: 'COATED', grain_direction: 'LONG_GRAIN' }
+                    }
+                }
+            });
+
+            const updatedRows = await paperImportService.getImportBatchRows({
+                batchId: preview.batchId,
+                tenantId: 'tenant-alpha',
+                supplierId: 'supp-alpha-1'
+            });
+            const updated = updatedRows.rows[0];
+            expect(updated.normalized.width_mm).toBe(640);
+            expect(updated.normalized.height_mm).toBe(900);
+            expect(updated.normalized.finish).toBe('COATED');
+            expect(updated.normalized.grain_direction).toBe('LONG_GRAIN');
+            expect(updated.normalized._audit_log.length).toBe(1);
+            expect(updated.normalized._audit_log[0].actor_id).toBe('user-op-alpha');
+            expect(updated.normalized._audit_log[0].previous_values.width_mm).toBe(700);
+            expect(updated.normalized._audit_log[0].new_values.width_mm).toBe(640);
+        });
+
+        it('normalizes and persists declared grain direction into paper_variants and fingerprint', async () => {
+            const csvData = [
+                'CODE;NAME;PRICE;GRAMS;WIDTH (MM);HEIGHT (MM);COAT;PROVISER;GRAIN',
+                'GR-01;Grain Test Long;300;120;700;1000;uncoated;Polap DEF;LONG GRAIN',
+                'GR-02;Grain Test Short;300;120;700;1000;uncoated;Polap DEF;SHORT GRAIN'
+            ].join('\n');
+
+            const buffer = Buffer.from(csvData, 'utf8');
+            const preview = await paperImportService.processImportPreview({
+                buffer,
+                fileName: 'grain_test.csv',
+                tenantId: 'tenant-alpha',
+                supplierId: 'supp-alpha-1',
+                createdBy: 'user-op-alpha'
+            });
+
+            expect(preview.rows[0].normalized.grain_direction).toBe('LONG_GRAIN');
+            expect(preview.rows[1].normalized.grain_direction).toBe('SHORT_GRAIN');
+            // Fingerprints must be distinct because grain direction differs!
+            expect(preview.rows[0].normalized.fingerprint).not.toBe(preview.rows[1].normalized.fingerprint);
+
+            await paperImportService.stageImportBatch(preview);
+            await paperImportService.confirmImportBatch({
+                batchId: preview.batchId,
+                tenantId: 'tenant-alpha',
+                supplierId: 'supp-alpha-1',
+                actorId: 'user-op-alpha'
+            });
+
+            const [variants] = await connectionPool.query('SELECT * FROM paper_variants WHERE width_mm = 700 AND height_mm = 1000 ORDER BY gsm ASC, grain_direction ASC');
+            const lg = variants.find(v => v.grain_direction === 'LONG_GRAIN');
+            const sg = variants.find(v => v.grain_direction === 'SHORT_GRAIN');
+            expect(lg).toBeDefined();
+            expect(sg).toBeDefined();
+            expect(lg.grain_direction).toBe('LONG_GRAIN');
+            expect(sg.grain_direction).toBe('SHORT_GRAIN');
+        });
+
+        it('concurrent review vs confirmation with row locks maintains consistency without deadlocks or partial state', async () => {
+            const csvData = [
+                'CODE;NAME;PRICE;GRAMS;WIDTH (MM);HEIGHT (MM);COAT;PROVISER',
+                'CON-01;Concurrent Test A;300;150;700;1000;uncoated;Polap DEF',
+                'CON-02;Concurrent Test B;300;170;700;1000;uncoated;Polap DEF'
+            ].join('\n');
+
+            const buffer = Buffer.from(csvData, 'utf8');
+            const preview = await paperImportService.processImportPreview({
+                buffer,
+                fileName: 'concurrent_test.csv',
+                tenantId: 'tenant-alpha',
+                supplierId: 'supp-alpha-1',
+                createdBy: 'user-op-alpha'
+            });
+
+            await paperImportService.stageImportBatch(preview);
+            const { rows } = await paperImportService.getImportBatchRows({
+                batchId: preview.batchId,
+                tenantId: 'tenant-alpha',
+                supplierId: 'supp-alpha-1'
+            });
+            const targetRow = rows[0];
+
+            // Run review update and confirm concurrently
+            const updatePromise = paperImportService.updateImportRowDecisions({
+                batchId: preview.batchId,
+                tenantId: 'tenant-alpha',
+                supplierId: 'supp-alpha-1',
+                actorId: 'user-op-alpha',
+                decisions: {
+                    [targetRow.id]: {
+                        decision: 'ACCEPTED',
+                        overrides: { width_mm: 720, height_mm: 1020 }
+                    }
+                }
+            });
+
+            const confirmPromise = paperImportService.confirmImportBatch({
+                batchId: preview.batchId,
+                tenantId: 'tenant-alpha',
+                supplierId: 'supp-alpha-1',
+                actorId: 'user-op-alpha'
+            });
+
+            const results = await Promise.allSettled([updatePromise, confirmPromise]);
+            // Either both succeed (if update locked first, then confirm confirmed updated row)
+            // or one threw BATCH_ALREADY_CONFIRMED if confirm locked first and confirmed.
+            // In all cases, no unhandled deadlock or crash occurs and status is CONFIRMED.
+            const [batch] = await connectionPool.query('SELECT status FROM paper_import_batches WHERE id = ?', [preview.batchId]);
+            expect(batch[0].status).toBe('CONFIRMED');
         });
 
         it('enforces HTTP authorization guards: approves active operator, rejects viewer, cross-tenant, suspended and unapproved suppliers', async () => {

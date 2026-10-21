@@ -439,6 +439,88 @@ function parseSpreadsheetBuffer(buffer, forcedFormat = null, targetSheetName = n
 }
 
 /**
+ * Parse and normalize grain direction from text declaration.
+ * Returns 'LONG_GRAIN' | 'SHORT_GRAIN' | 'UNKNOWN'.
+ */
+function parseGrainDirection(text) {
+    if (!text) return 'UNKNOWN';
+    const upper = String(text).toUpperCase();
+    if (/\b(LONG[\s_]*GRAIN|LG|GARĀ[\s_]*ŠĶIEDRA|BB|BREITBAHN)\b/.test(upper)) return 'LONG_GRAIN';
+    if (/\b(SHORT[\s_]*GRAIN|SG|ĪSĀ[\s_]*ŠĶIEDRA|SB|SCHMALBAHN)\b/.test(upper)) return 'SHORT_GRAIN';
+    return 'UNKNOWN';
+}
+
+/**
+ * Compute deterministic variant fingerprint incorporating name, gsm, dimensions, finish, caliper, and grain.
+ */
+function computeVariantFingerprint({ name, gsm, width_mm, height_mm, finish, caliper_um, grain_direction }) {
+    const normalizedName = (name || '').toLowerCase().replace(/\s+/g, ' ').trim();
+    const grain = grain_direction || 'UNKNOWN';
+    const fpString = `${normalizedName}|${gsm || 0}|${width_mm || 0}x${height_mm || 0}|${finish || 'UNCOATED'}|${caliper_um || 0}|${grain}`;
+    return crypto.createHash('sha256').update(fpString).digest('hex').substring(0, 32);
+}
+
+/**
+ * Shared validator for technical row attributes.
+ * Recalculates issues and validationStatus consistently across import and manual review/correction.
+ */
+function validateTechnicalRow({ name, gsm, width_mm, height_mm, finish, caliper_um, grain_direction, colGsm, nameGsm }) {
+    const technicalIssues = [];
+
+    if (!name) {
+        technicalIssues.push({
+            code: 'MISSING_NAME',
+            severity: 'ERROR',
+            category: 'TECHNICAL',
+            message: 'Product name is missing or empty'
+        });
+    }
+
+    if (!gsm) {
+        technicalIssues.push({
+            code: 'MISSING_GSM',
+            severity: 'WARNING',
+            category: 'TECHNICAL',
+            message: 'GSM (grammage) could not be determined with certainty.'
+        });
+    }
+
+    if (colGsm && nameGsm && colGsm !== nameGsm) {
+        technicalIssues.push({
+            code: 'GSM_DESCRIPTION_CONFLICT',
+            severity: 'WARNING',
+            category: 'TECHNICAL',
+            message: `Declared grammage (${colGsm} gsm) conflicts with description (${nameGsm} gsm). Explicit review required.`
+        });
+    }
+
+    if (!width_mm || !height_mm) {
+        technicalIssues.push({
+            code: 'MISSING_DIMENSIONS',
+            severity: 'WARNING',
+            category: 'TECHNICAL',
+            message: 'Width and Height dimensions could not be parsed.'
+        });
+    } else if (width_mm < 100 || height_mm < 100 || width_mm > 3000 || height_mm > 3000) {
+        technicalIssues.push({
+            code: 'AMBIGUOUS_DIMENSION_UNITS',
+            severity: 'WARNING',
+            category: 'TECHNICAL',
+            message: `Dimensions ${width_mm}x${height_mm} mm are outside standard sheet range and require review.`
+        });
+    }
+
+    let validationStatus = 'VALID';
+    if (technicalIssues.some(i => i.severity === 'ERROR')) {
+        validationStatus = 'REJECTED';
+    } else if (technicalIssues.some(i => i.severity === 'WARNING')) {
+        validationStatus = 'WARNING';
+    }
+
+    return { technicalIssues, validationStatus };
+}
+
+/**
  * Normalize row data using evidence-based rules without guessing or inversions.
  */
 function normalizeRowData(rawCells, headers = [], fileRowNumber = 1) {
@@ -475,6 +557,7 @@ function normalizeRowData(rawCells, headers = [], fileRowNumber = 1) {
     const paperTypeStr = getVal('PAPER TYPE', 15) || getVal('TYPE', 15);
     const providerStr = getVal('PROVISER', 16) || getVal('PROVIDER', 16);
     const aktivStr = getVal('AKTIV', 17) || getVal('ACTIVE', 17);
+    const grainStr = getVal('GRAIN', -1) || getVal('FIBRA', -1) || getVal('VIRZIENS', -1);
 
     const technicalIssues = [];
     const commercialIssues = [];
@@ -555,19 +638,14 @@ function normalizeRowData(rawCells, headers = [], fileRowNumber = 1) {
 
     if (hasColDims) {
         if (formatW && formatH) {
-            // Check if format and column dimensions contradict each other
-            // Example: FORMAT is "B1 70 x 100" (cm) and col is 70, 100 -> concordant evidence of cm -> 700x1000
-            // Example: FORMAT is "A1 640 x 920" (mm) and col is 64, 92 -> concordant evidence that col is cm -> 640x920
-            // Example: FORMAT is "B1 720 x 1040" and col is 72, 102 -> CONTRADICTION (1040 vs 1020)
-            const isCmEvidence = (Math.abs(formatW - rawW * 10) < 1e-3 && Math.abs(formatH - rawH * 10) < 1e-3) ||
-                                 (Math.abs(formatW - rawW) < 1e-3 && Math.abs(formatH - rawH) < 1e-3 && rawW <= 200 && rawH <= 250);
-
+            // Check exact and decimal matches
             const isExactMatch = (Math.abs(formatW - rawW) < 1e-3 && Math.abs(formatH - rawH) < 1e-3);
             const isDeciMatch = (Math.abs(formatW - rawW * 10) < 1e-3 && Math.abs(formatH - rawH * 10) < 1e-3) ||
                                 (Math.abs(formatW * 10 - rawW) < 1e-3 && Math.abs(formatH * 10 - rawH) < 1e-3);
 
             if (!isExactMatch && !isDeciMatch) {
-                // Dimensions contradict! Preserve raw values and flag for explicit review
+                // Dimensions contradict! Preserve raw values and flag for explicit review.
+                // Never use numeric thresholds or coincidence as evidence of cm.
                 width_mm = rawW;
                 height_mm = rawH;
                 technicalIssues.push({
@@ -576,11 +654,14 @@ function normalizeRowData(rawCells, headers = [], fileRowNumber = 1) {
                     category: 'TECHNICAL',
                     message: `Contradiction between FORMAT field (${formatW}x${formatH}) and dimension columns (${rawW}x${rawH}). Preserving raw values; explicit review required.`
                 });
-            } else if (isCmEvidence) {
-                // Clear concordant evidence of cm representation (70x100 cm -> 700x1000 mm)
-                width_mm = Math.round(rawW * 10);
-                height_mm = Math.round(rawH * 10);
+            } else if (isDeciMatch) {
+                // Concordant evidence that FORMAT is mm while column is cm (or vice-versa)
+                const targetW = formatW > rawW ? formatW : rawW * 10;
+                const targetH = formatH > rawH ? formatH : rawH * 10;
+                width_mm = Math.round(targetW);
+                height_mm = Math.round(targetH);
             } else {
+                // Exact match (e.g. 100x150 mm in cols and FORMAT="100 x 150 mm")
                 width_mm = Math.round(rawW);
                 height_mm = Math.round(rawH);
             }
@@ -706,11 +787,17 @@ function normalizeRowData(rawCells, headers = [], fileRowNumber = 1) {
         message: 'No currency or commercial price basis declared in file.'
     });
 
-    // 7. Physical Variant Fingerprint (incorporates name, gsm, dimensions, finish, caliper, and grain)
-    const normalizedName = name.toLowerCase().replace(/\s+/g, ' ').trim();
-    const grain = 'UNKNOWN';
-    const fpString = `${normalizedName}|${gsm || 0}|${width_mm || 0}x${height_mm || 0}|${finish}|${caliper_um || 0}|${grain}`;
-    const fingerprint = crypto.createHash('sha256').update(fpString).digest('hex').substring(0, 32);
+    // 7. Grain Direction & Physical Variant Fingerprint
+    const grain_direction = parseGrainDirection(grainStr || fullTextUpper);
+    const fingerprint = computeVariantFingerprint({
+        name,
+        gsm,
+        width_mm,
+        height_mm,
+        finish,
+        caliper_um,
+        grain_direction
+    });
 
     // 8. Proposed supplier matching
     let proposedSupplierMatch = null;
@@ -745,6 +832,7 @@ function normalizeRowData(rawCells, headers = [], fileRowNumber = 1) {
         gsm,
         caliper_um,
         caliper_mm,
+        grain_direction,
         width_mm,
         height_mm,
         fingerprint,
@@ -966,55 +1054,133 @@ async function getImportBatchRows({ batchId, tenantId, supplierId, page = 1, lim
  * Review / correct specific staged rows before confirmation.
  */
 async function updateImportRowDecisions({ batchId, tenantId, supplierId, actorId, decisions }) {
-    // decisions: { [rowId]: { decision: 'ACCEPTED' | 'REJECTED', overrides?: { width_mm, height_mm, gsm, finish } } }
-    const batchQuery = supplierId 
-        ? 'SELECT * FROM paper_import_batches WHERE id = ? AND tenant_id = ? AND supplier_id = ?'
-        : 'SELECT * FROM paper_import_batches WHERE id = ? AND tenant_id = ?';
-    const batchParams = supplierId ? [batchId, tenantId, supplierId] : [batchId, tenantId];
-
-    const batches = await db.query(batchQuery, batchParams);
-    const batch = Array.isArray(batches) ? batches[0] : null;
-    if (!batch) {
-        throw new Error('BATCH_NOT_FOUND: Import batch not found for tenant and supplier');
-    }
-    if (batch.status === 'CONFIRMED') {
-        throw new Error('BATCH_ALREADY_CONFIRMED: Cannot edit decisions on a confirmed batch');
-    }
-
+    // decisions: { [rowId]: { decision: 'ACCEPTED' | 'REJECTED' | 'PENDING', overrides?: { width_mm, height_mm, gsm, finish, caliper_um, grain_direction } } }
     const conn = await db.getConnection();
     try {
         await conn.beginTransaction();
 
+        // Lock batch row first with FOR UPDATE to prevent race conditions
+        const batchQuery = supplierId 
+            ? 'SELECT * FROM paper_import_batches WHERE id = ? AND tenant_id = ? AND supplier_id = ? FOR UPDATE'
+            : 'SELECT * FROM paper_import_batches WHERE id = ? AND tenant_id = ? FOR UPDATE';
+        const batchParams = supplierId ? [batchId, tenantId, supplierId] : [batchId, tenantId];
+
+        const [batchRows] = await conn.query(batchQuery, batchParams);
+        const batch = Array.isArray(batchRows) ? (batchRows[0] || null) : batchRows;
+        if (!batch) {
+            throw new Error('BATCH_NOT_FOUND: Import batch not found for tenant and supplier');
+        }
+        if (batch.status === 'CONFIRMED') {
+            throw new Error('BATCH_ALREADY_CONFIRMED: Cannot edit decisions on a confirmed batch');
+        }
+
+        const ALLOWED_OVERRIDE_FIELDS = ['width_mm', 'height_mm', 'gsm', 'finish', 'caliper_um', 'grain_direction'];
         let updatedCount = 0;
+
         for (const [rowId, dec] of Object.entries(decisions)) {
             const decisionValue = typeof dec === 'string' ? dec : dec.decision;
             if (!['ACCEPTED', 'REJECTED', 'PENDING'].includes(decisionValue)) {
                 continue;
             }
 
-            if (dec.overrides) {
-                // Fetch existing row to merge overrides
-                const [existingRows] = await conn.query('SELECT normalized_data_json FROM paper_import_rows WHERE id = ? AND batch_id = ?', [rowId, batchId]);
-                const existing = existingRows && existingRows[0];
-                if (existing && existing.normalized_data_json) {
-                    const norm = typeof existing.normalized_data_json === 'string' ? JSON.parse(existing.normalized_data_json) : existing.normalized_data_json;
-                    Object.assign(norm, dec.overrides);
-                    // Recompute fingerprint
-                    const fpString = `${norm.name.toLowerCase().trim()}|${norm.gsm || 0}|${norm.width_mm || 0}x${norm.height_mm || 0}|${norm.finish}|${norm.caliper_um || 0}|UNKNOWN`;
-                    norm.fingerprint = crypto.createHash('sha256').update(fpString).digest('hex').substring(0, 32);
+            // Fetch existing row to audit and validate
+            const [existingRows] = await conn.query('SELECT * FROM paper_import_rows WHERE id = ? AND batch_id = ? FOR UPDATE', [rowId, batchId]);
+            const existing = existingRows && existingRows[0];
+            if (!existing) continue;
 
-                    await conn.query(
-                        'UPDATE paper_import_rows SET decision = ?, normalized_data_json = ?, validation_status = "VALID" WHERE id = ? AND batch_id = ?',
-                        [decisionValue, JSON.stringify(norm), rowId, batchId]
-                    );
-                    updatedCount++;
-                    continue;
+            const norm = typeof existing.normalized_data_json === 'string' ? JSON.parse(existing.normalized_data_json) : (existing.normalized_data_json || {});
+            const prevValues = {};
+            const newValues = {};
+
+            if (dec.overrides && typeof dec.overrides === 'object') {
+                for (const [key, val] of Object.entries(dec.overrides)) {
+                    if (!ALLOWED_OVERRIDE_FIELDS.includes(key)) {
+                        throw new Error(`INVALID_OVERRIDE_FIELD: Field '${key}' is not allowed for manual override.`);
+                    }
+
+                    // Strict type and range validation
+                    if (key === 'width_mm' || key === 'height_mm') {
+                        const num = Number(val);
+                        if (isNaN(num) || num < 10 || num > 3000) {
+                            throw new Error(`INVALID_OVERRIDE_VALUE: ${key} must be a number between 10 and 3000.`);
+                        }
+                        prevValues[key] = norm[key];
+                        norm[key] = Math.round(num);
+                        newValues[key] = norm[key];
+                    } else if (key === 'gsm') {
+                        const num = Number(val);
+                        if (isNaN(num) || num < 20 || num > 2000) {
+                            throw new Error(`INVALID_OVERRIDE_VALUE: gsm must be a number between 20 and 2000.`);
+                        }
+                        prevValues[key] = norm[key];
+                        norm[key] = Math.round(num);
+                        newValues[key] = norm[key];
+                    } else if (key === 'finish') {
+                        const str = String(val).toUpperCase();
+                        if (!['COATED', 'UNCOATED', 'SILK'].includes(str)) {
+                            throw new Error(`INVALID_OVERRIDE_VALUE: finish must be one of 'COATED', 'UNCOATED', 'SILK'.`);
+                        }
+                        prevValues[key] = norm[key];
+                        norm[key] = str;
+                        newValues[key] = norm[key];
+                    } else if (key === 'caliper_um') {
+                        const num = Number(val);
+                        if (isNaN(num) || num < 0 || num > 10000) {
+                            throw new Error(`INVALID_OVERRIDE_VALUE: caliper_um must be a number between 0 and 10000.`);
+                        }
+                        prevValues[key] = norm[key];
+                        norm[key] = Math.round(num);
+                        norm.caliper_mm = parseFloat((norm[key] / 1000).toFixed(4));
+                        newValues[key] = norm[key];
+                    } else if (key === 'grain_direction') {
+                        const grain = parseGrainDirection(val);
+                        prevValues[key] = norm[key] || 'UNKNOWN';
+                        norm[key] = grain;
+                        newValues[key] = norm[key];
+                    }
                 }
+
+                // Recalculate issues and validation status using shared function; NEVER force VALID simply because overrides exist!
+                const validation = validateTechnicalRow({
+                    name: norm.name,
+                    gsm: norm.gsm,
+                    width_mm: norm.width_mm,
+                    height_mm: norm.height_mm,
+                    finish: norm.finish,
+                    caliper_um: norm.caliper_um,
+                    grain_direction: norm.grain_direction
+                });
+
+                norm.technicalIssues = validation.technicalIssues;
+                norm.issues = [...validation.technicalIssues, ...(norm.commercialIssues || [])];
+                norm.validationStatus = validation.validationStatus;
+
+                // Recalculate fingerprint using shared function
+                norm.fingerprint = computeVariantFingerprint({
+                    name: norm.name,
+                    gsm: norm.gsm,
+                    width_mm: norm.width_mm,
+                    height_mm: norm.height_mm,
+                    finish: norm.finish,
+                    caliper_um: norm.caliper_um,
+                    grain_direction: norm.grain_direction
+                });
             }
 
+            // Record audit trail
+            const existingAudit = norm._audit_log || [];
+            existingAudit.push({
+                actor_id: actorId || 'system',
+                timestamp: new Date().toISOString(),
+                decision: decisionValue,
+                previous_values: prevValues,
+                new_values: newValues
+            });
+            norm._audit_log = existingAudit;
+
             await conn.query(
-                'UPDATE paper_import_rows SET decision = ? WHERE id = ? AND batch_id = ?',
-                [decisionValue, rowId, batchId]
+                'UPDATE paper_import_rows SET decision = ?, normalized_data_json = ?, issues_json = ?, validation_status = ? WHERE id = ? AND batch_id = ?',
+                [decisionValue, JSON.stringify(norm), JSON.stringify(norm.issues || []), norm.validationStatus || existing.validation_status, rowId, batchId]
             );
             updatedCount++;
         }
@@ -1029,15 +1195,6 @@ async function updateImportRowDecisions({ batchId, tenantId, supplierId, actorId
     }
 }
 
-/**
- * Confirm technical import batch atomically with row locking.
- * Enforces:
- * 1. Scope bounded by tenantId AND supplierId.
- * 2. Locks batch with SELECT ... FOR UPDATE to prevent race conditions.
- * 3. Does NOT confirm pending technical issues by default.
- * 4. Idempotent: re-runs return previous confirmation without duplicating.
- * 5. Full rollback if any database error occurs.
- */
 async function confirmImportBatch({ batchId, tenantId, supplierId, actorId, selectedDecisions = null }) {
     const conn = await db.getConnection();
     try {
@@ -1065,6 +1222,32 @@ async function confirmImportBatch({ batchId, tenantId, supplierId, actorId, sele
             'SELECT * FROM paper_import_rows WHERE batch_id = ? ORDER BY `row_number` ASC FOR UPDATE',
             [batchId]
         );
+
+        // REQUIREMENT 3: Impide cerrar el lote mientras existan pendientes sin resolver.
+        // Unresolved if decision is PENDING and row is WARNING, DUPLICATE, REJECTED, or has issues.
+        const unresolvedRowIds = [];
+        for (const row of rows) {
+            let decision = row.decision;
+            if (selectedDecisions && selectedDecisions[row.id]) {
+                const dec = selectedDecisions[row.id];
+                decision = typeof dec === 'string' ? dec : dec.decision;
+            }
+
+            if (decision === 'PENDING') {
+                const norm = typeof row.normalized_data_json === 'string' ? JSON.parse(row.normalized_data_json) : row.normalized_data_json;
+                const hasTechWarning = (row.validation_status === 'WARNING' || row.validation_status === 'DUPLICATE' || row.validation_status === 'REJECTED' ||
+                    (norm && norm.technicalIssues && norm.technicalIssues.some(i => i.severity === 'WARNING' || i.severity === 'ERROR')) ||
+                    (!norm || !norm.name || !norm.width_mm || !norm.height_mm || !norm.gsm));
+
+                if (hasTechWarning) {
+                    unresolvedRowIds.push(row.id);
+                }
+            }
+        }
+
+        if (unresolvedRowIds.length > 0) {
+            throw new Error(`UNRESOLVED_ROWS_EXIST: Cannot confirm batch while ${unresolvedRowIds.length} row(s) remain pending review with issues or unassigned decisions. Resolve or reject them before confirmation.`);
+        }
 
         let validCount = 0;
         let pendingCount = 0;
@@ -1127,8 +1310,8 @@ async function confirmImportBatch({ batchId, tenantId, supplierId, actorId, sele
             const variantId = `var_${crypto.createHash('md5').update(norm.fingerprint).digest('hex').substring(0, 16)}`;
             await conn.query(
                 `INSERT INTO paper_variants 
-                 (id, product_id, gsm, caliper_um, caliper_mm, width_mm, height_mm, finish, fingerprint, metadata_json)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 (id, product_id, gsm, caliper_um, caliper_mm, width_mm, height_mm, finish, grain_direction, fingerprint, metadata_json)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                  ON DUPLICATE KEY UPDATE updated_at = CURRENT_TIMESTAMP`,
                 [
                     variantId,
@@ -1139,6 +1322,7 @@ async function confirmImportBatch({ batchId, tenantId, supplierId, actorId, sele
                     norm.width_mm,
                     norm.height_mm,
                     norm.finish,
+                    norm.grain_direction || 'UNKNOWN',
                     norm.fingerprint,
                     JSON.stringify({ original_code: norm.code, batch_id: batchId })
                 ]
@@ -1201,5 +1385,8 @@ module.exports = {
     getImportBatchRows,
     updateImportRowDecisions,
     confirmImportBatch,
+    parseGrainDirection,
+    computeVariantFingerprint,
+    validateTechnicalRow,
     NORMALIZATION_RULES_VERSION
 };

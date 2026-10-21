@@ -297,11 +297,18 @@ router.patch('/catalog/imports/:batchId/rows', requireSupplierScope('OPERATOR'),
         });
     } catch (err) {
         console.error('[PAPER-IMPORT][REVIEW-ERROR]', err);
-        const statusCode = err.message.startsWith('BATCH_NOT_FOUND') ? 404 : 400;
+        const isNotFound = err.message.startsWith('BATCH_NOT_FOUND');
+        const statusCode = isNotFound ? 404 : 400;
+        let errCode = 'IMPORT_REVIEW_UPDATE_FAILED';
+        if (err.message.startsWith('INVALID_OVERRIDE_FIELD')) errCode = 'INVALID_OVERRIDE_FIELD';
+        else if (err.message.startsWith('INVALID_OVERRIDE_VALUE')) errCode = 'INVALID_OVERRIDE_VALUE';
+        else if (err.message.startsWith('BATCH_ALREADY_CONFIRMED')) errCode = 'BATCH_ALREADY_CONFIRMED';
+        else if (isNotFound) errCode = 'BATCH_NOT_FOUND';
+
         return res.status(statusCode).json({
             ok: false,
             error: {
-                code: 'IMPORT_REVIEW_UPDATE_FAILED',
+                code: errCode,
                 message: err.message
             }
         });
@@ -334,11 +341,16 @@ router.post('/catalog/imports/:batchId/confirm', requireSupplierScope('OPERATOR'
         });
     } catch (err) {
         console.error('[PAPER-IMPORT][CONFIRM-ERROR]', err);
-        const statusCode = err.message.startsWith('BATCH_NOT_FOUND') ? 404 : 400;
+        const isNotFound = err.message.startsWith('BATCH_NOT_FOUND');
+        const statusCode = isNotFound ? 404 : 400;
+        let errCode = 'IMPORT_CONFIRMATION_FAILED';
+        if (err.message.startsWith('UNRESOLVED_ROWS_EXIST')) errCode = 'UNRESOLVED_ROWS_EXIST';
+        else if (isNotFound) errCode = 'BATCH_NOT_FOUND';
+
         return res.status(statusCode).json({
             ok: false,
             error: {
-                code: 'IMPORT_CONFIRMATION_FAILED',
+                code: errCode,
                 message: err.message
             }
         });
