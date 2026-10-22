@@ -11,6 +11,8 @@ const VALID_PRICE_BASES = ['KG', 'TONNE', 'SHEET', 'THOUSAND_SHEETS', 'PACK'];
 const VALID_VISIBILITIES = ['PRIVATE', 'APPROVED_CUSTOMERS', 'MARKETPLACE'];
 const VALID_STATUSES = ['ACTIVE', 'INACTIVE', 'ARCHIVED'];
 
+const ALLOWED_CURRENCIES = ['EUR', 'USD', 'GBP'];
+
 /**
  * Validate commercial offer input fields strictly.
  * Does not guess currency or price basis.
@@ -26,13 +28,19 @@ function validateOfferPayload(payload) {
         errors.push('supplierSku is required.');
     }
 
-    const priceAmount = Number(payload.priceAmount);
-    if (isNaN(priceAmount) || priceAmount <= 0) {
-        errors.push('priceAmount must be a positive number greater than 0.');
+    const rawPrice = payload.priceAmount;
+    const priceAmount = Number(rawPrice);
+    if (rawPrice === null || rawPrice === undefined || !Number.isFinite(priceAmount) || priceAmount <= 0) {
+        errors.push('priceAmount must be a finite positive number greater than 0.');
     }
 
-    if (!payload.currency || typeof payload.currency !== 'string' || payload.currency.trim().length !== 3) {
-        errors.push('currency must be a valid 3-letter ISO 4217 code.');
+    if (!payload.currency || typeof payload.currency !== 'string') {
+        errors.push(`currency must be one of: ${ALLOWED_CURRENCIES.join(', ')}.`);
+    } else {
+        const cur = payload.currency.trim().toUpperCase();
+        if (!ALLOWED_CURRENCIES.includes(cur)) {
+            errors.push(`currency '${cur}' is not supported. Allowed currencies: ${ALLOWED_CURRENCIES.join(', ')}.`);
+        }
     }
 
     const priceBasis = String(payload.priceBasis || '').toUpperCase();
@@ -42,22 +50,51 @@ function validateOfferPayload(payload) {
 
     let sheetsPerPack = null;
     if (priceBasis === 'PACK') {
-        sheetsPerPack = parseInt(payload.sheetsPerPack, 10);
-        if (isNaN(sheetsPerPack) || sheetsPerPack <= 0) {
-            errors.push("sheetsPerPack is required and must be an integer > 0 when priceBasis is 'PACK'.");
+        const rawSheets = Number(payload.sheetsPerPack);
+        if (!Number.isInteger(rawSheets) || rawSheets <= 0) {
+            errors.push("sheetsPerPack is required and must be a positive integer > 0 without decimal truncation when priceBasis is 'PACK'.");
+        } else {
+            sheetsPerPack = rawSheets;
         }
-    } else if (payload.sheetsPerPack) {
-        sheetsPerPack = parseInt(payload.sheetsPerPack, 10);
+    } else if (payload.sheetsPerPack !== null && payload.sheetsPerPack !== undefined && payload.sheetsPerPack !== '') {
+        const rawSheets = Number(payload.sheetsPerPack);
+        if (!Number.isInteger(rawSheets) || rawSheets <= 0) {
+            errors.push("sheetsPerPack must be a positive integer if provided.");
+        } else {
+            sheetsPerPack = rawSheets;
+        }
     }
 
-    const moq = parseInt(payload.moq !== undefined ? payload.moq : 1, 10);
-    if (isNaN(moq) || moq < 1) {
+    const rawMoq = Number(payload.moq !== undefined ? payload.moq : 1);
+    if (!Number.isInteger(rawMoq) || rawMoq < 1) {
         errors.push('moq (Minimum Order Quantity) must be an integer >= 1.');
     }
+    const moq = rawMoq;
 
-    const orderMultiple = parseInt(payload.orderMultiple !== undefined ? payload.orderMultiple : 1, 10);
-    if (isNaN(orderMultiple) || orderMultiple < 1) {
+    const rawMultiple = Number(payload.orderMultiple !== undefined ? payload.orderMultiple : 1);
+    if (!Number.isInteger(rawMultiple) || rawMultiple < 1) {
         errors.push('orderMultiple must be an integer >= 1.');
+    }
+    const orderMultiple = rawMultiple;
+
+    let validFrom = null;
+    if (payload.validFrom) {
+        validFrom = new Date(payload.validFrom);
+        if (isNaN(validFrom.getTime())) {
+            errors.push('validFrom must be a valid ISO date timestamp.');
+        }
+    }
+
+    let validUntil = null;
+    if (payload.validUntil) {
+        validUntil = new Date(payload.validUntil);
+        if (isNaN(validUntil.getTime())) {
+            errors.push('validUntil must be a valid ISO date timestamp.');
+        }
+    }
+
+    if (validFrom && validUntil && validFrom.getTime() > validUntil.getTime()) {
+        errors.push(`validFrom (${validFrom.toISOString()}) must be before or equal to validUntil (${validUntil.toISOString()}).`);
     }
 
     let visibility = 'PRIVATE';
@@ -95,8 +132,8 @@ function validateOfferPayload(payload) {
         sheetsPerPack: sheetsPerPack || null,
         moq,
         orderMultiple,
-        validFrom: payload.validFrom ? new Date(payload.validFrom) : null,
-        validUntil: payload.validUntil ? new Date(payload.validUntil) : null,
+        validFrom,
+        validUntil,
         deliveryZones: Array.isArray(payload.deliveryZones)
             ? payload.deliveryZones.map(z => String(z).trim().toUpperCase()).filter(Boolean)
             : (payload.deliveryZones ? [String(payload.deliveryZones).trim().toUpperCase()] : []),
@@ -108,8 +145,10 @@ function validateOfferPayload(payload) {
 
 /**
  * List products and confirmed technical variants with optional search and pagination.
+ * Scopes active offer count to current supplier and marketplace/approved visibility.
+ * Returns hierarchical products[].variants AND flat items for full contract compatibility.
  */
-async function getTechnicalCatalog({ page = 1, limit = 20, search = null, category = null, finish = null }) {
+async function getTechnicalCatalog({ page = 1, limit = 20, search = null, category = null, finish = null, supplierId = null }) {
     const offset = Math.max(0, (page - 1) * limit);
     const whereConditions = [];
     const params = [];
@@ -141,6 +180,18 @@ async function getTechnicalCatalog({ page = 1, limit = 20, search = null, catego
     const countResult = await db.query(countSql, params);
     const total = countResult[0]?.total || 0;
 
+    // Do NOT expose counts of PRIVATE offers belonging to competing suppliers
+    let activeOffersSubquery = `
+        (SELECT COUNT(*) FROM supplier_paper_offers o 
+         WHERE o.variant_id = v.id 
+           AND o.status = 'ACTIVE' 
+           AND (o.visibility IN ('MARKETPLACE', 'APPROVED_CUSTOMERS') ${supplierId ? 'OR o.supplier_id = ?' : ''})) as active_offers_count
+    `;
+    const dataParams = [...params];
+    if (supplierId) {
+        dataParams.push(supplierId);
+    }
+
     const dataSql = `
         SELECT 
             v.id as variant_id,
@@ -159,39 +210,64 @@ async function getTechnicalCatalog({ page = 1, limit = 20, search = null, catego
             v.is_reel,
             v.fingerprint,
             v.created_at,
-            (SELECT COUNT(*) FROM supplier_paper_offers o WHERE o.variant_id = v.id AND o.status = 'ACTIVE') as active_offers_count
+            ${activeOffersSubquery}
         FROM paper_variants v
         JOIN paper_products p ON v.product_id = p.id
         ${whereSql}
         ORDER BY p.name ASC, v.gsm ASC, v.width_mm ASC
         LIMIT ? OFFSET ?
     `;
-    const rows = await db.query(dataSql, [...params, limit, offset]);
+    const rows = await db.query(dataSql, [...dataParams, limit, offset]);
+
+    const flatItems = rows.map(r => ({
+        id: r.variant_id,
+        productId: r.product_id,
+        productName: r.product_name,
+        name: r.product_name,
+        category: r.category,
+        brand: r.brand,
+        manufacturer: r.manufacturer,
+        gsm: Number(r.gsm),
+        caliperUm: r.caliper_um ? Number(r.caliper_um) : null,
+        caliperMicrons: r.caliper_um ? Number(r.caliper_um) : null,
+        caliperMm: r.caliper_mm ? Number(r.caliper_mm) : null,
+        widthMm: Number(r.width_mm),
+        heightMm: Number(r.height_mm),
+        finish: r.finish,
+        grainDirection: r.grain_direction,
+        isReel: Boolean(r.is_reel),
+        fingerprint: r.fingerprint,
+        activeOffersCount: Number(r.active_offers_count || 0),
+        createdAt: r.created_at
+    }));
+
+    // Group items into canonical products[].variants hierarchy
+    const productsMap = new Map();
+    for (const item of flatItems) {
+        if (!productsMap.has(item.productId)) {
+            productsMap.set(item.productId, {
+                id: item.productId,
+                name: item.productName,
+                productName: item.productName,
+                brand: item.brand,
+                manufacturer: item.manufacturer,
+                category: item.category,
+                finish: item.finish,
+                variants: []
+            });
+        }
+        productsMap.get(item.productId).variants.push(item);
+    }
+
+    const groupedProducts = Array.from(productsMap.values());
 
     return {
         page,
         limit,
         total,
         totalPages: Math.ceil(total / limit),
-        items: rows.map(r => ({
-            id: r.variant_id,
-            productId: r.product_id,
-            productName: r.product_name,
-            category: r.category,
-            brand: r.brand,
-            manufacturer: r.manufacturer,
-            gsm: Number(r.gsm),
-            caliperUm: r.caliper_um ? Number(r.caliper_um) : null,
-            caliperMm: r.caliper_mm ? Number(r.caliper_mm) : null,
-            widthMm: Number(r.width_mm),
-            heightMm: Number(r.height_mm),
-            finish: r.finish,
-            grainDirection: r.grain_direction,
-            isReel: Boolean(r.is_reel),
-            fingerprint: r.fingerprint,
-            activeOffersCount: Number(r.active_offers_count || 0),
-            createdAt: r.created_at
-        }))
+        items: flatItems,
+        products: groupedProducts
     };
 }
 
@@ -338,15 +414,16 @@ async function createOffer({ tenantId, supplierId, actorId, payload }) {
             ]
         );
 
-        // 2. Insert immutable revision 1
+        // 2. Insert immutable revision 1 (including supplier_sku)
         await conn.query(
             `INSERT INTO supplier_paper_offer_revisions
-            (id, offer_id, revision_number, price_amount, currency, price_basis, sheets_per_pack, moq, order_multiple, valid_from, valid_until, delivery_zones_json, visibility, status, change_reason, created_by, metadata_json)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            (id, offer_id, revision_number, supplier_sku, price_amount, currency, price_basis, sheets_per_pack, moq, order_multiple, valid_from, valid_until, delivery_zones_json, visibility, status, change_reason, created_by, metadata_json)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
                 revisionId,
                 offerId,
                 revisionNumber,
+                validated.supplierSku,
                 validated.priceAmount,
                 validated.currency,
                 validated.priceBasis,
@@ -371,6 +448,9 @@ async function createOffer({ tenantId, supplierId, actorId, payload }) {
         return formatOfferRecord(createdRow);
     } catch (err) {
         await conn.rollback();
+        if (err.code === 'ER_DUP_ENTRY' || err.errno === 1062) {
+            throw new Error(`SKU_ALREADY_EXISTS: Supplier SKU '${validated.supplierSku}' is already in use by an active or inactive offer.`);
+        }
         throw err;
     } finally {
         conn.release();
@@ -499,6 +579,7 @@ async function getOfferById({ offerId, tenantId, supplierId }) {
         revisions: revRows.map(r => ({
             id: r.id,
             revisionNumber: r.revision_number,
+            supplierSku: r.supplier_sku,
             priceAmount: Number(r.price_amount),
             currency: r.currency,
             priceBasis: r.price_basis,
@@ -602,12 +683,13 @@ async function updateOffer({ offerId, tenantId, supplierId, actorId, payload }) 
         const changeReason = payload.changeReason || 'Commercial conditions update';
         await conn.query(
             `INSERT INTO supplier_paper_offer_revisions
-            (id, offer_id, revision_number, price_amount, currency, price_basis, sheets_per_pack, moq, order_multiple, valid_from, valid_until, delivery_zones_json, visibility, status, change_reason, created_by, metadata_json)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            (id, offer_id, revision_number, supplier_sku, price_amount, currency, price_basis, sheets_per_pack, moq, order_multiple, valid_from, valid_until, delivery_zones_json, visibility, status, change_reason, created_by, metadata_json)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
                 newRevisionId,
                 offerId,
                 nextRevNumber,
+                validated.supplierSku,
                 validated.priceAmount,
                 validated.currency,
                 validated.priceBasis,
@@ -637,6 +719,9 @@ async function updateOffer({ offerId, tenantId, supplierId, actorId, payload }) 
         return formatOfferRecord(updatedRow);
     } catch (err) {
         await conn.rollback();
+        if (err.code === 'ER_DUP_ENTRY' || err.errno === 1062) {
+            throw new Error(`SKU_ALREADY_EXISTS: Supplier SKU '${validated.supplierSku}' is already in use by another offer.`);
+        }
         throw err;
     } finally {
         conn.release();

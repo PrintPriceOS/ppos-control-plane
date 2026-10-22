@@ -384,19 +384,22 @@ router.get('/catalog/products', requireSupplierScope('VIEWER'), requireApprovedS
         const category = req.query.category || null;
         const finish = req.query.finish || null;
 
+        const context = resolveActorContext(req);
         const result = await paperOfferService.getTechnicalCatalog({
             page,
             limit,
             search,
             category,
-            finish
+            finish,
+            supplierId: context.supplierId
         });
 
         return res.json({
             ok: true,
             data: {
                 ...result,
-                products: result.items
+                products: result.products || result.items,
+                items: result.items
             }
         });
     } catch (err) {

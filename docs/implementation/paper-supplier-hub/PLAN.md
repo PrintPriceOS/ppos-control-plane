@@ -42,34 +42,37 @@ El **Paper Supplier Hub** incorpora un panel independiente para distribuidores/f
   - Validación y conciliación de los 1.573 registros del archivo original aportado (`Paper data base.ods.zip`, SHA-256 `7ffb63eb2705fa0c6faa459001ddd3db0702aa25d0bca52fa58e1a13899d4c9a`): desglose recalculado eliminando `isDeciMatch` e inferencias de ratio 10x: 16 válidos, 1.544 pendientes de revisión técnica/unidades, 13 duplicados internos, 0 rechazados de plano ($16 + 1.544 + 13 + 0 = 1.573$).
   - Separación canónica: sin ofertas comerciales, sin modificación de inventario ni costes de pricing.
   - Endurecimiento estricto de revisión: preservación de evidencia técnica, persistencia de contradicciones ante correcciones parciales, validación cerrada de decisiones (`PENDING`, `ACCEPTED`, `REJECTED`) con HTTP 400 `INVALID_DECISION` y aborto/rollback total ante cualquier `pendingCount > 0`.
-- [x] **I3 — Catálogo y ofertas en panel proveedor (Entrega R1)**:
-  - **Migración 164**: Creación de `supplier_paper_offers` y `supplier_paper_offer_revisions` para gestión comercial con versiones inmutables y segregación multitenant.
+- [x] **I3 — Catálogo y ofertas en panel proveedor (Remediado & Verificado)**:
+  - **Migración 164 & Integridad de Esquema**:
+    - Tabla `supplier_paper_offers` con restricción de unicidad estricta a nivel de motor: `UNIQUE KEY uk_supplier_sku_active (supplier_id, supplier_sku)`.
+    - Tabla `supplier_paper_offer_revisions` con conservación de `supplier_sku` y todos los campos comerciales editables para reconstrucción completa del histórico.
+    - Integridad de migraciones (`migration-integrity-baseline.json`) 100% verificada sin colisiones ni drift.
+  - **Cliente HTTP Dedicado (`src/ui/lib/paperSupplierApi.ts`)**:
+    - Cliente tipado que preserva códigos de estado HTTP reales (400, 403, 404, 409, 500) y detalles de error estructurados (`SupplierApiError`).
+    - Prohibición estricta de enmascarar errores de red o rechazos en `{ ok: true }` sintéticos o de omitir mutaciones simulando éxito.
   - **Servicios y Rutas de Backend**:
-    - `paperOfferService.js`: CRUD completo de ofertas, validación canónica de bases (`KG`, `TONNE`, `SHEET`, `THOUSAND_SHEETS`, `PACK` con `sheets_per_pack`), control estricto de campos obligatorios (sin deducir monedas ni bases del archivo original), versionado en `supplier_paper_offer_revisions`.
+    - `paperOfferService.js`: CRUD completo de ofertas, validación canónica de bases (`KG`, `TONNE`, `SHEET`, `THOUSAND_SHEETS`, `PACK`), rechazo fail-closed de truncamiento decimal en `sheets_per_pack` (exige enteros positivos exactos), validación cronológica estricta (`validFrom <= validUntil`), monedas ISO 4217 admitidas (`EUR`, `USD`, `GBP`), rechazo de no finitos (`NaN`, `Infinity`).
+    - Manejo de concurrencia: captura de error `ER_DUP_ENTRY` de MySQL devolviendo HTTP 409 `SKU_ALREADY_EXISTS`.
     - Endpoints en `paperSuppliersRoutes.js`:
-      - `GET /catalog/products`: listado paginado y búsqueda de productos y variantes técnicas confirmadas.
-      - `GET /catalog/variants/:id`: detalle técnico de variante con sus ofertas comerciales existentes.
-      - `GET /offers`: listado paginado y filtrado de ofertas del proveedor autenticado.
-      - `POST /offers`: creación de oferta vinculada a variante técnica con revisión inicial.
-      - `GET /offers/:id`: consulta de oferta con historial de revisiones.
-      - `PUT /offers/:id`: actualización de condiciones comerciales creando nueva revisión.
-      - `PATCH /offers/:id/status`: activación/desactivación de oferta (`ACTIVE` / `INACTIVE`).
-  - **Visibilidad y Seguridad Multitenant**:
-    - Visibilidad segmentada (`PRIVATE`, `APPROVED_CUSTOMERS`, `MARKETPLACE`).
-    - Resolución unívoca de `tenant_id` y `supplier_id` desde el token JWT.
+      - `GET /catalog/products`: unificación de contrato entregando jerarquía `products[].variants` esperada por la UI y variantes planas (`items`) para compatibilidad. Enmascaramiento de conteos de ofertas `PRIVATE` de competidores.
+      - `GET /catalog/variants/:id`: detalle técnico ampliado (`caliperUm`, gramaje, formato, grano, acabado) e histórico.
+      - `GET /offers`, `POST /offers`, `GET /offers/:id`, `PUT /offers/:id`, `PATCH /offers/:id/status`.
+  - **Visibilidad, Privacidad y Gobernanza Multitenant**:
+    - Políticas `PRIVATE`, `APPROVED_CUSTOMERS`, `MARKETPLACE` aplicadas en servidor.
+    - Ocultación garantizada de ofertas privadas ajenas en conteos de catálogo.
+    - Documentación de allowlist del piloto reutilizando capacidades existentes (`tenant_capabilities.PAPER_SUPPLIER`).
     - RBAC estricto: `SUPPLIER_ADMIN` y `SUPPLIER_OPERATOR` autorizados para escritura; `SUPPLIER_VIEWER` estrictamente lectura (rechazo fail-closed HTTP 403 `FORBIDDEN_WRITE_PERMISSION_REQUIRED`).
     - Proveedores suspendidos o pendientes bloqueados por `requireApprovedSupplier`.
-    - Flag `PAPER_SUPPLIER_HUB_ENABLED` y allowlist del piloto.
   - **Panel de Proveedor Frontend (`/supplier/*`)**:
-    - Catálogo paginado con buscador, filtros y detalle modal/drawer de variantes técnicas confirmadas.
-    - Gestor de ofertas comerciales: alta, edición con calculadora de base, historial de revisiones y conmutador de estado.
-    - Flujo integrado de importación y revisión de I2 (subida, previsualización, revisión de incidencias con indicación visual de filas pendientes, corrección y confirmación atómica).
-    - Estados completos: carga, vacío, error, validaciones comprensibles y confirmaciones claras con i18n (ES/EN/DE).
-  - **Criterios de Aceptación**:
-    - Aislamiento estricto: un proveedor nunca puede ver ni modificar ofertas de otro proveedor.
-    - Integridad comercial: prohibido publicar ofertas sin precio, moneda, base o con datos incompletos.
-    - No invasión de inventario: las ofertas comerciales no alteran `materials_catalog` ni `predictive_material_inventory`.
-    - Regresiones I1-R2 e I2 completamente verdes.
+    - Catálogo con buscador, filtros de categoría y acabado, modal de especificaciones técnicas completas (`caliperUm`, dimensiones, acabado, grano).
+    - Botón "+ Create Offer" funcional y preconfigurado con variante técnica seleccionada.
+    - Flujo de importación con inputs controlados persistentes ante paginación (`gsm`, `width_mm`, `height_mm`), auto-guardado previo de overrides vía `PATCH` antes de confirmar (bloqueando si falla la persistencia) y botón de reinicio para evitar reutilizar lotes previos.
+    - Paridad i18n completa en ES, EN y DE en todas las etiquetas, avisos y modales.
+  - **Criterios de Aceptación y Pruebas**:
+    - Eliminación de PASS silenciosos con `ctx.skip()` explícito cuando no hay variables de BD configuradas.
+    - Verificación contra MySQL efímero: 14/14 tests PASS en `tests/paper_supplier_offers_and_catalog.test.js`.
+    - Regresiones verificadas: 25/25 PASS en I2 (`tests/paper_technical_import_and_catalog.test.js`), 57/57 PASS en I1-R2 (`tests/security_paper_supplier_and_materials_isolation.test.js`).
+    - Cero mutaciones a inventario de imprenta (`materials_catalog`, `predictive_material_inventory`).
 - [ ] **I4 — Búsqueda de imprenta y RFQ bidireccional (Entrega R2)**:
   - Sourcing en `/materials`, RFQ con destinatarios aislados, respuesta versionada.
 - [ ] **I5 — Pedido, expedición y recepción a inventario (Entrega R3)**:

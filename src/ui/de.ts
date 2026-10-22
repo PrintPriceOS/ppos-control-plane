@@ -2364,7 +2364,28 @@ export const de = {
   'guided.review.statusAssistantPending': 'Kalibrierung ausstehend',
   'onboarding.duplicateDocTitle': 'Bestehendes Dokument erkannt',
   'onboarding.duplicateDocHelp': 'Dieses Dokument wurde bereits für diese Druckerei hochgeladen. Sie können den bestehenden Nachweis erneut öffnen, um die Kalibrierung fortzusetzen, ohne doppelte Datensätze anzulegen.',
-  'onboarding.reopenEvidence': 'Bestehenden Nachweis öffnen'
+  'onboarding.reopenEvidence': 'Bestehenden Nachweis öffnen',
+
+  // Paper Supplier Hub (Iteration I3)
+  'supplier.hub.title': 'Technischer Katalog & Kommerzielle Angebote',
+  'supplier.hub.subtitle': 'Bestätigte Papiervarianten verwalten, Preismatrizen verknüpfen und Käufersichtbarkeit konfigurieren.',
+  'supplier.hub.tabCatalog': 'Technische Papierartikel & Varianten',
+  'supplier.hub.tabOffers': 'Kommerzielle Angebote & Tarife',
+  'supplier.hub.importButton': 'Technischen Katalog importieren',
+  'supplier.hub.searchCatalog': 'Artikel, Marke, Oberfläche suchen...',
+  'supplier.hub.searchOffers': 'Angebot nach SKU, Produktname suchen...',
+  'supplier.hub.filterAllCategories': 'Alle Kategorien',
+  'supplier.hub.filterAllStatuses': 'Alle Status',
+  'supplier.hub.createOffer': '+ Angebot erstellen',
+  'supplier.hub.viewVariantDetails': 'Technische Daten',
+  'supplier.hub.editOffer': 'Konditionen bearbeiten',
+  'supplier.hub.activate': 'Aktivieren',
+  'supplier.hub.deactivate': 'Deaktivieren',
+  'supplier.hub.revisionsLedger': 'Preise & Revisionshistorie',
+  'supplier.hub.variantSpecsTitle': 'Technische Spezifikationen der Papiervariante',
+  'supplier.hub.noVariants': 'Keine bestätigten technischen Produkte gefunden. Klicken Sie auf "Technischen Katalog importieren", um Daten einzulesen.',
+  'supplier.hub.noOffers': 'Keine kommerziellen Angebote konfiguriert. Wählen Sie eine Variante aus dem Tab "Technische Papierartikel", um Tarife zu veröffentlichen.',
+  'supplier.hub.viewerReadOnly': 'Nur-Lese-Modus: Eingeschränkter Zugriff (SUPPLIER_VIEWER).'
 } as const;
 
 export type TranslationKeys = keyof typeof de;

@@ -62,3 +62,24 @@
      - `SUPPLIER_VIEWER`: solo lectura (`GET`). Cualquier mutación (`POST`, `PUT`, `PATCH`, `DELETE`) es rechazada con HTTP 403 `FORBIDDEN_WRITE_PERMISSION_REQUIRED`.
      - Proveedores con estado distinto de `ACTIVE` (e.g. `SUSPENDED`, `PENDING_REVIEW`): bloqueados fail-closed por `requireApprovedSupplier`.
 - **Consecuencia**: Garantía estricta de aislamiento multitenant y principio de mínimo privilegio.
+
+---
+
+## ADR 007: Unicidad de SKU por Proveedor y Trazabilidad Comercial en Revisiones (Remediación I3)
+- **Contexto**: Anteriormente el índice de SKU era no único a nivel de motor de BD (`KEY idx_supplier_sku`), lo que permitía colisiones de SKU ante concurrencia. Además, las revisiones inmutables omitían el SKU, impidiendo reconstruir la oferta exacta en auditorías históricas.
+- **Decisión**:
+  1. Forzar unicidad a nivel de motor en `supplier_paper_offers` con `UNIQUE KEY uk_supplier_sku_active (supplier_id, supplier_sku)` en la migración 164.
+  2. Almacenar `supplier_sku` de forma inmutable en `supplier_paper_offer_revisions`.
+  3. En `paperOfferService.js`, capturar colisiones de BD (`ER_DUP_ENTRY` / MySQL 1062) y mapear a HTTP 409 `SKU_ALREADY_EXISTS`.
+- **Consecuencia**: Integridad referencial inviolable en base de datos frente a condiciones de carrera concurrentes y reconstrucción histórica perfecta de ofertas.
+
+---
+
+## ADR 008: Cliente HTTP Específico para Proveedores y Preservación de Códigos de Error (Remediación I3)
+- **Contexto**: El cliente genérico `adminFetch` convertía ciertos fallos en respuestas con `ok: true` sintético o aplicaba backoffs que simulaban mutaciones exitosas.
+- **Decisión**:
+  1. Crear `paperSupplierFetch` y `SupplierApiError` en `src/ui/lib/paperSupplierApi.ts` exclusivamente para el Hub de Proveedores.
+  2. Preservar íntegramente códigos HTTP (400, 403, 404, 409, 500) y estructuras de error del servidor sin enmascaramiento.
+  3. En importación, validar el éxito de los `PATCH` de overrides antes de proceder a la confirmación de lote.
+- **Consecuencia**: La interfaz nunca anuncia confirmación tras un rechazo del servidor ni pierde trazabilidad de fallos.
+

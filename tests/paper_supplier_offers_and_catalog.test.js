@@ -120,7 +120,7 @@ let isDbConfigured = Boolean(process.env.TEST_MYSQL_HOST && process.env.TEST_MYS
 describe('Iteration I3: Paper Supplier Catalog & Commercial Offers Engine', () => {
 
     describe('1. Unit Validation & Commercial Rules', () => {
-        it('validates price basis constraints: PACK requires sheetsPerPack >= 1', () => {
+        it('validates price basis constraints: PACK requires exact positive integer sheetsPerPack', () => {
             const invalidPack = () => {
                 paperOfferService.validateOfferPayload({
                     variantId: 'var-123',
@@ -133,7 +133,21 @@ describe('Iteration I3: Paper Supplier Catalog & Commercial Offers Engine', () =
                     orderMultiple: 1
                 });
             };
-            expect(invalidPack).toThrow(/sheetsPerPack is required and must be an integer > 0 when priceBasis is 'PACK'/);
+            expect(invalidPack).toThrow(/sheetsPerPack is required and must be a positive integer/);
+
+            // Reject decimal truncation (e.g. 500.5 sheets)
+            expect(() => {
+                paperOfferService.validateOfferPayload({
+                    variantId: 'var-123',
+                    supplierSku: 'SKU-001',
+                    priceAmount: 12.5,
+                    currency: 'EUR',
+                    priceBasis: 'PACK',
+                    sheetsPerPack: 500.5,
+                    moq: 1,
+                    orderMultiple: 1
+                });
+            }).toThrow(/sheetsPerPack is required and must be a positive integer/);
 
             const validPack = paperOfferService.validateOfferPayload({
                 variantId: 'var-123',
@@ -148,16 +162,27 @@ describe('Iteration I3: Paper Supplier Catalog & Commercial Offers Engine', () =
             expect(validPack.sheetsPerPack).toBe(500);
         });
 
-        it('rejects unsupported price bases or currencies fail-closed', () => {
+        it('rejects unsupported currencies or non-finite numbers fail-closed', () => {
             expect(() => {
                 paperOfferService.validateOfferPayload({
                     variantId: 'var-123',
                     supplierSku: 'SKU-001',
                     priceAmount: 12.5,
-                    currency: 'INVALID_CURRENCY',
+                    currency: 'INVALID',
                     priceBasis: 'KG'
                 });
-            }).toThrow(/currency must be a valid 3-letter ISO 4217 code/);
+            }).toThrow(/currency 'INVALID' is not supported/);
+
+            // Rejects non-finite numbers (NaN, Infinity)
+            expect(() => {
+                paperOfferService.validateOfferPayload({
+                    variantId: 'var-123',
+                    supplierSku: 'SKU-001',
+                    priceAmount: Infinity,
+                    currency: 'EUR',
+                    priceBasis: 'KG'
+                });
+            }).toThrow(/priceAmount must be a finite positive number/);
 
             expect(() => {
                 paperOfferService.validateOfferPayload({
@@ -170,7 +195,7 @@ describe('Iteration I3: Paper Supplier Catalog & Commercial Offers Engine', () =
             }).toThrow(/priceBasis must be one of:/);
         });
 
-        it('rejects non-positive price, MOQ < 1, and orderMultiple < 1', () => {
+        it('validates date ordering (validFrom <= validUntil) and rejects non-positive price, MOQ < 1, orderMultiple < 1', () => {
             expect(() => {
                 paperOfferService.validateOfferPayload({
                     variantId: 'var-123',
@@ -179,7 +204,7 @@ describe('Iteration I3: Paper Supplier Catalog & Commercial Offers Engine', () =
                     currency: 'EUR',
                     priceBasis: 'KG'
                 });
-            }).toThrow(/priceAmount must be a positive number/);
+            }).toThrow(/priceAmount must be a finite positive number/);
 
             expect(() => {
                 paperOfferService.validateOfferPayload({
@@ -202,6 +227,19 @@ describe('Iteration I3: Paper Supplier Catalog & Commercial Offers Engine', () =
                     orderMultiple: -5
                 });
             }).toThrow(/orderMultiple must be an integer >= 1/);
+
+            // Chronological order validation
+            expect(() => {
+                paperOfferService.validateOfferPayload({
+                    variantId: 'var-123',
+                    supplierSku: 'SKU-001',
+                    priceAmount: 10,
+                    currency: 'EUR',
+                    priceBasis: 'KG',
+                    validFrom: '2026-12-31',
+                    validUntil: '2026-01-01'
+                });
+            }).toThrow(/must be before or equal to validUntil/);
         });
 
         it('normalizes delivery zones and validates visibility matrix options', () => {
@@ -360,8 +398,13 @@ describe('Iteration I3: Paper Supplier Catalog & Commercial Offers Engine', () =
             }
         });
 
+        beforeEach((ctx) => {
+            if (!isDbConfigured) {
+                ctx.skip();
+            }
+        });
+
         it('queries technical catalog with pagination and joins variants', async () => {
-            if (!isDbConfigured) return;
 
             const req = {
                 method: 'GET',
@@ -385,7 +428,6 @@ describe('Iteration I3: Paper Supplier Catalog & Commercial Offers Engine', () =
         });
 
         it('creates a commercial offer for confirmed variant and generates revision #1', async () => {
-            if (!isDbConfigured) return;
 
             const token = generateToken({
                 role: 'SUPPLIER_OPERATOR',
@@ -421,19 +463,46 @@ describe('Iteration I3: Paper Supplier Catalog & Commercial Offers Engine', () =
 
             const offerId = res.body.data.id;
 
-            // Verify in DB that revision #1 exists
+            // Verify in DB that revision #1 exists and retains supplier_sku
             const [revRows] = await connectionPool.query(
                 `SELECT * FROM supplier_paper_offer_revisions WHERE offer_id = ?`,
                 [offerId]
             );
             expect(revRows.length).toBe(1);
             expect(revRows[0].revision_number).toBe(1);
+            expect(revRows[0].supplier_sku).toBe('MUNKEN-120-70100-KG');
             expect(Number(revRows[0].price_amount)).toBe(1.485);
             expect(revRows[0].change_reason).toBe('Initial catalogue rate');
         });
 
-        it('updates commercial offer conditions and generates immutable revision #2', async () => {
-            if (!isDbConfigured) return;
+        it('guarantees SKU uniqueness per supplier and prevents duplicate SKU creation (HTTP 409)', async () => {
+
+            const token = generateToken({
+                role: 'SUPPLIER_OPERATOR',
+                tenantId: 'tenant-alpha',
+                supplierId: 'supp-alpha-1'
+            });
+
+            // Attempt to create another offer with the same SKU for supp-alpha-1
+            const dupReq = {
+                method: 'POST',
+                url: '/offers',
+                body: {
+                    variantId: 'var-munken-150-70100',
+                    supplierSku: 'MUNKEN-120-70100-KG', // Duplicate SKU
+                    priceAmount: 1.6000,
+                    currency: 'EUR',
+                    priceBasis: 'KG'
+                },
+                headers: { authorization: `Bearer ${token}` }
+            };
+
+            const dupRes = await dispatch(paperSuppliersRouter, dupReq);
+            expect(dupRes.statusCode).toBe(409);
+            expect(dupRes.body.error.code).toBe('SKU_ALREADY_EXISTS');
+        });
+
+        it('updates commercial offer conditions, retains supplier_sku in revision #2, and generates immutable audit entry', async () => {
 
             const token = generateToken({
                 role: 'SUPPLIER_OPERATOR',
@@ -488,12 +557,58 @@ describe('Iteration I3: Paper Supplier Catalog & Commercial Offers Engine', () =
             expect(getRes.statusCode).toBe(200);
             expect(getRes.body.data.revisions.length).toBe(2);
             expect(getRes.body.data.revisions[0].revisionNumber).toBe(2);
+            expect(getRes.body.data.revisions[0].supplierSku).toBe('MUNKEN-120-70100-KG');
             expect(getRes.body.data.revisions[0].changeReason).toBe('Q4 Raw pulp price adjustment');
             expect(getRes.body.data.revisions[1].revisionNumber).toBe(1);
+            expect(getRes.body.data.revisions[1].supplierSku).toBe('MUNKEN-120-70100-KG');
+        });
+
+        it('does not expose counts of PRIVATE offers belonging to competing suppliers', async () => {
+
+            // 1. supp-alpha-1 creates a PRIVATE offer on var-munken-150-70100
+            const alpha1Token = generateToken({
+                role: 'SUPPLIER_OPERATOR',
+                tenantId: 'tenant-alpha',
+                supplierId: 'supp-alpha-1'
+            });
+
+            await dispatch(paperSuppliersRouter, {
+                method: 'POST',
+                url: '/offers',
+                body: {
+                    variantId: 'var-munken-150-70100',
+                    supplierSku: 'ALPHA1-PRIVATE-OFFER',
+                    priceAmount: 2.10,
+                    currency: 'EUR',
+                    priceBasis: 'KG',
+                    visibility: 'PRIVATE'
+                },
+                headers: { authorization: `Bearer ${alpha1Token}` }
+            });
+
+            // 2. supp-alpha-2 queries technical catalog
+            const alpha2Token = generateToken({
+                userId: 'user-op-alpha-2',
+                role: 'SUPPLIER_OPERATOR',
+                tenantId: 'tenant-alpha',
+                supplierId: 'supp-alpha-2'
+            });
+
+            const catRes = await dispatch(paperSuppliersRouter, {
+                method: 'GET',
+                url: '/catalog/products',
+                query: { page: '1', limit: '10' },
+                headers: { authorization: `Bearer ${alpha2Token}` }
+            });
+
+            expect(catRes.statusCode).toBe(200);
+            const var150 = catRes.body.data.items.find(i => i.id === 'var-munken-150-70100');
+            expect(var150).toBeDefined();
+            // supp-alpha-2 must see 0 active offers for this variant because alpha-1's offer is PRIVATE
+            expect(var150.activeOffersCount).toBe(0);
         });
 
         it('toggles offer status between ACTIVE and INACTIVE', async () => {
-            if (!isDbConfigured) return;
 
             const token = generateToken({
                 role: 'SUPPLIER_OPERATOR',
@@ -532,7 +647,6 @@ describe('Iteration I3: Paper Supplier Catalog & Commercial Offers Engine', () =
         });
 
         it('enforces multi-tenant and cross-supplier isolation (Supplier Alpha-2 cannot access Alpha-1 offer)', async () => {
-            if (!isDbConfigured) return;
 
             const alpha1Token = generateToken({
                 userId: 'user-op-alpha-1',
@@ -591,7 +705,6 @@ describe('Iteration I3: Paper Supplier Catalog & Commercial Offers Engine', () =
         });
 
         it('enforces RBAC: SUPPLIER_VIEWER is denied modification with HTTP 403', async () => {
-            if (!isDbConfigured) return;
 
             const viewerToken = generateToken({
                 userId: 'user-view-alpha-1',
@@ -626,7 +739,6 @@ describe('Iteration I3: Paper Supplier Catalog & Commercial Offers Engine', () =
         });
 
         it('enforces status check: Suspended supplier is blocked with HTTP 403', async () => {
-            if (!isDbConfigured) return;
 
             const suspendedToken = generateToken({
                 userId: 'user-op-suspended',
@@ -645,7 +757,6 @@ describe('Iteration I3: Paper Supplier Catalog & Commercial Offers Engine', () =
         });
 
         it('verifies that printhouse inventory tables remain completely untouched by commercial paper offers', async () => {
-            if (!isDbConfigured) return;
 
             // In canonical schema, materials catalog and inventory are under materials_catalog / predictive_material_inventory if exists, or check tables count
             const [tables] = await connectionPool.query(`

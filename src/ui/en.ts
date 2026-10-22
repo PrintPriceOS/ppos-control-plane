@@ -2364,7 +2364,28 @@ export const en = {
   'guided.review.statusAssistantPending': 'Calibration pending',
   'onboarding.duplicateDocTitle': 'Existing Document Detected',
   'onboarding.duplicateDocHelp': 'This document has already been uploaded for this printer. You can reopen existing evidence to continue calibration without creating duplicate records.',
-  'onboarding.reopenEvidence': 'Reopen existing evidence'
+  'onboarding.reopenEvidence': 'Reopen existing evidence',
+
+  // Paper Supplier Hub (Iteration I3)
+  'supplier.hub.title': 'Technical Catalog & Commercial Offers',
+  'supplier.hub.subtitle': 'Manage confirmed technical paper variants, link pricing matrices, and configure buyer visibility.',
+  'supplier.hub.tabCatalog': 'Technical Paper Articles & Variants',
+  'supplier.hub.tabOffers': 'Commercial Offers & Rates',
+  'supplier.hub.importButton': 'Import Technical Catalog',
+  'supplier.hub.searchCatalog': 'Search article, brand, finish...',
+  'supplier.hub.searchOffers': 'Search offer by SKU, product name...',
+  'supplier.hub.filterAllCategories': 'All Categories',
+  'supplier.hub.filterAllStatuses': 'All Statuses',
+  'supplier.hub.createOffer': '+ Create Offer',
+  'supplier.hub.viewVariantDetails': 'Technical Specs',
+  'supplier.hub.editOffer': 'Edit Commercial Conditions',
+  'supplier.hub.activate': 'Activate',
+  'supplier.hub.deactivate': 'Deactivate',
+  'supplier.hub.revisionsLedger': 'Price & Terms Revision History',
+  'supplier.hub.variantSpecsTitle': 'Technical Paper Variant Specifications',
+  'supplier.hub.noVariants': 'No confirmed technical products found. Click "Import Technical Catalog" to stage a supplier data sheet.',
+  'supplier.hub.noOffers': 'No commercial offers configured. Go to the "Technical Paper Articles" tab and select a variant to publish rates.',
+  'supplier.hub.viewerReadOnly': 'View-only mode: You have read-only access (SUPPLIER_VIEWER).'
 } as const;
 
 export type TranslationKeys = keyof typeof en;

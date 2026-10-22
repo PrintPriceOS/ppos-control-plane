@@ -4,9 +4,10 @@ import {
     ArrowUpTrayIcon,
     CheckCircleIcon,
     ExclamationTriangleIcon,
-    InformationCircleIcon
+    InformationCircleIcon,
+    ArrowPathIcon
 } from '@heroicons/react/24/outline';
-import { adminFetch } from '../../lib/adminApi';
+import { paperSupplierFetch, SupplierApiError } from '../../lib/paperSupplierApi';
 import { StatusBadge } from '../StatusBadge';
 
 interface ImportModalProps {
@@ -27,6 +28,7 @@ export const TechnicalImportModal: React.FC<ImportModalProps> = ({
     const [loadingRows, setLoadingRows] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
     const [confirming, setConfirming] = useState<boolean>(false);
+    const [savingDecisions, setSavingDecisions] = useState<boolean>(false);
     const [page, setPage] = useState<number>(1);
     const [totalPages, setTotalPages] = useState<number>(1);
     const [filterStatus, setFilterStatus] = useState<string>('');
@@ -34,6 +36,22 @@ export const TechnicalImportModal: React.FC<ImportModalProps> = ({
     const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
     if (!isOpen) return null;
+
+    const handleResetImport = () => {
+        setFile(null);
+        setUploading(false);
+        setPreviewData(null);
+        setBatchRows([]);
+        setLoadingRows(false);
+        setError(null);
+        setConfirming(false);
+        setSavingDecisions(false);
+        setPage(1);
+        setTotalPages(1);
+        setFilterStatus('');
+        setDecisions({});
+        setSuccessMessage(null);
+    };
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
@@ -47,12 +65,13 @@ export const TechnicalImportModal: React.FC<ImportModalProps> = ({
         if (!file) return;
         setUploading(true);
         setError(null);
+        setSuccessMessage(null);
 
         const reader = new FileReader();
         reader.onload = async () => {
             try {
                 const base64 = (reader.result as string).split(',')[1];
-                const res: any = await adminFetch('/api/v1/paper-suppliers/catalog/imports/preview', {
+                const res = await paperSupplierFetch<any>('/api/v1/paper-suppliers/catalog/imports/preview', {
                     method: 'POST',
                     body: JSON.stringify({
                         fileBase64: base64,
@@ -60,14 +79,19 @@ export const TechnicalImportModal: React.FC<ImportModalProps> = ({
                     })
                 });
 
-                if (res && res.ok) {
+                if (res && res.ok && res.data) {
                     setPreviewData(res.data);
-                    loadBatchRows(res.data.batchId, 1, '');
+                    setDecisions({});
+                    await loadBatchRows(res.data.batchId, 1, '');
                 } else {
-                    setError(res?.error?.message || 'Error processing technical import preview.');
+                    setError('Error processing technical import preview.');
                 }
             } catch (err: any) {
-                setError(err.message || 'Failed to upload and parse file.');
+                if (err instanceof SupplierApiError) {
+                    setError(err.message);
+                } else {
+                    setError(err?.message || 'Failed to upload and parse file.');
+                }
             } finally {
                 setUploading(false);
             }
@@ -84,8 +108,8 @@ export const TechnicalImportModal: React.FC<ImportModalProps> = ({
             });
             if (status) queryParams.set('status', status);
 
-            const res: any = await adminFetch(`/api/v1/paper-suppliers/catalog/imports/${batchId}/rows?${queryParams.toString()}`);
-            if (res && res.ok) {
+            const res = await paperSupplierFetch<any>(`/api/v1/paper-suppliers/catalog/imports/${batchId}/rows?${queryParams.toString()}`);
+            if (res && res.ok && res.data) {
                 setBatchRows(res.data.rows || []);
                 setPage(res.data.page);
                 setTotalPages(res.data.totalPages || 1);
@@ -120,22 +144,29 @@ export const TechnicalImportModal: React.FC<ImportModalProps> = ({
         }));
     };
 
-    const handleApplyDecisions = async () => {
-        if (!previewData?.batchId || Object.keys(decisions).length === 0) return;
+    const handleApplyDecisions = async (): Promise<boolean> => {
+        if (!previewData?.batchId || Object.keys(decisions).length === 0) return true;
+        setSavingDecisions(true);
+        setError(null);
         try {
-            const res: any = await adminFetch(`/api/v1/paper-suppliers/catalog/imports/${previewData.batchId}/rows`, {
+            const res = await paperSupplierFetch<any>(`/api/v1/paper-suppliers/catalog/imports/${previewData.batchId}/rows`, {
                 method: 'PATCH',
                 body: JSON.stringify({ decisions })
             });
             if (res && res.ok) {
-                setSuccessMessage(`Updated ${res.data.updatedCount} row decisions successfully.`);
+                setSuccessMessage(`Saved ${res.data?.updatedCount || Object.keys(decisions).length} row overrides and decisions successfully.`);
                 setDecisions({});
-                loadBatchRows(previewData.batchId, page, filterStatus);
+                await loadBatchRows(previewData.batchId, page, filterStatus);
+                return true;
             } else {
-                setError(res?.error?.message || 'Failed to apply row decisions.');
+                setError('Failed to apply row decisions.');
+                return false;
             }
         } catch (err: any) {
             setError(err.message || 'Failed to submit review decisions.');
+            return false;
+        } finally {
+            setSavingDecisions(false);
         }
     };
 
@@ -143,28 +174,40 @@ export const TechnicalImportModal: React.FC<ImportModalProps> = ({
         if (!previewData?.batchId) return;
         setConfirming(true);
         setError(null);
+        setSuccessMessage(null);
+
         try {
-            // Apply any unsubmitted decisions together with confirmation
-            const res: any = await adminFetch(`/api/v1/paper-suppliers/catalog/imports/${previewData.batchId}/confirm`, {
+            // If there are unsaved decisions or overrides, save them first via PATCH and check success
+            if (Object.keys(decisions).length > 0) {
+                const patchOk = await handleApplyDecisions();
+                if (!patchOk) {
+                    setConfirming(false);
+                    return;
+                }
+            }
+
+            const res = await paperSupplierFetch<any>(`/api/v1/paper-suppliers/catalog/imports/${previewData.batchId}/confirm`, {
                 method: 'POST',
-                body: JSON.stringify({ decisions: Object.keys(decisions).length > 0 ? decisions : undefined })
+                body: JSON.stringify({})
             });
 
-            if (res && res.ok) {
-                setSuccessMessage(`Batch confirmed successfully! Created ${res.data.confirmedProducts} products.`);
+            if (res && res.ok && res.data) {
+                setSuccessMessage(`Batch confirmed successfully! Created ${res.data.confirmedProducts} products and ${res.data.confirmedVariants} variants.`);
                 setTimeout(() => {
                     onImportConfirmed();
                     onClose();
                 }, 1500);
             } else {
-                setError(res?.error?.message || 'Cannot confirm batch with unresolved pending rows.');
+                setError('Cannot confirm batch with unresolved pending rows.');
             }
         } catch (err: any) {
-            setError(err.message || 'Confirmation failed.');
+            setError(err.message || 'Confirmation failed on server.');
         } finally {
             setConfirming(false);
         }
     };
+
+    const hasUnsavedDecisions = Object.keys(decisions).length > 0;
 
     return (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 flex items-center justify-center p-4">
@@ -350,6 +393,10 @@ export const TechnicalImportModal: React.FC<ImportModalProps> = ({
                                                 batchRows.map((r: any) => {
                                                     const rowDecision = decisions[r.id]?.decision || r.decision || 'PENDING';
                                                     const issuesList = r.issues || [];
+                                                    const currentOverrides = decisions[r.id]?.overrides || {};
+                                                    const currentGsm = currentOverrides.gsm !== undefined ? currentOverrides.gsm : (r.normalized?.gsm || '');
+                                                    const currentWidth = currentOverrides.width_mm !== undefined ? currentOverrides.width_mm : (r.normalized?.width_mm || '');
+                                                    const currentHeight = currentOverrides.height_mm !== undefined ? currentOverrides.height_mm : (r.normalized?.height_mm || '');
 
                                                     return (
                                                         <tr key={r.id} className="hover:bg-slate-50 dark:hover:bg-zinc-900/50">
@@ -358,7 +405,7 @@ export const TechnicalImportModal: React.FC<ImportModalProps> = ({
                                                             <td className="p-2.5 font-mono">
                                                                 <input
                                                                     type="number"
-                                                                    defaultValue={r.normalized?.gsm || ''}
+                                                                    value={currentGsm}
                                                                     onChange={(e) => handleOverrideChange(r.id, 'gsm', Number(e.target.value))}
                                                                     className="w-16 px-1.5 py-0.5 border border-slate-200 dark:border-zinc-800 bg-transparent text-[11px] font-mono"
                                                                 />
@@ -367,14 +414,14 @@ export const TechnicalImportModal: React.FC<ImportModalProps> = ({
                                                                 <div className="flex items-center gap-1">
                                                                     <input
                                                                         type="number"
-                                                                        defaultValue={r.normalized?.width_mm || ''}
+                                                                        value={currentWidth}
                                                                         onChange={(e) => handleOverrideChange(r.id, 'width_mm', Number(e.target.value))}
                                                                         className="w-14 px-1 py-0.5 border border-slate-200 dark:border-zinc-800 bg-transparent text-[11px] font-mono"
                                                                     />
                                                                     <span>x</span>
                                                                     <input
                                                                         type="number"
-                                                                        defaultValue={r.normalized?.height_mm || ''}
+                                                                        value={currentHeight}
                                                                         onChange={(e) => handleOverrideChange(r.id, 'height_mm', Number(e.target.value))}
                                                                         className="w-14 px-1 py-0.5 border border-slate-200 dark:border-zinc-800 bg-transparent text-[11px] font-mono"
                                                                     />
@@ -447,18 +494,39 @@ export const TechnicalImportModal: React.FC<ImportModalProps> = ({
 
                 {/* Footer */}
                 <div className="p-5 border-t border-slate-200 dark:border-zinc-800 flex items-center justify-between bg-slate-50 dark:bg-zinc-900/50">
-                    <button
-                        onClick={onClose}
-                        className="px-4 py-2 border border-slate-300 dark:border-zinc-700 text-slate-700 dark:text-zinc-300 font-bold uppercase text-[10px] hover:bg-slate-100 dark:hover:bg-zinc-800 transition-colors"
-                    >
-                        Close
-                    </button>
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={onClose}
+                            className="px-4 py-2 border border-slate-300 dark:border-zinc-700 text-slate-700 dark:text-zinc-300 font-bold uppercase text-[10px] hover:bg-slate-100 dark:hover:bg-zinc-800 transition-colors"
+                        >
+                            Close
+                        </button>
+                        {previewData && (
+                            <button
+                                onClick={handleResetImport}
+                                className="flex items-center gap-1.5 px-3 py-2 border border-slate-300 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 font-bold uppercase text-[10px] hover:bg-slate-100 dark:hover:bg-zinc-800 transition-colors"
+                                title="Discard current batch and start a fresh import"
+                            >
+                                <ArrowPathIcon className="w-3.5 h-3.5" />
+                                <span>Start New Import</span>
+                            </button>
+                        )}
+                    </div>
 
                     {previewData && (
                         <div className="flex items-center gap-3">
+                            {hasUnsavedDecisions && (
+                                <button
+                                    onClick={() => handleApplyDecisions()}
+                                    disabled={savingDecisions}
+                                    className="px-3.5 py-2 bg-slate-800 text-white font-bold uppercase text-[10px] hover:bg-slate-700 transition-colors disabled:opacity-50"
+                                >
+                                    {savingDecisions ? 'Saving...' : `Save Decisions (${Object.keys(decisions).length})`}
+                                </button>
+                            )}
                             <button
                                 onClick={handleConfirmBatch}
-                                disabled={confirming}
+                                disabled={confirming || savingDecisions}
                                 className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold uppercase tracking-wider text-[11px] transition-colors"
                             >
                                 {confirming ? 'Confirming Batch...' : 'Confirm Technical Catalog'}

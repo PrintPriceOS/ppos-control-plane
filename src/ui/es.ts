@@ -2363,7 +2363,28 @@ export const es = {
   'guided.review.statusAssistantPending': 'Calibración pendiente',
   'onboarding.duplicateDocTitle': 'Documento existente detectado',
   'onboarding.duplicateDocHelp': 'Este documento ya fue cargado previamente para este taller. Puedes reabrir la evidencia existente para continuar con la calibración sin duplicar el registro.',
-  'onboarding.reopenEvidence': 'Reabrir evidencia existente'
+  'onboarding.reopenEvidence': 'Reabrir evidencia existente',
+
+  // Paper Supplier Hub (Iteration I3)
+  'supplier.hub.title': 'Catálogo Técnico y Ofertas Comerciales',
+  'supplier.hub.subtitle': 'Gestiona variantes técnicas de papel confirmadas, enlaza matrices de precios y configura la visibilidad de compradores.',
+  'supplier.hub.tabCatalog': 'Artículos y Variantes Técnicas de Papel',
+  'supplier.hub.tabOffers': 'Ofertas Comerciales y Tarifas',
+  'supplier.hub.importButton': 'Importar Catálogo Técnico',
+  'supplier.hub.searchCatalog': 'Buscar artículo, marca, acabado...',
+  'supplier.hub.searchOffers': 'Buscar oferta por SKU, nombre de producto...',
+  'supplier.hub.filterAllCategories': 'Todas las Categorías',
+  'supplier.hub.filterAllStatuses': 'Todos los Estados',
+  'supplier.hub.createOffer': '+ Crear Oferta',
+  'supplier.hub.viewVariantDetails': 'Especificaciones Técnicas',
+  'supplier.hub.editOffer': 'Editar Condiciones Comerciales',
+  'supplier.hub.activate': 'Activar',
+  'supplier.hub.deactivate': 'Desactivar',
+  'supplier.hub.revisionsLedger': 'Historial de Revisiones de Precios y Términos',
+  'supplier.hub.variantSpecsTitle': 'Especificaciones Técnicas de la Variante de Papel',
+  'supplier.hub.noVariants': 'No se encontraron productos técnicos confirmados. Haz clic en "Importar Catálogo Técnico" para procesar una hoja de datos.',
+  'supplier.hub.noOffers': 'No hay ofertas comerciales configuradas. Accede a "Artículos Técnicos de Papel" y selecciona una variante para publicar tarifas.',
+  'supplier.hub.viewerReadOnly': 'Modo solo lectura: Acceso restringido (SUPPLIER_VIEWER).'
 } as const;
 
 export type TranslationKeys = keyof typeof es;

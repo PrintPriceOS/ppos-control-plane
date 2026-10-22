@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS supplier_paper_offers (
     INDEX idx_offer_tenant (tenant_id),
     INDEX idx_offer_supplier (supplier_id),
     INDEX idx_offer_variant (variant_id),
-    INDEX idx_offer_sku (supplier_id, supplier_sku),
+    UNIQUE KEY uk_supplier_sku_active (supplier_id, supplier_sku),
     INDEX idx_offer_status_vis (status, visibility),
     CONSTRAINT fk_offer_supplier FOREIGN KEY (supplier_id) REFERENCES paper_suppliers(id) ON DELETE CASCADE,
     CONSTRAINT fk_offer_variant FOREIGN KEY (variant_id) REFERENCES paper_variants(id) ON DELETE CASCADE
@@ -37,6 +37,7 @@ CREATE TABLE IF NOT EXISTS supplier_paper_offer_revisions (
     id VARCHAR(64) PRIMARY KEY,
     offer_id VARCHAR(64) NOT NULL,
     revision_number INT NOT NULL,
+    supplier_sku VARCHAR(128) NOT NULL,
     price_amount DECIMAL(12, 4) NOT NULL,
     currency VARCHAR(3) NOT NULL,
     price_basis ENUM('KG', 'TONNE', 'SHEET', 'THOUSAND_SHEETS', 'PACK') NOT NULL,

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useTransition } from 'react';
+import React, { useEffect, useState } from 'react';
 import { 
     RectangleStackIcon, 
     DocumentTextIcon, 
@@ -12,14 +12,17 @@ import {
     EyeIcon,
     PencilSquareIcon,
     ShieldCheckIcon,
-    XMarkIcon
+    XMarkIcon,
+    InformationCircleIcon
 } from '@heroicons/react/24/outline';
-import { adminFetch } from '../../lib/adminApi';
+import { paperSupplierFetch, SupplierApiError } from '../../lib/paperSupplierApi';
 import { getUserRole, getAuthUser } from '../../lib/authStore';
 import { TechnicalImportModal } from '../../components/supplier/TechnicalImportModal';
 import { StatusBadge } from '../../components/StatusBadge';
+import { useLocale } from '../../i18n';
 
 export const SupplierCatalogOffersPage: React.FC = () => {
+    const { t } = useLocale();
     const role = getUserRole();
     const user = getAuthUser();
     const isReadOnly = role === 'SUPPLIER_VIEWER';
@@ -42,6 +45,11 @@ export const SupplierCatalogOffersPage: React.FC = () => {
     const [offersSearch, setOffersSearch] = useState<string>('');
     const [offersStatusFilter, setOffersStatusFilter] = useState<string>('');
     const [loadingOffers, setLoadingOffers] = useState<boolean>(false);
+
+    // Technical Variant Detail Modal State
+    const [variantDetailModalOpen, setVariantDetailModalOpen] = useState<boolean>(false);
+    const [viewingVariant, setViewingVariant] = useState<any>(null);
+    const [loadingVariantDetail, setLoadingVariantDetail] = useState<boolean>(false);
 
     // Offer Creation / Edition Modal State
     const [isOfferModalOpen, setIsOfferModalOpen] = useState<boolean>(false);
@@ -74,6 +82,7 @@ export const SupplierCatalogOffersPage: React.FC = () => {
     // Load Catalog
     const fetchCatalog = async (p = catalogPage, q = catalogSearch, cat = catalogCategory) => {
         setLoadingCatalog(true);
+        setErrorNotice(null);
         try {
             const params = new URLSearchParams({
                 page: String(p),
@@ -82,8 +91,8 @@ export const SupplierCatalogOffersPage: React.FC = () => {
             if (q) params.set('search', q);
             if (cat) params.set('category', cat);
 
-            const res: any = await adminFetch(`/api/v1/paper-suppliers/catalog/products?${params.toString()}`);
-            if (res && res.ok) {
+            const res = await paperSupplierFetch<any>(`/api/v1/paper-suppliers/catalog/products?${params.toString()}`);
+            if (res && res.ok && res.data) {
                 setCatalogProducts(res.data.products || []);
                 setCatalogPage(res.data.page || 1);
                 setCatalogTotalPages(res.data.totalPages || 1);
@@ -98,6 +107,7 @@ export const SupplierCatalogOffersPage: React.FC = () => {
     // Load Offers
     const fetchOffers = async (p = offersPage, q = offersSearch, status = offersStatusFilter) => {
         setLoadingOffers(true);
+        setErrorNotice(null);
         try {
             const params = new URLSearchParams({
                 page: String(p),
@@ -106,8 +116,8 @@ export const SupplierCatalogOffersPage: React.FC = () => {
             if (q) params.set('search', q);
             if (status) params.set('status', status);
 
-            const res: any = await adminFetch(`/api/v1/paper-suppliers/offers?${params.toString()}`);
-            if (res && res.ok) {
+            const res = await paperSupplierFetch<any>(`/api/v1/paper-suppliers/offers?${params.toString()}`);
+            if (res && res.ok && res.data) {
                 setOffers(res.data.offers || []);
                 setOffersPage(res.data.page || 1);
                 setOffersTotalPages(res.data.totalPages || 1);
@@ -126,6 +136,26 @@ export const SupplierCatalogOffersPage: React.FC = () => {
             fetchOffers(1, offersSearch, offersStatusFilter);
         }
     }, [activeTab]);
+
+    const handleViewVariantDetail = async (variantId: string) => {
+        setLoadingVariantDetail(true);
+        setVariantDetailModalOpen(true);
+        setErrorNotice(null);
+        try {
+            const res = await paperSupplierFetch<any>(`/api/v1/paper-suppliers/catalog/variants/${variantId}`);
+            if (res && res.ok && res.data) {
+                setViewingVariant(res.data);
+            } else {
+                setErrorNotice('Could not load variant technical specifications.');
+                setVariantDetailModalOpen(false);
+            }
+        } catch (err: any) {
+            setErrorNotice(err.message || 'Error loading variant detail.');
+            setVariantDetailModalOpen(false);
+        } finally {
+            setLoadingVariantDetail(false);
+        }
+    };
 
     const handleOpenCreateOffer = (variant: any) => {
         setSelectedVariant(variant);
@@ -150,13 +180,14 @@ export const SupplierCatalogOffersPage: React.FC = () => {
 
     const handleOpenEditOffer = (offer: any) => {
         setEditingOffer(offer);
+        const details = offer.variantDetails || {};
         setSelectedVariant({
             id: offer.variantId,
-            productName: offer.productName,
-            finish: offer.finish,
-            gsm: offer.gsm,
-            widthMm: offer.widthMm,
-            heightMm: offer.heightMm
+            productName: details.productName || offer.productName,
+            finish: details.finish || offer.finish,
+            gsm: details.gsm || offer.gsm,
+            widthMm: details.widthMm || offer.widthMm,
+            heightMm: details.heightMm || offer.heightMm
         });
         setOfferForm({
             supplierSku: offer.supplierSku || '',
@@ -204,13 +235,13 @@ export const SupplierCatalogOffersPage: React.FC = () => {
 
             let res: any;
             if (editingOffer) {
-                res = await adminFetch(`/api/v1/paper-suppliers/offers/${editingOffer.id}`, {
+                res = await paperSupplierFetch(`/api/v1/paper-suppliers/offers/${editingOffer.id}`, {
                     method: 'PUT',
                     body: JSON.stringify(payload)
                 });
             } else {
                 payload.variantId = selectedVariant.id;
-                res = await adminFetch('/api/v1/paper-suppliers/offers', {
+                res = await paperSupplierFetch('/api/v1/paper-suppliers/offers', {
                     method: 'POST',
                     body: JSON.stringify(payload)
                 });
@@ -225,7 +256,7 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                     fetchCatalog();
                 }
             } else {
-                setFormError(res?.error?.message || 'Failed to submit commercial offer.');
+                setFormError('Failed to submit commercial offer.');
             }
         } catch (err: any) {
             setFormError(err.message || 'Operation failed.');
@@ -237,7 +268,7 @@ export const SupplierCatalogOffersPage: React.FC = () => {
     const handleToggleOfferStatus = async (offerId: string, currentStatus: string) => {
         const nextStatus = currentStatus === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
         try {
-            const res: any = await adminFetch(`/api/v1/paper-suppliers/offers/${offerId}/status`, {
+            const res = await paperSupplierFetch(`/api/v1/paper-suppliers/offers/${offerId}/status`, {
                 method: 'PATCH',
                 body: JSON.stringify({ status: nextStatus })
             });
@@ -245,7 +276,7 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                 setGeneralNotice(`Offer status set to ${nextStatus}.`);
                 fetchOffers();
             } else {
-                setErrorNotice(res?.error?.message || 'Failed to update offer status.');
+                setErrorNotice('Failed to update offer status.');
             }
         } catch (err: any) {
             setErrorNotice(err.message || 'Error updating status.');
@@ -254,8 +285,8 @@ export const SupplierCatalogOffersPage: React.FC = () => {
 
     const handleViewRevisions = async (offerId: string) => {
         try {
-            const res: any = await adminFetch(`/api/v1/paper-suppliers/offers/${offerId}`);
-            if (res && res.ok) {
+            const res = await paperSupplierFetch<any>(`/api/v1/paper-suppliers/offers/${offerId}`);
+            if (res && res.ok && res.data) {
                 setRevisionOffer(res.data);
                 setIsRevisionsModalOpen(true);
             }
@@ -447,7 +478,7 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                                                         {v.gsm} gsm
                                                     </td>
                                                     <td className="p-3 font-mono text-zinc-500">
-                                                        Caliper: {v.caliperMicrons ? `${v.caliperMicrons} µm` : '—'}
+                                                        Caliper: {v.caliperUm ? `${v.caliperUm} µm` : (v.caliperMicrons ? `${v.caliperMicrons} µm` : '—')}
                                                     </td>
                                                     <td className="p-3">
                                                         <span className="text-[10px] font-mono text-zinc-400">
@@ -458,14 +489,23 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                                                         {v.id.slice(0, 8)}
                                                     </td>
                                                     <td className="p-3 text-right">
-                                                        {!isReadOnly && (
+                                                        <div className="flex items-center justify-end gap-2">
                                                             <button
-                                                                onClick={() => handleOpenCreateOffer({ ...v, productName: prod.name, finish: prod.finish })}
-                                                                className="px-2.5 py-1 bg-red-600 hover:bg-red-700 text-white font-bold uppercase text-[10px] transition-colors cursor-pointer"
+                                                                onClick={() => handleViewVariantDetail(v.id)}
+                                                                className="px-2 py-1 bg-slate-200 dark:bg-zinc-800 hover:bg-slate-300 dark:hover:bg-zinc-700 text-slate-700 dark:text-zinc-200 font-bold uppercase text-[10px] transition-colors cursor-pointer"
+                                                                title="View technical specifications"
                                                             >
-                                                                + Create Offer
+                                                                Specs
                                                             </button>
-                                                        )}
+                                                            {!isReadOnly && (
+                                                                <button
+                                                                    onClick={() => handleOpenCreateOffer({ ...v, productName: prod.name, finish: prod.finish })}
+                                                                    className="px-2.5 py-1 bg-red-600 hover:bg-red-700 text-white font-bold uppercase text-[10px] transition-colors cursor-pointer"
+                                                                >
+                                                                    + Create Offer
+                                                                </button>
+                                                            )}
+                                                        </div>
                                                     </td>
                                                 </tr>
                                             ))}
@@ -969,6 +1009,111 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                                 Close
                             </button>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* TECHNICAL VARIANT SPECS MODAL */}
+            {variantDetailModalOpen && (
+                <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 flex items-center justify-center p-4">
+                    <div className="bg-white dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 w-full max-w-xl shadow-2xl p-6 space-y-4">
+                        <div className="flex items-center justify-between border-b border-slate-200 dark:border-zinc-800 pb-3">
+                            <div>
+                                <span className="px-2 py-0.5 text-[9px] font-black uppercase tracking-widest bg-red-600 text-white">
+                                    Technical Specs
+                                </span>
+                                <h3 className="text-base font-black text-slate-900 dark:text-white mt-1">
+                                    {loadingVariantDetail ? 'Loading specifications...' : (viewingVariant?.variant?.productName || 'Paper Variant Details')}
+                                </h3>
+                            </div>
+                            <button
+                                onClick={() => setVariantDetailModalOpen(false)}
+                                className="p-1 text-zinc-400 hover:text-slate-900 dark:hover:text-white"
+                            >
+                                <XMarkIcon className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        {loadingVariantDetail ? (
+                            <p className="p-6 text-center text-zinc-400 text-xs">Fetching physical variant metrics...</p>
+                        ) : viewingVariant?.variant ? (
+                            <div className="space-y-4 text-xs">
+                                <div className="grid grid-cols-2 gap-3 p-3 bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 font-mono">
+                                    <div>
+                                        <span className="text-[10px] text-zinc-400 uppercase block">Product Name</span>
+                                        <span className="font-bold text-slate-900 dark:text-white">{viewingVariant.variant.productName}</span>
+                                    </div>
+                                    <div>
+                                        <span className="text-[10px] text-zinc-400 uppercase block">Category / Brand</span>
+                                        <span className="font-bold text-slate-900 dark:text-white">{viewingVariant.variant.category} · {viewingVariant.variant.brand || '—'}</span>
+                                    </div>
+                                    <div>
+                                        <span className="text-[10px] text-zinc-400 uppercase block">Dimensions</span>
+                                        <span className="font-bold text-slate-900 dark:text-white">{viewingVariant.variant.widthMm} × {viewingVariant.variant.heightMm} mm</span>
+                                    </div>
+                                    <div>
+                                        <span className="text-[10px] text-zinc-400 uppercase block">Grammage (GSM)</span>
+                                        <span className="font-bold text-slate-900 dark:text-white">{viewingVariant.variant.gsm} g/m²</span>
+                                    </div>
+                                    <div>
+                                        <span className="text-[10px] text-zinc-400 uppercase block">Caliper (Thickness)</span>
+                                        <span className="font-bold text-slate-900 dark:text-white">
+                                            {viewingVariant.variant.caliperUm ? `${viewingVariant.variant.caliperUm} µm` : '—'}
+                                            {viewingVariant.variant.caliperMm ? ` (${viewingVariant.variant.caliperMm} mm)` : ''}
+                                        </span>
+                                    </div>
+                                    <div>
+                                        <span className="text-[10px] text-zinc-400 uppercase block">Grain & Finish</span>
+                                        <span className="font-bold text-slate-900 dark:text-white">{viewingVariant.variant.grainDirection || '—'} · {viewingVariant.variant.finish || '—'}</span>
+                                    </div>
+                                    <div className="col-span-2">
+                                        <span className="text-[10px] text-zinc-400 uppercase block">Technical Fingerprint</span>
+                                        <span className="font-mono text-[10px] text-zinc-500 break-all">{viewingVariant.variant.fingerprint}</span>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <h4 className="font-bold text-slate-900 dark:text-white text-xs">Active Offers For This Variant ({viewingVariant.offers?.length || 0})</h4>
+                                    {viewingVariant.offers && viewingVariant.offers.length > 0 ? (
+                                        <div className="space-y-1 max-h-40 overflow-y-auto">
+                                            {viewingVariant.offers.map((off: any) => (
+                                                <div key={off.id} className="p-2 border border-slate-200 dark:border-zinc-800 flex items-center justify-between">
+                                                    <div>
+                                                        <span className="font-mono font-bold text-slate-800 dark:text-zinc-200">{off.supplierSku}</span>
+                                                        <span className="text-[10px] text-zinc-400 ml-2">MOQ: {off.moq}</span>
+                                                    </div>
+                                                    <span className="font-mono font-bold text-slate-900 dark:text-white">
+                                                        {Number(off.priceAmount).toFixed(2)} {off.currency} / {off.priceBasis}
+                                                    </span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <p className="text-zinc-400 italic text-[11px]">No active offers currently published by your organization for this physical variant.</p>
+                                    )}
+                                </div>
+
+                                <div className="flex justify-between items-center pt-3 border-t border-slate-200 dark:border-zinc-800">
+                                    <button
+                                        onClick={() => setVariantDetailModalOpen(false)}
+                                        className="px-4 py-2 border border-slate-300 dark:border-zinc-700 font-bold uppercase text-[10px]"
+                                    >
+                                        Close
+                                    </button>
+                                    {!isReadOnly && (
+                                        <button
+                                            onClick={() => {
+                                                setVariantDetailModalOpen(false);
+                                                handleOpenCreateOffer(viewingVariant.variant);
+                                            }}
+                                            className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-bold uppercase text-[10px]"
+                                        >
+                                            + Create Offer
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+                        ) : null}
                     </div>
                 </div>
             )}
