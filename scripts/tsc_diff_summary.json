@@ -1,0 +1,10 @@
+{
+  "base_ref": "ed111462cfe77c4d764657abc5a079fe6386d19b",
+  "base_errs_count": 199,
+  "base_unique_count": 81,
+  "cand_errs_count": 199,
+  "cand_unique_count": 81,
+  "newly_added_count": 0,
+  "removed_count": 0,
+  "newly_added": []
+}

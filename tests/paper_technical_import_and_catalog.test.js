@@ -304,6 +304,92 @@ describe('Iteration I2: Paper Technical Data Sheets & Multi-format Import Engine
             // Pure technical attributes are valid -> VALID status for technical cataloging
             expect(norm.validationStatus).toBe('VALID');
         });
+
+        // Mandatory Regression Suite for Item 2
+        it('regression 2a: parses canonical valid CSV with uppercase headers accurately', async () => {
+            const canonicalCsv = [
+                'NAME;GRAMS;WIDTH (MM);HEIGHT (MM);COAT;GRAIN;PRICE',
+                'Munken Kristall 150;150;700;1000;uncoated;LONG_GRAIN;420'
+            ].join('\n');
+            const buffer = Buffer.from(canonicalCsv, 'utf8');
+
+            const preview = await paperImportService.processImportPreview({
+                buffer,
+                fileName: 'canonical_test.csv',
+                tenantId: 'tenant-reg-1',
+                supplierId: 'supp-reg-1',
+                createdBy: 'admin-1'
+            });
+
+            expect(preview.summary.totalRows).toBe(1);
+            expect(preview.summary.validRows).toBe(1);
+            const row = preview.rows[0].normalized;
+            expect(row.name).toBe('Munken Kristall 150');
+            expect(row.gsm).toBe(150);
+            expect(row.width_mm).toBe(700);
+            expect(row.height_mm).toBe(1000);
+            expect(row.finish).toBe('UNCOATED');
+            expect(row.grain_direction).toBe('LONG_GRAIN');
+        });
+
+        it('regression 2b: maps CSV with product_name,brand,category,finish,gsm,width_mm,height_mm,caliper_um,grain_direction without column shift', async () => {
+            const aliasCsv = [
+                'product_name,brand,category,finish,gsm,width_mm,height_mm,caliper_um,grain_direction',
+                'Galerie Art Silk,Stora Enso,COATED,silk,170,720,1020,187,short_grain'
+            ].join('\n');
+            const buffer = Buffer.from(aliasCsv, 'utf8');
+
+            const preview = await paperImportService.processImportPreview({
+                buffer,
+                fileName: 'alias_columns.csv',
+                tenantId: 'tenant-reg-2',
+                supplierId: 'supp-reg-2',
+                createdBy: 'admin-1'
+            });
+
+            expect(preview.summary.totalRows).toBe(1);
+            expect(preview.summary.validRows).toBe(1);
+            const row = preview.rows[0].normalized;
+
+            // Strict verification: NO column shift!
+            expect(row.name).toBe('Galerie Art Silk');
+            expect(row.gsm).toBe(170);
+            expect(row.width_mm).toBe(720);
+            expect(row.height_mm).toBe(1020);
+            expect(row.caliper_um).toBe(187);
+            expect(row.finish).toBe('SILK');
+            expect(row.grain_direction).toBe('SHORT_GRAIN');
+            expect(row.providerLabel).toBe('Stora Enso');
+            // Must NOT have name='COATED' or caliper=170 or missing dimensions from shift
+            expect(row.name).not.toBe('COATED');
+            expect(row.name).not.toBe('Stora Enso');
+        });
+
+        it('regression 2c: clearly rejects incompatible CSV headers without mandatory columns fail-closed', async () => {
+            const invalidCsv = [
+                'random_id,notes,arbitrary_tag,color_hex',
+                '1234,foo,bar,#ffffff'
+            ].join('\n');
+            const buffer = Buffer.from(invalidCsv, 'utf8');
+
+            await expect(paperImportService.processImportPreview({
+                buffer,
+                fileName: 'invalid_headers.csv',
+                tenantId: 'tenant-reg-3',
+                supplierId: 'supp-reg-3',
+                createdBy: 'admin-1'
+            })).rejects.toThrow(/INVALID_HEADER_SCHEMA/);
+        });
+
+        it('regression 2d: preserves legacy ODS header structure through explicit detection', () => {
+            const legacyHeaders = ['CODE', 'QR', 'NAME', 'PRICE', 'MIKRONS', 'THICKNESS (mm)', 'FORMAT', 'GRAMS', '', 'COAT', 'Min. QUANTITY', 'STEPS/UNITS', 'SORTIMET', 'WIDTH (mm)', 'Heights (mm)', 'PAPER TYPE', 'PROVISER', 'AKTIV'];
+            const isLegacy = paperImportService.isLegacyOdsHeaderStructure(legacyHeaders);
+            expect(isLegacy).toBe(true);
+
+            const validation = paperImportService.validateHeaderSchema(legacyHeaders);
+            expect(validation.valid).toBe(true);
+            expect(validation.isLegacy).toBe(true);
+        });
     });
 
     describe('3. Recalculated Original File Breakdown (1,573 rows)', () => {

@@ -628,12 +628,83 @@ function validateTechnicalRow({
     return { technicalIssues, validationStatus };
 }
 
+const HEADER_CANONICAL_ALIASES = {
+    NAME: ['NAME', 'PRODUCT_NAME', 'PRODUCT', 'TITLE', 'DESCRIPTION'],
+    GRAMS: ['GRAMS', 'GSM', 'GRAMMAGE', 'WEIGHT'],
+    WIDTH: ['WIDTH (MM)', 'WIDTH_MM', 'WIDTH', 'PLATUMS'],
+    HEIGHT: ['HEIGHTS (MM)', 'HEIGHT (MM)', 'HEIGHT_MM', 'HEIGHT', 'GARUMS'],
+    CODE: ['CODE', 'SKU', 'ARTICLE', 'KODS'],
+    QR: ['QR', 'QR_CODE'],
+    PRICE: ['PRICE', 'CENA', 'COST'],
+    CALIPER: ['MIKRONS', 'CALIPER_UM', 'CALIPER', 'THICKNESS', 'BIEZUMS'],
+    THICKNESS_MM: ['THICKNESS (MM)', 'THICKNESS_MM'],
+    FORMAT: ['FORMAT', 'DIMENSIONS', 'SIZE'],
+    COAT: ['COAT', 'FINISH', 'PĀRKLĀJUMS', 'PARKLAJUMS'],
+    MIN_QTY: ['MIN. QUANTITY', 'MIN_QUANTITY', 'MOQ'],
+    STEPS_UNITS: ['STEPS/UNITS', 'STEPS_UNITS', 'PACK_SIZE', 'STEP'],
+    SORTIMENT: ['SORTIMET', 'SORTIMENT', 'GRADE'],
+    PAPER_TYPE: ['PAPER TYPE', 'TYPE', 'CATEGORY', 'KATEGORIJA'],
+    PROVIDER: ['PROVISER', 'PROVIDER', 'BRAND', 'RAŽOTĀJS', 'RAZOTAJS', 'MANUFACTURER', 'SUPPLIER'],
+    AKTIV: ['AKTIV', 'ACTIVE', 'STATUS'],
+    GRAIN: ['GRAIN', 'GRAIN_DIRECTION', 'FIBRA', 'VIRZIENS']
+};
+
+/**
+ * Detect whether the provided headers correspond to the legacy ODS sheet layout.
+ */
+function isLegacyOdsHeaderStructure(headers = []) {
+    if (!Array.isArray(headers) || headers.length === 0) return false;
+    const upperHeaders = headers.map(h => (typeof h === 'string' ? h.trim().toUpperCase() : ''));
+    const legacyMarkers = ['PROVISER', 'AKTIV', 'MIKRONS', 'SORTIMET', 'THICKNESS (MM)'];
+    let markerMatches = 0;
+    for (const marker of legacyMarkers) {
+        if (upperHeaders.includes(marker)) markerMatches++;
+    }
+    return markerMatches >= 2;
+}
+
+/**
+ * Validate that mandatory columns exist in headers, returning error if incompatible.
+ */
+function validateHeaderSchema(headers = []) {
+    if (!Array.isArray(headers) || headers.length === 0) {
+        return { valid: true, isLegacy: true, missingMandatory: [] };
+    }
+    if (isLegacyOdsHeaderStructure(headers)) {
+        return { valid: true, isLegacy: true, missingMandatory: [] };
+    }
+
+    const upperHeaders = headers.map(h => (typeof h === 'string' ? h.trim().toUpperCase() : ''));
+    const missing = [];
+
+    const hasName = HEADER_CANONICAL_ALIASES.NAME.some(alias => upperHeaders.includes(alias));
+    if (!hasName) missing.push('name (or product_name)');
+
+    const hasGsm = HEADER_CANONICAL_ALIASES.GRAMS.some(alias => upperHeaders.includes(alias));
+    if (!hasGsm) missing.push('gsm (or grams, weight)');
+
+    const hasWidth = HEADER_CANONICAL_ALIASES.WIDTH.some(alias => upperHeaders.includes(alias));
+    if (!hasWidth) missing.push('width_mm (or width, width (mm))');
+
+    const hasHeight = HEADER_CANONICAL_ALIASES.HEIGHT.some(alias => upperHeaders.includes(alias));
+    if (!hasHeight) missing.push('height_mm (or height, height (mm))');
+
+    return {
+        valid: missing.length === 0,
+        isLegacy: false,
+        missingMandatory: missing
+    };
+}
+
 /**
  * Normalize row data using evidence-based rules without guessing or inversions.
  */
 function normalizeRowData(rawCells, headers = [], fileRowNumber = 1) {
+    const hasHeaderRow = Array.isArray(headers) && headers.length > 0;
+    const isLegacy = !hasHeaderRow || isLegacyOdsHeaderStructure(headers);
+
     const headerMap = {};
-    if (Array.isArray(headers) && headers.length > 0) {
+    if (hasHeaderRow) {
         headers.forEach((h, idx) => {
             if (h && typeof h === 'string') {
                 headerMap[h.trim().toUpperCase()] = idx;
@@ -641,31 +712,40 @@ function normalizeRowData(rawCells, headers = [], fileRowNumber = 1) {
         });
     }
 
-    const getVal = (namedKey, positionalIdx) => {
-        if (headerMap[namedKey] !== undefined) {
-            return (rawCells[headerMap[namedKey]] || '').trim();
+    const getVal = (canonicalKey, positionalIdx) => {
+        const aliases = HEADER_CANONICAL_ALIASES[canonicalKey] || [canonicalKey];
+        if (hasHeaderRow) {
+            for (const alias of aliases) {
+                if (headerMap[alias] !== undefined) {
+                    return (rawCells[headerMap[alias]] || '').trim();
+                }
+            }
+            if (isLegacy && positionalIdx >= 0) {
+                return (rawCells[positionalIdx] || '').trim();
+            }
+            return '';
         }
-        return (rawCells[positionalIdx] || '').trim();
+        return positionalIdx >= 0 ? (rawCells[positionalIdx] || '').trim() : '';
     };
 
     const code = getVal('CODE', 0);
     const qr = getVal('QR', 1);
     const name = getVal('NAME', 2);
     const priceStr = getVal('PRICE', 3);
-    const micronsStr = getVal('MIKRONS', 4);
-    const thicknessMmStr = getVal('THICKNESS (MM)', 5);
+    const micronsStr = getVal('CALIPER', 4);
+    const thicknessMmStr = getVal('THICKNESS_MM', 5);
     const formatStr = getVal('FORMAT', 6);
     const gramsStr = getVal('GRAMS', 7);
     const coatStr = getVal('COAT', 9);
-    const minQtyStr = getVal('MIN. QUANTITY', 10);
-    const stepsUnitsStr = getVal('STEPS/UNITS', 11);
-    const sortimentStr = getVal('SORTIMET', 12);
-    const widthStr = getVal('WIDTH (MM)', 13) || getVal('WIDTH', 13);
-    const heightStr = getVal('HEIGHTS (MM)', 14) || getVal('HEIGHT (MM)', 14) || getVal('HEIGHT', 14);
-    const paperTypeStr = getVal('PAPER TYPE', 15) || getVal('TYPE', 15);
-    const providerStr = getVal('PROVISER', 16) || getVal('PROVIDER', 16);
-    const aktivStr = getVal('AKTIV', 17) || getVal('ACTIVE', 17);
-    const grainStr = getVal('GRAIN', -1) || getVal('FIBRA', -1) || getVal('VIRZIENS', -1);
+    const minQtyStr = getVal('MIN_QTY', 10);
+    const stepsUnitsStr = getVal('STEPS_UNITS', 11);
+    const sortimentStr = getVal('SORTIMENT', 12);
+    const widthStr = getVal('WIDTH', 13);
+    const heightStr = getVal('HEIGHT', 14);
+    const paperTypeStr = getVal('PAPER_TYPE', 15);
+    const providerStr = getVal('PROVIDER', 16);
+    const aktivStr = getVal('AKTIV', 17);
+    const grainStr = getVal('GRAIN', -1);
 
     const technicalIssues = [];
     const commercialIssues = [];
@@ -725,14 +805,30 @@ function normalizeRowData(rawCells, headers = [], fileRowNumber = 1) {
 
     // 3. Dimensions: Respect explicit units of columns and FORMAT separately, normalize each to mm and compare.
     // Never use numeric thresholds or coincidence as evidence of cm.
-    let width_mm = null;
-    let height_mm = null;
+    let widthHeader = '';
+    let heightHeader = '';
+    if (hasHeaderRow) {
+        for (const alias of HEADER_CANONICAL_ALIASES.WIDTH) {
+            if (headerMap[alias] !== undefined && headers[headerMap[alias]]) {
+                widthHeader = String(headers[headerMap[alias]]).toUpperCase();
+                break;
+            }
+        }
+        for (const alias of HEADER_CANONICAL_ALIASES.HEIGHT) {
+            if (headerMap[alias] !== undefined && headers[headerMap[alias]]) {
+                heightHeader = String(headers[headerMap[alias]]).toUpperCase();
+                break;
+            }
+        }
+    } else {
+        if (headers[13]) widthHeader = String(headers[13]).toUpperCase();
+        if (headers[14]) heightHeader = String(headers[14]).toUpperCase();
+    }
+    const widthColHeaderUnit = (widthHeader.includes('(MM)') || widthHeader.includes(' MM') || widthHeader.includes('_MM')) ? 'mm' : null;
+    const heightColHeaderUnit = (heightHeader.includes('(MM)') || heightHeader.includes(' MM') || heightHeader.includes('_MM')) ? 'mm' : null;
 
-    const widthHeader = (headers[headerMap['WIDTH (MM)']] || headers[13] || '').toUpperCase();
-    const colHeaderUnit = (widthHeader.includes('(MM)') || widthHeader.includes(' MM')) ? 'mm' : null;
-
-    const parsedColW = normalizeDimensionValue(widthStr, colHeaderUnit);
-    const parsedColH = normalizeDimensionValue(heightStr, colHeaderUnit);
+    const parsedColW = normalizeDimensionValue(widthStr, widthColHeaderUnit);
+    const parsedColH = normalizeDimensionValue(heightStr, heightColHeaderUnit);
     const parsedFmt = parseFormatDimensions(formatStr);
 
     let colW_mm = null;
@@ -974,6 +1070,11 @@ async function processImportPreview({ buffer, fileName, tenantId, supplierId, cr
 
     const sheet = parseResult.sheets[0] || { sheetName: 'Sheet1', headers: [], rows: [] };
     const rawRows = sheet.rows;
+
+    const headerValidation = validateHeaderSchema(sheet.headers);
+    if (!headerValidation.valid) {
+        throw new Error(`INVALID_HEADER_SCHEMA: Incompatible columns. Missing mandatory columns: ${headerValidation.missingMandatory.join(', ')}. Supported columns: product_name (or name), gsm (or grams), width_mm (or width), height_mm (or height).`);
+    }
 
     let validCount = 0;
     let pendingIssueCount = 0;
@@ -1562,5 +1663,8 @@ module.exports = {
     validateTechnicalRow,
     normalizeDimensionValue,
     parseFormatDimensions,
+    validateHeaderSchema,
+    isLegacyOdsHeaderStructure,
+    HEADER_CANONICAL_ALIASES,
     NORMALIZATION_RULES_VERSION
 };
