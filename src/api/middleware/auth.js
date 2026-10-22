@@ -212,8 +212,10 @@ async function requireAdmin(req, res, next) {
             tenantId: decoded.tenant_id ? String(decoded.tenant_id) : null,
             printhouseId: decoded.printhouse_id ? String(decoded.printhouse_id) : null,
             supplierId: decoded.supplier_id ? String(decoded.supplier_id) : null,
+            supplierRole: decoded.supplier_role || decoded.supplierRole || null,
             hasSupplierCapability: Boolean(decoded.has_supplier_capability || decoded.hasSupplierCapability),
             hasPrinthouseCapability: Boolean(decoded.has_printhouse_capability || decoded.hasPrinthouseCapability),
+            activeContext: decoded.active_context || (decoded.supplier_id ? 'supplier' : null),
             scopes: decoded.scopes || [],
             features: features,
             authMode: 'JWT',
@@ -308,7 +310,7 @@ function resolveActorContext(req) {
             effectiveActiveContext = 'supplier';
         }
     } else {
-        effectiveActiveContext = user.activeContext || (hasSupplierTokenRole ? 'supplier' : (hasPrinthouseTokenRole ? 'printhouse' : null));
+        effectiveActiveContext = user.activeContext || (hasSupplierTokenRole ? 'supplier' : (hasPrinthouseTokenRole ? 'printhouse' : (user.supplierId && !user.printhouseId ? 'supplier' : null)));
     }
 
     // Supplier ID validation: if header requested a supplier ID, verify it matches token or known supplier
