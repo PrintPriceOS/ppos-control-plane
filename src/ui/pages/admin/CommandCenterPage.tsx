@@ -35,9 +35,10 @@ import {
   getPrinthouseDashboardIncidents,
   getPrinthouseDashboardActivity
 } from "../../lib/adminApi";
+import { Navigate } from 'react-router-dom';
 import { FederationMap } from '../../components/federation/FederationMap';
 import { useAdminQuery } from "../../hooks/useAdminData";
-import { getUserRole } from "../../lib/authStore";
+import { getUserRole, isSupplierUser } from "../../lib/authStore";
 import { safeArray, toDisplayText } from '../../lib/display';
 import { COLORS } from '../../design-system/tokens';
 import { LiveOrdersFeed } from '../../components/dashboard/LiveOrdersFeed';
@@ -568,6 +569,10 @@ export const CommandCenterPage: React.FC = () => {
   const throughput = isPrinthouseUser
     ? 0
     : (industrial.data?.queue?.queues?.[0]?.throughput || 0);
+
+  if (isSupplierUser()) {
+    return <Navigate to="/supplier/catalog" replace />;
+  }
 
   if (!isGlobalAdmin && !isTenantAdmin && !isPrinthouseUser) {
     return (

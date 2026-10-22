@@ -135,6 +135,28 @@ router.post('/login', async (req, res) => {
         const userIdStr = String(user.id);
         const tenantIdStr = String(user.tenant_id || 'default');
 
+        // Dynamic Supplier Membership and Capability Lookup
+        let supplierContext = null;
+        try {
+            const membershipRows = await db.query(
+                `SELECT sm.supplier_id, sm.supplier_role, sm.tenant_id as supplier_tenant_id
+                 FROM supplier_memberships sm
+                 JOIN tenant_capabilities tc ON tc.tenant_id = sm.tenant_id AND tc.capability = 'PAPER_SUPPLIER' AND tc.is_active = 1
+                 WHERE sm.user_id = ? AND sm.is_active = 1
+                 LIMIT 1`,
+                [userIdStr]
+            );
+            const memberships = Array.isArray(membershipRows) ? (Array.isArray(membershipRows[0]) ? membershipRows[0] : membershipRows) : [];
+            if (memberships && memberships.length > 0) {
+                supplierContext = memberships[0];
+                if (!isSuper && (userRole === 'VIEWER' || userRole === 'TENANT_ADMIN' || !userRole)) {
+                    userRole = supplierContext.supplier_role || 'SUPPLIER_ADMIN';
+                }
+            }
+        } catch (smErr) {
+            console.warn('[AUTH-SUPPLIER-MEMBERSHIP-LOOKUP-WARN]', smErr.message);
+        }
+
         // Check if user has active TOTP MFA (Goal B)
         const userMfaService = require('../services/userMfaService');
         const mfaStatus = await userMfaService.getUserMfaStatus(userIdStr);
@@ -145,6 +167,9 @@ router.post('/login', async (req, res) => {
                     sub: userIdStr,
                     email: user.email,
                     tenant_id: tenantIdStr,
+                    supplier_id: supplierContext ? supplierContext.supplier_id : null,
+                    supplier_role: supplierContext ? supplierContext.supplier_role : null,
+                    has_supplier_capability: Boolean(supplierContext),
                     is_mfa_challenge: true,
                     purpose: 'mfa_challenge'
                 },
@@ -159,7 +184,14 @@ router.post('/login', async (req, res) => {
                 user: {
                     id: userIdStr,
                     email: user.email,
-                    tenantId: tenantIdStr
+                    tenantId: tenantIdStr,
+                    role: userRole,
+                    supplierId: supplierContext ? supplierContext.supplier_id : null,
+                    supplierRole: supplierContext ? supplierContext.supplier_role : null,
+                    hasSupplierCapability: Boolean(supplierContext),
+                    isSupplierUser: Boolean(supplierContext),
+                    isSupplierAdmin: supplierContext?.supplier_role === 'SUPPLIER_ADMIN',
+                    activeContext: supplierContext ? 'supplier' : null
                 }
             });
         }
@@ -174,7 +206,7 @@ router.post('/login', async (req, res) => {
             userAgent: req.headers['user-agent']
         });
 
-        // Sign JWT with jti linked to server session
+        // Sign JWT with jti linked to server session and supplier claims
         const token = jwt.sign(
             {
                 sub: userIdStr,
@@ -183,6 +215,9 @@ router.post('/login', async (req, res) => {
                 role: userRole,
                 tenant_id: tenantIdStr,
                 printhouse_id: user.printhouse_id ? String(user.printhouse_id) : null,
+                supplier_id: supplierContext ? supplierContext.supplier_id : null,
+                supplier_role: supplierContext ? supplierContext.supplier_role : null,
+                has_supplier_capability: Boolean(supplierContext),
                 is_super_admin: isSuper
             },
             JWT_SECRET,
@@ -202,6 +237,12 @@ router.post('/login', async (req, res) => {
                 role: userRole,
                 tenantId: tenantIdStr,
                 printhouseId: user.printhouse_id ? String(user.printhouse_id) : null,
+                supplierId: supplierContext ? supplierContext.supplier_id : null,
+                supplierRole: supplierContext ? supplierContext.supplier_role : null,
+                hasSupplierCapability: Boolean(supplierContext),
+                isSupplierUser: Boolean(supplierContext),
+                isSupplierAdmin: supplierContext?.supplier_role === 'SUPPLIER_ADMIN',
+                activeContext: supplierContext ? 'supplier' : null,
                 isSuperAdmin: isSuper,
                 sessionId: sessionRecord.sessionId,
                 mfaEnabled: false
@@ -624,11 +665,35 @@ router.post('/mfa/verify', async (req, res) => {
         }
 
         const user = await userService.findById ? await userService.findById(verifiedUserId) : await userService.findByEmail(decoded.email);
-        const userRole = (user?.role || 'VIEWER').toUpperCase();
+        let userRole = (user?.role || 'VIEWER').toUpperCase();
         const isSuper = userRole === 'SUPER_ADMIN' || user?.email === 'admin@printprice.pro';
+        if (isSuper) userRole = 'SUPER_ADMIN';
         const printhouseIdStr = user?.printhouse_id ? String(user.printhouse_id) : null;
 
+        // Dynamic Supplier Membership and Capability Lookup
+        let supplierContext = null;
+        try {
+            const membershipRows = await db.query(
+                `SELECT sm.supplier_id, sm.supplier_role, sm.tenant_id as supplier_tenant_id
+                 FROM supplier_memberships sm
+                 JOIN tenant_capabilities tc ON tc.tenant_id = sm.tenant_id AND tc.capability = 'PAPER_SUPPLIER' AND tc.is_active = 1
+                 WHERE sm.user_id = ? AND sm.is_active = 1
+                 LIMIT 1`,
+                [verifiedUserId]
+            );
+            const memberships = Array.isArray(membershipRows) ? (Array.isArray(membershipRows[0]) ? membershipRows[0] : membershipRows) : [];
+            if (memberships && memberships.length > 0) {
+                supplierContext = memberships[0];
+                if (!isSuper && (userRole === 'VIEWER' || userRole === 'TENANT_ADMIN' || !userRole)) {
+                    userRole = supplierContext.supplier_role || 'SUPPLIER_ADMIN';
+                }
+            }
+        } catch (smErr) {
+            console.warn('[AUTH-SUPPLIER-MEMBERSHIP-LOOKUP-WARN]', smErr.message);
+        }
+
         // Create Trackable Server Session
+        const userSessionService = require('../services/userSessionService');
         const sessionRecord = await userSessionService.createSession({
             userId: verifiedUserId,
             tenantId: verifiedTenantId,
@@ -637,7 +702,7 @@ router.post('/mfa/verify', async (req, res) => {
             userAgent: req.headers['user-agent']
         });
 
-        // Sign full JWT token with session jti
+        // Sign full JWT token with session jti and supplier claims
         const token = jwt.sign(
             {
                 sub: verifiedUserId,
@@ -646,6 +711,9 @@ router.post('/mfa/verify', async (req, res) => {
                 role: userRole,
                 tenant_id: verifiedTenantId,
                 printhouse_id: printhouseIdStr,
+                supplier_id: supplierContext ? supplierContext.supplier_id : null,
+                supplier_role: supplierContext ? supplierContext.supplier_role : null,
+                has_supplier_capability: Boolean(supplierContext),
                 is_super_admin: isSuper
             },
             JWT_SECRET,
@@ -661,6 +729,12 @@ router.post('/mfa/verify', async (req, res) => {
                 role: userRole,
                 tenantId: verifiedTenantId,
                 printhouseId: printhouseIdStr,
+                supplierId: supplierContext ? supplierContext.supplier_id : null,
+                supplierRole: supplierContext ? supplierContext.supplier_role : null,
+                hasSupplierCapability: Boolean(supplierContext),
+                isSupplierUser: Boolean(supplierContext),
+                isSupplierAdmin: supplierContext?.supplier_role === 'SUPPLIER_ADMIN',
+                activeContext: supplierContext ? 'supplier' : null,
                 isSuperAdmin: isSuper,
                 sessionId: sessionRecord.sessionId,
                 mfaEnabled: true

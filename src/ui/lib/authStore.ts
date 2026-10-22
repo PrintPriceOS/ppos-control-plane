@@ -108,6 +108,15 @@ export function getUserRole(): string {
         return 'SUPER_ADMIN';
     }
 
+    // Dynamic resolution for Supplier Context
+    const activeContext = getActiveContext();
+    if (activeContext === 'supplier' && user.supplierRole) {
+        return user.supplierRole.toUpperCase();
+    }
+    if ((user.isSupplierUser || user.supplierId) && !user.printhouseId && user.supplierRole) {
+        return user.supplierRole.toUpperCase();
+    }
+
     return rawRole;
 }
 
@@ -129,8 +138,8 @@ export function getActiveContext(): 'supplier' | 'printhouse' | null {
     if (stored === 'supplier' || stored === 'printhouse') return stored;
     const user = getAuthUser();
     if (user?.activeContext) return user.activeContext;
-    if (isSupplierUser()) return 'supplier';
-    if (isPrinthouseUser()) return 'printhouse';
+    if (user?.isSupplierUser || user?.supplierId) return 'supplier';
+    if (user?.printhouseId) return 'printhouse';
     return null;
 }
 
@@ -144,7 +153,10 @@ export function setActiveContext(context: 'supplier' | 'printhouse'): void {
 export function isPaperSupplierHubEnabled(): boolean {
     if (typeof window === 'undefined') return false;
     const envFlag = (import.meta as any).env?.VITE_PAPER_SUPPLIER_HUB_ENABLED;
-    return envFlag === 'true' || envFlag === true;
+    if (envFlag === 'true' || envFlag === true) return true;
+    const user = getAuthUser();
+    if (user?.hasSupplierCapability || Boolean(user?.supplierId) || Boolean(user?.isSupplierUser)) return true;
+    return false;
 }
 
 export function isSuperAdmin(): boolean {

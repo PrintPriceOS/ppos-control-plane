@@ -61,6 +61,15 @@ export async function resolveUserDestination(user: any, explicitRedirect: string
 
     const role = (user?.role || user?.declaredBy || '').toString().trim();
 
+    // Supplier user roles: route to Supplier Catalog Hub
+    const isSupplier = ['SUPPLIER_ADMIN', 'SUPPLIER_OPERATOR', 'SUPPLIER_VIEWER'].includes(role) ||
+        Boolean(user?.isSupplierUser) ||
+        ['SUPPLIER_ADMIN', 'SUPPLIER_OPERATOR', 'SUPPLIER_VIEWER'].includes((user?.supplierRole || '').toUpperCase());
+
+    if (isSupplier) {
+        return '/supplier/catalog';
+    }
+
     // Printhouse user roles: PRINTHOUSE_ADMIN, PRINTHOUSE_OPERATOR, PRINTHOUSE_USER
     if (isPrinthouseRole(role)) {
         // Query authoritative server readiness. Never infer onboarding completion from isActivated.
