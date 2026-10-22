@@ -42,9 +42,34 @@ El **Paper Supplier Hub** incorpora un panel independiente para distribuidores/f
   - Validación y conciliación de los 1.573 registros del archivo original aportado (`Paper data base.ods.zip`, SHA-256 `7ffb63eb2705fa0c6faa459001ddd3db0702aa25d0bca52fa58e1a13899d4c9a`): desglose recalculado eliminando `isDeciMatch` e inferencias de ratio 10x: 16 válidos, 1.544 pendientes de revisión técnica/unidades, 13 duplicados internos, 0 rechazados de plano ($16 + 1.544 + 13 + 0 = 1.573$).
   - Separación canónica: sin ofertas comerciales, sin modificación de inventario ni costes de pricing.
   - Endurecimiento estricto de revisión: preservación de evidencia técnica, persistencia de contradicciones ante correcciones parciales, validación cerrada de decisiones (`PENDING`, `ACCEPTED`, `REJECTED`) con HTTP 400 `INVALID_DECISION` y aborto/rollback total ante cualquier `pendingCount > 0`.
-- [ ] **I3 — Catálogo y ofertas en panel proveedor (Entrega R1)**:
-  - CRUD de ofertas, visibilidad (`PRIVATE`, `APPROVED_CUSTOMERS`, `MARKETPLACE`).
-  - Activación por flags y allowlist de organizaciones piloto.
+- [x] **I3 — Catálogo y ofertas en panel proveedor (Entrega R1)**:
+  - **Migración 164**: Creación de `supplier_paper_offers` y `supplier_paper_offer_revisions` para gestión comercial con versiones inmutables y segregación multitenant.
+  - **Servicios y Rutas de Backend**:
+    - `paperOfferService.js`: CRUD completo de ofertas, validación canónica de bases (`KG`, `TONNE`, `SHEET`, `THOUSAND_SHEETS`, `PACK` con `sheets_per_pack`), control estricto de campos obligatorios (sin deducir monedas ni bases del archivo original), versionado en `supplier_paper_offer_revisions`.
+    - Endpoints en `paperSuppliersRoutes.js`:
+      - `GET /catalog/products`: listado paginado y búsqueda de productos y variantes técnicas confirmadas.
+      - `GET /catalog/variants/:id`: detalle técnico de variante con sus ofertas comerciales existentes.
+      - `GET /offers`: listado paginado y filtrado de ofertas del proveedor autenticado.
+      - `POST /offers`: creación de oferta vinculada a variante técnica con revisión inicial.
+      - `GET /offers/:id`: consulta de oferta con historial de revisiones.
+      - `PUT /offers/:id`: actualización de condiciones comerciales creando nueva revisión.
+      - `PATCH /offers/:id/status`: activación/desactivación de oferta (`ACTIVE` / `INACTIVE`).
+  - **Visibilidad y Seguridad Multitenant**:
+    - Visibilidad segmentada (`PRIVATE`, `APPROVED_CUSTOMERS`, `MARKETPLACE`).
+    - Resolución unívoca de `tenant_id` y `supplier_id` desde el token JWT.
+    - RBAC estricto: `SUPPLIER_ADMIN` y `SUPPLIER_OPERATOR` autorizados para escritura; `SUPPLIER_VIEWER` estrictamente lectura (rechazo fail-closed HTTP 403 `FORBIDDEN_WRITE_PERMISSION_REQUIRED`).
+    - Proveedores suspendidos o pendientes bloqueados por `requireApprovedSupplier`.
+    - Flag `PAPER_SUPPLIER_HUB_ENABLED` y allowlist del piloto.
+  - **Panel de Proveedor Frontend (`/supplier/*`)**:
+    - Catálogo paginado con buscador, filtros y detalle modal/drawer de variantes técnicas confirmadas.
+    - Gestor de ofertas comerciales: alta, edición con calculadora de base, historial de revisiones y conmutador de estado.
+    - Flujo integrado de importación y revisión de I2 (subida, previsualización, revisión de incidencias con indicación visual de filas pendientes, corrección y confirmación atómica).
+    - Estados completos: carga, vacío, error, validaciones comprensibles y confirmaciones claras con i18n (ES/EN/DE).
+  - **Criterios de Aceptación**:
+    - Aislamiento estricto: un proveedor nunca puede ver ni modificar ofertas de otro proveedor.
+    - Integridad comercial: prohibido publicar ofertas sin precio, moneda, base o con datos incompletos.
+    - No invasión de inventario: las ofertas comerciales no alteran `materials_catalog` ni `predictive_material_inventory`.
+    - Regresiones I1-R2 e I2 completamente verdes.
 - [ ] **I4 — Búsqueda de imprenta y RFQ bidireccional (Entrega R2)**:
   - Sourcing en `/materials`, RFQ con destinatarios aislados, respuesta versionada.
 - [ ] **I5 — Pedido, expedición y recepción a inventario (Entrega R3)**:

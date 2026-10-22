@@ -363,6 +363,298 @@ router.post('/catalog/imports/:batchId/confirm', requireSupplierScope('OPERATOR'
     }
 });
 
+const paperOfferService = require('../services/paperOfferService');
+
+/**
+ * -------------------------------------------------------------
+ * ITERATION I3: TECHNICAL CATALOG & COMMERCIAL OFFERS ENDPOINTS
+ * -------------------------------------------------------------
+ */
+
+/**
+ * GET /api/v1/paper-suppliers/catalog/products
+ * Query confirmed technical products and physical variants.
+ * Accessible to VIEWER, OPERATOR, ADMIN.
+ */
+router.get('/catalog/products', requireSupplierScope('VIEWER'), requireApprovedSupplier, async (req, res) => {
+    try {
+        const page = parseInt(req.query.page || '1', 10);
+        const limit = Math.min(parseInt(req.query.limit || '20', 10), 100);
+        const search = req.query.search || null;
+        const category = req.query.category || null;
+        const finish = req.query.finish || null;
+
+        const result = await paperOfferService.getTechnicalCatalog({
+            page,
+            limit,
+            search,
+            category,
+            finish
+        });
+
+        return res.json({
+            ok: true,
+            data: {
+                ...result,
+                products: result.items
+            }
+        });
+    } catch (err) {
+        console.error('[PAPER-SUPPLIERS][CATALOG-ERROR]', err);
+        return res.status(500).json({
+            ok: false,
+            error: {
+                code: 'CATALOG_QUERY_FAILED',
+                message: err.message
+            }
+        });
+    }
+});
+
+/**
+ * GET /api/v1/paper-suppliers/catalog/variants/:variantId
+ * Query detailed technical variant specifications and supplier's own offers.
+ */
+router.get('/catalog/variants/:variantId', requireSupplierScope('VIEWER'), requireApprovedSupplier, async (req, res) => {
+    try {
+        const context = resolveActorContext(req);
+        const { variantId } = req.params;
+
+        const result = await paperOfferService.getTechnicalVariantDetail({
+            variantId,
+            tenantId: context.tenantId,
+            supplierId: context.supplierId
+        });
+
+        return res.json({
+            ok: true,
+            data: result
+        });
+    } catch (err) {
+        console.error('[PAPER-SUPPLIERS][VARIANT-DETAIL-ERROR]', err);
+        const isNotFound = err.message.startsWith('VARIANT_NOT_FOUND');
+        return res.status(isNotFound ? 404 : 500).json({
+            ok: false,
+            error: {
+                code: isNotFound ? 'VARIANT_NOT_FOUND' : 'VARIANT_QUERY_FAILED',
+                message: err.message
+            }
+        });
+    }
+});
+
+/**
+ * GET /api/v1/paper-suppliers/offers
+ * List commercial offers of current supplier with filtering and pagination.
+ */
+router.get('/offers', requireSupplierScope('VIEWER'), requireApprovedSupplier, async (req, res) => {
+    try {
+        const context = resolveActorContext(req);
+        const query = req.query || {};
+        const page = parseInt(query.page || '1', 10);
+        const limit = Math.min(parseInt(query.limit || '20', 10), 100);
+        const status = query.status || null;
+        const visibility = query.visibility || null;
+        const search = query.search || null;
+
+        const result = await paperOfferService.listSupplierOffers({
+            tenantId: context.tenantId,
+            supplierId: context.supplierId,
+            page,
+            limit,
+            status,
+            visibility,
+            search
+        });
+
+        return res.json({
+            ok: true,
+            data: {
+                ...result,
+                offers: result.items
+            }
+        });
+    } catch (err) {
+        console.error('[PAPER-SUPPLIERS][LIST-OFFERS-ERROR]', err);
+        return res.status(500).json({
+            ok: false,
+            error: {
+                code: 'OFFERS_QUERY_FAILED',
+                message: err.message
+            }
+        });
+    }
+});
+
+/**
+ * POST /api/v1/paper-suppliers/offers
+ * Create new commercial offer bound to confirmed variant.
+ * Operator or Admin capability required.
+ */
+router.post('/offers', requireSupplierScope('OPERATOR'), requireApprovedSupplier, async (req, res) => {
+    try {
+        const context = resolveActorContext(req);
+        const payload = req.body || {};
+
+        const result = await paperOfferService.createOffer({
+            tenantId: context.tenantId,
+            supplierId: context.supplierId,
+            actorId: context.userId,
+            payload
+        });
+
+        return res.status(201).json({
+            ok: true,
+            data: result
+        });
+    } catch (err) {
+        console.error('[PAPER-SUPPLIERS][CREATE-OFFER-ERROR]', err);
+        let statusCode = 400;
+        let errCode = 'OFFER_CREATION_FAILED';
+
+        if (err.message.startsWith('VARIANT_NOT_FOUND')) {
+            statusCode = 404;
+            errCode = 'VARIANT_NOT_FOUND';
+        } else if (err.message.startsWith('SKU_ALREADY_EXISTS')) {
+            statusCode = 409;
+            errCode = 'SKU_ALREADY_EXISTS';
+        } else if (err.message.startsWith('INVALID_OFFER_PAYLOAD')) {
+            statusCode = 400;
+            errCode = 'INVALID_OFFER_PAYLOAD';
+        }
+
+        return res.status(statusCode).json({
+            ok: false,
+            error: {
+                code: errCode,
+                message: err.message,
+                validationErrors: err.validationErrors || []
+            }
+        });
+    }
+});
+
+/**
+ * GET /api/v1/paper-suppliers/offers/:offerId
+ * Query offer details and revision history.
+ */
+router.get('/offers/:offerId', requireSupplierScope('VIEWER'), requireApprovedSupplier, async (req, res) => {
+    try {
+        const context = resolveActorContext(req);
+        const { offerId } = req.params;
+
+        const result = await paperOfferService.getOfferById({
+            offerId,
+            tenantId: context.tenantId,
+            supplierId: context.supplierId
+        });
+
+        return res.json({
+            ok: true,
+            data: result
+        });
+    } catch (err) {
+        console.error('[PAPER-SUPPLIERS][GET-OFFER-ERROR]', err);
+        const isNotFound = err.message.startsWith('OFFER_NOT_FOUND');
+        return res.status(isNotFound ? 404 : 500).json({
+            ok: false,
+            error: {
+                code: isNotFound ? 'OFFER_NOT_FOUND' : 'OFFER_QUERY_FAILED',
+                message: err.message
+            }
+        });
+    }
+});
+
+/**
+ * PUT /api/v1/paper-suppliers/offers/:offerId
+ * Update commercial conditions, creating new immutable revision.
+ */
+router.put('/offers/:offerId', requireSupplierScope('OPERATOR'), requireApprovedSupplier, async (req, res) => {
+    try {
+        const context = resolveActorContext(req);
+        const { offerId } = req.params;
+        const payload = req.body || {};
+
+        const result = await paperOfferService.updateOffer({
+            offerId,
+            tenantId: context.tenantId,
+            supplierId: context.supplierId,
+            actorId: context.userId,
+            payload
+        });
+
+        return res.json({
+            ok: true,
+            data: result
+        });
+    } catch (err) {
+        console.error('[PAPER-SUPPLIERS][UPDATE-OFFER-ERROR]', err);
+        const isNotFound = err.message.startsWith('OFFER_NOT_FOUND');
+        const isInvalid = err.message.startsWith('INVALID_OFFER_PAYLOAD');
+        const statusCode = isNotFound ? 404 : (isInvalid ? 400 : 500);
+
+        return res.status(statusCode).json({
+            ok: false,
+            error: {
+                code: isNotFound ? 'OFFER_NOT_FOUND' : (isInvalid ? 'INVALID_OFFER_PAYLOAD' : 'OFFER_UPDATE_FAILED'),
+                message: err.message,
+                validationErrors: err.validationErrors || []
+            }
+        });
+    }
+});
+
+/**
+ * PATCH /api/v1/paper-suppliers/offers/:offerId/status
+ * Toggle offer status (e.g. ACTIVE -> INACTIVE).
+ */
+router.patch('/offers/:offerId/status', requireSupplierScope('OPERATOR'), requireApprovedSupplier, async (req, res) => {
+    try {
+        const context = resolveActorContext(req);
+        const { offerId } = req.params;
+        const { status, reason } = req.body || {};
+
+        if (!status) {
+            return res.status(400).json({
+                ok: false,
+                error: {
+                    code: 'STATUS_REQUIRED',
+                    message: 'A valid status string is required.'
+                }
+            });
+        }
+
+        const result = await paperOfferService.updateOfferStatus({
+            offerId,
+            tenantId: context.tenantId,
+            supplierId: context.supplierId,
+            actorId: context.userId,
+            status,
+            reason
+        });
+
+        return res.json({
+            ok: true,
+            data: result
+        });
+    } catch (err) {
+        console.error('[PAPER-SUPPLIERS][STATUS-OFFER-ERROR]', err);
+        const isNotFound = err.message.startsWith('OFFER_NOT_FOUND');
+        const isInvalid = err.message.startsWith('INVALID_STATUS');
+        const statusCode = isNotFound ? 404 : (isInvalid ? 400 : 500);
+
+        return res.status(statusCode).json({
+            ok: false,
+            error: {
+                code: isNotFound ? 'OFFER_NOT_FOUND' : (isInvalid ? 'INVALID_STATUS' : 'OFFER_STATUS_UPDATE_FAILED'),
+                message: err.message
+            }
+        });
+    }
+});
+
 module.exports = router;
+
 
 

@@ -1,0 +1,472 @@
+import React, { useState } from 'react';
+import { 
+    XMarkIcon,
+    ArrowUpTrayIcon,
+    CheckCircleIcon,
+    ExclamationTriangleIcon,
+    InformationCircleIcon
+} from '@heroicons/react/24/outline';
+import { adminFetch } from '../../lib/adminApi';
+import { StatusBadge } from '../StatusBadge';
+
+interface ImportModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+    onImportConfirmed: () => void;
+}
+
+export const TechnicalImportModal: React.FC<ImportModalProps> = ({
+    isOpen,
+    onClose,
+    onImportConfirmed
+}) => {
+    const [file, setFile] = useState<File | null>(null);
+    const [uploading, setUploading] = useState<boolean>(false);
+    const [previewData, setPreviewData] = useState<any>(null);
+    const [batchRows, setBatchRows] = useState<any[]>([]);
+    const [loadingRows, setLoadingRows] = useState<boolean>(false);
+    const [error, setError] = useState<string | null>(null);
+    const [confirming, setConfirming] = useState<boolean>(false);
+    const [page, setPage] = useState<number>(1);
+    const [totalPages, setTotalPages] = useState<number>(1);
+    const [filterStatus, setFilterStatus] = useState<string>('');
+    const [decisions, setDecisions] = useState<Record<string, { decision: string; overrides?: any }>>({});
+    const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+    if (!isOpen) return null;
+
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files[0]) {
+            setFile(e.target.files[0]);
+            setError(null);
+            setSuccessMessage(null);
+        }
+    };
+
+    const handleUploadPreview = async () => {
+        if (!file) return;
+        setUploading(true);
+        setError(null);
+
+        const reader = new FileReader();
+        reader.onload = async () => {
+            try {
+                const base64 = (reader.result as string).split(',')[1];
+                const res: any = await adminFetch('/api/v1/paper-suppliers/catalog/imports/preview', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        fileBase64: base64,
+                        fileName: file.name
+                    })
+                });
+
+                if (res && res.ok) {
+                    setPreviewData(res.data);
+                    loadBatchRows(res.data.batchId, 1, '');
+                } else {
+                    setError(res?.error?.message || 'Error processing technical import preview.');
+                }
+            } catch (err: any) {
+                setError(err.message || 'Failed to upload and parse file.');
+            } finally {
+                setUploading(false);
+            }
+        };
+        reader.readAsDataURL(file);
+    };
+
+    const loadBatchRows = async (batchId: string, pageNum: number, status: string) => {
+        setLoadingRows(true);
+        try {
+            const queryParams = new URLSearchParams({
+                page: String(pageNum),
+                limit: '20'
+            });
+            if (status) queryParams.set('status', status);
+
+            const res: any = await adminFetch(`/api/v1/paper-suppliers/catalog/imports/${batchId}/rows?${queryParams.toString()}`);
+            if (res && res.ok) {
+                setBatchRows(res.data.rows || []);
+                setPage(res.data.page);
+                setTotalPages(res.data.totalPages || 1);
+            }
+        } catch (err: any) {
+            setError(err.message || 'Failed to fetch batch rows.');
+        } finally {
+            setLoadingRows(false);
+        }
+    };
+
+    const handleDecisionChange = (rowId: string, decision: string) => {
+        setDecisions(prev => ({
+            ...prev,
+            [rowId]: {
+                ...(prev[rowId] || {}),
+                decision
+            }
+        }));
+    };
+
+    const handleOverrideChange = (rowId: string, field: string, value: any) => {
+        setDecisions(prev => ({
+            ...prev,
+            [rowId]: {
+                ...(prev[rowId] || { decision: 'PENDING' }),
+                overrides: {
+                    ...(prev[rowId]?.overrides || {}),
+                    [field]: value
+                }
+            }
+        }));
+    };
+
+    const handleApplyDecisions = async () => {
+        if (!previewData?.batchId || Object.keys(decisions).length === 0) return;
+        try {
+            const res: any = await adminFetch(`/api/v1/paper-suppliers/catalog/imports/${previewData.batchId}/rows`, {
+                method: 'PATCH',
+                body: JSON.stringify({ decisions })
+            });
+            if (res && res.ok) {
+                setSuccessMessage(`Updated ${res.data.updatedCount} row decisions successfully.`);
+                setDecisions({});
+                loadBatchRows(previewData.batchId, page, filterStatus);
+            } else {
+                setError(res?.error?.message || 'Failed to apply row decisions.');
+            }
+        } catch (err: any) {
+            setError(err.message || 'Failed to submit review decisions.');
+        }
+    };
+
+    const handleConfirmBatch = async () => {
+        if (!previewData?.batchId) return;
+        setConfirming(true);
+        setError(null);
+        try {
+            // Apply any unsubmitted decisions together with confirmation
+            const res: any = await adminFetch(`/api/v1/paper-suppliers/catalog/imports/${previewData.batchId}/confirm`, {
+                method: 'POST',
+                body: JSON.stringify({ decisions: Object.keys(decisions).length > 0 ? decisions : undefined })
+            });
+
+            if (res && res.ok) {
+                setSuccessMessage(`Batch confirmed successfully! Created ${res.data.confirmedProducts} products.`);
+                setTimeout(() => {
+                    onImportConfirmed();
+                    onClose();
+                }, 1500);
+            } else {
+                setError(res?.error?.message || 'Cannot confirm batch with unresolved pending rows.');
+            }
+        } catch (err: any) {
+            setError(err.message || 'Confirmation failed.');
+        } finally {
+            setConfirming(false);
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 flex items-center justify-center p-4">
+            <div className="bg-white dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 w-full max-w-5xl flex flex-col max-h-[90vh] shadow-2xl">
+                {/* Header */}
+                <div className="p-5 border-b border-slate-200 dark:border-zinc-800 flex items-center justify-between">
+                    <div>
+                        <div className="flex items-center gap-2">
+                            <span className="px-2 py-0.5 text-[9px] font-black uppercase tracking-widest bg-red-600 text-white">
+                                Technical Importer
+                            </span>
+                            <span className="text-[10px] font-bold text-zinc-400">
+                                ODS · XLSX · CSV RFC 4180
+                            </span>
+                        </div>
+                        <h2 className="text-lg font-black text-slate-900 dark:text-white mt-1">
+                            Paper Data Sheet Import & Review Engine
+                        </h2>
+                    </div>
+                    <button
+                        onClick={onClose}
+                        className="p-1 text-zinc-400 hover:text-slate-900 dark:hover:text-white transition-colors"
+                    >
+                        <XMarkIcon className="w-5 h-5" />
+                    </button>
+                </div>
+
+                {/* Body */}
+                <div className="p-6 overflow-y-auto space-y-6 flex-1 text-xs">
+                    {error && (
+                        <div className="p-4 bg-red-500/10 border border-red-500/30 text-red-500 rounded-none flex items-start gap-3">
+                            <ExclamationTriangleIcon className="w-5 h-5 shrink-0 mt-0.5" />
+                            <div>
+                                <p className="font-bold">Import or Review Issue</p>
+                                <p className="mt-0.5">{error}</p>
+                            </div>
+                        </div>
+                    )}
+
+                    {successMessage && (
+                        <div className="p-4 bg-emerald-500/10 border border-emerald-500/30 text-emerald-500 rounded-none flex items-start gap-3">
+                            <CheckCircleIcon className="w-5 h-5 shrink-0 mt-0.5" />
+                            <div>
+                                <p className="font-bold">Success</p>
+                                <p className="mt-0.5">{successMessage}</p>
+                            </div>
+                        </div>
+                    )}
+
+                    {!previewData ? (
+                        /* Step 1: Upload File */
+                        <div className="space-y-4">
+                            <div className="border-2 border-dashed border-slate-300 dark:border-zinc-700 p-8 text-center flex flex-col items-center justify-center space-y-3 bg-slate-50 dark:bg-zinc-900/40">
+                                <ArrowUpTrayIcon className="w-10 h-10 text-zinc-400" />
+                                <div>
+                                    <p className="font-bold text-slate-800 dark:text-zinc-200">
+                                        Select technical supplier spreadsheet
+                                    </p>
+                                    <p className="text-zinc-500 text-[11px] mt-1">
+                                        Supported formats: .ods, .xlsx, .csv. File size limit: 25 MB.
+                                    </p>
+                                </div>
+                                <input
+                                    type="file"
+                                    id="paper-catalog-file-upload"
+                                    accept=".ods,.xlsx,.csv"
+                                    onChange={handleFileChange}
+                                    className="hidden"
+                                />
+                                <label
+                                    htmlFor="paper-catalog-file-upload"
+                                    className="px-4 py-2 bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold uppercase tracking-wider text-[10px] cursor-pointer hover:bg-slate-800 transition-colors"
+                                >
+                                    Browse Files
+                                </label>
+                                {file && (
+                                    <p className="text-[11px] font-mono text-emerald-600 dark:text-emerald-400 font-bold mt-2">
+                                        Selected: {file.name} ({(file.size / 1024).toFixed(1)} KB)
+                                    </p>
+                                )}
+                            </div>
+
+                            <div className="flex justify-end">
+                                <button
+                                    onClick={handleUploadPreview}
+                                    disabled={!file || uploading}
+                                    className="px-5 py-2.5 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-bold uppercase tracking-wider text-[11px] transition-colors"
+                                >
+                                    {uploading ? 'Processing File...' : 'Upload & Analyze Rows'}
+                                </button>
+                            </div>
+                        </div>
+                    ) : (
+                        /* Step 2: Staged Review & Confirmation */
+                        <div className="space-y-5">
+                            {/* Summary Metrics Bar */}
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                                <div className="p-3 bg-slate-100 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800">
+                                    <span className="text-[10px] font-bold uppercase text-zinc-500">Total Rows</span>
+                                    <p className="text-xl font-black font-mono mt-1">{previewData.summary?.totalRows || 0}</p>
+                                </div>
+                                <div className="p-3 bg-emerald-500/10 border border-emerald-500/20">
+                                    <span className="text-[10px] font-bold uppercase text-emerald-600 dark:text-emerald-400">Valid Rows</span>
+                                    <p className="text-xl font-black font-mono text-emerald-600 dark:text-emerald-400 mt-1">{previewData.summary?.validRows || 0}</p>
+                                </div>
+                                <div className="p-3 bg-amber-500/10 border border-amber-500/20">
+                                    <span className="text-[10px] font-bold uppercase text-amber-600 dark:text-amber-400">Pending Review</span>
+                                    <p className="text-xl font-black font-mono text-amber-600 dark:text-amber-400 mt-1">{previewData.summary?.pendingRows || 0}</p>
+                                </div>
+                                <div className="p-3 bg-violet-500/10 border border-violet-500/20">
+                                    <span className="text-[10px] font-bold uppercase text-violet-600 dark:text-violet-400">Duplicates</span>
+                                    <p className="text-xl font-black font-mono text-violet-600 dark:text-violet-400 mt-1">{previewData.summary?.duplicateRows || 0}</p>
+                                </div>
+                            </div>
+
+                            {/* Warning Banner regarding 1,544 pending rows */}
+                            {previewData.summary?.pendingRows > 0 && (
+                                <div className="p-3 bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-400 flex items-start gap-2 text-[11px]">
+                                    <InformationCircleIcon className="w-5 h-5 shrink-0 mt-0.5" />
+                                    <div>
+                                        <span className="font-bold">Pending Rows Safeguard:</span> Rows with dimension discrepancies, ambiguous units, or gsm conflicts require explicit operator resolution or rejection. Confirmation will be blocked if any non-rejected row lacks mandatory technical attributes or remains unaddressed.
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Table of Rows */}
+                            <div className="space-y-3">
+                                <div className="flex items-center justify-between gap-3">
+                                    <div className="flex items-center gap-2">
+                                        <span className="font-bold text-zinc-500 text-[10px] uppercase">Filter:</span>
+                                        <select
+                                            value={filterStatus}
+                                            onChange={(e) => {
+                                                setFilterStatus(e.target.value);
+                                                loadBatchRows(previewData.batchId, 1, e.target.value);
+                                            }}
+                                            className="px-2.5 py-1 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 text-[11px]"
+                                        >
+                                            <option value="">All Statuses</option>
+                                            <option value="VALID">Valid</option>
+                                            <option value="WARNING">Warning</option>
+                                            <option value="DUPLICATE">Duplicate</option>
+                                            <option value="REJECTED">Rejected</option>
+                                        </select>
+                                    </div>
+
+                                    <div className="flex items-center gap-2">
+                                        {Object.keys(decisions).length > 0 && (
+                                            <button
+                                                onClick={handleApplyDecisions}
+                                                className="px-3 py-1 bg-slate-800 text-white font-bold uppercase text-[10px] hover:bg-slate-700 transition-colors"
+                                            >
+                                                Save Decisions ({Object.keys(decisions).length})
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+
+                                <div className="border border-slate-200 dark:border-zinc-800 overflow-x-auto">
+                                    <table className="w-full text-left border-collapse">
+                                        <thead>
+                                            <tr className="bg-slate-100 dark:bg-zinc-900 border-b border-slate-200 dark:border-zinc-800 text-[10px] font-bold text-zinc-500 uppercase tracking-wider">
+                                                <th className="p-2.5">Row</th>
+                                                <th className="p-2.5">Product Name</th>
+                                                <th className="p-2.5">GSM</th>
+                                                <th className="p-2.5">Dimensions (mm)</th>
+                                                <th className="p-2.5">Finish</th>
+                                                <th className="p-2.5">Issues</th>
+                                                <th className="p-2.5">Status</th>
+                                                <th className="p-2.5">Decision</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-200 dark:divide-zinc-800">
+                                            {loadingRows ? (
+                                                <tr>
+                                                    <td colSpan={8} className="p-6 text-center text-zinc-400">Loading batch rows...</td>
+                                                </tr>
+                                            ) : batchRows.length === 0 ? (
+                                                <tr>
+                                                    <td colSpan={8} className="p-6 text-center text-zinc-400">No rows matching filter criteria.</td>
+                                                </tr>
+                                            ) : (
+                                                batchRows.map((r: any) => {
+                                                    const rowDecision = decisions[r.id]?.decision || r.decision || 'PENDING';
+                                                    const issuesList = r.issues || [];
+
+                                                    return (
+                                                        <tr key={r.id} className="hover:bg-slate-50 dark:hover:bg-zinc-900/50">
+                                                            <td className="p-2.5 font-mono text-zinc-400">{r.rowNumber}</td>
+                                                            <td className="p-2.5 font-bold text-slate-800 dark:text-zinc-200">{r.normalized?.name || '—'}</td>
+                                                            <td className="p-2.5 font-mono">
+                                                                <input
+                                                                    type="number"
+                                                                    defaultValue={r.normalized?.gsm || ''}
+                                                                    onChange={(e) => handleOverrideChange(r.id, 'gsm', Number(e.target.value))}
+                                                                    className="w-16 px-1.5 py-0.5 border border-slate-200 dark:border-zinc-800 bg-transparent text-[11px] font-mono"
+                                                                />
+                                                            </td>
+                                                            <td className="p-2.5 font-mono">
+                                                                <div className="flex items-center gap-1">
+                                                                    <input
+                                                                        type="number"
+                                                                        defaultValue={r.normalized?.width_mm || ''}
+                                                                        onChange={(e) => handleOverrideChange(r.id, 'width_mm', Number(e.target.value))}
+                                                                        className="w-14 px-1 py-0.5 border border-slate-200 dark:border-zinc-800 bg-transparent text-[11px] font-mono"
+                                                                    />
+                                                                    <span>x</span>
+                                                                    <input
+                                                                        type="number"
+                                                                        defaultValue={r.normalized?.height_mm || ''}
+                                                                        onChange={(e) => handleOverrideChange(r.id, 'height_mm', Number(e.target.value))}
+                                                                        className="w-14 px-1 py-0.5 border border-slate-200 dark:border-zinc-800 bg-transparent text-[11px] font-mono"
+                                                                    />
+                                                                </div>
+                                                            </td>
+                                                            <td className="p-2.5">
+                                                                <span className="px-1.5 py-0.5 bg-slate-200 dark:bg-zinc-800 text-[10px] font-bold">
+                                                                    {r.normalized?.finish || 'UNKNOWN'}
+                                                                </span>
+                                                            </td>
+                                                            <td className="p-2.5 max-w-xs">
+                                                                {issuesList.length > 0 ? (
+                                                                    <div className="space-y-1">
+                                                                        {issuesList.map((iss: any, idx: number) => (
+                                                                            <p key={idx} className="text-[10px] text-amber-600 dark:text-amber-400 truncate" title={iss.message}>
+                                                                                • {iss.code}
+                                                                            </p>
+                                                                        ))}
+                                                                    </div>
+                                                                ) : (
+                                                                    <span className="text-zinc-400 text-[10px]">None</span>
+                                                                )}
+                                                            </td>
+                                                            <td className="p-2.5">
+                                                                <StatusBadge status={r.validationStatus} />
+                                                            </td>
+                                                            <td className="p-2.5">
+                                                                <select
+                                                                    value={rowDecision}
+                                                                    onChange={(e) => handleDecisionChange(r.id, e.target.value)}
+                                                                    className="px-2 py-0.5 border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-[10px] font-bold uppercase"
+                                                                >
+                                                                    <option value="PENDING">PENDING</option>
+                                                                    <option value="ACCEPTED">ACCEPTED</option>
+                                                                    <option value="REJECTED">REJECTED</option>
+                                                                </select>
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                {/* Pagination */}
+                                <div className="flex items-center justify-between text-[11px] text-zinc-500">
+                                    <span>Page {page} of {totalPages}</span>
+                                    <div className="flex items-center gap-1">
+                                        <button
+                                            disabled={page <= 1}
+                                            onClick={() => loadBatchRows(previewData.batchId, page - 1, filterStatus)}
+                                            className="px-2.5 py-1 border border-slate-200 dark:border-zinc-800 disabled:opacity-40"
+                                        >
+                                            Prev
+                                        </button>
+                                        <button
+                                            disabled={page >= totalPages}
+                                            onClick={() => loadBatchRows(previewData.batchId, page + 1, filterStatus)}
+                                            className="px-2.5 py-1 border border-slate-200 dark:border-zinc-800 disabled:opacity-40"
+                                        >
+                                            Next
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                {/* Footer */}
+                <div className="p-5 border-t border-slate-200 dark:border-zinc-800 flex items-center justify-between bg-slate-50 dark:bg-zinc-900/50">
+                    <button
+                        onClick={onClose}
+                        className="px-4 py-2 border border-slate-300 dark:border-zinc-700 text-slate-700 dark:text-zinc-300 font-bold uppercase text-[10px] hover:bg-slate-100 dark:hover:bg-zinc-800 transition-colors"
+                    >
+                        Close
+                    </button>
+
+                    {previewData && (
+                        <div className="flex items-center gap-3">
+                            <button
+                                onClick={handleConfirmBatch}
+                                disabled={confirming}
+                                className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold uppercase tracking-wider text-[11px] transition-colors"
+                            >
+                                {confirming ? 'Confirming Batch...' : 'Confirm Technical Catalog'}
+                            </button>
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+};

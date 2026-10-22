@@ -82,6 +82,7 @@ import { PublicHumanReportPage } from './pages/public/PublicHumanReportPage';
 import { AuthGuard } from './components/AuthGuard';
 import { SupplierRouteGuard } from './components/SupplierRouteGuard';
 import { SupplierDashboardPage } from './pages/supplier/SupplierDashboardPage';
+import { SupplierCatalogOffersPage } from './pages/supplier/SupplierCatalogOffersPage';
 import { ActivationGuard } from './components/auth/ActivationGuard';
 
 import { ActivationHub } from './pages/connect/ActivationHub';
@@ -375,7 +376,7 @@ export const App: React.FC = () => {
                 } />
                 <Route path="/supplier/catalog" element={
                     <SupplierRouteGuard>
-                        <div className="p-8"><SupplierDashboardPage /></div>
+                        <div className="p-8"><SupplierCatalogOffersPage /></div>
                     </SupplierRouteGuard>
                 } />
                 <Route path="/supplier/orders" element={
