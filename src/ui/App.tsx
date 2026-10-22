@@ -83,6 +83,8 @@ import { AuthGuard } from './components/AuthGuard';
 import { SupplierRouteGuard } from './components/SupplierRouteGuard';
 import { SupplierDashboardPage } from './pages/supplier/SupplierDashboardPage';
 import { SupplierCatalogOffersPage } from './pages/supplier/SupplierCatalogOffersPage';
+import { SupplierOrdersPage } from './pages/supplier/SupplierOrdersPage';
+import { SupplierSettingsPage } from './pages/supplier/SupplierSettingsPage';
 import { ActivationGuard } from './components/auth/ActivationGuard';
 
 import { ActivationHub } from './pages/connect/ActivationHub';
@@ -381,12 +383,12 @@ export const App: React.FC = () => {
                 } />
                 <Route path="/supplier/orders" element={
                     <SupplierRouteGuard>
-                        <div className="p-8"><SupplierDashboardPage /></div>
+                        <div className="p-8"><SupplierOrdersPage /></div>
                     </SupplierRouteGuard>
                 } />
                 <Route path="/supplier/settings" element={
                     <SupplierRouteGuard>
-                        <div className="p-8"><SupplierDashboardPage /></div>
+                        <div className="p-8"><SupplierSettingsPage /></div>
                     </SupplierRouteGuard>
                 } />
             </Route>

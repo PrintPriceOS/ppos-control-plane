@@ -253,4 +253,43 @@ describe('Topbar Telemetry Contract & Classification Suite', () => {
         const esBadge = screen.getByText('Telemetría Núcleo: OK').closest('div');
         expect(esBadge?.getAttribute('title')).toContain('Entorno de imprenta listo para producción');
     });
+
+    it('7. Healthy Supplier Telemetry: Displays healthy badge with localized supplier tooltip', async () => {
+        vi.spyOn(authStore, 'isPrinthouseUser').mockReturnValue(false);
+        vi.spyOn(authStore, 'isSupplierUser').mockReturnValue(true);
+        vi.spyOn(authStore, 'getUserRole').mockReturnValue('SUPPLIER_ADMIN');
+
+        global.fetch = vi.fn().mockImplementation((url: string) => {
+            if (url === '/api/system/health') {
+                return Promise.resolve({
+                    ok: true,
+                    status: 200,
+                    json: () => Promise.resolve({
+                        ok: true,
+                        status: 'HEALTHY',
+                        services: { operational: true },
+                        timestamp: new Date().toISOString()
+                    })
+                });
+            }
+            return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+        });
+
+        render(
+            <MemoryRouter>
+                <LocaleProvider initialLocale="en">
+                    <Topbar />
+                </LocaleProvider>
+            </MemoryRouter>
+        );
+
+        await waitFor(() => {
+            expect(screen.getByText('Core Telemetry: OK')).toBeInTheDocument();
+        });
+
+        const badge = screen.getByText('Core Telemetry: OK').closest('div');
+        expect(badge?.getAttribute('title')).toContain('Supplier portal ready for catalog and procurement operations');
+        expect(badge?.getAttribute('title')).not.toContain('Redis');
+        expect(badge?.getAttribute('title')).not.toContain('HTTP 200');
+    });
 });

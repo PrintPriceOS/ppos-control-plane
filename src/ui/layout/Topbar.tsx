@@ -71,13 +71,16 @@ export const Topbar: React.FC<{ onMenuClick?: () => void }> = ({ onMenuClick }) 
 
           // 3. Inspect health response
           const isPrinthouse = isPrinthouseUser();
+          const isSupplier = isSupplierUser();
 
-          // Printhouse payload evaluation: { ok: boolean, status: 'HEALTHY' | 'DEGRADED', services: { operational: boolean } }
-          if (isPrinthouse) {
+          // Non-platform roles (Printhouse and Supplier): minimal sanitized contract { ok: boolean, status: 'HEALTHY' | 'DEGRADED', services: { operational: boolean } }
+          if (isPrinthouse || isSupplier) {
             if (data.ok === true && data.status === 'HEALTHY' && data.services?.operational !== false) {
               setTelemetryState({
                 status: 'HEALTHY',
-                tooltip: t('topbar.telemetryHealthyPrinthouseTooltip') || 'Live services fully operational. Print house environment ready for production.'
+                tooltip: isSupplier 
+                  ? (t('topbar.telemetryHealthySupplierTooltip') || 'Live services fully operational. Supplier portal ready for catalog and procurement operations.')
+                  : (t('topbar.telemetryHealthyPrinthouseTooltip') || 'Live services fully operational. Print house environment ready for production.')
               });
             } else {
               setTelemetryState({

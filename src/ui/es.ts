@@ -1281,6 +1281,7 @@ export const es = {
   'topbar.telemetryVerifying': 'Comprobando Núcleo...',
   'topbar.telemetryVerifyingTooltip': 'Comprobando estado del proceso y dependencias en /api/system/health...',
   'topbar.telemetryHealthyPrinthouseTooltip': 'Servicios operativos en tiempo real. Entorno de imprenta listo para producción.',
+  'topbar.telemetryHealthySupplierTooltip': 'Servicios operativos en tiempo real. Portal de proveedor listo para operaciones de catálogo y suministros.',
   'topbar.telemetryHealthyAdminTooltip': 'Telemetría de infraestructura OK: Proceso Node.js (PID {pid}, {uptime}s activo), Redis en estado {redisStatus} con latencia {latency}.',
   'topbar.telemetryDegradedTooltip': 'Telemetría degradada: dependencias evaluadas con incidencias. Verifique conectividad del sistema.',
   'topbar.telemetryDegradedAdminTooltip': 'Telemetría degradada: Redis status=\'{redisStatus}\', latency=\'{latency}\'. Verifique conectividad del servicio.',
@@ -2446,7 +2447,59 @@ export const es = {
   'supplier.hub.saveDecisions': 'Guardar Decisiones',
   'supplier.hub.confirmCatalog': 'Confirmar Catálogo Técnico',
   'supplier.hub.confirmingBatch': 'Confirmando Lote...',
-  'supplier.hub.startNewImport': 'Iniciar Nueva Importación'
+  'supplier.hub.startNewImport': 'Iniciar Nueva Importación',
+
+  // Supplier Dashboard
+  'supplier.dashboard.hubBadge': 'Portal de Proveedores',
+  'supplier.dashboard.operationsTag': 'Consola Operativa',
+  'supplier.dashboard.hubDescription': 'Publica catálogos técnicos de papel, gestiona matrices comerciales de precios y supervisa la demanda de imprentas.',
+  'supplier.dashboard.status': 'Estado',
+  'supplier.dashboard.role': 'Rol Asignado',
+  'supplier.dashboard.catalogCard': 'Catálogo Publicado',
+  'supplier.dashboard.catalogCardDesc': 'Variantes técnicas activas',
+  'supplier.dashboard.offersCard': 'Ofertas Comerciales',
+  'supplier.dashboard.offersCardDesc': 'Tarifas configuradas y tramos MOQ',
+  'supplier.dashboard.rfqCard': 'Pedidos Entrantes',
+  'supplier.dashboard.rfqCardDesc': 'Planificado para Fase I4',
+  'supplier.dashboard.scopeCard': 'Pertenencia Verificada',
+  'supplier.dashboard.scopeActive': 'Ámbito Autorizado',
+  'supplier.dashboard.quickCatalogTitle': 'Gestión de Catálogo Técnico',
+  'supplier.dashboard.quickCatalogDesc': 'Importa fichas normalizadas de papel (ODS, XLSX, CSV RFC 4180). Revisa dimensiones ambiguas, resuelve conflictos de gramaje y confirma variantes técnicas.',
+  'supplier.dashboard.goToCatalog': 'Abrir Catálogo Técnico',
+  'supplier.dashboard.quickOffersTitle': 'Tarifas y Ofertas Comerciales',
+  'supplier.dashboard.quickOffersDesc': 'Configura precios unitarios, múltiplos de compra y MOQ por base de precio (KG, TONNE, SHEET, THOUSAND_SHEETS, PACK). Conserva trazabilidad de auditoría en cada revisión.',
+  'supplier.dashboard.goToOffers': 'Gestionar Ofertas y Tarifas',
+
+  // Supplier Procurement Orders (I4 placeholder)
+  'supplier.orders.badge': 'Portal de Proveedores',
+  'supplier.orders.phaseTag': 'Planificado para Fase I4',
+  'supplier.orders.title': 'Pedidos de Aprovisionamiento y Suministro',
+  'supplier.orders.subtitle': 'Recepción de órdenes de compra y gestión de entregas de suministro a imprentas.',
+  'supplier.orders.emptyTitle': 'Módulo de Pedidos en Preparación (Fase I4 / Entrega R2)',
+  'supplier.orders.emptyDesc': 'La recepción de pedidos, confirmación automática y entrega a almacén estarán disponibles cuando se active el ciclo de RFQ y aprovisionamiento de imprenta en la Fase I4.',
+  'supplier.orders.rfqFlow': 'RFQ Bidireccional',
+  'supplier.orders.rfqFlowDesc': 'Solicitudes de cotización de imprentas y propuestas de tarifas por volumen.',
+  'supplier.orders.dispatchFlow': 'Recepción Atómica',
+  'supplier.orders.dispatchFlowDesc': 'Verificación de entrega y recepción en inventario con huella de idempotencia.',
+
+  // Supplier Settings / Profile
+  'supplier.settings.badge': 'Portal de Proveedores',
+  'supplier.settings.verifiedTag': 'Perfil Verificado',
+  'supplier.settings.title': 'Ficha de Organización Proveedora',
+  'supplier.settings.subtitle': 'Identidad corporativa registrada, monedas comerciales autorizadas y capacidades de gobernanza.',
+  'supplier.settings.statusLabel': 'Estado de Cuenta',
+  'supplier.settings.roleLabel': 'Rol Asignado',
+  'supplier.settings.orgCardTitle': 'Identidad Corporativa',
+  'supplier.settings.companyName': 'Razón Social / Proveedor',
+  'supplier.settings.contactEmail': 'Email de Contacto Registrado',
+  'supplier.settings.supplierId': 'Identificador de Proveedor',
+  'supplier.settings.tenantId': 'Ámbito de Tenencia',
+  'supplier.settings.commercialCardTitle': 'Condiciones Comerciales y Monedas',
+  'supplier.settings.currencies': 'Monedas Comerciales Autorizadas',
+  'supplier.settings.scopeStatus': 'Ámbito de Gobernanza',
+  'supplier.settings.approvedSupplier': 'Proveedor Aprobado (PAPER_SUPPLIER)',
+  'supplier.settings.scopeDesc': 'Autorizado para publicar fichas técnicas de papel, crear tarifas comerciales y participar en compras gobernadas.',
+  'supplier.settings.readOnlyNote': 'Para modificar datos registrales de la entidad o solicitar monedas comerciales adicionales, contacta al equipo de gobernanza.'
 } as const;
 
 export type TranslationKeys = keyof typeof es;

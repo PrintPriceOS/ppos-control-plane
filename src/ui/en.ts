@@ -1281,6 +1281,7 @@ export const en = {
   'topbar.telemetryVerifying': 'Checking Core...',
   'topbar.telemetryVerifyingTooltip': 'Checking process state and dependencies on /api/system/health...',
   'topbar.telemetryHealthyPrinthouseTooltip': 'Live services fully operational. Print house environment ready for production.',
+  'topbar.telemetryHealthySupplierTooltip': 'Live services fully operational. Supplier portal ready for catalog and procurement operations.',
   'topbar.telemetryHealthyAdminTooltip': 'Infrastructure telemetry OK: Node.js process (PID {pid}, {uptime}s uptime), Redis status \'{redisStatus}\' with latency \'{latency}\'.',
   'topbar.telemetryDegradedTooltip': 'Degraded telemetry: evaluated dependencies reported issues. Check system connectivity.',
   'topbar.telemetryDegradedAdminTooltip': 'Degraded telemetry: Redis status=\'{redisStatus}\', latency=\'{latency}\'. Check service connectivity.',
@@ -2447,7 +2448,59 @@ export const en = {
   'supplier.hub.saveDecisions': 'Save Decisions',
   'supplier.hub.confirmCatalog': 'Confirm Technical Catalog',
   'supplier.hub.confirmingBatch': 'Confirming Batch...',
-  'supplier.hub.startNewImport': 'Start New Import'
+  'supplier.hub.startNewImport': 'Start New Import',
+
+  // Supplier Dashboard
+  'supplier.dashboard.hubBadge': 'Paper Supplier Hub',
+  'supplier.dashboard.operationsTag': 'Operations Console',
+  'supplier.dashboard.hubDescription': 'Publish technical paper catalogs, manage commercial pricing matrices, and monitor print house demand.',
+  'supplier.dashboard.status': 'Status',
+  'supplier.dashboard.role': 'Assigned Role',
+  'supplier.dashboard.catalogCard': 'Published Catalog',
+  'supplier.dashboard.catalogCardDesc': 'Active technical variants',
+  'supplier.dashboard.offersCard': 'Commercial Offers',
+  'supplier.dashboard.offersCardDesc': 'Configured rates & MOQ brackets',
+  'supplier.dashboard.rfqCard': 'Incoming Orders',
+  'supplier.dashboard.rfqCardDesc': 'Planned for Phase I4',
+  'supplier.dashboard.scopeCard': 'Verified Tenancy',
+  'supplier.dashboard.scopeActive': 'Authorized Scope',
+  'supplier.dashboard.quickCatalogTitle': 'Technical Catalog Management',
+  'supplier.dashboard.quickCatalogDesc': 'Import normalized paper data sheets (ODS, XLSX, CSV RFC 4180). Review ambiguous dimensions, resolve grammage conflicts, and confirm technical variants.',
+  'supplier.dashboard.goToCatalog': 'Open Technical Catalog',
+  'supplier.dashboard.quickOffersTitle': 'Commercial Offer Rate Cards',
+  'supplier.dashboard.quickOffersDesc': 'Configure price amounts, order multiples, and MOQ per pricing basis (KG, TONNE, SHEET, THOUSAND_SHEETS, PACK). Maintain full audit trails across price revisions.',
+  'supplier.dashboard.goToOffers': 'Manage Offers & Rates',
+
+  // Supplier Procurement Orders (I4 placeholder)
+  'supplier.orders.badge': 'Paper Supplier Hub',
+  'supplier.orders.phaseTag': 'Phase I4 Planned',
+  'supplier.orders.title': 'Procurement Orders & Fulfillment',
+  'supplier.orders.subtitle': 'Incoming purchase orders and procurement dispatch fulfillment from print houses.',
+  'supplier.orders.emptyTitle': 'Procurement Orders Module Pending (Phase I4 / R2)',
+  'supplier.orders.emptyDesc': 'Order reception, automated PO acknowledgment, and warehouse dispatch fulfillment will become available once the RFQ and Printhouse Procurement lifecycle is activated in Phase I4.',
+  'supplier.orders.rfqFlow': 'Bidirectional RFQ',
+  'supplier.orders.rfqFlowDesc': 'Printhouse RFQs and customized volume quote proposals.',
+  'supplier.orders.dispatchFlow': 'Idempotent Restock',
+  'supplier.orders.dispatchFlowDesc': 'Atomic delivery verification and warehouse intake ledger integration.',
+
+  // Supplier Settings / Profile
+  'supplier.settings.badge': 'Paper Supplier Hub',
+  'supplier.settings.verifiedTag': 'Verified Profile',
+  'supplier.settings.title': 'Supplier Organization Profile',
+  'supplier.settings.subtitle': 'Registered organization identity, approved trading currencies, and governance capabilities.',
+  'supplier.settings.statusLabel': 'Account Status',
+  'supplier.settings.roleLabel': 'Role',
+  'supplier.settings.orgCardTitle': 'Corporate Identity',
+  'supplier.settings.companyName': 'Company Name',
+  'supplier.settings.contactEmail': 'Registered Contact Email',
+  'supplier.settings.supplierId': 'Supplier Organization ID',
+  'supplier.settings.tenantId': 'Tenancy Scope',
+  'supplier.settings.commercialCardTitle': 'Trading Conditions & Currencies',
+  'supplier.settings.currencies': 'Approved Currencies',
+  'supplier.settings.scopeStatus': 'Governance Scope',
+  'supplier.settings.approvedSupplier': 'Approved Paper Supplier (PAPER_SUPPLIER)',
+  'supplier.settings.scopeDesc': 'Authorized to publish physical paper catalogs, create commercial rate cards, and participate in governed procurement.',
+  'supplier.settings.readOnlyNote': 'To modify corporate registration data or add trading currencies, contact the platform governance team.'
 } as const;
 
 export type TranslationKeys = keyof typeof en;

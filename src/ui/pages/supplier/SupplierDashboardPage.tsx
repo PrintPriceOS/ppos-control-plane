@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
     CubeIcon, 
     RectangleStackIcon, 
@@ -6,42 +7,68 @@ import {
     ShieldCheckIcon,
     ArrowUpTrayIcon,
     DocumentTextIcon,
-    ExclamationTriangleIcon
+    ExclamationTriangleIcon,
+    PlusIcon,
+    ArrowRightIcon
 } from '@heroicons/react/24/outline';
-import { adminFetch } from '../../lib/adminApi';
+import { paperSupplierFetch } from '../../lib/paperSupplierApi';
 import { getUserRole, getAuthUser } from '../../lib/authStore';
+import { useLocale } from '../../i18n';
 
 export const SupplierDashboardPage: React.FC = () => {
+    const { t } = useLocale();
+    const navigate = useNavigate();
     const role = getUserRole();
     const user = getAuthUser();
     const [profile, setProfile] = useState<any>(null);
+    const [catalogCount, setCatalogCount] = useState<number | null>(null);
+    const [offersCount, setOffersCount] = useState<number | null>(null);
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
         let isMounted = true;
-        adminFetch('/api/v1/paper-suppliers/me')
-            .then((res: any) => {
-                if (isMounted) {
-                    if (res && res.ok) {
-                        setProfile(res.data);
-                    } else {
-                        setProfile({
-                            name: user?.companyName || 'Authorized Paper Supplier',
-                            status: 'ACTIVE',
-                            role: role,
-                            tenantId: user?.tenantId || 'tenant-supplier'
-                        });
-                    }
-                    setLoading(false);
-                }
-            })
-            .catch((err) => {
-                if (isMounted) {
-                    setError(err.message || 'Failed to load supplier profile');
-                    setLoading(false);
-                }
-            });
+        setLoading(true);
+        setError(null);
+
+        Promise.allSettled([
+            paperSupplierFetch<any>('/api/v1/paper-suppliers/me'),
+            paperSupplierFetch<any>('/api/v1/paper-suppliers/catalog/products?limit=1'),
+            paperSupplierFetch<any>('/api/v1/paper-suppliers/offers?limit=1')
+        ]).then(([meResult, catalogResult, offersResult]) => {
+            if (!isMounted) return;
+
+            if (meResult.status === 'fulfilled' && meResult.value?.ok) {
+                setProfile(meResult.value.data);
+            } else {
+                setProfile({
+                    name: user?.companyName || 'Authorized Paper Supplier',
+                    status: 'ACTIVE',
+                    role: role,
+                    tenantId: user?.tenantId || 'tenant-supplier'
+                });
+            }
+
+            if (catalogResult.status === 'fulfilled' && catalogResult.value?.ok) {
+                const total = catalogResult.value.data?.total;
+                setCatalogCount(typeof total === 'number' ? total : 0);
+            } else {
+                setCatalogCount(null);
+            }
+
+            if (offersResult.status === 'fulfilled' && offersResult.value?.ok) {
+                const total = offersResult.value.data?.total;
+                setOffersCount(typeof total === 'number' ? total : 0);
+            } else {
+                setOffersCount(null);
+            }
+
+            setLoading(false);
+        }).catch((err) => {
+            if (!isMounted) return;
+            setError(err.message || 'Failed to load supplier dashboard metrics');
+            setLoading(false);
+        });
 
         return () => {
             isMounted = false;
@@ -55,30 +82,34 @@ export const SupplierDashboardPage: React.FC = () => {
                 <div>
                     <div className="flex items-center gap-2 mb-1">
                         <span className="px-2 py-0.5 text-[9px] font-black uppercase tracking-widest bg-red-600 text-white">
-                            Paper Supplier Hub
+                            {t('supplier.dashboard.hubBadge') || 'Paper Supplier Hub'}
                         </span>
                         <span className="px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider bg-slate-200 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300">
-                            Phase I1 Pilot
+                            {t('supplier.dashboard.operationsTag') || 'Operations Console'}
                         </span>
                     </div>
                     <h1 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">
-                        {profile?.name || 'Supplier Operations Console'}
+                        {profile?.name || user?.companyName || 'Supplier Operations Console'}
                     </h1>
                     <p className="text-xs text-zinc-500 mt-1">
-                        Dedicated domain for catalog publication, commercial offers, and procurement dispatch fulfillment.
+                        {t('supplier.dashboard.hubDescription') || 'Publish technical paper catalogs, manage commercial pricing matrices, and monitor print house demand.'}
                     </p>
                 </div>
 
                 <div className="flex items-center gap-3">
                     <div className="text-right">
-                        <p className="text-[10px] font-bold uppercase text-zinc-400">Status</p>
+                        <p className="text-[10px] font-bold uppercase text-zinc-400">
+                            {t('supplier.dashboard.status') || 'Status'}
+                        </p>
                         <p className="text-xs font-black text-emerald-500 uppercase tracking-wider">
                             {profile?.status || 'ACTIVE'}
                         </p>
                     </div>
                     <div className="h-8 w-[1px] bg-slate-200 dark:bg-zinc-800" />
                     <div className="text-right">
-                        <p className="text-[10px] font-bold uppercase text-zinc-400">Assigned Role</p>
+                        <p className="text-[10px] font-bold uppercase text-zinc-400">
+                            {t('supplier.dashboard.role') || 'Role'}
+                        </p>
                         <p className="text-xs font-black text-slate-800 dark:text-zinc-200 uppercase tracking-wider">
                             {role}
                         </p>
@@ -95,84 +126,128 @@ export const SupplierDashboardPage: React.FC = () => {
 
             {/* KPI Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="p-5 ppos-surface border ppos-border flex flex-col justify-between">
+                {/* Published Catalog */}
+                <div 
+                    onClick={() => navigate('/supplier/catalog')}
+                    className="p-5 ppos-surface border ppos-border flex flex-col justify-between hover:border-slate-400 dark:hover:border-zinc-700 cursor-pointer transition-colors"
+                >
                     <div className="flex items-center justify-between">
                         <span className="text-[10px] font-black uppercase tracking-wider text-zinc-500">
-                            Published Catalog
+                            {t('supplier.dashboard.catalogCard') || 'Published Catalog'}
                         </span>
                         <RectangleStackIcon className="w-5 h-5 text-zinc-400" />
                     </div>
                     <div className="mt-3">
-                        <span className="text-3xl font-black font-mono text-slate-900 dark:text-white">0</span>
-                        <p className="text-[10px] text-zinc-400 mt-1">Active paper articles</p>
+                        <span className="text-3xl font-black font-mono text-slate-900 dark:text-white">
+                            {loading ? '...' : (catalogCount !== null ? catalogCount : '—')}
+                        </span>
+                        <p className="text-[10px] text-zinc-400 mt-1">
+                            {t('supplier.dashboard.catalogCardDesc') || 'Active technical variants'}
+                        </p>
                     </div>
                 </div>
 
-                <div className="p-5 ppos-surface border ppos-border flex flex-col justify-between">
+                {/* Commercial Offers */}
+                <div 
+                    onClick={() => navigate('/supplier/catalog')}
+                    className="p-5 ppos-surface border ppos-border flex flex-col justify-between hover:border-slate-400 dark:hover:border-zinc-700 cursor-pointer transition-colors"
+                >
                     <div className="flex items-center justify-between">
                         <span className="text-[10px] font-black uppercase tracking-wider text-zinc-500">
-                            Commercial Offers
+                            {t('supplier.dashboard.offersCard') || 'Commercial Offers'}
                         </span>
                         <DocumentTextIcon className="w-5 h-5 text-zinc-400" />
                     </div>
                     <div className="mt-3">
-                        <span className="text-3xl font-black font-mono text-slate-900 dark:text-white">0</span>
-                        <p className="text-[10px] text-zinc-400 mt-1">Rates & MOQ brackets</p>
+                        <span className="text-3xl font-black font-mono text-slate-900 dark:text-white">
+                            {loading ? '...' : (offersCount !== null ? offersCount : '—')}
+                        </span>
+                        <p className="text-[10px] text-zinc-400 mt-1">
+                            {t('supplier.dashboard.offersCardDesc') || 'Configured rates & MOQ brackets'}
+                        </p>
                     </div>
                 </div>
 
-                <div className="p-5 ppos-surface border ppos-border flex flex-col justify-between">
+                {/* Open RFQs / Demands */}
+                <div 
+                    onClick={() => navigate('/supplier/orders')}
+                    className="p-5 ppos-surface border ppos-border flex flex-col justify-between hover:border-slate-400 dark:hover:border-zinc-700 cursor-pointer transition-colors"
+                >
                     <div className="flex items-center justify-between">
                         <span className="text-[10px] font-black uppercase tracking-wider text-zinc-500">
-                            Open RFQs
+                            {t('supplier.dashboard.rfqCard') || 'Incoming Orders'}
                         </span>
                         <InboxIcon className="w-5 h-5 text-zinc-400" />
                     </div>
                     <div className="mt-3">
-                        <span className="text-3xl font-black font-mono text-slate-900 dark:text-white">0</span>
-                        <p className="text-[10px] text-zinc-400 mt-1">Pending printhouse quotes</p>
+                        <span className="text-3xl font-black font-mono text-slate-400 dark:text-zinc-600">
+                            —
+                        </span>
+                        <p className="text-[10px] text-zinc-400 mt-1">
+                            {t('supplier.dashboard.rfqCardDesc') || 'Planned for Phase I4'}
+                        </p>
                     </div>
                 </div>
 
-                <div className="p-5 ppos-surface border ppos-border flex flex-col justify-between">
+                {/* Domain Security / Access Scope */}
+                <div 
+                    onClick={() => navigate('/supplier/settings')}
+                    className="p-5 ppos-surface border ppos-border flex flex-col justify-between hover:border-slate-400 dark:hover:border-zinc-700 cursor-pointer transition-colors"
+                >
                     <div className="flex items-center justify-between">
                         <span className="text-[10px] font-black uppercase tracking-wider text-zinc-500">
-                            Domain Security
+                            {t('supplier.dashboard.scopeCard') || 'Verified Tenancy'}
                         </span>
                         <ShieldCheckIcon className="w-5 h-5 text-emerald-500" />
                     </div>
                     <div className="mt-3">
                         <span className="text-sm font-black text-emerald-500 uppercase tracking-wider">
-                            Isolated Scope
+                            {t('supplier.dashboard.scopeActive') || 'Authorized Scope'}
                         </span>
-                        <p className="text-[10px] text-zinc-400 mt-1">Zero printhouse data leakage</p>
+                        <p className="text-[10px] text-zinc-400 mt-1">
+                            {profile?.tenantId || user?.tenantId || 'Active supplier tenancy'}
+                        </p>
                     </div>
                 </div>
             </div>
 
-            {/* Scope & Feature Information */}
-            <div className="p-6 ppos-surface border ppos-border space-y-4">
-                <h2 className="text-sm font-black uppercase tracking-wider text-slate-900 dark:text-white flex items-center gap-2">
-                    <CubeIcon className="w-4 h-4 text-red-500" />
-                    Phase I1 Architecture & Capability Scope
-                </h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed">
-                    <div className="p-4 bg-slate-50 dark:bg-zinc-900/60 border border-slate-200 dark:border-zinc-800 space-y-2">
-                        <p className="font-bold text-slate-800 dark:text-zinc-200 uppercase text-[10px]">
-                            Multi-Tenant Identity & RBAC
-                        </p>
-                        <p>
-                            Supplier operators operate strictly under orthogonal roles (<code className="text-red-500 font-mono">SUPPLIER_ADMIN</code>, <code className="text-red-500 font-mono">SUPPLIER_OPERATOR</code>, <code className="text-red-500 font-mono">SUPPLIER_VIEWER</code>). These roles possess 0 inheritance toward printhouse management, preventing unauthorized inspection of machines, private job queues, or customer rates.
-                        </p>
+            {/* Quick Actions & Guidance Section */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="p-6 ppos-surface border ppos-border space-y-3">
+                    <h2 className="text-sm font-black uppercase tracking-wider text-slate-900 dark:text-white flex items-center gap-2">
+                        <RectangleStackIcon className="w-4 h-4 text-red-600" />
+                        {t('supplier.dashboard.quickCatalogTitle') || 'Technical Catalog Management'}
+                    </h2>
+                    <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed">
+                        {t('supplier.dashboard.quickCatalogDesc') || 'Import normalized paper data sheets (ODS, XLSX, CSV RFC 4180). Review ambiguous dimensions, resolve grammage conflicts, and confirm technical variants.'}
+                    </p>
+                    <div className="pt-2">
+                        <button
+                            onClick={() => navigate('/supplier/catalog')}
+                            className="inline-flex items-center gap-1.5 px-4 py-2 bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold uppercase tracking-wider hover:bg-slate-800 transition-colors"
+                        >
+                            <span>{t('supplier.dashboard.goToCatalog') || 'Open Technical Catalog'}</span>
+                            <ArrowRightIcon className="w-3.5 h-3.5" />
+                        </button>
                     </div>
+                </div>
 
-                    <div className="p-4 bg-slate-50 dark:bg-zinc-900/60 border border-slate-200 dark:border-zinc-800 space-y-2">
-                        <p className="font-bold text-slate-800 dark:text-zinc-200 uppercase text-[10px]">
-                            Atomic Receipt & Idempotency
-                        </p>
-                        <p>
-                            Restock deliveries are processed via MySQL row-level locked transactions (<code className="text-blue-500 font-mono">SELECT ... FOR UPDATE</code>) with SHA-256 payload validation. Inventory mutations, procurement records, and audit events commit together or revert cleanly.
-                        </p>
+                <div className="p-6 ppos-surface border ppos-border space-y-3">
+                    <h2 className="text-sm font-black uppercase tracking-wider text-slate-900 dark:text-white flex items-center gap-2">
+                        <DocumentTextIcon className="w-4 h-4 text-emerald-500" />
+                        {t('supplier.dashboard.quickOffersTitle') || 'Commercial Offer Rate Cards'}
+                    </h2>
+                    <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed">
+                        {t('supplier.dashboard.quickOffersDesc') || 'Configure price amounts, order multiples, and MOQ per pricing basis (KG, TONNE, SHEET, THOUSAND_SHEETS, PACK). Maintain full audit trails across price revisions.'}
+                    </p>
+                    <div className="pt-2">
+                        <button
+                            onClick={() => navigate('/supplier/catalog')}
+                            className="inline-flex items-center gap-1.5 px-4 py-2 bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold uppercase tracking-wider hover:bg-slate-800 transition-colors"
+                        >
+                            <span>{t('supplier.dashboard.goToOffers') || 'Manage Offers & Rates'}</span>
+                            <ArrowRightIcon className="w-3.5 h-3.5" />
+                        </button>
                     </div>
                 </div>
             </div>

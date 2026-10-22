@@ -1281,6 +1281,7 @@ export const de = {
   'topbar.telemetryVerifying': 'Kern prüfen...',
   'topbar.telemetryVerifyingTooltip': 'Prozessstatus und Abhängigkeiten unter /api/system/health werden geprüft...',
   'topbar.telemetryHealthyPrinthouseTooltip': 'Dienste in Echtzeit betriebsbereit. Druckerei-Umgebung produktionsbereit.',
+  'topbar.telemetryHealthySupplierTooltip': 'Dienste in Echtzeit betriebsbereit. Lieferantenportal bereit für Katalog- und Beschaffungsvorgänge.',
   'topbar.telemetryHealthyAdminTooltip': 'Infrastruktur-Telemetrie OK: Node.js-Prozess (PID {pid}, {uptime}s aktiv), Redis-Status \'{redisStatus}\' mit Latenz \'{latency}\'.',
   'topbar.telemetryDegradedTooltip': 'Degradierte Telemetrie: Bewertete Abhängigkeiten melden Auffälligkeiten. Systemverbindung prüfen.',
   'topbar.telemetryDegradedAdminTooltip': 'Degradierte Telemetrie: Redis status=\'{redisStatus}\', latency=\'{latency}\'. Dienstverbindung prüfen.',
@@ -2447,7 +2448,59 @@ export const de = {
   'supplier.hub.saveDecisions': 'Entscheidungen speichern',
   'supplier.hub.confirmCatalog': 'Technischen Katalog bestätigen',
   'supplier.hub.confirmingBatch': 'Charge wird bestätigt...',
-  'supplier.hub.startNewImport': 'Neuen Import starten'
+  'supplier.hub.startNewImport': 'Neuen Import starten',
+
+  // Supplier Dashboard
+  'supplier.dashboard.hubBadge': 'Lieferantenportal',
+  'supplier.dashboard.operationsTag': 'Betriebskonsole',
+  'supplier.dashboard.hubDescription': 'Veröffentlichen Sie technische Papierkataloge, verwalten Sie Preisstrukturen und überwachen Sie Druckerei-Anfragen.',
+  'supplier.dashboard.status': 'Status',
+  'supplier.dashboard.role': 'Zugewiesene Rolle',
+  'supplier.dashboard.catalogCard': 'Veröffentlichter Katalog',
+  'supplier.dashboard.catalogCardDesc': 'Aktive technische Varianten',
+  'supplier.dashboard.offersCard': 'Kommerzielle Angebote',
+  'supplier.dashboard.offersCardDesc': 'Preise und Mindestbestellmengen',
+  'supplier.dashboard.rfqCard': 'Eingehende Aufträge',
+  'supplier.dashboard.rfqCardDesc': 'Geplant für Phase I4',
+  'supplier.dashboard.scopeCard': 'Verifizierte Mitgliedschaft',
+  'supplier.dashboard.scopeActive': 'Autorisierter Bereich',
+  'supplier.dashboard.quickCatalogTitle': 'Technisches Katalogmanagement',
+  'supplier.dashboard.quickCatalogDesc': 'Importieren Sie normierte Papierdatenblätter (ODS, XLSX, CSV RFC 4180). Prüfen Sie Maßabweichungen und bestätigen Sie technische Varianten.',
+  'supplier.dashboard.goToCatalog': 'Technischen Katalog öffnen',
+  'supplier.dashboard.quickOffersTitle': 'Kommerzielle Preisstaffeln',
+  'supplier.dashboard.quickOffersDesc': 'Definieren Sie Einheitspreise, Bestellschritte und MOQ je Preisbasis (KG, TONNE, SHEET, THOUSAND_SHEETS, PACK). Volle Revisionshistorie.',
+  'supplier.dashboard.goToOffers': 'Angebote und Preise verwalten',
+
+  // Supplier Procurement Orders (I4 placeholder)
+  'supplier.orders.badge': 'Lieferantenportal',
+  'supplier.orders.phaseTag': 'Geplant für Phase I4',
+  'supplier.orders.title': 'Beschaffungsaufträge & Abwicklung',
+  'supplier.orders.subtitle': 'Eingang von Bestellungen und Verwaltung von Lieferungen an Druckereien.',
+  'supplier.orders.emptyTitle': 'Bestellmodul in Vorbereitung (Phase I4 / R2)',
+  'supplier.orders.emptyDesc': 'Bestelleingang, Auftragsbestätigung und Lagerabwicklung werden freigeschaltet, sobald der RFQ- und Beschaffungszyklus in Phase I4 aktiviert wird.',
+  'supplier.orders.rfqFlow': 'Bidirektionale RFQ',
+  'supplier.orders.rfqFlowDesc': 'Preisanfragen von Druckereien und kundenindividuelle Mengenangebote.',
+  'supplier.orders.dispatchFlow': 'Idempotenter Wareneingang',
+  'supplier.orders.dispatchFlowDesc': 'Lieferverifizierung und synchrone Bestandsverbuchung im Hauptbuch.',
+
+  // Supplier Settings / Profile
+  'supplier.settings.badge': 'Lieferantenportal',
+  'supplier.settings.verifiedTag': 'Verifiziertes Profil',
+  'supplier.settings.title': 'Lieferanten-Unternehmensprofil',
+  'supplier.settings.subtitle': 'Registrierte Unternehmensdaten, Handelswährungen und Berechtigungen.',
+  'supplier.settings.statusLabel': 'Kontostatus',
+  'supplier.settings.roleLabel': 'Rolle',
+  'supplier.settings.orgCardTitle': 'Unternehmensidentität',
+  'supplier.settings.companyName': 'Unternehmensname',
+  'supplier.settings.contactEmail': 'Registrierte Kontakt-E-Mail',
+  'supplier.settings.supplierId': 'Lieferanten-ID',
+  'supplier.settings.tenantId': 'Mandantenbereich',
+  'supplier.settings.commercialCardTitle': 'Handelskonditionen & Währungen',
+  'supplier.settings.currencies': 'Autorisierte Währungen',
+  'supplier.settings.scopeStatus': 'Organisationsbereich',
+  'supplier.settings.approvedSupplier': 'Freigegebener Papierlieferant (PAPER_SUPPLIER)',
+  'supplier.settings.scopeDesc': 'Autorisiert zur Bereitstellung technischer Datenblätter, Preisfestlegung und Teilnahme an Beschaffungsprozessen.',
+  'supplier.settings.readOnlyNote': 'Wenden Sie sich an das Plattform-Team, um Stammdaten zu ändern oder zusätzliche Währungen freizuschalten.'
 } as const;
 
 export type TranslationKeys = keyof typeof de;
