@@ -595,12 +595,14 @@ router.put('/offers/:offerId', requireSupplierScope('OPERATOR'), requireApproved
         console.error('[PAPER-SUPPLIERS][UPDATE-OFFER-ERROR]', err);
         const isNotFound = err.message.startsWith('OFFER_NOT_FOUND');
         const isInvalid = err.message.startsWith('INVALID_OFFER_PAYLOAD');
-        const statusCode = isNotFound ? 404 : (isInvalid ? 400 : 500);
+        const isSkuConflict = err.message.startsWith('SKU_ALREADY_EXISTS');
+        const statusCode = isNotFound ? 404 : (isSkuConflict ? 409 : (isInvalid ? 400 : 500));
+        const errCode = isNotFound ? 'OFFER_NOT_FOUND' : (isSkuConflict ? 'SKU_ALREADY_EXISTS' : (isInvalid ? 'INVALID_OFFER_PAYLOAD' : 'OFFER_UPDATE_FAILED'));
 
         return res.status(statusCode).json({
             ok: false,
             error: {
-                code: isNotFound ? 'OFFER_NOT_FOUND' : (isInvalid ? 'INVALID_OFFER_PAYLOAD' : 'OFFER_UPDATE_FAILED'),
+                code: errCode,
                 message: err.message,
                 validationErrors: err.validationErrors || []
             }

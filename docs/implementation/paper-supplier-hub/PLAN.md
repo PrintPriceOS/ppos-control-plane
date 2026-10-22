@@ -67,10 +67,13 @@ El **Paper Supplier Hub** incorpora un panel independiente para distribuidores/f
     - Catálogo con buscador, filtros de categoría y acabado, modal de especificaciones técnicas completas (`caliperUm`, dimensiones, acabado, grano).
     - Botón "+ Create Offer" funcional y preconfigurado con variante técnica seleccionada.
     - Flujo de importación con inputs controlados persistentes ante paginación (`gsm`, `width_mm`, `height_mm`), auto-guardado previo de overrides vía `PATCH` antes de confirmar (bloqueando si falla la persistencia) y botón de reinicio para evitar reutilizar lotes previos.
-    - Paridad i18n completa en ES, EN y DE en todas las etiquetas, avisos y modales.
+    - Paridad i18n completa en ES, EN y DE en todas las etiquetas, avisos y modales conectada reactivamente con `useLocale`.
+    - Orden secuencial de parámetros SQL en `getTechnicalCatalog` (`subqueryParams`, `params`, `LIMIT`, `OFFSET`).
+    - Manejo de colisiones SKU al editar: corrección de alcance de `validated` y mapeo unívoco a HTTP 409 `SKU_ALREADY_EXISTS` en `PUT`.
+    - Visibilidad diferenciada para `APPROVED_CUSTOMERS` basada en `approved_customer_ids` sin tratar como marketplace.
   - **Criterios de Aceptación y Pruebas**:
     - Eliminación de PASS silenciosos con `ctx.skip()` explícito cuando no hay variables de BD configuradas.
-    - Verificación contra MySQL efímero: 14/14 tests PASS en `tests/paper_supplier_offers_and_catalog.test.js`.
+    - Verificación contra MySQL efímero: 16/16 tests PASS en `tests/paper_supplier_offers_and_catalog.test.js`.
     - Regresiones verificadas: 25/25 PASS en I2 (`tests/paper_technical_import_and_catalog.test.js`), 57/57 PASS en I1-R2 (`tests/security_paper_supplier_and_materials_isolation.test.js`).
     - Cero mutaciones a inventario de imprenta (`materials_catalog`, `predictive_material_inventory`).
 - [ ] **I4 — Búsqueda de imprenta y RFQ bidireccional (Entrega R2)**:

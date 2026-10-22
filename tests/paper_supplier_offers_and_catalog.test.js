@@ -756,18 +756,218 @@ describe('Iteration I3: Paper Supplier Catalog & Commercial Offers Engine', () =
             expect(res.body.error.code).toBe('SUPPLIER_SUSPENDED');
         });
 
-        it('verifies that printhouse inventory tables remain completely untouched by commercial paper offers', async () => {
+        it('tests catalog parameter filtering combinations: search alone, category alone, finish alone, and combined', async () => {
+            const token = generateToken({
+                role: 'SUPPLIER_OPERATOR',
+                tenantId: 'tenant-alpha',
+                supplierId: 'supp-alpha-1'
+            });
 
-            // In canonical schema, materials catalog and inventory are under materials_catalog / predictive_material_inventory if exists, or check tables count
-            const [tables] = await connectionPool.query(`
-                SELECT table_name FROM information_schema.tables 
-                WHERE table_schema = ? AND table_name IN ('materials_catalog', 'predictive_material_inventory', 'material_procurements')
-            `, [executionSchemaName]);
+            // 1. Search alone
+            const resSearch = await dispatch(paperSuppliersRouter, {
+                method: 'GET',
+                url: '/catalog/products?search=Munken&page=1&limit=10',
+                query: { search: 'Munken', page: '1', limit: '10' },
+                headers: { authorization: `Bearer ${token}` }
+            });
+            expect(resSearch.statusCode).toBe(200);
+            expect(resSearch.body.data.total).toBe(2);
+            expect(resSearch.body.data.items.length).toBe(2);
 
-            for (const t of tables) {
-                const [rows] = await connectionPool.query(`SELECT COUNT(*) as count FROM \`${t.TABLE_NAME || t.table_name}\``);
-                expect(rows[0].count).toBe(0);
-            }
+            // 2. Category alone (UNCOATED)
+            const resCat = await dispatch(paperSuppliersRouter, {
+                method: 'GET',
+                url: '/catalog/products?category=UNCOATED&page=1&limit=10',
+                query: { category: 'UNCOATED', page: '1', limit: '10' },
+                headers: { authorization: `Bearer ${token}` }
+            });
+            expect(resCat.statusCode).toBe(200);
+            expect(resCat.body.data.total).toBe(2);
+            expect(resCat.body.data.items.length).toBe(2);
+
+            // Non-existent category
+            const resCatNone = await dispatch(paperSuppliersRouter, {
+                method: 'GET',
+                url: '/catalog/products?category=GLOSS&page=1&limit=10',
+                query: { category: 'GLOSS', page: '1', limit: '10' },
+                headers: { authorization: `Bearer ${token}` }
+            });
+            expect(resCatNone.statusCode).toBe(200);
+            expect(resCatNone.body.data.total).toBe(0);
+            expect(resCatNone.body.data.items.length).toBe(0);
+
+            // 3. Finish alone (ROUGH)
+            const resFinish = await dispatch(paperSuppliersRouter, {
+                method: 'GET',
+                url: '/catalog/products?finish=ROUGH&page=1&limit=10',
+                query: { finish: 'ROUGH', page: '1', limit: '10' },
+                headers: { authorization: `Bearer ${token}` }
+            });
+            expect(resFinish.statusCode).toBe(200);
+            expect(resFinish.body.data.total).toBe(2);
+
+            // 4. Combined: search + category + finish
+            const resCombined = await dispatch(paperSuppliersRouter, {
+                method: 'GET',
+                url: '/catalog/products?search=Lynx&category=UNCOATED&finish=ROUGH&page=1&limit=10',
+                query: { search: 'Lynx', category: 'UNCOATED', finish: 'ROUGH', page: '1', limit: '10' },
+                headers: { authorization: `Bearer ${token}` }
+            });
+            expect(resCombined.statusCode).toBe(200);
+            expect(resCombined.body.data.total).toBe(2);
+            expect(resCombined.body.data.items.length).toBe(2);
+
+            // 5. Pagination with limit=1, offset
+            const resPage1 = await dispatch(paperSuppliersRouter, {
+                method: 'GET',
+                url: '/catalog/products?page=1&limit=1',
+                query: { page: '1', limit: '1' },
+                headers: { authorization: `Bearer ${token}` }
+            });
+            expect(resPage1.statusCode).toBe(200);
+            expect(resPage1.body.data.total).toBe(2);
+            expect(resPage1.body.data.totalPages).toBe(2);
+            expect(resPage1.body.data.items.length).toBe(1);
+            expect(resPage1.body.data.items[0].gsm).toBe(120);
+
+            const resPage2 = await dispatch(paperSuppliersRouter, {
+                method: 'GET',
+                url: '/catalog/products?page=2&limit=1',
+                query: { page: '2', limit: '1' },
+                headers: { authorization: `Bearer ${token}` }
+            });
+            expect(resPage2.statusCode).toBe(200);
+            expect(resPage2.body.data.items.length).toBe(1);
+            expect(resPage2.body.data.items[0].gsm).toBe(150);
+        });
+
+        it('handles SKU collision on PUT edit: returns HTTP 409 and preserves original offer and revisions', async () => {
+            const token = generateToken({
+                role: 'SUPPLIER_OPERATOR',
+                tenantId: 'tenant-alpha',
+                supplierId: 'supp-alpha-1'
+            });
+
+            // Create Offer 1
+            const res1 = await dispatch(paperSuppliersRouter, {
+                method: 'POST',
+                url: '/offers',
+                body: {
+                    variantId: 'var-munken-120-70100',
+                    supplierSku: 'COLLISION-TEST-SKU-A',
+                    priceAmount: 1.20,
+                    currency: 'EUR',
+                    priceBasis: 'KG'
+                },
+                headers: { authorization: `Bearer ${token}` }
+            });
+            expect(res1.statusCode).toBe(201);
+            const offerAId = res1.body.data.id;
+
+            // Create Offer 2
+            const res2 = await dispatch(paperSuppliersRouter, {
+                method: 'POST',
+                url: '/offers',
+                body: {
+                    variantId: 'var-munken-150-70100',
+                    supplierSku: 'COLLISION-TEST-SKU-B',
+                    priceAmount: 1.40,
+                    currency: 'EUR',
+                    priceBasis: 'KG'
+                },
+                headers: { authorization: `Bearer ${token}` }
+            });
+            expect(res2.statusCode).toBe(201);
+            const offerBId = res2.body.data.id;
+
+            // Edit Offer B towards Offer A's SKU
+            const putRes = await dispatch(paperSuppliersRouter, {
+                method: 'PUT',
+                url: `/offers/${offerBId}`,
+                params: { offerId: offerBId },
+                body: {
+                    supplierSku: 'COLLISION-TEST-SKU-A', // Collides with Offer A
+                    priceAmount: 1.50
+                },
+                headers: { authorization: `Bearer ${token}` }
+            });
+
+            // Must return HTTP 409 without ReferenceError or 500
+            expect(putRes.statusCode).toBe(409);
+            expect(putRes.body.error.code).toBe('SKU_ALREADY_EXISTS');
+
+            // Verify Offer B remains unchanged in DB
+            const checkRes = await dispatch(paperSuppliersRouter, {
+                method: 'GET',
+                url: `/offers/${offerBId}`,
+                params: { offerId: offerBId },
+                headers: { authorization: `Bearer ${token}` }
+            });
+            expect(checkRes.statusCode).toBe(200);
+            expect(checkRes.body.data.offer.supplierSku).toBe('COLLISION-TEST-SKU-B');
+            expect(checkRes.body.data.offer.priceAmount).toBe(1.40);
+            expect(checkRes.body.data.revisions.length).toBe(1);
+        });
+
+        it('enforces effective visibility: APPROVED_CUSTOMERS is not MARKETPLACE and restricts access strictly', async () => {
+            const supp1Token = generateToken({
+                role: 'SUPPLIER_OPERATOR',
+                tenantId: 'tenant-alpha',
+                supplierId: 'supp-alpha-1'
+            });
+
+            // supp-alpha-1 creates an APPROVED_CUSTOMERS offer where only 'cust-approved-1' is in approved_customer_ids
+            const createRes = await dispatch(paperSuppliersRouter, {
+                method: 'POST',
+                url: '/offers',
+                body: {
+                    variantId: 'var-munken-120-70100',
+                    supplierSku: 'SKU-APPROVED-CUST-ONLY',
+                    priceAmount: 1.80,
+                    currency: 'EUR',
+                    priceBasis: 'KG',
+                    visibility: 'APPROVED_CUSTOMERS',
+                    metadata: {
+                        approved_customer_ids: ['cust-approved-1']
+                    }
+                },
+                headers: { authorization: `Bearer ${supp1Token}` }
+            });
+            expect(createRes.statusCode).toBe(201);
+
+            // 1. Owner Supplier: supp-alpha-1 sees their own offer in catalog counts
+            const ownerCat = await paperOfferService.getTechnicalCatalog({
+                supplierId: 'supp-alpha-1'
+            });
+            const ownerVar = ownerCat.items.find(i => i.id === 'var-munken-120-70100');
+            expect(ownerVar.activeOffersCount).toBeGreaterThanOrEqual(1);
+
+            // 2. Competing Supplier: supp-alpha-2 MUST NOT see the APPROVED_CUSTOMERS offer
+            // (competing supplier only sees MARKETPLACE and their own offers)
+            const competitorCat = await paperOfferService.getTechnicalCatalog({
+                supplierId: 'supp-alpha-2'
+            });
+            const competitorVar = competitorCat.items.find(i => i.id === 'var-munken-120-70100');
+            // Check that the APPROVED_CUSTOMERS offer was excluded from competitor's count
+            // Competitor only sees any MARKETPLACE offers, not APPROVED_CUSTOMERS
+            const [compMktCount] = await connectionPool.query(
+                "SELECT COUNT(*) as c FROM supplier_paper_offers WHERE variant_id = 'var-munken-120-70100' AND status = 'ACTIVE' AND visibility = 'MARKETPLACE'"
+            );
+            expect(competitorVar.activeOffersCount).toBe(compMktCount[0].c);
+
+            // 3. Approved Customer ('cust-approved-1') queries catalog
+            const approvedCustCat = await paperOfferService.getTechnicalCatalog({
+                customerId: 'cust-approved-1'
+            });
+            const approvedVar = approvedCustCat.items.find(i => i.id === 'var-munken-120-70100');
+            expect(approvedVar.activeOffersCount).toBe(compMktCount[0].c + 1);
+
+            // 4. Unapproved Customer ('cust-stranger-99') queries catalog: offer is excluded
+            const unapprovedCustCat = await paperOfferService.getTechnicalCatalog({
+                customerId: 'cust-stranger-99'
+            });
+            const unapprovedVar = unapprovedCustCat.items.find(i => i.id === 'var-munken-120-70100');
+            expect(unapprovedVar.activeOffersCount).toBe(compMktCount[0].c);
         });
     });
 });

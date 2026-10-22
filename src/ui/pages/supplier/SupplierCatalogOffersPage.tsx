@@ -309,10 +309,10 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                         </span>
                     </div>
                     <h1 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">
-                        Technical Catalog & Commercial Offers
+                        {t('supplier.hub.title')}
                     </h1>
                     <p className="text-xs text-zinc-500 mt-1">
-                        Manage confirmed technical paper variants, link pricing matrices, and configure buyer visibility.
+                        {t('supplier.hub.subtitle')}
                     </p>
                 </div>
 
@@ -323,7 +323,7 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                             className="flex items-center gap-2 px-3.5 py-2 bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold uppercase tracking-wider text-[11px] hover:bg-slate-800 transition-colors cursor-pointer"
                         >
                             <ArrowUpTrayIcon className="w-4 h-4" />
-                            <span>Import Technical Catalog</span>
+                            <span>{t('supplier.hub.importButton')}</span>
                         </button>
                     )}
                 </div>
@@ -361,7 +361,7 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                     }`}
                 >
                     <RectangleStackIcon className="w-4 h-4" />
-                    Technical Paper Articles & Variants
+                    {t('supplier.hub.tabCatalog')}
                 </button>
                 <button
                     onClick={() => setActiveTab('OFFERS')}
@@ -372,7 +372,7 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                     }`}
                 >
                     <DocumentTextIcon className="w-4 h-4" />
-                    Commercial Offers & Rates
+                    {t('supplier.hub.tabOffers')}
                 </button>
             </div>
 
@@ -386,7 +386,7 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                                 <MagnifyingGlassIcon className="w-4 h-4 absolute left-3 top-2.5 text-zinc-400" />
                                 <input
                                     type="text"
-                                    placeholder="Search article, brand, finish..."
+                                    placeholder={t('supplier.hub.searchCatalog')}
                                     value={catalogSearch}
                                     onChange={(e) => setCatalogSearch(e.target.value)}
                                     onKeyDown={(e) => e.key === 'Enter' && fetchCatalog(1, catalogSearch, catalogCategory)}
@@ -404,7 +404,7 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                                 }}
                                 className="px-3 py-1.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 text-xs"
                             >
-                                <option value="">All Categories</option>
+                                <option value="">{t('supplier.hub.filterAllCategories')}</option>
                                 <option value="COATED">Coated</option>
                                 <option value="UNCOATED">Uncoated</option>
                                 <option value="SPECIALTY">Specialty</option>
@@ -416,7 +416,7 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                                 onClick={() => fetchCatalog(1, catalogSearch, catalogCategory)}
                                 className="px-3.5 py-1.5 bg-slate-200 dark:bg-zinc-800 font-bold uppercase text-[10px] hover:bg-slate-300 dark:hover:bg-zinc-700 transition-colors"
                             >
-                                Filter
+                                {t('supplier.hub.filterButton')}
                             </button>
                         </div>
                     </div>
@@ -426,23 +426,23 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                         <table className="w-full text-left border-collapse text-xs">
                             <thead>
                                 <tr className="bg-slate-100 dark:bg-zinc-900 border-b border-slate-200 dark:border-zinc-800 text-[10px] font-bold text-zinc-500 uppercase tracking-wider">
-                                    <th className="p-3">Paper Product & Brand</th>
-                                    <th className="p-3">Category</th>
-                                    <th className="p-3">Finish</th>
-                                    <th className="p-3">Certified Variants</th>
-                                    <th className="p-3">Dimensions & GSM Specs</th>
-                                    <th className="p-3 text-right">Actions</th>
+                                    <th className="p-3">{t('supplier.hub.colProduct')}</th>
+                                    <th className="p-3">{t('supplier.hub.colCategory')}</th>
+                                    <th className="p-3">{t('supplier.hub.colFinish')}</th>
+                                    <th className="p-3">{t('supplier.hub.colVariants')}</th>
+                                    <th className="p-3">{t('supplier.hub.colSpecs')}</th>
+                                    <th className="p-3 text-right">{t('supplier.hub.colActions')}</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-200 dark:divide-zinc-800">
                                 {loadingCatalog ? (
                                     <tr>
-                                        <td colSpan={6} className="p-8 text-center text-zinc-400">Loading technical catalog...</td>
+                                        <td colSpan={6} className="p-8 text-center text-zinc-400">{t('supplier.hub.loadingCatalog')}</td>
                                     </tr>
                                 ) : catalogProducts.length === 0 ? (
                                     <tr>
                                         <td colSpan={6} className="p-8 text-center text-zinc-400">
-                                            No confirmed technical products found. Click "Import Technical Catalog" to stage a supplier data sheet.
+                                            {t('supplier.hub.noVariants')}
                                         </td>
                                     </tr>
                                 ) : (
@@ -482,7 +482,7 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                                                     </td>
                                                     <td className="p-3">
                                                         <span className="text-[10px] font-mono text-zinc-400">
-                                                            Grain: {v.grainDirection || '—'}
+                                                             Grain: {v.grainDirection || '—'}
                                                         </span>
                                                     </td>
                                                     <td className="p-3 font-mono text-[10px] text-zinc-400">
@@ -493,16 +493,16 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                                                             <button
                                                                 onClick={() => handleViewVariantDetail(v.id)}
                                                                 className="px-2 py-1 bg-slate-200 dark:bg-zinc-800 hover:bg-slate-300 dark:hover:bg-zinc-700 text-slate-700 dark:text-zinc-200 font-bold uppercase text-[10px] transition-colors cursor-pointer"
-                                                                title="View technical specifications"
+                                                                title={t('supplier.hub.viewVariantDetails')}
                                                             >
-                                                                Specs
+                                                                {t('supplier.hub.viewVariantDetails')}
                                                             </button>
                                                             {!isReadOnly && (
                                                                 <button
                                                                     onClick={() => handleOpenCreateOffer({ ...v, productName: prod.name, finish: prod.finish })}
                                                                     className="px-2.5 py-1 bg-red-600 hover:bg-red-700 text-white font-bold uppercase text-[10px] transition-colors cursor-pointer"
                                                                 >
-                                                                    + Create Offer
+                                                                    {t('supplier.hub.createOffer')}
                                                                 </button>
                                                             )}
                                                         </div>
@@ -518,21 +518,21 @@ export const SupplierCatalogOffersPage: React.FC = () => {
 
                     {/* Pagination */}
                     <div className="flex items-center justify-between text-xs text-zinc-500 pt-2">
-                        <span>Page {catalogPage} of {catalogTotalPages}</span>
+                        <span>{t('supplier.hub.pageOf', { page: catalogPage, total: catalogTotalPages })}</span>
                         <div className="flex items-center gap-1">
                             <button
                                 disabled={catalogPage <= 1}
                                 onClick={() => fetchCatalog(catalogPage - 1, catalogSearch, catalogCategory)}
                                 className="px-3 py-1 border border-slate-200 dark:border-zinc-800 disabled:opacity-40"
                             >
-                                Prev
+                                {t('supplier.hub.prev')}
                             </button>
                             <button
                                 disabled={catalogPage >= catalogTotalPages}
                                 onClick={() => fetchCatalog(catalogPage + 1, catalogSearch, catalogCategory)}
                                 className="px-3 py-1 border border-slate-200 dark:border-zinc-800 disabled:opacity-40"
                             >
-                                Next
+                                {t('supplier.hub.next')}
                             </button>
                         </div>
                     </div>
@@ -549,7 +549,7 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                                 <MagnifyingGlassIcon className="w-4 h-4 absolute left-3 top-2.5 text-zinc-400" />
                                 <input
                                     type="text"
-                                    placeholder="Search offer by SKU, product name..."
+                                    placeholder={t('supplier.hub.searchOffers')}
                                     value={offersSearch}
                                     onChange={(e) => setOffersSearch(e.target.value)}
                                     onKeyDown={(e) => e.key === 'Enter' && fetchOffers(1, offersSearch, offersStatusFilter)}
@@ -567,7 +567,7 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                                 }}
                                 className="px-3 py-1.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 text-xs"
                             >
-                                <option value="">All Statuses</option>
+                                <option value="">{t('supplier.hub.filterAllStatuses')}</option>
                                 <option value="ACTIVE">Active</option>
                                 <option value="INACTIVE">Inactive</option>
                                 <option value="ARCHIVED">Archived</option>
@@ -577,7 +577,7 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                                 onClick={() => fetchOffers(1, offersSearch, offersStatusFilter)}
                                 className="px-3.5 py-1.5 bg-slate-200 dark:bg-zinc-800 font-bold uppercase text-[10px] hover:bg-slate-300 dark:hover:bg-zinc-700 transition-colors"
                             >
-                                Filter
+                                {t('supplier.hub.filterButton')}
                             </button>
                         </div>
                     </div>
@@ -587,25 +587,25 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                         <table className="w-full text-left border-collapse text-xs">
                             <thead>
                                 <tr className="bg-slate-100 dark:bg-zinc-900 border-b border-slate-200 dark:border-zinc-800 text-[10px] font-bold text-zinc-500 uppercase tracking-wider">
-                                    <th className="p-3">Supplier SKU</th>
-                                    <th className="p-3">Paper Variant</th>
-                                    <th className="p-3">Rate & Basis</th>
-                                    <th className="p-3">MOQ / Multiple</th>
-                                    <th className="p-3">Visibility</th>
-                                    <th className="p-3">Status</th>
-                                    <th className="p-3">Rev #</th>
-                                    <th className="p-3 text-right">Actions</th>
+                                    <th className="p-3">{t('supplier.hub.colSku')}</th>
+                                    <th className="p-3">{t('supplier.hub.colPaperVariant')}</th>
+                                    <th className="p-3">{t('supplier.hub.colRateBasis')}</th>
+                                    <th className="p-3">{t('supplier.hub.colMoqMultiple')}</th>
+                                    <th className="p-3">{t('supplier.hub.colVisibility')}</th>
+                                    <th className="p-3">{t('supplier.hub.colStatus')}</th>
+                                    <th className="p-3">{t('supplier.hub.colRev')}</th>
+                                    <th className="p-3 text-right">{t('supplier.hub.colActions')}</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-200 dark:divide-zinc-800">
                                 {loadingOffers ? (
                                     <tr>
-                                        <td colSpan={8} className="p-8 text-center text-zinc-400">Loading commercial offers...</td>
+                                        <td colSpan={8} className="p-8 text-center text-zinc-400">{t('supplier.hub.loadingOffers')}</td>
                                     </tr>
                                 ) : offers.length === 0 ? (
                                     <tr>
                                         <td colSpan={8} className="p-8 text-center text-zinc-400">
-                                            No commercial offers configured. Go to the "Technical Paper Articles" tab and select a variant to publish rates.
+                                            {t('supplier.hub.noOffers')}
                                         </td>
                                     </tr>
                                 ) : (
@@ -662,7 +662,7 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                                                         <button
                                                             onClick={() => handleOpenEditOffer(off)}
                                                             className="p-1 text-zinc-400 hover:text-slate-900 dark:hover:text-white transition-colors cursor-pointer"
-                                                            title="Edit Commercial Conditions"
+                                                            title={t('supplier.hub.editOffer')}
                                                         >
                                                             <PencilSquareIcon className="w-4 h-4" />
                                                         </button>
@@ -674,7 +674,7 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                                                                     : 'bg-emerald-600 text-white hover:bg-emerald-700'
                                                             }`}
                                                         >
-                                                            {off.status === 'ACTIVE' ? 'Deactivate' : 'Activate'}
+                                                            {off.status === 'ACTIVE' ? t('supplier.hub.deactivate') : t('supplier.hub.activate')}
                                                         </button>
                                                     </div>
                                                 )}
@@ -688,21 +688,21 @@ export const SupplierCatalogOffersPage: React.FC = () => {
 
                     {/* Pagination */}
                     <div className="flex items-center justify-between text-xs text-zinc-500 pt-2">
-                        <span>Page {offersPage} of {offersTotalPages}</span>
+                        <span>{t('supplier.hub.pageOf', { page: offersPage, total: offersTotalPages })}</span>
                         <div className="flex items-center gap-1">
                             <button
                                 disabled={offersPage <= 1}
                                 onClick={() => fetchOffers(offersPage - 1, offersSearch, offersStatusFilter)}
                                 className="px-3 py-1 border border-slate-200 dark:border-zinc-800 disabled:opacity-40"
                             >
-                                Prev
+                                {t('supplier.hub.prev')}
                             </button>
                             <button
                                 disabled={offersPage >= offersTotalPages}
                                 onClick={() => fetchOffers(offersPage + 1, offersSearch, offersStatusFilter)}
                                 className="px-3 py-1 border border-slate-200 dark:border-zinc-800 disabled:opacity-40"
                             >
-                                Next
+                                {t('supplier.hub.next')}
                             </button>
                         </div>
                     </div>
@@ -716,10 +716,10 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                         <div className="flex items-center justify-between border-b border-slate-200 dark:border-zinc-800 pb-3">
                             <div>
                                 <span className="px-2 py-0.5 text-[9px] font-black uppercase tracking-widest bg-red-600 text-white">
-                                    {editingOffer ? 'Commercial Revision' : 'New Commercial Offer'}
+                                    {editingOffer ? t('supplier.hub.offerRevisionTitle') : t('supplier.hub.newOfferTitle')}
                                 </span>
                                 <h3 className="text-base font-black text-slate-900 dark:text-white mt-1">
-                                    {editingOffer ? `Edit Offer: ${editingOffer.supplierSku}` : 'Link Commercial Offer to Variant'}
+                                    {editingOffer ? `${t('supplier.hub.editOffer')}: ${editingOffer.supplierSku}` : t('supplier.hub.linkOfferTitle')}
                                 </h3>
                             </div>
                             <button
@@ -751,7 +751,7 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
                                     <label className="block text-[10px] font-bold uppercase text-zinc-500 mb-1">
-                                        Supplier SKU *
+                                        {t('supplier.hub.supplierSkuLabel')}
                                     </label>
                                     <input
                                         type="text"
@@ -764,7 +764,7 @@ export const SupplierCatalogOffersPage: React.FC = () => {
 
                                 <div>
                                     <label className="block text-[10px] font-bold uppercase text-zinc-500 mb-1">
-                                        Currency *
+                                        {t('supplier.hub.currencyLabel')}
                                     </label>
                                     <select
                                         value={offerForm.currency}
@@ -781,7 +781,7 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
                                     <label className="block text-[10px] font-bold uppercase text-zinc-500 mb-1">
-                                        Unit Price Amount *
+                                        {t('supplier.hub.priceAmountLabel')}
                                     </label>
                                     <input
                                         type="number"
@@ -797,7 +797,7 @@ export const SupplierCatalogOffersPage: React.FC = () => {
 
                                 <div>
                                     <label className="block text-[10px] font-bold uppercase text-zinc-500 mb-1">
-                                        Price Basis *
+                                        {t('supplier.hub.priceBasisLabel')}
                                     </label>
                                     <select
                                         value={offerForm.priceBasis}
@@ -817,7 +817,7 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                             {offerForm.priceBasis === 'PACK' && (
                                 <div className="p-3 bg-amber-500/10 border border-amber-500/20 space-y-1">
                                     <label className="block text-[10px] font-bold uppercase text-amber-700 dark:text-amber-400">
-                                        Sheets per Pack * (Mandatory for PACK basis)
+                                        {t('supplier.hub.sheetsPerPackLabel')}
                                     </label>
                                     <input
                                         type="number"
@@ -834,7 +834,7 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
                                     <label className="block text-[10px] font-bold uppercase text-zinc-500 mb-1">
-                                        Minimum Order Quantity (MOQ) *
+                                        {t('supplier.hub.moqLabel')}
                                     </label>
                                     <input
                                         type="number"
@@ -848,7 +848,7 @@ export const SupplierCatalogOffersPage: React.FC = () => {
 
                                 <div>
                                     <label className="block text-[10px] font-bold uppercase text-zinc-500 mb-1">
-                                        Order Multiple *
+                                        {t('supplier.hub.orderMultipleLabel')}
                                     </label>
                                     <input
                                         type="number"
@@ -864,7 +864,7 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
                                     <label className="block text-[10px] font-bold uppercase text-zinc-500 mb-1">
-                                        Valid From
+                                        {t('supplier.hub.validFromLabel')}
                                     </label>
                                     <input
                                         type="date"
@@ -876,7 +876,7 @@ export const SupplierCatalogOffersPage: React.FC = () => {
 
                                 <div>
                                     <label className="block text-[10px] font-bold uppercase text-zinc-500 mb-1">
-                                        Valid Until
+                                        {t('supplier.hub.validUntilLabel')}
                                     </label>
                                     <input
                                         type="date"
@@ -890,7 +890,7 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
                                     <label className="block text-[10px] font-bold uppercase text-zinc-500 mb-1">
-                                        Delivery Coverage Zones (CSV)
+                                        {t('supplier.hub.deliveryZonesLabel')}
                                     </label>
                                     <input
                                         type="text"
@@ -903,16 +903,16 @@ export const SupplierCatalogOffersPage: React.FC = () => {
 
                                 <div>
                                     <label className="block text-[10px] font-bold uppercase text-zinc-500 mb-1">
-                                        Visibility Matrix *
+                                        {t('supplier.hub.visibilityLabel')}
                                     </label>
                                     <select
                                         value={offerForm.visibility}
                                         onChange={(e) => setOfferForm({ ...offerForm, visibility: e.target.value })}
                                         className="w-full px-2.5 py-1.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 font-bold"
                                     >
-                                        <option value="APPROVED_CUSTOMERS">Approved Customers Only</option>
-                                        <option value="MARKETPLACE">Public Marketplace</option>
-                                        <option value="PRIVATE">Private (Restricted)</option>
+                                        <option value="APPROVED_CUSTOMERS">{t('supplier.hub.visApproved')}</option>
+                                        <option value="MARKETPLACE">{t('supplier.hub.visMarketplace')}</option>
+                                        <option value="PRIVATE">{t('supplier.hub.visPrivate')}</option>
                                     </select>
                                 </div>
                             </div>
@@ -920,7 +920,7 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                             {editingOffer && (
                                 <div>
                                     <label className="block text-[10px] font-bold uppercase text-zinc-500 mb-1">
-                                        Reason for Commercial Change *
+                                        {t('supplier.hub.changeReasonLabel')}
                                     </label>
                                     <input
                                         type="text"
@@ -939,14 +939,14 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                                     onClick={() => setIsOfferModalOpen(false)}
                                     className="px-4 py-2 border border-slate-300 dark:border-zinc-700 font-bold uppercase text-[10px]"
                                 >
-                                    Cancel
+                                    {t('supplier.hub.cancel')}
                                 </button>
                                 <button
                                     type="submit"
                                     disabled={formSubmitting}
                                     className="px-5 py-2 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-bold uppercase text-[11px] transition-colors"
                                 >
-                                    {formSubmitting ? 'Saving...' : editingOffer ? 'Record Revision' : 'Publish Offer'}
+                                    {formSubmitting ? t('supplier.hub.saving') : editingOffer ? t('supplier.hub.recordRevision') : t('supplier.hub.publishOffer')}
                                 </button>
                             </div>
                         </form>
@@ -1006,7 +1006,7 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                                 onClick={() => setIsRevisionsModalOpen(false)}
                                 className="px-4 py-2 bg-slate-800 text-white font-bold uppercase text-[10px]"
                             >
-                                Close
+                                {t('supplier.hub.close')}
                             </button>
                         </div>
                     </div>
@@ -1020,10 +1020,10 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                         <div className="flex items-center justify-between border-b border-slate-200 dark:border-zinc-800 pb-3">
                             <div>
                                 <span className="px-2 py-0.5 text-[9px] font-black uppercase tracking-widest bg-red-600 text-white">
-                                    Technical Specs
+                                    {t('supplier.hub.viewVariantDetails')}
                                 </span>
                                 <h3 className="text-base font-black text-slate-900 dark:text-white mt-1">
-                                    {loadingVariantDetail ? 'Loading specifications...' : (viewingVariant?.variant?.productName || 'Paper Variant Details')}
+                                    {loadingVariantDetail ? 'Loading specifications...' : (viewingVariant?.variant?.productName || t('supplier.hub.variantSpecsTitle'))}
                                 </h3>
                             </div>
                             <button
@@ -1098,7 +1098,7 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                                         onClick={() => setVariantDetailModalOpen(false)}
                                         className="px-4 py-2 border border-slate-300 dark:border-zinc-700 font-bold uppercase text-[10px]"
                                     >
-                                        Close
+                                        {t('supplier.hub.close')}
                                     </button>
                                     {!isReadOnly && (
                                         <button
@@ -1108,7 +1108,7 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                                             }}
                                             className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-bold uppercase text-[10px]"
                                         >
-                                            + Create Offer
+                                            {t('supplier.hub.createOffer')}
                                         </button>
                                     )}
                                 </div>

@@ -148,7 +148,7 @@ function validateOfferPayload(payload) {
  * Scopes active offer count to current supplier and marketplace/approved visibility.
  * Returns hierarchical products[].variants AND flat items for full contract compatibility.
  */
-async function getTechnicalCatalog({ page = 1, limit = 20, search = null, category = null, finish = null, supplierId = null }) {
+async function getTechnicalCatalog({ page = 1, limit = 20, search = null, category = null, finish = null, supplierId = null, customerId = null }) {
     const offset = Math.max(0, (page - 1) * limit);
     const whereConditions = [];
     const params = [];
@@ -180,17 +180,37 @@ async function getTechnicalCatalog({ page = 1, limit = 20, search = null, catego
     const countResult = await db.query(countSql, params);
     const total = countResult[0]?.total || 0;
 
-    // Do NOT expose counts of PRIVATE offers belonging to competing suppliers
+    // Effective Visibility:
+    // - MARKETPLACE is visible to all
+    // - PRIVATE is strictly visible only to the owning supplier
+    // - APPROVED_CUSTOMERS is NOT MARKETPLACE: competing suppliers must NEVER see it.
+    //   It is only visible to the owning supplier, or to an authorized customer if customerId/customerTenantId is supplied.
+    let visibilityCondition = "o.visibility = 'MARKETPLACE'";
+    const subqueryParams = [];
+
+    if (supplierId) {
+        visibilityCondition += ' OR o.supplier_id = ?';
+        subqueryParams.push(supplierId);
+    }
+
+    if (customerId) {
+        visibilityCondition += " OR (o.visibility = 'APPROVED_CUSTOMERS' AND JSON_CONTAINS(COALESCE(o.metadata_json->'$.approved_customer_ids', '[]'), JSON_QUOTE(?)))";
+        subqueryParams.push(String(customerId));
+    }
+
     let activeOffersSubquery = `
         (SELECT COUNT(*) FROM supplier_paper_offers o 
          WHERE o.variant_id = v.id 
            AND o.status = 'ACTIVE' 
-           AND (o.visibility IN ('MARKETPLACE', 'APPROVED_CUSTOMERS') ${supplierId ? 'OR o.supplier_id = ?' : ''})) as active_offers_count
+           AND (${visibilityCondition})) as active_offers_count
     `;
-    const dataParams = [...params];
-    if (supplierId) {
-        dataParams.push(supplierId);
-    }
+    
+    // Construct parameters in exact order of appearance in dataSql:
+    // 1. subqueryParams for SELECT activeOffersSubquery
+    // 2. WHERE conditions (params)
+    // 3. LIMIT
+    // 4. OFFSET
+    const dataParams = [...subqueryParams, ...params, limit, offset];
 
     const dataSql = `
         SELECT 
@@ -217,7 +237,7 @@ async function getTechnicalCatalog({ page = 1, limit = 20, search = null, catego
         ORDER BY p.name ASC, v.gsm ASC, v.width_mm ASC
         LIMIT ? OFFSET ?
     `;
-    const rows = await db.query(dataSql, [...dataParams, limit, offset]);
+    const rows = await db.query(dataSql, dataParams);
 
     const flatItems = rows.map(r => ({
         id: r.variant_id,
@@ -603,6 +623,7 @@ async function getOfferById({ offerId, tenantId, supplierId }) {
  */
 async function updateOffer({ offerId, tenantId, supplierId, actorId, payload }) {
     const conn = await db.getConnection();
+    let validated = null;
     try {
         await conn.beginTransaction();
 
@@ -646,7 +667,7 @@ async function updateOffer({ offerId, tenantId, supplierId, actorId, payload }) 
                     : (existing.metadata_json || {}))
         };
 
-        const validated = validateOfferPayload(mergedPayload);
+        validated = validateOfferPayload(mergedPayload);
 
         // Fetch max revision number
         const [revMax] = await conn.query('SELECT MAX(revision_number) as max_rev FROM supplier_paper_offer_revisions WHERE offer_id = ?', [offerId]);
@@ -720,7 +741,8 @@ async function updateOffer({ offerId, tenantId, supplierId, actorId, payload }) 
     } catch (err) {
         await conn.rollback();
         if (err.code === 'ER_DUP_ENTRY' || err.errno === 1062) {
-            throw new Error(`SKU_ALREADY_EXISTS: Supplier SKU '${validated.supplierSku}' is already in use by another offer.`);
+            const conflictedSku = (validated && validated.supplierSku) || payload.supplierSku || 'specified';
+            throw new Error(`SKU_ALREADY_EXISTS: Supplier SKU '${conflictedSku}' is already in use by another offer.`);
         }
         throw err;
     } finally {
