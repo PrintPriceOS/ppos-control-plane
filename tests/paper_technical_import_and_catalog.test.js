@@ -1451,5 +1451,618 @@ describe('Iteration I2: Paper Technical Data Sheets & Multi-format Import Engine
             expect(resPending.statusCode).toBe(403);
             expect(resPending.body.error.code).toBe('SUPPLIER_PENDING_REVIEW');
         });
+
+        describe('7. Paper Supplier Hub: Required Import or Review Remediations (10 Mandatory Acceptance Tests)', () => {
+            // 1. Catálogo técnico válido sin precios: PASS
+            it('Test 1: Valid technical catalog without prices validates and confirms cleanly', async () => {
+                const csvData = [
+                    'NAME;GRAMS;WIDTH (MM);HEIGHT (MM);COAT;PROVISER',
+                    'Amber Pure Unpriced 150;150;700;1000;uncoated;Antalis Latvija'
+                ].join('\n');
+                const buffer = Buffer.from(csvData, 'utf8');
+
+                const preview = await paperImportService.processImportPreview({
+                    buffer,
+                    fileName: 'pure_technical_sheet.csv',
+                    tenantId: 'tenant-alpha',
+                    supplierId: 'supp-alpha-1',
+                    createdBy: 'user-op-alpha'
+                });
+
+                expect(preview.summary.validRows).toBe(1);
+                expect(preview.rows[0].validationStatus).toBe('VALID');
+
+                const staged = await paperImportService.stageImportBatch(preview);
+                const confirmed = await paperImportService.confirmImportBatch({
+                    batchId: staged.batchId,
+                    tenantId: 'tenant-alpha',
+                    supplierId: 'supp-alpha-1',
+                    actorId: 'user-op-alpha'
+                });
+
+                expect(confirmed.status).toBe('CONFIRMED');
+                expect(confirmed.confirmedProducts).toBe(1);
+            });
+
+            // 2. Precio comercial no declarado: no bloquea catálogo técnico
+            it('Test 2: Undeclared commercial price (EMPTY_PRICE & CURRENCY_NOT_DECLARED) does not block technical catalog', async () => {
+                const csvData = [
+                    'NAME;GRAMS;WIDTH (MM);HEIGHT (MM);PRICE;COAT',
+                    'Munken Pure No Price;120;640;900;;uncoated'
+                ].join('\n');
+                const buffer = Buffer.from(csvData, 'utf8');
+
+                const preview = await paperImportService.processImportPreview({
+                    buffer,
+                    fileName: 'no_price_test.csv',
+                    tenantId: 'tenant-alpha',
+                    supplierId: 'supp-alpha-1',
+                    createdBy: 'user-op-alpha'
+                });
+
+                const row = preview.rows[0].normalized;
+                expect(row.commercialIssues.some(i => i.code === 'EMPTY_PRICE' && i.severity === 'INFO')).toBe(true);
+                expect(row.commercialIssues.some(i => i.code === 'CURRENCY_NOT_DECLARED' && i.severity === 'INFO')).toBe(true);
+                expect(row.validationStatus).toBe('VALID');
+
+                const staged = await paperImportService.stageImportBatch(preview);
+                const confirmed = await paperImportService.confirmImportBatch({
+                    batchId: staged.batchId,
+                    tenantId: 'tenant-alpha',
+                    supplierId: 'supp-alpha-1',
+                    actorId: 'user-op-alpha'
+                });
+                expect(confirmed.status).toBe('CONFIRMED');
+            });
+
+            // 3. Conflicto real de gramaje: requiere resolución explícita
+            it('Test 3: Real GSM conflict flags WARNING and blocks until explicitly resolved or accepted', async () => {
+                const csvData = [
+                    'NAME;GRAMS;WIDTH (MM);HEIGHT (MM);COAT',
+                    'Amber Graphic 150 100x70;178;1000;700;uncoated' // Declared col is 178, description is 150
+                ].join('\n');
+                const buffer = Buffer.from(csvData, 'utf8');
+
+                const preview = await paperImportService.processImportPreview({
+                    buffer,
+                    fileName: 'gsm_conflict.csv',
+                    tenantId: 'tenant-alpha',
+                    supplierId: 'supp-alpha-1',
+                    createdBy: 'user-op-alpha'
+                });
+
+                expect(preview.summary.pendingRows).toBe(1);
+                const row = preview.rows[0].normalized;
+                expect(row.validationStatus).toBe('WARNING');
+                expect(row.technicalIssues.some(i => i.code === 'GSM_DESCRIPTION_CONFLICT')).toBe(true);
+
+                const staged = await paperImportService.stageImportBatch(preview);
+                const { rows } = await paperImportService.getImportBatchRows({
+                    batchId: staged.batchId,
+                    tenantId: 'tenant-alpha',
+                    supplierId: 'supp-alpha-1'
+                });
+                const conflictRow = rows[0];
+
+                // Trying to confirm with PENDING decision throws UNRESOLVED_ROWS_EXIST
+                await expect(paperImportService.confirmImportBatch({
+                    batchId: staged.batchId,
+                    tenantId: 'tenant-alpha',
+                    supplierId: 'supp-alpha-1',
+                    actorId: 'user-op-alpha'
+                })).rejects.toThrow(/UNRESOLVED_ROWS_EXIST/);
+
+                // Explicit decision ACCEPTED resolves it
+                await paperImportService.updateImportRowDecisions({
+                    batchId: staged.batchId,
+                    tenantId: 'tenant-alpha',
+                    supplierId: 'supp-alpha-1',
+                    actorId: 'user-op-alpha',
+                    decisions: {
+                        [conflictRow.id]: { decision: 'ACCEPTED' }
+                    }
+                });
+
+                const confirmed = await paperImportService.confirmImportBatch({
+                    batchId: staged.batchId,
+                    tenantId: 'tenant-alpha',
+                    supplierId: 'supp-alpha-1',
+                    actorId: 'user-op-alpha'
+                });
+                expect(confirmed.status).toBe('CONFIRMED');
+            });
+
+            // 4. Falso positivo de gramaje: no genera advertencia
+            it('Test 4: False positive GSM from color numbers, shade numbers, formats does NOT generate conflict', async () => {
+                const samples = [
+                    { name: 'Burano 50 Shocking Pink 200 70x100', colGsm: 200 },
+                    { name: 'Burano 63 Nero black 140 70x100', colGsm: 140 },
+                    { name: 'Burano nero Nr.63 Nero black 320 72x101', colGsm: 320 },
+                    { name: 'Efalin FINE LINEN 105 (Blue) 120 102x70', colGsm: 120 }
+                ];
+
+                for (const s of samples) {
+                    const csvData = `NAME;GRAMS;WIDTH (MM);HEIGHT (MM);COAT\n${s.name};${s.colGsm};700;1000;uncoated`;
+                    const preview = await paperImportService.processImportPreview({
+                        buffer: Buffer.from(csvData, 'utf8'),
+                        fileName: 'test_gsm_fp.csv',
+                        tenantId: 'tenant-alpha',
+                        supplierId: 'supp-alpha-1',
+                        createdBy: 'user-op-alpha'
+                    });
+                    const row = preview.rows[0].normalized;
+                    expect(row.technicalIssues.some(i => i.code === 'GSM_DESCRIPTION_CONFLICT')).toBe(false);
+                    expect(row.validationStatus).toBe('VALID');
+                }
+            });
+
+            // 5. Dimensión ambigua o contradictoria: requiere resolución
+            it('Test 5: Contradictory dimensions flag DIMENSION_CONTRADICTION and require resolution', async () => {
+                const csvData = [
+                    'NAME;GRAMS;WIDTH (MM);HEIGHT (MM);FORMAT;COAT',
+                    'Contradictory Format;150;700;1000;A1 640 x 920;uncoated'
+                ].join('\n');
+                const buffer = Buffer.from(csvData, 'utf8');
+
+                const preview = await paperImportService.processImportPreview({
+                    buffer,
+                    fileName: 'dim_contradiction.csv',
+                    tenantId: 'tenant-alpha',
+                    supplierId: 'supp-alpha-1',
+                    createdBy: 'user-op-alpha'
+                });
+
+                const row = preview.rows[0].normalized;
+                expect(row.validationStatus).toBe('WARNING');
+                expect(row.technicalIssues.some(i => i.code === 'DIMENSION_CONTRADICTION')).toBe(true);
+
+                const staged = await paperImportService.stageImportBatch(preview);
+                // While pending, confirm fails
+                await expect(paperImportService.confirmImportBatch({
+                    batchId: staged.batchId,
+                    tenantId: 'tenant-alpha',
+                    supplierId: 'supp-alpha-1',
+                    actorId: 'user-op-alpha'
+                })).rejects.toThrow(/UNRESOLVED_ROWS_EXIST/);
+            });
+
+            // 6. Fila rechazada: no se incorpora al catálogo
+            it('Test 6: Rejected row is excluded from paper_products and paper_variants', async () => {
+                const csvData = [
+                    'NAME;GRAMS;WIDTH (MM);HEIGHT (MM);COAT',
+                    'Included Product;150;700;1000;uncoated',
+                    'Excluded Product;200;700;1000;uncoated'
+                ].join('\n');
+                const buffer = Buffer.from(csvData, 'utf8');
+
+                const preview = await paperImportService.processImportPreview({
+                    buffer,
+                    fileName: 'rejection_test.csv',
+                    tenantId: 'tenant-alpha',
+                    supplierId: 'supp-alpha-1',
+                    createdBy: 'user-op-alpha'
+                });
+
+                const staged = await paperImportService.stageImportBatch(preview);
+                const { rows } = await paperImportService.getImportBatchRows({
+                    batchId: staged.batchId,
+                    tenantId: 'tenant-alpha',
+                    supplierId: 'supp-alpha-1'
+                });
+
+                const incRow = rows.find(r => r.normalized.name === 'Included Product');
+                const excRow = rows.find(r => r.normalized.name === 'Excluded Product');
+
+                await paperImportService.updateImportRowDecisions({
+                    batchId: staged.batchId,
+                    tenantId: 'tenant-alpha',
+                    supplierId: 'supp-alpha-1',
+                    actorId: 'user-op-alpha',
+                    decisions: {
+                        [incRow.id]: { decision: 'ACCEPTED' },
+                        [excRow.id]: { decision: 'REJECTED' }
+                    }
+                });
+
+                await paperImportService.confirmImportBatch({
+                    batchId: staged.batchId,
+                    tenantId: 'tenant-alpha',
+                    supplierId: 'supp-alpha-1',
+                    actorId: 'user-op-alpha'
+                });
+
+                const [prods] = await connectionPool.query('SELECT * FROM paper_products WHERE name IN ("Included Product", "Excluded Product")');
+                expect(prods.some(p => p.name === 'Included Product')).toBe(true);
+                expect(prods.some(p => p.name === 'Excluded Product')).toBe(false);
+            });
+
+            // 7. Importación repetida: sin duplicados
+            it('Test 7: Repeated import is idempotent and does not create duplicate variants', async () => {
+                const csvData = [
+                    'NAME;GRAMS;WIDTH (MM);HEIGHT (MM);COAT',
+                    'Idempotent Paper;130;700;1000;coated'
+                ].join('\n');
+                const buffer = Buffer.from(csvData, 'utf8');
+
+                const preview1 = await paperImportService.processImportPreview({
+                    buffer,
+                    fileName: 'idem1.csv',
+                    tenantId: 'tenant-alpha',
+                    supplierId: 'supp-alpha-1',
+                    createdBy: 'user-op-alpha'
+                });
+                const staged1 = await paperImportService.stageImportBatch(preview1);
+                await paperImportService.confirmImportBatch({
+                    batchId: staged1.batchId,
+                    tenantId: 'tenant-alpha',
+                    supplierId: 'supp-alpha-1',
+                    actorId: 'user-op-alpha'
+                });
+
+                // Count variants with this name
+                const [count1] = await connectionPool.query(
+                    'SELECT COUNT(*) as cnt FROM paper_variants v JOIN paper_products p ON v.product_id = p.id WHERE p.name = "Idempotent Paper"'
+                );
+                expect(count1[0].cnt).toBe(1);
+
+                // Stage and confirm second identical batch
+                const preview2 = await paperImportService.processImportPreview({
+                    buffer,
+                    fileName: 'idem2.csv',
+                    tenantId: 'tenant-alpha',
+                    supplierId: 'supp-alpha-1',
+                    createdBy: 'user-op-alpha'
+                });
+                const staged2 = await paperImportService.stageImportBatch(preview2);
+                await paperImportService.confirmImportBatch({
+                    batchId: staged2.batchId,
+                    tenantId: 'tenant-alpha',
+                    supplierId: 'supp-alpha-1',
+                    actorId: 'user-op-alpha'
+                });
+
+                // Count must still be 1 (no duplicate variants created)
+                const [count2] = await connectionPool.query(
+                    'SELECT COUNT(*) as cnt FROM paper_variants v JOIN paper_products p ON v.product_id = p.id WHERE p.name = "Idempotent Paper"'
+                );
+                expect(count2[0].cnt).toBe(1);
+            });
+
+            // 8. Aislamiento entre tenants: PASS
+            it('Test 8: Strict multi-tenant isolation prevents cross-tenant access and modification', async () => {
+                const csvData = 'NAME;GRAMS;WIDTH (MM);HEIGHT (MM);COAT\nTenant Alpha Paper;100;700;1000;uncoated';
+                const preview = await paperImportService.processImportPreview({
+                    buffer: Buffer.from(csvData, 'utf8'),
+                    fileName: 'tenant_iso.csv',
+                    tenantId: 'tenant-alpha',
+                    supplierId: 'supp-alpha-1',
+                    createdBy: 'user-op-alpha'
+                });
+                const staged = await paperImportService.stageImportBatch(preview);
+
+                // Tenant Beta attempts to access batch -> BATCH_NOT_FOUND
+                await expect(paperImportService.getImportBatchRows({
+                    batchId: staged.batchId,
+                    tenantId: 'tenant-beta',
+                    supplierId: 'supp-beta-1'
+                })).rejects.toThrow(/BATCH_NOT_FOUND/);
+
+                // Tenant Beta attempts to update decisions -> BATCH_NOT_FOUND
+                await expect(paperImportService.updateImportRowDecisions({
+                    batchId: staged.batchId,
+                    tenantId: 'tenant-beta',
+                    supplierId: 'supp-beta-1',
+                    actorId: 'user-op-beta',
+                    decisions: {}
+                })).rejects.toThrow(/BATCH_NOT_FOUND/);
+
+                // Tenant Beta attempts to confirm -> BATCH_NOT_FOUND
+                await expect(paperImportService.confirmImportBatch({
+                    batchId: staged.batchId,
+                    tenantId: 'tenant-beta',
+                    supplierId: 'supp-beta-1',
+                    actorId: 'user-op-beta'
+                })).rejects.toThrow(/BATCH_NOT_FOUND/);
+            });
+
+            // 9. Importación por lotes con acciones masivas: PASS
+            it('Test 9: Safe bulk actions (ACCEPT_ALL_VALID, ACCEPT_SAFE_WARNINGS, REJECT_PENDING_ISSUES) resolve batch cleanly', async () => {
+                const csvData = [
+                    'NAME;GRAMS;WIDTH (MM);HEIGHT (MM);COAT;PRICE',
+                    'Bulk Valid 1;100;700;1000;uncoated;150',
+                    'Bulk Valid 2;120;700;1000;uncoated;180',
+                    'Bulk Safe Warning;130;700;1000;uncoated;0', // Safe warning: ZERO_PRICE (price is 0)
+                    'Bulk Unsafe Discrepancy;150;50;50;uncoated;200' // Unsafe warning: AMBIGUOUS_DIMENSION_UNITS (50x50 mm)
+                ].join('\n');
+                const buffer = Buffer.from(csvData, 'utf8');
+
+                const preview = await paperImportService.processImportPreview({
+                    buffer,
+                    fileName: 'bulk_batch.csv',
+                    tenantId: 'tenant-alpha',
+                    supplierId: 'supp-alpha-1',
+                    createdBy: 'user-op-alpha'
+                });
+                const staged = await paperImportService.stageImportBatch(preview);
+
+                // Execute ACCEPT_ALL_VALID -> accepts the 2 VALID rows
+                const resValid = await paperImportService.updateImportRowDecisions({
+                    batchId: staged.batchId,
+                    tenantId: 'tenant-alpha',
+                    supplierId: 'supp-alpha-1',
+                    actorId: 'user-op-alpha',
+                    action: 'ACCEPT_ALL_VALID'
+                });
+                expect(resValid.updatedCount).toBe(2);
+
+                // Execute ACCEPT_SAFE_WARNINGS -> accepts only Bulk Safe Warning (ZERO_PRICE)
+                // Refuses to accept Bulk Unsafe Discrepancy (AMBIGUOUS_DIMENSION_UNITS)!
+                const resWarn = await paperImportService.updateImportRowDecisions({
+                    batchId: staged.batchId,
+                    tenantId: 'tenant-alpha',
+                    supplierId: 'supp-alpha-1',
+                    actorId: 'user-op-alpha',
+                    action: 'ACCEPT_SAFE_WARNINGS'
+                });
+                expect(resWarn.updatedCount).toBe(1);
+
+                // The batch still has 1 unresolved discrepancy row (AMBIGUOUS_DIMENSION_UNITS) -> confirm fails!
+                await expect(paperImportService.confirmImportBatch({
+                    batchId: staged.batchId,
+                    tenantId: 'tenant-alpha',
+                    supplierId: 'supp-alpha-1',
+                    actorId: 'user-op-alpha'
+                })).rejects.toThrow(/UNRESOLVED_ROWS_EXIST/);
+
+                // Operator rejects the unresolved discrepancy row
+                const resReject = await paperImportService.updateImportRowDecisions({
+                    batchId: staged.batchId,
+                    tenantId: 'tenant-alpha',
+                    supplierId: 'supp-alpha-1',
+                    actorId: 'user-op-alpha',
+                    action: 'REJECT_PENDING_ISSUES'
+                });
+                expect(resReject.updatedCount).toBe(1);
+
+                // Now all active rows are ACCEPTED, confirm succeeds with the 3 accepted products!
+                const confirmed = await paperImportService.confirmImportBatch({
+                    batchId: staged.batchId,
+                    tenantId: 'tenant-alpha',
+                    supplierId: 'supp-alpha-1',
+                    actorId: 'user-op-alpha'
+                });
+                expect(confirmed.status).toBe('CONFIRMED');
+                expect(confirmed.confirmedProducts).toBe(3);
+            });
+
+            // 10. Confirmación transaccional y trazabilidad: PASS
+            it('Test 10: Operator audit trail is recorded on each decision and rollback is transactional', async () => {
+                const csvData = [
+                    'NAME;GRAMS;WIDTH (MM);HEIGHT (MM);COAT',
+                    'Audit Paper 1;150;700;1000;uncoated'
+                ].join('\n');
+                const buffer = Buffer.from(csvData, 'utf8');
+
+                const preview = await paperImportService.processImportPreview({
+                    buffer,
+                    fileName: 'audit_trace.csv',
+                    tenantId: 'tenant-alpha',
+                    supplierId: 'supp-alpha-1',
+                    createdBy: 'user-op-alpha'
+                });
+                const staged = await paperImportService.stageImportBatch(preview);
+                const { rows } = await paperImportService.getImportBatchRows({
+                    batchId: staged.batchId,
+                    tenantId: 'tenant-alpha',
+                    supplierId: 'supp-alpha-1'
+                });
+                const targetRow = rows[0];
+
+                // Manual override with audit
+                await paperImportService.updateImportRowDecisions({
+                    batchId: staged.batchId,
+                    tenantId: 'tenant-alpha',
+                    supplierId: 'supp-alpha-1',
+                    actorId: 'operator-agent-99',
+                    decisions: {
+                        [targetRow.id]: {
+                            decision: 'ACCEPTED',
+                            overrides: { finish: 'SILK' }
+                        }
+                    }
+                });
+
+                // Verify audit log in database
+                const [dbRow] = await connectionPool.query('SELECT normalized_data_json FROM paper_import_rows WHERE id = ?', [targetRow.id]);
+                const parsedNorm = typeof dbRow[0].normalized_data_json === 'string' ? JSON.parse(dbRow[0].normalized_data_json) : dbRow[0].normalized_data_json;
+                expect(parsedNorm._audit_log).toBeDefined();
+                expect(parsedNorm._audit_log.length).toBeGreaterThan(0);
+                const auditEntry = parsedNorm._audit_log[parsedNorm._audit_log.length - 1];
+                expect(auditEntry.actor_id).toBe('operator-agent-99');
+                expect(auditEntry.batch_id).toBe(staged.batchId);
+                expect(auditEntry.decision).toBe('ACCEPTED');
+                expect(auditEntry.timestamp).toBeDefined();
+                expect(auditEntry.previous_values.finish).toBe('UNCOATED');
+                expect(auditEntry.new_values.finish).toBe('SILK');
+
+                // Transactional confirmation
+                const confirmed = await paperImportService.confirmImportBatch({
+                    batchId: staged.batchId,
+                    tenantId: 'tenant-alpha',
+                    supplierId: 'supp-alpha-1',
+                    actorId: 'operator-agent-99'
+                });
+                expect(confirmed.status).toBe('CONFIRMED');
+            });
+
+            // 11. Regresión ACCEPT_SAFE_WARNINGS: Bloquea discrepancia real de GSM (GSM_DESCRIPTION_CONFLICT)
+            it('Test 11: ACCEPT_SAFE_WARNINGS blocks GSM_DESCRIPTION_CONFLICT from bulk acceptance (remains PENDING)', async () => {
+                const csvData = [
+                    'NAME;GRAMS;WIDTH (MM);HEIGHT (MM);COAT',
+                    'Amber Graphic 150;178;700;1000;uncoated' // Declared col is 178, description is 150
+                ].join('\n');
+                const buffer = Buffer.from(csvData, 'utf8');
+
+                const preview = await paperImportService.processImportPreview({
+                    buffer,
+                    fileName: 'gsm_discrepancy.csv',
+                    tenantId: 'tenant-alpha',
+                    supplierId: 'supp-alpha-1',
+                    createdBy: 'user-op-alpha'
+                });
+                const staged = await paperImportService.stageImportBatch(preview);
+
+                // Attempt ACCEPT_SAFE_WARNINGS
+                const res = await paperImportService.updateImportRowDecisions({
+                    batchId: staged.batchId,
+                    tenantId: 'tenant-alpha',
+                    supplierId: 'supp-alpha-1',
+                    actorId: 'user-op-alpha',
+                    action: 'ACCEPT_SAFE_WARNINGS'
+                });
+                // Updated count must be 0 because GSM discrepancy cannot be safely bulk-accepted!
+                expect(res.updatedCount).toBe(0);
+
+                const { rows } = await paperImportService.getImportBatchRows({
+                    batchId: staged.batchId,
+                    tenantId: 'tenant-alpha',
+                    supplierId: 'supp-alpha-1'
+                });
+                expect(rows[0].decision).toBe('PENDING');
+                expect(rows[0].issues.some((i) => i.code === 'GSM_DESCRIPTION_CONFLICT')).toBe(true);
+
+                // Batch cannot be confirmed while discrepancy row is PENDING
+                await expect(paperImportService.confirmImportBatch({
+                    batchId: staged.batchId,
+                    tenantId: 'tenant-alpha',
+                    supplierId: 'supp-alpha-1',
+                    actorId: 'user-op-alpha'
+                })).rejects.toThrow(/UNRESOLVED_ROWS_EXIST/);
+            });
+
+            // 12. Regresión ACCEPT_SAFE_WARNINGS: Bloquea discrepancia real de dimensiones (DIMENSION_CONTRADICTION)
+            it('Test 12: ACCEPT_SAFE_WARNINGS blocks DIMENSION_CONTRADICTION from bulk acceptance (remains PENDING)', async () => {
+                const csvData = [
+                    'NAME;GRAMS;WIDTH (MM);HEIGHT (MM);FORMAT;COAT',
+                    'Contradictory Sheet;150;700;1000;A1 640 x 920;uncoated' // Format contradicts W/H columns
+                ].join('\n');
+                const buffer = Buffer.from(csvData, 'utf8');
+
+                const preview = await paperImportService.processImportPreview({
+                    buffer,
+                    fileName: 'dim_contradiction_bulk.csv',
+                    tenantId: 'tenant-alpha',
+                    supplierId: 'supp-alpha-1',
+                    createdBy: 'user-op-alpha'
+                });
+                const staged = await paperImportService.stageImportBatch(preview);
+
+                // Attempt ACCEPT_SAFE_WARNINGS
+                const res = await paperImportService.updateImportRowDecisions({
+                    batchId: staged.batchId,
+                    tenantId: 'tenant-alpha',
+                    supplierId: 'supp-alpha-1',
+                    actorId: 'user-op-alpha',
+                    action: 'ACCEPT_SAFE_WARNINGS'
+                });
+                // Updated count must be 0
+                expect(res.updatedCount).toBe(0);
+
+                const { rows } = await paperImportService.getImportBatchRows({
+                    batchId: staged.batchId,
+                    tenantId: 'tenant-alpha',
+                    supplierId: 'supp-alpha-1'
+                });
+                expect(rows[0].decision).toBe('PENDING');
+                expect(rows[0].issues.some((i) => i.code === 'DIMENSION_CONTRADICTION')).toBe(true);
+            });
+
+            // 13. Regresión ACCEPT_SAFE_WARNINGS: Bloquea unidades dudosas / fuera de rango (AMBIGUOUS_DIMENSION_UNITS)
+            it('Test 13: ACCEPT_SAFE_WARNINGS blocks AMBIGUOUS_DIMENSION_UNITS from bulk acceptance (remains PENDING)', async () => {
+                const csvData = [
+                    'NAME;GRAMS;WIDTH (MM);HEIGHT (MM);COAT',
+                    'Suspect Sheet Size;150;50;60;uncoated' // 50x60 mm is outside sheet range (<100mm)
+                ].join('\n');
+                const buffer = Buffer.from(csvData, 'utf8');
+
+                const preview = await paperImportService.processImportPreview({
+                    buffer,
+                    fileName: 'ambiguous_dim_bulk.csv',
+                    tenantId: 'tenant-alpha',
+                    supplierId: 'supp-alpha-1',
+                    createdBy: 'user-op-alpha'
+                });
+                const staged = await paperImportService.stageImportBatch(preview);
+
+                // Attempt ACCEPT_SAFE_WARNINGS
+                const res = await paperImportService.updateImportRowDecisions({
+                    batchId: staged.batchId,
+                    tenantId: 'tenant-alpha',
+                    supplierId: 'supp-alpha-1',
+                    actorId: 'user-op-alpha',
+                    action: 'ACCEPT_SAFE_WARNINGS'
+                });
+                // Updated count must be 0
+                expect(res.updatedCount).toBe(0);
+
+                const { rows } = await paperImportService.getImportBatchRows({
+                    batchId: staged.batchId,
+                    tenantId: 'tenant-alpha',
+                    supplierId: 'supp-alpha-1'
+                });
+                expect(rows[0].decision).toBe('PENDING');
+                expect(rows[0].issues.some((i) => i.code === 'AMBIGUOUS_DIMENSION_UNITS')).toBe(true);
+            });
+
+            // 14. Regresión isRowWarningExplicitlySafe: Clasificación estricta de advertencias seguras vs discrepancias
+            it('Test 14: isRowWarningExplicitlySafe accurately discriminates safe warnings from real discrepancies', () => {
+                const { isRowWarningExplicitlySafe, UNSAFE_DISCREPANCY_WARNING_CODES, EXPLICIT_SAFE_WARNING_CODES } = paperImportService;
+                expect(isRowWarningExplicitlySafe).toBeDefined();
+                expect(UNSAFE_DISCREPANCY_WARNING_CODES.has('GSM_DESCRIPTION_CONFLICT')).toBe(true);
+                expect(UNSAFE_DISCREPANCY_WARNING_CODES.has('DIMENSION_CONTRADICTION')).toBe(true);
+                expect(UNSAFE_DISCREPANCY_WARNING_CODES.has('AMBIGUOUS_DIMENSION_UNITS')).toBe(true);
+
+                // Row with safe warning (ZERO_PRICE) -> true
+                const safeRow = {
+                    name: 'Safe Paper',
+                    gsm: 150,
+                    width_mm: 700,
+                    height_mm: 1000,
+                    issues: [{ code: 'ZERO_PRICE', severity: 'WARNING', category: 'COMMERCIAL' }]
+                };
+                expect(isRowWarningExplicitlySafe(safeRow)).toBe(true);
+
+                // Row with GSM discrepancy -> false
+                const gsmDiscrepancyRow = {
+                    name: 'Discrepancy Paper',
+                    gsm: 150,
+                    width_mm: 700,
+                    height_mm: 1000,
+                    issues: [{ code: 'GSM_DESCRIPTION_CONFLICT', severity: 'WARNING', category: 'TECHNICAL' }]
+                };
+                expect(isRowWarningExplicitlySafe(gsmDiscrepancyRow)).toBe(false);
+
+                // Row with dimension contradiction -> false
+                const dimContradictionRow = {
+                    name: 'Dim Conflict Paper',
+                    gsm: 150,
+                    width_mm: 700,
+                    height_mm: 1000,
+                    issues: [{ code: 'DIMENSION_CONTRADICTION', severity: 'WARNING', category: 'TECHNICAL' }]
+                };
+                expect(isRowWarningExplicitlySafe(dimContradictionRow)).toBe(false);
+
+                // Incomplete row (missing width) -> false
+                const incompleteRow = {
+                    name: 'Incomplete Paper',
+                    gsm: 150,
+                    width_mm: null,
+                    height_mm: 1000,
+                    issues: [{ code: 'ZERO_PRICE', severity: 'WARNING', category: 'COMMERCIAL' }]
+                };
+                expect(isRowWarningExplicitlySafe(incompleteRow)).toBe(false);
+            });
+
+        });
     });
 });

@@ -2449,6 +2449,12 @@ export const de = {
   'supplier.hub.confirmCatalog': 'Technischen Katalog bestätigen',
   'supplier.hub.confirmingBatch': 'Charge wird bestätigt...',
   'supplier.hub.startNewImport': 'Neuen Import starten',
+  'supplier.hub.acceptAllValid': 'Alle gültigen annehmen',
+  'supplier.hub.acceptSafeWarnings': 'Gerechtfertigte Warnungen annehmen',
+  'supplier.hub.rejectSelected': 'Ausgewählte ablehnen',
+  'supplier.hub.rejectAllIssues': 'Ausstehende Probleme ablehnen',
+  'supplier.hub.unpricedTechnical': 'Gültiges Datenblatt (ohne Preis)',
+  'supplier.hub.executingBulkAction': 'Massenaktion wird angewendet...',
 
   // Supplier Dashboard
   'supplier.dashboard.hubBadge': 'Lieferantenportal',

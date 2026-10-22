@@ -36,6 +36,7 @@ export const TechnicalImportModal: React.FC<ImportModalProps> = ({
     const [filterStatus, setFilterStatus] = useState<string>('');
     const [decisions, setDecisions] = useState<Record<string, { decision: string; overrides?: any }>>({});
     const [successMessage, setSuccessMessage] = useState<string | null>(null);
+    const [bulkActionLoading, setBulkActionLoading] = useState<boolean>(false);
 
     if (!isOpen) return null;
 
@@ -48,11 +49,36 @@ export const TechnicalImportModal: React.FC<ImportModalProps> = ({
         setError(null);
         setConfirming(false);
         setSavingDecisions(false);
+        setBulkActionLoading(false);
         setPage(1);
         setTotalPages(1);
         setFilterStatus('');
         setDecisions({});
         setSuccessMessage(null);
+    };
+
+    const handleBulkAction = async (action: string) => {
+        if (!previewData?.batchId) return;
+        setBulkActionLoading(true);
+        setError(null);
+        setSuccessMessage(null);
+        try {
+            const res = await paperSupplierFetch<any>(`/api/v1/paper-suppliers/catalog/imports/${previewData.batchId}/rows`, {
+                method: 'PATCH',
+                body: JSON.stringify({ action })
+            });
+            if (res && res.ok) {
+                setSuccessMessage(`${t('supplier.hub.executingBulkAction')} (${res.data?.updatedCount || 0})`);
+                setDecisions({});
+                await loadBatchRows(previewData.batchId, page, filterStatus);
+            } else {
+                setError('Error al ejecutar la acción masiva.');
+            }
+        } catch (err: any) {
+            setError(err.message || 'Fallo en la acción masiva.');
+        } finally {
+            setBulkActionLoading(false);
+        }
     };
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -337,7 +363,7 @@ export const TechnicalImportModal: React.FC<ImportModalProps> = ({
 
                             {/* Table of Rows */}
                             <div className="space-y-3">
-                                <div className="flex items-center justify-between gap-3">
+                                <div className="flex flex-wrap items-center justify-between gap-3">
                                     <div className="flex items-center gap-2">
                                         <span className="font-bold text-zinc-500 text-[10px] uppercase">Filter:</span>
                                         <select
@@ -356,13 +382,38 @@ export const TechnicalImportModal: React.FC<ImportModalProps> = ({
                                         </select>
                                     </div>
 
-                                    <div className="flex items-center gap-2">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <button
+                                            onClick={() => handleBulkAction('ACCEPT_ALL_VALID')}
+                                            disabled={bulkActionLoading || savingDecisions}
+                                            className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold uppercase text-[10px] disabled:opacity-50 transition-colors"
+                                            title="Aceptar todas las filas válidas del lote"
+                                        >
+                                            {t('supplier.hub.acceptAllValid')}
+                                        </button>
+                                        <button
+                                            onClick={() => handleBulkAction('ACCEPT_SAFE_WARNINGS')}
+                                            disabled={bulkActionLoading || savingDecisions}
+                                            className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white font-bold uppercase text-[10px] disabled:opacity-50 transition-colors"
+                                            title="Aceptar advertencias justificadas con requisitos técnicos completos"
+                                        >
+                                            {t('supplier.hub.acceptSafeWarnings')}
+                                        </button>
+                                        <button
+                                            onClick={() => handleBulkAction('REJECT_PENDING_ISSUES')}
+                                            disabled={bulkActionLoading || savingDecisions}
+                                            className="px-2.5 py-1 bg-red-700 hover:bg-red-800 text-white font-bold uppercase text-[10px] disabled:opacity-50 transition-colors"
+                                            title="Rechazar filas pendientes con incidencias técnicas"
+                                        >
+                                            {t('supplier.hub.rejectAllIssues')}
+                                        </button>
                                         {Object.keys(decisions).length > 0 && (
                                             <button
                                                 onClick={handleApplyDecisions}
+                                                disabled={savingDecisions || bulkActionLoading}
                                                 className="px-3 py-1 bg-slate-800 text-white font-bold uppercase text-[10px] hover:bg-slate-700 transition-colors"
                                             >
-                                                Save Decisions ({Object.keys(decisions).length})
+                                                {t('supplier.hub.saveDecisions')} ({Object.keys(decisions).length})
                                             </button>
                                         )}
                                     </div>
@@ -395,6 +446,8 @@ export const TechnicalImportModal: React.FC<ImportModalProps> = ({
                                                 batchRows.map((r: any) => {
                                                     const rowDecision = decisions[r.id]?.decision || r.decision || 'PENDING';
                                                     const issuesList = r.issues || [];
+                                                    const technicalIssues = issuesList.filter((iss: any) => iss.category === 'TECHNICAL' || !iss.category);
+                                                    const commercialIssues = issuesList.filter((iss: any) => iss.category === 'COMMERCIAL');
                                                     const currentOverrides = decisions[r.id]?.overrides || {};
                                                     const currentGsm = currentOverrides.gsm !== undefined ? currentOverrides.gsm : (r.normalized?.gsm || '');
                                                     const currentWidth = currentOverrides.width_mm !== undefined ? currentOverrides.width_mm : (r.normalized?.width_mm || '');
@@ -435,13 +488,20 @@ export const TechnicalImportModal: React.FC<ImportModalProps> = ({
                                                                 </span>
                                                             </td>
                                                             <td className="p-2.5 max-w-xs">
-                                                                {issuesList.length > 0 ? (
+                                                                {technicalIssues.length > 0 ? (
                                                                     <div className="space-y-1">
-                                                                        {issuesList.map((iss: any, idx: number) => (
+                                                                        {technicalIssues.map((iss: any, idx: number) => (
                                                                             <p key={idx} className="text-[10px] text-amber-600 dark:text-amber-400 truncate" title={iss.message}>
                                                                                 • {iss.code}
                                                                             </p>
                                                                         ))}
+                                                                    </div>
+                                                                ) : r.validationStatus === 'VALID' ? (
+                                                                    <div className="flex flex-col gap-0.5">
+                                                                        <span className="text-emerald-600 dark:text-emerald-400 text-[10px] font-bold">✓ Technical Valid</span>
+                                                                        {commercialIssues.some((c: any) => c.code === 'EMPTY_PRICE') && (
+                                                                            <span className="text-zinc-400 text-[9px]">{t('supplier.hub.unpricedTechnical')}</span>
+                                                                        )}
                                                                     </div>
                                                                 ) : (
                                                                     <span className="text-zinc-400 text-[10px]">None</span>

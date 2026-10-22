@@ -2449,6 +2449,12 @@ export const en = {
   'supplier.hub.confirmCatalog': 'Confirm Technical Catalog',
   'supplier.hub.confirmingBatch': 'Confirming Batch...',
   'supplier.hub.startNewImport': 'Start New Import',
+  'supplier.hub.acceptAllValid': 'Accept All Valid',
+  'supplier.hub.acceptSafeWarnings': 'Accept Justified Warnings',
+  'supplier.hub.rejectSelected': 'Reject Selected',
+  'supplier.hub.rejectAllIssues': 'Reject Pending Issues',
+  'supplier.hub.unpricedTechnical': 'Valid technical sheet (unpriced)',
+  'supplier.hub.executingBulkAction': 'Applying bulk action...',
 
   // Supplier Dashboard
   'supplier.dashboard.hubBadge': 'Paper Supplier Hub',

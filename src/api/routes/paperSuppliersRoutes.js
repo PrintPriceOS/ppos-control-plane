@@ -271,14 +271,14 @@ router.patch('/catalog/imports/:batchId/rows', requireSupplierScope('OPERATOR'),
     try {
         const context = resolveActorContext(req);
         const { batchId } = req.params;
-        const { decisions } = req.body || {};
+        const { decisions, action, scope, rowIds } = req.body || {};
 
-        if (!decisions || typeof decisions !== 'object') {
+        if (!decisions && !action) {
             return res.status(400).json({
                 ok: false,
                 error: {
                     code: 'DECISIONS_REQUIRED',
-                    message: 'A map of row decisions is required.'
+                    message: 'A map of row decisions or a bulk action is required.'
                 }
             });
         }
@@ -288,7 +288,10 @@ router.patch('/catalog/imports/:batchId/rows', requireSupplierScope('OPERATOR'),
             tenantId: context.tenantId,
             supplierId: context.supplierId,
             actorId: context.userId,
-            decisions
+            decisions: decisions || {},
+            action,
+            scope,
+            rowIds
         });
 
         return res.json({
@@ -305,6 +308,8 @@ router.patch('/catalog/imports/:batchId/rows', requireSupplierScope('OPERATOR'),
         else if (err.message.startsWith('INVALID_DECISION_STRUCTURE')) errCode = 'INVALID_DECISION_STRUCTURE';
         else if (err.message.startsWith('INVALID_DECISION')) errCode = 'INVALID_DECISION';
         else if (err.message.startsWith('ROW_NOT_FOUND')) errCode = 'ROW_NOT_FOUND';
+        else if (err.message.startsWith('ROW_IDS_REQUIRED')) errCode = 'ROW_IDS_REQUIRED';
+        else if (err.message.startsWith('INCOMPLETE_ROW')) errCode = 'INCOMPLETE_ROW';
         else if (err.message.startsWith('BATCH_ALREADY_CONFIRMED')) errCode = 'BATCH_ALREADY_CONFIRMED';
         else if (isNotFound) errCode = 'BATCH_NOT_FOUND';
 

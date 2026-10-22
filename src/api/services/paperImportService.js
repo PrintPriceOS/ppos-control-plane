@@ -516,6 +516,57 @@ function computeVariantFingerprint({ name, gsm, width_mm, height_mm, finish, cal
 }
 
 /**
+ * Contextual grammage extractor from product descriptions.
+ * Eliminates false positives from commercial color numbers, shade numbers, format codes,
+ * and dimensions, prioritizing explicit units and direct column GSM confirmations.
+ */
+function extractGsmFromDescription(name, colGsm) {
+    if (!name || typeof name !== 'string') return null;
+
+    // 1. Explicit unit match (e.g. "150 gsm", "250 g/m²", "80g") takes absolute precedence
+    const unitMatch = name.match(/\b(\d{2,4})\s*(?:gsm|g\/m²|g\/m2|g|gr)\b/i);
+    if (unitMatch) {
+        const val = parseInt(unitMatch[1], 10);
+        if (val >= 40 && val <= 1000) return val;
+    }
+
+    // Clean dimensions (e.g. "70x100", "102 x 70", "64*92") and sheet formats (A1, B1, B2, etc.)
+    const withoutDims = name
+        .replace(/\b\d+\s*[xX*]\s*\d+\b/g, ' ')
+        .replace(/\b[A-G]\d\b/gi, ' ');
+
+    // 2. Direct confirmation: if colGsm is declared, check if that exact number appears in the name outside dimensions
+    if (colGsm && colGsm >= 40 && colGsm <= 1000) {
+        const directRegex = new RegExp('(?<![xX0-9])\\b' + colGsm + '\\b(?![xX0-9])');
+        if (directRegex.test(withoutDims)) {
+            return colGsm; // The name directly confirms colGsm; any other numbers are shades/series
+        }
+    }
+
+    // 3. Filter shade, color, and article number prefixes (e.g. "Nr. 63", "No. 58", "#90", "Color 50")
+    const cleaned = withoutDims
+        .replace(/\b(?:Nr|No|Color|Colour|Shade)\.?\s*\d+\b/gi, ' ')
+        .replace(/#\d+\b/g, ' ');
+
+    // 4. Candidate numbers between 40 and 1000
+    const matches = [...cleaned.matchAll(/\b(\d{2,4})\b/g)];
+    if (matches.length > 0) {
+        if (colGsm) {
+            for (const m of matches) {
+                const val = parseInt(m[1], 10);
+                if (val === colGsm) return colGsm;
+            }
+        }
+        for (const m of matches) {
+            const val = parseInt(m[1], 10);
+            if (val >= 40 && val <= 1000) return val;
+        }
+    }
+
+    return null;
+}
+
+/**
  * Shared validator for technical row attributes.
  * Recalculates issues and validationStatus consistently across import and manual review/correction.
  */
@@ -553,14 +604,15 @@ function validateTechnicalRow({
         });
     }
 
-    // GSM conflict evidence check
-    if (colGsm && nameGsm && colGsm !== nameGsm) {
-        if (gsm !== nameGsm) {
+    // GSM conflict evidence check: calculate contextual description GSM if not already supplied
+    const effectiveNameGsm = nameGsm !== undefined ? nameGsm : extractGsmFromDescription(name, colGsm);
+    if (colGsm && effectiveNameGsm && colGsm !== effectiveNameGsm) {
+        if (gsm !== effectiveNameGsm) {
             technicalIssues.push({
                 code: 'GSM_DESCRIPTION_CONFLICT',
                 severity: 'WARNING',
                 category: 'TECHNICAL',
-                message: `Declared grammage (${colGsm} gsm) conflicts with description (${nameGsm} gsm). Explicit review required.`
+                message: `Declared grammage (${colGsm} gsm) conflicts with description (${effectiveNameGsm} gsm). Explicit review required.`
             });
         }
     }
@@ -626,6 +678,72 @@ function validateTechnicalRow({
     }
 
     return { technicalIssues, validationStatus };
+}
+
+/**
+ * Strict classification of warning codes for safe automated bulk acceptance.
+ * 
+ * Physical specification discrepancies (GSM, dimensions, units) and missing core attributes
+ * represent real technical contradictions or ambiguities that CANNOT be blindly accepted
+ * and require explicit individual operator review or manual override.
+ */
+const UNSAFE_DISCREPANCY_WARNING_CODES = new Set([
+    'GSM_DESCRIPTION_CONFLICT',
+    'DIMENSION_CONTRADICTION',
+    'AMBIGUOUS_DIMENSION_UNITS',
+    'MISSING_GSM',
+    'MISSING_DIMENSIONS',
+    'MISSING_NAME',
+    'DUPLICATE_IN_FILE'
+]);
+
+/**
+ * Warnings explicitly classified as safe for bulk acceptance (ACCEPT_SAFE_WARNINGS)
+ * when mandatory technical fields (name, gsm, width_mm, height_mm) are complete and valid.
+ */
+const EXPLICIT_SAFE_WARNING_CODES = new Set([
+    'ZERO_PRICE',
+    'EMPTY_PRICE',
+    'CURRENCY_NOT_DECLARED',
+    'CALIPER_MISSING',
+    'CALIPER_ESTIMATED',
+    'GRAIN_DIRECTION_UNKNOWN',
+    'MINOR_FINISH_DEFAULT',
+    'PROVISIONAL_SUPPLIER_MATCH'
+]);
+
+/**
+ * Checks whether a row's warnings qualify for safe automated bulk acceptance.
+ * Returns true ONLY if all mandatory technical attributes are present, no errors exist,
+ * no physical specification discrepancies exist, and all present warnings are in EXPLICIT_SAFE_WARNING_CODES.
+ */
+function isRowWarningExplicitlySafe(norm) {
+    if (!norm || typeof norm !== 'object') return false;
+
+    // 1. Mandatory technical completeness
+    if (!norm.name || !norm.gsm || !norm.width_mm || !norm.height_mm) {
+        return false;
+    }
+
+    const issues = norm.issues || norm.technicalIssues || [];
+
+    // 2. Reject if any ERROR exists
+    if (issues.some(i => i.severity === 'ERROR')) {
+        return false;
+    }
+
+    // 3. Reject if any warning represents an unsafe physical or structural discrepancy
+    if (issues.some(i => UNSAFE_DISCREPANCY_WARNING_CODES.has(i.code))) {
+        return false;
+    }
+
+    const warningIssues = issues.filter(i => i.severity === 'WARNING');
+    if (warningIssues.length === 0) {
+        return true;
+    }
+
+    // 4. Every warning must be explicitly classified in EXPLICIT_SAFE_WARNING_CODES
+    return warningIssues.every(i => EXPLICIT_SAFE_WARNING_CODES.has(i.code));
 }
 
 const HEADER_CANONICAL_ALIASES = {
@@ -771,16 +889,7 @@ function normalizeRowData(rawCells, headers = [], fileRowNumber = 1) {
         }
     }
 
-    let nameGsm = null;
-    if (name) {
-        const nameMatch = name.match(/\b(\d{2,4})\s*(?:gsm|g|gr)\b/i) || name.match(/\b(\d{2,4})\b/);
-        if (nameMatch) {
-            const val = parseInt(nameMatch[1], 10);
-            if (val >= 40 && val <= 1000) {
-                nameGsm = val;
-            }
-        }
-    }
+    let nameGsm = extractGsmFromDescription(name, colGsm);
 
     // Check conflict between declared column gsm and name gsm
     if (colGsm && nameGsm && colGsm !== nameGsm) {
@@ -965,9 +1074,9 @@ function normalizeRowData(rawCells, headers = [], fileRowNumber = 1) {
         priceStatus = 'EMPTY_PRICE';
         commercialIssues.push({
             code: 'EMPTY_PRICE',
-            severity: 'WARNING',
+            severity: 'INFO',
             category: 'COMMERCIAL',
-            message: 'Price is not specified in source sheet.'
+            message: 'Price is not specified in source sheet (pure technical data sheet).'
         });
     } else {
         rawPrice = parseFloat(priceStr.replace(',', '.'));
@@ -1020,10 +1129,11 @@ function normalizeRowData(rawCells, headers = [], fileRowNumber = 1) {
     const allIssues = [...technicalIssues, ...commercialIssues];
     const hasTechnicalError = technicalIssues.some(i => i.severity === 'ERROR');
     const hasTechnicalWarning = technicalIssues.some(i => i.severity === 'WARNING');
+    const hasCommercialWarning = commercialIssues.some(i => i.severity === 'WARNING');
 
     let validationStatus = 'VALID';
     if (hasTechnicalError) validationStatus = 'REJECTED';
-    else if (hasTechnicalWarning) validationStatus = 'WARNING';
+    else if (hasTechnicalWarning || hasCommercialWarning) validationStatus = 'WARNING';
 
     return {
         rowNumber: fileRowNumber,
@@ -1051,7 +1161,10 @@ function normalizeRowData(rawCells, headers = [], fileRowNumber = 1) {
             nameGsm,
             colW_mm,
             colH_mm,
-            formatDimensions: parsedFmt
+            formatDimensions: parsedFmt,
+            rawPrice,
+            priceStatus,
+            currencyDeclared: false
         }
     };
 }
@@ -1267,8 +1380,9 @@ async function getImportBatchRows({ batchId, tenantId, supplierId, page = 1, lim
 /**
  * Review / correct specific staged rows before confirmation.
  */
-async function updateImportRowDecisions({ batchId, tenantId, supplierId, actorId, decisions }) {
+async function updateImportRowDecisions({ batchId, tenantId, supplierId, actorId, decisions = {}, action = null, scope = null, rowIds = null }) {
     // decisions: { [rowId]: { decision: 'ACCEPTED' | 'REJECTED' | 'PENDING', overrides?: { width_mm, height_mm, gsm, finish, caliper_um, grain_direction } } }
+    // action: 'ACCEPT_ALL_VALID' | 'ACCEPT_SAFE_WARNINGS' | 'ACCEPT_SELECTED' | 'REJECT_SELECTED' | 'REJECT_PENDING_ISSUES'
     const conn = await db.getConnection();
     try {
         await conn.beginTransaction();
@@ -1291,124 +1405,272 @@ async function updateImportRowDecisions({ batchId, tenantId, supplierId, actorId
         const ALLOWED_OVERRIDE_FIELDS = ['width_mm', 'height_mm', 'gsm', 'finish', 'caliper_um', 'grain_direction'];
         let updatedCount = 0;
 
-        for (const [rowId, dec] of Object.entries(decisions)) {
-            if (!dec || (typeof dec !== 'object' && typeof dec !== 'string')) {
-                throw new Error(`INVALID_DECISION_STRUCTURE: Decision for row '${rowId}' must be an object or string.`);
+        // 1. Process Safe Bulk Actions
+        if (action === 'ACCEPT_ALL_VALID') {
+            const [validRows] = await conn.query(
+                'SELECT id, normalized_data_json, validation_status, decision FROM paper_import_rows WHERE batch_id = ? AND validation_status = "VALID" AND decision != "ACCEPTED" FOR UPDATE',
+                [batchId]
+            );
+            for (const r of validRows) {
+                const norm = typeof r.normalized_data_json === 'string' ? JSON.parse(r.normalized_data_json) : (r.normalized_data_json || {});
+                if (!norm.name || !norm.gsm || !norm.width_mm || !norm.height_mm) {
+                    continue; // Skip any incomplete row fail-closed
+                }
+                const existingAudit = norm._audit_log || [];
+                existingAudit.push({
+                    actor_id: actorId || 'system',
+                    batch_id: batchId,
+                    timestamp: new Date().toISOString(),
+                    decision: 'ACCEPTED',
+                    action: 'ACCEPT_ALL_VALID',
+                    previous_values: { decision: r.decision },
+                    new_values: { decision: 'ACCEPTED' }
+                });
+                norm._audit_log = existingAudit;
+                await conn.query(
+                    'UPDATE paper_import_rows SET decision = "ACCEPTED", normalized_data_json = ? WHERE id = ? AND batch_id = ?',
+                    [JSON.stringify(norm), r.id, batchId]
+                );
+                updatedCount++;
             }
-
-            const decisionValue = typeof dec === 'string' ? dec : dec.decision;
-            if (!decisionValue || !['ACCEPTED', 'REJECTED', 'PENDING'].includes(decisionValue)) {
-                throw new Error(`INVALID_DECISION: Decision value '${decisionValue}' for row '${rowId}' is not allowed. Must be one of: 'PENDING', 'ACCEPTED', 'REJECTED'.`);
+        } else if (action === 'ACCEPT_SAFE_WARNINGS') {
+            let warningQuery = 'SELECT id, normalized_data_json, validation_status, decision FROM paper_import_rows WHERE batch_id = ? AND validation_status = "WARNING" AND decision = "PENDING" FOR UPDATE';
+            let warningParams = [batchId];
+            if (Array.isArray(rowIds) && rowIds.length > 0) {
+                warningQuery = `SELECT id, normalized_data_json, validation_status, decision FROM paper_import_rows WHERE batch_id = ? AND id IN (${rowIds.map(() => '?').join(',')}) FOR UPDATE`;
+                warningParams = [batchId, ...rowIds];
             }
-
-            // Fetch existing row to audit and validate
-            const [existingRows] = await conn.query('SELECT * FROM paper_import_rows WHERE id = ? AND batch_id = ? FOR UPDATE', [rowId, batchId]);
-            const existing = existingRows && existingRows[0];
-            if (!existing) {
-                throw new Error(`ROW_NOT_FOUND: Row '${rowId}' not found in import batch '${batchId}'.`);
+            const [warningRows] = await conn.query(warningQuery, warningParams);
+            for (const r of warningRows) {
+                const norm = typeof r.normalized_data_json === 'string' ? JSON.parse(r.normalized_data_json) : (r.normalized_data_json || {});
+                // Mandatory technical completeness & safe warning classification check:
+                // Real physical discrepancies (GSM, dimensions, units) and incomplete rows MUST NOT be bulk-accepted!
+                if (!isRowWarningExplicitlySafe(norm)) {
+                    continue;
+                }
+                const existingAudit = norm._audit_log || [];
+                existingAudit.push({
+                    actor_id: actorId || 'system',
+                    batch_id: batchId,
+                    timestamp: new Date().toISOString(),
+                    decision: 'ACCEPTED',
+                    action: 'ACCEPT_SAFE_WARNINGS',
+                    previous_values: { decision: r.decision },
+                    new_values: { decision: 'ACCEPTED' }
+                });
+                norm._audit_log = existingAudit;
+                await conn.query(
+                    'UPDATE paper_import_rows SET decision = "ACCEPTED", normalized_data_json = ? WHERE id = ? AND batch_id = ?',
+                    [JSON.stringify(norm), r.id, batchId]
+                );
+                updatedCount++;
             }
+        } else if (action === 'ACCEPT_SELECTED') {
+            if (!Array.isArray(rowIds) || rowIds.length === 0) {
+                throw new Error('ROW_IDS_REQUIRED: rowIds array is required for ACCEPT_SELECTED action.');
+            }
+            const [selectedRows] = await conn.query(
+                `SELECT id, normalized_data_json, validation_status, decision FROM paper_import_rows WHERE batch_id = ? AND id IN (${rowIds.map(() => '?').join(',')}) FOR UPDATE`,
+                [batchId, ...rowIds]
+            );
+            for (const r of selectedRows) {
+                const norm = typeof r.normalized_data_json === 'string' ? JSON.parse(r.normalized_data_json) : (r.normalized_data_json || {});
+                if (!norm.name || !norm.gsm || !norm.width_mm || !norm.height_mm) {
+                    throw new Error(`INCOMPLETE_ROW: Row '${r.id}' lacks mandatory technical attributes (name, gsm, width_mm, height_mm).`);
+                }
+                const existingAudit = norm._audit_log || [];
+                existingAudit.push({
+                    actor_id: actorId || 'system',
+                    batch_id: batchId,
+                    timestamp: new Date().toISOString(),
+                    decision: 'ACCEPTED',
+                    action: 'ACCEPT_SELECTED',
+                    previous_values: { decision: r.decision },
+                    new_values: { decision: 'ACCEPTED' }
+                });
+                norm._audit_log = existingAudit;
+                await conn.query(
+                    'UPDATE paper_import_rows SET decision = "ACCEPTED", normalized_data_json = ? WHERE id = ? AND batch_id = ?',
+                    [JSON.stringify(norm), r.id, batchId]
+                );
+                updatedCount++;
+            }
+        } else if (action === 'REJECT_SELECTED') {
+            if (!Array.isArray(rowIds) || rowIds.length === 0) {
+                throw new Error('ROW_IDS_REQUIRED: rowIds array is required for REJECT_SELECTED action.');
+            }
+            const [selectedRows] = await conn.query(
+                `SELECT id, normalized_data_json, validation_status, decision FROM paper_import_rows WHERE batch_id = ? AND id IN (${rowIds.map(() => '?').join(',')}) FOR UPDATE`,
+                [batchId, ...rowIds]
+            );
+            for (const r of selectedRows) {
+                const norm = typeof r.normalized_data_json === 'string' ? JSON.parse(r.normalized_data_json) : (r.normalized_data_json || {});
+                const existingAudit = norm._audit_log || [];
+                existingAudit.push({
+                    actor_id: actorId || 'system',
+                    batch_id: batchId,
+                    timestamp: new Date().toISOString(),
+                    decision: 'REJECTED',
+                    action: 'REJECT_SELECTED',
+                    previous_values: { decision: r.decision },
+                    new_values: { decision: 'REJECTED' }
+                });
+                norm._audit_log = existingAudit;
+                await conn.query(
+                    'UPDATE paper_import_rows SET decision = "REJECTED", normalized_data_json = ? WHERE id = ? AND batch_id = ?',
+                    [JSON.stringify(norm), r.id, batchId]
+                );
+                updatedCount++;
+            }
+        } else if (action === 'REJECT_PENDING_ISSUES') {
+            const [issueRows] = await conn.query(
+                'SELECT id, normalized_data_json, validation_status, decision FROM paper_import_rows WHERE batch_id = ? AND decision = "PENDING" AND validation_status IN ("WARNING", "DUPLICATE", "REJECTED") FOR UPDATE',
+                [batchId]
+            );
+            for (const r of issueRows) {
+                const norm = typeof r.normalized_data_json === 'string' ? JSON.parse(r.normalized_data_json) : (r.normalized_data_json || {});
+                const existingAudit = norm._audit_log || [];
+                existingAudit.push({
+                    actor_id: actorId || 'system',
+                    batch_id: batchId,
+                    timestamp: new Date().toISOString(),
+                    decision: 'REJECTED',
+                    action: 'REJECT_PENDING_ISSUES',
+                    previous_values: { decision: r.decision },
+                    new_values: { decision: 'REJECTED' }
+                });
+                norm._audit_log = existingAudit;
+                await conn.query(
+                    'UPDATE paper_import_rows SET decision = "REJECTED", normalized_data_json = ? WHERE id = ? AND batch_id = ?',
+                    [JSON.stringify(norm), r.id, batchId]
+                );
+                updatedCount++;
+            }
+        }
 
-            const norm = typeof existing.normalized_data_json === 'string' ? JSON.parse(existing.normalized_data_json) : (existing.normalized_data_json || {});
-            const prevValues = {};
-            const newValues = {};
-
-            if (dec.overrides && typeof dec.overrides === 'object') {
-                for (const [key, val] of Object.entries(dec.overrides)) {
-                    if (!ALLOWED_OVERRIDE_FIELDS.includes(key)) {
-                        throw new Error(`INVALID_OVERRIDE_FIELD: Field '${key}' is not allowed for manual override.`);
-                    }
-
-                    // Strict type and range validation
-                    if (key === 'width_mm' || key === 'height_mm') {
-                        const num = Number(val);
-                        if (isNaN(num) || num < 10 || num > 3000) {
-                            throw new Error(`INVALID_OVERRIDE_VALUE: ${key} must be a number between 10 and 3000.`);
-                        }
-                        prevValues[key] = norm[key];
-                        norm[key] = Math.round(num);
-                        newValues[key] = norm[key];
-                    } else if (key === 'gsm') {
-                        const num = Number(val);
-                        if (isNaN(num) || num < 20 || num > 2000) {
-                            throw new Error(`INVALID_OVERRIDE_VALUE: gsm must be a number between 20 and 2000.`);
-                        }
-                        prevValues[key] = norm[key];
-                        norm[key] = Math.round(num);
-                        newValues[key] = norm[key];
-                    } else if (key === 'finish') {
-                        const str = String(val).toUpperCase();
-                        if (!['COATED', 'UNCOATED', 'SILK'].includes(str)) {
-                            throw new Error(`INVALID_OVERRIDE_VALUE: finish must be one of 'COATED', 'UNCOATED', 'SILK'.`);
-                        }
-                        prevValues[key] = norm[key];
-                        norm[key] = str;
-                        newValues[key] = norm[key];
-                    } else if (key === 'caliper_um') {
-                        const num = Number(val);
-                        if (isNaN(num) || num < 0 || num > 10000) {
-                            throw new Error(`INVALID_OVERRIDE_VALUE: caliper_um must be a number between 0 and 10000.`);
-                        }
-                        prevValues[key] = norm[key];
-                        norm[key] = Math.round(num);
-                        norm.caliper_mm = parseFloat((norm[key] / 1000).toFixed(4));
-                        newValues[key] = norm[key];
-                    } else if (key === 'grain_direction') {
-                        const grain = parseGrainDirection(val);
-                        prevValues[key] = norm[key] || 'UNKNOWN';
-                        norm[key] = grain;
-                        newValues[key] = norm[key];
-                    }
+        // 2. Process Granular Row Decisions / Overrides
+        if (decisions && typeof decisions === 'object' && Object.keys(decisions).length > 0) {
+            for (const [rowId, dec] of Object.entries(decisions)) {
+                if (!dec || (typeof dec !== 'object' && typeof dec !== 'string')) {
+                    throw new Error(`INVALID_DECISION_STRUCTURE: Decision for row '${rowId}' must be an object or string.`);
                 }
 
-                // Recalculate issues and validation status using shared function; NEVER force VALID simply because overrides exist!
-                const evidence = norm.evidence || {};
-                const validation = validateTechnicalRow({
-                    name: norm.name,
-                    gsm: norm.gsm,
-                    width_mm: norm.width_mm,
-                    height_mm: norm.height_mm,
-                    finish: norm.finish,
-                    caliper_um: norm.caliper_um,
-                    grain_direction: norm.grain_direction,
-                    colGsm: evidence.colGsm,
-                    nameGsm: evidence.nameGsm,
-                    colW_mm: evidence.colW_mm,
-                    colH_mm: evidence.colH_mm,
-                    formatDimensions: evidence.formatDimensions
-                });
+                const decisionValue = typeof dec === 'string' ? dec : dec.decision;
+                if (!decisionValue || !['ACCEPTED', 'REJECTED', 'PENDING'].includes(decisionValue)) {
+                    throw new Error(`INVALID_DECISION: Decision value '${decisionValue}' for row '${rowId}' is not allowed. Must be one of: 'PENDING', 'ACCEPTED', 'REJECTED'.`);
+                }
 
-                norm.technicalIssues = validation.technicalIssues;
-                norm.issues = [...validation.technicalIssues, ...(norm.commercialIssues || [])];
-                norm.validationStatus = validation.validationStatus;
+                // Fetch existing row to audit and validate
+                const [existingRows] = await conn.query('SELECT * FROM paper_import_rows WHERE id = ? AND batch_id = ? FOR UPDATE', [rowId, batchId]);
+                const existing = existingRows && existingRows[0];
+                if (!existing) {
+                    throw new Error(`ROW_NOT_FOUND: Row '${rowId}' not found in import batch '${batchId}'.`);
+                }
 
-                // Recalculate fingerprint using shared function
-                norm.fingerprint = computeVariantFingerprint({
-                    name: norm.name,
-                    gsm: norm.gsm,
-                    width_mm: norm.width_mm,
-                    height_mm: norm.height_mm,
-                    finish: norm.finish,
-                    caliper_um: norm.caliper_um,
-                    grain_direction: norm.grain_direction
+                const norm = typeof existing.normalized_data_json === 'string' ? JSON.parse(existing.normalized_data_json) : (existing.normalized_data_json || {});
+                const prevValues = {};
+                const newValues = {};
+
+                if (dec.overrides && typeof dec.overrides === 'object') {
+                    for (const [key, val] of Object.entries(dec.overrides)) {
+                        if (!ALLOWED_OVERRIDE_FIELDS.includes(key)) {
+                            throw new Error(`INVALID_OVERRIDE_FIELD: Field '${key}' is not allowed for manual override.`);
+                        }
+
+                        // Strict type and range validation
+                        if (key === 'width_mm' || key === 'height_mm') {
+                            const num = Number(val);
+                            if (isNaN(num) || num < 10 || num > 3000) {
+                                throw new Error(`INVALID_OVERRIDE_VALUE: ${key} must be a number between 10 and 3000.`);
+                            }
+                            prevValues[key] = norm[key];
+                            norm[key] = Math.round(num);
+                            newValues[key] = norm[key];
+                        } else if (key === 'gsm') {
+                            const num = Number(val);
+                            if (isNaN(num) || num < 20 || num > 2000) {
+                                throw new Error(`INVALID_OVERRIDE_VALUE: gsm must be a number between 20 and 2000.`);
+                            }
+                            prevValues[key] = norm[key];
+                            norm[key] = Math.round(num);
+                            newValues[key] = norm[key];
+                        } else if (key === 'finish') {
+                            const str = String(val).toUpperCase();
+                            if (!['COATED', 'UNCOATED', 'SILK'].includes(str)) {
+                                throw new Error(`INVALID_OVERRIDE_VALUE: finish must be one of 'COATED', 'UNCOATED', 'SILK'.`);
+                            }
+                            prevValues[key] = norm[key];
+                            norm[key] = str;
+                            newValues[key] = norm[key];
+                        } else if (key === 'caliper_um') {
+                            const num = Number(val);
+                            if (isNaN(num) || num < 0 || num > 10000) {
+                                throw new Error(`INVALID_OVERRIDE_VALUE: caliper_um must be a number between 0 and 10000.`);
+                            }
+                            prevValues[key] = norm[key];
+                            norm[key] = Math.round(num);
+                            norm.caliper_mm = parseFloat((norm[key] / 1000).toFixed(4));
+                            newValues[key] = norm[key];
+                        } else if (key === 'grain_direction') {
+                            const grain = parseGrainDirection(val);
+                            prevValues[key] = norm[key] || 'UNKNOWN';
+                            norm[key] = grain;
+                            newValues[key] = norm[key];
+                        }
+                    }
+
+                    // Recalculate issues and validation status using shared function; NEVER force VALID simply because overrides exist!
+                    const evidence = norm.evidence || {};
+                    const validation = validateTechnicalRow({
+                        name: norm.name,
+                        gsm: norm.gsm,
+                        width_mm: norm.width_mm,
+                        height_mm: norm.height_mm,
+                        finish: norm.finish,
+                        caliper_um: norm.caliper_um,
+                        grain_direction: norm.grain_direction,
+                        colGsm: evidence.colGsm,
+                        nameGsm: evidence.nameGsm,
+                        colW_mm: evidence.colW_mm,
+                        colH_mm: evidence.colH_mm,
+                        formatDimensions: evidence.formatDimensions
+                    });
+
+                    norm.technicalIssues = validation.technicalIssues;
+                    norm.issues = [...validation.technicalIssues, ...(norm.commercialIssues || [])];
+                    norm.validationStatus = validation.validationStatus;
+
+                    // Recalculate fingerprint using shared function
+                    norm.fingerprint = computeVariantFingerprint({
+                        name: norm.name,
+                        gsm: norm.gsm,
+                        width_mm: norm.width_mm,
+                        height_mm: norm.height_mm,
+                        finish: norm.finish,
+                        caliper_um: norm.caliper_um,
+                        grain_direction: norm.grain_direction
+                    });
+                }
+
+                // Record audit trail
+                const existingAudit = norm._audit_log || [];
+                existingAudit.push({
+                    actor_id: actorId || 'system',
+                    batch_id: batchId,
+                    timestamp: new Date().toISOString(),
+                    decision: decisionValue,
+                    action: 'MANUAL_OVERRIDE',
+                    previous_values: prevValues,
+                    new_values: newValues
                 });
+                norm._audit_log = existingAudit;
+
+                await conn.query(
+                    'UPDATE paper_import_rows SET decision = ?, normalized_data_json = ?, issues_json = ?, validation_status = ? WHERE id = ? AND batch_id = ?',
+                    [decisionValue, JSON.stringify(norm), JSON.stringify(norm.issues || []), norm.validationStatus || existing.validation_status, rowId, batchId]
+                );
+                updatedCount++;
             }
-
-            // Record audit trail
-            const existingAudit = norm._audit_log || [];
-            existingAudit.push({
-                actor_id: actorId || 'system',
-                timestamp: new Date().toISOString(),
-                decision: decisionValue,
-                previous_values: prevValues,
-                new_values: newValues
-            });
-            norm._audit_log = existingAudit;
-
-            await conn.query(
-                'UPDATE paper_import_rows SET decision = ?, normalized_data_json = ?, issues_json = ?, validation_status = ? WHERE id = ? AND batch_id = ?',
-                [decisionValue, JSON.stringify(norm), JSON.stringify(norm.issues || []), norm.validationStatus || existing.validation_status, rowId, batchId]
-            );
-            updatedCount++;
         }
 
         await conn.commit();
@@ -1666,5 +1928,8 @@ module.exports = {
     validateHeaderSchema,
     isLegacyOdsHeaderStructure,
     HEADER_CANONICAL_ALIASES,
-    NORMALIZATION_RULES_VERSION
+    NORMALIZATION_RULES_VERSION,
+    UNSAFE_DISCREPANCY_WARNING_CODES,
+    EXPLICIT_SAFE_WARNING_CODES,
+    isRowWarningExplicitlySafe
 };

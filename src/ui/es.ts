@@ -2448,6 +2448,12 @@ export const es = {
   'supplier.hub.confirmCatalog': 'Confirmar Catálogo Técnico',
   'supplier.hub.confirmingBatch': 'Confirmando Lote...',
   'supplier.hub.startNewImport': 'Iniciar Nueva Importación',
+  'supplier.hub.acceptAllValid': 'Aceptar Válidas',
+  'supplier.hub.acceptSafeWarnings': 'Aceptar Advertencias Justificadas',
+  'supplier.hub.rejectSelected': 'Rechazar Seleccionadas',
+  'supplier.hub.rejectAllIssues': 'Rechazar Pendientes con Incidencias',
+  'supplier.hub.unpricedTechnical': 'Ficha técnica válida (precio no declarado)',
+  'supplier.hub.executingBulkAction': 'Aplicando acción masiva...',
 
   // Supplier Dashboard
   'supplier.dashboard.hubBadge': 'Portal de Proveedores',
