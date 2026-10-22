@@ -2500,7 +2500,13 @@ export const de = {
   'supplier.settings.scopeStatus': 'Organisationsbereich',
   'supplier.settings.approvedSupplier': 'Freigegebener Papierlieferant (PAPER_SUPPLIER)',
   'supplier.settings.scopeDesc': 'Autorisiert zur Bereitstellung technischer Datenblätter, Preisfestlegung und Teilnahme an Beschaffungsprozessen.',
-  'supplier.settings.readOnlyNote': 'Wenden Sie sich an das Plattform-Team, um Stammdaten zu ändern oder zusätzliche Währungen freizuschalten.'
+  'supplier.settings.readOnlyNote': 'Wenden Sie sich an das Plattform-Team, um Stammdaten zu ändern oder zusätzliche Währungen freizuschalten.',
+
+  // Common fallbacks & supplier errors
+  'common.notAvailable': 'Nicht verfügbar',
+  'supplier.status.notAvailable': 'Nicht verfügbar',
+  'supplier.dashboard.loadError': 'Fehler beim Laden der Lieferanten-Dashboard-Metriken.',
+  'supplier.settings.loadError': 'Fehler beim Laden des Lieferantenprofils.'
 } as const;
 
 export type TranslationKeys = keyof typeof de;

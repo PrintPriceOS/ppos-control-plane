@@ -1,18 +1,21 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
-    CubeIcon, 
     RectangleStackIcon, 
     InboxIcon, 
     ShieldCheckIcon,
-    ArrowUpTrayIcon,
     DocumentTextIcon,
     ExclamationTriangleIcon,
-    PlusIcon,
     ArrowRightIcon
 } from '@heroicons/react/24/outline';
 import { paperSupplierFetch } from '../../lib/paperSupplierApi';
-import { getUserRole, getAuthUser } from '../../lib/authStore';
+import { 
+    getUserRole, 
+    getAuthUser, 
+    getUserTenantId, 
+    getUserSupplierId, 
+    getActiveContext 
+} from '../../lib/authStore';
 import { useLocale } from '../../i18n';
 
 export const SupplierDashboardPage: React.FC = () => {
@@ -20,6 +23,11 @@ export const SupplierDashboardPage: React.FC = () => {
     const navigate = useNavigate();
     const role = getUserRole();
     const user = getAuthUser();
+    const userId = user?.id || user?.userId || user?.sub || user?.email || '';
+    const tenantId = user?.tenantId || getUserTenantId() || '';
+    const supplierId = user?.supplierId || getUserSupplierId() || '';
+    const activeContext = getActiveContext() || '';
+
     const [profile, setProfile] = useState<any>(null);
     const [catalogCount, setCatalogCount] = useState<number | null>(null);
     const [offersCount, setOffersCount] = useState<number | null>(null);
@@ -31,49 +39,75 @@ export const SupplierDashboardPage: React.FC = () => {
         setLoading(true);
         setError(null);
 
-        Promise.allSettled([
-            paperSupplierFetch<any>('/api/v1/paper-suppliers/me'),
-            paperSupplierFetch<any>('/api/v1/paper-suppliers/catalog/products?limit=1'),
-            paperSupplierFetch<any>('/api/v1/paper-suppliers/offers?limit=1')
-        ]).then(([meResult, catalogResult, offersResult]) => {
-            if (!isMounted) return;
+        const fetchMetrics = async () => {
+            try {
+                const [meResult, catalogResult, offersResult] = await Promise.allSettled([
+                    paperSupplierFetch<any>('/api/v1/paper-suppliers/me'),
+                    paperSupplierFetch<any>('/api/v1/paper-suppliers/catalog/products?limit=1'),
+                    paperSupplierFetch<any>('/api/v1/paper-suppliers/offers?limit=1')
+                ]);
 
-            if (meResult.status === 'fulfilled' && meResult.value?.ok) {
-                setProfile(meResult.value.data);
-            } else {
-                setProfile({
-                    name: user?.companyName || 'Authorized Paper Supplier',
-                    status: 'ACTIVE',
-                    role: role,
-                    tenantId: user?.tenantId || 'tenant-supplier'
-                });
+                if (!isMounted) return;
+
+                const errors: string[] = [];
+
+                if (meResult.status === 'fulfilled' && meResult.value?.ok && meResult.value?.data) {
+                    setProfile(meResult.value.data);
+                } else {
+                    setProfile(null);
+                    const meErr = meResult.status === 'rejected'
+                        ? meResult.reason?.message
+                        : meResult.value?.error?.message;
+                    if (meErr) errors.push(meErr);
+                }
+
+                if (
+                    catalogResult.status === 'fulfilled' &&
+                    catalogResult.value?.ok &&
+                    typeof catalogResult.value.data?.total === 'number'
+                ) {
+                    setCatalogCount(catalogResult.value.data.total);
+                } else {
+                    setCatalogCount(null);
+                    const catErr = catalogResult.status === 'rejected'
+                        ? catalogResult.reason?.message
+                        : catalogResult.value?.error?.message;
+                    if (catErr) errors.push(catErr);
+                }
+
+                if (
+                    offersResult.status === 'fulfilled' &&
+                    offersResult.value?.ok &&
+                    typeof offersResult.value.data?.total === 'number'
+                ) {
+                    setOffersCount(offersResult.value.data.total);
+                } else {
+                    setOffersCount(null);
+                    const offErr = offersResult.status === 'rejected'
+                        ? offersResult.reason?.message
+                        : offersResult.value?.error?.message;
+                    if (offErr) errors.push(offErr);
+                }
+
+                if (errors.length > 0) {
+                    setError(Array.from(new Set(errors)).join(' | '));
+                }
+            } catch (err: any) {
+                if (!isMounted) return;
+                setError(err.message || t('supplier.dashboard.loadError') || 'Failed to load supplier dashboard metrics');
+            } finally {
+                if (isMounted) {
+                    setLoading(false);
+                }
             }
+        };
 
-            if (catalogResult.status === 'fulfilled' && catalogResult.value?.ok) {
-                const total = catalogResult.value.data?.total;
-                setCatalogCount(typeof total === 'number' ? total : 0);
-            } else {
-                setCatalogCount(null);
-            }
-
-            if (offersResult.status === 'fulfilled' && offersResult.value?.ok) {
-                const total = offersResult.value.data?.total;
-                setOffersCount(typeof total === 'number' ? total : 0);
-            } else {
-                setOffersCount(null);
-            }
-
-            setLoading(false);
-        }).catch((err) => {
-            if (!isMounted) return;
-            setError(err.message || 'Failed to load supplier dashboard metrics');
-            setLoading(false);
-        });
+        fetchMetrics();
 
         return () => {
             isMounted = false;
         };
-    }, [role, user]);
+    }, [role, userId, tenantId, supplierId, activeContext]);
 
     return (
         <div className="space-y-6">
@@ -89,7 +123,7 @@ export const SupplierDashboardPage: React.FC = () => {
                         </span>
                     </div>
                     <h1 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">
-                        {profile?.name || user?.companyName || 'Supplier Operations Console'}
+                        {loading ? '...' : (profile?.name || user?.companyName || (t('common.notAvailable') || 'No disponible'))}
                     </h1>
                     <p className="text-xs text-zinc-500 mt-1">
                         {t('supplier.dashboard.hubDescription') || 'Publish technical paper catalogs, manage commercial pricing matrices, and monitor print house demand.'}
@@ -101,8 +135,14 @@ export const SupplierDashboardPage: React.FC = () => {
                         <p className="text-[10px] font-bold uppercase text-zinc-400">
                             {t('supplier.dashboard.status') || 'Status'}
                         </p>
-                        <p className="text-xs font-black text-emerald-500 uppercase tracking-wider">
-                            {profile?.status || 'ACTIVE'}
+                        <p className={`text-xs font-black uppercase tracking-wider ${
+                            profile?.status === 'APPROVED' || profile?.status === 'ACTIVE'
+                                ? 'text-emerald-500'
+                                : profile?.status === 'SUSPENDED'
+                                    ? 'text-red-500'
+                                    : 'text-zinc-400'
+                        }`}>
+                            {loading ? '...' : (profile?.status || (t('common.notAvailable') || 'No disponible'))}
                         </p>
                     </div>
                     <div className="h-8 w-[1px] bg-slate-200 dark:bg-zinc-800" />
@@ -111,7 +151,7 @@ export const SupplierDashboardPage: React.FC = () => {
                             {t('supplier.dashboard.role') || 'Role'}
                         </p>
                         <p className="text-xs font-black text-slate-800 dark:text-zinc-200 uppercase tracking-wider">
-                            {role}
+                            {role || (t('common.notAvailable') || 'No disponible')}
                         </p>
                     </div>
                 </div>
@@ -138,8 +178,8 @@ export const SupplierDashboardPage: React.FC = () => {
                         <RectangleStackIcon className="w-5 h-5 text-zinc-400" />
                     </div>
                     <div className="mt-3">
-                        <span className="text-3xl font-black font-mono text-slate-900 dark:text-white">
-                            {loading ? '...' : (catalogCount !== null ? catalogCount : '—')}
+                        <span className={`font-black ${catalogCount !== null ? 'text-3xl font-mono' : 'text-base font-sans text-zinc-400'} text-slate-900 dark:text-white`}>
+                            {loading ? '...' : (catalogCount !== null ? catalogCount : (t('common.notAvailable') || 'No disponible'))}
                         </span>
                         <p className="text-[10px] text-zinc-400 mt-1">
                             {t('supplier.dashboard.catalogCardDesc') || 'Active technical variants'}
@@ -159,8 +199,8 @@ export const SupplierDashboardPage: React.FC = () => {
                         <DocumentTextIcon className="w-5 h-5 text-zinc-400" />
                     </div>
                     <div className="mt-3">
-                        <span className="text-3xl font-black font-mono text-slate-900 dark:text-white">
-                            {loading ? '...' : (offersCount !== null ? offersCount : '—')}
+                        <span className={`font-black ${offersCount !== null ? 'text-3xl font-mono' : 'text-base font-sans text-zinc-400'} text-slate-900 dark:text-white`}>
+                            {loading ? '...' : (offersCount !== null ? offersCount : (t('common.notAvailable') || 'No disponible'))}
                         </span>
                         <p className="text-[10px] text-zinc-400 mt-1">
                             {t('supplier.dashboard.offersCardDesc') || 'Configured rates & MOQ brackets'}
@@ -201,11 +241,11 @@ export const SupplierDashboardPage: React.FC = () => {
                         <ShieldCheckIcon className="w-5 h-5 text-emerald-500" />
                     </div>
                     <div className="mt-3">
-                        <span className="text-sm font-black text-emerald-500 uppercase tracking-wider">
-                            {t('supplier.dashboard.scopeActive') || 'Authorized Scope'}
+                        <span className={`text-sm font-black uppercase tracking-wider ${(profile?.tenantId || tenantId) ? 'text-emerald-500' : 'text-zinc-400'}`}>
+                            {loading ? '...' : ((profile?.tenantId || tenantId) ? (t('supplier.dashboard.scopeActive') || 'Authorized Scope') : (t('common.notAvailable') || 'No disponible'))}
                         </span>
                         <p className="text-[10px] text-zinc-400 mt-1">
-                            {profile?.tenantId || user?.tenantId || 'Active supplier tenancy'}
+                            {loading ? '...' : (profile?.tenantId || tenantId || (t('common.notAvailable') || 'No disponible'))}
                         </p>
                     </div>
                 </div>

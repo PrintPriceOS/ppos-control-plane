@@ -2499,7 +2499,13 @@ export const es = {
   'supplier.settings.scopeStatus': 'Ámbito de Gobernanza',
   'supplier.settings.approvedSupplier': 'Proveedor Aprobado (PAPER_SUPPLIER)',
   'supplier.settings.scopeDesc': 'Autorizado para publicar fichas técnicas de papel, crear tarifas comerciales y participar en compras gobernadas.',
-  'supplier.settings.readOnlyNote': 'Para modificar datos registrales de la entidad o solicitar monedas comerciales adicionales, contacta al equipo de gobernanza.'
+  'supplier.settings.readOnlyNote': 'Para modificar datos registrales de la entidad o solicitar monedas comerciales adicionales, contacta al equipo de gobernanza.',
+
+  // Common fallbacks & supplier errors
+  'common.notAvailable': 'No disponible',
+  'supplier.status.notAvailable': 'No disponible',
+  'supplier.dashboard.loadError': 'Error al cargar las métricas del panel de proveedores.',
+  'supplier.settings.loadError': 'Error al cargar los datos de perfil del proveedor.'
 } as const;
 
 export type TranslationKeys = keyof typeof es;

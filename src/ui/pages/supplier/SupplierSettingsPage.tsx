@@ -1,22 +1,29 @@
 import React, { useEffect, useState } from 'react';
 import { 
     BuildingOfficeIcon, 
-    EnvelopeIcon, 
     CurrencyEuroIcon, 
     ShieldCheckIcon,
-    ExclamationTriangleIcon,
-    CheckBadgeIcon,
-    IdentificationIcon,
-    TagIcon
+    ExclamationTriangleIcon
 } from '@heroicons/react/24/outline';
-import { paperSupplierFetch, SupplierApiError } from '../../lib/paperSupplierApi';
-import { getUserRole, getAuthUser } from '../../lib/authStore';
+import { paperSupplierFetch } from '../../lib/paperSupplierApi';
+import { 
+    getUserRole, 
+    getAuthUser, 
+    getUserTenantId, 
+    getUserSupplierId, 
+    getActiveContext 
+} from '../../lib/authStore';
 import { useLocale } from '../../i18n';
 
 export const SupplierSettingsPage: React.FC = () => {
     const { t } = useLocale();
     const role = getUserRole();
     const user = getAuthUser();
+    const userId = user?.id || user?.userId || user?.sub || user?.email || '';
+    const tenantId = user?.tenantId || getUserTenantId() || '';
+    const supplierId = user?.supplierId || getUserSupplierId() || '';
+    const activeContext = getActiveContext() || '';
+
     const [profile, setProfile] = useState<any>(null);
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
@@ -26,34 +33,34 @@ export const SupplierSettingsPage: React.FC = () => {
         setLoading(true);
         setError(null);
 
-        paperSupplierFetch<any>('/api/v1/paper-suppliers/me')
-            .then((res: any) => {
+        const fetchProfile = async () => {
+            try {
+                const res = await paperSupplierFetch<any>('/api/v1/paper-suppliers/me');
+                if (!isMounted) return;
+
+                if (res && res.ok && res.data) {
+                    setProfile(res.data);
+                } else {
+                    setProfile(null);
+                    setError(res?.error?.message || t('supplier.settings.loadError') || 'Failed to load supplier profile data.');
+                }
+            } catch (err: any) {
+                if (!isMounted) return;
+                setProfile(null);
+                setError(err.message || t('supplier.settings.loadError') || 'Failed to load supplier profile data.');
+            } finally {
                 if (isMounted) {
-                    if (res && res.ok && res.data) {
-                        setProfile(res.data);
-                    } else {
-                        setProfile({
-                            name: user?.companyName || 'Authorized Paper Supplier',
-                            status: 'ACTIVE',
-                            role: role,
-                            tenantId: user?.tenantId || 'tenant-supplier',
-                            currencies: ['EUR']
-                        });
-                    }
                     setLoading(false);
                 }
-            })
-            .catch((err: any) => {
-                if (isMounted) {
-                    setError(err.message || 'Failed to load supplier profile data.');
-                    setLoading(false);
-                }
-            });
+            }
+        };
+
+        fetchProfile();
 
         return () => {
             isMounted = false;
         };
-    }, [role, user]);
+    }, [role, userId, tenantId, supplierId, activeContext]);
 
     return (
         <div className="space-y-6">
@@ -81,8 +88,14 @@ export const SupplierSettingsPage: React.FC = () => {
                         <p className="text-[10px] font-bold uppercase text-zinc-400">
                             {t('supplier.settings.statusLabel') || 'Account Status'}
                         </p>
-                        <p className="text-xs font-black text-emerald-500 uppercase tracking-wider">
-                            {profile?.status || 'ACTIVE'}
+                        <p className={`text-xs font-black uppercase tracking-wider ${
+                            profile?.status === 'APPROVED' || profile?.status === 'ACTIVE'
+                                ? 'text-emerald-500'
+                                : profile?.status === 'SUSPENDED'
+                                    ? 'text-red-500'
+                                    : 'text-zinc-400'
+                        }`}>
+                            {loading ? '...' : (profile?.status || (t('common.notAvailable') || 'No disponible'))}
                         </p>
                     </div>
                     <div className="h-8 w-[1px] bg-slate-200 dark:bg-zinc-800" />
@@ -91,7 +104,7 @@ export const SupplierSettingsPage: React.FC = () => {
                             {t('supplier.settings.roleLabel') || 'Role'}
                         </p>
                         <p className="text-xs font-black text-slate-800 dark:text-zinc-200 uppercase tracking-wider">
-                            {role}
+                            {role || (t('common.notAvailable') || 'No disponible')}
                         </p>
                     </div>
                 </div>
@@ -121,7 +134,7 @@ export const SupplierSettingsPage: React.FC = () => {
                                 {t('supplier.settings.companyName') || 'Company Name'}
                             </span>
                             <p className="text-sm font-bold text-slate-900 dark:text-white mt-0.5">
-                                {loading ? '...' : (profile?.name || user?.companyName || '—')}
+                                {loading ? '...' : (profile?.name || user?.companyName || (t('common.notAvailable') || 'No disponible'))}
                             </p>
                         </div>
 
@@ -130,7 +143,7 @@ export const SupplierSettingsPage: React.FC = () => {
                                 {t('supplier.settings.contactEmail') || 'Registered Contact Email'}
                             </span>
                             <p className="font-mono text-slate-800 dark:text-zinc-200 mt-0.5">
-                                {user?.email || '—'}
+                                {loading ? '...' : (profile?.contactEmail || user?.email || (t('common.notAvailable') || 'No disponible'))}
                             </p>
                         </div>
 
@@ -139,7 +152,7 @@ export const SupplierSettingsPage: React.FC = () => {
                                 {t('supplier.settings.supplierId') || 'Supplier Organization ID'}
                             </span>
                             <p className="font-mono text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-                                {profile?.supplierId || user?.supplierId || '—'}
+                                {loading ? '...' : (profile?.supplierId || supplierId || (t('common.notAvailable') || 'No disponible'))}
                             </p>
                         </div>
 
@@ -148,7 +161,7 @@ export const SupplierSettingsPage: React.FC = () => {
                                 {t('supplier.settings.tenantId') || 'Tenancy Scope'}
                             </span>
                             <p className="font-mono text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-                                {profile?.tenantId || user?.tenantId || '—'}
+                                {loading ? '...' : (profile?.tenantId || tenantId || (t('common.notAvailable') || 'No disponible'))}
                             </p>
                         </div>
                     </div>
@@ -169,11 +182,19 @@ export const SupplierSettingsPage: React.FC = () => {
                                 {t('supplier.settings.currencies') || 'Approved Currencies'}
                             </span>
                             <div className="flex flex-wrap gap-2 mt-1.5">
-                                {(profile?.currencies && profile.currencies.length > 0 ? profile.currencies : ['EUR']).map((cur: string) => (
-                                    <span key={cur} className="px-2.5 py-1 text-xs font-mono font-bold bg-slate-100 dark:bg-zinc-800 text-slate-800 dark:text-zinc-200 border border-slate-200 dark:border-zinc-700">
-                                        {cur}
+                                {loading ? (
+                                    <span className="text-xs text-zinc-400">...</span>
+                                ) : profile?.currencies && Array.isArray(profile.currencies) && profile.currencies.length > 0 ? (
+                                    profile.currencies.map((cur: string) => (
+                                        <span key={cur} className="px-2.5 py-1 text-xs font-mono font-bold bg-slate-100 dark:bg-zinc-800 text-slate-800 dark:text-zinc-200 border border-slate-200 dark:border-zinc-700">
+                                            {cur}
+                                        </span>
+                                    ))
+                                ) : (
+                                    <span className="text-xs text-zinc-400">
+                                        {t('common.notAvailable') || 'No disponible'}
                                     </span>
-                                ))}
+                                )}
                             </div>
                         </div>
 
@@ -182,9 +203,9 @@ export const SupplierSettingsPage: React.FC = () => {
                                 {t('supplier.settings.scopeStatus') || 'Governance Scope'}
                             </span>
                             <div className="flex items-center gap-2 mt-1.5">
-                                <ShieldCheckIcon className="w-4 h-4 text-emerald-500" />
+                                <ShieldCheckIcon className={`w-4 h-4 ${profile?.status === 'APPROVED' ? 'text-emerald-500' : 'text-zinc-400'}`} />
                                 <span className="font-bold text-slate-800 dark:text-zinc-200">
-                                    {t('supplier.settings.approvedSupplier') || 'Approved Paper Supplier (PAPER_SUPPLIER)'}
+                                    {loading ? '...' : (profile ? (t('supplier.settings.approvedSupplier') || 'Approved Paper Supplier (PAPER_SUPPLIER)') : (t('common.notAvailable') || 'No disponible'))}
                                 </span>
                             </div>
                             <p className="text-[11px] text-zinc-500 mt-1 leading-relaxed">

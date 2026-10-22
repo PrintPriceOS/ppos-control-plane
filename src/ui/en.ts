@@ -2500,7 +2500,13 @@ export const en = {
   'supplier.settings.scopeStatus': 'Governance Scope',
   'supplier.settings.approvedSupplier': 'Approved Paper Supplier (PAPER_SUPPLIER)',
   'supplier.settings.scopeDesc': 'Authorized to publish physical paper catalogs, create commercial rate cards, and participate in governed procurement.',
-  'supplier.settings.readOnlyNote': 'To modify corporate registration data or add trading currencies, contact the platform governance team.'
+  'supplier.settings.readOnlyNote': 'To modify corporate registration data or add trading currencies, contact the platform governance team.',
+
+  // Common fallbacks & supplier errors
+  'common.notAvailable': 'Not available',
+  'supplier.status.notAvailable': 'Not available',
+  'supplier.dashboard.loadError': 'Failed to load supplier dashboard metrics.',
+  'supplier.settings.loadError': 'Failed to load supplier profile data.'
 } as const;
 
 export type TranslationKeys = keyof typeof en;
