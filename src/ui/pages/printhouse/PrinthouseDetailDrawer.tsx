@@ -10,6 +10,7 @@ import { PrinthouseReadinessPanel } from './PrinthouseReadinessPanel';
 import { CapabilityAuditTimeline } from './CapabilityAuditTimeline';
 import { COUNTRIES, getCountryDisplayName } from '../../lib/countryCatalog';
 import { CountrySelect } from '../../components/common/CountrySelect';
+import { TimezoneSelect } from '../../components/common/TimezoneSelect';
 
 interface PrinthouseDetailDrawerProps {
     printhouse: Printhouse | null;
@@ -168,12 +169,11 @@ export const PrinthouseDetailDrawer: React.FC<PrinthouseDetailDrawerProps> = ({
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1.5">Timezone</label>
-                                    <input 
-                                        type="text"
+                                    <TimezoneSelect 
+                                        label="Timezone"
                                         value={form.timezone || 'Europe/Madrid'}
-                                        onChange={e => setForm({ ...form, timezone: e.target.value })}
-                                        className="w-full px-3 py-1.5 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-primary"
+                                        onChange={tz => setForm({ ...form, timezone: tz })}
+                                        countryCode={form.country}
                                     />
                                 </div>
                             </div>

@@ -2,11 +2,11 @@
  * src/ui/components/printhouse/setup/CompanyProfileForm.tsx
  * 
  * Form for viewing and editing Company Profile canonical domain data in tenants table.
+ * Standardized with rounded-2xl cards, rounded-xl inputs, and shared CountrySelect.
  */
 import React, { useState } from 'react';
 import { FieldGuidance } from './FieldGuidance';
 import { getAuthToken } from '../../../lib/authStore';
-import { COUNTRIES, getCountryDisplayName, getCountryName } from '../../../lib/countryCatalog';
 import { CountrySelect } from '../../common/CountrySelect';
 import { Save, CheckCircle, AlertCircle } from 'lucide-react';
 import { useLocale } from '../../../i18n';
@@ -79,25 +79,27 @@ export const CompanyProfileForm: React.FC<{ companyData?: CompanyData; onSaved?:
     };
 
     return (
-        <form onSubmit={handleSubmit} className="bg-white dark:bg-[#18181b] border border-zinc-200 dark:border-[#27272a] rounded-xl p-7 shadow-sm transition-colors">
-            <h2 className="text-lg font-bold text-zinc-900 dark:text-white mb-5">{t('company.title') || 'Company Profile'}</h2>
+        <form onSubmit={handleSubmit} className="bg-white dark:bg-[#18181b] border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 sm:p-7 shadow-2xs transition-colors">
+            <h2 className="text-lg font-bold text-zinc-900 dark:text-white mb-5 tracking-tight">
+                {t('company.title') || 'Company Profile'}
+            </h2>
 
             {successMsg && (
-                <div className="bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 p-3 rounded-lg mb-5 flex items-center gap-2 text-xs font-medium">
-                    <CheckCircle size={16} className="text-emerald-600 dark:text-emerald-400" /> {successMsg}
+                <div className="bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 p-3.5 rounded-xl mb-5 flex items-center gap-2 text-xs font-medium">
+                    <CheckCircle size={16} className="text-emerald-600 dark:text-emerald-400 shrink-0" /> {successMsg}
                 </div>
             )}
 
             {errorMsg && (
-                <div className="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 text-red-800 dark:text-red-300 p-3 rounded-lg mb-5 flex items-center gap-2 text-xs font-medium">
-                    <AlertCircle size={16} className="text-red-600 dark:text-red-400" /> {errorMsg}
+                <div className="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 text-red-800 dark:text-red-300 p-3.5 rounded-xl mb-5 flex items-center gap-2 text-xs font-medium">
+                    <AlertCircle size={16} className="text-red-600 dark:text-red-400 shrink-0" /> {errorMsg}
                 </div>
             )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-5">
                 <div>
-                    <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">
-                        {t('company.legalName') || 'Legal Company Name'}
+                    <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5 flex items-center justify-between">
+                        <span>{t('company.legalName') || 'Legal Company Name'} <span className="text-[#dc0000]">*</span></span>
                         <FieldGuidance title={t('company.legalName') || 'Legal Company Name'} description="Used for contracts, invoicing, and compliance records. It may differ from the public trading name." />
                     </label>
                     <input
@@ -105,20 +107,20 @@ export const CompanyProfileForm: React.FC<{ companyData?: CompanyData; onSaved?:
                         required
                         value={form.legalName}
                         onChange={(e) => setForm({ ...form, legalName: e.target.value, companyName: e.target.value })}
-                        className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 px-3 py-2 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-[#dc0000] focus:border-[#dc0000] transition-colors"
+                        className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 px-3.5 py-2.5 rounded-xl text-sm placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-[#dc0000]/30 focus:border-[#dc0000] transition-colors"
                     />
                 </div>
 
                 <div>
-                    <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">
-                        {t('company.tradingName') || 'Trading / Display Name'}
+                    <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5 flex items-center justify-between">
+                        <span>{t('company.tradingName') || 'Trading / Display Name'}</span>
                         <FieldGuidance title={t('company.tradingName') || 'Trading Name'} description="The public brand name displayed to customers in the marketplace." />
                     </label>
                     <input
                         type="text"
                         value={form.tradingName}
                         onChange={(e) => setForm({ ...form, tradingName: e.target.value })}
-                        className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 px-3 py-2 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-[#dc0000] focus:border-[#dc0000] transition-colors"
+                        className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 px-3.5 py-2.5 rounded-xl text-sm placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-[#dc0000]/30 focus:border-[#dc0000] transition-colors"
                     />
                 </div>
 
@@ -134,28 +136,28 @@ export const CompanyProfileForm: React.FC<{ companyData?: CompanyData; onSaved?:
                 </div>
 
                 <div>
-                    <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">
-                        {t('company.city') || 'City / Municipality'}
+                    <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5 flex items-center justify-between">
+                        <span>{t('company.city') || 'City / Municipality'}</span>
                         <FieldGuidance title={t('company.city') || 'City'} description="Headquarters or principal office city." />
                     </label>
                     <input
                         type="text"
                         value={form.city}
                         onChange={(e) => setForm({ ...form, city: e.target.value })}
-                        className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 px-3 py-2 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-[#dc0000] focus:border-[#dc0000] transition-colors"
+                        className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 px-3.5 py-2.5 rounded-xl text-sm placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-[#dc0000]/30 focus:border-[#dc0000] transition-colors"
                     />
                 </div>
 
                 <div className="md:col-span-2">
-                    <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">
-                        {t('company.address') || 'Registered Street Address'}
+                    <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5 flex items-center justify-between">
+                        <span>{t('company.address') || 'Registered Street Address'}</span>
                         <FieldGuidance title={t('company.address') || 'Registered Address'} description="Official address corresponding to tax and incorporation documents." />
                     </label>
                     <input
                         type="text"
                         value={form.address}
                         onChange={(e) => setForm({ ...form, address: e.target.value })}
-                        className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 px-3 py-2 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-[#dc0000] focus:border-[#dc0000] transition-colors"
+                        className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 px-3.5 py-2.5 rounded-xl text-sm placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-[#dc0000]/30 focus:border-[#dc0000] transition-colors"
                     />
                 </div>
 
@@ -167,7 +169,7 @@ export const CompanyProfileForm: React.FC<{ companyData?: CompanyData; onSaved?:
                         type="text"
                         value={form.postalCode}
                         onChange={(e) => setForm({ ...form, postalCode: e.target.value })}
-                        className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 px-3 py-2 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-[#dc0000] focus:border-[#dc0000] transition-colors"
+                        className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 px-3.5 py-2.5 rounded-xl text-sm placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-[#dc0000]/30 focus:border-[#dc0000] transition-colors"
                     />
                 </div>
 
@@ -179,38 +181,40 @@ export const CompanyProfileForm: React.FC<{ companyData?: CompanyData; onSaved?:
                         type="tel"
                         value={form.phone}
                         onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                        className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 px-3 py-2 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-[#dc0000] focus:border-[#dc0000] transition-colors"
+                        className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 px-3.5 py-2.5 rounded-xl text-sm placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-[#dc0000]/30 focus:border-[#dc0000] transition-colors"
                     />
                 </div>
 
                 <div>
-                    <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">
-                        {t('company.website') || 'Company Website URL'}
+                    <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5 flex items-center justify-between">
+                        <span>{t('company.website') || 'Official Website URL'}</span>
+                        <FieldGuidance title={t('company.website') || 'Website'} description="Public web presence of your printing facility or company." />
                     </label>
                     <input
                         type="url"
-                        placeholder="https://..."
+                        placeholder="https://example.com"
                         value={form.website}
                         onChange={(e) => setForm({ ...form, website: e.target.value })}
-                        className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 px-3 py-2 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-[#dc0000] focus:border-[#dc0000] transition-colors"
+                        className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 px-3.5 py-2.5 rounded-xl text-sm placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-[#dc0000]/30 focus:border-[#dc0000] transition-colors"
                     />
                 </div>
 
                 <div>
-                    <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">
-                        {t('company.contactName') || 'Primary Contact Name'}
+                    <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5 flex items-center justify-between">
+                        <span>{t('company.contactName') || 'Key Account / Operations Manager'}</span>
+                        <FieldGuidance title={t('company.contactName') || 'Contact Person'} description="Primary operational representative responsible for communication." />
                     </label>
                     <input
                         type="text"
                         value={form.contactName}
                         onChange={(e) => setForm({ ...form, contactName: e.target.value })}
-                        className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 px-3 py-2 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-[#dc0000] focus:border-[#dc0000] transition-colors"
+                        className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 px-3.5 py-2.5 rounded-xl text-sm placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-[#dc0000]/30 focus:border-[#dc0000] transition-colors"
                     />
                 </div>
 
                 <div>
-                    <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">
-                        {t('company.taxId') || 'Tax ID / VAT Number'}
+                    <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5 flex items-center justify-between">
+                        <span>{t('company.taxId') || 'Tax ID / VAT Number'}</span>
                         <FieldGuidance title={t('company.taxId') || 'Tax / VAT ID'} description="Used for cross-border VAT validation and B2B marketplace invoicing." />
                     </label>
                     <input
@@ -218,20 +222,20 @@ export const CompanyProfileForm: React.FC<{ companyData?: CompanyData; onSaved?:
                         placeholder="e.g. ESB12345678"
                         value={form.taxId}
                         onChange={(e) => setForm({ ...form, taxId: e.target.value })}
-                        className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 px-3 py-2 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-[#dc0000] focus:border-[#dc0000] transition-colors"
+                        className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 px-3.5 py-2.5 rounded-xl text-sm placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-[#dc0000]/30 focus:border-[#dc0000] transition-colors"
                     />
                 </div>
 
                 <div>
-                    <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">
-                        {t('company.registrationId') || 'Company Registration Number (Optional)'}
+                    <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5 flex items-center justify-between">
+                        <span>{t('company.registrationId') || 'Company Registration Number (Optional)'}</span>
                         <FieldGuidance title={t('company.registrationId') || 'Registration Number'} description="National commercial register or mercantile registry identification." />
                     </label>
                     <input
                         type="text"
                         value={form.companyRegistrationId}
                         onChange={(e) => setForm({ ...form, companyRegistrationId: e.target.value })}
-                        className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 px-3 py-2 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-[#dc0000] focus:border-[#dc0000] transition-colors"
+                        className="w-full bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 px-3.5 py-2.5 rounded-xl text-sm placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-[#dc0000]/30 focus:border-[#dc0000] transition-colors"
                     />
                 </div>
             </div>
@@ -240,7 +244,7 @@ export const CompanyProfileForm: React.FC<{ companyData?: CompanyData; onSaved?:
                 <button
                     type="submit"
                     disabled={loading}
-                    className="bg-[#dc0000] hover:bg-red-700 text-white font-semibold px-6 py-2.5 rounded-lg text-sm transition-colors shadow-sm disabled:opacity-50 flex items-center gap-2 cursor-pointer"
+                    className="bg-[#dc0000] hover:bg-red-700 text-white font-semibold px-6 py-2.5 rounded-xl text-xs transition-colors shadow-2xs disabled:opacity-50 flex items-center gap-2 cursor-pointer"
                 >
                     <Save size={16} />
                     <span>{loading ? (t('company.savingBtn') || 'Saving Changes...') : (t('company.saveBtn') || 'Save Company Profile')}</span>

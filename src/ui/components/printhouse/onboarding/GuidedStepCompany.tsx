@@ -15,6 +15,7 @@ import React, { useState, useEffect } from 'react';
 import { Building2, MapPin, User, Phone, FileCheck, ArrowRight, ArrowLeft, RefreshCw, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { useLocale } from '../../../i18n';
 import { CountrySelect } from '../../common/CountrySelect';
+import { TimezoneSelect } from '../../common/TimezoneSelect';
 import { getAuthToken } from '../../../lib/authStore';
 import { CompanyDraftData } from '../../../lib/onboardingDraftStore';
 import { normalizeUiError } from '../../../utils/errorUtils';
@@ -304,28 +305,19 @@ export const GuidedStepCompany: React.FC<GuidedStepCompanyProps> = ({
                         </div>
 
                         <div>
-                            <label htmlFor="company-site-timezone" className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1">
-                                {t('setup.sites.timezone') || 'Zona horaria de producción'} <span className="text-[#dc0000]">*</span>
-                            </label>
-                            <select
+                            <TimezoneSelect
                                 id="company-site-timezone"
+                                label={t('setup.sites.timezone') || 'Zona horaria de producción'}
+                                required
                                 value={form.siteTimezone || (form.country === 'DE' ? 'Europe/Berlin' : form.country === 'GB' ? 'Europe/London' : 'Europe/Madrid')}
-                                onChange={(e) => handleChange('siteTimezone', e.target.value)}
-                                className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-900/80 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-[#dc0000]/30 focus:border-[#dc0000] transition-colors cursor-pointer"
-                            >
-                                <option value="Europe/Madrid">Europe/Madrid (CET/CEST)</option>
-                                <option value="Europe/Berlin">Europe/Berlin (CET/CEST)</option>
-                                <option value="Europe/London">Europe/London (GMT/BST)</option>
-                                <option value="Europe/Paris">Europe/Paris (CET/CEST)</option>
-                                <option value="Europe/Lisbon">Europe/Lisbon (WET/WEST)</option>
-                                <option value="America/New_York">America/New_York (EST/EDT)</option>
-                                <option value="America/Chicago">America/Chicago (CST/CDT)</option>
-                                <option value="America/Los_Angeles">America/Los_Angeles (PST/PDT)</option>
-                                <option value="UTC">UTC (Universal Time)</option>
-                            </select>
-                            <p className="text-[11px] text-zinc-500 mt-1">
-                                {t('guided.company.timezoneNotice') || 'Requerida para calcular los plazos de entrega y la hora de corte diario.'}
-                            </p>
+                                onChange={(tz) => handleChange('siteTimezone', tz)}
+                                countryCode={form.country}
+                                helperText={
+                                    <span className="text-[11px] text-zinc-500 font-normal">
+                                        {t('guided.company.timezoneNotice') || 'Requerida para calcular los plazos de entrega y la hora de corte diario.'}
+                                    </span>
+                                }
+                            />
                         </div>
 
                         <div>

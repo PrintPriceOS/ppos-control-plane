@@ -22,6 +22,8 @@ import {
     getAuthToken 
 } from '../../lib/authStore';
 import { adminFetch } from '../../lib/adminApi';
+import { CountrySelect } from '../../components/common/CountrySelect';
+import { TimezoneSelect } from '../../components/common/TimezoneSelect';
 import {
     Cog6ToothIcon,
     GlobeAltIcon,
@@ -50,12 +52,12 @@ const Toggle: React.FC<{ checked: boolean; onChange: () => void; id?: string }> 
         role="switch"
         aria-checked={checked}
         onClick={onChange}
-        className={`relative inline-flex h-6 w-11 items-center rounded-none transition-colors cursor-pointer ${
-            checked ? 'bg-[#dc0000]' : 'bg-zinc-200 dark:bg-zinc-800'
+        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#dc0000]/30 ${
+            checked ? 'bg-[#dc0000]' : 'bg-zinc-200 dark:bg-zinc-700'
         }`}
     >
         <span 
-            className={`inline-block h-4 w-4 transform rounded-none bg-white shadow-none border border-transparent transition-transform ${
+            className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform ${
                 checked ? 'translate-x-6' : 'translate-x-1'
             }`} 
         />
@@ -707,10 +709,10 @@ export const GlobalSettingsPage: React.FC = () => {
                             key={id}
                             id={`settings-tab-${id}`}
                             onClick={() => setActive(id)}
-                            className={`settings-nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-none text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                            className={`settings-nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-semibold tracking-wide transition-all cursor-pointer ${
                                 active === id
-                                    ? 'bg-zinc-100 dark:bg-zinc-900 text-zinc-900 dark:text-[#dc0000] border-l-2 border-[#dc0000]'
-                                    : 'text-zinc-500 dark:text-zinc-500 hover:bg-zinc-50 dark:hover:bg-zinc-900/50 hover:text-zinc-900 dark:hover:text-zinc-200 border-l-2 border-transparent'
+                                    ? 'bg-red-50 dark:bg-red-950/40 text-[#dc0000] dark:text-red-400 font-bold border-l-2 border-[#dc0000]'
+                                    : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800/60 hover:text-zinc-900 dark:hover:text-zinc-200 border-l-2 border-transparent'
                             }`}
                         >
                             <Icon className="w-4 h-4 shrink-0" />
@@ -719,11 +721,11 @@ export const GlobalSettingsPage: React.FC = () => {
                     ))}
 
                     {/* Tenant & Role Badge */}
-                    <div className="mt-8 p-3 bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 text-[10px]">
+                    <div className="mt-8 p-3.5 bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 rounded-xl text-[10px]">
                         <p className="font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">Active Tenant</p>
                         <p className="font-mono font-bold text-zinc-800 dark:text-zinc-200 truncate mt-0.5">{tenantId}</p>
                         <p className="font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest mt-2">Effective Role</p>
-                        <span className={`inline-block mt-0.5 px-1.5 py-0.5 font-bold uppercase tracking-wider ${
+                        <span className={`inline-block mt-1 px-2 py-0.5 font-bold uppercase tracking-wider rounded-full ${
                             isSuper ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30' : 'bg-red-500/10 text-red-500 border border-red-500/20'
                         }`}>
                             {userRole}
@@ -732,7 +734,7 @@ export const GlobalSettingsPage: React.FC = () => {
                 </nav>
 
                 {/* Panel */}
-                <div className="settings-panel flex-1 bg-white dark:bg-zinc-950 rounded-none border border-zinc-200 dark:border-zinc-800 p-8 space-y-6">
+                <div className="settings-panel flex-1 bg-white dark:bg-[#18181b] rounded-2xl border border-zinc-200 dark:border-zinc-800 p-6 sm:p-8 space-y-6 shadow-sm">
 
                     {/* ── GENERAL ────────────────────────────────────────── */}
                     {active === 'general' && (
@@ -764,18 +766,12 @@ export const GlobalSettingsPage: React.FC = () => {
                                     </Field>
 
                                     <Field label={t('settings.general.timezone')}>
-                                        <select 
+                                        <TimezoneSelect 
                                             id="settings-select-timezone"
                                             value={timezone} 
-                                            onChange={e => setTimezone(e.target.value)} 
-                                            className={inputCls}
-                                        >
-                                            <option value="Europe/Madrid">Europe/Madrid (CET/CEST)</option>
-                                            <option value="Europe/Berlin">Europe/Berlin (CET/CEST)</option>
-                                            <option value="Europe/London">Europe/London (GMT/BST)</option>
-                                            <option value="UTC">UTC (Universal Coordinated Time)</option>
-                                            <option value="America/New_York">America/New_York (EST/EDT)</option>
-                                        </select>
+                                            onChange={tz => setTimezone(tz)}
+                                            countryCode={country}
+                                        />
                                     </Field>
                                 </div>
 
@@ -836,23 +832,15 @@ export const GlobalSettingsPage: React.FC = () => {
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <Field label={t('settings.general.country')}>
-                                        <select 
+                                        <CountrySelect 
                                             id="settings-select-country"
                                             value={country} 
-                                            onChange={e => {
-                                                const v = e.target.value;
-                                                setCountry(v);
-                                                try { localStorage.setItem('ppos_draft_country', v); } catch {}
+                                            onChange={code => {
+                                                setCountry(code);
+                                                try { localStorage.setItem('ppos_draft_country', code); } catch {}
                                             }} 
-                                            className={inputCls}
-                                        >
-                                            <option value="ES">Spain (ES)</option>
-                                            <option value="DE">Germany (DE)</option>
-                                            <option value="FR">France (FR)</option>
-                                            <option value="IT">Italy (IT)</option>
-                                            <option value="PT">Portugal (PT)</option>
-                                            <option value="NL">Netherlands (NL)</option>
-                                        </select>
+                                            disabled={!isPrinthouse && !isSuper}
+                                        />
                                     </Field>
                                     <Field label={t('settings.general.currency')}>
                                         <input 
@@ -1015,7 +1003,7 @@ export const GlobalSettingsPage: React.FC = () => {
                                                 id="settings-mfa-disable-btn"
                                                 type="button"
                                                 onClick={() => { setMfaDisableModalOpen(true); setMfaMessage(null); }}
-                                                className="px-3 py-1.5 bg-red-500/10 text-red-500 border border-red-500/30 text-xs font-bold rounded-none hover:bg-red-500/20 transition-colors cursor-pointer"
+                                                className="px-3.5 py-1.5 bg-red-500/10 text-red-500 border border-red-500/30 text-xs font-semibold rounded-xl hover:bg-red-500/20 transition-colors cursor-pointer"
                                             >
                                                 {t('settings.security.mfaDisableBtn')}
                                             </button>
@@ -1025,7 +1013,7 @@ export const GlobalSettingsPage: React.FC = () => {
                                                 type="button"
                                                 onClick={handleStartMfaSetup}
                                                 disabled={mfaActionLoading}
-                                                className="px-3 py-1.5 bg-zinc-900 dark:bg-[#dc0000] text-white text-xs font-bold rounded-none hover:bg-zinc-800 dark:hover:bg-red-600 transition-colors cursor-pointer flex items-center gap-1.5"
+                                                className="px-3.5 py-1.5 bg-zinc-900 dark:bg-[#dc0000] text-white text-xs font-semibold rounded-xl hover:bg-zinc-800 dark:hover:bg-red-600 transition-colors shadow-2xs cursor-pointer flex items-center gap-1.5"
                                             >
                                                 {mfaActionLoading ? (
                                                     <ArrowPathIcon className="w-3.5 h-3.5 animate-spin" />
@@ -1065,7 +1053,7 @@ export const GlobalSettingsPage: React.FC = () => {
                                             type="button"
                                             onClick={loadSessions}
                                             disabled={loadingSessions}
-                                            className="p-1.5 text-zinc-400 hover:text-zinc-200 border border-zinc-200 dark:border-zinc-800 hover:border-zinc-400 cursor-pointer"
+                                            className="p-2 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 border border-zinc-200 dark:border-zinc-800 rounded-lg hover:border-zinc-300 dark:hover:border-zinc-700 transition-colors cursor-pointer"
                                             title="Refresh Sessions"
                                         >
                                             <ArrowPathIcon className={`w-3.5 h-3.5 ${loadingSessions ? 'animate-spin' : ''}`} />
@@ -1075,7 +1063,7 @@ export const GlobalSettingsPage: React.FC = () => {
                                             type="button"
                                             onClick={handleRevokeAllOtherSessions}
                                             disabled={sessionsList.filter(s => s.status === 'ACTIVE').length <= 1}
-                                            className="px-3 py-1.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 border border-zinc-200 dark:border-zinc-700 text-xs font-bold rounded-none hover:bg-zinc-200 dark:hover:bg-zinc-700 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                                            className="px-3.5 py-1.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 border border-zinc-200 dark:border-zinc-700 text-xs font-semibold rounded-xl hover:bg-zinc-200 dark:hover:bg-zinc-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
                                         >
                                             {t('settings.security.sessionRevokeAll')}
                                         </button>
@@ -1434,7 +1422,7 @@ export const GlobalSettingsPage: React.FC = () => {
                                                                     setSlackEvents(prev => prev.filter(x => x !== ev.id));
                                                                 }
                                                             }}
-                                                            className="rounded-none text-[#dc0000] focus:ring-0 cursor-pointer"
+                                                            className="rounded text-[#dc0000] focus:ring-1 focus:ring-[#dc0000] cursor-pointer"
                                                         />
                                                         <span>{ev.label}</span>
                                                     </label>
@@ -1622,7 +1610,7 @@ export const GlobalSettingsPage: React.FC = () => {
                             type="button"
                             onClick={handleSave}
                             disabled={saving}
-                            className="px-6 py-2.5 bg-zinc-900 dark:bg-[#dc0000] text-white text-xs font-bold uppercase tracking-widest rounded-none hover:bg-zinc-800 dark:hover:bg-red-600 transition-colors cursor-pointer flex items-center gap-2"
+                            className="px-6 py-2.5 bg-zinc-900 dark:bg-[#dc0000] text-white text-xs font-bold uppercase tracking-wider rounded-xl hover:bg-zinc-800 dark:hover:bg-red-600 transition-colors shadow-sm cursor-pointer flex items-center gap-2"
                         >
                             {saving ? (
                                 <>
@@ -1839,23 +1827,23 @@ export const GlobalSettingsPage: React.FC = () => {
 
 // ─── Visual Components ───────────────────────────────────────────────────────
 
-const inputCls = "settings-input w-full px-4 py-2.5 rounded-none bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs font-medium text-zinc-900 dark:text-zinc-200 focus:outline-none focus:border-[#dc0000]";
+const inputCls = "settings-input w-full px-3.5 py-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-xs font-medium text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-[#dc0000]/30 focus:border-[#dc0000] transition-colors";
 
 const SectionHeader: React.FC<{ icon: React.ElementType; title: string; description: string }> = ({ icon: Icon, title, description }) => (
-    <div className="flex items-center gap-3 pb-3 border-b border-zinc-200 dark:border-zinc-800">
-        <div className="p-2 rounded-none bg-zinc-50 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400">
-            <Icon className="w-5 h-5 text-[#dc0000]" />
+    <div className="flex items-center gap-3.5 pb-4 border-b border-zinc-100 dark:border-zinc-800">
+        <div className="p-2.5 rounded-xl bg-red-50 dark:bg-red-950/40 text-[#dc0000] dark:text-red-400">
+            <Icon className="w-5 h-5" />
         </div>
         <div>
-            <p className="text-sm font-black text-zinc-900 dark:text-zinc-100 uppercase tracking-tight">{title}</p>
-            <p className="text-xs text-zinc-400 dark:text-zinc-500 font-medium">{description}</p>
+            <p className="text-sm font-bold text-zinc-900 dark:text-zinc-100 tracking-tight">{title}</p>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400 font-medium mt-0.5">{description}</p>
         </div>
     </div>
 );
 
 const Field: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => (
     <div className="space-y-1.5">
-        <label className="text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-widest">{label}</label>
+        <label className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">{label}</label>
         {children}
     </div>
 );
