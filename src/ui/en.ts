@@ -2523,6 +2523,7 @@ export const en = {
   'supplier.hub.batchRejected': 'Rej',
   'supplier.hub.batchIssues': 'Issues',
   'supplier.hub.batchPending': 'Pending',
+  'supplier.hub.inconsistencyWarning': 'Inconsistency detected in batch',
   'supplier.hub.dependencyWarningsTitle': 'Dependency and Preservation Warnings:',
   'supplier.hub.networkError': 'Network communication error.',
   'supplier.hub.previewError': 'Could not generate catalog action preview.',

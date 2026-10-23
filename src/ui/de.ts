@@ -2523,6 +2523,7 @@ export const de = {
   'supplier.hub.batchRejected': 'Abgel',
   'supplier.hub.batchIssues': 'Probleme',
   'supplier.hub.batchPending': 'Ausst',
+  'supplier.hub.inconsistencyWarning': 'Inkonsistenz im Batch erkannt',
   'supplier.hub.dependencyWarningsTitle': 'Abhängigkeits- und Erhaltungswarnungen:',
   'supplier.hub.networkError': 'Netzwerkkommunikationsfehler.',
   'supplier.hub.previewError': 'Katalogaktionsvorschau konnte nicht erstellt werden.',

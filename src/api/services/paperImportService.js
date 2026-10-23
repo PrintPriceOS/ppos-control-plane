@@ -689,9 +689,11 @@ function validateTechnicalRow({
 
         // Check contradiction between declared dimension columns and dimensions found in product description
         const descDims = extractDimensionsFromDescription(name);
-        if (descDims && colW_mm !== undefined && colH_mm !== undefined && colW_mm !== null && colH_mm !== null) {
-            const matchesDirect = (Math.abs(colW_mm - descDims.w_mm) < 1e-3 && Math.abs(colH_mm - descDims.h_mm) < 1e-3);
-            const matchesInverted = (Math.abs(colW_mm - descDims.h_mm) < 1e-3 && Math.abs(colH_mm - descDims.w_mm) < 1e-3);
+        const effectiveColW = (colW_mm !== undefined && colW_mm !== null) ? colW_mm : width_mm;
+        const effectiveColH = (colH_mm !== undefined && colH_mm !== null) ? colH_mm : height_mm;
+        if (descDims && effectiveColW !== undefined && effectiveColH !== undefined && effectiveColW !== null && effectiveColH !== null) {
+            const matchesDirect = (Math.abs(effectiveColW - descDims.w_mm) < 1e-3 && Math.abs(effectiveColH - descDims.h_mm) < 1e-3);
+            const matchesInverted = (Math.abs(effectiveColW - descDims.h_mm) < 1e-3 && Math.abs(effectiveColH - descDims.w_mm) < 1e-3);
             if (!matchesDirect && !matchesInverted) {
                 const resolvedDirect = (Math.abs(width_mm - descDims.w_mm) < 1e-3 && Math.abs(height_mm - descDims.h_mm) < 1e-3);
                 const resolvedInverted = (Math.abs(width_mm - descDims.h_mm) < 1e-3 && Math.abs(height_mm - descDims.w_mm) < 1e-3);
@@ -700,7 +702,7 @@ function validateTechnicalRow({
                         code: 'DIMENSION_DESCRIPTION_CONFLICT',
                         severity: 'WARNING',
                         category: 'TECHNICAL',
-                        message: `Declared dimensions (${colW_mm}x${colH_mm} mm) conflict with dimensions found in description (${descDims.rawW}x${descDims.rawH} -> ${descDims.w_mm}x${descDims.h_mm} mm). Explicit review required.`
+                        message: `Declared dimensions (${effectiveColW}x${effectiveColH} mm) conflict with dimensions found in description (${descDims.rawW}x${descDims.rawH} -> ${descDims.w_mm}x${descDims.h_mm} mm). Explicit review required.`
                     });
                 }
             }
@@ -736,6 +738,7 @@ function validateTechnicalRow({
 const UNSAFE_DISCREPANCY_WARNING_CODES = new Set([
     'GSM_DESCRIPTION_CONFLICT',
     'DIMENSION_CONTRADICTION',
+    'DIMENSION_DESCRIPTION_CONFLICT',
     'AMBIGUOUS_DIMENSION_UNITS',
     'MISSING_GSM',
     'MISSING_DIMENSIONS',
@@ -1193,6 +1196,8 @@ function normalizeRowData(rawCells, headers = [], fileRowNumber = 1) {
         grain_direction,
         width_mm,
         height_mm,
+        format: formatStr || null,
+        rawFormat: formatStr || null,
         fingerprint,
         priceStatus,
         rawPrice,
@@ -1207,6 +1212,8 @@ function normalizeRowData(rawCells, headers = [], fileRowNumber = 1) {
             nameGsm,
             colW_mm,
             colH_mm,
+            format: formatStr || null,
+            rawFormat: formatStr || null,
             formatDimensions: parsedFmt,
             rawPrice,
             priceStatus,
@@ -1806,7 +1813,11 @@ async function confirmImportBatch({ batchId, tenantId, supplierId, actorId, sele
                 continue;
             }
 
-            // A row with decision PENDING cannot be confirmed if it has warnings, duplicate or issues
+            // A row cannot be confirmed if it remains PENDING with warnings/issues, or if an unsafe contradiction was blindly marked ACCEPTED without resolution
+            const hasUnresolvedDiscrepancy = norm && norm.technicalIssues && norm.technicalIssues.some(i =>
+                i.code === 'DIMENSION_DESCRIPTION_CONFLICT' || i.code === 'DIMENSION_CONTRADICTION'
+            );
+
             if (decision === 'PENDING') {
                 const hasTechWarning = (row.validation_status === 'WARNING' || row.validation_status === 'DUPLICATE' ||
                     (norm && norm.technicalIssues && norm.technicalIssues.some(i => i.severity === 'WARNING' || i.severity === 'ERROR')));
@@ -1814,6 +1825,8 @@ async function confirmImportBatch({ batchId, tenantId, supplierId, actorId, sele
                 if (hasTechWarning) {
                     unresolvedRowIds.push(row.id);
                 }
+            } else if (decision === 'ACCEPTED' && hasUnresolvedDiscrepancy && !norm._allow_unresolved_contradiction && !row.supplier_confirmed) {
+                unresolvedRowIds.push(row.id);
             }
         }
 
@@ -2007,25 +2020,86 @@ async function listImportBatches({ tenantId, supplierId, page = 1, limit = 20 })
         [...params, limit, offset]
     );
 
+    let rowDecisionCounts = {};
+    if (rows && rows.length > 0) {
+        const batchIds = rows.map(r => r.id);
+        const counts = await db.query(
+            `SELECT batch_id, decision, COUNT(*) as cnt 
+             FROM paper_import_rows 
+             WHERE batch_id IN (?) 
+             GROUP BY batch_id, decision`,
+            [batchIds]
+        ).catch(() => []);
+
+        if (Array.isArray(counts)) {
+            for (const c of counts) {
+                if (!rowDecisionCounts[c.batch_id]) {
+                    rowDecisionCounts[c.batch_id] = {};
+                }
+                rowDecisionCounts[c.batch_id][c.decision] = Number(c.cnt || 0);
+            }
+        }
+    }
+
     return {
         page,
         limit,
         total,
         totalPages: Math.ceil(total / limit),
         batches: rows.map(b => {
+            const batchId = b.id;
             const total = Number(b.total_rows || 0);
             const valid = Number(b.valid_rows || 0);
             const issues = Number(b.issue_rows || 0);
             const duplicates = Number(b.duplicate_rows || 0);
             const meta = typeof b.metadata_json === 'string' ? JSON.parse(b.metadata_json) : (b.metadata_json || {});
             const isConfirmed = b.status === 'CONFIRMED';
+            const realDecisions = rowDecisionCounts[batchId];
 
-            // Invariants:
-            // 1. A confirmed batch MUST have zero real pending rows.
-            // 2. Rejected rows are tracked explicitly from confirmation metadata (or total - valid if missing).
-            // 3. Historical issues reflect rows that had parsing/spec warnings during preview staging.
-            const pending = isConfirmed ? Number(meta.pending_count ?? 0) : issues;
-            const rejected = isConfirmed ? Number(meta.rejected_count ?? Math.max(0, total - valid)) : Number(meta.rejected_count ?? 0);
+            let pending;
+            let rejected;
+            let resolvedValid = valid;
+            let hasInconsistency = false;
+            let inconsistencyCode = null;
+            let inconsistencyMessage = null;
+
+            if (realDecisions && Object.keys(realDecisions).length > 0) {
+                // Derived from verified granular row decisions in database
+                const realPending = realDecisions['PENDING'] || 0;
+                const realAccepted = realDecisions['ACCEPTED'] || 0;
+                const realRejected = realDecisions['REJECTED'] || 0;
+
+                pending = realPending;
+                rejected = realRejected;
+                if (realAccepted > 0) {
+                    resolvedValid = realAccepted;
+                }
+
+                if (isConfirmed && realPending > 0) {
+                    hasInconsistency = true;
+                    inconsistencyCode = 'CONFIRMED_BATCH_HAS_PENDING_ROWS';
+                    inconsistencyMessage = `Inconsistencia detectada: lote confirmado contiene ${realPending} fila(s) pendiente(s) real(es).`;
+                }
+            } else {
+                // Derived from audited confirmation metadata (for archived or metadata-backed batches)
+                if (meta.pending_count !== undefined && meta.pending_count !== null) {
+                    pending = Number(meta.pending_count);
+                } else {
+                    pending = isConfirmed ? 0 : issues;
+                }
+
+                if (meta.rejected_count !== undefined && meta.rejected_count !== null) {
+                    rejected = Number(meta.rejected_count);
+                } else {
+                    rejected = isConfirmed ? Math.max(0, total - valid) : 0;
+                }
+
+                if (isConfirmed && pending > 0) {
+                    hasInconsistency = true;
+                    inconsistencyCode = 'CONFIRMED_BATCH_AUDIT_HAS_PENDING';
+                    inconsistencyMessage = `Inconsistencia detectada: metadatos auditados indican ${pending} fila(s) pendiente(s) en lote confirmado.`;
+                }
+            }
 
             return {
                 id: b.id,
@@ -2036,8 +2110,8 @@ async function listImportBatches({ tenantId, supplierId, page = 1, limit = 20 })
                 format: b.format,
                 totalRows: total,
                 total_rows: total,
-                validRows: valid,
-                valid_rows: valid,
+                validRows: resolvedValid,
+                valid_rows: resolvedValid,
                 issueRows: issues,
                 issue_rows: issues,
                 rejectedRows: rejected,
@@ -2052,7 +2126,10 @@ async function listImportBatches({ tenantId, supplierId, page = 1, limit = 20 })
                 confirmed_at: b.confirmed_at,
                 createdAt: b.created_at,
                 created_at: b.created_at,
-                metadata: meta
+                metadata: meta,
+                hasInconsistency,
+                inconsistencyCode,
+                inconsistencyMessage
             };
         })
     };

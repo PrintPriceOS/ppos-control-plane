@@ -2201,6 +2201,13 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                                                             {t('supplier.hub.batchTotal')}: {totalRows} · {t('supplier.hub.batchValid')}: {validRows} · {t('supplier.hub.batchIssues')}: {issueRows} · {t('supplier.hub.batchPending')}: {pendingRows}
                                                         </span>
                                                     )}
+                                                    {(b.hasInconsistency || b.has_inconsistency) && (
+                                                        <div className="mt-1 text-[10px] text-amber-600 dark:text-amber-400 font-sans font-bold flex items-center gap-1">
+                                                            <span title={b.inconsistencyMessage || b.inconsistency_message || t('supplier.hub.inconsistencyWarning')}>
+                                                                ⚠️ {b.inconsistencyMessage || b.inconsistency_message || t('supplier.hub.inconsistencyWarning')}
+                                                            </span>
+                                                        </div>
+                                                    )}
                                                 </td>
                                             <td className="p-2.5 text-right">
                                                 <div className="flex items-center justify-end gap-2">

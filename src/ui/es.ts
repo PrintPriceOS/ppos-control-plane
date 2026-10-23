@@ -2522,6 +2522,7 @@ export const es = {
   'supplier.hub.batchRejected': 'Rech',
   'supplier.hub.batchIssues': 'Incid',
   'supplier.hub.batchPending': 'Pend',
+  'supplier.hub.inconsistencyWarning': 'Inconsistencia detectada en lote',
   'supplier.hub.dependencyWarningsTitle': 'Advertencias de Dependencias y Preservación:',
   'supplier.hub.networkError': 'Error de comunicación de red.',
   'supplier.hub.previewError': 'No se pudo generar la previsualización de la acción de catálogo.',
