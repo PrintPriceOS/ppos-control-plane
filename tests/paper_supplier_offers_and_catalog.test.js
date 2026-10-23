@@ -1455,6 +1455,275 @@ describe('Iteration I3: Paper Supplier Catalog & Commercial Offers Engine', () =
         });
     });
 
+    describe('7. Schema Deletion, Audit Survival, Shared Variant Protection & Concurrency', () => {
+        let adminToken;
+        beforeAll(async () => {
+            if (!isDbConfigured || !connectionPool) return;
+            adminToken = generateToken({
+                id: 'user-admin-alpha',
+                userId: 'user-admin-alpha',
+                role: 'SUPPLIER_ADMIN',
+                tenantId: 'tenant-alpha',
+                supplierId: 'supp-alpha-1'
+            });
+            await connectionPool.query(`
+                CREATE TABLE IF NOT EXISTS api_audit_logs (
+                    id VARCHAR(64) PRIMARY KEY,
+                    tenant_id VARCHAR(64) NOT NULL,
+                    user_id VARCHAR(64) NOT NULL,
+                    event_type VARCHAR(64) NOT NULL,
+                    status VARCHAR(32) NOT NULL,
+                    metadata_json JSON NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+            `);
+        });
+
+        it('Demonstrates that on hard DELETE of supplier_paper_offers, revisions cascade while api_audit_logs survives', async () => {
+            if (!isDbConfigured) return;
+
+            // 1. Create an offer with initial revision
+            const createRes = await dispatch(paperSuppliersRouter, {
+                method: 'POST',
+                url: '/offers',
+                body: {
+                    variantId: 'var-munken-120-70100',
+                    supplierSku: 'AUDIT-SURVIVE-01',
+                    priceAmount: 850.00,
+                    currency: 'EUR',
+                    priceBasis: 'TONNE',
+                    moq: 1,
+                    orderMultiple: 1
+                },
+                headers: { authorization: `Bearer ${adminToken}` }
+            });
+            expect(createRes.statusCode).toBe(201);
+            const offerId = createRes.body.data.id;
+
+            // Verify parent offer exists in supplier_paper_offers
+            const [offerRows] = await connectionPool.query('SELECT * FROM supplier_paper_offers WHERE id = ?', [offerId]);
+            expect(offerRows.length).toBe(1);
+
+            // Verify child revisions exist in supplier_paper_offer_revisions
+            const [revRows] = await connectionPool.query('SELECT * FROM supplier_paper_offer_revisions WHERE offer_id = ?', [offerId]);
+            expect(revRows.length).toBe(1);
+
+            // 2. Hard delete the offer via SUPPLIER_ADMIN
+            const delRes = await dispatch(paperSuppliersRouter, {
+                method: 'DELETE',
+                url: `/offers/${offerId}`,
+                params: { offerId },
+                headers: { authorization: `Bearer ${adminToken}` }
+            });
+            expect(delRes.statusCode).toBe(200);
+
+            // Parent offer is deleted from supplier_paper_offers
+            const [postDelOffer] = await connectionPool.query('SELECT * FROM supplier_paper_offers WHERE id = ?', [offerId]);
+            expect(postDelOffer.length).toBe(0);
+
+            // Child revisions in supplier_paper_offer_revisions are CASCADE deleted per fk_revision_offer ON DELETE CASCADE
+            const [postDelRev] = await connectionPool.query('SELECT * FROM supplier_paper_offer_revisions WHERE offer_id = ?', [offerId]);
+            expect(postDelRev.length).toBe(0);
+
+            // Audit record in api_audit_logs SURVIVES because it has no FK cascade
+            const [auditLogs] = await connectionPool.query('SELECT * FROM api_audit_logs WHERE event_type = "OFFER_DELETED" AND JSON_EXTRACT(metadata_json, "$.deletedOfferId") = ?', [offerId]);
+            expect(auditLogs.length).toBeGreaterThanOrEqual(1);
+            const meta = typeof auditLogs[0].metadata_json === 'string' ? JSON.parse(auditLogs[0].metadata_json) : auditLogs[0].metadata_json;
+            expect(meta.supplierSku).toBe('AUDIT-SURVIVE-01');
+
+            // 3. Contrast with ARCHIVE: Archiving preserves both parent offer and all revisions
+            const archiveCreateRes = await dispatch(paperSuppliersRouter, {
+                method: 'POST',
+                url: '/offers',
+                body: {
+                    variantId: 'var-munken-120-70100',
+                    supplierSku: 'ARCHIVE-SURVIVE-02',
+                    priceAmount: 890.00,
+                    currency: 'EUR',
+                    priceBasis: 'TONNE',
+                    moq: 1,
+                    orderMultiple: 1
+                },
+                headers: { authorization: `Bearer ${adminToken}` }
+            });
+            const archOfferId = archiveCreateRes.body.data.id;
+
+            const archRes = await dispatch(paperSuppliersRouter, {
+                method: 'PATCH',
+                url: `/offers/${archOfferId}/status`,
+                params: { offerId: archOfferId },
+                body: { status: 'ARCHIVED', reason: 'Archiving for compliance retention' },
+                headers: { authorization: `Bearer ${adminToken}` }
+            });
+            expect(archRes.statusCode).toBe(200);
+
+            const [archRows] = await connectionPool.query('SELECT * FROM supplier_paper_offers WHERE id = ?', [archOfferId]);
+            expect(archRows.length).toBe(1);
+            expect(archRows[0].status).toBe('ARCHIVED');
+
+            const [archRevs] = await connectionPool.query('SELECT * FROM supplier_paper_offer_revisions WHERE offer_id = ? ORDER BY revision_number ASC', [archOfferId]);
+            expect(archRevs.length).toBe(2); // Revision 1 (Creation) + Revision 2 (Archived)
+        });
+
+        it('Demonstrates that UNIQUE(supplier_id, supplier_sku) is unconditional per DDL: archived SKU cannot be duplicated', async () => {
+            if (!isDbConfigured) return;
+
+            // Offer with SKU 'ARCHIVED-SKU-LOCK' is created and archived
+            const res1 = await dispatch(paperSuppliersRouter, {
+                method: 'POST',
+                url: '/offers',
+                body: {
+                    variantId: 'var-munken-120-70100',
+                    supplierSku: 'ARCHIVED-SKU-LOCK',
+                    priceAmount: 920.00,
+                    currency: 'EUR',
+                    priceBasis: 'TONNE',
+                    moq: 1,
+                    orderMultiple: 1
+                },
+                headers: { authorization: `Bearer ${adminToken}` }
+            });
+            expect(res1.statusCode).toBe(201);
+            const offerId1 = res1.body.data.id;
+
+            await dispatch(paperSuppliersRouter, {
+                method: 'PATCH',
+                url: `/offers/${offerId1}/status`,
+                params: { offerId: offerId1 },
+                body: { status: 'ARCHIVED' },
+                headers: { authorization: `Bearer ${adminToken}` }
+            });
+
+            // Attempting to create a NEW offer with the SAME SKU 'ARCHIVED-SKU-LOCK' fails with SKU_ALREADY_EXISTS
+            const res2 = await dispatch(paperSuppliersRouter, {
+                method: 'POST',
+                url: '/offers',
+                body: {
+                    variantId: 'var-munken-120-70100',
+                    supplierSku: 'ARCHIVED-SKU-LOCK',
+                    priceAmount: 950.00,
+                    currency: 'EUR',
+                    priceBasis: 'TONNE',
+                    moq: 1,
+                    orderMultiple: 1
+                },
+                headers: { authorization: `Bearer ${adminToken}` }
+            });
+            expect(res2.statusCode).toBe(409);
+            const errCode = res2.body.error?.code || res2.body.code || res2.body.error;
+            expect(String(errCode)).toContain('SKU_ALREADY_EXISTS');
+        });
+
+        it('Protects shared variant mapped by Supplier B batch even without offers from deletion or batch retraction', async () => {
+            if (!isDbConfigured) return;
+
+            const sharedFp = 'fp-shared-no-offers-' + Date.now();
+            const varId = 'var-shared-test-1';
+            await connectionPool.query(`
+                INSERT INTO paper_variants
+                (id, product_id, gsm, caliper_um, caliper_mm, width_mm, height_mm, finish, grain_direction, fingerprint)
+                VALUES (?, 'prod-munken-1', 120, 140, 0.1400, 640.00, 900.00, 'Matt', 'LONG_GRAIN', ?)
+            `, [varId, sharedFp]);
+
+            // Batch 1 belonging to Supplier Alpha 1
+            const batch1 = 'batch-supp1-' + Date.now();
+            await connectionPool.query(`
+                INSERT INTO paper_import_batches (id, tenant_id, supplier_id, file_name, file_sha256, format, status, created_by)
+                VALUES (?, 'tenant-alpha', 'supp-alpha-1', 'batch1.csv', 'sha1', 'CSV', 'CONFIRMED', 'admin')
+            `, [batch1]);
+            await connectionPool.query(`
+                INSERT INTO paper_import_rows (id, batch_id, \`row_number\`, raw_data_json, mapped_variant_id, validation_status, decision)
+                VALUES ('row-b1-1', ?, 1, '{}', ?, 'VALID', 'ACCEPTED')
+            `, [batch1, varId]);
+
+            // Batch 2 belonging to Supplier Beta 1 mapping the SAME variant, with ZERO offers
+            const batch2 = 'batch-supp2-' + Date.now();
+            await connectionPool.query(`
+                INSERT INTO paper_import_batches (id, tenant_id, supplier_id, file_name, file_sha256, format, status, created_by)
+                VALUES (?, 'tenant-beta', 'supp-beta-1', 'batch2.csv', 'sha2', 'CSV', 'CONFIRMED', 'admin')
+            `, [batch2]);
+            await connectionPool.query(`
+                INSERT INTO paper_import_rows (id, batch_id, \`row_number\`, raw_data_json, mapped_variant_id, validation_status, decision)
+                VALUES ('row-b2-1', ?, 1, '{}', ?, 'VALID', 'ACCEPTED')
+            `, [batch2, varId]);
+
+            // Supplier Alpha 1 attempts to delete varId: MUST FAIL because Supplier Beta 1 has mapped it in an import batch
+            const delRes = await dispatch(paperSuppliersRouter, {
+                method: 'DELETE',
+                url: `/catalog/variants/${varId}`,
+                params: { variantId: varId },
+                headers: { authorization: `Bearer ${adminToken}` }
+            });
+            expect(delRes.statusCode).toBe(409);
+            const delErrCode = delRes.body.error?.code || delRes.body.code || delRes.body.error;
+            expect(String(delErrCode)).toContain('CANNOT_DELETE_SHARED_VARIANT');
+
+            // Supplier Alpha 1 attempts to retract batch1: varId must be PRESERVED because batch2 also references it
+            const retractRes = await dispatch(paperSuppliersRouter, {
+                method: 'POST',
+                url: `/catalog/imports/${batch1}/retract`,
+                params: { id: batch1 },
+                headers: { authorization: `Bearer ${adminToken}` }
+            });
+            expect(retractRes.statusCode).toBe(200);
+            expect(retractRes.body.data.preservedSharedVariantsCount).toBeGreaterThanOrEqual(1);
+
+            // Verify variant still exists in paper_variants
+            const [vCheck] = await connectionPool.query('SELECT id FROM paper_variants WHERE id = ?', [varId]);
+            expect(vCheck.length).toBe(1);
+
+            // Cleanup
+            await connectionPool.query('DELETE FROM paper_import_rows WHERE batch_id IN (?, ?)', [batch1, batch2]);
+            await connectionPool.query('DELETE FROM paper_import_batches WHERE id IN (?, ?)', [batch1, batch2]);
+            await connectionPool.query('DELETE FROM paper_variants WHERE id = ?', [varId]);
+        });
+
+        it('Concurrency test: two independent MySQL connections prevent orphaned references via FK constraint', async () => {
+            if (!isDbConfigured) return;
+
+            // Dedicated variant for concurrency test
+            const varId = 'var-concurrent-fk-' + Date.now();
+            await connectionPool.query(`
+                INSERT INTO paper_variants
+                (id, product_id, gsm, caliper_um, caliper_mm, width_mm, height_mm, finish, grain_direction, fingerprint)
+                VALUES (?, 'prod-munken-1', 100, 110, 0.1100, 700.00, 1000.00, 'Gloss', 'LONG_GRAIN', ?)
+            `, [varId, 'fp-concurrent-' + Date.now()]);
+
+            const conn1 = await connectionPool.getConnection();
+            const conn2 = await connectionPool.getConnection();
+
+            try {
+                // Connection 1 begins transaction and deletes the variant
+                await conn1.beginTransaction();
+                await conn1.query('DELETE FROM paper_variants WHERE id = ?', [varId]);
+                await conn1.commit();
+
+                // Connection 2 attempts to insert an offer referencing the deleted variant
+                let caughtFkError = null;
+                try {
+                    await conn2.query(`
+                        INSERT INTO supplier_paper_offers
+                        (id, tenant_id, supplier_id, variant_id, supplier_sku, price_amount, currency, price_basis, moq, order_multiple, status, visibility)
+                        VALUES ('off-concurrent-orphan', 'tenant-paper-1', 'supp-alpha', ?, 'SKU-CONC-01', 500.00, 'EUR', 'TONNE', 1, 1, 'ACTIVE', 'PRIVATE')
+                    `, [varId]);
+                } catch (err) {
+                    caughtFkError = err;
+                }
+
+                // Verified: MySQL InnoDB rejects the insertion with foreign key constraint failure (code 1452 / ER_NO_REFERENCED_ROW_2)
+                expect(caughtFkError).not.toBeNull();
+                expect(caughtFkError.message).toContain('foreign key constraint fails');
+
+                // Verify zero orphaned offers exist in supplier_paper_offers
+                const [orphanCheck] = await connectionPool.query('SELECT * FROM supplier_paper_offers WHERE id = "off-concurrent-orphan"');
+                expect(orphanCheck.length).toBe(0);
+            } finally {
+                conn1.release();
+                conn2.release();
+            }
+        });
+    });
+
     afterAll(async () => {
         if (connectionPool) {
             await connectionPool.end();

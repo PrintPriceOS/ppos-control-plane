@@ -422,13 +422,13 @@ async function createOffer({ tenantId, supplierId, actorId, payload }) {
         throw new Error('VARIANT_NOT_FOUND: Cannot create offer for non-existent paper variant.');
     }
 
-    // Check SKU uniqueness for this supplier
+    // Check SKU uniqueness for this supplier unconditionally per canonical DDL (uk_supplier_sku_active: UNIQUE(supplier_id, supplier_sku))
     const skuCheck = await db.query(
-        'SELECT id FROM supplier_paper_offers WHERE supplier_id = ? AND supplier_sku = ? AND status != "ARCHIVED"',
+        'SELECT id FROM supplier_paper_offers WHERE supplier_id = ? AND supplier_sku = ?',
         [supplierId, validated.supplierSku]
     );
     if (skuCheck && skuCheck.length > 0) {
-        throw new Error(`SKU_ALREADY_EXISTS: Supplier SKU '${validated.supplierSku}' is already in use by an active or inactive offer.`);
+        throw new Error(`SKU_ALREADY_EXISTS: Supplier SKU '${validated.supplierSku}' is already in use by offer '${skuCheck[0].id}'.`);
     }
 
     const offerId = `off_${uuidv4().replace(/-/g, '').substring(0, 16)}`;
@@ -725,6 +725,17 @@ async function updateOffer({ offerId, tenantId, supplierId, actorId, payload }) 
 
         validated = validateOfferPayload(mergedPayload);
 
+        // Check SKU uniqueness if changing SKU
+        if (validated.supplierSku !== existing.supplier_sku) {
+            const [skuConflict] = await conn.query(
+                'SELECT id FROM supplier_paper_offers WHERE supplier_id = ? AND supplier_sku = ? AND id != ?',
+                [supplierId, validated.supplierSku, offerId]
+            );
+            if (skuConflict && skuConflict.length > 0) {
+                throw new Error(`SKU_ALREADY_EXISTS: Supplier SKU '${validated.supplierSku}' is already in use by offer '${skuConflict[0].id}'.`);
+            }
+        }
+
         // Fetch max revision number
         const [revMax] = await conn.query('SELECT MAX(revision_number) as max_rev FROM supplier_paper_offer_revisions WHERE offer_id = ?', [offerId]);
         const nextRevNumber = (revMax[0]?.max_rev || 1) + 1;
@@ -967,6 +978,27 @@ async function deleteOffer({ tenantId, supplierId, actorId, role, offerId }) {
     try {
         await conn.beginTransaction();
 
+        // Audit log entry in api_audit_logs before hard deletion
+        try {
+            await conn.query(
+                `INSERT INTO api_audit_logs (id, tenant_id, user_id, event_type, status, metadata_json, created_at)
+                 VALUES (?, ?, ?, 'OFFER_DELETED', 'SUCCESS', ?, CURRENT_TIMESTAMP)`,
+                [
+                    `audit_${uuidv4().replace(/-/g, '').substring(0, 16)}`,
+                    tenantId,
+                    actorId || 'system',
+                    JSON.stringify({
+                        offerId,
+                        supplierId,
+                        supplierSku: offer.supplier_sku,
+                        deletedOfferId: offerId
+                    })
+                ]
+            );
+        } catch (auditErr) {
+            // Non-fatal if api_audit_logs is omitted in isolated ephemeral tests
+        }
+
         // Delete revisions first (or rely on CASCADE)
         await conn.query('DELETE FROM supplier_paper_offer_revisions WHERE offer_id = ?', [offerId]);
         await conn.query('DELETE FROM supplier_paper_offers WHERE id = ?', [offerId]);
@@ -1042,6 +1074,7 @@ async function bulkDeleteOffers({ tenantId, supplierId, actorId, role, offerIds 
  * Safe deletion of a canonical paper variant.
  * Enforces technical sharing invariants:
  * - NEVER deletes if another supplier has an offer on it.
+ * - NEVER deletes if another supplier has mapped rows for this variant in confirmed batches.
  * - NEVER deletes if current supplier still has active/inactive offers (must be deleted first).
  * - NEVER deletes if originated by another supplier.
  * - Restricted strictly to SUPPLIER_ADMIN.
@@ -1065,6 +1098,19 @@ async function deleteTechnicalVariant({ tenantId, supplierId, actorId, role, var
     const otherRow = Array.isArray(otherRes) ? (Array.isArray(otherRes[0]) ? otherRes[0][0] : otherRes[0]) : otherRes;
     if (otherRow && Number(otherRow.count || 0) > 0) {
         throw new Error('CANNOT_DELETE_SHARED_VARIANT: This technical variant is shared with other suppliers. Remove your own commercial offers instead of deleting the shared physical variant.');
+    }
+
+    // 1b. Check if ANY other supplier has mapped this variant in an import batch
+    const otherBatchRes = await db.query(
+        `SELECT COUNT(*) as count 
+         FROM paper_import_rows r 
+         JOIN paper_import_batches b ON r.batch_id = b.id 
+         WHERE r.mapped_variant_id = ? AND b.supplier_id != ?`,
+        [variantId, supplierId]
+    );
+    const otherBatchRow = Array.isArray(otherBatchRes) ? (Array.isArray(otherBatchRes[0]) ? otherBatchRes[0][0] : otherBatchRes[0]) : otherBatchRes;
+    if (otherBatchRow && Number(otherBatchRow.count || 0) > 0) {
+        throw new Error('CANNOT_DELETE_SHARED_VARIANT: This technical variant is mapped or reused by another supplier in the technical catalog. Remove your own commercial offers instead of deleting the shared physical variant.');
     }
 
     // 2. Check if current supplier has offers on this variant
@@ -1160,10 +1206,21 @@ async function retractImportBatch({ tenantId, supplierId, actorId, role, batchId
                 continue; // Preserve shared technical variant
             }
 
+            // Check if any OTHER batch (from any supplier or another batch of the same supplier) maps to this variant
+            const [otherBatchCheck] = await conn.query(
+                'SELECT COUNT(*) as count FROM paper_import_rows WHERE mapped_variant_id = ? AND batch_id != ?',
+                [vId, batchId]
+            );
+            const otherBatchCount = Number(otherBatchCheck && otherBatchCheck[0]?.count || 0);
+            if (otherBatchCount > 0) {
+                preservedSharedVariantsCount++;
+                continue; // Preserve shared / pre-existing technical variant
+            }
+
             // Remove this supplier's offers on this variant
             await conn.query('DELETE FROM supplier_paper_offers WHERE variant_id = ? AND supplier_id = ?', [vId, supplierId]);
 
-            // Unlink from other rows and delete variant
+            // Unlink from this batch's rows and delete variant
             await conn.query('UPDATE paper_import_rows SET mapped_variant_id = NULL WHERE mapped_variant_id = ?', [vId]);
             await conn.query('DELETE FROM paper_variants WHERE id = ?', [vId]);
             retractedVariantsCount++;

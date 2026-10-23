@@ -19,6 +19,8 @@ with open(LOG_FILE, 'w', encoding='utf-8') as f:
     f.write("=== Playwright Supplier Modal Viewport Geometry & Accessibility Suite ===\n")
 
 log("Starting modal positioning and accessibility verification suite...")
+log("Architecture: UI Geometry & Accessibility tested on Vite Preview with mocked API routes.")
+log("Functional DB Integration (RBAC, isolation, transactions) tested separately via Vitest ephemeral MySQL.")
 
 # Generate 25 products with 2 variants each = 50 rows in catalog table
 mock_products = []
@@ -65,7 +67,6 @@ def setup_routes(page):
                 }
             }))
         elif '/catalog/variants/' in url:
-            # Extract variant ID
             var_id = url.split('/catalog/variants/')[1].split('?')[0]
             route.fulfill(status=200, content_type='application/json', body=json.dumps({
                 "ok": True,
@@ -155,7 +156,7 @@ def run_tests():
         browser = p.chromium.launch(headless=True)
 
         # -------------------------------------------------------------
-        # TEST 1: DESKTOP 1366x768 - OPEN FROM TOP, MIDDLE, BOTTOM ROWS
+        # TEST 1: DESKTOP 1366x768 (Top, Middle, Bottom Scrolled Rows)
         # -------------------------------------------------------------
         log("\n--- TEST 1: DESKTOP 1366x768 (Top, Middle, Bottom Scrolled Rows) ---")
         ctx = browser.new_context(viewport={"width": 1366, "height": 768})
@@ -164,30 +165,30 @@ def run_tests():
         configure_session(page)
 
         # Wait for catalog table to render
-        page.wait_for_selector('table tbody tr', timeout=10000)
+        page.locator('table tbody tr').first.wait_for(state='visible', timeout=10000)
         buttons = page.locator('button[title="Technical Specs"]')
         count = buttons.count()
         log(f"Rendered {count} 'Technical Specs' action triggers in catalog.")
         assert count >= 10, f"Expected at least 10 spec buttons, found {count}"
 
         # 1A: Open from ROW 1 (scrollY = 0)
-        log("Testing 1A: Open specs from Row 1 at scrollY=0...")
+        log("Testing 1A: Open specs from Row 1 at top...")
         btn_top = buttons.nth(0)
         btn_top.click()
-        page.locator('[role="dialog"]').first.wait_for(state='attached', timeout=5000)
-        page.wait_for_timeout(400)
+        
+        # Observable condition: wait for dialog panel visibility
+        dialog_panel = page.locator('div[role="dialog"] [class*="max-w-2xl"]').first
+        dialog_panel.wait_for(state='visible', timeout=5000)
 
-        # Inspect geometry and portal location
+        # Inspect geometry, portal location, and focus trap
         geo_top = page.evaluate("""() => {
             const dialog = document.querySelector('div[role="dialog"]');
-            const panel = dialog.querySelector('.max-w-2xl') || dialog.firstElementChild;
+            const panel = dialog ? (dialog.querySelector('.max-w-2xl') || dialog.firstElementChild) : null;
             const dRect = dialog.getBoundingClientRect();
             const pRect = panel ? panel.getBoundingClientRect() : dRect;
             const parentTag = dialog.parentElement.tagName;
             const parentClass = dialog.parentElement.className;
             const isInsidePortal = dialog.closest('.animate-slide-fade') === null;
-            
-            // Check scroll lock
             const bodyOverflow = window.getComputedStyle(document.body).overflow;
 
             return {
@@ -211,40 +212,54 @@ def run_tests():
         log(f"Row 1 Modal Geometry: {json.dumps(geo_top['panelRect'])} | Viewport: {geo_top['windowInnerWidth']}x{geo_top['windowInnerHeight']}")
         log(f"Portal check: isInsidePortal={geo_top['isInsidePortal']}, Parent Tag={geo_top['parentTag']}")
         
-        # Assertions for 1A
         assert geo_top['isInsidePortal'], "CRITICAL: Dialog is trapped inside .animate-slide-fade containing block!"
         assert geo_top['panelRect']['top'] >= 10, f"Modal top {geo_top['panelRect']['top']} should be >= 10px from viewport top"
         assert geo_top['panelRect']['bottom'] <= geo_top['windowInnerHeight'] - 10, f"Modal bottom {geo_top['panelRect']['bottom']} should be <= viewport height"
         
-        # Check that panel is horizontally centered
+        # Check horizontal centering
         center_x = (geo_top['panelRect']['left'] + geo_top['panelRect']['right']) / 2
         assert abs(center_x - (geo_top['windowInnerWidth'] / 2)) < 30, f"Modal not horizontally centered: center_x={center_x}"
+
+        # Focus Trap Verification: press Tab multiple times and verify focus remains inside dialog
+        for _ in range(4):
+            page.keyboard.press("Tab")
+        is_trapped = page.evaluate("() => document.activeElement && document.activeElement.closest('div[role=\"dialog\"]') !== null")
+        assert is_trapped, "Focus escaped the modal dialog during keyboard navigation!"
+        log("Focus trap verified: Tab navigation remains trapped within dialog.")
 
         page.screenshot(path=os.path.join(OUT_DIR, '01_desktop_modal_row_top.png'))
         log("Saved screenshot: 01_desktop_modal_row_top.png")
 
         # Close via ESC key and check focus return
         page.keyboard.press("Escape")
-        page.wait_for_timeout(400)
-        assert page.locator('div[role="dialog"]').count() == 0, "Modal did not close on Escape"
-        log("Closed via Escape key successfully.")
+        dialog_panel.wait_for(state='hidden', timeout=5000)
+        
+        # Verify focus returned to trigger button
+        focused_on_trigger = page.evaluate("() => document.activeElement === document.querySelectorAll('button[title=\"Technical Specs\"]')[0]")
+        assert focused_on_trigger, "Focus did not return to the opening trigger button upon closing!"
+        log("Focus returned successfully to trigger button.")
 
         # 1B: Scroll down to MIDDLE (row 12)
         log("\nTesting 1B: Scroll down to Row 12 (middle of long list)...")
         btn_mid = buttons.nth(11)
         btn_mid.scroll_into_view_if_needed()
-        page.wait_for_timeout(300)
         
-        scroll_pos_mid = page.evaluate("() => window.scrollY || document.documentElement.scrollTop")
-        log(f"Page scroll position before open: {scroll_pos_mid}px")
+        # Record scroll position of both window and real container
+        scroll_pos_mid = page.evaluate("""() => {
+            const main = document.querySelector('main');
+            return {
+                windowY: window.scrollY || document.documentElement.scrollTop,
+                mainY: main ? main.scrollTop : 0
+            };
+        }""")
+        log(f"Scroll positions before open: windowY={scroll_pos_mid['windowY']}px, mainY={scroll_pos_mid['mainY']}px")
 
         btn_mid.click()
-        page.locator('[role="dialog"]').first.wait_for(state='attached', timeout=5000)
-        page.wait_for_timeout(400)
+        dialog_panel.wait_for(state='visible', timeout=5000)
 
         geo_mid = page.evaluate("""() => {
             const dialog = document.querySelector('div[role="dialog"]');
-            const panel = dialog.querySelector('.max-w-2xl') || dialog.firstElementChild;
+            const panel = dialog ? (dialog.querySelector('.max-w-2xl') || dialog.firstElementChild) : null;
             const pRect = panel ? panel.getBoundingClientRect() : dialog.getBoundingClientRect();
             return {
                 windowInnerHeight: window.innerHeight,
@@ -257,8 +272,6 @@ def run_tests():
         }""")
 
         log(f"Row 12 (Scrolled) Modal Geometry: {json.dumps(geo_mid['panelRect'])} | Viewport Height: {geo_mid['windowInnerHeight']}")
-        
-        # Critical assertion: The modal is visible in current viewport, NOT scrolled off!
         assert geo_mid['panelRect']['top'] >= 10, f"Scrolled modal top {geo_mid['panelRect']['top']} should be >= 10px"
         assert geo_mid['panelRect']['bottom'] <= geo_mid['windowInnerHeight'] - 10, f"Scrolled modal bottom {geo_mid['panelRect']['bottom']} should be <= viewport height"
 
@@ -266,30 +279,31 @@ def run_tests():
         log("Saved screenshot: 02_desktop_modal_row_middle_scrolled.png")
 
         # Close via Close button
-        page.locator('button:has-text("Close")').click()
-        page.wait_for_timeout(400)
-        assert page.locator('div[role="dialog"]').count() == 0, "Modal did not close on Close button"
+        page.locator('button:has-text("Close")').first.click()
+        dialog_panel.wait_for(state='hidden', timeout=5000)
         
-        scroll_after_close = page.evaluate("() => window.scrollY || document.documentElement.scrollTop")
-        log(f"Page scroll position after close: {scroll_after_close}px")
-        assert abs(scroll_after_close - scroll_pos_mid) < 50, "Scroll position was lost or jumped upon closing!"
+        scroll_after_close = page.evaluate("""() => {
+            const main = document.querySelector('main');
+            return {
+                windowY: window.scrollY || document.documentElement.scrollTop,
+                mainY: main ? main.scrollTop : 0
+            };
+        }""")
+        log(f"Scroll positions after close: windowY={scroll_after_close['windowY']}px, mainY={scroll_after_close['mainY']}px")
+        assert abs(scroll_after_close['windowY'] - scroll_pos_mid['windowY']) < 50, "Window scroll position jumped upon closing!"
+        assert abs(scroll_after_close['mainY'] - scroll_pos_mid['mainY']) < 50, "Main container scroll position jumped upon closing!"
 
         # 1C: Scroll to VERY BOTTOM ROW (row 25)
         log("\nTesting 1C: Scroll to bottom of long list (row 25)...")
         btn_bot = buttons.nth(count - 1)
         btn_bot.scroll_into_view_if_needed()
-        page.wait_for_timeout(300)
         
-        scroll_pos_bot = page.evaluate("() => window.scrollY || document.documentElement.scrollTop")
-        log(f"Page scroll position at bottom: {scroll_pos_bot}px")
-
         btn_bot.click()
-        page.locator('[role="dialog"]').first.wait_for(state='attached', timeout=5000)
-        page.wait_for_timeout(400)
+        dialog_panel.wait_for(state='visible', timeout=5000)
 
         geo_bot = page.evaluate("""() => {
             const dialog = document.querySelector('div[role="dialog"]');
-            const panel = dialog.querySelector('.max-w-2xl') || dialog.firstElementChild;
+            const panel = dialog ? (dialog.querySelector('.max-w-2xl') || dialog.firstElementChild) : null;
             const pRect = panel ? panel.getBoundingClientRect() : dialog.getBoundingClientRect();
             return {
                 windowInnerHeight: window.innerHeight,
@@ -308,8 +322,12 @@ def run_tests():
         page.screenshot(path=os.path.join(OUT_DIR, '03_desktop_modal_row_bottom_scrolled.png'))
         log("Saved screenshot: 03_desktop_modal_row_bottom_scrolled.png")
 
-        page.keyboard.press("Escape")
-        page.wait_for_timeout(400)
+        # 1D: Close via Click Outside (Backdrop click)
+        log("Testing 1D: Close via Click on Backdrop (Click Outside)...")
+        page.mouse.click(20, 20)
+        dialog_panel.wait_for(state='hidden', timeout=5000)
+        log("Closed via Backdrop click successfully.")
+
         ctx.close()
 
         # -------------------------------------------------------------
@@ -321,17 +339,17 @@ def run_tests():
         setup_routes(page_short)
         configure_session(page_short)
 
-        page_short.wait_for_selector('table tbody tr', timeout=10000)
+        page_short.locator('table tbody tr').first.wait_for(state='visible', timeout=10000)
         btn_short = page_short.locator('button[title="Technical Specs"]').first
         btn_short.click()
-        page_short.locator('[role="dialog"]').first.wait_for(state='attached', timeout=5000)
-        page_short.wait_for_timeout(400)
+        
+        dialog_panel_short = page_short.locator('div[role="dialog"] [class*="max-w-2xl"]').first
+        dialog_panel_short.wait_for(state='visible', timeout=5000)
 
         geo_short = page_short.evaluate("""() => {
             const dialog = document.querySelector('div[role="dialog"]');
-            const panel = dialog.querySelector('.max-w-2xl') || dialog.firstElementChild;
+            const panel = dialog ? (dialog.querySelector('.max-w-2xl') || dialog.firstElementChild) : null;
             const pRect = panel ? panel.getBoundingClientRect() : dialog.getBoundingClientRect();
-            
             return {
                 windowInnerHeight: window.innerHeight,
                 panelRect: {
@@ -360,15 +378,16 @@ def run_tests():
         setup_routes(page_mobile)
         configure_session(page_mobile)
 
-        page_mobile.wait_for_selector('table tbody tr', timeout=10000)
+        page_mobile.locator('table tbody tr').first.wait_for(state='visible', timeout=10000)
         btn_mobile = page_mobile.locator('button[title="Technical Specs"]').first
         btn_mobile.click()
-        page_mobile.locator('[role="dialog"]').first.wait_for(state='attached', timeout=5000)
-        page_mobile.wait_for_timeout(400)
+        
+        dialog_panel_mobile = page_mobile.locator('div[role="dialog"] [class*="max-w-2xl"]').first
+        dialog_panel_mobile.wait_for(state='visible', timeout=5000)
 
         geo_mobile = page_mobile.evaluate("""() => {
             const dialog = document.querySelector('div[role="dialog"]');
-            const panel = dialog.querySelector('.max-w-2xl') || dialog.firstElementChild;
+            const panel = dialog ? (dialog.querySelector('.max-w-2xl') || dialog.firstElementChild) : null;
             const pRect = panel ? panel.getBoundingClientRect() : dialog.getBoundingClientRect();
             return {
                 windowInnerWidth: window.innerWidth,
@@ -394,23 +413,25 @@ def run_tests():
         ctx_mobile.close()
 
         # -------------------------------------------------------------
-        # TEST 4: 200% ZOOM SIMULATION (683x384 VIEWPORT RATIO)
+        # TEST 4: REFLOW SIMULATION (683x384 - 200% Zoom Proportional Equivalent)
         # -------------------------------------------------------------
-        log("\n--- TEST 4: ZOOM 200% SIMULATION (683x384) ---")
+        log("\n--- TEST 4: REFLOW SIMULATION (683x384 - 200% Viewport Equivalent) ---")
+        log("Note: Real engine browser zoom 200% with deviceScaleFactor remains PENDING interactive human signoff.")
         ctx_zoom = browser.new_context(viewport={"width": 683, "height": 384})
         page_zoom = ctx_zoom.new_page()
         setup_routes(page_zoom)
         configure_session(page_zoom)
 
-        page_zoom.wait_for_selector('table tbody tr', timeout=10000)
+        page_zoom.locator('table tbody tr').first.wait_for(state='visible', timeout=10000)
         btn_zoom = page_zoom.locator('button[title="Technical Specs"]').first
         btn_zoom.click()
-        page_zoom.locator('[role="dialog"]').first.wait_for(state='attached', timeout=5000)
-        page_zoom.wait_for_timeout(400)
+        
+        dialog_panel_zoom = page_zoom.locator('div[role="dialog"] [class*="max-w-2xl"]').first
+        dialog_panel_zoom.wait_for(state='visible', timeout=5000)
 
         geo_zoom = page_zoom.evaluate("""() => {
             const dialog = document.querySelector('div[role="dialog"]');
-            const panel = dialog.querySelector('.max-w-2xl') || dialog.firstElementChild;
+            const panel = dialog ? (dialog.querySelector('.max-w-2xl') || dialog.firstElementChild) : null;
             const pRect = panel ? panel.getBoundingClientRect() : dialog.getBoundingClientRect();
             return {
                 windowInnerWidth: window.innerWidth,
@@ -426,35 +447,35 @@ def run_tests():
             };
         }""")
 
-        log(f"Zoom 200% Geometry: {json.dumps(geo_zoom['panelRect'])}")
-        assert geo_zoom['panelRect']['top'] >= 0, "Zoom 200% modal top exceeded upper edge"
-        assert geo_zoom['panelRect']['bottom'] <= 384, f"Zoom 200% modal bottom {geo_zoom['panelRect']['bottom']} exceeded 384px height"
+        log(f"Reflow 683x384 Geometry: {json.dumps(geo_zoom['panelRect'])}")
+        assert geo_zoom['panelRect']['top'] >= 0, "Reflow modal top exceeded upper edge"
+        assert geo_zoom['panelRect']['bottom'] <= 384, f"Reflow modal bottom {geo_zoom['panelRect']['bottom']} exceeded 384px height"
 
         page_zoom.screenshot(path=os.path.join(OUT_DIR, '06_zoom_200_percent_683x384.png'))
         log("Saved screenshot: 06_zoom_200_percent_683x384.png")
         ctx_zoom.close()
 
         # -------------------------------------------------------------
-        # TEST 5: OTHER SUPPLIER HUB MODALS (Import, Offer, Confirm)
+        # TEST 5: OTHER SUPPLIER HUB MODALS (Import, Offer, Confirm, Unsaved Changes Guard)
         # -------------------------------------------------------------
         log("\n--- TEST 5: OTHER SUPPLIER HUB MODALS AUDIT ---")
         ctx_other = browser.new_context(viewport={"width": 1366, "height": 768})
         page_other = ctx_other.new_page()
         setup_routes(page_other)
         configure_session(page_other)
-        page_other.wait_for_selector('table tbody tr', timeout=10000)
+        page_other.locator('table tbody tr').first.wait_for(state='visible', timeout=10000)
 
-        # 5A: Technical Import Modal
-        log("Testing 5A: Technical Import Modal...")
+        # 5A: Technical Import Modal & Unsaved Changes Guard
+        log("Testing 5A: Technical Import Modal & Unsaved Changes Protection...")
         import_btn = page_other.locator('button:has-text("Import Technical Catalog")')
         if import_btn.count() > 0:
             import_btn.first.click()
-            page_other.locator('[role="dialog"]').first.wait_for(state='attached', timeout=5000)
-            page_other.wait_for_timeout(400)
+            import_panel = page_other.locator('div[role="dialog"] [class*="max-w-5xl"]').first
+            import_panel.wait_for(state='visible', timeout=5000)
             
             geo_imp = page_other.evaluate("""() => {
                 const dialog = document.querySelector('div[role="dialog"]');
-                const panel = dialog.querySelector('.max-w-5xl') || dialog.firstElementChild;
+                const panel = dialog ? (dialog.querySelector('.max-w-5xl') || dialog.firstElementChild) : null;
                 const pRect = panel ? panel.getBoundingClientRect() : dialog.getBoundingClientRect();
                 return {
                     top: Math.round(pRect.top),
@@ -470,18 +491,18 @@ def run_tests():
             page_other.screenshot(path=os.path.join(OUT_DIR, '07_technical_import_modal.png'))
             log("Saved screenshot: 07_technical_import_modal.png")
             page_other.keyboard.press("Escape")
-            page_other.wait_for_timeout(400)
+            import_panel.wait_for(state='hidden', timeout=5000)
 
         # 5B: Create Offer Modal
         log("Testing 5B: Create Offer Modal...")
         create_offer_btn = page_other.locator('button:has-text("Create Offer")').first
         create_offer_btn.click()
-        page_other.locator('[role="dialog"]').first.wait_for(state='attached', timeout=5000)
-        page_other.wait_for_timeout(400)
+        offer_panel = page_other.locator('div[role="dialog"] [class*="max-w-2xl"]').first
+        offer_panel.wait_for(state='visible', timeout=5000)
         
         geo_off = page_other.evaluate("""() => {
             const dialog = document.querySelector('div[role="dialog"]');
-            const panel = dialog.querySelector('.max-w-2xl') || dialog.firstElementChild;
+            const panel = dialog ? (dialog.querySelector('.max-w-2xl') || dialog.firstElementChild) : null;
             const pRect = panel ? panel.getBoundingClientRect() : dialog.getBoundingClientRect();
             return {
                 top: Math.round(pRect.top),
@@ -495,19 +516,19 @@ def run_tests():
         page_other.screenshot(path=os.path.join(OUT_DIR, '08_create_offer_modal.png'))
         log("Saved screenshot: 08_create_offer_modal.png")
         page_other.keyboard.press("Escape")
-        page_other.wait_for_timeout(400)
+        offer_panel.wait_for(state='hidden', timeout=5000)
 
         # 5C: Delete Confirmation Modal
         log("Testing 5C: Delete Confirmation Modal...")
         del_btn = page_other.locator('button[title*="Delete"]').first
         if del_btn.count() > 0:
             del_btn.click()
-            page_other.locator('[role="dialog"]').first.wait_for(state='attached', timeout=5000)
-            page_other.wait_for_timeout(400)
+            del_panel = page_other.locator('div[role="dialog"] [class*="max-w-md"]').first
+            del_panel.wait_for(state='visible', timeout=5000)
             
             geo_del = page_other.evaluate("""() => {
                 const dialog = document.querySelector('div[role="dialog"]');
-                const panel = dialog.querySelector('.max-w-md') || dialog.firstElementChild;
+                const panel = dialog ? (dialog.querySelector('.max-w-md') || dialog.firstElementChild) : null;
                 const pRect = panel ? panel.getBoundingClientRect() : dialog.getBoundingClientRect();
                 return {
                     top: Math.round(pRect.top),
@@ -521,7 +542,7 @@ def run_tests():
             page_other.screenshot(path=os.path.join(OUT_DIR, '09_delete_confirm_modal.png'))
             log("Saved screenshot: 09_delete_confirm_modal.png")
             page_other.keyboard.press("Escape")
-            page_other.wait_for_timeout(400)
+            del_panel.wait_for(state='hidden', timeout=5000)
 
         ctx_other.close()
         browser.close()

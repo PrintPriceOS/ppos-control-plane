@@ -1,5 +1,8 @@
 # Paper Supplier Hub — Operational Management Plan (Pre-I4)
 
+> [!NOTE]
+> **Documentación Canónica**: La especificación maestra y trazabilidad histórica del módulo se gestionan en [docs/implementation/paper-supplier-hub/PLAN.md](file:///c:/Users/KIKE/Downloads/ppos-control-plane-phase-10-intelligence-layer/docs/implementation/paper-supplier-hub/PLAN.md) y [docs/implementation/paper-supplier-hub/STATUS.md](file:///c:/Users/KIKE/Downloads/ppos-control-plane-phase-10-intelligence-layer/docs/implementation/paper-supplier-hub/STATUS.md). Este documento en la raíz sirve como tracker operativo del sprint Pre-I4.
+
 ## 1. Executive Summary & Objective
 Complete the operational governance, lifecycle management, and catalog maintenance of Paper Supplier Hub on branch `feat/paper-supplier-hub` prior to Iteration I4 (Procurement Orders).
 
