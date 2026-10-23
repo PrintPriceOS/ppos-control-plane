@@ -220,8 +220,8 @@ describe('Iteration I6: Paper Cost Integration & Procurement Documents', () => {
             expect(estimate.totals.totalEstimatedCost).toBeCloseTo(estimate.interior.estimatedCost + estimate.cover.estimatedCost, 2);
         });
 
-        it('does not inject phantom scrap when machine or run waste parameters are omitted', () => {
-            const cleanJob = {
+        it('distinguishes omitted scrap parameters from explicit zero and returns incomplete diagnostic', () => {
+            const omittedJob = {
                 copies: 1000,
                 interior_pages: 96,
                 signature_size: 16,
@@ -230,16 +230,42 @@ describe('Iteration I6: Paper Cost Integration & Procurement Documents', () => {
                 press_sheet_width_mm: 700,
                 press_sheet_height_mm: 1000
             };
-            const est = paperCostIntegrationService.calculateJobPaperRequirements(cleanJob);
-            expect(est.interior.makereadySheets).toBe(0);
-            expect(est.interior.runWasteSheets).toBe(0);
-            expect(est.cover.makereadySheets).toBe(0);
-            expect(est.cover.runWasteSheets).toBe(0);
-            expect(est.interior.totalSheets).toBe(6000);
-            expect(est.cover.totalSheets).toBe(500);
+            const estOmitted = paperCostIntegrationService.calculateJobPaperRequirements(omittedJob);
+            expect(estOmitted.isIncomplete).toBe(true);
+            expect(estOmitted.isDefinitiveCost).toBe(false);
+            expect(estOmitted.isExplicitZeroScrap).toBe(false);
+            expect(estOmitted.calculationType).toBe('PARTIAL_NET_ESTIMATE');
+            expect(estOmitted.missingParameters).toEqual([
+                'interior_makeready_sheets',
+                'cover_makeready_sheets',
+                'run_waste_rate'
+            ]);
+            expect(estOmitted.warnings.length).toBeGreaterThan(0);
+            expect(estOmitted.interior.isMakereadyOmitted).toBe(true);
+            expect(estOmitted.cover.isMakereadyOmitted).toBe(true);
+            expect(estOmitted.totals.isRunWasteOmitted).toBe(true);
+            expect(estOmitted.interior.totalSheets).toBe(6000);
+            expect(estOmitted.cover.totalSheets).toBe(500);
+
+            // Now test explicit zero scrap inputs
+            const explicitZeroJob = {
+                ...omittedJob,
+                interior_makeready_sheets: 0,
+                cover_makeready_sheets: 0,
+                run_waste_rate: 0
+            };
+            const estExplicitZero = paperCostIntegrationService.calculateJobPaperRequirements(explicitZeroJob);
+            expect(estExplicitZero.isIncomplete).toBe(false);
+            expect(estExplicitZero.isDefinitiveCost).toBe(true);
+            expect(estExplicitZero.isExplicitZeroScrap).toBe(true);
+            expect(estExplicitZero.calculationType).toBe('CONFIRMED_INDUSTRIAL_ESTIMATE');
+            expect(estExplicitZero.missingParameters).toEqual([]);
+            expect(estExplicitZero.interior.isMakereadyOmitted).toBe(false);
+            expect(estExplicitZero.cover.isMakereadyOmitted).toBe(false);
+            expect(estExplicitZero.totals.isRunWasteOmitted).toBe(false);
         });
 
-        it('derives signature imposition geometrically when explicit signatureSize is omitted', () => {
+        it('derives signature imposition geometrically when explicit signatureSize is omitted and flags approximation', () => {
             // A4 book (210x297 mm) on B1 press sheet (700x1000 mm):
             // 700 / 210 = 3 cols; 1000 / 297 = 3 rows -> 9 pages per side * 2 sides = 18 pages raw capacity, clamped to 16pp folding section
             const a4Job = {
@@ -250,12 +276,98 @@ describe('Iteration I6: Paper Cost Integration & Procurement Documents', () => {
                 press_sheet_width_mm: 700,
                 press_sheet_height_mm: 1000,
                 paper_weight_interior: 80,
-                paper_weight_cover: 250
+                paper_weight_cover: 250,
+                interior_makeready_sheets: 100,
+                cover_makeready_sheets: 50,
+                run_waste_rate: 0.02
             };
             const est = paperCostIntegrationService.calculateJobPaperRequirements(a4Job);
             expect(est.signatureSize).toBe(16);
             expect(est.signatureSource).toBe('geometric_derivation');
+            expect(est.isGeometricApproximation).toBe(true);
+            expect(est.impositionWarning).toContain('unconfirmed approximation');
             expect(est.signaturesCount).toBe(4); // 64 / 16 = 4 signatures
+        });
+
+        it('printhousePricingPreviewService consumes BPE paper rate patch, validates currency, and preserves price books', async () => {
+            const previewService = require('../src/api/services/printhousePricingPreviewService');
+            const priceBookService = require('../src/api/services/printhousePriceBookService');
+            const ruleService = require('../src/api/services/printhousePricingRuleService');
+
+            // Mock priceBook and ruleService
+            const mockPb = { id: 'pb_alpha', currency: 'EUR' };
+            const mockRules = [
+                { id: 'rule_base', scope: 'TENANT_DEFAULT', base_price: 0.15, pricing_unit: 'PER_UNIT', setup_charge: 50 }
+            ];
+
+            const origGetPriceBook = priceBookService.getPriceBook;
+            const origGetRules = ruleService.getRules;
+            priceBookService.getPriceBook = async () => mockPb;
+            ruleService.getRules = async () => mockRules;
+
+            try {
+                // 1. Rejects cross-currency mismatch without authorized conversion
+                await expect(previewService.generatePreview('tenant_1', {
+                    priceBookId: 'pb_alpha',
+                    quantity: 1000,
+                    paperRatePatch: {
+                        currency: 'USD',
+                        pricePerKg: 2.10
+                    }
+                })).rejects.toThrow('CURRENCY_MISMATCH');
+
+                // 2. Accepts matching currency (EUR) and injects dynamic supplier rate component
+                const preview = await previewService.generatePreview('tenant_1', {
+                    priceBookId: 'pb_alpha',
+                    quantity: 1000,
+                    paperRatePatch: {
+                        currency: 'EUR',
+                        pricePerKg: 2.00,
+                        kgPerUnit: 0.05,
+                        snapshotMetadata: {
+                            interior: {
+                                offerId: 'off_real_phoenix',
+                                supplierId: 'supp_scheufelen',
+                                supplierName: 'Scheufelen',
+                                sku: 'PHX-130-B1',
+                                pricePerKg: 2.00,
+                                gsm: 130
+                            }
+                        }
+                    }
+                });
+
+                expect(preview.currency).toBe('EUR');
+                const paperComponent = preview.components.find(c => c.code === 'SUPPLIER_PAPER_MARKET_RATE');
+                expect(paperComponent).toBeDefined();
+                expect(paperComponent.provenance).toBe('PPOS_PAPER_SUPPLIER_HUB');
+                expect(paperComponent.metadata.offerId).toBe('off_real_phoenix');
+                expect(paperComponent.metadata.pricePerKg).toBe(2.00);
+                // 1000 * 0.05 * 2.00 = 100.00 EUR paper component
+                expect(Number(paperComponent.amount)).toBeCloseTo(100.00, 2);
+            } finally {
+                priceBookService.getPriceBook = origGetPriceBook;
+                ruleService.getRules = origGetRules;
+            }
+        });
+
+        it('enforces RBAC on POST /api/admin/materials/sourcing/bpe-rate-patch (rejects VIEWER)', async () => {
+            const viewerToken = generateToken({
+                userId: 'viewer_user_1',
+                tenantId: 'tenant_alpha',
+                printhouseId: 'center_1',
+                role: 'VIEWER'
+            });
+
+            const res = await dispatch(materialsAdminRouter, {
+                method: 'POST',
+                url: '/sourcing/bpe-rate-patch',
+                headers: { authorization: `Bearer ${viewerToken}` },
+                body: { interiorGsm: 130 }
+            });
+
+            expect(res.statusCode).toBe(403);
+            expect(res.body.code).toBe('FORBIDDEN_WRITE_PERMISSION_REQUIRED');
         });
     });
 

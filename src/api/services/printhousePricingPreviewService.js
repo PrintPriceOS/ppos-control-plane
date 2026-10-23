@@ -18,7 +18,7 @@ class PrinthousePricingPreviewService {
      * Compute a dynamic pricing preview.
      */
     async generatePreview(tenantId, {
-        priceBookId, quantity, siteId, machineId, materialCatalogId, capabilities, expedited
+        priceBookId, quantity, siteId, machineId, materialCatalogId, capabilities, expedited, paperRatePatch
     }) {
         if (!priceBookId || !quantity || quantity <= 0) {
             throw new Error('priceBookId and positive quantity are required');
@@ -27,6 +27,18 @@ class PrinthousePricingPreviewService {
         const pb = await priceBookService.getPriceBook(tenantId, priceBookId);
         if (!pb) {
             throw new Error('Price book not found');
+        }
+
+        // Validate currency parity if a dynamic supplier paper rate patch is supplied
+        if (paperRatePatch && paperRatePatch.currency && pb.currency) {
+            const patchCurr = String(paperRatePatch.currency).trim().toUpperCase();
+            const pbCurr = String(pb.currency).trim().toUpperCase();
+            if (patchCurr !== pbCurr) {
+                const err = new Error(`CURRENCY_MISMATCH: Paper rate patch currency (${patchCurr}) does not match price book currency (${pbCurr}). Cross-currency rate application requires explicit authorized conversion.`);
+                err.statusCode = 400;
+                err.code = 'CURRENCY_MISMATCH';
+                throw err;
+            }
         }
 
         const rules = await ruleService.getRules(tenantId, priceBookId);
@@ -72,8 +84,31 @@ class PrinthousePricingPreviewService {
             netTotal = roundDecimal(netTotal + baseResult.setupAmount, 4);
         }
 
-        // 2. Resolve Material Surcharge
-        if (materialCatalogId) {
+        // 2. Resolve Material Surcharge or Dynamic Supplier Paper Rate Patch
+        if (paperRatePatch && (paperRatePatch.snapshotMetadata || paperRatePatch.candidateOverrides || paperRatePatch.pricePerKg)) {
+            const meta = paperRatePatch.snapshotMetadata || paperRatePatch;
+            const interiorMeta = meta.interior || (paperRatePatch.pricePerKg ? paperRatePatch : null);
+            const pricePerKg = Number(interiorMeta?.pricePerKg || paperRatePatch.pricePerKg || 0);
+            const kgPerUnit = Number(interiorMeta?.kgPerSheet || paperRatePatch.kgPerUnit || 0.05);
+            const rateAmount = roundDecimal(pricePerKg * kgPerUnit * quantity, 4);
+
+            components.push({
+                code: 'SUPPLIER_PAPER_MARKET_RATE',
+                name: `Supplier Paper Market Rate (${interiorMeta?.supplierName || 'Market'} - ${interiorMeta?.gsm || ''}gsm)`,
+                amount: rateAmount.toFixed(4),
+                provenance: 'PPOS_PAPER_SUPPLIER_HUB',
+                ruleId: interiorMeta?.offerId || 'market_patch',
+                metadata: {
+                    offerId: interiorMeta?.offerId,
+                    supplierId: interiorMeta?.supplierId,
+                    supplierName: interiorMeta?.supplierName,
+                    sku: interiorMeta?.sku,
+                    pricePerKg,
+                    currency: paperRatePatch.currency || pb.currency
+                }
+            });
+            netTotal = roundDecimal(netTotal + rateAmount, 4);
+        } else if (materialCatalogId) {
             const materialRule = rules.find(
                 r => r.scope === 'MATERIAL_RULE' && r.material_catalog_id === materialCatalogId
             );

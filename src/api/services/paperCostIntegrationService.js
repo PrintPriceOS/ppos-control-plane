@@ -388,25 +388,34 @@ class PaperCostIntegrationService {
         const bookWidthMm = Number(jobSpec.book_width_mm || 0);
         const bookHeightMm = Number(jobSpec.book_height_mm || 0);
 
-        // Derive signature size from machine spec, geometry, or explicit input
+        // 1. Signature Size derivation and source tracking
         let signatureSize = Number(jobSpec.signature_size ?? jobSpec.signatureSize ?? jobSpec.pages_per_signature ?? jobSpec.pagesPerSignature);
         let signatureSource = 'explicit';
+        let isGeometricApproximation = false;
+        let impositionWarning = null;
 
-        if (!Number.isFinite(signatureSize) || signatureSize <= 0) {
-            if (bookWidthMm > 0 && bookHeightMm > 0 && pressWidthMm > 0 && pressHeightMm > 0) {
-                // Geometric derivation: pages fitting per press sheet side
-                const horizFit = Math.floor(pressWidthMm / bookWidthMm) * Math.floor(pressHeightMm / bookHeightMm);
-                const rotFit = Math.floor(pressWidthMm / bookHeightMm) * Math.floor(pressHeightMm / bookWidthMm);
-                const pagesPerSide = Math.max(horizFit, rotFit);
-                const rawCapacity = pagesPerSide > 0 ? pagesPerSide * 2 : 16;
-                // Industrial signature folding sections fold in halves: 32, 16, 8, 4 pages
-                const binarySections = [32, 16, 8, 4];
-                signatureSize = binarySections.find(s => s <= rawCapacity) || 16;
-                signatureSource = 'geometric_derivation';
-            } else {
-                signatureSize = 16;
-                signatureSource = 'nominal_standard';
-            }
+        if (Number.isFinite(signatureSize) && signatureSize > 0) {
+            signatureSource = 'explicit';
+        } else if (jobSpec.canonical_imposition || jobSpec.machine_profile?.impositionScheme || jobSpec.impositionScheme) {
+            signatureSize = Number(jobSpec.canonical_imposition || jobSpec.machine_profile?.impositionScheme || jobSpec.impositionScheme);
+            signatureSource = 'canonical_machine';
+        } else if (bookWidthMm > 0 && bookHeightMm > 0 && pressWidthMm > 0 && pressHeightMm > 0) {
+            // Geometric derivation: pages fitting per press sheet side
+            const horizFit = Math.floor(pressWidthMm / bookWidthMm) * Math.floor(pressHeightMm / bookHeightMm);
+            const rotFit = Math.floor(pressWidthMm / bookHeightMm) * Math.floor(pressHeightMm / bookWidthMm);
+            const pagesPerSide = Math.max(horizFit, rotFit);
+            const rawCapacity = pagesPerSide > 0 ? pagesPerSide * 2 : 16;
+            // Industrial signature folding sections fold in halves: 32, 16, 8, 4 pages
+            const binarySections = [32, 16, 8, 4];
+            signatureSize = binarySections.find(s => s <= rawCapacity) || 16;
+            signatureSource = 'geometric_derivation';
+            isGeometricApproximation = true;
+            impositionWarning = 'Geometric imposition is an unconfirmed approximation and does not replace canonical machine imposition.';
+        } else {
+            signatureSize = 16;
+            signatureSource = 'nominal_standard_fallback';
+            isGeometricApproximation = true;
+            impositionWarning = 'Nominal standard 16pp fallback applied; machine imposition scheme was not provided.';
         }
 
         const signaturesCount = Math.max(1, Math.ceil(interiorPages / signatureSize));
@@ -416,23 +425,62 @@ class PaperCostIntegrationService {
         const coversPerSheet = Math.max(1, Number(jobSpec.covers_per_sheet ?? jobSpec.coversPerSheet) || 2);
         const netCoverSheets = Math.ceil(copies / coversPerSheet);
 
-        // Makeready setup waste sheets: strictly driven by input parameters (0 if omitted)
+        // 2. Makeready & Scrap Parameter Resolution (Distinguish missing from explicit zero)
+        const missingParameters = [];
         let interiorMakereadySheets = 0;
-        if (jobSpec.interior_makeready_sheets !== undefined || jobSpec.interiorMakereadySheets !== undefined) {
-            interiorMakereadySheets = Math.max(0, Number(jobSpec.interior_makeready_sheets ?? jobSpec.interiorMakereadySheets) || 0);
-        } else if (jobSpec.makeready_sheets_per_signature !== undefined || jobSpec.makereadySheetsPerSignature !== undefined) {
-            const sheetsPerSig = Number(jobSpec.makeready_sheets_per_signature ?? jobSpec.makereadySheetsPerSignature) || 0;
+        let isInteriorMakereadyExplicit = false;
+
+        const rawIntMakeready = jobSpec.interior_makeready_sheets ?? jobSpec.interiorMakereadySheets ?? jobSpec.machine_profile?.interiorMakereadySheets;
+        const rawMakereadyPerSig = jobSpec.makeready_sheets_per_signature ?? jobSpec.makereadySheetsPerSignature ?? jobSpec.machine_profile?.makereadySheetsPerSignature;
+
+        if (rawIntMakeready !== undefined && rawIntMakeready !== null && rawIntMakeready !== '') {
+            interiorMakereadySheets = Math.max(0, Number(rawIntMakeready) || 0);
+            isInteriorMakereadyExplicit = true;
+        } else if (rawMakereadyPerSig !== undefined && rawMakereadyPerSig !== null && rawMakereadyPerSig !== '') {
+            const sheetsPerSig = Number(rawMakereadyPerSig) || 0;
             interiorMakereadySheets = Math.max(0, signaturesCount * sheetsPerSig);
+            isInteriorMakereadyExplicit = true;
+        } else {
+            missingParameters.push('interior_makeready_sheets');
         }
 
-        const coverMakereadySheets = Math.max(0, Number(jobSpec.cover_makeready_sheets ?? jobSpec.coverMakereadySheets) || 0);
+        let coverMakereadySheets = 0;
+        let isCoverMakereadyExplicit = false;
+        const rawCovMakeready = jobSpec.cover_makeready_sheets ?? jobSpec.coverMakereadySheets ?? jobSpec.machine_profile?.coverMakereadySheets;
 
-        // Run waste rate: strictly driven by input parameters (0 if omitted)
+        if (rawCovMakeready !== undefined && rawCovMakeready !== null && rawCovMakeready !== '') {
+            coverMakereadySheets = Math.max(0, Number(rawCovMakeready) || 0);
+            isCoverMakereadyExplicit = true;
+        } else {
+            missingParameters.push('cover_makeready_sheets');
+        }
+
         let runWasteRate = 0;
-        if (jobSpec.run_waste_rate !== undefined || jobSpec.runWasteRate !== undefined) {
-            runWasteRate = Math.max(0, Number(jobSpec.run_waste_rate ?? jobSpec.runWasteRate) || 0);
-        } else if (jobSpec.run_waste_percentage !== undefined || jobSpec.runWastePercentage !== undefined) {
-            runWasteRate = Math.max(0, (Number(jobSpec.run_waste_percentage ?? jobSpec.runWastePercentage) || 0) / 100);
+        let isRunWasteExplicit = false;
+        const rawRunWasteRate = jobSpec.run_waste_rate ?? jobSpec.runWasteRate ?? jobSpec.machine_profile?.runWasteRate;
+        const rawRunWastePct = jobSpec.run_waste_percentage ?? jobSpec.runWastePercentage ?? jobSpec.machine_profile?.runWastePercentage;
+
+        if (rawRunWasteRate !== undefined && rawRunWasteRate !== null && rawRunWasteRate !== '') {
+            runWasteRate = Math.max(0, Number(rawRunWasteRate) || 0);
+            isRunWasteExplicit = true;
+        } else if (rawRunWastePct !== undefined && rawRunWastePct !== null && rawRunWastePct !== '') {
+            runWasteRate = Math.max(0, (Number(rawRunWastePct) || 0) / 100);
+            isRunWasteExplicit = true;
+        } else {
+            missingParameters.push('run_waste_rate');
+        }
+
+        const isIncomplete = missingParameters.length > 0;
+        const isExplicitZeroScrap = !isIncomplete && interiorMakereadySheets === 0 && coverMakereadySheets === 0 && runWasteRate === 0;
+        const isDefinitiveCost = !isIncomplete;
+        const calculationType = isIncomplete ? 'PARTIAL_NET_ESTIMATE' : 'CONFIRMED_INDUSTRIAL_ESTIMATE';
+
+        const warnings = [];
+        if (isIncomplete) {
+            warnings.push(`Missing required industrial scrap parameters: [${missingParameters.join(', ')}]. Estimate reflects unconfirmed partial net sheets and must not be presented as a definitive commercial cost.`);
+        }
+        if (impositionWarning) {
+            warnings.push(impositionWarning);
         }
 
         const interiorRunWasteSheets = Math.ceil(netInteriorSheets * runWasteRate);
@@ -471,9 +519,17 @@ class PaperCostIntegrationService {
             signaturesCount,
             signatureSize,
             signatureSource,
+            isGeometricApproximation,
+            impositionWarning,
             coversPerSheet,
             pressSheetDimensions: `${pressWidthMm}x${pressHeightMm} mm`,
             currency,
+            isIncomplete,
+            isDefinitiveCost,
+            isExplicitZeroScrap,
+            calculationType,
+            missingParameters,
+            warnings,
             interior: {
                 gsm: interiorGsm,
                 netSheets: netInteriorSheets,
@@ -484,7 +540,8 @@ class PaperCostIntegrationService {
                 grossKg: grossInteriorKg,
                 wasteKg: wasteInteriorKg,
                 ratePerKg: rateInt,
-                estimatedCost: interiorCost
+                estimatedCost: interiorCost,
+                isMakereadyOmitted: !isInteriorMakereadyExplicit
             },
             cover: {
                 gsm: coverGsm,
@@ -496,7 +553,8 @@ class PaperCostIntegrationService {
                 grossKg: grossCoverKg,
                 wasteKg: wasteCoverKg,
                 ratePerKg: rateCov,
-                estimatedCost: coverCost
+                estimatedCost: coverCost,
+                isMakereadyOmitted: !isCoverMakereadyExplicit
             },
             totals: {
                 totalNetSheets: netInteriorSheets + netCoverSheets,
@@ -505,7 +563,8 @@ class PaperCostIntegrationService {
                 totalGrossKg,
                 totalWasteKg,
                 wastePercentage: totalGrossKg > 0 ? Number(((totalWasteKg / totalGrossKg) * 100).toFixed(1)) : 0,
-                totalEstimatedCost
+                totalEstimatedCost,
+                isRunWasteOmitted: !isRunWasteExplicit
             }
         };
     }

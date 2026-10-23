@@ -104,30 +104,25 @@ El **Paper Supplier Hub** incorpora un panel independiente para distribuidores/f
     - Cálculo de peso exacto de pliego: $\text{area\_m}^2 \times (\text{gsm} / 1000)$.
     - Normalización canónica por base (`KG`, `TONNE`, `SHEET`, `THOUSAND_SHEETS`, `PACK`) preservando estrictamente la moneda original `{ pricePerKg, currency }` (sin etiquetar USD/GBP como EUR).
     - Resolución de mejor tarifa activa (`resolveMarketPaperRate`) con exigencia de tipo de cambio autorizado en comparativas multidivisa o filtrado forzoso por `targetCurrency`.
-    - Estimación industrial de pliegos y kilogramos (`calculateJobPaperRequirements`) completamente parametrizada por imposición y tolerancias de máquina, derivando la imposición geométrica de corte si no se especifican constantes.
-    - Generación no invasiva de parches BPE (`buildBpePaperPatch`) gobernada exclusivamente por solicitud explícita de operador de imprenta, garantizando cero mutaciones automáticas a cotizaciones o pedidos existentes.
+    - Estimación industrial de pliegos y kilogramos (`calculateJobPaperRequirements`) completamente parametrizada: distingue explícitamente parámetros de merma/preparación ausentes (`isIncomplete: true`) de cero explícito (`isExplicitZeroScrap: true`); etiqueta la deducción geométrica de imposición como aproximación no confirmada (`isGeometricApproximation: true`).
+    - Integración BPE activa: consumidor conectado en `printhousePricingPreviewService.generatePreview` con validación de paridad de moneda (`CURRENCY_MISMATCH`), inyección de componente con procedencia `PPOS_PAPER_SUPPLIER_HUB` y comprobación RBAC (`assertWritePermission`) en `/sourcing/bpe-rate-patch`.
   - **Generación de Documentos y Motor de Impresión**:
     - Documentos canónicos estructurados e imprimibles en HTML5 con `@media print`: Orden de Compra (`PO`) y Albarán de Entrega (`PACKING_SLIP`) con desglose de recibos y datos de transporte (`generateProcurementDocument`).
     - Visualización y descarga accesible en frontend con `<ProcurementDocumentModal>` integrado en compras de imprenta y pedidos de proveedor.
     - Soporte trilingüe estricto ES/EN/DE en interfaz y documentos.
-  - **Verificación**: 13/13 tests PASS en `tests/paper_supplier_cost_and_documents.test.js`.
-- [x] **I7 — Suite de humo E2E, verificación en navegador real y cierre de candidato**:
-  - **Suite de Humo E2E (`scripts/smoke_paper_supplier_hub_e2e.js`)**:
-    - Script standalone con 47/47 aserciones verificadas sobre MySQL 8 efímero en 5.63s sin tocar producción.
-    - Abarca el ciclo de vida completo: bootstrap, migraciones 007, 162-166, oferta comercial, cotización RFQ, aceptación, despacho, recepción atómica con balance e idempotencia, inventario, albaranes, documentos y notificaciones.
-  - **Verificación E2E en Navegador Real (`scripts/test_paper_supplier_hub_browser_journey.py`)**:
-    - 6 pasos verificados en Playwright sobre servidor Vite preview con 10 capturas de pantalla en `review_artifacts_paper_supplier_e2e/`:
-      1. Imprenta formula RFQ de 5.000 pliegos Phoenix Silk.
-      2. Proveedor revisa solicitud, perfil, dashboard y cotiza a 1,95 EUR/kg.
-      3. Imprenta acepta formalmente (`CONFIRMED`) y previsualiza Orden de Compra (PO).
-      4. Proveedor expide pedido (`DISPATCHED`) con Dachser y previsualiza Albarán.
-      5. Imprenta registra recepción en almacén (`RECEIVED`) y el catálogo de inventario `/materials` refleja de inmediato el incremento físico (+5.000 unidades).
-      6. Paridad trilingüe verificada en EN y DE, y viewport móvil (390x844) verificado con cero desbordamiento horizontal.
-  - **Gobernanza y Arquitectura**:
+  - **Verificación**: 15/15 tests PASS en `tests/paper_supplier_cost_and_documents.test.js`.
+- [x] **I7 — Endurecimiento, Clasificación Rigurosa de Pruebas y Cierre de Candidato**:
+  - **Separación de 5 Niveles de Validación**:
+    1. *Implementación*: Servicios, rutas y vistas operativas completadas.
+    2. *Tests de Servicios/API con BD Real*: Suites de Vitest y `scripts/smoke_paper_supplier_hub_e2e.js`. En ausencia de MySQL local, reporta formalmente `STATUS: BLOCKED / CONNECTED_ENV_REQUIRED` sin falsos PASS.
+    3. *UI con Mocks (Prueba de Interfaz con API Simulada)*: `scripts/test_paper_supplier_hub_browser_journey.py` con Playwright (6/6 pasos PASS, 10 capturas de pantalla de evidencia visual, modales, `<iframe>`, ES/EN/DE, tema oscuro y móvil 390x844 sin desbordamiento horizontal).
+    4. *E2E Integrado (Navegador + Backend Real + MySQL Real)*: Identificado honestamente como bloqueado localmente por ausencia de daemon MySQL.
+    5. *Validación Pendiente en Producción*: Plan de despliegue canónico con PM2 `ppos-control-plane`, migración 166 vía runner oficial y política de rollback sin `DROP TABLE`.
+  - **Gobernanza y Calidad**:
     - Integridad de migraciones 100% verificada (`npm run migration:integrity` PASS, 170 archivos descubiertos / 169 migraciones SQL clasificadas / 1 archivo `.json` excluido).
-    - ADR 013, ADR 014 y ADR 015 formalizados en `DECISIONS.md`.
+    - ADR 013 a ADR 016 formalizados en `DECISIONS.md`.
     - Build de producción `npm run build` completado limpiamente con 0 errores (3.577 módulos).
-    - Suites Vitest de papel: 71 tests PASS (0 FAIL). Zero modificaciones al motor `@ppos/pricing-engine` (fijado a `1f8997e`).
+    - Suites Vitest de papel: 65 tests PASS (0 FAIL). Paridad de diagnósticos TypeScript (0 errores netos contra la base `3ebddef0`).
 
 
 ---

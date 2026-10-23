@@ -239,19 +239,43 @@
      - Toda resolución registra metadatos de trazabilidad en `conversionTrace` (`sourceCurrency`, `targetCurrency`, `rateApplied`).
   2. **Cálculo Industrial Parametrizado (`calculateJobPaperRequirements`)**:
      - Los valores de 16 páginas por pliego, 100 pliegos de preparación interior, 50 de cubierta y 2,5% de merma se eliminan como constantes universales del motor.
-     - El cálculo acepta parámetros explícitos de producción (`pagesPerSheet`, `makereadyWasteSheets`, `runWastePercentage`).
-     - Si no se suministran, el motor deriva la imposición geométrica a partir de las dimensiones del pliego y del corte de página (acotando a signaturas binarias estándar: 32, 16, 8, 4) y aplica 0 de merma por defecto para no inventar costes ocultos.
-     - Los valores de ejemplo quedan confinados a fixtures explícitas de prueba.
-  3. **Gobernanza del Parche BPE (`buildBpePaperPatch`)**:
-     - **Consumidor**: Exclusivamente `commercialEstimationService` / módulo de cotización y presupuestación industrial.
-     - **Momento de aplicación**: Únicamente cuando un operador o administrador de la imprenta pulsa explícitamente "Aplicar tarifa de proveedor de mercado" en la confección o recálculo de una nueva cotización de trabajo.
-     - **Autorización requerida**: Roles autenticados `PRINTHOUSE_ADMIN` o `PRINTHOUSE_OPERATOR`.
-     - **Inmutabilidad de datos históricos**: El parche BPE **nunca** muta de forma automática tarifas base configuradas en la imprenta, cotizaciones ya guardadas, ni condiciones acordadas en pedidos (`orders`) existentes. Genera un objeto de actualización transitorio con metadatos auditables (`_metadata.rateSnapshot`).
+     - El cálculo acepta parámetros explícitos de producción (`pagesPerSheet`, `interior_makeready_sheets`, `cover_makeready_sheets`, `run_waste_rate`).
+     - **Distinción entre parámetro ausente y cero explícito**: Si los parámetros de merma o preparación no se suministran, el motor devuelve un resultado incompleto identificable (`isIncomplete: true`, `isDefinitiveCost: false`, `calculationType: 'PARTIAL_NET_ESTIMATE'`, `missingParameters: [...]`). Queda prohibido presentar una estimación con merma implícita cero como coste industrial definitivo.
+     - Si el operador suministra 0 explícito, se procesa como `isExplicitZeroScrap: true`, `isIncomplete: false`, `isDefinitiveCost: true`.
+     - **Aproximación de Imposición Geométrica**: Si no se proporciona signatura explícita ni imposición canónica de máquina, la deducción geométrica se etiqueta formalmente como aproximación no confirmada (`signatureSource: 'geometric_derivation'`, `isGeometricApproximation: true`, `impositionWarning: 'Geometric imposition is an unconfirmed approximation and does not replace canonical machine imposition.'`).
+  3. **Gobernanza del Parche BPE (`buildBpePaperPatch`) y Consumidor Conectado**:
+     - **Consumidor Conectado**: `printhousePricingPreviewService.generatePreview` (invocado por el endpoint `POST /api/admin/pricing/preview`) y el endpoint de generación de parches `POST /api/admin/materials/sourcing/bpe-rate-patch`.
+     - **Validación de Divisa y Autorización**: `generatePreview` valida la paridad de moneda entre el parche y el price book (`pb.currency`), rechazando discrepancias sin conversión con `CURRENCY_MISMATCH`. El endpoint `/sourcing/bpe-rate-patch` exige rol `OPERATOR` o `ADMIN` (`assertWritePermission`).
+     - **Inmutabilidad y No Mutación de BD**: El parche inyecta un componente transitorio `SUPPLIER_PAPER_MARKET_RATE` con procedencia `PPOS_PAPER_SUPPLIER_HUB` y metadatos de oferta. **Nunca** muta tablas de tarifas base, cotizaciones ya guardadas ni pedidos en curso.
   4. **Explicación de Integridad de Migraciones (170 vs 169)**:
      - El directorio `migrations/` contiene 170 archivos totales en disco: 169 scripts DDL/DML que terminan en `.sql` y 1 archivo de metadatos `migration-integrity-baseline.json`.
      - El script de validación `scripts/smoke_phase183_migration_integrity.js` contabiliza los 170 archivos, excluye formalmente el archivo no migración (`.json`) y valida criptográficamente los 169 archivos `.sql` clasificados contra sus SHA-256 baseline ($169 + 1 = 170$).
 - **Consecuencia**: Cero distorsión contable multidivisa, respeto a la realidad física de cada taller e inviolabilidad de las cotizaciones y pedidos históricos.
 
+---
 
-
+## ADR 016: Clasificación Estricta de Pruebas, Identificación de Bloqueos Locales, Despliegue con PM2 y Recuperación sin DROP TABLE
+- **Fecha**: 2026-10-23
+- **Estado**: Aceptado
+- **Contexto**:
+  Se detectó que el script de pruebas en navegador `scripts/test_paper_supplier_hub_browser_journey.py` utilizaba intercepción de rutas `page.route` (`route.fulfill`) y estado en memoria Python, por lo que clasificarse como "E2E integrado con MySQL real" era técnicamente incorrecto.
+  Adicionalmente, el procedimiento de despliegue sugería re-ejecutar migraciones 162–165 (que ya formaban parte de la base desplegada `3ebddef0`) y empleaba `DROP TABLE` como rutina de rollback, lo cual en producción provocaría la pérdida catastrófica de pedidos y recepciones reales. Además, el servicio en producción se gestiona mediante PM2 (`ppos-control-plane`), no Passenger.
+- **Decisión**:
+  1. **Clasificación Estricta de 5 Niveles de Validación**:
+     - **Nivel 1 - Implementación**: Código fuente de servicios, rutas y componentes de interfaz.
+     - **Nivel 2 - Tests de Servicios/API con BD Real**: Suites de Vitest y script `smoke_paper_supplier_hub_e2e.js`. Cuando se ejecuta sin MySQL disponible en localhost, reporta formalmente `STATUS: BLOCKED / CONNECTED_ENV_REQUIRED` sin declarar un falso PASS.
+     - **Nivel 3 - UI con Mocks (Prueba de Interfaz con API Simulada)**: `scripts/test_paper_supplier_hub_browser_journey.py` con Playwright, comprobando navegación, renderizado, modales, `<iframe>` de documentos, multi-idioma (ES/EN/DE), tema oscuro y ausencia de desbordamiento horizontal en móvil (390x844). Se conservan sus 10 capturas de pantalla exclusivamente como evidencia de interfaz.
+     - **Nivel 4 - E2E Integrado (Navegador + Backend Real + MySQL Real)**: Requiere entorno conectado con daemon MySQL activo. En la máquina de desarrollo local (Docker Desktop detenido, puertos 3306/3307 cerrados) se declara como **BLOQUEADO (STATUS: BLOCKED / CONNECTED_ENV_REQUIRED)** sin sustituir por mocks.
+     - **Nivel 5 - Validación Pendiente en Producción**: Ejecución en servidor Plesk con servicio PM2 real y base de datos persistente.
+  2. **Procedimiento de Despliegue Canónico en Plesk**:
+     - **Base desplegada**: `3ebddef0`.
+     - **Migraciones pendientes reales por diff**: Únicamente `migrations/166_phase196e_supplier_paper_procurement_orders.sql`. Las migraciones 162–165 ya están incorporadas en la base.
+     - **Ejecución vía Runner Canónico**: Usar `node scripts/run_control_plane_migrations.js --dry-run` para inspeccionar el ledger `schema_versions` y luego aplicar exclusivamente las pendientes. Prohibido ejecutar SQL a ciegas.
+     - **Servicio PM2**: El proceso es `ppos-control-plane`. Verificar identidad con `pm2 describe ppos-control-plane` antes de `pm2 reload ppos-control-plane`.
+     - **Frontend**: El bundle `dist/` se publica en el webroot configurado en Plesk previa copia de seguridad del contenido anterior.
+  3. **Política de Rollback Seguro sin DROP TABLE**:
+     - La migración 166 introduce tablas aditivas (`supplier_paper_procurement_orders`, `supplier_paper_order_receipts`) que son retrocompatibles con la versión `3ebddef0`.
+     - Revertir código a `3ebddef0` no requiere modificar el esquema de base de datos.
+     - **Queda prohibido el uso rutinario de `DROP TABLE`** para rollback, protegiendo de destrucción cualquier pedido o albarán registrado durante la operación.
+- **Consecuencia**: Honestidad técnica absoluta en la cobertura de pruebas, despliegue idempotente y seguro mediante PM2 y preservación garantizada de los datos de compras en producción.
 

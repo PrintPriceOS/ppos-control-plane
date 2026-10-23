@@ -8,6 +8,7 @@
 const express = require('express');
 const router = express.Router();
 const materialService = require('../services/materialAvailabilityService');
+const paperCostIntegrationService = require('../services/paperCostIntegrationService');
 const db = require('../services/mysqlClient');
 const logger = require('../services/logger').child('materials-route');
 
@@ -567,8 +568,6 @@ router.get('/procurements/paper-orders/:id/document', async (req, res) => {
     }
 });
 
-const paperCostIntegrationService = require('../services/paperCostIntegrationService');
-
 /**
  * POST /api/admin/materials/sourcing/estimate-job-paper
  * Calculates physical sheets, net/gross kilograms, scrap allowance, and estimated procurement costs.
@@ -611,11 +610,13 @@ router.post('/sourcing/bpe-rate-patch', async (req, res) => {
         if (!scope.tenantId) {
             return res.status(401).json({ ok: false, error: 'TENANT_ID_REQUIRED' });
         }
+        assertWritePermission(scope);
         const result = await paperCostIntegrationService.buildBpePaperPatch(scope.tenantId, req.body || {});
         return res.json({ ok: true, data: result });
     } catch (err) {
         console.error('[MATERIALS-API] Failed to build BPE paper patch:', err);
-        return res.status(500).json({ ok: false, error: err.message, code: 'BPE_RATE_PATCH_ERROR' });
+        const status = err.statusCode || 500;
+        return res.status(status).json({ ok: false, error: err.message, code: err.code || 'BPE_RATE_PATCH_ERROR' });
     }
 });
 

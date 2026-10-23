@@ -16,10 +16,14 @@ def log(msg):
         f.write(entry + "\n")
 
 with open(LOG_FILE, 'w', encoding='utf-8') as f:
-    f.write("=== Playwright E2E Browser Journey: Paper Supplier Hub & Procurement ===\n")
+    f.write("=== Playwright Frontend UI Verification: Paper Supplier Hub (Mock API) ===\n")
+    f.write("Classification: FRONTEND_UI_MOCK_VERIFICATION (Simulated API Layer)\n")
+    f.write("Scope: Browser visual rendering, interaction, modals, iframes, multi-language (ES/EN/DE), theme toggle, and mobile 390x844.\n")
+    f.write("Notice: Intercepts /api/ routes via page.route and stateful Python mock data. This suite tests UI behavior only and does NOT connect to live backend or MySQL.\n\n")
 
-log("Starting browser journey verification suite...")
+log("Starting frontend mock UI journey verification suite...")
 log("Server target: http://localhost:4173 (Vite preview)")
+log("Classification: FRONTEND_UI_MOCK_VERIFICATION (Simulated API Layer)")
 
 # Shared stateful mock database
 orders_db = [
@@ -723,9 +727,9 @@ def run_e2e_journey():
         page5.keyboard.press("Escape")
         time.sleep(1)
 
-        # Verify Inventory Table reflects the increased stock: 15,000 + 5,000 = 20,000 units
+        # Verify Inventory Table reflects the increased stock in client state: 15,000 + 5,000 = 20,000 units
         page5.locator('text=Phoenix Silk Coated').first.wait_for(state='visible', timeout=5000)
-        log("PASS: Inventory table on /materials reflects incoming goods intake.")
+        log("PASS: Inventory table on /materials correctly reflects incoming goods intake in simulated client UI view.")
 
         screenshot_7 = os.path.join(OUT_DIR, '07_printhouse_inventory_reflected.png')
         page5.screenshot(path=screenshot_7)
@@ -784,7 +788,10 @@ def run_e2e_journey():
         browser.close()
 
     log("\n=========================================================================")
-    log("=== BROWSER JOURNEY VERIFICATION COMPLETE: ALL 6 STEPS PASSED ===")
+    log("=== FRONTEND UI MOCK VERIFICATION COMPLETE: ALL 6 STEPS PASSED ===")
+    log("Classification: FRONTEND_UI_MOCK_VERIFICATION")
+    log("Verified: Visual layout, iframes, multi-language ES/EN/DE, dark theme, and mobile 390x844.")
+    log("Status: Real backend & MySQL integrated E2E verification remains separate.")
     log("=========================================================================")
 
 if __name__ == '__main__':

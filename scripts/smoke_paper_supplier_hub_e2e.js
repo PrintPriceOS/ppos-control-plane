@@ -73,6 +73,7 @@ async function runSmokeSuite() {
 
     let adminPool = null;
     let connectionPool = null;
+    let schemaCreated = false;
 
     try {
         adminPool = mysql.createPool({
@@ -84,11 +85,24 @@ async function runSmokeSuite() {
         });
 
         // Test connectivity
-        const [ping] = await adminPool.query('SELECT 1 as alive');
-        assert(ping[0].alive === 1, 'Connected to MySQL server successfully');
+        try {
+            const [ping] = await adminPool.query('SELECT 1 as alive');
+            assert(ping[0].alive === 1, 'Connected to MySQL server successfully');
+        } catch (connErr) {
+            console.log('\n----------------------------------------------------------------------');
+            console.log('STATUS: BLOCKED / CONNECTED_ENV_REQUIRED');
+            console.log(`Reason: No active MySQL connection available on ${dbHost}:${dbPort} (${connErr.code || connErr.message}).`);
+            console.log('Requirements: Set explicit TEST_MYSQL_* variables targeting an isolated test database (or start local MySQL).');
+            console.log('Real backend and database tests require an isolated MySQL instance.');
+            console.log('----------------------------------------------------------------------\n');
+            process.exitCode = 2;
+            return;
+        }
 
         // Create ephemeral database
+        schemaCreated = false;
         await adminPool.query(`CREATE DATABASE \`${executionSchema}\` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;`);
+        schemaCreated = true;
         assert(true, `Created ephemeral database ${executionSchema}`);
 
         connectionPool = mysql.createPool({
@@ -460,18 +474,20 @@ async function runSmokeSuite() {
         failedAssertions++;
     } finally {
         // Teardown ephemeral database
-        console.log('\n--- Teardown: Dropping Ephemeral Database ---');
         if (connectionPool) {
             try { await connectionPool.end(); } catch {}
         }
         if (adminPool) {
-            try {
-                await adminPool.query(`DROP DATABASE IF EXISTS \`${executionSchema}\`;`);
-                console.log(`[TEARDOWN] Dropped ephemeral database ${executionSchema}`);
-                await adminPool.end();
-            } catch (cleanupErr) {
-                console.warn(`[WARN] Failed to drop schema ${executionSchema}:`, cleanupErr.message);
+            if (schemaCreated) {
+                console.log('\n--- Teardown: Dropping Ephemeral Database ---');
+                try {
+                    await adminPool.query(`DROP DATABASE IF EXISTS \`${executionSchema}\`;`);
+                    console.log(`[TEARDOWN] Dropped ephemeral database ${executionSchema}`);
+                } catch (cleanupErr) {
+                    console.warn(`[WARN] Failed to drop schema ${executionSchema}:`, cleanupErr.message);
+                }
             }
+            try { await adminPool.end(); } catch {}
         }
     }
 

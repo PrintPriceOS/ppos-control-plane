@@ -185,39 +185,29 @@ Se identificaron 6 agrupaciones de distribuidores presentes en el archivo:
 
 ## Cierre y Verificación Final de Candidato feat/paper-supplier-hub-completion (Iteraciones I0–I7)
 
-### 1. Matriz de Estado Cuádruple (Implementado / Verificado Automáticamente / Verificado en Navegador / Pendiente en Producción)
+### 1. Clasificación de 5 Niveles de Validación
 
-| Componente / Alcance | 1. Implementado | 2. Verificado Automáticamente | 3. Verificado en Navegador | 4. Pendiente en Producción |
-|---|---|---|---|---|
-| **I0: Fundación, Tenancy e Invariantes** | Roles `SUPPLIER_ADMIN/OPERATOR/VIEWER`, tablas `paper_suppliers`, aislamiento multi-tenant y middleware `requireSupplierScope`. | 57/57 tests PASS en `security_paper_supplier_and_materials_isolation.test.js`. Integridad de migraciones PASS. | Navegación e inicio de sesión verificado con token en Vite preview (ES/EN/DE). | Migración 162 pendiente de ejecutar en MySQL de producción Plesk. |
-| **I1: Dominio y Aislamiento de Imprenta** | Endpoints de compras y materiales protegidos con `requireAdmin` y comprobación de `printhouseId`. Rechazo fail-closed sin centro asignado. | Pruebas HTTP de autorización: acceso denegado (HTTP 403) para roles sin permiso y proveedores en rutas de imprenta. | Visualización de catálogo y almacén con scope de planta Frankfurt validado en navegador. | Migración 162 aplicada a tabla de relaciones. |
-| **I2: Fichas Técnicas e Importador de Papel** | Motor de importación ODS/XLSX/CSV con detección real, revisión de discrepancias y confirmación atómica transaccional (`confirmImportBatch`). | 25/25 tests PASS en `paper_technical_import_and_catalog.test.js` (incluyendo archivo de 1.573 registros y reglas de huella física). | Pruebas de modales de importación y catálogo técnico en Playwright. | Migración 163 pendiente de aplicar en Plesk. |
-| **I3: Catálogo Comercial y Tarifas Multibase** | Publicación de ofertas en bases `KG`, `TONNE`, `SHEET`, `THOUSAND_SHEETS`, `PACK`, revisiones históricas inmutables y control de unicidad de SKU. | 43/43 tests PASS en `paper_supplier_offers_and_catalog.test.js` (incluyendo SKU colisiones y semántica de retirada). | Formulario de creación de oferta y tabla de tarifas del proveedor verificadas en tema claro y oscuro. | Migración 164 pendiente de aplicar en Plesk. |
-| **I4: Aprovisionamiento y RFQ Bidireccional** | Buscador de sourcing en imprenta (`PaperSourcingModal.tsx`), formulación de RFQ, cola de pedidos de proveedor (`/supplier/orders`) y aceptación formal. | Tests unitarios y de integración de transición de estados y cotización comercial (14/14 tests PASS). | **Paso 1, 2 y 3 E2E Navegador**: Imprenta solicita RFQ de 5.000 pliegos Phoenix Silk -> Proveedor cotiza a 1,95 EUR/kg -> Imprenta acepta formalmente pasando a `CONFIRMED`. | Migración 165 pendiente de aplicar en Plesk. |
-| **I5: Expedición y Recepción con Stock** | Transición a `DISPATCHED` con transportista y seguimiento; recepción atómica (`receiveOrderAtomic`) con balance, idempotencia y registro en ledger. | 14/14 tests PASS en `paper_supplier_procurement_and_orders.test.js` (concurrencia, prevención de sobre-entrega y rollback seguro ante fallo). | **Paso 4 y 5 E2E Navegador**: Proveedor despacha vía Dachser Logistics -> Imprenta registra entrada en muelle de 5.000 pliegos -> Almacén refleja incremento inmediato (+5.000 unidades en `/materials`). | Migración 166 pendiente de aplicar en Plesk. |
-| **I6: Costes, Documentos PO/Albarán y BPE** | `paperCostIntegrationService.js` con normalización estricta por moneda, cálculo de pliegos y signaturas parametrizado; generador de documentos HTML5 `@media print`. | 13/13 tests PASS en `paper_supplier_cost_and_documents.test.js` (normalización multibase, ofertas USD/GBP/EUR, imposición geométrica de corte). | **Pasos 3 y 4 E2E Navegador**: Previsualización y renderizado verificado en `iframe` de Orden Oficial de Compra (`PO`) y Albarán de Expedición y Entrega. | Integración BPE disponible en caliente; no muta datos persistidos. |
-| **I7: Auditoría Multilingüe, Responsive y Cierre** | Paridad completa en ES/EN/DE, tema claro y oscuro, soporte móvil 390x844 sin desbordamiento horizontal y build de producción. | `npm run build` (3.577 módulos, 0 errores), `npm run migration:integrity` (170 archivos descubiertos / 169 migraciones SQL validadas). | **Paso 6 E2E Navegador**: Verificación en inglés, alemán y viewport móvil iPhone 12/13 (390x844) con `scrollWidth <= innerWidth`. 10 capturas de pantalla generadas. | Activación opcional de flag `VITE_PAPER_SUPPLIER_HUB_ENABLED=true` tras verificar despliegue. |
+| Nivel de Verificación | Descripción y Herramienta | Alcance Cubierto | Estado de Verificación |
+|---|---|---|---|
+| **1. Implementación** | Código fuente en `src/api/` y `src/ui/` | Normalización multidivisa (preserva USD/GBP/EUR), parametrización industrial (distingue merma ausente de cero explícito), conexión BPE en `printhousePricingPreviewService`, órdenes, albaranes, recepciones atómicas e inmutabilidad de snapshots. | **COMPLETO** |
+| **2. Tests de Servicios / API con BD Real** | `vitest` (65 tests PASS en suites de compras) y `scripts/smoke_paper_supplier_hub_e2e.js` | RBAC en endpoints reales, aislamiento de tenants y proveedores, concurrencia, idempotencia de recepción y transacciones con rollback. | **VERIFICADO EN TESTS / BLOCKED EN LOCAL SIN MYSQL** (En ausencia de daemon MySQL local, reporta formalmente `STATUS: BLOCKED / CONNECTED_ENV_REQUIRED`). |
+| **3. UI con Mocks (Prueba de Interfaz con API Simulada)** | `scripts/test_paper_supplier_hub_browser_journey.py` (Playwright sobre Vite preview `http://localhost:4173/` con `page.route` y estado simulado) | Recorrido de interfaz completo: RFQ, cotización de proveedor, aceptación, expedición, recepción en almacén, modales, documentos PO/albarán en `iframe`, cambio de tema claro/oscuro, paridad ES/EN/DE y móvil 390x844 sin desbordamiento horizontal. | **VERIFICADO EN NAVEGADOR CON API SIMULADA (6/6 PASOS PASS)**. Generó 10 capturas de pantalla de evidencia visual. |
+| **4. E2E Integrado (Navegador + Backend Real + MySQL)** | Navegador real comunicándose con API Express sin mocks y persistiendo en base de datos MySQL real | Validación integrada de flujo sin simulación de red ni de base de datos. | **BLOQUEADO LOCALMENTE (STATUS: BLOCKED / CONNECTED_ENV_REQUIRED)**: En este entorno de desarrollo no hay daemon MySQL activo (Docker detenido, puertos 3306/3307 cerrados). Se documenta con rigor sin simular PASS. |
+| **5. Validación Pendiente en Producción** | Servidor Plesk con proceso PM2 `ppos-control-plane` y base de datos de producción | Aplicación de la migración pendiente 166 mediante el runner canónico, verificación de identidad PM2, publicación del bundle `dist/` en el webroot de Plesk y smoke real post-despliegue. | **PENDIENTE TRAS DESPLIEGUE EN PRODUCCIÓN** |
 
 ---
 
-### 2. Evidencia de Ejecución de Navegador Real (Playwright)
+### 2. Evidencias de Interfaz de Usuario con API Simulada (Playwright Mock Journey)
 
-La suite de navegador real (`scripts/test_paper_supplier_hub_browser_journey.py`) se ejecutó sobre el servidor de previsualización de producción (`http://localhost:4173`), completando los 6 pasos del ciclo industrial y generando las 10 evidencias visuales en `review_artifacts_paper_supplier_e2e/`:
+La suite de interfaz de usuario (`scripts/test_paper_supplier_hub_browser_journey.py`) se ejecutó sobre el servidor preview (`http://localhost:4173`), completando los 6 pasos de interacción visual y generando las 10 evidencias en `review_artifacts_paper_supplier_e2e/`:
 
 1. `01_printhouse_rfq_submitted.png`: Imprenta selecciona Phoenix Silk en `/materials` y envía RFQ de 5.000 pliegos.
 2. `02_supplier_dashboard_dark.png`: Proveedor Scheufelen en tema oscuro con métricas de variantes, ofertas y solicitudes activas.
 3. `03_supplier_settings.png`: Perfil del proveedor Scheufelen con datos de contacto, huso horario y monedas activas.
 4. `04_supplier_quotes_rfq.png`: Proveedor cotiza tarifa unitaria de 1,95 EUR/kg para el RFQ recibido.
-5. `05_printhouse_accepted_po_document.png`: Imprenta acepta formalmente la cotización (`CONFIRMED`) y previsualiza la Orden de Compra oficial (PO).
-6. `06_supplier_dispatched_and_albaran.png`: Proveedor expide pedido con Dachser Logistics (`DISPATCHED`) y previsualiza el Albarán de Entrega.
-7. `07_printhouse_inventory_reflected.png`: Imprenta efectúa recepción en muelle (`RECEIVED`) y el catálogo de inventario físico refleja inmediatamente el incremento de stock (+5.000 hojas).
+5. `05_printhouse_accepted_po_document.png`: Imprenta acepta formalmente la cotización (`CONFIRMED`) y previsualiza la Orden de Compra oficial (PO) en `iframe`.
+6. `06_supplier_dispatched_and_albaran.png`: Proveedor expide pedido con Dachser Logistics (`DISPATCHED`) y previsualiza el Albarán de Entrega en `iframe`.
+7. `07_printhouse_inventory_reflected.png`: Imprenta efectúa recepción en muelle (`RECEIVED`) y el catálogo de inventario en la vista de cliente refleja el incremento de stock (+5.000 hojas).
 8. `08_supplier_dashboard_en.png`: Panel de proveedor verificado en inglés (`Paper Supplier Hub`).
 9. `09_supplier_dashboard_de.png`: Panel de proveedor verificado en alemán (`Papierlieferanten-Hub`).
-10. `10_supplier_mobile_390x844.png`: Panel de proveedor verificado en viewport móvil (390x844 px) con ausencia de desbordamiento horizontal.
-
-
-
-
-
-
-
+10. `10_supplier_mobile_390x844.png`: Panel de proveedor verificado en viewport móvil (390x844 px) con ausencia de desbordamiento horizontal (`scrollWidth <= innerWidth`).
