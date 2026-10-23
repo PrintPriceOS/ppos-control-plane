@@ -63,6 +63,7 @@ export interface SupplierOrderDetail extends SupplierOrderSummary {
     snapshotCaliperMicrons?: number;
     snapshotGrainDirection?: string;
     snapshotPricePerBasis?: number;
+    snapshotPriceBasis?: string;
     snapshotPricingFormula?: string;
     carrierName?: string;
     trackingNumber?: string;

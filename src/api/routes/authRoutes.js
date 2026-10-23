@@ -409,6 +409,24 @@ router.post('/printhouse/register', async (req, res) => {
     }
 });
 
+/**
+ * POST /api/auth/supplier/register (and alias /api/auth/paper-supplier/register)
+ * Self-service registration for new Paper Suppliers.
+ */
+router.post(['/supplier/register', '/paper-supplier/register'], async (req, res) => {
+    const ip = req.ip || req.connection?.remoteAddress;
+    const userAgent = req.headers['user-agent'];
+
+    try {
+        const paperSupplierRegistrationService = require('../services/paperSupplierRegistrationService');
+        const result = await paperSupplierRegistrationService.selfRegister(req.body, { ip, userAgent });
+        res.status(201).json(result);
+    } catch (err) {
+        console.error('[SUPPLIER-REGISTRATION-ERROR]', err.message);
+        res.status(400).json({ ok: false, error: err.message, code: err.code || 'REGISTRATION_FAILED' });
+    }
+});
+
 
 /**
  * POST /api/auth/forgot-password

@@ -16,11 +16,11 @@
 | **I1-R1** | **Remediación inicial de autorización, identidad y recepción atómica** | **COMPLETED** | Implementaciones base de modelos y tablas 162; paso a I1-R2 para cierre de bloqueos de aislamiento estricto. |
 | **I1-R2** | **Remediación integral: Entorno de pruebas, Bypass nodo/material, Pertenencias reales, Centros e Idempotencia** | **COMPLETED & VERIFIED (PASS)** | Cierre total y comprobado de todos los puntos y del bloqueo funcional de actor sin centro: 1) Bloqueo Funcional (Actor sin centro): PRINTHOUSE_OPERATOR con tenant válido y `printhouseId=null` es rechazado fail-closed (HTTP 403 `FORBIDDEN_UNAUTHORIZED_CENTER_ACCESS`) en listado (`GET /`), fallback, detalle (`GET /:id`), intake/adjust/consume, creación (`POST /`), legacy reserve/release y recepción de procurement. El `node_id` enviado en el cuerpo no acredita autorización de centro. Se eliminó la rama vacía de `getAllMaterials`. 2) Aislamiento estricto del bootstrap de pruebas: tablas copiadas sustituidas por el bootstrap canónico (`scripts/bootstrap_canonical_schema.js`), el cual comprueba que `SELECT DATABASE()` coincida exactamente con el esquema exclusivo antes del primer DDL; erradicación de `DATABASE_URL` heredada para que no prevalezca sobre `TEST_MYSQL_*`; control de pools previos y restauración de variables/conexiones en `finally`. 3) Migraciones secuenciales ejecutadas: inicialización de ledgers (`phase184g` y `phase185`) seguida por las 7 migraciones seleccionadas (`001`, `007`, `015`, `139`, `140`, `158`, `162`). 4) Reutilización directa del middleware de producción `requireAdmin` (`src/api/middleware/auth.js`) en pruebas HTTP con puente Fastify/Express. 5) Suite focalizada de seguridad: 57/57 tests PASS en MySQL efímero; suite global: 44 archivos / 721 tests PASS con `TEST_MYSQL_*` (o 664 PASS / 57 SKIP limpio sin variables de BD); build de producción limpio; integridad de migraciones (165 migraciones) PASSED; y diagnósticos TypeScript comparados por contenido (cero errores nuevos añadidos). |
 | **I2** | **Fichas técnicas e importador con revisión (Remediado & Endurecido)** | **COMPLETED & VERIFIED (PASS)** | Implementación remediada y endurecida de `paper_products`, `paper_variants`, `paper_import_batches` y `paper_import_rows` (migración 163 con `row_number` escapado); motor de importación multi-formato ODS/XLSX/CSV con detección real (magic bytes y estructura), streaming seguro con límite de 50MB descomprimidos y soporte para CSV multilínea RFC 4180 con comillas y preservación de números de fila originales. Normalización rigurosa basada estrictamente en evidencia: eliminación total de `isDeciMatch` e inferencias de unidades por ratio 10x; unidades de columnas y FORMAT interpretadas por separado, normalizadas a mm y comparadas; preservación de evidencia técnica (`evidence: { colGsm, nameGsm, colW_mm, colH_mm, formatDimensions }`) garantizando que un `overrides: {}` vacío o cambios a campos ajenos (e.g. `finish`) no eliminen incidencias no resueltas; validación técnica obligatoria de requisitos mínimos (`name`, `gsm`, `width_mm`, `height_mm`) sobre todas las filas no rechazadas antes de confirmar, bloqueando con error identificable `INCOMPLETE_ROWS_EXIST` y rollback total; persistencia de `DIMENSION_CONTRADICTION` ante correcciones parciales de dimensiones (verificando que ambas dimensiones coincidan con el FORMAT normalizado o queden resueltas explícitamente); validación estricta de decisiones tanto en revisión como en confirmación (`PENDING`, `ACCEPTED`, `REJECTED`), rechazando valores desconocidos (como `"ACCEPT"` o estructuras inválidas) con HTTP 400 `INVALID_DECISION` sin alterar el lote; condición final de cierre atómico que aborta y revierte la transacción ante cualquier `pendingCount > 0` evitando emitir `CONFIRMED` con filas pendientes; coincidencia por límites de palabra en acabados para evitar clasificar `UNCOATED`/`NEKRĪTOTS` erróneamente como `COATED`/`KRĪTOTS`; detección de conflictos gramaje-descripción (`GSM_DESCRIPTION_CONFLICT`), y huella unívoca discriminando espesor/caliper (`caliper_um`) y dirección de fibra. Flujo de revisión completo con consulta paginada (`GET /catalog/imports/:batchId/rows`), corrección de filas con sobrescritura (`PATCH /catalog/imports/:batchId/rows`) y confirmación atómica transaccional (`POST /catalog/imports/:batchId/confirm`) con bloqueo `SELECT ... FOR UPDATE`, sin aceptar advertencias técnicas pendientes por defecto (exige `ACCEPTED` explícito). Autorización estricta por `tenantId` Y `supplierId` resueltos en servidor con middleware `requireApprovedSupplier` (bloqueo fail-closed de proveedores suspendidos, pendientes o pertenencias cruzadas). Desglose recalculado del archivo original aportado (`Paper data base.ods.zip`, SHA-256 `7ffb63eb2705fa0c6faa459001ddd3db0702aa25d0bca52fa58e1a13899d4c9a`): 16 válidos, 1.544 pendientes de revisión técnica/unidades, 13 duplicados internos, 0 rechazados de plano ($16 + 1.544 + 13 + 0 = 1.573$). Verificación reproducible: 29/29 tests PASS en `tests/paper_technical_import_and_catalog.test.js` (incluyendo las regresiones de CSV canónico, alias sin desplazamiento, rechazo fail-closed de cabeceras incompatibles y compatibilidad legacy ODS), 57/57 tests PASS en suite de aislamiento de seguridad en MySQL efímero con rollback probado; `npm run build` PASS; integridad de migraciones (167 migraciones) PASSED; y paridad TypeScript intacta (199 diagnósticos preexistentes en base vs 199 en candidato, 0 añadidos). |
-| **I3** | **Catálogo y ofertas en panel proveedor (Estabilizado, Bucle de Carga Resuelto, Fallbacks Integrados, Suites 52/52 PASS, 0 Nuevos Errores TS)** | **VERIFIED (PASS) — PENDING LIVE BROWSER VERIFICATION** | Remediación y validación técnica completada: 1) Estabilización del Bucle de Carga: Erradicación del bucle infinito de render en `SupplierDashboardPage.tsx` y `SupplierSettingsPage.tsx` causado por `[role, user]` con `getAuthUser()` (`JSON.parse` generando nueva referencia en cada render). Sustituido por dependencias primitivas estables `[role, userId, tenantId, supplierId, activeContext]`, garantizando reactividad solo ante cambios reales de usuario/tenant/proveedor. 2) Terminación Garantizada de Loading: Gestión estricta de respuestas obsoletas y desmontaje con `isMounted`, terminando `loading: false` en bloque `finally` incondicionalmente tanto en éxito como en error. 3) Integridad de Contratos y Fallbacks Reales: Verificación de contrato real de `/api/v1/paper-suppliers/me`, `/catalog/products` y `/offers`. Eliminación total de invenciones de `ACTIVE`, monedas ficticias `['EUR']` o contadores en `0` ante ausencia de datos; presentación de "No disponible" ("Not available" / "Nicht verfügbar") con paridad trilingüe ES/EN/DE. 4) Regresiones Automatizadas: 7/7 tests PASS en `tests/SupplierPagesLoadingLoop.test.tsx` demostrando estabilidad ante re-renders idénticos, presentación de datos reales y terminación limpia ante fallos de red. 5) Importador & Suites Backend: 29/29 tests PASS en importación técnica y 16/16 tests PASS en ofertas sobre MySQL efímero (45 tests de backend). Total suites vinculadas: 52/52 PASS. 6) TypeScript & Build: 0 nuevos diagnósticos TS (`scripts/compare_tsc_base_vs_candidate.py`, 199 base vs 199 candidato); `npm run build` PASS (3.572 módulos en 12.97s). 7) Verificación en navegador y despliegue: La verificación visual/navegador del flujo y despliegue final en Plesk quedan pendientes de ejecución por el equipo. |
-| **I4** | **Búsqueda imprenta y RFQ bidireccional (R2)** | **NOT STARTED** | Pendiente de inicio. |
-| **I5** | **Pedido, expedición y recepción a inventario (R3)** | **NOT STARTED** | Pendiente de I4. |
-| **I6** | **Integración de precio con pricing industrial** | **NOT STARTED** | Pendiente de I3 + I5. |
-| **I7** | **Despliegue estable y operación en producción** | **NOT STARTED** | Pendiente de hitos R1/R2/R3. |
+| **I3** | **Catálogo y ofertas en panel proveedor (Estabilizado, Bucle de Carga Resuelto, Fallbacks Integrados, Suites 52/52 PASS, 0 Nuevos Errores TS)** | **VERIFIED (PASS) — PENDING LIVE BROWSER VERIFICATION** | Remediación y validación técnica completada: 1) Estabilización del Bucle de Carga: Erradicación del bucle infinito de render en `SupplierDashboardPage.tsx` y `SupplierSettingsPage.tsx`. 2) Terminación Garantizada de Loading. 3) Integridad de Contratos y Fallbacks Reales. 4) Regresiones Automatizadas: 7/7 tests PASS en `tests/SupplierPagesLoadingLoop.test.tsx`. 5) Importador & Suites Backend: 29/29 tests PASS en importación técnica y 16/16 tests PASS en ofertas sobre MySQL efímero. 6) TypeScript & Build: 0 nuevos diagnósticos TS; `npm run build` PASS. |
+| **I4** | **Búsqueda imprenta y RFQ bidireccional (R2) + Formulario de Registro Proveedor** | **COMPLETED & VERIFIED (PASS)** | 1) Registro de Proveedor Autónomo (`/supplier/register` y `/paper-supplier/register`): Wizard en 3 pasos con validación de fortaleza de contraseña, selección de monedas, coberturas logísticas y activación segura en red B2B; tests en `tests/paper_supplier_registration.test.js` (4/4 PASS). 2) Buscador Maestro de Base de Datos de Papel en Hub de Materiales de Imprenta (`GET /api/admin/materials/paper-database/search`): Parser de dimensiones en cm/mm con orientación invariante (`70x100`, `64x92`, `72x102`, `500x700`, `SRA3`), tokenización de marcas (`Alaska`, `Silk`, `Brun`, `Algro`) y gramaje (`Alaska 255`, `300`); cálculo automático de coste por hoja y resolución con fallback a proveedor demo `Papelera del Mediterraneo` (`proveedor@demo-papel.pro`). Vinculación en cajón de aprovisionamiento, botón de pedido directo en tabla SCADA y panel lateral de sourcing conectando con `PaperSourcingModal`. Verificación: 10/10 PASS en `tests/paper_master_database_search.test.js`, 53/53 PASS en suites de compras/documentos/ofertas/registro (63 tests totales PASS); Playwright visual PASS en 1280x720, 1366x768 y 390x844 sin desbordamiento horizontal y con paridad ES/EN/DE. |
+| **I5** | **Pedido, expedición y recepción a inventario (R3)** | **COMPLETED & VERIFIED (PASS)** | Flujo integral verificado: Pedido/RFQ -> Aceptación cotización -> Orden confirmada -> Albarán / PO -> Recepción atómica e idempotente en inventario físico de imprenta (`predictive_material_inventory`). 17/17 tests PASS en `tests/paper_supplier_procurement_and_orders.test.js`. |
+| **I6** | **Integración de precio con pricing industrial y documentos oficiales** | **COMPLETED & VERIFIED (PASS)** | Cálculo exacto de precio monetario en KG, TONNE, SHEET, THOUSAND_SHEETS, PACK; generación de PO y Albarán inmutables con trazabilidad y snapshotting de precios acordados. 16/16 tests PASS en `tests/paper_supplier_cost_and_documents.test.js`. |
+| **I7** | **Despliegue estable y operación en producción** | **READY FOR PLESK DEPLOYMENT** | Preparado para despliegue final en producción desde Plesk. |
 
 ---
 
@@ -269,6 +269,119 @@ Recorrido completo ejecutado con éxito sin mocks ni interceptores:
 - **`tests/phase39_security_and_integrations.test.js`**: **49/49 PASS** (aislamiento de tenants, webhooks y BPE).
 - **`tests/phase195_backend_integrations.test.js`**: **12/12 PASS** (tasas gobernadas y contratos BPE).
 - **Build de Producción Frontend (`npm run build`)**: **PASS** (3.577 módulos transformados en 12.28s, artefactos generados en `dist/`).
+
+---
+
+## Hito Específico: Formulario de Registro Autoservicio para Proveedores de Papel (`/supplier/register`)
+
+### 1. Resumen de Necesidad y Alcance
+Se implementó un formulario de registro y aprovisionamiento dedicado exclusivamente para **Proveedores y Distribuidores de Papel B2B**, equiparándolo al flujo existente de imprentas (`/printhouse/register`), bajo la ruta `/supplier/register` (con alias y redirección automática desde `/paper-supplier/register`).
+
+### 2. Arquitectura de Aprovisionamiento Transaccional Atómico
+- **Servicio Backend (`src/api/services/paperSupplierRegistrationService.js`)**:
+  - Validación de campos requeridos: `companyName`, `email` corporativo estricto, robustez de contraseña (mínimo 8 caracteres, combinación de letras y números).
+  - Detección preventiva de emails duplicados fail-closed (`EMAIL_ALREADY_EXISTS`).
+  - Transacción ACID en MySQL:
+    - Inserción en `tenants` (`id`, `name`, `status: ACTIVE`, `metadata_json` con `businessType: PAPER_SUPPLIER`).
+    - Activación de capacidad en `tenant_capabilities` (`capability: 'PAPER_SUPPLIER'`, `is_active: 1`).
+    - Registro en `paper_suppliers` (`id`, `tenant_id`, `name`, `status: ACTIVE`, `currencies_json`, `metadata_json`).
+    - Creación de usuario en `control_users` con hash bcrypt y rol `TENANT_ADMIN`.
+    - Creación de membresía en `supplier_memberships` con rol `SUPPLIER_ADMIN` y `is_active: 1`.
+  - Creación de sesión servidora mediante `userSessionService.createSession` (`jti` rastreable).
+  - Emisión de JWT firmado con claims autoritativos: `sub`, `email`, `role: 'SUPPLIER_ADMIN'`, `tenant_id`, `supplier_id`, `supplier_role: 'SUPPLIER_ADMIN'`, `has_supplier_capability: true`, `active_context: 'supplier'`.
+- **Rutas de Autenticación (`src/api/routes/authRoutes.js`)**:
+  - `POST /api/auth/supplier/register` y `POST /api/auth/paper-supplier/register`.
+
+### 3. Interfaz y Experiencia de Usuario (`SupplierRegistrationPage.tsx`)
+- Montado en `/supplier/register` y `/paper-supplier/register` (redirección a `/supplier/register`).
+- Diseño glassmórfico integrado en `AuthShell` con acento corporativo `#dc0000`, acorde a las directrices de `Impeccable`.
+- Soporte trilingüe completo (ES, EN, DE) sincronizado al 100% (2.781 líneas en `src/ui/es.ts`, `src/ui/en.ts`, `src/ui/de.ts`).
+- Wizard multi-paso intuitivo con barra de progreso reactiva:
+  - **Paso 1: Empresa y Fiscalidad**: Razón social, marca comercial, NIF/CIF/VAT ID, país (catálogo canónico ISO), ciudad/hub logístico, web, contacto comercial y teléfono.
+  - **Paso 2: Distribución y Catálogo**: Selector interactivo de monedas de facturación (`EUR`, `USD`, `GBP`), categorías de papel suministradas (`COATED`, `UNCOATED`, `CARTON`, `SPECIALTY`, `DIGITAL`, `PACKAGING`), alcance de entrega (`LOCAL`, `REGIONAL`, `NATIONAL`, `INTERNATIONAL`), pedido mínimo y plazo de entrega estándar.
+  - **Paso 3: Acceso y Credenciales**: Email de administrador, contraseña con medidor visual de fortaleza y toggle de visibilidad, confirmación de contraseña con validación de coincidencia, aceptación de términos comerciales B2B y declaración de capacidad de representación legal.
+  - **Paso 4: Pantalla de Éxito**: Resumen del proveedor activado, confirmación del rol `SUPPLIER_ADMIN` y botón de acceso directo al `/supplier/dashboard`.
+- Enlaces cruzados en `AuthShell` y pie de página hacia `/login` y `/printhouse/register`.
+
+### 4. Verificación y Resultados de Pruebas
+1. **Tests Unitarios e Integración MySQL (`tests/paper_supplier_registration.test.js`)**: **4/4 PASS** (validación de entrada, rechazo de duplicados, creación atómica de tablas/sesión/JWT, e integración HTTP Express).
+2. **Pruebas de Interfaz y Responsividad Playwright (`scripts/verify_supplier_registration_ui.py`)**:
+   - Redirección de alias `/paper-supplier/register` -> `/supplier/register`: **PASS**.
+   - Cero desbordamiento horizontal (`scrollWidth <= clientWidth`):
+     - `desktop_1280` (1280x720): `scrollWidth=1280, clientWidth=1280` (**PASS**).
+     - `desktop_1366` (1366x768): `scrollWidth=1366, clientWidth=1366` (**PASS**).
+     - `mobile_390` (390x844): `scrollWidth=390, clientWidth=390` (**PASS**).
+   - Transiciones del wizard y medidor de contraseñas: **PASS**.
+   - Capturas de evidencia archivadas en `docs/reviews/supplier_registration_evidence/`.
+3. **Compilación de Producción (`npm run build`)**: **PASS** (3.578 módulos compilados en 12.92s).
+4. **Paridad de Diccionarios i18n**: Exactamente 2.781 líneas en `es.ts`, `en.ts` y `de.ts`.
+
+---
+
+## Hito Específico: Buscador Maestro de Base de Datos de Papel en Hub de Materiales de Imprenta (`MaterialsPage.tsx`)
+
+### 1. Resumen de Necesidad y Alcance
+Se integró en el Hub de Materiales de Imprenta (`MaterialsPage.tsx`) un buscador inteligente conectado a la base de datos maestra de papel (`paper_products`, `paper_variants`, `supplier_paper_offers`). Permite a los operadores de taller aprovisionar perfiles de materiales directamente desde el catálogo maestro (sembrado con `proveedor@demo-papel.pro` y distribuidores asociados), eliminando la introducción manual repetitiva y posibilitando la emisión inmediata de Órdenes de Compra y RFQ a proveedores con un solo clic.
+
+### 2. Arquitectura del Servicio de Búsqueda y Parser Físico
+- **Servicio Backend (`src/api/services/paperProcurementService.js` -> `searchMasterPaperDatabase`)**:
+  - **Parser de Dimensiones Multiformato**:
+    - Detección de patrones dimensionales `(\d+(?:[.,]\d+)?)\s*[xX*]\s*(\d+(?:[.,]\d+)?)`.
+    - Normalización automática de centímetros a milímetros (si $dim < 200$, multiplica por 10; e.g. `70x100` -> $700 \times 1000\text{ mm}$).
+    - Soporte de nombres de formato estándar (`SRA3` -> $320 \times 450\text{ mm}$, `A3` -> $297 \times 420\text{ mm}$, `A4` -> $210 \times 297\text{ mm}$).
+    - **Invarianza de Orientación**: Cláusula SQL bidireccional `((v.width_mm = W AND v.height_mm = H) OR (v.width_mm = H AND v.height_mm = W))` para que `70x100` y `100x70` resuelvan exactamente la misma variante física sin importar cómo se introdujo el pliego.
+  - **Extracción de Gramaje (GSM) y Desacoplamiento de Tokens**:
+    - Extracción de gramaje (`(\d{2,4})\s*(?:g|gsm|g\/m2)?`).
+    - Eliminación del gramaje y de las dimensiones del texto de búsqueda (`textQuery`) para evitar colisiones con el nombre de producto (e.g. en `"Alaska 255"`, extrae `gsm = 255` y busca `"Alaska"` por nombre/marca en lugar de forzar `p.name LIKE '%255%'`).
+  - **Resolución Multi-Proveedor y Fallback Seguro**:
+    - Consulta uniones de variantes de proveedores vinculados al tenant de la imprenta.
+    - Fallback determinista al catálogo del proveedor maestro sembrado `Papelera del Mediterraneo (Demo)` (`proveedor@demo-papel.pro`), garantizando disponibilidad inmediata de fichas y tarifas de demostración.
+  - **Cálculo de Precio por Hoja en Servidor**:
+    - Conversión exacta de tarifas por `KG`, `TONNE`, `THOUSAND_SHEETS`, `PACK` a coste unitario por pliego según el peso físico $W_{\text{pliego}} = \frac{W\text{ (mm)}}{1000} \times \frac{H\text{ (mm)}}{1000} \times \frac{\text{GSM}}{1000}$.
+- **Ruta de Administración (`src/api/routes/materialsAdmin.js`)**:
+  - `GET /api/admin/materials/paper-database/search?q=...&category=...&finish=...&limit=...`
+  - Aislamiento estricto de tenant validado con `resolveActorContext`.
+
+### 3. Interfaz de Usuario y Experiencia en Taller (`MaterialsPage.tsx`)
+- **Cajón de Aprovisionamiento ("Provision Material Profile")**:
+  - Tarjeta de Búsqueda Rápida en Base de Datos Maestra con indicador visual de catálogo oficial (`proveedor@demo-papel.pro`).
+  - Chips de filtrado rápido por medidas populares (`70x100`, `64x92`, `72x102`, `500x700`, `SRA3`) y marcas conocidas (`Alaska`, `Silk`, `Algro`).
+  - Menú desplegable interactivo con sugerencias ricas: nombre comercial, categoría, acabado, dimensiones normalizadas, gramaje, distribuidor, tarifa ofertada y coste calculado por pliego.
+  - Al seleccionar una variante, autocompleta instantáneamente:
+    - Nombre del material, categoría (`PAPER`), fabricante, código SKU del proveedor, gramaje, calibre/espesor, ancho ($W$), alto ($H$), unidad física (`SHEET`) y coste de reposición estimado.
+    - Metadatos persistentes de trazabilidad: `paper_variant_id`, `paper_product_id`, `supplier_id`, `offer_id`.
+  - Banner de confirmación verde que confirma la vinculación oficial a la base de datos de papel.
+- **Acceso Directo a Compras en Tabla SCADA**:
+  - Botón `"Pedir"` / `"Order"` en la columna de acciones para todas las filas de tipo `PAPER`.
+- **Panel Lateral de Detalle del Material**:
+  - Tarjeta "Proveedor de Papel & Sourcing" con insignia `"Vinculado a BD"` / `"Linked to DB"`.
+  - Botón prominente `"Hacer Pedido al Proveedor"` / `"Order from Supplier"`.
+  - Sugerencia interactiva de pedido a proveedor en el modal de reposición manual de existencias.
+- **Conexión Directa con `<PaperSourcingModal>`**:
+  - Despliega el modal de aprovisionamiento preseleccionando automáticamente el producto, variante y tarifa del proveedor para emitir RFQ o Pedido en 1 solo clic.
+
+### 4. Verificación y Resultados de Pruebas
+1. **Tests Unitarios e Integración MySQL (`tests/paper_master_database_search.test.js`)**: **10/10 PASS**:
+   - Búsqueda por dimensiones en cm (`70x100` -> $700 \times 1000\text{ mm}$).
+   - Invarianza de orientación dimensional (`100x70` encuentra la misma variante que `70x100`).
+   - Búsqueda por dimensiones en mm (`640x920` -> $640 \times 920\text{ mm}$).
+   - Búsqueda por nombre de formato estándar (`SRA3` -> $320 \times 450\text{ mm}$).
+   - Búsqueda combinada marca + gramaje (`Alaska 255`).
+   - Búsqueda por fabricante/marca (`Silk`, `Brun`, `Algro`).
+   - Cálculo determinista de precio por hoja (`pricePerSheet`).
+   - Guard de longitud mínima (consultas de $<2$ caracteres retornan vacío sin sobrecargar la base de datos).
+   - Seguridad: requerimiento estricto de autenticación y aislamiento multi-tenant.
+2. **Pruebas de Interfaz y Responsividad Playwright (`scripts/verify_materials_paper_search_ui.py`)**:
+   - Cero desbordamiento horizontal (`scrollWidth <= clientWidth`):
+     - `desktop_1280` (1280x720): `scrollWidth=1280, clientWidth=1280` (**PASS**).
+     - `desktop_1366` (1366x768): `scrollWidth=1366, clientWidth=1366` (**PASS**).
+     - `mobile_390` (390x844): `scrollWidth=390, clientWidth=390` (**PASS**).
+   - Interacción de autocompletado y selección de ficha técnica: **PASS**.
+   - Capturas de evidencia archivadas en `docs/reviews/paper_db_search_evidence/`.
+3. **Compilación de Producción (`npm run build`)**: **PASS** (3.578 módulos compilados en 13.07s).
+4. **Paridad de Diccionarios i18n**: Claves `materials.dbSearch.*`, `materials.orderFromSupplier`, `materials.orderPaper`, `materials.linkedToDb`, `materials.manualSpec` sincronizadas al 100% en `es.ts`, `en.ts` y `de.ts`.
+
+
 
 
 

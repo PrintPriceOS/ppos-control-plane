@@ -227,11 +227,16 @@ export const AuthShell: React.FC<AuthShellProps> = ({
                     fontFamily: "'Manrope', system-ui, sans-serif",
                     fontWeight: 600,
                     margin: 0,
+                    lineHeight: 1.6,
                 }}>
                     PrintPrice OS v1.9.0 © {new Date().getFullYear()}
                     {' · '}
                     <a href="/printhouse/register" style={{ color: '#dc0000', textDecoration: 'none' }}>
-                        New print house? Register
+                        Printhouse Registration
+                    </a>
+                    {' · '}
+                    <a href="/supplier/register" style={{ color: '#dc0000', textDecoration: 'none' }}>
+                        Paper Supplier Registration
                     </a>
                 </p>
             </div>

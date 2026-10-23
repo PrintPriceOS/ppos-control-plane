@@ -25,12 +25,18 @@ interface PaperSourcingModalProps {
     isOpen: boolean;
     onClose: () => void;
     onStockUpdated?: () => void;
+    initialSearchQuery?: string;
+    initialVariantId?: string;
+    initialOfferId?: string;
 }
 
 export const PaperSourcingModal: React.FC<PaperSourcingModalProps> = ({
     isOpen,
     onClose,
-    onStockUpdated
+    onStockUpdated,
+    initialSearchQuery,
+    initialVariantId,
+    initialOfferId
 }) => {
     const { t } = useLocale();
     const printhouseId = getUserPrinthouseId() || 'node_plant_frankfurt';
@@ -118,13 +124,28 @@ export const PaperSourcingModal: React.FC<PaperSourcingModalProps> = ({
 
     useEffect(() => {
         if (isOpen) {
+            if (initialSearchQuery) {
+                setSearchQuery(initialSearchQuery);
+            }
             if (activeTab === 'CATALOG') {
                 fetchOffers();
             } else {
                 fetchProcurementOrders();
             }
         }
-    }, [isOpen, activeTab, fetchOffers, fetchProcurementOrders]);
+    }, [isOpen, activeTab, initialSearchQuery, fetchOffers, fetchProcurementOrders]);
+
+    useEffect(() => {
+        if (isOpen && offers.length > 0 && (initialOfferId || initialVariantId) && !selectedOffer) {
+            const match = offers.find(o => 
+                (initialOfferId && (o.id === initialOfferId || o.offerId === initialOfferId)) ||
+                (initialVariantId && (o.variantId === initialVariantId || o.variant_id === initialVariantId))
+            );
+            if (match) {
+                setSelectedOffer(match);
+            }
+        }
+    }, [isOpen, offers, initialOfferId, initialVariantId, selectedOffer]);
 
     // Live calculation of sheets and price
     const calculatedEstimate = React.useMemo(() => {

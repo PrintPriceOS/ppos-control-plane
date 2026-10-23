@@ -298,6 +298,255 @@ class PaperProcurementService {
     }
 
     /**
+     * Search master paper products, technical variants, and system supplier offers.
+     * Allows Printhouse operators to search by name/brand/finish or by dimensions/format (e.g. 70x100, 700x1000, 64x92).
+     */
+    async searchMasterPaperDatabase(buyerTenantId, query = {}) {
+        const rawQuery = (query.query || query.q || '').trim();
+        const limit = Math.min(Math.max(1, parseInt(query.limit, 10) || 30), 100);
+        const offset = Math.max(0, parseInt(query.offset, 10) || 0);
+
+        // If raw query is non-empty but under 2 characters and no category/finish filter is specified, return empty
+        if (rawQuery.length > 0 && rawQuery.length < 2 && !query.category && !query.finish && !query.gsm) {
+            return {
+                total: 0,
+                limit,
+                offset,
+                items: []
+            };
+        }
+
+        // 1. Parse dimension pairs if present
+        // Matches e.g. 700x1000, 70 x 100, 64x92, 72x102, 1020x720, 500x700
+        const dimMatch = rawQuery.match(/\b(\d{2,4})\s*[*xX×]\s*(\d{2,4})\b/);
+        let dimPairs = [];
+        if (dimMatch) {
+            const d1 = parseInt(dimMatch[1], 10);
+            const d2 = parseInt(dimMatch[2], 10);
+            dimPairs.push([d1, d2], [d2, d1]);
+            // If dimensions look like cm (< 200), also check mm equivalents (* 10)
+            if (d1 < 200 && d2 < 200) {
+                dimPairs.push([d1 * 10, d2 * 10], [d2 * 10, d1 * 10]);
+            }
+        }
+
+        // 2. Parse GSM if query contains standalone grammage like "130g", "255 gsm", "300"
+        let parsedGsm = query.gsm ? parseInt(query.gsm, 10) : null;
+        const gsmMatch = rawQuery.match(/\b(\d{2,3})\s*(?:g|gsm)?\b/i);
+        if (!parsedGsm && gsmMatch && !dimMatch) {
+            const possibleGsm = parseInt(gsmMatch[1], 10);
+            if (possibleGsm >= 50 && possibleGsm <= 600) {
+                parsedGsm = possibleGsm;
+            }
+        }
+
+        // 3. Extract text keywords (excluding matched dimension token and matched gsm token)
+        let textQuery = rawQuery;
+        if (dimMatch) {
+            textQuery = textQuery.replace(dimMatch[0], ' ').trim();
+        }
+        if (parsedGsm && gsmMatch) {
+            textQuery = textQuery.replace(gsmMatch[0], ' ').trim();
+        }
+
+        let whereClauses = [];
+        let params = [buyerTenantId, buyerTenantId];
+
+        // Dimension filter
+        if (dimPairs.length > 0) {
+            const orDimClauses = dimPairs.map(() => '(v.width_mm = ? AND v.height_mm = ?)').join(' OR ');
+            const dimFlat = [];
+            for (const pair of dimPairs) {
+                dimFlat.push(pair[0], pair[1]);
+            }
+            whereClauses.push(`(${orDimClauses} OR p.name LIKE ?)`);
+            params.push(...dimFlat, `%${dimMatch[0]}%`);
+        }
+
+        // Text query
+        if (textQuery && textQuery.length > 0) {
+            const tokens = textQuery.split(/\s+/).filter(t => t.length > 0);
+            for (const token of tokens) {
+                const s = `%${token}%`;
+                whereClauses.push('(p.name LIKE ? OR p.brand LIKE ? OR p.manufacturer LIKE ? OR p.category LIKE ? OR v.finish LIKE ? OR s.name LIKE ?)');
+                params.push(s, s, s, s, s, s);
+            }
+        }
+
+        // Category filter
+        if (query.category) {
+            whereClauses.push('p.category = ?');
+            params.push(String(query.category).toUpperCase());
+        }
+
+        // Finish filter
+        if (query.finish) {
+            whereClauses.push('v.finish = ?');
+            params.push(String(query.finish).toUpperCase());
+        }
+
+        // GSM filter
+        if (parsedGsm) {
+            whereClauses.push('(v.gsm = ? OR p.name LIKE ?)');
+            params.push(parsedGsm, `%${parsedGsm}%`);
+        }
+
+        const whereSql = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
+
+        // Query with Left Join on supplier offers
+        const sql = `
+            SELECT 
+                v.id AS variant_id,
+                v.product_id,
+                p.name AS product_name,
+                p.brand,
+                p.manufacturer,
+                p.category,
+                p.finish_summary,
+                p.description,
+                v.gsm,
+                v.width_mm,
+                v.height_mm,
+                v.caliper_um,
+                v.caliper_mm,
+                v.is_reel,
+                v.finish,
+                v.grain_direction,
+                v.fingerprint,
+                o.id AS offer_id,
+                o.supplier_id,
+                s.name AS supplier_name,
+                s.contact_email AS supplier_email,
+                o.supplier_sku,
+                o.price_amount,
+                o.price_basis,
+                o.currency,
+                o.moq,
+                o.order_multiple,
+                o.sheets_per_pack,
+                o.status AS offer_status
+            FROM paper_variants v
+            JOIN paper_products p ON v.product_id = p.id
+            LEFT JOIN supplier_paper_offers o ON o.variant_id = v.id 
+                AND o.deleted_at IS NULL
+                AND (o.visibility = 'MARKETPLACE' OR (o.visibility = 'APPROVED_CUSTOMERS' AND JSON_CONTAINS(COALESCE(o.metadata_json->'$.approved_customer_ids', '[]'), JSON_QUOTE(?))) OR (o.visibility = 'PRIVATE' AND o.tenant_id = ?))
+            LEFT JOIN paper_suppliers s ON o.supplier_id = s.id
+            ${whereSql}
+            ORDER BY 
+                (o.status = 'ACTIVE') DESC,
+                (o.id IS NOT NULL) DESC,
+                p.name ASC, 
+                v.gsm ASC, 
+                v.width_mm ASC
+            LIMIT ? OFFSET ?
+        `;
+
+        const countSql = `
+            SELECT COUNT(DISTINCT v.id) as total
+            FROM paper_variants v
+            JOIN paper_products p ON v.product_id = p.id
+            LEFT JOIN supplier_paper_offers o ON o.variant_id = v.id 
+                AND o.deleted_at IS NULL
+                AND (o.visibility = 'MARKETPLACE' OR (o.visibility = 'APPROVED_CUSTOMERS' AND JSON_CONTAINS(COALESCE(o.metadata_json->'$.approved_customer_ids', '[]'), JSON_QUOTE(?))) OR (o.visibility = 'PRIVATE' AND o.tenant_id = ?))
+            LEFT JOIN paper_suppliers s ON o.supplier_id = s.id
+            ${whereSql}
+        `;
+
+        const countRows = unwrapRows(await db.query(countSql, params));
+        const total = (countRows && countRows[0] && countRows[0].total) ? Number(countRows[0].total) : 0;
+
+        const rows = unwrapRows(await db.query(sql, [...params, limit, offset]));
+        const rawItems = Array.isArray(rows) ? rows : [];
+
+        // Deduplicate variants so each variant appears only once with its best offer
+        const seenVariantIds = new Set();
+        const items = [];
+
+        for (const r of rawItems) {
+            if (seenVariantIds.has(r.variant_id)) continue;
+            seenVariantIds.add(r.variant_id);
+
+            const widthMm = Number(r.width_mm);
+            const heightMm = Number(r.height_mm);
+            const gsm = Number(r.gsm);
+            const areaM2 = (widthMm * heightMm) / 1000000;
+            const kgPerSheet = areaM2 * (gsm / 1000);
+
+            let calculatedCostPerSheet = null;
+            if (r.price_amount && r.price_basis) {
+                const amt = Number(r.price_amount);
+                switch (r.price_basis) {
+                    case 'SHEET':
+                        calculatedCostPerSheet = amt;
+                        break;
+                    case 'THOUSAND_SHEETS':
+                        calculatedCostPerSheet = amt / 1000;
+                        break;
+                    case 'PACK':
+                        if (Number(r.sheets_per_pack) > 0) {
+                            calculatedCostPerSheet = amt / Number(r.sheets_per_pack);
+                        }
+                        break;
+                    case 'KG':
+                        calculatedCostPerSheet = Number((amt * kgPerSheet).toFixed(5));
+                        break;
+                    case 'TONNE':
+                        calculatedCostPerSheet = Number(((amt / 1000) * kgPerSheet).toFixed(5));
+                        break;
+                }
+            }
+
+            // Standard sheet format tag
+            let sheetFormat = `${Math.round(widthMm)}x${Math.round(heightMm)}`;
+            if (widthMm === 700 && heightMm === 1000) sheetFormat = '700x1000 (B1)';
+            else if (widthMm === 500 && heightMm === 700) sheetFormat = '500x700 (B2)';
+            else if (widthMm === 640 && heightMm === 900) sheetFormat = '640x900';
+            else if (widthMm === 640 && heightMm === 920) sheetFormat = '640x920';
+            else if (widthMm === 720 && heightMm === 1020) sheetFormat = '720x1020';
+            else if (widthMm === 1020 && heightMm === 720) sheetFormat = '1020x720';
+            else if (widthMm === 320 && heightMm === 450) sheetFormat = 'SRA3';
+            else if (widthMm === 450 && heightMm === 640) sheetFormat = '450x640 (SRA2)';
+
+            items.push({
+                variantId: r.variant_id,
+                productId: r.product_id,
+                productName: r.product_name,
+                brand: r.brand || null,
+                manufacturer: r.manufacturer || null,
+                category: r.category || 'OTHER',
+                finishSummary: r.finish_summary || null,
+                gsm,
+                widthMm,
+                heightMm,
+                dimensionsFormatted: `${widthMm} × ${heightMm} mm`,
+                sheetFormat,
+                finish: r.finish || 'UNCOATED',
+                grainDirection: r.grain_direction || 'UNKNOWN',
+                caliperUm: r.caliper_um ? Number(r.caliper_um) : null,
+                isReel: Boolean(r.is_reel),
+                supplierId: r.supplier_id || 'supp-test-mill-01',
+                supplierName: r.supplier_name || 'Papelera del Mediterraneo (Demo)',
+                supplierEmail: r.supplier_email || 'proveedor@demo-papel.pro',
+                offerId: r.offer_id || null,
+                supplierSku: r.supplier_sku || null,
+                priceAmount: r.price_amount ? Number(r.price_amount) : null,
+                priceBasis: r.price_basis || null,
+                currency: r.currency || 'EUR',
+                moq: r.moq ? Number(r.moq) : 1,
+                calculatedCostPerSheet,
+                hasActiveOffer: Boolean(r.offer_id && r.offer_status === 'ACTIVE')
+            });
+        }
+
+        return {
+            items,
+            total,
+            limit,
+            offset
+        };
+    }
+
+    /**
      * Printhouse Places Order or RFQ against a paper offer or variant.
      * Takes an immutable snapshot of specifications and commercial terms.
      */

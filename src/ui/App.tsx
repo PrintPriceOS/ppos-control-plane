@@ -85,6 +85,7 @@ import { SupplierDashboardPage } from './pages/supplier/SupplierDashboardPage';
 import { SupplierCatalogOffersPage } from './pages/supplier/SupplierCatalogOffersPage';
 import { SupplierOrdersPage } from './pages/supplier/SupplierOrdersPage';
 import { SupplierSettingsPage } from './pages/supplier/SupplierSettingsPage';
+import { SupplierRegistrationPage } from './pages/supplier/SupplierRegistrationPage';
 import { ActivationGuard } from './components/auth/ActivationGuard';
 
 import { ActivationHub } from './pages/connect/ActivationHub';
@@ -181,6 +182,8 @@ export const App: React.FC = () => {
             <Route path="/auth/reset-password" element={<ForgotPasswordPage />} />
             <Route path="/auth/activate" element={<PrinthouseActivationPage />} />
             <Route path="/printhouse/register" element={<PrinthouseRegistrationPage />} />
+            <Route path="/supplier/register" element={<SupplierRegistrationPage />} />
+            <Route path="/paper-supplier/register" element={<Navigate to="/supplier/register" replace />} />
             <Route path="/public/preflight/human-report/:token" element={<PublicHumanReportPage />} />
             <Route path="/printhouse/onboarding-guided" element={<AuthGuard><GuidedOnboardingPage /></AuthGuard>} />
             <Route path="/printhouse/onboarding" element={<AuthGuard><GuidedOnboardingPage /></AuthGuard>} />

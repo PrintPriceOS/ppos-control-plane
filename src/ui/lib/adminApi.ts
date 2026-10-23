@@ -2898,6 +2898,63 @@ export async function getFederationRegistry() {
 // ==========================================
 // Paper Sourcing & Procurement Hub (Phase I4-I5)
 // ==========================================
+// MASTER PAPER DATABASE SEARCH FOR PRINTHOUSES
+// ==========================================
+
+export interface MasterPaperDatabaseItem {
+    variantId: string;
+    productId: string;
+    productName: string;
+    brand: string | null;
+    manufacturer: string | null;
+    category: string;
+    finishSummary: string | null;
+    gsm: number;
+    widthMm: number;
+    heightMm: number;
+    dimensionsFormatted: string;
+    sheetFormat: string;
+    finish: string;
+    grainDirection: string;
+    caliperUm: number | null;
+    isReel: boolean;
+    supplierId: string;
+    supplierName: string;
+    supplierEmail: string;
+    offerId: string | null;
+    supplierSku: string | null;
+    priceAmount: number | null;
+    priceBasis: string | null;
+    currency: string;
+    moq: number;
+    calculatedCostPerSheet: number | null;
+    hasActiveOffer: boolean;
+}
+
+export async function searchMasterPaperDatabase(params?: {
+    query?: string;
+    gsm?: number;
+    category?: string;
+    finish?: string;
+    limit?: number;
+    offset?: number;
+}) {
+    const q = new URLSearchParams();
+    if (params?.query) q.set('query', params.query);
+    if (params?.gsm) q.set('gsm', String(params.gsm));
+    if (params?.category) q.set('category', params.category);
+    if (params?.finish) q.set('finish', params.finish);
+    if (params?.limit) q.set('limit', String(params.limit));
+    if (params?.offset) q.set('offset', String(params.offset));
+
+    return adminFetch<{ ok: boolean; data: { items: MasterPaperDatabaseItem[]; total: number; limit: number; offset: number } }>(
+        `/api/admin/materials/paper-database/search?${q.toString()}`
+    );
+}
+
+// ==========================================
+// ITERATIONS I4 & I5: PRINTHOUSE PAPER SOURCING & PROCUREMENT API
+// ==========================================
 
 export async function searchPaperSourcingOffers(params?: {
     query?: string;

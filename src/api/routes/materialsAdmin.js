@@ -361,6 +361,29 @@ const paperProcurementService = require('../services/paperProcurementService');
  */
 
 /**
+ * GET /api/admin/materials/paper-database/search
+ * Search master paper catalog products, variants, and system supplier offers.
+ * Supports search by name, brand, finish, and dimensions/measurements (e.g. 70x100, 700x1000).
+ */
+router.get('/paper-database/search', async (req, res) => {
+    try {
+        const scope = getScopeContext(req);
+        if (!scope.tenantId) {
+            return res.status(401).json({ ok: false, error: 'TENANT_ID_REQUIRED' });
+        }
+
+        const result = await paperProcurementService.searchMasterPaperDatabase(scope.tenantId, req.query);
+        return res.json({ ok: true, data: result });
+    } catch (err) {
+        if (err.statusCode) {
+            return res.status(err.statusCode).json({ ok: false, error: err.message, code: err.code || 'PAPER_DB_SEARCH_ERROR' });
+        }
+        console.error('[MATERIALS-API] Failed to search master paper database:', err);
+        return res.status(500).json({ ok: false, error: err.message, code: 'PAPER_DB_SEARCH_ERROR' });
+    }
+});
+
+/**
  * GET /api/admin/materials/sourcing/offers
  * Sourcing search across visible supplier paper offers.
  */
