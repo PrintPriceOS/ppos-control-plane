@@ -1908,6 +1908,132 @@ async function confirmImportBatch({ batchId, tenantId, supplierId, actorId, sele
     }
 }
 
+/**
+ * List import batches for a supplier with execution history and row counts.
+ */
+async function listImportBatches({ tenantId, supplierId, page = 1, limit = 20 }) {
+    const offset = Math.max(0, (page - 1) * limit);
+    const where = ['b.tenant_id = ?', 'b.supplier_id = ?'];
+    const params = [tenantId, supplierId];
+
+    const [countRow] = await db.query(
+        `SELECT COUNT(*) as total FROM paper_import_batches b WHERE ${where.join(' AND ')}`,
+        params
+    );
+    const total = Number(countRow?.total || 0);
+
+    const rows = await db.query(
+        `SELECT 
+            b.id,
+            b.tenant_id,
+            b.supplier_id,
+            b.file_name,
+            b.file_sha256,
+            b.format,
+            b.total_rows,
+            b.valid_rows,
+            b.issue_rows,
+            b.duplicate_rows,
+            b.status,
+            b.created_by,
+            b.confirmed_at,
+            b.metadata_json,
+            b.created_at,
+            b.updated_at
+         FROM paper_import_batches b
+         WHERE ${where.join(' AND ')}
+         ORDER BY b.created_at DESC
+         LIMIT ? OFFSET ?`,
+        [...params, limit, offset]
+    );
+
+    return {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+        batches: rows.map(b => ({
+            id: b.id,
+            fileName: b.file_name,
+            fileSha256: b.file_sha256,
+            format: b.format,
+            totalRows: Number(b.total_rows),
+            validRows: Number(b.valid_rows),
+            issueRows: Number(b.issue_rows),
+            duplicateRows: Number(b.duplicate_rows),
+            status: b.status,
+            createdBy: b.created_by,
+            confirmedAt: b.confirmed_at,
+            createdAt: b.created_at,
+            metadata: typeof b.metadata_json === 'string' ? JSON.parse(b.metadata_json) : (b.metadata_json || {})
+        }))
+    };
+}
+
+/**
+ * Export all rows with issues or pending review from an import batch as standard CSV.
+ */
+async function exportBatchIssuesCsv({ tenantId, supplierId, batchId }) {
+    const [batchRows] = await db.query(
+        'SELECT * FROM paper_import_batches WHERE id = ? AND tenant_id = ? AND supplier_id = ?',
+        [batchId, tenantId, supplierId]
+    );
+    if (!batchRows || batchRows.length === 0) {
+        throw new Error('BATCH_NOT_FOUND: Import batch not found for tenant and supplier');
+    }
+
+    const rows = await db.query(
+        `SELECT row_number, sheet_name, raw_data_json, normalized_data_json, issues_json, validation_status, decision
+         FROM paper_import_rows
+         WHERE batch_id = ? AND (validation_status IN ('WARNING', 'REJECTED', 'DUPLICATE') OR issues_json IS NOT NULL)
+         ORDER BY row_number ASC`,
+        [batchId]
+    );
+
+    const escapeCsv = (str) => {
+        if (str === null || str === undefined) return '';
+        const s = String(str);
+        if (s.includes('"') || s.includes(',') || s.includes('\n') || s.includes('\r')) {
+            return `"${s.replace(/"/g, '""')}"`;
+        }
+        return s;
+    };
+
+    const headers = ['Row Number', 'Sheet', 'Validation Status', 'Decision', 'Product Name', 'Brand', 'Category', 'GSM', 'Width (mm)', 'Height (mm)', 'Issues / Warnings'];
+    const lines = [headers.join(',')];
+
+    for (const r of rows) {
+        const norm = typeof r.normalized_data_json === 'string' ? JSON.parse(r.normalized_data_json) : (r.normalized_data_json || {});
+        const issues = typeof r.issues_json === 'string' ? JSON.parse(r.issues_json) : (r.issues_json || []);
+        const issueSummary = issues.map(iss => iss.message || iss.code || String(iss)).join(' | ');
+
+        lines.push([
+            r.row_number,
+            escapeCsv(r.sheet_name),
+            escapeCsv(r.validation_status),
+            escapeCsv(r.decision),
+            escapeCsv(norm.product_name || norm.name || ''),
+            escapeCsv(norm.brand || ''),
+            escapeCsv(norm.category || ''),
+            escapeCsv(norm.gsm || ''),
+            escapeCsv(norm.width_mm || ''),
+            escapeCsv(norm.height_mm || ''),
+            escapeCsv(issueSummary)
+        ].join(','));
+    }
+
+    return lines.join('\r\n');
+}
+
+/**
+ * Returns RFC 4180 compliant CSV template with required headers and example row.
+ */
+function getCatalogCsvTemplate() {
+    return 'product_name,brand,category,finish,gsm,width_mm,height_mm,caliper_um,grain_direction\r\n' +
+           'Munken Polar,Arctic Paper,UNCOATED,Smooth,120,700,1000,140,LONG_GRAIN\r\n' +
+           'AllyKing Cream GC2,AllyKing,CARTON,Semi-gloss,325,720,1020,450,LONG_GRAIN\r\n';
+}
+
 module.exports = {
     detectFormat,
     parseOdsBuffer,
@@ -1920,6 +2046,9 @@ module.exports = {
     getImportBatchRows,
     updateImportRowDecisions,
     confirmImportBatch,
+    listImportBatches,
+    exportBatchIssuesCsv,
+    getCatalogCsvTemplate,
     parseGrainDirection,
     computeVariantFingerprint,
     validateTechnicalRow,

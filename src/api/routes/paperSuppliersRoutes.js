@@ -368,6 +368,201 @@ router.post('/catalog/imports/:batchId/confirm', requireSupplierScope('OPERATOR'
     }
 });
 
+/**
+ * GET /api/v1/paper-suppliers/catalog/imports
+ * List staged and confirmed technical import batches for this supplier.
+ */
+router.get('/catalog/imports', requireSupplierScope('VIEWER'), requireApprovedSupplier, async (req, res) => {
+    try {
+        const context = resolveActorContext(req);
+        const page = parseInt(req.query.page || '1', 10);
+        const limit = Math.min(parseInt(req.query.limit || '20', 10), 100);
+
+        const result = await paperImportService.listImportBatches({
+            tenantId: context.tenantId,
+            supplierId: context.supplierId,
+            page,
+            limit
+        });
+
+        return res.json({
+            ok: true,
+            data: result
+        });
+    } catch (err) {
+        console.error('[PAPER-IMPORT][LIST-BATCHES-ERROR]', err);
+        return res.status(500).json({
+            ok: false,
+            error: { code: 'LIST_BATCHES_FAILED', message: err.message }
+        });
+    }
+});
+
+/**
+ * GET /api/v1/paper-suppliers/catalog/imports/:batchId/export-issues
+ * Download CSV of rows with validation issues/warnings from an import batch.
+ */
+router.get('/catalog/imports/:batchId/export-issues', requireSupplierScope('VIEWER'), requireApprovedSupplier, async (req, res) => {
+    try {
+        const context = resolveActorContext(req);
+        const { batchId } = req.params;
+
+        const csvContent = await paperImportService.exportBatchIssuesCsv({
+            tenantId: context.tenantId,
+            supplierId: context.supplierId,
+            batchId
+        });
+
+        res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+        res.setHeader('Content-Disposition', `attachment; filename="import_issues_${batchId}.csv"`);
+        return res.status(200).send(csvContent);
+    } catch (err) {
+        console.error('[PAPER-IMPORT][EXPORT-ISSUES-ERROR]', err);
+        const isNotFound = err.message.startsWith('BATCH_NOT_FOUND');
+        return res.status(isNotFound ? 404 : 500).json({
+            ok: false,
+            error: { code: isNotFound ? 'BATCH_NOT_FOUND' : 'EXPORT_ISSUES_FAILED', message: err.message }
+        });
+    }
+});
+
+/**
+ * GET /api/v1/paper-suppliers/catalog/template
+ * Download RFC 4180 compliant CSV template for paper technical catalog imports.
+ */
+router.get('/catalog/template', requireSupplierScope('VIEWER'), (req, res) => {
+    try {
+        const csvContent = paperImportService.getCatalogCsvTemplate();
+        res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+        res.setHeader('Content-Disposition', 'attachment; filename="paper_catalog_template.csv"');
+        return res.status(200).send(csvContent);
+    } catch (err) {
+        return res.status(500).json({ ok: false, error: { code: 'TEMPLATE_DOWNLOAD_FAILED', message: err.message } });
+    }
+});
+
+/**
+ * POST /api/v1/paper-suppliers/catalog/imports/:batchId/retract
+ * Retract / rollback a confirmed import batch, safely removing unshared variants.
+ */
+router.post('/catalog/imports/:batchId/retract', requireSupplierScope('OPERATOR'), requireApprovedSupplier, async (req, res) => {
+    try {
+        const context = resolveActorContext(req);
+        const role = req.verifiedSupplierContext?.role || context.role;
+        const { batchId } = req.params;
+
+        const result = await paperOfferService.retractImportBatch({
+            tenantId: context.tenantId,
+            supplierId: context.supplierId,
+            actorId: context.userId,
+            role,
+            batchId
+        });
+
+        return res.json({
+            ok: true,
+            data: result
+        });
+    } catch (err) {
+        console.error('[PAPER-IMPORT][RETRACT-ERROR]', err);
+        const isNotFound = err.message.startsWith('BATCH_NOT_FOUND');
+        const isInvalid = err.message.startsWith('CANNOT_RETRACT_UNCONFIRMED_BATCH');
+        const isForbidden = err.message.startsWith('FORBIDDEN');
+        const statusCode = isNotFound ? 404 : (isInvalid ? 400 : (isForbidden ? 403 : 500));
+
+        return res.status(statusCode).json({
+            ok: false,
+            error: {
+                code: isNotFound ? 'BATCH_NOT_FOUND' : (isInvalid ? 'CANNOT_RETRACT' : (isForbidden ? 'FORBIDDEN' : 'RETRACT_FAILED')),
+                message: err.message
+            }
+        });
+    }
+});
+
+/**
+ * PATCH /api/v1/paper-suppliers/catalog/variants/:variantId
+ * Controlled technical modification of variant specifications.
+ */
+router.patch('/catalog/variants/:variantId', requireSupplierScope('OPERATOR'), requireApprovedSupplier, async (req, res) => {
+    try {
+        const context = resolveActorContext(req);
+        const role = req.verifiedSupplierContext?.role || context.role;
+        const { variantId } = req.params;
+        const payload = req.body || {};
+
+        const result = await paperOfferService.updateTechnicalVariant({
+            tenantId: context.tenantId,
+            supplierId: context.supplierId,
+            actorId: context.userId,
+            role,
+            variantId,
+            payload
+        });
+
+        return res.json({
+            ok: true,
+            data: result
+        });
+    } catch (err) {
+        console.error('[PAPER-SUPPLIERS][UPDATE-VARIANT-ERROR]', err);
+        const isNotFound = err.message.startsWith('VARIANT_NOT_FOUND');
+        const isCollision = err.message.startsWith('VARIANT_FINGERPRINT_COLLISION');
+        const isRestricted = err.message.startsWith('SHARED_VARIANT_MUTATION_RESTRICTED');
+        const isInvalid = err.message.startsWith('INVALID_');
+        const statusCode = isNotFound ? 404 : (isCollision ? 409 : (isRestricted ? 403 : (isInvalid ? 400 : 500)));
+
+        return res.status(statusCode).json({
+            ok: false,
+            error: {
+                code: isNotFound ? 'VARIANT_NOT_FOUND' : (isCollision ? 'VARIANT_FINGERPRINT_COLLISION' : (isRestricted ? 'SHARED_VARIANT_MUTATION_RESTRICTED' : 'VARIANT_UPDATE_FAILED')),
+                message: err.message
+            }
+        });
+    }
+});
+
+/**
+ * DELETE /api/v1/paper-suppliers/catalog/variants/:variantId
+ * Safe deletion of an unshared technical variant originated by this supplier.
+ */
+router.delete('/catalog/variants/:variantId', requireSupplierScope('ADMIN'), requireApprovedSupplier, async (req, res) => {
+    try {
+        const context = resolveActorContext(req);
+        const role = req.verifiedSupplierContext?.role || context.role;
+        const { variantId } = req.params;
+
+        const result = await paperOfferService.deleteTechnicalVariant({
+            tenantId: context.tenantId,
+            supplierId: context.supplierId,
+            actorId: context.userId,
+            role,
+            variantId
+        });
+
+        return res.json({
+            ok: true,
+            data: result
+        });
+    } catch (err) {
+        console.error('[PAPER-SUPPLIERS][DELETE-VARIANT-ERROR]', err);
+        const isNotFound = err.message.startsWith('VARIANT_NOT_FOUND');
+        const isShared = err.message.startsWith('CANNOT_DELETE_SHARED_VARIANT');
+        const hasOffers = err.message.startsWith('VARIANT_HAS_OFFERS');
+        const notOrigin = err.message.startsWith('NOT_VARIANT_ORIGINATOR');
+        const isForbidden = err.message.startsWith('FORBIDDEN');
+        const statusCode = isNotFound ? 404 : (isShared || hasOffers || notOrigin ? 409 : (isForbidden ? 403 : 500));
+
+        return res.status(statusCode).json({
+            ok: false,
+            error: {
+                code: isNotFound ? 'VARIANT_NOT_FOUND' : (isShared ? 'CANNOT_DELETE_SHARED_VARIANT' : (hasOffers ? 'VARIANT_HAS_OFFERS' : (notOrigin ? 'NOT_VARIANT_ORIGINATOR' : 'DELETE_VARIANT_FAILED'))),
+                message: err.message
+            }
+        });
+    }
+});
+
 const paperOfferService = require('../services/paperOfferService');
 
 /**
@@ -658,6 +853,128 @@ router.patch('/offers/:offerId/status', requireSupplierScope('OPERATOR'), requir
             ok: false,
             error: {
                 code: isNotFound ? 'OFFER_NOT_FOUND' : (isInvalid ? 'INVALID_STATUS' : 'OFFER_STATUS_UPDATE_FAILED'),
+                message: err.message
+            }
+        });
+    }
+});
+
+/**
+ * PATCH /api/v1/paper-suppliers/offers/bulk-status
+ * Bulk activate, deactivate, archive, or restore offers.
+ */
+router.patch('/offers/bulk-status', requireSupplierScope('OPERATOR'), requireApprovedSupplier, async (req, res) => {
+    try {
+        const context = resolveActorContext(req);
+        const { action, offerIds, scope, filters, reason } = req.body || {};
+
+        const result = await paperOfferService.bulkUpdateOfferStatus({
+            tenantId: context.tenantId,
+            supplierId: context.supplierId,
+            actorId: context.userId,
+            action,
+            offerIds,
+            scope,
+            filters,
+            reason
+        });
+
+        return res.json({
+            ok: true,
+            data: result
+        });
+    } catch (err) {
+        console.error('[PAPER-SUPPLIERS][BULK-STATUS-ERROR]', err);
+        const isInvalid = err.message.startsWith('INVALID_BULK_ACTION') || err.message.startsWith('OFFER_IDS_REQUIRED');
+        const statusCode = isInvalid ? 400 : 500;
+
+        return res.status(statusCode).json({
+            ok: false,
+            error: {
+                code: isInvalid ? 'INVALID_REQUEST' : 'BULK_STATUS_UPDATE_FAILED',
+                message: err.message
+            }
+        });
+    }
+});
+
+/**
+ * DELETE /api/v1/paper-suppliers/offers/:offerId
+ * Permanently delete a commercial offer if unreferenced by procurement.
+ * Strictly restricted to SUPPLIER_ADMIN.
+ */
+router.delete('/offers/:offerId', requireSupplierScope('ADMIN'), requireApprovedSupplier, async (req, res) => {
+    try {
+        const context = resolveActorContext(req);
+        const role = req.verifiedSupplierContext?.role || context.role;
+        const { offerId } = req.params;
+
+        const result = await paperOfferService.deleteOffer({
+            tenantId: context.tenantId,
+            supplierId: context.supplierId,
+            actorId: context.userId,
+            role,
+            offerId
+        });
+
+        return res.json({
+            ok: true,
+            data: result
+        });
+    } catch (err) {
+        console.error('[PAPER-SUPPLIERS][DELETE-OFFER-ERROR]', err);
+        const isNotFound = err.message.startsWith('OFFER_NOT_FOUND');
+        const isDependencies = err.message.startsWith('OFFER_HAS_DEPENDENCIES');
+        const isForbidden = err.message.startsWith('FORBIDDEN');
+        const statusCode = isNotFound ? 404 : (isDependencies ? 409 : (isForbidden ? 403 : 500));
+        const errCode = isNotFound ? 'OFFER_NOT_FOUND' : (isDependencies ? 'OFFER_HAS_DEPENDENCIES' : (isForbidden ? 'FORBIDDEN' : 'DELETE_FAILED'));
+
+        return res.status(statusCode).json({
+            ok: false,
+            error: {
+                code: errCode,
+                message: err.message
+            }
+        });
+    }
+});
+
+/**
+ * POST /api/v1/paper-suppliers/offers/bulk-delete
+ * Bulk delete commercial offers with dependency revalidation per item.
+ * Strictly restricted to SUPPLIER_ADMIN.
+ */
+router.post('/offers/bulk-delete', requireSupplierScope('ADMIN'), requireApprovedSupplier, async (req, res) => {
+    try {
+        const context = resolveActorContext(req);
+        const role = req.verifiedSupplierContext?.role || context.role;
+        const { offerIds, scope, filters, reason } = req.body || {};
+
+        const result = await paperOfferService.bulkDeleteOffers({
+            tenantId: context.tenantId,
+            supplierId: context.supplierId,
+            actorId: context.userId,
+            role,
+            offerIds,
+            scope,
+            filters,
+            reason
+        });
+
+        return res.json({
+            ok: true,
+            data: result
+        });
+    } catch (err) {
+        console.error('[PAPER-SUPPLIERS][BULK-DELETE-ERROR]', err);
+        const isForbidden = err.message.startsWith('FORBIDDEN');
+        const isIdsReq = err.message.startsWith('OFFER_IDS_REQUIRED');
+        const statusCode = isForbidden ? 403 : (isIdsReq ? 400 : 500);
+
+        return res.status(statusCode).json({
+            ok: false,
+            error: {
+                code: isForbidden ? 'FORBIDDEN' : (isIdsReq ? 'OFFER_IDS_REQUIRED' : 'BULK_DELETE_FAILED'),
                 message: err.message
             }
         });

@@ -10,6 +10,7 @@ import {
 import { paperSupplierFetch, SupplierApiError } from '../../lib/paperSupplierApi';
 import { StatusBadge } from '../StatusBadge';
 import { useLocale } from '../../i18n';
+import { AccessibleModal } from '../AccessibleModal';
 
 interface ImportModalProps {
     isOpen: boolean;
@@ -237,34 +238,52 @@ export const TechnicalImportModal: React.FC<ImportModalProps> = ({
 
     const hasUnsavedDecisions = Object.keys(decisions).length > 0;
 
-    return (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 flex items-center justify-center p-4">
-            <div className="bg-white dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 w-full max-w-5xl flex flex-col max-h-[90vh] shadow-2xl">
-                {/* Header */}
-                <div className="p-5 border-b border-slate-200 dark:border-zinc-800 flex items-center justify-between">
-                    <div>
-                        <div className="flex items-center gap-2">
-                            <span className="px-2 py-0.5 text-[9px] font-black uppercase tracking-widest bg-red-600 text-white">
-                                Technical Importer
-                            </span>
-                            <span className="text-[10px] font-bold text-zinc-400">
-                                ODS · XLSX · CSV RFC 4180
-                            </span>
-                        </div>
-                        <h2 className="text-lg font-black text-slate-900 dark:text-white mt-1">
-                            {t('supplier.hub.importerTitle')}
-                        </h2>
-                    </div>
+    const footerContent = previewData ? (
+        <div className="flex items-center justify-between w-full">
+            <div>
+                <button
+                    onClick={handleResetImport}
+                    className="flex items-center gap-1.5 px-3 py-1.5 border border-slate-300 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-800 font-bold uppercase text-[10px] transition-colors"
+                    title="Discard current batch and start a fresh import"
+                >
+                    <ArrowPathIcon className="w-3.5 h-3.5" />
+                    <span>{t('supplier.hub.startNewImport')}</span>
+                </button>
+            </div>
+            <div className="flex items-center gap-3">
+                {hasUnsavedDecisions && (
                     <button
-                        onClick={onClose}
-                        className="p-1 text-zinc-400 hover:text-slate-900 dark:hover:text-white transition-colors"
+                        onClick={() => handleApplyDecisions()}
+                        disabled={savingDecisions}
+                        className="px-3.5 py-2 bg-slate-800 text-white font-bold uppercase text-[10px] hover:bg-slate-700 transition-colors disabled:opacity-50"
                     >
-                        <XMarkIcon className="w-5 h-5" />
+                        {savingDecisions ? t('supplier.hub.saving') : `${t('supplier.hub.saveDecisions')} (${Object.keys(decisions).length})`}
                     </button>
-                </div>
+                )}
+                <button
+                    onClick={handleConfirmBatch}
+                    disabled={confirming || savingDecisions}
+                    className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold uppercase tracking-wider text-[11px] transition-colors"
+                >
+                    {confirming ? t('supplier.hub.confirmingBatch') : t('supplier.hub.confirmCatalog')}
+                </button>
+            </div>
+        </div>
+    ) : undefined;
 
-                {/* Body */}
-                <div className="p-6 overflow-y-auto space-y-6 flex-1 text-xs">
+    return (
+        <AccessibleModal
+            isOpen={isOpen}
+            onClose={onClose}
+            title={t('supplier.hub.importerTitle')}
+            subtitle="ODS · XLSX · CSV RFC 4180"
+            badge="Technical Importer"
+            maxWidth="max-w-5xl"
+            hasUnsavedChanges={hasUnsavedDecisions}
+            unsavedWarningMessage="Hay decisiones de revisión sin guardar en este lote. ¿Está seguro de que desea cerrar?"
+            footer={footerContent}
+        >
+            <div className="space-y-6 text-xs">
                     {error && (
                         <div className="p-4 bg-red-500/10 border border-red-500/30 text-red-500 rounded-none flex items-start gap-3">
                             <ExclamationTriangleIcon className="w-5 h-5 shrink-0 mt-0.5" />
@@ -553,50 +572,6 @@ export const TechnicalImportModal: React.FC<ImportModalProps> = ({
                         </div>
                     )}
                 </div>
-
-                {/* Footer */}
-                <div className="p-5 border-t border-slate-200 dark:border-zinc-800 flex items-center justify-between bg-slate-50 dark:bg-zinc-900/50">
-                    <div className="flex items-center gap-2">
-                        <button
-                            onClick={onClose}
-                            className="px-4 py-2 border border-slate-300 dark:border-zinc-700 text-slate-700 dark:text-zinc-300 font-bold uppercase text-[10px] hover:bg-slate-100 dark:hover:bg-zinc-800 transition-colors"
-                        >
-                            {t('supplier.hub.close')}
-                        </button>
-                        {previewData && (
-                            <button
-                                onClick={handleResetImport}
-                                className="flex items-center gap-1.5 px-3 py-2 border border-slate-300 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 font-bold uppercase text-[10px] hover:bg-slate-100 dark:hover:bg-zinc-800 transition-colors"
-                                title="Discard current batch and start a fresh import"
-                            >
-                                <ArrowPathIcon className="w-3.5 h-3.5" />
-                                <span>{t('supplier.hub.startNewImport')}</span>
-                            </button>
-                        )}
-                    </div>
-
-                    {previewData && (
-                        <div className="flex items-center gap-3">
-                            {hasUnsavedDecisions && (
-                                <button
-                                    onClick={() => handleApplyDecisions()}
-                                    disabled={savingDecisions}
-                                    className="px-3.5 py-2 bg-slate-800 text-white font-bold uppercase text-[10px] hover:bg-slate-700 transition-colors disabled:opacity-50"
-                                >
-                                    {savingDecisions ? t('supplier.hub.saving') : `${t('supplier.hub.saveDecisions')} (${Object.keys(decisions).length})`}
-                                </button>
-                            )}
-                            <button
-                                onClick={handleConfirmBatch}
-                                disabled={confirming || savingDecisions}
-                                className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold uppercase tracking-wider text-[11px] transition-colors"
-                            >
-                                {confirming ? t('supplier.hub.confirmingBatch') : t('supplier.hub.confirmCatalog')}
-                            </button>
-                        </div>
-                    )}
-                </div>
-            </div>
-        </div>
+        </AccessibleModal>
     );
 };

@@ -13,11 +13,16 @@ import {
     PencilSquareIcon,
     ShieldCheckIcon,
     XMarkIcon,
-    InformationCircleIcon
+    InformationCircleIcon,
+    TrashIcon,
+    ArchiveBoxIcon,
+    ArrowPathIcon,
+    ArrowDownTrayIcon
 } from '@heroicons/react/24/outline';
 import { paperSupplierFetch, SupplierApiError } from '../../lib/paperSupplierApi';
-import { getUserRole, getAuthUser } from '../../lib/authStore';
+import { getUserRole, getAuthUser, getAuthToken } from '../../lib/authStore';
 import { TechnicalImportModal } from '../../components/supplier/TechnicalImportModal';
+import { AccessibleModal } from '../../components/AccessibleModal';
 import { StatusBadge } from '../../components/StatusBadge';
 import { useLocale } from '../../i18n';
 
@@ -26,6 +31,7 @@ export const SupplierCatalogOffersPage: React.FC = () => {
     const role = getUserRole();
     const user = getAuthUser();
     const isReadOnly = role === 'SUPPLIER_VIEWER';
+    const isAdmin = role === 'SUPPLIER_ADMIN';
 
     const [activeTab, setActiveTab] = useState<'CATALOG' | 'OFFERS'>('CATALOG');
     const [isImportModalOpen, setIsImportModalOpen] = useState<boolean>(false);
@@ -45,6 +51,17 @@ export const SupplierCatalogOffersPage: React.FC = () => {
     const [offersSearch, setOffersSearch] = useState<string>('');
     const [offersStatusFilter, setOffersStatusFilter] = useState<string>('');
     const [loadingOffers, setLoadingOffers] = useState<boolean>(false);
+    const [offersTotalCount, setOffersTotalCount] = useState<number>(0);
+    const [offersCounts, setOffersCounts] = useState<{ total: number; active: number; inactive: number; archived: number }>({
+        total: 0,
+        active: 0,
+        inactive: 0,
+        archived: 0
+    });
+
+    // Selection engine state
+    const [selectedOfferIds, setSelectedOfferIds] = useState<Set<string>>(new Set());
+    const [isAllMatchingSelected, setIsAllMatchingSelected] = useState<boolean>(false);
 
     // Technical Variant Detail Modal State
     const [variantDetailModalOpen, setVariantDetailModalOpen] = useState<boolean>(false);
@@ -76,6 +93,44 @@ export const SupplierCatalogOffersPage: React.FC = () => {
     const [revisionOffer, setRevisionOffer] = useState<any>(null);
     const [isRevisionsModalOpen, setIsRevisionsModalOpen] = useState<boolean>(false);
 
+    // Batch History Modal
+    const [isBatchHistoryModalOpen, setIsBatchHistoryModalOpen] = useState<boolean>(false);
+    const [importBatches, setImportBatches] = useState<any[]>([]);
+    const [loadingBatches, setLoadingBatches] = useState<boolean>(false);
+
+    // Edit Variant Modal
+    const [isEditVariantModalOpen, setIsEditVariantModalOpen] = useState<boolean>(false);
+    const [editingVariant, setEditingVariant] = useState<any>(null);
+    const [variantForm, setVariantForm] = useState({
+        gsm: '',
+        widthMm: '',
+        heightMm: '',
+        finish: '',
+        grainDirection: 'LONG_GRAIN',
+        caliperUm: ''
+    });
+    const [savingVariant, setSavingVariant] = useState<boolean>(false);
+    const [variantError, setVariantError] = useState<string | null>(null);
+
+    // Confirmation Modal
+    const [confirmModal, setConfirmModal] = useState<{
+        isOpen: boolean;
+        title: string;
+        warning: string;
+        actionLabel: string;
+        isDanger: boolean;
+        onConfirm: () => Promise<void>;
+    } | null>(null);
+
+    // Operation Report Modal
+    const [reportModal, setReportModal] = useState<{
+        title: string;
+        totalProcessed: number;
+        succeededCount: number;
+        failedCount: number;
+        results: any[];
+    } | null>(null);
+
     const [generalNotice, setGeneralNotice] = useState<string | null>(null);
     const [errorNotice, setErrorNotice] = useState<string | null>(null);
 
@@ -93,7 +148,7 @@ export const SupplierCatalogOffersPage: React.FC = () => {
 
             const res = await paperSupplierFetch<any>(`/api/v1/paper-suppliers/catalog/products?${params.toString()}`);
             if (res && res.ok && res.data) {
-                setCatalogProducts(res.data.products || []);
+                setCatalogProducts(res.data.products || res.data.items || []);
                 setCatalogPage(res.data.page || 1);
                 setCatalogTotalPages(res.data.totalPages || 1);
             }
@@ -121,6 +176,10 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                 setOffers(res.data.offers || []);
                 setOffersPage(res.data.page || 1);
                 setOffersTotalPages(res.data.totalPages || 1);
+                setOffersTotalCount(res.data.total || 0);
+                if (res.data.counts) {
+                    setOffersCounts(res.data.counts);
+                }
             }
         } catch (err: any) {
             setErrorNotice(err.message || 'Error fetching supplier commercial offers.');
@@ -130,6 +189,8 @@ export const SupplierCatalogOffersPage: React.FC = () => {
     };
 
     useEffect(() => {
+        setSelectedOfferIds(new Set());
+        setIsAllMatchingSelected(false);
         if (activeTab === 'CATALOG') {
             fetchCatalog(1, catalogSearch, catalogCategory);
         } else {
@@ -137,6 +198,163 @@ export const SupplierCatalogOffersPage: React.FC = () => {
         }
     }, [activeTab]);
 
+    // Handle single row selection
+    const handleToggleSelectOffer = (id: string) => {
+        setIsAllMatchingSelected(false);
+        setSelectedOfferIds((prev) => {
+            const next = new Set(prev);
+            if (next.has(id)) {
+                next.delete(id);
+            } else {
+                next.add(id);
+            }
+            return next;
+        });
+    };
+
+    // Handle select all visible on page
+    const isPageSelected = offers.length > 0 && offers.every((o) => selectedOfferIds.has(o.id));
+    const handleToggleSelectPage = () => {
+        setIsAllMatchingSelected(false);
+        if (isPageSelected) {
+            // Deselect all on current page
+            setSelectedOfferIds((prev) => {
+                const next = new Set(prev);
+                offers.forEach((o) => next.delete(o.id));
+                return next;
+            });
+        } else {
+            // Select all on current page
+            setSelectedOfferIds((prev) => {
+                const next = new Set(prev);
+                offers.forEach((o) => next.add(o.id));
+                return next;
+            });
+        }
+    };
+
+    // Select all matching filter results across pagination
+    const handleSelectAllMatching = () => {
+        setIsAllMatchingSelected(true);
+        setSelectedOfferIds(new Set(offers.map((o) => o.id)));
+    };
+
+    const handleClearSelection = () => {
+        setSelectedOfferIds(new Set());
+        setIsAllMatchingSelected(false);
+    };
+
+    // Bulk execute status change
+    const handleExecuteBulkStatus = async (action: 'ACTIVATE' | 'DEACTIVATE' | 'ARCHIVE' | 'RESTORE') => {
+        try {
+            setErrorNotice(null);
+            const scope = isAllMatchingSelected ? 'ALL_MATCHING' : 'SELECTED';
+            const payload: any = {
+                action,
+                scope,
+                offerIds: Array.from(selectedOfferIds),
+                filters: {
+                    status: offersStatusFilter || undefined,
+                    search: offersSearch.trim() || undefined
+                },
+                reason: `Bulk ${action} executed from supplier operations table`
+            };
+
+            const res = await paperSupplierFetch<any>('/api/v1/paper-suppliers/offers/bulk-status', {
+                method: 'PATCH',
+                body: JSON.stringify(payload)
+            });
+
+            if (res && res.ok && res.data) {
+                const report = res.data;
+                handleClearSelection();
+                fetchOffers(offersPage, offersSearch, offersStatusFilter);
+
+                if (report.failedCount > 0) {
+                    setReportModal({
+                        title: t('supplier.hub.operationReportTitle'),
+                        totalProcessed: report.totalProcessed,
+                        succeededCount: report.succeededCount,
+                        failedCount: report.failedCount,
+                        results: report.results
+                    });
+                } else {
+                    setGeneralNotice(`Operación ${action} completada con éxito en ${report.succeededCount} ofertas.`);
+                }
+            }
+        } catch (err: any) {
+            setErrorNotice(err.message || 'Error executing bulk action.');
+        }
+    };
+
+    // Bulk execute delete
+    const handleOpenBulkDeleteConfirm = () => {
+        const count = isAllMatchingSelected ? offersTotalCount : selectedOfferIds.size;
+        setConfirmModal({
+            isOpen: true,
+            title: t('supplier.hub.deleteConfirmTitle'),
+            warning: `${t('supplier.hub.deleteConfirmWarning')} (${count} ofertas seleccionadas).`,
+            actionLabel: t('supplier.hub.delete'),
+            isDanger: true,
+            onConfirm: async () => {
+                const scope = isAllMatchingSelected ? 'ALL_MATCHING' : 'SELECTED';
+                const payload: any = {
+                    scope,
+                    offerIds: Array.from(selectedOfferIds),
+                    filters: {
+                        status: offersStatusFilter || undefined,
+                        search: offersSearch.trim() || undefined
+                    },
+                    reason: 'Bulk hard deletion executed by SUPPLIER_ADMIN'
+                };
+
+                const res = await paperSupplierFetch<any>('/api/v1/paper-suppliers/offers/bulk-delete', {
+                    method: 'POST',
+                    body: JSON.stringify(payload)
+                });
+
+                if (res && res.ok && res.data) {
+                    const report = res.data;
+                    handleClearSelection();
+                    fetchOffers(offersPage, offersSearch, offersStatusFilter);
+
+                    if (report.failedCount > 0) {
+                        setReportModal({
+                            title: t('supplier.hub.operationReportTitle'),
+                            totalProcessed: report.totalProcessed,
+                            succeededCount: report.succeededCount,
+                            failedCount: report.failedCount,
+                            results: report.results
+                        });
+                    } else {
+                        setGeneralNotice(t('supplier.hub.deleteOfferSuccess'));
+                    }
+                }
+            }
+        });
+    };
+
+    // Individual offer delete
+    const handleOpenSingleDeleteConfirm = (offer: any) => {
+        setConfirmModal({
+            isOpen: true,
+            title: t('supplier.hub.deleteConfirmTitle'),
+            warning: `${t('supplier.hub.deleteConfirmWarning')} Oferta: ${offer.supplierSku}.`,
+            actionLabel: t('supplier.hub.delete'),
+            isDanger: true,
+            onConfirm: async () => {
+                const res = await paperSupplierFetch<any>(`/api/v1/paper-suppliers/offers/${offer.id}`, {
+                    method: 'DELETE'
+                });
+                if (res && res.ok) {
+                    setGeneralNotice(t('supplier.hub.deleteOfferSuccess'));
+                    fetchOffers(offersPage, offersSearch, offersStatusFilter);
+                }
+            }
+        });
+    };
+
+    // Technical Variant Detail
     const handleViewVariantDetail = async (variantId: string) => {
         setLoadingVariantDetail(true);
         setVariantDetailModalOpen(true);
@@ -154,6 +372,150 @@ export const SupplierCatalogOffersPage: React.FC = () => {
             setVariantDetailModalOpen(false);
         } finally {
             setLoadingVariantDetail(false);
+        }
+    };
+
+    // Delete Variant
+    const handleOpenDeleteVariantConfirm = (variant: any) => {
+        setConfirmModal({
+            isOpen: true,
+            title: t('supplier.hub.deleteVariantConfirmTitle'),
+            warning: `${t('supplier.hub.deleteVariantWarning')} (${variant.gsm} gsm ${variant.widthMm}x${variant.heightMm} mm).`,
+            actionLabel: t('supplier.hub.delete'),
+            isDanger: true,
+            onConfirm: async () => {
+                const res = await paperSupplierFetch<any>(`/api/v1/paper-suppliers/catalog/variants/${variant.id}`, {
+                    method: 'DELETE'
+                });
+                if (res && res.ok) {
+                    setGeneralNotice(t('supplier.hub.deleteVariantSuccess'));
+                    fetchCatalog(catalogPage, catalogSearch, catalogCategory);
+                }
+            }
+        });
+    };
+
+    // Open Edit Variant Modal
+    const handleOpenEditVariant = (variant: any, productName: string) => {
+        setEditingVariant({ ...variant, productName });
+        setVariantForm({
+            gsm: String(variant.gsm || ''),
+            widthMm: String(variant.widthMm || ''),
+            heightMm: String(variant.heightMm || ''),
+            finish: variant.finish || '',
+            grainDirection: variant.grainDirection || 'LONG_GRAIN',
+            caliperUm: String(variant.caliperUm || '')
+        });
+        setVariantError(null);
+        setIsEditVariantModalOpen(true);
+    };
+
+    const handleSaveVariantSpecs = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setSavingVariant(true);
+        setVariantError(null);
+        try {
+            const res = await paperSupplierFetch<any>(`/api/v1/paper-suppliers/catalog/variants/${editingVariant.id}`, {
+                method: 'PATCH',
+                body: JSON.stringify({
+                    gsm: Number(variantForm.gsm),
+                    widthMm: Number(variantForm.widthMm),
+                    heightMm: Number(variantForm.heightMm),
+                    finish: variantForm.finish.trim(),
+                    grainDirection: variantForm.grainDirection,
+                    caliperUm: variantForm.caliperUm ? Number(variantForm.caliperUm) : null
+                })
+            });
+
+            if (res && res.ok) {
+                setGeneralNotice('Especificaciones de la variante modificadas y fingerprint actualizado.');
+                setIsEditVariantModalOpen(false);
+                fetchCatalog(catalogPage, catalogSearch, catalogCategory);
+            }
+        } catch (err: any) {
+            setVariantError(err.message || 'Error al actualizar especificaciones.');
+        } finally {
+            setSavingVariant(false);
+        }
+    };
+
+    // Batch History
+    const handleOpenBatchHistory = async () => {
+        setIsBatchHistoryModalOpen(true);
+        setLoadingBatches(true);
+        try {
+            const res = await paperSupplierFetch<any>('/api/v1/paper-suppliers/catalog/imports');
+            if (res && res.ok && res.data) {
+                setImportBatches(res.data.batches || []);
+            }
+        } catch (err: any) {
+            setErrorNotice(err.message || 'Error al cargar historial de lotes.');
+        } finally {
+            setLoadingBatches(false);
+        }
+    };
+
+    const handleRetractBatch = (batch: any) => {
+        setConfirmModal({
+            isOpen: true,
+            title: t('supplier.hub.retractBatch'),
+            warning: `${t('supplier.hub.retractConfirmWarning')} Lote: ${batch.original_filename || batch.id}.`,
+            actionLabel: t('supplier.hub.retractBatch'),
+            isDanger: true,
+            onConfirm: async () => {
+                const res = await paperSupplierFetch<any>(`/api/v1/paper-suppliers/catalog/imports/${batch.id}/retract`, {
+                    method: 'POST'
+                });
+                if (res && res.ok) {
+                    setGeneralNotice(`Lote retirado. Se eliminaron ${res.data.retractedVariantsCount} variantes exclusivas.`);
+                    setIsBatchHistoryModalOpen(false);
+                    fetchCatalog(1, catalogSearch, catalogCategory);
+                }
+            }
+        });
+    };
+
+    const handleDownloadTemplate = async () => {
+        try {
+            const res = await fetch('/api/v1/paper-suppliers/catalog/template', {
+                headers: {
+                    Authorization: `Bearer ${getAuthToken()}`
+                }
+            });
+            if (!res.ok) throw new Error('Download failed');
+            const blob = await res.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'paper_catalog_template.csv';
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            window.URL.revokeObjectURL(url);
+        } catch (err: any) {
+            setErrorNotice(err.message || 'Error downloading template');
+        }
+    };
+
+    const handleDownloadBatchIssues = async (batchId: string) => {
+        try {
+            const res = await fetch(`/api/v1/paper-suppliers/catalog/imports/${batchId}/export-issues`, {
+                headers: {
+                    Authorization: `Bearer ${getAuthToken()}`
+                }
+            });
+            if (!res.ok) throw new Error('Download issues failed');
+            const blob = await res.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `import_issues_${batchId}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            window.URL.revokeObjectURL(url);
+        } catch (err: any) {
+            setErrorNotice(err.message || 'Error downloading issues CSV');
         }
     };
 
@@ -215,7 +577,7 @@ export const SupplierCatalogOffersPage: React.FC = () => {
         try {
             const zones = offerForm.deliveryZones
                 .split(',')
-                .map(z => z.trim().toUpperCase())
+                .map((z) => z.trim().toUpperCase())
                 .filter(Boolean);
 
             const payload: any = {
@@ -273,13 +635,29 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                 body: JSON.stringify({ status: nextStatus })
             });
             if (res && res.ok) {
-                setGeneralNotice(`Offer status set to ${nextStatus}.`);
-                fetchOffers();
+                setGeneralNotice(`Estado de la oferta cambiado a ${nextStatus}.`);
+                fetchOffers(offersPage, offersSearch, offersStatusFilter);
             } else {
-                setErrorNotice('Failed to update offer status.');
+                setErrorNotice('Error al actualizar estado.');
             }
         } catch (err: any) {
             setErrorNotice(err.message || 'Error updating status.');
+        }
+    };
+
+    const handleArchiveOrRestoreSingleOffer = async (offerId: string, currentStatus: string) => {
+        const nextStatus = currentStatus === 'ARCHIVED' ? 'ACTIVE' : 'ARCHIVED';
+        try {
+            const res = await paperSupplierFetch(`/api/v1/paper-suppliers/offers/${offerId}/status`, {
+                method: 'PATCH',
+                body: JSON.stringify({ status: nextStatus, reason: `Individual ${nextStatus} action` })
+            });
+            if (res && res.ok) {
+                setGeneralNotice(nextStatus === 'ARCHIVED' ? 'Oferta archivada.' : 'Oferta restaurada y activada.');
+                fetchOffers(offersPage, offersSearch, offersStatusFilter);
+            }
+        } catch (err: any) {
+            setErrorNotice(err.message || 'Error updating archive state.');
         }
     };
 
@@ -305,7 +683,7 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                             Paper Supplier Hub
                         </span>
                         <span className="px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider bg-slate-200 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300">
-                            Phase I3
+                            Operational Hub
                         </span>
                     </div>
                     <h1 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">
@@ -316,7 +694,24 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                     </p>
                 </div>
 
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 flex-wrap">
+                    <button
+                        onClick={handleDownloadTemplate}
+                        className="flex items-center gap-2 px-3 py-2 border border-slate-300 dark:border-zinc-700 text-slate-700 dark:text-zinc-300 font-bold uppercase tracking-wider text-[11px] hover:bg-slate-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+                        title={t('supplier.hub.downloadTemplate')}
+                    >
+                        <ArrowDownTrayIcon className="w-4 h-4" />
+                        <span>{t('supplier.hub.downloadTemplate')}</span>
+                    </button>
+
+                    <button
+                        onClick={handleOpenBatchHistory}
+                        className="flex items-center gap-2 px-3 py-2 border border-slate-300 dark:border-zinc-700 text-slate-700 dark:text-zinc-300 font-bold uppercase tracking-wider text-[11px] hover:bg-slate-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+                    >
+                        <ClockIcon className="w-4 h-4" />
+                        <span>{t('supplier.hub.batchHistory')}</span>
+                    </button>
+
                     {!isReadOnly && (
                         <button
                             onClick={() => setIsImportModalOpen(true)}
@@ -402,19 +797,24 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                                     setCatalogCategory(e.target.value);
                                     fetchCatalog(1, catalogSearch, e.target.value);
                                 }}
-                                className="px-3 py-1.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 text-xs"
+                                className="px-3 py-1.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 text-xs font-bold"
                             >
                                 <option value="">{t('supplier.hub.filterAllCategories')}</option>
                                 <option value="COATED">Coated</option>
                                 <option value="UNCOATED">Uncoated</option>
+                                <option value="CARTON">Carton</option>
+                                <option value="OFFSET">Offset</option>
+                                <option value="DESIGN">Design</option>
+                                <option value="DIGITAL">Digital</option>
                                 <option value="SPECIALTY">Specialty</option>
                                 <option value="KRAFT">Kraft</option>
                                 <option value="BOARD">Board</option>
+                                <option value="OTHER">Other</option>
                             </select>
 
                             <button
                                 onClick={() => fetchCatalog(1, catalogSearch, catalogCategory)}
-                                className="px-3.5 py-1.5 bg-slate-200 dark:bg-zinc-800 font-bold uppercase text-[10px] hover:bg-slate-300 dark:hover:bg-zinc-700 transition-colors"
+                                className="px-3.5 py-1.5 bg-slate-200 dark:bg-zinc-800 font-bold uppercase text-[10px] hover:bg-slate-300 dark:hover:bg-zinc-700 transition-colors cursor-pointer"
                             >
                                 {t('supplier.hub.filterButton')}
                             </button>
@@ -472,7 +872,9 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                                                 <tr key={v.id} className="hover:bg-slate-50 dark:hover:bg-zinc-900/60 pl-4">
                                                     <td className="p-3 pl-8 text-zinc-600 dark:text-zinc-400 flex items-center gap-2">
                                                         <span className="w-1.5 h-1.5 bg-red-600 rounded-full" />
-                                                        <span className="font-mono">{v.widthMm} x {v.heightMm} mm</span>
+                                                        <span className="font-mono font-bold text-slate-800 dark:text-zinc-200">
+                                                            {v.widthMm} x {v.heightMm} mm
+                                                        </span>
                                                     </td>
                                                     <td className="p-3 font-mono font-bold text-slate-800 dark:text-zinc-200">
                                                         {v.gsm} gsm
@@ -482,7 +884,7 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                                                     </td>
                                                     <td className="p-3">
                                                         <span className="text-[10px] font-mono text-zinc-400">
-                                                             Grain: {v.grainDirection || '—'}
+                                                            Grain: {v.grainDirection || '—'}
                                                         </span>
                                                     </td>
                                                     <td className="p-3 font-mono text-[10px] text-zinc-400">
@@ -498,12 +900,30 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                                                                 {t('supplier.hub.viewVariantDetails')}
                                                             </button>
                                                             {!isReadOnly && (
-                                                                <button
-                                                                    onClick={() => handleOpenCreateOffer({ ...v, productName: prod.name, finish: prod.finish })}
-                                                                    className="px-2.5 py-1 bg-red-600 hover:bg-red-700 text-white font-bold uppercase text-[10px] transition-colors cursor-pointer"
-                                                                >
-                                                                    {t('supplier.hub.createOffer')}
-                                                                </button>
+                                                                <>
+                                                                    <button
+                                                                        onClick={() => handleOpenEditVariant(v, prod.name)}
+                                                                        className="p-1 text-zinc-400 hover:text-slate-900 dark:hover:text-white transition-colors cursor-pointer"
+                                                                        title={t('supplier.hub.editVariantSpecs')}
+                                                                    >
+                                                                        <PencilSquareIcon className="w-4 h-4" />
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => handleOpenCreateOffer({ ...v, productName: prod.name, finish: prod.finish })}
+                                                                        className="px-2.5 py-1 bg-red-600 hover:bg-red-700 text-white font-bold uppercase text-[10px] transition-colors cursor-pointer"
+                                                                    >
+                                                                        {t('supplier.hub.createOffer')}
+                                                                    </button>
+                                                                    {isAdmin && (
+                                                                        <button
+                                                                            onClick={() => handleOpenDeleteVariantConfirm(v)}
+                                                                            className="p-1 text-zinc-400 hover:text-red-600 transition-colors cursor-pointer"
+                                                                            title={t('supplier.hub.deleteVariantConfirmTitle')}
+                                                                        >
+                                                                            <TrashIcon className="w-4 h-4" />
+                                                                        </button>
+                                                                    )}
+                                                                </>
                                                             )}
                                                         </div>
                                                     </td>
@@ -523,14 +943,14 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                             <button
                                 disabled={catalogPage <= 1}
                                 onClick={() => fetchCatalog(catalogPage - 1, catalogSearch, catalogCategory)}
-                                className="px-3 py-1 border border-slate-200 dark:border-zinc-800 disabled:opacity-40"
+                                className="px-3 py-1 border border-slate-200 dark:border-zinc-800 disabled:opacity-40 cursor-pointer"
                             >
                                 {t('supplier.hub.prev')}
                             </button>
                             <button
                                 disabled={catalogPage >= catalogTotalPages}
                                 onClick={() => fetchCatalog(catalogPage + 1, catalogSearch, catalogCategory)}
-                                className="px-3 py-1 border border-slate-200 dark:border-zinc-800 disabled:opacity-40"
+                                className="px-3 py-1 border border-slate-200 dark:border-zinc-800 disabled:opacity-40 cursor-pointer"
                             >
                                 {t('supplier.hub.next')}
                             </button>
@@ -542,7 +962,63 @@ export const SupplierCatalogOffersPage: React.FC = () => {
             {/* TAB 2: COMMERCIAL OFFERS */}
             {activeTab === 'OFFERS' && (
                 <div className="space-y-4">
-                    {/* Filters */}
+                    {/* Status Breakdown Filter Pills */}
+                    <div className="flex items-center gap-2 flex-wrap pb-1">
+                        <button
+                            onClick={() => {
+                                setOffersStatusFilter('');
+                                fetchOffers(1, offersSearch, '');
+                            }}
+                            className={`px-3 py-1 text-xs font-bold uppercase tracking-wider border transition-colors cursor-pointer ${
+                                offersStatusFilter === ''
+                                    ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 border-transparent shadow-sm'
+                                    : 'border-slate-200 dark:border-zinc-800 text-zinc-500 hover:border-slate-400'
+                            }`}
+                        >
+                            {t('supplier.hub.statusAll')} ({offersCounts.total})
+                        </button>
+                        <button
+                            onClick={() => {
+                                setOffersStatusFilter('ACTIVE');
+                                fetchOffers(1, offersSearch, 'ACTIVE');
+                            }}
+                            className={`px-3 py-1 text-xs font-bold uppercase tracking-wider border transition-colors cursor-pointer ${
+                                offersStatusFilter === 'ACTIVE'
+                                    ? 'bg-emerald-600 text-white border-transparent shadow-sm'
+                                    : 'border-slate-200 dark:border-zinc-800 text-emerald-600 dark:text-emerald-400 hover:border-emerald-500'
+                            }`}
+                        >
+                            {t('supplier.hub.statusActive')} ({offersCounts.active})
+                        </button>
+                        <button
+                            onClick={() => {
+                                setOffersStatusFilter('INACTIVE');
+                                fetchOffers(1, offersSearch, 'INACTIVE');
+                            }}
+                            className={`px-3 py-1 text-xs font-bold uppercase tracking-wider border transition-colors cursor-pointer ${
+                                offersStatusFilter === 'INACTIVE'
+                                    ? 'bg-zinc-600 text-white border-transparent shadow-sm'
+                                    : 'border-slate-200 dark:border-zinc-800 text-zinc-500 hover:border-zinc-400'
+                            }`}
+                        >
+                            {t('supplier.hub.statusInactive')} ({offersCounts.inactive})
+                        </button>
+                        <button
+                            onClick={() => {
+                                setOffersStatusFilter('ARCHIVED');
+                                fetchOffers(1, offersSearch, 'ARCHIVED');
+                            }}
+                            className={`px-3 py-1 text-xs font-bold uppercase tracking-wider border transition-colors cursor-pointer ${
+                                offersStatusFilter === 'ARCHIVED'
+                                    ? 'bg-amber-600 text-white border-transparent shadow-sm'
+                                    : 'border-slate-200 dark:border-zinc-800 text-amber-600 dark:text-amber-400 hover:border-amber-500'
+                            }`}
+                        >
+                            {t('supplier.hub.statusArchived')} ({offersCounts.archived})
+                        </button>
+                    </div>
+
+                    {/* Search & Actions Bar */}
                     <div className="flex flex-col sm:flex-row gap-3 items-center justify-between">
                         <div className="flex items-center gap-2 w-full sm:w-80">
                             <div className="relative w-full">
@@ -559,34 +1035,101 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                         </div>
 
                         <div className="flex items-center gap-3 w-full sm:w-auto">
-                            <select
-                                value={offersStatusFilter}
-                                onChange={(e) => {
-                                    setOffersStatusFilter(e.target.value);
-                                    fetchOffers(1, offersSearch, e.target.value);
-                                }}
-                                className="px-3 py-1.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 text-xs"
-                            >
-                                <option value="">{t('supplier.hub.filterAllStatuses')}</option>
-                                <option value="ACTIVE">Active</option>
-                                <option value="INACTIVE">Inactive</option>
-                                <option value="ARCHIVED">Archived</option>
-                            </select>
-
                             <button
                                 onClick={() => fetchOffers(1, offersSearch, offersStatusFilter)}
-                                className="px-3.5 py-1.5 bg-slate-200 dark:bg-zinc-800 font-bold uppercase text-[10px] hover:bg-slate-300 dark:hover:bg-zinc-700 transition-colors"
+                                className="px-3.5 py-1.5 bg-slate-200 dark:bg-zinc-800 font-bold uppercase text-[10px] hover:bg-slate-300 dark:hover:bg-zinc-700 transition-colors cursor-pointer"
                             >
                                 {t('supplier.hub.filterButton')}
                             </button>
                         </div>
                     </div>
 
+                    {/* Multi-Row Sticky Action Bar */}
+                    {selectedOfferIds.size > 0 && !isReadOnly && (
+                        <div className="sticky top-0 z-20 flex flex-col sm:flex-row items-center justify-between gap-3 p-3 bg-slate-900 text-white shadow-xl border-l-4 border-red-600">
+                            <div className="flex items-center gap-3">
+                                <span className="text-xs font-bold">
+                                    {isAllMatchingSelected
+                                        ? t('supplier.hub.allMatchingSelected', { total: offersTotalCount })
+                                        : t('supplier.hub.selectedCount', { count: selectedOfferIds.size })}
+                                </span>
+                                <button
+                                    onClick={handleClearSelection}
+                                    className="text-[11px] underline text-zinc-300 hover:text-white cursor-pointer"
+                                >
+                                    {t('supplier.hub.clearSelection')}
+                                </button>
+                            </div>
+
+                            <div className="flex items-center gap-2 flex-wrap">
+                                <button
+                                    onClick={() => handleExecuteBulkStatus('ACTIVATE')}
+                                    className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold uppercase cursor-pointer"
+                                >
+                                    {t('supplier.hub.bulkActivate')}
+                                </button>
+                                <button
+                                    onClick={() => handleExecuteBulkStatus('DEACTIVATE')}
+                                    className="px-2.5 py-1 bg-zinc-700 hover:bg-zinc-600 text-white text-[10px] font-bold uppercase cursor-pointer"
+                                >
+                                    {t('supplier.hub.bulkDeactivate')}
+                                </button>
+                                {offersStatusFilter === 'ARCHIVED' ? (
+                                    <button
+                                        onClick={() => handleExecuteBulkStatus('RESTORE')}
+                                        className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-bold uppercase cursor-pointer"
+                                    >
+                                        {t('supplier.hub.bulkRestore')}
+                                    </button>
+                                ) : (
+                                    <button
+                                        onClick={() => handleExecuteBulkStatus('ARCHIVE')}
+                                        className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white text-[10px] font-bold uppercase cursor-pointer"
+                                    >
+                                        {t('supplier.hub.bulkArchive')}
+                                    </button>
+                                )}
+                                {isAdmin && (
+                                    <button
+                                        onClick={handleOpenBulkDeleteConfirm}
+                                        className="px-2.5 py-1 bg-red-600 hover:bg-red-700 text-white text-[10px] font-bold uppercase cursor-pointer"
+                                    >
+                                        {t('supplier.hub.bulkDelete')}
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Page select-all banner with prompt to select all matching across pagination */}
+                    {isPageSelected && offersTotalCount > offers.length && !isAllMatchingSelected && (
+                        <div className="p-2.5 bg-blue-500/10 border border-blue-500/30 text-blue-600 dark:text-blue-400 text-xs flex items-center justify-between">
+                            <span>{t('supplier.hub.selectedCount', { count: offers.length })} (página actual).</span>
+                            <button
+                                onClick={handleSelectAllMatching}
+                                className="underline font-bold text-xs hover:text-blue-700 dark:hover:text-blue-300 cursor-pointer"
+                            >
+                                {t('supplier.hub.selectAllMatching', { total: offersTotalCount })}
+                            </button>
+                        </div>
+                    )}
+
                     {/* Offers Table */}
                     <div className="border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 overflow-x-auto">
                         <table className="w-full text-left border-collapse text-xs">
                             <thead>
                                 <tr className="bg-slate-100 dark:bg-zinc-900 border-b border-slate-200 dark:border-zinc-800 text-[10px] font-bold text-zinc-500 uppercase tracking-wider">
+                                    {!isReadOnly && (
+                                        <th className="p-3 w-8">
+                                            <input
+                                                type="checkbox"
+                                                checked={isPageSelected}
+                                                onChange={handleToggleSelectPage}
+                                                className="cursor-pointer"
+                                                title={t('supplier.hub.selectAllVisible')}
+                                            />
+                                        </th>
+                                    )}
                                     <th className="p-3">{t('supplier.hub.colSku')}</th>
                                     <th className="p-3">{t('supplier.hub.colPaperVariant')}</th>
                                     <th className="p-3">{t('supplier.hub.colRateBasis')}</th>
@@ -600,87 +1143,124 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                             <tbody className="divide-y divide-slate-200 dark:divide-zinc-800">
                                 {loadingOffers ? (
                                     <tr>
-                                        <td colSpan={8} className="p-8 text-center text-zinc-400">{t('supplier.hub.loadingOffers')}</td>
+                                        <td colSpan={isReadOnly ? 8 : 9} className="p-8 text-center text-zinc-400">{t('supplier.hub.loadingOffers')}</td>
                                     </tr>
                                 ) : offers.length === 0 ? (
                                     <tr>
-                                        <td colSpan={8} className="p-8 text-center text-zinc-400">
+                                        <td colSpan={isReadOnly ? 8 : 9} className="p-8 text-center text-zinc-400">
                                             {t('supplier.hub.noOffers')}
                                         </td>
                                     </tr>
                                 ) : (
-                                    offers.map((off) => (
-                                        <tr key={off.id} className="hover:bg-slate-50 dark:hover:bg-zinc-900/50">
-                                            <td className="p-3 font-mono font-bold text-slate-800 dark:text-zinc-200">
-                                                {off.supplierSku}
-                                            </td>
-                                            <td className="p-3">
-                                                <div className="font-bold text-slate-900 dark:text-white">{off.productName || 'Paper Product'}</div>
-                                                <div className="text-[10px] text-zinc-400 font-mono">
-                                                    {off.gsm} gsm · {off.widthMm}x{off.heightMm} mm · {off.finish || 'Standard'}
-                                                </div>
-                                            </td>
-                                            <td className="p-3 font-mono">
-                                                <span className="text-sm font-black text-slate-900 dark:text-white">
-                                                    {Number(off.priceAmount).toFixed(2)} {off.currency}
-                                                </span>
-                                                <span className="text-[10px] font-bold text-zinc-400 uppercase ml-1">
-                                                    / {off.priceBasis}
-                                                    {off.priceBasis === 'PACK' && off.sheetsPerPack ? ` (${off.sheetsPerPack} sh)` : ''}
-                                                </span>
-                                            </td>
-                                            <td className="p-3 font-mono text-[11px]">
-                                                <span>Min: {off.moq}</span>
-                                                <span className="text-zinc-400 ml-1">· Step: {off.orderMultiple}</span>
-                                            </td>
-                                            <td className="p-3">
-                                                <span className={`px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider ${
-                                                    off.visibility === 'MARKETPLACE'
-                                                        ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
-                                                        : off.visibility === 'APPROVED_CUSTOMERS'
-                                                        ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20'
-                                                        : 'bg-zinc-500/10 text-zinc-600 dark:text-zinc-400 border border-zinc-500/20'
-                                                }`}>
-                                                    {off.visibility}
-                                                </span>
-                                            </td>
-                                            <td className="p-3">
-                                                <StatusBadge status={off.status} />
-                                            </td>
-                                            <td className="p-3 font-mono">
-                                                <button
-                                                    onClick={() => handleViewRevisions(off.id)}
-                                                    className="flex items-center gap-1 text-[11px] font-bold text-red-600 hover:underline cursor-pointer"
-                                                >
-                                                    <ClockIcon className="w-3.5 h-3.5" />
-                                                    v{off.revisionNumber || 1}
-                                                </button>
-                                            </td>
-                                            <td className="p-3 text-right">
+                                    offers.map((off) => {
+                                        const isSelected = selectedOfferIds.has(off.id);
+                                        const productName = off.variantDetails?.productName || off.productName || 'Variante no disponible';
+                                        const gsm = off.variantDetails?.gsm || off.gsm;
+                                        const widthMm = off.variantDetails?.widthMm || off.widthMm;
+                                        const heightMm = off.variantDetails?.heightMm || off.heightMm;
+                                        const finish = off.variantDetails?.finish || off.finish || 'Estándar';
+
+                                        return (
+                                            <tr key={off.id} className={`hover:bg-slate-50 dark:hover:bg-zinc-900/50 ${isSelected ? 'bg-red-50/40 dark:bg-red-950/20' : ''}`}>
                                                 {!isReadOnly && (
-                                                    <div className="flex items-center justify-end gap-2">
-                                                        <button
-                                                            onClick={() => handleOpenEditOffer(off)}
-                                                            className="p-1 text-zinc-400 hover:text-slate-900 dark:hover:text-white transition-colors cursor-pointer"
-                                                            title={t('supplier.hub.editOffer')}
-                                                        >
-                                                            <PencilSquareIcon className="w-4 h-4" />
-                                                        </button>
-                                                        <button
-                                                            onClick={() => handleToggleOfferStatus(off.id, off.status)}
-                                                            className={`px-2 py-0.5 text-[10px] font-bold uppercase transition-colors cursor-pointer ${
-                                                                off.status === 'ACTIVE'
-                                                                    ? 'bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-red-600 hover:text-white'
-                                                                    : 'bg-emerald-600 text-white hover:bg-emerald-700'
-                                                            }`}
-                                                        >
-                                                            {off.status === 'ACTIVE' ? t('supplier.hub.deactivate') : t('supplier.hub.activate')}
-                                                        </button>
-                                                    </div>
+                                                    <td className="p-3">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={isSelected}
+                                                            onChange={() => handleToggleSelectOffer(off.id)}
+                                                            className="cursor-pointer"
+                                                        />
+                                                    </td>
                                                 )}
-                                            </td>
-                                        </tr>
-                                    ))
+                                                <td className="p-3 font-mono font-bold text-slate-800 dark:text-zinc-200">
+                                                    {off.supplierSku}
+                                                </td>
+                                                <td className="p-3">
+                                                    <div className="font-bold text-slate-900 dark:text-white">{productName}</div>
+                                                    <div className="text-[10px] text-zinc-400 font-mono">
+                                                        {gsm ? `${gsm} gsm` : 'GSM no declarado'} · {widthMm && heightMm ? `${widthMm}x${heightMm} mm` : 'Dimensiones no declaradas'} · {finish}
+                                                    </div>
+                                                </td>
+                                                <td className="p-3 font-mono">
+                                                    <span className="text-sm font-black text-slate-900 dark:text-white">
+                                                        {Number(off.priceAmount).toFixed(2)} {off.currency}
+                                                    </span>
+                                                    <span className="text-[10px] font-bold text-zinc-400 uppercase ml-1">
+                                                        / {off.priceBasis}
+                                                        {off.priceBasis === 'PACK' && off.sheetsPerPack ? ` (${off.sheetsPerPack} sh)` : ''}
+                                                    </span>
+                                                </td>
+                                                <td className="p-3 font-mono text-[11px]">
+                                                    <span>Min: {off.moq}</span>
+                                                    <span className="text-zinc-400 ml-1">· Step: {off.orderMultiple}</span>
+                                                </td>
+                                                <td className="p-3">
+                                                    <span className={`px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider ${
+                                                        off.visibility === 'MARKETPLACE'
+                                                            ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
+                                                            : off.visibility === 'APPROVED_CUSTOMERS'
+                                                            ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20'
+                                                            : 'bg-zinc-500/10 text-zinc-600 dark:text-zinc-400 border border-zinc-500/20'
+                                                    }`}>
+                                                        {off.visibility}
+                                                    </span>
+                                                </td>
+                                                <td className="p-3">
+                                                    <StatusBadge status={off.status} />
+                                                </td>
+                                                <td className="p-3 font-mono">
+                                                    <button
+                                                        onClick={() => handleViewRevisions(off.id)}
+                                                        className="flex items-center gap-1 text-[11px] font-bold text-red-600 hover:underline cursor-pointer"
+                                                    >
+                                                        <ClockIcon className="w-3.5 h-3.5" />
+                                                        v{off.revisionNumber || 1}
+                                                    </button>
+                                                </td>
+                                                <td className="p-3 text-right">
+                                                    {!isReadOnly && (
+                                                        <div className="flex items-center justify-end gap-2">
+                                                            <button
+                                                                onClick={() => handleOpenEditOffer(off)}
+                                                                className="p-1 text-zinc-400 hover:text-slate-900 dark:hover:text-white transition-colors cursor-pointer"
+                                                                title={t('supplier.hub.editOffer')}
+                                                            >
+                                                                <PencilSquareIcon className="w-4 h-4" />
+                                                            </button>
+                                                            {off.status !== 'ARCHIVED' && (
+                                                                <button
+                                                                    onClick={() => handleToggleOfferStatus(off.id, off.status)}
+                                                                    className={`px-2 py-0.5 text-[10px] font-bold uppercase transition-colors cursor-pointer ${
+                                                                        off.status === 'ACTIVE'
+                                                                            ? 'bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-300'
+                                                                            : 'bg-emerald-600 text-white hover:bg-emerald-700'
+                                                                    }`}
+                                                                >
+                                                                    {off.status === 'ACTIVE' ? t('supplier.hub.deactivate') : t('supplier.hub.activate')}
+                                                                </button>
+                                                            )}
+                                                            <button
+                                                                onClick={() => handleArchiveOrRestoreSingleOffer(off.id, off.status)}
+                                                                className="px-2 py-0.5 text-[10px] font-bold uppercase border border-slate-300 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+                                                                title={off.status === 'ARCHIVED' ? t('supplier.hub.restore') : t('supplier.hub.archive')}
+                                                            >
+                                                                {off.status === 'ARCHIVED' ? t('supplier.hub.restore') : t('supplier.hub.archive')}
+                                                            </button>
+                                                            {isAdmin && (
+                                                                <button
+                                                                    onClick={() => handleOpenSingleDeleteConfirm(off)}
+                                                                    className="p-1 text-zinc-400 hover:text-red-600 transition-colors cursor-pointer"
+                                                                    title={t('supplier.hub.delete')}
+                                                                >
+                                                                    <TrashIcon className="w-4 h-4" />
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        );
+                                    })
                                 )}
                             </tbody>
                         </table>
@@ -693,14 +1273,14 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                             <button
                                 disabled={offersPage <= 1}
                                 onClick={() => fetchOffers(offersPage - 1, offersSearch, offersStatusFilter)}
-                                className="px-3 py-1 border border-slate-200 dark:border-zinc-800 disabled:opacity-40"
+                                className="px-3 py-1 border border-slate-200 dark:border-zinc-800 disabled:opacity-40 cursor-pointer"
                             >
                                 {t('supplier.hub.prev')}
                             </button>
                             <button
                                 disabled={offersPage >= offersTotalPages}
                                 onClick={() => fetchOffers(offersPage + 1, offersSearch, offersStatusFilter)}
-                                className="px-3 py-1 border border-slate-200 dark:border-zinc-800 disabled:opacity-40"
+                                className="px-3 py-1 border border-slate-200 dark:border-zinc-800 disabled:opacity-40 cursor-pointer"
                             >
                                 {t('supplier.hub.next')}
                             </button>
@@ -710,413 +1290,653 @@ export const SupplierCatalogOffersPage: React.FC = () => {
             )}
 
             {/* CREATE / EDIT OFFER MODAL */}
-            {isOfferModalOpen && (
-                <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 flex items-center justify-center p-4">
-                    <div className="bg-white dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 w-full max-w-xl shadow-2xl p-6 space-y-4">
-                        <div className="flex items-center justify-between border-b border-slate-200 dark:border-zinc-800 pb-3">
+            <AccessibleModal
+                isOpen={isOfferModalOpen}
+                onClose={() => setIsOfferModalOpen(false)}
+                title={editingOffer ? `${t('supplier.hub.editOffer')}: ${editingOffer.supplierSku}` : t('supplier.hub.linkOfferTitle')}
+                badge={editingOffer ? t('supplier.hub.offerRevisionTitle') : t('supplier.hub.newOfferTitle')}
+                maxWidth="max-w-2xl"
+            >
+                <div className="space-y-4">
+                    {/* Variant Summary */}
+                    {selectedVariant && (
+                        <div className="p-3 bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 text-xs">
+                            <p className="font-bold text-slate-900 dark:text-white">{selectedVariant.productName}</p>
+                            <p className="text-zinc-500 font-mono text-[11px] mt-0.5">
+                                {selectedVariant.gsm} gsm · {selectedVariant.widthMm} x {selectedVariant.heightMm} mm · {selectedVariant.finish || 'Standard'}
+                            </p>
+                        </div>
+                    )}
+
+                    {formError && (
+                        <div className="p-3 bg-red-500/10 border border-red-500/30 text-red-500 text-xs flex items-center gap-2">
+                            <ExclamationTriangleIcon className="w-4 h-4 shrink-0" />
+                            <span>{formError}</span>
+                        </div>
+                    )}
+
+                    <form onSubmit={handleSubmitOfferForm} className="space-y-4 text-xs">
+                        <div className="grid grid-cols-2 gap-3">
                             <div>
-                                <span className="px-2 py-0.5 text-[9px] font-black uppercase tracking-widest bg-red-600 text-white">
-                                    {editingOffer ? t('supplier.hub.offerRevisionTitle') : t('supplier.hub.newOfferTitle')}
-                                </span>
-                                <h3 className="text-base font-black text-slate-900 dark:text-white mt-1">
-                                    {editingOffer ? `${t('supplier.hub.editOffer')}: ${editingOffer.supplierSku}` : t('supplier.hub.linkOfferTitle')}
-                                </h3>
+                                <label className="block text-[10px] font-bold uppercase text-zinc-500 mb-1">
+                                    {t('supplier.hub.supplierSkuLabel')}
+                                </label>
+                                <input
+                                    type="text"
+                                    required
+                                    value={offerForm.supplierSku}
+                                    onChange={(e) => setOfferForm({ ...offerForm, supplierSku: e.target.value })}
+                                    className="w-full px-2.5 py-1.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 font-mono"
+                                />
                             </div>
-                            <button
-                                onClick={() => setIsOfferModalOpen(false)}
-                                className="p-1 text-zinc-400 hover:text-slate-900 dark:hover:text-white"
-                            >
-                                <XMarkIcon className="w-5 h-5" />
-                            </button>
+
+                            <div>
+                                <label className="block text-[10px] font-bold uppercase text-zinc-500 mb-1">
+                                    {t('supplier.hub.currencyLabel')}
+                                </label>
+                                <select
+                                    value={offerForm.currency}
+                                    onChange={(e) => setOfferForm({ ...offerForm, currency: e.target.value })}
+                                    className="w-full px-2.5 py-1.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 font-bold"
+                                >
+                                    <option value="EUR">EUR (€)</option>
+                                    <option value="USD">USD ($)</option>
+                                    <option value="GBP">GBP (£)</option>
+                                </select>
+                            </div>
                         </div>
 
-                        {/* Variant Summary */}
-                        {selectedVariant && (
-                            <div className="p-3 bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 text-xs">
-                                <p className="font-bold text-slate-900 dark:text-white">{selectedVariant.productName}</p>
-                                <p className="text-zinc-500 font-mono text-[11px] mt-0.5">
-                                    {selectedVariant.gsm} gsm · {selectedVariant.widthMm} x {selectedVariant.heightMm} mm · {selectedVariant.finish || 'Standard'}
-                                </p>
+                        <div className="grid grid-cols-2 gap-3">
+                            <div>
+                                <label className="block text-[10px] font-bold uppercase text-zinc-500 mb-1">
+                                    {t('supplier.hub.priceAmountLabel')}
+                                </label>
+                                <input
+                                    type="number"
+                                    step="0.0001"
+                                    min="0.0001"
+                                    required
+                                    placeholder="e.g. 1.4500"
+                                    value={offerForm.priceAmount}
+                                    onChange={(e) => setOfferForm({ ...offerForm, priceAmount: e.target.value })}
+                                    className="w-full px-2.5 py-1.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 font-mono font-bold"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-[10px] font-bold uppercase text-zinc-500 mb-1">
+                                    {t('supplier.hub.priceBasisLabel')}
+                                </label>
+                                <select
+                                    value={offerForm.priceBasis}
+                                    onChange={(e) => setOfferForm({ ...offerForm, priceBasis: e.target.value })}
+                                    className="w-full px-2.5 py-1.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 font-bold"
+                                >
+                                    <option value="KG">KG (per Kilogram)</option>
+                                    <option value="TONNE">TONNE (per Metric Tonne)</option>
+                                    <option value="SHEET">SHEET (per Individual Sheet)</option>
+                                    <option value="THOUSAND_SHEETS">THOUSAND_SHEETS (per 1,000 Sheets)</option>
+                                    <option value="PACK">PACK (per Sealed Ream / Pack)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        {offerForm.priceBasis === 'PACK' && (
+                            <div className="p-3 bg-amber-500/10 border border-amber-500/20 space-y-1">
+                                <label className="block text-[10px] font-bold uppercase text-amber-700 dark:text-amber-400">
+                                    {t('supplier.hub.sheetsPerPackLabel')}
+                                </label>
+                                <input
+                                    type="number"
+                                    min="1"
+                                    required
+                                    placeholder="e.g. 500"
+                                    value={offerForm.sheetsPerPack}
+                                    onChange={(e) => setOfferForm({ ...offerForm, sheetsPerPack: e.target.value })}
+                                    className="w-full px-2.5 py-1.5 bg-white dark:bg-zinc-900 border border-amber-500/40 font-mono font-bold"
+                                />
                             </div>
                         )}
 
-                        {formError && (
-                            <div className="p-3 bg-red-500/10 border border-red-500/30 text-red-500 text-xs flex items-center gap-2">
-                                <ExclamationTriangleIcon className="w-4 h-4 shrink-0" />
-                                <span>{formError}</span>
+                        <div className="grid grid-cols-2 gap-3">
+                            <div>
+                                <label className="block text-[10px] font-bold uppercase text-zinc-500 mb-1">
+                                    {t('supplier.hub.moqLabel')}
+                                </label>
+                                <input
+                                    type="number"
+                                    min="1"
+                                    required
+                                    value={offerForm.moq}
+                                    onChange={(e) => setOfferForm({ ...offerForm, moq: e.target.value })}
+                                    className="w-full px-2.5 py-1.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 font-mono"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-[10px] font-bold uppercase text-zinc-500 mb-1">
+                                    {t('supplier.hub.orderMultipleLabel')}
+                                </label>
+                                <input
+                                    type="number"
+                                    min="1"
+                                    required
+                                    value={offerForm.orderMultiple}
+                                    onChange={(e) => setOfferForm({ ...offerForm, orderMultiple: e.target.value })}
+                                    className="w-full px-2.5 py-1.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 font-mono"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3">
+                            <div>
+                                <label className="block text-[10px] font-bold uppercase text-zinc-500 mb-1">
+                                    {t('supplier.hub.validFromLabel')}
+                                </label>
+                                <input
+                                    type="date"
+                                    value={offerForm.validFrom}
+                                    onChange={(e) => setOfferForm({ ...offerForm, validFrom: e.target.value })}
+                                    className="w-full px-2.5 py-1.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-[10px] font-bold uppercase text-zinc-500 mb-1">
+                                    {t('supplier.hub.validUntilLabel')}
+                                </label>
+                                <input
+                                    type="date"
+                                    value={offerForm.validUntil}
+                                    onChange={(e) => setOfferForm({ ...offerForm, validUntil: e.target.value })}
+                                    className="w-full px-2.5 py-1.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3">
+                            <div>
+                                <label className="block text-[10px] font-bold uppercase text-zinc-500 mb-1">
+                                    {t('supplier.hub.deliveryZonesLabel')}
+                                </label>
+                                <input
+                                    type="text"
+                                    placeholder="ES, PT, FR"
+                                    value={offerForm.deliveryZones}
+                                    onChange={(e) => setOfferForm({ ...offerForm, deliveryZones: e.target.value })}
+                                    className="w-full px-2.5 py-1.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 font-mono uppercase"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-[10px] font-bold uppercase text-zinc-500 mb-1">
+                                    {t('supplier.hub.visibilityLabel')}
+                                </label>
+                                <select
+                                    value={offerForm.visibility}
+                                    onChange={(e) => setOfferForm({ ...offerForm, visibility: e.target.value })}
+                                    className="w-full px-2.5 py-1.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 font-bold"
+                                >
+                                    <option value="APPROVED_CUSTOMERS">{t('supplier.hub.visApproved')}</option>
+                                    <option value="MARKETPLACE">{t('supplier.hub.visMarketplace')}</option>
+                                    <option value="PRIVATE">{t('supplier.hub.visPrivate')}</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        {editingOffer && (
+                            <div>
+                                <label className="block text-[10px] font-bold uppercase text-zinc-500 mb-1">
+                                    {t('supplier.hub.changeReasonLabel')}
+                                </label>
+                                <input
+                                    type="text"
+                                    required
+                                    placeholder="e.g. Q4 Raw pulp index adjustment"
+                                    value={offerForm.changeReason}
+                                    onChange={(e) => setOfferForm({ ...offerForm, changeReason: e.target.value })}
+                                    className="w-full px-2.5 py-1.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800"
+                                />
                             </div>
                         )}
 
-                        <form onSubmit={handleSubmitOfferForm} className="space-y-4 text-xs">
-                            <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                    <label className="block text-[10px] font-bold uppercase text-zinc-500 mb-1">
-                                        {t('supplier.hub.supplierSkuLabel')}
-                                    </label>
-                                    <input
-                                        type="text"
-                                        required
-                                        value={offerForm.supplierSku}
-                                        onChange={(e) => setOfferForm({ ...offerForm, supplierSku: e.target.value })}
-                                        className="w-full px-2.5 py-1.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 font-mono"
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className="block text-[10px] font-bold uppercase text-zinc-500 mb-1">
-                                        {t('supplier.hub.currencyLabel')}
-                                    </label>
-                                    <select
-                                        value={offerForm.currency}
-                                        onChange={(e) => setOfferForm({ ...offerForm, currency: e.target.value })}
-                                        className="w-full px-2.5 py-1.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 font-bold"
-                                    >
-                                        <option value="EUR">EUR (€)</option>
-                                        <option value="USD">USD ($)</option>
-                                        <option value="GBP">GBP (£)</option>
-                                    </select>
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                    <label className="block text-[10px] font-bold uppercase text-zinc-500 mb-1">
-                                        {t('supplier.hub.priceAmountLabel')}
-                                    </label>
-                                    <input
-                                        type="number"
-                                        step="0.0001"
-                                        min="0.0001"
-                                        required
-                                        placeholder="e.g. 1.4500"
-                                        value={offerForm.priceAmount}
-                                        onChange={(e) => setOfferForm({ ...offerForm, priceAmount: e.target.value })}
-                                        className="w-full px-2.5 py-1.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 font-mono font-bold"
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className="block text-[10px] font-bold uppercase text-zinc-500 mb-1">
-                                        {t('supplier.hub.priceBasisLabel')}
-                                    </label>
-                                    <select
-                                        value={offerForm.priceBasis}
-                                        onChange={(e) => setOfferForm({ ...offerForm, priceBasis: e.target.value })}
-                                        className="w-full px-2.5 py-1.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 font-bold"
-                                    >
-                                        <option value="KG">KG (per Kilogram)</option>
-                                        <option value="TONNE">TONNE (per Metric Tonne)</option>
-                                        <option value="SHEET">SHEET (per Individual Sheet)</option>
-                                        <option value="THOUSAND_SHEETS">THOUSAND_SHEETS (per 1,000 Sheets)</option>
-                                        <option value="PACK">PACK (per Sealed Ream / Pack)</option>
-                                    </select>
-                                </div>
-                            </div>
-
-                            {/* PACK specific requirement */}
-                            {offerForm.priceBasis === 'PACK' && (
-                                <div className="p-3 bg-amber-500/10 border border-amber-500/20 space-y-1">
-                                    <label className="block text-[10px] font-bold uppercase text-amber-700 dark:text-amber-400">
-                                        {t('supplier.hub.sheetsPerPackLabel')}
-                                    </label>
-                                    <input
-                                        type="number"
-                                        min="1"
-                                        required
-                                        placeholder="e.g. 500"
-                                        value={offerForm.sheetsPerPack}
-                                        onChange={(e) => setOfferForm({ ...offerForm, sheetsPerPack: e.target.value })}
-                                        className="w-full px-2.5 py-1.5 bg-white dark:bg-zinc-900 border border-amber-500/40 font-mono font-bold"
-                                    />
-                                </div>
-                            )}
-
-                            <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                    <label className="block text-[10px] font-bold uppercase text-zinc-500 mb-1">
-                                        {t('supplier.hub.moqLabel')}
-                                    </label>
-                                    <input
-                                        type="number"
-                                        min="1"
-                                        required
-                                        value={offerForm.moq}
-                                        onChange={(e) => setOfferForm({ ...offerForm, moq: e.target.value })}
-                                        className="w-full px-2.5 py-1.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 font-mono"
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className="block text-[10px] font-bold uppercase text-zinc-500 mb-1">
-                                        {t('supplier.hub.orderMultipleLabel')}
-                                    </label>
-                                    <input
-                                        type="number"
-                                        min="1"
-                                        required
-                                        value={offerForm.orderMultiple}
-                                        onChange={(e) => setOfferForm({ ...offerForm, orderMultiple: e.target.value })}
-                                        className="w-full px-2.5 py-1.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 font-mono"
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                    <label className="block text-[10px] font-bold uppercase text-zinc-500 mb-1">
-                                        {t('supplier.hub.validFromLabel')}
-                                    </label>
-                                    <input
-                                        type="date"
-                                        value={offerForm.validFrom}
-                                        onChange={(e) => setOfferForm({ ...offerForm, validFrom: e.target.value })}
-                                        className="w-full px-2.5 py-1.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800"
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className="block text-[10px] font-bold uppercase text-zinc-500 mb-1">
-                                        {t('supplier.hub.validUntilLabel')}
-                                    </label>
-                                    <input
-                                        type="date"
-                                        value={offerForm.validUntil}
-                                        onChange={(e) => setOfferForm({ ...offerForm, validUntil: e.target.value })}
-                                        className="w-full px-2.5 py-1.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800"
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                    <label className="block text-[10px] font-bold uppercase text-zinc-500 mb-1">
-                                        {t('supplier.hub.deliveryZonesLabel')}
-                                    </label>
-                                    <input
-                                        type="text"
-                                        placeholder="ES, PT, FR"
-                                        value={offerForm.deliveryZones}
-                                        onChange={(e) => setOfferForm({ ...offerForm, deliveryZones: e.target.value })}
-                                        className="w-full px-2.5 py-1.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 font-mono uppercase"
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className="block text-[10px] font-bold uppercase text-zinc-500 mb-1">
-                                        {t('supplier.hub.visibilityLabel')}
-                                    </label>
-                                    <select
-                                        value={offerForm.visibility}
-                                        onChange={(e) => setOfferForm({ ...offerForm, visibility: e.target.value })}
-                                        className="w-full px-2.5 py-1.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 font-bold"
-                                    >
-                                        <option value="APPROVED_CUSTOMERS">{t('supplier.hub.visApproved')}</option>
-                                        <option value="MARKETPLACE">{t('supplier.hub.visMarketplace')}</option>
-                                        <option value="PRIVATE">{t('supplier.hub.visPrivate')}</option>
-                                    </select>
-                                </div>
-                            </div>
-
-                            {editingOffer && (
-                                <div>
-                                    <label className="block text-[10px] font-bold uppercase text-zinc-500 mb-1">
-                                        {t('supplier.hub.changeReasonLabel')}
-                                    </label>
-                                    <input
-                                        type="text"
-                                        required
-                                        placeholder="e.g. Q4 Raw pulp index adjustment"
-                                        value={offerForm.changeReason}
-                                        onChange={(e) => setOfferForm({ ...offerForm, changeReason: e.target.value })}
-                                        className="w-full px-2.5 py-1.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800"
-                                    />
-                                </div>
-                            )}
-
-                            <div className="flex justify-end gap-3 pt-3 border-t border-slate-200 dark:border-zinc-800">
-                                <button
-                                    type="button"
-                                    onClick={() => setIsOfferModalOpen(false)}
-                                    className="px-4 py-2 border border-slate-300 dark:border-zinc-700 font-bold uppercase text-[10px]"
-                                >
-                                    {t('supplier.hub.cancel')}
-                                </button>
-                                <button
-                                    type="submit"
-                                    disabled={formSubmitting}
-                                    className="px-5 py-2 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-bold uppercase text-[11px] transition-colors"
-                                >
-                                    {formSubmitting ? t('supplier.hub.saving') : editingOffer ? t('supplier.hub.recordRevision') : t('supplier.hub.publishOffer')}
-                                </button>
-                            </div>
-                        </form>
-                    </div>
+                        <div className="flex justify-end gap-3 pt-3 border-t border-slate-200 dark:border-zinc-800">
+                            <button
+                                type="button"
+                                onClick={() => setIsOfferModalOpen(false)}
+                                className="px-4 py-2 border border-slate-300 dark:border-zinc-700 font-bold uppercase text-[10px] cursor-pointer"
+                            >
+                                {t('supplier.hub.cancel')}
+                            </button>
+                            <button
+                                type="submit"
+                                disabled={formSubmitting}
+                                className="px-5 py-2 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-bold uppercase text-[11px] transition-colors cursor-pointer"
+                            >
+                                {formSubmitting ? t('supplier.hub.saving') : editingOffer ? t('supplier.hub.recordRevision') : t('supplier.hub.publishOffer')}
+                            </button>
+                        </div>
+                    </form>
                 </div>
-            )}
+            </AccessibleModal>
 
             {/* REVISIONS HISTORY MODAL */}
-            {isRevisionsModalOpen && revisionOffer && (
-                <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 flex items-center justify-center p-4">
-                    <div className="bg-white dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 w-full max-w-2xl shadow-2xl p-6 space-y-4">
-                        <div className="flex items-center justify-between border-b border-slate-200 dark:border-zinc-800 pb-3">
-                            <div>
-                                <span className="px-2 py-0.5 text-[9px] font-black uppercase tracking-widest bg-red-600 text-white">
-                                    Audit Ledger
+            <AccessibleModal
+                isOpen={isRevisionsModalOpen && Boolean(revisionOffer)}
+                onClose={() => setIsRevisionsModalOpen(false)}
+                title={revisionOffer?.offer ? `${t('supplier.hub.revisionsLedger')}: ${revisionOffer.offer.supplierSku}` : t('supplier.hub.revisionsLedger')}
+                badge="Audit Ledger"
+                maxWidth="max-w-2xl"
+                footer={
+                    <button
+                        onClick={() => setIsRevisionsModalOpen(false)}
+                        className="px-4 py-2 bg-slate-800 text-white font-bold uppercase text-[10px] cursor-pointer"
+                    >
+                        {t('supplier.hub.close')}
+                    </button>
+                }
+            >
+                <div className="space-y-3">
+                    {revisionOffer?.revisions && revisionOffer.revisions.map((rev: any) => (
+                        <div key={rev.id} className="p-3 bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 text-xs space-y-1">
+                            <div className="flex items-center justify-between">
+                                <span className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                                    <span className="px-1.5 py-0.2 bg-red-600 text-white text-[10px] font-mono">
+                                        v{rev.revisionNumber}
+                                    </span>
+                                    <span>{rev.priceAmount} {rev.currency} / {rev.priceBasis}</span>
                                 </span>
-                                <h3 className="text-base font-black text-slate-900 dark:text-white mt-1">
-                                    Price & Terms Revision History: {revisionOffer.offer?.supplierSku}
-                                </h3>
+                                <span className="text-[10px] font-mono text-zinc-400">
+                                    {new Date(rev.createdAt).toLocaleString()}
+                                </span>
                             </div>
-                            <button
-                                onClick={() => setIsRevisionsModalOpen(false)}
-                                className="p-1 text-zinc-400 hover:text-slate-900 dark:hover:text-white"
-                            >
-                                <XMarkIcon className="w-5 h-5" />
-                            </button>
+                            <div className="text-[11px] text-zinc-500">
+                                <span>MOQ: {rev.moq}</span>
+                                <span className="ml-2">· Step: {rev.orderMultiple}</span>
+                                <span className="ml-2">· Visibility: {rev.visibility}</span>
+                            </div>
+                            <div className="text-[10px] italic text-zinc-400">
+                                Reason: "{rev.changeReason || 'No reason specified'}"
+                            </div>
                         </div>
-
-                        <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
-                            {revisionOffer.revisions && revisionOffer.revisions.map((rev: any) => (
-                                <div key={rev.id} className="p-3 bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 text-xs space-y-1">
-                                    <div className="flex items-center justify-between">
-                                        <span className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                                            <span className="px-1.5 py-0.2 bg-red-600 text-white text-[10px] font-mono">
-                                                v{rev.revisionNumber}
-                                            </span>
-                                            <span>{rev.priceAmount} {rev.currency} / {rev.priceBasis}</span>
-                                        </span>
-                                        <span className="text-[10px] font-mono text-zinc-400">
-                                            {new Date(rev.createdAt).toLocaleString()}
-                                        </span>
-                                    </div>
-                                    <div className="text-[11px] text-zinc-500">
-                                        <span>MOQ: {rev.moq}</span>
-                                        <span className="ml-2">· Step: {rev.orderMultiple}</span>
-                                        <span className="ml-2">· Visibility: {rev.visibility}</span>
-                                    </div>
-                                    <div className="text-[10px] italic text-zinc-400">
-                                        Reason: "{rev.changeReason || 'No reason specified'}"
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-
-                        <div className="flex justify-end pt-3 border-t border-slate-200 dark:border-zinc-800">
-                            <button
-                                onClick={() => setIsRevisionsModalOpen(false)}
-                                className="px-4 py-2 bg-slate-800 text-white font-bold uppercase text-[10px]"
-                            >
-                                {t('supplier.hub.close')}
-                            </button>
-                        </div>
-                    </div>
+                    ))}
                 </div>
-            )}
+            </AccessibleModal>
 
             {/* TECHNICAL VARIANT SPECS MODAL */}
-            {variantDetailModalOpen && (
-                <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 flex items-center justify-center p-4">
-                    <div className="bg-white dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 w-full max-w-xl shadow-2xl p-6 space-y-4">
-                        <div className="flex items-center justify-between border-b border-slate-200 dark:border-zinc-800 pb-3">
-                            <div>
-                                <span className="px-2 py-0.5 text-[9px] font-black uppercase tracking-widest bg-red-600 text-white">
-                                    {t('supplier.hub.viewVariantDetails')}
-                                </span>
-                                <h3 className="text-base font-black text-slate-900 dark:text-white mt-1">
-                                    {loadingVariantDetail ? 'Loading specifications...' : (viewingVariant?.variant?.productName || t('supplier.hub.variantSpecsTitle'))}
-                                </h3>
-                            </div>
+            <AccessibleModal
+                isOpen={variantDetailModalOpen}
+                onClose={() => setVariantDetailModalOpen(false)}
+                title={loadingVariantDetail ? 'Loading specifications...' : (viewingVariant?.variant?.productName || t('supplier.hub.variantSpecsTitle'))}
+                badge={t('supplier.hub.viewVariantDetails')}
+                maxWidth="max-w-2xl"
+                footer={
+                    <div className="flex justify-between items-center w-full">
+                        <button
+                            onClick={() => setVariantDetailModalOpen(false)}
+                            className="px-4 py-2 border border-slate-300 dark:border-zinc-700 font-bold uppercase text-[10px] cursor-pointer"
+                        >
+                            {t('supplier.hub.close')}
+                        </button>
+                        {!isReadOnly && viewingVariant?.variant && (
                             <button
-                                onClick={() => setVariantDetailModalOpen(false)}
-                                className="p-1 text-zinc-400 hover:text-slate-900 dark:hover:text-white"
+                                onClick={() => {
+                                    setVariantDetailModalOpen(false);
+                                    handleOpenCreateOffer(viewingVariant.variant);
+                                }}
+                                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-bold uppercase text-[10px] cursor-pointer"
                             >
-                                <XMarkIcon className="w-5 h-5" />
+                                {t('supplier.hub.createOffer')}
                             </button>
+                        )}
+                    </div>
+                }
+            >
+                {loadingVariantDetail ? (
+                    <p className="p-6 text-center text-zinc-400 text-xs">Fetching physical variant metrics...</p>
+                ) : viewingVariant?.variant ? (
+                    <div className="space-y-4 text-xs">
+                        <div className="grid grid-cols-2 gap-3 p-3 bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 font-mono">
+                            <div>
+                                <span className="text-[10px] text-zinc-400 uppercase block">Product Name</span>
+                                <span className="font-bold text-slate-900 dark:text-white">{viewingVariant.variant.productName}</span>
+                            </div>
+                            <div>
+                                <span className="text-[10px] text-zinc-400 uppercase block">Category / Brand</span>
+                                <span className="font-bold text-slate-900 dark:text-white">{viewingVariant.variant.category} · {viewingVariant.variant.brand || '—'}</span>
+                            </div>
+                            <div>
+                                <span className="text-[10px] text-zinc-400 uppercase block">Dimensions</span>
+                                <span className="font-bold text-slate-900 dark:text-white">{viewingVariant.variant.widthMm} × {viewingVariant.variant.heightMm} mm</span>
+                            </div>
+                            <div>
+                                <span className="text-[10px] text-zinc-400 uppercase block">Grammage (GSM)</span>
+                                <span className="font-bold text-slate-900 dark:text-white">{viewingVariant.variant.gsm} g/m²</span>
+                            </div>
+                            <div>
+                                <span className="text-[10px] text-zinc-400 uppercase block">Caliper (Thickness)</span>
+                                <span className="font-bold text-slate-900 dark:text-white">
+                                    {viewingVariant.variant.caliperUm ? `${viewingVariant.variant.caliperUm} µm` : '—'}
+                                    {viewingVariant.variant.caliperMm ? ` (${viewingVariant.variant.caliperMm} mm)` : ''}
+                                </span>
+                            </div>
+                            <div>
+                                <span className="text-[10px] text-zinc-400 uppercase block">Grain & Finish</span>
+                                <span className="font-bold text-slate-900 dark:text-white">{viewingVariant.variant.grainDirection || '—'} · {viewingVariant.variant.finish || '—'}</span>
+                            </div>
+                            <div className="col-span-2">
+                                <span className="text-[10px] text-zinc-400 uppercase block">Technical Fingerprint</span>
+                                <span className="font-mono text-[10px] text-zinc-500 break-all">{viewingVariant.variant.fingerprint}</span>
+                            </div>
                         </div>
 
-                        {loadingVariantDetail ? (
-                            <p className="p-6 text-center text-zinc-400 text-xs">Fetching physical variant metrics...</p>
-                        ) : viewingVariant?.variant ? (
-                            <div className="space-y-4 text-xs">
-                                <div className="grid grid-cols-2 gap-3 p-3 bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 font-mono">
-                                    <div>
-                                        <span className="text-[10px] text-zinc-400 uppercase block">Product Name</span>
-                                        <span className="font-bold text-slate-900 dark:text-white">{viewingVariant.variant.productName}</span>
-                                    </div>
-                                    <div>
-                                        <span className="text-[10px] text-zinc-400 uppercase block">Category / Brand</span>
-                                        <span className="font-bold text-slate-900 dark:text-white">{viewingVariant.variant.category} · {viewingVariant.variant.brand || '—'}</span>
-                                    </div>
-                                    <div>
-                                        <span className="text-[10px] text-zinc-400 uppercase block">Dimensions</span>
-                                        <span className="font-bold text-slate-900 dark:text-white">{viewingVariant.variant.widthMm} × {viewingVariant.variant.heightMm} mm</span>
-                                    </div>
-                                    <div>
-                                        <span className="text-[10px] text-zinc-400 uppercase block">Grammage (GSM)</span>
-                                        <span className="font-bold text-slate-900 dark:text-white">{viewingVariant.variant.gsm} g/m²</span>
-                                    </div>
-                                    <div>
-                                        <span className="text-[10px] text-zinc-400 uppercase block">Caliper (Thickness)</span>
-                                        <span className="font-bold text-slate-900 dark:text-white">
-                                            {viewingVariant.variant.caliperUm ? `${viewingVariant.variant.caliperUm} µm` : '—'}
-                                            {viewingVariant.variant.caliperMm ? ` (${viewingVariant.variant.caliperMm} mm)` : ''}
-                                        </span>
-                                    </div>
-                                    <div>
-                                        <span className="text-[10px] text-zinc-400 uppercase block">Grain & Finish</span>
-                                        <span className="font-bold text-slate-900 dark:text-white">{viewingVariant.variant.grainDirection || '—'} · {viewingVariant.variant.finish || '—'}</span>
-                                    </div>
-                                    <div className="col-span-2">
-                                        <span className="text-[10px] text-zinc-400 uppercase block">Technical Fingerprint</span>
-                                        <span className="font-mono text-[10px] text-zinc-500 break-all">{viewingVariant.variant.fingerprint}</span>
-                                    </div>
-                                </div>
-
-                                <div className="space-y-2">
-                                    <h4 className="font-bold text-slate-900 dark:text-white text-xs">Active Offers For This Variant ({viewingVariant.offers?.length || 0})</h4>
-                                    {viewingVariant.offers && viewingVariant.offers.length > 0 ? (
-                                        <div className="space-y-1 max-h-40 overflow-y-auto">
-                                            {viewingVariant.offers.map((off: any) => (
-                                                <div key={off.id} className="p-2 border border-slate-200 dark:border-zinc-800 flex items-center justify-between">
-                                                    <div>
-                                                        <span className="font-mono font-bold text-slate-800 dark:text-zinc-200">{off.supplierSku}</span>
-                                                        <span className="text-[10px] text-zinc-400 ml-2">MOQ: {off.moq}</span>
-                                                    </div>
-                                                    <span className="font-mono font-bold text-slate-900 dark:text-white">
-                                                        {Number(off.priceAmount).toFixed(2)} {off.currency} / {off.priceBasis}
-                                                    </span>
-                                                </div>
-                                            ))}
+                        <div className="space-y-2">
+                            <h4 className="font-bold text-slate-900 dark:text-white text-xs">Active Offers For This Variant ({viewingVariant.offers?.length || 0})</h4>
+                            {viewingVariant.offers && viewingVariant.offers.length > 0 ? (
+                                <div className="space-y-1 max-h-40 overflow-y-auto">
+                                    {viewingVariant.offers.map((off: any) => (
+                                        <div key={off.id} className="p-2 border border-slate-200 dark:border-zinc-800 flex items-center justify-between">
+                                            <div>
+                                                <span className="font-mono font-bold text-slate-800 dark:text-zinc-200">{off.supplierSku}</span>
+                                                <span className="text-[10px] text-zinc-400 ml-2">MOQ: {off.moq}</span>
+                                            </div>
+                                            <span className="font-mono font-bold text-slate-900 dark:text-white">
+                                                {Number(off.priceAmount).toFixed(2)} {off.currency} / {off.priceBasis}
+                                            </span>
                                         </div>
-                                    ) : (
-                                        <p className="text-zinc-400 italic text-[11px]">No active offers currently published by your organization for this physical variant.</p>
-                                    )}
+                                    ))}
                                 </div>
+                            ) : (
+                                <p className="text-zinc-400 italic text-[11px]">No active offers currently published by your organization for this physical variant.</p>
+                            )}
+                        </div>
+                    </div>
+                ) : null}
+            </AccessibleModal>
 
-                                <div className="flex justify-between items-center pt-3 border-t border-slate-200 dark:border-zinc-800">
-                                    <button
-                                        onClick={() => setVariantDetailModalOpen(false)}
-                                        className="px-4 py-2 border border-slate-300 dark:border-zinc-700 font-bold uppercase text-[10px]"
-                                    >
-                                        {t('supplier.hub.close')}
-                                    </button>
-                                    {!isReadOnly && (
-                                        <button
-                                            onClick={() => {
-                                                setVariantDetailModalOpen(false);
-                                                handleOpenCreateOffer(viewingVariant.variant);
-                                            }}
-                                            className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-bold uppercase text-[10px]"
-                                        >
-                                            {t('supplier.hub.createOffer')}
-                                        </button>
-                                    )}
+            {/* EDIT TECHNICAL VARIANT SPECS MODAL */}
+            <AccessibleModal
+                isOpen={isEditVariantModalOpen && Boolean(editingVariant)}
+                onClose={() => setIsEditVariantModalOpen(false)}
+                title={t('supplier.hub.editVariantTitle')}
+                subtitle={t('supplier.hub.editVariantWarning')}
+                badge="Technical Edit"
+                maxWidth="max-w-md"
+            >
+                {editingVariant && (
+                    <form onSubmit={handleSaveVariantSpecs} className="space-y-4 text-xs">
+                        <div className="p-2.5 bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800">
+                            <p className="font-bold text-slate-900 dark:text-white">{editingVariant.productName}</p>
+                            <p className="text-[10px] font-mono text-zinc-400">ID: {editingVariant.id}</p>
+                        </div>
+
+                        {variantError && (
+                            <div className="p-2.5 bg-red-500/10 border border-red-500/30 text-red-500 text-xs flex items-center gap-2">
+                                <ExclamationTriangleIcon className="w-4 h-4 shrink-0" />
+                                <span>{variantError}</span>
+                            </div>
+                        )}
+
+                        <div className="grid grid-cols-2 gap-3">
+                            <div>
+                                <label className="block text-[10px] font-bold uppercase text-zinc-500 mb-1">GSM *</label>
+                                <input
+                                    type="number"
+                                    min="1"
+                                    required
+                                    value={variantForm.gsm}
+                                    onChange={(e) => setVariantForm({ ...variantForm, gsm: e.target.value })}
+                                    className="w-full px-2.5 py-1.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 font-mono font-bold"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-[10px] font-bold uppercase text-zinc-500 mb-1">Caliper (µm)</label>
+                                <input
+                                    type="number"
+                                    min="0"
+                                    value={variantForm.caliperUm}
+                                    onChange={(e) => setVariantForm({ ...variantForm, caliperUm: e.target.value })}
+                                    className="w-full px-2.5 py-1.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 font-mono"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3">
+                            <div>
+                                <label className="block text-[10px] font-bold uppercase text-zinc-500 mb-1">Width (mm) *</label>
+                                <input
+                                    type="number"
+                                    min="1"
+                                    required
+                                    value={variantForm.widthMm}
+                                    onChange={(e) => setVariantForm({ ...variantForm, widthMm: e.target.value })}
+                                    className="w-full px-2.5 py-1.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 font-mono font-bold"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-[10px] font-bold uppercase text-zinc-500 mb-1">Height (mm) *</label>
+                                <input
+                                    type="number"
+                                    min="1"
+                                    required
+                                    value={variantForm.heightMm}
+                                    onChange={(e) => setVariantForm({ ...variantForm, heightMm: e.target.value })}
+                                    className="w-full px-2.5 py-1.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 font-mono font-bold"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3">
+                            <div>
+                                <label className="block text-[10px] font-bold uppercase text-zinc-500 mb-1">Finish</label>
+                                <input
+                                    type="text"
+                                    value={variantForm.finish}
+                                    onChange={(e) => setVariantForm({ ...variantForm, finish: e.target.value })}
+                                    className="w-full px-2.5 py-1.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-[10px] font-bold uppercase text-zinc-500 mb-1">Grain Direction</label>
+                                <select
+                                    value={variantForm.grainDirection}
+                                    onChange={(e) => setVariantForm({ ...variantForm, grainDirection: e.target.value })}
+                                    className="w-full px-2.5 py-1.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 font-bold"
+                                >
+                                    <option value="LONG_GRAIN">LONG_GRAIN</option>
+                                    <option value="SHORT_GRAIN">SHORT_GRAIN</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div className="flex justify-end gap-2 pt-3 border-t border-slate-200 dark:border-zinc-800">
+                            <button
+                                type="button"
+                                onClick={() => setIsEditVariantModalOpen(false)}
+                                className="px-4 py-2 border border-slate-300 dark:border-zinc-700 font-bold uppercase text-[10px] cursor-pointer"
+                            >
+                                {t('supplier.hub.cancel')}
+                            </button>
+                            <button
+                                type="submit"
+                                disabled={savingVariant}
+                                className="px-5 py-2 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-bold uppercase text-[11px] transition-colors cursor-pointer"
+                            >
+                                {savingVariant ? t('supplier.hub.saving') : t('supplier.hub.save')}
+                            </button>
+                        </div>
+                    </form>
+                )}
+            </AccessibleModal>
+
+            {/* BATCH HISTORY MODAL */}
+            <AccessibleModal
+                isOpen={isBatchHistoryModalOpen}
+                onClose={() => setIsBatchHistoryModalOpen(false)}
+                title={t('supplier.hub.batchHistoryTitle')}
+                badge="Import History"
+                maxWidth="max-w-4xl"
+                footer={
+                    <button
+                        onClick={() => setIsBatchHistoryModalOpen(false)}
+                        className="px-4 py-2 border border-slate-300 dark:border-zinc-700 font-bold uppercase text-[10px] cursor-pointer"
+                    >
+                        {t('supplier.hub.close')}
+                    </button>
+                }
+            >
+                <div className="space-y-3">
+                    {loadingBatches ? (
+                        <p className="p-8 text-center text-zinc-400">Cargando lotes de importación...</p>
+                    ) : importBatches.length === 0 ? (
+                        <p className="p-8 text-center text-zinc-400">No se registran lotes importados para este proveedor.</p>
+                    ) : (
+                        <div className="border border-slate-200 dark:border-zinc-800 overflow-x-auto">
+                            <table className="w-full text-left text-xs">
+                                <thead>
+                                    <tr className="bg-slate-100 dark:bg-zinc-900 border-b border-slate-200 dark:border-zinc-800 text-[10px] font-bold text-zinc-500 uppercase tracking-wider">
+                                        <th className="p-2.5">Fecha</th>
+                                        <th className="p-2.5">Archivo</th>
+                                        <th className="p-2.5">Estado</th>
+                                        <th className="p-2.5">Filas</th>
+                                        <th className="p-2.5 text-right">Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100 dark:divide-zinc-900">
+                                    {importBatches.map((b) => (
+                                        <tr key={b.id} className="hover:bg-slate-50 dark:hover:bg-zinc-900/50">
+                                            <td className="p-2.5 font-mono text-[11px] text-zinc-500">
+                                                {new Date(b.created_at).toLocaleString()}
+                                            </td>
+                                            <td className="p-2.5 font-bold text-slate-800 dark:text-zinc-200">
+                                                {b.original_filename || b.id.slice(0, 8)}
+                                            </td>
+                                            <td className="p-2.5">
+                                                <StatusBadge status={b.status} />
+                                            </td>
+                                            <td className="p-2.5 font-mono text-[11px]">
+                                                Tot: {b.total_rows} · Vál: {b.valid_rows} · Pend: {b.pending_rows}
+                                            </td>
+                                            <td className="p-2.5 text-right">
+                                                <div className="flex items-center justify-end gap-2">
+                                                    <button
+                                                        onClick={() => handleDownloadBatchIssues(b.id)}
+                                                        className="px-2 py-1 border border-slate-300 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-800 font-bold uppercase text-[9px] cursor-pointer"
+                                                        title={t('supplier.hub.exportIssuesCsv')}
+                                                    >
+                                                        {t('supplier.hub.exportIssuesCsv')}
+                                                    </button>
+                                                    {b.status === 'CONFIRMED' && !isReadOnly && (
+                                                        <button
+                                                            onClick={() => handleRetractBatch(b)}
+                                                            className="px-2 py-1 bg-red-600 hover:bg-red-700 text-white font-bold uppercase text-[9px] cursor-pointer"
+                                                        >
+                                                            {t('supplier.hub.retractBatch')}
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </div>
+            </AccessibleModal>
+
+            {/* CONFIRMATION MODAL */}
+            <AccessibleModal
+                isOpen={Boolean(confirmModal)}
+                onClose={() => setConfirmModal(null)}
+                title={confirmModal?.title || t('supplier.hub.confirmAction')}
+                badge="Action Confirmation"
+                maxWidth="max-w-md"
+                footer={
+                    <div className="flex items-center justify-end gap-2 w-full">
+                        <button
+                            onClick={() => setConfirmModal(null)}
+                            className="px-4 py-2 border border-slate-300 dark:border-zinc-700 text-slate-700 dark:text-zinc-300 font-bold uppercase text-[10px] cursor-pointer"
+                        >
+                            {t('supplier.hub.cancel')}
+                        </button>
+                        <button
+                            onClick={async () => {
+                                if (confirmModal?.onConfirm) {
+                                    await confirmModal.onConfirm();
+                                }
+                                setConfirmModal(null);
+                            }}
+                            className={`px-4 py-2 font-bold uppercase text-[10px] text-white cursor-pointer ${
+                                confirmModal?.isDanger ? 'bg-red-600 hover:bg-red-700' : 'bg-slate-900 dark:bg-white text-white dark:text-slate-900'
+                            }`}
+                        >
+                            {confirmModal?.actionLabel || t('supplier.hub.confirmAction')}
+                        </button>
+                    </div>
+                }
+            >
+                {confirmModal && (
+                    <div className="space-y-3">
+                        <p className="text-xs text-slate-700 dark:text-zinc-300">
+                            {confirmModal.warning}
+                        </p>
+                    </div>
+                )}
+            </AccessibleModal>
+
+            {/* OPERATION REPORT MODAL */}
+            <AccessibleModal
+                isOpen={Boolean(reportModal)}
+                onClose={() => setReportModal(null)}
+                title={reportModal?.title || t('supplier.hub.operationReportTitle')}
+                badge="Batch Execution"
+                maxWidth="max-w-xl"
+                footer={
+                    <button
+                        onClick={() => setReportModal(null)}
+                        className="px-4 py-2 bg-slate-900 text-white font-bold uppercase text-[10px] cursor-pointer"
+                    >
+                        {t('supplier.hub.close')}
+                    </button>
+                }
+            >
+                {reportModal && (
+                    <div className="space-y-4 text-xs">
+                        <div className="grid grid-cols-2 gap-3">
+                            <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400">
+                                <p className="text-[10px] uppercase font-bold tracking-wider">{t('supplier.hub.succeeded')}</p>
+                                <p className="text-2xl font-black">{reportModal.succeededCount}</p>
+                            </div>
+                            <div className={`p-3 border ${
+                                reportModal.failedCount > 0 
+                                    ? 'bg-red-500/10 border-red-500/30 text-red-500' 
+                                    : 'bg-slate-100 dark:bg-zinc-900 border-slate-200 dark:border-zinc-800 text-zinc-400'
+                            }`}>
+                                <p className="text-[10px] uppercase font-bold tracking-wider">{t('supplier.hub.failed')}</p>
+                                <p className="text-2xl font-black">{reportModal.failedCount}</p>
+                            </div>
+                        </div>
+
+                        {reportModal.results?.some((r: any) => !r.success) && (
+                            <div className="space-y-2">
+                                <p className="font-bold text-slate-900 dark:text-white">Detalle de bloqueos o errores:</p>
+                                <div className="border border-slate-200 dark:border-zinc-800 max-h-48 overflow-y-auto divide-y divide-slate-100 dark:divide-zinc-900 font-mono text-[11px]">
+                                    {reportModal.results.filter((r: any) => !r.success).map((r: any, idx: number) => (
+                                        <div key={idx} className="p-2.5 bg-red-50/50 dark:bg-red-950/20">
+                                            <div className="flex items-center justify-between text-red-600 dark:text-red-400 font-bold">
+                                                <span>{r.sku || r.id}</span>
+                                                <span className="text-[10px] px-1 bg-red-200 dark:bg-red-900/50">{r.code}</span>
+                                            </div>
+                                            <p className="text-zinc-600 dark:text-zinc-400 text-[10px] mt-0.5">{r.message}</p>
+                                        </div>
+                                    ))}
                                 </div>
                             </div>
-                        ) : null}
+                        )}
                     </div>
-                </div>
-            )}
+                )}
+            </AccessibleModal>
 
             {/* Technical Import Modal */}
             <TechnicalImportModal

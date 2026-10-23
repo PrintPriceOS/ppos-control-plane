@@ -160,8 +160,17 @@ async function getTechnicalCatalog({ page = 1, limit = 20, search = null, catego
     }
 
     if (category) {
-        whereConditions.push('p.category = ?');
-        params.push(category);
+        const catNorm = String(category).trim().toUpperCase();
+        if (catNorm === 'BOARD') {
+            whereConditions.push('(p.category = "CARTON" OR p.category = "BOARD")');
+        } else if (catNorm === 'SPECIALTY') {
+            whereConditions.push('(p.category = "DESIGN" OR p.category = "OTHER" OR p.category = "SPECIALTY")');
+        } else if (catNorm === 'KRAFT') {
+            whereConditions.push('(p.category = "UNCOATED" OR p.category = "OTHER" OR p.name LIKE "%Kraft%")');
+        } else {
+            whereConditions.push('p.category = ?');
+            params.push(catNorm);
+        }
     }
 
     if (finish) {
@@ -179,6 +188,14 @@ async function getTechnicalCatalog({ page = 1, limit = 20, search = null, catego
     `;
     const countResult = await db.query(countSql, params);
     const total = countResult[0]?.total || 0;
+
+    let supplierActiveVariants = 0;
+    if (supplierId) {
+        const suppVarSql = 'SELECT COUNT(DISTINCT variant_id) as count FROM supplier_paper_offers WHERE supplier_id = ? AND status = "ACTIVE"';
+        const suppVarRes = await db.query(suppVarSql, [supplierId]);
+        const suppRow = Array.isArray(suppVarRes) ? (Array.isArray(suppVarRes[0]) ? suppVarRes[0][0] : suppVarRes[0]) : suppVarRes;
+        supplierActiveVariants = Number(suppRow?.count || 0);
+    }
 
     // Effective Visibility:
     // - MARKETPLACE is visible to all
@@ -286,6 +303,7 @@ async function getTechnicalCatalog({ page = 1, limit = 20, search = null, catego
         limit,
         total,
         totalPages: Math.ceil(total / limit),
+        supplierActiveVariants,
         items: flatItems,
         products: groupedProducts
     };
@@ -352,7 +370,7 @@ async function getTechnicalVariantDetail({ variantId, tenantId, supplierId }) {
  * Format a raw database offer row into a clean canonical response object.
  */
 function formatOfferRecord(raw) {
-    return {
+    const formatted = {
         id: raw.id,
         tenantId: raw.tenant_id,
         supplierId: raw.supplier_id,
@@ -375,6 +393,20 @@ function formatOfferRecord(raw) {
         createdAt: raw.created_at,
         updatedAt: raw.updated_at
     };
+
+    if (raw.product_name !== undefined || raw.gsm !== undefined || raw.productName !== undefined) {
+        formatted.productName = raw.product_name || raw.productName || null;
+        formatted.category = raw.category || null;
+        formatted.brand = raw.brand || null;
+        formatted.gsm = (raw.gsm !== null && raw.gsm !== undefined) ? Number(raw.gsm) : null;
+        formatted.widthMm = (raw.width_mm !== null && raw.width_mm !== undefined) ? Number(raw.width_mm) : (raw.widthMm ? Number(raw.widthMm) : null);
+        formatted.heightMm = (raw.height_mm !== null && raw.height_mm !== undefined) ? Number(raw.height_mm) : (raw.heightMm ? Number(raw.heightMm) : null);
+        formatted.finish = raw.finish || null;
+        formatted.grainDirection = raw.grain_direction || raw.grainDirection || null;
+        formatted.fingerprint = raw.fingerprint || null;
+    }
+
+    return formatted;
 }
 
 /**
@@ -508,8 +540,8 @@ async function listSupplierOffers({ tenantId, supplierId, page = 1, limit = 20, 
     const countSql = `
         SELECT COUNT(*) as total
         FROM supplier_paper_offers o
-        JOIN paper_variants v ON o.variant_id = v.id
-        JOIN paper_products p ON v.product_id = p.id
+        LEFT JOIN paper_variants v ON o.variant_id = v.id
+        LEFT JOIN paper_products p ON v.product_id = p.id
         ${whereSql}
     `;
     const countResult = await db.query(countSql, params);
@@ -521,6 +553,7 @@ async function listSupplierOffers({ tenantId, supplierId, page = 1, limit = 20, 
             COALESCE(rev.revision_number, 1) as revision_number,
             p.name as product_name,
             p.category,
+            p.brand,
             v.gsm,
             v.width_mm,
             v.height_mm,
@@ -528,8 +561,8 @@ async function listSupplierOffers({ tenantId, supplierId, page = 1, limit = 20, 
             v.grain_direction,
             v.fingerprint
         FROM supplier_paper_offers o
-        JOIN paper_variants v ON o.variant_id = v.id
-        JOIN paper_products p ON v.product_id = p.id
+        LEFT JOIN paper_variants v ON o.variant_id = v.id
+        LEFT JOIN paper_products p ON v.product_id = p.id
         LEFT JOIN supplier_paper_offer_revisions rev ON o.current_revision_id = rev.id
         ${whereSql}
         ORDER BY o.updated_at DESC
@@ -537,22 +570,43 @@ async function listSupplierOffers({ tenantId, supplierId, page = 1, limit = 20, 
     `;
     const rows = await db.query(dataSql, [...params, limit, offset]);
 
+    // Breakdown counts across all offers of current supplier
+    const countsSql = `
+        SELECT 
+            COUNT(*) as total,
+            SUM(CASE WHEN o.status = 'ACTIVE' THEN 1 ELSE 0 END) as active_count,
+            SUM(CASE WHEN o.status = 'INACTIVE' THEN 1 ELSE 0 END) as inactive_count,
+            SUM(CASE WHEN o.status = 'ARCHIVED' THEN 1 ELSE 0 END) as archived_count
+        FROM supplier_paper_offers o
+        WHERE o.tenant_id = ? AND o.supplier_id = ?
+    `;
+    const countsResult = await db.query(countsSql, [tenantId, supplierId]);
+    const countsRow = Array.isArray(countsResult) ? (Array.isArray(countsResult[0]) ? countsResult[0][0] : countsResult[0]) : countsResult;
+    const counts = {
+        total: Number(countsRow?.total || 0),
+        active: Number(countsRow?.active_count || 0),
+        inactive: Number(countsRow?.inactive_count || 0),
+        archived: Number(countsRow?.archived_count || 0)
+    };
+
     return {
         page,
         limit,
         total,
         totalPages: Math.ceil(total / limit),
+        counts,
         items: rows.map(r => ({
             ...formatOfferRecord(r),
             variantDetails: {
-                productName: r.product_name,
-                category: r.category,
-                gsm: Number(r.gsm),
-                widthMm: Number(r.width_mm),
-                heightMm: Number(r.height_mm),
-                finish: r.finish,
-                grainDirection: r.grain_direction,
-                fingerprint: r.fingerprint
+                productName: r.product_name || null,
+                category: r.category || null,
+                brand: r.brand || null,
+                gsm: r.gsm !== null && r.gsm !== undefined ? Number(r.gsm) : null,
+                widthMm: r.width_mm !== null && r.width_mm !== undefined ? Number(r.width_mm) : null,
+                heightMm: r.height_mm !== null && r.height_mm !== undefined ? Number(r.height_mm) : null,
+                finish: r.finish || null,
+                grainDirection: r.grain_direction || null,
+                fingerprint: r.fingerprint || null
             }
         }))
     };
@@ -563,10 +617,10 @@ async function listSupplierOffers({ tenantId, supplierId, page = 1, limit = 20, 
  */
 async function getOfferById({ offerId, tenantId, supplierId }) {
     const offerSql = `
-        SELECT o.*, p.name as product_name, p.category, v.gsm, v.width_mm, v.height_mm, v.finish, v.grain_direction
+        SELECT o.*, p.name as product_name, p.category, p.brand, v.gsm, v.width_mm, v.height_mm, v.finish, v.grain_direction, v.fingerprint
         FROM supplier_paper_offers o
-        JOIN paper_variants v ON o.variant_id = v.id
-        JOIN paper_products p ON v.product_id = p.id
+        LEFT JOIN paper_variants v ON o.variant_id = v.id
+        LEFT JOIN paper_products p ON v.product_id = p.id
         WHERE o.id = ? AND o.tenant_id = ? AND o.supplier_id = ?
     `;
     const rows = await db.query(offerSql, [offerId, tenantId, supplierId]);
@@ -587,13 +641,15 @@ async function getOfferById({ offerId, tenantId, supplierId }) {
         offer: {
             ...formatOfferRecord(offer),
             variantDetails: {
-                productName: offer.product_name,
-                category: offer.category,
-                gsm: Number(offer.gsm),
-                widthMm: Number(offer.width_mm),
-                heightMm: Number(offer.height_mm),
-                finish: offer.finish,
-                grainDirection: offer.grain_direction
+                productName: offer.product_name || null,
+                category: offer.category || null,
+                brand: offer.brand || null,
+                gsm: offer.gsm !== null && offer.gsm !== undefined ? Number(offer.gsm) : null,
+                widthMm: offer.width_mm !== null && offer.width_mm !== undefined ? Number(offer.width_mm) : null,
+                heightMm: offer.height_mm !== null && offer.height_mm !== undefined ? Number(offer.height_mm) : null,
+                finish: offer.finish || null,
+                grainDirection: offer.grain_direction || null,
+                fingerprint: offer.fingerprint || null
             }
         },
         revisions: revRows.map(r => ({
@@ -771,6 +827,453 @@ async function updateOfferStatus({ offerId, tenantId, supplierId, actorId, statu
     });
 }
 
+/**
+ * Bulk update commercial paper offer statuses (ACTIVATE, DEACTIVATE, ARCHIVE, RESTORE).
+ * Supports both explicit array of offerIds (scope='SELECTED') and all matching filter (scope='ALL_MATCHING').
+ * Fails closed and reports per-record success/failure without inventing global success.
+ * Enforces SKU uniqueness invariant upon RESTORE / ACTIVATE.
+ */
+async function bulkUpdateOfferStatus({ tenantId, supplierId, actorId, action, offerIds = [], scope = 'SELECTED', filters = {}, reason = null }) {
+    const validActions = ['ACTIVATE', 'DEACTIVATE', 'ARCHIVE', 'RESTORE'];
+    const normAction = String(action || '').toUpperCase();
+    if (!validActions.includes(normAction)) {
+        throw new Error(`INVALID_BULK_ACTION: Action must be one of: ${validActions.join(', ')}.`);
+    }
+
+    let targetStatus = 'ACTIVE';
+    if (normAction === 'DEACTIVATE') targetStatus = 'INACTIVE';
+    else if (normAction === 'ARCHIVE') targetStatus = 'ARCHIVED';
+    else if (normAction === 'RESTORE') targetStatus = 'ACTIVE';
+    else if (normAction === 'ACTIVATE') targetStatus = 'ACTIVE';
+
+    let targetIds = [];
+    if (scope === 'ALL_MATCHING') {
+        const where = ['tenant_id = ?', 'supplier_id = ?'];
+        const p = [tenantId, supplierId];
+        if (filters.status) {
+            where.push('status = ?');
+            p.push(filters.status);
+        } else {
+            // Default: do not touch archived records unless explicitly filtered
+            where.push('status != "ARCHIVED"');
+        }
+        if (filters.search && filters.search.trim()) {
+            where.push('(supplier_sku LIKE ?)');
+            p.push(`%${filters.search.trim()}%`);
+        }
+        const matchRows = await db.query(`SELECT id FROM supplier_paper_offers WHERE ${where.join(' AND ')} LIMIT 500`, p);
+        targetIds = (Array.isArray(matchRows) ? matchRows : []).map(r => r.id);
+    } else {
+        if (!Array.isArray(offerIds) || offerIds.length === 0) {
+            throw new Error('OFFER_IDS_REQUIRED: offerIds array cannot be empty when scope is SELECTED.');
+        }
+        targetIds = offerIds.slice(0, 500);
+    }
+
+    const results = [];
+    let succeededCount = 0;
+    let failedCount = 0;
+
+    for (const id of targetIds) {
+        try {
+            // Check offer existence and tenant isolation
+            const offerRes = await db.query(
+                'SELECT * FROM supplier_paper_offers WHERE id = ? AND tenant_id = ? AND supplier_id = ?',
+                [id, tenantId, supplierId]
+            );
+            const offer = Array.isArray(offerRes) ? (Array.isArray(offerRes[0]) ? offerRes[0][0] : offerRes[0]) : offerRes;
+            if (!offer || !offer.id) {
+                results.push({ id, success: false, code: 'OFFER_NOT_FOUND', message: 'Offer not found or unauthorized.' });
+                failedCount++;
+                continue;
+            }
+
+            // If restoring or activating, verify SKU uniqueness against OTHER offers
+            if (targetStatus === 'ACTIVE') {
+                const skuRes = await db.query(
+                    'SELECT id FROM supplier_paper_offers WHERE supplier_id = ? AND supplier_sku = ? AND id != ? AND status != "ARCHIVED"',
+                    [supplierId, offer.supplier_sku, id]
+                );
+                const skuConflict = Array.isArray(skuRes) ? (Array.isArray(skuRes[0]) ? skuRes[0] : skuRes) : [];
+                if (skuConflict && skuConflict.length > 0) {
+                    results.push({
+                        id,
+                        sku: offer.supplier_sku,
+                        success: false,
+                        code: 'SKU_ALREADY_EXISTS',
+                        message: `Cannot restore offer: SKU '${offer.supplier_sku}' is currently active in offer '${skuConflict[0].id}'.`
+                    });
+                    failedCount++;
+                    continue;
+                }
+            }
+
+            await updateOfferStatus({
+                offerId: id,
+                tenantId,
+                supplierId,
+                actorId,
+                status: targetStatus,
+                reason: reason || `Bulk ${normAction} action executed by operator`
+            });
+
+            results.push({ id, sku: offer.supplier_sku, success: true, status: targetStatus });
+            succeededCount++;
+        } catch (itemErr) {
+            results.push({ id, success: false, code: 'UPDATE_FAILED', message: itemErr.message });
+            failedCount++;
+        }
+    }
+
+    return {
+        action: normAction,
+        targetStatus,
+        totalProcessed: targetIds.length,
+        succeededCount,
+        failedCount,
+        results
+    };
+}
+
+/**
+ * Permanently delete a commercial paper offer if unreferenced by procurement or historical orders.
+ * Restricted strictly to SUPPLIER_ADMIN.
+ */
+async function deleteOffer({ tenantId, supplierId, actorId, role, offerId }) {
+    if (role !== 'SUPPLIER_ADMIN') {
+        throw new Error('FORBIDDEN: Hard deletion of commercial offers is restricted to SUPPLIER_ADMIN. Use ARCHIVE instead.');
+    }
+
+    const rows = await db.query(
+        'SELECT * FROM supplier_paper_offers WHERE id = ? AND tenant_id = ? AND supplier_id = ?',
+        [offerId, tenantId, supplierId]
+    );
+    const offer = Array.isArray(rows) ? (Array.isArray(rows[0]) ? rows[0][0] : rows[0]) : rows;
+    if (!offer || !offer.id) {
+        throw new Error('OFFER_NOT_FOUND: Offer not found for current supplier.');
+    }
+
+    // Dependency check: procurement_receipt_records referencing this offer/procurement
+    const receiptRes = await db.query(
+        'SELECT COUNT(*) as count FROM procurement_receipt_records WHERE tenant_id = ? AND procurement_id = ?',
+        [tenantId, offerId]
+    );
+    const receiptRow = Array.isArray(receiptRes) ? (Array.isArray(receiptRes[0]) ? receiptRes[0][0] : receiptRes[0]) : receiptRes;
+    if (receiptRow && Number(receiptRow.count || 0) > 0) {
+        throw new Error(`OFFER_HAS_DEPENDENCIES: Offer '${offer.supplier_sku}' cannot be deleted because historical procurement receipts exist. Use ARCHIVE instead.`);
+    }
+
+    const conn = await db.getConnection();
+    try {
+        await conn.beginTransaction();
+
+        // Delete revisions first (or rely on CASCADE)
+        await conn.query('DELETE FROM supplier_paper_offer_revisions WHERE offer_id = ?', [offerId]);
+        await conn.query('DELETE FROM supplier_paper_offers WHERE id = ?', [offerId]);
+
+        await conn.commit();
+        return {
+            ok: true,
+            deletedOfferId: offerId,
+            supplierSku: offer.supplier_sku
+        };
+    } catch (err) {
+        await conn.rollback();
+        throw err;
+    } finally {
+        conn.release();
+    }
+}
+
+/**
+ * Bulk delete commercial paper offers with strict dependency revalidation per record.
+ * Restricted to SUPPLIER_ADMIN.
+ */
+async function bulkDeleteOffers({ tenantId, supplierId, actorId, role, offerIds = [], scope = 'SELECTED', filters = {}, reason = null }) {
+    if (role !== 'SUPPLIER_ADMIN') {
+        throw new Error('FORBIDDEN: Bulk deletion of commercial offers is restricted to SUPPLIER_ADMIN.');
+    }
+
+    let targetIds = [];
+    if (scope === 'ALL_MATCHING') {
+        const where = ['tenant_id = ?', 'supplier_id = ?'];
+        const p = [tenantId, supplierId];
+        if (filters.status) {
+            where.push('status = ?');
+            p.push(filters.status);
+        }
+        if (filters.search && filters.search.trim()) {
+            where.push('(supplier_sku LIKE ?)');
+            p.push(`%${filters.search.trim()}%`);
+        }
+        const matchRows = await db.query(`SELECT id FROM supplier_paper_offers WHERE ${where.join(' AND ')} LIMIT 500`, p);
+        targetIds = (Array.isArray(matchRows) ? matchRows : []).map(r => r.id);
+    } else {
+        if (!Array.isArray(offerIds) || offerIds.length === 0) {
+            throw new Error('OFFER_IDS_REQUIRED: offerIds array cannot be empty when scope is SELECTED.');
+        }
+        targetIds = offerIds.slice(0, 500);
+    }
+
+    const results = [];
+    let succeededCount = 0;
+    let failedCount = 0;
+
+    for (const id of targetIds) {
+        try {
+            await deleteOffer({ tenantId, supplierId, actorId, role, offerId: id });
+            results.push({ id, success: true });
+            succeededCount++;
+        } catch (err) {
+            results.push({ id, success: false, code: 'DELETE_BLOCKED', message: err.message });
+            failedCount++;
+        }
+    }
+
+    return {
+        totalProcessed: targetIds.length,
+        succeededCount,
+        failedCount,
+        results
+    };
+}
+
+/**
+ * Safe deletion of a canonical paper variant.
+ * Enforces technical sharing invariants:
+ * - NEVER deletes if another supplier has an offer on it.
+ * - NEVER deletes if current supplier still has active/inactive offers (must be deleted first).
+ * - NEVER deletes if originated by another supplier.
+ * - Restricted strictly to SUPPLIER_ADMIN.
+ */
+async function deleteTechnicalVariant({ tenantId, supplierId, actorId, role, variantId }) {
+    if (role !== 'SUPPLIER_ADMIN') {
+        throw new Error('FORBIDDEN: Variant deletion is restricted to SUPPLIER_ADMIN.');
+    }
+
+    const vRes = await db.query('SELECT * FROM paper_variants WHERE id = ?', [variantId]);
+    const variant = Array.isArray(vRes) ? (Array.isArray(vRes[0]) ? vRes[0][0] : vRes[0]) : vRes;
+    if (!variant || !variant.id) {
+        throw new Error('VARIANT_NOT_FOUND: Variant does not exist.');
+    }
+
+    // 1. Check if ANY other supplier has offers on this variant
+    const otherRes = await db.query(
+        'SELECT COUNT(*) as count FROM supplier_paper_offers WHERE variant_id = ? AND supplier_id != ?',
+        [variantId, supplierId]
+    );
+    const otherRow = Array.isArray(otherRes) ? (Array.isArray(otherRes[0]) ? otherRes[0][0] : otherRes[0]) : otherRes;
+    if (otherRow && Number(otherRow.count || 0) > 0) {
+        throw new Error('CANNOT_DELETE_SHARED_VARIANT: This technical variant is shared with other suppliers. Remove your own commercial offers instead of deleting the shared physical variant.');
+    }
+
+    // 2. Check if current supplier has offers on this variant
+    const ownRes = await db.query(
+        'SELECT COUNT(*) as count FROM supplier_paper_offers WHERE variant_id = ? AND supplier_id = ?',
+        [variantId, supplierId]
+    );
+    const ownRow = Array.isArray(ownRes) ? (Array.isArray(ownRes[0]) ? ownRes[0][0] : ownRes[0]) : ownRes;
+    if (ownRow && Number(ownRow.count || 0) > 0) {
+        throw new Error('VARIANT_HAS_OFFERS: Cannot delete variant while commercial offers exist for it. Delete or archive your offers first.');
+    }
+
+    // 3. Verify supplier originated this variant via an import batch
+    const originRes = await db.query(
+        `SELECT COUNT(*) as count 
+         FROM paper_import_rows r 
+         JOIN paper_import_batches b ON r.batch_id = b.id 
+         WHERE r.mapped_variant_id = ? AND b.supplier_id = ?`,
+        [variantId, supplierId]
+    );
+    const originRow = Array.isArray(originRes) ? (Array.isArray(originRes[0]) ? originRes[0][0] : originRes[0]) : originRes;
+    if (!originRow || Number(originRow.count || 0) === 0) {
+        throw new Error('NOT_VARIANT_ORIGINATOR: This technical variant was not imported by your organization and cannot be deleted.');
+    }
+
+    const conn = await db.getConnection();
+    try {
+        await conn.beginTransaction();
+
+        // Unlink from import rows so cascade doesn't fail
+        await conn.query('UPDATE paper_import_rows SET mapped_variant_id = NULL WHERE mapped_variant_id = ?', [variantId]);
+        await conn.query('DELETE FROM paper_variants WHERE id = ?', [variantId]);
+
+        await conn.commit();
+        return {
+            ok: true,
+            deletedVariantId: variantId
+        };
+    } catch (err) {
+        await conn.rollback();
+        throw err;
+    } finally {
+        conn.release();
+    }
+}
+
+/**
+ * Retract / rollback an import batch.
+ * Removes variants created by this batch that are NOT referenced by other suppliers.
+ * Preserves shared canonical records and records with active external offers.
+ */
+async function retractImportBatch({ tenantId, supplierId, actorId, role, batchId }) {
+    if (!['SUPPLIER_ADMIN', 'SUPPLIER_OPERATOR'].includes(role)) {
+        throw new Error('FORBIDDEN: Only SUPPLIER_ADMIN or SUPPLIER_OPERATOR can retract import batches.');
+    }
+
+    const batchRes = await db.query(
+        'SELECT * FROM paper_import_batches WHERE id = ? AND tenant_id = ? AND supplier_id = ?',
+        [batchId, tenantId, supplierId]
+    );
+    const batch = Array.isArray(batchRes) ? (Array.isArray(batchRes[0]) ? batchRes[0][0] : batchRes[0]) : batchRes;
+    if (!batch || !batch.id) {
+        throw new Error('BATCH_NOT_FOUND: Import batch not found for tenant and supplier');
+    }
+
+    if (batch.status !== 'CONFIRMED') {
+        throw new Error(`CANNOT_RETRACT_UNCONFIRMED_BATCH: Batch is in '${batch.status}' status. Only CONFIRMED batches can be retracted.`);
+    }
+
+    const conn = await db.getConnection();
+    try {
+        await conn.beginTransaction();
+
+        // Get all variants mapped from this batch
+        const [mappedVariants] = await conn.query(
+            'SELECT DISTINCT mapped_variant_id FROM paper_import_rows WHERE batch_id = ? AND mapped_variant_id IS NOT NULL',
+            [batchId]
+        );
+        const variantIds = (Array.isArray(mappedVariants) ? mappedVariants : []).map(r => r.mapped_variant_id).filter(Boolean);
+
+        let retractedVariantsCount = 0;
+        let preservedSharedVariantsCount = 0;
+
+        for (const vId of variantIds) {
+            // Check if any other supplier has an offer on this variant
+            const [otherCheck] = await conn.query(
+                'SELECT COUNT(*) as count FROM supplier_paper_offers WHERE variant_id = ? AND supplier_id != ?',
+                [vId, supplierId]
+            );
+            const otherCount = Number(otherCheck && otherCheck[0]?.count || 0);
+            if (otherCount > 0) {
+                preservedSharedVariantsCount++;
+                continue; // Preserve shared technical variant
+            }
+
+            // Remove this supplier's offers on this variant
+            await conn.query('DELETE FROM supplier_paper_offers WHERE variant_id = ? AND supplier_id = ?', [vId, supplierId]);
+
+            // Unlink from other rows and delete variant
+            await conn.query('UPDATE paper_import_rows SET mapped_variant_id = NULL WHERE mapped_variant_id = ?', [vId]);
+            await conn.query('DELETE FROM paper_variants WHERE id = ?', [vId]);
+            retractedVariantsCount++;
+        }
+
+        // Update batch status
+        await conn.query(
+            `UPDATE paper_import_batches 
+             SET status = 'REJECTED', 
+                 metadata_json = JSON_SET(COALESCE(metadata_json, '{}'), '$.retracted_at', CURRENT_TIMESTAMP, '$.retracted_by', ?)
+             WHERE id = ?`,
+            [actorId, batchId]
+        );
+
+        await conn.commit();
+        return {
+            ok: true,
+            batchId,
+            status: 'RETRACTED',
+            retractedVariantsCount,
+            preservedSharedVariantsCount
+        };
+    } catch (err) {
+        await conn.rollback();
+        throw err;
+    } finally {
+        conn.release();
+    }
+}
+
+/**
+ * Controlled technical modification of a variant specification.
+ * Validates gsm, dimensions, caliper, recalculates fingerprint.
+ * If variant is shared with other suppliers, blocks silent mutation.
+ */
+async function updateTechnicalVariant({ tenantId, supplierId, actorId, role, variantId, payload }) {
+    if (!['SUPPLIER_ADMIN', 'SUPPLIER_OPERATOR'].includes(role)) {
+        throw new Error('FORBIDDEN: Only SUPPLIER_ADMIN or SUPPLIER_OPERATOR can edit technical variants.');
+    }
+
+    const { computeVariantFingerprint } = require('./paperImportService');
+
+    const vRes = await db.query(
+        'SELECT v.*, p.name as product_name, p.category, p.brand, p.manufacturer FROM paper_variants v JOIN paper_products p ON v.product_id = p.id WHERE v.id = ?',
+        [variantId]
+    );
+    const existing = Array.isArray(vRes) ? (Array.isArray(vRes[0]) ? vRes[0][0] : vRes[0]) : vRes;
+    if (!existing || !existing.id) {
+        throw new Error('VARIANT_NOT_FOUND: Technical variant not found.');
+    }
+
+    // Check sharing with other suppliers
+    const otherRes = await db.query(
+        'SELECT COUNT(*) as count FROM supplier_paper_offers WHERE variant_id = ? AND supplier_id != ?',
+        [variantId, supplierId]
+    );
+    const otherRow = Array.isArray(otherRes) ? (Array.isArray(otherRes[0]) ? otherRes[0][0] : otherRes[0]) : otherRes;
+    if (otherRow && Number(otherRow.count || 0) > 0 && role !== 'SUPPLIER_ADMIN') {
+        throw new Error('SHARED_VARIANT_MUTATION_RESTRICTED: This variant is shared by other suppliers. Only SUPPLIER_ADMIN can modify shared physical specifications.');
+    }
+
+    const gsm = payload.gsm !== undefined ? Number(payload.gsm) : Number(existing.gsm);
+    const widthMm = payload.widthMm !== undefined ? Number(payload.widthMm) : Number(existing.width_mm);
+    const heightMm = payload.heightMm !== undefined ? Number(payload.heightMm) : Number(existing.height_mm);
+    const finish = payload.finish !== undefined ? String(payload.finish).trim() : existing.finish;
+    const grainDirection = payload.grainDirection !== undefined ? String(payload.grainDirection).toUpperCase() : existing.grain_direction;
+    const caliperUm = payload.caliperUm !== undefined ? (payload.caliperUm ? Number(payload.caliperUm) : null) : existing.caliper_um;
+    const caliperMm = caliperUm ? Number((caliperUm / 1000).toFixed(4)) : (existing.caliper_mm ? Number(existing.caliper_mm) : null);
+
+    if (!Number.isFinite(gsm) || gsm <= 0) throw new Error('INVALID_GSM: GSM must be a positive number.');
+    if (!Number.isFinite(widthMm) || widthMm <= 0) throw new Error('INVALID_WIDTH: Width (mm) must be a positive number.');
+    if (!Number.isFinite(heightMm) || heightMm <= 0) throw new Error('INVALID_HEIGHT: Height (mm) must be a positive number.');
+
+    const newFingerprint = computeVariantFingerprint({
+        name: existing.product_name,
+        gsm,
+        width_mm: widthMm,
+        height_mm: heightMm,
+        finish,
+        grain_direction: grainDirection,
+        caliper_um: caliperUm
+    });
+
+    // Check if another variant already has this fingerprint
+    const conflictRes = await db.query('SELECT id FROM paper_variants WHERE fingerprint = ? AND id != ?', [newFingerprint, variantId]);
+    const conflict = Array.isArray(conflictRes) ? (Array.isArray(conflictRes[0]) ? conflictRes[0] : conflictRes) : [];
+    if (conflict && conflict.length > 0) {
+        throw new Error(`VARIANT_FINGERPRINT_COLLISION: A variant with specifications (${gsm}gsm ${widthMm}x${heightMm}mm ${finish || ''}) already exists (ID: ${conflict[0].id}).`);
+    }
+
+    await db.query(
+        `UPDATE paper_variants 
+         SET gsm = ?, width_mm = ?, height_mm = ?, finish = ?, grain_direction = ?, caliper_um = ?, caliper_mm = ?, fingerprint = ?, updated_at = CURRENT_TIMESTAMP
+         WHERE id = ?`,
+        [gsm, widthMm, heightMm, finish, grainDirection, caliperUm, caliperMm, newFingerprint, variantId]
+    );
+
+    return {
+        ok: true,
+        variantId,
+        gsm,
+        widthMm,
+        heightMm,
+        finish,
+        grainDirection,
+        caliperUm,
+        fingerprint: newFingerprint
+    };
+}
+
 module.exports = {
     VALID_PRICE_BASES,
     VALID_VISIBILITIES,
@@ -782,5 +1285,11 @@ module.exports = {
     listSupplierOffers,
     getOfferById,
     updateOffer,
-    updateOfferStatus
+    updateOfferStatus,
+    bulkUpdateOfferStatus,
+    deleteOffer,
+    bulkDeleteOffers,
+    deleteTechnicalVariant,
+    retractImportBatch,
+    updateTechnicalVariant
 };
