@@ -131,9 +131,9 @@ export const PaperSourcingModal: React.FC<PaperSourcingModalProps> = ({
         const qty = parseFloat(orderedQuantity) || 0;
         const basis = selectedOffer.priceBasis || 'KG';
         const pricePerUnit = parseFloat(selectedOffer.priceAmount) || 0;
-        const widthMm = selectedOffer.variant?.widthMm || 700;
-        const heightMm = selectedOffer.variant?.heightMm || 1000;
-        const gsm = selectedOffer.variant?.gsm || 150;
+        const widthMm = selectedOffer.variant?.widthMm || selectedOffer.widthMm || 700;
+        const heightMm = selectedOffer.variant?.heightMm || selectedOffer.heightMm || 1000;
+        const gsm = selectedOffer.variant?.gsm || selectedOffer.gsm || 150;
         const sheetsPerPack = selectedOffer.sheetsPerPack || 500;
 
         let totalSheets = 0;
@@ -173,10 +173,13 @@ export const PaperSourcingModal: React.FC<PaperSourcingModalProps> = ({
                 throw new Error('Please enter a valid order quantity');
             }
 
+            const effectiveOfferId = selectedOffer.id || selectedOffer.offerId;
+            const effectiveVariantId = selectedOffer.variantId || selectedOffer.variant?.id;
+
             const res = await adminApi.placePaperSourcingOrder({
                 type: orderType,
-                offerId: selectedOffer.id,
-                variantId: selectedOffer.variantId || selectedOffer.variant?.id,
+                offerId: effectiveOfferId,
+                variantId: effectiveVariantId,
                 orderedQuantity: qty,
                 quantityBasis: selectedOffer.priceBasis || 'KG',
                 printhouseId,
@@ -184,7 +187,7 @@ export const PaperSourcingModal: React.FC<PaperSourcingModalProps> = ({
                 targetPrice: targetPrice ? parseFloat(targetPrice) : undefined
             });
 
-            if (res?.ok) {
+            if (res?.ok && (res?.data?.orderId || res?.data?.id)) {
                 setOrderSuccessMsg(
                     orderType === 'RFQ'
                         ? 'RFQ submitted successfully. The paper supplier will review and transmit a customized quote.'
@@ -198,7 +201,7 @@ export const PaperSourcingModal: React.FC<PaperSourcingModalProps> = ({
                     fetchProcurementOrders();
                 }, 1200);
             } else {
-                setOrderErrorMsg((res as any)?.error?.message || 'Failed to place order');
+                setOrderErrorMsg((res as any)?.error?.message || (res as any)?.error || 'Failed to place order');
             }
         } catch (err: any) {
             setOrderErrorMsg(err.message || 'Failed to place order');

@@ -66,7 +66,7 @@ class UserSessionService {
         }
 
         try {
-            let query = `SELECT id, user_id, tenant_id, role, status, last_activity_at, expires_at FROM user_sessions WHERE id = ?`;
+            let query = `SELECT id, user_id, tenant_id, role, status, last_activity_at, expires_at, TIMESTAMPDIFF(SECOND, last_activity_at, NOW()) AS idle_seconds FROM user_sessions WHERE id = ?`;
             let params = [sessionId];
 
             const rows = await db.query(query, params);
@@ -107,15 +107,18 @@ class UserSessionService {
             }
 
             // 2. Inactivity Timeout Check
-            const lastActivity = new Date(session.last_activity_at);
-            const inactivityMs = inactivityMinutes * 60 * 1000;
-            if ((now.getTime() - lastActivity.getTime()) > inactivityMs) {
+            // Use TIMESTAMPDIFF from MySQL to avoid timezone drift between Node host (e.g. UTC+2) and MySQL container (UTC).
+            const idleSeconds = session.idle_seconds !== undefined && session.idle_seconds !== null
+                ? Number(session.idle_seconds)
+                : Math.max(0, Math.floor((now.getTime() - new Date(session.last_activity_at).getTime()) / 1000));
+            const inactivitySeconds = inactivityMinutes * 60;
+            if (idleSeconds > inactivitySeconds) {
                 await this.markExpired(session.id, 'INACTIVITY_TIMEOUT');
                 return { valid: false, reason: 'SESSION_INACTIVE' };
             }
 
             // 3. Throttled activity update (at most once every 60s)
-            if ((now.getTime() - lastActivity.getTime()) > 60000) {
+            if (idleSeconds > 60) {
                 db.query(`UPDATE user_sessions SET last_activity_at = NOW() WHERE id = ?`, [session.id]).catch(() => {});
             }
 

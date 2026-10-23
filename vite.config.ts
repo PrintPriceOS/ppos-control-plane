@@ -46,4 +46,13 @@ export default defineConfig({
       '/federation': 'http://localhost:8080',
     },
   },
+  preview: {
+    port: 4173,
+    host: '127.0.0.1',
+    proxy: {
+      '/api': 'http://localhost:8080',
+      '/health': 'http://localhost:8080',
+      '/federation': 'http://localhost:8080',
+    },
+  },
 });

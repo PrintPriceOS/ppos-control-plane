@@ -7,6 +7,7 @@
  */
 const ruleService = require('./printhousePricingRuleService');
 const priceBookService = require('./printhousePriceBookService');
+const paperCostIntegrationService = require('./paperCostIntegrationService');
 
 function roundDecimal(num, decimals = 4) {
     const factor = Math.pow(10, decimals);
@@ -88,12 +89,66 @@ class PrinthousePricingPreviewService {
         }
 
         // 2. Resolve Material Surcharge or Dynamic Supplier Paper Rate Patch
-        if (paperRatePatch && (paperRatePatch.snapshotMetadata || paperRatePatch.candidateOverrides || paperRatePatch.pricePerKg)) {
-            const meta = paperRatePatch.snapshotMetadata || paperRatePatch;
-            const interiorMeta = meta.interior || (paperRatePatch.pricePerKg ? paperRatePatch : null);
-            const rawPrice = interiorMeta?.pricePerKg ?? paperRatePatch.pricePerKg;
-            const pricePerKg = Number(rawPrice);
+        if (paperRatePatch) {
+            let verifiedRate = null;
+            let verifiedCurrency = null;
+            let verifiedOfferMeta = null;
 
+            // Scenario A: Cryptographic Server Snapshot verification
+            if (paperRatePatch.snapshotMetadata) {
+                const meta = paperRatePatch.snapshotMetadata;
+                const interior = meta.interior;
+                if (!interior || !interior.signature) {
+                    const err = new Error('UNAUTHORIZED_PAPER_RATE: Missing server cryptographic signature in snapshot metadata. Unverified client rates are rejected.');
+                    err.statusCode = 400;
+                    err.code = 'UNAUTHORIZED_PAPER_RATE';
+                    throw err;
+                }
+
+                const isValidSig = paperCostIntegrationService.verifySnapshot(tenantId, meta);
+                if (!isValidSig) {
+                    const err = new Error('TAMPERED_PAPER_RATE: Server snapshot signature verification failed. The paper rate or metadata has been altered.');
+                    err.statusCode = 400;
+                    err.code = 'TAMPERED_PAPER_RATE';
+                    throw err;
+                }
+
+                verifiedRate = interior.pricePerKg;
+                verifiedCurrency = interior.currency || meta.currency;
+                verifiedOfferMeta = interior;
+            }
+            // Scenario B: Server resolution by offerId from active authorized DB catalog
+            else if (paperRatePatch.offerId) {
+                const resolved = await paperCostIntegrationService.resolveOfferById(tenantId, paperRatePatch.offerId);
+                if (!resolved) {
+                    const err = new Error(`UNAUTHORIZED_SUPPLIER_OFFER: Offer '${paperRatePatch.offerId}' is not an active authorized supplier offer for this tenant.`);
+                    err.statusCode = 400;
+                    err.code = 'UNAUTHORIZED_SUPPLIER_OFFER';
+                    throw err;
+                }
+                verifiedRate = resolved.pricePerKg;
+                verifiedCurrency = resolved.currency;
+                verifiedOfferMeta = resolved;
+            }
+            // Scenario C: Untrusted client-supplied raw price without server signature or offerId
+            else {
+                const err = new Error('UNAUTHENTICATED_PAPER_RATE: Arbitrary client-provided paper rates are rejected. Rates must be resolved by server or accompanied by a valid server snapshot signature.');
+                err.statusCode = 400;
+                err.code = 'UNAUTHENTICATED_PAPER_RATE';
+                throw err;
+            }
+
+            // Currency Parity Enforcement against Price Book
+            const patchCurr = String(verifiedCurrency || pb.currency).trim().toUpperCase();
+            const pbCurr = String(pb.currency).trim().toUpperCase();
+            if (patchCurr !== pbCurr) {
+                const err = new Error(`CURRENCY_MISMATCH: Paper rate currency (${patchCurr}) does not match price book currency (${pbCurr}). Cross-currency rate application requires explicit authorized conversion.`);
+                err.statusCode = 400;
+                err.code = 'CURRENCY_MISMATCH';
+                throw err;
+            }
+
+            const pricePerKg = Number(verifiedRate);
             if (!Number.isFinite(pricePerKg) || pricePerKg <= 0) {
                 const err = new Error('INVALID_PAPER_RATE: pricePerKg must be a positive finite number resolved by server');
                 err.statusCode = 400;
@@ -103,22 +158,22 @@ class PrinthousePricingPreviewService {
 
             // Do not trust client-sent provenance; server strictly assigns PPOS_PAPER_SUPPLIER_HUB
             const enforcedProvenance = 'PPOS_PAPER_SUPPLIER_HUB';
-            const kgPerUnit = Number(interiorMeta?.kgPerSheet || paperRatePatch.kgPerUnit || 0.05);
+            const kgPerUnit = Number(verifiedOfferMeta?.kgPerSheet || paperRatePatch.kgPerUnit || 0.05);
             const rateAmount = roundDecimal(pricePerKg * kgPerUnit * quantity, 4);
 
             components.push({
                 code: 'SUPPLIER_PAPER_MARKET_RATE',
-                name: `Supplier Paper Market Rate (${interiorMeta?.supplierName || 'Market'} - ${interiorMeta?.gsm || ''}gsm)`,
+                name: `Supplier Paper Market Rate (${verifiedOfferMeta?.supplierName || 'Market'} - ${verifiedOfferMeta?.gsm || ''}gsm)`,
                 amount: rateAmount.toFixed(4),
                 provenance: enforcedProvenance,
-                ruleId: interiorMeta?.offerId || 'market_patch',
+                ruleId: verifiedOfferMeta?.offerId || 'market_patch',
                 metadata: {
-                    offerId: interiorMeta?.offerId || null,
-                    supplierId: interiorMeta?.supplierId || null,
-                    supplierName: interiorMeta?.supplierName || null,
-                    sku: interiorMeta?.sku || null,
+                    offerId: verifiedOfferMeta?.offerId || null,
+                    supplierId: verifiedOfferMeta?.supplierId || null,
+                    supplierName: verifiedOfferMeta?.supplierName || null,
+                    sku: verifiedOfferMeta?.sku || null,
                     pricePerKg,
-                    currency: paperRatePatch.currency || pb.currency,
+                    currency: patchCurr,
                     substitutesMaterialCatalogId: materialCatalogId || null
                 }
             });

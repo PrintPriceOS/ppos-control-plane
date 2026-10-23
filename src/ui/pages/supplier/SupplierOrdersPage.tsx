@@ -232,6 +232,7 @@ export const SupplierOrdersPage: React.FC = () => {
                 if (!quotePrice || isNaN(Number(quotePrice)) || Number(quotePrice) <= 0) {
                     throw new Error(t('supplier.orders.invalidQuotePrice') || 'Valid quote price per unit basis is required');
                 }
+                payload.pricePerBasis = Number(quotePrice);
                 payload.quotePricePerBasis = Number(quotePrice);
                 if (quoteValidUntil) {
                     payload.quoteValidUntil = new Date(quoteValidUntil).toISOString();

@@ -250,7 +250,7 @@ router.get('/', async (req, res) => {
 function assertWritePermission(scope) {
     if (scope.isSuperAdmin) return;
     const actorRole = (scope.role || '').toUpperCase();
-    const canWrite = ['SUPER_ADMIN', 'OPS_ADMIN', 'SYSTEM_ADMIN', 'TENANT_ADMIN', 'PRINTHOUSE_ADMIN', 'OPERATOR', 'PRINTHOUSE_OPERATOR'].includes(actorRole);
+    const canWrite = ['ADMIN', 'SUPER_ADMIN', 'OPS_ADMIN', 'SYSTEM_ADMIN', 'TENANT_ADMIN', 'PRINTHOUSE_ADMIN', 'OPERATOR', 'PRINTHOUSE_OPERATOR'].includes(actorRole);
     if (!canWrite) {
         const err = new Error('FORBIDDEN_WRITE_PERMISSION_REQUIRED');
         err.statusCode = 403;
@@ -414,10 +414,11 @@ router.post('/sourcing/orders', async (req, res) => {
 
         return res.status(201).json({ ok: true, data: result });
     } catch (err) {
+        console.error('[MATERIALS-API] Failed to place sourcing order:', err.message, 'Code:', err.code, 'Status:', err.statusCode, 'Body:', req.body);
         if (err.statusCode) {
             return res.status(err.statusCode).json({ ok: false, error: err.message, code: err.code || 'ORDER_PLACEMENT_ERROR' });
         }
-        console.error('[MATERIALS-API] Failed to place sourcing order:', err);
+        console.error('[MATERIALS-API] Failed to place sourcing order (internal):', err);
         return res.status(500).json({ ok: false, error: err.message, code: 'ORDER_PLACEMENT_ERROR' });
     }
 });
@@ -592,11 +593,16 @@ router.get('/sourcing/resolve-market-rate', async (req, res) => {
         if (!scope.tenantId) {
             return res.status(401).json({ ok: false, error: 'TENANT_ID_REQUIRED' });
         }
-        const result = await paperCostIntegrationService.resolveMarketPaperRate(scope.tenantId, req.query);
+        const query = { ...req.query };
+        if (!query.targetCurrency && !query.currency) {
+            query.targetCurrency = 'EUR';
+        }
+        const result = await paperCostIntegrationService.resolveMarketPaperRate(scope.tenantId, query);
         return res.json({ ok: true, data: result });
     } catch (err) {
         console.error('[MATERIALS-API] Failed to resolve market rate:', err);
-        return res.status(500).json({ ok: false, error: err.message, code: 'MARKET_RATE_RESOLUTION_ERROR' });
+        const status = err.statusCode || (err.message.includes('TARGET_CURRENCY_REQUIRED') ? 400 : 500);
+        return res.status(status).json({ ok: false, error: err.message, code: err.code || 'MARKET_RATE_RESOLUTION_ERROR' });
     }
 });
 

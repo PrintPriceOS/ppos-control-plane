@@ -319,46 +319,109 @@ describe('Iteration I6: Paper Cost Integration & Procurement Documents', () => {
             ruleService.getRules = async () => mockRules;
 
             try {
-                // 1. Rejects cross-currency mismatch without authorized conversion
-                await expect(previewService.generatePreview('tenant_1', {
-                    priceBookId: 'pb_alpha',
-                    quantity: 1000,
-                    paperRatePatch: {
-                        currency: 'USD',
-                        pricePerKg: 2.10
-                    }
-                })).rejects.toThrow('CURRENCY_MISMATCH');
-
-                // 2. Rejects invalid / non-positive untrusted client rate
+                // 1. Rejects arbitrary client price even if positive and matching currency (e.g. client attempts to send pricePerKg: 0.05 EUR)
                 await expect(previewService.generatePreview('tenant_1', {
                     priceBookId: 'pb_alpha',
                     quantity: 1000,
                     paperRatePatch: {
                         currency: 'EUR',
-                        pricePerKg: -1.50
+                        pricePerKg: 0.05
                     }
-                })).rejects.toThrow('INVALID_PAPER_RATE');
+                })).rejects.toThrow('UNAUTHENTICATED_PAPER_RATE');
 
-                // 3. Accepts matching currency (EUR), strictly enforces server provenance, and substitutes material without duplicating
+                // 2. Rejects unsigned snapshot metadata (missing cryptographic server signature)
+                await expect(previewService.generatePreview('tenant_1', {
+                    priceBookId: 'pb_alpha',
+                    quantity: 1000,
+                    paperRatePatch: {
+                        currency: 'EUR',
+                        snapshotMetadata: {
+                            interior: {
+                                offerId: 'off_spoofed',
+                                pricePerKg: 0.01,
+                                currency: 'EUR'
+                            }
+                        }
+                    }
+                })).rejects.toThrow('UNAUTHORIZED_PAPER_RATE');
+
+                // 3. Rejects tampered snapshot metadata where client modified pricePerKg after server signed it
+                const resolvedAt = new Date().toISOString();
+                const validSignature = paperCostIntegrationService.generateSnapshotSignature(
+                    'tenant_1', 'off_phoenix', 2.00, 'EUR', resolvedAt
+                );
+
+                await expect(previewService.generatePreview('tenant_1', {
+                    priceBookId: 'pb_alpha',
+                    quantity: 1000,
+                    paperRatePatch: {
+                        currency: 'EUR',
+                        snapshotMetadata: {
+                            tenantId: 'tenant_1',
+                            resolvedAt,
+                            currency: 'EUR',
+                            interior: {
+                                offerId: 'off_phoenix',
+                                pricePerKg: 0.01, // Tampered from 2.00 to 0.01!
+                                currency: 'EUR',
+                                signature: validSignature
+                            }
+                        }
+                    }
+                })).rejects.toThrow('TAMPERED_PAPER_RATE');
+
+                // 4. Rejects cross-currency mismatch even with valid signature
+                const usdResolvedAt = new Date().toISOString();
+                const usdSignature = paperCostIntegrationService.generateSnapshotSignature(
+                    'tenant_1', 'off_usd', 2.10, 'USD', usdResolvedAt
+                );
+                await expect(previewService.generatePreview('tenant_1', {
+                    priceBookId: 'pb_alpha',
+                    quantity: 1000,
+                    paperRatePatch: {
+                        currency: 'USD',
+                        snapshotMetadata: {
+                            tenantId: 'tenant_1',
+                            resolvedAt: usdResolvedAt,
+                            currency: 'USD',
+                            interior: {
+                                offerId: 'off_usd',
+                                pricePerKg: 2.10,
+                                currency: 'USD',
+                                signature: usdSignature
+                            }
+                        }
+                    }
+                })).rejects.toThrow('CURRENCY_MISMATCH');
+
+                // 5. Accepts authentic, validly signed snapshot, verifies server provenance, and substitutes substrate without duplication
+                const authenticSnapshot = {
+                    tenantId: 'tenant_1',
+                    resolvedAt,
+                    currency: 'EUR',
+                    interior: {
+                        offerId: 'off_real_phoenix',
+                        supplierId: 'supp_scheufelen',
+                        supplierName: 'Scheufelen',
+                        sku: 'PHX-130-B1',
+                        pricePerKg: 2.00,
+                        currency: 'EUR',
+                        gsm: 130,
+                        signature: paperCostIntegrationService.generateSnapshotSignature(
+                            'tenant_1', 'off_real_phoenix', 2.00, 'EUR', resolvedAt
+                        )
+                    }
+                };
+
                 const previewWithPatchAndMaterial = await previewService.generatePreview('tenant_1', {
                     priceBookId: 'pb_alpha',
                     quantity: 1000,
                     materialCatalogId: 'mat_offset_80',
                     paperRatePatch: {
                         currency: 'EUR',
-                        pricePerKg: 2.00,
                         kgPerUnit: 0.05,
                         provenance: 'CLIENT_ATTEMPTED_SPOOF', // Must be ignored
-                        snapshotMetadata: {
-                            interior: {
-                                offerId: 'off_real_phoenix',
-                                supplierId: 'supp_scheufelen',
-                                supplierName: 'Scheufelen',
-                                sku: 'PHX-130-B1',
-                                pricePerKg: 2.00,
-                                gsm: 130
-                            }
-                        }
+                        snapshotMetadata: authenticSnapshot
                     }
                 });
 
@@ -377,7 +440,7 @@ describe('Iteration I6: Paper Cost Integration & Procurement Documents', () => {
                 const duplicateMaterialComponent = previewWithPatchAndMaterial.components.find(c => c.code === 'MATERIAL_SURCHARGE');
                 expect(duplicateMaterialComponent).toBeUndefined();
 
-                // 4. In absence of paperRatePatch, catalog material rule applies normally
+                // 6. In absence of paperRatePatch, catalog material rule applies normally
                 const previewWithoutPatch = await previewService.generatePreview('tenant_1', {
                     priceBookId: 'pb_alpha',
                     quantity: 1000,
@@ -386,6 +449,52 @@ describe('Iteration I6: Paper Cost Integration & Procurement Documents', () => {
                 const standardMaterial = previewWithoutPatch.components.find(c => c.code === 'MATERIAL_SURCHARGE');
                 expect(standardMaterial).toBeDefined();
                 expect(Number(standardMaterial.amount)).toBeCloseTo(80.00, 2);
+
+                // 7. Resolves offer on server when offerId is provided in paperRatePatch without snapshot
+                const origResolveOffer = paperCostIntegrationService.resolveOfferById;
+                paperCostIntegrationService.resolveOfferById = async (tId, offId) => {
+                    if (offId === 'off_authorized_db') {
+                        return {
+                            offerId: 'off_authorized_db',
+                            supplierId: 'supp_1',
+                            supplierName: 'PaperCorp',
+                            sku: 'PC-150',
+                            pricePerKg: 1.95,
+                            currency: 'EUR'
+                        };
+                    }
+                    return null;
+                };
+
+                try {
+                    const previewFromOfferId = await previewService.generatePreview('tenant_1', {
+                        priceBookId: 'pb_alpha',
+                        quantity: 1000,
+                        paperRatePatch: {
+                            offerId: 'off_authorized_db',
+                            kgPerUnit: 0.1
+                        }
+                    });
+                    const offerComponent = previewFromOfferId.components.find(c => c.code === 'SUPPLIER_PAPER_MARKET_RATE');
+                    expect(offerComponent).toBeDefined();
+                    expect(offerComponent.provenance).toBe('PPOS_PAPER_SUPPLIER_HUB');
+                    expect(offerComponent.metadata.offerId).toBe('off_authorized_db');
+                    expect(offerComponent.metadata.pricePerKg).toBe(1.95);
+                    // 1000 * 0.1 * 1.95 = 195.00 EUR
+                    expect(Number(offerComponent.amount)).toBeCloseTo(195.00, 2);
+
+                    // 8. Rejects unauthorized or non-existent offerId
+                    await expect(previewService.generatePreview('tenant_1', {
+                        priceBookId: 'pb_alpha',
+                        quantity: 1000,
+                        paperRatePatch: {
+                            offerId: 'off_unauthorized_or_fake',
+                            kgPerUnit: 0.1
+                        }
+                    })).rejects.toThrow('UNAUTHORIZED_SUPPLIER_OFFER');
+                } finally {
+                    paperCostIntegrationService.resolveOfferById = origResolveOffer;
+                }
             } finally {
                 priceBookService.getPriceBook = origGetPriceBook;
                 ruleService.getRules = origGetRules;
@@ -417,13 +526,26 @@ describe('Iteration I6: Paper Cost Integration & Procurement Documents', () => {
             };
 
             try {
+                const resolvedAt = new Date().toISOString();
                 const preview = await previewService.generatePreview('tenant_immut', {
                     priceBookId: 'pb_immut',
                     quantity: 500,
                     paperRatePatch: {
                         currency: 'EUR',
-                        pricePerKg: 1.85,
-                        kgPerUnit: 0.04
+                        kgPerUnit: 0.04,
+                        snapshotMetadata: {
+                            tenantId: 'tenant_immut',
+                            resolvedAt,
+                            currency: 'EUR',
+                            interior: {
+                                offerId: 'off_immut',
+                                pricePerKg: 1.85,
+                                currency: 'EUR',
+                                signature: paperCostIntegrationService.generateSnapshotSignature(
+                                    'tenant_immut', 'off_immut', 1.85, 'EUR', resolvedAt
+                                )
+                            }
+                        }
                     }
                 });
 
@@ -933,10 +1055,10 @@ describe('Iteration I6: Paper Cost Integration & Procurement Documents', () => {
             expect(resEstimate.body.ok).toBe(true);
             expect(resEstimate.body.data.totals.totalEstimatedCost).toBeGreaterThan(0);
 
-            // 5. Market rate route: GET /sourcing/resolve-market-rate?gsm=130
+            // 5. Market rate route: GET /sourcing/resolve-market-rate?gsm=130&targetCurrency=EUR
             const reqRate = {
                 method: 'GET',
-                url: '/sourcing/resolve-market-rate?gsm=130&widthMm=700&heightMm=1000',
+                url: '/sourcing/resolve-market-rate?gsm=130&widthMm=700&heightMm=1000&targetCurrency=EUR',
                 headers: { authorization: `Bearer ${buyerToken}` }
             };
             const resRate = await dispatch(materialsAdminRouter, reqRate);

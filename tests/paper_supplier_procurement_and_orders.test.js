@@ -794,7 +794,7 @@ describe('Iterations I4 & I5: Paper Procurement Orders & Warehouse Receipts', ()
                 type: 'ORDER',
                 offerId: 'off_mkt_phoenix',
                 variantId: 'var_phoenix_150_70100',
-                orderedQuantity: 200,
+                orderedQuantity: 1000,
                 quantityBasis: 'KG',
                 printhouseId: 'node_plant_frankfurt'
             });
@@ -808,12 +808,12 @@ describe('Iterations I4 & I5: Paper Procurement Orders & Warehouse Receipts', ()
             // Two concurrent receipt requests with different idempotency keys for the entire order
             const p1 = paperProcurementService.receiveOrderAtomic(order.id, actorAlpha, {
                 receivedSheets: totalSheets,
-                receivedQuantity: 200,
+                receivedQuantity: 1000,
                 idempotencyKey: `conc_key_1_${Date.now()}`
             });
             const p2 = paperProcurementService.receiveOrderAtomic(order.id, actorAlpha, {
                 receivedSheets: totalSheets,
-                receivedQuantity: 200,
+                receivedQuantity: 1000,
                 idempotencyKey: `conc_key_2_${Date.now()}`
             });
 
@@ -843,7 +843,7 @@ describe('Iterations I4 & I5: Paper Procurement Orders & Warehouse Receipts', ()
                 type: 'ORDER',
                 offerId: 'off_mkt_phoenix',
                 variantId: 'var_phoenix_150_70100',
-                orderedQuantity: 100,
+                orderedQuantity: 1000,
                 quantityBasis: 'KG',
                 printhouseId: 'node_plant_frankfurt'
             });

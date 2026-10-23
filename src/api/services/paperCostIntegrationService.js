@@ -634,7 +634,14 @@ class PaperCostIntegrationService {
                 pricePerKg: resolvedInterior.pricePerKg,
                 currency: resolvedInterior.currency,
                 gsm: resolvedInterior.gsm,
-                finish: resolvedInterior.finish
+                finish: resolvedInterior.finish,
+                signature: this.generateSnapshotSignature(
+                    tenantId,
+                    resolvedInterior.offerId,
+                    resolvedInterior.pricePerKg,
+                    resolvedInterior.currency,
+                    snapshotMetadata.resolvedAt
+                )
             };
         }
 
@@ -650,7 +657,14 @@ class PaperCostIntegrationService {
                 pricePerKg: resolvedCover.pricePerKg,
                 currency: resolvedCover.currency,
                 gsm: resolvedCover.gsm,
-                finish: resolvedCover.finish
+                finish: resolvedCover.finish,
+                signature: this.generateSnapshotSignature(
+                    tenantId,
+                    resolvedCover.offerId,
+                    resolvedCover.pricePerKg,
+                    resolvedCover.currency,
+                    snapshotMetadata.resolvedAt
+                )
             };
         }
 
@@ -662,6 +676,98 @@ class PaperCostIntegrationService {
             hasResolvedInterior: Boolean(resolvedInterior),
             hasResolvedCover: Boolean(resolvedCover)
         };
+    }
+
+    /**
+     * Generates a deterministic cryptographic HMAC signature for a paper rate snapshot.
+     */
+    generateSnapshotSignature(tenantId, offerId, pricePerKg, currency, resolvedAt) {
+        const secret = process.env.JWT_SECRET || 'ppos_default_secret_for_snapshot';
+        const payload = `${tenantId}:${offerId}:${Number(pricePerKg).toFixed(4)}:${String(currency).toUpperCase()}:${resolvedAt}`;
+        return crypto.createHmac('sha256', secret).update(payload).digest('hex');
+    }
+
+    /**
+     * Cryptographically verifies whether a paper rate snapshot was issued by this server and untampered.
+     */
+    verifySnapshot(tenantId, snapshotMetadata) {
+        if (!snapshotMetadata || typeof snapshotMetadata !== 'object') return false;
+        if (snapshotMetadata.tenantId && snapshotMetadata.tenantId !== tenantId) return false;
+
+        if (snapshotMetadata.interior) {
+            const { offerId, pricePerKg, currency, signature } = snapshotMetadata.interior;
+            if (!signature || !offerId) return false;
+            const expected = this.generateSnapshotSignature(
+                tenantId,
+                offerId,
+                pricePerKg,
+                currency,
+                snapshotMetadata.resolvedAt
+            );
+            if (signature !== expected) return false;
+        }
+
+        if (snapshotMetadata.cover) {
+            const { offerId, pricePerKg, currency, signature } = snapshotMetadata.cover;
+            if (!signature || !offerId) return false;
+            const expected = this.generateSnapshotSignature(
+                tenantId,
+                offerId,
+                pricePerKg,
+                currency,
+                snapshotMetadata.resolvedAt
+            );
+            if (signature !== expected) return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Resolves an authorized supplier offer by ID for a given tenant, computing its canonical price_per_kg.
+     */
+    async resolveOfferById(tenantId, offerId) {
+        if (!tenantId || !offerId) return null;
+        try {
+            const rows = await db.query(`
+                SELECT o.*, s.name as supplier_name, p.name as product_name, p.brand, p.category,
+                       v.finish, v.gsm, v.width_mm, v.height_mm, v.caliper_um, v.grain_direction
+                FROM supplier_paper_offers o
+                JOIN paper_suppliers s ON s.id = o.supplier_id
+                JOIN paper_variants v ON v.id = o.variant_id
+                JOIN paper_products p ON p.id = v.product_id
+                WHERE o.id = ? AND o.deleted_at IS NULL AND o.status = 'ACTIVE'
+                  AND (o.valid_from IS NULL OR o.valid_from <= CURRENT_TIMESTAMP)
+                  AND (o.valid_until IS NULL OR o.valid_until >= CURRENT_TIMESTAMP)
+                  AND (o.visibility = 'MARKETPLACE' OR (o.visibility = 'APPROVED_CUSTOMERS' AND JSON_CONTAINS(COALESCE(o.metadata_json->'$.approved_customer_ids', '[]'), JSON_QUOTE(?))) OR (o.visibility = 'PRIVATE' AND o.tenant_id = ?))
+            `, [offerId, tenantId, tenantId]);
+            const unwrapped = unwrapRows(rows);
+            if (!unwrapped || unwrapped.length === 0) return null;
+            const r = unwrapped[0];
+            const conversion = this.convertPriceToKg({
+                priceAmount: r.price_amount,
+                priceBasis: r.price_basis,
+                widthMm: r.width_mm,
+                heightMm: r.height_mm,
+                gsm: r.gsm,
+                sheetsPerPack: r.sheets_per_pack,
+                currency: r.currency
+            });
+            const pricePerKg = typeof conversion === 'object' ? conversion.pricePerKg : conversion;
+            return {
+                offerId: r.id,
+                supplierId: r.supplier_id,
+                supplierName: r.supplier_name,
+                sku: r.supplier_sku,
+                pricePerKg,
+                currency: r.currency,
+                gsm: r.gsm,
+                finish: r.finish
+            };
+        } catch (err) {
+            logger.warn({ event: 'resolve_offer_by_id_failed', offerId, tenantId, error: err.message });
+            return null;
+        }
     }
 }
 

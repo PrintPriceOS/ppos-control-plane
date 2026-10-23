@@ -260,6 +260,7 @@ class PaperProcurementService {
         const items = Array.isArray(rows) ? rows : [];
 
         const formattedItems = items.map(r => ({
+            id: r.offer_id,
             offerId: r.offer_id,
             supplierId: r.supplier_id,
             supplierName: r.supplier_name,
@@ -859,7 +860,7 @@ class PaperProcurementService {
                     throw err;
                 }
 
-                const price = Number(payload.pricePerBasis);
+                const price = Number(payload.pricePerBasis !== undefined && payload.pricePerBasis !== null ? payload.pricePerBasis : payload.quotePricePerBasis);
                 if (!Number.isFinite(price) || price <= 0) {
                     const err = new Error('pricePerBasis must be a positive finite number');
                     err.statusCode = 400;
@@ -1487,6 +1488,7 @@ class PaperProcurementService {
         return {
             id: r.id,
             orderNumber: r.order_number,
+            type: r.order_type,
             orderType: r.order_type,
             tenantId: r.tenant_id,
             printhouseId: r.printhouse_id,
@@ -1513,18 +1515,37 @@ class PaperProcurementService {
                 supplierSku: r.snapshot_supplier_sku,
                 sheetsPerPack: r.snapshot_sheets_per_pack
             },
+            snapshotProductName: r.snapshot_product_name,
+            snapshotBrand: r.snapshot_brand,
+            snapshotCategory: r.snapshot_category,
+            snapshotFinish: r.snapshot_finish,
+            snapshotGsm: Number(r.snapshot_gsm),
+            snapshotWidthMm: Number(r.snapshot_width_mm),
+            snapshotHeightMm: Number(r.snapshot_height_mm),
+            snapshotCaliperMicrons: r.snapshot_caliper_um ? Number(r.snapshot_caliper_um) : null,
+            snapshotGrainDirection: r.snapshot_grain_direction,
+            snapshotPricePerBasis: Number(r.snapshot_price_per_basis),
             orderedQuantity: Number(r.ordered_quantity),
             orderedQuantityBasis: r.ordered_quantity_basis,
+            quantityBasis: r.ordered_quantity_basis,
             totalSheets: Number(r.total_sheets),
             deliveredQuantity: Number(r.delivered_quantity),
             deliveredSheets: Number(r.delivered_sheets),
             receivedQuantity: Number(r.received_quantity),
             receivedSheets: Number(r.received_sheets),
             totalAmount: Number(r.total_amount),
+            currency: r.snapshot_currency || 'EUR',
             status: r.status,
             deliverySiteName: r.delivery_site_name,
+            deliveryCenterName: r.delivery_site_name,
             deliveryAddress: r.delivery_address,
             expectedDeliveryDate: r.expected_delivery_date,
+            carrierName: r.carrier_name || null,
+            trackingNumber: r.tracking_number || null,
+            quotePricePerBasis: r.quote_price_per_basis ? Number(r.quote_price_per_basis) : null,
+            quoteTotalAmount: r.quote_total_amount ? Number(r.quote_total_amount) : null,
+            quoteValidUntil: r.quote_valid_until || null,
+            confirmedAt: r.confirmed_at || null,
             dispatchedAt: r.dispatched_at,
             deliveredAt: r.delivered_at,
             cancelledAt: r.cancelled_at,
