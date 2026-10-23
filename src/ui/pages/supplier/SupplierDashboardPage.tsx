@@ -112,13 +112,13 @@ export const SupplierDashboardPage: React.FC = () => {
     return (
         <div className="space-y-6">
             {/* Header */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b ppos-border pb-5">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-zinc-200 dark:border-zinc-800 pb-5">
                 <div>
-                    <div className="flex items-center gap-2 mb-1">
-                        <span className="px-2 py-0.5 text-[9px] font-black uppercase tracking-widest bg-red-600 text-white">
+                    <div className="flex items-center gap-2 mb-2">
+                        <span className="px-3 py-0.5 text-xs font-semibold rounded-full bg-red-600 text-white shadow-xs">
                             {t('supplier.dashboard.hubBadge') || 'Paper Supplier Hub'}
                         </span>
-                        <span className="px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider bg-slate-200 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300">
+                        <span className="px-3 py-0.5 text-xs font-medium rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700">
                             {t('supplier.dashboard.operationsTag') || 'Operations Console'}
                         </span>
                     </div>
@@ -158,7 +158,7 @@ export const SupplierDashboardPage: React.FC = () => {
             </div>
 
             {error && (
-                <div className="p-4 bg-red-500/10 border border-red-500/30 text-red-500 text-xs flex items-center gap-2">
+                <div className="p-4 bg-red-500/10 border border-red-500/30 text-red-500 text-xs rounded-xl flex items-center gap-2">
                     <ExclamationTriangleIcon className="w-5 h-5 shrink-0" />
                     <span>{error}</span>
                 </div>
@@ -169,19 +169,21 @@ export const SupplierDashboardPage: React.FC = () => {
                 {/* Published Catalog */}
                 <div 
                     onClick={() => navigate('/supplier/catalog')}
-                    className="p-5 ppos-surface border ppos-border flex flex-col justify-between hover:border-slate-400 dark:hover:border-zinc-700 cursor-pointer transition-colors"
+                    className="p-6 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xs hover:shadow-md hover:border-zinc-300 dark:hover:border-zinc-700 flex flex-col justify-between cursor-pointer transition-all"
                 >
                     <div className="flex items-center justify-between">
-                        <span className="text-[10px] font-black uppercase tracking-wider text-zinc-500">
+                        <span className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
                             {t('supplier.dashboard.catalogCard') || 'Published Catalog'}
                         </span>
-                        <RectangleStackIcon className="w-5 h-5 text-zinc-400" />
+                        <div className="p-2 rounded-xl bg-zinc-50 dark:bg-zinc-800/60">
+                            <RectangleStackIcon className="w-5 h-5 text-zinc-400" />
+                        </div>
                     </div>
-                    <div className="mt-3">
+                    <div className="mt-4">
                         <span className={`font-black ${catalogCount !== null ? 'text-3xl font-mono' : 'text-base font-sans text-zinc-400'} text-slate-900 dark:text-white`}>
                             {loading ? '...' : (catalogCount !== null ? catalogCount : (t('common.notAvailable') || 'No disponible'))}
                         </span>
-                        <p className="text-[10px] text-zinc-400 mt-1">
+                        <p className="text-xs text-zinc-400 mt-1">
                             {t('supplier.dashboard.catalogCardDesc') || 'Active technical variants'}
                         </p>
                     </div>
@@ -190,19 +192,21 @@ export const SupplierDashboardPage: React.FC = () => {
                 {/* Commercial Offers */}
                 <div 
                     onClick={() => navigate('/supplier/catalog')}
-                    className="p-5 ppos-surface border ppos-border flex flex-col justify-between hover:border-slate-400 dark:hover:border-zinc-700 cursor-pointer transition-colors"
+                    className="p-6 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xs hover:shadow-md hover:border-zinc-300 dark:hover:border-zinc-700 flex flex-col justify-between cursor-pointer transition-all"
                 >
                     <div className="flex items-center justify-between">
-                        <span className="text-[10px] font-black uppercase tracking-wider text-zinc-500">
+                        <span className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
                             {t('supplier.dashboard.offersCard') || 'Commercial Offers'}
                         </span>
-                        <DocumentTextIcon className="w-5 h-5 text-zinc-400" />
+                        <div className="p-2 rounded-xl bg-zinc-50 dark:bg-zinc-800/60">
+                            <DocumentTextIcon className="w-5 h-5 text-zinc-400" />
+                        </div>
                     </div>
-                    <div className="mt-3">
+                    <div className="mt-4">
                         <span className={`font-black ${offersCount !== null ? 'text-3xl font-mono' : 'text-base font-sans text-zinc-400'} text-slate-900 dark:text-white`}>
                             {loading ? '...' : (offersCount !== null ? offersCount : (t('common.notAvailable') || 'No disponible'))}
                         </span>
-                        <p className="text-[10px] text-zinc-400 mt-1">
+                        <p className="text-xs text-zinc-400 mt-1">
                             {t('supplier.dashboard.offersCardDesc') || 'Configured rates & MOQ brackets'}
                         </p>
                     </div>
@@ -211,19 +215,21 @@ export const SupplierDashboardPage: React.FC = () => {
                 {/* Open RFQs / Demands */}
                 <div 
                     onClick={() => navigate('/supplier/orders')}
-                    className="p-5 ppos-surface border ppos-border flex flex-col justify-between hover:border-slate-400 dark:hover:border-zinc-700 cursor-pointer transition-colors"
+                    className="p-6 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xs hover:shadow-md hover:border-zinc-300 dark:hover:border-zinc-700 flex flex-col justify-between cursor-pointer transition-all"
                 >
                     <div className="flex items-center justify-between">
-                        <span className="text-[10px] font-black uppercase tracking-wider text-zinc-500">
+                        <span className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
                             {t('supplier.dashboard.rfqCard') || 'Incoming Orders'}
                         </span>
-                        <InboxIcon className="w-5 h-5 text-zinc-400" />
+                        <div className="p-2 rounded-xl bg-zinc-50 dark:bg-zinc-800/60">
+                            <InboxIcon className="w-5 h-5 text-zinc-400" />
+                        </div>
                     </div>
-                    <div className="mt-3">
+                    <div className="mt-4">
                         <span className="text-3xl font-black font-mono text-slate-400 dark:text-zinc-600">
                             —
                         </span>
-                        <p className="text-[10px] text-zinc-400 mt-1">
+                        <p className="text-xs text-zinc-400 mt-1">
                             {t('supplier.dashboard.rfqCardDesc') || 'Planned for Phase I4'}
                         </p>
                     </div>
@@ -232,19 +238,21 @@ export const SupplierDashboardPage: React.FC = () => {
                 {/* Domain Security / Access Scope */}
                 <div 
                     onClick={() => navigate('/supplier/settings')}
-                    className="p-5 ppos-surface border ppos-border flex flex-col justify-between hover:border-slate-400 dark:hover:border-zinc-700 cursor-pointer transition-colors"
+                    className="p-6 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xs hover:shadow-md hover:border-zinc-300 dark:hover:border-zinc-700 flex flex-col justify-between cursor-pointer transition-all"
                 >
                     <div className="flex items-center justify-between">
-                        <span className="text-[10px] font-black uppercase tracking-wider text-zinc-500">
+                        <span className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
                             {t('supplier.dashboard.scopeCard') || 'Verified Tenancy'}
                         </span>
-                        <ShieldCheckIcon className="w-5 h-5 text-emerald-500" />
+                        <div className="p-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/40">
+                            <ShieldCheckIcon className="w-5 h-5 text-emerald-500" />
+                        </div>
                     </div>
-                    <div className="mt-3">
+                    <div className="mt-4">
                         <span className={`text-sm font-black uppercase tracking-wider ${(profile?.tenantId || tenantId) ? 'text-emerald-500' : 'text-zinc-400'}`}>
                             {loading ? '...' : ((profile?.tenantId || tenantId) ? (t('supplier.dashboard.scopeActive') || 'Authorized Scope') : (t('common.notAvailable') || 'No disponible'))}
                         </span>
-                        <p className="text-[10px] text-zinc-400 mt-1">
+                        <p className="text-xs text-zinc-400 mt-1">
                             {loading ? '...' : (profile?.tenantId || tenantId || (t('common.notAvailable') || 'No disponible'))}
                         </p>
                     </div>
@@ -253,9 +261,11 @@ export const SupplierDashboardPage: React.FC = () => {
 
             {/* Quick Actions & Guidance Section */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="p-6 ppos-surface border ppos-border space-y-3">
-                    <h2 className="text-sm font-black uppercase tracking-wider text-slate-900 dark:text-white flex items-center gap-2">
-                        <RectangleStackIcon className="w-4 h-4 text-red-600" />
+                <div className="p-6 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xs space-y-4">
+                    <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                        <div className="p-1.5 rounded-lg bg-red-50 dark:bg-red-950/40">
+                            <RectangleStackIcon className="w-4 h-4 text-red-600" />
+                        </div>
                         {t('supplier.dashboard.quickCatalogTitle') || 'Technical Catalog Management'}
                     </h2>
                     <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed">
@@ -264,7 +274,7 @@ export const SupplierDashboardPage: React.FC = () => {
                     <div className="pt-2">
                         <button
                             onClick={() => navigate('/supplier/catalog')}
-                            className="inline-flex items-center gap-1.5 px-4 py-2 bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold uppercase tracking-wider hover:bg-slate-800 transition-colors"
+                            className="inline-flex items-center gap-2 px-4 py-2.5 bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-semibold rounded-xl hover:bg-slate-800 dark:hover:bg-zinc-100 transition-colors shadow-2xs cursor-pointer"
                         >
                             <span>{t('supplier.dashboard.goToCatalog') || 'Open Technical Catalog'}</span>
                             <ArrowRightIcon className="w-3.5 h-3.5" />
@@ -272,9 +282,11 @@ export const SupplierDashboardPage: React.FC = () => {
                     </div>
                 </div>
 
-                <div className="p-6 ppos-surface border ppos-border space-y-3">
-                    <h2 className="text-sm font-black uppercase tracking-wider text-slate-900 dark:text-white flex items-center gap-2">
-                        <DocumentTextIcon className="w-4 h-4 text-emerald-500" />
+                <div className="p-6 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xs space-y-4">
+                    <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                        <div className="p-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/40">
+                            <DocumentTextIcon className="w-4 h-4 text-emerald-500" />
+                        </div>
                         {t('supplier.dashboard.quickOffersTitle') || 'Commercial Offer Rate Cards'}
                     </h2>
                     <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed">
@@ -283,7 +295,7 @@ export const SupplierDashboardPage: React.FC = () => {
                     <div className="pt-2">
                         <button
                             onClick={() => navigate('/supplier/catalog')}
-                            className="inline-flex items-center gap-1.5 px-4 py-2 bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold uppercase tracking-wider hover:bg-slate-800 transition-colors"
+                            className="inline-flex items-center gap-2 px-4 py-2.5 bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-semibold rounded-xl hover:bg-slate-800 dark:hover:bg-zinc-100 transition-colors shadow-2xs cursor-pointer"
                         >
                             <span>{t('supplier.dashboard.goToOffers') || 'Manage Offers & Rates'}</span>
                             <ArrowRightIcon className="w-3.5 h-3.5" />

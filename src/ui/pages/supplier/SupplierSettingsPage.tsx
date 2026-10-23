@@ -65,13 +65,13 @@ export const SupplierSettingsPage: React.FC = () => {
     return (
         <div className="space-y-6">
             {/* Header */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b ppos-border pb-5">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-zinc-200 dark:border-zinc-800 pb-5">
                 <div>
-                    <div className="flex items-center gap-2 mb-1">
-                        <span className="px-2 py-0.5 text-[9px] font-black uppercase tracking-widest bg-red-600 text-white">
+                    <div className="flex items-center gap-2 mb-2">
+                        <span className="px-3 py-0.5 text-xs font-semibold rounded-full bg-red-600 text-white shadow-xs">
                             {t('supplier.settings.badge') || 'Paper Supplier Hub'}
                         </span>
-                        <span className="px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider bg-slate-200 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300">
+                        <span className="px-3 py-0.5 text-xs font-medium rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700">
                             {t('supplier.settings.verifiedTag') || 'Verified Profile'}
                         </span>
                     </div>
@@ -111,7 +111,7 @@ export const SupplierSettingsPage: React.FC = () => {
             </div>
 
             {error && (
-                <div className="p-4 bg-red-500/10 border border-red-500/30 text-red-500 text-xs flex items-center gap-2">
+                <div className="p-4 bg-red-500/10 border border-red-500/30 text-red-500 text-xs rounded-xl flex items-center gap-2">
                     <ExclamationTriangleIcon className="w-5 h-5 shrink-0" />
                     <span>{error}</span>
                 </div>
@@ -120,15 +120,17 @@ export const SupplierSettingsPage: React.FC = () => {
             {/* Profile Information Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Organization Data */}
-                <div className="p-6 ppos-surface border ppos-border space-y-4">
-                    <div className="flex items-center gap-2 border-b ppos-border pb-3">
-                        <BuildingOfficeIcon className="w-5 h-5 text-red-600" />
-                        <h2 className="text-sm font-black uppercase tracking-wider text-slate-900 dark:text-white">
+                <div className="p-6 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xs space-y-4">
+                    <div className="flex items-center gap-2 border-b border-zinc-200 dark:border-zinc-800 pb-3">
+                        <div className="p-1.5 rounded-lg bg-red-50 dark:bg-red-950/40">
+                            <BuildingOfficeIcon className="w-5 h-5 text-red-600" />
+                        </div>
+                        <h2 className="text-sm font-bold text-slate-900 dark:text-white">
                             {t('supplier.settings.orgCardTitle') || 'Corporate Identity'}
                         </h2>
                     </div>
 
-                    <div className="space-y-3 text-xs">
+                    <div className="space-y-3.5 text-xs">
                         <div>
                             <span className="text-[10px] font-bold uppercase text-zinc-400">
                                 {t('supplier.settings.companyName') || 'Company Name'}
@@ -168,10 +170,12 @@ export const SupplierSettingsPage: React.FC = () => {
                 </div>
 
                 {/* Commercial & Currency Capabilities */}
-                <div className="p-6 ppos-surface border ppos-border space-y-4">
-                    <div className="flex items-center gap-2 border-b ppos-border pb-3">
-                        <CurrencyEuroIcon className="w-5 h-5 text-emerald-500" />
-                        <h2 className="text-sm font-black uppercase tracking-wider text-slate-900 dark:text-white">
+                <div className="p-6 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xs space-y-4">
+                    <div className="flex items-center gap-2 border-b border-zinc-200 dark:border-zinc-800 pb-3">
+                        <div className="p-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/40">
+                            <CurrencyEuroIcon className="w-5 h-5 text-emerald-500" />
+                        </div>
+                        <h2 className="text-sm font-bold text-slate-900 dark:text-white">
                             {t('supplier.settings.commercialCardTitle') || 'Trading Conditions & Currencies'}
                         </h2>
                     </div>
@@ -186,7 +190,7 @@ export const SupplierSettingsPage: React.FC = () => {
                                     <span className="text-xs text-zinc-400">...</span>
                                 ) : profile?.currencies && Array.isArray(profile.currencies) && profile.currencies.length > 0 ? (
                                     profile.currencies.map((cur: string) => (
-                                        <span key={cur} className="px-2.5 py-1 text-xs font-mono font-bold bg-slate-100 dark:bg-zinc-800 text-slate-800 dark:text-zinc-200 border border-slate-200 dark:border-zinc-700">
+                                        <span key={cur} className="px-3 py-1 text-xs font-mono font-semibold bg-zinc-100 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 rounded-full border border-zinc-200 dark:border-zinc-700">
                                             {cur}
                                         </span>
                                     ))
@@ -204,7 +208,7 @@ export const SupplierSettingsPage: React.FC = () => {
                             </span>
                             <div className="flex items-center gap-2 mt-1.5">
                                 <ShieldCheckIcon className={`w-4 h-4 ${profile?.status === 'APPROVED' ? 'text-emerald-500' : 'text-zinc-400'}`} />
-                                <span className="font-bold text-slate-800 dark:text-zinc-200">
+                                <span className="font-semibold text-slate-800 dark:text-zinc-200">
                                     {loading ? '...' : (profile ? (t('supplier.settings.approvedSupplier') || 'Approved Paper Supplier (PAPER_SUPPLIER)') : (t('common.notAvailable') || 'No disponible'))}
                                 </span>
                             </div>
@@ -213,7 +217,7 @@ export const SupplierSettingsPage: React.FC = () => {
                             </p>
                         </div>
 
-                        <div className="pt-2 border-t ppos-border text-[11px] text-zinc-400 italic">
+                        <div className="pt-2 border-t border-zinc-200 dark:border-zinc-800 text-[11px] text-zinc-400 italic">
                             {t('supplier.settings.readOnlyNote') || 'To modify corporate registration data or add trading currencies, contact the platform governance team.'}
                         </div>
                     </div>

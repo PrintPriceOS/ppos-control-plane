@@ -243,7 +243,7 @@ export const TechnicalImportModal: React.FC<ImportModalProps> = ({
             <div>
                 <button
                     onClick={handleResetImport}
-                    className="flex items-center gap-1.5 px-3 py-1.5 border border-slate-300 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-800 font-bold uppercase text-[10px] transition-colors"
+                    className="flex items-center gap-1.5 px-3 py-1.5 border border-zinc-300 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 font-medium text-xs rounded-xl transition-colors cursor-pointer"
                     title="Discard current batch and start a fresh import"
                 >
                     <ArrowPathIcon className="w-3.5 h-3.5" />
@@ -255,7 +255,7 @@ export const TechnicalImportModal: React.FC<ImportModalProps> = ({
                     <button
                         onClick={() => handleApplyDecisions()}
                         disabled={savingDecisions}
-                        className="px-3.5 py-2 bg-slate-800 text-white font-bold uppercase text-[10px] hover:bg-slate-700 transition-colors disabled:opacity-50"
+                        className="px-3.5 py-2 bg-slate-800 text-white font-medium text-xs rounded-xl hover:bg-slate-700 transition-colors disabled:opacity-50 cursor-pointer"
                     >
                         {savingDecisions ? t('supplier.hub.saving') : `${t('supplier.hub.saveDecisions')} (${Object.keys(decisions).length})`}
                     </button>
@@ -263,7 +263,7 @@ export const TechnicalImportModal: React.FC<ImportModalProps> = ({
                 <button
                     onClick={handleConfirmBatch}
                     disabled={confirming || savingDecisions}
-                    className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold uppercase tracking-wider text-[11px] transition-colors"
+                    className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-semibold text-xs rounded-xl shadow-xs transition-colors cursor-pointer"
                 >
                     {confirming ? t('supplier.hub.confirmingBatch') : t('supplier.hub.confirmCatalog')}
                 </button>
@@ -285,7 +285,7 @@ export const TechnicalImportModal: React.FC<ImportModalProps> = ({
         >
             <div className="space-y-6 text-xs">
                     {error && (
-                        <div className="p-4 bg-red-500/10 border border-red-500/30 text-red-500 rounded-none flex items-start gap-3">
+                        <div className="p-4 bg-red-500/10 border border-red-500/30 text-red-500 rounded-xl flex items-start gap-3">
                             <ExclamationTriangleIcon className="w-5 h-5 shrink-0 mt-0.5" />
                             <div>
                                 <p className="font-bold">Import or Review Issue</p>
@@ -295,7 +295,7 @@ export const TechnicalImportModal: React.FC<ImportModalProps> = ({
                     )}
 
                     {successMessage && (
-                        <div className="p-4 bg-emerald-500/10 border border-emerald-500/30 text-emerald-500 rounded-none flex items-start gap-3">
+                        <div className="p-4 bg-emerald-500/10 border border-emerald-500/30 text-emerald-500 rounded-xl flex items-start gap-3">
                             <CheckCircleIcon className="w-5 h-5 shrink-0 mt-0.5" />
                             <div>
                                 <p className="font-bold">Success</p>
@@ -307,7 +307,7 @@ export const TechnicalImportModal: React.FC<ImportModalProps> = ({
                     {!previewData ? (
                         /* Step 1: Upload File */
                         <div className="space-y-4">
-                            <div className="border-2 border-dashed border-slate-300 dark:border-zinc-700 p-8 text-center flex flex-col items-center justify-center space-y-3 bg-slate-50 dark:bg-zinc-900/40">
+                            <div className="border-2 border-dashed border-zinc-300 dark:border-zinc-700 rounded-2xl p-8 text-center flex flex-col items-center justify-center space-y-3 bg-zinc-50/50 dark:bg-zinc-900/40 hover:border-zinc-400 dark:hover:border-zinc-600 transition-colors">
                                 <ArrowUpTrayIcon className="w-10 h-10 text-zinc-400" />
                                 <div>
                                     <p className="font-bold text-slate-800 dark:text-zinc-200">
@@ -326,7 +326,7 @@ export const TechnicalImportModal: React.FC<ImportModalProps> = ({
                                 />
                                 <label
                                     htmlFor="paper-catalog-file-upload"
-                                    className="px-4 py-2 bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold uppercase tracking-wider text-[10px] cursor-pointer hover:bg-slate-800 transition-colors"
+                                    className="px-4 py-2 bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-semibold text-xs rounded-xl cursor-pointer hover:bg-slate-800 dark:hover:bg-zinc-100 transition-colors shadow-2xs"
                                 >
                                     {t('supplier.hub.browseFiles')}
                                 </label>
@@ -341,7 +341,7 @@ export const TechnicalImportModal: React.FC<ImportModalProps> = ({
                                 <button
                                     onClick={handleUploadPreview}
                                     disabled={!file || uploading}
-                                    className="px-5 py-2.5 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-bold uppercase tracking-wider text-[11px] transition-colors"
+                                    className="px-5 py-2.5 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-semibold text-xs rounded-xl shadow-xs transition-colors cursor-pointer"
                                 >
                                     {uploading ? t('supplier.hub.processingFile') : t('supplier.hub.uploadAnalyze')}
                                 </button>
@@ -352,19 +352,19 @@ export const TechnicalImportModal: React.FC<ImportModalProps> = ({
                         <div className="space-y-5">
                             {/* Summary Metrics Bar */}
                             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                                <div className="p-3 bg-slate-100 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800">
+                                <div className="p-3 bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl">
                                     <span className="text-[10px] font-bold uppercase text-zinc-500">{t('supplier.hub.totalRows')}</span>
                                     <p className="text-xl font-black font-mono mt-1">{previewData.summary?.totalRows || 0}</p>
                                 </div>
-                                <div className="p-3 bg-emerald-500/10 border border-emerald-500/20">
+                                <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl">
                                     <span className="text-[10px] font-bold uppercase text-emerald-600 dark:text-emerald-400">{t('supplier.hub.validRows')}</span>
                                     <p className="text-xl font-black font-mono text-emerald-600 dark:text-emerald-400 mt-1">{previewData.summary?.validRows || 0}</p>
                                 </div>
-                                <div className="p-3 bg-amber-500/10 border border-amber-500/20">
+                                <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl">
                                     <span className="text-[10px] font-bold uppercase text-amber-600 dark:text-amber-400">{t('supplier.hub.pendingReview')}</span>
                                     <p className="text-xl font-black font-mono text-amber-600 dark:text-amber-400 mt-1">{previewData.summary?.pendingRows || 0}</p>
                                 </div>
-                                <div className="p-3 bg-violet-500/10 border border-violet-500/20">
+                                <div className="p-3 bg-violet-500/10 border border-violet-500/20 rounded-xl">
                                     <span className="text-[10px] font-bold uppercase text-violet-600 dark:text-violet-400">{t('supplier.hub.duplicates')}</span>
                                     <p className="text-xl font-black font-mono text-violet-600 dark:text-violet-400 mt-1">{previewData.summary?.duplicateRows || 0}</p>
                                 </div>
@@ -372,7 +372,7 @@ export const TechnicalImportModal: React.FC<ImportModalProps> = ({
 
                             {/* Warning Banner regarding 1,544 pending rows */}
                             {previewData.summary?.pendingRows > 0 && (
-                                <div className="p-3 bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-400 flex items-start gap-2 text-[11px]">
+                                <div className="p-3 bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-400 rounded-xl flex items-start gap-2 text-[11px]">
                                     <InformationCircleIcon className="w-5 h-5 shrink-0 mt-0.5" />
                                     <div>
                                         <span className="font-bold">Pending Rows Safeguard:</span> {t('supplier.hub.pendingSafeguard')}
@@ -391,7 +391,7 @@ export const TechnicalImportModal: React.FC<ImportModalProps> = ({
                                                 setFilterStatus(e.target.value);
                                                 loadBatchRows(previewData.batchId, 1, e.target.value);
                                             }}
-                                            className="px-2.5 py-1 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 text-[11px]"
+                                            className="px-2.5 py-1 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg text-[11px]"
                                         >
                                             <option value="">All Statuses</option>
                                             <option value="VALID">Valid</option>
@@ -405,7 +405,7 @@ export const TechnicalImportModal: React.FC<ImportModalProps> = ({
                                         <button
                                             onClick={() => handleBulkAction('ACCEPT_ALL_VALID')}
                                             disabled={bulkActionLoading || savingDecisions}
-                                            className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold uppercase text-[10px] disabled:opacity-50 transition-colors"
+                                            className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-[10px] rounded-lg disabled:opacity-50 transition-colors cursor-pointer"
                                             title={t('supplier.hub.acceptAllValidTitle')}
                                         >
                                             {t('supplier.hub.acceptAllValid')}
@@ -413,7 +413,7 @@ export const TechnicalImportModal: React.FC<ImportModalProps> = ({
                                         <button
                                             onClick={() => handleBulkAction('ACCEPT_SAFE_WARNINGS')}
                                             disabled={bulkActionLoading || savingDecisions}
-                                            className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white font-bold uppercase text-[10px] disabled:opacity-50 transition-colors"
+                                            className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white font-semibold text-[10px] rounded-lg disabled:opacity-50 transition-colors cursor-pointer"
                                             title={t('supplier.hub.acceptSafeWarningsTitle')}
                                         >
                                             {t('supplier.hub.acceptSafeWarnings')}
@@ -421,7 +421,7 @@ export const TechnicalImportModal: React.FC<ImportModalProps> = ({
                                         <button
                                             onClick={() => handleBulkAction('REJECT_PENDING_ISSUES')}
                                             disabled={bulkActionLoading || savingDecisions}
-                                            className="px-2.5 py-1 bg-red-700 hover:bg-red-800 text-white font-bold uppercase text-[10px] disabled:opacity-50 transition-colors"
+                                            className="px-2.5 py-1 bg-red-700 hover:bg-red-800 text-white font-semibold text-[10px] rounded-lg disabled:opacity-50 transition-colors cursor-pointer"
                                             title={t('supplier.hub.rejectAllIssuesTitle')}
                                         >
                                             {t('supplier.hub.rejectAllIssues')}
@@ -430,7 +430,7 @@ export const TechnicalImportModal: React.FC<ImportModalProps> = ({
                                             <button
                                                 onClick={handleApplyDecisions}
                                                 disabled={savingDecisions || bulkActionLoading}
-                                                className="px-3 py-1 bg-slate-800 text-white font-bold uppercase text-[10px] hover:bg-slate-700 transition-colors"
+                                                className="px-3 py-1 bg-slate-800 text-white font-semibold text-[10px] rounded-lg hover:bg-slate-700 transition-colors cursor-pointer"
                                             >
                                                 {t('supplier.hub.saveDecisions')} ({Object.keys(decisions).length})
                                             </button>
@@ -438,10 +438,10 @@ export const TechnicalImportModal: React.FC<ImportModalProps> = ({
                                     </div>
                                 </div>
 
-                                <div className="border border-slate-200 dark:border-zinc-800 overflow-x-auto">
+                                <div className="border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden overflow-x-auto">
                                     <table className="w-full text-left border-collapse">
                                         <thead>
-                                            <tr className="bg-slate-100 dark:bg-zinc-900 border-b border-slate-200 dark:border-zinc-800 text-[10px] font-bold text-zinc-500 uppercase tracking-wider">
+                                            <tr className="bg-slate-100 dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 text-[10px] font-bold text-zinc-500 uppercase tracking-wider">
                                                 <th className="p-2.5">Row</th>
                                                 <th className="p-2.5">Product Name</th>
                                                 <th className="p-2.5">GSM</th>
@@ -533,7 +533,7 @@ export const TechnicalImportModal: React.FC<ImportModalProps> = ({
                                                                 <select
                                                                     value={rowDecision}
                                                                     onChange={(e) => handleDecisionChange(r.id, e.target.value)}
-                                                                    className="px-2 py-0.5 border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-[10px] font-bold uppercase"
+                                                                    className="px-2 py-1 border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 rounded-lg text-[10px] font-bold uppercase cursor-pointer"
                                                                 >
                                                                     <option value="PENDING">PENDING</option>
                                                                     <option value="ACCEPTED">ACCEPTED</option>
@@ -555,14 +555,14 @@ export const TechnicalImportModal: React.FC<ImportModalProps> = ({
                                         <button
                                             disabled={page <= 1}
                                             onClick={() => loadBatchRows(previewData.batchId, page - 1, filterStatus)}
-                                            className="px-2.5 py-1 border border-slate-200 dark:border-zinc-800 disabled:opacity-40"
+                                            className="px-2.5 py-1 border border-zinc-200 dark:border-zinc-800 rounded-lg disabled:opacity-40 cursor-pointer"
                                         >
                                             {t('supplier.hub.prev')}
                                         </button>
                                         <button
                                             disabled={page >= totalPages}
                                             onClick={() => loadBatchRows(previewData.batchId, page + 1, filterStatus)}
-                                            className="px-2.5 py-1 border border-slate-200 dark:border-zinc-800 disabled:opacity-40"
+                                            className="px-2.5 py-1 border border-zinc-200 dark:border-zinc-800 rounded-lg disabled:opacity-40 cursor-pointer"
                                         >
                                             {t('supplier.hub.next')}
                                         </button>

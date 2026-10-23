@@ -865,13 +865,13 @@ export const SupplierCatalogOffersPage: React.FC = () => {
     return (
         <div className="space-y-6">
             {/* Header */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b ppos-border pb-5">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-zinc-200 dark:border-zinc-800 pb-5">
                 <div>
-                    <div className="flex items-center gap-2 mb-1">
-                        <span className="px-2 py-0.5 text-[9px] font-black uppercase tracking-widest bg-red-600 text-white">
+                    <div className="flex items-center gap-2 mb-2">
+                        <span className="px-3 py-0.5 text-xs font-semibold rounded-full bg-red-600 text-white shadow-xs">
                             Paper Supplier Hub
                         </span>
-                        <span className="px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider bg-slate-200 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300">
+                        <span className="px-3 py-0.5 text-xs font-medium rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700">
                             Operational Hub
                         </span>
                     </div>
@@ -886,7 +886,7 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                 <div className="flex items-center gap-3 flex-wrap">
                     <button
                         onClick={handleDownloadTemplate}
-                        className="flex items-center gap-2 px-3 py-2 border border-slate-300 dark:border-zinc-700 text-slate-700 dark:text-zinc-300 font-bold uppercase tracking-wider text-[11px] hover:bg-slate-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+                        className="flex items-center gap-2 px-3.5 py-2 border border-zinc-300 dark:border-zinc-700 text-slate-700 dark:text-zinc-300 font-medium text-xs rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
                         title={t('supplier.hub.downloadTemplate')}
                     >
                         <ArrowDownTrayIcon className="w-4 h-4" />
@@ -895,7 +895,7 @@ export const SupplierCatalogOffersPage: React.FC = () => {
 
                     <button
                         onClick={handleOpenBatchHistory}
-                        className="flex items-center gap-2 px-3 py-2 border border-slate-300 dark:border-zinc-700 text-slate-700 dark:text-zinc-300 font-bold uppercase tracking-wider text-[11px] hover:bg-slate-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+                        className="flex items-center gap-2 px-3.5 py-2 border border-zinc-300 dark:border-zinc-700 text-slate-700 dark:text-zinc-300 font-medium text-xs rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
                     >
                         <ClockIcon className="w-4 h-4" />
                         <span>{t('supplier.hub.batchHistory')}</span>
@@ -904,7 +904,7 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                     {!isReadOnly && (
                         <button
                             onClick={() => setIsImportModalOpen(true)}
-                            className="flex items-center gap-2 px-3.5 py-2 bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold uppercase tracking-wider text-[11px] hover:bg-slate-800 transition-colors cursor-pointer"
+                            className="flex items-center gap-2 px-4 py-2 bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-semibold text-xs rounded-xl hover:bg-slate-800 dark:hover:bg-zinc-100 transition-colors shadow-2xs cursor-pointer"
                         >
                             <ArrowUpTrayIcon className="w-4 h-4" />
                             <span>{t('supplier.hub.importButton')}</span>
@@ -915,30 +915,30 @@ export const SupplierCatalogOffersPage: React.FC = () => {
 
             {/* Notifications */}
             {generalNotice && (
-                <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-xs flex items-center justify-between">
+                <div className="p-3.5 bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-xs rounded-xl flex items-center justify-between">
                     <div className="flex items-center gap-2">
                         <CheckCircleIcon className="w-4 h-4 shrink-0" />
                         <span>{generalNotice}</span>
                     </div>
-                    <button onClick={() => setGeneralNotice(null)}><XMarkIcon className="w-4 h-4" /></button>
+                    <button onClick={() => setGeneralNotice(null)} className="cursor-pointer"><XMarkIcon className="w-4 h-4" /></button>
                 </div>
             )}
 
             {errorNotice && (
-                <div className="p-3 bg-red-500/10 border border-red-500/30 text-red-500 text-xs flex items-center justify-between">
+                <div className="p-3.5 bg-red-500/10 border border-red-500/30 text-red-500 text-xs rounded-xl flex items-center justify-between">
                     <div className="flex items-center gap-2">
                         <ExclamationTriangleIcon className="w-4 h-4 shrink-0" />
                         <span>{errorNotice}</span>
                     </div>
-                    <button onClick={() => setErrorNotice(null)}><XMarkIcon className="w-4 h-4" /></button>
+                    <button onClick={() => setErrorNotice(null)} className="cursor-pointer"><XMarkIcon className="w-4 h-4" /></button>
                 </div>
             )}
 
             {/* Tabs */}
-            <div className="flex border-b border-slate-200 dark:border-zinc-800 gap-6">
+            <div className="flex border-b border-zinc-200 dark:border-zinc-800 gap-6">
                 <button
                     onClick={() => setActiveTab('CATALOG')}
-                    className={`pb-3 text-xs font-black uppercase tracking-wider transition-colors flex items-center gap-2 cursor-pointer ${
+                    className={`pb-3 text-xs font-bold uppercase tracking-wider transition-colors flex items-center gap-2 cursor-pointer ${
                         activeTab === 'CATALOG'
                             ? 'border-b-2 border-red-600 text-red-600'
                             : 'text-zinc-400 hover:text-slate-800 dark:hover:text-zinc-200'
@@ -949,7 +949,7 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                 </button>
                 <button
                     onClick={() => setActiveTab('OFFERS')}
-                    className={`pb-3 text-xs font-black uppercase tracking-wider transition-colors flex items-center gap-2 cursor-pointer ${
+                    className={`pb-3 text-xs font-bold uppercase tracking-wider transition-colors flex items-center gap-2 cursor-pointer ${
                         activeTab === 'OFFERS'
                             ? 'border-b-2 border-red-600 text-red-600'
                             : 'text-zinc-400 hover:text-slate-800 dark:hover:text-zinc-200'
@@ -974,7 +974,7 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                                     value={catalogSearch}
                                     onChange={(e) => setCatalogSearch(e.target.value)}
                                     onKeyDown={(e) => e.key === 'Enter' && fetchCatalog(1, catalogSearch, catalogCategory)}
-                                    className="w-full pl-9 pr-3 py-1.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 text-xs"
+                                    className="w-full pl-9 pr-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-600 transition-all"
                                 />
                             </div>
                         </div>
@@ -986,7 +986,7 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                                     setCatalogCategory(e.target.value);
                                     fetchCatalog(1, catalogSearch, e.target.value);
                                 }}
-                                className="px-3 py-1.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 text-xs font-bold"
+                                className="px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl text-xs font-semibold cursor-pointer focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-600 transition-all"
                             >
                                 <option value="">{t('supplier.hub.filterAllCategories')}</option>
                                 <option value="COATED">Coated</option>
@@ -1003,7 +1003,7 @@ export const SupplierCatalogOffersPage: React.FC = () => {
 
                             <button
                                 onClick={() => fetchCatalog(1, catalogSearch, catalogCategory)}
-                                className="px-3.5 py-1.5 bg-slate-200 dark:bg-zinc-800 font-bold uppercase text-[10px] hover:bg-slate-300 dark:hover:bg-zinc-700 transition-colors cursor-pointer"
+                                className="px-4 py-2 bg-zinc-100 dark:bg-zinc-800 font-semibold text-xs rounded-xl hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors cursor-pointer border border-zinc-200 dark:border-zinc-700"
                             >
                                 {t('supplier.hub.filterButton')}
                             </button>
@@ -1012,7 +1012,7 @@ export const SupplierCatalogOffersPage: React.FC = () => {
 
                     {/* Catalog Multi-Row Sticky Action Bar */}
                     {selectedCatalogVariantIds.size > 0 && !isReadOnly && (
-                        <div className="sticky top-0 z-20 flex flex-col sm:flex-row items-center justify-between gap-3 p-3 bg-slate-900 text-white shadow-xl border-l-4 border-red-600">
+                        <div className="sticky top-0 z-20 flex flex-col sm:flex-row items-center justify-between gap-3 p-3.5 bg-slate-900 text-white shadow-xl rounded-2xl border-l-4 border-red-600">
                             <div className="flex items-center gap-3">
                                 <span className="text-xs font-bold">
                                     {isAllMatchingCatalogSelected
@@ -1030,19 +1030,19 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                             <div className="flex items-center gap-2 flex-wrap">
                                 <button
                                     onClick={() => handleOpenCatalogAction('ARCHIVE')}
-                                    className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white text-[10px] font-bold uppercase cursor-pointer"
+                                    className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold rounded-lg cursor-pointer transition-colors"
                                 >
                                     {t('supplier.hub.bulkArchive')}
                                 </button>
                                 <button
                                     onClick={() => handleOpenCatalogAction('RESTORE')}
-                                    className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-bold uppercase cursor-pointer"
+                                    className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg cursor-pointer transition-colors"
                                 >
                                     {t('supplier.hub.bulkRestore')}
                                 </button>
                                 <button
                                     onClick={() => handleOpenCatalogAction('WITHDRAW')}
-                                    className="px-2.5 py-1 bg-zinc-700 hover:bg-zinc-600 text-white text-[10px] font-bold uppercase cursor-pointer"
+                                    className="px-3 py-1.5 bg-zinc-700 hover:bg-zinc-600 text-white text-xs font-semibold rounded-lg cursor-pointer transition-colors"
                                     title={t('supplier.hub.withdrawConfirmWarning')}
                                 >
                                     {t('supplier.hub.bulkWithdraw')}
@@ -1050,7 +1050,7 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                                 {isAdmin && (
                                     <button
                                         onClick={() => handleOpenCatalogAction('DELETE')}
-                                        className="px-2.5 py-1 bg-red-600 hover:bg-red-700 text-white text-[10px] font-bold uppercase cursor-pointer"
+                                        className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold rounded-lg cursor-pointer transition-colors"
                                     >
                                         {t('supplier.hub.bulkDelete')}
                                     </button>
@@ -1061,7 +1061,7 @@ export const SupplierCatalogOffersPage: React.FC = () => {
 
                     {/* Catalog Page select-all banner with prompt to select all matching across pagination */}
                     {isCatalogPageSelected && catalogTotalCount > allVisibleCatalogVariantIds.length && !isAllMatchingCatalogSelected && (
-                        <div className="p-2.5 bg-blue-500/10 border border-blue-500/30 text-blue-600 dark:text-blue-400 text-xs flex items-center justify-between">
+                        <div className="p-3 bg-blue-500/10 border border-blue-500/30 text-blue-600 dark:text-blue-400 text-xs rounded-xl flex items-center justify-between">
                             <span>{t('supplier.hub.selectedVariantsCount', { count: allVisibleCatalogVariantIds.length })} (página actual).</span>
                             <button
                                 onClick={handleSelectAllMatchingCatalog}
@@ -1073,7 +1073,7 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                     )}
 
                     {/* Technical Products & Variants Table */}
-                    <div className="border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 overflow-x-auto">
+                    <div className="border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 rounded-2xl shadow-2xs overflow-hidden overflow-x-auto">
                         <table className="w-full text-left border-collapse text-xs">
                             <thead>
                                 <tr className="bg-slate-100 dark:bg-zinc-900 border-b border-slate-200 dark:border-zinc-800 text-[10px] font-bold text-zinc-500 uppercase tracking-wider">
@@ -1135,7 +1135,7 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                                                         <div className="flex items-center gap-2">
                                                             <span>{prod.name}</span>
                                                             {selectedInProd > 0 && (
-                                                                <span className="px-1.5 py-0.5 text-[9px] font-bold bg-red-100 dark:bg-red-950/60 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-900/50">
+                                                                <span className="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-red-100 dark:bg-red-950/60 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-900/50">
                                                                     {t('supplier.hub.selectedInProduct', { selected: selectedInProd, total: prodVariantIds.length })}
                                                                 </span>
                                                             )}
@@ -1143,7 +1143,7 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                                                         <span className="text-[10px] font-mono text-zinc-400">{prod.brand || 'No brand specified'}</span>
                                                     </td>
                                                     <td className="p-3">
-                                                        <span className="px-2 py-0.5 text-[9px] font-bold bg-slate-200 dark:bg-zinc-800">
+                                                        <span className="px-2.5 py-0.5 text-[10px] font-medium rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700">
                                                             {prod.category}
                                                         </span>
                                                     </td>
@@ -1185,17 +1185,17 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                                                                     {v.widthMm} x {v.heightMm} mm
                                                                 </span>
                                                                 {isUnassociated && (
-                                                                    <span className="px-1.5 py-0.2 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700 text-[9px] font-bold uppercase">
+                                                                    <span className="px-2 py-0.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700 text-[9px] font-semibold uppercase rounded-full">
                                                                         {t('supplier.hub.statusUnassociated')}
                                                                     </span>
                                                                 )}
                                                                 {isWithdrawn && !isUnassociated && (
-                                                                    <span className="px-1.5 py-0.2 bg-zinc-200 dark:bg-zinc-800 text-zinc-500 text-[9px] font-bold uppercase">
+                                                                    <span className="px-2 py-0.5 bg-zinc-200 dark:bg-zinc-800 text-zinc-500 text-[9px] font-semibold uppercase rounded-full">
                                                                         {t('supplier.hub.statusWithdrawn')}
                                                                     </span>
                                                                 )}
                                                                 {isArchived && !isWithdrawn && !isUnassociated && (
-                                                                    <span className="px-1.5 py-0.2 bg-amber-100 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400 text-[9px] font-bold uppercase">
+                                                                    <span className="px-2 py-0.5 bg-amber-100 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400 text-[9px] font-semibold uppercase rounded-full">
                                                                         {t('supplier.hub.statusArchived')}
                                                                     </span>
                                                                 )}
@@ -1218,7 +1218,7 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                                                                 <div className="flex items-center justify-end gap-1.5 flex-wrap">
                                                                     <button
                                                                         onClick={() => handleViewVariantDetail(v.id)}
-                                                                        className="px-2 py-1 bg-slate-200 dark:bg-zinc-800 hover:bg-slate-300 dark:hover:bg-zinc-700 text-slate-700 dark:text-zinc-200 font-bold uppercase text-[10px] transition-colors cursor-pointer"
+                                                                        className="px-2.5 py-1 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-slate-700 dark:text-zinc-200 font-medium text-[10px] rounded-lg border border-zinc-200 dark:border-zinc-700 transition-colors cursor-pointer"
                                                                         title={t('supplier.hub.viewVariantDetails')}
                                                                     >
                                                                         {t('supplier.hub.viewVariantDetails')}
@@ -1228,7 +1228,7 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                                                                             {isUnassociated ? (
                                                                                 <button
                                                                                     onClick={() => handleIncorporateVariant(v.id)}
-                                                                                    className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold uppercase text-[10px] transition-colors cursor-pointer"
+                                                                                    className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-[10px] rounded-lg transition-colors cursor-pointer shadow-xs"
                                                                                     title={t('supplier.hub.incorporateVariant')}
                                                                                 >
                                                                                     {t('supplier.hub.incorporateVariant')}
@@ -1244,7 +1244,7 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                                                                                     </button>
                                                                                     <button
                                                                                         onClick={() => handleOpenCreateOffer({ ...v, productName: prod.name, finish: prod.finish })}
-                                                                                        className="px-2.5 py-1 bg-red-600 hover:bg-red-700 text-white font-bold uppercase text-[10px] transition-colors cursor-pointer"
+                                                                                        className="px-2.5 py-1 bg-red-600 hover:bg-red-700 text-white font-semibold text-[10px] rounded-lg transition-colors cursor-pointer shadow-xs"
                                                                                     >
                                                                                         {t('supplier.hub.createOffer')}
                                                                                     </button>
@@ -1307,14 +1307,14 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                             <button
                                 disabled={catalogPage <= 1}
                                 onClick={() => fetchCatalog(catalogPage - 1, catalogSearch, catalogCategory)}
-                                className="px-3 py-1 border border-slate-200 dark:border-zinc-800 disabled:opacity-40 cursor-pointer"
+                                className="px-3 py-1 border border-zinc-200 dark:border-zinc-800 rounded-lg disabled:opacity-40 cursor-pointer"
                             >
                                 {t('supplier.hub.prev')}
                             </button>
                             <button
                                 disabled={catalogPage >= catalogTotalPages}
                                 onClick={() => fetchCatalog(catalogPage + 1, catalogSearch, catalogCategory)}
-                                className="px-3 py-1 border border-slate-200 dark:border-zinc-800 disabled:opacity-40 cursor-pointer"
+                                className="px-3 py-1 border border-zinc-200 dark:border-zinc-800 rounded-lg disabled:opacity-40 cursor-pointer"
                             >
                                 {t('supplier.hub.next')}
                             </button>
@@ -1333,10 +1333,10 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                                 setOffersStatusFilter('');
                                 fetchOffers(1, offersSearch, '');
                             }}
-                            className={`px-3 py-1 text-xs font-bold uppercase tracking-wider border transition-colors cursor-pointer ${
+                            className={`px-3 py-1 text-xs font-semibold rounded-full border transition-colors cursor-pointer ${
                                 offersStatusFilter === ''
-                                    ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 border-transparent shadow-sm'
-                                    : 'border-slate-200 dark:border-zinc-800 text-zinc-500 hover:border-slate-400'
+                                    ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 border-transparent shadow-xs'
+                                    : 'border-zinc-200 dark:border-zinc-800 text-zinc-500 hover:border-zinc-400'
                             }`}
                         >
                             {t('supplier.hub.statusAll')} ({offersCounts.total})
@@ -1346,10 +1346,10 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                                 setOffersStatusFilter('ACTIVE');
                                 fetchOffers(1, offersSearch, 'ACTIVE');
                             }}
-                            className={`px-3 py-1 text-xs font-bold uppercase tracking-wider border transition-colors cursor-pointer ${
+                            className={`px-3 py-1 text-xs font-semibold rounded-full border transition-colors cursor-pointer ${
                                 offersStatusFilter === 'ACTIVE'
-                                    ? 'bg-emerald-600 text-white border-transparent shadow-sm'
-                                    : 'border-slate-200 dark:border-zinc-800 text-emerald-600 dark:text-emerald-400 hover:border-emerald-500'
+                                    ? 'bg-emerald-600 text-white border-transparent shadow-xs'
+                                    : 'border-zinc-200 dark:border-zinc-800 text-emerald-600 dark:text-emerald-400 hover:border-emerald-500'
                             }`}
                         >
                             {t('supplier.hub.statusActive')} ({offersCounts.active})
@@ -1359,10 +1359,10 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                                 setOffersStatusFilter('INACTIVE');
                                 fetchOffers(1, offersSearch, 'INACTIVE');
                             }}
-                            className={`px-3 py-1 text-xs font-bold uppercase tracking-wider border transition-colors cursor-pointer ${
+                            className={`px-3 py-1 text-xs font-semibold rounded-full border transition-colors cursor-pointer ${
                                 offersStatusFilter === 'INACTIVE'
-                                    ? 'bg-zinc-600 text-white border-transparent shadow-sm'
-                                    : 'border-slate-200 dark:border-zinc-800 text-zinc-500 hover:border-zinc-400'
+                                    ? 'bg-zinc-600 text-white border-transparent shadow-xs'
+                                    : 'border-zinc-200 dark:border-zinc-800 text-zinc-500 hover:border-zinc-400'
                             }`}
                         >
                             {t('supplier.hub.statusInactive')} ({offersCounts.inactive})
@@ -1372,10 +1372,10 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                                 setOffersStatusFilter('ARCHIVED');
                                 fetchOffers(1, offersSearch, 'ARCHIVED');
                             }}
-                            className={`px-3 py-1 text-xs font-bold uppercase tracking-wider border transition-colors cursor-pointer ${
+                            className={`px-3 py-1 text-xs font-semibold rounded-full border transition-colors cursor-pointer ${
                                 offersStatusFilter === 'ARCHIVED'
-                                    ? 'bg-amber-600 text-white border-transparent shadow-sm'
-                                    : 'border-slate-200 dark:border-zinc-800 text-amber-600 dark:text-amber-400 hover:border-amber-500'
+                                    ? 'bg-amber-600 text-white border-transparent shadow-xs'
+                                    : 'border-zinc-200 dark:border-zinc-800 text-amber-600 dark:text-amber-400 hover:border-amber-500'
                             }`}
                         >
                             {t('supplier.hub.statusArchived')} ({offersCounts.archived})
@@ -1393,7 +1393,7 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                                     value={offersSearch}
                                     onChange={(e) => setOffersSearch(e.target.value)}
                                     onKeyDown={(e) => e.key === 'Enter' && fetchOffers(1, offersSearch, offersStatusFilter)}
-                                    className="w-full pl-9 pr-3 py-1.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 text-xs"
+                                    className="w-full pl-9 pr-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-600 transition-all"
                                 />
                             </div>
                         </div>
@@ -1401,7 +1401,7 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                         <div className="flex items-center gap-3 w-full sm:w-auto">
                             <button
                                 onClick={() => fetchOffers(1, offersSearch, offersStatusFilter)}
-                                className="px-3.5 py-1.5 bg-slate-200 dark:bg-zinc-800 font-bold uppercase text-[10px] hover:bg-slate-300 dark:hover:bg-zinc-700 transition-colors cursor-pointer"
+                                className="px-4 py-2 bg-zinc-100 dark:bg-zinc-800 font-semibold text-xs rounded-xl hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors cursor-pointer border border-zinc-200 dark:border-zinc-700"
                             >
                                 {t('supplier.hub.filterButton')}
                             </button>
@@ -1410,7 +1410,7 @@ export const SupplierCatalogOffersPage: React.FC = () => {
 
                     {/* Multi-Row Sticky Action Bar */}
                     {selectedOfferIds.size > 0 && !isReadOnly && (
-                        <div className="sticky top-0 z-20 flex flex-col sm:flex-row items-center justify-between gap-3 p-3 bg-slate-900 text-white shadow-xl border-l-4 border-red-600">
+                        <div className="sticky top-0 z-20 flex flex-col sm:flex-row items-center justify-between gap-3 p-3.5 bg-slate-900 text-white shadow-xl rounded-2xl border-l-4 border-red-600">
                             <div className="flex items-center gap-3">
                                 <span className="text-xs font-bold">
                                     {isAllMatchingSelected
@@ -1428,27 +1428,27 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                             <div className="flex items-center gap-2 flex-wrap">
                                 <button
                                     onClick={() => handleExecuteBulkStatus('ACTIVATE')}
-                                    className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold uppercase cursor-pointer"
+                                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg cursor-pointer transition-colors"
                                 >
                                     {t('supplier.hub.bulkActivate')}
                                 </button>
                                 <button
                                     onClick={() => handleExecuteBulkStatus('DEACTIVATE')}
-                                    className="px-2.5 py-1 bg-zinc-700 hover:bg-zinc-600 text-white text-[10px] font-bold uppercase cursor-pointer"
+                                    className="px-3 py-1.5 bg-zinc-700 hover:bg-zinc-600 text-white text-xs font-semibold rounded-lg cursor-pointer transition-colors"
                                 >
                                     {t('supplier.hub.bulkDeactivate')}
                                 </button>
                                 {offersStatusFilter === 'ARCHIVED' ? (
                                     <button
                                         onClick={() => handleExecuteBulkStatus('RESTORE')}
-                                        className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-bold uppercase cursor-pointer"
+                                        className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg cursor-pointer transition-colors"
                                     >
                                         {t('supplier.hub.bulkRestore')}
                                     </button>
                                 ) : (
                                     <button
                                         onClick={() => handleExecuteBulkStatus('ARCHIVE')}
-                                        className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white text-[10px] font-bold uppercase cursor-pointer"
+                                        className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold rounded-lg cursor-pointer transition-colors"
                                     >
                                         {t('supplier.hub.bulkArchive')}
                                     </button>
@@ -1456,7 +1456,7 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                                 {isAdmin && (
                                     <button
                                         onClick={handleOpenBulkDeleteConfirm}
-                                        className="px-2.5 py-1 bg-red-600 hover:bg-red-700 text-white text-[10px] font-bold uppercase cursor-pointer"
+                                        className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold rounded-lg cursor-pointer transition-colors"
                                     >
                                         {t('supplier.hub.bulkDelete')}
                                     </button>
@@ -1467,7 +1467,7 @@ export const SupplierCatalogOffersPage: React.FC = () => {
 
                     {/* Page select-all banner with prompt to select all matching across pagination */}
                     {isPageSelected && offersTotalCount > offers.length && !isAllMatchingSelected && (
-                        <div className="p-2.5 bg-blue-500/10 border border-blue-500/30 text-blue-600 dark:text-blue-400 text-xs flex items-center justify-between">
+                        <div className="p-3 bg-blue-500/10 border border-blue-500/30 text-blue-600 dark:text-blue-400 text-xs rounded-xl flex items-center justify-between">
                             <span>{t('supplier.hub.selectedCount', { count: offers.length })} (página actual).</span>
                             <button
                                 onClick={handleSelectAllMatching}
@@ -1479,7 +1479,7 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                     )}
 
                     {/* Offers Table */}
-                    <div className="border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 overflow-x-auto">
+                    <div className="border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 rounded-2xl shadow-2xs overflow-hidden overflow-x-auto">
                         <table className="w-full text-left border-collapse text-xs">
                             <thead>
                                 <tr className="bg-slate-100 dark:bg-zinc-900 border-b border-slate-200 dark:border-zinc-800 text-[10px] font-bold text-zinc-500 uppercase tracking-wider">
@@ -1559,7 +1559,7 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                                                     <span className="text-zinc-400 ml-1">· Step: {off.orderMultiple}</span>
                                                 </td>
                                                 <td className="p-3">
-                                                    <span className={`px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider ${
+                                                    <span className={`px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider rounded-full ${
                                                         off.visibility === 'MARKETPLACE'
                                                             ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
                                                             : off.visibility === 'APPROVED_CUSTOMERS'
@@ -1594,10 +1594,10 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                                                             {off.status !== 'ARCHIVED' && (
                                                                 <button
                                                                     onClick={() => handleToggleOfferStatus(off.id, off.status)}
-                                                                    className={`px-2 py-0.5 text-[10px] font-bold uppercase transition-colors cursor-pointer ${
+                                                                    className={`px-2.5 py-1 text-[10px] font-semibold uppercase rounded-lg transition-colors cursor-pointer ${
                                                                         off.status === 'ACTIVE'
                                                                             ? 'bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-300'
-                                                                            : 'bg-emerald-600 text-white hover:bg-emerald-700'
+                                                                            : 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-xs'
                                                                     }`}
                                                                 >
                                                                     {off.status === 'ACTIVE' ? t('supplier.hub.deactivate') : t('supplier.hub.activate')}
@@ -1605,7 +1605,7 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                                                             )}
                                                             <button
                                                                 onClick={() => handleArchiveOrRestoreSingleOffer(off.id, off.status)}
-                                                                className="px-2 py-0.5 text-[10px] font-bold uppercase border border-slate-300 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+                                                                className="px-2.5 py-1 text-[10px] font-medium uppercase border border-zinc-300 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-colors cursor-pointer"
                                                                 title={off.status === 'ARCHIVED' ? t('supplier.hub.restore') : t('supplier.hub.archive')}
                                                             >
                                                                 {off.status === 'ARCHIVED' ? t('supplier.hub.restore') : t('supplier.hub.archive')}
@@ -1637,14 +1637,14 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                             <button
                                 disabled={offersPage <= 1}
                                 onClick={() => fetchOffers(offersPage - 1, offersSearch, offersStatusFilter)}
-                                className="px-3 py-1 border border-slate-200 dark:border-zinc-800 disabled:opacity-40 cursor-pointer"
+                                className="px-3 py-1 border border-zinc-200 dark:border-zinc-800 rounded-lg disabled:opacity-40 cursor-pointer"
                             >
                                 {t('supplier.hub.prev')}
                             </button>
                             <button
                                 disabled={offersPage >= offersTotalPages}
                                 onClick={() => fetchOffers(offersPage + 1, offersSearch, offersStatusFilter)}
-                                className="px-3 py-1 border border-slate-200 dark:border-zinc-800 disabled:opacity-40 cursor-pointer"
+                                className="px-3 py-1 border border-zinc-200 dark:border-zinc-800 rounded-lg disabled:opacity-40 cursor-pointer"
                             >
                                 {t('supplier.hub.next')}
                             </button>
@@ -1664,7 +1664,7 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                 <div className="space-y-4">
                     {/* Variant Summary */}
                     {selectedVariant && (
-                        <div className="p-3 bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 text-xs">
+                        <div className="p-3.5 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl text-xs">
                             <p className="font-bold text-slate-900 dark:text-white">{selectedVariant.productName}</p>
                             <p className="text-zinc-500 font-mono text-[11px] mt-0.5">
                                 {selectedVariant.gsm} gsm · {selectedVariant.widthMm} x {selectedVariant.heightMm} mm · {selectedVariant.finish || 'Standard'}
@@ -1673,7 +1673,7 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                     )}
 
                     {formError && (
-                        <div className="p-3 bg-red-500/10 border border-red-500/30 text-red-500 text-xs flex items-center gap-2">
+                        <div className="p-3 bg-red-500/10 border border-red-500/30 text-red-500 text-xs rounded-xl flex items-center gap-2">
                             <ExclamationTriangleIcon className="w-4 h-4 shrink-0" />
                             <span>{formError}</span>
                         </div>
@@ -1690,7 +1690,7 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                                     required
                                     value={offerForm.supplierSku}
                                     onChange={(e) => setOfferForm({ ...offerForm, supplierSku: e.target.value })}
-                                    className="w-full px-2.5 py-1.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 font-mono"
+                                    className="w-full px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl font-mono text-xs focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-600 transition-all"
                                 />
                             </div>
 
@@ -1701,7 +1701,7 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                                 <select
                                     value={offerForm.currency}
                                     onChange={(e) => setOfferForm({ ...offerForm, currency: e.target.value })}
-                                    className="w-full px-2.5 py-1.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 font-bold"
+                                    className="w-full px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl font-semibold text-xs cursor-pointer focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-600 transition-all"
                                 >
                                     <option value="EUR">EUR (€)</option>
                                     <option value="USD">USD ($)</option>
@@ -1723,7 +1723,7 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                                     placeholder="e.g. 1.4500"
                                     value={offerForm.priceAmount}
                                     onChange={(e) => setOfferForm({ ...offerForm, priceAmount: e.target.value })}
-                                    className="w-full px-2.5 py-1.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 font-mono font-bold"
+                                    className="w-full px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl font-mono font-bold text-xs focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-600 transition-all"
                                 />
                             </div>
 
@@ -1734,7 +1734,7 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                                 <select
                                     value={offerForm.priceBasis}
                                     onChange={(e) => setOfferForm({ ...offerForm, priceBasis: e.target.value })}
-                                    className="w-full px-2.5 py-1.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 font-bold"
+                                    className="w-full px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl font-semibold text-xs cursor-pointer focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-600 transition-all"
                                 >
                                     <option value="KG">KG (per Kilogram)</option>
                                     <option value="TONNE">TONNE (per Metric Tonne)</option>
@@ -1746,7 +1746,7 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                         </div>
 
                         {offerForm.priceBasis === 'PACK' && (
-                            <div className="p-3 bg-amber-500/10 border border-amber-500/20 space-y-1">
+                            <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl space-y-1">
                                 <label className="block text-[10px] font-bold uppercase text-amber-700 dark:text-amber-400">
                                     {t('supplier.hub.sheetsPerPackLabel')}
                                 </label>
@@ -1757,7 +1757,7 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                                     placeholder="e.g. 500"
                                     value={offerForm.sheetsPerPack}
                                     onChange={(e) => setOfferForm({ ...offerForm, sheetsPerPack: e.target.value })}
-                                    className="w-full px-2.5 py-1.5 bg-white dark:bg-zinc-900 border border-amber-500/40 font-mono font-bold"
+                                    className="w-full px-3 py-2 bg-white dark:bg-zinc-900 border border-amber-500/40 rounded-xl font-mono font-bold text-xs focus:outline-none focus:ring-2 focus:ring-amber-500/20 transition-all"
                                 />
                             </div>
                         )}
@@ -1773,7 +1773,7 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                                     required
                                     value={offerForm.moq}
                                     onChange={(e) => setOfferForm({ ...offerForm, moq: e.target.value })}
-                                    className="w-full px-2.5 py-1.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 font-mono"
+                                    className="w-full px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl font-mono text-xs focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-600 transition-all"
                                 />
                             </div>
 
@@ -1787,7 +1787,7 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                                     required
                                     value={offerForm.orderMultiple}
                                     onChange={(e) => setOfferForm({ ...offerForm, orderMultiple: e.target.value })}
-                                    className="w-full px-2.5 py-1.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 font-mono"
+                                    className="w-full px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl font-mono text-xs focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-600 transition-all"
                                 />
                             </div>
                         </div>
@@ -1801,7 +1801,7 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                                     type="date"
                                     value={offerForm.validFrom}
                                     onChange={(e) => setOfferForm({ ...offerForm, validFrom: e.target.value })}
-                                    className="w-full px-2.5 py-1.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800"
+                                    className="w-full px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-600 transition-all"
                                 />
                             </div>
 
@@ -1813,7 +1813,7 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                                     type="date"
                                     value={offerForm.validUntil}
                                     onChange={(e) => setOfferForm({ ...offerForm, validUntil: e.target.value })}
-                                    className="w-full px-2.5 py-1.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800"
+                                    className="w-full px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-600 transition-all"
                                 />
                             </div>
                         </div>
@@ -1828,7 +1828,7 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                                     placeholder="ES, PT, FR"
                                     value={offerForm.deliveryZones}
                                     onChange={(e) => setOfferForm({ ...offerForm, deliveryZones: e.target.value })}
-                                    className="w-full px-2.5 py-1.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 font-mono uppercase"
+                                    className="w-full px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl font-mono uppercase text-xs focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-600 transition-all"
                                 />
                             </div>
 
@@ -1839,7 +1839,7 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                                 <select
                                     value={offerForm.visibility}
                                     onChange={(e) => setOfferForm({ ...offerForm, visibility: e.target.value })}
-                                    className="w-full px-2.5 py-1.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 font-bold"
+                                    className="w-full px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl font-semibold text-xs cursor-pointer focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-600 transition-all"
                                 >
                                     <option value="APPROVED_CUSTOMERS">{t('supplier.hub.visApproved')}</option>
                                     <option value="MARKETPLACE">{t('supplier.hub.visMarketplace')}</option>
@@ -1859,23 +1859,23 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                                     placeholder="e.g. Q4 Raw pulp index adjustment"
                                     value={offerForm.changeReason}
                                     onChange={(e) => setOfferForm({ ...offerForm, changeReason: e.target.value })}
-                                    className="w-full px-2.5 py-1.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800"
+                                    className="w-full px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-600 transition-all"
                                 />
                             </div>
                         )}
 
-                        <div className="flex justify-end gap-3 pt-3 border-t border-slate-200 dark:border-zinc-800">
+                        <div className="flex justify-end gap-3 pt-3 border-t border-zinc-200 dark:border-zinc-800">
                             <button
                                 type="button"
                                 onClick={() => setIsOfferModalOpen(false)}
-                                className="px-4 py-2 border border-slate-300 dark:border-zinc-700 font-bold uppercase text-[10px] cursor-pointer"
+                                className="px-4 py-2 border border-zinc-300 dark:border-zinc-700 font-medium text-xs rounded-xl hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
                             >
                                 {t('supplier.hub.cancel')}
                             </button>
                             <button
                                 type="submit"
                                 disabled={formSubmitting}
-                                className="px-5 py-2 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-bold uppercase text-[11px] transition-colors cursor-pointer"
+                                className="px-5 py-2 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-semibold text-xs rounded-xl shadow-xs transition-colors cursor-pointer"
                             >
                                 {formSubmitting ? t('supplier.hub.saving') : editingOffer ? t('supplier.hub.recordRevision') : t('supplier.hub.publishOffer')}
                             </button>
@@ -1894,7 +1894,7 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                 footer={
                     <button
                         onClick={() => setIsRevisionsModalOpen(false)}
-                        className="px-4 py-2 bg-slate-800 text-white font-bold uppercase text-[10px] cursor-pointer"
+                        className="px-4 py-2 bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-semibold text-xs rounded-xl hover:bg-slate-800 dark:hover:bg-zinc-100 transition-colors cursor-pointer"
                     >
                         {t('supplier.hub.close')}
                     </button>
@@ -1902,10 +1902,10 @@ export const SupplierCatalogOffersPage: React.FC = () => {
             >
                 <div className="space-y-3">
                     {revisionOffer?.revisions && revisionOffer.revisions.map((rev: any) => (
-                        <div key={rev.id} className="p-3 bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 text-xs space-y-1">
+                        <div key={rev.id} className="p-3.5 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl text-xs space-y-1.5">
                             <div className="flex items-center justify-between">
                                 <span className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                                    <span className="px-1.5 py-0.2 bg-red-600 text-white text-[10px] font-mono">
+                                    <span className="px-2 py-0.5 bg-red-600 text-white text-[10px] font-mono rounded-full shadow-2xs">
                                         v{rev.revisionNumber}
                                     </span>
                                     <span>{rev.priceAmount} {rev.currency} / {rev.priceBasis}</span>
@@ -1938,7 +1938,7 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                     <div className="flex justify-between items-center w-full">
                         <button
                             onClick={() => setVariantDetailModalOpen(false)}
-                            className="px-4 py-2 border border-slate-300 dark:border-zinc-700 font-bold uppercase text-[10px] cursor-pointer"
+                            className="px-4 py-2 border border-zinc-300 dark:border-zinc-700 font-medium text-xs rounded-xl hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
                         >
                             {t('supplier.hub.close')}
                         </button>
@@ -1948,7 +1948,7 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                                     setVariantDetailModalOpen(false);
                                     handleOpenCreateOffer(viewingVariant.variant);
                                 }}
-                                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-bold uppercase text-[10px] cursor-pointer"
+                                className="px-5 py-2 bg-red-600 hover:bg-red-700 text-white font-semibold text-xs rounded-xl shadow-xs transition-colors cursor-pointer"
                             >
                                 {t('supplier.hub.createOffer')}
                             </button>
@@ -1960,7 +1960,7 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                     <p className="p-6 text-center text-zinc-400 text-xs">Fetching physical variant metrics...</p>
                 ) : viewingVariant?.variant ? (
                     <div className="space-y-4 text-xs">
-                        <div className="grid grid-cols-2 gap-3 p-3 bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 font-mono">
+                        <div className="grid grid-cols-2 gap-3 p-4 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl font-mono">
                             <div>
                                 <span className="text-[10px] text-zinc-400 uppercase block">Product Name</span>
                                 <span className="font-bold text-slate-900 dark:text-white">{viewingVariant.variant.productName}</span>
@@ -1997,9 +1997,9 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                         <div className="space-y-2">
                             <h4 className="font-bold text-slate-900 dark:text-white text-xs">Active Offers For This Variant ({viewingVariant.offers?.length || 0})</h4>
                             {viewingVariant.offers && viewingVariant.offers.length > 0 ? (
-                                <div className="space-y-1 max-h-40 overflow-y-auto">
+                                <div className="space-y-2 max-h-40 overflow-y-auto">
                                     {viewingVariant.offers.map((off: any) => (
-                                        <div key={off.id} className="p-2 border border-slate-200 dark:border-zinc-800 flex items-center justify-between">
+                                        <div key={off.id} className="p-3 border border-zinc-200 dark:border-zinc-800 rounded-xl flex items-center justify-between">
                                             <div>
                                                 <span className="font-mono font-bold text-slate-800 dark:text-zinc-200">{off.supplierSku}</span>
                                                 <span className="text-[10px] text-zinc-400 ml-2">MOQ: {off.moq}</span>
@@ -2029,13 +2029,13 @@ export const SupplierCatalogOffersPage: React.FC = () => {
             >
                 {editingVariant && (
                     <form onSubmit={handleSaveVariantSpecs} className="space-y-4 text-xs">
-                        <div className="p-2.5 bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800">
+                        <div className="p-3 rounded-xl bg-slate-50 dark:bg-zinc-900/60 border border-slate-200 dark:border-zinc-800">
                             <p className="font-bold text-slate-900 dark:text-white">{editingVariant.productName}</p>
                             <p className="text-[10px] font-mono text-zinc-400">ID: {editingVariant.id}</p>
                         </div>
 
                         {variantError && (
-                            <div className="p-2.5 bg-red-500/10 border border-red-500/30 text-red-500 text-xs flex items-center gap-2">
+                            <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-500 text-xs flex items-center gap-2">
                                 <ExclamationTriangleIcon className="w-4 h-4 shrink-0" />
                                 <span>{variantError}</span>
                             </div>
@@ -2043,69 +2043,69 @@ export const SupplierCatalogOffersPage: React.FC = () => {
 
                         <div className="grid grid-cols-2 gap-3">
                             <div>
-                                <label className="block text-[10px] font-bold uppercase text-zinc-500 mb-1">GSM *</label>
+                                <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-500 mb-1">GSM *</label>
                                 <input
                                     type="number"
                                     min="1"
                                     required
                                     value={variantForm.gsm}
                                     onChange={(e) => setVariantForm({ ...variantForm, gsm: e.target.value })}
-                                    className="w-full px-2.5 py-1.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 font-mono font-bold"
+                                    className="w-full px-3 py-2 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl font-mono font-bold text-xs focus:ring-2 focus:ring-red-500/20 focus:border-red-500 outline-none transition-all"
                                 />
                             </div>
                             <div>
-                                <label className="block text-[10px] font-bold uppercase text-zinc-500 mb-1">Caliper (µm)</label>
+                                <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-500 mb-1">Caliper (µm)</label>
                                 <input
                                     type="number"
                                     min="0"
                                     value={variantForm.caliperUm}
                                     onChange={(e) => setVariantForm({ ...variantForm, caliperUm: e.target.value })}
-                                    className="w-full px-2.5 py-1.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 font-mono"
+                                    className="w-full px-3 py-2 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl font-mono text-xs focus:ring-2 focus:ring-red-500/20 focus:border-red-500 outline-none transition-all"
                                 />
                             </div>
                         </div>
 
                         <div className="grid grid-cols-2 gap-3">
                             <div>
-                                <label className="block text-[10px] font-bold uppercase text-zinc-500 mb-1">Width (mm) *</label>
+                                <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-500 mb-1">Width (mm) *</label>
                                 <input
                                     type="number"
                                     min="1"
                                     required
                                     value={variantForm.widthMm}
                                     onChange={(e) => setVariantForm({ ...variantForm, widthMm: e.target.value })}
-                                    className="w-full px-2.5 py-1.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 font-mono font-bold"
+                                    className="w-full px-3 py-2 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl font-mono font-bold text-xs focus:ring-2 focus:ring-red-500/20 focus:border-red-500 outline-none transition-all"
                                 />
                             </div>
                             <div>
-                                <label className="block text-[10px] font-bold uppercase text-zinc-500 mb-1">Height (mm) *</label>
+                                <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-500 mb-1">Height (mm) *</label>
                                 <input
                                     type="number"
                                     min="1"
                                     required
                                     value={variantForm.heightMm}
                                     onChange={(e) => setVariantForm({ ...variantForm, heightMm: e.target.value })}
-                                    className="w-full px-2.5 py-1.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 font-mono font-bold"
+                                    className="w-full px-3 py-2 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl font-mono font-bold text-xs focus:ring-2 focus:ring-red-500/20 focus:border-red-500 outline-none transition-all"
                                 />
                             </div>
                         </div>
 
                         <div className="grid grid-cols-2 gap-3">
                             <div>
-                                <label className="block text-[10px] font-bold uppercase text-zinc-500 mb-1">Finish</label>
+                                <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-500 mb-1">Finish</label>
                                 <input
                                     type="text"
                                     value={variantForm.finish}
                                     onChange={(e) => setVariantForm({ ...variantForm, finish: e.target.value })}
-                                    className="w-full px-2.5 py-1.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800"
+                                    className="w-full px-3 py-2 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl text-xs focus:ring-2 focus:ring-red-500/20 focus:border-red-500 outline-none transition-all"
                                 />
                             </div>
                             <div>
-                                <label className="block text-[10px] font-bold uppercase text-zinc-500 mb-1">Grain Direction</label>
+                                <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-500 mb-1">Grain Direction</label>
                                 <select
                                     value={variantForm.grainDirection}
                                     onChange={(e) => setVariantForm({ ...variantForm, grainDirection: e.target.value })}
-                                    className="w-full px-2.5 py-1.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 font-bold"
+                                    className="w-full px-3 py-2 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl font-bold text-xs focus:ring-2 focus:ring-red-500/20 focus:border-red-500 outline-none transition-all"
                                 >
                                     <option value="LONG_GRAIN">LONG_GRAIN</option>
                                     <option value="SHORT_GRAIN">SHORT_GRAIN</option>
@@ -2117,14 +2117,14 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                             <button
                                 type="button"
                                 onClick={() => setIsEditVariantModalOpen(false)}
-                                className="px-4 py-2 border border-slate-300 dark:border-zinc-700 font-bold uppercase text-[10px] cursor-pointer"
+                                className="px-4 py-2 border border-slate-200 dark:border-zinc-800 hover:bg-slate-50 dark:hover:bg-zinc-800 text-slate-700 dark:text-zinc-300 font-bold uppercase text-[10px] tracking-wider rounded-xl cursor-pointer transition-colors"
                             >
                                 {t('supplier.hub.cancel')}
                             </button>
                             <button
                                 type="submit"
                                 disabled={savingVariant}
-                                className="px-5 py-2 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-bold uppercase text-[11px] transition-colors cursor-pointer"
+                                className="px-5 py-2 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-bold uppercase text-[11px] tracking-wider rounded-xl shadow-xs hover:shadow transition-all cursor-pointer"
                             >
                                 {savingVariant ? t('supplier.hub.saving') : t('supplier.hub.save')}
                             </button>
@@ -2143,7 +2143,7 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                 footer={
                     <button
                         onClick={() => setIsBatchHistoryModalOpen(false)}
-                        className="px-4 py-2 border border-slate-300 dark:border-zinc-700 font-bold uppercase text-[10px] cursor-pointer"
+                        className="px-4 py-2 border border-slate-200 dark:border-zinc-800 hover:bg-slate-50 dark:hover:bg-zinc-800 text-slate-700 dark:text-zinc-300 font-bold uppercase text-[10px] tracking-wider rounded-xl cursor-pointer transition-colors"
                     >
                         {t('supplier.hub.close')}
                     </button>
@@ -2155,84 +2155,86 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                     ) : importBatches.length === 0 ? (
                         <p className="p-8 text-center text-zinc-400">{t('supplier.hub.noBatches')}</p>
                     ) : (
-                        <div className="border border-slate-200 dark:border-zinc-800 overflow-x-auto">
-                            <table className="w-full text-left text-xs">
-                                <thead>
-                                    <tr className="bg-slate-100 dark:bg-zinc-900 border-b border-slate-200 dark:border-zinc-800 text-[10px] font-bold text-zinc-500 uppercase tracking-wider">
-                                        <th className="p-2.5">{t('supplier.hub.batchDate')}</th>
-                                        <th className="p-2.5">{t('supplier.hub.batchFile')}</th>
-                                        <th className="p-2.5">{t('supplier.hub.batchStatus')}</th>
-                                        <th className="p-2.5">{t('supplier.hub.batchRows')}</th>
-                                        <th className="p-2.5 text-right">{t('supplier.hub.batchActions')}</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-100 dark:divide-zinc-900">
-                                    {importBatches.map((b) => {
-                                        const rawDate = b.created_at || b.createdAt;
-                                        const formattedDate = rawDate && !isNaN(new Date(rawDate).getTime())
-                                            ? new Date(rawDate).toLocaleString()
-                                            : '—';
-                                        const fileName = b.original_filename || b.fileName || b.file_name || b.id;
-                                        const isConfirmed = b.status === 'CONFIRMED';
-                                        const totalRows = b.total_rows ?? b.totalRows ?? 0;
-                                        const validRows = b.valid_rows ?? b.validRows ?? 0;
-                                        const pendingRows = b.pending_rows ?? b.pendingRows ?? 0;
-                                        const rejectedRows = b.rejected_rows ?? b.rejectedRows ?? (isConfirmed ? Math.max(0, totalRows - validRows) : 0);
-                                        const issueRows = b.issue_rows ?? b.issueRows ?? 0;
-
-                                        return (
-                                            <tr key={b.id} className="hover:bg-slate-50 dark:hover:bg-zinc-900/50">
-                                                <td className="p-2.5 font-mono text-[11px] text-zinc-500">
-                                                    {formattedDate}
-                                                </td>
-                                                <td className="p-2.5 font-bold text-slate-800 dark:text-zinc-200">
-                                                    {fileName}
-                                                </td>
-                                                <td className="p-2.5">
-                                                    <StatusBadge status={b.status} />
-                                                </td>
-                                                <td className="p-2.5 font-mono text-[11px]">
-                                                    {isConfirmed ? (
-                                                        <span>
-                                                            {t('supplier.hub.batchTotal')}: {totalRows} · {t('supplier.hub.batchValid')}: {validRows} · {t('supplier.hub.batchRejected')}: {rejectedRows} · {t('supplier.hub.batchPending')}: {pendingRows}
-                                                        </span>
-                                                    ) : (
-                                                        <span>
-                                                            {t('supplier.hub.batchTotal')}: {totalRows} · {t('supplier.hub.batchValid')}: {validRows} · {t('supplier.hub.batchIssues')}: {issueRows} · {t('supplier.hub.batchPending')}: {pendingRows}
-                                                        </span>
-                                                    )}
-                                                    {(b.hasInconsistency || b.has_inconsistency) && (
-                                                        <div className="mt-1 text-[10px] text-amber-600 dark:text-amber-400 font-sans font-bold flex items-center gap-1">
-                                                            <span title={b.inconsistencyMessage || b.inconsistency_message || t('supplier.hub.inconsistencyWarning')}>
-                                                                ⚠️ {b.inconsistencyMessage || b.inconsistency_message || t('supplier.hub.inconsistencyWarning')}
-                                                            </span>
-                                                        </div>
-                                                    )}
-                                                </td>
-                                            <td className="p-2.5 text-right">
-                                                <div className="flex items-center justify-end gap-2">
-                                                    <button
-                                                        onClick={() => handleDownloadBatchIssues(b.id)}
-                                                        className="px-2 py-1 border border-slate-300 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-800 font-bold uppercase text-[9px] cursor-pointer"
-                                                        title={t('supplier.hub.exportIssuesCsv')}
-                                                    >
-                                                        {t('supplier.hub.exportIssuesCsv')}
-                                                    </button>
-                                                    {b.status === 'CONFIRMED' && !isReadOnly && (
-                                                        <button
-                                                            onClick={() => handleRetractBatch(b)}
-                                                            className="px-2 py-1 bg-red-600 hover:bg-red-700 text-white font-bold uppercase text-[9px] cursor-pointer"
-                                                        >
-                                                            {t('supplier.hub.retractBatch')}
-                                                        </button>
-                                                    )}
-                                                </div>
-                                            </td>
+                        <div className="rounded-xl border border-slate-200 dark:border-zinc-800 overflow-hidden">
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left text-xs">
+                                    <thead>
+                                        <tr className="bg-slate-50/75 dark:bg-zinc-900/60 border-b border-slate-200 dark:border-zinc-800 text-[10px] font-bold text-zinc-500 uppercase tracking-wider">
+                                            <th className="p-3">{t('supplier.hub.batchDate')}</th>
+                                            <th className="p-3">{t('supplier.hub.batchFile')}</th>
+                                            <th className="p-3">{t('supplier.hub.batchStatus')}</th>
+                                            <th className="p-3">{t('supplier.hub.batchRows')}</th>
+                                            <th className="p-3 text-right">{t('supplier.hub.batchActions')}</th>
                                         </tr>
-                                    );
-                                })}
-                                </tbody>
-                            </table>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100 dark:divide-zinc-900">
+                                        {importBatches.map((b) => {
+                                            const rawDate = b.created_at || b.createdAt;
+                                            const formattedDate = rawDate && !isNaN(new Date(rawDate).getTime())
+                                                ? new Date(rawDate).toLocaleString()
+                                                : '—';
+                                            const fileName = b.original_filename || b.fileName || b.file_name || b.id;
+                                            const isConfirmed = b.status === 'CONFIRMED';
+                                            const totalRows = b.total_rows ?? b.totalRows ?? 0;
+                                            const validRows = b.valid_rows ?? b.validRows ?? 0;
+                                            const pendingRows = b.pending_rows ?? b.pendingRows ?? 0;
+                                            const rejectedRows = b.rejected_rows ?? b.rejectedRows ?? (isConfirmed ? Math.max(0, totalRows - validRows) : 0);
+                                            const issueRows = b.issue_rows ?? b.issueRows ?? 0;
+
+                                            return (
+                                                <tr key={b.id} className="hover:bg-slate-50 dark:hover:bg-zinc-900/50 transition-colors">
+                                                    <td className="p-3 font-mono text-[11px] text-zinc-500">
+                                                        {formattedDate}
+                                                    </td>
+                                                    <td className="p-3 font-bold text-slate-800 dark:text-zinc-200">
+                                                        {fileName}
+                                                    </td>
+                                                    <td className="p-3">
+                                                        <StatusBadge status={b.status} />
+                                                    </td>
+                                                    <td className="p-3 font-mono text-[11px]">
+                                                        {isConfirmed ? (
+                                                            <span>
+                                                                {t('supplier.hub.batchTotal')}: {totalRows} · {t('supplier.hub.batchValid')}: {validRows} · {t('supplier.hub.batchRejected')}: {rejectedRows} · {t('supplier.hub.batchPending')}: {pendingRows}
+                                                            </span>
+                                                        ) : (
+                                                            <span>
+                                                                {t('supplier.hub.batchTotal')}: {totalRows} · {t('supplier.hub.batchValid')}: {validRows} · {t('supplier.hub.batchIssues')}: {issueRows} · {t('supplier.hub.batchPending')}: {pendingRows}
+                                                            </span>
+                                                        )}
+                                                        {(b.hasInconsistency || b.has_inconsistency) && (
+                                                            <div className="mt-1 text-[10px] text-amber-600 dark:text-amber-400 font-sans font-bold flex items-center gap-1">
+                                                                <span title={b.inconsistencyMessage || b.inconsistency_message || t('supplier.hub.inconsistencyWarning')}>
+                                                                    ⚠️ {b.inconsistencyMessage || b.inconsistency_message || t('supplier.hub.inconsistencyWarning')}
+                                                                </span>
+                                                            </div>
+                                                        )}
+                                                    </td>
+                                                    <td className="p-3 text-right">
+                                                        <div className="flex items-center justify-end gap-2">
+                                                            <button
+                                                                onClick={() => handleDownloadBatchIssues(b.id)}
+                                                                className="px-2.5 py-1 border border-slate-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-800 font-bold uppercase text-[9px] tracking-wider rounded-lg cursor-pointer transition-colors"
+                                                                title={t('supplier.hub.exportIssuesCsv')}
+                                                            >
+                                                                {t('supplier.hub.exportIssuesCsv')}
+                                                            </button>
+                                                            {b.status === 'CONFIRMED' && !isReadOnly && (
+                                                                <button
+                                                                    onClick={() => handleRetractBatch(b)}
+                                                                    className="px-2.5 py-1 bg-red-600 hover:bg-red-700 text-white font-bold uppercase text-[9px] tracking-wider rounded-lg shadow-2xs cursor-pointer transition-colors"
+                                                                >
+                                                                    {t('supplier.hub.retractBatch')}
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     )}
                 </div>
@@ -2249,7 +2251,7 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                     <div className="flex items-center justify-end gap-2 w-full">
                         <button
                             onClick={() => setConfirmModal(null)}
-                            className="px-4 py-2 border border-slate-300 dark:border-zinc-700 text-slate-700 dark:text-zinc-300 font-bold uppercase text-[10px] cursor-pointer"
+                            className="px-4 py-2 border border-slate-200 dark:border-zinc-800 hover:bg-slate-50 dark:hover:bg-zinc-800 text-slate-700 dark:text-zinc-300 font-bold uppercase text-[10px] tracking-wider rounded-xl cursor-pointer transition-colors"
                         >
                             {t('supplier.hub.cancel')}
                         </button>
@@ -2260,8 +2262,8 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                                 }
                                 setConfirmModal(null);
                             }}
-                            className={`px-4 py-2 font-bold uppercase text-[10px] text-white cursor-pointer ${
-                                confirmModal?.isDanger ? 'bg-red-600 hover:bg-red-700' : 'bg-slate-900 dark:bg-white text-white dark:text-slate-900'
+                            className={`px-4 py-2 font-bold uppercase text-[10px] tracking-wider rounded-xl shadow-xs transition-colors cursor-pointer ${
+                                confirmModal?.isDanger ? 'bg-red-600 hover:bg-red-700 text-white' : 'bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-zinc-100 text-white dark:text-slate-900'
                             }`}
                         >
                             {confirmModal?.actionLabel || t('supplier.hub.confirmAction')}
@@ -2288,7 +2290,7 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                 footer={
                     <button
                         onClick={() => setReportModal(null)}
-                        className="px-4 py-2 bg-slate-900 text-white font-bold uppercase text-[10px] cursor-pointer"
+                        className="px-4 py-2 bg-slate-900 hover:bg-slate-800 dark:bg-zinc-100 dark:hover:bg-white text-white dark:text-zinc-900 font-bold uppercase text-[10px] tracking-wider rounded-xl cursor-pointer transition-colors"
                     >
                         {t('supplier.hub.close')}
                     </button>
@@ -2297,14 +2299,14 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                 {reportModal && (
                     <div className="space-y-4 text-xs">
                         <div className="grid grid-cols-2 gap-3">
-                            <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400">
+                            <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400">
                                 <p className="text-[10px] uppercase font-bold tracking-wider">{t('supplier.hub.succeeded')}</p>
                                 <p className="text-2xl font-black">{reportModal.succeededCount}</p>
                             </div>
-                            <div className={`p-3 border ${
+                            <div className={`p-3.5 rounded-xl border ${
                                 reportModal.failedCount > 0 
-                                    ? 'bg-red-500/10 border-red-500/30 text-red-500' 
-                                    : 'bg-slate-100 dark:bg-zinc-900 border-slate-200 dark:border-zinc-800 text-zinc-400'
+                                    ? 'bg-red-500/10 border-red-500/20 text-red-500' 
+                                    : 'bg-slate-50 dark:bg-zinc-900/60 border-slate-200 dark:border-zinc-800 text-zinc-400'
                             }`}>
                                 <p className="text-[10px] uppercase font-bold tracking-wider">{t('supplier.hub.failed')}</p>
                                 <p className="text-2xl font-black">{reportModal.failedCount}</p>
@@ -2314,12 +2316,12 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                         {reportModal.results?.some((r: any) => !r.success) && (
                             <div className="space-y-2">
                                 <p className="font-bold text-slate-900 dark:text-white">Detalle de bloqueos o errores:</p>
-                                <div className="border border-slate-200 dark:border-zinc-800 max-h-48 overflow-y-auto divide-y divide-slate-100 dark:divide-zinc-900 font-mono text-[11px]">
+                                <div className="rounded-xl border border-slate-200 dark:border-zinc-800 max-h-48 overflow-y-auto divide-y divide-slate-100 dark:divide-zinc-900 font-mono text-[11px] overflow-hidden">
                                     {reportModal.results.filter((r: any) => !r.success).map((r: any, idx: number) => (
                                         <div key={idx} className="p-2.5 bg-red-50/50 dark:bg-red-950/20">
                                             <div className="flex items-center justify-between text-red-600 dark:text-red-400 font-bold">
                                                 <span>{r.sku || r.id}</span>
-                                                <span className="text-[10px] px-1 bg-red-200 dark:bg-red-900/50">{r.code}</span>
+                                                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-red-200 dark:bg-red-900/50">{r.code}</span>
                                             </div>
                                             <p className="text-zinc-600 dark:text-zinc-400 text-[10px] mt-0.5">{r.message}</p>
                                         </div>
@@ -2343,7 +2345,7 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                         <button
                             type="button"
                             onClick={() => setIsCatalogPreviewModalOpen(false)}
-                            className="px-4 py-2 border border-slate-300 dark:border-zinc-700 text-slate-700 dark:text-zinc-300 font-bold uppercase text-[10px] cursor-pointer"
+                            className="px-4 py-2 border border-slate-200 dark:border-zinc-800 hover:bg-slate-50 dark:hover:bg-zinc-800 text-slate-700 dark:text-zinc-300 font-bold uppercase text-[10px] tracking-wider rounded-xl cursor-pointer transition-colors"
                         >
                             {t('supplier.hub.cancel')}
                         </button>
@@ -2351,7 +2353,7 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                             type="button"
                             disabled={executingCatalogAction || (catalogActionPreview?.blockedCount > 0 && catalogActionPreview?.targetCount === catalogActionPreview?.blockedCount)}
                             onClick={handleConfirmCatalogAction}
-                            className={`px-5 py-2 font-bold uppercase text-[11px] text-white transition-colors cursor-pointer disabled:opacity-50 ${
+                            className={`px-5 py-2 font-bold uppercase text-[11px] tracking-wider rounded-xl shadow-xs hover:shadow text-white transition-all cursor-pointer disabled:opacity-50 ${
                                 pendingCatalogAction === 'DELETE'
                                     ? 'bg-red-600 hover:bg-red-700'
                                     : pendingCatalogAction === 'ARCHIVE'
@@ -2370,33 +2372,33 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                     <div className="space-y-4 text-xs">
                         {/* Summary Metrics */}
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                            <div className="p-3 bg-slate-100 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800">
-                                <p className="text-[10px] uppercase font-bold text-zinc-500">{t('supplier.hub.catalogPreviewAffectedCount')}</p>
-                                <p className="text-xl font-black text-slate-900 dark:text-white">{catalogActionPreview.targetCount}</p>
+                            <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-zinc-900/60 border border-slate-200 dark:border-zinc-800">
+                                <p className="text-[10px] uppercase font-bold text-zinc-500 tracking-wider">{t('supplier.hub.catalogPreviewAffectedCount')}</p>
+                                <p className="text-xl font-black text-slate-900 dark:text-white mt-0.5">{catalogActionPreview.targetCount}</p>
                             </div>
-                            <div className="p-3 bg-slate-100 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800">
-                                <p className="text-[10px] uppercase font-bold text-zinc-500">{t('supplier.hub.catalogPreviewAffectedProducts')}</p>
-                                <p className="text-xl font-black text-slate-900 dark:text-white">{catalogActionPreview.affectedProducts}</p>
+                            <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-zinc-900/60 border border-slate-200 dark:border-zinc-800">
+                                <p className="text-[10px] uppercase font-bold text-zinc-500 tracking-wider">{t('supplier.hub.catalogPreviewAffectedProducts')}</p>
+                                <p className="text-xl font-black text-slate-900 dark:text-white mt-0.5">{catalogActionPreview.affectedProducts}</p>
                             </div>
-                            <div className="p-3 bg-slate-100 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800">
-                                <p className="text-[10px] uppercase font-bold text-zinc-500">{t('supplier.hub.catalogPreviewActiveOffers')}</p>
-                                <p className="text-xl font-black text-amber-600 dark:text-amber-400">{catalogActionPreview.activeOffersCount}</p>
+                            <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-zinc-900/60 border border-slate-200 dark:border-zinc-800">
+                                <p className="text-[10px] uppercase font-bold text-zinc-500 tracking-wider">{t('supplier.hub.catalogPreviewActiveOffers')}</p>
+                                <p className="text-xl font-black text-amber-600 dark:text-amber-400 mt-0.5">{catalogActionPreview.activeOffersCount}</p>
                             </div>
-                            <div className={`p-3 border ${
+                            <div className={`p-3.5 rounded-xl border ${
                                 catalogActionPreview.blockedCount > 0
-                                    ? 'bg-red-500/10 border-red-500/30 text-red-600 dark:text-red-400'
-                                    : 'bg-slate-100 dark:bg-zinc-900 border-slate-200 dark:border-zinc-800 text-zinc-400'
+                                    ? 'bg-red-500/10 border-red-500/20 text-red-600 dark:text-red-400'
+                                    : 'bg-slate-50 dark:bg-zinc-900/60 border-slate-200 dark:border-zinc-800 text-zinc-400'
                             }`}>
-                                <p className="text-[10px] uppercase font-bold">{t('supplier.hub.catalogPreviewBlockedCount')}</p>
-                                <p className="text-xl font-black">{catalogActionPreview.blockedCount}</p>
+                                <p className="text-[10px] uppercase font-bold tracking-wider">{t('supplier.hub.catalogPreviewBlockedCount')}</p>
+                                <p className="text-xl font-black mt-0.5">{catalogActionPreview.blockedCount}</p>
                             </div>
                         </div>
 
                         {/* Warnings banner */}
                         {catalogActionPreview.warnings && catalogActionPreview.warnings.length > 0 && (
-                            <div className="p-3 bg-amber-50 dark:bg-amber-950/20 border-l-4 border-amber-500 space-y-1">
+                            <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 space-y-1">
                                 <div className="flex items-center gap-2 font-bold text-amber-800 dark:text-amber-300">
-                                    <ExclamationTriangleIcon className="w-4 h-4" />
+                                    <ExclamationTriangleIcon className="w-4 h-4 shrink-0" />
                                     <span>{t('supplier.hub.dependencyWarningsTitle')}</span>
                                 </div>
                                 <ul className="list-disc pl-5 text-amber-700 dark:text-amber-400 space-y-0.5 text-[11px]">
@@ -2412,15 +2414,15 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                             <p className="font-bold text-slate-900 dark:text-white">
                                 {t('supplier.hub.catalogPreviewActionImpact')}:
                             </p>
-                            <div className="border border-slate-200 dark:border-zinc-800 max-h-56 overflow-y-auto divide-y divide-slate-100 dark:divide-zinc-900">
+                            <div className="rounded-xl border border-slate-200 dark:border-zinc-800 max-h-56 overflow-y-auto divide-y divide-slate-100 dark:divide-zinc-900 overflow-hidden">
                                 {catalogActionPreview.items && catalogActionPreview.items.map((item: any) => (
-                                    <div key={item.variantId} className="p-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                                    <div key={item.variantId} className="p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 hover:bg-slate-50/50 dark:hover:bg-zinc-900/30 transition-colors">
                                         <div className="space-y-0.5">
                                             <div className="flex items-center gap-2">
                                                 <span className="font-bold text-slate-800 dark:text-zinc-200">{item.productName}</span>
                                                 <span className="font-mono text-zinc-500 text-[11px]">{item.dimensions} · {item.gsm} gsm</span>
                                                 {item.sharedWithOtherSuppliers && (
-                                                    <span className="px-1.5 py-0.2 bg-blue-100 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 text-[9px] font-bold">
+                                                    <span className="px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 text-[9px] font-bold">
                                                         Ficha Compartida
                                                     </span>
                                                 )}
@@ -2429,11 +2431,11 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                                         </div>
                                         <div className="flex items-center gap-2 shrink-0">
                                             {item.isBlocked ? (
-                                                <span className="px-2 py-0.5 bg-red-100 dark:bg-red-950/50 text-red-600 dark:text-red-400 text-[10px] font-bold">
+                                                <span className="px-2.5 py-0.5 rounded-full bg-red-100 dark:bg-red-950/50 text-red-600 dark:text-red-400 text-[10px] font-bold">
                                                     Bloqueado: {item.blockReason}
                                                 </span>
                                             ) : (
-                                                <span className="px-2 py-0.5 bg-emerald-100 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 text-[10px] font-bold">
+                                                <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 text-[10px] font-bold">
                                                     Elegible
                                                 </span>
                                             )}
