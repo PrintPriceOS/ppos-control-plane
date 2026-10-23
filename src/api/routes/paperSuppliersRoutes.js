@@ -74,10 +74,13 @@ router.get('/me', requireSupplierScope('VIEWER'), async (req, res) => {
         }
 
         let currencies = [];
+        let meta = {};
+        if (supplier.metadata_json) {
+            meta = typeof supplier.metadata_json === 'string' ? JSON.parse(supplier.metadata_json) : (supplier.metadata_json || {});
+        }
         if (supplier.currencies_json) {
             currencies = typeof supplier.currencies_json === 'string' ? JSON.parse(supplier.currencies_json) : supplier.currencies_json;
-        } else if (supplier.metadata_json) {
-            const meta = typeof supplier.metadata_json === 'string' ? JSON.parse(supplier.metadata_json) : supplier.metadata_json;
+        } else if (meta.currencies) {
             currencies = meta.currencies || [];
         }
 
@@ -91,11 +94,125 @@ router.get('/me', requireSupplierScope('VIEWER'), async (req, res) => {
                 supplierId: supplier.id,
                 status: supplier.status,
                 name: supplier.name,
+                contactEmail: supplier.contact_email || meta.contactEmail || null,
+                phone: meta.phone || null,
+                address: meta.address || null,
+                country: meta.country || null,
+                timezone: meta.timezone || null,
                 currencies: Array.isArray(currencies) ? currencies : []
             }
         });
     } catch (err) {
         console.error('[PAPER-SUPPLIERS][ME-ERROR]', err);
+        return res.status(500).json({ ok: false, error: err.message, code: 'DATABASE_ERROR' });
+    }
+});
+
+/**
+ * PATCH /api/v1/paper-suppliers/profile
+ * Updates authorized supplier organization profile fields.
+ * Restricted to SUPPLIER_ADMIN or SUPPLIER_OPERATOR (fails closed on VIEWER with HTTP 403).
+ * Governed invariants:
+ * - supplier_id, tenant_id, status (approval status), and approved currencies CANNOT be altered here.
+ * - Allowed fields: name, contactEmail, phone, address, country, timezone.
+ */
+router.patch('/profile', requireSupplierScope('OPERATOR'), requireApprovedSupplier, async (req, res) => {
+    try {
+        const context = resolveActorContext(req);
+        const supplierId = context.supplierId;
+        if (!supplierId) {
+            return res.status(404).json({
+                ok: false,
+                error: {
+                    code: 'SUPPLIER_NOT_FOUND',
+                    message: 'No registered supplier organization associated with authenticated session.'
+                }
+            });
+        }
+
+        const rows = await db.query(
+            'SELECT id, tenant_id, name, status, contact_email, currencies_json, metadata_json FROM paper_suppliers WHERE id = ?',
+            [supplierId]
+        );
+        const supplier = Array.isArray(rows) ? (Array.isArray(rows[0]) ? rows[0][0] : rows[0]) : null;
+        if (!supplier) {
+            return res.status(404).json({
+                ok: false,
+                error: { code: 'SUPPLIER_NOT_FOUND', message: 'Supplier organization not found.' }
+            });
+        }
+
+        const { name, contactEmail, phone, address, country, timezone } = req.body || {};
+
+        let currentMeta = {};
+        if (supplier.metadata_json) {
+            currentMeta = typeof supplier.metadata_json === 'string' ? JSON.parse(supplier.metadata_json) : (supplier.metadata_json || {});
+        }
+
+        let newName = supplier.name;
+        if (name !== undefined) {
+            if (typeof name !== 'string' || !name.trim()) {
+                return res.status(400).json({
+                    ok: false,
+                    error: { code: 'INVALID_NAME', message: 'Company name cannot be empty.' }
+                });
+            }
+            newName = name.trim().slice(0, 255);
+        }
+
+        let newContactEmail = supplier.contact_email;
+        if (contactEmail !== undefined) {
+            if (contactEmail && (typeof contactEmail !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactEmail.trim()))) {
+                return res.status(400).json({
+                    ok: false,
+                    error: { code: 'INVALID_EMAIL', message: 'Invalid contact email format.' }
+                });
+            }
+            newContactEmail = contactEmail ? contactEmail.trim().slice(0, 255) : null;
+        }
+
+        if (phone !== undefined) {
+            currentMeta.phone = phone ? String(phone).trim().slice(0, 50) : null;
+        }
+        if (address !== undefined) {
+            currentMeta.address = address ? String(address).trim().slice(0, 255) : null;
+        }
+        if (country !== undefined) {
+            currentMeta.country = country ? String(country).trim().toUpperCase().slice(0, 2) : null;
+        }
+        if (timezone !== undefined) {
+            currentMeta.timezone = timezone ? String(timezone).trim().slice(0, 64) : null;
+        }
+
+        await db.query(
+            'UPDATE paper_suppliers SET name = ?, contact_email = ?, metadata_json = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+            [newName, newContactEmail, JSON.stringify(currentMeta), supplierId]
+        );
+
+        let currencies = [];
+        if (supplier.currencies_json) {
+            currencies = typeof supplier.currencies_json === 'string' ? JSON.parse(supplier.currencies_json) : supplier.currencies_json;
+        } else if (currentMeta.currencies) {
+            currencies = currentMeta.currencies || [];
+        }
+
+        return res.json({
+            ok: true,
+            data: {
+                supplierId: supplier.id,
+                tenantId: supplier.tenant_id,
+                status: supplier.status,
+                name: newName,
+                contactEmail: newContactEmail,
+                phone: currentMeta.phone || null,
+                address: currentMeta.address || null,
+                country: currentMeta.country || null,
+                timezone: currentMeta.timezone || null,
+                currencies: Array.isArray(currencies) ? currencies : []
+            }
+        });
+    } catch (err) {
+        console.error('[PAPER-SUPPLIERS][UPDATE-PROFILE-ERROR]', err);
         return res.status(500).json({ ok: false, error: err.message, code: 'DATABASE_ERROR' });
     }
 });

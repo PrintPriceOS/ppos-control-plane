@@ -16,12 +16,16 @@ import { useLocale, Locale } from '../../i18n';
 import { 
     getUserRole, 
     getUserTenantId, 
+    getUserSupplierId,
     isSuperAdmin, 
     isPrinthouseUser, 
+    isSupplierUser,
+    getActiveContext,
     getAuthUser,
     getAuthToken 
 } from '../../lib/authStore';
 import { adminFetch } from '../../lib/adminApi';
+import { paperSupplierFetch } from '../../lib/paperSupplierApi';
 import { CountrySelect } from '../../components/common/CountrySelect';
 import { TimezoneSelect } from '../../components/common/TimezoneSelect';
 import {
@@ -74,8 +78,13 @@ export const GlobalSettingsPage: React.FC = () => {
     const currentUser = getAuthUser();
     const userRole = getUserRole();
     const tenantId = getUserTenantId() || 'tenant-demo-local';
+    const supplierId = getUserSupplierId();
     const isSuper = isSuperAdmin();
     const isPrinthouse = isPrinthouseUser();
+    const isSupplier = isSupplierUser() || getActiveContext() === 'supplier';
+
+    const [supplierProfile, setSupplierProfile] = useState<any>(null);
+    const [loadingSupplierProfile, setLoadingSupplierProfile] = useState<boolean>(false);
 
     // ── Appearance State ─────────────────────────────────────────────────────
     const [theme, setThemeState] = useState<Theme>(getTheme());
@@ -278,17 +287,35 @@ export const GlobalSettingsPage: React.FC = () => {
 
     // Load initial tenant company profile, notification preferences, and audit log
     useEffect(() => {
-        // Load company profile from backend if available
-        adminFetch<any>('/api/printhouse/onboarding/company-profile')
-            .then(res => {
-                if (res && res.company) {
-                    if (res.company.company_name) setCompanyName(res.company.company_name);
-                    if (res.company.tax_id) setTaxId(res.company.tax_id);
-                    if (res.company.country) setCountry(res.company.country);
-                    if (res.company.address) setAddress(res.company.address);
-                }
-            })
-            .catch(() => {});
+        // Load company profile according to authorized context
+        if (isSupplier) {
+            setLoadingSupplierProfile(true);
+            paperSupplierFetch<any>('/api/v1/paper-suppliers/me')
+                .then(res => {
+                    if (res && res.data) {
+                        const s = res.data.supplier || res.data;
+                        setSupplierProfile(s);
+                        if (s.name) setCompanyName(s.name);
+                        if (s.country) setCountry(s.country);
+                        if (s.address) setAddress(s.address);
+                        if (s.timezone) setTimezone(s.timezone);
+                    }
+                })
+                .catch(() => {})
+                .finally(() => setLoadingSupplierProfile(false));
+        } else {
+            // Load printhouse company profile from backend if available
+            adminFetch<any>('/api/printhouse/onboarding/company-profile')
+                .then(res => {
+                    if (res && res.company) {
+                        if (res.company.company_name) setCompanyName(res.company.company_name);
+                        if (res.company.tax_id) setTaxId(res.company.tax_id);
+                        if (res.company.country) setCountry(res.company.country);
+                        if (res.company.address) setAddress(res.company.address);
+                    }
+                })
+                .catch(() => {});
+        }
 
         // Load tenant notification preferences from authorized endpoint
         adminFetch<any>(`/api/admin/tenants/${encodeURIComponent(tenantId)}/notification-preferences`)
@@ -642,31 +669,53 @@ export const GlobalSettingsPage: React.FC = () => {
             }
 
             // 3. Persist tenant company profile to backend endpoint
-            try {
-                const token = getAuthToken();
-                const patchRes = await fetch('/api/printhouse/onboarding/company-profile', {
-                    method: 'PATCH',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-                    },
-                    body: JSON.stringify({
-                        company_name: companyName,
-                        tax_id: taxId,
-                        country: country,
-                        address: address
-                    })
-                });
-
-                const patchData = await patchRes.json().catch(() => ({}));
-                if (!patchRes.ok || !patchData.ok) {
-                    tenantProfileFailed = true;
-                    setProfileError(patchData?.error || `HTTP ${patchRes.status}: Server error updating tenant profile`);
+            // 3. Persist company profile according to authorized context
+            if (isSupplier) {
+                const role = getUserRole();
+                const canEditSupplier = ['SUPPLIER_ADMIN', 'SUPPLIER_OPERATOR'].includes(role) || isSuper;
+                if (canEditSupplier) {
+                    try {
+                        await paperSupplierFetch('/api/v1/paper-suppliers/profile', {
+                            method: 'PATCH',
+                            body: JSON.stringify({
+                                name: companyName,
+                                address: address,
+                                country: country,
+                                timezone: timezone
+                            })
+                        });
+                    } catch (err: any) {
+                        tenantProfileFailed = true;
+                        setProfileError(err?.message || 'Server error updating supplier profile');
+                    }
                 }
-            } catch (err: any) {
-                // Do NOT swallow backend failure: retain draft and mark failure
-                tenantProfileFailed = true;
-                setProfileError(err?.message || 'Server error updating tenant profile');
+            } else {
+                try {
+                    const token = getAuthToken();
+                    const patchRes = await fetch('/api/printhouse/onboarding/company-profile', {
+                        method: 'PATCH',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+                        },
+                        body: JSON.stringify({
+                            company_name: companyName,
+                            tax_id: taxId,
+                            country: country,
+                            address: address
+                        })
+                    });
+
+                    const patchData = await patchRes.json().catch(() => ({}));
+                    if (!patchRes.ok || !patchData.ok) {
+                        tenantProfileFailed = true;
+                        setProfileError(patchData?.error || `HTTP ${patchRes.status}: Server error updating tenant profile`);
+                    }
+                } catch (err: any) {
+                    // Do NOT swallow backend failure: retain draft and mark failure
+                    tenantProfileFailed = true;
+                    setProfileError(err?.message || 'Server error updating tenant profile');
+                }
             }
 
             if (tenantProfileFailed && notifFailed) {
@@ -722,13 +771,13 @@ export const GlobalSettingsPage: React.FC = () => {
 
                     {/* Tenant & Role Badge */}
                     <div className="mt-8 p-3.5 bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 rounded-xl text-[10px]">
-                        <p className="font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">Active Tenant</p>
+                        <p className="font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-widest">{t('settings.activeTenant') || 'Active Tenant'}</p>
                         <p className="font-mono font-bold text-zinc-800 dark:text-zinc-200 truncate mt-0.5">{tenantId}</p>
-                        <p className="font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest mt-2">Effective Role</p>
-                        <span className={`inline-block mt-1 px-2 py-0.5 font-bold uppercase tracking-wider rounded-full ${
-                            isSuper ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30' : 'bg-red-500/10 text-red-500 border border-red-500/20'
+                        <p className="font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-widest mt-2">{t('settings.effectiveRole') || 'Effective Role'}</p>
+                        <span className={`inline-block mt-1 px-2.5 py-0.5 font-bold uppercase tracking-wider rounded-full text-[11px] ${
+                            isSuper ? 'bg-purple-500/20 text-purple-700 dark:text-purple-300 border border-purple-500/30' : 'bg-red-500/10 text-[#dc0000] dark:text-red-400 border border-red-500/20'
                         }`}>
-                            {userRole}
+                            {t(`role.${userRole}`) || userRole}
                         </span>
                     </div>
                 </nav>
@@ -786,85 +835,163 @@ export const GlobalSettingsPage: React.FC = () => {
                                 </Field>
                             </div>
 
-                            {/* Tenant Organization Profile */}
-                            <div className="space-y-4 pt-6 border-t border-zinc-200 dark:border-zinc-800">
-                                <h3 className="text-xs font-black uppercase tracking-widest text-[#dc0000]">
-                                    {t('settings.general.tenantSection')}
-                                </h3>
-
-                                {profileError && (
-                                    <div className="p-3 bg-amber-500/10 border-l-2 border-amber-500 text-xs text-amber-700 dark:text-amber-400 font-medium">
-                                        <p><strong>{t('settings.savedLocalOnly')}</strong></p>
-                                        <p className="mt-1 text-[11px] font-mono">{profileError}</p>
+                            {/* Corporate Profile (Branched by context) */}
+                            {isSupplier ? (
+                                <div className="space-y-4 pt-6 border-t border-zinc-200 dark:border-zinc-800">
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <h3 className="text-xs font-black uppercase tracking-widest text-[#dc0000]">
+                                                {t('settings.general.supplierSection') || 'Supplier Organization Profile'}
+                                            </h3>
+                                            <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+                                                {t('settings.general.supplierProfileDesc') || 'Commercial identity, governed credentials, and operational scope.'}
+                                            </p>
+                                        </div>
+                                        <a 
+                                            href="/supplier/settings" 
+                                            className="text-xs font-bold text-[#dc0000] hover:underline flex items-center gap-1.5"
+                                        >
+                                            <span>{t('settings.general.manageInSupplierHub') || 'Full Profile in Supplier Hub'}</span>
+                                            <span>&rarr;</span>
+                                        </a>
                                     </div>
-                                )}
 
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <Field label={t('settings.general.companyName')}>
+                                    {profileError && (
+                                        <div className="p-3 bg-amber-500/10 border-l-2 border-amber-500 text-xs text-amber-700 dark:text-amber-400 font-medium">
+                                            <p><strong>{t('settings.savedLocalOnly')}</strong></p>
+                                            <p className="mt-1 text-[11px] font-mono">{profileError}</p>
+                                        </div>
+                                    )}
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <Field label={t('supplier.settings.companyName') || 'Organization Name'}>
+                                            <input 
+                                                id="settings-input-supplier-company"
+                                                value={companyName} 
+                                                onChange={e => setCompanyName(e.target.value)} 
+                                                placeholder="Enter registered supplier company name"
+                                                className={inputCls} 
+                                                disabled={isSupplierUser() && getUserRole() === 'SUPPLIER_VIEWER'}
+                                            />
+                                        </Field>
+                                        <Field label={t('supplier.settings.supplierId') || 'Supplier Organization ID'}>
+                                            <input 
+                                                value={supplierProfile?.supplierId || supplierId || (t('common.notAvailable') || 'No disponible')} 
+                                                disabled 
+                                                className={`${inputCls} font-mono opacity-80 cursor-not-allowed`} 
+                                            />
+                                        </Field>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <Field label={t('supplier.settings.country') || 'Country of Registration'}>
+                                            <CountrySelect 
+                                                id="settings-select-supplier-country"
+                                                value={country} 
+                                                onChange={code => setCountry(code)} 
+                                                disabled={isSupplierUser() && getUserRole() === 'SUPPLIER_VIEWER'}
+                                            />
+                                        </Field>
+                                        <Field label={t('supplier.settings.currencies') || 'Approved Currencies'}>
+                                            <input 
+                                                value={supplierProfile?.currencies?.join(', ') || 'EUR'} 
+                                                disabled 
+                                                className={`${inputCls} opacity-80 cursor-not-allowed font-mono`} 
+                                            />
+                                        </Field>
+                                    </div>
+
+                                    <Field label={t('supplier.settings.address') || 'Operational Address'}>
                                         <input 
-                                            id="settings-input-company"
-                                            value={companyName} 
-                                            onChange={e => {
-                                                const v = e.target.value;
-                                                setCompanyName(v);
-                                                try { localStorage.setItem('ppos_draft_company_name', v); } catch {}
-                                            }} 
-                                            placeholder="Enter registered legal company name"
+                                            id="settings-input-supplier-address"
+                                            value={address} 
+                                            onChange={e => setAddress(e.target.value)} 
+                                            placeholder="Supplier corporate or warehouse address"
                                             className={inputCls} 
-                                            disabled={!isPrinthouse && !isSuper}
-                                        />
-                                    </Field>
-                                    <Field label={t('settings.general.taxId')}>
-                                        <input 
-                                            id="settings-input-taxid"
-                                            value={taxId} 
-                                            onChange={e => {
-                                                const v = e.target.value;
-                                                setTaxId(v);
-                                                try { localStorage.setItem('ppos_draft_tax_id', v); } catch {}
-                                            }} 
-                                            placeholder="e.g. DE123456789 / B12345678"
-                                            className={inputCls} 
-                                            disabled={!isPrinthouse && !isSuper}
+                                            disabled={isSupplierUser() && getUserRole() === 'SUPPLIER_VIEWER'}
                                         />
                                     </Field>
                                 </div>
+                            ) : (
+                                <div className="space-y-4 pt-6 border-t border-zinc-200 dark:border-zinc-800">
+                                    <h3 className="text-xs font-black uppercase tracking-widest text-[#dc0000]">
+                                        {t('settings.general.tenantSection')}
+                                    </h3>
 
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <Field label={t('settings.general.country')}>
-                                        <CountrySelect 
-                                            id="settings-select-country"
-                                            value={country} 
-                                            onChange={code => {
-                                                setCountry(code);
-                                                try { localStorage.setItem('ppos_draft_country', code); } catch {}
-                                            }} 
-                                            disabled={!isPrinthouse && !isSuper}
-                                        />
-                                    </Field>
-                                    <Field label={t('settings.general.currency')}>
+                                    {profileError && (
+                                        <div className="p-3 bg-amber-500/10 border-l-2 border-amber-500 text-xs text-amber-700 dark:text-amber-400 font-medium">
+                                            <p><strong>{t('settings.savedLocalOnly')}</strong></p>
+                                            <p className="mt-1 text-[11px] font-mono">{profileError}</p>
+                                        </div>
+                                    )}
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <Field label={t('settings.general.companyName')}>
+                                            <input 
+                                                id="settings-input-company"
+                                                value={companyName} 
+                                                onChange={e => {
+                                                    const v = e.target.value;
+                                                    setCompanyName(v);
+                                                    try { localStorage.setItem('ppos_draft_company_name', v); } catch {}
+                                                }} 
+                                                placeholder="Enter registered legal company name"
+                                                className={inputCls} 
+                                                disabled={!isPrinthouse && !isSuper}
+                                            />
+                                        </Field>
+                                        <Field label={t('settings.general.taxId')}>
+                                            <input 
+                                                id="settings-input-taxid"
+                                                value={taxId} 
+                                                onChange={e => {
+                                                    const v = e.target.value;
+                                                    setTaxId(v);
+                                                    try { localStorage.setItem('ppos_draft_tax_id', v); } catch {}
+                                                }} 
+                                                placeholder="e.g. DE123456789 / B12345678"
+                                                className={inputCls} 
+                                                disabled={!isPrinthouse && !isSuper}
+                                            />
+                                        </Field>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <Field label={t('settings.general.country')}>
+                                            <CountrySelect 
+                                                id="settings-select-country"
+                                                value={country} 
+                                                onChange={code => {
+                                                    setCountry(code);
+                                                    try { localStorage.setItem('ppos_draft_country', code); } catch {}
+                                                }} 
+                                                disabled={!isPrinthouse && !isSuper}
+                                            />
+                                        </Field>
+                                        <Field label={t('settings.general.currency')}>
+                                            <input 
+                                                value="EUR (€) — Euro" 
+                                                disabled 
+                                                className={`${inputCls} opacity-75 cursor-not-allowed`} 
+                                            />
+                                        </Field>
+                                    </div>
+
+                                    <Field label={t('settings.general.address')}>
                                         <input 
-                                            value="EUR (€) — Euro" 
-                                            disabled 
-                                            className={`${inputCls} opacity-75 cursor-not-allowed`} 
+                                            id="settings-input-address"
+                                            value={address} 
+                                            onChange={e => {
+                                                const v = e.target.value;
+                                                setAddress(v);
+                                                try { localStorage.setItem('ppos_draft_address', v); } catch {}
+                                            }} 
+                                            placeholder="Plant / headquarters street address"
+                                            className={inputCls} 
                                         />
                                     </Field>
                                 </div>
-
-                                <Field label={t('settings.general.address')}>
-                                    <input 
-                                        id="settings-input-address"
-                                        value={address} 
-                                        onChange={e => {
-                                            const v = e.target.value;
-                                            setAddress(v);
-                                            try { localStorage.setItem('ppos_draft_address', v); } catch {}
-                                        }} 
-                                        placeholder="Plant / headquarters street address"
-                                        className={inputCls} 
-                                    />
-                                </Field>
-                            </div>
+                            )}
                         </>
                     )}
 

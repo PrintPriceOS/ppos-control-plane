@@ -1268,7 +1268,7 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                                                                                     {!isWithdrawn && (
                                                                                         <button
                                                                                             onClick={() => handleOpenCatalogAction('WITHDRAW', v.id)}
-                                                                                            className="px-2 py-1 border border-zinc-300 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-[10px] font-bold uppercase cursor-pointer"
+                                                                                            className="px-2.5 py-1 rounded-xl border border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-[10px] font-bold uppercase cursor-pointer transition-colors shadow-2xs"
                                                                                             title={t('supplier.hub.withdrawConfirmWarning')}
                                                                                         >
                                                                                             {t('supplier.hub.withdraw')}

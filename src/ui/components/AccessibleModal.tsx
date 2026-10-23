@@ -2,6 +2,8 @@ import React, { Fragment, useRef } from 'react';
 import { Dialog, Transition, TransitionChild, DialogPanel, DialogTitle } from '@headlessui/react';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 
+import { useLocale } from '../i18n';
+
 export interface AccessibleModalProps {
     isOpen: boolean;
     onClose: () => void;
@@ -13,6 +15,7 @@ export interface AccessibleModalProps {
     footer?: React.ReactNode;
     hasUnsavedChanges?: boolean;
     unsavedWarningMessage?: string;
+    closeAriaLabel?: string;
     initialFocusRef?: React.RefObject<any>;
 }
 
@@ -26,14 +29,30 @@ export const AccessibleModal: React.FC<AccessibleModalProps> = ({
     children,
     footer,
     hasUnsavedChanges = false,
-    unsavedWarningMessage = 'Tiene cambios sin guardar. ¿Está seguro de que desea cerrar?',
+    unsavedWarningMessage,
+    closeAriaLabel,
     initialFocusRef
 }) => {
+    const { t, locale } = useLocale();
     const defaultCloseRef = useRef<HTMLButtonElement>(null);
+
+    const defaultWarning = t('common.unsavedChangesWarning') || (
+        locale === 'es' ? 'Tiene cambios sin guardar. ¿Está seguro de que desea cerrar?' :
+        locale === 'de' ? 'Sie haben ungespeicherte Änderungen. Möchten Sie wirklich schließen?' :
+        'You have unsaved changes. Are you sure you want to close?'
+    );
+    const effectiveWarning = unsavedWarningMessage || defaultWarning;
+
+    const defaultCloseLabel = t('common.closeDialog') || (
+        locale === 'es' ? 'Cerrar diálogo' :
+        locale === 'de' ? 'Dialog schließen' :
+        'Close dialog'
+    );
+    const effectiveCloseLabel = closeAriaLabel || defaultCloseLabel;
 
     const handleClose = () => {
         if (hasUnsavedChanges) {
-            if (!window.confirm(unsavedWarningMessage)) {
+            if (!window.confirm(effectiveWarning)) {
                 return;
             }
         }
@@ -100,7 +119,7 @@ export const AccessibleModal: React.FC<AccessibleModalProps> = ({
                                     type="button"
                                     onClick={handleClose}
                                     className="p-1.5 rounded-xl text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
-                                    aria-label="Cerrar diálogo"
+                                    aria-label={effectiveCloseLabel}
                                 >
                                     <XMarkIcon className="w-5 h-5" />
                                 </button>
