@@ -83,3 +83,30 @@
   3. En importación, validar el éxito de los `PATCH` de overrides antes de proceder a la confirmación de lote.
 - **Consecuencia**: La interfaz nunca anuncia confirmación tras un rechazo del servidor ni pierde trazabilidad de fallos.
 
+---
+
+## ADR 009: Transición de Datos, Semántica de Retirada, Techo de Lote y Reversión Segura (Migración 165)
+- **Contexto**: La migración 165 introdujo `supplier_paper_catalog_variants` y la columna `deleted_at` en `supplier_paper_offers` para soportar ciclo de vida de catálogo a nivel de proveedor y soft-delete de ofertas con preservación de revisiones históricas.
+- **Decisión**:
+  1. **Backfill Idempotente Basado en Relaciones Reales**:
+     - Las asociaciones preexistentes se derivan exclusivamente de:
+       a) Lotes de importación confirmados (`paper_import_rows` con `mapped_variant_id` y `paper_import_batches` con `status = 'CONFIRMED'`).
+       b) Ofertas comerciales existentes (`supplier_paper_offers` con `variant_id IS NOT NULL`).
+     - Se utiliza `INSERT IGNORE` con identificadores deterministas `spcv_<md5(supplier_id:variant_id)>`. Jamás se asigna el catálogo global de forma indiscriminada.
+     - Si una asociación ya fue marcada como `ARCHIVED` o retirada (`deleted_at IS NOT NULL`), re-ejecutar el backfill o confirmar nuevos lotes preserva estrictamente el estado y nunca reactiva silenciosamente a `ACTIVE`.
+  2. **Semántica de Retirada y Retención de SKU**:
+     - Las ofertas con `deleted_at IS NOT NULL` quedan congeladas e inmutables: rechazadas con HTTP 409 `OFFER_RETIRED` ante cualquier intento de edición (`PUT /offers/:id`), cambio de estado (`PATCH /offers/:id/status`), o actualización masiva (`PATCH /offers/bulk-status` con `ACTIVATE` o `RESTORE`).
+     - Quedan omitidas de listados operativos (`listSupplierOffers`) y del conteo de ofertas activas en el catálogo técnico (`getTechnicalCatalog`).
+     - El SKU comercial permanece retenido y protegido por la restricción `UNIQUE KEY uk_supplier_sku_active (supplier_id, supplier_sku)` incondicional del motor MySQL. La recuperación de una oferta retirada no está habilitada por endpoints estándar para evitar violaciones de trazabilidad.
+     - La retirada de una variante técnica (`withdrawSupplierCatalogVariants`) retira en cascada lógica sus ofertas propias preservando el 100% de revisiones. La repetición de la operación o de `deleteOffer` es idempotente y devuelve `alreadyRetired: true` sin duplicar revisiones terminales.
+  3. **Límite Exacto de Operaciones Masivas (Ceiling de 500 ítems)**:
+     - Se fija `MAX_BULK_OPERATION_LIMIT = 500` tanto para ofertas como para variantes de catálogo.
+     - Si el alcance `ALL_MATCHING` coincide con más de 500 registros, la previsualización bloquea la acción (`canProceed: false`, `blockedCount = totalMatches`), y cualquier intento de ejecución directa aborta lanzando `EXCEEDS_MAX_BATCH_LIMIT`. Queda prohibido el procesamiento parcial silencioso.
+  4. **Precisión Técnica sobre `ON DELETE CASCADE`**:
+     - El DDL de `supplier_paper_offer_revisions` conserva `CONSTRAINT fk_offer_revision_offer ... ON DELETE CASCADE`.
+     - La protección de historial no reside en haber eliminado esa FK del DDL, sino en la salvaguarda de la capa de aplicación (`deleteOffer`), que intercepta la eliminación física cuando existen revisiones auditables y ejecuta un borrado lógico (`deleted_at = CURRENT_TIMESTAMP`), evitando que el motor active la cascada física.
+  5. **Procedimiento de Reversión Segura (Pre-escrituras vs Post-escrituras)**:
+     - **Pre-escrituras**: `DROP TABLE supplier_paper_catalog_variants` y `ALTER TABLE supplier_paper_offers DROP COLUMN deleted_at` solo es inocuo si la funcionalidad nunca recibió escrituras.
+     - **Post-escrituras**: Tras operar, ejecutar `DROP TABLE` o `DROP COLUMN` es destructivo (elimina asociaciones de proveedor y marcas de retirada). Si el código retrocediera a una versión que ignore `deleted_at`, las ofertas retiradas con `status = 'ARCHIVED'` podrían reactivarse comercialmente vía `RESTORE`. La estrategia prioritaria y recomendada es **corrección hacia delante (roll-forward)** conservando el esquema y la compatibilidad hacia atrás.
+- **Consecuencia**: Transición de datos 100% determinista, integridad referencial y de auditoría inviolable, y eliminación de riesgos de pérdida de datos en reversión.
+

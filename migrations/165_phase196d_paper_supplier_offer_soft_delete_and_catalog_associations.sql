@@ -26,3 +26,34 @@ CREATE TABLE IF NOT EXISTS supplier_paper_catalog_variants (
     CONSTRAINT fk_spcv_supplier FOREIGN KEY (supplier_id) REFERENCES paper_suppliers(id) ON DELETE CASCADE,
     CONSTRAINT fk_spcv_variant FOREIGN KEY (variant_id) REFERENCES paper_variants(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 3. Idempotent Backfill of Catalog Associations from Real Supplier Relationships
+INSERT IGNORE INTO supplier_paper_catalog_variants (id, tenant_id, supplier_id, variant_id, status, notes, created_at, updated_at)
+SELECT 
+    CONCAT('spcv_', MD5(CONCAT(b.supplier_id, ':', r.mapped_variant_id))),
+    b.tenant_id,
+    b.supplier_id,
+    r.mapped_variant_id,
+    'ACTIVE',
+    'Backfilled from confirmed import batch',
+    CURRENT_TIMESTAMP,
+    CURRENT_TIMESTAMP
+FROM paper_import_rows r
+JOIN paper_import_batches b ON r.batch_id = b.id
+WHERE b.status = 'CONFIRMED' AND r.mapped_variant_id IS NOT NULL
+GROUP BY b.tenant_id, b.supplier_id, r.mapped_variant_id;
+
+INSERT IGNORE INTO supplier_paper_catalog_variants (id, tenant_id, supplier_id, variant_id, status, notes, created_at, updated_at)
+SELECT 
+    CONCAT('spcv_', MD5(CONCAT(o.supplier_id, ':', o.variant_id))),
+    o.tenant_id,
+    o.supplier_id,
+    o.variant_id,
+    'ACTIVE',
+    'Backfilled from supplier commercial offers',
+    CURRENT_TIMESTAMP,
+    CURRENT_TIMESTAMP
+FROM supplier_paper_offers o
+WHERE o.variant_id IS NOT NULL
+GROUP BY o.tenant_id, o.supplier_id, o.variant_id;
+

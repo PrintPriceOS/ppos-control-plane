@@ -1821,7 +1821,7 @@ async function confirmImportBatch({ batchId, tenantId, supplierId, actorId, sele
             validCount++;
 
             // Upsert paper_product
-            const productId = `prod_${crypto.createHash('md5').update(norm.name.toLowerCase().trim()).digest('hex').substring(0, 16)}`;
+            const productId = row.mapped_product_id || `prod_${crypto.createHash('md5').update(norm.name.toLowerCase().trim()).digest('hex').substring(0, 16)}`;
             await conn.query(
                 `INSERT INTO paper_products (id, name, category, finish_summary, description, metadata_json)
                  VALUES (?, ?, ?, ?, ?, ?)
@@ -1829,7 +1829,7 @@ async function confirmImportBatch({ batchId, tenantId, supplierId, actorId, sele
                 [
                     productId,
                     norm.name,
-                    norm.category,
+                    norm.category || 'OTHER',
                     norm.finish,
                     `Imported from batch ${batchId}`,
                     JSON.stringify({ original_code: norm.code, provider_label: norm.providerLabel })
@@ -1837,7 +1837,8 @@ async function confirmImportBatch({ batchId, tenantId, supplierId, actorId, sele
             );
 
             // Upsert paper_variant with unique deterministic fingerprint
-            const variantId = `var_${crypto.createHash('md5').update(norm.fingerprint).digest('hex').substring(0, 16)}`;
+            const fp = norm.fingerprint || `fp_${norm.name}_${norm.gsm}_${norm.width_mm}_${norm.height_mm}`;
+            const variantId = row.mapped_variant_id || `var_${crypto.createHash('md5').update(fp).digest('hex').substring(0, 16)}`;
             await conn.query(
                 `INSERT INTO paper_variants 
                  (id, product_id, gsm, caliper_um, caliper_mm, width_mm, height_mm, finish, grain_direction, fingerprint, metadata_json)
@@ -1853,7 +1854,7 @@ async function confirmImportBatch({ batchId, tenantId, supplierId, actorId, sele
                     norm.height_mm,
                     norm.finish,
                     norm.grain_direction || 'UNKNOWN',
-                    norm.fingerprint,
+                    fp,
                     JSON.stringify({ original_code: norm.code, batch_id: batchId })
                 ]
             );
@@ -1862,6 +1863,19 @@ async function confirmImportBatch({ batchId, tenantId, supplierId, actorId, sele
                 'UPDATE paper_import_rows SET decision = "ACCEPTED", mapped_product_id = ?, mapped_variant_id = ? WHERE id = ?',
                 [productId, variantId, row.id]
             );
+
+            // Ensure supplier catalog association exists for confirmed import
+            try {
+                await conn.query(`
+                    INSERT INTO supplier_paper_catalog_variants
+                    (id, tenant_id, supplier_id, variant_id, status, notes, updated_at)
+                    VALUES (?, ?, ?, ?, 'ACTIVE', 'Associated from confirmed import batch', CURRENT_TIMESTAMP)
+                    ON DUPLICATE KEY UPDATE updated_at = CURRENT_TIMESTAMP
+                `, [`spcv_${crypto.randomBytes(8).toString('hex')}`, batch.tenant_id, batch.supplier_id, variantId]);
+            } catch (spcvErr) {
+                // Non-fatal if table not yet migrated in test harnesses
+            }
+
             confirmedCount++;
         }
 

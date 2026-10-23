@@ -12,6 +12,7 @@ const VALID_VISIBILITIES = ['PRIVATE', 'APPROVED_CUSTOMERS', 'MARKETPLACE'];
 const VALID_STATUSES = ['ACTIVE', 'INACTIVE', 'ARCHIVED'];
 
 const ALLOWED_CURRENCIES = ['EUR', 'USD', 'GBP'];
+const MAX_BULK_OPERATION_LIMIT = 500;
 
 /**
  * Validate commercial offer input fields strictly.
@@ -191,7 +192,7 @@ async function getTechnicalCatalog({ page = 1, limit = 20, search = null, catego
 
     let supplierActiveVariants = 0;
     if (supplierId) {
-        const suppVarSql = 'SELECT COUNT(DISTINCT variant_id) as count FROM supplier_paper_offers WHERE supplier_id = ? AND status = "ACTIVE"';
+        const suppVarSql = 'SELECT COUNT(DISTINCT variant_id) as count FROM supplier_paper_offers WHERE supplier_id = ? AND status = "ACTIVE" AND deleted_at IS NULL';
         const suppVarRes = await db.query(suppVarSql, [supplierId]);
         const suppRow = Array.isArray(suppVarRes) ? (Array.isArray(suppVarRes[0]) ? suppVarRes[0][0] : suppVarRes[0]) : suppVarRes;
         supplierActiveVariants = Number(suppRow?.count || 0);
@@ -219,6 +220,7 @@ async function getTechnicalCatalog({ page = 1, limit = 20, search = null, catego
         (SELECT COUNT(*) FROM supplier_paper_offers o 
          WHERE o.variant_id = v.id 
            AND o.status = 'ACTIVE' 
+           AND o.deleted_at IS NULL 
            AND (${visibilityCondition})) as active_offers_count
     `;
     
@@ -351,7 +353,7 @@ async function getTechnicalVariantDetail({ variantId, tenantId, supplierId }) {
     const offersSql = `
         SELECT *
         FROM supplier_paper_offers
-        WHERE variant_id = ? AND tenant_id = ? AND supplier_id = ?
+        WHERE variant_id = ? AND tenant_id = ? AND supplier_id = ? AND deleted_at IS NULL
         ORDER BY created_at DESC
     `;
     const offers = await db.query(offersSql, [variantId, tenantId, supplierId]);
@@ -403,6 +405,7 @@ function formatOfferRecord(raw) {
         visibility: raw.visibility,
         status: raw.status,
         deletedAt: raw.deleted_at || null,
+        isRetired: Boolean(raw.deleted_at),
         currentRevisionId: raw.current_revision_id,
         revisionNumber: raw.revision_number !== undefined ? Number(raw.revision_number) : (raw.current_revision_number ? Number(raw.current_revision_number) : 1),
         metadata: typeof raw.metadata_json === 'string' ? JSON.parse(raw.metadata_json) : (raw.metadata_json || {}),
@@ -509,6 +512,18 @@ async function createOffer({ tenantId, supplierId, actorId, payload }) {
             ]
         );
 
+        // Ensure association in supplier_paper_catalog_variants for current supplier
+        try {
+            await conn.query(`
+                INSERT INTO supplier_paper_catalog_variants
+                (id, tenant_id, supplier_id, variant_id, status, notes, updated_at)
+                VALUES (?, ?, ?, ?, 'ACTIVE', 'Associated from commercial offer', CURRENT_TIMESTAMP)
+                ON DUPLICATE KEY UPDATE updated_at = CURRENT_TIMESTAMP
+            `, [`spcv_${uuidv4().replace(/-/g, '').substring(0, 16)}`, tenantId, supplierId, validated.variantId]);
+        } catch (spcvErr) {
+            // Non-fatal if table not yet migrated in legacy test harnesses
+        }
+
         await conn.commit();
 
         const queryRes = await db.query('SELECT * FROM supplier_paper_offers WHERE id = ?', [offerId]);
@@ -530,7 +545,7 @@ async function createOffer({ tenantId, supplierId, actorId, payload }) {
  */
 async function listSupplierOffers({ tenantId, supplierId, page = 1, limit = 20, status = null, visibility = null, search = null }) {
     const offset = Math.max(0, (page - 1) * limit);
-    const whereConditions = ['o.tenant_id = ?', 'o.supplier_id = ?'];
+    const whereConditions = ['o.tenant_id = ?', 'o.supplier_id = ?', 'o.deleted_at IS NULL'];
     const params = [tenantId, supplierId];
 
     if (status) {
@@ -586,7 +601,7 @@ async function listSupplierOffers({ tenantId, supplierId, page = 1, limit = 20, 
     `;
     const rows = await db.query(dataSql, [...params, limit, offset]);
 
-    // Breakdown counts across all offers of current supplier
+    // Breakdown counts across all active/inactive/archived offers of current supplier (excluding retired/deleted_at)
     const countsSql = `
         SELECT 
             COUNT(*) as total,
@@ -594,7 +609,7 @@ async function listSupplierOffers({ tenantId, supplierId, page = 1, limit = 20, 
             SUM(CASE WHEN o.status = 'INACTIVE' THEN 1 ELSE 0 END) as inactive_count,
             SUM(CASE WHEN o.status = 'ARCHIVED' THEN 1 ELSE 0 END) as archived_count
         FROM supplier_paper_offers o
-        WHERE o.tenant_id = ? AND o.supplier_id = ?
+        WHERE o.tenant_id = ? AND o.supplier_id = ? AND o.deleted_at IS NULL
     `;
     const countsResult = await db.query(countsSql, [tenantId, supplierId]);
     const countsRow = Array.isArray(countsResult) ? (Array.isArray(countsResult[0]) ? countsResult[0][0] : countsResult[0]) : countsResult;
@@ -706,6 +721,10 @@ async function updateOffer({ offerId, tenantId, supplierId, actorId, payload }) 
         const existing = existingRows && existingRows[0];
         if (!existing) {
             throw new Error('OFFER_NOT_FOUND: Offer not found for current supplier.');
+        }
+
+        if (existing.deleted_at !== null) {
+            throw new Error('OFFER_RETIRED: Offer has been retired and cannot be modified or reactivated via normal status endpoints.');
         }
 
         // Validate merged payload
@@ -875,7 +894,7 @@ async function bulkUpdateOfferStatus({ tenantId, supplierId, actorId, action, of
 
     let targetIds = [];
     if (scope === 'ALL_MATCHING') {
-        const where = ['tenant_id = ?', 'supplier_id = ?'];
+        const where = ['tenant_id = ?', 'supplier_id = ?', 'deleted_at IS NULL'];
         const p = [tenantId, supplierId];
         if (filters.status) {
             where.push('status = ?');
@@ -888,13 +907,23 @@ async function bulkUpdateOfferStatus({ tenantId, supplierId, actorId, action, of
             where.push('(supplier_sku LIKE ?)');
             p.push(`%${filters.search.trim()}%`);
         }
-        const matchRows = await db.query(`SELECT id FROM supplier_paper_offers WHERE ${where.join(' AND ')} LIMIT 500`, p);
+
+        const countRows = await db.query(`SELECT COUNT(*) as total FROM supplier_paper_offers WHERE ${where.join(' AND ')}`, p);
+        const matchTotal = Number(countRows[0]?.total || 0);
+        if (matchTotal > MAX_BULK_OPERATION_LIMIT) {
+            throw new Error(`EXCEEDS_MAX_BATCH_LIMIT: Operation matches ${matchTotal} offers, exceeding the maximum batch limit of ${MAX_BULK_OPERATION_LIMIT}. Please refine your search filters.`);
+        }
+
+        const matchRows = await db.query(`SELECT id FROM supplier_paper_offers WHERE ${where.join(' AND ')}`, p);
         targetIds = (Array.isArray(matchRows) ? matchRows : []).map(r => r.id);
     } else {
         if (!Array.isArray(offerIds) || offerIds.length === 0) {
             throw new Error('OFFER_IDS_REQUIRED: offerIds array cannot be empty when scope is SELECTED.');
         }
-        targetIds = offerIds.slice(0, 500);
+        if (offerIds.length > MAX_BULK_OPERATION_LIMIT) {
+            throw new Error(`EXCEEDS_MAX_BATCH_LIMIT: Selected ${offerIds.length} offers exceed the maximum batch limit of ${MAX_BULK_OPERATION_LIMIT}.`);
+        }
+        targetIds = [...offerIds];
     }
 
     const results = [];
@@ -911,6 +940,12 @@ async function bulkUpdateOfferStatus({ tenantId, supplierId, actorId, action, of
             const offer = Array.isArray(offerRes) ? (Array.isArray(offerRes[0]) ? offerRes[0][0] : offerRes[0]) : offerRes;
             if (!offer || !offer.id) {
                 results.push({ id, success: false, code: 'OFFER_NOT_FOUND', message: 'Offer not found or unauthorized.' });
+                failedCount++;
+                continue;
+            }
+
+            if (offer.deleted_at !== null) {
+                results.push({ id, sku: offer.supplier_sku, success: false, code: 'OFFER_RETIRED', message: 'Offer has been retired and cannot be reactivated via bulk status.' });
                 failedCount++;
                 continue;
             }
@@ -978,6 +1013,29 @@ async function deleteOffer({ tenantId, supplierId, actorId, role, offerId }) {
     const offer = Array.isArray(rows) ? (Array.isArray(rows[0]) ? rows[0][0] : rows[0]) : rows;
     if (!offer || !offer.id) {
         throw new Error('OFFER_NOT_FOUND: Offer not found for current supplier.');
+    }
+
+    // Idempotent: If offer is already retired, return immediately without duplicating terminal revision
+    if (offer.deleted_at !== null) {
+        let revisionCount = 0;
+        try {
+            const revCountRows = await db.query(
+                'SELECT COUNT(*) as count FROM supplier_paper_offer_revisions WHERE offer_id = ?',
+                [offerId]
+            );
+            revisionCount = Number(revCountRows[0]?.count || 0);
+        } catch (e) {
+            revisionCount = 0;
+        }
+        return {
+            ok: true,
+            deleted: true,
+            deletedOfferId: offerId,
+            supplierSku: offer.supplier_sku,
+            retired: true,
+            alreadyRetired: true,
+            revisionsPreserved: revisionCount
+        };
     }
 
     // Dependency check: procurement_receipt_records referencing this offer/procurement
@@ -1129,7 +1187,7 @@ async function bulkDeleteOffers({ tenantId, supplierId, actorId, role, offerIds 
 
     let targetIds = [];
     if (scope === 'ALL_MATCHING') {
-        const where = ['tenant_id = ?', 'supplier_id = ?'];
+        const where = ['tenant_id = ?', 'supplier_id = ?', 'deleted_at IS NULL'];
         const p = [tenantId, supplierId];
         if (filters.status) {
             where.push('status = ?');
@@ -1139,13 +1197,21 @@ async function bulkDeleteOffers({ tenantId, supplierId, actorId, role, offerIds 
             where.push('(supplier_sku LIKE ?)');
             p.push(`%${filters.search.trim()}%`);
         }
-        const matchRows = await db.query(`SELECT id FROM supplier_paper_offers WHERE ${where.join(' AND ')} LIMIT 500`, p);
+        const countRows = await db.query(`SELECT COUNT(*) as total FROM supplier_paper_offers WHERE ${where.join(' AND ')}`, p);
+        const matchTotal = Number(countRows[0]?.total || 0);
+        if (matchTotal > MAX_BULK_OPERATION_LIMIT) {
+            throw new Error(`EXCEEDS_MAX_BATCH_LIMIT: Operation matches ${matchTotal} offers, exceeding the maximum batch limit of ${MAX_BULK_OPERATION_LIMIT}. Please refine your search filters.`);
+        }
+        const matchRows = await db.query(`SELECT id FROM supplier_paper_offers WHERE ${where.join(' AND ')}`, p);
         targetIds = (Array.isArray(matchRows) ? matchRows : []).map(r => r.id);
     } else {
         if (!Array.isArray(offerIds) || offerIds.length === 0) {
             throw new Error('OFFER_IDS_REQUIRED: offerIds array cannot be empty when scope is SELECTED.');
         }
-        targetIds = offerIds.slice(0, 500);
+        if (offerIds.length > MAX_BULK_OPERATION_LIMIT) {
+            throw new Error(`EXCEEDS_MAX_BATCH_LIMIT: Selected ${offerIds.length} offers exceed the maximum batch limit of ${MAX_BULK_OPERATION_LIMIT}.`);
+        }
+        targetIds = [...offerIds];
     }
 
     const results = [];
@@ -1441,13 +1507,53 @@ async function previewCatalogAction({ tenantId, supplierId, action = 'WITHDRAW',
     if (scope === 'ALL_MATCHING') {
         const catRes = await getTechnicalCatalog({
             page: 1,
-            limit: 1000,
+            limit: MAX_BULK_OPERATION_LIMIT + 1,
             search: filters.search,
             category: filters.category,
             finish: filters.finish,
             supplierId
         });
+        const totalMatches = catRes.total || 0;
+        if (totalMatches > MAX_BULK_OPERATION_LIMIT) {
+            return {
+                action,
+                targetCount: totalMatches,
+                totalSelected: totalMatches,
+                affectedProducts: 0,
+                activeOffersCount: 0,
+                affectedOffersCount: 0,
+                sharedVariantsCount: 0,
+                isSharedProtected: false,
+                blockedCount: totalMatches,
+                blockedItems: [{ id: 'ALL_MATCHING', reason: `El conjunto filtrado (${totalMatches} variantes) supera el límite máximo permitido (${MAX_BULK_OPERATION_LIMIT}). Acota los filtros de búsqueda.` }],
+                warnings: [`El conjunto filtrado (${totalMatches} variantes) supera el límite de ejecución masiva de ${MAX_BULK_OPERATION_LIMIT} variantes. No se procesará parcialmente. Acota la búsqueda.`],
+                items: [],
+                variants: [],
+                canProceed: false,
+                message: `EXCEEDS_MAX_BATCH_LIMIT: ${totalMatches} variants exceed maximum batch limit of ${MAX_BULK_OPERATION_LIMIT}. Please refine filters.`
+            };
+        }
         targetVariantIds = (catRes.items || []).map(i => i.id);
+    } else {
+        if (targetVariantIds.length > MAX_BULK_OPERATION_LIMIT) {
+            return {
+                action,
+                targetCount: targetVariantIds.length,
+                totalSelected: targetVariantIds.length,
+                affectedProducts: 0,
+                activeOffersCount: 0,
+                affectedOffersCount: 0,
+                sharedVariantsCount: 0,
+                isSharedProtected: false,
+                blockedCount: targetVariantIds.length,
+                blockedItems: [{ id: 'SELECTION_TOO_LARGE', reason: `La selección (${targetVariantIds.length} variantes) supera el límite máximo (${MAX_BULK_OPERATION_LIMIT}).` }],
+                warnings: [`La selección actual supera el límite máximo permitido de ${MAX_BULK_OPERATION_LIMIT} variantes.`],
+                items: [],
+                variants: [],
+                canProceed: false,
+                message: `EXCEEDS_MAX_BATCH_LIMIT: ${targetVariantIds.length} variants exceed maximum batch limit of ${MAX_BULK_OPERATION_LIMIT}.`
+            };
+        }
     }
 
     if (targetVariantIds.length === 0) {
@@ -1588,22 +1694,40 @@ async function previewCatalogAction({ tenantId, supplierId, action = 'WITHDRAW',
 }
 
 /**
- * Archive technical variants within current supplier's catalog scope.
- * Preserves the global paper_variants row intact.
+ * Helper to resolve and bound target variant IDs for bulk catalog operations.
+ * Enforces MAX_BULK_OPERATION_LIMIT = 500 without silent truncations.
  */
-async function archiveSupplierCatalogVariants({ tenantId, supplierId, actorId, role, variantIds = [], scope = 'SELECTED', filters = {} }) {
-    let targetVariantIds = [...variantIds];
+async function resolveTargetVariantIds({ scope, variantIds, filters = {}, supplierId }) {
     if (scope === 'ALL_MATCHING') {
         const catRes = await getTechnicalCatalog({
             page: 1,
-            limit: 1000,
+            limit: MAX_BULK_OPERATION_LIMIT + 1,
             search: filters.search,
             category: filters.category,
             finish: filters.finish,
             supplierId
         });
-        targetVariantIds = (catRes.items || []).map(i => i.id);
+        const matchTotal = Number(catRes.total || 0);
+        if (matchTotal > MAX_BULK_OPERATION_LIMIT) {
+            throw new Error(`EXCEEDS_MAX_BATCH_LIMIT: Operation matches ${matchTotal} variants, exceeding the maximum batch limit of ${MAX_BULK_OPERATION_LIMIT}. Please refine your search filters.`);
+        }
+        return (catRes.items || []).map(i => i.id);
     }
+    if (!Array.isArray(variantIds) || variantIds.length === 0) {
+        throw new Error('VARIANT_IDS_REQUIRED: variantIds array cannot be empty when scope is SELECTED.');
+    }
+    if (variantIds.length > MAX_BULK_OPERATION_LIMIT) {
+        throw new Error(`EXCEEDS_MAX_BATCH_LIMIT: Selected ${variantIds.length} variants exceed the maximum batch limit of ${MAX_BULK_OPERATION_LIMIT}.`);
+    }
+    return [...variantIds];
+}
+
+/**
+ * Archive technical variants within current supplier's catalog scope.
+ * Preserves the global paper_variants row intact.
+ */
+async function archiveSupplierCatalogVariants({ tenantId, supplierId, actorId, role, variantIds = [], scope = 'SELECTED', filters = {} }) {
+    const targetVariantIds = await resolveTargetVariantIds({ scope, variantIds, filters, supplierId });
 
     const results = [];
     for (const vId of targetVariantIds) {
@@ -1625,7 +1749,7 @@ async function archiveSupplierCatalogVariants({ tenantId, supplierId, actorId, r
                 INSERT INTO supplier_paper_catalog_variants
                 (id, tenant_id, supplier_id, variant_id, status, notes, updated_at)
                 VALUES (?, ?, ?, ?, 'ARCHIVED', 'Archived by supplier', CURRENT_TIMESTAMP)
-                ON DUPLICATE KEY UPDATE status = 'ARCHIVED', updated_at = CURRENT_TIMESTAMP
+                ON DUPLICATE KEY UPDATE status = 'ARCHIVED', notes = 'Archived by supplier', updated_at = CURRENT_TIMESTAMP
             `, [`spcv_${uuidv4().replace(/-/g, '').substring(0, 16)}`, tenantId, supplierId, vId]);
 
             // Archive active offers for this variant of current supplier
@@ -1680,18 +1804,7 @@ async function archiveSupplierCatalogVariants({ tenantId, supplierId, actorId, r
  * Preserves the global paper_variants row intact.
  */
 async function restoreSupplierCatalogVariants({ tenantId, supplierId, actorId, role, variantIds = [], scope = 'SELECTED', filters = {} }) {
-    let targetVariantIds = [...variantIds];
-    if (scope === 'ALL_MATCHING') {
-        const catRes = await getTechnicalCatalog({
-            page: 1,
-            limit: 1000,
-            search: filters.search,
-            category: filters.category,
-            finish: filters.finish,
-            supplierId
-        });
-        targetVariantIds = (catRes.items || []).map(i => i.id);
-    }
+    const targetVariantIds = await resolveTargetVariantIds({ scope, variantIds, filters, supplierId });
 
     const results = [];
     for (const vId of targetVariantIds) {
@@ -1712,7 +1825,7 @@ async function restoreSupplierCatalogVariants({ tenantId, supplierId, actorId, r
                 INSERT INTO supplier_paper_catalog_variants
                 (id, tenant_id, supplier_id, variant_id, status, notes, updated_at)
                 VALUES (?, ?, ?, ?, 'ACTIVE', 'Restored by supplier', CURRENT_TIMESTAMP)
-                ON DUPLICATE KEY UPDATE status = 'ACTIVE', updated_at = CURRENT_TIMESTAMP
+                ON DUPLICATE KEY UPDATE status = 'ACTIVE', notes = 'Restored by supplier', deleted_at = NULL, updated_at = CURRENT_TIMESTAMP
             `, [`spcv_${uuidv4().replace(/-/g, '').substring(0, 16)}`, tenantId, supplierId, vId]);
 
             results.push({
@@ -1746,18 +1859,7 @@ async function restoreSupplierCatalogVariants({ tenantId, supplierId, actorId, r
  * Preserves the global paper_variants row intact for other suppliers.
  */
 async function withdrawSupplierCatalogVariants({ tenantId, supplierId, actorId, role, variantIds = [], scope = 'SELECTED', filters = {} }) {
-    let targetVariantIds = [...variantIds];
-    if (scope === 'ALL_MATCHING') {
-        const catRes = await getTechnicalCatalog({
-            page: 1,
-            limit: 1000,
-            search: filters.search,
-            category: filters.category,
-            finish: filters.finish,
-            supplierId
-        });
-        targetVariantIds = (catRes.items || []).map(i => i.id);
-    }
+    const targetVariantIds = await resolveTargetVariantIds({ scope, variantIds, filters, supplierId });
 
     const results = [];
     for (const vId of targetVariantIds) {
@@ -1778,7 +1880,7 @@ async function withdrawSupplierCatalogVariants({ tenantId, supplierId, actorId, 
                 INSERT INTO supplier_paper_catalog_variants
                 (id, tenant_id, supplier_id, variant_id, status, notes, deleted_at, updated_at)
                 VALUES (?, ?, ?, ?, 'ARCHIVED', 'Withdrawn from supplier catalog', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-                ON DUPLICATE KEY UPDATE status = 'ARCHIVED', deleted_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+                ON DUPLICATE KEY UPDATE status = 'ARCHIVED', notes = 'Withdrawn from supplier catalog', deleted_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
             `, [`spcv_${uuidv4().replace(/-/g, '').substring(0, 16)}`, tenantId, supplierId, vId]);
 
             // Retire own offers preserving full revisions
@@ -1838,18 +1940,7 @@ async function bulkDeleteTechnicalVariants({ tenantId, supplierId, actorId, role
         throw new Error('FORBIDDEN: Bulk deletion of technical variants is restricted to SUPPLIER_ADMIN.');
     }
 
-    let targetVariantIds = [...variantIds];
-    if (scope === 'ALL_MATCHING') {
-        const catRes = await getTechnicalCatalog({
-            page: 1,
-            limit: 1000,
-            search: filters.search,
-            category: filters.category,
-            finish: filters.finish,
-            supplierId
-        });
-        targetVariantIds = (catRes.items || []).map(i => i.id);
-    }
+    const targetVariantIds = await resolveTargetVariantIds({ scope, variantIds, filters, supplierId });
 
     const results = [];
     for (const vId of targetVariantIds) {

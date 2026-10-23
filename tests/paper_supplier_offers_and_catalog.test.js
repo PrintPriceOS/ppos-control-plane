@@ -45,6 +45,7 @@ process.env.JWT_ISSUER = JWT_ISSUER;
 process.env.PAPER_SUPPLIER_HUB_ENABLED = 'true';
 
 const paperOfferService = require('../src/api/services/paperOfferService');
+const paperImportService = require('../src/api/services/paperImportService');
 const paperSuppliersRouter = require('../src/api/routes/paperSuppliersRoutes');
 let mysqlClient = require('../src/api/services/mysqlClient');
 const { parseMigrationSql } = require('../src/api/services/migrationSqlParser');
@@ -1968,6 +1969,409 @@ describe('Iteration I3: Paper Supplier Catalog & Commercial Offers Engine', () =
             const munkenInAlpha = alphaCatalogRes.body.data.products.find((p) => p.id === 'prod-munken-1');
             const var150InAlpha = munkenInAlpha.variants.find((v) => v.id === 'var-munken-150-70100');
             expect(var150InAlpha.supplierCatalogStatus).not.toBe('ARCHIVED');
+        });
+    });
+
+    describe('9. Data Transition, Soft-Delete Semantics, and Reversal Verification', () => {
+        it('Migrates and backfills catalog associations idempotently from real supplier imports/offers without global leakage', async () => {
+            if (!isDbConfigured) return;
+
+            // Seed raw import batch and commercial offer representing pre-migration-165 state
+            const preBatchId = 'batch-pre-mig165-1';
+            const preRowId = 'row-pre-mig165-1';
+            const preOfferId = 'offer-pre-mig165-1';
+            const preVariantFromBatch = 'var-soporset-80-6490';
+            const preVariantFromOffer = 'var-soporset-90-6490';
+            const unrelatedGlobalVariant = 'var-munken-300-70100';
+
+            // Seed physical products and variants for test
+            await connectionPool.query(`
+                INSERT INTO paper_products (id, name, brand, category, finish_summary)
+                VALUES ('prod-soporset-1', 'Soporset Offset', 'The Navigator Company', 'UNCOATED', 'SMOOTH')
+                ON DUPLICATE KEY UPDATE name=VALUES(name);
+            `);
+            await connectionPool.query(`
+                INSERT INTO paper_variants (id, product_id, gsm, width_mm, height_mm, finish, grain_direction, fingerprint)
+                VALUES 
+                ('var-soporset-80-6490', 'prod-soporset-1', 80, 640.00, 900.00, 'SMOOTH', 'LONG_GRAIN', 'fp_soporset_80_640_900'),
+                ('var-soporset-90-6490', 'prod-soporset-1', 90, 640.00, 900.00, 'SMOOTH', 'LONG_GRAIN', 'fp_soporset_90_640_900'),
+                ('var-soporset-100-6490', 'prod-soporset-1', 100, 640.00, 900.00, 'SMOOTH', 'LONG_GRAIN', 'fp_soporset_100_640_900'),
+                ('var-munken-300-70100', 'prod-munken-1', 300, 700.00, 1000.00, 'ROUGH', 'LONG_GRAIN', 'fp_munken_300_700_1000')
+                ON DUPLICATE KEY UPDATE gsm=VALUES(gsm);
+            `);
+
+            // Clean any existing associations for these test variants
+            await connectionPool.query(
+                'DELETE FROM supplier_paper_catalog_variants WHERE supplier_id = "supp-alpha-1" AND variant_id IN (?, ?, ?)',
+                [preVariantFromBatch, preVariantFromOffer, unrelatedGlobalVariant]
+            );
+
+            // 1. Insert confirmed import batch & row for supp-alpha-1
+            await connectionPool.query(`
+                INSERT INTO paper_import_batches (id, tenant_id, supplier_id, file_name, file_sha256, format, total_rows, valid_rows, status, created_by)
+                VALUES (?, 'tenant-alpha', 'supp-alpha-1', 'pre_mig165.csv', 'sha256_mock_pre165', 'CSV', 1, 1, 'CONFIRMED', 'user-admin-alpha')
+                ON DUPLICATE KEY UPDATE status='CONFIRMED'
+            `, [preBatchId]);
+
+            await connectionPool.query(`
+                INSERT INTO paper_import_rows (id, batch_id, \`row_number\`, sheet_name, raw_data_json, normalized_data_json, validation_status, decision, mapped_variant_id)
+                VALUES (?, ?, 1, 'Sheet1', '{"raw": true}', '{"name":"Soporset Offset","gsm":80,"width_mm":640,"height_mm":900}', 'VALID', 'ACCEPTED', ?)
+                ON DUPLICATE KEY UPDATE decision='ACCEPTED', mapped_variant_id=?
+            `, [preRowId, preBatchId, preVariantFromBatch, preVariantFromBatch]);
+
+            // 2. Insert commercial offer for supp-alpha-1
+            await connectionPool.query(`
+                INSERT INTO supplier_paper_offers (id, tenant_id, supplier_id, variant_id, supplier_sku, price_amount, currency, price_basis, moq, order_multiple, status)
+                VALUES (?, 'tenant-alpha', 'supp-alpha-1', ?, 'SKU-PRE-165', 45.00, 'EUR', 'PACK', 1, 1, 'ACTIVE')
+                ON DUPLICATE KEY UPDATE status='ACTIVE'
+            `, [preOfferId, preVariantFromOffer]);
+
+            // Execute the Migration 165 Backfill SQL Statements
+            const backfillSql1 = `
+                INSERT IGNORE INTO supplier_paper_catalog_variants (id, tenant_id, supplier_id, variant_id, status, notes, created_at, updated_at)
+                SELECT 
+                    CONCAT('spcv_', MD5(CONCAT(b.supplier_id, ':', r.mapped_variant_id))),
+                    b.tenant_id,
+                    b.supplier_id,
+                    r.mapped_variant_id,
+                    'ACTIVE',
+                    'Backfilled from confirmed import batch',
+                    CURRENT_TIMESTAMP,
+                    CURRENT_TIMESTAMP
+                FROM paper_import_rows r
+                JOIN paper_import_batches b ON r.batch_id = b.id
+                WHERE b.status = 'CONFIRMED' AND r.mapped_variant_id = ?
+                GROUP BY b.tenant_id, b.supplier_id, r.mapped_variant_id;
+            `;
+            await connectionPool.query(backfillSql1, [preVariantFromBatch]);
+
+            const backfillSql2 = `
+                INSERT IGNORE INTO supplier_paper_catalog_variants (id, tenant_id, supplier_id, variant_id, status, notes, created_at, updated_at)
+                SELECT 
+                    CONCAT('spcv_', MD5(CONCAT(o.supplier_id, ':', o.variant_id))),
+                    o.tenant_id,
+                    o.supplier_id,
+                    o.variant_id,
+                    'ACTIVE',
+                    'Backfilled from supplier commercial offers',
+                    CURRENT_TIMESTAMP,
+                    CURRENT_TIMESTAMP
+                FROM supplier_paper_offers o
+                WHERE o.variant_id = ?
+                GROUP BY o.tenant_id, o.supplier_id, o.variant_id;
+            `;
+            await connectionPool.query(backfillSql2, [preVariantFromOffer]);
+
+            // Verify associations were created
+            const [assocRows] = await connectionPool.query(
+                'SELECT * FROM supplier_paper_catalog_variants WHERE supplier_id = "supp-alpha-1" AND variant_id IN (?, ?, ?)',
+                [preVariantFromBatch, preVariantFromOffer, unrelatedGlobalVariant]
+            );
+            expect(assocRows.length).toBe(2);
+            const batchAssoc = assocRows.find(r => r.variant_id === preVariantFromBatch);
+            const offerAssoc = assocRows.find(r => r.variant_id === preVariantFromOffer);
+            expect(batchAssoc).toBeDefined();
+            expect(batchAssoc.status).toBe('ACTIVE');
+            expect(batchAssoc.id).toBe(`spcv_${crypto.createHash('md5').update(`supp-alpha-1:${preVariantFromBatch}`).digest('hex')}`);
+
+            expect(offerAssoc).toBeDefined();
+            expect(offerAssoc.status).toBe('ACTIVE');
+            expect(offerAssoc.id).toBe(`spcv_${crypto.createHash('md5').update(`supp-alpha-1:${preVariantFromOffer}`).digest('hex')}`);
+
+            // Unrelated global variant is NOT associated to supp-alpha-1
+            const unrelatedAssoc = assocRows.find(r => r.variant_id === unrelatedGlobalVariant);
+            expect(unrelatedAssoc).toBeUndefined();
+
+            // Re-running backfill is completely idempotent
+            await connectionPool.query(backfillSql1, [preVariantFromBatch]);
+            await connectionPool.query(backfillSql2, [preVariantFromOffer]);
+            const [reAssocRows] = await connectionPool.query(
+                'SELECT * FROM supplier_paper_catalog_variants WHERE supplier_id = "supp-alpha-1" AND variant_id IN (?, ?)',
+                [preVariantFromBatch, preVariantFromOffer]
+            );
+            expect(reAssocRows.length).toBe(2);
+
+            // Now mark preVariantFromBatch as ARCHIVED with deleted_at (withdrawn)
+            await connectionPool.query(
+                'UPDATE supplier_paper_catalog_variants SET status = "ARCHIVED", deleted_at = CURRENT_TIMESTAMP WHERE supplier_id = "supp-alpha-1" AND variant_id = ?',
+                [preVariantFromBatch]
+            );
+
+            // Re-running backfill MUST NOT reactivate or clear deleted_at on ARCHIVED / withdrawn association
+            await connectionPool.query(backfillSql1, [preVariantFromBatch]);
+            const [checkArchivedRows] = await connectionPool.query(
+                'SELECT status, deleted_at FROM supplier_paper_catalog_variants WHERE supplier_id = "supp-alpha-1" AND variant_id = ?',
+                [preVariantFromBatch]
+            );
+            expect(checkArchivedRows[0].status).toBe('ARCHIVED');
+            expect(checkArchivedRows[0].deleted_at).not.toBeNull();
+        });
+
+        it('New confirmed import batch associates variant and does not overwrite existing ARCHIVED state', async () => {
+            if (!isDbConfigured) return;
+
+            const testVarId = 'var-soporset-100-6490';
+            const adminToken = generateToken({ id: 'user-admin-alpha', userId: 'user-admin-alpha', tenantId: 'tenant-alpha', supplierId: 'supp-alpha-1', role: 'SUPPLIER_ADMIN' });
+
+            // Ensure clean initial state
+            await connectionPool.query(
+                'DELETE FROM supplier_paper_catalog_variants WHERE supplier_id = "supp-alpha-1" AND variant_id = ?',
+                [testVarId]
+            );
+
+            // Create and confirm a new batch via paperImportService
+            const batchId = `batch-confirm-${Date.now()}`;
+            await connectionPool.query(`
+                INSERT INTO paper_import_batches (id, tenant_id, supplier_id, file_name, file_sha256, format, total_rows, valid_rows, status, created_by)
+                VALUES (?, 'tenant-alpha', 'supp-alpha-1', 'new_import.csv', 'sha256_new_import', 'CSV', 1, 1, 'PREVIEW', 'user-admin-alpha')
+            `, [batchId]);
+
+            const rowId = `row-confirm-${Date.now()}`;
+            await connectionPool.query(`
+                INSERT INTO paper_import_rows (id, batch_id, \`row_number\`, sheet_name, raw_data_json, normalized_data_json, validation_status, decision, mapped_product_id, mapped_variant_id)
+                VALUES (?, ?, 1, 'Sheet1', '{"raw": 1}', '{"name":"Soporset Offset","gsm":100,"width_mm":640,"height_mm":900}', 'VALID', 'PENDING', 'prod-soporset-1', ?)
+            `, [rowId, batchId, testVarId]);
+
+            const confirmRes = await paperImportService.confirmImportBatch({
+                batchId,
+                tenantId: 'tenant-alpha',
+                supplierId: 'supp-alpha-1',
+                actorId: 'user-admin-alpha',
+                selectedRowIds: [rowId]
+            });
+            expect(confirmRes.ok).toBe(true);
+
+            // Association is created as ACTIVE
+            const [assoc1] = await connectionPool.query(
+                'SELECT * FROM supplier_paper_catalog_variants WHERE supplier_id = "supp-alpha-1" AND variant_id = ?',
+                [testVarId]
+            );
+            expect(assoc1.length).toBe(1);
+            expect(assoc1[0].status).toBe('ACTIVE');
+
+            // Supplier now explicitly archives this variant
+            await connectionPool.query(
+                'UPDATE supplier_paper_catalog_variants SET status = "ARCHIVED" WHERE supplier_id = "supp-alpha-1" AND variant_id = ?',
+                [testVarId]
+            );
+
+            // Confirm a second batch with the same variant
+            const batchId2 = `batch-confirm2-${Date.now()}`;
+            await connectionPool.query(`
+                INSERT INTO paper_import_batches (id, tenant_id, supplier_id, file_name, file_sha256, format, total_rows, valid_rows, status, created_by)
+                VALUES (?, 'tenant-alpha', 'supp-alpha-1', 'new_import2.csv', 'sha256_new_import2', 'CSV', 1, 1, 'PREVIEW', 'user-admin-alpha')
+            `, [batchId2]);
+            const rowId2 = `row-confirm2-${Date.now()}`;
+            await connectionPool.query(`
+                INSERT INTO paper_import_rows (id, batch_id, \`row_number\`, sheet_name, raw_data_json, normalized_data_json, validation_status, decision, mapped_product_id, mapped_variant_id)
+                VALUES (?, ?, 1, 'Sheet1', '{"raw": 2}', '{"name":"Soporset Offset","gsm":100,"width_mm":640,"height_mm":900}', 'VALID', 'PENDING', 'prod-soporset-1', ?)
+            `, [rowId2, batchId2, testVarId]);
+
+            await paperImportService.confirmImportBatch({
+                batchId: batchId2,
+                tenantId: 'tenant-alpha',
+                supplierId: 'supp-alpha-1',
+                actorId: 'user-admin-alpha',
+                selectedRowIds: [rowId2]
+            });
+
+            // Status MUST remain ARCHIVED (confirmBatch does NOT overwrite status)
+            const [assoc2] = await connectionPool.query(
+                'SELECT * FROM supplier_paper_catalog_variants WHERE supplier_id = "supp-alpha-1" AND variant_id = ?',
+                [testVarId]
+            );
+            expect(assoc2.length).toBe(1);
+            expect(assoc2[0].status).toBe('ARCHIVED');
+        });
+
+        it('Retired offer (deleted_at) is immutable, cannot be reactivated or appear available, preserves SKU and revision idempotence', async () => {
+            if (!isDbConfigured) return;
+
+            const adminToken = generateToken({ id: 'user-admin-alpha', userId: 'user-admin-alpha', tenantId: 'tenant-alpha', supplierId: 'supp-alpha-1', role: 'SUPPLIER_ADMIN' });
+            const testSku = `SKU-IMMUTABLE-${Date.now()}`;
+
+            // Create offer with 2 revisions
+            const createRes = await paperOfferService.createOffer({
+                tenantId: 'tenant-alpha',
+                supplierId: 'supp-alpha-1',
+                actorId: 'user-admin-alpha',
+                payload: {
+                    variantId: 'var-munken-120-70100',
+                    supplierSku: testSku,
+                    priceAmount: 110.0,
+                    currency: 'EUR',
+                    priceBasis: 'TONNE',
+                    moq: 1,
+                    orderMultiple: 1
+                }
+            });
+            const offerId = createRes.id;
+
+            // Update to revision 2
+            await paperOfferService.updateOffer({
+                offerId,
+                tenantId: 'tenant-alpha',
+                supplierId: 'supp-alpha-1',
+                actorId: 'user-admin-alpha',
+                payload: {
+                    priceAmount: 115.0,
+                    changeReason: 'Revision 2 price adjustment'
+                }
+            });
+
+            // Retire offer via deleteOffer
+            const delRes = await paperOfferService.deleteOffer({
+                tenantId: 'tenant-alpha',
+                supplierId: 'supp-alpha-1',
+                actorId: 'user-admin-alpha',
+                role: 'SUPPLIER_ADMIN',
+                offerId
+            });
+            expect(delRes.ok).toBe(true);
+            expect(delRes.retired).toBe(true);
+            expect(delRes.revisionsPreserved).toBe(3); // rev1, rev2, terminal rev3
+
+            // 1. Gating verification: Calling updateOffer throws OFFER_RETIRED
+            await expect(paperOfferService.updateOffer({
+                offerId,
+                tenantId: 'tenant-alpha',
+                supplierId: 'supp-alpha-1',
+                actorId: 'user-admin-alpha',
+                payload: { priceAmount: 120.0 }
+            })).rejects.toThrow(/OFFER_RETIRED/);
+
+            // 2. Gating verification: Calling updateOfferStatus throws OFFER_RETIRED
+            await expect(paperOfferService.updateOfferStatus({
+                offerId,
+                tenantId: 'tenant-alpha',
+                supplierId: 'supp-alpha-1',
+                actorId: 'user-admin-alpha',
+                status: 'ACTIVE'
+            })).rejects.toThrow(/OFFER_RETIRED/);
+
+            // 3. Gating verification: Calling bulkUpdateOfferStatus fails closed
+            const bulkRes = await paperOfferService.bulkUpdateOfferStatus({
+                tenantId: 'tenant-alpha',
+                supplierId: 'supp-alpha-1',
+                actorId: 'user-admin-alpha',
+                action: 'RESTORE',
+                offerIds: [offerId],
+                scope: 'SELECTED'
+            });
+            expect(bulkRes.succeededCount).toBe(0);
+            expect(bulkRes.failedCount).toBe(1);
+            expect(bulkRes.results[0].code).toBe('OFFER_RETIRED');
+
+            // 4. Query verification: Omitted from listSupplierOffers
+            const listRes = await paperOfferService.listSupplierOffers({
+                tenantId: 'tenant-alpha',
+                supplierId: 'supp-alpha-1',
+                page: 1,
+                limit: 100
+            });
+            const foundInList = listRes.items.find(i => i.id === offerId);
+            expect(foundInList).toBeUndefined();
+
+            // 5. Query verification: Not counted as active offer in catalog
+            const catRes = await paperOfferService.getTechnicalCatalog({
+                supplierId: 'supp-alpha-1',
+                page: 1,
+                limit: 50
+            });
+            const munkenItem = catRes.items.find(i => i.id === 'var-munken-120-70100');
+            expect(munkenItem).toBeDefined();
+            // All active offers for this variant were retired
+            expect(munkenItem.activeOffersCount).toBe(0);
+
+            // 6. SKU preservation verification under uk_supplier_sku_active constraint
+            // Attempting to reuse testSku must fail on UNIQUE constraint
+            await expect(paperOfferService.createOffer({
+                tenantId: 'tenant-alpha',
+                supplierId: 'supp-alpha-1',
+                actorId: 'user-admin-alpha',
+                payload: {
+                    variantId: 'var-munken-120-70100',
+                    supplierSku: testSku,
+                    priceAmount: 99.0,
+                    currency: 'EUR',
+                    priceBasis: 'TONNE',
+                    moq: 1,
+                    orderMultiple: 1
+                }
+            })).rejects.toThrow();
+
+            // 7. Duplicate retirement idempotence: Calling deleteOffer again does NOT duplicate terminal revision
+            const delRes2 = await paperOfferService.deleteOffer({
+                tenantId: 'tenant-alpha',
+                supplierId: 'supp-alpha-1',
+                actorId: 'user-admin-alpha',
+                role: 'SUPPLIER_ADMIN',
+                offerId
+            });
+            expect(delRes2.ok).toBe(true);
+            expect(delRes2.alreadyRetired).toBe(true);
+            expect(delRes2.revisionsPreserved).toBe(3);
+
+            const [revRows] = await connectionPool.query(
+                'SELECT COUNT(*) as total FROM supplier_paper_offer_revisions WHERE offer_id = ?',
+                [offerId]
+            );
+            expect(Number(revRows[0].total)).toBe(3); // Exactly 3 revisions, zero duplicates
+        });
+
+        it('Enforces exact MAX_BULK_OPERATION_LIMIT = 500 ceiling on ALL_MATCHING and prevents silent partial processing', async () => {
+            if (!isDbConfigured) return;
+
+            const adminToken = generateToken({ id: 'user-admin-alpha', userId: 'user-admin-alpha', tenantId: 'tenant-alpha', supplierId: 'supp-alpha-1', role: 'SUPPLIER_ADMIN' });
+
+            // 1. Preview action with > 500 items blocks execution
+            const oversizedSelectedIds = Array.from({ length: 501 }, (_, i) => `var-dummy-${i}`);
+
+            const previewRes = await dispatch(paperSuppliersRouter, {
+                method: 'POST',
+                url: '/catalog/variants/preview-action',
+                body: {
+                    action: 'ARCHIVE',
+                    variantIds: oversizedSelectedIds,
+                    scope: 'SELECTED'
+                },
+                headers: { authorization: `Bearer ${adminToken}` }
+            });
+            expect(previewRes.statusCode).toBe(200);
+            expect(previewRes.body.data.canProceed).toBe(false);
+            expect(previewRes.body.data.blockedCount).toBe(501);
+            expect(previewRes.body.data.message).toContain('EXCEEDS_MAX_BATCH_LIMIT');
+
+            // 2. Direct execution of bulk status on > 500 offers throws EXCEEDS_MAX_BATCH_LIMIT
+            const oversizedOfferIds = Array.from({ length: 501 }, (_, i) => `off-dummy-${i}`);
+            await expect(paperOfferService.bulkUpdateOfferStatus({
+                tenantId: 'tenant-alpha',
+                supplierId: 'supp-alpha-1',
+                actorId: 'user-admin-alpha',
+                action: 'ARCHIVE',
+                offerIds: oversizedOfferIds,
+                scope: 'SELECTED'
+            })).rejects.toThrow(/EXCEEDS_MAX_BATCH_LIMIT/);
+
+            // 3. Direct execution of bulk delete on > 500 offers throws EXCEEDS_MAX_BATCH_LIMIT
+            await expect(paperOfferService.bulkDeleteOffers({
+                tenantId: 'tenant-alpha',
+                supplierId: 'supp-alpha-1',
+                actorId: 'user-admin-alpha',
+                role: 'SUPPLIER_ADMIN',
+                offerIds: oversizedOfferIds,
+                scope: 'SELECTED'
+            })).rejects.toThrow(/EXCEEDS_MAX_BATCH_LIMIT/);
+
+            // 4. Catalog bulk archive with > 500 variants throws EXCEEDS_MAX_BATCH_LIMIT
+            await expect(paperOfferService.archiveSupplierCatalogVariants({
+                tenantId: 'tenant-alpha',
+                supplierId: 'supp-alpha-1',
+                actorId: 'user-admin-alpha',
+                role: 'SUPPLIER_ADMIN',
+                variantIds: oversizedSelectedIds,
+                scope: 'SELECTED'
+            })).rejects.toThrow(/EXCEEDS_MAX_BATCH_LIMIT/);
         });
     });
 

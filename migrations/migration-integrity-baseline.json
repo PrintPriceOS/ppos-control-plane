@@ -2221,9 +2221,9 @@
     {
       "path": "migrations/165_phase196d_paper_supplier_offer_soft_delete_and_catalog_associations.sql",
       "prefix": "165",
-      "canonicalSha256": "9d73dd4069006e48e1cfa706f8f90404fd438ef24f64bf0ff7129307b1536b73",
+      "canonicalSha256": "37fd3881fbcd3affe22631d7dc0e4342350a63ef4e49c007e2ee8c96eba1b250",
       "contentNormalization": "utf8-lf-v1",
-      "sizeBytes": 1553,
+      "sizeBytes": 2697,
       "containsDdl": true,
       "containsDml": true,
       "containsTransaction": false,
