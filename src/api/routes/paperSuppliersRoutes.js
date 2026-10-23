@@ -1337,7 +1337,122 @@ router.post('/offers/bulk-delete', requireSupplierScope('ADMIN'), requireApprove
     }
 });
 
+const paperProcurementService = require('../services/paperProcurementService');
+
+/**
+ * -------------------------------------------------------------
+ * ITERATIONS I4 & I5: PROCUREMENT ORDERS & DASHBOARD STATS
+ * -------------------------------------------------------------
+ */
+
+/**
+ * GET /api/v1/paper-suppliers/dashboard/stats
+ * Aggregates real operational metrics for Supplier Dashboard cards.
+ */
+router.get('/dashboard/stats', requireSupplierScope('VIEWER'), requireApprovedSupplier, async (req, res) => {
+    try {
+        const context = resolveActorContext(req);
+        const supplierId = context.supplierId;
+        if (!supplierId) {
+            return res.status(404).json({
+                ok: false,
+                error: { code: 'SUPPLIER_NOT_FOUND', message: 'No registered supplier organization associated with authenticated session.' }
+            });
+        }
+
+        const stats = await paperProcurementService.getSupplierDashboardStats(supplierId);
+        return res.json({ ok: true, data: stats });
+    } catch (err) {
+        console.error('[PAPER-SUPPLIERS][DASHBOARD-STATS-ERROR]', err);
+        return res.status(500).json({
+            ok: false,
+            error: { code: 'DASHBOARD_STATS_FAILED', message: err.message }
+        });
+    }
+});
+
+/**
+ * GET /api/v1/paper-suppliers/orders
+ * List procurement orders and RFQs for authenticated supplier.
+ */
+router.get('/orders', requireSupplierScope('VIEWER'), requireApprovedSupplier, async (req, res) => {
+    try {
+        const context = resolveActorContext(req);
+        const supplierId = context.supplierId;
+        if (!supplierId) {
+            return res.status(404).json({
+                ok: false,
+                error: { code: 'SUPPLIER_NOT_FOUND', message: 'No registered supplier organization associated with authenticated session.' }
+            });
+        }
+
+        const result = await paperProcurementService.listSupplierOrders(supplierId, req.query);
+        return res.json({ ok: true, data: result });
+    } catch (err) {
+        console.error('[PAPER-SUPPLIERS][LIST-ORDERS-ERROR]', err);
+        return res.status(500).json({
+            ok: false,
+            error: { code: 'LIST_ORDERS_FAILED', message: err.message }
+        });
+    }
+});
+
+/**
+ * GET /api/v1/paper-suppliers/orders/:orderId
+ * Query procurement order detail with snapshot, buyer details, and receipt history.
+ */
+router.get('/orders/:orderId', requireSupplierScope('VIEWER'), requireApprovedSupplier, async (req, res) => {
+    try {
+        const context = resolveActorContext(req);
+        const supplierId = context.supplierId;
+        const { orderId } = req.params;
+
+        const order = await paperProcurementService.getSupplierOrderById(supplierId, orderId);
+        return res.json({ ok: true, data: order });
+    } catch (err) {
+        console.error('[PAPER-SUPPLIERS][GET-ORDER-ERROR]', err);
+        const isNotFound = err.message.startsWith('ORDER_NOT_FOUND');
+        return res.status(isNotFound ? 404 : 500).json({
+            ok: false,
+            error: { code: isNotFound ? 'ORDER_NOT_FOUND' : 'GET_ORDER_FAILED', message: err.message }
+        });
+    }
+});
+
+/**
+ * POST /api/v1/paper-suppliers/orders/:orderId/transition
+ * Transition order lifecycle state (QUOTE, CONFIRM, DISPATCH, DELIVER, REJECT, CANCEL).
+ * Operator or Admin capability required.
+ */
+router.post('/orders/:orderId/transition', requireSupplierScope('OPERATOR'), requireApprovedSupplier, async (req, res) => {
+    try {
+        const context = resolveActorContext(req);
+        const supplierId = context.supplierId;
+        const { orderId } = req.params;
+        const { action } = req.body || {};
+
+        if (!action) {
+            return res.status(400).json({
+                ok: false,
+                error: { code: 'ACTION_REQUIRED', message: 'A valid action string is required.' }
+            });
+        }
+
+        const order = await paperProcurementService.transitionSupplierOrder(supplierId, orderId, action, req.body);
+        return res.json({ ok: true, data: order });
+    } catch (err) {
+        console.error('[PAPER-SUPPLIERS][ORDER-TRANSITION-ERROR]', err);
+        const isNotFound = err.message.startsWith('ORDER_NOT_FOUND');
+        const statusCode = isNotFound ? 404 : (err.statusCode || 400);
+        return res.status(statusCode).json({
+            ok: false,
+            error: { code: isNotFound ? 'ORDER_NOT_FOUND' : 'ORDER_TRANSITION_FAILED', message: err.message }
+        });
+    }
+});
+
 module.exports = router;
+
 
 
 

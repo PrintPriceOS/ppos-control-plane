@@ -2231,6 +2231,19 @@
         "CREATE_TABLE",
         "ALTER_TABLE"
       ]
+    },
+    {
+      "path": "migrations/166_phase196e_supplier_paper_procurement_orders.sql",
+      "prefix": "166",
+      "canonicalSha256": "1439dbd0c90f7ad5072ae81af2b73ab2281e454df6fdcf9e7c40cfcd6ca8268a",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 3796,
+      "containsDdl": true,
+      "containsDml": false,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
     }
   ]
 }

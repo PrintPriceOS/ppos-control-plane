@@ -351,6 +351,195 @@ router.post('/', async (req, res) => {
     }
 });
 
+const paperProcurementService = require('../services/paperProcurementService');
+
+/**
+ * -------------------------------------------------------------
+ * ITERATIONS I4 & I5: PRINTHOUSE PAPER SOURCING & PROCUREMENT
+ * -------------------------------------------------------------
+ */
+
+/**
+ * GET /api/admin/materials/sourcing/offers
+ * Sourcing search across visible supplier paper offers.
+ */
+router.get('/sourcing/offers', async (req, res) => {
+    try {
+        const scope = getScopeContext(req);
+        if (!scope.tenantId) {
+            return res.status(401).json({ ok: false, error: 'TENANT_ID_REQUIRED' });
+        }
+
+        const result = await paperProcurementService.searchVisibleOffers(scope.tenantId, req.query);
+        return res.json({ ok: true, data: result });
+    } catch (err) {
+        if (err.statusCode) {
+            return res.status(err.statusCode).json({ ok: false, error: err.message, code: err.code || 'SOURCING_ERROR' });
+        }
+        console.error('[MATERIALS-API] Failed to search sourcing offers:', err);
+        return res.status(500).json({ ok: false, error: err.message, code: 'SOURCING_QUERY_ERROR' });
+    }
+});
+
+/**
+ * POST /api/admin/materials/sourcing/orders
+ * Printhouse places an order or RFQ against a paper offer.
+ */
+router.post('/sourcing/orders', async (req, res) => {
+    try {
+        const scope = getScopeContext(req);
+        assertWritePermission(scope);
+
+        if (!scope.isSuperAdmin && !scope.printhouseId) {
+            return res.status(403).json({
+                ok: false,
+                error: 'FORBIDDEN_UNAUTHORIZED_CENTER_ACCESS',
+                code: 'FORBIDDEN_UNAUTHORIZED_CENTER_ACCESS'
+            });
+        }
+
+        const actor = {
+            tenantId: scope.tenantId,
+            printhouseId: scope.printhouseId,
+            userId: scope.operatorId,
+            role: scope.role,
+            isSuperAdmin: scope.isSuperAdmin
+        };
+
+        const result = await paperProcurementService.placeOrderOrRfq(actor, {
+            ...req.body,
+            printhouseId: scope.printhouseId || req.body.printhouseId
+        });
+
+        return res.status(201).json({ ok: true, data: result });
+    } catch (err) {
+        if (err.statusCode) {
+            return res.status(err.statusCode).json({ ok: false, error: err.message, code: err.code || 'ORDER_PLACEMENT_ERROR' });
+        }
+        console.error('[MATERIALS-API] Failed to place sourcing order:', err);
+        return res.status(500).json({ ok: false, error: err.message, code: 'ORDER_PLACEMENT_ERROR' });
+    }
+});
+
+/**
+ * GET /api/admin/materials/procurements/paper-orders
+ * List paper procurement orders for authenticated printhouse.
+ */
+router.get('/procurements/paper-orders', async (req, res) => {
+    try {
+        const scope = getScopeContext(req);
+        const result = await paperProcurementService.listPrinthouseOrders(scope.tenantId, scope.printhouseId, req.query);
+        return res.json({ ok: true, data: result });
+    } catch (err) {
+        if (err.statusCode) {
+            return res.status(err.statusCode).json({ ok: false, error: err.message, code: err.code || 'LIST_ORDERS_ERROR' });
+        }
+        console.error('[MATERIALS-API] Failed to list paper orders:', err);
+        return res.status(500).json({ ok: false, error: err.message, code: 'LIST_ORDERS_ERROR' });
+    }
+});
+
+/**
+ * GET /api/admin/materials/procurements/paper-orders/:id
+ * Retrieve paper procurement order detail by ID.
+ */
+router.get('/procurements/paper-orders/:id', async (req, res) => {
+    try {
+        const scope = getScopeContext(req);
+        const order = await paperProcurementService.getPrinthouseOrderById(scope.tenantId, req.params.id);
+        return res.json({ ok: true, data: order });
+    } catch (err) {
+        if (err.statusCode) {
+            return res.status(err.statusCode).json({ ok: false, error: err.message, code: err.code || 'GET_ORDER_ERROR' });
+        }
+        console.error('[MATERIALS-API] Failed to get paper order:', err);
+        return res.status(500).json({ ok: false, error: err.message, code: 'GET_ORDER_ERROR' });
+    }
+});
+
+/**
+ * POST /api/admin/materials/procurements/paper-orders/:id/accept-quote
+ * Printhouse accepts supplier's RFQ quote.
+ */
+router.post('/procurements/paper-orders/:id/accept-quote', async (req, res) => {
+    try {
+        const scope = getScopeContext(req);
+        assertWritePermission(scope);
+
+        const actor = {
+            tenantId: scope.tenantId,
+            printhouseId: scope.printhouseId,
+            userId: scope.operatorId,
+            role: scope.role
+        };
+
+        const result = await paperProcurementService.acceptRfqQuote(actor, req.params.id);
+        return res.json({ ok: true, data: result });
+    } catch (err) {
+        if (err.statusCode) {
+            return res.status(err.statusCode).json({ ok: false, error: err.message, code: err.code || 'ACCEPT_QUOTE_ERROR' });
+        }
+        console.error('[MATERIALS-API] Failed to accept RFQ quote:', err);
+        return res.status(500).json({ ok: false, error: err.message, code: 'ACCEPT_QUOTE_ERROR' });
+    }
+});
+
+/**
+ * POST /api/admin/materials/procurements/paper-orders/:id/receive
+ * Atomic and idempotent warehouse receipt for paper procurement order.
+ */
+router.post('/procurements/paper-orders/:id/receive', async (req, res) => {
+    try {
+        const scope = getScopeContext(req);
+        assertWritePermission(scope);
+
+        if (!scope.isSuperAdmin && !scope.printhouseId) {
+            return res.status(403).json({
+                ok: false,
+                error: 'FORBIDDEN_UNAUTHORIZED_CENTER_ACCESS',
+                code: 'FORBIDDEN_UNAUTHORIZED_CENTER_ACCESS'
+            });
+        }
+
+        const idempotencyKey = req.headers?.['idempotency-key'] || req.body?.idempotency_key || req.body?.idempotencyKey || null;
+        if (!idempotencyKey) {
+            return res.status(400).json({
+                ok: false,
+                error: 'IDEMPOTENCY_KEY_REQUIRED',
+                code: 'IDEMPOTENCY_KEY_REQUIRED'
+            });
+        }
+
+        const actor = {
+            tenantId: scope.tenantId,
+            printhouseId: scope.printhouseId,
+            userId: scope.operatorId,
+            role: scope.role,
+            isSuperAdmin: scope.isSuperAdmin
+        };
+
+        const result = await paperProcurementService.receiveOrderAtomic(
+            req.params.id,
+            actor,
+            {
+                receivedQuantity: req.body?.receivedQuantity ?? req.body?.received_quantity,
+                receivedSheets: req.body?.receivedSheets ?? req.body?.received_sheets,
+                idempotencyKey,
+                notes: req.body?.notes,
+                operatorId: scope.operatorId
+            }
+        );
+
+        return res.json({ ok: true, data: result });
+    } catch (err) {
+        if (err.statusCode) {
+            return res.status(err.statusCode).json({ ok: false, error: err.message, code: err.code || 'RECEIVE_ORDER_ERROR' });
+        }
+        console.error('[MATERIALS-API] Failed to receive paper order:', err);
+        return res.status(500).json({ ok: false, error: err.message, code: 'RECEIVE_ORDER_ERROR' });
+    }
+});
+
 /**
  * POST /api/admin/materials/procurements/:id/receive
  * Marks an active supplier procurement as received, auto-incrementing stock atomically and idempotently.

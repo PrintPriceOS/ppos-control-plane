@@ -29,8 +29,13 @@ export const SupplierDashboardPage: React.FC = () => {
     const activeContext = getActiveContext() || '';
 
     const [profile, setProfile] = useState<any>(null);
-    const [catalogCount, setCatalogCount] = useState<number | null>(null);
-    const [offersCount, setOffersCount] = useState<number | null>(null);
+    const [stats, setStats] = useState<{
+        catalogVariants: number;
+        offers: { total: number; active: number };
+        pendingRequests: number;
+        activeOrders: number;
+        completedOrders: number;
+    } | null>(null);
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
 
@@ -41,10 +46,9 @@ export const SupplierDashboardPage: React.FC = () => {
 
         const fetchMetrics = async () => {
             try {
-                const [meResult, catalogResult, offersResult] = await Promise.allSettled([
+                const [meResult, statsResult] = await Promise.allSettled([
                     paperSupplierFetch<any>('/api/v1/paper-suppliers/me'),
-                    paperSupplierFetch<any>('/api/v1/paper-suppliers/catalog/products?limit=1'),
-                    paperSupplierFetch<any>('/api/v1/paper-suppliers/offers?limit=1')
+                    paperSupplierFetch<any>('/api/v1/paper-suppliers/dashboard/stats')
                 ]);
 
                 if (!isMounted) return;
@@ -61,32 +65,14 @@ export const SupplierDashboardPage: React.FC = () => {
                     if (meErr) errors.push(meErr);
                 }
 
-                if (
-                    catalogResult.status === 'fulfilled' &&
-                    catalogResult.value?.ok &&
-                    typeof catalogResult.value.data?.total === 'number'
-                ) {
-                    setCatalogCount(catalogResult.value.data.total);
+                if (statsResult.status === 'fulfilled' && statsResult.value?.ok && statsResult.value?.data) {
+                    setStats(statsResult.value.data);
                 } else {
-                    setCatalogCount(null);
-                    const catErr = catalogResult.status === 'rejected'
-                        ? catalogResult.reason?.message
-                        : catalogResult.value?.error?.message;
-                    if (catErr) errors.push(catErr);
-                }
-
-                if (
-                    offersResult.status === 'fulfilled' &&
-                    offersResult.value?.ok &&
-                    typeof offersResult.value.data?.total === 'number'
-                ) {
-                    setOffersCount(offersResult.value.data.total);
-                } else {
-                    setOffersCount(null);
-                    const offErr = offersResult.status === 'rejected'
-                        ? offersResult.reason?.message
-                        : offersResult.value?.error?.message;
-                    if (offErr) errors.push(offErr);
+                    setStats(null);
+                    const statsErr = statsResult.status === 'rejected'
+                        ? statsResult.reason?.message
+                        : statsResult.value?.error?.message;
+                    if (statsErr) errors.push(statsErr);
                 }
 
                 if (errors.length > 0) {
@@ -180,8 +166,8 @@ export const SupplierDashboardPage: React.FC = () => {
                         </div>
                     </div>
                     <div className="mt-4">
-                        <span className={`font-black ${catalogCount !== null ? 'text-3xl font-mono' : 'text-base font-sans text-zinc-400'} text-slate-900 dark:text-white`}>
-                            {loading ? '...' : (catalogCount !== null ? catalogCount : (t('common.notAvailable') || 'No disponible'))}
+                        <span className={`font-black ${stats?.catalogVariants !== undefined ? 'text-3xl font-mono' : 'text-base font-sans text-zinc-400'} text-slate-900 dark:text-white`}>
+                            {loading ? '...' : (stats?.catalogVariants !== undefined ? stats.catalogVariants : (t('common.notAvailable') || 'No disponible'))}
                         </span>
                         <p className="text-xs text-zinc-400 mt-1">
                             {t('supplier.dashboard.catalogCardDesc') || 'Active technical variants'}
@@ -191,7 +177,7 @@ export const SupplierDashboardPage: React.FC = () => {
 
                 {/* Commercial Offers */}
                 <div 
-                    onClick={() => navigate('/supplier/catalog')}
+                    onClick={() => navigate('/supplier/catalog?tab=offers')}
                     className="p-6 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xs hover:shadow-md hover:border-zinc-300 dark:hover:border-zinc-700 flex flex-col justify-between cursor-pointer transition-all"
                 >
                     <div className="flex items-center justify-between">
@@ -203,57 +189,57 @@ export const SupplierDashboardPage: React.FC = () => {
                         </div>
                     </div>
                     <div className="mt-4">
-                        <span className={`font-black ${offersCount !== null ? 'text-3xl font-mono' : 'text-base font-sans text-zinc-400'} text-slate-900 dark:text-white`}>
-                            {loading ? '...' : (offersCount !== null ? offersCount : (t('common.notAvailable') || 'No disponible'))}
+                        <span className={`font-black ${stats?.offers?.active !== undefined ? 'text-3xl font-mono' : 'text-base font-sans text-zinc-400'} text-slate-900 dark:text-white`}>
+                            {loading ? '...' : (stats?.offers?.active !== undefined ? stats.offers.active : (t('common.notAvailable') || 'No disponible'))}
                         </span>
                         <p className="text-xs text-zinc-400 mt-1">
-                            {t('supplier.dashboard.offersCardDesc') || 'Configured rates & MOQ brackets'}
+                            {stats?.offers ? `${stats.offers.total} ${t('supplier.dashboard.totalRates') || 'total rates'}` : (t('supplier.dashboard.offersCardDesc') || 'Configured rates & MOQ')}
                         </p>
                     </div>
                 </div>
 
                 {/* Open RFQs / Demands */}
                 <div 
+                    onClick={() => navigate('/supplier/orders?status=SUBMITTED')}
+                    className="p-6 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xs hover:shadow-md hover:border-zinc-300 dark:hover:border-zinc-700 flex flex-col justify-between cursor-pointer transition-all"
+                >
+                    <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
+                            {t('supplier.dashboard.rfqCard') || 'Pending Requests'}
+                        </span>
+                        <div className="p-2 rounded-xl bg-amber-50 dark:bg-amber-950/40">
+                            <InboxIcon className="w-5 h-5 text-amber-500" />
+                        </div>
+                    </div>
+                    <div className="mt-4">
+                        <span className={`font-black ${stats?.pendingRequests !== undefined ? 'text-3xl font-mono' : 'text-base font-sans text-zinc-400'} text-slate-900 dark:text-white`}>
+                            {loading ? '...' : (stats?.pendingRequests !== undefined ? stats.pendingRequests : (t('common.notAvailable') || 'No disponible'))}
+                        </span>
+                        <p className="text-xs text-zinc-400 mt-1">
+                            {t('supplier.dashboard.rfqCardDesc') || 'Awaiting quote or confirmation'}
+                        </p>
+                    </div>
+                </div>
+
+                {/* Orders in Fulfillment */}
+                <div 
                     onClick={() => navigate('/supplier/orders')}
                     className="p-6 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xs hover:shadow-md hover:border-zinc-300 dark:hover:border-zinc-700 flex flex-col justify-between cursor-pointer transition-all"
                 >
                     <div className="flex items-center justify-between">
                         <span className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
-                            {t('supplier.dashboard.rfqCard') || 'Incoming Orders'}
+                            {t('supplier.dashboard.activeOrdersCard') || 'Active Orders'}
                         </span>
-                        <div className="p-2 rounded-xl bg-zinc-50 dark:bg-zinc-800/60">
-                            <InboxIcon className="w-5 h-5 text-zinc-400" />
+                        <div className="p-2 rounded-xl bg-blue-50 dark:bg-blue-950/40">
+                            <ShieldCheckIcon className="w-5 h-5 text-blue-500" />
                         </div>
                     </div>
                     <div className="mt-4">
-                        <span className="text-3xl font-black font-mono text-slate-400 dark:text-zinc-600">
-                            —
+                        <span className={`font-black ${stats?.activeOrders !== undefined ? 'text-3xl font-mono' : 'text-base font-sans text-zinc-400'} text-slate-900 dark:text-white`}>
+                            {loading ? '...' : (stats?.activeOrders !== undefined ? stats.activeOrders : (t('common.notAvailable') || 'No disponible'))}
                         </span>
                         <p className="text-xs text-zinc-400 mt-1">
-                            {t('supplier.dashboard.rfqCardDesc') || 'Planned for Phase I4'}
-                        </p>
-                    </div>
-                </div>
-
-                {/* Domain Security / Access Scope */}
-                <div 
-                    onClick={() => navigate('/supplier/settings')}
-                    className="p-6 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xs hover:shadow-md hover:border-zinc-300 dark:hover:border-zinc-700 flex flex-col justify-between cursor-pointer transition-all"
-                >
-                    <div className="flex items-center justify-between">
-                        <span className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
-                            {t('supplier.dashboard.scopeCard') || 'Verified Tenancy'}
-                        </span>
-                        <div className="p-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/40">
-                            <ShieldCheckIcon className="w-5 h-5 text-emerald-500" />
-                        </div>
-                    </div>
-                    <div className="mt-4">
-                        <span className={`text-sm font-black uppercase tracking-wider ${(profile?.tenantId || tenantId) ? 'text-emerald-500' : 'text-zinc-400'}`}>
-                            {loading ? '...' : ((profile?.tenantId || tenantId) ? (t('supplier.dashboard.scopeActive') || 'Authorized Scope') : (t('common.notAvailable') || 'No disponible'))}
-                        </span>
-                        <p className="text-xs text-zinc-400 mt-1">
-                            {loading ? '...' : (profile?.tenantId || tenantId || (t('common.notAvailable') || 'No disponible'))}
+                            {stats?.completedOrders !== undefined ? `${stats.completedOrders} ${t('supplier.dashboard.completedOrders') || 'completed'}` : (t('supplier.dashboard.activeOrdersDesc') || 'In fulfillment / dispatch')}
                         </p>
                     </div>
                 </div>

@@ -14,11 +14,13 @@ import {
     TruckIcon,
     ClockIcon,
     ArchiveBoxIcon,
-    XMarkIcon
+    XMarkIcon,
+    ShoppingBagIcon
 } from "@heroicons/react/24/outline";
 import * as adminApi from "../../lib/adminApi";
 import { toDisplayText } from "../../lib/formatters";
 import { useTheme } from "../../hooks/useTheme";
+import { PaperSourcingModal } from "../../components/printhouse/PaperSourcingModal";
 
 export const MaterialsPage: React.FC = () => {
     const theme = useTheme();
@@ -29,6 +31,7 @@ export const MaterialsPage: React.FC = () => {
     const [selectedMaterial, setSelectedMaterial] = useState<any | null>(null);
     const [targetNodeId, setTargetNodeId] = useState<string>("");
     const [actionFeedback, setActionFeedback] = useState<{ type: 'success' | 'error', message: string } | null>(null);
+    const [isSourcingModalOpen, setIsSourcingModalOpen] = useState(false);
 
     // Operator Workflows Extended Modals & Drawer State
     const [activeModal, setActiveModal] = useState<null | 'ADD_MATERIAL' | 'INTAKE' | 'ADJUST' | 'RESERVE' | 'CONSUME' | 'PROCUREMENT'>(null);
@@ -442,6 +445,14 @@ export const MaterialsPage: React.FC = () => {
                             </button>
                         )}
                     </div>
+
+                    <button
+                        onClick={() => setIsSourcingModalOpen(true)}
+                        className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-manrope flex items-center space-x-1.5 transition-all rounded-xl shadow-xs font-bold cursor-pointer"
+                    >
+                        <ShoppingBagIcon className="w-3.5 h-3.5 flex-shrink-0" />
+                        <span>Paper Sourcing &amp; RFQs</span>
+                    </button>
 
                     <button
                         onClick={() => setActiveModal('ADD_MATERIAL')}
@@ -1781,6 +1792,12 @@ export const MaterialsPage: React.FC = () => {
                     </div>
                 </div>
             )}
+
+            <PaperSourcingModal
+                isOpen={isSourcingModalOpen}
+                onClose={() => setIsSourcingModalOpen(false)}
+                onStockUpdated={fetchCatalog}
+            />
         </div>
     );
 };

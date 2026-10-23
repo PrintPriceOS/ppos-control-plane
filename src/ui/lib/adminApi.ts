@@ -2894,3 +2894,85 @@ export async function executeFederationSimulation() {
 export async function getFederationRegistry() {
     return adminFetch<any>('/api/admin/federation/registry');
 }
+
+// ==========================================
+// Paper Sourcing & Procurement Hub (Phase I4-I5)
+// ==========================================
+
+export async function searchPaperSourcingOffers(params?: {
+    query?: string;
+    gsmMin?: number;
+    gsmMax?: number;
+    paperType?: string;
+    supplierId?: string;
+    limit?: number;
+    offset?: number;
+}) {
+    const q = new URLSearchParams();
+    if (params?.query) q.set('query', params.query);
+    if (params?.gsmMin) q.set('gsmMin', String(params.gsmMin));
+    if (params?.gsmMax) q.set('gsmMax', String(params.gsmMax));
+    if (params?.paperType) q.set('paperType', params.paperType);
+    if (params?.supplierId) q.set('supplierId', params.supplierId);
+    if (params?.limit) q.set('limit', String(params.limit));
+    if (params?.offset) q.set('offset', String(params.offset));
+
+    return adminFetch<{ ok: boolean; data: { items: any[]; total: number } }>(`/api/admin/materials/sourcing/offers?${q.toString()}`);
+}
+
+export async function placePaperSourcingOrder(payload: {
+    type: 'ORDER' | 'RFQ';
+    offerId: string;
+    variantId?: string;
+    orderedQuantity: number;
+    quantityBasis: string;
+    printhouseId: string;
+    buyerNotes?: string;
+    targetPrice?: number;
+}) {
+    return adminFetch<{ ok: boolean; data: any }>('/api/admin/materials/sourcing/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    });
+}
+
+export async function listPrinthousePaperOrders(params?: {
+    status?: string;
+    type?: string;
+    page?: number;
+    limit?: number;
+}) {
+    const q = new URLSearchParams();
+    if (params?.status) q.set('status', params.status);
+    if (params?.type) q.set('type', params.type);
+    if (params?.page) q.set('page', String(params.page));
+    if (params?.limit) q.set('limit', String(params.limit));
+
+    return adminFetch<{ ok: boolean; data: { items: any[]; total: number; counts: Record<string, number> } }>(`/api/admin/materials/procurements/paper-orders?${q.toString()}`);
+}
+
+export async function acceptPaperRfqQuote(orderId: string) {
+    return adminFetch<{ ok: boolean; data: any }>(`/api/admin/materials/procurements/paper-orders/${orderId}/accept-quote`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+    });
+}
+
+export async function receivePaperProcurementOrder(orderId: string, payload: {
+    receivedSheets?: number;
+    receivedQuantity?: number;
+    idempotencyKey: string;
+    notes?: string;
+    operatorId?: string;
+}) {
+    return adminFetch<{ ok: boolean; data: any }>(`/api/admin/materials/procurements/paper-orders/${orderId}/receive`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'idempotency-key': payload.idempotencyKey
+        },
+        body: JSON.stringify(payload)
+    });
+}
+

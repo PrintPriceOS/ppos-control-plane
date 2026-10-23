@@ -83,10 +83,22 @@ El **Paper Supplier Hub** incorpora un panel independiente para distribuidores/f
   - **D. Mantenimiento Técnico de Catálogo e Importador**: Historial de lotes de importación (`GET /catalog/imports`), descarga de plantilla CSV estándar (`GET /catalog/template`), exportación de incidencias en CSV RFC 4180 (`GET /catalog/imports/:id/export-issues`), retracción de lotes no vinculados (`POST /catalog/imports/:id/retract`) y edición técnica controlada con recálculo de huella (`PATCH /catalog/variants/:id`).
   - **E. Remediación de Posicionamiento y Accesibilidad de Modales**: Montaje mediante portal en `document.body` a través de `<AccessibleModal>`, erradicando la contención por `transform` (`.animate-slide-fade`) y `overflow-y-auto`; overlay a pantalla completa (`fixed inset-0 z-50`); centrado absoluto en viewport; limitación de dimensiones y scroll interno; bloqueo y restauración limpia de scroll; semántica accesible (`role="dialog"`, `aria-modal="true"`, focus trap, retorno de foco, Escape con guarda de cambios sin guardar).
   - **Criterios de Cierre**: 74/74 tests en MySQL efímero PASS, 0 nuevos diagnósticos TypeScript (199 vs 199), suite E2E de geometría en navegador con Playwright PASS (5/5 pruebas en escritorio, móvil y simulación de reflow).
-- [ ] **I4 — Búsqueda de imprenta y RFQ bidireccional (Entrega R2)**:
-  - Sourcing en `/materials`, RFQ con destinatarios aislados, respuesta versionada.
-- [ ] **I5 — Pedido, expedición y recepción a inventario (Entrega R3)**:
-  - Orden de compra vinculada a `material_procurements`, recepción atómica e idempotente por lote/centro.
+- [x] **I4 — Búsqueda de imprenta y RFQ bidireccional (Entrega R2)**:
+  - **Sourcing de Imprenta en `/materials` & Modal `PaperSourcingModal.tsx`**: Buscador de catálogo público (`MARKETPLACE`) y autorizado (`APPROVED_CUSTOMERS`), filtros de gramaje, cálculo en vivo de recuento de hojas y precio estimado total, formulación de pedidos directos (`ORDER`) y solicitudes de cotización (`RFQ`).
+  - **Gestión de Órdenes y Cotizaciones en Panel Proveedor (`/supplier/orders`)**: Pestañas de estado (`ALL`, `SUBMITTED`, `QUOTED`, `CONFIRMED`, `DISPATCHED`, `RECEIVED`, `REJECTED/CANCELLED`), filtro por tipo (`ORDER`/`RFQ`), buscador reactivo, tabla con métricas y modal accesible de detalle con ficha técnica inmutable, condiciones comerciales y formulario de cotización personalizada con fecha de vigencia.
+  - **Aceptación y Conversión de Cotizaciones**: Endpoint `POST /api/v1/paper-suppliers/orders/:id/accept-quote` permitiendo a la imprenta aceptar formalmente una cotización vigente, transicionando a `CONFIRMED`.
+  - **Dashboard Operativo Real (`/supplier/dashboard`)**: Conexión a `/api/v1/paper-suppliers/dashboard/stats` con métricas reales (`catalogVariants`, `offers: { total, active }`, `pendingRequests`, `activeOrders`, `completedOrders`) y navegación interactiva.
+- [x] **I5 — Pedido, expedición y recepción a inventario (Entrega R3)**:
+  - **Migración 166**: Creación de `supplier_paper_procurement_orders` y `supplier_paper_order_receipts` con baseline verificado (`npm run migration:integrity` PASS).
+  - **Servicio Transaccional de Compras (`paperProcurementService.js`)**:
+    - Expedición logística con registro de transportista (`carrierName`) y seguimiento (`trackingNumber`).
+    - Recepción atómica e idempotente (`receiveOrderAtomic`) con `receipt_key`, comprobación de balance, prevención de sobre-recepción (`RECEIPT_EXCEEDS_ORDERED_QUANTITY:`).
+    - Registro en `material_inventory_events` y auto-aprovisionamiento canónico en `predictive_material_inventory`.
+    - Evaluación de clave de idempotencia previa a guardas de estado para soportar repeticiones de red sobre órdenes completadas.
+  - **Verificación Reproducible**:
+    - Backend: 9/9 tests PASS en `tests/paper_supplier_procurement_and_orders.test.js` sobre MySQL efímero.
+    - Frontend: 3/3 tests PASS en `tests/SupplierOrdersAndSourcingUI.test.tsx` y 7/7 tests PASS en `tests/SupplierPagesLoadingLoop.test.tsx`.
+    - Build: `npx vite build` completado limpiamente sin advertencias de claves duplicadas (3.576 módulos).
 - [ ] **I6 — Integración de coste de papel en cálculo industrial**:
   - Adaptador de precio para `@ppos/pricing-engine` (1f8997e), snapshots inmutables en sesiones y quotes.
 - [ ] **I7 — Despliegue estable y operación**:

@@ -343,7 +343,8 @@ describe('Iteration I3: Paper Supplier Catalog & Commercial Offers Engine', () =
                 '162_phase196a_paper_suppliers_and_procurement_idempotency.sql',
                 '163_phase196b_paper_products_and_import_staging.sql',
                 '164_phase196c_supplier_paper_offers_and_revisions.sql',
-                '165_phase196d_paper_supplier_offer_soft_delete_and_catalog_associations.sql'
+                '165_phase196d_paper_supplier_offer_soft_delete_and_catalog_associations.sql',
+                '166_phase196e_supplier_paper_procurement_orders.sql'
             ]) {
                 const sql = fs.readFileSync(path.join(migrationsDir, f), 'utf8');
                 const parsed = parseMigrationSql(sql);

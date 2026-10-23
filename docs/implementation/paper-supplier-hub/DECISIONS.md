@@ -135,4 +135,42 @@
      - Dichos entornos persistentes requieren la aplicación de una migración secuencial posterior (o la ejecución manual del bloque de backfill DML) para sincronizar las filas de `supplier_paper_catalog_variants`.
 - **Consecuencia**: Aislamiento multi-proveedor robusto, cero contaminación lateral de catálogos en operaciones masivas, inmutabilidad de fichas técnicas compartidas y claridad operativa sobre la aplicación de migraciones en entornos preexistentes.
 
+---
+
+## ADR 011: Ciclo de Vida de Pedidos de Aprovisionamiento, Contratos RFQ e Inmutabilidad de Instantánea Comercial (Fases I4 & I5)
+- **Fecha**: 2026-10-23
+- **Estado**: Aceptado
+- **Contexto**:
+  La interacción entre imprentas y proveedores de papel requería un ciclo gobernado para órdenes directas (`ORDER`) y solicitudes de cotización (`RFQ`), donde:
+  a) Una alteración posterior de la oferta del proveedor no altere jamás el precio, especificaciones ni condiciones acordadas en un pedido existente.
+  b) Las solicitudes de cotización (RFQ) permitan al proveedor presentar precios y fechas de validez personalizadas, las cuales la imprenta puede aceptar formalmente convirtiendo la RFQ en orden en firme.
+- **Decisión**:
+  1. **Tablas de Aprovisionamiento y Recibos (`migrations/166_phase196e_supplier_paper_procurement_orders.sql`)**:
+     - `supplier_paper_procurement_orders`: Encabezado y contrato del pedido/RFQ con campos inmutables de snapshot técnico (`snapshot_product_name`, `snapshot_gsm`, `snapshot_width_mm`, `snapshot_height_mm`, `snapshot_finish`, `snapshot_caliper_microns`, `snapshot_grain_direction`) y financiero (`snapshot_price_per_basis`, `snapshot_pricing_formula`, `currency`, `total_amount`).
+     - `supplier_paper_order_receipts`: Libro mayor de recepciones físicas atómicas con `receipt_key` idempotente.
+  2. **Máquina de Estados Unificada**:
+     - Para `ORDER`: `SUBMITTED` -> `CONFIRMED` -> `DISPATCHED` -> `DELIVERED` -> `PARTIALLY_RECEIVED` -> `RECEIVED` (o `REJECTED`/`CANCELLED`).
+     - Para `RFQ`: `SUBMITTED` -> `QUOTED` -> `CONFIRMED` (tras aceptación explícita de la imprenta con verificación de expiración de `quote_valid_until`).
+  3. **Inmutabilidad y Preservación de Contrato**:
+     - Las modificaciones, desactivaciones o re-indexaciones de `supplier_paper_offers` posteriores a la colocación del pedido NO alteran la instantánea contractual.
+- **Consecuencia**: Seguridad jurídica y técnica entre imprentas y proveedores, prevención de desajustes contables y auditoría 100% inmutable.
+
+---
+
+## ADR 012: Entrada Idempotente en Inventario Físico con Verificación Multi-Unidad y Auto-Aprovisionamiento Predictivo (Fase I5)
+- **Fecha**: 2026-10-23
+- **Estado**: Aceptado
+- **Contexto**:
+  Al ingresar físicamente papel en la planta de la imprenta, el sistema debe registrar albaranes parciales o totales sin permitir sobre-recepciones, integrando concurrentemente `materials_catalog`, `predictive_material_inventory` y el ledger de auditoría `material_inventory_events`.
+- **Decisión**:
+  1. **Idempotencia Estricta con Verificación Previa (`receipt_key`)**:
+     - La verificación de `receipt_key` preexistente se evalúa antes de verificar el estado del pedido, garantizando que un reintento idempotente de red sobre un pedido ya `RECEIVED` responda con éxito ({ alreadyProcessed: true }) sin arrojar excepciones de balance agotado.
+  2. **Guarda Anti Sobre-Recepción**:
+     - Bloqueo estricto con prefijo `RECEIPT_EXCEEDS_ORDERED_QUANTITY:` si la suma de hojas o volumen recepcionado supera la cantidad contratada.
+  3. **Auto-Aprovisionamiento Canónico en Inventario**:
+     - Si el material no existía previamente en la planta, `predictive_material_inventory` se aprovisiona automáticamente con los campos canónicos requeridos (`material_name`, `material_type = 'PAPER'`, `paper_gsm`, `finish`, `current_stock_units`, `available_units`).
+  4. **Trazabilidad Completa en `material_inventory_events`**:
+     - Se registra `(id, material_inventory_id, event_type, quantity_units, before_stock, after_stock, operator_id, reason, metadata_json)` con auditoría completa de albarán y operador.
+- **Consecuencia**: Cero descuadres de inventario en planta, sincronización atómica entre proveedores y el ERP/MES industrial de la imprenta.
+
 

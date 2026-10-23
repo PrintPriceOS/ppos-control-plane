@@ -73,16 +73,16 @@ describe('Supplier Hub Loading Loop & Fallback Resilience Regression Suite', () 
                         }
                     });
                 }
-                if (path.startsWith('/api/v1/paper-suppliers/catalog/products')) {
+                if (path.startsWith('/api/v1/paper-suppliers/dashboard/stats')) {
                     return Promise.resolve({
                         ok: true,
-                        data: { total: 1573, products: [] }
-                    });
-                }
-                if (path.startsWith('/api/v1/paper-suppliers/offers')) {
-                    return Promise.resolve({
-                        ok: true,
-                        data: { total: 42, offers: [] }
+                        data: {
+                            catalogVariants: 1573,
+                            offers: { total: 42, active: 42 },
+                            pendingRequests: 3,
+                            activeOrders: 5,
+                            completedOrders: 12
+                        }
                     });
                 }
                 return Promise.reject(new Error(`Unhandled path: ${path}`));
@@ -98,8 +98,8 @@ describe('Supplier Hub Loading Loop & Fallback Resilience Regression Suite', () 
             expect(screen.getByText('1573')).toBeInTheDocument();
             expect(screen.getByText('42')).toBeInTheDocument();
 
-            // Initial fetch count: 3 requests (/me, /catalog, /offers)
-            expect(mockPaperSupplierFetch).toHaveBeenCalledTimes(3);
+            // Initial fetch count: 2 requests (/me, /dashboard/stats)
+            expect(mockPaperSupplierFetch).toHaveBeenCalledTimes(2);
 
             // Re-render component without changing user identity.
             // Note: getAuthUser() will parse localStorage again and return a new object reference,
@@ -113,7 +113,7 @@ describe('Supplier Hub Loading Loop & Fallback Resilience Regression Suite', () 
             );
 
             // Ensure no additional calls were made
-            expect(mockPaperSupplierFetch).toHaveBeenCalledTimes(3);
+            expect(mockPaperSupplierFetch).toHaveBeenCalledTimes(2);
 
             // Now simulate a genuine tenant/supplier identity change
             setAuthUser({
@@ -136,7 +136,7 @@ describe('Supplier Hub Loading Loop & Fallback Resilience Regression Suite', () 
 
             // Must have re-fetched because tenantId / supplierId genuinely changed
             await waitFor(() => {
-                expect(mockPaperSupplierFetch).toHaveBeenCalledTimes(6);
+                expect(mockPaperSupplierFetch).toHaveBeenCalledTimes(4);
             });
         });
 
@@ -161,16 +161,16 @@ describe('Supplier Hub Loading Loop & Fallback Resilience Regression Suite', () 
                         }
                     });
                 }
-                if (path.startsWith('/api/v1/paper-suppliers/catalog/products')) {
+                if (path.startsWith('/api/v1/paper-suppliers/dashboard/stats')) {
                     return Promise.resolve({
                         ok: true,
-                        data: { total: 240, products: [] }
-                    });
-                }
-                if (path.startsWith('/api/v1/paper-suppliers/offers')) {
-                    return Promise.resolve({
-                        ok: true,
-                        data: { total: 18, offers: [] }
+                        data: {
+                            catalogVariants: 240,
+                            offers: { total: 18, active: 18 },
+                            pendingRequests: 1,
+                            activeOrders: 2,
+                            completedOrders: 5
+                        }
                     });
                 }
                 return Promise.reject(new Error(`Unhandled path: ${path}`));
