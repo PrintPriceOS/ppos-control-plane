@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { Search, ChevronDown, Check, X } from 'lucide-react';
-import { COUNTRIES, CountryItem, filterCountries, getCountryDisplayName } from '../../lib/countryCatalog';
+import { Search, ChevronDown, Check, X, AlertTriangle } from 'lucide-react';
+import { COUNTRIES, CountryItem, filterCountries, getCountryDisplayName, getLocalizedCountryName } from '../../lib/countryCatalog';
+import { useLocale } from '../../i18n';
 
 interface CountrySelectProps {
     value: string;
@@ -29,22 +30,43 @@ export const CountrySelect: React.FC<CountrySelectProps> = ({
     showCodeInDisplay = true,
     helperText
 }) => {
+    const { locale, t } = useLocale();
     const [isOpen, setIsOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
+    const [highlightedIndex, setHighlightedIndex] = useState(0);
+
     const containerRef = useRef<HTMLDivElement>(null);
     const searchInputRef = useRef<HTMLInputElement>(null);
+    const listRef = useRef<HTMLDivElement>(null);
 
-    // Selected country item
+    // Selected country item from canonical catalog
     const selectedCountry = useMemo(() => {
         if (!value) return null;
         const norm = value.trim().toUpperCase();
         return COUNTRIES.find(c => c.code === norm) || null;
     }, [value]);
 
-    // Filtered options based on search query
+    // Localized display name for trigger button
+    const triggerDisplay = useMemo(() => {
+        if (selectedCountry) {
+            const locName = getLocalizedCountryName(selectedCountry.code, locale);
+            return showCodeInDisplay ? `${locName} (${selectedCountry.code})` : locName;
+        }
+        if (value) {
+            return null; // Will render legacy badge
+        }
+        return null;
+    }, [selectedCountry, value, locale, showCodeInDisplay]);
+
+    // Filtered options based on search query and active locale
     const filteredOptions = useMemo(() => {
-        return filterCountries(searchQuery);
-    }, [searchQuery]);
+        return filterCountries(searchQuery, locale);
+    }, [searchQuery, locale]);
+
+    // Reset highlighted index when filtered options change
+    useEffect(() => {
+        setHighlightedIndex(0);
+    }, [filteredOptions]);
 
     // Handle outside click to close dropdown
     useEffect(() => {
@@ -69,6 +91,16 @@ export const CountrySelect: React.FC<CountrySelectProps> = ({
         }
     }, [isOpen]);
 
+    // Scroll active item into view
+    useEffect(() => {
+        if (isOpen && listRef.current) {
+            const activeEl = listRef.current.children[highlightedIndex] as HTMLElement;
+            if (activeEl) {
+                activeEl.scrollIntoView({ block: 'nearest' });
+            }
+        }
+    }, [highlightedIndex, isOpen]);
+
     const handleSelect = (code: string) => {
         onChange(code);
         setIsOpen(false);
@@ -81,10 +113,54 @@ export const CountrySelect: React.FC<CountrySelectProps> = ({
         setSearchQuery('');
     };
 
+    // Keyboard navigation
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+        if (disabled) return;
+
+        if (!isOpen) {
+            if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                setIsOpen(true);
+            }
+            return;
+        }
+
+        switch (e.key) {
+            case 'ArrowDown':
+                e.preventDefault();
+                setHighlightedIndex(prev => 
+                    prev < filteredOptions.length - 1 ? prev + 1 : prev
+                );
+                break;
+            case 'ArrowUp':
+                e.preventDefault();
+                setHighlightedIndex(prev => (prev > 0 ? prev - 1 : 0));
+                break;
+            case 'Enter':
+                e.preventDefault();
+                if (filteredOptions[highlightedIndex]) {
+                    handleSelect(filteredOptions[highlightedIndex].code);
+                }
+                break;
+            case 'Escape':
+                e.preventDefault();
+                setIsOpen(false);
+                setSearchQuery('');
+                break;
+            default:
+                break;
+        }
+    };
+
+    const listboxId = id ? `${id}-listbox` : 'country-select-listbox';
+
     return (
-        <div className={`relative ${className}`} ref={containerRef}>
+        <div className={`relative ${className}`} ref={containerRef} onKeyDown={handleKeyDown}>
             {label && (
-                <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5 flex items-center justify-between">
+                <label 
+                    htmlFor={id} 
+                    className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5 flex items-center justify-between"
+                >
                     <span>
                         {label} {required && <span className="text-[#dc0000]">*</span>}
                     </span>
@@ -96,6 +172,10 @@ export const CountrySelect: React.FC<CountrySelectProps> = ({
             <button
                 type="button"
                 id={id}
+                role="combobox"
+                aria-expanded={isOpen}
+                aria-haspopup="listbox"
+                aria-controls={listboxId}
                 disabled={disabled}
                 onClick={() => !disabled && setIsOpen(prev => !prev)}
                 className={`w-full text-left bg-white dark:bg-zinc-900 border ${
@@ -104,14 +184,15 @@ export const CountrySelect: React.FC<CountrySelectProps> = ({
                         : isOpen 
                             ? 'border-[#dc0000] ring-1 ring-[#dc0000]' 
                             : 'border-zinc-300 dark:border-zinc-700 hover:border-zinc-400 dark:hover:border-zinc-600'
-                } text-zinc-900 dark:text-zinc-100 px-3 py-2 rounded-lg text-sm flex items-center justify-between transition-colors focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed`}
+                } text-zinc-900 dark:text-zinc-100 px-3.5 py-2.5 rounded-xl text-sm flex items-center justify-between transition-colors focus:outline-none focus:ring-2 focus:ring-[#dc0000]/30 disabled:opacity-50 disabled:cursor-not-allowed`}
             >
                 <span className="truncate">
-                    {selectedCountry ? (
-                        showCodeInDisplay ? `${selectedCountry.name} (${selectedCountry.code})` : selectedCountry.name
+                    {triggerDisplay ? (
+                        <span>{triggerDisplay}</span>
                     ) : value ? (
-                        <span className="text-amber-600 dark:text-amber-400 font-medium">
-                            Legacy / Unrecognized ({value})
+                        <span className="inline-flex items-center gap-1.5 text-amber-600 dark:text-amber-400 font-medium">
+                            <AlertTriangle size={14} className="shrink-0" />
+                            <span>Legacy / Unrecognized ({value})</span>
                         </span>
                     ) : (
                         <span className="text-zinc-400 dark:text-zinc-500">{placeholder}</span>
@@ -121,7 +202,8 @@ export const CountrySelect: React.FC<CountrySelectProps> = ({
                     {value && !required && !disabled && (
                         <span
                             onClick={handleClear}
-                            className="p-0.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300"
+                            title="Clear"
+                            className="p-1 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-md text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 cursor-pointer"
                         >
                             <X size={14} />
                         </span>
@@ -132,7 +214,11 @@ export const CountrySelect: React.FC<CountrySelectProps> = ({
 
             {/* Dropdown Popover */}
             {isOpen && (
-                <div className="absolute z-50 mt-1 w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl shadow-xl overflow-hidden animate-in fade-in-50 zoom-in-95 duration-150">
+                <div 
+                    id={listboxId}
+                    role="listbox"
+                    className="absolute z-50 mt-1 w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-xl overflow-hidden animate-in fade-in-50 zoom-in-95 duration-150"
+                >
                     {/* Search Field */}
                     <div className="p-2 border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/50">
                         <div className="relative">
@@ -150,7 +236,7 @@ export const CountrySelect: React.FC<CountrySelectProps> = ({
                                 <button
                                     type="button"
                                     onClick={() => setSearchQuery('')}
-                                    className="absolute right-2 top-2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"
+                                    className="absolute right-2 top-2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 cursor-pointer"
                                 >
                                     <X size={13} />
                                 </button>
@@ -159,27 +245,39 @@ export const CountrySelect: React.FC<CountrySelectProps> = ({
                     </div>
 
                     {/* Results List */}
-                    <div className="max-h-60 overflow-y-auto p-1 text-xs">
+                    <div ref={listRef} className="max-h-60 overflow-y-auto p-1 text-xs">
                         {filteredOptions.length === 0 ? (
                             <div className="py-6 px-3 text-center text-zinc-400 text-xs">
                                 No countries matching "{searchQuery}"
                             </div>
                         ) : (
-                            filteredOptions.map((c: CountryItem) => {
+                            filteredOptions.map((c: CountryItem, idx: number) => {
                                 const isSelected = selectedCountry?.code === c.code;
+                                const isHighlighted = idx === highlightedIndex;
+                                const localizedName = getLocalizedCountryName(c.code, locale);
+
                                 return (
-                                    <button
+                                    <div
                                         key={c.code}
-                                        type="button"
+                                        role="option"
+                                        aria-selected={isSelected}
                                         onClick={() => handleSelect(c.code)}
-                                        className={`w-full px-3 py-2 rounded-lg text-left text-xs font-medium flex items-center justify-between transition-colors ${
+                                        onMouseEnter={() => setHighlightedIndex(idx)}
+                                        className={`w-full px-3 py-2 rounded-lg text-left text-xs font-medium flex items-center justify-between transition-colors cursor-pointer ${
                                             isSelected
                                                 ? 'bg-red-50 dark:bg-red-950/40 text-[#dc0000] font-bold'
-                                                : 'text-zinc-800 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800'
+                                                : isHighlighted
+                                                    ? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white'
+                                                    : 'text-zinc-800 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-850'
                                         }`}
                                     >
                                         <div className="flex items-center gap-2 truncate">
-                                            <span className="truncate">{c.name}</span>
+                                            <span className="truncate">{localizedName}</span>
+                                            {localizedName !== c.name && (
+                                                <span className="text-[11px] text-zinc-400 dark:text-zinc-500 truncate">
+                                                    ({c.name})
+                                                </span>
+                                            )}
                                             <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${
                                                 isSelected 
                                                     ? 'bg-red-100 dark:bg-red-900/50 text-[#dc0000]' 
@@ -189,7 +287,7 @@ export const CountrySelect: React.FC<CountrySelectProps> = ({
                                             </span>
                                         </div>
                                         {isSelected && <Check size={14} className="text-[#dc0000] shrink-0" />}
-                                    </button>
+                                    </div>
                                 );
                             })
                         )}

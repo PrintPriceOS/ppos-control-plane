@@ -76,21 +76,21 @@ export const AccessibleModal: React.FC<AccessibleModalProps> = ({
                         leaveTo="opacity-0 scale-95"
                     >
                         <DialogPanel 
-                            className={`w-full ${maxWidth} bg-white dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 shadow-2xl flex flex-col max-h-[calc(100vh-2rem)] sm:max-h-[88vh] text-left align-middle rounded-none my-auto`}
+                            className={`w-full ${maxWidth} bg-white dark:bg-[#18181b] border border-zinc-200 dark:border-zinc-800 shadow-2xl flex flex-col max-h-[calc(100vh-2rem)] sm:max-h-[88vh] text-left align-middle rounded-2xl overflow-hidden my-auto`}
                         >
                             {/* Sticky Header */}
-                            <div className="flex items-center justify-between border-b border-slate-200 dark:border-zinc-800 px-6 py-4 shrink-0 bg-white dark:bg-zinc-950">
+                            <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800/80 px-6 py-4.5 shrink-0 bg-white dark:bg-[#18181b]">
                                 <div>
                                     {badge && (
-                                        <span className="px-2 py-0.5 text-[9px] font-black uppercase tracking-widest bg-red-600 text-white inline-block mb-1">
+                                        <span className="px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-red-600 text-white rounded-full inline-block mb-1.5 shadow-2xs">
                                             {badge}
                                         </span>
                                     )}
-                                    <DialogTitle className="text-base font-black text-slate-900 dark:text-white tracking-tight">
+                                    <DialogTitle className="text-base font-bold text-zinc-900 dark:text-zinc-100 tracking-tight">
                                         {title}
                                     </DialogTitle>
                                     {subtitle && (
-                                        <p className="text-xs text-zinc-500 mt-0.5">
+                                        <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
                                             {subtitle}
                                         </p>
                                     )}
@@ -99,7 +99,7 @@ export const AccessibleModal: React.FC<AccessibleModalProps> = ({
                                     ref={defaultCloseRef}
                                     type="button"
                                     onClick={handleClose}
-                                    className="p-1 text-zinc-400 hover:text-slate-900 dark:hover:text-white transition-colors cursor-pointer"
+                                    className="p-1.5 rounded-xl text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
                                     aria-label="Cerrar diálogo"
                                 >
                                     <XMarkIcon className="w-5 h-5" />

@@ -31,7 +31,7 @@ export const Layout: React.FC = () => {
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden relative">
         <Topbar onMenuClick={() => setIsSidebarOpen(true)} />
-        <main className={`flex-1 overflow-y-auto tactical-grid custom-scrollbar ${isPrinthouseSetup ? 'flex flex-col' : ''}`}>
+        <main className={`flex-1 overflow-y-auto custom-scrollbar ${isPrinthouseSetup ? 'flex flex-col' : ''}`}>
           <div className={isPrinthouseSetup ? 'p-2 sm:p-2.5 max-w-none flex-1 flex flex-col min-h-0 animate-slide-fade' : 'p-4 lg:p-8 max-w-none space-y-8 animate-slide-fade'}>
             <Outlet />
           </div>

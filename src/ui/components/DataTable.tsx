@@ -121,10 +121,10 @@ export function DataTable<T>({
   }
 
   return (
-    <div className="w-full bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 flex flex-col rounded-none">
+    <div className="w-full bg-white dark:bg-[#18181b] border border-zinc-200 dark:border-zinc-800 flex flex-col rounded-2xl shadow-2xs overflow-hidden">
       {/* Canonical TableToolbar */}
       {(title || enableSearch || toolbarActions) && (
-        <div className="px-4 py-3 bg-zinc-50 dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <div className="px-5 py-3.5 bg-zinc-50/80 dark:bg-zinc-900/60 border-b border-zinc-200 dark:border-zinc-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           {title && (
             <span className="font-manrope text-xs font-bold uppercase tracking-wider text-zinc-900 dark:text-zinc-100">
               {title}
@@ -133,13 +133,13 @@ export function DataTable<T>({
           <div className="flex items-center gap-3 w-full sm:w-auto justify-end flex-1">
             {enableSearch && (
               <div className="relative w-full sm:w-64">
-                <MagnifyingGlassIcon className="absolute left-2.5 top-2.5 w-4 h-4 text-zinc-400" />
+                <MagnifyingGlassIcon className="absolute left-3 top-2.5 w-4 h-4 text-zinc-400" />
                 <input
                   type="text"
                   placeholder={searchPlaceholder}
                   value={searchQuery}
                   onChange={e => { setSearchQuery(e.target.value); setCurrentPage(1); }}
-                  className="w-full pl-8 pr-3 py-1.5 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-xs font-manrope text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-[#dc0000] rounded-none"
+                  className="w-full pl-9 pr-3 py-2 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-700 text-xs font-manrope text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:ring-1 focus:ring-[#dc0000] focus:border-[#dc0000] rounded-xl transition-colors"
                 />
               </div>
             )}
@@ -230,22 +230,22 @@ export function DataTable<T>({
 
       {/* Canonical Pagination */}
       {enablePagination && totalPages > 1 && (
-        <div className="px-4 py-3 bg-zinc-50 dark:bg-zinc-900 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
+        <div className="px-5 py-3 bg-zinc-50/80 dark:bg-zinc-900/60 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
           <span className="font-manrope text-xs text-zinc-500 dark:text-zinc-400">
             Showing page <strong className="text-zinc-900 dark:text-zinc-100">{currentPage}</strong> of <strong className="text-zinc-900 dark:text-zinc-100">{totalPages}</strong>
           </span>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1.5">
             <button
               disabled={currentPage === 1}
               onClick={() => setCurrentPage(p => Math.max(p - 1, 1))}
-              className="px-2.5 py-1 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-xs font-manrope font-bold text-zinc-900 dark:text-zinc-100 disabled:opacity-40 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors"
+              className="px-3 py-1.5 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-xs font-manrope font-semibold text-zinc-900 dark:text-zinc-100 rounded-lg disabled:opacity-40 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors shadow-2xs cursor-pointer"
             >
               PREV
             </button>
             <button
               disabled={currentPage === totalPages}
               onClick={() => setCurrentPage(p => Math.min(p + 1, totalPages))}
-              className="px-2.5 py-1 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-xs font-manrope font-bold text-zinc-900 dark:text-zinc-100 disabled:opacity-40 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors"
+              className="px-3 py-1.5 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-xs font-manrope font-semibold text-zinc-900 dark:text-zinc-100 rounded-lg disabled:opacity-40 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors shadow-2xs cursor-pointer"
             >
               NEXT
             </button>

@@ -1731,6 +1731,7 @@ export const de = {
   'status.archived': 'Archiviert',
   'status.maintenance': 'Wartung',
   'status.decommissioned': 'Außer Betrieb',
+  'status.suspended': 'Ausgesetzt',
   'common.saving': 'Speichern...',
   'common.saved': 'Gespeichert',
   'common.submitting': 'Übermitteln...',

@@ -18,10 +18,10 @@ export const COLORS = {
   // Centralized adaptive token classes for pure light/dark mode governance
   adaptive: {
     // Backgrounds
-    background: "bg-zinc-50 dark:bg-zinc-950",
-    surface: "bg-white dark:bg-zinc-900",
-    surfaceElevated: "bg-white dark:bg-zinc-800",
-    surfaceMuted: "bg-zinc-100 dark:bg-zinc-800/50",
+    background: "bg-[#fafafa] dark:bg-[#0e0e0f]",
+    surface: "bg-white dark:bg-[#18181b]",
+    surfaceElevated: "bg-white dark:bg-[#202024]",
+    surfaceMuted: "bg-zinc-50 dark:bg-zinc-900/80",
 
     // Text
     textPrimary: "text-zinc-900 dark:text-zinc-100",
@@ -30,7 +30,7 @@ export const COLORS = {
 
     // Borders
     borderPrimary: "border-zinc-200 dark:border-zinc-800",
-    borderSubtle: "border-zinc-100 dark:border-zinc-800/50",
+    borderSubtle: "border-zinc-100 dark:border-zinc-800/60",
     borderElevated: "border-zinc-200 dark:border-zinc-700",
 
     // Interactive/Hover lifts
@@ -39,23 +39,23 @@ export const COLORS = {
   },
 
   drawers: {
-    overlay: "bg-zinc-900/40 backdrop-blur-sm",
-    panel: "bg-white dark:bg-zinc-950 border-l border-zinc-200 dark:border-zinc-800 shadow-2xl",
-    header: "px-6 py-6 sm:px-8 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950",
-    body: "px-6 py-8 sm:px-8 bg-white dark:bg-zinc-950",
-    footer: "px-6 py-4 sm:px-8 border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950",
-    closeBtn: "p-2 bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors",
+    overlay: "bg-black/60 backdrop-blur-sm",
+    panel: "bg-white dark:bg-[#18181b] border-l border-zinc-200 dark:border-zinc-800 shadow-2xl",
+    header: "px-6 py-6 sm:px-8 border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#18181b]",
+    body: "px-6 py-8 sm:px-8 bg-white dark:bg-[#18181b]",
+    footer: "px-6 py-4 sm:px-8 border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/60",
+    closeBtn: "p-2 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors cursor-pointer",
   },
 
   cards: {
-    base: "bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 p-4 rounded-none transition-all",
-    elevated: "bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-4 rounded-none transition-all",
+    base: "bg-white dark:bg-[#18181b] border border-zinc-200 dark:border-zinc-800 p-5 sm:p-6 rounded-2xl shadow-2xs transition-all",
+    elevated: "bg-white dark:bg-[#18181b] border border-zinc-200 dark:border-zinc-800 p-5 sm:p-6 rounded-2xl shadow-xs transition-all",
   },
 
   icons: {
-    containerDark: "bg-zinc-800 text-zinc-200",
-    containerLight: "bg-zinc-100 text-zinc-900",
-    containerAdaptive: "bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-200",
+    containerDark: "bg-zinc-800 text-zinc-200 rounded-xl",
+    containerLight: "bg-zinc-100 text-zinc-900 rounded-xl",
+    containerAdaptive: "bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-200 rounded-xl",
   },
 
   tables: {

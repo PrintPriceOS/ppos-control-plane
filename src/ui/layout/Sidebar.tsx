@@ -257,9 +257,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 title={t('nav.printhouseSetup') || 'Printhouse setup'}
                 className={`w-full flex items-center ${
                     effectiveCollapsed ? 'justify-center px-2' : 'justify-between px-3'
-                } py-2 text-xs font-bold transition-all rounded ${
+                } py-2.5 text-xs font-semibold transition-all rounded-xl ${
                     isPrinthouseSetupRoute
-                        ? 'bg-red-50/80 dark:bg-red-950/40 text-[#dc0000] dark:text-red-400'
+                        ? 'bg-red-50/80 dark:bg-red-950/40 text-[#dc0000] dark:text-red-400 font-bold'
                         : 'text-slate-600 dark:text-zinc-300 hover:bg-black/5 dark:hover:bg-white/5'
                 }`}
             >
@@ -287,9 +287,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
                             <NavLink
                                 key={sec.key}
                                 to={targetUrl}
-                                className={`flex items-start gap-2.5 px-2.5 py-1.5 text-xs font-semibold rounded transition-colors group ${
+                                className={`flex items-start gap-2.5 px-2.5 py-1.5 text-xs font-medium rounded-lg transition-colors group ${
                                     isSubActive
-                                        ? 'bg-[#dc0000] text-white font-bold shadow-xs'
+                                        ? 'bg-[#dc0000] text-white font-semibold shadow-2xs'
                                         : 'text-slate-500 dark:text-zinc-400 hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5'
                                 }`}
                             >
@@ -320,9 +320,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 to={item.path}
                 title={effectiveCollapsed ? itemLabel : undefined}
                 className={({ isActive }) => [
-                  `flex items-center ${effectiveCollapsed ? 'justify-center px-2' : 'justify-between px-3'} py-2 text-xs font-bold transition-all duration-100 group rounded`,
+                  `flex items-center ${effectiveCollapsed ? 'justify-center px-2' : 'justify-between px-3'} py-2.5 text-xs font-medium transition-all duration-100 group rounded-xl`,
                   isActive
-                    ? "bg-primary text-white"
+                    ? "bg-[#dc0000] text-white font-semibold shadow-2xs"
                     : "text-slate-500 dark:text-zinc-400 hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5"
                 ].join(" ")}
               >
@@ -331,7 +331,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   {!effectiveCollapsed && <span className="truncate">{itemLabel}</span>}
                 </div>
                 {!effectiveCollapsed && badge && (
-                  <span className="bg-primary text-white text-[9px] font-black px-1 py-0.5 uppercase shrink-0">
+                  <span className="bg-red-100 dark:bg-red-950 text-[#dc0000] dark:text-red-400 text-[9px] font-bold px-2 py-0.5 rounded-full uppercase shrink-0">
                     {badge}
                   </span>
                 )}
@@ -342,23 +342,23 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </nav>
 
       {/* Sidebar Footer */}
-      <div className={`p-2 ppos-surface-muted border-t ppos-border space-y-1 shrink-0 ${effectiveCollapsed ? 'flex flex-col items-center' : ''}`}>
+      <div className={`p-2.5 ppos-surface-muted border-t ppos-border space-y-1 shrink-0 ${effectiveCollapsed ? 'flex flex-col items-center' : ''}`}>
         <a 
           href="/admin/help" 
           title={t('nav.helpConsole') || 'OS Help Console'}
-          className={`flex items-center ${effectiveCollapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2'} text-primary hover:bg-primary hover:text-white transition-colors border border-primary/20 group rounded`}
+          className={`flex items-center ${effectiveCollapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5'} text-primary hover:bg-primary hover:text-white transition-colors border border-primary/20 group rounded-xl`}
         >
           <BookOpenIcon className="w-4 h-4 shrink-0" />
-          {!effectiveCollapsed && <span className="text-[10px] font-black uppercase truncate">{t('nav.helpConsole') || 'OS Help Console'}</span>}
+          {!effectiveCollapsed && <span className="text-[10px] font-bold uppercase tracking-wider truncate">{t('nav.helpConsole') || 'OS Help Console'}</span>}
         </a>
         
         <button 
           onClick={handleLogout}
           title={t('nav.logout') || 'Logout Session'}
-          className={`w-full flex items-center ${effectiveCollapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2'} text-slate-500 dark:text-zinc-500 hover:text-black dark:hover:text-white hover:bg-slate-200 dark:hover:bg-red-600 transition-all group rounded cursor-pointer`}
+          className={`w-full flex items-center ${effectiveCollapsed ? 'justify-center p-2' : 'gap-3 px-3 py-2.5'} text-slate-500 dark:text-zinc-400 hover:text-black dark:hover:text-white hover:bg-slate-200 dark:hover:bg-red-600 dark:hover:text-white transition-all group rounded-xl cursor-pointer`}
         >
           <ArrowPathIcon className="w-4 h-4 shrink-0" />
-          {!effectiveCollapsed && <span className="text-[10px] font-black uppercase truncate">{t('nav.logout') || 'Logout Session'}</span>}
+          {!effectiveCollapsed && <span className="text-[10px] font-bold uppercase tracking-wider truncate">{t('nav.logout') || 'Logout Session'}</span>}
         </button>
       </div>
     </aside>
