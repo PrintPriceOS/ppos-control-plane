@@ -480,6 +480,214 @@ router.post('/catalog/imports/:batchId/retract', requireSupplierScope('OPERATOR'
     }
 });
 
+const paperOfferService = require('../services/paperOfferService');
+
+/**
+ * POST /api/v1/paper-suppliers/catalog/variants/preview-action
+ * Previews impact of bulk or single variant action.
+ */
+router.post('/catalog/variants/preview-action', requireSupplierScope('VIEWER'), requireApprovedSupplier, async (req, res) => {
+    try {
+        const context = resolveActorContext(req);
+        const { action, variantIds, scope, filters } = req.body || {};
+
+        const result = await paperOfferService.previewCatalogAction({
+            tenantId: context.tenantId,
+            supplierId: context.supplierId,
+            action,
+            variantIds,
+            scope,
+            filters
+        });
+
+        return res.json({ ok: true, data: result });
+    } catch (err) {
+        console.error('[PAPER-SUPPLIERS][CATALOG-PREVIEW-ERROR]', err);
+        return res.status(500).json({
+            ok: false,
+            error: { code: 'PREVIEW_ACTION_FAILED', message: err.message }
+        });
+    }
+});
+
+/**
+ * PATCH /api/v1/paper-suppliers/catalog/variants/bulk-status
+ * Bulk archive or restore variants in supplier catalog scope.
+ */
+router.patch('/catalog/variants/bulk-status', requireSupplierScope('OPERATOR'), requireApprovedSupplier, async (req, res) => {
+    try {
+        const context = resolveActorContext(req);
+        const role = req.verifiedSupplierContext?.role || context.role;
+        const { status, variantIds, scope, filters } = req.body || {};
+
+        if (status !== 'ACTIVE' && status !== 'ARCHIVED') {
+            return res.status(400).json({
+                ok: false,
+                error: { code: 'INVALID_STATUS', message: 'Status must be ACTIVE or ARCHIVED.' }
+            });
+        }
+
+        let result;
+        if (status === 'ARCHIVED') {
+            result = await paperOfferService.archiveSupplierCatalogVariants({
+                tenantId: context.tenantId,
+                supplierId: context.supplierId,
+                actorId: context.userId,
+                role,
+                variantIds,
+                scope,
+                filters
+            });
+        } else {
+            result = await paperOfferService.restoreSupplierCatalogVariants({
+                tenantId: context.tenantId,
+                supplierId: context.supplierId,
+                actorId: context.userId,
+                role,
+                variantIds,
+                scope,
+                filters
+            });
+        }
+
+        return res.json({ ok: true, data: result });
+    } catch (err) {
+        console.error('[PAPER-SUPPLIERS][BULK-VARIANT-STATUS-ERROR]', err);
+        return res.status(500).json({
+            ok: false,
+            error: { code: 'BULK_VARIANT_STATUS_FAILED', message: err.message }
+        });
+    }
+});
+
+/**
+ * POST /api/v1/paper-suppliers/catalog/variants/bulk-withdraw
+ * Bulk withdraw variants from supplier's catalog scope.
+ */
+router.post('/catalog/variants/bulk-withdraw', requireSupplierScope('OPERATOR'), requireApprovedSupplier, async (req, res) => {
+    try {
+        const context = resolveActorContext(req);
+        const role = req.verifiedSupplierContext?.role || context.role;
+        const { variantIds, scope, filters } = req.body || {};
+
+        const result = await paperOfferService.withdrawSupplierCatalogVariants({
+            tenantId: context.tenantId,
+            supplierId: context.supplierId,
+            actorId: context.userId,
+            role,
+            variantIds,
+            scope,
+            filters
+        });
+
+        return res.json({ ok: true, data: result });
+    } catch (err) {
+        console.error('[PAPER-SUPPLIERS][BULK-VARIANT-WITHDRAW-ERROR]', err);
+        return res.status(500).json({
+            ok: false,
+            error: { code: 'BULK_VARIANT_WITHDRAW_FAILED', message: err.message }
+        });
+    }
+});
+
+/**
+ * POST /api/v1/paper-suppliers/catalog/variants/bulk-delete
+ * Bulk delete unshared variants (admin only).
+ */
+router.post('/catalog/variants/bulk-delete', requireSupplierScope('ADMIN'), requireApprovedSupplier, async (req, res) => {
+    try {
+        const context = resolveActorContext(req);
+        const role = req.verifiedSupplierContext?.role || context.role;
+        const { variantIds, scope, filters } = req.body || {};
+
+        const result = await paperOfferService.bulkDeleteTechnicalVariants({
+            tenantId: context.tenantId,
+            supplierId: context.supplierId,
+            actorId: context.userId,
+            role,
+            variantIds,
+            scope,
+            filters
+        });
+
+        return res.json({ ok: true, data: result });
+    } catch (err) {
+        console.error('[PAPER-SUPPLIERS][BULK-VARIANT-DELETE-ERROR]', err);
+        return res.status(500).json({
+            ok: false,
+            error: { code: 'BULK_VARIANT_DELETE_FAILED', message: err.message }
+        });
+    }
+});
+
+/**
+ * PATCH /api/v1/paper-suppliers/catalog/variants/:variantId/status
+ * Archive or restore single variant in supplier catalog scope.
+ */
+router.patch('/catalog/variants/:variantId/status', requireSupplierScope('OPERATOR'), requireApprovedSupplier, async (req, res) => {
+    try {
+        const context = resolveActorContext(req);
+        const role = req.verifiedSupplierContext?.role || context.role;
+        const { variantId } = req.params;
+        const { status } = req.body || {};
+
+        let result;
+        if (status === 'ARCHIVED') {
+            result = await paperOfferService.archiveSupplierCatalogVariants({
+                tenantId: context.tenantId,
+                supplierId: context.supplierId,
+                actorId: context.userId,
+                role,
+                variantIds: [variantId]
+            });
+        } else {
+            result = await paperOfferService.restoreSupplierCatalogVariants({
+                tenantId: context.tenantId,
+                supplierId: context.supplierId,
+                actorId: context.userId,
+                role,
+                variantIds: [variantId]
+            });
+        }
+
+        return res.json({ ok: true, data: result });
+    } catch (err) {
+        console.error('[PAPER-SUPPLIERS][VARIANT-STATUS-ERROR]', err);
+        return res.status(500).json({
+            ok: false,
+            error: { code: 'VARIANT_STATUS_FAILED', message: err.message }
+        });
+    }
+});
+
+/**
+ * POST /api/v1/paper-suppliers/catalog/variants/:variantId/withdraw
+ * Withdraw single variant from supplier catalog scope.
+ */
+router.post('/catalog/variants/:variantId/withdraw', requireSupplierScope('OPERATOR'), requireApprovedSupplier, async (req, res) => {
+    try {
+        const context = resolveActorContext(req);
+        const role = req.verifiedSupplierContext?.role || context.role;
+        const { variantId } = req.params;
+
+        const result = await paperOfferService.withdrawSupplierCatalogVariants({
+            tenantId: context.tenantId,
+            supplierId: context.supplierId,
+            actorId: context.userId,
+            role,
+            variantIds: [variantId]
+        });
+
+        return res.json({ ok: true, data: result });
+    } catch (err) {
+        console.error('[PAPER-SUPPLIERS][VARIANT-WITHDRAW-ERROR]', err);
+        return res.status(500).json({
+            ok: false,
+            error: { code: 'VARIANT_WITHDRAW_FAILED', message: err.message }
+        });
+    }
+});
+
 /**
  * PATCH /api/v1/paper-suppliers/catalog/variants/:variantId
  * Controlled technical modification of variant specifications.
@@ -562,8 +770,6 @@ router.delete('/catalog/variants/:variantId', requireSupplierScope('ADMIN'), req
         });
     }
 });
-
-const paperOfferService = require('../services/paperOfferService');
 
 /**
  * -------------------------------------------------------------

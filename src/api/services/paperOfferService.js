@@ -222,12 +222,22 @@ async function getTechnicalCatalog({ page = 1, limit = 20, search = null, catego
            AND (${visibilityCondition})) as active_offers_count
     `;
     
+    let catalogJoin = '';
+    let catalogSelect = '';
+    const catalogJoinParams = [];
+    if (supplierId) {
+        catalogSelect = ', spcv.status as catalog_status, spcv.deleted_at as catalog_deleted_at';
+        catalogJoin = 'LEFT JOIN supplier_paper_catalog_variants spcv ON spcv.variant_id = v.id AND spcv.supplier_id = ?';
+        catalogJoinParams.push(supplierId);
+    }
+
     // Construct parameters in exact order of appearance in dataSql:
     // 1. subqueryParams for SELECT activeOffersSubquery
-    // 2. WHERE conditions (params)
-    // 3. LIMIT
-    // 4. OFFSET
-    const dataParams = [...subqueryParams, ...params, limit, offset];
+    // 2. catalogJoinParams
+    // 3. WHERE conditions (params)
+    // 4. LIMIT
+    // 5. OFFSET
+    const dataParams = [...subqueryParams, ...catalogJoinParams, ...params, limit, offset];
 
     const dataSql = `
         SELECT 
@@ -248,8 +258,10 @@ async function getTechnicalCatalog({ page = 1, limit = 20, search = null, catego
             v.fingerprint,
             v.created_at,
             ${activeOffersSubquery}
+            ${catalogSelect}
         FROM paper_variants v
         JOIN paper_products p ON v.product_id = p.id
+        ${catalogJoin}
         ${whereSql}
         ORDER BY p.name ASC, v.gsm ASC, v.width_mm ASC
         LIMIT ? OFFSET ?
@@ -275,6 +287,9 @@ async function getTechnicalCatalog({ page = 1, limit = 20, search = null, catego
         isReel: Boolean(r.is_reel),
         fingerprint: r.fingerprint,
         activeOffersCount: Number(r.active_offers_count || 0),
+        supplierCatalogStatus: r.catalog_status || 'ACTIVE',
+        isWithdrawn: Boolean(r.catalog_deleted_at),
+        isCatalogAssociated: Boolean(r.catalog_status && !r.catalog_deleted_at),
         createdAt: r.created_at
     }));
 
@@ -387,6 +402,7 @@ function formatOfferRecord(raw) {
         deliveryZones: typeof raw.delivery_zones_json === 'string' ? JSON.parse(raw.delivery_zones_json) : (raw.delivery_zones_json || []),
         visibility: raw.visibility,
         status: raw.status,
+        deletedAt: raw.deleted_at || null,
         currentRevisionId: raw.current_revision_id,
         revisionNumber: raw.revision_number !== undefined ? Number(raw.revision_number) : (raw.current_revision_number ? Number(raw.current_revision_number) : 1),
         metadata: typeof raw.metadata_json === 'string' ? JSON.parse(raw.metadata_json) : (raw.metadata_json || {}),
@@ -978,37 +994,122 @@ async function deleteOffer({ tenantId, supplierId, actorId, role, offerId }) {
     try {
         await conn.beginTransaction();
 
-        // Audit log entry in api_audit_logs before hard deletion
+        // Check if offer has revisions that must be preserved
+        let revCountRows;
         try {
-            await conn.query(
-                `INSERT INTO api_audit_logs (id, tenant_id, user_id, event_type, status, metadata_json, created_at)
-                 VALUES (?, ?, ?, 'OFFER_DELETED', 'SUCCESS', ?, CURRENT_TIMESTAMP)`,
-                [
-                    `audit_${uuidv4().replace(/-/g, '').substring(0, 16)}`,
-                    tenantId,
-                    actorId || 'system',
-                    JSON.stringify({
-                        offerId,
-                        supplierId,
-                        supplierSku: offer.supplier_sku,
-                        deletedOfferId: offerId
-                    })
-                ]
+            [revCountRows] = await conn.query(
+                'SELECT COUNT(*) as count, MAX(revision_number) as max_rev FROM supplier_paper_offer_revisions WHERE offer_id = ?',
+                [offerId]
             );
-        } catch (auditErr) {
-            // Non-fatal if api_audit_logs is omitted in isolated ephemeral tests
+        } catch (e) {
+            revCountRows = [{ count: 0, max_rev: 0 }];
         }
+        const revisionCount = Number(revCountRows && revCountRows[0]?.count || 0);
+        const maxRev = Number(revCountRows && revCountRows[0]?.max_rev || 0);
 
-        // Delete revisions first (or rely on CASCADE)
-        await conn.query('DELETE FROM supplier_paper_offer_revisions WHERE offer_id = ?', [offerId]);
-        await conn.query('DELETE FROM supplier_paper_offers WHERE id = ?', [offerId]);
+        if (revisionCount > 0) {
+            // Logical retirement / soft-delete: append terminal revision and mark ARCHIVED + deleted_at
+            const nextRevNumber = maxRev + 1;
+            const retirementRevId = `rev_${uuidv4().replace(/-/g, '').substring(0, 16)}`;
 
-        await conn.commit();
-        return {
-            ok: true,
-            deletedOfferId: offerId,
-            supplierSku: offer.supplier_sku
-        };
+            await conn.query(`
+                INSERT INTO supplier_paper_offer_revisions (
+                    id, offer_id, revision_number, supplier_sku, price_amount, currency, price_basis,
+                    sheets_per_pack, moq, order_multiple, valid_from, valid_until, delivery_zones_json,
+                    visibility, status, change_reason, created_by, metadata_json
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'ARCHIVED', ?, ?, ?)
+            `, [
+                retirementRevId,
+                offerId,
+                nextRevNumber,
+                offer.supplier_sku,
+                offer.price_amount,
+                offer.currency,
+                offer.price_basis,
+                offer.sheets_per_pack,
+                offer.moq,
+                offer.order_multiple,
+                offer.valid_from,
+                offer.valid_until,
+                typeof offer.delivery_zones_json === 'string' ? offer.delivery_zones_json : JSON.stringify(offer.delivery_zones_json || []),
+                offer.visibility,
+                'Offer retired / soft-deleted (commercial history preserved)',
+                actorId || 'system',
+                JSON.stringify({ retiredAt: new Date().toISOString(), priorStatus: offer.status })
+            ]);
+
+            try {
+                await conn.query(
+                    'UPDATE supplier_paper_offers SET status = "ARCHIVED", deleted_at = CURRENT_TIMESTAMP, current_revision_id = ? WHERE id = ?',
+                    [retirementRevId, offerId]
+                );
+            } catch (colErr) {
+                await conn.query(
+                    'UPDATE supplier_paper_offers SET status = "ARCHIVED", current_revision_id = ? WHERE id = ?',
+                    [retirementRevId, offerId]
+                );
+            }
+
+            try {
+                await conn.query(
+                    `INSERT INTO api_audit_logs (id, tenant_id, user_id, event_type, status, metadata_json, created_at)
+                     VALUES (?, ?, ?, 'OFFER_RETIRED', 'SUCCESS', ?, CURRENT_TIMESTAMP)`,
+                    [
+                        `audit_${uuidv4().replace(/-/g, '').substring(0, 16)}`,
+                        tenantId,
+                        actorId || 'system',
+                        JSON.stringify({
+                            offerId,
+                            supplierId,
+                            supplierSku: offer.supplier_sku,
+                            logicalRetirement: true,
+                            revisionsPreserved: revisionCount + 1
+                        })
+                    ]
+                );
+            } catch (auditErr) {}
+
+            await conn.commit();
+            return {
+                ok: true,
+                deleted: true,
+                deletedOfferId: offerId,
+                supplierSku: offer.supplier_sku,
+                retired: true,
+                revisionsPreserved: revisionCount + 1
+            };
+        } else {
+            // Revisions count is 0: physical hard delete
+            await conn.query('DELETE FROM supplier_paper_offers WHERE id = ?', [offerId]);
+
+            try {
+                await conn.query(
+                    `INSERT INTO api_audit_logs (id, tenant_id, user_id, event_type, status, metadata_json, created_at)
+                     VALUES (?, ?, ?, 'OFFER_DELETED', 'SUCCESS', ?, CURRENT_TIMESTAMP)`,
+                    [
+                        `audit_${uuidv4().replace(/-/g, '').substring(0, 16)}`,
+                        tenantId,
+                        actorId || 'system',
+                        JSON.stringify({
+                            offerId,
+                            supplierId,
+                            supplierSku: offer.supplier_sku,
+                            deletedOfferId: offerId
+                        })
+                    ]
+                );
+            } catch (auditErr) {}
+
+            await conn.commit();
+            return {
+                ok: true,
+                deleted: true,
+                deletedOfferId: offerId,
+                supplierSku: offer.supplier_sku,
+                retired: false,
+                revisionsPreserved: 0
+            };
+        }
     } catch (err) {
         await conn.rollback();
         throw err;
@@ -1331,6 +1432,456 @@ async function updateTechnicalVariant({ tenantId, supplierId, actorId, role, var
     };
 }
 
+/**
+ * Preview catalog variant actions (WITHDRAW, ARCHIVE, RESTORE, DELETE).
+ * Computes affected variants, dependencies, shared status, and blocking constraints.
+ */
+async function previewCatalogAction({ tenantId, supplierId, action = 'WITHDRAW', variantIds = [], scope = 'SELECTED', filters = {} }) {
+    let targetVariantIds = [...variantIds];
+    if (scope === 'ALL_MATCHING') {
+        const catRes = await getTechnicalCatalog({
+            page: 1,
+            limit: 1000,
+            search: filters.search,
+            category: filters.category,
+            finish: filters.finish,
+            supplierId
+        });
+        targetVariantIds = (catRes.items || []).map(i => i.id);
+    }
+
+    if (targetVariantIds.length === 0) {
+        return {
+            action,
+            targetCount: 0,
+            totalSelected: 0,
+            affectedProducts: 0,
+            activeOffersCount: 0,
+            affectedOffersCount: 0,
+            sharedVariantsCount: 0,
+            isSharedProtected: false,
+            blockedCount: 0,
+            blockedItems: [],
+            warnings: [],
+            items: [],
+            variants: [],
+            canProceed: true,
+            message: 'No variants selected.'
+        };
+    }
+
+    const placeholders = targetVariantIds.map(() => '?').join(',');
+    const vRows = await db.query(`
+        SELECT v.id, v.product_id, p.name as product_name, p.category, v.gsm, v.width_mm, v.height_mm, v.finish
+        FROM paper_variants v
+        JOIN paper_products p ON v.product_id = p.id
+        WHERE v.id IN (${placeholders})
+    `, targetVariantIds);
+
+    const ownOffers = await db.query(`
+        SELECT id, variant_id, supplier_sku, status
+        FROM supplier_paper_offers
+        WHERE supplier_id = ? AND variant_id IN (${placeholders}) AND deleted_at IS NULL
+    `, [supplierId, ...targetVariantIds]);
+
+    const ownOffersByVariant = new Map();
+    for (const off of (Array.isArray(ownOffers) ? ownOffers : [])) {
+        if (!ownOffersByVariant.has(off.variant_id)) ownOffersByVariant.set(off.variant_id, []);
+        ownOffersByVariant.get(off.variant_id).push(off);
+    }
+
+    // Check shared with other suppliers
+    const otherBatchRes = await db.query(`
+        SELECT DISTINCT r.mapped_variant_id as variant_id
+        FROM paper_import_rows r
+        JOIN paper_import_batches b ON r.batch_id = b.id
+        WHERE b.supplier_id != ? AND r.mapped_variant_id IN (${placeholders})
+    `, [supplierId, ...targetVariantIds]);
+
+    const otherOffersRes = await db.query(`
+        SELECT DISTINCT variant_id
+        FROM supplier_paper_offers
+        WHERE supplier_id != ? AND variant_id IN (${placeholders}) AND deleted_at IS NULL
+    `, [supplierId, ...targetVariantIds]);
+
+    const sharedVariantSet = new Set([
+        ...(Array.isArray(otherBatchRes) ? otherBatchRes : []).map(r => r.variant_id),
+        ...(Array.isArray(otherOffersRes) ? otherOffersRes : []).map(r => r.variant_id)
+    ]);
+
+    const blockedItems = [];
+    if (action === 'DELETE') {
+        for (const v of (Array.isArray(vRows) ? vRows : [])) {
+            if (sharedVariantSet.has(v.id)) {
+                blockedItems.push({ id: v.id, reason: 'Variant is shared with other suppliers. Hard delete is forbidden.' });
+            } else if (ownOffersByVariant.has(v.id) && ownOffersByVariant.get(v.id).length > 0) {
+                blockedItems.push({ id: v.id, reason: 'Variant has commercial offers. Remove offers first.' });
+            }
+        }
+    }
+
+    const variantsList = (Array.isArray(vRows) ? vRows : []).map(v => ({
+        id: v.id,
+        productId: v.product_id,
+        productName: v.product_name,
+        category: v.category,
+        gsm: Number(v.gsm),
+        widthMm: Number(v.width_mm),
+        heightMm: Number(v.height_mm),
+        finish: v.finish,
+        isShared: sharedVariantSet.has(v.id),
+        ownOffersCount: ownOffersByVariant.get(v.id)?.length || 0
+    }));
+
+    const warnings = [];
+    if (action === 'WITHDRAW') {
+        warnings.push('Las fichas técnicas compartidas se conservarán intactas en el catálogo global y seguirán disponibles para otros proveedores.');
+        if ((Array.isArray(ownOffers) ? ownOffers : []).length > 0) {
+            warnings.push(`Se retirarán ${ownOffers.length} ofertas comerciales propias preservando el 100% del historial de revisiones.`);
+        }
+    } else if (action === 'ARCHIVE') {
+        warnings.push('El archivo en ámbito de proveedor desactiva las ofertas comerciales activas asociadas.');
+    } else if (action === 'DELETE') {
+        warnings.push('La eliminación física solo está permitida para variantes no compartidas y sin ofertas.');
+        if (sharedVariantSet.size > 0) {
+            warnings.push(`${sharedVariantSet.size} variante(s) compartida(s) con otros proveedores están bloqueadas contra borrado físico.`);
+        }
+    }
+
+    const items = (Array.isArray(vRows) ? vRows : []).map(v => {
+        const isBlocked = blockedItems.some(b => b.id === v.id);
+        const blockReason = blockedItems.find(b => b.id === v.id)?.reason || null;
+        const isShared = sharedVariantSet.has(v.id);
+        return {
+            variantId: v.id,
+            productName: v.product_name,
+            dimensions: `${v.width_mm}x${v.height_mm} mm`,
+            gsm: Number(v.gsm),
+            sharedWithOtherSuppliers: isShared,
+            actionImpact: action === 'WITHDRAW'
+                ? (isShared ? 'Retira asociación de proveedor; ficha global compartida protegida' : 'Retira variante del catálogo del proveedor')
+                : (action === 'ARCHIVE' ? 'Archiva en ámbito del proveedor' : (action === 'RESTORE' ? 'Restaura a estado activo' : 'Elimina variante física')),
+            isBlocked,
+            blockReason
+        };
+    });
+
+    return {
+        action,
+        targetCount: variantsList.length,
+        totalSelected: variantsList.length,
+        affectedProducts: new Set(variantsList.map(v => v.productId)).size,
+        activeOffersCount: (Array.isArray(ownOffers) ? ownOffers : []).length,
+        affectedOffersCount: (Array.isArray(ownOffers) ? ownOffers : []).length,
+        sharedVariantsCount: sharedVariantSet.size,
+        isSharedProtected: sharedVariantSet.size > 0,
+        blockedCount: blockedItems.length,
+        blockedItems,
+        canProceed: blockedItems.length === 0,
+        warnings,
+        items,
+        variants: variantsList,
+        message: action === 'WITHDRAW'
+            ? `Withdrawing ${variantsList.length} variant(s) from your supplier catalog. ${ownOffers.length} own commercial offer(s) will be retired with full revision preservation. ${sharedVariantSet.size} shared technical sheet(s) will remain completely intact in the global catalog.`
+            : `Executing ${action} on ${variantsList.length} variant(s).`
+    };
+}
+
+/**
+ * Archive technical variants within current supplier's catalog scope.
+ * Preserves the global paper_variants row intact.
+ */
+async function archiveSupplierCatalogVariants({ tenantId, supplierId, actorId, role, variantIds = [], scope = 'SELECTED', filters = {} }) {
+    let targetVariantIds = [...variantIds];
+    if (scope === 'ALL_MATCHING') {
+        const catRes = await getTechnicalCatalog({
+            page: 1,
+            limit: 1000,
+            search: filters.search,
+            category: filters.category,
+            finish: filters.finish,
+            supplierId
+        });
+        targetVariantIds = (catRes.items || []).map(i => i.id);
+    }
+
+    const results = [];
+    for (const vId of targetVariantIds) {
+        try {
+            // Verify variant exists in paper_variants
+            const vCheck = await db.query('SELECT id FROM paper_variants WHERE id = ?', [vId]);
+            const vRow = Array.isArray(vCheck) ? (Array.isArray(vCheck[0]) ? vCheck[0][0] : vCheck[0]) : vCheck;
+            if (!vRow || !vRow.id) {
+                results.push({
+                    id: vId,
+                    success: false,
+                    code: 'VARIANT_NOT_FOUND',
+                    message: `Technical variant '${vId}' not found.`
+                });
+                continue;
+            }
+
+            await db.query(`
+                INSERT INTO supplier_paper_catalog_variants
+                (id, tenant_id, supplier_id, variant_id, status, notes, updated_at)
+                VALUES (?, ?, ?, ?, 'ARCHIVED', 'Archived by supplier', CURRENT_TIMESTAMP)
+                ON DUPLICATE KEY UPDATE status = 'ARCHIVED', updated_at = CURRENT_TIMESTAMP
+            `, [`spcv_${uuidv4().replace(/-/g, '').substring(0, 16)}`, tenantId, supplierId, vId]);
+
+            // Archive active offers for this variant of current supplier
+            const ownActiveOffers = await db.query(
+                'SELECT id FROM supplier_paper_offers WHERE supplier_id = ? AND variant_id = ? AND status = "ACTIVE" AND deleted_at IS NULL',
+                [supplierId, vId]
+            );
+            let affectedOffers = 0;
+            const offersList = Array.isArray(ownActiveOffers) ? (Array.isArray(ownActiveOffers[0]) ? ownActiveOffers[0] : ownActiveOffers) : [];
+            for (const o of offersList) {
+                if (o && o.id) {
+                    await updateOfferStatus({
+                        offerId: o.id,
+                        tenantId,
+                        supplierId,
+                        actorId,
+                        status: 'ARCHIVED',
+                        reason: 'Variant archived in supplier catalog'
+                    });
+                    affectedOffers++;
+                }
+            }
+
+            results.push({
+                id: vId,
+                success: true,
+                status: 'ARCHIVED',
+                affectedOffersCount: affectedOffers
+            });
+        } catch (err) {
+            results.push({
+                id: vId,
+                success: false,
+                code: 'ARCHIVE_VARIANT_FAILED',
+                message: err.message
+            });
+        }
+    }
+
+    return {
+        ok: true,
+        action: 'ARCHIVE',
+        totalProcessed: targetVariantIds.length,
+        succeededCount: results.filter(r => r.success).length,
+        failedCount: results.filter(r => !r.success).length,
+        results
+    };
+}
+
+/**
+ * Restore technical variants within current supplier's catalog scope.
+ * Preserves the global paper_variants row intact.
+ */
+async function restoreSupplierCatalogVariants({ tenantId, supplierId, actorId, role, variantIds = [], scope = 'SELECTED', filters = {} }) {
+    let targetVariantIds = [...variantIds];
+    if (scope === 'ALL_MATCHING') {
+        const catRes = await getTechnicalCatalog({
+            page: 1,
+            limit: 1000,
+            search: filters.search,
+            category: filters.category,
+            finish: filters.finish,
+            supplierId
+        });
+        targetVariantIds = (catRes.items || []).map(i => i.id);
+    }
+
+    const results = [];
+    for (const vId of targetVariantIds) {
+        try {
+            const vCheck = await db.query('SELECT id FROM paper_variants WHERE id = ?', [vId]);
+            const vRow = Array.isArray(vCheck) ? (Array.isArray(vCheck[0]) ? vCheck[0][0] : vCheck[0]) : vCheck;
+            if (!vRow || !vRow.id) {
+                results.push({
+                    id: vId,
+                    success: false,
+                    code: 'VARIANT_NOT_FOUND',
+                    message: `Technical variant '${vId}' not found.`
+                });
+                continue;
+            }
+
+            await db.query(`
+                INSERT INTO supplier_paper_catalog_variants
+                (id, tenant_id, supplier_id, variant_id, status, notes, updated_at)
+                VALUES (?, ?, ?, ?, 'ACTIVE', 'Restored by supplier', CURRENT_TIMESTAMP)
+                ON DUPLICATE KEY UPDATE status = 'ACTIVE', updated_at = CURRENT_TIMESTAMP
+            `, [`spcv_${uuidv4().replace(/-/g, '').substring(0, 16)}`, tenantId, supplierId, vId]);
+
+            results.push({
+                id: vId,
+                success: true,
+                status: 'ACTIVE'
+            });
+        } catch (err) {
+            results.push({
+                id: vId,
+                success: false,
+                code: 'RESTORE_VARIANT_FAILED',
+                message: err.message
+            });
+        }
+    }
+
+    return {
+        ok: true,
+        action: 'RESTORE',
+        totalProcessed: targetVariantIds.length,
+        succeededCount: results.filter(r => r.success).length,
+        failedCount: results.filter(r => !r.success).length,
+        results
+    };
+}
+
+/**
+ * Withdraw technical variants from current supplier's catalog scope.
+ * Retires this supplier's offers preserving full revision history.
+ * Preserves the global paper_variants row intact for other suppliers.
+ */
+async function withdrawSupplierCatalogVariants({ tenantId, supplierId, actorId, role, variantIds = [], scope = 'SELECTED', filters = {} }) {
+    let targetVariantIds = [...variantIds];
+    if (scope === 'ALL_MATCHING') {
+        const catRes = await getTechnicalCatalog({
+            page: 1,
+            limit: 1000,
+            search: filters.search,
+            category: filters.category,
+            finish: filters.finish,
+            supplierId
+        });
+        targetVariantIds = (catRes.items || []).map(i => i.id);
+    }
+
+    const results = [];
+    for (const vId of targetVariantIds) {
+        try {
+            const vCheck = await db.query('SELECT id FROM paper_variants WHERE id = ?', [vId]);
+            const vRow = Array.isArray(vCheck) ? (Array.isArray(vCheck[0]) ? vCheck[0][0] : vCheck[0]) : vCheck;
+            if (!vRow || !vRow.id) {
+                results.push({
+                    id: vId,
+                    success: false,
+                    code: 'VARIANT_NOT_FOUND',
+                    message: `Technical variant '${vId}' not found.`
+                });
+                continue;
+            }
+
+            await db.query(`
+                INSERT INTO supplier_paper_catalog_variants
+                (id, tenant_id, supplier_id, variant_id, status, notes, deleted_at, updated_at)
+                VALUES (?, ?, ?, ?, 'ARCHIVED', 'Withdrawn from supplier catalog', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                ON DUPLICATE KEY UPDATE status = 'ARCHIVED', deleted_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+            `, [`spcv_${uuidv4().replace(/-/g, '').substring(0, 16)}`, tenantId, supplierId, vId]);
+
+            // Retire own offers preserving full revisions
+            const ownOffers = await db.query(
+                'SELECT id FROM supplier_paper_offers WHERE supplier_id = ? AND variant_id = ? AND deleted_at IS NULL',
+                [supplierId, vId]
+            );
+            let retiredOffersCount = 0;
+            const offersList = Array.isArray(ownOffers) ? (Array.isArray(ownOffers[0]) ? ownOffers[0] : ownOffers) : [];
+            for (const o of offersList) {
+                if (o && o.id) {
+                    await deleteOffer({
+                        tenantId,
+                        supplierId,
+                        actorId,
+                        role: 'SUPPLIER_ADMIN',
+                        offerId: o.id
+                    });
+                    retiredOffersCount++;
+                }
+            }
+
+            // Global paper_variants row is NOT touched.
+            results.push({
+                id: vId,
+                success: true,
+                withdrawn: true,
+                globalVariantPreserved: true,
+                retiredOffersCount
+            });
+        } catch (err) {
+            results.push({
+                id: vId,
+                success: false,
+                code: 'WITHDRAW_VARIANT_FAILED',
+                message: err.message
+            });
+        }
+    }
+
+    return {
+        ok: true,
+        action: 'WITHDRAW',
+        totalProcessed: targetVariantIds.length,
+        succeededCount: results.filter(r => r.success).length,
+        failedCount: results.filter(r => !r.success).length,
+        results
+    };
+}
+
+/**
+ * Bulk delete unshared technical variants for SUPPLIER_ADMIN.
+ * Fails per record if shared with other suppliers or if offers exist.
+ */
+async function bulkDeleteTechnicalVariants({ tenantId, supplierId, actorId, role, variantIds = [], scope = 'SELECTED', filters = {} }) {
+    if (role !== 'SUPPLIER_ADMIN') {
+        throw new Error('FORBIDDEN: Bulk deletion of technical variants is restricted to SUPPLIER_ADMIN.');
+    }
+
+    let targetVariantIds = [...variantIds];
+    if (scope === 'ALL_MATCHING') {
+        const catRes = await getTechnicalCatalog({
+            page: 1,
+            limit: 1000,
+            search: filters.search,
+            category: filters.category,
+            finish: filters.finish,
+            supplierId
+        });
+        targetVariantIds = (catRes.items || []).map(i => i.id);
+    }
+
+    const results = [];
+    for (const vId of targetVariantIds) {
+        try {
+            await deleteTechnicalVariant({
+                tenantId,
+                supplierId,
+                actorId,
+                role,
+                variantId: vId
+            });
+            results.push({ id: vId, success: true });
+        } catch (err) {
+            results.push({
+                id: vId,
+                success: false,
+                code: err.message.split(':')[0].trim(),
+                message: err.message
+            });
+        }
+    }
+
+    return {
+        ok: true,
+        action: 'DELETE',
+        totalProcessed: targetVariantIds.length,
+        succeededCount: results.filter(r => r.success).length,
+        failedCount: results.filter(r => !r.success).length,
+        results
+    };
+}
+
 module.exports = {
     VALID_PRICE_BASES,
     VALID_VISIBILITIES,
@@ -1348,5 +1899,10 @@ module.exports = {
     bulkDeleteOffers,
     deleteTechnicalVariant,
     retractImportBatch,
-    updateTechnicalVariant
+    updateTechnicalVariant,
+    previewCatalogAction,
+    archiveSupplierCatalogVariants,
+    restoreSupplierCatalogVariants,
+    withdrawSupplierCatalogVariants,
+    bulkDeleteTechnicalVariants
 };

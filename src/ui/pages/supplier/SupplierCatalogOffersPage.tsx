@@ -43,6 +43,13 @@ export const SupplierCatalogOffersPage: React.FC = () => {
     const [catalogSearch, setCatalogSearch] = useState<string>('');
     const [catalogCategory, setCatalogCategory] = useState<string>('');
     const [loadingCatalog, setLoadingCatalog] = useState<boolean>(false);
+    const [catalogTotalCount, setCatalogTotalCount] = useState<number>(0);
+    const [selectedCatalogVariantIds, setSelectedCatalogVariantIds] = useState<Set<string>>(new Set());
+    const [isAllMatchingCatalogSelected, setIsAllMatchingCatalogSelected] = useState<boolean>(false);
+    const [catalogActionPreview, setCatalogActionPreview] = useState<any>(null);
+    const [isCatalogPreviewModalOpen, setIsCatalogPreviewModalOpen] = useState<boolean>(false);
+    const [pendingCatalogAction, setPendingCatalogAction] = useState<'ARCHIVE' | 'RESTORE' | 'WITHDRAW' | 'DELETE' | null>(null);
+    const [executingCatalogAction, setExecutingCatalogAction] = useState<boolean>(false);
 
     // Offers state
     const [offers, setOffers] = useState<any[]>([]);
@@ -151,6 +158,7 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                 setCatalogProducts(res.data.products || res.data.items || []);
                 setCatalogPage(res.data.page || 1);
                 setCatalogTotalPages(res.data.totalPages || 1);
+                setCatalogTotalCount(res.data.total || 0);
             }
         } catch (err: any) {
             setErrorNotice(err.message || 'Error fetching technical catalog.');
@@ -242,6 +250,168 @@ export const SupplierCatalogOffersPage: React.FC = () => {
     const handleClearSelection = () => {
         setSelectedOfferIds(new Set());
         setIsAllMatchingSelected(false);
+    };
+
+    // Catalog variant selection helpers
+    const allVisibleCatalogVariantIds = catalogProducts.flatMap((p: any) =>
+        p.variants ? p.variants.map((v: any) => v.id) : []
+    );
+
+    const isCatalogPageSelected = allVisibleCatalogVariantIds.length > 0 &&
+        allVisibleCatalogVariantIds.every((id: string) => selectedCatalogVariantIds.has(id));
+
+    const handleToggleSelectVariant = (id: string) => {
+        setIsAllMatchingCatalogSelected(false);
+        setSelectedCatalogVariantIds((prev) => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
+    };
+
+    const handleToggleSelectProduct = (product: any) => {
+        setIsAllMatchingCatalogSelected(false);
+        const prodVariantIds = product.variants ? product.variants.map((v: any) => v.id) : [];
+        if (prodVariantIds.length === 0) return;
+
+        const allSelected = prodVariantIds.every((id: string) => selectedCatalogVariantIds.has(id));
+        setSelectedCatalogVariantIds((prev) => {
+            const next = new Set(prev);
+            if (allSelected) {
+                prodVariantIds.forEach((id: string) => next.delete(id));
+            } else {
+                prodVariantIds.forEach((id: string) => next.add(id));
+            }
+            return next;
+        });
+    };
+
+    const handleToggleSelectCatalogPage = () => {
+        setIsAllMatchingCatalogSelected(false);
+        if (isCatalogPageSelected) {
+            setSelectedCatalogVariantIds((prev) => {
+                const next = new Set(prev);
+                allVisibleCatalogVariantIds.forEach((id: string) => next.delete(id));
+                return next;
+            });
+        } else {
+            setSelectedCatalogVariantIds((prev) => {
+                const next = new Set(prev);
+                allVisibleCatalogVariantIds.forEach((id: string) => next.add(id));
+                return next;
+            });
+        }
+    };
+
+    const handleSelectAllMatchingCatalog = () => {
+        setIsAllMatchingCatalogSelected(true);
+        setSelectedCatalogVariantIds(new Set(allVisibleCatalogVariantIds));
+    };
+
+    const handleClearCatalogSelection = () => {
+        setSelectedCatalogVariantIds(new Set());
+        setIsAllMatchingCatalogSelected(false);
+    };
+
+    // Open catalog action preview modal
+    const handleOpenCatalogAction = async (action: 'ARCHIVE' | 'RESTORE' | 'WITHDRAW' | 'DELETE', singleVariantId?: string) => {
+        try {
+            setErrorNotice(null);
+            const targetIds = singleVariantId ? [singleVariantId] : Array.from(selectedCatalogVariantIds);
+            if (singleVariantId) {
+                setSelectedCatalogVariantIds(new Set([singleVariantId]));
+                setIsAllMatchingCatalogSelected(false);
+            }
+
+            const res = await paperSupplierFetch<any>('/api/v1/paper-suppliers/catalog/variants/preview-action', {
+                method: 'POST',
+                body: JSON.stringify({
+                    action,
+                    variantIds: targetIds,
+                    scope: isAllMatchingCatalogSelected && !singleVariantId ? 'ALL_MATCHING' : 'SELECTED',
+                    filters: { search: catalogSearch, category: catalogCategory }
+                })
+            });
+
+            if (res && res.ok && res.data) {
+                setCatalogActionPreview(res.data);
+                setPendingCatalogAction(action);
+                setIsCatalogPreviewModalOpen(true);
+            } else {
+                setErrorNotice('No se pudo generar la previsualización de la acción de catálogo.');
+            }
+        } catch (err: any) {
+            setErrorNotice(err.message || 'Error al preparar la acción de catálogo.');
+        }
+    };
+
+    // Execute confirmed catalog action
+    const handleConfirmCatalogAction = async () => {
+        if (!pendingCatalogAction) return;
+        setExecutingCatalogAction(true);
+        setErrorNotice(null);
+
+        try {
+            const targetIds = Array.from(selectedCatalogVariantIds);
+            const scope = isAllMatchingCatalogSelected ? 'ALL_MATCHING' : 'SELECTED';
+            const filters = { search: catalogSearch, category: catalogCategory };
+
+            let res: any;
+            if (pendingCatalogAction === 'ARCHIVE' || pendingCatalogAction === 'RESTORE') {
+                res = await paperSupplierFetch<any>('/api/v1/paper-suppliers/catalog/variants/bulk-status', {
+                    method: 'PATCH',
+                    body: JSON.stringify({
+                        status: pendingCatalogAction === 'ARCHIVE' ? 'ARCHIVED' : 'ACTIVE',
+                        variantIds: targetIds,
+                        scope,
+                        filters
+                    })
+                });
+            } else if (pendingCatalogAction === 'WITHDRAW') {
+                res = await paperSupplierFetch<any>('/api/v1/paper-suppliers/catalog/variants/bulk-withdraw', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        variantIds: targetIds,
+                        scope,
+                        filters
+                    })
+                });
+            } else if (pendingCatalogAction === 'DELETE') {
+                res = await paperSupplierFetch<any>('/api/v1/paper-suppliers/catalog/variants/bulk-delete', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        variantIds: targetIds,
+                        scope,
+                        filters
+                    })
+                });
+            }
+
+            if (res && res.ok && res.data) {
+                setIsCatalogPreviewModalOpen(false);
+                setSelectedCatalogVariantIds(new Set());
+                setIsAllMatchingCatalogSelected(false);
+
+                setReportModal({
+                    title: `Reporte de Operación: ${pendingCatalogAction}`,
+                    totalProcessed: res.data.totalProcessed || 0,
+                    succeededCount: res.data.succeededCount || 0,
+                    failedCount: res.data.failedCount || 0,
+                    results: res.data.results || []
+                });
+
+                setGeneralNotice(`Acción ${pendingCatalogAction} completada: ${res.data.succeededCount} procesadas correctamente.`);
+                fetchCatalog();
+                fetchOffers();
+            } else {
+                setErrorNotice(res?.error?.message || 'Error al ejecutar la acción.');
+            }
+        } catch (err: any) {
+            setErrorNotice(err.message || 'Error de comunicación.');
+        } finally {
+            setExecutingCatalogAction(false);
+        }
     };
 
     // Bulk execute status change
@@ -821,11 +991,84 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                         </div>
                     </div>
 
+                    {/* Catalog Multi-Row Sticky Action Bar */}
+                    {selectedCatalogVariantIds.size > 0 && !isReadOnly && (
+                        <div className="sticky top-0 z-20 flex flex-col sm:flex-row items-center justify-between gap-3 p-3 bg-slate-900 text-white shadow-xl border-l-4 border-red-600">
+                            <div className="flex items-center gap-3">
+                                <span className="text-xs font-bold">
+                                    {isAllMatchingCatalogSelected
+                                        ? t('supplier.hub.allMatchingVariantsSelected', { total: catalogTotalCount })
+                                        : t('supplier.hub.selectedVariantsCount', { count: selectedCatalogVariantIds.size })}
+                                </span>
+                                <button
+                                    onClick={handleClearCatalogSelection}
+                                    className="text-[11px] underline text-zinc-300 hover:text-white cursor-pointer"
+                                >
+                                    {t('supplier.hub.clearSelection')}
+                                </button>
+                            </div>
+
+                            <div className="flex items-center gap-2 flex-wrap">
+                                <button
+                                    onClick={() => handleOpenCatalogAction('ARCHIVE')}
+                                    className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white text-[10px] font-bold uppercase cursor-pointer"
+                                >
+                                    {t('supplier.hub.bulkArchive')}
+                                </button>
+                                <button
+                                    onClick={() => handleOpenCatalogAction('RESTORE')}
+                                    className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-bold uppercase cursor-pointer"
+                                >
+                                    {t('supplier.hub.bulkRestore')}
+                                </button>
+                                <button
+                                    onClick={() => handleOpenCatalogAction('WITHDRAW')}
+                                    className="px-2.5 py-1 bg-zinc-700 hover:bg-zinc-600 text-white text-[10px] font-bold uppercase cursor-pointer"
+                                    title={t('supplier.hub.withdrawConfirmWarning')}
+                                >
+                                    {t('supplier.hub.bulkWithdraw')}
+                                </button>
+                                {isAdmin && (
+                                    <button
+                                        onClick={() => handleOpenCatalogAction('DELETE')}
+                                        className="px-2.5 py-1 bg-red-600 hover:bg-red-700 text-white text-[10px] font-bold uppercase cursor-pointer"
+                                    >
+                                        {t('supplier.hub.bulkDelete')}
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Catalog Page select-all banner with prompt to select all matching across pagination */}
+                    {isCatalogPageSelected && catalogTotalCount > allVisibleCatalogVariantIds.length && !isAllMatchingCatalogSelected && (
+                        <div className="p-2.5 bg-blue-500/10 border border-blue-500/30 text-blue-600 dark:text-blue-400 text-xs flex items-center justify-between">
+                            <span>{t('supplier.hub.selectedVariantsCount', { count: allVisibleCatalogVariantIds.length })} (página actual).</span>
+                            <button
+                                onClick={handleSelectAllMatchingCatalog}
+                                className="underline font-bold text-xs hover:text-blue-700 dark:hover:text-blue-300 cursor-pointer"
+                            >
+                                {t('supplier.hub.selectAllMatchingVariants', { total: catalogTotalCount })}
+                            </button>
+                        </div>
+                    )}
+
                     {/* Technical Products & Variants Table */}
                     <div className="border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 overflow-x-auto">
                         <table className="w-full text-left border-collapse text-xs">
                             <thead>
                                 <tr className="bg-slate-100 dark:bg-zinc-900 border-b border-slate-200 dark:border-zinc-800 text-[10px] font-bold text-zinc-500 uppercase tracking-wider">
+                                    {!isReadOnly && (
+                                        <th className="p-3 w-8">
+                                            <input
+                                                type="checkbox"
+                                                checked={isCatalogPageSelected}
+                                                onChange={handleToggleSelectCatalogPage}
+                                                className="cursor-pointer"
+                                                title={t('supplier.hub.selectAllVisible')}
+                                            />
+                                        </th>
+                                    )}
                                     <th className="p-3">{t('supplier.hub.colProduct')}</th>
                                     <th className="p-3">{t('supplier.hub.colCategory')}</th>
                                     <th className="p-3">{t('supplier.hub.colFinish')}</th>
@@ -837,100 +1080,180 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                             <tbody className="divide-y divide-slate-200 dark:divide-zinc-800">
                                 {loadingCatalog ? (
                                     <tr>
-                                        <td colSpan={6} className="p-8 text-center text-zinc-400">{t('supplier.hub.loadingCatalog')}</td>
+                                        <td colSpan={isReadOnly ? 6 : 7} className="p-8 text-center text-zinc-400">{t('supplier.hub.loadingCatalog')}</td>
                                     </tr>
                                 ) : catalogProducts.length === 0 ? (
                                     <tr>
-                                        <td colSpan={6} className="p-8 text-center text-zinc-400">
+                                        <td colSpan={isReadOnly ? 6 : 7} className="p-8 text-center text-zinc-400">
                                             {t('supplier.hub.noVariants')}
                                         </td>
                                     </tr>
                                 ) : (
-                                    catalogProducts.map((prod) => (
-                                        <React.Fragment key={prod.id}>
-                                            <tr className="bg-slate-50/50 dark:bg-zinc-900/30 font-bold">
-                                                <td className="p-3 text-slate-900 dark:text-white">
-                                                    <div>{prod.name}</div>
-                                                    <span className="text-[10px] font-mono text-zinc-400">{prod.brand || 'No brand specified'}</span>
-                                                </td>
-                                                <td className="p-3">
-                                                    <span className="px-2 py-0.5 text-[9px] font-bold bg-slate-200 dark:bg-zinc-800">
-                                                        {prod.category}
-                                                    </span>
-                                                </td>
-                                                <td className="p-3 text-zinc-500">{prod.finish || '—'}</td>
-                                                <td className="p-3 font-mono text-emerald-600 dark:text-emerald-400">
-                                                    {prod.variants?.length || 0} variants
-                                                </td>
-                                                <td colSpan={2} className="p-3 text-right text-zinc-400 text-[10px] uppercase font-mono">
-                                                    Product ID: {prod.id.slice(0, 8)}
-                                                </td>
-                                            </tr>
+                                    catalogProducts.map((prod) => {
+                                        const prodVariantIds = prod.variants ? prod.variants.map((v: any) => v.id) : [];
+                                        const selectedInProd = prodVariantIds.filter((id: string) => selectedCatalogVariantIds.has(id)).length;
+                                        const allProdSelected = prodVariantIds.length > 0 && selectedInProd === prodVariantIds.length;
+                                        const someProdSelected = selectedInProd > 0 && !allProdSelected;
 
-                                            {/* Sub-rows for Variants */}
-                                            {prod.variants && prod.variants.map((v: any) => (
-                                                <tr key={v.id} className="hover:bg-slate-50 dark:hover:bg-zinc-900/60 pl-4">
-                                                    <td className="p-3 pl-8 text-zinc-600 dark:text-zinc-400 flex items-center gap-2">
-                                                        <span className="w-1.5 h-1.5 bg-red-600 rounded-full" />
-                                                        <span className="font-mono font-bold text-slate-800 dark:text-zinc-200">
-                                                            {v.widthMm} x {v.heightMm} mm
-                                                        </span>
-                                                    </td>
-                                                    <td className="p-3 font-mono font-bold text-slate-800 dark:text-zinc-200">
-                                                        {v.gsm} gsm
-                                                    </td>
-                                                    <td className="p-3 font-mono text-zinc-500">
-                                                        Caliper: {v.caliperUm ? `${v.caliperUm} µm` : (v.caliperMicrons ? `${v.caliperMicrons} µm` : '—')}
-                                                    </td>
-                                                    <td className="p-3">
-                                                        <span className="text-[10px] font-mono text-zinc-400">
-                                                            Grain: {v.grainDirection || '—'}
-                                                        </span>
-                                                    </td>
-                                                    <td className="p-3 font-mono text-[10px] text-zinc-400">
-                                                        {v.id.slice(0, 8)}
-                                                    </td>
-                                                    <td className="p-3 text-right">
-                                                        <div className="flex items-center justify-end gap-2">
-                                                            <button
-                                                                onClick={() => handleViewVariantDetail(v.id)}
-                                                                className="px-2 py-1 bg-slate-200 dark:bg-zinc-800 hover:bg-slate-300 dark:hover:bg-zinc-700 text-slate-700 dark:text-zinc-200 font-bold uppercase text-[10px] transition-colors cursor-pointer"
-                                                                title={t('supplier.hub.viewVariantDetails')}
-                                                            >
-                                                                {t('supplier.hub.viewVariantDetails')}
-                                                            </button>
-                                                            {!isReadOnly && (
-                                                                <>
-                                                                    <button
-                                                                        onClick={() => handleOpenEditVariant(v, prod.name)}
-                                                                        className="p-1 text-zinc-400 hover:text-slate-900 dark:hover:text-white transition-colors cursor-pointer"
-                                                                        title={t('supplier.hub.editVariantSpecs')}
-                                                                    >
-                                                                        <PencilSquareIcon className="w-4 h-4" />
-                                                                    </button>
-                                                                    <button
-                                                                        onClick={() => handleOpenCreateOffer({ ...v, productName: prod.name, finish: prod.finish })}
-                                                                        className="px-2.5 py-1 bg-red-600 hover:bg-red-700 text-white font-bold uppercase text-[10px] transition-colors cursor-pointer"
-                                                                    >
-                                                                        {t('supplier.hub.createOffer')}
-                                                                    </button>
-                                                                    {isAdmin && (
-                                                                        <button
-                                                                            onClick={() => handleOpenDeleteVariantConfirm(v)}
-                                                                            className="p-1 text-zinc-400 hover:text-red-600 transition-colors cursor-pointer"
-                                                                            title={t('supplier.hub.deleteVariantConfirmTitle')}
-                                                                        >
-                                                                            <TrashIcon className="w-4 h-4" />
-                                                                        </button>
-                                                                    )}
-                                                                </>
+                                        return (
+                                            <React.Fragment key={prod.id}>
+                                                <tr className="bg-slate-50/50 dark:bg-zinc-900/30 font-bold">
+                                                    {!isReadOnly && (
+                                                        <td className="p-3 w-8">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={allProdSelected}
+                                                                ref={(el) => {
+                                                                    if (el) el.indeterminate = someProdSelected;
+                                                                }}
+                                                                onChange={() => handleToggleSelectProduct(prod)}
+                                                                className="cursor-pointer"
+                                                                title={`Seleccionar todas las variantes de ${prod.name}`}
+                                                            />
+                                                        </td>
+                                                    )}
+                                                    <td className="p-3 text-slate-900 dark:text-white">
+                                                        <div className="flex items-center gap-2">
+                                                            <span>{prod.name}</span>
+                                                            {selectedInProd > 0 && (
+                                                                <span className="px-1.5 py-0.5 text-[9px] font-bold bg-red-100 dark:bg-red-950/60 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-900/50">
+                                                                    {t('supplier.hub.selectedInProduct', { selected: selectedInProd, total: prodVariantIds.length })}
+                                                                </span>
                                                             )}
                                                         </div>
+                                                        <span className="text-[10px] font-mono text-zinc-400">{prod.brand || 'No brand specified'}</span>
+                                                    </td>
+                                                    <td className="p-3">
+                                                        <span className="px-2 py-0.5 text-[9px] font-bold bg-slate-200 dark:bg-zinc-800">
+                                                            {prod.category}
+                                                        </span>
+                                                    </td>
+                                                    <td className="p-3 text-zinc-500">{prod.finish || '—'}</td>
+                                                    <td className="p-3 font-mono text-emerald-600 dark:text-emerald-400">
+                                                        {prod.variants?.length || 0} variants
+                                                    </td>
+                                                    <td colSpan={2} className="p-3 text-right text-zinc-400 text-[10px] uppercase font-mono">
+                                                        Product ID: {prod.id.slice(0, 8)}
                                                     </td>
                                                 </tr>
-                                            ))}
-                                        </React.Fragment>
-                                    ))
+
+                                                {/* Sub-rows for Variants */}
+                                                {prod.variants && prod.variants.map((v: any) => {
+                                                    const isVariantSelected = selectedCatalogVariantIds.has(v.id);
+                                                    const isWithdrawn = Boolean(v.isWithdrawn);
+                                                    const isArchived = v.supplierCatalogStatus === 'ARCHIVED';
+
+                                                    return (
+                                                        <tr key={v.id} className={`hover:bg-slate-50 dark:hover:bg-zinc-900/60 pl-4 ${isVariantSelected ? 'bg-red-50/40 dark:bg-red-950/20' : ''}`}>
+                                                            {!isReadOnly && (
+                                                                <td className="p-3 w-8">
+                                                                    <input
+                                                                        type="checkbox"
+                                                                        checked={isVariantSelected}
+                                                                        onChange={() => handleToggleSelectVariant(v.id)}
+                                                                        className="cursor-pointer"
+                                                                    />
+                                                                </td>
+                                                            )}
+                                                            <td className="p-3 pl-8 text-zinc-600 dark:text-zinc-400 flex items-center gap-2">
+                                                                <span className={`w-1.5 h-1.5 rounded-full ${isWithdrawn ? 'bg-zinc-400' : isArchived ? 'bg-amber-500' : 'bg-red-600'}`} />
+                                                                <span className="font-mono font-bold text-slate-800 dark:text-zinc-200">
+                                                                    {v.widthMm} x {v.heightMm} mm
+                                                                </span>
+                                                                {isWithdrawn && (
+                                                                    <span className="px-1.5 py-0.2 bg-zinc-200 dark:bg-zinc-800 text-zinc-500 text-[9px] font-bold uppercase">
+                                                                        {t('supplier.hub.statusWithdrawn')}
+                                                                    </span>
+                                                                )}
+                                                                {isArchived && !isWithdrawn && (
+                                                                    <span className="px-1.5 py-0.2 bg-amber-100 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400 text-[9px] font-bold uppercase">
+                                                                        {t('supplier.hub.statusArchived')}
+                                                                    </span>
+                                                                )}
+                                                            </td>
+                                                            <td className="p-3 font-mono font-bold text-slate-800 dark:text-zinc-200">
+                                                                {v.gsm} gsm
+                                                            </td>
+                                                            <td className="p-3 font-mono text-zinc-500">
+                                                                Caliper: {v.caliperUm ? `${v.caliperUm} µm` : (v.caliperMicrons ? `${v.caliperMicrons} µm` : '—')}
+                                                            </td>
+                                                            <td className="p-3">
+                                                                <span className="text-[10px] font-mono text-zinc-400">
+                                                                    Grain: {v.grainDirection || '—'}
+                                                                </span>
+                                                            </td>
+                                                            <td className="p-3 font-mono text-[10px] text-zinc-400">
+                                                                {v.id.slice(0, 8)}
+                                                            </td>
+                                                            <td className="p-3 text-right">
+                                                                <div className="flex items-center justify-end gap-1.5 flex-wrap">
+                                                                    <button
+                                                                        onClick={() => handleViewVariantDetail(v.id)}
+                                                                        className="px-2 py-1 bg-slate-200 dark:bg-zinc-800 hover:bg-slate-300 dark:hover:bg-zinc-700 text-slate-700 dark:text-zinc-200 font-bold uppercase text-[10px] transition-colors cursor-pointer"
+                                                                        title={t('supplier.hub.viewVariantDetails')}
+                                                                    >
+                                                                        {t('supplier.hub.viewVariantDetails')}
+                                                                    </button>
+                                                                    {!isReadOnly && (
+                                                                        <>
+                                                                            <button
+                                                                                onClick={() => handleOpenEditVariant(v, prod.name)}
+                                                                                className="p-1 text-zinc-400 hover:text-slate-900 dark:hover:text-white transition-colors cursor-pointer"
+                                                                                title={t('supplier.hub.editVariantSpecs')}
+                                                                            >
+                                                                                <PencilSquareIcon className="w-4 h-4" />
+                                                                            </button>
+                                                                            <button
+                                                                                onClick={() => handleOpenCreateOffer({ ...v, productName: prod.name, finish: prod.finish })}
+                                                                                className="px-2.5 py-1 bg-red-600 hover:bg-red-700 text-white font-bold uppercase text-[10px] transition-colors cursor-pointer"
+                                                                            >
+                                                                                {t('supplier.hub.createOffer')}
+                                                                            </button>
+                                                                            {isArchived ? (
+                                                                                <button
+                                                                                    onClick={() => handleOpenCatalogAction('RESTORE', v.id)}
+                                                                                    className="p-1 text-blue-600 hover:text-blue-700 transition-colors cursor-pointer"
+                                                                                    title={t('supplier.hub.restore')}
+                                                                                >
+                                                                                    <ArrowPathIcon className="w-4 h-4" />
+                                                                                </button>
+                                                                            ) : (
+                                                                                <button
+                                                                                    onClick={() => handleOpenCatalogAction('ARCHIVE', v.id)}
+                                                                                    className="p-1 text-amber-600 hover:text-amber-700 transition-colors cursor-pointer"
+                                                                                    title={t('supplier.hub.archive')}
+                                                                                >
+                                                                                    <ArchiveBoxIcon className="w-4 h-4" />
+                                                                                </button>
+                                                                            )}
+                                                                            {!isWithdrawn && (
+                                                                                <button
+                                                                                    onClick={() => handleOpenCatalogAction('WITHDRAW', v.id)}
+                                                                                    className="px-2 py-1 border border-zinc-300 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-[10px] font-bold uppercase cursor-pointer"
+                                                                                    title={t('supplier.hub.withdrawConfirmWarning')}
+                                                                                >
+                                                                                    {t('supplier.hub.withdraw')}
+                                                                                </button>
+                                                                            )}
+                                                                            {isAdmin && (
+                                                                                <button
+                                                                                    onClick={() => handleOpenDeleteVariantConfirm(v)}
+                                                                                    className="p-1 text-zinc-400 hover:text-red-600 transition-colors cursor-pointer"
+                                                                                    title={t('supplier.hub.deleteVariantConfirmTitle')}
+                                                                                >
+                                                                                    <TrashIcon className="w-4 h-4" />
+                                                                                </button>
+                                                                            )}
+                                                                        </>
+                                                                    )}
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                            </React.Fragment>
+                                        );
+                                    })
                                 )}
                             </tbody>
                         </table>
@@ -1934,6 +2257,121 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                                 </div>
                             </div>
                         )}
+                    </div>
+                )}
+            </AccessibleModal>
+
+            {/* CATALOG ACTION PREVIEW MODAL */}
+            <AccessibleModal
+                isOpen={isCatalogPreviewModalOpen}
+                onClose={() => setIsCatalogPreviewModalOpen(false)}
+                title={`${t('supplier.hub.catalogPreviewTitle')}: ${pendingCatalogAction || ''}`}
+                badge="Impact Analysis"
+                maxWidth="max-w-3xl"
+                footer={
+                    <div className="flex items-center justify-end gap-2 w-full">
+                        <button
+                            type="button"
+                            onClick={() => setIsCatalogPreviewModalOpen(false)}
+                            className="px-4 py-2 border border-slate-300 dark:border-zinc-700 text-slate-700 dark:text-zinc-300 font-bold uppercase text-[10px] cursor-pointer"
+                        >
+                            {t('supplier.hub.cancel')}
+                        </button>
+                        <button
+                            type="button"
+                            disabled={executingCatalogAction || (catalogActionPreview?.blockedCount > 0 && catalogActionPreview?.targetCount === catalogActionPreview?.blockedCount)}
+                            onClick={handleConfirmCatalogAction}
+                            className={`px-5 py-2 font-bold uppercase text-[11px] text-white transition-colors cursor-pointer disabled:opacity-50 ${
+                                pendingCatalogAction === 'DELETE'
+                                    ? 'bg-red-600 hover:bg-red-700'
+                                    : pendingCatalogAction === 'ARCHIVE'
+                                    ? 'bg-amber-600 hover:bg-amber-700'
+                                    : pendingCatalogAction === 'WITHDRAW'
+                                    ? 'bg-zinc-800 hover:bg-zinc-900 dark:bg-zinc-700 dark:hover:bg-zinc-600'
+                                    : 'bg-blue-600 hover:bg-blue-700'
+                            }`}
+                        >
+                            {executingCatalogAction ? t('supplier.hub.executingBulkAction') : t('supplier.hub.catalogPreviewExecute')}
+                        </button>
+                    </div>
+                }
+            >
+                {catalogActionPreview && (
+                    <div className="space-y-4 text-xs">
+                        {/* Summary Metrics */}
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                            <div className="p-3 bg-slate-100 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800">
+                                <p className="text-[10px] uppercase font-bold text-zinc-500">{t('supplier.hub.catalogPreviewAffectedCount')}</p>
+                                <p className="text-xl font-black text-slate-900 dark:text-white">{catalogActionPreview.targetCount}</p>
+                            </div>
+                            <div className="p-3 bg-slate-100 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800">
+                                <p className="text-[10px] uppercase font-bold text-zinc-500">{t('supplier.hub.catalogPreviewAffectedProducts')}</p>
+                                <p className="text-xl font-black text-slate-900 dark:text-white">{catalogActionPreview.affectedProducts}</p>
+                            </div>
+                            <div className="p-3 bg-slate-100 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800">
+                                <p className="text-[10px] uppercase font-bold text-zinc-500">{t('supplier.hub.catalogPreviewActiveOffers')}</p>
+                                <p className="text-xl font-black text-amber-600 dark:text-amber-400">{catalogActionPreview.activeOffersCount}</p>
+                            </div>
+                            <div className={`p-3 border ${
+                                catalogActionPreview.blockedCount > 0
+                                    ? 'bg-red-500/10 border-red-500/30 text-red-600 dark:text-red-400'
+                                    : 'bg-slate-100 dark:bg-zinc-900 border-slate-200 dark:border-zinc-800 text-zinc-400'
+                            }`}>
+                                <p className="text-[10px] uppercase font-bold">{t('supplier.hub.catalogPreviewBlockedCount')}</p>
+                                <p className="text-xl font-black">{catalogActionPreview.blockedCount}</p>
+                            </div>
+                        </div>
+
+                        {/* Warnings banner */}
+                        {catalogActionPreview.warnings && catalogActionPreview.warnings.length > 0 && (
+                            <div className="p-3 bg-amber-50 dark:bg-amber-950/20 border-l-4 border-amber-500 space-y-1">
+                                <div className="flex items-center gap-2 font-bold text-amber-800 dark:text-amber-300">
+                                    <ExclamationTriangleIcon className="w-4 h-4" />
+                                    <span>Advertencias de Dependencias y Preservación:</span>
+                                </div>
+                                <ul className="list-disc pl-5 text-amber-700 dark:text-amber-400 space-y-0.5 text-[11px]">
+                                    {catalogActionPreview.warnings.map((w: string, idx: number) => (
+                                        <li key={idx}>{w}</li>
+                                    ))}
+                                </ul>
+                            </div>
+                        )}
+
+                        {/* Breakdown per variant */}
+                        <div className="space-y-2">
+                            <p className="font-bold text-slate-900 dark:text-white">
+                                {t('supplier.hub.catalogPreviewActionImpact')}:
+                            </p>
+                            <div className="border border-slate-200 dark:border-zinc-800 max-h-56 overflow-y-auto divide-y divide-slate-100 dark:divide-zinc-900">
+                                {catalogActionPreview.items && catalogActionPreview.items.map((item: any) => (
+                                    <div key={item.variantId} className="p-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                                        <div className="space-y-0.5">
+                                            <div className="flex items-center gap-2">
+                                                <span className="font-bold text-slate-800 dark:text-zinc-200">{item.productName}</span>
+                                                <span className="font-mono text-zinc-500 text-[11px]">{item.dimensions} · {item.gsm} gsm</span>
+                                                {item.sharedWithOtherSuppliers && (
+                                                    <span className="px-1.5 py-0.2 bg-blue-100 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 text-[9px] font-bold">
+                                                        Ficha Compartida
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <p className="text-[11px] text-zinc-500 dark:text-zinc-400">{item.actionImpact}</p>
+                                        </div>
+                                        <div className="flex items-center gap-2 shrink-0">
+                                            {item.isBlocked ? (
+                                                <span className="px-2 py-0.5 bg-red-100 dark:bg-red-950/50 text-red-600 dark:text-red-400 text-[10px] font-bold">
+                                                    Bloqueado: {item.blockReason}
+                                                </span>
+                                            ) : (
+                                                <span className="px-2 py-0.5 bg-emerald-100 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 text-[10px] font-bold">
+                                                    Elegible
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
                     </div>
                 )}
             </AccessibleModal>

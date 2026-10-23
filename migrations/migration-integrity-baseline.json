@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-10-22T00:47:24.068Z",
+  "generatedAt": "2026-10-23T02:18:38.084Z",
   "hashAlgorithm": "sha256",
   "contentNormalization": "utf8-lf-v1",
   "approvedPrefixCollisions": {
@@ -2216,6 +2216,20 @@
       "containsTransaction": false,
       "statementTypes": [
         "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/165_phase196d_paper_supplier_offer_soft_delete_and_catalog_associations.sql",
+      "prefix": "165",
+      "canonicalSha256": "9d73dd4069006e48e1cfa706f8f90404fd438ef24f64bf0ff7129307b1536b73",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 1553,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE",
+        "ALTER_TABLE"
       ]
     }
   ]

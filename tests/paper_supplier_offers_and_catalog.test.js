@@ -67,8 +67,9 @@ function dispatch(router, req) {
     req.params = req.params || {};
     req.headers = req.headers || {};
     return new Promise((resolve) => {
+        let isResolved = false;
         const res = {
-            statusCode: 200,
+            statusCode: null,
             headers: {},
             body: null,
             status(code) {
@@ -76,13 +77,21 @@ function dispatch(router, req) {
                 return this;
             },
             json(data) {
+                if (this.statusCode === null) this.statusCode = 200;
                 this.body = data;
-                resolve(this);
+                if (!isResolved) {
+                    isResolved = true;
+                    resolve(this);
+                }
                 return this;
             },
             send(data) {
+                if (this.statusCode === null) this.statusCode = 200;
                 this.body = data;
-                resolve(this);
+                if (!isResolved) {
+                    isResolved = true;
+                    resolve(this);
+                }
                 return this;
             },
             setHeader(name, value) {
@@ -93,6 +102,8 @@ function dispatch(router, req) {
         };
 
         router(req, res, (err) => {
+            if (isResolved) return;
+            isResolved = true;
             if (err) {
                 res.statusCode = err.statusCode || err.status || 500;
                 res.body = { ok: false, error: err.message, code: err.code };
@@ -330,7 +341,8 @@ describe('Iteration I3: Paper Supplier Catalog & Commercial Offers Engine', () =
             for (const f of [
                 '162_phase196a_paper_suppliers_and_procurement_idempotency.sql',
                 '163_phase196b_paper_products_and_import_staging.sql',
-                '164_phase196c_supplier_paper_offers_and_revisions.sql'
+                '164_phase196c_supplier_paper_offers_and_revisions.sql',
+                '165_phase196d_paper_supplier_offer_soft_delete_and_catalog_associations.sql'
             ]) {
                 const sql = fs.readFileSync(path.join(migrationsDir, f), 'utf8');
                 const parsed = parseMigrationSql(sql);
@@ -1296,14 +1308,35 @@ describe('Iteration I3: Paper Supplier Catalog & Commercial Offers Engine', () =
             });
             expect(deleteRes.statusCode).toBe(200);
             expect(deleteRes.body.ok).toBe(true);
+            expect(deleteRes.body.data.retired).toBe(true);
 
-            // Verify deleted from DB
+            // Verify logically retired in DB (deleted_at set, status ARCHIVED)
             const [check] = await connectionPool.query('SELECT * FROM supplier_paper_offers WHERE id = ?', [testOff.id]);
-            expect(check.length).toBe(0);
+            expect(check.length).toBe(1);
+            expect(check[0].deleted_at).not.toBeNull();
+            expect(check[0].status).toBe('ARCHIVED');
 
-            // Verify revisions purged
+            // Verify revisions PRESERVED (initial revision + terminal retired revision)
             const [revCheck] = await connectionPool.query('SELECT * FROM supplier_paper_offer_revisions WHERE offer_id = ?', [testOff.id]);
-            expect(revCheck.length).toBe(0);
+            expect(revCheck.length).toBe(2);
+
+            // Contrast: Physical delete on unreferenced offer with 0 revisions physically removes the row
+            const orphanOfferId = 'off-orphan-zero-rev';
+            await connectionPool.query(`
+                INSERT INTO supplier_paper_offers (id, tenant_id, supplier_id, variant_id, supplier_sku, price_amount, currency, price_basis, moq, order_multiple, status, visibility)
+                VALUES (?, 'tenant-alpha', 'supp-alpha-1', 'var-munken-120-70100', 'SKU-ZERO-REV-TEST', 2.00, 'EUR', 'KG', 1, 1, 'ACTIVE', 'PRIVATE')
+            `, [orphanOfferId]);
+
+            const orphanDelRes = await dispatch(paperSuppliersRouter, {
+                method: 'DELETE',
+                url: `/offers/${orphanOfferId}`,
+                params: { offerId: orphanOfferId },
+                headers: { authorization: `Bearer ${adminToken}` }
+            });
+            expect(orphanDelRes.statusCode).toBe(200);
+            expect(orphanDelRes.body.data.deleted).toBe(true);
+            const [orphanCheck] = await connectionPool.query('SELECT * FROM supplier_paper_offers WHERE id = ?', [orphanOfferId]);
+            expect(orphanCheck.length).toBe(0);
         });
 
         it('Iter C3: DELETE /offers/:offerId blocks hard delete if procurement receipts exist (HTTP 409 OFFER_HAS_DEPENDENCIES)', async () => {
@@ -1508,14 +1541,14 @@ describe('Iteration I3: Paper Supplier Catalog & Commercial Offers Engine', () =
             const [revRows] = await connectionPool.query('SELECT * FROM supplier_paper_offer_revisions WHERE offer_id = ?', [offerId]);
             expect(revRows.length).toBe(1);
 
-            // 2. Hard delete the offer via SUPPLIER_ADMIN
-            const delRes = await dispatch(paperSuppliersRouter, {
-                method: 'DELETE',
-                url: `/offers/${offerId}`,
-                params: { offerId },
-                headers: { authorization: `Bearer ${adminToken}` }
-            });
-            expect(delRes.statusCode).toBe(200);
+            // 2. Demonstrate MySQL DDL CASCADE behavior: direct physical SQL delete cascades revisions
+            await connectionPool.query(
+                `INSERT INTO api_audit_logs (id, tenant_id, user_id, event_type, status, metadata_json, created_at)
+                 VALUES (?, ?, ?, 'OFFER_DELETED', 'SUCCESS', ?, CURRENT_TIMESTAMP)`,
+                ['audit-test-survive-01', 'tenant-alpha', 'user-admin-alpha', JSON.stringify({ deletedOfferId: offerId, supplierSku: 'AUDIT-SURVIVE-01' })]
+            );
+
+            await connectionPool.query('DELETE FROM supplier_paper_offers WHERE id = ?', [offerId]);
 
             // Parent offer is deleted from supplier_paper_offers
             const [postDelOffer] = await connectionPool.query('SELECT * FROM supplier_paper_offers WHERE id = ?', [offerId]);
@@ -1721,6 +1754,220 @@ describe('Iteration I3: Paper Supplier Catalog & Commercial Offers Engine', () =
                 conn1.release();
                 conn2.release();
             }
+        });
+    });
+
+    describe('8. Commercial Revisions Preservation, Catalog Associations & Granular Lifecycle', () => {
+        it('Offer logical retirement preserves 100% of revisions in supplier_paper_offer_revisions instead of cascading delete', async () => {
+            if (!isDbConfigured) return;
+
+            const adminToken = generateToken({ id: 'user-admin-alpha', userId: 'user-admin-alpha', tenantId: 'tenant-alpha', supplierId: 'supp-alpha-1', role: 'SUPPLIER_ADMIN' });
+
+            // 1. Create offer -> revision #1
+            const createRes = await dispatch(paperSuppliersRouter, {
+                method: 'POST',
+                url: '/offers',
+                body: {
+                    variantId: 'var-munken-120-70100',
+                    supplierSku: 'SKU-REVISION-LEDGER-01',
+                    priceAmount: 850.50,
+                    currency: 'EUR',
+                    priceBasis: 'TONNE',
+                    moq: 1,
+                    orderMultiple: 1,
+                    deliveryZones: ['ES', 'PT'],
+                    visibility: 'APPROVED_CUSTOMERS',
+                    changeReason: 'Initial revision v1'
+                },
+                headers: { authorization: `Bearer ${adminToken}` }
+            });
+            expect(createRes.statusCode).toBe(201);
+            const offerId = createRes.body.data.id;
+
+            // 2. Update offer price -> revision #2
+            const updateRes1 = await dispatch(paperSuppliersRouter, {
+                method: 'PUT',
+                url: `/offers/${offerId}`,
+                params: { offerId },
+                body: {
+                    priceAmount: 890.00,
+                    changeReason: 'Price adjustment Q4 v2'
+                },
+                headers: { authorization: `Bearer ${adminToken}` }
+            });
+            expect(updateRes1.statusCode).toBe(200);
+
+            // 3. Update delivery zones -> revision #3
+            const updateRes2 = await dispatch(paperSuppliersRouter, {
+                method: 'PUT',
+                url: `/offers/${offerId}`,
+                params: { offerId },
+                body: {
+                    deliveryZones: ['ES', 'PT', 'FR'],
+                    changeReason: 'Expanding zones to France v3'
+                },
+                headers: { authorization: `Bearer ${adminToken}` }
+            });
+            expect(updateRes2.statusCode).toBe(200);
+
+            // Verify 3 revisions exist before delete
+            const [revsBefore] = await connectionPool.query(
+                'SELECT * FROM supplier_paper_offer_revisions WHERE offer_id = ? ORDER BY revision_number ASC',
+                [offerId]
+            );
+            expect(revsBefore.length).toBe(3);
+
+            // 4. DELETE the offer
+            const delRes = await dispatch(paperSuppliersRouter, {
+                method: 'DELETE',
+                url: `/offers/${offerId}`,
+                params: { id: offerId },
+                headers: { authorization: `Bearer ${adminToken}` }
+            });
+            expect(delRes.statusCode).toBe(200);
+            expect(delRes.body.ok).toBe(true);
+            expect(delRes.body.data.retired).toBe(true);
+
+            // 5. CRUCIAL ASSERTION: Revisions are NOT destroyed by ON DELETE CASCADE!
+            const [revsAfter] = await connectionPool.query(
+                'SELECT * FROM supplier_paper_offer_revisions WHERE offer_id = ? ORDER BY revision_number ASC',
+                [offerId]
+            );
+            expect(revsAfter.length).toBe(4);
+            expect(revsAfter[3].status).toBe('ARCHIVED');
+            expect(revsAfter[3].change_reason).toContain('Offer retired / soft-deleted');
+
+            // 6. Offer row in supplier_paper_offers is retained with deleted_at and status ARCHIVED
+            const [offerRows] = await connectionPool.query(
+                'SELECT id, deleted_at, status FROM supplier_paper_offers WHERE id = ?',
+                [offerId]
+            );
+            expect(offerRows.length).toBe(1);
+            expect(offerRows[0].deleted_at).not.toBeNull();
+            expect(offerRows[0].status).toBe('ARCHIVED');
+
+            // 7. GET /offers/:id retrieves the retired offer along with full revision ledger
+            const getRes = await dispatch(paperSuppliersRouter, {
+                method: 'GET',
+                url: `/offers/${offerId}`,
+                params: { id: offerId },
+                headers: { authorization: `Bearer ${adminToken}` }
+            });
+            expect(getRes.statusCode).toBe(200);
+            expect(getRes.body.data.deletedAt).not.toBeNull();
+            expect(getRes.body.data.revisions.length).toBe(4);
+            const revReasons = getRes.body.data.revisions.map(r => r.changeReason);
+            expect(revReasons).toContain('Initial revision v1');
+            expect(revReasons).toContain('Price adjustment Q4 v2');
+            expect(revReasons).toContain('Expanding zones to France v3');
+            expect(revReasons).toContain('Offer retired / soft-deleted (commercial history preserved)');
+        });
+
+        it('Supplier-scoped variant withdrawal records association and offers as withdrawn/archived without destroying shared paper_variants', async () => {
+            if (!isDbConfigured) return;
+
+            const adminToken = generateToken({ id: 'user-admin-alpha', userId: 'user-admin-alpha', tenantId: 'tenant-alpha', supplierId: 'supp-alpha-1', role: 'SUPPLIER_ADMIN' });
+            const varId = 'var-munken-120-70100';
+
+            // Preview catalog withdrawal
+            const previewRes = await dispatch(paperSuppliersRouter, {
+                method: 'POST',
+                url: '/catalog/variants/preview-action',
+                body: {
+                    action: 'WITHDRAW',
+                    variantIds: [varId],
+                    scope: 'SELECTED'
+                },
+                headers: { authorization: `Bearer ${adminToken}` }
+            });
+            expect(previewRes.statusCode).toBe(200);
+            expect(previewRes.body.data.targetCount).toBe(1);
+            expect(previewRes.body.data.warnings.length).toBeGreaterThan(0);
+
+            // Execute withdrawal
+            const withdrawRes = await dispatch(paperSuppliersRouter, {
+                method: 'POST',
+                url: '/catalog/variants/bulk-withdraw',
+                body: {
+                    variantIds: [varId],
+                    scope: 'SELECTED'
+                },
+                headers: { authorization: `Bearer ${adminToken}` }
+            });
+            expect(withdrawRes.statusCode).toBe(200);
+            expect(withdrawRes.body.data.succeededCount).toBe(1);
+
+            // Verification 1: Association in supplier_paper_catalog_variants is recorded as withdrawn
+            const [assocRows] = await connectionPool.query(
+                'SELECT * FROM supplier_paper_catalog_variants WHERE supplier_id = "supp-alpha-1" AND variant_id = ?',
+                [varId]
+            );
+            expect(assocRows.length).toBe(1);
+            expect(assocRows[0].status).toBe('ARCHIVED');
+            expect(assocRows[0].deleted_at).not.toBeNull();
+            expect(assocRows[0].notes).toContain('Withdrawn');
+
+            // Verification 2: Shared canonical record in paper_variants is 100% UNTOUCHED
+            const [variantRows] = await connectionPool.query(
+                'SELECT * FROM paper_variants WHERE id = ?',
+                [varId]
+            );
+            expect(variantRows.length).toBe(1);
+
+            // Verification 3: Supplier Beta can still see the variant in catalog
+            const betaToken = generateToken({ id: 'user-op-beta-1', userId: 'user-op-beta-1', tenantId: 'tenant-beta', supplierId: 'supp-beta-1', role: 'SUPPLIER_OPERATOR' });
+            const betaCatalogRes = await dispatch(paperSuppliersRouter, {
+                method: 'GET',
+                url: '/catalog/products',
+                headers: { authorization: `Bearer ${betaToken}` }
+            });
+            expect(betaCatalogRes.statusCode).toBe(200);
+            const munkenInBeta = betaCatalogRes.body.data.products.find((p) => p.id === 'prod-munken-1');
+            expect(munkenInBeta).toBeDefined();
+            const varInBeta = munkenInBeta.variants.find((v) => v.id === varId);
+            expect(varInBeta).toBeDefined();
+            expect(varInBeta.isWithdrawn).toBe(false);
+        });
+
+        it('Enforces cross-supplier isolation and returns granular results and error reporting on mixed batch', async () => {
+            if (!isDbConfigured) return;
+
+            const alphaToken = generateToken({ id: 'user-op-alpha', userId: 'user-op-alpha', tenantId: 'tenant-alpha', supplierId: 'supp-alpha-1', role: 'SUPPLIER_OPERATOR' });
+            const betaToken = generateToken({ id: 'user-op-beta-1', userId: 'user-op-beta-1', tenantId: 'tenant-beta', supplierId: 'supp-beta-1', role: 'SUPPLIER_OPERATOR' });
+
+            // Supplier Beta attempts to archive variant with non-existent ID + existing ID
+            const mixedBatchRes = await dispatch(paperSuppliersRouter, {
+                method: 'PATCH',
+                url: '/catalog/variants/bulk-status',
+                body: {
+                    status: 'ARCHIVED',
+                    variantIds: ['var-munken-150-70100', 'var-ghost-id-999'],
+                    scope: 'SELECTED'
+                },
+                headers: { authorization: `Bearer ${betaToken}` }
+            });
+
+            expect(mixedBatchRes.statusCode).toBe(200);
+            expect(mixedBatchRes.body.data.totalProcessed).toBe(2);
+            expect(mixedBatchRes.body.data.succeededCount).toBe(1);
+            expect(mixedBatchRes.body.data.failedCount).toBe(1);
+            expect(mixedBatchRes.body.data.results).toEqual(
+                expect.arrayContaining([
+                    expect.objectContaining({ id: 'var-munken-150-70100', success: true }),
+                    expect.objectContaining({ id: 'var-ghost-id-999', success: false, code: 'VARIANT_NOT_FOUND' })
+                ])
+            );
+
+            // Supplier Beta's archive of var-munken-150 does NOT affect Supplier Alpha's catalog view
+            const alphaCatalogRes = await dispatch(paperSuppliersRouter, {
+                method: 'GET',
+                url: '/catalog/products',
+                headers: { authorization: `Bearer ${alphaToken}` }
+            });
+            expect(alphaCatalogRes.statusCode).toBe(200);
+            const munkenInAlpha = alphaCatalogRes.body.data.products.find((p) => p.id === 'prod-munken-1');
+            const var150InAlpha = munkenInAlpha.variants.find((v) => v.id === 'var-munken-150-70100');
+            expect(var150InAlpha.supplierCatalogStatus).not.toBe('ARCHIVED');
         });
     });
 
