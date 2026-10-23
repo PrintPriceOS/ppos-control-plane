@@ -367,7 +367,7 @@ export const MaterialsPage: React.FC = () => {
     const renderRiskBadge = (mat: any) => {
         const norm = normalizeMaterialStatus(mat, mat?.shortage_risk);
         return (
-            <span className={`inline-flex items-center px-2 py-0.5 rounded-none text-[10px] font-bold tracking-wider font-manrope uppercase border ${norm.className}`}>
+            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wider font-manrope uppercase border ${norm.className}`}>
                 {norm.label === 'Critical' ? (
                     <ExclamationTriangleIcon className="w-3 h-3 mr-1 flex-shrink-0" />
                 ) : norm.label === 'At Risk' || norm.label === 'Locked' ? (
@@ -383,7 +383,7 @@ export const MaterialsPage: React.FC = () => {
     const renderStatusBadge = (mat: any) => {
         const norm = normalizeMaterialStatus(mat, mat?.status || mat?.operational_status);
         return (
-            <span className={`px-2 py-0.5 text-[10px] font-manrope font-bold tracking-wider rounded-none uppercase border ${norm.className}`}>
+            <span className={`px-2.5 py-0.5 text-[10px] font-manrope font-bold tracking-wider rounded-full uppercase border ${norm.className}`}>
                 {norm.label}
             </span>
         );
@@ -396,12 +396,12 @@ export const MaterialsPage: React.FC = () => {
     return (
         <div className={`space-y-6 ${isLight ? 'text-zinc-900' : 'text-zinc-100'} ppos-layout-transition font-manrope`}>
             {/* Header Section */}
-            <div className={`flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 border rounded-none transition-all ${
-                isLight ? 'bg-white border-zinc-200' : 'bg-zinc-950 border-zinc-800'
+            <div className={`flex flex-col md:flex-row md:items-center justify-between gap-4 p-5 border rounded-2xl shadow-2xs transition-all ${
+                isLight ? 'bg-white border-zinc-200' : 'bg-[#18181b] border-zinc-800'
             }`}>
                 <div>
                     <div className="flex items-center space-x-2">
-                        <span className="px-2 py-0.5 text-[10px] font-manrope font-bold bg-red-500/10 text-red-500 border border-red-500/20 rounded-none uppercase tracking-widest">
+                        <span className="px-2.5 py-0.5 text-[10px] font-manrope font-bold bg-red-500/10 text-red-500 border border-red-500/20 rounded-full uppercase tracking-widest">
                             MES INVENTORY ORCHESTRATION LAYER
                         </span>
                         <span className="text-xs font-manrope text-zinc-500 font-bold">PRINTHOUSE WORKFLOW CORE</span>
@@ -420,7 +420,7 @@ export const MaterialsPage: React.FC = () => {
                 </div>
 
                 <div className="flex flex-wrap items-center gap-3">
-                    <div className={`flex items-center space-x-2 px-3 py-1.5 border rounded-none transition-all ${
+                    <div className={`flex items-center space-x-2 px-3.5 py-2 border rounded-xl transition-all ${
                         isLight ? 'bg-zinc-50 border-zinc-200' : 'bg-zinc-900 border-zinc-800'
                     }`}>
                         <CpuChipIcon className={`w-4 h-4 ${isLight ? 'text-zinc-400' : 'text-zinc-400'}`} />
@@ -437,7 +437,7 @@ export const MaterialsPage: React.FC = () => {
                             }`}
                         />
                         {targetNodeId && (
-                            <button onClick={() => setTargetNodeId("")} className="text-[10px] text-red-500 hover:underline font-manrope font-bold">
+                            <button onClick={() => setTargetNodeId("")} className="text-[10px] text-red-500 hover:underline font-manrope font-bold cursor-pointer">
                                 [clear]
                             </button>
                         )}
@@ -445,7 +445,7 @@ export const MaterialsPage: React.FC = () => {
 
                     <button
                         onClick={() => setActiveModal('ADD_MATERIAL')}
-                        className={`px-3 py-1.5 border text-xs font-manrope flex items-center space-x-1.5 transition-all rounded-none font-bold ${
+                        className={`px-4 py-2 border text-xs font-manrope flex items-center space-x-1.5 transition-all rounded-xl shadow-xs font-bold cursor-pointer ${
                             isLight 
                                 ? 'bg-red-50 hover:bg-red-100 text-red-700 border-red-200' 
                                 : 'bg-red-950 hover:bg-red-900 text-red-300 hover:text-white border-red-800'
@@ -458,7 +458,7 @@ export const MaterialsPage: React.FC = () => {
                     <button
                         onClick={() => { setLoading(true); fetchCatalog(); }}
                         disabled={loading}
-                        className={`px-3 py-1.5 border text-xs font-manrope flex items-center space-x-1 transition-all rounded-none font-bold ${
+                        className={`px-4 py-2 border text-xs font-manrope flex items-center space-x-1 transition-all rounded-xl shadow-xs font-bold cursor-pointer ${
                             isLight 
                                 ? 'bg-zinc-100 hover:bg-zinc-200 text-zinc-700 border-zinc-200 disabled:opacity-50' 
                                 : 'bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white border-zinc-700 disabled:opacity-50'
@@ -472,8 +472,8 @@ export const MaterialsPage: React.FC = () => {
 
             {/* Metrics Overview Grid */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div className={`p-4 border rounded-none relative overflow-hidden group transition-all ${
-                    isLight ? 'bg-white border-zinc-200 hover:border-zinc-300' : 'bg-zinc-950 border-zinc-800 hover:border-zinc-700'
+                <div className={`p-5 border rounded-2xl shadow-2xs relative overflow-hidden group transition-all ${
+                    isLight ? 'bg-white border-zinc-200 hover:border-zinc-300' : 'bg-[#18181b] border-zinc-800 hover:border-zinc-700'
                 }`}>
                     <div className="absolute top-0 left-0 h-full w-1 bg-zinc-700 group-hover:bg-red-500 transition-colors" />
                     <span className="text-[10px] font-manrope text-zinc-500 block uppercase tracking-wider font-bold">Registered Stock Units</span>
@@ -487,8 +487,8 @@ export const MaterialsPage: React.FC = () => {
                     }`}>Total tracked warehouse pools</span>
                 </div>
 
-                <div className={`p-4 border rounded-none relative overflow-hidden group transition-all ${
-                    isLight ? 'bg-white border-zinc-200 hover:border-zinc-300' : 'bg-zinc-950 border-zinc-800 hover:border-zinc-700'
+                <div className={`p-5 border rounded-2xl shadow-2xs relative overflow-hidden group transition-all ${
+                    isLight ? 'bg-white border-zinc-200 hover:border-zinc-300' : 'bg-[#18181b] border-zinc-800 hover:border-zinc-700'
                 }`}>
                     <div className="absolute top-0 left-0 h-full w-1 bg-zinc-700 group-hover:bg-amber-500 transition-colors" />
                     <span className="text-[10px] font-manrope text-zinc-500 block uppercase tracking-wider font-bold">Reserved Capacity Locks</span>
@@ -502,8 +502,8 @@ export const MaterialsPage: React.FC = () => {
                     }`}>Held for active dispatch tasks</span>
                 </div>
 
-                <div className={`p-4 border rounded-none relative overflow-hidden group transition-all ${
-                    isLight ? 'bg-white border-zinc-200 hover:border-zinc-300' : 'bg-zinc-950 border-zinc-800 hover:border-zinc-700'
+                <div className={`p-5 border rounded-2xl shadow-2xs relative overflow-hidden group transition-all ${
+                    isLight ? 'bg-white border-zinc-200 hover:border-zinc-300' : 'bg-[#18181b] border-zinc-800 hover:border-zinc-700'
                 }`}>
                     <div className="absolute top-0 left-0 h-full w-1 bg-zinc-700 group-hover:bg-emerald-500 transition-colors" />
                     <span className="text-[10px] font-manrope text-zinc-500 block uppercase tracking-wider font-bold">Net Available Pool</span>
@@ -517,8 +517,8 @@ export const MaterialsPage: React.FC = () => {
                     }`}>Unallocated threshold surplus</span>
                 </div>
 
-                <div className={`p-4 border rounded-none relative overflow-hidden group transition-all ${
-                    isLight ? 'bg-white border-zinc-200 hover:border-zinc-300' : 'bg-zinc-950 border-zinc-800 hover:border-zinc-700'
+                <div className={`p-5 border rounded-2xl shadow-2xs relative overflow-hidden group transition-all ${
+                    isLight ? 'bg-white border-zinc-200 hover:border-zinc-300' : 'bg-[#18181b] border-zinc-800 hover:border-zinc-700'
                 }`}>
                     <div className="absolute top-0 left-0 h-full w-1 bg-zinc-700 group-hover:bg-red-500 transition-colors" />
                     <span className="text-[10px] font-manrope text-zinc-500 block uppercase tracking-wider font-bold">Shortage Impact Indicators</span>
@@ -535,7 +535,7 @@ export const MaterialsPage: React.FC = () => {
 
             {/* Action Feedback Alerts */}
             {actionFeedback && (
-                <div className={`p-3 border text-xs font-manrope flex items-center justify-between rounded-none animate-fade-in ${
+                <div className={`p-3.5 border text-xs font-manrope flex items-center justify-between rounded-xl animate-fade-in ${
                     actionFeedback.type === 'success' 
                         ? (isLight ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-emerald-950/80 border-emerald-800 text-emerald-300') 
                         : (isLight ? 'bg-red-50 border-red-200 text-red-800' : 'bg-red-950/80 border-red-800 text-red-300')
@@ -548,7 +548,7 @@ export const MaterialsPage: React.FC = () => {
                         )}
                         <span>{toDisplayText(actionFeedback.message)}</span>
                     </div>
-                    <button onClick={() => setActionFeedback(null)} className={`text-[10px] underline uppercase tracking-wider ml-2 font-bold ${isLight ? 'hover:text-zinc-900 text-zinc-600' : 'hover:text-white text-zinc-400'}`}>
+                    <button onClick={() => setActionFeedback(null)} className={`text-[10px] underline uppercase tracking-wider ml-2 font-bold cursor-pointer ${isLight ? 'hover:text-zinc-900 text-zinc-600' : 'hover:text-white text-zinc-400'}`}>
                         Dismiss
                     </button>
                 </div>
@@ -558,211 +558,213 @@ export const MaterialsPage: React.FC = () => {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Catalog Table Area (Spans 2 Cols) */}
                 <div className="lg:col-span-2 space-y-4">
-                    <div className={`p-4 border rounded-none flex items-center justify-between transition-all ${
-                        isLight ? 'bg-zinc-50 border-zinc-200' : 'bg-zinc-950 border-zinc-800'
+                    <div className={`border rounded-2xl overflow-hidden shadow-2xs transition-all ${
+                        isLight ? 'bg-white border-zinc-200' : 'bg-[#18181b] border-zinc-800'
                     }`}>
-                        <span className={`text-xs font-manrope font-bold uppercase tracking-wider flex items-center ${
-                            isLight ? 'text-zinc-900' : 'text-zinc-300'
+                        <div className={`p-4 border-b flex items-center justify-between transition-all ${
+                            isLight ? 'bg-zinc-50/75 border-zinc-200' : 'bg-zinc-900/60 border-zinc-800'
                         }`}>
-                            <span className="w-2 h-2 bg-red-500 rounded-full mr-2 animate-ping" />
-                            Inventory Substrate Pool Datastore
-                        </span>
-                        <span className="text-[10px] font-manrope font-bold text-zinc-500">
-                            Operator SCADA Controls
-                        </span>
-                    </div>
+                            <span className={`text-xs font-manrope font-bold uppercase tracking-wider flex items-center ${
+                                isLight ? 'text-zinc-900' : 'text-zinc-300'
+                            }`}>
+                                <span className="w-2 h-2 bg-red-500 rounded-full mr-2 animate-ping" />
+                                Inventory Substrate Pool Datastore
+                            </span>
+                            <span className="text-[10px] font-manrope font-bold text-zinc-500">
+                                Operator SCADA Controls
+                            </span>
+                        </div>
 
-                    <div className={`border rounded-none overflow-x-auto transition-all ${
-                        isLight ? 'bg-white border-zinc-200' : 'bg-zinc-950 border-zinc-800'
-                    }`}>
-                        {loading && materials.length === 0 ? (
-                            <div className="p-12 text-center text-xs font-manrope text-zinc-500 font-bold">
-                                <ArrowPathIcon className="w-6 h-6 mx-auto animate-spin text-red-500 mb-2" />
-                                Synchronizing real-time inventory SCADA registers...
-                            </div>
-                        ) : materials.length === 0 ? (
-                            <div className="p-12 text-center text-xs font-manrope text-zinc-500 font-bold">
-                                No inventory records present matching defined multi-tenant filtering.
-                            </div>
-                        ) : (
-                            <table className="w-full text-left border-collapse">
-                                <thead>
-                                    <tr className={`border-b text-[10px] font-manrope font-bold uppercase tracking-wider ${
-                                        isLight ? 'bg-zinc-50 text-zinc-500 border-zinc-200' : 'bg-zinc-900/50 text-zinc-400 border-zinc-800'
+                        <div className="overflow-x-auto">
+                            {loading && materials.length === 0 ? (
+                                <div className="p-12 text-center text-xs font-manrope text-zinc-500 font-bold">
+                                    <ArrowPathIcon className="w-6 h-6 mx-auto animate-spin text-red-500 mb-2" />
+                                    Synchronizing real-time inventory SCADA registers...
+                                </div>
+                            ) : materials.length === 0 ? (
+                                <div className="p-12 text-center text-xs font-manrope text-zinc-500 font-bold">
+                                    No inventory records present matching defined multi-tenant filtering.
+                                </div>
+                            ) : (
+                                <table className="w-full text-left border-collapse">
+                                    <thead>
+                                        <tr className={`border-b text-[10px] font-manrope font-bold uppercase tracking-wider ${
+                                            isLight ? 'bg-zinc-50 text-zinc-500 border-zinc-200' : 'bg-zinc-900/50 text-zinc-400 border-zinc-800'
+                                        }`}>
+                                            <th className="p-3">Material Profile</th>
+                                            <th className="p-3">Node Assign</th>
+                                            <th className="p-3 text-right">Physical / Net Avail</th>
+                                            <th className="p-3">Telemetry Indicators</th>
+                                            <th className="p-3">State</th>
+                                            <th className="p-3 text-center">SCADA Operations</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className={`divide-y text-xs font-manrope ${
+                                        isLight ? 'divide-zinc-100' : 'divide-zinc-800/60'
                                     }`}>
-                                        <th className="p-3">Material Profile</th>
-                                        <th className="p-3">Node Assign</th>
-                                        <th className="p-3 text-right">Physical / Net Avail</th>
-                                        <th className="p-3">Telemetry Indicators</th>
-                                        <th className="p-3">State</th>
-                                        <th className="p-3 text-center">SCADA Operations</th>
-                                    </tr>
-                                </thead>
-                                <tbody className={`divide-y text-xs font-manrope ${
-                                    isLight ? 'divide-zinc-100' : 'divide-zinc-800/60'
-                                }`}>
-                                    {materials.map((m) => {
-                                        const currentStock = Number(m.current_stock_units) || 0;
-                                        const reservedStock = Number(m.reserved_stock_units) || 0;
-                                        const avail = currentStock - reservedStock;
-                                        const isSelected = selectedMaterial?.id === m.id;
-                                        const percentageUsed = Math.min(100, Math.max(0, (reservedStock / (currentStock || 1)) * 100));
-                                        const procRisk = m.procurement_risk || 'LOW';
+                                        {materials.map((m) => {
+                                            const currentStock = Number(m.current_stock_units) || 0;
+                                            const reservedStock = Number(m.reserved_stock_units) || 0;
+                                            const avail = currentStock - reservedStock;
+                                            const isSelected = selectedMaterial?.id === m.id;
+                                            const percentageUsed = Math.min(100, Math.max(0, (reservedStock / (currentStock || 1)) * 100));
+                                            const procRisk = m.procurement_risk || 'LOW';
 
-                                        return (
-                                            <tr 
-                                                key={m.id} 
-                                                className={`transition-colors ${
-                                                    isSelected 
-                                                        ? (isLight ? 'bg-red-50/50 border-l-2 border-red-500' : 'bg-zinc-900/80 border-l-2 border-red-500') 
-                                                        : (isLight ? 'hover:bg-zinc-50' : 'hover:bg-zinc-900/40')
-                                                }`}
-                                            >
-                                                <td className="p-3">
-                                                    <div className={`font-bold flex items-center ${isLight ? 'text-zinc-900' : 'text-white'}`}>
-                                                        <span>{m.material_name}</span>
-                                                        <span className={`ml-2 px-1.5 py-0.2 text-[9px] rounded-none border font-bold ${
-                                                            isLight ? 'bg-zinc-100 text-zinc-700 border-zinc-200' : 'bg-zinc-800 text-zinc-300 border-zinc-700'
-                                                        }`}>
-                                                            {m.material_type}
-                                                        </span>
-                                                    </div>
-                                                    <div className={`text-[10px] mt-0.5 ${isLight ? 'text-zinc-500' : 'text-zinc-400'}`}>
-                                                        {m.material_type === 'PAPER' ? (
-                                                            <>
-                                                                {m.paper_gsm ? `${m.paper_gsm} GSM` : 'N/A'} • <span className={`${isLight ? 'text-zinc-700' : 'text-zinc-300'} font-semibold`}>{m.finish || 'UNCOATED'}</span>
-                                                            </>
-                                                        ) : m.material_type === 'INK' ? (
-                                                            <>
-                                                                System: <span className={`${isLight ? 'text-zinc-700' : 'text-zinc-300'} font-semibold`}>{m.metadata?.ink_system || 'CMYK Dedicated Channel'}</span> • Fluid Datastore
-                                                            </>
-                                                        ) : (
-                                                            <>
-                                                                Category: <span className={`${isLight ? 'text-zinc-700' : 'text-zinc-300'} font-semibold`}>{m.metadata?.consumable_category || 'Core Maintenance Part'}</span> • Component SCADA
-                                                            </>
-                                                        )}
-                                                    </div>
-                                                </td>
-                                                <td className={`p-3 text-[10px] ${isLight ? 'text-zinc-500' : 'text-zinc-400'}`}>
-                                                    <span className={`font-bold block ${isLight ? 'text-zinc-900' : 'text-zinc-200'}`}>{m.node_id}</span>
-                                                    <span className={isLight ? 'text-zinc-400' : 'text-zinc-500'}>Printhouse Target</span>
-                                                </td>
-                                                <td className="p-3 text-right">
-                                                    <div className={`font-bold ${isLight ? 'text-zinc-900' : 'text-white'}`}>
-                                                        {Number(m.current_stock_units).toLocaleString()} <span className={`text-[9px] font-normal ${isLight ? 'text-zinc-400' : 'text-zinc-500'}`}>units</span>
-                                                    </div>
-                                                    <div className={`text-[10px] font-bold ${avail <= 0 ? 'text-red-500' : (isLight ? 'text-emerald-600' : 'text-emerald-400')}`}>
-                                                        Net: {avail.toLocaleString()}
-                                                    </div>
-                                                    <div className={`w-full h-1 mt-1 border overflow-hidden flex ${
-                                                        isLight ? 'bg-zinc-100 border-zinc-200' : 'bg-zinc-950 border-zinc-800'
-                                                    }`}>
-                                                        <div className="bg-amber-500 h-full transition-all" style={{ width: `${percentageUsed}%` }} title={`Reserved: ${percentageUsed.toFixed(0)}%`} />
-                                                        <div className={`h-full flex-1 ${avail <= 0 ? 'bg-red-500/20' : 'bg-emerald-500/20'}`} />
-                                                    </div>
-                                                </td>
-                                                <td className="p-3">
-                                                    <div className="mb-1 flex flex-wrap gap-1">
-                                                        {renderRiskBadge(m)}
-                                                        {procRisk !== 'LOW' && (
-                                                            <span className={`px-1.5 py-0.2 text-[8px] font-bold border rounded-none uppercase ${
-                                                                procRisk === 'CRITICAL' 
-                                                                    ? (isLight ? 'bg-red-50 text-red-700 border-red-200' : 'bg-red-950 text-red-400 border-red-800') 
-                                                                    : (isLight ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-amber-950 text-amber-400 border-amber-800')
+                                            return (
+                                                <tr 
+                                                    key={m.id} 
+                                                    className={`transition-colors ${
+                                                        isSelected 
+                                                            ? (isLight ? 'bg-red-50/50 border-l-2 border-red-500' : 'bg-zinc-900/80 border-l-2 border-red-500') 
+                                                            : (isLight ? 'hover:bg-zinc-50' : 'hover:bg-zinc-900/40')
+                                                    }`}
+                                                >
+                                                    <td className="p-3">
+                                                        <div className={`font-bold flex items-center ${isLight ? 'text-zinc-900' : 'text-white'}`}>
+                                                            <span>{m.material_name}</span>
+                                                            <span className={`ml-2 px-2 py-0.5 text-[9px] rounded-md border font-bold ${
+                                                                isLight ? 'bg-zinc-100 text-zinc-700 border-zinc-200' : 'bg-zinc-800 text-zinc-300 border-zinc-700'
                                                             }`}>
-                                                                Proc: {procRisk}
+                                                                {m.material_type}
                                                             </span>
-                                                        )}
-                                                    </div>
-                                                    <span className={`text-[9px] block font-semibold ${isLight ? 'text-zinc-500' : 'text-zinc-400'}`}>
-                                                        Depletion threshold: <strong className={isLight ? 'text-zinc-900' : 'text-zinc-200'}>{m.depletion_forecast_days || 30}d</strong>
-                                                    </span>
-                                                </td>
-                                                <td className="p-3">
-                                                    {renderStatusBadge(m)}
-                                                </td>
-                                                <td className="p-3 text-center">
-                                                    <div className="flex flex-wrap items-center justify-center gap-1">
-                                                        <button
-                                                            onClick={() => handleSelectMaterial(m)}
-                                                            title="Inspect Evidence Ledger"
-                                                            className={`p-1 px-1.5 border text-[9px] font-bold uppercase rounded-none transition-colors ${
-                                                                isLight 
-                                                                    ? 'bg-zinc-100 hover:bg-zinc-200 text-zinc-700 border-zinc-200' 
-                                                                    : 'bg-zinc-900 hover:bg-zinc-700 text-zinc-300 hover:text-white border-zinc-800'
-                                                            }`}
-                                                        >
-                                                            Inspect
-                                                        </button>
-                                                        <button
-                                                            onClick={() => triggerModal('INTAKE', m)}
-                                                            title="Intake stock units"
-                                                            className={`p-1 px-1.5 border text-[9px] font-bold uppercase rounded-none transition-colors ${
-                                                                isLight 
-                                                                    ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-200' 
-                                                                    : 'bg-zinc-900 hover:bg-emerald-950 text-zinc-400 hover:text-emerald-300 border-zinc-800 hover:border-emerald-800'
-                                                            }`}
-                                                        >
-                                                            + Intake
-                                                        </button>
-                                                        <button
-                                                            onClick={() => triggerModal('ADJUST', m)}
-                                                            title="Audited handcount adjustment"
-                                                            className={`p-1 px-1.5 border text-[9px] font-bold uppercase rounded-none transition-colors ${
-                                                                isLight 
-                                                                    ? 'bg-zinc-100 hover:bg-zinc-200 text-zinc-700 border-zinc-200' 
-                                                                    : 'bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 border-zinc-800'
-                                                            }`}
-                                                        >
-                                                            Adjust
-                                                        </button>
-                                                        <button
-                                                            onClick={() => triggerModal('RESERVE', m)}
-                                                            title="Reserve allocation lock"
-                                                            className={`p-1 px-1.5 border text-[9px] font-bold uppercase rounded-none transition-colors ${
-                                                                isLight 
-                                                                    ? 'bg-amber-50 hover:bg-amber-100 text-amber-700 border-amber-200' 
-                                                                    : 'bg-zinc-900 hover:bg-amber-950 text-zinc-400 hover:text-amber-300 border-zinc-800 hover:border-amber-800'
-                                                            }`}
-                                                        >
-                                                            Reserve
-                                                        </button>
-                                                        <button
-                                                            onClick={() => triggerModal('CONSUME', m)}
-                                                            title="Permanently consume units"
-                                                            className={`p-1 px-1.5 border text-[9px] font-bold uppercase rounded-none transition-colors ${
-                                                                isLight 
-                                                                    ? 'bg-red-50 hover:bg-red-100 text-red-700 border-red-200' 
-                                                                    : 'bg-zinc-900 hover:bg-red-950 text-zinc-400 hover:text-red-300 border-zinc-800 hover:border-red-800'
-                                                            }`}
-                                                        >
-                                                            Consume
-                                                        </button>
-                                                        <button
-                                                            onClick={() => triggerModal('PROCUREMENT', m)}
-                                                            title="Issue restock purchase order"
-                                                            className={`p-1 px-1.5 border text-[9px] font-bold uppercase rounded-none transition-colors ${
-                                                                isLight 
-                                                                    ? 'bg-zinc-100 hover:bg-zinc-200 text-zinc-800 border-zinc-200' 
-                                                                    : 'bg-zinc-900 hover:bg-zinc-800 text-zinc-500 hover:text-white border-zinc-800'
-                                                            }`}
-                                                        >
-                                                            Restock
-                                                        </button>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        );
-                                    })}
-                                </tbody>
-                            </table>
-                        )}
+                                                        </div>
+                                                        <div className={`text-[10px] mt-0.5 ${isLight ? 'text-zinc-500' : 'text-zinc-400'}`}>
+                                                            {m.material_type === 'PAPER' ? (
+                                                                <>
+                                                                    {m.paper_gsm ? `${m.paper_gsm} GSM` : 'N/A'} • <span className={`${isLight ? 'text-zinc-700' : 'text-zinc-300'} font-semibold`}>{m.finish || 'UNCOATED'}</span>
+                                                                </>
+                                                            ) : m.material_type === 'INK' ? (
+                                                                <>
+                                                                    System: <span className={`${isLight ? 'text-zinc-700' : 'text-zinc-300'} font-semibold`}>{m.metadata?.ink_system || 'CMYK Dedicated Channel'}</span> • Fluid Datastore
+                                                                </>
+                                                            ) : (
+                                                                <>
+                                                                    Category: <span className={`${isLight ? 'text-zinc-700' : 'text-zinc-300'} font-semibold`}>{m.metadata?.consumable_category || 'Core Maintenance Part'}</span> • Component SCADA
+                                                                </>
+                                                            )}
+                                                        </div>
+                                                    </td>
+                                                    <td className={`p-3 text-[10px] ${isLight ? 'text-zinc-500' : 'text-zinc-400'}`}>
+                                                        <span className={`font-bold block ${isLight ? 'text-zinc-900' : 'text-zinc-200'}`}>{m.node_id}</span>
+                                                        <span className={isLight ? 'text-zinc-400' : 'text-zinc-500'}>Printhouse Target</span>
+                                                    </td>
+                                                    <td className="p-3 text-right">
+                                                        <div className={`font-bold ${isLight ? 'text-zinc-900' : 'text-white'}`}>
+                                                            {Number(m.current_stock_units).toLocaleString()} <span className={`text-[9px] font-normal ${isLight ? 'text-zinc-400' : 'text-zinc-500'}`}>units</span>
+                                                        </div>
+                                                        <div className={`text-[10px] font-bold ${avail <= 0 ? 'text-red-500' : (isLight ? 'text-emerald-600' : 'text-emerald-400')}`}>
+                                                            Net: {avail.toLocaleString()}
+                                                        </div>
+                                                        <div className={`w-full h-1.5 mt-1 rounded-full border overflow-hidden flex ${
+                                                            isLight ? 'bg-zinc-100 border-zinc-200' : 'bg-zinc-950 border-zinc-800'
+                                                        }`}>
+                                                            <div className="bg-amber-500 h-full transition-all" style={{ width: `${percentageUsed}%` }} title={`Reserved: ${percentageUsed.toFixed(0)}%`} />
+                                                            <div className={`h-full flex-1 ${avail <= 0 ? 'bg-red-500/20' : 'bg-emerald-500/20'}`} />
+                                                        </div>
+                                                    </td>
+                                                    <td className="p-3">
+                                                        <div className="mb-1 flex flex-wrap gap-1">
+                                                            {renderRiskBadge(m)}
+                                                            {procRisk !== 'LOW' && (
+                                                                <span className={`px-2 py-0.5 text-[8px] font-bold border rounded-full uppercase ${
+                                                                    procRisk === 'CRITICAL' 
+                                                                        ? (isLight ? 'bg-red-50 text-red-700 border-red-200' : 'bg-red-950 text-red-400 border-red-800') 
+                                                                        : (isLight ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-amber-950 text-amber-400 border-amber-800')
+                                                                }`}>
+                                                                    Proc: {procRisk}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        <span className={`text-[9px] block font-semibold ${isLight ? 'text-zinc-500' : 'text-zinc-400'}`}>
+                                                            Depletion threshold: <strong className={isLight ? 'text-zinc-900' : 'text-zinc-200'}>{m.depletion_forecast_days || 30}d</strong>
+                                                        </span>
+                                                    </td>
+                                                    <td className="p-3">
+                                                        {renderStatusBadge(m)}
+                                                    </td>
+                                                    <td className="p-3 text-center">
+                                                        <div className="flex flex-wrap items-center justify-center gap-1">
+                                                            <button
+                                                                onClick={() => handleSelectMaterial(m)}
+                                                                title="Inspect Evidence Ledger"
+                                                                className={`p-1 px-2 border text-[9px] font-bold uppercase rounded-lg transition-colors cursor-pointer ${
+                                                                    isLight 
+                                                                        ? 'bg-zinc-100 hover:bg-zinc-200 text-zinc-700 border-zinc-200' 
+                                                                        : 'bg-zinc-900 hover:bg-zinc-700 text-zinc-300 hover:text-white border-zinc-800'
+                                                                }`}
+                                                            >
+                                                                Inspect
+                                                            </button>
+                                                            <button
+                                                                onClick={() => triggerModal('INTAKE', m)}
+                                                                title="Intake stock units"
+                                                                className={`p-1 px-2 border text-[9px] font-bold uppercase rounded-lg transition-colors cursor-pointer ${
+                                                                    isLight 
+                                                                        ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-200' 
+                                                                        : 'bg-zinc-900 hover:bg-emerald-950 text-zinc-400 hover:text-emerald-300 border-zinc-800 hover:border-emerald-800'
+                                                                }`}
+                                                            >
+                                                                + Intake
+                                                            </button>
+                                                            <button
+                                                                onClick={() => triggerModal('ADJUST', m)}
+                                                                title="Audited handcount adjustment"
+                                                                className={`p-1 px-2 border text-[9px] font-bold uppercase rounded-lg transition-colors cursor-pointer ${
+                                                                    isLight 
+                                                                        ? 'bg-zinc-100 hover:bg-zinc-200 text-zinc-700 border-zinc-200' 
+                                                                        : 'bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 border-zinc-800'
+                                                                }`}
+                                                            >
+                                                                Adjust
+                                                            </button>
+                                                            <button
+                                                                onClick={() => triggerModal('RESERVE', m)}
+                                                                title="Reserve allocation lock"
+                                                                className={`p-1 px-2 border text-[9px] font-bold uppercase rounded-lg transition-colors cursor-pointer ${
+                                                                    isLight 
+                                                                        ? 'bg-amber-50 hover:bg-amber-100 text-amber-700 border-amber-200' 
+                                                                        : 'bg-zinc-900 hover:bg-amber-950 text-zinc-400 hover:text-amber-300 border-zinc-800 hover:border-amber-800'
+                                                                }`}
+                                                            >
+                                                                Reserve
+                                                            </button>
+                                                            <button
+                                                                onClick={() => triggerModal('CONSUME', m)}
+                                                                title="Permanently consume units"
+                                                                className={`p-1 px-2 border text-[9px] font-bold uppercase rounded-lg transition-colors cursor-pointer ${
+                                                                    isLight 
+                                                                        ? 'bg-red-50 hover:bg-red-100 text-red-700 border-red-200' 
+                                                                        : 'bg-zinc-900 hover:bg-red-950 text-zinc-400 hover:text-red-300 border-zinc-800 hover:border-red-800'
+                                                                }`}
+                                                            >
+                                                                Consume
+                                                            </button>
+                                                            <button
+                                                                onClick={() => triggerModal('PROCUREMENT', m)}
+                                                                title="Issue restock purchase order"
+                                                                className={`p-1 px-2 border text-[9px] font-bold uppercase rounded-lg transition-colors cursor-pointer ${
+                                                                    isLight 
+                                                                        ? 'bg-zinc-100 hover:bg-zinc-200 text-zinc-800 border-zinc-200' 
+                                                                        : 'bg-zinc-900 hover:bg-zinc-800 text-zinc-500 hover:text-white border-zinc-800'
+                                                                }`}
+                                                            >
+                                                                Restock
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            )}
+                        </div>
                     </div>
                 </div>
 
                 {/* Extended Side Panel View (Details / Timeline / Procurements) */}
                 <div className="space-y-4">
-                    <div className={`p-4 border rounded-none transition-all ${
+                    <div className={`p-4 border rounded-2xl shadow-2xs transition-all ${
                         isLight ? 'bg-white border-zinc-200' : 'bg-zinc-950 border-zinc-800'
                     }`}>
                         <div className={`flex items-center justify-between border-b pb-2.5 ${
@@ -774,7 +776,7 @@ export const MaterialsPage: React.FC = () => {
                                 Context Evidence Explorer
                             </span>
                             {selectedMaterial && (
-                                <button onClick={() => setSelectedMaterial(null)} className="text-[10px] text-zinc-500 hover:text-red-500 uppercase font-bold">
+                                <button onClick={() => setSelectedMaterial(null)} className="text-[10px] text-zinc-500 hover:text-red-500 uppercase font-bold cursor-pointer transition-colors">
                                     [clear]
                                 </button>
                             )}
@@ -783,12 +785,12 @@ export const MaterialsPage: React.FC = () => {
                         {selectedMaterial ? (
                             <div className="mt-4 space-y-4 font-manrope text-xs">
                                 {/* Explorer Tabs Navigation */}
-                                <div className={`flex border-b p-1 gap-1 ${
+                                <div className={`flex border p-1 gap-1 rounded-xl ${
                                     isLight ? 'bg-zinc-50 border-zinc-200' : 'border-zinc-800 bg-zinc-900/60'
                                 }`}>
                                     <button
                                         onClick={() => setActiveTab('DETAILS')}
-                                        className={`flex-1 py-1 text-[10px] font-bold uppercase tracking-wider transition-colors ${
+                                        className={`flex-1 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-lg transition-colors cursor-pointer ${
                                             activeTab === 'DETAILS' 
                                                 ? (isLight ? 'bg-white text-zinc-900 border border-zinc-200 shadow-2xs' : 'bg-zinc-800 text-white border border-zinc-700') 
                                                 : (isLight ? 'text-zinc-500 hover:text-zinc-900' : 'text-zinc-500 hover:text-zinc-300')
@@ -798,7 +800,7 @@ export const MaterialsPage: React.FC = () => {
                                     </button>
                                     <button
                                         onClick={() => setActiveTab('TIMELINE')}
-                                        className={`flex-1 py-1 text-[10px] font-bold uppercase tracking-wider transition-colors ${
+                                        className={`flex-1 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-lg transition-colors cursor-pointer ${
                                             activeTab === 'TIMELINE' 
                                                 ? (isLight ? 'bg-white text-zinc-900 border border-zinc-200 shadow-2xs' : 'bg-zinc-800 text-white border border-zinc-700') 
                                                 : (isLight ? 'text-zinc-500 hover:text-zinc-900' : 'text-zinc-500 hover:text-zinc-300')
@@ -808,7 +810,7 @@ export const MaterialsPage: React.FC = () => {
                                     </button>
                                     <button
                                         onClick={() => setActiveTab('PROCUREMENTS')}
-                                        className={`flex-1 py-1 text-[10px] font-bold uppercase tracking-wider transition-colors ${
+                                        className={`flex-1 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-lg transition-colors cursor-pointer ${
                                             activeTab === 'PROCUREMENTS' 
                                                 ? (isLight ? 'bg-white text-zinc-900 border border-zinc-200 shadow-2xs' : 'bg-zinc-800 text-white border border-zinc-700') 
                                                 : (isLight ? 'text-zinc-500 hover:text-zinc-900' : 'text-zinc-500 hover:text-zinc-300')
@@ -823,7 +825,7 @@ export const MaterialsPage: React.FC = () => {
                                     <div className="space-y-3 animate-fade-in">
                                         <div>
                                             <span className="text-[10px] text-zinc-500 block uppercase font-bold">Material Item Code</span>
-                                            <span className={`font-bold font-mono text-[11px] block break-all select-all p-1.5 border mt-0.5 ${
+                                            <span className={`font-bold font-mono text-[11px] block break-all select-all p-2 border mt-0.5 rounded-xl ${
                                                 isLight ? 'bg-zinc-50 border-zinc-200 text-zinc-900' : 'bg-zinc-900 border-zinc-800 text-white'
                                             }`}>
                                                 {selectedMaterial.id}
@@ -831,32 +833,32 @@ export const MaterialsPage: React.FC = () => {
                                         </div>
 
                                         <div className="grid grid-cols-2 gap-2">
-                                            <div className={`p-2 border ${isLight ? 'bg-zinc-50 border-zinc-200' : 'bg-zinc-900 border-zinc-800'}`}>
+                                            <div className={`p-2.5 border rounded-xl ${isLight ? 'bg-zinc-50 border-zinc-200' : 'bg-zinc-900 border-zinc-800'}`}>
                                                 <span className="text-[9px] text-zinc-500 block uppercase font-bold">Substrate Type</span>
                                                 <span className="font-bold text-red-500 block mt-0.5">{selectedMaterial.material_type}</span>
                                             </div>
-                                            <div className={`p-2 border ${isLight ? 'bg-zinc-50 border-zinc-200' : 'bg-zinc-900 border-zinc-800'}`}>
+                                            <div className={`p-2.5 border rounded-xl ${isLight ? 'bg-zinc-50 border-zinc-200' : 'bg-zinc-900 border-zinc-800'}`}>
                                                 <span className="text-[9px] text-zinc-500 block uppercase font-bold">Weight Specs</span>
                                                 <span className={`font-bold block mt-0.5 ${isLight ? 'text-zinc-900' : 'text-zinc-200'}`}>{selectedMaterial.paper_gsm ? `${selectedMaterial.paper_gsm} GSM` : 'UNSPECIFIED'}</span>
                                             </div>
                                         </div>
 
                                         <div className="grid grid-cols-2 gap-2">
-                                            <div className={`p-2 border ${isLight ? 'bg-zinc-50 border-zinc-200' : 'bg-zinc-900 border-zinc-800'}`}>
+                                            <div className={`p-2.5 border rounded-xl ${isLight ? 'bg-zinc-50 border-zinc-200' : 'bg-zinc-900 border-zinc-800'}`}>
                                                 <span className="text-[9px] text-zinc-500 block uppercase font-bold">Daily Burn Rate</span>
                                                 <span className={`font-bold block mt-0.5 ${isLight ? 'text-amber-600' : 'text-amber-400'}`}>{Number(selectedMaterial.daily_burn_rate || 0).toLocaleString()} <span className="text-[9px] text-zinc-500 font-normal">u/d</span></span>
                                             </div>
-                                            <div className={`p-2 border ${isLight ? 'bg-zinc-50 border-zinc-200' : 'bg-zinc-900 border-zinc-800'}`}>
+                                            <div className={`p-2.5 border rounded-xl ${isLight ? 'bg-zinc-50 border-zinc-200' : 'bg-zinc-900 border-zinc-800'}`}>
                                                 <span className="text-[9px] text-zinc-500 block uppercase font-bold">Unit Pricing</span>
                                                 <span className={`font-bold block mt-0.5 ${isLight ? 'text-zinc-900' : 'text-zinc-200'}`}>${Number(selectedMaterial.cost_per_unit || 0).toFixed(4)}</span>
                                             </div>
                                         </div>
 
-                                        <div className={`p-2 border ${isLight ? 'bg-zinc-50 border-zinc-200' : 'bg-zinc-900 border-zinc-800'}`}>
+                                        <div className={`p-2.5 border rounded-xl ${isLight ? 'bg-zinc-50 border-zinc-200' : 'bg-zinc-900 border-zinc-800'}`}>
                                             <span className="text-[9px] text-zinc-500 block uppercase font-bold">Supplier Pipeline</span>
                                             <div className="flex justify-between items-center mt-0.5">
                                                 <span className={`font-bold text-[11px] truncate ${isLight ? 'text-zinc-900' : 'text-zinc-300'}`}>{selectedMaterial.supplier_name || 'Consolidated Substrate Provider'}</span>
-                                                <span className={`text-[8px] px-1 py-0.2 font-bold uppercase ml-2 border ${
+                                                <span className={`text-[8px] px-2 py-0.5 font-bold uppercase ml-2 border rounded-full ${
                                                     selectedMaterial.procurement_risk === 'CRITICAL' 
                                                         ? (isLight ? 'text-red-700 bg-red-50 border-red-200' : 'text-red-400 bg-red-950 border-red-800') 
                                                         : (isLight ? 'text-zinc-600 bg-zinc-100 border-zinc-200' : 'text-zinc-400 bg-zinc-800 border-zinc-700')
@@ -864,7 +866,7 @@ export const MaterialsPage: React.FC = () => {
                                             </div>
                                         </div>
 
-                                        <div className={`p-2 border space-y-1 ${isLight ? 'bg-zinc-50 border-zinc-200' : 'bg-zinc-900 border-zinc-800'}`}>
+                                        <div className={`p-2.5 border rounded-xl space-y-1 ${isLight ? 'bg-zinc-50 border-zinc-200' : 'bg-zinc-900 border-zinc-800'}`}>
                                             <span className={`text-[9px] text-zinc-500 block uppercase border-b pb-1 font-bold ${isLight ? 'border-zinc-200' : 'border-zinc-800'}`}>Substrate Pools Balance</span>
                                             <div className="flex justify-between text-[11px] pt-1">
                                                 <span className="text-zinc-500">Tracked Physical Pool:</span>
@@ -911,9 +913,9 @@ export const MaterialsPage: React.FC = () => {
                                                 }
 
                                                 return (
-                                                    <div key={evt.id} className={`p-2 border space-y-1 ${isLight ? 'bg-zinc-50 border-zinc-200' : 'bg-zinc-900 border-zinc-800'}`}>
+                                                    <div key={evt.id} className={`p-2.5 border rounded-xl space-y-1 ${isLight ? 'bg-zinc-50 border-zinc-200' : 'bg-zinc-900 border-zinc-800'}`}>
                                                         <div className="flex items-center justify-between">
-                                                            <span className={`px-1.5 py-0.2 text-[8px] font-bold border rounded-none uppercase ${badgeClass}`}>
+                                                            <span className={`px-2 py-0.5 text-[8px] font-bold border rounded-full uppercase ${badgeClass}`}>
                                                                 {evt.event_type}
                                                             </span>
                                                             <span className="text-[9px] text-zinc-500 font-mono">
@@ -951,7 +953,7 @@ export const MaterialsPage: React.FC = () => {
                                             procurementsList.map((proc) => {
                                                 const isReceived = proc.procurement_status === 'RECEIVED';
                                                 return (
-                                                    <div key={proc.id} className={`p-2.5 border space-y-1.5 ${
+                                                    <div key={proc.id} className={`p-2.5 border rounded-xl space-y-1.5 ${
                                                         isReceived 
                                                             ? (isLight ? 'bg-zinc-50 border-zinc-200 text-zinc-500' : 'bg-zinc-950 border-zinc-900') 
                                                             : (isLight ? 'bg-white border-zinc-200' : 'bg-zinc-900 border-zinc-800')
@@ -960,7 +962,7 @@ export const MaterialsPage: React.FC = () => {
                                                             <span className={`text-[10px] font-bold truncate max-w-[140px] ${
                                                                 isReceived ? 'text-zinc-500' : (isLight ? 'text-zinc-900' : 'text-white')
                                                             }`}>{proc.supplier_name || 'External Provider'}</span>
-                                                            <span className={`px-1.5 py-0.2 text-[8px] font-bold border rounded-none uppercase ${
+                                                            <span className={`px-2 py-0.5 text-[8px] font-bold border rounded-full uppercase ${
                                                                 isReceived 
                                                                     ? (isLight ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-emerald-950 text-emerald-400 border-emerald-900') 
                                                                     : (isLight ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-amber-950 text-amber-400 border-amber-800')
@@ -982,7 +984,7 @@ export const MaterialsPage: React.FC = () => {
                                                             <div className={`pt-1.5 border-t ${isLight ? 'border-zinc-200' : 'border-zinc-800'}`}>
                                                                 <button
                                                                     onClick={() => handleReceiveProcurement(proc.id)}
-                                                                    className={`w-full py-1 border text-[9px] font-bold uppercase tracking-wider transition-colors rounded-none ${
+                                                                    className={`w-full py-1.5 border text-[9px] font-bold uppercase tracking-wider transition-colors rounded-xl cursor-pointer ${
                                                                         isLight 
                                                                             ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-200' 
                                                                             : 'bg-emerald-950 hover:bg-emerald-900 text-emerald-300 hover:text-white border-emerald-800'
@@ -1006,7 +1008,7 @@ export const MaterialsPage: React.FC = () => {
                         )}
                     </div>
 
-                    <div className={`p-4 border rounded-none space-y-2 transition-all ${
+                    <div className={`p-4 border rounded-2xl shadow-2xs space-y-2 transition-all ${
                         isLight ? 'bg-white border-zinc-200' : 'bg-zinc-950 border-zinc-800'
                     }`}>
                         <span className={`text-xs font-manrope font-bold uppercase tracking-wider block ${
@@ -1030,8 +1032,8 @@ export const MaterialsPage: React.FC = () => {
                         onClick={() => setActiveModal(null)} 
                     />
                     {/* Drawer Panel Loading from Right Side */}
-                    <div className={`relative z-10 border-l w-full max-w-lg h-full p-6 space-y-4 rounded-none transition-all overflow-y-auto animate-slide-in-right ${
-                        isLight ? 'bg-white border-zinc-200 shadow-2xl' : 'bg-zinc-950 border-zinc-800'
+                    <div className={`relative z-10 border-l w-full max-w-lg h-full p-6 space-y-4 rounded-l-2xl shadow-2xl transition-all overflow-y-auto animate-slide-in-right ${
+                        isLight ? 'bg-white border-zinc-200' : 'bg-zinc-950 border-zinc-800'
                     }`}>
                         <div className={`flex items-center justify-between border-b pb-3 ${
                             isLight ? 'border-zinc-200' : 'border-zinc-800'
@@ -1042,7 +1044,7 @@ export const MaterialsPage: React.FC = () => {
                                 <PlusCircleIcon className="w-4 h-4 mr-2 text-red-500" />
                                 Provision Material Profile
                             </h3>
-                            <button onClick={() => setActiveModal(null)} className="text-zinc-500 hover:text-red-500 transition-colors">
+                            <button onClick={() => setActiveModal(null)} className="text-zinc-500 hover:text-red-500 transition-colors cursor-pointer">
                                 <XMarkIcon className="w-4 h-4" />
                             </button>
                         </div>
@@ -1055,7 +1057,7 @@ export const MaterialsPage: React.FC = () => {
                                     placeholder="e.g. Silk Premium Digital SRA3"
                                     value={addMatForm.material_name}
                                     onChange={e => setAddMatForm({...addMatForm, material_name: e.target.value})}
-                                    className={`w-full border p-2 focus:outline-none focus:border-red-500 rounded-none transition-colors ${
+                                    className={`w-full border p-2 focus:outline-none focus:border-red-500 rounded-xl transition-colors ${
                                         isLight ? 'bg-white border-zinc-300 text-zinc-900' : 'bg-zinc-900 border-zinc-800 text-white'
                                     }`}
                                 />
@@ -1067,7 +1069,7 @@ export const MaterialsPage: React.FC = () => {
                                     <select
                                         value={addMatForm.material_type}
                                         onChange={e => setAddMatForm({...addMatForm, material_type: e.target.value})}
-                                        className={`w-full border p-2 focus:outline-none focus:border-red-500 rounded-none transition-colors ${
+                                        className={`w-full border p-2 focus:outline-none focus:border-red-500 rounded-xl transition-colors ${
                                             isLight ? 'bg-white border-zinc-300 text-zinc-900' : 'bg-zinc-900 border-zinc-800 text-white'
                                         }`}
                                     >
@@ -1083,7 +1085,7 @@ export const MaterialsPage: React.FC = () => {
                                             type="number"
                                             value={addMatForm.gsm}
                                             onChange={e => setAddMatForm({...addMatForm, gsm: Number(e.target.value)})}
-                                            className={`w-full border p-2 focus:outline-none focus:border-red-500 rounded-none transition-colors ${
+                                            className={`w-full border p-2 focus:outline-none focus:border-red-500 rounded-xl transition-colors ${
                                                 isLight ? 'bg-white border-zinc-300 text-zinc-900' : 'bg-zinc-900 border-zinc-800 text-white'
                                             }`}
                                         />
@@ -1099,7 +1101,7 @@ export const MaterialsPage: React.FC = () => {
                                             type="text"
                                             value={addMatForm.sheet_format}
                                             onChange={e => setAddMatForm({...addMatForm, sheet_format: e.target.value})}
-                                            className={`w-full border p-2 focus:outline-none focus:border-red-500 rounded-none transition-colors ${
+                                            className={`w-full border p-2 focus:outline-none focus:border-red-500 rounded-xl transition-colors ${
                                                 isLight ? 'bg-white border-zinc-300 text-zinc-900' : 'bg-zinc-900 border-zinc-800 text-white'
                                             }`}
                                         />
@@ -1109,7 +1111,7 @@ export const MaterialsPage: React.FC = () => {
                                         <select
                                             value={addMatForm.finish_type}
                                             onChange={e => setAddMatForm({...addMatForm, finish_type: e.target.value})}
-                                            className={`w-full border p-2 focus:outline-none focus:border-red-500 rounded-none transition-colors ${
+                                            className={`w-full border p-2 focus:outline-none focus:border-red-500 rounded-xl transition-colors ${
                                                 isLight ? 'bg-white border-zinc-300 text-zinc-900' : 'bg-zinc-900 border-zinc-800 text-white'
                                             }`}
                                         >
@@ -1128,7 +1130,7 @@ export const MaterialsPage: React.FC = () => {
                                     <select
                                         value={addMatForm.ink_system}
                                         onChange={e => setAddMatForm({...addMatForm, ink_system: e.target.value})}
-                                        className={`w-full border p-2 focus:outline-none focus:border-red-500 rounded-none transition-colors ${
+                                        className={`w-full border p-2 focus:outline-none focus:border-red-500 rounded-xl transition-colors ${
                                             isLight ? 'bg-white border-zinc-300 text-zinc-900' : 'bg-zinc-900 border-zinc-800 text-white'
                                         }`}
                                     >
@@ -1146,7 +1148,7 @@ export const MaterialsPage: React.FC = () => {
                                     <select
                                         value={addMatForm.consumable_category}
                                         onChange={e => setAddMatForm({...addMatForm, consumable_category: e.target.value})}
-                                        className={`w-full border p-2 focus:outline-none focus:border-red-500 rounded-none transition-colors ${
+                                        className={`w-full border p-2 focus:outline-none focus:border-red-500 rounded-xl transition-colors ${
                                             isLight ? 'bg-white border-zinc-300 text-zinc-900' : 'bg-zinc-900 border-zinc-800 text-white'
                                         }`}
                                     >
@@ -1165,7 +1167,7 @@ export const MaterialsPage: React.FC = () => {
                                     placeholder="e.g. Sappi Fine Paper Group"
                                     value={addMatForm.supplier_name}
                                     onChange={e => setAddMatForm({...addMatForm, supplier_name: e.target.value})}
-                                    className={`w-full border p-2 focus:outline-none focus:border-red-500 rounded-none transition-colors ${
+                                    className={`w-full border p-2 focus:outline-none focus:border-red-500 rounded-xl transition-colors ${
                                         isLight ? 'bg-white border-zinc-300 text-zinc-900' : 'bg-zinc-900 border-zinc-800 text-white'
                                     }`}
                                 />
@@ -1179,7 +1181,7 @@ export const MaterialsPage: React.FC = () => {
                                         step="0.0001"
                                         value={addMatForm.cost_per_unit}
                                         onChange={e => setAddMatForm({...addMatForm, cost_per_unit: Number(e.target.value)})}
-                                        className={`w-full border p-2 focus:outline-none focus:border-red-500 rounded-none transition-colors ${
+                                        className={`w-full border p-2 focus:outline-none focus:border-red-500 rounded-xl transition-colors ${
                                             isLight ? 'bg-white border-zinc-300 text-zinc-900' : 'bg-zinc-900 border-zinc-800 text-white'
                                         }`}
                                     />
@@ -1190,7 +1192,7 @@ export const MaterialsPage: React.FC = () => {
                                         type="text"
                                         value={addMatForm.node_id}
                                         onChange={e => setAddMatForm({...addMatForm, node_id: e.target.value})}
-                                        className={`w-full border p-2 focus:outline-none focus:border-red-500 rounded-none transition-colors ${
+                                        className={`w-full border p-2 focus:outline-none focus:border-red-500 rounded-xl transition-colors ${
                                             isLight ? 'bg-white border-zinc-300 text-zinc-900' : 'bg-zinc-900 border-zinc-800 text-white'
                                         }`}
                                     />
@@ -1206,7 +1208,7 @@ export const MaterialsPage: React.FC = () => {
                                         type="number"
                                         value={addMatForm.initial_stock}
                                         onChange={e => setAddMatForm({...addMatForm, initial_stock: Number(e.target.value)})}
-                                        className={`w-full border p-1.5 focus:outline-none focus:border-red-500 rounded-none text-xs font-mono transition-colors ${
+                                        className={`w-full border p-2 focus:outline-none focus:border-red-500 rounded-xl text-xs font-mono transition-colors ${
                                             isLight ? 'bg-white border-zinc-300 text-zinc-900' : 'bg-zinc-900 border-zinc-800 text-white'
                                         }`}
                                     />
@@ -1217,7 +1219,7 @@ export const MaterialsPage: React.FC = () => {
                                         type="number"
                                         value={addMatForm.reorder_point}
                                         onChange={e => setAddMatForm({...addMatForm, reorder_point: Number(e.target.value)})}
-                                        className={`w-full border p-1.5 focus:outline-none focus:border-red-500 rounded-none text-xs font-mono transition-colors ${
+                                        className={`w-full border p-2 focus:outline-none focus:border-red-500 rounded-xl text-xs font-mono transition-colors ${
                                             isLight ? 'bg-white border-zinc-300 text-zinc-900' : 'bg-zinc-900 border-zinc-800 text-white'
                                         }`}
                                     />
@@ -1228,7 +1230,7 @@ export const MaterialsPage: React.FC = () => {
                                         type="number"
                                         value={addMatForm.replenishment_lead_days}
                                         onChange={e => setAddMatForm({...addMatForm, replenishment_lead_days: Number(e.target.value)})}
-                                        className={`w-full border p-1.5 focus:outline-none focus:border-red-500 rounded-none text-xs font-mono transition-colors ${
+                                        className={`w-full border p-2 focus:outline-none focus:border-red-500 rounded-xl text-xs font-mono transition-colors ${
                                             isLight ? 'bg-white border-zinc-300 text-zinc-900' : 'bg-zinc-900 border-zinc-800 text-white'
                                         }`}
                                     />
@@ -1239,17 +1241,17 @@ export const MaterialsPage: React.FC = () => {
                                 <button
                                     type="button"
                                     onClick={() => setActiveModal(null)}
-                                    className={`px-4 py-2 border font-bold uppercase rounded-none transition-colors ${
+                                    className={`px-4 py-2 border font-bold uppercase rounded-xl transition-colors cursor-pointer ${
                                         isLight 
                                             ? 'bg-zinc-100 hover:bg-zinc-200 text-zinc-700 border-zinc-200' 
-                                            : 'bg-zinc-900 hover:bg-zinc-800 text-zinc-400 border-zinc-800'
+                                             : 'bg-zinc-900 hover:bg-zinc-800 text-zinc-400 border-zinc-800'
                                     }`}
                                 >
                                     Cancel
                                 </button>
                                 <button
                                     type="submit"
-                                    className={`px-4 py-2 border font-bold uppercase rounded-none transition-colors ${
+                                    className={`px-4 py-2 border font-bold uppercase rounded-xl transition-colors cursor-pointer ${
                                         isLight 
                                             ? 'bg-red-50 hover:bg-red-100 text-red-700 border-red-200' 
                                             : 'bg-red-950 hover:bg-red-900 text-red-300 border-red-800'
@@ -1266,8 +1268,8 @@ export const MaterialsPage: React.FC = () => {
             {/* MODAL 2: INTAKE BAY */}
             {activeModal === 'INTAKE' && modalMaterial && (
                 <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in font-manrope">
-                    <div className={`border max-w-md w-full p-6 space-y-4 rounded-none transition-all ${
-                        isLight ? 'bg-white border-zinc-200 shadow-xl' : 'bg-zinc-950 border-zinc-800'
+                    <div className={`border max-w-md w-full p-6 space-y-4 rounded-2xl shadow-2xl transition-all ${
+                        isLight ? 'bg-white border-zinc-200' : 'bg-zinc-950 border-zinc-800'
                     }`}>
                         <div className={`flex items-center justify-between border-b pb-3 ${
                             isLight ? 'border-zinc-200' : 'border-zinc-800'
@@ -1280,7 +1282,7 @@ export const MaterialsPage: React.FC = () => {
                                 </h3>
                                 <span className="text-[10px] text-emerald-500 font-mono block mt-0.5">{modalMaterial.material_name}</span>
                             </div>
-                            <button onClick={() => setActiveModal(null)} className="text-zinc-500 hover:text-red-500 transition-colors">
+                            <button onClick={() => setActiveModal(null)} className="text-zinc-500 hover:text-red-500 transition-colors cursor-pointer">
                                 <XMarkIcon className="w-4 h-4" />
                             </button>
                         </div>
@@ -1293,7 +1295,7 @@ export const MaterialsPage: React.FC = () => {
                                     min="1"
                                     value={intakeForm.quantity}
                                     onChange={e => setIntakeForm({...intakeForm, quantity: Number(e.target.value)})}
-                                    className={`w-full border p-2 font-mono font-bold text-sm focus:outline-none focus:border-emerald-500 rounded-none transition-colors ${
+                                    className={`w-full border p-2.5 font-mono font-bold text-sm focus:outline-none focus:border-emerald-500 rounded-xl transition-colors ${
                                         isLight ? 'bg-white border-zinc-300 text-zinc-900' : 'bg-zinc-900 border-zinc-800 text-white'
                                     }`}
                                 />
@@ -1304,7 +1306,7 @@ export const MaterialsPage: React.FC = () => {
                                     type="text"
                                     value={intakeForm.supplier_batch}
                                     onChange={e => setIntakeForm({...intakeForm, supplier_batch: e.target.value})}
-                                    className={`w-full border p-2 focus:outline-none focus:border-emerald-500 rounded-none font-mono transition-colors ${
+                                    className={`w-full border p-2 focus:outline-none focus:border-emerald-500 rounded-xl font-mono transition-colors ${
                                         isLight ? 'bg-white border-zinc-300 text-zinc-900' : 'bg-zinc-900 border-zinc-800 text-white'
                                     }`}
                                 />
@@ -1316,7 +1318,7 @@ export const MaterialsPage: React.FC = () => {
                                     required
                                     value={intakeForm.reason}
                                     onChange={e => setIntakeForm({...intakeForm, reason: e.target.value})}
-                                    className={`w-full border p-2 focus:outline-none focus:border-emerald-500 rounded-none transition-colors ${
+                                    className={`w-full border p-2 focus:outline-none focus:border-emerald-500 rounded-xl transition-colors ${
                                         isLight ? 'bg-white border-zinc-300 text-zinc-900' : 'bg-zinc-900 border-zinc-800 text-white'
                                     }`}
                                 />
@@ -1327,7 +1329,7 @@ export const MaterialsPage: React.FC = () => {
                                     type="text"
                                     value={intakeForm.expected_use}
                                     onChange={e => setIntakeForm({...intakeForm, expected_use: e.target.value})}
-                                    className={`w-full border p-2 focus:outline-none focus:border-emerald-500 rounded-none text-[11px] transition-colors ${
+                                    className={`w-full border p-2 focus:outline-none focus:border-emerald-500 rounded-xl text-[11px] transition-colors ${
                                         isLight ? 'bg-white border-zinc-300 text-zinc-900' : 'bg-zinc-900 border-zinc-800 text-white'
                                     }`}
                                 />
@@ -1339,7 +1341,7 @@ export const MaterialsPage: React.FC = () => {
                                 <button
                                     type="button"
                                     onClick={() => setActiveModal(null)}
-                                    className={`px-4 py-2 border font-bold uppercase rounded-none transition-colors ${
+                                    className={`px-4 py-2 border font-bold uppercase rounded-xl transition-colors cursor-pointer ${
                                         isLight 
                                             ? 'bg-zinc-100 hover:bg-zinc-200 text-zinc-700 border-zinc-200' 
                                             : 'bg-zinc-900 text-zinc-400 border-zinc-800'
@@ -1349,7 +1351,7 @@ export const MaterialsPage: React.FC = () => {
                                 </button>
                                 <button
                                     type="submit"
-                                    className={`px-4 py-2 border font-bold uppercase rounded-none transition-colors ${
+                                    className={`px-4 py-2 border font-bold uppercase rounded-xl transition-colors cursor-pointer ${
                                         isLight 
                                             ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-200' 
                                             : 'bg-emerald-950 hover:bg-emerald-900 text-emerald-300 border-emerald-800'
@@ -1366,8 +1368,8 @@ export const MaterialsPage: React.FC = () => {
             {/* MODAL 3: AUDITED ADJUSTMENT */}
             {activeModal === 'ADJUST' && modalMaterial && (
                 <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in font-manrope">
-                    <div className={`border max-w-md w-full p-6 space-y-4 rounded-none transition-all ${
-                        isLight ? 'bg-white border-zinc-200 shadow-xl' : 'bg-zinc-950 border-zinc-800'
+                    <div className={`border max-w-md w-full p-6 space-y-4 rounded-2xl shadow-2xl transition-all ${
+                        isLight ? 'bg-white border-zinc-200' : 'bg-zinc-950 border-zinc-800'
                     }`}>
                         <div className={`flex items-center justify-between border-b pb-3 ${
                             isLight ? 'border-zinc-200' : 'border-zinc-800'
@@ -1380,7 +1382,7 @@ export const MaterialsPage: React.FC = () => {
                                 </h3>
                                 <span className="text-[10px] text-zinc-400 font-mono block mt-0.5">{modalMaterial.material_name}</span>
                             </div>
-                            <button onClick={() => setActiveModal(null)} className="text-zinc-500 hover:text-red-500 transition-colors">
+                            <button onClick={() => setActiveModal(null)} className="text-zinc-500 hover:text-red-500 transition-colors cursor-pointer">
                                 <XMarkIcon className="w-4 h-4" />
                             </button>
                         </div>
@@ -1393,7 +1395,7 @@ export const MaterialsPage: React.FC = () => {
                                     placeholder="-500 or +200"
                                     value={adjustForm.quantity_delta}
                                     onChange={e => setAdjustForm({...adjustForm, quantity_delta: Number(e.target.value)})}
-                                    className={`w-full border p-2 font-mono font-bold text-sm focus:outline-none focus:border-red-500 rounded-none transition-colors ${
+                                    className={`w-full border p-2.5 font-mono font-bold text-sm focus:outline-none focus:border-red-500 rounded-xl transition-colors ${
                                         isLight ? 'bg-white border-zinc-300 text-zinc-900' : 'bg-zinc-900 border-zinc-800 text-white'
                                     }`}
                                 />
@@ -1407,7 +1409,7 @@ export const MaterialsPage: React.FC = () => {
                                     placeholder="e.g. Audit Handcount discrepancy verified"
                                     value={adjustForm.reason}
                                     onChange={e => setAdjustForm({...adjustForm, reason: e.target.value})}
-                                    className={`w-full border p-2 focus:outline-none focus:border-red-500 rounded-none transition-colors ${
+                                    className={`w-full border p-2 focus:outline-none focus:border-red-500 rounded-xl transition-colors ${
                                         isLight ? 'bg-white border-zinc-300 text-zinc-900' : 'bg-zinc-900 border-zinc-800 text-white'
                                     }`}
                                 />
@@ -1418,7 +1420,7 @@ export const MaterialsPage: React.FC = () => {
                                     rows={2}
                                     value={adjustForm.operator_note}
                                     onChange={e => setAdjustForm({...adjustForm, operator_note: e.target.value})}
-                                    className={`w-full border p-2 focus:outline-none focus:border-red-500 rounded-none text-xs transition-colors ${
+                                    className={`w-full border p-2.5 focus:outline-none focus:border-red-500 rounded-xl text-xs transition-colors ${
                                         isLight ? 'bg-white border-zinc-300 text-zinc-900' : 'bg-zinc-900 border-zinc-800 text-white'
                                     }`}
                                     placeholder="Document specific location or authorized management overriding signature..."
@@ -1431,7 +1433,7 @@ export const MaterialsPage: React.FC = () => {
                                 <button
                                     type="button"
                                     onClick={() => setActiveModal(null)}
-                                    className={`px-4 py-2 border font-bold uppercase rounded-none transition-colors ${
+                                    className={`px-4 py-2 border font-bold uppercase rounded-xl transition-colors cursor-pointer ${
                                         isLight 
                                             ? 'bg-zinc-100 hover:bg-zinc-200 text-zinc-700 border-zinc-200' 
                                             : 'bg-zinc-900 text-zinc-400 border-zinc-800'
@@ -1441,7 +1443,7 @@ export const MaterialsPage: React.FC = () => {
                                 </button>
                                 <button
                                     type="submit"
-                                    className={`px-4 py-2 border font-bold uppercase rounded-none transition-colors ${
+                                    className={`px-4 py-2 border font-bold uppercase rounded-xl transition-colors cursor-pointer ${
                                         isLight 
                                             ? 'bg-zinc-900 hover:bg-zinc-800 text-white border-zinc-900' 
                                             : 'bg-zinc-900 hover:bg-zinc-800 text-white border-zinc-700'
@@ -1458,8 +1460,8 @@ export const MaterialsPage: React.FC = () => {
             {/* MODAL 4: RESERVE ALLOCATION LOCK */}
             {activeModal === 'RESERVE' && modalMaterial && (
                 <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in font-manrope">
-                    <div className={`border max-w-md w-full p-6 space-y-4 rounded-none transition-all ${
-                        isLight ? 'bg-white border-zinc-200 shadow-xl' : 'bg-zinc-950 border-zinc-800'
+                    <div className={`border max-w-md w-full p-6 space-y-4 rounded-2xl shadow-2xl transition-all ${
+                        isLight ? 'bg-white border-zinc-200' : 'bg-zinc-950 border-zinc-800'
                     }`}>
                         <div className={`flex items-center justify-between border-b pb-3 ${
                             isLight ? 'border-zinc-200' : 'border-zinc-800'
@@ -1472,7 +1474,7 @@ export const MaterialsPage: React.FC = () => {
                                 </h3>
                                 <span className="text-[10px] text-amber-500 font-mono block mt-0.5">{modalMaterial.material_name}</span>
                             </div>
-                            <button onClick={() => setActiveModal(null)} className="text-zinc-500 hover:text-red-500 transition-colors">
+                            <button onClick={() => setActiveModal(null)} className="text-zinc-500 hover:text-red-500 transition-colors cursor-pointer">
                                 <XMarkIcon className="w-4 h-4" />
                             </button>
                         </div>
@@ -1485,7 +1487,7 @@ export const MaterialsPage: React.FC = () => {
                                     min="1"
                                     value={reserveForm.quantity}
                                     onChange={e => setReserveForm({...reserveForm, quantity: Number(e.target.value)})}
-                                    className={`w-full border p-2 font-mono font-bold text-sm focus:outline-none focus:border-amber-500 rounded-none transition-colors ${
+                                    className={`w-full border p-2.5 font-mono font-bold text-sm focus:outline-none focus:border-amber-500 rounded-xl transition-colors ${
                                         isLight ? 'bg-white border-zinc-300 text-zinc-900' : 'bg-zinc-900 border-zinc-800 text-white'
                                     }`}
                                 />
@@ -1498,7 +1500,7 @@ export const MaterialsPage: React.FC = () => {
                                         type="text"
                                         value={reserveForm.job_id}
                                         onChange={e => setReserveForm({...reserveForm, job_id: e.target.value})}
-                                        className={`w-full border p-2 focus:outline-none focus:border-amber-500 rounded-none font-mono transition-colors ${
+                                        className={`w-full border p-2 focus:outline-none focus:border-amber-500 rounded-xl font-mono transition-colors ${
                                             isLight ? 'bg-white border-zinc-300 text-zinc-900' : 'bg-zinc-900 border-zinc-800 text-white'
                                         }`}
                                     />
@@ -1509,7 +1511,7 @@ export const MaterialsPage: React.FC = () => {
                                         type="text"
                                         value={reserveForm.dispatch_id}
                                         onChange={e => setReserveForm({...reserveForm, dispatch_id: e.target.value})}
-                                        className={`w-full border p-2 focus:outline-none focus:border-amber-500 rounded-none font-mono transition-colors ${
+                                        className={`w-full border p-2 focus:outline-none focus:border-amber-500 rounded-xl font-mono transition-colors ${
                                             isLight ? 'bg-white border-zinc-300 text-zinc-900' : 'bg-zinc-900 border-zinc-800 text-white'
                                         }`}
                                     />
@@ -1521,7 +1523,7 @@ export const MaterialsPage: React.FC = () => {
                                     type="datetime-local"
                                     value={reserveForm.expiration}
                                     onChange={e => setReserveForm({...reserveForm, expiration: e.target.value})}
-                                    className={`w-full border p-2 focus:outline-none focus:border-amber-500 rounded-none font-mono text-[11px] transition-colors ${
+                                    className={`w-full border p-2 focus:outline-none focus:border-amber-500 rounded-xl font-mono text-[11px] transition-colors ${
                                         isLight ? 'bg-white border-zinc-300 text-zinc-900' : 'bg-zinc-900 border-zinc-800 text-zinc-400'
                                     }`}
                                 />
@@ -1533,7 +1535,7 @@ export const MaterialsPage: React.FC = () => {
                                 <button
                                     type="button"
                                     onClick={() => setActiveModal(null)}
-                                    className={`px-4 py-2 border font-bold uppercase rounded-none transition-colors ${
+                                    className={`px-4 py-2 border font-bold uppercase rounded-xl transition-colors cursor-pointer ${
                                         isLight 
                                             ? 'bg-zinc-100 hover:bg-zinc-200 text-zinc-700 border-zinc-200' 
                                             : 'bg-zinc-900 text-zinc-400 border-zinc-800'
@@ -1543,7 +1545,7 @@ export const MaterialsPage: React.FC = () => {
                                 </button>
                                 <button
                                     type="submit"
-                                    className={`px-4 py-2 border font-bold uppercase rounded-none transition-colors ${
+                                    className={`px-4 py-2 border font-bold uppercase rounded-xl transition-colors cursor-pointer ${
                                         isLight 
                                             ? 'bg-amber-50 hover:bg-amber-100 text-amber-700 border-amber-200' 
                                             : 'bg-amber-950 hover:bg-amber-900 text-amber-300 border-amber-800'
@@ -1560,8 +1562,8 @@ export const MaterialsPage: React.FC = () => {
             {/* MODAL 5: CONSUME MATERIAL */}
             {activeModal === 'CONSUME' && modalMaterial && (
                 <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in font-manrope">
-                    <div className={`border max-w-md w-full p-6 space-y-4 rounded-none transition-all ${
-                        isLight ? 'bg-white border-zinc-200 shadow-xl' : 'bg-zinc-950 border-zinc-800'
+                    <div className={`border max-w-md w-full p-6 space-y-4 rounded-2xl shadow-2xl transition-all ${
+                        isLight ? 'bg-white border-zinc-200' : 'bg-zinc-950 border-zinc-800'
                     }`}>
                         <div className={`flex items-center justify-between border-b pb-3 ${
                             isLight ? 'border-zinc-200' : 'border-zinc-800'
@@ -1574,7 +1576,7 @@ export const MaterialsPage: React.FC = () => {
                                 </h3>
                                 <span className="text-[10px] text-red-500 font-mono block mt-0.5">{modalMaterial.material_name}</span>
                             </div>
-                            <button onClick={() => setActiveModal(null)} className="text-zinc-500 hover:text-red-500 transition-colors">
+                            <button onClick={() => setActiveModal(null)} className="text-zinc-500 hover:text-red-500 transition-colors cursor-pointer">
                                 <XMarkIcon className="w-4 h-4" />
                             </button>
                         </div>
@@ -1588,7 +1590,7 @@ export const MaterialsPage: React.FC = () => {
                                         min="1"
                                         value={consumeForm.quantity_consumed}
                                         onChange={e => setConsumeForm({...consumeForm, quantity_consumed: Number(e.target.value)})}
-                                        className={`w-full border p-2 font-mono font-bold focus:outline-none focus:border-red-500 rounded-none text-sm transition-colors ${
+                                        className={`w-full border p-2 font-mono font-bold focus:outline-none focus:border-red-500 rounded-xl text-sm transition-colors ${
                                             isLight ? 'bg-white border-zinc-300 text-zinc-900' : 'bg-zinc-900 border-zinc-800 text-white'
                                         }`}
                                     />
@@ -1600,7 +1602,7 @@ export const MaterialsPage: React.FC = () => {
                                         min="0"
                                         value={consumeForm.waste_units}
                                         onChange={e => setConsumeForm({...consumeForm, waste_units: Number(e.target.value)})}
-                                        className={`w-full border p-2 font-mono focus:outline-none focus:border-red-500 rounded-none text-sm transition-colors ${
+                                        className={`w-full border p-2 font-mono focus:outline-none focus:border-red-500 rounded-xl text-sm transition-colors ${
                                             isLight ? 'bg-white border-zinc-300 text-zinc-900' : 'bg-zinc-900 border-zinc-800 text-white'
                                         }`}
                                     />
@@ -1613,7 +1615,7 @@ export const MaterialsPage: React.FC = () => {
                                     required
                                     value={consumeForm.job_id}
                                     onChange={e => setConsumeForm({...consumeForm, job_id: e.target.value})}
-                                    className={`w-full border p-2 focus:outline-none focus:border-red-500 rounded-none font-mono transition-colors ${
+                                    className={`w-full border p-2 focus:outline-none focus:border-red-500 rounded-xl font-mono transition-colors ${
                                         isLight ? 'bg-white border-zinc-300 text-zinc-900' : 'bg-zinc-900 border-zinc-800 text-white'
                                     }`}
                                 />
@@ -1625,7 +1627,7 @@ export const MaterialsPage: React.FC = () => {
                                     required
                                     value={consumeForm.reason}
                                     onChange={e => setConsumeForm({...consumeForm, reason: e.target.value})}
-                                    className={`w-full border p-2 focus:outline-none focus:border-red-500 rounded-none transition-colors ${
+                                    className={`w-full border p-2 focus:outline-none focus:border-red-500 rounded-xl transition-colors ${
                                         isLight ? 'bg-white border-zinc-300 text-zinc-900' : 'bg-zinc-900 border-zinc-800 text-white'
                                     }`}
                                 />
@@ -1637,7 +1639,7 @@ export const MaterialsPage: React.FC = () => {
                                 <button
                                     type="button"
                                     onClick={() => setActiveModal(null)}
-                                    className={`px-4 py-2 border font-bold uppercase rounded-none transition-colors ${
+                                    className={`px-4 py-2 border font-bold uppercase rounded-xl transition-colors cursor-pointer ${
                                         isLight 
                                             ? 'bg-zinc-100 hover:bg-zinc-200 text-zinc-700 border-zinc-200' 
                                             : 'bg-zinc-900 text-zinc-400 border-zinc-800'
@@ -1647,7 +1649,7 @@ export const MaterialsPage: React.FC = () => {
                                 </button>
                                 <button
                                     type="submit"
-                                    className={`px-4 py-2 border font-bold uppercase rounded-none transition-colors ${
+                                    className={`px-4 py-2 border font-bold uppercase rounded-xl transition-colors cursor-pointer ${
                                         isLight 
                                             ? 'bg-red-50 hover:bg-red-100 text-red-700 border-red-200' 
                                             : 'bg-red-950 hover:bg-red-900 text-red-300 border-red-800'
@@ -1664,8 +1666,8 @@ export const MaterialsPage: React.FC = () => {
             {/* MODAL 6: PROCUREMENT RESTOCK ORDER */}
             {activeModal === 'PROCUREMENT' && modalMaterial && (
                 <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in font-manrope">
-                    <div className={`border max-w-md w-full p-6 space-y-4 rounded-none transition-all ${
-                        isLight ? 'bg-white border-zinc-200 shadow-xl' : 'bg-zinc-950 border-zinc-800'
+                    <div className={`border max-w-md w-full p-6 space-y-4 rounded-2xl shadow-2xl transition-all ${
+                        isLight ? 'bg-white border-zinc-200' : 'bg-zinc-950 border-zinc-800'
                     }`}>
                         <div className={`flex items-center justify-between border-b pb-3 ${
                             isLight ? 'border-zinc-200' : 'border-zinc-800'
@@ -1678,7 +1680,7 @@ export const MaterialsPage: React.FC = () => {
                                 </h3>
                                 <span className="text-[10px] text-zinc-500 font-mono block mt-0.5">{modalMaterial.material_name}</span>
                             </div>
-                            <button onClick={() => setActiveModal(null)} className="text-zinc-500 hover:text-red-500 transition-colors">
+                            <button onClick={() => setActiveModal(null)} className="text-zinc-500 hover:text-red-500 transition-colors cursor-pointer">
                                 <XMarkIcon className="w-4 h-4" />
                             </button>
                         </div>
@@ -1690,7 +1692,7 @@ export const MaterialsPage: React.FC = () => {
                                     required
                                     value={procurementForm.supplier_name}
                                     onChange={e => setProcurementForm({...procurementForm, supplier_name: e.target.value})}
-                                    className={`w-full border p-2 focus:outline-none focus:border-red-500 rounded-none transition-colors ${
+                                    className={`w-full border p-2 focus:outline-none focus:border-red-500 rounded-xl transition-colors ${
                                         isLight ? 'bg-white border-zinc-300 text-zinc-900' : 'bg-zinc-900 border-zinc-800 text-white'
                                     }`}
                                 />
@@ -1705,7 +1707,7 @@ export const MaterialsPage: React.FC = () => {
                                         step="100"
                                         value={procurementForm.ordered_units}
                                         onChange={e => setProcurementForm({...procurementForm, ordered_units: Number(e.target.value)})}
-                                        className={`w-full border p-2 font-mono font-bold focus:outline-none focus:border-red-500 rounded-none transition-colors ${
+                                        className={`w-full border p-2 font-mono font-bold focus:outline-none focus:border-red-500 rounded-xl transition-colors ${
                                             isLight ? 'bg-white border-zinc-300 text-zinc-900' : 'bg-zinc-900 border-zinc-800 text-white'
                                         }`}
                                     />
@@ -1715,7 +1717,7 @@ export const MaterialsPage: React.FC = () => {
                                     <select
                                         value={procurementForm.risk}
                                         onChange={e => setProcurementForm({...procurementForm, risk: e.target.value})}
-                                        className={`w-full border p-2 focus:outline-none focus:border-red-500 rounded-none font-bold transition-colors ${
+                                        className={`w-full border p-2 focus:outline-none focus:border-red-500 rounded-xl font-bold transition-colors ${
                                             isLight ? 'bg-white border-zinc-300 text-zinc-900' : 'bg-zinc-900 border-zinc-800 text-white'
                                         }`}
                                     >
@@ -1732,7 +1734,7 @@ export const MaterialsPage: React.FC = () => {
                                     type="datetime-local"
                                     value={procurementForm.expected_delivery_date}
                                     onChange={e => setProcurementForm({...procurementForm, expected_delivery_date: e.target.value})}
-                                    className={`w-full border p-2 focus:outline-none focus:border-red-500 rounded-none font-mono text-[11px] transition-colors ${
+                                    className={`w-full border p-2 focus:outline-none focus:border-red-500 rounded-xl font-mono text-[11px] transition-colors ${
                                         isLight ? 'bg-white border-zinc-300 text-zinc-900' : 'bg-zinc-900 border-zinc-800 text-zinc-400'
                                     }`}
                                 />
@@ -1743,7 +1745,7 @@ export const MaterialsPage: React.FC = () => {
                                     rows={2}
                                     value={procurementForm.notes}
                                     onChange={e => setProcurementForm({...procurementForm, notes: e.target.value})}
-                                    className={`w-full border p-2 focus:outline-none focus:border-red-500 rounded-none text-xs transition-colors ${
+                                    className={`w-full border p-2.5 focus:outline-none focus:border-red-500 rounded-xl text-xs transition-colors ${
                                         isLight ? 'bg-white border-zinc-300 text-zinc-900' : 'bg-zinc-900 border-zinc-800 text-white'
                                     }`}
                                     placeholder="Enter authorization reference or shipping delivery dock route specifications..."
@@ -1756,7 +1758,7 @@ export const MaterialsPage: React.FC = () => {
                                 <button
                                     type="button"
                                     onClick={() => setActiveModal(null)}
-                                    className={`px-4 py-2 border font-bold uppercase rounded-none transition-colors ${
+                                    className={`px-4 py-2 border font-bold uppercase rounded-xl transition-colors cursor-pointer ${
                                         isLight 
                                             ? 'bg-zinc-100 hover:bg-zinc-200 text-zinc-700 border-zinc-200' 
                                             : 'bg-zinc-900 text-zinc-400 border-zinc-800'
@@ -1766,7 +1768,7 @@ export const MaterialsPage: React.FC = () => {
                                 </button>
                                 <button
                                     type="submit"
-                                    className={`px-4 py-2 border font-bold uppercase rounded-none transition-colors ${
+                                    className={`px-4 py-2 border font-bold uppercase rounded-xl transition-colors cursor-pointer ${
                                         isLight 
                                             ? 'bg-red-50 hover:bg-red-100 text-red-700 border-red-200' 
                                             : 'bg-red-950 hover:bg-red-900 text-red-300 border-red-800'

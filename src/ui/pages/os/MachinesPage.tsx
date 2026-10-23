@@ -109,7 +109,7 @@ export const MachinesPage: React.FC = () => {
                 <div className="flex items-center gap-4">
                     <h1 className="text-2xl font-black text-zinc-900 dark:text-zinc-100 tracking-tight">Industrial Machines</h1>
                     {q.data?.timestamp && (
-                        <div className="hidden md:flex items-center gap-1.5 px-2 py-0.5 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-none text-[9px] font-bold text-zinc-500 uppercase tracking-widest">
+                        <div className="hidden md:flex items-center gap-1.5 px-2.5 py-0.5 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-full text-[9px] font-bold text-zinc-500 uppercase tracking-widest">
                             <ClockIcon className="w-3 h-3" />
                             <span>Sync: {new Date(q.data.timestamp).toLocaleTimeString()}</span>
                         </div>
@@ -122,13 +122,13 @@ export const MachinesPage: React.FC = () => {
                           setSelectedPrinthouseId('');
                           setIsOnboardOpen(true);
                       }}
-                      className="px-4 py-2 bg-[#dc0000] text-white text-xs font-bold hover:bg-[#dc0000]/90 transition-colors uppercase tracking-wider shadow-none"
+                      className="px-4 py-2 bg-[#dc0000] hover:bg-[#dc0000]/90 text-white text-xs font-bold rounded-xl shadow-xs transition-colors uppercase tracking-wider cursor-pointer"
                     >
                       + Onboard Fleet Unit
                     </button>
                     <button 
                       onClick={() => q.refetch()}
-                      className="p-1.5 rounded-none border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors text-zinc-500 dark:text-zinc-400"
+                      className="p-2 rounded-xl border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors text-zinc-500 dark:text-zinc-400 cursor-pointer"
                       title="Force Telemetry Refresh"
                     >
                       <ArrowPathIcon className={`w-4 h-4 ${q.isFetching ? 'animate-spin' : ''}`} />
@@ -143,9 +143,9 @@ export const MachinesPage: React.FC = () => {
                     { label: 'Avg. Uptime', value: avgUptime ? `${avgUptime}%` : 'N/A', icon: BoltIcon, config: { bg: "bg-sky-50 dark:bg-sky-950/30", text: "text-sky-500 dark:text-sky-400" } },
                     { label: 'Grid Efficiency', value: avgEfficiency ? `${avgEfficiency}%` : 'N/A', icon: ScaleIcon, config: { bg: "bg-amber-50 dark:bg-amber-950/40", text: "text-amber-500 dark:text-amber-400" } },
                 ].map((stat, i) => (
-                    <div key={i} className="bg-white dark:bg-zinc-950 p-3 rounded-none border border-zinc-200 dark:border-zinc-800 flex items-center gap-3 shadow-none">
-                        <div className={`p-2 rounded-none ${stat.config.bg} ${stat.config.text}`}>
-                            <stat.icon className="w-4 h-4" />
+                    <div key={i} className="bg-white dark:bg-[#18181b] p-4 rounded-2xl border border-zinc-200 dark:border-zinc-800 flex items-center gap-3 shadow-2xs">
+                        <div className={`p-2.5 rounded-xl ${stat.config.bg} ${stat.config.text}`}>
+                            <stat.icon className="w-5 h-5" />
                         </div>
                         <div>
                             <p className="text-[9px] font-bold text-zinc-400 uppercase tracking-widest leading-none mb-1">{stat.label}</p>
@@ -155,7 +155,7 @@ export const MachinesPage: React.FC = () => {
                 ))}
             </div>
 
-            <div className="flex flex-col md:flex-row items-center gap-3 bg-white dark:bg-zinc-950 p-1.5 rounded-none border border-zinc-200 dark:border-zinc-800 shadow-none">
+            <div className="flex flex-col md:flex-row items-center gap-3 bg-white dark:bg-[#18181b] p-2 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-2xs">
                 <div className="relative flex-1 w-full">
                     <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
                     <input 
@@ -172,7 +172,7 @@ export const MachinesPage: React.FC = () => {
                         <button
                             key={status}
                             onClick={() => setFilterStatus(status)}
-                            className={`px-3 py-1.5 rounded-none text-[9px] font-bold uppercase tracking-wider transition-all ${filterStatus === status ? 'bg-zinc-50 dark:bg-zinc-900 text-[#dc0000] dark:text-red-400 ring-1 ring-zinc-200 dark:ring-zinc-800' : 'text-zinc-500 dark:text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'}`}
+                            className={`px-3 py-1.5 rounded-full text-[9px] font-bold uppercase tracking-wider transition-all cursor-pointer ${filterStatus === status ? 'bg-zinc-100 dark:bg-zinc-800 text-[#dc0000] dark:text-red-400 ring-1 ring-zinc-300 dark:ring-zinc-700' : 'text-zinc-500 dark:text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'}`}
                         >
                             {status}
                         </button>
@@ -181,8 +181,8 @@ export const MachinesPage: React.FC = () => {
             </div>
 
             {q.status === 'error' && (
-                <div className="p-4 rounded-none border border-red-200 dark:border-red-900/60 bg-red-50 dark:bg-red-950/40 text-sm font-medium text-red-600 dark:text-red-400 flex items-center gap-3">
-                    <div className="p-2 bg-red-100 dark:bg-red-900/60 rounded-none">
+                <div className="p-4 rounded-xl border border-red-200 dark:border-red-900/60 bg-red-50 dark:bg-red-950/40 text-sm font-medium text-red-600 dark:text-red-400 flex items-center gap-3">
+                    <div className="p-2 bg-red-100 dark:bg-red-900/60 rounded-xl">
                         <SignalIcon className="w-5 h-5 text-red-600 dark:text-red-400" />
                     </div>
                     <span>Failed to synchronize grid telemetry: {q.error}</span>
@@ -197,17 +197,17 @@ export const MachinesPage: React.FC = () => {
                         header: 'Machine / Node',
                         accessor: (m) => (
                             <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-none bg-zinc-50 dark:bg-zinc-900 flex items-center justify-center flex-shrink-0 border border-zinc-200 dark:border-zinc-800 relative">
+                                <div className="w-10 h-10 rounded-xl bg-zinc-50 dark:bg-zinc-900 flex items-center justify-center flex-shrink-0 border border-zinc-200 dark:border-zinc-800 relative">
                                     <CpuChipIcon className="w-5 h-5 text-zinc-400" />
                                     {m.profileCompletenessScore < 100 && (
-                                        <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-amber-500 border border-zinc-950 rounded-none" />
+                                        <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-amber-500 border-2 border-white dark:border-zinc-950 rounded-full" />
                                     )}
                                 </div>
                                 <div>
                                     <div className="flex items-center gap-2">
                                         <p className="font-bold text-zinc-900 dark:text-zinc-100 leading-tight">{m.companyName || 'Industrial Node'}</p>
                                         {m.profileCompletenessScore < 75 && (
-                                            <span className="px-1.5 py-0.5 rounded-none bg-amber-50 dark:bg-amber-950/40 text-[8px] font-bold text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-900/60 uppercase tracking-wide">
+                                            <span className="px-2 py-0.5 rounded-full bg-amber-50 dark:bg-amber-950/40 text-[8px] font-bold text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-900/60 uppercase tracking-wide">
                                                 Needs Profile
                                             </span>
                                         )}
@@ -215,7 +215,7 @@ export const MachinesPage: React.FC = () => {
                                     <div className="flex items-center gap-1.5 mt-0.5">
                                         <span className="text-[10px] font-mono text-zinc-400 uppercase">{m.id}</span>
                                         {m.clusterId && (
-                                            <span className="px-1 py-0.5 rounded-none bg-zinc-50 dark:bg-zinc-900 text-[9px] font-bold text-zinc-400 uppercase tracking-wide border border-zinc-200 dark:border-zinc-800">
+                                            <span className="px-1.5 py-0.5 rounded-md bg-zinc-50 dark:bg-zinc-900 text-[9px] font-bold text-zinc-400 uppercase tracking-wide border border-zinc-200 dark:border-zinc-800">
                                                 {m.clusterId}
                                             </span>
                                         )}
@@ -258,7 +258,7 @@ export const MachinesPage: React.FC = () => {
                                     <StatusBadge status={m.healthState} />
                                 </div>
                                 {m.healthState === 'OFFLINE' && (
-                                    <div className="px-1.5 py-0.5 rounded-none bg-zinc-50 dark:bg-zinc-900 text-[8px] font-bold text-zinc-500 uppercase tracking-wide w-fit">
+                                    <div className="px-2 py-0.5 rounded-full bg-zinc-100 dark:bg-zinc-800 text-[8px] font-bold text-zinc-500 uppercase tracking-wide w-fit">
                                         No live heartbeat
                                     </div>
                                 )}
@@ -284,10 +284,10 @@ export const MachinesPage: React.FC = () => {
                                             {m.capacityUtilizationPct !== null ? `${m.capacityUtilizationPct}%` : 'N/A'}
                                         </span>
                                     </div>
-                                    <div className="h-1.5 w-full bg-zinc-100 dark:bg-zinc-900 rounded-none overflow-hidden">
+                                    <div className="h-1.5 w-full bg-zinc-100 dark:bg-zinc-900 rounded-full overflow-hidden">
                                         {m.capacityUtilizationPct !== null && (
                                             <div 
-                                                className={`h-full rounded-none transition-all duration-1000 ${
+                                                className={`h-full rounded-full transition-all duration-1000 ${
                                                     m.capacityUtilizationPct > 90 ? 'bg-red-500' : 
                                                     m.capacityUtilizationPct > 70 ? 'bg-amber-500' : 'bg-red-600'
                                                 }`}
@@ -299,9 +299,9 @@ export const MachinesPage: React.FC = () => {
                                 <div className="flex justify-between items-center">
                                     <span className="text-[8px] font-bold text-zinc-400 uppercase">Completeness</span>
                                     <div className="flex items-center gap-1">
-                                        <div className="w-12 h-1 bg-zinc-100 dark:bg-zinc-900 rounded-none overflow-hidden">
+                                        <div className="w-12 h-1.5 bg-zinc-100 dark:bg-zinc-900 rounded-full overflow-hidden">
                                             <div 
-                                                className={`h-full rounded-none ${m.telemetryCompletenessScore > 75 ? 'bg-emerald-500' : 'bg-amber-500'}`}
+                                                className={`h-full rounded-full ${m.telemetryCompletenessScore > 75 ? 'bg-emerald-500' : 'bg-amber-500'}`}
                                                 style={{ width: `${m.telemetryCompletenessScore}%` }}
                                             />
                                         </div>
@@ -375,7 +375,7 @@ export const MachinesPage: React.FC = () => {
                                         console.error(err);
                                     }
                                 }}
-                                className="px-2 py-1 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-900 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 text-[10px] font-bold uppercase tracking-wider text-zinc-600 dark:text-zinc-400 transition-colors"
+                                className="px-2.5 py-1 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-900 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 text-[10px] font-bold uppercase tracking-wider text-zinc-600 dark:text-zinc-400 rounded-lg transition-colors cursor-pointer"
                             >
                                 Edit Specs
                             </button>
@@ -390,20 +390,20 @@ export const MachinesPage: React.FC = () => {
                 </p>
                 <div className="flex items-center gap-4 text-[10px] font-bold text-zinc-400 uppercase tracking-widest">
                     <div className="flex items-center gap-1.5">
-                        <span className="w-2 h-2 rounded-none bg-emerald-500" /> ONLINE
+                        <span className="w-2 h-2 rounded-full bg-emerald-500" /> ONLINE
                     </div>
                     <div className="flex items-center gap-1.5">
-                        <span className="w-2 h-2 rounded-none bg-amber-500" /> DEGRADED
+                        <span className="w-2 h-2 rounded-full bg-amber-500" /> DEGRADED
                     </div>
                     <div className="flex items-center gap-1.5">
-                        <span className="w-2 h-2 rounded-none bg-red-500" /> OFFLINE
+                        <span className="w-2 h-2 rounded-full bg-red-500" /> OFFLINE
                     </div>
                 </div>
             </div>
 
             {isOnboardOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-                    <div className="w-full max-w-4xl max-h-[90vh] overflow-y-auto bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 p-6 shadow-2xl space-y-6">
+                    <div className="w-full max-w-4xl max-h-[90vh] overflow-y-auto bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 p-6 rounded-2xl shadow-2xl space-y-6">
                         <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 pb-4">
                             <div>
                                 <h3 className="text-sm font-black text-zinc-900 dark:text-zinc-100 uppercase tracking-widest">Onboard / Edit Fleet Unit</h3>
@@ -411,7 +411,7 @@ export const MachinesPage: React.FC = () => {
                             </div>
                             <button 
                                 onClick={() => { setIsOnboardOpen(false); setSelectedPrinthouseId(''); setEditingMachine(null); }}
-                                className="p-1.5 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 hover:border-[#dc0000] transition-colors"
+                                className="p-2 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 hover:border-[#dc0000] transition-colors cursor-pointer"
                             >
                                 <XMarkIcon className="w-5 h-5" />
                             </button>
@@ -424,7 +424,7 @@ export const MachinesPage: React.FC = () => {
                                     <select 
                                         value={selectedPrinthouseId}
                                         onChange={e => setSelectedPrinthouseId(e.target.value)}
-                                        className="w-full max-w-md px-3 py-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs font-bold focus:outline-none focus:border-[#dc0000] text-zinc-900 dark:text-zinc-100 bg-transparent"
+                                        className="w-full max-w-md px-3.5 py-2.5 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-[#dc0000]/20 focus:border-[#dc0000] text-zinc-900 dark:text-zinc-100"
                                     >
                                         <option value="" disabled className="text-zinc-500">-- Choose Printhouse --</option>
                                         {printhouses.map(ph => (

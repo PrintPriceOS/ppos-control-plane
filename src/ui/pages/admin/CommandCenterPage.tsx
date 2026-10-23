@@ -89,14 +89,14 @@ const resolveNodeLocation = (node: any) => {
 // --- BASE COMPONENTS ---
 
 const TacticalPanel = ({ title, children, icon: Icon, badge, color = 'slate', status = 'success', error = null }: { title: string, children: React.ReactNode, icon?: any, badge?: string, color?: string, status?: string, error?: string | null }) => (
-  <div className={`${COLORS.adaptive.surface} border ${COLORS.adaptive.borderPrimary} flex flex-col overflow-hidden rounded-none shadow-sm transition-all`}>
-    <div className={`px-4 py-2.5 ${COLORS.adaptive.surfaceMuted} border-b ${COLORS.adaptive.borderSubtle} flex items-center justify-between`}>
+  <div className={`${COLORS.adaptive.surface} border ${COLORS.adaptive.borderPrimary} flex flex-col overflow-hidden rounded-2xl shadow-2xs transition-all`}>
+    <div className={`px-4 py-3 ${COLORS.adaptive.surfaceMuted} border-b ${COLORS.adaptive.borderSubtle} flex items-center justify-between`}>
       <div className="flex items-center gap-2">
         {Icon && <Icon className={`w-4 h-4 ${COLORS.adaptive.textMuted}`} />}
         <h3 className={`text-[10px] font-black ${COLORS.adaptive.textSecondary} uppercase tracking-[0.2em]`}>{title}</h3>
       </div>
       {badge && (
-        <span className={`px-1.5 py-0.5 text-[8px] font-black uppercase tracking-tight ${
+        <span className={`px-2 py-0.5 text-[8px] font-black uppercase tracking-tight rounded-full ${
           color === 'emerald' ? 'bg-[#10B981]/10 text-[#10B981] border border-[#10B981]/20' :
           color === 'red' ? 'bg-[#dc0000]/10 text-[#dc0000] border border-[#dc0000]/20 animate-pulse' :
           color === 'amber' ? 'bg-amber-500/10 text-amber-500 border border-amber-500/20' :
@@ -110,7 +110,7 @@ const TacticalPanel = ({ title, children, icon: Icon, badge, color = 'slate', st
     <div className="overflow-x-auto overflow-y-auto p-4 custom-scrollbar relative flex-grow">
       {status === 'loading' ? (
         <div className="flex items-center justify-center py-6">
-          <div className="w-5 h-5 border-2 border-zinc-200 dark:border-zinc-800 border-t-[#dc0000] rounded-none animate-spin" />
+          <div className="w-5 h-5 border-2 border-zinc-200 dark:border-zinc-800 border-t-[#dc0000] rounded-full animate-spin" />
         </div>
       ) : status === 'error' ? (
         <div className="flex flex-col items-center justify-center text-center py-6">
@@ -129,7 +129,7 @@ const TelemetryItem = ({ label, value, sub, status }: { label: string, value: st
   <div className="flex flex-col gap-0.5 mb-4 last:mb-0">
     <div className="flex items-center justify-between">
       <span className={`text-[9px] font-bold ${COLORS.adaptive.textMuted} uppercase tracking-widest`}>{label}</span>
-      <div className={`w-1.5 h-1.5 rounded-none ${
+      <div className={`w-2 h-2 rounded-full ${
         status === 'stable' ? 'bg-[#10B981]' :
         status === 'warning' ? 'bg-amber-500' :
         status === 'critical' ? 'bg-[#dc0000] animate-pulse' :
@@ -151,7 +151,7 @@ const StatBar = ({ label, value, color }: { label: string, value: number, color:
       <span>{label}</span>
       <span>{Math.round(value)}%</span>
     </div>
-    <div className={`h-1 ${COLORS.adaptive.surfaceMuted} rounded-none overflow-hidden border ${COLORS.adaptive.borderSubtle}`}>
+    <div className={`h-1.5 ${COLORS.adaptive.surfaceMuted} rounded-full overflow-hidden border ${COLORS.adaptive.borderSubtle}`}>
       <div 
         className={`h-full transition-all duration-1000 ${
           color === 'emerald' ? 'bg-[#10B981]' :
@@ -172,14 +172,14 @@ const MiniMetric = ({ label, value }: { label: string, value: string | number })
 );
 
 const GovernanceRow = ({ label, status, color = 'emerald' }: { label: string, status: string, color?: string }) => (
-  <div className={`flex items-center justify-between p-2.5 rounded-none ${COLORS.adaptive.surfaceMuted} border ${COLORS.adaptive.borderSubtle}`}>
+  <div className={`flex items-center justify-between p-2.5 rounded-xl ${COLORS.adaptive.surfaceMuted} border ${COLORS.adaptive.borderSubtle}`}>
     <span className={`text-[9px] font-bold ${COLORS.adaptive.textSecondary} uppercase truncate pr-4`}>{label}</span>
     <span className={`text-[8px] font-black uppercase ${color === 'emerald' ? 'text-[#10B981]' : 'text-[#dc0000]'}`}>{status}</span>
   </div>
 );
 
 const LifecycleTier = ({ label, value, color }: { label: string, value: number, color: string }) => (
-  <div className={`p-2 rounded-none ${COLORS.adaptive.surfaceMuted} border ${COLORS.adaptive.borderSubtle} text-center`}>
+  <div className={`p-2.5 rounded-xl ${COLORS.adaptive.surfaceMuted} border ${COLORS.adaptive.borderSubtle} text-center`}>
     <span className={`text-[7px] font-black ${COLORS.adaptive.textMuted} uppercase block mb-1`}>{label}</span>
     <span className={`text-xs font-black ${
       color === 'primary' ? 'text-[#dc0000]' :
@@ -193,7 +193,7 @@ const CommandButton = ({ label, icon: Icon, color, onClick, badge, disabled }: {
   <button 
     onClick={onClick}
     disabled={disabled}
-    className={`flex items-center gap-2.5 p-3 rounded-none border transition-all text-left relative ${
+    className={`flex items-center gap-2.5 p-3.5 rounded-xl border transition-all text-left relative cursor-pointer ${
       disabled ? 'opacity-40 cursor-not-allowed' : 'active:scale-95'
     } ${
       color === 'red' && !disabled ? 'bg-[#dc0000]/5 border-[#dc0000]/20 text-[#dc0000] hover:bg-[#dc0000]/10' :
@@ -218,9 +218,9 @@ const UnlocatedCapacityStrip = ({ data }: { data: any[] }) => {
 
   return (
     <div className="mt-2 flex flex-col gap-1">
-      <div className="flex items-center justify-between px-3 py-2 bg-amber-500/5 border border-amber-500/20 rounded-none">
+      <div className="flex items-center justify-between px-3.5 py-2.5 bg-amber-500/5 border border-amber-500/20 rounded-xl">
         <div className="flex items-center gap-2">
-          <ExclamationTriangleIcon className="w-3 h-3 text-amber-500 opacity-80" />
+          <ExclamationTriangleIcon className="w-3.5 h-3.5 text-amber-500 opacity-80" />
           <span className="text-[9px] font-black text-amber-500 uppercase tracking-tight">
             Location Metadata Incomplete: {unlocated.reduce((acc, curr) => acc + (curr.printers || 0), 0)} Printers
           </span>
@@ -250,13 +250,13 @@ const IncidentBridge = ({ auditData, isPrinthouse, printhouseIncidents }: { audi
   const bridgeStatus = incidentCount > 0 ? 'DEGRADED' : 'ONLINE';
 
   return (
-    <div className={`glass border ${COLORS.adaptive.borderPrimary} ${COLORS.adaptive.surface} ${COLORS.adaptive.textPrimary} p-5 rounded-none shadow-sm flex flex-col gap-4`}>
-      <div className={`flex items-center justify-between border-b ${COLORS.adaptive.borderSubtle} pb-2`}>
+    <div className={`glass border ${COLORS.adaptive.borderPrimary} ${COLORS.adaptive.surface} ${COLORS.adaptive.textPrimary} p-5 rounded-2xl shadow-2xs flex flex-col gap-4`}>
+      <div className={`flex items-center justify-between border-b ${COLORS.adaptive.borderSubtle} pb-3`}>
         <div className="flex items-center gap-2">
           <ExclamationTriangleIcon className="w-4 h-4 text-[#dc0000]" />
           <h3 className={`text-[10px] font-black uppercase tracking-[0.2em] ${COLORS.adaptive.textPrimary}`}>{t('dashboard.panelIncidentBridge') || 'Incident Bridge'}</h3>
         </div>
-        <span className={`px-2 py-0.5 text-[8px] font-black uppercase tracking-tight font-mono border ${
+        <span className={`px-2 py-0.5 text-[8px] font-black uppercase tracking-tight font-mono rounded-full border ${
           bridgeStatus === 'DEGRADED' ? 'bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/20' : 'bg-emerald-600/15 text-emerald-900 dark:text-emerald-300 border-emerald-600/30'
         }`}>
           {bridgeStatus}
@@ -268,9 +268,9 @@ const IncidentBridge = ({ auditData, isPrinthouse, printhouseIncidents }: { audi
         </div>
         {isPrinthouse ? (
           safeArray(printhouseIncidents).slice(0, 5).map((inc: any) => (
-            <div key={inc.id} className="p-2 border border-red-200 dark:border-red-950 bg-red-50/60 dark:bg-red-950/20 flex items-center justify-between">
+            <div key={inc.id} className="p-2.5 rounded-xl border border-red-200 dark:border-red-950 bg-red-50/60 dark:bg-red-950/20 flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <div className="w-1.5 h-1.5 bg-[#dc0000] animate-pulse" />
+                <div className="w-2 h-2 rounded-full bg-[#dc0000] animate-pulse" />
                 <span className="text-[9px] font-mono font-bold text-zinc-900 dark:text-zinc-200 uppercase truncate max-w-[120px]">{inc.eventType || inc.title}</span>
               </div>
               <span className="text-[8px] font-mono font-black text-red-700 dark:text-red-400 uppercase">{inc.severity}</span>
@@ -278,9 +278,9 @@ const IncidentBridge = ({ auditData, isPrinthouse, printhouseIncidents }: { audi
           ))
         ) : (
           safeArray(incidents.data).slice(0, 5).map((inc: any) => (
-            <div key={inc.id} className="p-2 border border-red-200 dark:border-red-950 bg-red-50/60 dark:bg-red-950/20 flex items-center justify-between">
+            <div key={inc.id} className="p-2.5 rounded-xl border border-red-200 dark:border-red-950 bg-red-50/60 dark:bg-red-950/20 flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <div className="w-1.5 h-1.5 bg-[#dc0000] animate-pulse" />
+                <div className="w-2 h-2 rounded-full bg-[#dc0000] animate-pulse" />
                 <span className="text-[9px] font-mono font-bold text-zinc-900 dark:text-zinc-200 uppercase truncate max-w-[120px]">{inc.title || inc.type}</span>
               </div>
               <span className="text-[8px] font-mono font-black text-red-700 dark:text-red-400 uppercase">{inc.severity}</span>
@@ -288,7 +288,7 @@ const IncidentBridge = ({ auditData, isPrinthouse, printhouseIncidents }: { audi
           ))
         )}
         {incidentCount === 0 && (
-          <div className="p-3 bg-zinc-50 dark:bg-zinc-950/20 border border-zinc-200 dark:border-zinc-800 flex flex-col gap-1.5">
+          <div className="p-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-950/20 border border-zinc-200 dark:border-zinc-800 flex flex-col gap-1.5">
             <div className="flex justify-between items-center">
               <span className="text-[9px] font-mono font-bold text-zinc-800 dark:text-zinc-300 uppercase">{t('dashboard.sectorClear') || 'Sector Clear'}</span>
               <span className="text-[8px] font-mono font-black text-emerald-800 dark:text-emerald-400">{formatOperationalStatus('SECURE', t)}</span>
@@ -318,13 +318,13 @@ const IntelligenceAnomalies = ({ registryData, overviewData }: { registryData?: 
     ?? 0.85;
 
   return (
-    <div className={`glass border ${COLORS.adaptive.borderPrimary} ${COLORS.adaptive.surface} ${COLORS.adaptive.textPrimary} p-5 rounded-none shadow-sm flex flex-col gap-4`}>
-      <div className={`flex items-center justify-between border-b ${COLORS.adaptive.borderSubtle} pb-2`}>
+    <div className={`glass border ${COLORS.adaptive.borderPrimary} ${COLORS.adaptive.surface} ${COLORS.adaptive.textPrimary} p-5 rounded-2xl shadow-2xs flex flex-col gap-4`}>
+      <div className={`flex items-center justify-between border-b ${COLORS.adaptive.borderSubtle} pb-3`}>
         <div className="flex items-center gap-2">
           <BoltIcon className="w-4 h-4 text-blue-500 dark:text-blue-400" />
           <h3 className={`text-[10px] font-black uppercase tracking-[0.2em] ${COLORS.adaptive.textPrimary}`}>{t('dashboard.panelIntelligenceLayer') || 'Intelligence Layer'}</h3>
         </div>
-        <span className={`px-2 py-0.5 text-[8px] font-black uppercase tracking-tight font-mono border ${
+        <span className={`px-2 py-0.5 text-[8px] font-black uppercase tracking-tight font-mono rounded-full border ${
           inferenceActive ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20' : 'bg-zinc-100 dark:bg-zinc-950/40 text-zinc-600 dark:text-zinc-400 border-zinc-200 dark:border-zinc-800'
         }`}>
           {inferenceActive ? 'ACTIVE' : 'INERT'}
@@ -345,9 +345,9 @@ const IntelligenceAnomalies = ({ registryData, overviewData }: { registryData?: 
         </div>
         <div className={`space-y-2 pt-2 border-t ${COLORS.adaptive.borderSubtle}`}>
           {safeArray(anomalies.data).slice(0, 4).map((anom: any) => (
-            <div key={anom.id} className="p-2 border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950/20 flex items-center justify-between">
+            <div key={anom.id} className="p-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950/20 flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <div className="w-1 h-3 bg-[#dc0000]" />
+                <div className="w-1.5 h-3 rounded-full bg-[#dc0000]" />
                 <div className="flex flex-col">
                   <span className="text-[9px] font-mono font-bold text-zinc-800 dark:text-zinc-300 uppercase truncate">{anom.title}</span>
                   <span className="text-[7px] font-mono text-zinc-500 uppercase">{anom.severity} Risk</span>
@@ -357,7 +357,7 @@ const IntelligenceAnomalies = ({ registryData, overviewData }: { registryData?: 
             </div>
           ))}
           {safeArray(anomalies.data).length === 0 && (
-            <div className="p-3 bg-zinc-50 dark:bg-zinc-950/20 border border-zinc-200 dark:border-zinc-800 flex flex-col gap-1.5">
+            <div className="p-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-950/20 border border-zinc-200 dark:border-zinc-800 flex flex-col gap-1.5">
               <div className="flex justify-between items-center">
                 <span className="text-[9px] font-mono font-bold text-zinc-600 dark:text-zinc-400 uppercase">{t('dashboard.telemetryInference') || 'Telemetry Inference'}</span>
                 <span className="text-[8px] font-mono font-black text-emerald-600 dark:text-emerald-400">OPTIMAL</span>
@@ -382,37 +382,37 @@ const IndustrialHeartbeatMatrix = () => {
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'ONLINE': return <div className="w-2 h-2 rounded-none bg-[#10B981]" />;
-      case 'DEGRADED': return <div className="w-2 h-2 rounded-none bg-amber-500 animate-pulse" />;
-      case 'SATURATED': return <div className="w-2 h-2 rounded-none bg-[#dc0000]" />;
-      case 'OFFLINE': return <div className="w-2 h-2 rounded-none bg-zinc-600" />;
-      default: return <div className="w-2 h-2 rounded-none bg-zinc-700" />;
+      case 'ONLINE': return <div className="w-2 h-2 rounded-full bg-[#10B981]" />;
+      case 'DEGRADED': return <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />;
+      case 'SATURATED': return <div className="w-2 h-2 rounded-full bg-[#dc0000]" />;
+      case 'OFFLINE': return <div className="w-2 h-2 rounded-full bg-zinc-600" />;
+      default: return <div className="w-2 h-2 rounded-full bg-zinc-700" />;
     }
   };
 
   return (
     <TacticalPanel title={t('dashboard.panelHeartbeat') || 'Heartbeat Matrix'} icon={BoltIcon} badge="Industrial" color="emerald" status={telemetry.status}>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4">
-        <div className={`p-2.5 ${COLORS.adaptive.surfaceMuted} border ${COLORS.adaptive.borderSubtle}`}>
-          <span className={`text-[7px] font-bold ${COLORS.adaptive.textMuted} uppercase block`}>{t('dashboard.metricActive') || 'Active'}</span>
-          <div className={`text-sm font-black ${COLORS.adaptive.textPrimary}`}>{stats.active}</div>
+        <div className={`p-3 rounded-xl ${COLORS.adaptive.surfaceMuted} border ${COLORS.adaptive.borderSubtle}`}>
+          <span className={`text-[7px] font-bold ${COLORS.adaptive.textMuted} uppercase block tracking-wider`}>{t('dashboard.metricActive') || 'Active'}</span>
+          <div className={`text-sm font-black ${COLORS.adaptive.textPrimary} mt-0.5`}>{stats.active}</div>
         </div>
-        <div className={`p-2.5 ${COLORS.adaptive.surfaceMuted} border ${COLORS.adaptive.borderSubtle}`}>
-          <span className={`text-[7px] font-bold ${COLORS.adaptive.textMuted} uppercase block`}>{t('dashboard.metricLoad') || 'Load'}</span>
-          <div className="text-sm font-black text-[#dc0000]">{stats.avg_load || 0}%</div>
+        <div className={`p-3 rounded-xl ${COLORS.adaptive.surfaceMuted} border ${COLORS.adaptive.borderSubtle}`}>
+          <span className={`text-[7px] font-bold ${COLORS.adaptive.textMuted} uppercase block tracking-wider`}>{t('dashboard.metricLoad') || 'Load'}</span>
+          <div className="text-sm font-black text-[#dc0000] mt-0.5">{stats.avg_load || 0}%</div>
         </div>
-        <div className={`p-2.5 ${COLORS.adaptive.surfaceMuted} border ${COLORS.adaptive.borderSubtle}`}>
-          <span className={`text-[7px] font-bold ${COLORS.adaptive.textMuted} uppercase block`}>{t('dashboard.metricRisks') || 'Risks'}</span>
-          <div className="text-sm font-black text-amber-500">{stats.degraded + stats.saturated}</div>
+        <div className={`p-3 rounded-xl ${COLORS.adaptive.surfaceMuted} border ${COLORS.adaptive.borderSubtle}`}>
+          <span className={`text-[7px] font-bold ${COLORS.adaptive.textMuted} uppercase block tracking-wider`}>{t('dashboard.metricRisks') || 'Risks'}</span>
+          <div className="text-sm font-black text-amber-500 mt-0.5">{stats.degraded + stats.saturated}</div>
         </div>
-        <div className={`p-2.5 ${COLORS.adaptive.surfaceMuted} border ${COLORS.adaptive.borderSubtle}`}>
-          <span className={`text-[7px] font-bold ${COLORS.adaptive.textMuted} uppercase block`}>{t('dashboard.metricSync') || 'Sync'}</span>
-          <div className="text-sm font-black text-[#10B981]">{stats.freshness_pct}%</div>
+        <div className={`p-3 rounded-xl ${COLORS.adaptive.surfaceMuted} border ${COLORS.adaptive.borderSubtle}`}>
+          <span className={`text-[7px] font-bold ${COLORS.adaptive.textMuted} uppercase block tracking-wider`}>{t('dashboard.metricSync') || 'Sync'}</span>
+          <div className="text-sm font-black text-[#10B981] mt-0.5">{stats.freshness_pct}%</div>
         </div>
       </div>
       <div className="grid grid-cols-2 gap-2 max-h-[140px] overflow-y-auto custom-scrollbar">
         {Array.isArray(nodes.data) && nodes.data.map((node: any) => (
-          <div key={node.id} className={`p-2 ${COLORS.adaptive.surfaceMuted} border ${COLORS.adaptive.borderSubtle} flex items-center justify-between`}>
+          <div key={node.id} className={`p-2.5 rounded-xl ${COLORS.adaptive.surfaceMuted} border ${COLORS.adaptive.borderSubtle} flex items-center justify-between`}>
             <div className="flex items-center gap-2 min-w-0">
               {getStatusIcon(node.status)}
               <span className={`text-[8px] font-black ${COLORS.adaptive.textPrimary} uppercase truncate`}>{node.company_name || 'UNK'}</span>
@@ -444,12 +444,12 @@ const ManufacturingDispatchConsole = () => {
     <TacticalPanel title={t('dashboard.panelDispatchConsole') || 'Dispatch Console'} icon={ArchiveBoxIcon} badge="Orchestration" color="slate" status={dispatches.status}>
       <div className="space-y-2 max-h-[300px] overflow-y-auto custom-scrollbar">
         {safeArray(dispatches.data?.dispatches).map((d: any) => (
-          <div key={d?.id || Math.random()} className={`p-3 ${COLORS.adaptive.surfaceMuted} border ${COLORS.adaptive.borderSubtle} flex items-center justify-between group`}>
+          <div key={d?.id || Math.random()} className={`p-3 rounded-xl ${COLORS.adaptive.surfaceMuted} border ${COLORS.adaptive.borderSubtle} flex items-center justify-between group`}>
             <div className="flex flex-col">
               <span className={`text-[9px] font-black ${COLORS.adaptive.textPrimary} uppercase`}>DISPATCH #{String(d?.id || '').slice(0, 8)}</span>
               <span className={`text-[7px] ${COLORS.adaptive.textMuted} uppercase`}>{toDisplayText(d?.status)}</span>
             </div>
-            <button onClick={() => handleRollback(d?.id)} className="opacity-0 group-hover:opacity-100 text-[8px] font-black text-[#dc0000] uppercase transition-opacity">Rollback</button>
+            <button onClick={() => handleRollback(d?.id)} className="opacity-0 group-hover:opacity-100 px-2 py-1 rounded-lg border border-red-200 dark:border-red-900/50 text-[8px] font-black text-[#dc0000] uppercase hover:bg-red-500/10 transition-all cursor-pointer">Rollback</button>
           </div>
         ))}
         {(!dispatches.data?.dispatches || dispatches.data.dispatches.length === 0) && (
@@ -505,16 +505,16 @@ const RoutingSimulationPanel = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-2">
-            <input type="text" value={input.destination_country} onChange={e => setInput({...input, destination_country: e.target.value})} className={`w-full ${COLORS.adaptive.surfaceMuted} border ${COLORS.adaptive.borderPrimary} p-2.5 text-[10px] ${COLORS.adaptive.textPrimary} focus:outline-none focus:border-[#dc0000]`} placeholder="Country" />
-            <input type="text" value={input.destination_city} onChange={e => setInput({...input, destination_city: e.target.value})} className={`w-full ${COLORS.adaptive.surfaceMuted} border ${COLORS.adaptive.borderPrimary} p-2.5 text-[10px] ${COLORS.adaptive.textPrimary} focus:outline-none focus:border-[#dc0000]`} placeholder="City" />
+            <input type="text" value={input.destination_country} onChange={e => setInput({...input, destination_country: e.target.value})} className={`w-full ${COLORS.adaptive.surfaceMuted} border ${COLORS.adaptive.borderPrimary} rounded-xl px-3 py-2 text-xs ${COLORS.adaptive.textPrimary} focus:outline-none focus:ring-2 focus:ring-[#dc0000]/20 focus:border-[#dc0000]`} placeholder="Country" />
+            <input type="text" value={input.destination_city} onChange={e => setInput({...input, destination_city: e.target.value})} className={`w-full ${COLORS.adaptive.surfaceMuted} border ${COLORS.adaptive.borderPrimary} rounded-xl px-3 py-2 text-xs ${COLORS.adaptive.textPrimary} focus:outline-none focus:ring-2 focus:ring-[#dc0000]/20 focus:border-[#dc0000]`} placeholder="City" />
           </div>
-          <button onClick={() => runSimulation(false)} disabled={loading} className="w-full py-3 bg-[#dc0000] text-white text-[10px] font-black uppercase tracking-widest hover:bg-[#dc0000]/90 transition-colors">
+          <button onClick={() => runSimulation(false)} disabled={loading} className="w-full py-2.5 bg-[#dc0000] hover:bg-[#dc0000]/90 text-white text-[10px] font-black uppercase tracking-widest rounded-xl shadow-xs transition-colors cursor-pointer">
             {loading ? 'Simulating...' : 'Execute Simulation'}
           </button>
         </div>
         <div className={`border-l ${COLORS.adaptive.borderSubtle} pl-6 max-h-[200px] overflow-y-auto custom-scrollbar`}>
           {result?.candidates?.map((c: any) => (
-            <div key={c.node_id} className={`p-2.5 border-b ${COLORS.adaptive.borderSubtle} flex items-center justify-between`}>
+            <div key={c.node_id} className={`p-2.5 rounded-lg border-b ${COLORS.adaptive.borderSubtle} flex items-center justify-between`}>
               <span className={`text-[9px] font-black ${COLORS.adaptive.textPrimary} uppercase truncate`}>{c.display_name}</span>
               <span className="text-[10px] font-black text-[#dc0000]">{c.score_total}%</span>
             </div>
@@ -576,7 +576,7 @@ export const CommandCenterPage: React.FC = () => {
 
   if (!isGlobalAdmin && !isTenantAdmin && !isPrinthouseUser) {
     return (
-      <div className="p-8 text-center uppercase font-black text-xs text-[#dc0000] border border-[#dc0000]/20 bg-[#dc0000]/5 rounded-none">
+      <div className="p-8 text-center uppercase font-black text-xs text-[#dc0000] border border-[#dc0000]/20 bg-[#dc0000]/5 rounded-2xl">
         Security Exception: Unauthorized Role Context.
       </div>
     );
@@ -601,8 +601,8 @@ export const CommandCenterPage: React.FC = () => {
           </p>
         </div>
         <div className="flex gap-4">
-          <div className={`flex items-center gap-2 px-3 py-1.5 ${COLORS.adaptive.surface} border ${COLORS.adaptive.borderPrimary}`}>
-            <div className={`w-2 h-2 ${(isPrinthouseUser ? 'ACTIVE' : industrial.data?.queue?.state) === 'LIVE' || (isPrinthouseUser ? 'ACTIVE' : industrial.data?.queue?.state) === 'ACTIVE' ? 'bg-[#10B981]' : 'bg-[#dc0000]'}`} />
+          <div className={`flex items-center gap-2 px-3.5 py-1.5 rounded-full ${COLORS.adaptive.surface} border ${COLORS.adaptive.borderPrimary} shadow-2xs`}>
+            <div className={`w-2 h-2 rounded-full ${(isPrinthouseUser ? 'ACTIVE' : industrial.data?.queue?.state) === 'LIVE' || (isPrinthouseUser ? 'ACTIVE' : industrial.data?.queue?.state) === 'ACTIVE' ? 'bg-[#10B981]' : 'bg-[#dc0000]'}`} />
             <span className={`text-[9px] font-black ${COLORS.adaptive.textSecondary} uppercase tracking-wider`}>
               {t('dashboard.systemStatus') || 'System:'} {isPrinthouseUser ? 'ACTIVE' : (industrial.data?.queue?.state || 'OFFLINE')}
             </span>
@@ -628,7 +628,7 @@ export const CommandCenterPage: React.FC = () => {
             <TacticalPanel title={t('dashboard.panelFleet') || 'Fleet'} icon={CpuChipIcon} badge={formatOperationalStatus(phMachines.status === 'success' ? 'ACTIVE' : 'LOADING', t)} color="primary" status={phMachines.status}>
               <div className="space-y-2">
                 {safeArray(phMachines.data?.data?.machines).slice(0, 4).map((w: any) => (
-                  <div key={w?.id || Math.random()} className={`p-2.5 ${COLORS.adaptive.surfaceMuted} border ${COLORS.adaptive.borderSubtle} flex items-center justify-between`}>
+                  <div key={w?.id || Math.random()} className={`p-2.5 rounded-xl ${COLORS.adaptive.surfaceMuted} border ${COLORS.adaptive.borderSubtle} flex items-center justify-between`}>
                     <span className={`text-[9px] font-mono ${COLORS.adaptive.textSecondary} truncate`}>{toDisplayText(w?.name || w?.id)}</span>
                     <span className={`text-[8px] font-black ${w?.status === 'active' || w?.status === 'ACTIVE' ? 'text-[#10B981]' : COLORS.adaptive.textMuted} uppercase`}>{formatOperationalStatus(w?.status, t)}</span>
                   </div>
@@ -649,13 +649,13 @@ export const CommandCenterPage: React.FC = () => {
           <div className="space-y-6">
             <TacticalPanel title={t('dashboard.panelOperationalSummary') || 'Operational Summary'} icon={ServerIcon} badge="Summary" color="slate">
                <div className="space-y-2">
-                   <div className={`flex justify-between items-center p-2 border ${COLORS.adaptive.borderSubtle} ${COLORS.adaptive.surfaceMuted}`}>
+                   <div className={`flex justify-between items-center p-2.5 rounded-xl border ${COLORS.adaptive.borderSubtle} ${COLORS.adaptive.surfaceMuted}`}>
                       <span className={`text-[9px] font-bold ${COLORS.adaptive.textPrimary} uppercase`}>{t('dashboard.storageUtilized') || 'Storage Utilized'}</span>
                       <span className="text-[9px] font-mono font-black text-[#10B981]">
                         {storageAvailable ? `${((phSummary.data?.data?.storage?.sizeBytes || 0) / (1024**3)).toFixed(1)} GB` : 'Unavailable'}
                       </span>
                    </div>
-                   <div className={`flex justify-between items-center p-2 border ${COLORS.adaptive.borderSubtle} ${COLORS.adaptive.surfaceMuted}`}>
+                   <div className={`flex justify-between items-center p-2.5 rounded-xl border ${COLORS.adaptive.borderSubtle} ${COLORS.adaptive.surfaceMuted}`}>
                       <span className={`text-[9px] font-bold ${COLORS.adaptive.textPrimary} uppercase`}>{t('dashboard.activeArtifacts') || 'Active Artifacts'}</span>
                       <span className="text-[9px] font-mono font-black text-[#10B981]">
                         {storageAvailable ? (phSummary.data?.data?.storage?.artifactsCount || 0) : 'Unavailable'}
@@ -713,7 +713,7 @@ export const CommandCenterPage: React.FC = () => {
                   { id: 'worker-eu-west-1b', status: 'LISTENING' },
                   { id: 'worker-us-east-1a', status: 'STANDBY' }
                 ]).slice(0, 4).map((w: any) => (
-                  <div key={w?.id || Math.random()} className={`p-2.5 ${COLORS.adaptive.surfaceMuted} border ${COLORS.adaptive.borderSubtle} flex items-center justify-between`}>
+                  <div key={w?.id || Math.random()} className={`p-2.5 rounded-xl ${COLORS.adaptive.surfaceMuted} border ${COLORS.adaptive.borderSubtle} flex items-center justify-between`}>
                     <span className={`text-[9px] font-mono ${COLORS.adaptive.textSecondary} truncate`}>{toDisplayText(w?.id)}</span>
                     <span className={`text-[8px] font-black ${w?.status === 'PROCESSING' ? 'text-[#10B981]' : COLORS.adaptive.textMuted} uppercase`}>{formatOperationalStatus(w?.status, t)}</span>
                   </div>
@@ -775,15 +775,15 @@ export const CommandCenterPage: React.FC = () => {
             {!isTenantAdmin && (
               <TacticalPanel title={t('dashboard.panelSystemRegistry') || 'System Registry'} icon={ServerIcon} badge="State DB" color="slate">
                  <div className="space-y-2">
-                     <div className={`flex justify-between items-center p-2 border ${COLORS.adaptive.borderSubtle} ${COLORS.adaptive.surfaceMuted}`}>
+                     <div className={`flex justify-between items-center p-2.5 rounded-xl border ${COLORS.adaptive.borderSubtle} ${COLORS.adaptive.surfaceMuted}`}>
                         <span className={`text-[9px] font-bold ${COLORS.adaptive.textPrimary} uppercase`}>PostgreSQL Clusters</span>
                         <span className="text-[9px] font-mono font-black text-[#10B981]">{formatOperationalStatus('SYNCED', t)} [{capacity.data?.length ? 2 + (capacity.data.length % 4) : 3}ms]</span>
                      </div>
-                     <div className={`flex justify-between items-center p-2 border ${COLORS.adaptive.borderSubtle} ${COLORS.adaptive.surfaceMuted}`}>
+                     <div className={`flex justify-between items-center p-2.5 rounded-xl border ${COLORS.adaptive.borderSubtle} ${COLORS.adaptive.surfaceMuted}`}>
                         <span className={`text-[9px] font-bold ${COLORS.adaptive.textPrimary} uppercase`}>Redis Sub/Pub Engine</span>
                         <span className="text-[9px] font-mono font-black text-[#10B981]">{formatOperationalStatus('ACTIVE', t)} [{network.data ? 4 : 7}ms]</span>
                      </div>
-                     <div className={`flex justify-between items-center p-2 border ${COLORS.adaptive.borderSubtle} ${COLORS.adaptive.surfaceMuted}`}>
+                     <div className={`flex justify-between items-center p-2.5 rounded-xl border ${COLORS.adaptive.borderSubtle} ${COLORS.adaptive.surfaceMuted}`}>
                         <span className={`text-[9px] font-bold ${COLORS.adaptive.textPrimary} uppercase`}>Control Plane Broker</span>
                         <span className="text-[9px] font-mono font-black text-[#10B981]">{formatOperationalStatus('HEALTHY', t)} [1ms]</span>
                      </div>
@@ -796,7 +796,7 @@ export const CommandCenterPage: React.FC = () => {
           {!isTenantAdmin && (
             <div className="lg:col-span-3">
               <TacticalPanel title={t('dashboard.panelHeatmap') || 'Manufacturing Heatmap'} icon={GlobeAltIcon} badge="Global Topology" color="emerald" status={capacity.status}>
-                <div className={`h-[400px] ${COLORS.adaptive.surfaceMuted} border ${COLORS.adaptive.borderPrimary} relative overflow-hidden`}>
+                <div className={`h-[400px] ${COLORS.adaptive.surfaceMuted} border ${COLORS.adaptive.borderPrimary} rounded-2xl relative overflow-hidden`}>
                    <FederationMap />
                    <div className={`absolute bottom-0 left-0 right-0 ${COLORS.adaptive.surface} bg-opacity-90 p-3 border-t ${COLORS.adaptive.borderPrimary} flex justify-around`}>
                      <MiniMetric label="TOTAL NODES" value={capacity.data?.length || 0} />

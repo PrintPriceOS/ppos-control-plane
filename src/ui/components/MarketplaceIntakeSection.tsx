@@ -108,7 +108,7 @@ export const MarketplaceIntakeSection: React.FC<MarketplaceIntakeSectionProps> =
 
     if (!isHardened) {
         return (
-            <div className="bg-zinc-50/50 dark:bg-zinc-950/50 border border-zinc-100 dark:border-zinc-800 p-4 rounded-none">
+            <div className="bg-zinc-50/50 dark:bg-zinc-950/50 border border-zinc-100 dark:border-zinc-800 p-4 rounded-xl">
                 <p className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">Marketplace Intake</p>
                 <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">This is a legacy order without hardened production intake contracts.</p>
             </div>
@@ -124,7 +124,7 @@ export const MarketplaceIntakeSection: React.FC<MarketplaceIntakeSectionProps> =
                 </h3>
                 <button 
                     onClick={fetchFiles}
-                    className="p-1 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                    className="p-1.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
                 >
                     <ArrowPathIcon className={`w-3.5 h-3.5 text-zinc-400 ${loading ? 'animate-spin' : ''}`} />
                 </button>
@@ -132,7 +132,7 @@ export const MarketplaceIntakeSection: React.FC<MarketplaceIntakeSectionProps> =
 
             {/* Financial Gate */}
             <div className="grid grid-cols-2 gap-3">
-                <div className="bg-zinc-50/50 dark:bg-zinc-950/50 border border-zinc-100 dark:border-zinc-800 p-3">
+                <div className="bg-zinc-50/50 dark:bg-zinc-950/50 border border-zinc-100 dark:border-zinc-800 p-3 rounded-xl">
                     <p className="text-[9px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-tight mb-2">Invoice Status</p>
                     <div className="flex items-center justify-between">
                         <StatusBadge status={invoicePayment.invoice_status || 'PENDING'} />
@@ -140,21 +140,21 @@ export const MarketplaceIntakeSection: React.FC<MarketplaceIntakeSectionProps> =
                             <button 
                                 onClick={handleInvoice}
                                 disabled={!!actionLoading}
-                                className="text-[9px] font-black text-[#dc0000] hover:underline uppercase tracking-widest disabled:opacity-30"
+                                className="text-[9px] font-black text-[#dc0000] hover:underline uppercase tracking-widest disabled:opacity-30 cursor-pointer"
                             >
                                 {actionLoading === 'invoice' ? 'Generating...' : 'Generate Now'}
                             </button>
                         )}
                     </div>
                 </div>
-                <div className="bg-zinc-50/50 dark:bg-zinc-950/50 border border-zinc-100 dark:border-zinc-800 p-3">
+                <div className="bg-zinc-50/50 dark:bg-zinc-950/50 border border-zinc-100 dark:border-zinc-800 p-3 rounded-xl">
                     <p className="text-[9px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-tight mb-2">Payment Status</p>
                     <StatusBadge status={invoicePayment.payment_status || 'PENDING'} />
                 </div>
             </div>
 
             {/* Assets Table */}
-            <div className="border border-zinc-200 dark:border-zinc-800 overflow-hidden">
+            <div className="border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden">
                 <table className="w-full text-[11px] text-left">
                     <thead className="bg-zinc-50 dark:bg-zinc-950 text-[9px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest border-b border-zinc-200 dark:border-zinc-800">
                         <tr>
@@ -173,7 +173,7 @@ export const MarketplaceIntakeSection: React.FC<MarketplaceIntakeSectionProps> =
                                         {kind === 'INTERIOR_PDF' ? 'Interior' : 'Cover'}
                                     </td>
                                     <td className="px-3 py-2">
-                                        <span className="text-[9px] font-mono bg-zinc-100 dark:bg-zinc-900 px-1 py-0.5 text-zinc-500">
+                                        <span className="text-[9px] font-mono bg-zinc-100 dark:bg-zinc-900 px-2 py-0.5 rounded-full text-zinc-500 border border-zinc-200 dark:border-zinc-800">
                                             {file?.source_type || 'DECLARED'}
                                         </span>
                                     </td>
@@ -207,7 +207,7 @@ export const MarketplaceIntakeSection: React.FC<MarketplaceIntakeSectionProps> =
                     <button 
                         onClick={handleFetch}
                         disabled={!!actionLoading}
-                        className="flex items-center gap-2 px-3 py-1.5 bg-[#dc0000] text-white text-[10px] font-black uppercase tracking-widest hover:bg-[#b00000] transition-colors disabled:opacity-30 shadow-none"
+                        className="flex items-center gap-2 px-3 py-2 bg-[#dc0000] text-white text-[10px] font-black uppercase tracking-widest hover:bg-[#b00000] transition-colors disabled:opacity-30 rounded-xl cursor-pointer shadow-xs"
                     >
                         <CloudArrowDownIcon className="w-3.5 h-3.5" />
                         {actionLoading === 'fetch' ? 'Fetching...' : 'Trigger Fetch'}
@@ -218,7 +218,7 @@ export const MarketplaceIntakeSection: React.FC<MarketplaceIntakeSectionProps> =
                     <button 
                         onClick={handleValidate}
                         disabled={!!actionLoading}
-                        className="flex items-center gap-2 px-3 py-1.5 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 text-[10px] font-black uppercase tracking-widest hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-colors disabled:opacity-30 shadow-none"
+                        className="flex items-center gap-2 px-3 py-2 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 text-[10px] font-black uppercase tracking-widest hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-colors disabled:opacity-30 rounded-xl cursor-pointer shadow-xs"
                     >
                         <DocumentCheckIcon className="w-3.5 h-3.5" />
                         {actionLoading === 'validate' ? 'Validating...' : 'Validate Assets'}
@@ -227,7 +227,7 @@ export const MarketplaceIntakeSection: React.FC<MarketplaceIntakeSectionProps> =
 
                 <button 
                     onClick={copyRepoPath}
-                    className="flex items-center gap-2 px-3 py-1.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 text-[10px] font-black uppercase tracking-widest hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors shadow-none"
+                    className="flex items-center gap-2 px-3 py-2 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 text-[10px] font-black uppercase tracking-widest hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors rounded-xl cursor-pointer border border-zinc-200 dark:border-zinc-700 shadow-2xs"
                 >
                     <FolderIcon className="w-3.5 h-3.5" />
                     Repo Path
@@ -236,7 +236,7 @@ export const MarketplaceIntakeSection: React.FC<MarketplaceIntakeSectionProps> =
 
             {/* Ingestion Errors */}
             {files.some(f => f.error_message) && (
-                <div className="bg-red-50 dark:bg-red-950/20 border border-red-100 dark:border-red-900/40 p-3 space-y-1">
+                <div className="bg-red-50 dark:bg-red-950/20 border border-red-100 dark:border-red-900/40 p-3 space-y-1 rounded-xl">
                     <p className="text-[9px] font-black text-red-600 dark:text-red-400 uppercase tracking-widest">Intake Errors Detected</p>
                     {files.filter(f => f.error_message).map((f, i) => (
                         <p key={i} className="text-[10px] font-medium text-red-800 dark:text-red-300 leading-tight">

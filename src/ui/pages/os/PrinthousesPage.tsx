@@ -167,13 +167,13 @@ export const PrinthouseFormModal: React.FC<FormModalProps> = ({ isOpen, onClose,
                 <div className="fixed inset-0 overflow-y-auto">
                     <div className="flex min-h-full items-start justify-center p-4 pt-6">
                         <TransitionChild as={Fragment} enter="ease-out duration-200" enterFrom="opacity-0 scale-95" enterTo="opacity-100 scale-100" leave="ease-in duration-150" leaveFrom="opacity-100 scale-100" leaveTo="opacity-0 scale-95">
-                            <DialogPanel className="w-full max-w-6xl bg-white dark:bg-zinc-950 rounded-none shadow-none flex flex-col border border-zinc-200 dark:border-zinc-800" style={{ maxHeight: '92vh' }}>
+                            <DialogPanel className="w-full max-w-6xl bg-white dark:bg-zinc-950 rounded-2xl shadow-2xl overflow-hidden flex flex-col border border-zinc-200 dark:border-zinc-800" style={{ maxHeight: '92vh' }}>
                                 {/* Header */}
                                 <div className="flex items-center justify-between px-8 py-5 border-b border-zinc-200 dark:border-zinc-800 flex-shrink-0 bg-zinc-50 dark:bg-zinc-950">
                                     <h2 className="text-xl font-bold text-zinc-900 dark:text-zinc-100 tracking-tight">
                                         {editing ? `Edit Printhouse: ${editing.name}` : 'Add Printhouse Node'}
                                     </h2>
-                                    <button onClick={onClose} className="p-2 rounded-none bg-zinc-100 dark:bg-zinc-800 text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 transition-colors">
+                                    <button onClick={onClose} className="p-2 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 transition-colors cursor-pointer">
                                         <XMarkIcon className="w-5 h-5" />
                                     </button>
                                 </div>
@@ -247,7 +247,7 @@ export const PrinthousesPage: React.FC = () => {
                     <p className="text-sm text-zinc-500 dark:text-zinc-400 font-medium tracking-tight">Registered print facilities, signatures, lead times, and copy limits.</p>
                 </div>
                 <button onClick={openAdd}
-                    className="flex items-center gap-2 px-4 py-2.5 rounded-none bg-zinc-900 dark:bg-[#dc0000] text-white text-sm font-bold shadow-none hover:bg-zinc-800 dark:hover:bg-red-700 transition-colors">
+                    className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 dark:bg-[#dc0000] dark:hover:bg-red-700 text-white text-sm font-bold shadow-xs transition-colors cursor-pointer">
                     <PlusIcon className="w-4 h-4" />
                     Add Printhouse
                 </button>
@@ -259,8 +259,8 @@ export const PrinthousesPage: React.FC = () => {
                     { label: 'Avg. Lead Days', value: avgLeadDays, icon: ClockIcon },
                     { label: 'Unique Signature Sets', value: new Set(printhouses.map(p => (p.signatures ?? []).join(','))).size, icon: HashtagIcon },
                 ].map((stat, i) => (
-                    <div key={i} className="bg-white dark:bg-zinc-950 p-5 rounded-none border border-zinc-200 dark:border-zinc-800 flex items-center gap-4 shadow-none">
-                        <div className="p-3 rounded-none bg-zinc-100 dark:bg-zinc-900 text-zinc-500 dark:text-zinc-200 border border-transparent dark:border-zinc-800">
+                    <div key={i} className="bg-white dark:bg-[#18181b] p-5 rounded-2xl border border-zinc-200 dark:border-zinc-800 flex items-center gap-4 shadow-2xs">
+                        <div className="p-3 rounded-xl bg-zinc-100 dark:bg-zinc-900 text-zinc-500 dark:text-zinc-200 border border-transparent dark:border-zinc-800">
                             <stat.icon className="w-6 h-6 text-zinc-600 dark:text-zinc-200" />
                         </div>
                         <div>
@@ -272,7 +272,7 @@ export const PrinthousesPage: React.FC = () => {
             </div>
 
             {q.status === 'error' && (
-                <div className="px-5 py-4 rounded-none border border-red-200 dark:border-red-900/60 bg-red-50 dark:bg-red-950/40 text-sm font-medium text-[#dc0000] dark:text-red-400">
+                <div className="px-5 py-4 rounded-xl border border-red-200 dark:border-red-900/60 bg-red-50 dark:bg-red-950/40 text-sm font-medium text-[#dc0000] dark:text-red-400">
                     Failed to load printhouses: {q.error}
                 </div>
             )}
@@ -285,7 +285,7 @@ export const PrinthousesPage: React.FC = () => {
                         header: 'Printhouse',
                         accessor: (p) => (
                             <div className="flex items-center gap-2">
-                                <div className="w-7 h-7 rounded-none bg-zinc-100 dark:bg-zinc-900 border border-transparent dark:border-zinc-800 flex items-center justify-center flex-shrink-0">
+                                <div className="w-8 h-8 rounded-xl bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 flex items-center justify-center flex-shrink-0">
                                     <PrinterIcon className="w-4 h-4 text-zinc-500 dark:text-zinc-200" />
                                 </div>
                                 <div>
@@ -300,7 +300,7 @@ export const PrinthousesPage: React.FC = () => {
                         accessor: (p) => (
                             <div className="flex items-center gap-1.5 flex-wrap">
                                 {(p.signatures ?? []).map(s => (
-                                    <span key={s} className="px-2 py-0.5 rounded-none bg-zinc-100 dark:bg-zinc-900 text-zinc-700 dark:text-zinc-200 border border-transparent dark:border-zinc-800 text-[10px] font-bold uppercase tracking-wide">{s}p</span>
+                                    <span key={s} className="px-2.5 py-0.5 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 text-[10px] font-bold uppercase tracking-wide">{s}p</span>
                                 ))}
                             </div>
                         ),
@@ -317,7 +317,7 @@ export const PrinthousesPage: React.FC = () => {
                     {
                         header: 'Lead Days',
                         accessor: (p) => (
-                            <span className="px-2 py-0.5 rounded-none bg-zinc-100 dark:bg-zinc-900 text-zinc-700 dark:text-zinc-200 border border-transparent dark:border-zinc-800 font-bold text-[10px] uppercase tracking-wide">{p.production_lead_days}d</span>
+                            <span className="px-2.5 py-0.5 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 font-bold text-[10px] uppercase tracking-wide">{p.production_lead_days}d</span>
                         ),
                     },
                     {
@@ -344,11 +344,11 @@ export const PrinthousesPage: React.FC = () => {
                         accessor: (p) => (
                             <div className="flex items-center gap-1 justify-end">
                                 <button onClick={(e) => { e.stopPropagation(); openEdit(p); }}
-                                    className="p-2 rounded-none text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 transition-colors" title="Edit">
+                                    className="p-2 rounded-lg text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer" title="Edit">
                                     <PencilSquareIcon className="w-4 h-4" />
                                 </button>
                                 <button onClick={(e) => { e.stopPropagation(); setDeleteTarget(p); }}
-                                    className="p-2 rounded-none text-zinc-400 hover:text-[#dc0000] dark:hover:text-red-400 transition-colors" title="Delete">
+                                    className="p-2 rounded-lg text-zinc-400 hover:text-[#dc0000] dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors cursor-pointer" title="Delete">
                                     <TrashIcon className="w-4 h-4" />
                                 </button>
                             </div>
@@ -368,9 +368,9 @@ export const PrinthousesPage: React.FC = () => {
                     </TransitionChild>
                     <div className="fixed inset-0 flex items-center justify-center p-4">
                         <TransitionChild as={Fragment} enter="ease-out duration-200" enterFrom="opacity-0 scale-95" enterTo="opacity-100 scale-100" leave="ease-in duration-150" leaveFrom="opacity-100 scale-100" leaveTo="opacity-0 scale-95">
-                            <DialogPanel className="bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-none shadow-none p-8 max-w-sm w-full space-y-4">
-                                <div className="flex items-center gap-2">
-                                    <div className="p-3 rounded-none bg-red-50 dark:bg-red-950/40 text-[#dc0000] dark:text-red-400 border border-red-100 dark:border-red-900/60"><TrashIcon className="w-6 h-6" /></div>
+                            <DialogPanel className="bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl p-6 max-w-sm w-full space-y-4">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-3 rounded-xl bg-red-50 dark:bg-red-950/40 text-[#dc0000] dark:text-red-400 border border-red-100 dark:border-red-900/60"><TrashIcon className="w-6 h-6" /></div>
                                     <div>
                                         <p className="text-sm font-bold text-zinc-900 dark:text-zinc-100">Delete Printhouse</p>
                                         <p className="text-xs text-zinc-500 font-medium">This action cannot be undone.</p>
@@ -381,11 +381,11 @@ export const PrinthousesPage: React.FC = () => {
                                 </p>
                                 <div className="flex gap-2 pt-2">
                                     <button onClick={confirmDelete} disabled={deleting}
-                                        className="flex-1 py-2.5 rounded-none bg-[#dc0000] text-white text-sm font-bold hover:bg-red-700 dark:hover:bg-red-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed shadow-none">
+                                        className="flex-1 py-2.5 rounded-xl bg-[#dc0000] hover:bg-red-700 text-white text-sm font-bold shadow-xs transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer">
                                         {deleting ? 'Deleting…' : 'Delete'}
                                     </button>
                                     <button onClick={() => setDeleteTarget(null)}
-                                        className="flex-1 py-2.5 rounded-none border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-sm font-bold text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors">
+                                        className="flex-1 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-sm font-bold text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors cursor-pointer">
                                         Cancel
                                     </button>
                                 </div>
