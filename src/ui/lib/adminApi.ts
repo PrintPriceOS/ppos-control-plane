@@ -3088,3 +3088,20 @@ export async function buildBpePaperPatch(params?: {
     });
 }
 
+export interface SystemSupplierItem {
+    id: string;
+    name: string;
+    country?: string | null;
+    contactEmail?: string | null;
+    status: string;
+    isSystem?: boolean;
+}
+
+export async function listSystemSuppliers(params?: { query?: string }) {
+    const q = new URLSearchParams();
+    if (params?.query) q.set('q', params.query);
+    return adminFetch<{ ok: boolean; data: { items: SystemSupplierItem[]; total: number } }>(
+        `/api/admin/materials/suppliers?${q.toString()}`
+    );
+}
+

@@ -334,3 +334,22 @@
      - Reutilización estricta de las claves i18n existentes en `es.ts`, `en.ts` y `de.ts` (`materials.dbSearch.*`, `materials.linkedToDb`, `materials.orderFromSupplier`, `materials.orderPaper`).
      - Diseño responsive verificado sin scroll horizontal en resoluciones desktop (1280px, 1366px) y móvil (390px).
 - **Consecuencia**: Experiencia de configuración unificada entre el asistente de onboarding de taller y el ecosistema SCADA de proveedores de papel, con trazabilidad comercial garantizada y cero duplicación manual de datos.
+
+---
+
+### Decisión 11: Normalización de Proveedores en Printhouse Setup y Selector Trilingüe en Registro Autónomo
+- **Contexto**:
+  1. En el formulario de alta/edición de materiales de `MaterialsPanel.tsx`, los campos `supplier_name` y `supplier_country` eran entradas de texto libre sin validación contra el catálogo del sistema ni autocompletado de país de origen.
+  2. En el autoservicio de registro de distribuidores de papel (`/supplier/register`), existían textos técnicos en español fijos en el asistente (categorías de papel, ámbitos logísticos, medidor de robustez y toasts), sin selector visible que permitiera al usuario internacional cambiar de idioma antes o durante el registro.
+- **Decisión**:
+  1. **Endpoint Federado de Proveedores del Sistema (`GET /api/admin/materials/suppliers`)**:
+     - Expuesto en `materialsAdmin.js` con autenticación estricta y aislamiento de tenant.
+     - Recupera dinámicamente entidades registradas en `paper_suppliers`, nombres presentes en el histórico de `materials_catalog` y proveedores base del sistema (ej. Antalis, Torraspapel/Lecta, Fedrigoni, Papelera del Mediterraneo), unificando nombre, país y distintivo de proveedor registrado.
+  2. **Componente `<SupplierSelect>` y Normalización con `<CountrySelect>`**:
+     - Creado `<SupplierSelect>` (`src/ui/components/common/SupplierSelect.tsx`) como combobox con filtrado en tiempo real, badge de proveedor oficial del sistema y opción para ingresar nombres nuevos personalizados.
+     - Integración con `<CountrySelect>` para autocompletar inmediatamente `supplier_country` al elegir un proveedor conocido.
+  3. **Selector Trilingüe y Completa i18n en Registro (`SupplierRegistrationPage.tsx`)**:
+     - Incorporado un selector de idiomas con botones segmentados `[ES] [EN] [DE]` en la barra de cabecera junto al badge de red B2B, permitiendo alternar idioma sin perder los datos del formulario.
+     - Internacionalización exhaustiva de familias de papel suministradas (`paperCategories`), ámbitos logísticos (`coverageOptions`), medidor de seguridad de contraseña y todas las notificaciones toast y banners de error en `es.ts`, `en.ts` y `de.ts`.
+- **Consecuencia**: Ecosistema consistente para la asignación de proveedores y experiencia de autoservicio 100% multilingüe para distribuidores europeos en español, inglés y alemán.
+

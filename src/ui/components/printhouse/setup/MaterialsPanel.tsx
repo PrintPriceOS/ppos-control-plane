@@ -11,6 +11,8 @@ import { Layers, Plus, Trash2, Link2, Unlink, AlertCircle, CheckCircle, Search, 
 import { normalizeUiError } from '../../../utils/errorUtils';
 import * as adminApi from '../../../lib/adminApi';
 import { PaperSourcingModal } from '../PaperSourcingModal';
+import { CountrySelect } from '../../common/CountrySelect';
+import { SupplierSelect } from '../../common/SupplierSelect';
 
 interface MaterialsPanelProps {
     sites: { siteId: string; siteName: string }[];
@@ -514,37 +516,39 @@ export const MaterialsPanel: React.FC<MaterialsPanelProps> = ({ sites, onSaved }
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                        <div>
-                            <label className={labelClass}>{t('setup.materials.finish')}</label>
-                            <input
-                                type="text"
-                                placeholder="e.g. MATT, GLOSS, SILK"
-                                value={finishType}
-                                onChange={(e) => setFinishType(e.target.value)}
-                                className={inputClass}
-                            />
-                        </div>
-                        <div>
-                            <label className={labelClass}>{t('setup.materials.supplierCountry')}</label>
-                            <input
-                                type="text"
-                                placeholder="e.g. ES, DE, FR"
-                                value={supplierCountry}
-                                onChange={(e) => setSupplierCountry(e.target.value)}
-                                className={inputClass}
-                            />
-                        </div>
-                    </div>
-
                     <div>
-                        <label className={labelClass}>{t('setup.materials.supplier')}</label>
+                        <label className={labelClass}>{t('setup.materials.finish')}</label>
                         <input
                             type="text"
-                            placeholder="e.g. Antalis Co."
-                            value={supplierName}
-                            onChange={(e) => setSupplierName(e.target.value)}
+                            placeholder="e.g. MATT, GLOSS, SILK"
+                            value={finishType}
+                            onChange={(e) => setFinishType(e.target.value)}
                             className={inputClass}
+                        />
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                        <SupplierSelect
+                            id="material-supplier-select"
+                            label={t('setup.materials.supplier')}
+                            placeholder={t('setup.materials.selectSupplier') || 'Select or enter supplier...'}
+                            value={supplierName}
+                            onChange={(name, countryCode) => {
+                                setSupplierName(name);
+                                if (countryCode) {
+                                    setSupplierCountry(countryCode);
+                                }
+                            }}
+                            triggerClassName="w-full px-3 py-2 rounded-lg text-sm"
+                        />
+
+                        <CountrySelect
+                            id="material-supplier-country-select"
+                            label={t('setup.materials.supplierCountry')}
+                            placeholder="Select country..."
+                            value={supplierCountry}
+                            onChange={(code) => setSupplierCountry(code)}
+                            triggerClassName="w-full px-3 py-2 rounded-lg text-sm"
                         />
                     </div>
 

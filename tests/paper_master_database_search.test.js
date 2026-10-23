@@ -359,4 +359,44 @@ describe('Master Paper Database Search & Autocomplete', () => {
         expect(res.body).toHaveProperty('ok', true);
         expect(res.body.data.items).toEqual([]);
     });
+
+    test('11. HTTP Route GET /api/admin/materials/suppliers requires authentication', async () => {
+        const req = {
+            method: 'GET',
+            url: '/suppliers',
+            query: {},
+            headers: {}
+        };
+        const res = await dispatch(materialsAdminRouter, req);
+        expect(res.statusCode).toBe(401);
+    });
+
+    test('12. HTTP Route GET /api/admin/materials/suppliers returns system suppliers with country and names', async () => {
+        const token = generateToken({
+            tenantId: buyerTenantId,
+            role: 'PRINTHOUSE_ADMIN'
+        });
+
+        const req = {
+            method: 'GET',
+            url: '/suppliers',
+            query: {},
+            headers: {
+                authorization: `Bearer ${token}`
+            }
+        };
+        const res = await dispatch(materialsAdminRouter, req);
+        expect(res.statusCode).toBe(200);
+        expect(res.body).toHaveProperty('ok', true);
+        expect(Array.isArray(res.body.data.items)).toBe(true);
+        expect(res.body.data.items.length).toBeGreaterThan(0);
+        
+        const suppNames = res.body.data.items.map(s => s.name);
+        expect(suppNames.some(n => n.includes('Papelera') || n.includes('Test Mill') || n.includes('Antalis'))).toBe(true);
+        
+        const first = res.body.data.items[0];
+        expect(first).toHaveProperty('name');
+        expect(first).toHaveProperty('country');
+    });
 });
+

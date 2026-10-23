@@ -44,7 +44,7 @@ interface StrengthResult {
     color: string;
 }
 
-function checkPasswordStrength(pw: string): StrengthResult {
+function checkPasswordStrength(pw: string, t: (key: string) => string): StrengthResult {
     let score = 0;
     if (pw.length >= 8) score++;
     if (pw.length >= 12) score++;
@@ -52,17 +52,17 @@ function checkPasswordStrength(pw: string): StrengthResult {
     if (/\d/.test(pw)) score++;
     if (/[^A-Za-z0-9]/.test(pw)) score++;
     const clamped = Math.min(score, 4) as 0 | 1 | 2 | 3 | 4;
-    const map: Record<0 | 1 | 2 | 3 | 4, { label: string; color: string }> = {
-        0: { label: 'Muy débil', color: '#ef4444' },
-        1: { label: 'Débil', color: '#f97316' },
-        2: { label: 'Media', color: '#eab308' },
-        3: { label: 'Robusta', color: '#22c55e' },
-        4: { label: 'Excelente', color: '#10b981' },
+    const map: Record<0 | 1 | 2 | 3 | 4, { key: string; color: string }> = {
+        0: { key: 'supplier.register.pw.veryWeak', color: '#ef4444' },
+        1: { key: 'supplier.register.pw.weak', color: '#f97316' },
+        2: { key: 'supplier.register.pw.medium', color: '#eab308' },
+        3: { key: 'supplier.register.pw.strong', color: '#22c55e' },
+        4: { key: 'supplier.register.pw.excellent', color: '#10b981' },
     };
-    return { score: clamped, ...map[clamped] };
+    return { score: clamped, label: t(map[clamped].key), color: map[clamped].color };
 }
 
-// ── Paper Categories Catalog ──────────────────────────────────────────────────
+// ── Paper Categories & Currency Catalog ──────────────────────────────────────
 
 interface CategoryOption {
     id: string;
@@ -70,23 +70,7 @@ interface CategoryOption {
     subtitle: string;
 }
 
-const PAPER_CATEGORIES: CategoryOption[] = [
-    { id: 'COATED', label: 'Estucados / Couché', subtitle: 'Brillo, Mate, Silk (80-400 gsm)' },
-    { id: 'UNCOATED', label: 'Offset / No Estucado', subtitle: 'Edición, papelería y preprint (60-350 gsm)' },
-    { id: 'CARTON', label: 'Cartoncillo & Folding', subtitle: 'GC1, GC2, SBS para packaging plegable' },
-    { id: 'SPECIALTY', label: 'Especialidades & Texturados', subtitle: 'Verjurados, teñidos en masa, perlados' },
-    { id: 'DIGITAL', label: 'Papel Certificado Digital', subtitle: 'Optimizado HP Indigo y tóner electrostático' },
-    { id: 'PACKAGING', label: 'Kraft & Embalaje', subtitle: 'Papeles reciclados, liners y embalaje industrial' },
-];
-
 const CURRENCY_OPTIONS = ['EUR', 'USD', 'GBP'];
-
-const COVERAGE_OPTIONS = [
-    { id: 'LOCAL', label: 'Local / Provincial (24h)' },
-    { id: 'REGIONAL', label: 'Regional / Autonómico (24-48h)' },
-    { id: 'NATIONAL', label: 'Cobertura Nacional Completa' },
-    { id: 'INTERNATIONAL', label: 'Internacional / Exportación UE' },
-];
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Component
@@ -94,7 +78,7 @@ const COVERAGE_OPTIONS = [
 
 export const SupplierRegistrationPage: React.FC = () => {
     const navigate = useNavigate();
-    const { t, locale } = useLocale();
+    const { t, locale, setLocale } = useLocale();
     const { toasts, addToast, dismiss } = useAuthToast();
 
     // Step state: 1: Company, 2: Catalog/Distribution, 3: Credentials, 4: Success
@@ -129,8 +113,25 @@ export const SupplierRegistrationPage: React.FC = () => {
     // Registered response data for success screen
     const [registeredData, setRegisteredData] = useState<any>(null);
 
+    // Localized Catalogs
+    const paperCategories: CategoryOption[] = useMemo(() => [
+        { id: 'COATED', label: t('supplier.register.cat.coated.label'), subtitle: t('supplier.register.cat.coated.desc') },
+        { id: 'UNCOATED', label: t('supplier.register.cat.uncoated.label'), subtitle: t('supplier.register.cat.uncoated.desc') },
+        { id: 'CARTON', label: t('supplier.register.cat.carton.label'), subtitle: t('supplier.register.cat.carton.desc') },
+        { id: 'SPECIALTY', label: t('supplier.register.cat.specialty.label'), subtitle: t('supplier.register.cat.specialty.desc') },
+        { id: 'DIGITAL', label: t('supplier.register.cat.digital.label'), subtitle: t('supplier.register.cat.digital.desc') },
+        { id: 'PACKAGING', label: t('supplier.register.cat.packaging.label'), subtitle: t('supplier.register.cat.packaging.desc') },
+    ], [t]);
+
+    const coverageOptions = useMemo(() => [
+        { id: 'LOCAL', label: t('supplier.register.cov.local') },
+        { id: 'REGIONAL', label: t('supplier.register.cov.regional') },
+        { id: 'NATIONAL', label: t('supplier.register.cov.national') },
+        { id: 'INTERNATIONAL', label: t('supplier.register.cov.international') },
+    ], [t]);
+
     // Validation helpers
-    const passwordStrength = useMemo(() => checkPasswordStrength(password), [password]);
+    const passwordStrength = useMemo(() => checkPasswordStrength(password, t), [password, t]);
     const passwordsMatch = password && confirmPassword && password === confirmPassword;
     const isEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
 
@@ -159,19 +160,19 @@ export const SupplierRegistrationPage: React.FC = () => {
     // Step 1 Validation
     const validateStep1 = (): boolean => {
         if (!companyName.trim()) {
-            addToast('error', 'Campo obligatorio', 'Introduzca la razón social o nombre de la empresa proveedora.');
+            addToast('error', t('supplier.register.err.requiredTitle'), t('supplier.register.err.companyNameReq'));
             return false;
         }
         if (!city.trim()) {
-            addToast('error', 'Campo obligatorio', 'Introduzca la ciudad o centro logístico principal.');
+            addToast('error', t('supplier.register.err.requiredTitle'), t('supplier.register.err.cityReq'));
             return false;
         }
         if (!contactName.trim()) {
-            addToast('error', 'Campo obligatorio', 'Introduzca el nombre del responsable comercial o de operaciones.');
+            addToast('error', t('supplier.register.err.requiredTitle'), t('supplier.register.err.contactReq'));
             return false;
         }
         if (!phone.trim()) {
-            addToast('error', 'Campo obligatorio', 'Introduzca un teléfono de contacto directo o de pedidos.');
+            addToast('error', t('supplier.register.err.requiredTitle'), t('supplier.register.err.phoneReq'));
             return false;
         }
         return true;
@@ -180,11 +181,11 @@ export const SupplierRegistrationPage: React.FC = () => {
     // Step 2 Validation
     const validateStep2 = (): boolean => {
         if (currencies.length === 0) {
-            addToast('error', 'Moneda requerida', 'Seleccione al menos una moneda de facturación admitida.');
+            addToast('error', t('supplier.register.err.currencyReqTitle'), t('supplier.register.err.currencyReq'));
             return false;
         }
         if (categories.length === 0) {
-            addToast('error', 'Catálogo requerido', 'Seleccione al menos una familia de papel suministrada.');
+            addToast('error', t('supplier.register.err.catalogReqTitle'), t('supplier.register.err.catalogReq'));
             return false;
         }
         return true;
@@ -196,23 +197,23 @@ export const SupplierRegistrationPage: React.FC = () => {
         setServerError(null);
 
         if (!isEmailValid) {
-            addToast('error', 'Email no válido', 'Introduzca un email corporativo válido.');
+            addToast('error', t('supplier.register.err.invalidEmailTitle'), t('supplier.register.err.invalidEmail'));
             return;
         }
         if (password.length < 8) {
-            addToast('error', 'Contraseña débil', 'La contraseña debe tener al menos 8 caracteres.');
+            addToast('error', t('supplier.register.err.pwWeakTitle'), t('supplier.register.err.pwWeak'));
             return;
         }
         if (password !== confirmPassword) {
-            addToast('error', 'Discrepancia', 'Las contraseñas introducidas no coinciden.');
+            addToast('error', t('supplier.register.err.pwMismatchTitle'), t('supplier.register.err.pwMismatch'));
             return;
         }
         if (!termsAccepted) {
-            addToast('error', 'Términos B2B', 'Debe aceptar las condiciones comerciales y de gobernanza B2B.');
+            addToast('error', t('supplier.register.err.termsTitle'), t('supplier.register.err.terms'));
             return;
         }
         if (!authorityConfirmed) {
-            addToast('error', 'Representación', 'Debe confirmar su capacidad para representar a la distribuidora.');
+            addToast('error', t('supplier.register.err.authorityTitle'), t('supplier.register.err.authority'));
             return;
         }
 
@@ -248,9 +249,9 @@ export const SupplierRegistrationPage: React.FC = () => {
             const data = await res.json().catch(() => ({}));
 
             if (!res.ok || !data.ok) {
-                const msg = data.error || 'No se pudo completar el registro. Compruebe los datos e inténtelo de nuevo.';
+                const msg = data.error || t('supplier.register.err.defaultError');
                 setServerError(msg);
-                addToast('error', 'Error en el registro', msg);
+                addToast('error', t('supplier.register.err.requiredTitle'), msg);
                 return;
             }
 
@@ -265,12 +266,12 @@ export const SupplierRegistrationPage: React.FC = () => {
 
             setRegisteredData(data);
             setStep(4);
-            addToast('success', '¡Registro completado!', 'Proveedor activado en PrintPrice Paper Hub.');
+            addToast('success', t('supplier.register.successToastTitle'), t('supplier.register.successToastMsg'));
 
         } catch (err: any) {
-            const netErr = 'Error de red al conectar con el servidor. Inténtelo de nuevo.';
+            const netErr = t('supplier.register.err.network');
             setServerError(netErr);
-            addToast('error', 'Fallo de conexión', netErr);
+            addToast('error', t('supplier.register.err.networkTitle'), netErr);
         } finally {
             setLoading(false);
         }
@@ -283,11 +284,13 @@ export const SupplierRegistrationPage: React.FC = () => {
                 subtitle={t('supplier.register.subtitle')}
                 maxWidth={680}
             >
-                {/* Hub Header Badge */}
+                {/* Hub Header Badge & Interactive Language Selector */}
                 <div style={{
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
+                    flexWrap: 'wrap',
+                    gap: '12px',
                     marginBottom: '20px',
                     paddingBottom: '16px',
                     borderBottom: '1px solid rgba(255, 255, 255, 0.08)'
@@ -306,13 +309,60 @@ export const SupplierRegistrationPage: React.FC = () => {
                     }}>
                         {t('supplier.register.badge')}
                     </span>
-                    <span style={{
-                        fontSize: '12px',
-                        color: '#a1a1aa',
-                        fontFamily: "'Manrope', system-ui, sans-serif"
-                    }}>
-                        {step < 4 ? `Paso ${step} de 3` : 'Completado'}
-                    </span>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        {/* Interactive Language Selector (ES / EN / DE) */}
+                        <div
+                            role="group"
+                            aria-label="Language selection"
+                            style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                background: 'rgba(255, 255, 255, 0.04)',
+                                border: '1px solid rgba(255, 255, 255, 0.1)',
+                                borderRadius: '6px',
+                                padding: '2px',
+                                gap: '2px'
+                            }}
+                        >
+                            {(['es', 'en', 'de'] as const).map((lang) => {
+                                const active = locale === lang;
+                                return (
+                                    <button
+                                        key={lang}
+                                        type="button"
+                                        id={`supplier-lang-${lang}`}
+                                        onClick={() => setLocale(lang)}
+                                        aria-pressed={active}
+                                        title={lang === 'es' ? 'Español' : lang === 'en' ? 'English' : 'Deutsch'}
+                                        style={{
+                                            border: 'none',
+                                            background: active ? '#dc0000' : 'transparent',
+                                            color: active ? '#ffffff' : '#a1a1aa',
+                                            fontSize: '11px',
+                                            fontWeight: 800,
+                                            padding: '4px 8px',
+                                            borderRadius: '4px',
+                                            cursor: 'pointer',
+                                            letterSpacing: '0.04em',
+                                            fontFamily: "'Manrope', system-ui, sans-serif",
+                                            transition: 'all 0.15s ease'
+                                        }}
+                                    >
+                                        {lang.toUpperCase()}
+                                    </button>
+                                );
+                            })}
+                        </div>
+
+                        <span style={{
+                            fontSize: '12px',
+                            color: '#a1a1aa',
+                            fontFamily: "'Manrope', system-ui, sans-serif"
+                        }}>
+                            {step < 4 ? t('supplier.register.stepOf', { current: step, total: 3 }) : t('supplier.register.completed')}
+                        </span>
+                    </div>
                 </div>
 
                 {/* Stepper Progress Bar */}
@@ -359,7 +409,7 @@ export const SupplierRegistrationPage: React.FC = () => {
                     }}>
                         <AlertCircle size={18} style={{ color: '#ef4444', flexShrink: 0, marginTop: '2px' }} />
                         <div style={{ flex: 1 }}>
-                            <strong>Error en la solicitud:</strong> {serverError}
+                            <strong>{t('supplier.register.err.serverErrorPrefix')}</strong> {serverError}
                             {serverError.includes('already exists') && (
                                 <div style={{ marginTop: '8px' }}>
                                     <Link
@@ -370,7 +420,7 @@ export const SupplierRegistrationPage: React.FC = () => {
                                             fontWeight: 700
                                         }}
                                     >
-                                        Haga clic aquí para iniciar sesión con su cuenta existente →
+                                        {t('supplier.register.err.existingAccount')}
                                     </Link>
                                 </div>
                             )}
@@ -397,7 +447,7 @@ export const SupplierRegistrationPage: React.FC = () => {
                                 margin: 0,
                                 fontFamily: "'Manrope', system-ui, sans-serif"
                             }}>
-                                Datos fiscales y de contacto de la entidad distribuidora o fabricante de papel.
+                                {t('supplier.register.step1Desc')}
                             </p>
                         </div>
 
@@ -411,7 +461,7 @@ export const SupplierRegistrationPage: React.FC = () => {
                                 id="supplier-company-name"
                                 label={`${t('supplier.register.companyName')} *`}
                                 icon={Building2}
-                                placeholder="Ej. Torraspapel Distribución S.A."
+                                placeholder={t('supplier.register.companyNamePlaceholder')}
                                 value={companyName}
                                 onChange={(e) => setCompanyName(e.target.value)}
                                 autoFocus
@@ -422,7 +472,7 @@ export const SupplierRegistrationPage: React.FC = () => {
                                 id="supplier-brand-name"
                                 label={t('supplier.register.brandName')}
                                 icon={Sparkles}
-                                placeholder="Ej. Lecta Group / Torras"
+                                placeholder={t('supplier.register.brandNamePlaceholder')}
                                 value={brandName}
                                 onChange={(e) => setBrandName(e.target.value)}
                             />
@@ -431,7 +481,7 @@ export const SupplierRegistrationPage: React.FC = () => {
                                 id="supplier-tax-id"
                                 label={t('supplier.register.taxId')}
                                 icon={FileText}
-                                placeholder="Ej. ESA08000000 / DE123456789"
+                                placeholder={t('supplier.register.taxIdPlaceholder')}
                                 value={taxId}
                                 onChange={(e) => setTaxId(e.target.value)}
                             />
@@ -492,7 +542,7 @@ export const SupplierRegistrationPage: React.FC = () => {
                                 id="supplier-city"
                                 label={`${t('supplier.register.city')} *`}
                                 icon={MapPin}
-                                placeholder="Ej. Zaragoza / Madrid"
+                                placeholder={t('supplier.register.cityPlaceholder')}
                                 value={city}
                                 onChange={(e) => setCity(e.target.value)}
                                 required
@@ -502,7 +552,7 @@ export const SupplierRegistrationPage: React.FC = () => {
                                 id="supplier-website"
                                 label={t('supplier.register.website')}
                                 icon={Globe}
-                                placeholder="https://www.papelera-ejemplo.es"
+                                placeholder={t('supplier.register.websitePlaceholder')}
                                 value={website}
                                 onChange={(e) => setWebsite(e.target.value)}
                             />
@@ -511,7 +561,7 @@ export const SupplierRegistrationPage: React.FC = () => {
                                 id="supplier-contact-name"
                                 label={`${t('supplier.register.contactName')} *`}
                                 icon={ShieldCheck}
-                                placeholder="Ej. Laura Martínez Gómez"
+                                placeholder={t('supplier.register.contactNamePlaceholder')}
                                 value={contactName}
                                 onChange={(e) => setContactName(e.target.value)}
                                 required
@@ -521,7 +571,7 @@ export const SupplierRegistrationPage: React.FC = () => {
                                 id="supplier-phone"
                                 label={`${t('supplier.register.phone')} *`}
                                 icon={Phone}
-                                placeholder="+34 91 123 4567"
+                                placeholder={t('supplier.register.phonePlaceholder')}
                                 value={phone}
                                 onChange={(e) => setPhone(e.target.value)}
                                 required
@@ -563,7 +613,7 @@ export const SupplierRegistrationPage: React.FC = () => {
                                 margin: 0,
                                 fontFamily: "'Manrope', system-ui, sans-serif"
                             }}>
-                                Configure las monedas, categorías de papel y capacidades de distribución logística.
+                                {t('supplier.register.step2Desc')}
                             </p>
                         </div>
 
@@ -634,7 +684,7 @@ export const SupplierRegistrationPage: React.FC = () => {
                                 gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
                                 gap: '10px'
                             }}>
-                                {PAPER_CATEGORIES.map((cat) => {
+                                {paperCategories.map((cat) => {
                                     const isSelected = categories.includes(cat.id);
                                     return (
                                         <div
@@ -736,7 +786,7 @@ export const SupplierRegistrationPage: React.FC = () => {
                                             boxSizing: 'border-box'
                                         }}
                                     >
-                                        {COVERAGE_OPTIONS.map((cov) => (
+                                        {coverageOptions.map((cov) => (
                                             <option key={cov.id} value={cov.id} style={{ background: '#18181b', color: '#ffffff' }}>
                                                 {cov.label}
                                             </option>
@@ -790,7 +840,7 @@ export const SupplierRegistrationPage: React.FC = () => {
                                 }}
                             >
                                 <ArrowLeft size={16} />
-                                <span>Atrás: Empresa</span>
+                                <span>{t('supplier.register.backCompany')}</span>
                             </button>
 
                             <div style={{ flex: 2 }}>
@@ -829,7 +879,7 @@ export const SupplierRegistrationPage: React.FC = () => {
                                 margin: 0,
                                 fontFamily: "'Manrope', system-ui, sans-serif"
                             }}>
-                                Configure las credenciales del usuario Administrador del Proveedor y confirme la adhesión B2B.
+                                {t('supplier.register.step3Desc')}
                             </p>
                         </div>
 
@@ -838,7 +888,7 @@ export const SupplierRegistrationPage: React.FC = () => {
                             label={`${t('supplier.register.email')} *`}
                             icon={Mail}
                             type="email"
-                            placeholder="pedidos@papelera-ejemplo.es"
+                            placeholder={t('supplier.register.emailPlaceholder')}
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
                             autoComplete="email"
@@ -864,7 +914,7 @@ export const SupplierRegistrationPage: React.FC = () => {
                                         onClick={() => setShowPassword(!showPassword)}
                                         style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#a1a1aa' }}
                                         tabIndex={-1}
-                                        aria-label={showPassword ? 'Ocultar contraseña' : 'Ver contraseña'}
+                                        aria-label={showPassword ? t('supplier.register.pw.hide') : t('supplier.register.pw.show')}
                                     >
                                         {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                                     </button>
@@ -896,7 +946,7 @@ export const SupplierRegistrationPage: React.FC = () => {
                                         fontWeight: 600,
                                         fontFamily: "'Manrope', system-ui, sans-serif"
                                     }}>
-                                        Robustez: {passwordStrength.label} (mínimo 8 caracteres)
+                                        {t('supplier.register.pw.strength')}: {passwordStrength.label} {t('supplier.register.pw.minChars')}
                                     </div>
                                 </div>
                             )}
@@ -923,7 +973,7 @@ export const SupplierRegistrationPage: React.FC = () => {
                                         onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                                         style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#a1a1aa' }}
                                         tabIndex={-1}
-                                        aria-label={showConfirmPassword ? 'Ocultar confirmación' : 'Ver confirmación'}
+                                        aria-label={showConfirmPassword ? t('supplier.register.pw.hideConfirm') : t('supplier.register.pw.showConfirm')}
                                     >
                                         {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                                     </button>
@@ -1017,7 +1067,7 @@ export const SupplierRegistrationPage: React.FC = () => {
                                 }}
                             >
                                 <ArrowLeft size={16} />
-                                <span>Atrás: Catálogo</span>
+                                <span>{t('supplier.register.backCatalog')}</span>
                             </button>
 
                             <div style={{ flex: 2 }}>
@@ -1101,17 +1151,17 @@ export const SupplierRegistrationPage: React.FC = () => {
                                 gap: '10px'
                             }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: '8px' }}>
-                                    <span style={{ fontSize: '12px', color: '#71717a', textTransform: 'uppercase', fontWeight: 700 }}>Proveedor</span>
+                                    <span style={{ fontSize: '12px', color: '#71717a', textTransform: 'uppercase', fontWeight: 700 }}>{t('supplier.register.summarySupplier')}</span>
                                     <span style={{ fontSize: '13px', color: '#ffffff', fontWeight: 800 }}>{registeredData.supplier?.name}</span>
                                 </div>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: '8px' }}>
-                                    <span style={{ fontSize: '12px', color: '#71717a', textTransform: 'uppercase', fontWeight: 700 }}>Administrador</span>
+                                    <span style={{ fontSize: '12px', color: '#71717a', textTransform: 'uppercase', fontWeight: 700 }}>{t('supplier.register.summaryAdmin')}</span>
                                     <span style={{ fontSize: '13px', color: '#ffffff', fontWeight: 600 }}>{registeredData.user?.email}</span>
                                 </div>
                                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                    <span style={{ fontSize: '12px', color: '#71717a', textTransform: 'uppercase', fontWeight: 700 }}>Rol Asignado</span>
+                                    <span style={{ fontSize: '12px', color: '#71717a', textTransform: 'uppercase', fontWeight: 700 }}>{t('supplier.register.summaryRole')}</span>
                                     <span style={{ fontSize: '12px', color: '#10b981', fontWeight: 800, background: 'rgba(16, 185, 129, 0.1)', padding: '2px 8px', borderRadius: '4px' }}>
-                                        SUPPLIER_ADMIN (Activo)
+                                        {t('supplier.register.summaryRoleValue')}
                                     </span>
                                 </div>
                             </div>
