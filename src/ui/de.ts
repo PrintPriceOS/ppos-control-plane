@@ -2717,7 +2717,30 @@ export const de = {
   'materials.sourcing.subtitle': 'Bestellen Sie direkt bei auditierten Papierlieferanten oder fordern Sie Mengenrabatte für Ihr Werk an.',
   'materials.sourcing.tabCatalog': 'Papiermarktplatz & Angebote',
   'materials.sourcing.tabMyOrders': 'Werksbeschaffungen & Wareneingänge',
-  'materials.sourcing.searchPlaceholder': 'Papiermarke, Hersteller, Format, SKU suchen...'
+  'materials.sourcing.searchPlaceholder': 'Papiermarke, Hersteller, Format, SKU suchen...',
+
+  // Procurement Documents
+  'procurement.document.titlePo': 'Offizielle Bestellung (PO)',
+  'procurement.document.titleSlip': 'Lieferschein / Frachtbegleitschein',
+  'procurement.document.subtitle': 'Offizielles unveränderliches Dokument ausgestellt von PrintPrice OS Control Plane',
+  'procurement.document.tabPo': 'Bestellung (PO)',
+  'procurement.document.tabSlip': 'Lieferschein',
+  'procurement.document.btnPrint': 'Drucken / PDF',
+  'procurement.document.btnDownloadHtml': 'HTML herunterladen',
+  'procurement.document.btnClose': 'Schließen',
+  'procurement.document.loading': 'Offizielles Dokument wird generiert...',
+  'procurement.document.error': 'Fehler beim Generieren oder Laden des Beschaffungsdokuments',
+  'procurement.document.viewBtn': 'Dokumente',
+  'procurement.document.viewPo': 'PO ansehen',
+  'procurement.document.viewSlip': 'Lieferschein ansehen',
+  'procurement.document.buyerInfo': 'Einkaufende Druckerei',
+  'procurement.document.supplierInfo': 'Papierlieferant',
+  'procurement.document.materialSpec': 'Technische Papierspezifikation',
+  'procurement.document.orderedQuantity': 'Bestellmenge',
+  'procurement.document.totalSheets': 'Bogen gesamt',
+  'procurement.document.receivedSheets': 'Vereinnahmte Bogen',
+  'procurement.document.remainingSheets': 'Restbestand',
+  'procurement.document.financialTotal': 'Gesamtbetrag'
 } as const;
 
 export type TranslationKeys = keyof typeof de;

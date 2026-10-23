@@ -1451,6 +1451,31 @@ router.post('/orders/:orderId/transition', requireSupplierScope('OPERATOR'), req
     }
 });
 
+/**
+ * GET /api/v1/paper-suppliers/orders/:orderId/document
+ * Generates official Purchase Order (PO) or Delivery Receipt (Packing Slip / Albarán) document.
+ * Query param: ?type=po | packing_slip
+ */
+router.get('/orders/:orderId/document', requireSupplierScope('VIEWER'), requireApprovedSupplier, async (req, res) => {
+    try {
+        const context = resolveActorContext(req);
+        const { orderId } = req.params;
+        const { type = 'po' } = req.query;
+
+        const doc = await paperProcurementService.generateProcurementDocument(orderId, type, context);
+        return res.json({ ok: true, data: doc });
+    } catch (err) {
+        console.error('[PAPER-SUPPLIERS][ORDER-DOCUMENT-ERROR]', err);
+        const isNotFound = err.message.startsWith('ORDER_NOT_FOUND');
+        const isForbidden = err.message.startsWith('FORBIDDEN');
+        const statusCode = isNotFound ? 404 : (isForbidden ? 403 : 500);
+        return res.status(statusCode).json({
+            ok: false,
+            error: { code: isNotFound ? 'ORDER_NOT_FOUND' : (isForbidden ? 'FORBIDDEN_DOCUMENT_ACCESS' : 'DOCUMENT_GENERATION_FAILED'), message: err.message }
+        });
+    }
+});
+
 module.exports = router;
 
 

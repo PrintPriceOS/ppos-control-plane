@@ -2976,3 +2976,53 @@ export async function receivePaperProcurementOrder(orderId: string, payload: {
     });
 }
 
+export async function getPrinthousePaperOrderDocument(orderId: string, type: 'po' | 'packing_slip' = 'po') {
+    return adminFetch<{ ok: boolean; data: any }>(`/api/admin/materials/procurements/paper-orders/${orderId}/document?type=${type}`);
+}
+
+export async function estimateJobPaper(jobSpec: {
+    copies: number;
+    interior_pages: number;
+    paper_weight_interior?: number;
+    paper_weight_cover?: number;
+    press_sheet_width_mm?: number;
+    press_sheet_height_mm?: number;
+    rate_per_kg_interior?: number;
+    rate_per_kg_cover?: number;
+}) {
+    return adminFetch<{ ok: boolean; data: any }>('/api/admin/materials/sourcing/estimate-job-paper', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(jobSpec)
+    });
+}
+
+export async function resolveMarketPaperRate(params?: {
+    gsm?: number;
+    finish?: string;
+    category?: string;
+    widthMm?: number;
+    heightMm?: number;
+}) {
+    const q = new URLSearchParams();
+    if (params?.gsm) q.set('gsm', String(params.gsm));
+    if (params?.finish) q.set('finish', params.finish);
+    if (params?.category) q.set('category', params.category);
+    if (params?.widthMm) q.set('widthMm', String(params.widthMm));
+    if (params?.heightMm) q.set('heightMm', String(params.heightMm));
+    return adminFetch<{ ok: boolean; data: any }>(`/api/admin/materials/sourcing/resolve-market-rate?${q.toString()}`);
+}
+
+export async function buildBpePaperPatch(params?: {
+    interiorPaperType?: string;
+    interiorGsm?: number;
+    coverPaperType?: string;
+    coverGsm?: number;
+}) {
+    return adminFetch<{ ok: boolean; data: any }>('/api/admin/materials/sourcing/bpe-rate-patch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(params || {})
+    });
+}
+

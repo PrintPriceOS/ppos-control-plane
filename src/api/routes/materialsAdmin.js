@@ -541,6 +541,85 @@ router.post('/procurements/paper-orders/:id/receive', async (req, res) => {
 });
 
 /**
+ * GET /api/admin/materials/procurements/paper-orders/:id/document
+ * Generates official Purchase Order (PO) or Delivery Receipt (Packing Slip) document.
+ * Query param: ?type=po | packing_slip
+ */
+router.get('/procurements/paper-orders/:id/document', async (req, res) => {
+    try {
+        const scope = getScopeContext(req);
+        const { type = 'po' } = req.query;
+        const actor = {
+            tenantId: scope.tenantId,
+            printhouseId: scope.printhouseId,
+            userId: scope.operatorId,
+            role: scope.role,
+            isSuperAdmin: scope.isSuperAdmin
+        };
+        const doc = await paperProcurementService.generateProcurementDocument(req.params.id, type, actor);
+        return res.json({ ok: true, data: doc });
+    } catch (err) {
+        if (err.statusCode) {
+            return res.status(err.statusCode).json({ ok: false, error: err.message, code: err.code || 'DOCUMENT_ERROR' });
+        }
+        console.error('[MATERIALS-API] Failed to generate paper procurement document:', err);
+        return res.status(500).json({ ok: false, error: err.message, code: 'DOCUMENT_ERROR' });
+    }
+});
+
+const paperCostIntegrationService = require('../services/paperCostIntegrationService');
+
+/**
+ * POST /api/admin/materials/sourcing/estimate-job-paper
+ * Calculates physical sheets, net/gross kilograms, scrap allowance, and estimated procurement costs.
+ */
+router.post('/sourcing/estimate-job-paper', async (req, res) => {
+    try {
+        const result = paperCostIntegrationService.calculateJobPaperRequirements(req.body || {});
+        return res.json({ ok: true, data: result });
+    } catch (err) {
+        console.error('[MATERIALS-API] Failed to estimate job paper:', err);
+        return res.status(400).json({ ok: false, error: err.message, code: 'JOB_PAPER_ESTIMATION_ERROR' });
+    }
+});
+
+/**
+ * GET /api/admin/materials/sourcing/resolve-market-rate
+ * Resolves best available market rate normalized to price_per_kg from active supplier offers.
+ */
+router.get('/sourcing/resolve-market-rate', async (req, res) => {
+    try {
+        const scope = getScopeContext(req);
+        if (!scope.tenantId) {
+            return res.status(401).json({ ok: false, error: 'TENANT_ID_REQUIRED' });
+        }
+        const result = await paperCostIntegrationService.resolveMarketPaperRate(scope.tenantId, req.query);
+        return res.json({ ok: true, data: result });
+    } catch (err) {
+        console.error('[MATERIALS-API] Failed to resolve market rate:', err);
+        return res.status(500).json({ ok: false, error: err.message, code: 'MARKET_RATE_RESOLUTION_ERROR' });
+    }
+});
+
+/**
+ * POST /api/admin/materials/sourcing/bpe-rate-patch
+ * Builds a BPE forward pricing candidate rate patch from active supplier paper rates.
+ */
+router.post('/sourcing/bpe-rate-patch', async (req, res) => {
+    try {
+        const scope = getScopeContext(req);
+        if (!scope.tenantId) {
+            return res.status(401).json({ ok: false, error: 'TENANT_ID_REQUIRED' });
+        }
+        const result = await paperCostIntegrationService.buildBpePaperPatch(scope.tenantId, req.body || {});
+        return res.json({ ok: true, data: result });
+    } catch (err) {
+        console.error('[MATERIALS-API] Failed to build BPE paper patch:', err);
+        return res.status(500).json({ ok: false, error: err.message, code: 'BPE_RATE_PATCH_ERROR' });
+    }
+});
+
+/**
  * POST /api/admin/materials/procurements/:id/receive
  * Marks an active supplier procurement as received, auto-incrementing stock atomically and idempotently.
  */

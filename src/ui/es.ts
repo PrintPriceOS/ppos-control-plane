@@ -2717,7 +2717,30 @@ export const es = {
   'materials.sourcing.subtitle': 'Compre directamente a proveedores homologados o solicite cotizaciones por volumen para su planta.',
   'materials.sourcing.tabCatalog': 'Mercado y Catálogo de Papel',
   'materials.sourcing.tabMyOrders': 'Aprovisionamientos y Entradas de Planta',
-  'materials.sourcing.searchPlaceholder': 'Buscar marca de papel, fabricante, formato, SKU...'
+  'materials.sourcing.searchPlaceholder': 'Buscar marca de papel, fabricante, formato, SKU...',
+
+  // Procurement Documents
+  'procurement.document.titlePo': 'Orden de Compra Oficial (PO)',
+  'procurement.document.titleSlip': 'Albarán de Entrega (Packing Slip)',
+  'procurement.document.subtitle': 'Documento oficial inmutable emitido por PrintPrice OS Control Plane',
+  'procurement.document.tabPo': 'Orden de Compra (PO)',
+  'procurement.document.tabSlip': 'Albarán de Entrega',
+  'procurement.document.btnPrint': 'Imprimir / PDF',
+  'procurement.document.btnDownloadHtml': 'Descargar HTML',
+  'procurement.document.btnClose': 'Cerrar',
+  'procurement.document.loading': 'Generando documento oficial...',
+  'procurement.document.error': 'Error al generar o cargar el documento de aprovisionamiento',
+  'procurement.document.viewBtn': 'Documentos',
+  'procurement.document.viewPo': 'Ver PO',
+  'procurement.document.viewSlip': 'Ver Albarán',
+  'procurement.document.buyerInfo': 'Imprenta Compradora',
+  'procurement.document.supplierInfo': 'Proveedor de Papel',
+  'procurement.document.materialSpec': 'Especificación Técnica del Papel',
+  'procurement.document.orderedQuantity': 'Cantidad Pedida',
+  'procurement.document.totalSheets': 'Hojas Totales',
+  'procurement.document.receivedSheets': 'Hojas Recibidas',
+  'procurement.document.remainingSheets': 'Saldo Pendiente',
+  'procurement.document.financialTotal': 'Importe Total'
 } as const;
 
 export type TranslationKeys = keyof typeof es;

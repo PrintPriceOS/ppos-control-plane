@@ -173,4 +173,52 @@
      - Se registra `(id, material_inventory_id, event_type, quantity_units, before_stock, after_stock, operator_id, reason, metadata_json)` con auditoría completa de albarán y operador.
 - **Consecuencia**: Cero descuadres de inventario en planta, sincronización atómica entre proveedores y el ERP/MES industrial de la imprenta.
 
+---
+
+## ADR 013: Generación Canónica de Documentos de Aprovisionamiento (PO & Albarán de Entrega) con Motor de Impresión (Fase I6)
+- **Fecha**: 2026-10-23
+- **Estado**: Aceptado
+- **Contexto**:
+  La operativa de aprovisionamiento de bobinas y resmas de papel entre imprentas comerciales y proveedores requiere documentos físicos y descargables legalmente válidos para recepción en muelle, control contable y firma de conformidad:
+  a) **Orden de Compra / Purchase Order (PO)**: Generada al confirmar el pedido/RFQ, con desglose de especificaciones físicas, condiciones comerciales, importes y datos del comprador/proveedor.
+  b) **Albarán de Entrega / Packing Slip**: Generado por el proveedor o en planta con historial de recepciones parciales o totales, números de albarán, bultos y casillas de firma de entrega y recepción.
+- **Decisión**:
+  1. **Servicio Centralizado y Multilateral (`paperProcurementService.generateProcurementDocument`)**:
+     - Acceso autorizado bilateral: permitido al tenant comprador de la imprenta (`isBuyer`) y a la organización proveedora asociada (`isSupplier`).
+     - Rechazo fail-closed (HTTP 403 `FORBIDDEN_DOCUMENT_ACCESS`) para proveedores o imprentas ajenas.
+     - Contrato dual de retorno: entrega `{ ok: true, data: docData, ...docData }` garantizando compatibilidad con clientes frontend (`res.data`) y servicios de backend.
+  2. **Estructura HTML5 Auto-Contenida e Imprimible (`renderPrintableDocumentHtml`)**:
+     - Estilos CSS profesionales `@media print` optimizados para A4 portrait (márgenes de 12mm x 15mm, tipografía Segoe UI/Roboto, encabezados de tabla de alto contraste, casillas de firma y eliminación de elementos interactivos con `.no-print`).
+     - Inclusión de identidad corporativa de PrintPrice OS, marca/subtítulo, estado del pedido, dirección de entrega del centro de impresión y SKU comercial del proveedor.
+     - En Albaranes (`PACKING_SLIP`), renderizado dinámico de la tabla histórica de recibos con número de albarán, fecha, hojas verificadas, operador y notas.
+  3. **Visualización y Descarga en UI (`ProcurementDocumentModal.tsx`)**:
+     - Montaje accesible vía `<AccessibleModal>` sobre `document.body` con tabs para conmutar entre Orden de Compra y Albarán, previsualización en iframe aislado, descarga de archivo `.html` y soporte trilingüe ES/EN/DE.
+- **Consecuencia**: Estandarización de documentos industriales sin dependencias pesadas de renderizado en servidor (como Puppeteer o Chromium), 100% interactivo y ligero en navegador.
+
+---
+
+## ADR 014: Integración No Invasiva de Coste de Papel y Parcheo BPE de Tarifas Forward (Fases I6 & I7)
+- **Fecha**: 2026-10-23
+- **Estado**: Aceptado
+- **Contexto**:
+  El motor de pricing industrial `@ppos/pricing-engine` (fijado estrictamente al commit `1f8997eb34b14db6787986249a1fb8c4e01ea77e`) calcula el precio de trabajos de imprenta basándose en matrices de tarifas horarias de máquina, velocidades y coste de materias primas (`paper_price_interior_by_kilo`, `paper_price_cover_by_kilo`). Los costes de papel fluctúan dinámicamente y la imprenta necesita consultar tarifas reales de mercado e inyectarlas en presupuestos sin modificar el código fuente del motor de precios.
+- **Decisión**:
+  1. **Fórmulas Físicas Exactas e Inmutables (`paperCostIntegrationService.js`)**:
+     $$\text{kg\_per\_sheet} = \frac{\text{width\_mm} \times \text{height\_mm}}{1\,000\,000} \times \frac{\text{gsm}}{1\,000}$$
+     $$\text{price\_per\_kg} = \frac{\text{price\_amount}}{\text{weight\_basis\_kg}}$$
+     Normalización exacta a EUR/kg para todas las bases canónicas: `KG`, `TONNE`, `SHEET`, `THOUSAND_SHEETS`, `PACK`.
+  2. **Estimación Industrial de Papel para Trabajos**:
+     - Cálculo de pliegos netos por imposición de signaturas (16 páginas por pliego de máquina).
+     - Curvas de merma estándar de imprenta: merma de puesta a punto (100 pliegos por signatura interior, 50 pliegos para cubierta) más 2.5% de merma de tirada en régimen constante.
+     - Cómputo de pliegos y kilogramos brutos y netos, y presupuesto estimado de compra.
+  3. **Resolución de Mejor Oferta de Mercado (`resolveMarketPaperRate`)**:
+     - Consulta indexada de ofertas activas en marketplace o clientes autorizados para las especificaciones físicas requeridas (GSM, acabado, formato), seleccionando de forma determinista la tarifa con menor coste por kilogramo normalizado.
+  4. **Parcheo BPE No Invasivo (`buildBpePaperPatch`)**:
+     - Construcción de un objeto de parche que inyecta `paper_price_interior_by_kilo` y `paper_price_cover_by_kilo` compatible con las matrices de BPE.
+     - Metadatos de procedencia inmutables (`_metadata`) con `source: 'PPOS_PAPER_SUPPLIER_HUB'`, ID de proveedor, SKU, ID de oferta y timestamp de resolución.
+  5. **Verificación E2E de Humo (`scripts/smoke_paper_supplier_hub_e2e.js`)**:
+     - Ejecución integral y aislada del ciclo de vida en 12 fases sobre MySQL efímero con aserciones estrictas y reporte limpio sin mutaciones en base de datos productiva.
+- **Consecuencia**: Máxima precisión en cotizaciones industriales, desacoplamiento absoluto de `@ppos/pricing-engine`, trazabilidad completa de origen de coste y reproducibilidad en CI.
+
+
 

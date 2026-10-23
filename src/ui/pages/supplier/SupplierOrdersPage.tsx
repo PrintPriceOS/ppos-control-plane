@@ -24,9 +24,10 @@ import {
     ArrowDownTrayIcon,
     InformationCircleIcon
 } from '@heroicons/react/24/outline';
-import { paperSupplierFetch, SupplierApiError } from '../../lib/paperSupplierApi';
+import { paperSupplierFetch, SupplierApiError, getSupplierOrderDocument } from '../../lib/paperSupplierApi';
 import { getUserRole, getAuthUser } from '../../lib/authStore';
 import { AccessibleModal } from '../../components/AccessibleModal';
+import { ProcurementDocumentModal } from '../../components/printhouse/ProcurementDocumentModal';
 import { useLocale } from '../../i18n';
 
 export interface SupplierOrderSummary {
@@ -120,6 +121,11 @@ export const SupplierOrdersPage: React.FC = () => {
     const [carrierName, setCarrierName] = useState<string>('');
     const [trackingNumber, setTrackingNumber] = useState<string>('');
     const [actionNotes, setActionNotes] = useState<string>('');
+
+    // Document Modal state
+    const [docModalOpen, setDocModalOpen] = useState<boolean>(false);
+    const [selectedDocOrderId, setSelectedDocOrderId] = useState<string | null>(null);
+    const [selectedDocType, setSelectedDocType] = useState<'po' | 'packing_slip'>('po');
 
     // Fetch orders list
     const fetchOrders = useCallback(async () => {
@@ -600,16 +606,32 @@ export const SupplierOrdersPage: React.FC = () => {
 
                                             {/* Actions */}
                                             <td className="py-3.5 px-4 text-right">
-                                                <button
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        openOrderDetail(order.id);
-                                                    }}
-                                                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-slate-800 dark:text-zinc-200 font-semibold text-xs transition-colors shadow-2xs cursor-pointer"
-                                                >
-                                                    <EyeIcon className="w-3.5 h-3.5" />
-                                                    <span>{t('common.details') || 'Details'}</span>
-                                                </button>
+                                                <div className="flex items-center justify-end gap-1.5">
+                                                    <button
+                                                        type="button"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setSelectedDocOrderId(order.id);
+                                                            setSelectedDocType(order.status === 'RECEIVED' || order.status === 'PARTIALLY_RECEIVED' ? 'packing_slip' : 'po');
+                                                            setDocModalOpen(true);
+                                                        }}
+                                                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-700 text-slate-700 dark:text-zinc-200 font-semibold text-xs transition-colors shadow-2xs cursor-pointer"
+                                                        title={t('procurement.document.viewBtn') || 'Documento'}
+                                                    >
+                                                        <DocumentCheckIcon className="w-3.5 h-3.5 text-zinc-500" />
+                                                        <span>{t('procurement.document.viewBtn') || 'Doc'}</span>
+                                                    </button>
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            openOrderDetail(order.id);
+                                                        }}
+                                                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-slate-800 dark:text-zinc-200 font-semibold text-xs transition-colors shadow-2xs cursor-pointer"
+                                                    >
+                                                        <EyeIcon className="w-3.5 h-3.5" />
+                                                        <span>{t('common.details') || 'Details'}</span>
+                                                    </button>
+                                                </div>
                                             </td>
                                         </tr>
                                     );
@@ -673,11 +695,41 @@ export const SupplierOrdersPage: React.FC = () => {
                                     ID: {orderDetail.id}
                                 </span>
                             </div>
-                            <div className="flex items-center gap-2 text-xs font-semibold">
-                                <span className="text-zinc-400">{t('supplier.orders.deliveryCenter') || 'Plant:'}</span>
-                                <span className="text-slate-900 dark:text-white font-mono bg-white dark:bg-zinc-900 px-2 py-0.5 rounded-md border border-zinc-200 dark:border-zinc-700">
-                                    {orderDetail.deliveryCenterName || orderDetail.printhouseId}
-                                </span>
+                            <div className="flex items-center gap-3">
+                                <div className="flex items-center gap-2 text-xs font-semibold">
+                                    <span className="text-zinc-400">{t('supplier.orders.deliveryCenter') || 'Plant:'}</span>
+                                    <span className="text-slate-900 dark:text-white font-mono bg-white dark:bg-zinc-900 px-2 py-0.5 rounded-md border border-zinc-200 dark:border-zinc-700">
+                                        {orderDetail.deliveryCenterName || orderDetail.printhouseId}
+                                    </span>
+                                </div>
+                                <div className="flex items-center gap-1.5 border-l border-zinc-200 dark:border-zinc-700 pl-3">
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setSelectedDocOrderId(orderDetail.id);
+                                            setSelectedDocType('po');
+                                            setDocModalOpen(true);
+                                        }}
+                                        className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-slate-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer shadow-2xs"
+                                        title={t('procurement.document.titlePo')}
+                                    >
+                                        <DocumentCheckIcon className="w-3.5 h-3.5 text-red-600" />
+                                        <span>{t('procurement.document.viewPo') || 'PO'}</span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setSelectedDocOrderId(orderDetail.id);
+                                            setSelectedDocType('packing_slip');
+                                            setDocModalOpen(true);
+                                        }}
+                                        className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-slate-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer shadow-2xs"
+                                        title={t('procurement.document.titleSlip')}
+                                    >
+                                        <TruckIcon className="w-3.5 h-3.5 text-indigo-600" />
+                                        <span>{t('procurement.document.viewSlip') || 'Albarán'}</span>
+                                    </button>
+                                </div>
                             </div>
                         </div>
 
@@ -1122,6 +1174,14 @@ export const SupplierOrdersPage: React.FC = () => {
                     </div>
                 ) : null}
             </AccessibleModal>
+
+            <ProcurementDocumentModal
+                isOpen={docModalOpen}
+                onClose={() => setDocModalOpen(false)}
+                orderId={selectedDocOrderId}
+                initialDocType={selectedDocType}
+                fetchDocFn={(orderId, type) => getSupplierOrderDocument(orderId, type)}
+            />
         </div>
     );
 };

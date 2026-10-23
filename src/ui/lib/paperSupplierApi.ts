@@ -138,3 +138,7 @@ export async function paperSupplierFetch<T = any>(
 
     return parsedBody as PaperSupplierApiResponse<T>;
 }
+
+export async function getSupplierOrderDocument(orderId: string, type: 'po' | 'packing_slip' = 'po') {
+    return paperSupplierFetch<any>(`/api/v1/paper-suppliers/orders/${orderId}/document?type=${type}`);
+}

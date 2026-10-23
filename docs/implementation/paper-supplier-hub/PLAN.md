@@ -99,10 +99,27 @@ El **Paper Supplier Hub** incorpora un panel independiente para distribuidores/f
     - Backend: 9/9 tests PASS en `tests/paper_supplier_procurement_and_orders.test.js` sobre MySQL efímero.
     - Frontend: 3/3 tests PASS en `tests/SupplierOrdersAndSourcingUI.test.tsx` y 7/7 tests PASS en `tests/SupplierPagesLoadingLoop.test.tsx`.
     - Build: `npx vite build` completado limpiamente sin advertencias de claves duplicadas (3.576 módulos).
-- [ ] **I6 — Integración de coste de papel en cálculo industrial**:
-  - Adaptador de precio para `@ppos/pricing-engine` (1f8997e), snapshots inmutables en sesiones y quotes.
-- [ ] **I7 — Despliegue estable y operación**:
-  - Smoke tests, verificación en servidor productivo por SHA exacto, runbook de rollback.
+- [x] **I6 — Integración de coste de papel y generación de documentos canónicos**:
+  - **Cálculo Físico y Normalización de Precios (`paperCostIntegrationService.js`)**:
+    - Cálculo de peso exacto de pliego: $\text{area\_m}^2 \times (\text{gsm} / 1000)$.
+    - Normalización canónica a EUR/kg para todas las bases (`KG`, `TONNE`, `SHEET`, `THOUSAND_SHEETS`, `PACK`).
+    - Resolución de mejor tarifa activa en marketplace y clientes autorizados (`resolveMarketPaperRate`).
+    - Estimación industrial de pliegos y kilogramos para tiradas comerciales con signaturas de 16pp y curvas de merma de puesta a punto y tirada (`calculateJobPaperRequirements`).
+    - Generación no invasiva de parches BPE (`paper_price_interior_by_kilo`, `paper_price_cover_by_kilo`) con procedencia trazable (`buildBpePaperPatch`).
+  - **Generación de Documentos y Motor de Impresión**:
+    - Documentos canónicos estructurados e imprimibles en HTML5 con `@media print`: Orden de Compra (`PO`) y Albarán de Entrega (`PACKING_SLIP`) con desglose de recibos y datos de transporte (`generateProcurementDocument`).
+    - Visualización y descarga accesible en frontend con `<ProcurementDocumentModal>` integrado en compras de imprenta y pedidos de proveedor.
+    - Soporte trilingüe estricto ES/EN/DE en interfaz y documentos.
+  - **Verificación**: 9/9 tests PASS en `tests/paper_supplier_cost_and_documents.test.js`.
+- [x] **I7 — Suite de humo E2E, verificación de integridad y cierre de versión**:
+  - **Suite de Humo E2E (`scripts/smoke_paper_supplier_hub_e2e.js`)**:
+    - Script standalone con 47/47 aserciones verificadas sobre MySQL 8 efímero en 5.63s sin tocar producción.
+    - Abarca el ciclo de vida completo: bootstrap, migraciones 007, 162-166, oferta comercial, cotización RFQ, aceptación, despacho, recepción atómica con balance e idempotencia, inventario, albaranes, documentos y notificaciones.
+  - **Gobernanza y Arquitectura**:
+    - Integridad de migraciones 100% verificada (`npm run migration:integrity` PASS, 170 archivos / 169 migraciones).
+    - ADR 013 (Generación de Documentos de Aprovisionamiento) y ADR 014 (Integración No Invasiva de Coste y Parcheo BPE) formalizados en `DECISIONS.md`.
+    - Build de producción `npx vite build` completado en 13.73s con 0 errores (3.577 módulos).
+    - Suite global Vitest: 28/28 tests PASS (0 FAIL). Zero modificaciones al motor `@ppos/pricing-engine` (fijado a `1f8997e`).
 
 ---
 

@@ -16,6 +16,7 @@ import {
     ScaleIcon
 } from '@heroicons/react/24/outline';
 import { AccessibleModal } from '../AccessibleModal';
+import { ProcurementDocumentModal } from './ProcurementDocumentModal';
 import * as adminApi from '../../lib/adminApi';
 import { getUserPrinthouseId, getUserTenantId } from '../../lib/authStore';
 import { useLocale } from '../../i18n';
@@ -36,6 +37,11 @@ export const PaperSourcingModal: React.FC<PaperSourcingModalProps> = ({
     const tenantId = getUserTenantId();
 
     const [activeTab, setActiveTab] = useState<'CATALOG' | 'MY_ORDERS'>('CATALOG');
+
+    // Document Modal state
+    const [docModalOpen, setDocModalOpen] = useState(false);
+    const [selectedDocOrderId, setSelectedDocOrderId] = useState<string | null>(null);
+    const [selectedDocType, setSelectedDocType] = useState<'po' | 'packing_slip'>('po');
 
     // Catalog search state
     const [offers, setOffers] = useState<any[]>([]);
@@ -252,7 +258,8 @@ export const PaperSourcingModal: React.FC<PaperSourcingModalProps> = ({
     };
 
     return (
-        <AccessibleModal
+        <>
+            <AccessibleModal
             isOpen={isOpen}
             onClose={onClose}
             title={t('materials.sourcing.title') || 'Paper Supplier Sourcing & RFQ Hub'}
@@ -582,26 +589,43 @@ export const PaperSourcingModal: React.FC<PaperSourcingModalProps> = ({
                                                     </span>
                                                 </td>
                                                 <td className="py-2.5 px-3 text-right">
-                                                    {ord.type === 'RFQ' && ord.status === 'QUOTED' && (
+                                                    <div className="flex items-center justify-end gap-1.5">
+                                                        {ord.type === 'RFQ' && ord.status === 'QUOTED' && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleAcceptQuote(ord.id)}
+                                                                className="px-2.5 py-1 text-xs font-bold rounded-lg bg-purple-600 hover:bg-purple-700 text-white cursor-pointer shadow-2xs"
+                                                            >
+                                                                Accept Quote
+                                                            </button>
+                                                        )}
+                                                        {['CONFIRMED', 'DISPATCHED', 'PARTIALLY_DELIVERED', 'DELIVERED', 'PARTIALLY_RECEIVED'].includes(ord.status) && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    setReceivingOrder(ord);
+                                                                    setReceiveSheets(String(ord.totalSheets - (ord.receivedSheets || 0)));
+                                                                }}
+                                                                className="px-2.5 py-1 text-xs font-bold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer shadow-2xs inline-flex items-center gap-1"
+                                                            >
+                                                                <ArrowDownTrayIcon className="w-3.5 h-3.5" />
+                                                                <span>Receive</span>
+                                                            </button>
+                                                        )}
                                                         <button
-                                                            onClick={() => handleAcceptQuote(ord.id)}
-                                                            className="px-2.5 py-1 text-xs font-bold rounded-lg bg-purple-600 hover:bg-purple-700 text-white cursor-pointer shadow-2xs"
-                                                        >
-                                                            Accept Quote
-                                                        </button>
-                                                    )}
-                                                    {['CONFIRMED', 'DISPATCHED', 'PARTIALLY_DELIVERED', 'DELIVERED', 'PARTIALLY_RECEIVED'].includes(ord.status) && (
-                                                        <button
+                                                            type="button"
                                                             onClick={() => {
-                                                                setReceivingOrder(ord);
-                                                                setReceiveSheets(String(ord.totalSheets - (ord.receivedSheets || 0)));
+                                                                setSelectedDocOrderId(ord.id);
+                                                                setSelectedDocType(ord.status === 'RECEIVED' || ord.status === 'PARTIALLY_RECEIVED' ? 'packing_slip' : 'po');
+                                                                setDocModalOpen(true);
                                                             }}
-                                                            className="px-2.5 py-1 text-xs font-bold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer shadow-2xs inline-flex items-center gap-1"
+                                                            className="px-2 py-1 text-xs font-semibold rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-700 text-slate-700 dark:text-zinc-200 cursor-pointer inline-flex items-center gap-1"
+                                                            title={t('procurement.document.viewBtn')}
                                                         >
-                                                            <ArrowDownTrayIcon className="w-3.5 h-3.5" />
-                                                            <span>Receive</span>
+                                                            <DocumentTextIcon className="w-3.5 h-3.5 text-zinc-500" />
+                                                            <span>{t('procurement.document.viewBtn')}</span>
                                                         </button>
-                                                    )}
+                                                    </div>
                                                 </td>
                                             </tr>
                                         ))
@@ -685,5 +709,14 @@ export const PaperSourcingModal: React.FC<PaperSourcingModalProps> = ({
                 )}
             </div>
         </AccessibleModal>
+
+        <ProcurementDocumentModal
+            isOpen={docModalOpen}
+            onClose={() => setDocModalOpen(false)}
+            orderId={selectedDocOrderId}
+            initialDocType={selectedDocType}
+            fetchDocFn={(orderId, type) => adminApi.getPrinthousePaperOrderDocument(orderId, type)}
+        />
+    </>
     );
 };

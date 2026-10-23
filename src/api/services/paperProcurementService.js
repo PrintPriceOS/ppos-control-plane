@@ -18,6 +18,8 @@
 const crypto = require('crypto');
 const db = require('./mysqlClient');
 const logger = require('./logger');
+const controlPlaneNotificationService = require('./controlPlaneNotificationService');
+const notificationDispatcherService = require('./notificationDispatcherService');
 
 const ALLOWED_ORDER_TYPES = ['ORDER', 'RFQ'];
 const ALLOWED_PRICE_BASES = ['KG', 'TONNE', 'SHEET', 'THOUSAND_SHEETS', 'PACK'];
@@ -551,7 +553,15 @@ class PaperProcurementService {
             actor.userId || null
         ]);
 
-        return await this.getSupplierOrderById(supplierId, orderId);
+        const createdOrder = await this.getSupplierOrderById(supplierId, orderId);
+        
+        // Notify supplier of newly submitted Order / RFQ
+        const rawRows = unwrapRows(await db.query("SELECT * FROM supplier_paper_procurement_orders WHERE id = ?", [orderId]));
+        if (rawRows && rawRows.length > 0) {
+            this._notifyProcurementEvent(type === 'RFQ' ? 'PAPER_RFQ_SUBMITTED' : 'PAPER_ORDER_SUBMITTED', rawRows[0]);
+        }
+
+        return createdOrder;
     }
 
     /**
@@ -883,10 +893,16 @@ class PaperProcurementService {
                         supplier_notes = COALESCE(?, supplier_notes)
                     WHERE id = ?
                 `, [price, basis, totalAmount, expDate, payload.supplierNotes || null, orderId]);
+
+                const quotedRaw = unwrapRows(await db.query("SELECT * FROM supplier_paper_procurement_orders WHERE id = ?", [orderId]));
+                if (quotedRaw && quotedRaw.length > 0) {
+                    this._notifyProcurementEvent('PAPER_RFQ_QUOTED', quotedRaw[0]);
+                }
                 break;
             }
 
-            case 'CONFIRM': {
+            case 'CONFIRM':
+            case 'CONFIRMED': {
                 if (!['SUBMITTED', 'QUOTED'].includes(currentStatus)) {
                     const err = new Error(`Cannot confirm order in status '${currentStatus}'`);
                     err.statusCode = 400;
@@ -907,7 +923,8 @@ class PaperProcurementService {
                 break;
             }
 
-            case 'DISPATCH': {
+            case 'DISPATCH':
+            case 'DISPATCHED': {
                 if (!['CONFIRMED', 'PARTIALLY_DELIVERED'].includes(currentStatus)) {
                     const err = new Error(`Cannot dispatch order in status '${currentStatus}'`);
                     err.statusCode = 400;
@@ -919,6 +936,10 @@ class PaperProcurementService {
                 const isPartial = dispatchedSheets < order.total_sheets;
                 const newStatus = isPartial ? 'PARTIALLY_DELIVERED' : 'DISPATCHED';
 
+                const logisticsNote = payload.supplierNotes || (payload.carrier || payload.carrierName || payload.trackingNumber
+                    ? `Transportista: ${payload.carrier || payload.carrierName || 'Estándar'} | Seguimiento: ${payload.trackingNumber || 'N/A'}`
+                    : null);
+
                 await db.query(`
                     UPDATE supplier_paper_procurement_orders
                     SET status = ?,
@@ -927,7 +948,12 @@ class PaperProcurementService {
                         dispatched_at = CURRENT_TIMESTAMP,
                         supplier_notes = COALESCE(?, supplier_notes)
                     WHERE id = ?
-                `, [newStatus, dispatchedQty, dispatchedSheets, payload.supplierNotes || null, orderId]);
+                `, [newStatus, dispatchedQty, dispatchedSheets, logisticsNote, orderId]);
+
+                const dispatchedRaw = unwrapRows(await db.query("SELECT * FROM supplier_paper_procurement_orders WHERE id = ?", [orderId]));
+                if (dispatchedRaw && dispatchedRaw.length > 0) {
+                    this._notifyProcurementEvent('PAPER_ORDER_DISPATCHED', dispatchedRaw[0]);
+                }
                 break;
             }
 
@@ -1022,6 +1048,11 @@ class PaperProcurementService {
             WHERE id = ?
         `, [orderId]);
 
+        const acceptedRaw = unwrapRows(await db.query("SELECT * FROM supplier_paper_procurement_orders WHERE id = ?", [orderId]));
+        if (acceptedRaw && acceptedRaw.length > 0) {
+            this._notifyProcurementEvent('PAPER_QUOTE_ACCEPTED', acceptedRaw[0]);
+        }
+
         return await this.getPrinthouseOrderById(actor.tenantId, orderId);
     }
 
@@ -1030,14 +1061,15 @@ class PaperProcurementService {
      * Receives physical delivery, increments stock in predictive_material_inventory,
      * logs immutable audit event, and updates order cumulative received counts.
      */
-    async receiveOrderAtomic(orderId, actor, options = {}) {
+    async receiveOrderAtomic(orderId, actor, options = {}, fourthArg = null) {
+        const idempKey = options.idempotencyKey || (typeof fourthArg === 'string' ? fourthArg : null);
         const {
             receivedQuantity = null,
             receivedSheets = null,
-            idempotencyKey,
             notes = '',
             operatorId = null
         } = options;
+        const idempotencyKey = idempKey;
 
         if (!idempotencyKey || !idempotencyKey.trim()) {
             const err = new Error('IDEMPOTENCY_KEY_REQUIRED');
@@ -1276,7 +1308,7 @@ class PaperProcurementService {
 
             // 10. Record receipt in supplier_paper_order_receipts
             const receiptId = `prct_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
-            const receiptNumber = `RCV-${Date.now().toString().slice(-6)}`;
+            const receiptNumber = options.receiptNumber || options.receipt_number || `RCV-${Date.now().toString().slice(-6)}`;
 
             await connection.query(`
                 INSERT INTO supplier_paper_order_receipts (
@@ -1335,6 +1367,16 @@ class PaperProcurementService {
             `, [newAccumulatedQty, newAccumulatedSheets, terminalStatus, orderId]);
 
             await connection.commit();
+
+            // Notify supplier of received delivery
+            const finalRaw = unwrapRows(await db.query("SELECT * FROM supplier_paper_procurement_orders WHERE id = ?", [orderId]));
+            if (finalRaw && finalRaw.length > 0) {
+                this._notifyProcurementEvent('PAPER_ORDER_RECEIVED', finalRaw[0], {
+                    receivedSheets: effectiveSheets,
+                    receiptNumber,
+                    newStatus: terminalStatus
+                });
+            }
 
             return {
                 ok: true,
@@ -1492,6 +1534,575 @@ class PaperProcurementService {
             createdAt: r.created_at,
             updatedAt: r.updated_at
         };
+    }
+
+    /**
+     * Internal async notification dispatcher for procurement lifecycle events.
+     * Non-blocking and resilient to prevent database transaction rollbacks.
+     */
+    async _notifyProcurementEvent(eventType, order, extra = {}) {
+        try {
+            let targetTenantId = null;
+            let title = '';
+            let message = '';
+            let actionUrl = '';
+
+            switch (eventType) {
+                case 'PAPER_ORDER_SUBMITTED':
+                case 'PAPER_RFQ_SUBMITTED': {
+                    const suppRows = unwrapRows(await db.query("SELECT tenant_id, name FROM paper_suppliers WHERE id = ?", [order.supplier_id]));
+                    if (suppRows && suppRows.length > 0) {
+                        targetTenantId = suppRows[0].tenant_id;
+                    }
+                    const isRfq = order.order_type === 'RFQ';
+                    title = isRfq ? 'Nueva Solicitud de Cotización (RFQ)' : 'Nuevo Pedido de Suministro de Papel';
+                    message = `La imprenta ha enviado ${isRfq ? 'una solicitud RFQ' : 'un pedido en firme'} para ${order.snapshot_product_name} (${order.total_sheets} hojas). Ref: ${order.order_number}`;
+                    actionUrl = '/supplier/orders';
+                    break;
+                }
+                case 'PAPER_RFQ_QUOTED': {
+                    targetTenantId = order.tenant_id;
+                    title = 'Cotización de Papel Recibida';
+                    message = `El proveedor ha cotizado tu solicitud RFQ para ${order.snapshot_product_name} a ${order.snapshot_price_per_basis} ${order.snapshot_currency}/${order.snapshot_price_basis}. Ref: ${order.order_number}`;
+                    actionUrl = '/materials/sourcing';
+                    break;
+                }
+                case 'PAPER_QUOTE_ACCEPTED': {
+                    const suppRows = unwrapRows(await db.query("SELECT tenant_id, name FROM paper_suppliers WHERE id = ?", [order.supplier_id]));
+                    if (suppRows && suppRows.length > 0) {
+                        targetTenantId = suppRows[0].tenant_id;
+                    }
+                    title = 'Cotización Aceptada — Pedido Confirmado';
+                    message = `La imprenta ha aceptado la cotización para ${order.snapshot_product_name}. La orden pasa a estado CONFIRMED. Ref: ${order.order_number}`;
+                    actionUrl = '/supplier/orders';
+                    break;
+                }
+                case 'PAPER_ORDER_DISPATCHED': {
+                    targetTenantId = order.tenant_id;
+                    title = 'Expedición en Tránsito';
+                    message = `El proveedor ha expedido ${order.delivered_sheets || order.total_sheets} hojas de ${order.snapshot_product_name}. Ref: ${order.order_number}`;
+                    actionUrl = '/materials/sourcing';
+                    break;
+                }
+                case 'PAPER_ORDER_RECEIVED': {
+                    const suppRows = unwrapRows(await db.query("SELECT tenant_id, name FROM paper_suppliers WHERE id = ?", [order.supplier_id]));
+                    if (suppRows && suppRows.length > 0) {
+                        targetTenantId = suppRows[0].tenant_id;
+                    }
+                    title = 'Mercancía Recepcionada en Planta';
+                    message = `La imprenta ha registrado la recepción de ${extra.receivedSheets || order.received_sheets} hojas de ${order.snapshot_product_name}. Ref: ${order.order_number}`;
+                    actionUrl = '/supplier/orders';
+                    break;
+                }
+                default:
+                    return;
+            }
+
+            if (targetTenantId) {
+                const notifId = `notif_proc_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
+                await controlPlaneNotificationService.createNotification({
+                    id: notifId,
+                    tenant_id: targetTenantId,
+                    user_id: null,
+                    scope: 'TENANT',
+                    type: eventType,
+                    severity: 'info',
+                    title,
+                    message,
+                    entity_type: 'PAPER_PROCUREMENT_ORDER',
+                    entity_id: order.id,
+                    action_url: actionUrl,
+                    metadata_json: {
+                        orderId: order.id,
+                        orderNumber: order.order_number,
+                        orderType: order.order_type,
+                        productName: order.snapshot_product_name,
+                        status: order.status,
+                        ...extra
+                    }
+                }).catch(err => {
+                    logger.warn({ event: 'notification_creation_caught', error: err.message });
+                });
+
+                notificationDispatcherService.dispatch(eventType, {
+                    orderId: order.id,
+                    orderNumber: order.order_number,
+                    tenantId: targetTenantId,
+                    title,
+                    message
+                }).catch(err => {
+                    logger.warn({ event: 'notification_dispatch_caught', error: err.message });
+                });
+            }
+        } catch (err) {
+            logger.warn({ event: 'procurement_notification_handler_error', error: err.message });
+        }
+    }
+
+    /**
+     * Generates a canonical procurement document (PO or Packing Slip/Albarán).
+     * Accessible by both buyer (printhouse) and seller (supplier).
+     * 
+     * @param {string} orderId 
+     * @param {string} docType - 'po' | 'packing_slip'
+     * @param {Object} actor - Authenticated user context
+     */
+    async generateProcurementDocument(orderId, docType = 'po', actor = {}) {
+        if (!orderId) {
+            const err = new Error('ORDER_ID_REQUIRED');
+            err.statusCode = 400;
+            throw err;
+        }
+
+        const rows = unwrapRows(await db.query(`
+            SELECT 
+                o.*,
+                t.name AS printhouse_name,
+                s.name AS supplier_name,
+                o.snapshot_currency AS supplier_currency,
+                s.status AS supplier_status
+            FROM supplier_paper_procurement_orders o
+            LEFT JOIN tenants t ON o.tenant_id = t.id
+            LEFT JOIN paper_suppliers s ON o.supplier_id = s.id
+            WHERE o.id = ?
+        `, [orderId]));
+
+        if (!rows || rows.length === 0) {
+            const err = new Error('ORDER_NOT_FOUND');
+            err.statusCode = 404;
+            throw err;
+        }
+
+        const raw = rows[0];
+
+        // Authorization check: Actor must be either buyer tenant or supplier
+        const isBuyer = actor.tenantId && actor.tenantId === raw.tenant_id;
+        const isSupplier = (actor.supplierId && actor.supplierId === raw.supplier_id) ||
+                           (actor.verifiedSupplierContext && actor.verifiedSupplierContext.supplierId === raw.supplier_id);
+        const isSuperAdmin = actor.role === 'SUPER_ADMIN' || actor.isSuperAdmin;
+
+        if (!isBuyer && !isSupplier && !isSuperAdmin) {
+            const err = new Error('FORBIDDEN_DOCUMENT_ACCESS');
+            err.statusCode = 403;
+            err.code = 'FORBIDDEN_DOCUMENT_ACCESS';
+            throw err;
+        }
+
+        // Fetch all receipts
+        const receiptRows = unwrapRows(await db.query(`
+            SELECT * FROM supplier_paper_order_receipts
+            WHERE order_id = ?
+            ORDER BY created_at DESC
+        `, [orderId]));
+
+        const receipts = (Array.isArray(receiptRows) ? receiptRows : []).map(r => ({
+            id: r.id,
+            receiptNumber: r.receipt_number,
+            receivedQuantity: Number(r.received_quantity),
+            receivedSheets: Number(r.received_sheets),
+            operatorId: r.operator_id,
+            notes: r.notes,
+            receivedAt: r.created_at
+        }));
+
+        const isPackingSlip = String(docType).toLowerCase() === 'packing_slip' || String(docType).toLowerCase() === 'receipt';
+        const docNumber = isPackingSlip
+            ? (receipts.length > 0 ? receipts[0].receiptNumber : `ALB-${raw.order_number}`)
+            : raw.order_number;
+
+        const docData = {
+            documentType: isPackingSlip ? 'PACKING_SLIP' : 'PO',
+            documentTitle: isPackingSlip ? 'Albarán de Entrega / Packing Slip' : 'Orden de Compra / Purchase Order',
+            documentNumber: docNumber,
+            documentCode: docNumber,
+            orderNumber: raw.order_number,
+            orderType: raw.order_type,
+            issueDate: new Date().toISOString().split('T')[0],
+            orderDate: (raw.created_at ? new Date(raw.created_at) : new Date()).toISOString().split('T')[0],
+            status: raw.status,
+            buyer: {
+                tenantId: raw.tenant_id,
+                name: raw.printhouse_name || 'Printhouse Production Partner',
+                companyName: raw.printhouse_name || 'Printhouse Production Partner',
+                centerId: raw.printhouse_id,
+                deliverySiteName: raw.delivery_site_name || 'Main Production Plant',
+                deliveryAddress: raw.delivery_address || 'Facility Address',
+                buyerNotes: raw.buyer_notes || 'Ninguna especificación adicional'
+            },
+            supplier: {
+                supplierId: raw.supplier_id,
+                companyName: raw.supplier_name || 'Paper Supplier Partner',
+                supplierSku: raw.snapshot_supplier_sku || 'N/A',
+                supplierNotes: raw.supplier_notes || 'Ninguna especificación adicional'
+            },
+            material: {
+                productName: raw.snapshot_product_name,
+                brand: raw.snapshot_brand || 'Standard Mill',
+                category: raw.snapshot_category,
+                finish: raw.snapshot_finish || 'UNCOATED',
+                gsm: raw.snapshot_gsm,
+                dimensions: `${raw.snapshot_width_mm} × ${raw.snapshot_height_mm} mm`,
+                caliperUm: raw.snapshot_caliper_um ? `${raw.snapshot_caliper_um} µm` : 'N/A',
+                grainDirection: raw.snapshot_grain_direction || 'LONG_GRAIN',
+                sheetsPerPack: raw.snapshot_sheets_per_pack
+            },
+            quantities: {
+                orderedQuantity: Number(raw.ordered_quantity),
+                orderedQuantityBasis: raw.ordered_quantity_basis,
+                totalSheets: Number(raw.total_sheets),
+                deliveredSheets: Number(raw.delivered_sheets),
+                receivedSheets: Number(raw.received_sheets),
+                remainingBalanceSheets: Math.max(0, Number(raw.total_sheets) - Number(raw.received_sheets))
+            },
+            financials: {
+                priceBasis: raw.snapshot_price_basis,
+                pricePerBasis: Number(raw.snapshot_price_per_basis),
+                currency: raw.snapshot_currency || 'EUR',
+                totalAmount: Number(raw.total_amount),
+                taxRate: 0.21,
+                taxAmount: Number((Number(raw.total_amount) * 0.21).toFixed(2)),
+                grandTotal: Number((Number(raw.total_amount) * 1.21).toFixed(2))
+            },
+            logistics: {
+                carrierName: 'Standard Freight Logistics',
+                trackingNumber: raw.order_number,
+                dispatchedAt: raw.dispatched_at,
+                deliveredAt: raw.delivered_at,
+                expectedDeliveryDate: raw.expected_delivery_date
+            },
+            receipts
+        };
+
+        docData.printableHtml = this.renderPrintableDocumentHtml(docData);
+        return { ok: true, data: docData, ...docData };
+    }
+
+    /**
+     * Renders a standalone, high-fidelity printable HTML document with embedded CSS.
+     * Complies with industrial invoice and packing slip presentation standards.
+     */
+    renderPrintableDocumentHtml(d) {
+        const isSlip = d.documentType === 'PACKING_SLIP';
+        return `<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${d.documentTitle} — ${d.documentNumber}</title>
+    <style>
+        @page { size: A4 portrait; margin: 12mm 15mm; }
+        * { box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            color: #0f172a;
+            background-color: #ffffff;
+            margin: 0;
+            padding: 24px;
+            font-size: 13px;
+            line-height: 1.4;
+        }
+        .no-print {
+            display: flex;
+            justify-content: flex-end;
+            margin-bottom: 24px;
+            gap: 12px;
+        }
+        .btn-print {
+            background-color: #dc0000;
+            color: #ffffff;
+            border: none;
+            padding: 10px 20px;
+            font-weight: 600;
+            font-size: 13px;
+            border-radius: 8px;
+            cursor: pointer;
+            box-shadow: 0 2px 4px rgba(220, 0, 0, 0.2);
+        }
+        .btn-print:hover { background-color: #b30000; }
+        .doc-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            border-bottom: 2px solid #0f172a;
+            padding-bottom: 16px;
+            margin-bottom: 20px;
+        }
+        .brand-title {
+            font-size: 20px;
+            font-weight: 800;
+            color: #dc0000;
+            letter-spacing: -0.5px;
+            margin: 0;
+        }
+        .brand-subtitle {
+            font-size: 11px;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-top: 2px;
+        }
+        .doc-title-block { text-align: right; }
+        .doc-title {
+            font-size: 18px;
+            font-weight: 800;
+            margin: 0;
+            color: #0f172a;
+        }
+        .doc-badge {
+            display: inline-block;
+            background-color: #f1f5f9;
+            border: 1px solid #cbd5e1;
+            padding: 4px 10px;
+            border-radius: 9999px;
+            font-size: 11px;
+            font-weight: 700;
+            margin-top: 6px;
+        }
+        .info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            margin-bottom: 24px;
+        }
+        .info-card {
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 14px;
+            background-color: #f8fafc;
+        }
+        .card-label {
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            color: #64748b;
+            margin-bottom: 6px;
+        }
+        .card-name {
+            font-size: 14px;
+            font-weight: 700;
+            color: #0f172a;
+            margin-bottom: 4px;
+        }
+        .card-detail { font-size: 12px; color: #334155; margin: 2px 0; }
+        .spec-table, .receipt-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 24px;
+        }
+        .spec-table th, .receipt-table th {
+            background-color: #0f172a;
+            color: #ffffff;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            padding: 8px 12px;
+            text-align: left;
+        }
+        .spec-table td, .receipt-table td {
+            padding: 10px 12px;
+            border-bottom: 1px solid #e2e8f0;
+            font-size: 12px;
+        }
+        .spec-table tr:nth-child(even) { background-color: #f8fafc; }
+        .totals-section {
+            display: flex;
+            justify-content: flex-end;
+            margin-bottom: 30px;
+        }
+        .totals-card {
+            width: 280px;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 12px;
+            background-color: #f8fafc;
+        }
+        .totals-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            padding: 4px 0;
+            color: #475569;
+        }
+        .totals-row.grand-total {
+            border-top: 2px solid #0f172a;
+            margin-top: 6px;
+            padding-top: 8px;
+            font-size: 15px;
+            font-weight: 800;
+            color: #0f172a;
+        }
+        .signatures-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            margin-top: 36px;
+            page-break-inside: avoid;
+        }
+        .signature-box {
+            border: 1px dashed #94a3b8;
+            border-radius: 8px;
+            padding: 16px;
+            min-height: 100px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+        .sig-title {
+            font-size: 11px;
+            font-weight: 700;
+            color: #475569;
+            text-transform: uppercase;
+        }
+        .sig-line {
+            border-top: 1px solid #cbd5e1;
+            margin-top: 40px;
+            font-size: 10px;
+            color: #64748b;
+            padding-top: 4px;
+        }
+        .footer-note {
+            margin-top: 40px;
+            text-align: center;
+            font-size: 10px;
+            color: #94a3b8;
+            border-top: 1px solid #f1f5f9;
+            padding-top: 12px;
+        }
+        @media print {
+            .no-print { display: none !important; }
+            body { padding: 0; background: white; }
+            .info-card { background: white !important; border: 1px solid #cbd5e1; }
+            .spec-table th, .receipt-table th { background-color: #000000 !important; color: #ffffff !important; }
+        }
+    </style>
+</head>
+<body>
+    <div class="no-print">
+        <button class="btn-print" onclick="window.print()">Imprimir / Guardar PDF</button>
+    </div>
+
+    <header class="doc-header">
+        <div>
+            <h1 class="brand-title">PrintPrice OS</h1>
+            <div class="brand-subtitle">Control Plane — Paper Procurement Hub</div>
+        </div>
+        <div class="doc-title-block">
+            <h2 class="doc-title">${d.documentTitle}</h2>
+            <div class="doc-badge">DOC REF: ${d.documentNumber}</div>
+        </div>
+    </header>
+
+    <div class="info-grid">
+        <div class="info-card">
+            <div class="card-label">Comprador / Destino de Entrega</div>
+            <div class="card-name">${d.buyer.companyName}</div>
+            <div class="card-detail"><strong>Centro:</strong> ${d.buyer.deliverySiteName}</div>
+            <div class="card-detail"><strong>Dirección:</strong> ${d.buyer.deliveryAddress}</div>
+            <div class="card-detail"><strong>Notas:</strong> ${d.buyer.buyerNotes}</div>
+        </div>
+        <div class="info-card">
+            <div class="card-label">Proveedor / Emisor</div>
+            <div class="card-name">${d.supplier.companyName}</div>
+            <div class="card-detail"><strong>SKU Proveedor:</strong> ${d.supplier.supplierSku}</div>
+            <div class="card-detail"><strong>Pedido PPOS:</strong> ${d.orderNumber} (${d.orderType})</div>
+            <div class="card-detail"><strong>Fecha Emisión:</strong> ${d.issueDate} | <strong>Estado:</strong> ${d.status}</div>
+            ${d.supplier.supplierNotes ? `<div class="card-detail"><strong>Logística / Notas:</strong> ${d.supplier.supplierNotes}</div>` : ''}
+        </div>
+    </div>
+
+    <table class="spec-table">
+        <thead>
+            <tr>
+                <th>Material & Ficha Técnica</th>
+                <th>Gramaje</th>
+                <th>Formato</th>
+                <th>Acabado</th>
+                <th>Cantidad</th>
+                <th>Hojas Totales</th>
+                ${isSlip ? '<th>Recibidas</th><th>Saldo Pendiente</th>' : '<th>Precio/Base</th><th>Importe</th>'}
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>
+                    <strong>${d.material.productName}</strong><br>
+                    <span style="font-size: 10px; color: #64748b;">Marca: ${d.material.brand} | Cat: ${d.material.category} | Fibra: ${d.material.grainDirection}</span>
+                </td>
+                <td>${d.material.gsm} g/m²</td>
+                <td>${d.material.dimensions}</td>
+                <td>${d.material.finish}</td>
+                <td>${d.quantities.orderedQuantity} ${d.quantities.orderedQuantityBasis}</td>
+                <td><strong>${Number(d.quantities.totalSheets).toLocaleString()}</strong></td>
+                ${isSlip
+                    ? `<td><strong style="color: #16a34a;">${Number(d.quantities.receivedSheets).toLocaleString()}</strong></td>
+                       <td><strong>${Number(d.quantities.remainingBalanceSheets).toLocaleString()}</strong></td>`
+                    : `<td>${Number(d.financials.pricePerBasis).toFixed(2)} ${d.financials.currency}/${d.financials.priceBasis}</td>
+                       <td><strong>${Number(d.financials.totalAmount).toFixed(2)} ${d.financials.currency}</strong></td>`
+                }
+            </tr>
+        </tbody>
+    </table>
+
+    ${isSlip && d.receipts && d.receipts.length > 0 ? `
+    <h3 style="font-size: 13px; text-transform: uppercase; color: #0f172a; margin-bottom: 8px; letter-spacing: 0.5px;">Desglose de Albaranes de Entrada Físicos</h3>
+    <table class="receipt-table">
+        <thead>
+            <tr>
+                <th>Nº Albarán</th>
+                <th>Fecha Entrada</th>
+                <th>Cantidad Recibida</th>
+                <th>Hojas Verificadas</th>
+                <th>Operador / Inspección</th>
+                <th>Notas</th>
+            </tr>
+        </thead>
+        <tbody>
+            ${d.receipts.map(r => `
+            <tr>
+                <td><strong>${r.receiptNumber}</strong></td>
+                <td>${new Date(r.receivedAt).toLocaleString()}</td>
+                <td>${r.receivedQuantity}</td>
+                <td><strong>${Number(r.receivedSheets).toLocaleString()}</strong></td>
+                <td>${r.operatorId || 'Responsable de Almacén'}</td>
+                <td>${r.notes || 'Recepción conforme'}</td>
+            </tr>
+            `).join('')}
+        </tbody>
+    </table>
+    ` : ''}
+
+    <div class="totals-section">
+        <div class="totals-card">
+            ${isSlip ? `
+            <div class="totals-row"><span>Total Hojas Contratadas:</span><strong>${Number(d.quantities.totalSheets).toLocaleString()}</strong></div>
+            <div class="totals-row"><span>Total Hojas Recibidas:</span><strong style="color: #16a34a;">${Number(d.quantities.receivedSheets).toLocaleString()}</strong></div>
+            <div class="totals-row grand-total"><span>Saldo Pendiente:</span><strong>${Number(d.quantities.remainingBalanceSheets).toLocaleString()}</strong></div>
+            ` : `
+            <div class="totals-row"><span>Subtotal Neto:</span><strong>${Number(d.financials.totalAmount).toFixed(2)} ${d.financials.currency}</strong></div>
+            <div class="totals-row"><span>IVA Est. (21%):</span><strong>${Number(d.financials.taxAmount).toFixed(2)} ${d.financials.currency}</strong></div>
+            <div class="totals-row grand-total"><span>Total Pedido:</span><strong>${Number(d.financials.grandTotal).toFixed(2)} ${d.financials.currency}</strong></div>
+            `}
+        </div>
+    </div>
+
+    <div class="signatures-grid">
+        <div class="signature-box">
+            <div class="sig-title">Expedición Proveedor / Conductor</div>
+            <div class="sig-line">Firma y Sello de Salida de Fábrica</div>
+        </div>
+        <div class="signature-box">
+            <div class="sig-title">Recepción Almacén Imprenta</div>
+            <div class="sig-line">Firma Responsable y Sello de Entrada en Planta</div>
+        </div>
+    </div>
+
+    <footer class="footer-note">
+        Documento oficial emitido por PrintPrice OS Control Plane. Inmutable, con registro de auditoría en ledger criptográfico de inventario.
+    </footer>
+</body>
+</html>`;
     }
 }
 
