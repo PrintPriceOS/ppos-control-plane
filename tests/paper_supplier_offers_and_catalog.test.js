@@ -1936,6 +1936,13 @@ describe('Iteration I3: Paper Supplier Catalog & Commercial Offers Engine', () =
             const alphaToken = generateToken({ id: 'user-op-alpha', userId: 'user-op-alpha', tenantId: 'tenant-alpha', supplierId: 'supp-alpha-1', role: 'SUPPLIER_OPERATOR' });
             const betaToken = generateToken({ id: 'user-op-beta-1', userId: 'user-op-beta-1', tenantId: 'tenant-beta', supplierId: 'supp-beta-1', role: 'SUPPLIER_OPERATOR' });
 
+            // Seed Beta's catalog association for var-munken-150-70100 first so it belongs to Beta's catalog
+            await connectionPool.query(`
+                INSERT INTO supplier_paper_catalog_variants (id, tenant_id, supplier_id, variant_id, status, notes, created_at, updated_at)
+                VALUES ('spcv-beta-munken-150', 'tenant-beta', 'supp-beta-1', 'var-munken-150-70100', 'ACTIVE', 'Active in Beta catalog', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                ON DUPLICATE KEY UPDATE status = 'ACTIVE', deleted_at = NULL;
+            `);
+
             // Supplier Beta attempts to archive variant with non-existent ID + existing ID
             const mixedBatchRes = await dispatch(paperSuppliersRouter, {
                 method: 'PATCH',
@@ -2372,6 +2379,227 @@ describe('Iteration I3: Paper Supplier Catalog & Commercial Offers Engine', () =
                 variantIds: oversizedSelectedIds,
                 scope: 'SELECTED'
             })).rejects.toThrow(/EXCEEDS_MAX_BATCH_LIMIT/);
+        });
+    });
+
+    describe('10. Multi-Supplier Catalog Scope, Unassociated Variants & Incorporation Protection', () => {
+        it('Ensures unassociated variants are queryable as UNASSOCIATED without side-effect associations, bulk actions do not sweep foreign variants, and incorporation protects shared specifications', async () => {
+            if (!isDbConfigured) return;
+
+            const supplierAlpha = 'supp-alpha-1';
+            const supplierBeta = 'supp-beta-1';
+            const tenantId = 'tenant-alpha';
+            const alphaAdminToken = generateToken({ id: 'user-admin-alpha', userId: 'user-admin-alpha', tenantId, supplierId: supplierAlpha, role: 'SUPPLIER_ADMIN' });
+            const betaAdminToken = generateToken({ id: 'user-admin-beta', userId: 'user-admin-beta', tenantId, supplierId: supplierBeta, role: 'SUPPLIER_ADMIN' });
+
+            // 1. Seed a global technical product and variants that belong exclusively to Supplier Beta or global catalog
+            const testProductId = 'prod-multi-reg-1';
+            const testVariantBeta = 'var-beta-exclusive-1';
+            const testVariantGlobalOnly = 'var-global-unrelated-1';
+
+            await connectionPool.query(`
+                INSERT INTO paper_products (id, name, category, brand, manufacturer, created_at, updated_at)
+                VALUES (?, 'Regal Coated Silk', 'COATED', 'Regal Papers', 'Regal Mills', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                ON DUPLICATE KEY UPDATE name = VALUES(name)
+            `, [testProductId]);
+
+            await connectionPool.query(`
+                INSERT INTO paper_variants (id, product_id, gsm, width_mm, height_mm, finish, grain_direction, caliper_um, caliper_mm, fingerprint, created_at, updated_at)
+                VALUES 
+                (?, ?, 170, 700, 1000, 'SILK', 'LONG_GRAIN', 160, 0.1600, 'fp-regal-170-silk-70100', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+                (?, ?, 250, 700, 1000, 'SILK', 'LONG_GRAIN', 240, 0.2400, 'fp-regal-250-silk-70100', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                ON DUPLICATE KEY UPDATE gsm = VALUES(gsm)
+            `, [testVariantBeta, testProductId, testVariantGlobalOnly, testProductId]);
+
+            // Associate testVariantBeta strictly to Supplier Beta (active)
+            await connectionPool.query(`
+                INSERT INTO supplier_paper_catalog_variants (id, tenant_id, supplier_id, variant_id, status, notes, created_at, updated_at)
+                VALUES (?, ?, ?, ?, 'ACTIVE', 'Associated to Beta', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                ON DUPLICATE KEY UPDATE status = 'ACTIVE'
+            `, ['spcv_beta_regal_170', tenantId, supplierBeta, testVariantBeta]);
+
+            // Confirm that Supplier Alpha has ZERO associations with testVariantBeta and testVariantGlobalOnly
+            const [alphaAssocBefore] = await connectionPool.query(
+                'SELECT COUNT(*) as count FROM supplier_paper_catalog_variants WHERE supplier_id = ? AND variant_id IN (?, ?)',
+                [supplierAlpha, testVariantBeta, testVariantGlobalOnly]
+            );
+            expect(Number(alphaAssocBefore[0].count)).toBe(0);
+
+            // =========================================================================
+            // REQUIREMENT 1: Querying catalog as Supplier Alpha:
+            // - Variants are consultable
+            // - Return supplierCatalogStatus = 'UNASSOCIATED' and isCatalogAssociated = false
+            // - Consultation creates ZERO side-effect associations in database
+            // =========================================================================
+            const alphaQueryRes = await dispatch(paperSuppliersRouter, {
+                method: 'GET',
+                url: `/catalog/products?search=Regal`,
+                headers: { authorization: `Bearer ${alphaAdminToken}` }
+            });
+            expect(alphaQueryRes.statusCode).toBe(200);
+            const regalProdInAlpha = alphaQueryRes.body.data.products.find((p) => p.id === testProductId);
+            expect(regalProdInAlpha).toBeDefined();
+
+            const betaVarViewedByAlpha = regalProdInAlpha.variants.find((v) => v.id === testVariantBeta);
+            expect(betaVarViewedByAlpha).toBeDefined();
+            expect(betaVarViewedByAlpha.supplierCatalogStatus).toBe('UNASSOCIATED');
+            expect(betaVarViewedByAlpha.isCatalogAssociated).toBe(false);
+
+            const globalVarViewedByAlpha = regalProdInAlpha.variants.find((v) => v.id === testVariantGlobalOnly);
+            expect(globalVarViewedByAlpha).toBeDefined();
+            expect(globalVarViewedByAlpha.supplierCatalogStatus).toBe('UNASSOCIATED');
+            expect(globalVarViewedByAlpha.isCatalogAssociated).toBe(false);
+
+            // Check database: ZERO associations created for Supplier Alpha as side-effect of querying
+            const [alphaAssocAfterQuery] = await connectionPool.query(
+                'SELECT COUNT(*) as count FROM supplier_paper_catalog_variants WHERE supplier_id = ? AND variant_id IN (?, ?)',
+                [supplierAlpha, testVariantBeta, testVariantGlobalOnly]
+            );
+            expect(Number(alphaAssocAfterQuery[0].count)).toBe(0);
+
+            // =========================================================================
+            // REQUIREMENT 2: Bulk ALL_MATCHING execution by Supplier Alpha:
+            // - Archiving all matching results for search=Regal must NOT sweep or associate testVariantBeta or testVariantGlobalOnly
+            // - Withdrawing all matching results must NOT affect or associate foreign variants
+            // - Selected execution on unassociated variants must return VARIANT_NOT_ASSOCIATED
+            // =========================================================================
+
+            // Preview ALL_MATCHING for search=Regal by Supplier Alpha: targetCount must be 0 (no associated variants match)
+            const alphaPreviewRes = await dispatch(paperSuppliersRouter, {
+                method: 'POST',
+                url: '/catalog/variants/preview-action',
+                body: {
+                    action: 'ARCHIVE',
+                    scope: 'ALL_MATCHING',
+                    filters: { search: 'Regal' }
+                },
+                headers: { authorization: `Bearer ${alphaAdminToken}` }
+            });
+            expect(alphaPreviewRes.statusCode).toBe(200);
+            expect(alphaPreviewRes.body.data.targetCount).toBe(0);
+
+            // Execute bulk status ARCHIVE with ALL_MATCHING for search=Regal by Supplier Alpha
+            const alphaBulkArchiveRes = await dispatch(paperSuppliersRouter, {
+                method: 'PATCH',
+                url: '/catalog/variants/bulk-status',
+                body: {
+                    status: 'ARCHIVED',
+                    scope: 'ALL_MATCHING',
+                    filters: { search: 'Regal' }
+                },
+                headers: { authorization: `Bearer ${alphaAdminToken}` }
+            });
+            expect(alphaBulkArchiveRes.statusCode).toBe(200);
+            expect(alphaBulkArchiveRes.body.data.totalProcessed).toBe(0);
+
+            // Execute bulk WITHDRAW with ALL_MATCHING for search=Regal by Supplier Alpha
+            const alphaBulkWithdrawRes = await dispatch(paperSuppliersRouter, {
+                method: 'POST',
+                url: '/catalog/variants/bulk-withdraw',
+                body: {
+                    scope: 'ALL_MATCHING',
+                    filters: { search: 'Regal' }
+                },
+                headers: { authorization: `Bearer ${alphaAdminToken}` }
+            });
+            expect(alphaBulkWithdrawRes.statusCode).toBe(200);
+            expect(alphaBulkWithdrawRes.body.data.totalProcessed).toBe(0);
+
+            // Confirm that Supplier Beta's association with testVariantBeta remains untouched and ACTIVE
+            const [betaAssocCheck] = await connectionPool.query(
+                'SELECT status, deleted_at FROM supplier_paper_catalog_variants WHERE supplier_id = ? AND variant_id = ?',
+                [supplierBeta, testVariantBeta]
+            );
+            expect(betaAssocCheck[0].status).toBe('ACTIVE');
+            expect(betaAssocCheck[0].deleted_at).toBeNull();
+
+            // Attempting to directly archive or withdraw an unassociated variant with scope=SELECTED fails with VARIANT_NOT_ASSOCIATED
+            const directArchiveRes = await paperOfferService.archiveSupplierCatalogVariants({
+                tenantId,
+                supplierId: supplierAlpha,
+                actorId: 'user-admin-alpha',
+                role: 'SUPPLIER_ADMIN',
+                variantIds: [testVariantBeta],
+                scope: 'SELECTED'
+            });
+            expect(directArchiveRes.totalProcessed).toBe(1);
+            expect(directArchiveRes.succeededCount).toBe(0);
+            expect(directArchiveRes.failedCount).toBe(1);
+            expect(directArchiveRes.results[0].code).toBe('VARIANT_NOT_ASSOCIATED');
+
+            const directWithdrawRes = await paperOfferService.withdrawSupplierCatalogVariants({
+                tenantId,
+                supplierId: supplierAlpha,
+                actorId: 'user-admin-alpha',
+                role: 'SUPPLIER_ADMIN',
+                variantIds: [testVariantBeta],
+                scope: 'SELECTED'
+            });
+            expect(directWithdrawRes.totalProcessed).toBe(1);
+            expect(directWithdrawRes.succeededCount).toBe(0);
+            expect(directWithdrawRes.failedCount).toBe(1);
+            expect(directWithdrawRes.results[0].code).toBe('VARIANT_NOT_ASSOCIATED');
+
+            // =========================================================================
+            // REQUIREMENT 3: Explicit authorized incorporation of a global variant:
+            // - Supplier Alpha explicitly incorporates testVariantBeta
+            // - Action creates association for Supplier Alpha as ACTIVE
+            // - That incorporation does NOT grant permission to mutate or delete the shared technical sheet
+            // =========================================================================
+            const incRes = await dispatch(paperSuppliersRouter, {
+                method: 'POST',
+                url: `/catalog/variants/${testVariantBeta}/incorporate`,
+                headers: { authorization: `Bearer ${alphaAdminToken}` }
+            });
+            expect(incRes.statusCode).toBe(200);
+            expect(incRes.body.ok).toBe(true);
+            expect(incRes.body.data.supplierCatalogStatus).toBe('ACTIVE');
+            expect(incRes.body.data.isCatalogAssociated).toBe(true);
+
+            // Verify Supplier Alpha now has an ACTIVE association
+            const [alphaAssocAfterInc] = await connectionPool.query(
+                'SELECT status, deleted_at FROM supplier_paper_catalog_variants WHERE supplier_id = ? AND variant_id = ?',
+                [supplierAlpha, testVariantBeta]
+            );
+            expect(alphaAssocAfterInc[0].status).toBe('ACTIVE');
+            expect(alphaAssocAfterInc[0].deleted_at).toBeNull();
+
+            // Verify Supplier Beta's association remains intact
+            const [betaAssocStillActive] = await connectionPool.query(
+                'SELECT status, deleted_at FROM supplier_paper_catalog_variants WHERE supplier_id = ? AND variant_id = ?',
+                [supplierBeta, testVariantBeta]
+            );
+            expect(betaAssocStillActive[0].status).toBe('ACTIVE');
+            expect(betaAssocStillActive[0].deleted_at).toBeNull();
+
+            // Invariant: Supplier Alpha tries to delete the shared technical variant -> MUST BE BLOCKED
+            await expect(paperOfferService.deleteTechnicalVariant({
+                tenantId,
+                supplierId: supplierAlpha,
+                actorId: 'user-admin-alpha',
+                role: 'SUPPLIER_ADMIN',
+                variantId: testVariantBeta
+            })).rejects.toThrow(/(CANNOT_DELETE_SHARED_VARIANT|NOT_VARIANT_ORIGINATOR)/);
+
+            // Invariant: Supplier Alpha tries to modify physical specifications -> MUST BE BLOCKED
+            await expect(paperOfferService.updateTechnicalVariant({
+                tenantId,
+                supplierId: supplierAlpha,
+                actorId: 'user-admin-alpha',
+                role: 'SUPPLIER_ADMIN',
+                variantId: testVariantBeta,
+                payload: { gsm: 180 }
+            })).rejects.toThrow(/(SHARED_VARIANT_MUTATION_RESTRICTED|NOT_VARIANT_ORIGINATOR)/);
+
+            // Global technical specs in paper_variants remain completely unmodified
+            const [globalVarCheck] = await connectionPool.query(
+                'SELECT gsm, width_mm, height_mm, finish FROM paper_variants WHERE id = ?',
+                [testVariantBeta]
+            );
+            expect(Number(globalVarCheck[0].gsm)).toBe(170);
+            expect(Number(globalVarCheck[0].width_mm)).toBe(700);
+            expect(Number(globalVarCheck[0].height_mm)).toBe(1000);
+            expect(globalVarCheck[0].finish).toBe('SILK');
         });
     });
 

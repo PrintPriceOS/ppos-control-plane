@@ -2505,6 +2505,10 @@ export const es = {
   'supplier.hub.catalogPreviewActionImpact': 'Impacto y Preservación de Fichas Compartidas',
   'supplier.hub.catalogPreviewExecute': 'Confirmar y Ejecutar Acción',
   'supplier.hub.statusWithdrawn': 'Retirada',
+  'supplier.hub.statusUnassociated': 'No incorporada',
+  'supplier.hub.incorporateVariant': 'Incorporar al catálogo',
+  'supplier.hub.incorporateSuccess': 'Variante incorporada correctamente al catálogo',
+  'supplier.hub.incorporateFailed': 'No se pudo incorporar la variante al catálogo',
   'supplier.hub.selectedInProduct': '({{selected}} de {{total}} sel.)',
 
   // Supplier Dashboard

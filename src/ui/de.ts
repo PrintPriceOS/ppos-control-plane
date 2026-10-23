@@ -2506,6 +2506,10 @@ export const de = {
   'supplier.hub.catalogPreviewActionImpact': 'Auswirkung & Erhalt geteilter Datenblätter',
   'supplier.hub.catalogPreviewExecute': 'Aktion bestätigen und ausführen',
   'supplier.hub.statusWithdrawn': 'Zurückgezogen',
+  'supplier.hub.statusUnassociated': 'Nicht übernommen',
+  'supplier.hub.incorporateVariant': 'In Katalog übernehmen',
+  'supplier.hub.incorporateSuccess': 'Variante erfolgreich in den Katalog übernommen',
+  'supplier.hub.incorporateFailed': 'Variante konnte nicht in den Katalog übernommen werden',
   'supplier.hub.selectedInProduct': '({{selected}} von {{total}} ausgew.)',
 
   // Supplier Dashboard

@@ -254,7 +254,7 @@ export const SupplierCatalogOffersPage: React.FC = () => {
 
     // Catalog variant selection helpers
     const allVisibleCatalogVariantIds = catalogProducts.flatMap((p: any) =>
-        p.variants ? p.variants.map((v: any) => v.id) : []
+        p.variants ? p.variants.filter((v: any) => v.isCatalogAssociated !== false && v.supplierCatalogStatus !== 'UNASSOCIATED').map((v: any) => v.id) : []
     );
 
     const isCatalogPageSelected = allVisibleCatalogVariantIds.length > 0 &&
@@ -272,7 +272,7 @@ export const SupplierCatalogOffersPage: React.FC = () => {
 
     const handleToggleSelectProduct = (product: any) => {
         setIsAllMatchingCatalogSelected(false);
-        const prodVariantIds = product.variants ? product.variants.map((v: any) => v.id) : [];
+        const prodVariantIds = product.variants ? product.variants.filter((v: any) => v.isCatalogAssociated !== false && v.supplierCatalogStatus !== 'UNASSOCIATED').map((v: any) => v.id) : [];
         if (prodVariantIds.length === 0) return;
 
         const allSelected = prodVariantIds.every((id: string) => selectedCatalogVariantIds.has(id));
@@ -312,6 +312,24 @@ export const SupplierCatalogOffersPage: React.FC = () => {
     const handleClearCatalogSelection = () => {
         setSelectedCatalogVariantIds(new Set());
         setIsAllMatchingCatalogSelected(false);
+    };
+
+    // Explicitly incorporate a global variant into supplier's own catalog
+    const handleIncorporateVariant = async (variantId: string) => {
+        try {
+            setErrorNotice(null);
+            const res = await paperSupplierFetch<any>(`/api/v1/paper-suppliers/catalog/variants/${variantId}/incorporate`, {
+                method: 'POST'
+            });
+            if (res && res.ok) {
+                setGeneralNotice(t('supplier.hub.incorporateSuccess'));
+                fetchCatalog();
+            } else {
+                setErrorNotice(res?.error?.message || t('supplier.hub.incorporateFailed'));
+            }
+        } catch (err: any) {
+            setErrorNotice(err.message || 'Error de comunicación.');
+        }
     };
 
     // Open catalog action preview modal
@@ -1142,30 +1160,40 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                                                     const isVariantSelected = selectedCatalogVariantIds.has(v.id);
                                                     const isWithdrawn = Boolean(v.isWithdrawn);
                                                     const isArchived = v.supplierCatalogStatus === 'ARCHIVED';
+                                                    const isUnassociated = v.supplierCatalogStatus === 'UNASSOCIATED' || v.isCatalogAssociated === false;
 
                                                     return (
                                                         <tr key={v.id} className={`hover:bg-slate-50 dark:hover:bg-zinc-900/60 pl-4 ${isVariantSelected ? 'bg-red-50/40 dark:bg-red-950/20' : ''}`}>
                                                             {!isReadOnly && (
                                                                 <td className="p-3 w-8">
-                                                                    <input
-                                                                        type="checkbox"
-                                                                        checked={isVariantSelected}
-                                                                        onChange={() => handleToggleSelectVariant(v.id)}
-                                                                        className="cursor-pointer"
-                                                                    />
+                                                                    {isUnassociated ? (
+                                                                        <span className="inline-block w-4 h-4 text-center text-zinc-300 dark:text-zinc-600 text-xs select-none" title={t('supplier.hub.statusUnassociated')}>—</span>
+                                                                    ) : (
+                                                                        <input
+                                                                            type="checkbox"
+                                                                            checked={isVariantSelected}
+                                                                            onChange={() => handleToggleSelectVariant(v.id)}
+                                                                            className="cursor-pointer"
+                                                                        />
+                                                                    )}
                                                                 </td>
                                                             )}
                                                             <td className="p-3 pl-8 text-zinc-600 dark:text-zinc-400 flex items-center gap-2">
-                                                                <span className={`w-1.5 h-1.5 rounded-full ${isWithdrawn ? 'bg-zinc-400' : isArchived ? 'bg-amber-500' : 'bg-red-600'}`} />
+                                                                <span className={`w-1.5 h-1.5 rounded-full ${isUnassociated ? 'bg-zinc-400 dark:bg-zinc-600' : isWithdrawn ? 'bg-zinc-400' : isArchived ? 'bg-amber-500' : 'bg-red-600'}`} />
                                                                 <span className="font-mono font-bold text-slate-800 dark:text-zinc-200">
                                                                     {v.widthMm} x {v.heightMm} mm
                                                                 </span>
-                                                                {isWithdrawn && (
+                                                                {isUnassociated && (
+                                                                    <span className="px-1.5 py-0.2 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700 text-[9px] font-bold uppercase">
+                                                                        {t('supplier.hub.statusUnassociated')}
+                                                                    </span>
+                                                                )}
+                                                                {isWithdrawn && !isUnassociated && (
                                                                     <span className="px-1.5 py-0.2 bg-zinc-200 dark:bg-zinc-800 text-zinc-500 text-[9px] font-bold uppercase">
                                                                         {t('supplier.hub.statusWithdrawn')}
                                                                     </span>
                                                                 )}
-                                                                {isArchived && !isWithdrawn && (
+                                                                {isArchived && !isWithdrawn && !isUnassociated && (
                                                                     <span className="px-1.5 py-0.2 bg-amber-100 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400 text-[9px] font-bold uppercase">
                                                                         {t('supplier.hub.statusArchived')}
                                                                     </span>
@@ -1196,53 +1224,65 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                                                                     </button>
                                                                     {!isReadOnly && (
                                                                         <>
-                                                                            <button
-                                                                                onClick={() => handleOpenEditVariant(v, prod.name)}
-                                                                                className="p-1 text-zinc-400 hover:text-slate-900 dark:hover:text-white transition-colors cursor-pointer"
-                                                                                title={t('supplier.hub.editVariantSpecs')}
-                                                                            >
-                                                                                <PencilSquareIcon className="w-4 h-4" />
-                                                                            </button>
-                                                                            <button
-                                                                                onClick={() => handleOpenCreateOffer({ ...v, productName: prod.name, finish: prod.finish })}
-                                                                                className="px-2.5 py-1 bg-red-600 hover:bg-red-700 text-white font-bold uppercase text-[10px] transition-colors cursor-pointer"
-                                                                            >
-                                                                                {t('supplier.hub.createOffer')}
-                                                                            </button>
-                                                                            {isArchived ? (
+                                                                            {isUnassociated ? (
                                                                                 <button
-                                                                                    onClick={() => handleOpenCatalogAction('RESTORE', v.id)}
-                                                                                    className="p-1 text-blue-600 hover:text-blue-700 transition-colors cursor-pointer"
-                                                                                    title={t('supplier.hub.restore')}
+                                                                                    onClick={() => handleIncorporateVariant(v.id)}
+                                                                                    className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold uppercase text-[10px] transition-colors cursor-pointer"
+                                                                                    title={t('supplier.hub.incorporateVariant')}
                                                                                 >
-                                                                                    <ArrowPathIcon className="w-4 h-4" />
+                                                                                    {t('supplier.hub.incorporateVariant')}
                                                                                 </button>
                                                                             ) : (
-                                                                                <button
-                                                                                    onClick={() => handleOpenCatalogAction('ARCHIVE', v.id)}
-                                                                                    className="p-1 text-amber-600 hover:text-amber-700 transition-colors cursor-pointer"
-                                                                                    title={t('supplier.hub.archive')}
-                                                                                >
-                                                                                    <ArchiveBoxIcon className="w-4 h-4" />
-                                                                                </button>
-                                                                            )}
-                                                                            {!isWithdrawn && (
-                                                                                <button
-                                                                                    onClick={() => handleOpenCatalogAction('WITHDRAW', v.id)}
-                                                                                    className="px-2 py-1 border border-zinc-300 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-[10px] font-bold uppercase cursor-pointer"
-                                                                                    title={t('supplier.hub.withdrawConfirmWarning')}
-                                                                                >
-                                                                                    {t('supplier.hub.withdraw')}
-                                                                                </button>
-                                                                            )}
-                                                                            {isAdmin && (
-                                                                                <button
-                                                                                    onClick={() => handleOpenDeleteVariantConfirm(v)}
-                                                                                    className="p-1 text-zinc-400 hover:text-red-600 transition-colors cursor-pointer"
-                                                                                    title={t('supplier.hub.deleteVariantConfirmTitle')}
-                                                                                >
-                                                                                    <TrashIcon className="w-4 h-4" />
-                                                                                </button>
+                                                                                <>
+                                                                                    <button
+                                                                                        onClick={() => handleOpenEditVariant(v, prod.name)}
+                                                                                        className="p-1 text-zinc-400 hover:text-slate-900 dark:hover:text-white transition-colors cursor-pointer"
+                                                                                        title={t('supplier.hub.editVariantSpecs')}
+                                                                                    >
+                                                                                        <PencilSquareIcon className="w-4 h-4" />
+                                                                                    </button>
+                                                                                    <button
+                                                                                        onClick={() => handleOpenCreateOffer({ ...v, productName: prod.name, finish: prod.finish })}
+                                                                                        className="px-2.5 py-1 bg-red-600 hover:bg-red-700 text-white font-bold uppercase text-[10px] transition-colors cursor-pointer"
+                                                                                    >
+                                                                                        {t('supplier.hub.createOffer')}
+                                                                                    </button>
+                                                                                    {isArchived ? (
+                                                                                        <button
+                                                                                            onClick={() => handleOpenCatalogAction('RESTORE', v.id)}
+                                                                                            className="p-1 text-blue-600 hover:text-blue-700 transition-colors cursor-pointer"
+                                                                                            title={t('supplier.hub.restore')}
+                                                                                        >
+                                                                                            <ArrowPathIcon className="w-4 h-4" />
+                                                                                        </button>
+                                                                                    ) : (
+                                                                                        <button
+                                                                                            onClick={() => handleOpenCatalogAction('ARCHIVE', v.id)}
+                                                                                            className="p-1 text-amber-600 hover:text-amber-700 transition-colors cursor-pointer"
+                                                                                            title={t('supplier.hub.archive')}
+                                                                                        >
+                                                                                            <ArchiveBoxIcon className="w-4 h-4" />
+                                                                                        </button>
+                                                                                    )}
+                                                                                    {!isWithdrawn && (
+                                                                                        <button
+                                                                                            onClick={() => handleOpenCatalogAction('WITHDRAW', v.id)}
+                                                                                            className="px-2 py-1 border border-zinc-300 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-[10px] font-bold uppercase cursor-pointer"
+                                                                                            title={t('supplier.hub.withdrawConfirmWarning')}
+                                                                                        >
+                                                                                            {t('supplier.hub.withdraw')}
+                                                                                        </button>
+                                                                                    )}
+                                                                                    {isAdmin && (
+                                                                                        <button
+                                                                                            onClick={() => handleOpenDeleteVariantConfirm(v)}
+                                                                                            className="p-1 text-zinc-400 hover:text-red-600 transition-colors cursor-pointer"
+                                                                                            title={t('supplier.hub.deleteVariantConfirmTitle')}
+                                                                                        >
+                                                                                            <TrashIcon className="w-4 h-4" />
+                                                                                        </button>
+                                                                                    )}
+                                                                                </>
                                                                             )}
                                                                         </>
                                                                     )}

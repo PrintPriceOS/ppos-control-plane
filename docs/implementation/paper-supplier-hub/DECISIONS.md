@@ -110,3 +110,29 @@
      - **Post-escrituras**: Tras operar, ejecutar `DROP TABLE` o `DROP COLUMN` es destructivo (elimina asociaciones de proveedor y marcas de retirada). Si el código retrocediera a una versión que ignore `deleted_at`, las ofertas retiradas con `status = 'ARCHIVED'` podrían reactivarse comercialmente vía `RESTORE`. La estrategia prioritaria y recomendada es **corrección hacia delante (roll-forward)** conservando el esquema y la compatibilidad hacia atrás.
 - **Consecuencia**: Transición de datos 100% determinista, integridad referencial y de auditoría inviolable, y eliminación de riesgos de pérdida de datos en reversión.
 
+## ADR 010: Alcance de Variantes Sin Asociación, Incorporación Explícita y Modificación Pre-Despliegue de Migración 165
+
+- **Fecha**: 2026-10-23
+- **Estado**: Aceptado
+- **Contexto**:
+  En el candidato `656d587b2f4e99c557f86f4b67e8c2200bdc32d3`, el catálogo técnico devolvía variantes sin asociación con `supplierCatalogStatus: r.catalog_status || 'ACTIVE'`, presentándolas como integrantes activos del catálogo propio del proveedor en lugar de "No incorporadas". Adicionalmente, las acciones masivas con alcance `ALL_MATCHING` o selección directa en endpoints de archivo/retirada utilizaban `INSERT ... ON DUPLICATE KEY UPDATE`, creando asociaciones involuntarias con variantes globales ajenas como efecto secundario. Asimismo, la migración 165 fue modificada in-tree antes de su primer despliegue a producción añadiendo el backfill de relaciones reales.
+- **Decisión**:
+  1. **Estado Explícito 'UNASSOCIATED' para Variantes Globales Sin Relación**:
+     - Las variantes de la tabla global `paper_variants` sin registro correspondiente en `supplier_paper_catalog_variants` son plenamente consultables para descubrimiento técnico, pero devuelven de forma obligatoria `supplierCatalogStatus: 'UNASSOCIATED'` e `isCatalogAssociated: false`.
+     - En la interfaz de usuario (`SupplierCatalogOffersPage.tsx`), se presentan con badge "No incorporada", quedan excluidas del checkbox maestro de selección para ofertas o acciones masivas de catálogo, y exponen la acción explícita "Incorporar al catálogo".
+  2. **Acotamiento Estricto de `ALL_MATCHING` al Catálogo del Proveedor**:
+     - Las operaciones masivas (`ARCHIVE`, `RESTORE`, `WITHDRAW`) con alcance `ALL_MATCHING` filtran de forma incondicional por `associatedOnly: true` (y `catalogStatus` acorde a la acción).
+     - Las variantes globales ajenas o no incorporadas quedan 100% fuera del barrido.
+     - Las acciones `archiveSupplierCatalogVariants`, `restoreSupplierCatalogVariants` y `withdrawSupplierCatalogVariants` ejecutan exclusivamente `UPDATE` sobre asociaciones existentes; si una variante no está asociada al proveedor, devuelven error granular `VARIANT_NOT_ASSOCIATED` sin realizar `INSERT` ni generar asociaciones como efecto secundario.
+  3. **Incorporación Explícita y Blindaje de Especificaciones Compartidas**:
+     - La incorporación de una variante global al catálogo propio requiere una acción explícita y autorizada: `POST /api/v1/paper-suppliers/catalog/variants/:variantId/incorporate` (restringida a `SUPPLIER_ADMIN` o `SUPPLIER_OPERATOR`).
+     - Dicha incorporación concede derecho a gestionar ofertas comerciales propias para esa variante, pero **NO concede permiso para modificar ni eliminar la ficha técnica compartida**.
+     - Cualquier intento de `PATCH /catalog/variants/:id` o `DELETE /catalog/variants/:id` sobre una variante incorporada o compartida con otros proveedores se rechaza con HTTP 403/409 (`SHARED_VARIANT_MUTATION_RESTRICTED` / `CANNOT_DELETE_SHARED_VARIANT` / `NOT_VARIANT_ORIGINATOR`), preservando intactas las especificaciones físicas globales.
+  4. **Modificación Pre-Despliegue de la Migración 165 y Protocolo para Entornos Persistentes**:
+     - La migración `165_phase196d_paper_supplier_offer_soft_delete_and_catalog_associations.sql` fue modificada in-tree antes de su primer despliegue a producción (pasó de 28 líneas que creaban la tabla vacía a 60 líneas que incluyen el backfill idempotente derivado de lotes y ofertas reales).
+     - **Advertencia crítica para entornos persistentes**: Si algún entorno persistente (staging, pre-producción o entorno de desarrollo de larga duración) ya aplicó la versión inicial de 28 líneas, el runner de migraciones ya habrá registrado la migración 165 en `schema_migrations`.
+     - Actualizar el checksum en `migration-integrity-baseline.json` solo satisface la validación estática de integridad del repositorio, pero **no re-ejecuta la migración en una base de datos donde ya figure como aplicada**.
+     - Dichos entornos persistentes requieren la aplicación de una migración secuencial posterior (o la ejecución manual del bloque de backfill DML) para sincronizar las filas de `supplier_paper_catalog_variants`.
+- **Consecuencia**: Aislamiento multi-proveedor robusto, cero contaminación lateral de catálogos en operaciones masivas, inmutabilidad de fichas técnicas compartidas y claridad operativa sobre la aplicación de migraciones en entornos preexistentes.
+
+

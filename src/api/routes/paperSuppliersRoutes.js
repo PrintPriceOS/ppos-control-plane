@@ -689,6 +689,39 @@ router.post('/catalog/variants/:variantId/withdraw', requireSupplierScope('OPERA
 });
 
 /**
+ * POST /api/v1/paper-suppliers/catalog/variants/:variantId/incorporate
+ * Explicitly incorporate a global variant into supplier's active catalog.
+ */
+router.post('/catalog/variants/:variantId/incorporate', requireSupplierScope('OPERATOR'), requireApprovedSupplier, async (req, res) => {
+    try {
+        const context = resolveActorContext(req);
+        const role = req.verifiedSupplierContext?.role || context.role;
+        const { variantId } = req.params;
+
+        const result = await paperOfferService.incorporateSupplierCatalogVariant({
+            tenantId: context.tenantId,
+            supplierId: context.supplierId,
+            actorId: context.userId,
+            role,
+            variantId
+        });
+
+        return res.json({ ok: true, data: result });
+    } catch (err) {
+        console.error('[PAPER-SUPPLIERS][VARIANT-INCORPORATE-ERROR]', err);
+        const isNotFound = err.message.startsWith('VARIANT_NOT_FOUND');
+        const isForbidden = err.message.startsWith('FORBIDDEN');
+        return res.status(isNotFound ? 404 : (isForbidden ? 403 : 500)).json({
+            ok: false,
+            error: {
+                code: isNotFound ? 'VARIANT_NOT_FOUND' : (isForbidden ? 'FORBIDDEN' : 'VARIANT_INCORPORATE_FAILED'),
+                message: err.message
+            }
+        });
+    }
+});
+
+/**
  * PATCH /api/v1/paper-suppliers/catalog/variants/:variantId
  * Controlled technical modification of variant specifications.
  */

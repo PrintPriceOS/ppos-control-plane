@@ -75,6 +75,18 @@ const mockProducts = [
                 grainDirection: 'SHORT_GRAIN',
                 supplierCatalogStatus: 'ACTIVE',
                 isWithdrawn: false
+            },
+            {
+                id: 'var-coral-100',
+                productId: 'prod-coral-1',
+                gsm: 100,
+                widthMm: 650,
+                heightMm: 900,
+                finish: 'NATURAL',
+                grainDirection: 'SHORT_GRAIN',
+                supplierCatalogStatus: 'UNASSOCIATED',
+                isCatalogAssociated: false,
+                isWithdrawn: false
             }
         ]
     }
@@ -166,6 +178,17 @@ describe('Supplier Catalog Technical Variant Selection & Lifecycle UI Suite', ()
                             { id: 'var-munken-120', success: true, message: 'Variant association withdrawn from supplier catalog.' },
                             { id: 'var-munken-150', success: true, message: 'Variant association withdrawn from supplier catalog.' }
                         ]
+                    }
+                });
+            }
+            if (path.includes('/incorporate')) {
+                return Promise.resolve({
+                    ok: true,
+                    data: {
+                        ok: true,
+                        variantId: 'var-coral-100',
+                        supplierCatalogStatus: 'ACTIVE',
+                        isCatalogAssociated: true
                     }
                 });
             }
@@ -315,6 +338,31 @@ describe('Supplier Catalog Technical Variant Selection & Lifecycle UI Suite', ()
         await waitFor(() => {
             expect(screen.getByText(/Reporte de Operación: WITHDRAW/i)).toBeInTheDocument();
             expect(screen.getByText(/Acción WITHDRAW completada: 2 procesadas correctamente/i)).toBeInTheDocument();
+        });
+    });
+
+    it('displays unassociated variants as "No incorporada", omits lifecycle checkboxes, and provides explicit incorporate action', async () => {
+        renderPage('es');
+
+        await waitFor(() => {
+            expect(screen.getByText('Coral Book')).toBeInTheDocument();
+        });
+
+        // Badge "No incorporada" must be rendered for unassociated variant
+        expect(screen.getByText('No incorporada')).toBeInTheDocument();
+
+        // Incorporate button must be present for the unassociated variant
+        const incBtn = screen.getByTitle('Incorporar al catálogo');
+        expect(incBtn).toBeInTheDocument();
+
+        // Clicking incorporate triggers API call
+        fireEvent.click(incBtn);
+
+        await waitFor(() => {
+            expect(mockPaperSupplierFetch).toHaveBeenCalledWith(
+                '/api/v1/paper-suppliers/catalog/variants/var-coral-100/incorporate',
+                expect.objectContaining({ method: 'POST' })
+            );
         });
     });
 });

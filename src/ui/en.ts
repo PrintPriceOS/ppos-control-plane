@@ -2506,6 +2506,10 @@ export const en = {
   'supplier.hub.catalogPreviewActionImpact': 'Impact & Shared Specification Preservation',
   'supplier.hub.catalogPreviewExecute': 'Confirm & Execute Action',
   'supplier.hub.statusWithdrawn': 'Withdrawn',
+  'supplier.hub.statusUnassociated': 'Not incorporated',
+  'supplier.hub.incorporateVariant': 'Incorporate into catalog',
+  'supplier.hub.incorporateSuccess': 'Variant incorporated into supplier catalog successfully',
+  'supplier.hub.incorporateFailed': 'Failed to incorporate variant into catalog',
   'supplier.hub.selectedInProduct': '({{selected}} of {{total}} sel.)',
 
   // Supplier Dashboard
