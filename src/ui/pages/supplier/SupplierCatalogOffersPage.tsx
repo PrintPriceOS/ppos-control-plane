@@ -328,7 +328,7 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                 setErrorNotice(res?.error?.message || t('supplier.hub.incorporateFailed'));
             }
         } catch (err: any) {
-            setErrorNotice(err.message || 'Error de comunicación.');
+            setErrorNotice(err.message || t('supplier.hub.networkError'));
         }
     };
 
@@ -357,10 +357,10 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                 setPendingCatalogAction(action);
                 setIsCatalogPreviewModalOpen(true);
             } else {
-                setErrorNotice('No se pudo generar la previsualización de la acción de catálogo.');
+                setErrorNotice(t('supplier.hub.previewError'));
             }
         } catch (err: any) {
-            setErrorNotice(err.message || 'Error al preparar la acción de catálogo.');
+            setErrorNotice(err.message || t('supplier.hub.previewPrepareError'));
         }
     };
 
@@ -412,21 +412,21 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                 setIsAllMatchingCatalogSelected(false);
 
                 setReportModal({
-                    title: `Reporte de Operación: ${pendingCatalogAction}`,
+                    title: `${t('supplier.hub.operationReportTitle')}: ${pendingCatalogAction}`,
                     totalProcessed: res.data.totalProcessed || 0,
                     succeededCount: res.data.succeededCount || 0,
                     failedCount: res.data.failedCount || 0,
                     results: res.data.results || []
                 });
 
-                setGeneralNotice(`Acción ${pendingCatalogAction} completada: ${res.data.succeededCount} procesadas correctamente.`);
+                setGeneralNotice(t('supplier.hub.actionCompletedCount', { action: pendingCatalogAction, count: res.data.succeededCount }));
                 fetchCatalog();
                 fetchOffers();
             } else {
-                setErrorNotice(res?.error?.message || 'Error al ejecutar la acción.');
+                setErrorNotice(res?.error?.message || t('supplier.hub.actionFailed'));
             }
         } catch (err: any) {
-            setErrorNotice(err.message || 'Error de comunicación.');
+            setErrorNotice(err.message || t('supplier.hub.networkError'));
         } finally {
             setExecutingCatalogAction(false);
         }
@@ -467,7 +467,7 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                         results: report.results
                     });
                 } else {
-                    setGeneralNotice(`Operación ${action} completada con éxito en ${report.succeededCount} ofertas.`);
+                    setGeneralNotice(t('supplier.hub.offersActionCompleted', { action, count: report.succeededCount }));
                 }
             }
         } catch (err: any) {
@@ -616,7 +616,7 @@ export const SupplierCatalogOffersPage: React.FC = () => {
             });
 
             if (res && res.ok) {
-                setGeneralNotice('Especificaciones de la variante modificadas y fingerprint actualizado.');
+                setGeneralNotice(t('supplier.hub.variantUpdated'));
                 setIsEditVariantModalOpen(false);
                 fetchCatalog(catalogPage, catalogSearch, catalogCategory);
             }
@@ -637,17 +637,18 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                 setImportBatches(res.data.batches || []);
             }
         } catch (err: any) {
-            setErrorNotice(err.message || 'Error al cargar historial de lotes.');
+            setErrorNotice(err.message || t('supplier.hub.batchHistoryLoadError'));
         } finally {
             setLoadingBatches(false);
         }
     };
 
     const handleRetractBatch = (batch: any) => {
+        const fileName = batch.original_filename || batch.fileName || batch.file_name || batch.id;
         setConfirmModal({
             isOpen: true,
             title: t('supplier.hub.retractBatch'),
-            warning: `${t('supplier.hub.retractConfirmWarning')} Lote: ${batch.original_filename || batch.id}.`,
+            warning: `${t('supplier.hub.retractConfirmWarning')} ${t('supplier.hub.batchFile')}: ${fileName}.`,
             actionLabel: t('supplier.hub.retractBatch'),
             isDanger: true,
             onConfirm: async () => {
@@ -655,7 +656,7 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                     method: 'POST'
                 });
                 if (res && res.ok) {
-                    setGeneralNotice(`Lote retirado. Se eliminaron ${res.data.retractedVariantsCount} variantes exclusivas.`);
+                    setGeneralNotice(t('supplier.hub.batchRetractedCount', { count: res.data.retractedVariantsCount }));
                     setIsBatchHistoryModalOpen(false);
                     fetchCatalog(1, catalogSearch, catalogCategory);
                 }
@@ -823,10 +824,10 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                 body: JSON.stringify({ status: nextStatus })
             });
             if (res && res.ok) {
-                setGeneralNotice(`Estado de la oferta cambiado a ${nextStatus}.`);
+                setGeneralNotice(t('supplier.hub.offerStatusChanged', { status: nextStatus }));
                 fetchOffers(offersPage, offersSearch, offersStatusFilter);
             } else {
-                setErrorNotice('Error al actualizar estado.');
+                setErrorNotice(t('supplier.hub.offerStatusError'));
             }
         } catch (err: any) {
             setErrorNotice(err.message || 'Error updating status.');
@@ -1126,7 +1127,7 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                                                                 }}
                                                                 onChange={() => handleToggleSelectProduct(prod)}
                                                                 className="cursor-pointer"
-                                                                title={`Seleccionar todas las variantes de ${prod.name}`}
+                                                                title={t('supplier.hub.selectAllVariantsInProduct', { name: prod.name })}
                                                             />
                                                         </td>
                                                     )}
@@ -1517,11 +1518,11 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                                 ) : (
                                     offers.map((off) => {
                                         const isSelected = selectedOfferIds.has(off.id);
-                                        const productName = off.variantDetails?.productName || off.productName || 'Variante no disponible';
+                                        const productName = off.variantDetails?.productName || off.productName || t('supplier.hub.variantUnavailable');
                                         const gsm = off.variantDetails?.gsm || off.gsm;
                                         const widthMm = off.variantDetails?.widthMm || off.widthMm;
                                         const heightMm = off.variantDetails?.heightMm || off.heightMm;
-                                        const finish = off.variantDetails?.finish || off.finish || 'Estándar';
+                                        const finish = off.variantDetails?.finish || off.finish || t('supplier.hub.standardFinish');
 
                                         return (
                                             <tr key={off.id} className={`hover:bg-slate-50 dark:hover:bg-zinc-900/50 ${isSelected ? 'bg-red-50/40 dark:bg-red-950/20' : ''}`}>
@@ -2150,36 +2151,57 @@ export const SupplierCatalogOffersPage: React.FC = () => {
             >
                 <div className="space-y-3">
                     {loadingBatches ? (
-                        <p className="p-8 text-center text-zinc-400">Cargando lotes de importación...</p>
+                        <p className="p-8 text-center text-zinc-400">{t('supplier.hub.loadingBatches')}</p>
                     ) : importBatches.length === 0 ? (
-                        <p className="p-8 text-center text-zinc-400">No se registran lotes importados para este proveedor.</p>
+                        <p className="p-8 text-center text-zinc-400">{t('supplier.hub.noBatches')}</p>
                     ) : (
                         <div className="border border-slate-200 dark:border-zinc-800 overflow-x-auto">
                             <table className="w-full text-left text-xs">
                                 <thead>
                                     <tr className="bg-slate-100 dark:bg-zinc-900 border-b border-slate-200 dark:border-zinc-800 text-[10px] font-bold text-zinc-500 uppercase tracking-wider">
-                                        <th className="p-2.5">Fecha</th>
-                                        <th className="p-2.5">Archivo</th>
-                                        <th className="p-2.5">Estado</th>
-                                        <th className="p-2.5">Filas</th>
-                                        <th className="p-2.5 text-right">Acciones</th>
+                                        <th className="p-2.5">{t('supplier.hub.batchDate')}</th>
+                                        <th className="p-2.5">{t('supplier.hub.batchFile')}</th>
+                                        <th className="p-2.5">{t('supplier.hub.batchStatus')}</th>
+                                        <th className="p-2.5">{t('supplier.hub.batchRows')}</th>
+                                        <th className="p-2.5 text-right">{t('supplier.hub.batchActions')}</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100 dark:divide-zinc-900">
-                                    {importBatches.map((b) => (
-                                        <tr key={b.id} className="hover:bg-slate-50 dark:hover:bg-zinc-900/50">
-                                            <td className="p-2.5 font-mono text-[11px] text-zinc-500">
-                                                {new Date(b.created_at).toLocaleString()}
-                                            </td>
-                                            <td className="p-2.5 font-bold text-slate-800 dark:text-zinc-200">
-                                                {b.original_filename || b.id.slice(0, 8)}
-                                            </td>
-                                            <td className="p-2.5">
-                                                <StatusBadge status={b.status} />
-                                            </td>
-                                            <td className="p-2.5 font-mono text-[11px]">
-                                                Tot: {b.total_rows} · Vál: {b.valid_rows} · Pend: {b.pending_rows}
-                                            </td>
+                                    {importBatches.map((b) => {
+                                        const rawDate = b.created_at || b.createdAt;
+                                        const formattedDate = rawDate && !isNaN(new Date(rawDate).getTime())
+                                            ? new Date(rawDate).toLocaleString()
+                                            : '—';
+                                        const fileName = b.original_filename || b.fileName || b.file_name || b.id;
+                                        const isConfirmed = b.status === 'CONFIRMED';
+                                        const totalRows = b.total_rows ?? b.totalRows ?? 0;
+                                        const validRows = b.valid_rows ?? b.validRows ?? 0;
+                                        const pendingRows = b.pending_rows ?? b.pendingRows ?? 0;
+                                        const rejectedRows = b.rejected_rows ?? b.rejectedRows ?? (isConfirmed ? Math.max(0, totalRows - validRows) : 0);
+                                        const issueRows = b.issue_rows ?? b.issueRows ?? 0;
+
+                                        return (
+                                            <tr key={b.id} className="hover:bg-slate-50 dark:hover:bg-zinc-900/50">
+                                                <td className="p-2.5 font-mono text-[11px] text-zinc-500">
+                                                    {formattedDate}
+                                                </td>
+                                                <td className="p-2.5 font-bold text-slate-800 dark:text-zinc-200">
+                                                    {fileName}
+                                                </td>
+                                                <td className="p-2.5">
+                                                    <StatusBadge status={b.status} />
+                                                </td>
+                                                <td className="p-2.5 font-mono text-[11px]">
+                                                    {isConfirmed ? (
+                                                        <span>
+                                                            {t('supplier.hub.batchTotal')}: {totalRows} · {t('supplier.hub.batchValid')}: {validRows} · {t('supplier.hub.batchRejected')}: {rejectedRows} · {t('supplier.hub.batchPending')}: {pendingRows}
+                                                        </span>
+                                                    ) : (
+                                                        <span>
+                                                            {t('supplier.hub.batchTotal')}: {totalRows} · {t('supplier.hub.batchValid')}: {validRows} · {t('supplier.hub.batchIssues')}: {issueRows} · {t('supplier.hub.batchPending')}: {pendingRows}
+                                                        </span>
+                                                    )}
+                                                </td>
                                             <td className="p-2.5 text-right">
                                                 <div className="flex items-center justify-end gap-2">
                                                     <button
@@ -2200,7 +2222,8 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                                                 </div>
                                             </td>
                                         </tr>
-                                    ))}
+                                    );
+                                })}
                                 </tbody>
                             </table>
                         </div>
@@ -2367,7 +2390,7 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                             <div className="p-3 bg-amber-50 dark:bg-amber-950/20 border-l-4 border-amber-500 space-y-1">
                                 <div className="flex items-center gap-2 font-bold text-amber-800 dark:text-amber-300">
                                     <ExclamationTriangleIcon className="w-4 h-4" />
-                                    <span>Advertencias de Dependencias y Preservación:</span>
+                                    <span>{t('supplier.hub.dependencyWarningsTitle')}</span>
                                 </div>
                                 <ul className="list-disc pl-5 text-amber-700 dark:text-amber-400 space-y-0.5 text-[11px]">
                                     {catalogActionPreview.warnings.map((w: string, idx: number) => (

@@ -567,6 +567,33 @@ function extractGsmFromDescription(name, colGsm) {
 }
 
 /**
+ * Extract sheet dimensions (width and height in mm) from product description string.
+ * Handles forms like "72x104", "70 x 100", "640x920", "640 x 920 mm", "72x102 cm".
+ */
+function extractDimensionsFromDescription(name) {
+    if (!name || typeof name !== 'string') return null;
+
+    const match = name.match(/\b(\d{2,4})\s*[xX*]\s*(\d{2,4})(?:\s*(mm|cm))?\b/);
+    if (!match) return null;
+
+    let w = parseFloat(match[1]);
+    let h = parseFloat(match[2]);
+    const unit = match[3] ? match[3].toLowerCase() : null;
+
+    if (isNaN(w) || isNaN(h)) return null;
+
+    if (unit === 'cm' || (!unit && w <= 250 && h <= 250)) {
+        w = Math.round(w * 10);
+        h = Math.round(h * 10);
+    }
+
+    if (w >= 100 && w <= 3000 && h >= 100 && h <= 3000) {
+        return { w_mm: w, h_mm: h, rawW: match[1], rawH: match[2] };
+    }
+    return null;
+}
+
+/**
  * Shared validator for technical row attributes.
  * Recalculates issues and validationStatus consistently across import and manual review/correction.
  */
@@ -655,6 +682,25 @@ function validateTechnicalRow({
                         severity: 'WARNING',
                         category: 'TECHNICAL',
                         message: `Contradiction between FORMAT field (${fmt.rawW}${fmt.unitW || ''}x${fmt.rawH}${fmt.unitH || ''}) and dimension columns (${colW_mm}x${colH_mm} mm). Current dimensions (${width_mm}x${height_mm} mm) have not fully resolved the discrepancy. Explicit review required.`
+                    });
+                }
+            }
+        }
+
+        // Check contradiction between declared dimension columns and dimensions found in product description
+        const descDims = extractDimensionsFromDescription(name);
+        if (descDims && colW_mm !== undefined && colH_mm !== undefined && colW_mm !== null && colH_mm !== null) {
+            const matchesDirect = (Math.abs(colW_mm - descDims.w_mm) < 1e-3 && Math.abs(colH_mm - descDims.h_mm) < 1e-3);
+            const matchesInverted = (Math.abs(colW_mm - descDims.h_mm) < 1e-3 && Math.abs(colH_mm - descDims.w_mm) < 1e-3);
+            if (!matchesDirect && !matchesInverted) {
+                const resolvedDirect = (Math.abs(width_mm - descDims.w_mm) < 1e-3 && Math.abs(height_mm - descDims.h_mm) < 1e-3);
+                const resolvedInverted = (Math.abs(width_mm - descDims.h_mm) < 1e-3 && Math.abs(height_mm - descDims.w_mm) < 1e-3);
+                if (!resolvedDirect && !resolvedInverted) {
+                    technicalIssues.push({
+                        code: 'DIMENSION_DESCRIPTION_CONFLICT',
+                        severity: 'WARNING',
+                        category: 'TECHNICAL',
+                        message: `Declared dimensions (${colW_mm}x${colH_mm} mm) conflict with dimensions found in description (${descDims.rawW}x${descDims.rawH} -> ${descDims.w_mm}x${descDims.h_mm} mm). Explicit review required.`
                     });
                 }
             }
@@ -1966,21 +2012,49 @@ async function listImportBatches({ tenantId, supplierId, page = 1, limit = 20 })
         limit,
         total,
         totalPages: Math.ceil(total / limit),
-        batches: rows.map(b => ({
-            id: b.id,
-            fileName: b.file_name,
-            fileSha256: b.file_sha256,
-            format: b.format,
-            totalRows: Number(b.total_rows),
-            validRows: Number(b.valid_rows),
-            issueRows: Number(b.issue_rows),
-            duplicateRows: Number(b.duplicate_rows),
-            status: b.status,
-            createdBy: b.created_by,
-            confirmedAt: b.confirmed_at,
-            createdAt: b.created_at,
-            metadata: typeof b.metadata_json === 'string' ? JSON.parse(b.metadata_json) : (b.metadata_json || {})
-        }))
+        batches: rows.map(b => {
+            const total = Number(b.total_rows || 0);
+            const valid = Number(b.valid_rows || 0);
+            const issues = Number(b.issue_rows || 0);
+            const duplicates = Number(b.duplicate_rows || 0);
+            const meta = typeof b.metadata_json === 'string' ? JSON.parse(b.metadata_json) : (b.metadata_json || {});
+            const isConfirmed = b.status === 'CONFIRMED';
+
+            // Invariants:
+            // 1. A confirmed batch MUST have zero real pending rows.
+            // 2. Rejected rows are tracked explicitly from confirmation metadata (or total - valid if missing).
+            // 3. Historical issues reflect rows that had parsing/spec warnings during preview staging.
+            const pending = isConfirmed ? Number(meta.pending_count ?? 0) : issues;
+            const rejected = isConfirmed ? Number(meta.rejected_count ?? Math.max(0, total - valid)) : Number(meta.rejected_count ?? 0);
+
+            return {
+                id: b.id,
+                fileName: b.file_name,
+                file_name: b.file_name,
+                original_filename: b.file_name,
+                fileSha256: b.file_sha256,
+                format: b.format,
+                totalRows: total,
+                total_rows: total,
+                validRows: valid,
+                valid_rows: valid,
+                issueRows: issues,
+                issue_rows: issues,
+                rejectedRows: rejected,
+                rejected_rows: rejected,
+                pendingRows: pending,
+                pending_rows: pending,
+                duplicateRows: duplicates,
+                duplicate_rows: duplicates,
+                status: b.status,
+                createdBy: b.created_by,
+                confirmedAt: b.confirmed_at,
+                confirmed_at: b.confirmed_at,
+                createdAt: b.created_at,
+                created_at: b.created_at,
+                metadata: meta
+            };
+        })
     };
 }
 

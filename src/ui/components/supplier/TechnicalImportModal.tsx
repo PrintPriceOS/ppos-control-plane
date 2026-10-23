@@ -73,10 +73,10 @@ export const TechnicalImportModal: React.FC<ImportModalProps> = ({
                 setDecisions({});
                 await loadBatchRows(previewData.batchId, page, filterStatus);
             } else {
-                setError('Error al ejecutar la acción masiva.');
+                setError(t('supplier.hub.bulkActionError'));
             }
         } catch (err: any) {
-            setError(err.message || 'Fallo en la acción masiva.');
+            setError(err.message || t('supplier.hub.bulkActionFailed'));
         } finally {
             setBulkActionLoading(false);
         }
@@ -280,7 +280,7 @@ export const TechnicalImportModal: React.FC<ImportModalProps> = ({
             badge="Technical Importer"
             maxWidth="max-w-5xl"
             hasUnsavedChanges={hasUnsavedDecisions}
-            unsavedWarningMessage="Hay decisiones de revisión sin guardar en este lote. ¿Está seguro de que desea cerrar?"
+            unsavedWarningMessage={t('supplier.hub.unsavedDecisionsWarning')}
             footer={footerContent}
         >
             <div className="space-y-6 text-xs">
@@ -406,7 +406,7 @@ export const TechnicalImportModal: React.FC<ImportModalProps> = ({
                                             onClick={() => handleBulkAction('ACCEPT_ALL_VALID')}
                                             disabled={bulkActionLoading || savingDecisions}
                                             className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold uppercase text-[10px] disabled:opacity-50 transition-colors"
-                                            title="Aceptar todas las filas válidas del lote"
+                                            title={t('supplier.hub.acceptAllValidTitle')}
                                         >
                                             {t('supplier.hub.acceptAllValid')}
                                         </button>
@@ -414,7 +414,7 @@ export const TechnicalImportModal: React.FC<ImportModalProps> = ({
                                             onClick={() => handleBulkAction('ACCEPT_SAFE_WARNINGS')}
                                             disabled={bulkActionLoading || savingDecisions}
                                             className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white font-bold uppercase text-[10px] disabled:opacity-50 transition-colors"
-                                            title="Aceptar advertencias justificadas con requisitos técnicos completos"
+                                            title={t('supplier.hub.acceptSafeWarningsTitle')}
                                         >
                                             {t('supplier.hub.acceptSafeWarnings')}
                                         </button>
@@ -422,7 +422,7 @@ export const TechnicalImportModal: React.FC<ImportModalProps> = ({
                                             onClick={() => handleBulkAction('REJECT_PENDING_ISSUES')}
                                             disabled={bulkActionLoading || savingDecisions}
                                             className="px-2.5 py-1 bg-red-700 hover:bg-red-800 text-white font-bold uppercase text-[10px] disabled:opacity-50 transition-colors"
-                                            title="Rechazar filas pendientes con incidencias técnicas"
+                                            title={t('supplier.hub.rejectAllIssuesTitle')}
                                         >
                                             {t('supplier.hub.rejectAllIssues')}
                                         </button>
