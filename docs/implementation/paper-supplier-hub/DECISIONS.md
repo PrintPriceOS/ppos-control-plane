@@ -267,15 +267,44 @@
      - **Nivel 3 - UI con Mocks (Prueba de Interfaz con API Simulada)**: `scripts/test_paper_supplier_hub_browser_journey.py` con Playwright, comprobando navegación, renderizado, modales, `<iframe>` de documentos, multi-idioma (ES/EN/DE), tema oscuro y ausencia de desbordamiento horizontal en móvil (390x844). Se conservan sus 10 capturas de pantalla exclusivamente como evidencia de interfaz.
      - **Nivel 4 - E2E Integrado (Navegador + Backend Real + MySQL Real)**: Requiere entorno conectado con daemon MySQL activo. En la máquina de desarrollo local (Docker Desktop detenido, puertos 3306/3307 cerrados) se declara como **BLOQUEADO (STATUS: BLOCKED / CONNECTED_ENV_REQUIRED)** sin sustituir por mocks.
      - **Nivel 5 - Validación Pendiente en Producción**: Ejecución en servidor Plesk con servicio PM2 real y base de datos persistente.
-  2. **Procedimiento de Despliegue Canónico en Plesk**:
-     - **Base desplegada**: `3ebddef0`.
-     - **Migraciones pendientes reales por diff**: Únicamente `migrations/166_phase196e_supplier_paper_procurement_orders.sql`. Las migraciones 162–165 ya están incorporadas en la base.
-     - **Ejecución vía Runner Canónico**: Usar `node scripts/run_control_plane_migrations.js --dry-run` para inspeccionar el ledger `schema_versions` y luego aplicar exclusivamente las pendientes. Prohibido ejecutar SQL a ciegas.
-     - **Servicio PM2**: El proceso es `ppos-control-plane`. Verificar identidad con `pm2 describe ppos-control-plane` antes de `pm2 reload ppos-control-plane`.
-     - **Frontend**: El bundle `dist/` se publica en el webroot configurado en Plesk previa copia de seguridad del contenido anterior.
+  2. **Procedimiento de Despliegue Canónico en Plesk y Rutas Reales**:
+     - **Rutas verificadas obligatorias**:
+       - Repositorio: `/opt/printprice-os/ppos-control-plane`
+       - Webroot servido: `/var/www/vhosts/printprice.pro/control.printprice.pro/httpdocs/`
+       - Servicio PM2: `ppos-control-plane`
+     - **Comprobación previa obligatoria de existencia de rutas**:
+       ```bash
+       test -d /opt/printprice-os/ppos-control-plane || { echo "Directorio de repositorio no encontrado"; exit 1; }
+       test -d /var/www/vhosts/printprice.pro/control.printprice.pro/httpdocs/ || { echo "Webroot no encontrado"; exit 1; }
+       pm2 describe ppos-control-plane || { echo "Servicio PM2 no identificado"; exit 1; }
+       ```
+     - **Respaldo previo de base de datos y frontend servido**:
+       ```bash
+       mysqldump -u <user> -p<pass> <db_name> > /var/backups/ppos_db_pre_deploy_$(date +%s).sql
+       cp -r /var/www/vhosts/printprice.pro/control.printprice.pro/httpdocs/ /var/backups/httpdocs_backup_$(date +%s)/
+       ```
+     - **Base desplegada y migraciones pendientes por diff**:
+       - Base desplegada en producción: `3ebddef0`.
+       - Única migración pendiente en diff: `migrations/166_phase196e_supplier_paper_procurement_orders.sql`.
+       - Las migraciones 162–165 ya forman parte de los ancestros incorporados en la base desplegada. Queda prohibido reaplicarlas manualmente por defecto.
+       - Inspección canónica obligatoria con runner:
+         ```bash
+         cd /opt/printprice-os/ppos-control-plane
+         node scripts/run_control_plane_migrations.js --dry-run
+         node scripts/run_control_plane_migrations.js
+         ```
+     - **Publicación coordinada de Frontend y Servicio PM2**:
+       ```bash
+       npm run build
+       rsync -av --delete dist/ /var/www/vhosts/printprice.pro/control.printprice.pro/httpdocs/
+       ```
+       - **Advertencia sobre Downtime en PM2**: No prometer cero downtime a ciegas. `pm2 describe ppos-control-plane` revela el modo de ejecución: solo si `exec_mode` es `cluster_mode` se garantiza recarga sin caída con `pm2 reload ppos-control-plane`. Si está en `fork_mode`, se efectúa `pm2 restart ppos-control-plane` con interrupción breve de servicio.
   3. **Política de Rollback Seguro sin DROP TABLE**:
-     - La migración 166 introduce tablas aditivas (`supplier_paper_procurement_orders`, `supplier_paper_order_receipts`) que son retrocompatibles con la versión `3ebddef0`.
-     - Revertir código a `3ebddef0` no requiere modificar el esquema de base de datos.
-     - **Queda prohibido el uso rutinario de `DROP TABLE`** para rollback, protegiendo de destrucción cualquier pedido o albarán registrado durante la operación.
-- **Consecuencia**: Honestidad técnica absoluta en la cobertura de pruebas, despliegue idempotente y seguro mediante PM2 y preservación garantizada de los datos de compras en producción.
-
+     - La migración 166 introduce tablas aditivas (`supplier_paper_rfqs`, `supplier_paper_procurement_orders`, `supplier_paper_order_receipts`) que son retrocompatibles con la versión `3ebddef0`.
+     - **Prohibición estricta de DROP TABLE**: Borrar tablas como rutina de reversión destruiría pedidos, cotizaciones y recepciones físicas registradas durante el tiempo operativo del candidato.
+     - **Restauración coordinada segura**:
+       1. Revertir backend: `git checkout 3ebddef0`.
+       2. Restaurar frontend desde el respaldo de `/httpdocs/`.
+       3. Recargar/reiniciar PM2: `pm2 restart ppos-control-plane`.
+       4. Las tablas aditivas permanecen en la base de datos sin afectar a la versión anterior ni perder los datos comerciales creados.
+- **Consecuencia**: Honestidad técnica absoluta en la cobertura de pruebas, despliegue idempotente y seguro mediante PM2 con comprobación de rutas reales y preservación garantizada de los datos de compras en producción.

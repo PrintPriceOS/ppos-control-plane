@@ -30,14 +30,17 @@ class PrinthousePricingPreviewService {
         }
 
         // Validate currency parity if a dynamic supplier paper rate patch is supplied
-        if (paperRatePatch && paperRatePatch.currency && pb.currency) {
-            const patchCurr = String(paperRatePatch.currency).trim().toUpperCase();
-            const pbCurr = String(pb.currency).trim().toUpperCase();
-            if (patchCurr !== pbCurr) {
-                const err = new Error(`CURRENCY_MISMATCH: Paper rate patch currency (${patchCurr}) does not match price book currency (${pbCurr}). Cross-currency rate application requires explicit authorized conversion.`);
-                err.statusCode = 400;
-                err.code = 'CURRENCY_MISMATCH';
-                throw err;
+        if (paperRatePatch) {
+            const rawCurr = paperRatePatch.currency || paperRatePatch.snapshotMetadata?.currency;
+            if (rawCurr && pb.currency) {
+                const patchCurr = String(rawCurr).trim().toUpperCase();
+                const pbCurr = String(pb.currency).trim().toUpperCase();
+                if (patchCurr !== pbCurr) {
+                    const err = new Error(`CURRENCY_MISMATCH: Paper rate patch currency (${patchCurr}) does not match price book currency (${pbCurr}). Cross-currency rate application requires explicit authorized conversion.`);
+                    err.statusCode = 400;
+                    err.code = 'CURRENCY_MISMATCH';
+                    throw err;
+                }
             }
         }
 
@@ -88,7 +91,18 @@ class PrinthousePricingPreviewService {
         if (paperRatePatch && (paperRatePatch.snapshotMetadata || paperRatePatch.candidateOverrides || paperRatePatch.pricePerKg)) {
             const meta = paperRatePatch.snapshotMetadata || paperRatePatch;
             const interiorMeta = meta.interior || (paperRatePatch.pricePerKg ? paperRatePatch : null);
-            const pricePerKg = Number(interiorMeta?.pricePerKg || paperRatePatch.pricePerKg || 0);
+            const rawPrice = interiorMeta?.pricePerKg ?? paperRatePatch.pricePerKg;
+            const pricePerKg = Number(rawPrice);
+
+            if (!Number.isFinite(pricePerKg) || pricePerKg <= 0) {
+                const err = new Error('INVALID_PAPER_RATE: pricePerKg must be a positive finite number resolved by server');
+                err.statusCode = 400;
+                err.code = 'INVALID_PAPER_RATE';
+                throw err;
+            }
+
+            // Do not trust client-sent provenance; server strictly assigns PPOS_PAPER_SUPPLIER_HUB
+            const enforcedProvenance = 'PPOS_PAPER_SUPPLIER_HUB';
             const kgPerUnit = Number(interiorMeta?.kgPerSheet || paperRatePatch.kgPerUnit || 0.05);
             const rateAmount = roundDecimal(pricePerKg * kgPerUnit * quantity, 4);
 
@@ -96,15 +110,16 @@ class PrinthousePricingPreviewService {
                 code: 'SUPPLIER_PAPER_MARKET_RATE',
                 name: `Supplier Paper Market Rate (${interiorMeta?.supplierName || 'Market'} - ${interiorMeta?.gsm || ''}gsm)`,
                 amount: rateAmount.toFixed(4),
-                provenance: 'PPOS_PAPER_SUPPLIER_HUB',
+                provenance: enforcedProvenance,
                 ruleId: interiorMeta?.offerId || 'market_patch',
                 metadata: {
-                    offerId: interiorMeta?.offerId,
-                    supplierId: interiorMeta?.supplierId,
-                    supplierName: interiorMeta?.supplierName,
-                    sku: interiorMeta?.sku,
+                    offerId: interiorMeta?.offerId || null,
+                    supplierId: interiorMeta?.supplierId || null,
+                    supplierName: interiorMeta?.supplierName || null,
+                    sku: interiorMeta?.sku || null,
                     pricePerKg,
-                    currency: paperRatePatch.currency || pb.currency
+                    currency: paperRatePatch.currency || pb.currency,
+                    substitutesMaterialCatalogId: materialCatalogId || null
                 }
             });
             netTotal = roundDecimal(netTotal + rateAmount, 4);

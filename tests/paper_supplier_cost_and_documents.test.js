@@ -287,9 +287,21 @@ describe('Iteration I6: Paper Cost Integration & Procurement Documents', () => {
             expect(est.isGeometricApproximation).toBe(true);
             expect(est.impositionWarning).toContain('unconfirmed approximation');
             expect(est.signaturesCount).toBe(4); // 64 / 16 = 4 signatures
+            // Crucial: Unconfirmed geometric derivation must NEVER yield isDefinitiveCost: true even if scrap inputs are explicit
+            expect(est.isDefinitiveCost).toBe(false);
+            expect(est.calculationType).toBe('GEOMETRIC_PROVISIONAL_ESTIMATE');
+            expect(est.warnings.some(w => w.includes('Geometric imposition is an unconfirmed approximation'))).toBe(true);
+
+            // Canonical explicit signature imposition produces confirmed definitive cost
+            const canonicalJob = { ...a4Job, signature_size: 16 };
+            const estCanonical = paperCostIntegrationService.calculateJobPaperRequirements(canonicalJob);
+            expect(estCanonical.signatureSource).toBe('explicit');
+            expect(estCanonical.isGeometricApproximation).toBe(false);
+            expect(estCanonical.isDefinitiveCost).toBe(true);
+            expect(estCanonical.calculationType).toBe('CONFIRMED_INDUSTRIAL_ESTIMATE');
         });
 
-        it('printhousePricingPreviewService consumes BPE paper rate patch, validates currency, and preserves price books', async () => {
+        it('printhousePricingPreviewService consumes BPE paper rate patch, validates currency, rejects untrusted input, substitutes substrate without duplication, and preserves data', async () => {
             const previewService = require('../src/api/services/printhousePricingPreviewService');
             const priceBookService = require('../src/api/services/printhousePriceBookService');
             const ruleService = require('../src/api/services/printhousePricingRuleService');
@@ -297,7 +309,8 @@ describe('Iteration I6: Paper Cost Integration & Procurement Documents', () => {
             // Mock priceBook and ruleService
             const mockPb = { id: 'pb_alpha', currency: 'EUR' };
             const mockRules = [
-                { id: 'rule_base', scope: 'TENANT_DEFAULT', base_price: 0.15, pricing_unit: 'PER_UNIT', setup_charge: 50 }
+                { id: 'rule_base', scope: 'TENANT_DEFAULT', base_price: 0.15, pricing_unit: 'PER_UNIT', setup_charge: 50, provenance: 'RULES_ENGINE' },
+                { id: 'rule_mat', scope: 'MATERIAL_RULE', material_catalog_id: 'mat_offset_80', base_price: 0.08, pricing_unit: 'PER_UNIT', setup_charge: 20, provenance: 'CATALOG_DEFAULT' }
             ];
 
             const origGetPriceBook = priceBookService.getPriceBook;
@@ -316,14 +329,26 @@ describe('Iteration I6: Paper Cost Integration & Procurement Documents', () => {
                     }
                 })).rejects.toThrow('CURRENCY_MISMATCH');
 
-                // 2. Accepts matching currency (EUR) and injects dynamic supplier rate component
-                const preview = await previewService.generatePreview('tenant_1', {
+                // 2. Rejects invalid / non-positive untrusted client rate
+                await expect(previewService.generatePreview('tenant_1', {
                     priceBookId: 'pb_alpha',
                     quantity: 1000,
                     paperRatePatch: {
                         currency: 'EUR',
+                        pricePerKg: -1.50
+                    }
+                })).rejects.toThrow('INVALID_PAPER_RATE');
+
+                // 3. Accepts matching currency (EUR), strictly enforces server provenance, and substitutes material without duplicating
+                const previewWithPatchAndMaterial = await previewService.generatePreview('tenant_1', {
+                    priceBookId: 'pb_alpha',
+                    quantity: 1000,
+                    materialCatalogId: 'mat_offset_80',
+                    paperRatePatch: {
+                        currency: 'EUR',
                         pricePerKg: 2.00,
                         kgPerUnit: 0.05,
+                        provenance: 'CLIENT_ATTEMPTED_SPOOF', // Must be ignored
                         snapshotMetadata: {
                             interior: {
                                 offerId: 'off_real_phoenix',
@@ -337,17 +362,77 @@ describe('Iteration I6: Paper Cost Integration & Procurement Documents', () => {
                     }
                 });
 
-                expect(preview.currency).toBe('EUR');
-                const paperComponent = preview.components.find(c => c.code === 'SUPPLIER_PAPER_MARKET_RATE');
+                expect(previewWithPatchAndMaterial.currency).toBe('EUR');
+                const paperComponent = previewWithPatchAndMaterial.components.find(c => c.code === 'SUPPLIER_PAPER_MARKET_RATE');
                 expect(paperComponent).toBeDefined();
+                // Enforces server provenance
                 expect(paperComponent.provenance).toBe('PPOS_PAPER_SUPPLIER_HUB');
                 expect(paperComponent.metadata.offerId).toBe('off_real_phoenix');
                 expect(paperComponent.metadata.pricePerKg).toBe(2.00);
-                // 1000 * 0.05 * 2.00 = 100.00 EUR paper component
+                expect(paperComponent.metadata.substitutesMaterialCatalogId).toBe('mat_offset_80');
+                // 1000 * 0.05 * 2.00 = 100.00 EUR
                 expect(Number(paperComponent.amount)).toBeCloseTo(100.00, 2);
+
+                // Crucial: Substrate is substituted, NOT duplicated
+                const duplicateMaterialComponent = previewWithPatchAndMaterial.components.find(c => c.code === 'MATERIAL_SURCHARGE');
+                expect(duplicateMaterialComponent).toBeUndefined();
+
+                // 4. In absence of paperRatePatch, catalog material rule applies normally
+                const previewWithoutPatch = await previewService.generatePreview('tenant_1', {
+                    priceBookId: 'pb_alpha',
+                    quantity: 1000,
+                    materialCatalogId: 'mat_offset_80'
+                });
+                const standardMaterial = previewWithoutPatch.components.find(c => c.code === 'MATERIAL_SURCHARGE');
+                expect(standardMaterial).toBeDefined();
+                expect(Number(standardMaterial.amount)).toBeCloseTo(80.00, 2);
             } finally {
                 priceBookService.getPriceBook = origGetPriceBook;
                 ruleService.getRules = origGetRules;
+            }
+        });
+
+        it('guarantees zero mutation to existing quotes or orders during preview evaluation', async () => {
+            const previewService = require('../src/api/services/printhousePricingPreviewService');
+            const priceBookService = require('../src/api/services/printhousePriceBookService');
+            const ruleService = require('../src/api/services/printhousePricingRuleService');
+
+            const origGetPriceBook = priceBookService.getPriceBook;
+            const origGetRules = ruleService.getRules;
+            priceBookService.getPriceBook = async () => ({ id: 'pb_immut', currency: 'EUR' });
+            ruleService.getRules = async () => [
+                { id: 'rule_immut', scope: 'TENANT_DEFAULT', base_price: 1.00, pricing_unit: 'PER_UNIT', setup_charge: 0, provenance: 'TEST' }
+            ];
+
+            // Track any calls to mysqlClient query or execute
+            let queryCount = 0;
+            const origQuery = mysqlClient.query;
+            mysqlClient.query = async (...args) => {
+                queryCount++;
+                const sql = (args[0] || '').toString().toUpperCase();
+                if (sql.includes('INSERT') || sql.includes('UPDATE') || sql.includes('DELETE')) {
+                    throw new Error(`ILLEGAL_DB_MUTATION: ${sql}`);
+                }
+                return origQuery ? origQuery.apply(mysqlClient, args) : [];
+            };
+
+            try {
+                const preview = await previewService.generatePreview('tenant_immut', {
+                    priceBookId: 'pb_immut',
+                    quantity: 500,
+                    paperRatePatch: {
+                        currency: 'EUR',
+                        pricePerKg: 1.85,
+                        kgPerUnit: 0.04
+                    }
+                });
+
+                expect(preview).toBeDefined();
+                expect(preview.netTotal).toBeDefined();
+            } finally {
+                priceBookService.getPriceBook = origGetPriceBook;
+                ruleService.getRules = origGetRules;
+                mysqlClient.query = origQuery;
             }
         });
 

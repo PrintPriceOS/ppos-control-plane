@@ -190,7 +190,7 @@ Se identificaron 6 agrupaciones de distribuidores presentes en el archivo:
 | Nivel de Verificación | Descripción y Herramienta | Alcance Cubierto | Estado de Verificación |
 |---|---|---|---|
 | **1. Implementación** | Código fuente en `src/api/` y `src/ui/` | Normalización multidivisa (preserva USD/GBP/EUR), parametrización industrial (distingue merma ausente de cero explícito), conexión BPE en `printhousePricingPreviewService`, órdenes, albaranes, recepciones atómicas e inmutabilidad de snapshots. | **COMPLETO** |
-| **2. Tests de Servicios / API con BD Real** | `vitest` (65 tests PASS en suites de compras) y `scripts/smoke_paper_supplier_hub_e2e.js` | RBAC en endpoints reales, aislamiento de tenants y proveedores, concurrencia, idempotencia de recepción y transacciones con rollback. | **VERIFICADO EN TESTS / BLOCKED EN LOCAL SIN MYSQL** (En ausencia de daemon MySQL local, reporta formalmente `STATUS: BLOCKED / CONNECTED_ENV_REQUIRED`). |
+| **2. Tests de Servicios / API con BD Real** | `vitest` (66 tests PASS unitarios, 107 SKIP dependientes de BD en 5 suites) y `scripts/smoke_paper_supplier_hub_e2e.js` | RBAC en endpoints reales, aislamiento de tenants y proveedores, concurrencia, idempotencia de recepción y transacciones con rollback. | **66 PASS / 107 SKIP**. En ausencia de daemon MySQL local activo (`com.docker.service` detenido en Windows), los tests dependientes de BD se omiten limpiamente. Script standalone reporta formalmente `STATUS: BLOCKED / CONNECTED_ENV_REQUIRED`. |
 | **3. UI con Mocks (Prueba de Interfaz con API Simulada)** | `scripts/test_paper_supplier_hub_browser_journey.py` (Playwright sobre Vite preview `http://localhost:4173/` con `page.route` y estado simulado) | Recorrido de interfaz completo: RFQ, cotización de proveedor, aceptación, expedición, recepción en almacén, modales, documentos PO/albarán en `iframe`, cambio de tema claro/oscuro, paridad ES/EN/DE y móvil 390x844 sin desbordamiento horizontal. | **VERIFICADO EN NAVEGADOR CON API SIMULADA (6/6 PASOS PASS)**. Generó 10 capturas de pantalla de evidencia visual. |
 | **4. E2E Integrado (Navegador + Backend Real + MySQL)** | Navegador real comunicándose con API Express sin mocks y persistiendo en base de datos MySQL real | Validación integrada de flujo sin simulación de red ni de base de datos. | **BLOQUEADO LOCALMENTE (STATUS: BLOCKED / CONNECTED_ENV_REQUIRED)**: En este entorno de desarrollo no hay daemon MySQL activo (Docker detenido, puertos 3306/3307 cerrados). Se documenta con rigor sin simular PASS. |
 | **5. Validación Pendiente en Producción** | Servidor Plesk con proceso PM2 `ppos-control-plane` y base de datos de producción | Aplicación de la migración pendiente 166 mediante el runner canónico, verificación de identidad PM2, publicación del bundle `dist/` en el webroot de Plesk y smoke real post-despliegue. | **PENDIENTE TRAS DESPLIEGUE EN PRODUCCIÓN** |
@@ -211,3 +211,70 @@ La suite de interfaz de usuario (`scripts/test_paper_supplier_hub_browser_journe
 8. `08_supplier_dashboard_en.png`: Panel de proveedor verificado en inglés (`Paper Supplier Hub`).
 9. `09_supplier_dashboard_de.png`: Panel de proveedor verificado en alemán (`Papierlieferanten-Hub`).
 10. `10_supplier_mobile_390x844.png`: Panel de proveedor verificado en viewport móvil (390x844 px) con ausencia de desbordamiento horizontal (`scrollWidth <= innerWidth`).
+
+---
+
+### 3. Diagnóstico de MySQL Local, Desglose por Suite y Acción Concreta Requerida
+
+#### A. Diagnóstico de Docker y Servicio Local
+- **Estado del servicio**: `com.docker.service` (Docker Desktop Service) se encuentra en estado `Stopped`.
+- **Diagnóstico de Permisos**: La sesión de terminal no elevada no dispone de privilegios de Administrador en Windows para iniciar servicios del sistema (`Start-Service com.docker.service` arroja `OpenError`).
+- **Acción Manual Concreta para Iniciar Docker**:
+  1. Abrir **Docker Desktop** desde el menú Inicio de Windows y aceptar la elevación de permisos (UAC).
+  2. O bien abrir una consola PowerShell como Administrador y ejecutar:
+     ```powershell
+     Start-Service com.docker.service
+     ```
+  3. Una vez iniciado Docker, arrancar la instancia MySQL efímera aislada:
+     ```bash
+     docker run -d --name ppos-mysql-test -p 3306:3306 -e MYSQL_ROOT_PASSWORD=test_root_pwd -e MYSQL_DATABASE=ppos_test mysql:8.0
+     ```
+  4. Configurar las variables de entorno para los test runners:
+     ```bash
+     export TEST_MYSQL_HOST=127.0.0.1
+     export TEST_MYSQL_PORT=3306
+     export TEST_MYSQL_USER=root
+     export TEST_MYSQL_PASSWORD=test_root_pwd
+     ```
+- **Aislamiento Estricto**: Ninguna prueba se conecta a la base de datos de producción.
+
+#### B. Desglose Riguroso por Suite (Candidato HEAD)
+- **Unitarias en Memoria**: **66 PASS**
+- **Integración con BD Omitidas por Falta de MySQL**: **107 SKIP**
+- **Fallos**: **0 FAIL**
+
+| Suite de Pruebas | Archivo | PASS | SKIP | FAIL | Alcance / Naturaleza |
+|---|---|---|---|---|---|
+| **I6 Coste, Parche BPE y Documentos** | `tests/paper_supplier_cost_and_documents.test.js` | **16** | 0 | 0 | 100% en memoria: cálculos físicos, distinción de merma ausente vs cero, aproximación geométrica provisional (`GEOMETRIC_PROVISIONAL_ESTIMATE`), inyección BPE en `printhousePricingPreviewService`, rechazo de tarifas cliente no confiables (`INVALID_PAPER_RATE`), paridad de divisa (`CURRENCY_MISMATCH`), sustitución de sustrato sin duplicar `MATERIAL_SURCHARGE`, RBAC y aserción de cero mutaciones a BD. |
+| **I4-I5 Órdenes y Compras** | `tests/paper_supplier_procurement_and_orders.test.js` | **14** | 0 | 0 | 100% en memoria: generación de documentos PO/Albarán, renderizado HTML5 `@media print`, cálculos de totales y líneas. |
+| **I3 Catálogo y Ofertas** | `tests/paper_supplier_offers_and_catalog.test.js` | **16** | 27 | 0 | 16 unitarios en memoria (normalización, reglas de negocio); 27 omitidos dependientes de persistencia MySQL (revisiones, histórico, queries SQL). |
+| **I2 Fichas Técnicas e Importación** | `tests/paper_technical_import_and_catalog.test.js` | **20** | 23 | 0 | 20 unitarios en memoria (parsers ODS/XLSX/CSV, normalización de unidades, detección de colisiones); 23 omitidos dependientes de tablas de staging MySQL. |
+| **I1-R2 Aislamiento y Seguridad** | `tests/security_paper_supplier_and_materials_isolation.test.js` | 0 | 57 | 0 | 57 omitidos dependientes al 100% de transacciones de base de datos MySQL multi-tenant. |
+| **TOTAL** | **5 Suites** | **66** | **107** | **0** | **66 PASS / 107 SKIP (0 FAIL)** |
+
+---
+
+### 4. Acreditación de Conexión BPE, Parámetros Industriales y Despliegue en Plesk
+
+1. **Resolución y Autorización de Tarifa en Servidor**:
+   - El endpoint `POST /api/admin/materials/sourcing/bpe-rate-patch` invoca `paperCostIntegrationService.buildBpePaperPatch`, el cual resuelve las tarifas directamente desde las ofertas autorizadas de base de datos (`resolveMarketPaperRate`) aplicando los filtros de tenant y proveedor del servidor.
+   - Requiere rol `ADMIN` u `OPERATOR` (`assertWritePermission`).
+2. **Rechazo de Importes y Procedencias Manipulados por Cliente**:
+   - `printhousePricingPreviewService.generatePreview` valida que `pricePerKg` sea un número positivo finito (`INVALID_PAPER_RATE`).
+   - La procedencia se fija forzosamente por el servidor a `'PPOS_PAPER_SUPPLIER_HUB'`, ignorando cualquier intento del cliente de falsear la proveniencia.
+3. **Paridad de Moneda Estricta**:
+   - Se valida que la divisa del parche (`paperRatePatch.currency`) coincida exactamente con la del catálogo de precios (`priceBook.currency`). Toda discrepancia lanza `CURRENCY_MISMATCH`.
+4. **Sustitución de Sustrato sin Duplicación**:
+   - Al suministrar `paperRatePatch`, se inyecta el componente `SUPPLIER_PAPER_MARKET_RATE` y se omite la rama `else if (materialCatalogId)`.
+   - El componente registra `substitutesMaterialCatalogId`, sustituyendo el coste del papel del catálogo sin duplicarlo.
+5. **Aproximación Geométrica de Imposición**:
+   - En `paperCostIntegrationService.calculateJobPaperRequirements`, si la imposición se deduce geométricamente (`signatureSource: 'geometric_derivation'`), el resultado se etiqueta como `calculationType: 'GEOMETRIC_PROVISIONAL_ESTIMATE'` y **`isDefinitiveCost: false`**, incluso si el usuario aporta valores explícitos de merma y preparación. Requiere imposición canónica de máquina para calificarse como coste definitivo.
+6. **Inmutabilidad y Preservación de Datos**:
+   - La evaluación de `generatePreview` es 100% en memoria: cero sentencias `INSERT`, `UPDATE` o `DELETE`. Cotizaciones y pedidos existentes permanecen inalterados.
+7. **Procedimiento de Despliegue Canónico en Plesk**:
+   - **Rutas verificadas**: Repositorio `/opt/printprice-os/ppos-control-plane`, Webroot `/var/www/vhosts/printprice.pro/control.printprice.pro/httpdocs/`, Servicio PM2 `ppos-control-plane`.
+   - **Comprobación obligatoria previa**: `test -d` sobre ambas rutas y `pm2 describe ppos-control-plane`.
+   - **Respaldo**: `mysqldump` de BD y `cp -r` del contenido de `/httpdocs/`.
+   - **Migraciones canónicas**: Única pendiente en diff respecto a `3ebddef0` es `166_phase196e_supplier_paper_procurement_orders.sql`. Ejecución mediante `node scripts/run_control_plane_migrations.js --dry-run`.
+   - **Modo PM2**: Solo `cluster_mode` admite recarga sin downtime (`pm2 reload`). Si corre en `fork_mode`, se efectúa `pm2 restart` asumiendo reinicio de proceso.
+   - **Rollback Seguro**: Prohibido `DROP TABLE`. El esquema 166 es retrocompatible y aditivo. Revertir backend a `3ebddef0` y restaurar `/httpdocs/` sin borrar tablas preserva los pedidos y recepciones físicas generados.

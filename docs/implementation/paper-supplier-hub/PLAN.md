@@ -110,7 +110,7 @@ El **Paper Supplier Hub** incorpora un panel independiente para distribuidores/f
     - Documentos canónicos estructurados e imprimibles en HTML5 con `@media print`: Orden de Compra (`PO`) y Albarán de Entrega (`PACKING_SLIP`) con desglose de recibos y datos de transporte (`generateProcurementDocument`).
     - Visualización y descarga accesible en frontend con `<ProcurementDocumentModal>` integrado en compras de imprenta y pedidos de proveedor.
     - Soporte trilingüe estricto ES/EN/DE en interfaz y documentos.
-  - **Verificación**: 15/15 tests PASS en `tests/paper_supplier_cost_and_documents.test.js`.
+  - **Verificación**: 16/16 tests PASS en `tests/paper_supplier_cost_and_documents.test.js`.
 - [x] **I7 — Endurecimiento, Clasificación Rigurosa de Pruebas y Cierre de Candidato**:
   - **Separación de 5 Niveles de Validación**:
     1. *Implementación*: Servicios, rutas y vistas operativas completadas.
@@ -122,7 +122,7 @@ El **Paper Supplier Hub** incorpora un panel independiente para distribuidores/f
     - Integridad de migraciones 100% verificada (`npm run migration:integrity` PASS, 170 archivos descubiertos / 169 migraciones SQL clasificadas / 1 archivo `.json` excluido).
     - ADR 013 a ADR 016 formalizados en `DECISIONS.md`.
     - Build de producción `npm run build` completado limpiamente con 0 errores (3.577 módulos).
-    - Suites Vitest de papel: 65 tests PASS (0 FAIL). Paridad de diagnósticos TypeScript (0 errores netos contra la base `3ebddef0`).
+    - Suites Vitest de papel: 66 tests PASS unitarios, 107 SKIP dependientes de BD en 5 suites (0 FAIL). Paridad de diagnósticos TypeScript (0 errores netos contra la base `3ebddef0`).
 
 
 ---

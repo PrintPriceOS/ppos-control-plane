@@ -472,8 +472,10 @@ class PaperCostIntegrationService {
 
         const isIncomplete = missingParameters.length > 0;
         const isExplicitZeroScrap = !isIncomplete && interiorMakereadySheets === 0 && coverMakereadySheets === 0 && runWasteRate === 0;
-        const isDefinitiveCost = !isIncomplete;
-        const calculationType = isIncomplete ? 'PARTIAL_NET_ESTIMATE' : 'CONFIRMED_INDUSTRIAL_ESTIMATE';
+        const isDefinitiveCost = !isIncomplete && !isGeometricApproximation;
+        const calculationType = isIncomplete
+            ? 'PARTIAL_NET_ESTIMATE'
+            : (isGeometricApproximation ? 'GEOMETRIC_PROVISIONAL_ESTIMATE' : 'CONFIRMED_INDUSTRIAL_ESTIMATE');
 
         const warnings = [];
         if (isIncomplete) {
@@ -481,6 +483,9 @@ class PaperCostIntegrationService {
         }
         if (impositionWarning) {
             warnings.push(impositionWarning);
+        }
+        if (!isIncomplete && isGeometricApproximation) {
+            warnings.push('Geometric imposition is an unconfirmed approximation. Canonical folding imposition rule required before cost can be certified as definitive.');
         }
 
         const interiorRunWasteSheets = Math.ceil(netInteriorSheets * runWasteRate);
