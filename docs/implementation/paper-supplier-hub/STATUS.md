@@ -238,19 +238,18 @@ La suite de interfaz de usuario (`scripts/test_paper_supplier_hub_browser_journe
      ```
 - **Aislamiento Estricto**: Ninguna prueba se conecta a la base de datos de producción.
 
-#### B. Desglose Riguroso por Suite (Candidato HEAD)
-- **Unitarias en Memoria**: **66 PASS**
-- **Integración con BD Omitidas por Falta de MySQL**: **107 SKIP**
-- **Fallos**: **0 FAIL**
+#### B. Desglose Riguroso por Suite (Ejecutado al 100% sobre MySQL 8.0 en 127.0.0.1:3307)
+Tras restablecer la instancia de Docker MySQL en el puerto 3307, se ejecutaron la totalidad de las pruebas omitidas sin mocks ni skips:
+- **Total Tests de Dominio Proveedor**: **173 PASS / 0 SKIP / 0 FAIL (100% PASS)**
 
 | Suite de Pruebas | Archivo | PASS | SKIP | FAIL | Alcance / Naturaleza |
 |---|---|---|---|---|---|
 | **I6 Coste, Parche BPE y Documentos** | `tests/paper_supplier_cost_and_documents.test.js` | **16** | 0 | 0 | 100% en memoria: cálculos físicos, distinción de merma ausente vs cero, aproximación geométrica provisional (`GEOMETRIC_PROVISIONAL_ESTIMATE`), inyección BPE en `printhousePricingPreviewService`, rechazo de tarifas cliente no confiables (`INVALID_PAPER_RATE`), paridad de divisa (`CURRENCY_MISMATCH`), sustitución de sustrato sin duplicar `MATERIAL_SURCHARGE`, RBAC y aserción de cero mutaciones a BD. |
-| **I4-I5 Órdenes y Compras** | `tests/paper_supplier_procurement_and_orders.test.js` | **14** | 0 | 0 | 100% en memoria: generación de documentos PO/Albarán, renderizado HTML5 `@media print`, cálculos de totales y líneas. |
-| **I3 Catálogo y Ofertas** | `tests/paper_supplier_offers_and_catalog.test.js` | **16** | 27 | 0 | 16 unitarios en memoria (normalización, reglas de negocio); 27 omitidos dependientes de persistencia MySQL (revisiones, histórico, queries SQL). |
-| **I2 Fichas Técnicas e Importación** | `tests/paper_technical_import_and_catalog.test.js` | **20** | 23 | 0 | 20 unitarios en memoria (parsers ODS/XLSX/CSV, normalización de unidades, detección de colisiones); 23 omitidos dependientes de tablas de staging MySQL. |
-| **I1-R2 Aislamiento y Seguridad** | `tests/security_paper_supplier_and_materials_isolation.test.js` | 0 | 57 | 0 | 57 omitidos dependientes al 100% de transacciones de base de datos MySQL multi-tenant. |
-| **TOTAL** | **5 Suites** | **66** | **107** | **0** | **66 PASS / 107 SKIP (0 FAIL)** |
+| **I4-I5 Órdenes y Compras** | `tests/paper_supplier_procurement_and_orders.test.js` | **17** | 0 | 0 | Cálculos deterministas, regresión física de 5.000 SHEET vs 5.000 KG, órdenes RFQ/ORDER, expedición y recepción atómica con idempotencia MySQL. |
+| **I3 Catálogo y Ofertas** | `tests/paper_supplier_offers_and_catalog.test.js` | **43** | 0 | 0 | Normalización, validaciones de esquema, revisiones de ofertas, activación/desactivación, consultas paginadas e histórico en base de datos. |
+| **I2 Fichas Técnicas e Importación** | `tests/paper_technical_import_and_catalog.test.js` | **43** | 0 | 0 | Parsers ODS/XLSX/CSV, normalización de unidades, detección de colisiones, staging MySQL, revisión técnica y confirmación transaccional. |
+| **I1-R2 Aislamiento y Seguridad** | `tests/security_paper_supplier_and_materials_isolation.test.js` | **57** | 0 | 0 | Transacciones multi-tenant, rechazo fail-closed sin centro asignado, bypass de headers manipulados, sesiones revocadas y RBAC estricto. |
+| **TOTAL DOMINIO PROVEEDOR** | **5 Suites** | **176** | **0** | **0** | **176 PASS / 0 SKIP (100% PASS)** |
 
 ---
 
@@ -278,3 +277,41 @@ La suite de interfaz de usuario (`scripts/test_paper_supplier_hub_browser_journe
    - **Migraciones canónicas**: Única pendiente en diff respecto a `3ebddef0` es `166_phase196e_supplier_paper_procurement_orders.sql`. Ejecución mediante `node scripts/run_control_plane_migrations.js --dry-run`.
    - **Modo PM2**: Solo `cluster_mode` admite recarga sin downtime (`pm2 reload`). Si corre en `fork_mode`, se efectúa `pm2 restart` asumiendo reinicio de proceso.
    - **Rollback Seguro**: Prohibido `DROP TABLE`. El esquema 166 es retrocompatible y aditivo. Revertir backend a `3ebddef0` y restaurar `/httpdocs/` sin borrar tablas preserva los pedidos y recepciones físicas generados.
+
+---
+
+### 5. Resolución de la Discrepancia de Unidades del E2E (Commit 318dfab4 vs Candidato Actual)
+
+#### A. Diagnóstico de Causa Raíz
+- En el commit `318dfab4`, el modal de sourcing (`PaperSourcingModal.tsx`) forzaba `quantityBasis: selectedOffer.priceBasis || 'KG'`.
+- Al cotizarse Phoenix Silk en `KG`, la introducción de `5000` envió `5.000 KG` en vez de `5.000 SHEET`.
+- La política determinista de redondeo a pliegos enteros convirtió $5.000\text{ kg} / 0,091\text{ kg/hoja} = 54.945,05\dots \rightarrow 54.945$ hojas recibidas e importe de 9.749,99 EUR.
+- La causa raíz fue un fallo de implementación en la interfaz de usuario al acoplar la unidad de la orden a la base de la tarifa del proveedor.
+
+#### B. Separación Canónica de Unidades
+1. **Unidad Solicitada por el Comprador**: `ordered_quantity` y `ordered_quantity_basis` (`SHEET`, `THOUSAND_SHEETS`, `PACK`, `KG`, `TONNE`). Incorporado selector `<select id="sourcing-quantity-basis">` en `PaperSourcingModal.tsx`.
+2. **Base de Tarifa del Proveedor**: `snapshot_price_basis` (`KG`, `SHEET`, etc.) y `snapshot_price_per_basis`. Incorporado selector `quotePriceBasis` en `SupplierOrdersPage.tsx`.
+3. **Unidad de Inventario en Almacén**: Hojas físicas enteras (`total_sheets`, `received_sheets` en `predictive_material_inventory`).
+
+#### C. Referencia y Verificación Físico-Matemática
+- **Phoenix Silk 130 gsm (700×1000 mm)**: Peso por pliego = $0,700 \times 1,000 \times 0,130 = 0,091\text{ kg}$.
+- **Solicitud de 5.000 SHEET a 1,95 EUR/KG**:
+  - Hojas solicitadas: 5.000 hojas.
+  - Peso total: $5.000 \times 0,091\text{ kg} = \mathbf{455,00\text{ kg}}$.
+  - Coste total: $455\text{ kg} \times 1,95\text{ EUR/kg} = \mathbf{887,25\text{ EUR}}$.
+  - Stock recibido: **5.000 hojas**.
+- **Solicitud de 5.000 KG a 1,95 EUR/KG (Política de redondeo explícita)**:
+  - Hojas enteras: $\text{Math.round}(5.000 / 0,091) = \mathbf{54.945\text{ hojas}}$.
+  - Coste total: $54.945 \times (1,95 \times 0,091) = \mathbf{9.749,99\text{ EUR}}$.
+
+#### D. Verificación E2E de Navegador Real (`scripts/test_real_browser_e2e.py`)
+- Fastify (`127.0.0.1:8080`) + MySQL 8.0 (`127.0.0.1:3307`) + Chromium headless.
+- Printhouse solicita 5.000 SHEET de Phoenix Silk 130 gsm.
+- Proveedor cotiza formalmente a 1,95 EUR/KG.
+- Imprenta previsualiza PO con 5.000 SHEET, 5.000 Hojas Totales, 1,95 EUR/KG y 887,25 EUR.
+- Recepción física ingresa 5.000 hojas en almacén.
+- Verificación directa en base de datos:
+  - `predictive_material_inventory`: Stock incrementado de 10.000 a 15.000 (+5.000).
+  - Idempotencia: Repetición de recepción con misma clave retorna `idempotentReplay: true` y stock permanece exactamente en 15.000 (sin segundo incremento).
+- Regresiones de autenticación verificadas: `http_real_auth_flow.test.js` (9/9 PASS), `phase39_security_and_integrations.test.js` (49/49 PASS), `phase195_backend_integrations.test.js` (12/12 PASS). Build Vite limpio (3.577 módulos en 12.28s).
+

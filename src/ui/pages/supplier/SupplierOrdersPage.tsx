@@ -117,6 +117,7 @@ export const SupplierOrdersPage: React.FC = () => {
 
     // Action forms
     const [quotePrice, setQuotePrice] = useState<string>('');
+    const [quotePriceBasis, setQuotePriceBasis] = useState<string>('KG');
     const [quoteValidUntil, setQuoteValidUntil] = useState<string>('');
     const [carrierName, setCarrierName] = useState<string>('');
     const [trackingNumber, setTrackingNumber] = useState<string>('');
@@ -203,6 +204,7 @@ export const SupplierOrdersPage: React.FC = () => {
                 if (res.data.quotePricePerBasis) {
                     setQuotePrice(String(res.data.quotePricePerBasis));
                 }
+                setQuotePriceBasis(res.data.snapshotPriceBasis || res.data.priceBasis || 'KG');
                 if (res.data.quoteValidUntil) {
                     setQuoteValidUntil(res.data.quoteValidUntil.slice(0, 10));
                 }
@@ -234,6 +236,7 @@ export const SupplierOrdersPage: React.FC = () => {
                 }
                 payload.pricePerBasis = Number(quotePrice);
                 payload.quotePricePerBasis = Number(quotePrice);
+                payload.priceBasis = quotePriceBasis || orderDetail?.snapshotPriceBasis || 'KG';
                 if (quoteValidUntil) {
                     payload.quoteValidUntil = new Date(quoteValidUntil).toISOString();
                 }
@@ -943,19 +946,36 @@ export const SupplierOrdersPage: React.FC = () => {
                                     <h5 className="text-xs font-bold text-purple-600 dark:text-purple-400 uppercase tracking-wider">
                                         {t('supplier.orders.submitQuoteTitle') || 'Submit Custom Volume Quote'}
                                     </h5>
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
                                         <div>
                                             <label className="block text-[11px] font-semibold text-zinc-500 mb-1">
-                                                {t('supplier.orders.quotePricePerBasis') || 'Unit Price Amount'} ({orderDetail.currency} / {orderDetail.quantityBasis}) *
+                                                {t('supplier.orders.quotePricePerBasis') || 'Unit Price Amount'} ({orderDetail.currency}) *
                                             </label>
                                             <input
                                                 type="number"
                                                 step="0.0001"
                                                 value={quotePrice}
                                                 onChange={(e) => setQuotePrice(e.target.value)}
-                                                placeholder="e.g. 1.4500"
+                                                placeholder="e.g. 1.9500"
                                                 className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl font-mono text-xs focus:ring-2 focus:ring-purple-500/40"
                                             />
+                                        </div>
+                                        <div>
+                                            <label className="block text-[11px] font-semibold text-zinc-500 mb-1">
+                                                Pricing Basis *
+                                            </label>
+                                            <select
+                                                id="supplier-quote-price-basis"
+                                                value={quotePriceBasis}
+                                                onChange={(e) => setQuotePriceBasis(e.target.value)}
+                                                className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl font-medium text-xs focus:ring-2 focus:ring-purple-500/40"
+                                            >
+                                                <option value="KG">EUR / KG</option>
+                                                <option value="SHEET">EUR / Hoja (SHEET)</option>
+                                                <option value="THOUSAND_SHEETS">EUR / Millar (THOUSAND_SHEETS)</option>
+                                                <option value="PACK">EUR / Paquete (PACK)</option>
+                                                <option value="TONNE">EUR / Tonelada (TONNE)</option>
+                                            </select>
                                         </div>
                                         <div>
                                             <label className="block text-[11px] font-semibold text-zinc-500 mb-1">

@@ -54,6 +54,7 @@ export const PaperSourcingModal: React.FC<PaperSourcingModalProps> = ({
     const [selectedOffer, setSelectedOffer] = useState<any | null>(null);
     const [orderType, setOrderType] = useState<'ORDER' | 'RFQ'>('ORDER');
     const [orderedQuantity, setOrderedQuantity] = useState<string>('1000');
+    const [quantityBasis, setQuantityBasis] = useState<string>('SHEET');
     const [buyerNotes, setBuyerNotes] = useState<string>('');
     const [targetPrice, setTargetPrice] = useState<string>('');
     const [submittingOrder, setSubmittingOrder] = useState(false);
@@ -129,35 +130,58 @@ export const PaperSourcingModal: React.FC<PaperSourcingModalProps> = ({
     const calculatedEstimate = React.useMemo(() => {
         if (!selectedOffer) return null;
         const qty = parseFloat(orderedQuantity) || 0;
-        const basis = selectedOffer.priceBasis || 'KG';
-        const pricePerUnit = parseFloat(selectedOffer.priceAmount) || 0;
         const widthMm = selectedOffer.variant?.widthMm || selectedOffer.widthMm || 700;
         const heightMm = selectedOffer.variant?.heightMm || selectedOffer.heightMm || 1000;
         const gsm = selectedOffer.variant?.gsm || selectedOffer.gsm || 150;
         const sheetsPerPack = selectedOffer.sheetsPerPack || 500;
+        const pricePerUnit = parseFloat(selectedOffer.priceAmount) || 0;
+        const priceBasis = selectedOffer.priceBasis || 'KG';
+
+        const sheetAreaSqm = (widthMm * heightMm) / 1_000_000;
+        const singleSheetWeightKg = sheetAreaSqm * (gsm / 1000);
 
         let totalSheets = 0;
-        if (basis === 'SHEET') {
+        if (quantityBasis === 'SHEET') {
             totalSheets = Math.round(qty);
-        } else if (basis === 'THOUSAND_SHEETS') {
+        } else if (quantityBasis === 'THOUSAND_SHEETS') {
             totalSheets = Math.round(qty * 1000);
-        } else if (basis === 'PACK') {
+        } else if (quantityBasis === 'PACK') {
             totalSheets = Math.round(qty * sheetsPerPack);
-        } else if (basis === 'KG' || basis === 'TONNE') {
-            const kg = basis === 'TONNE' ? qty * 1000 : qty;
-            const sheetAreaSqm = (widthMm * heightMm) / 1_000_000;
-            const singleSheetWeightKg = sheetAreaSqm * (gsm / 1000);
+        } else if (quantityBasis === 'KG' || quantityBasis === 'TONNE') {
+            const kg = quantityBasis === 'TONNE' ? qty * 1000 : qty;
             totalSheets = singleSheetWeightKg > 0 ? Math.round(kg / singleSheetWeightKg) : 0;
         }
 
-        const estimatedAmount = qty * pricePerUnit;
+        const totalWeightKg = totalSheets * singleSheetWeightKg;
+
+        let estimatedAmount = 0;
+        switch (priceBasis) {
+            case 'SHEET':
+                estimatedAmount = totalSheets * pricePerUnit;
+                break;
+            case 'THOUSAND_SHEETS':
+                estimatedAmount = (totalSheets / 1000) * pricePerUnit;
+                break;
+            case 'PACK':
+                estimatedAmount = (totalSheets / (sheetsPerPack || 500)) * pricePerUnit;
+                break;
+            case 'KG':
+                estimatedAmount = totalWeightKg * pricePerUnit;
+                break;
+            case 'TONNE':
+                estimatedAmount = (totalWeightKg / 1000) * pricePerUnit;
+                break;
+            default:
+                estimatedAmount = qty * pricePerUnit;
+        }
 
         return {
             totalSheets,
-            estimatedAmount,
+            totalWeightKg,
+            estimatedAmount: Math.round(estimatedAmount * 100) / 100,
             currency: selectedOffer.currency || 'EUR'
         };
-    }, [selectedOffer, orderedQuantity]);
+    }, [selectedOffer, orderedQuantity, quantityBasis]);
 
     // Handle submit purchase order or RFQ
     const handleSubmitOrder = async (e: React.FormEvent) => {
@@ -181,7 +205,7 @@ export const PaperSourcingModal: React.FC<PaperSourcingModalProps> = ({
                 offerId: effectiveOfferId,
                 variantId: effectiveVariantId,
                 orderedQuantity: qty,
-                quantityBasis: selectedOffer.priceBasis || 'KG',
+                quantityBasis: quantityBasis || 'SHEET',
                 printhouseId,
                 buyerNotes: buyerNotes.trim() || undefined,
                 targetPrice: targetPrice ? parseFloat(targetPrice) : undefined
@@ -432,7 +456,7 @@ export const PaperSourcingModal: React.FC<PaperSourcingModalProps> = ({
                                     </div>
                                 )}
 
-                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                                <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs">
                                     <div>
                                         <label htmlFor="sourcing-order-type" className="block text-[11px] font-semibold text-zinc-500 mb-1">
                                             Order Type
@@ -450,7 +474,7 @@ export const PaperSourcingModal: React.FC<PaperSourcingModalProps> = ({
 
                                     <div>
                                         <label htmlFor="sourcing-order-quantity" className="block text-[11px] font-semibold text-zinc-500 mb-1">
-                                            Order Quantity ({selectedOffer.priceBasis}) *
+                                            Order Quantity *
                                         </label>
                                         <input
                                             id="sourcing-order-quantity"
@@ -458,9 +482,27 @@ export const PaperSourcingModal: React.FC<PaperSourcingModalProps> = ({
                                             step="any"
                                             value={orderedQuantity}
                                             onChange={(e) => setOrderedQuantity(e.target.value)}
-                                            min={selectedOffer.moq || 1}
+                                            min={1}
                                             className="w-full px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl font-mono focus:outline-none"
                                         />
+                                    </div>
+
+                                    <div>
+                                        <label htmlFor="sourcing-quantity-basis" className="block text-[11px] font-semibold text-zinc-500 mb-1">
+                                            Quantity Unit *
+                                        </label>
+                                        <select
+                                            id="sourcing-quantity-basis"
+                                            value={quantityBasis}
+                                            onChange={(e) => setQuantityBasis(e.target.value)}
+                                            className="w-full px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl font-medium focus:outline-none"
+                                        >
+                                            <option value="SHEET">Hojas / Sheets (SHEET)</option>
+                                            <option value="THOUSAND_SHEETS">Millares (THOUSAND_SHEETS)</option>
+                                            <option value="PACK">Paquetes / Reams (PACK)</option>
+                                            <option value="KG">Kilogramos (KG)</option>
+                                            <option value="TONNE">Toneladas (TONNE)</option>
+                                        </select>
                                     </div>
 
                                     <div>
@@ -499,7 +541,15 @@ export const PaperSourcingModal: React.FC<PaperSourcingModalProps> = ({
                                         <div className="flex items-center gap-4">
                                             <div>
                                                 <span className="text-[10px] text-zinc-400 block font-semibold uppercase">Calculated Sheets</span>
-                                                <span className="font-mono font-bold text-slate-800 dark:text-zinc-200">{calculatedEstimate.totalSheets.toLocaleString()} sh</span>
+                                                <span className="font-mono font-bold text-slate-800 dark:text-zinc-200">
+                                                    {calculatedEstimate.totalSheets.toLocaleString()} sh ({calculatedEstimate.totalWeightKg.toFixed(1)} kg)
+                                                </span>
+                                            </div>
+                                            <div>
+                                                <span className="text-[10px] text-zinc-400 block font-semibold uppercase">Pricing Basis</span>
+                                                <span className="font-mono text-zinc-600 dark:text-zinc-400">
+                                                    {selectedOffer.priceAmount} {selectedOffer.currency}/{selectedOffer.priceBasis}
+                                                </span>
                                             </div>
                                             <div>
                                                 <span className="text-[10px] text-zinc-400 block font-semibold uppercase">Estimated Amount</span>

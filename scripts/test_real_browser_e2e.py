@@ -170,14 +170,15 @@ def run_real_e2e():
             # Select RFQ type
             page1.select_option('#sourcing-order-type', 'RFQ')
 
-            # Fill RFQ quantity & notes
+            # Fill RFQ quantity & notes (Explicitly select SHEET quantity basis)
             page1.fill('#sourcing-order-quantity', '5000')
+            page1.select_option('#sourcing-quantity-basis', 'SHEET')
             page1.fill('#sourcing-buyer-notes', 'Solicitud formal para 5.000 hojas de Phoenix Silk 130gsm para edicion editorial.')
 
             # Submit RFQ (Real POST /api/admin/materials/sourcing/orders)
             page1.click('button[type="submit"]')
             page1.locator('text=RFQ submitted successfully').wait_for(state='visible', timeout=10000)
-            log("PASS: Printhouse submitted RFQ for 5,000 sheets through real backend to MySQL.")
+            log("PASS: Printhouse submitted RFQ for 5,000 sheets (unit: SHEET) through real backend to MySQL.")
 
             screenshot_1 = os.path.join(OUT_DIR, '01_printhouse_rfq_submitted_real.png')
             page1.screenshot(path=screenshot_1)
@@ -231,6 +232,10 @@ def run_real_e2e():
             price_input = dialog2.locator('input[type="number"]').first
             price_input.wait_for(state='visible', timeout=5000)
             price_input.fill('1.95')
+
+            basis_select = dialog2.locator('#supplier-quote-price-basis')
+            if basis_select.is_visible():
+                basis_select.select_option('KG')
 
             date_input = dialog2.locator('input[type="date"]').first
             if date_input.is_visible():
@@ -287,8 +292,15 @@ def run_real_e2e():
             # Preview PO Document
             po_doc_btn = dialog3.locator('button:has-text("Doc")').or_(dialog3.locator('button:has-text("Documentos")')).first
             po_doc_btn.click()
-            page3.frame_locator('iframe').locator('body').first.wait_for(state='visible', timeout=10000)
+            doc_frame = page3.frame_locator('iframe')
+            doc_frame.locator('body').first.wait_for(state='visible', timeout=10000)
             log("PASS: Real Purchase Order PDF/HTML document preview loaded from backend.")
+
+            doc_text = doc_frame.locator('body').inner_text()
+            if "887.25" in doc_text:
+                log("PASS: PO document accurately reflects 887.25 EUR total amount.")
+            if "5000 SHEET" in doc_text or "5.000" in doc_text:
+                log("PASS: PO document accurately reflects 5,000 SHEET requested.")
 
             screenshot_4 = os.path.join(OUT_DIR, '04_printhouse_accepted_po_document_real.png')
             page3.screenshot(path=screenshot_4)
@@ -410,36 +422,101 @@ def run_real_e2e():
                     database: 'ppos_test_browser_live'
                 });
                 
-                // 1. Verify order
-                const [orders] = await c.query('SELECT id, status, order_type, total_sheets, received_sheets, total_amount FROM supplier_paper_procurement_orders');
-                console.log('Orders in DB:', JSON.stringify(orders));
-                if (orders.length !== 1 || orders[0].status !== 'RECEIVED') {
-                    throw new Error('Order verification failed: expected 1 order with status RECEIVED, found: ' + JSON.stringify(orders));
+                // 1. Verify order commercial snapshot and unit separation
+                const [orders] = await c.query('SELECT id, status, order_type, ordered_quantity, ordered_quantity_basis, snapshot_price_basis, snapshot_price_per_basis, total_sheets, received_sheets, total_amount FROM supplier_paper_procurement_orders');
+                console.log('Orders in DB:', JSON.stringify(orders, null, 2));
+                if (orders.length !== 1) {
+                    throw new Error('Expected exactly 1 order, found: ' + orders.length);
+                }
+                const ord = orders[0];
+                if (ord.status !== 'RECEIVED') {
+                    throw new Error('Order status expected RECEIVED, found: ' + ord.status);
+                }
+                if (Number(ord.ordered_quantity) !== 5000) {
+                    throw new Error('Order ordered_quantity expected 5000, found: ' + ord.ordered_quantity);
+                }
+                if (ord.ordered_quantity_basis !== 'SHEET') {
+                    throw new Error('Order ordered_quantity_basis expected SHEET, found: ' + ord.ordered_quantity_basis);
+                }
+                if (ord.snapshot_price_basis !== 'KG') {
+                    throw new Error('Order snapshot_price_basis expected KG, found: ' + ord.snapshot_price_basis);
+                }
+                if (Number(ord.snapshot_price_per_basis) !== 1.95) {
+                    throw new Error('Order snapshot_price_per_basis expected 1.95, found: ' + ord.snapshot_price_per_basis);
+                }
+                if (Number(ord.total_sheets) !== 5000) {
+                    throw new Error('Order total_sheets expected 5000, found: ' + ord.total_sheets);
+                }
+                if (Number(ord.received_sheets) !== 5000) {
+                    throw new Error('Order received_sheets expected 5000, found: ' + ord.received_sheets);
+                }
+                if (Number(ord.total_amount) !== 887.25) {
+                    throw new Error('Order total_amount expected 887.25 EUR, found: ' + ord.total_amount);
                 }
 
                 // 2. Verify receipts
-                const [receipts] = await c.query('SELECT id, order_id, received_sheets FROM supplier_paper_order_receipts');
-                console.log('Receipts in DB:', JSON.stringify(receipts));
-                if (receipts.length !== 1 || Number(receipts[0].received_sheets) <= 0) {
-                    throw new Error('Receipt verification failed: expected 1 receipt row');
+                const [receipts] = await c.query('SELECT id, order_id, received_sheets, received_quantity, idempotency_key FROM supplier_paper_order_receipts');
+                console.log('Receipts in DB:', JSON.stringify(receipts, null, 2));
+                if (receipts.length !== 1 || Number(receipts[0].received_sheets) !== 5000) {
+                    throw new Error('Receipt verification failed: expected 1 receipt row with 5000 received_sheets');
                 }
+                const receiptKey = receipts[0].idempotency_key;
 
-                // 3. Verify stock increment
-                const [inventory] = await c.query("SELECT id, current_stock_units FROM predictive_material_inventory WHERE id = 'mat-inv-phoenix-130'");
-                console.log('Inventory in DB:', JSON.stringify(inventory));
-                if (inventory.length !== 1 || Number(inventory[0].current_stock_units) <= 10000) {
-                    throw new Error('Inventory increment failed: current_stock_units was not incremented');
+                // 3. Verify stock increment: 10,000 + 5,000 = 15,000 sheets
+                const [inventory] = await c.query("SELECT id, current_stock_units, available_units FROM predictive_material_inventory WHERE id = 'mat-inv-phoenix-130'");
+                console.log('Inventory in DB:', JSON.stringify(inventory, null, 2));
+                if (inventory.length !== 1 || Number(inventory[0].current_stock_units) !== 15000) {
+                    throw new Error('Inventory increment failed: current_stock_units expected 15000, found: ' + (inventory[0] ? inventory[0].current_stock_units : 'none'));
                 }
 
                 // 4. Verify immutable inventory events
                 const [events] = await c.query('SELECT id, event_type, quantity_units, before_stock, after_stock FROM material_inventory_events');
-                console.log('Inventory events in DB:', JSON.stringify(events));
-                if (events.length < 1) {
-                    throw new Error('Inventory event audit failed: no events logged');
+                console.log('Inventory events in DB:', JSON.stringify(events, null, 2));
+                if (events.length !== 1 || Number(events[0].quantity_units) !== 5000 || Number(events[0].before_stock) !== 10000 || Number(events[0].after_stock) !== 15000) {
+                    throw new Error('Inventory event audit failed: expected +5000 units from 10000 to 15000');
                 }
 
-                console.log('ALL MYSQL VERIFICATIONS PASSED 100%');
+                // 5. Test Idempotency: replaying warehouse receipt with existing idempotencyKey
+                console.log('Testing receipt idempotency replay with key:', receiptKey);
+                const paperProcurementService = require('./src/api/services/paperProcurementService');
+                const mysqlClient = require('./src/api/services/mysqlClient');
+                const livePool = mysql.createPool({
+                    host: '127.0.0.1',
+                    port: 3307,
+                    user: 'root',
+                    password: 'root_password_ppos_2026',
+                    database: 'ppos_test_browser_live'
+                });
+                mysqlClient.getPool = () => livePool;
+                mysqlClient.query = async (sql, params) => {
+                    const [rows] = await livePool.query(sql, params);
+                    return rows;
+                };
+                mysqlClient.getConnection = async () => livePool.getConnection();
+
+                const replayRes = await paperProcurementService.receiveOrderAtomic(ord.id, {
+                    tenantId: 'tenant_printhouse_alpha',
+                    printhouseId: 'node_plant_frankfurt'
+                }, {
+                    receivedSheets: 5000,
+                    idempotencyKey: receiptKey
+                });
+
+                console.log('Idempotent replay response:', JSON.stringify(replayRes));
+                if (!replayRes.ok || !replayRes.idempotentReplay) {
+                    throw new Error('Idempotency failed: expected idempotentReplay: true');
+                }
+
+                // Verify stock did NOT increment a second time
+                const [inventoryAfterReplay] = await c.query("SELECT current_stock_units FROM predictive_material_inventory WHERE id = 'mat-inv-phoenix-130'");
+                console.log('Inventory after idempotent replay:', JSON.stringify(inventoryAfterReplay));
+                if (Number(inventoryAfterReplay[0].current_stock_units) !== 15000) {
+                    throw new Error('Idempotency violation: stock incremented a second time! Found: ' + inventoryAfterReplay[0].current_stock_units);
+                }
+
+                await livePool.end();
                 await c.end();
+                console.log('ALL MYSQL VERIFICATIONS PASSED 100% (5,000 sheets, 455 kg, 887.25 EUR, Stock: 10,000 -> 15,000, Idempotency Verified)');
             })();
             """
         ]

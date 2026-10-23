@@ -197,6 +197,29 @@ describe('Iterations I4 & I5: Paper Procurement Orders & Warehouse Receipts', ()
             expect(() => paperProcurementService.calculateTotalAmount(100, 'INVALID_BASIS', totalSheets, sampleVariant)).toThrow(/Unsupported price basis/);
         });
 
+        it('regression: Phoenix Silk 130gsm (700x1000mm) deterministic calculations for 5,000 SHEET vs 5,000 KG at 1.95 EUR/KG', () => {
+            const phoenixVariant = {
+                width_mm: 700,
+                height_mm: 1000,
+                gsm: 130
+            }; // Single sheet weight: 0.7 * 1.0 * (130 / 1000) = 0.091 kg
+
+            // 1. Scenario A: 5,000 SHEET requested, quoted at 1.95 EUR/KG
+            const sheetsA = paperProcurementService.calculateSheets(5000, 'SHEET', phoenixVariant);
+            expect(sheetsA).toBe(5000);
+            const totalAmountA = paperProcurementService.calculateTotalAmount(1.95, 'KG', sheetsA, phoenixVariant);
+            // 5,000 sheets * 0.091 kg/sheet = 455.00 kg. 455 kg * 1.95 EUR/kg = 887.25 EUR
+            expect(totalAmountA).toBe(887.25);
+
+            // 2. Scenario B: 5,000 KG requested, quoted at 1.95 EUR/KG (whole-sheet rounding policy)
+            // 5,000 kg / 0.091 kg/sheet = 54,945.054945... sheets -> Math.round rounds to 54,945 whole sheets
+            const sheetsB = paperProcurementService.calculateSheets(5000, 'KG', phoenixVariant);
+            expect(sheetsB).toBe(54945);
+            const totalAmountB = paperProcurementService.calculateTotalAmount(1.95, 'KG', sheetsB, phoenixVariant);
+            // 54,945 sheets * (1.95 * 0.091 EUR/sheet) = 9,749.99 EUR
+            expect(totalAmountB).toBe(9749.99);
+        });
+
         it('validates placeOrderOrRfq payload constraints fail-closed', async () => {
             await expect(
                 paperProcurementService.placeOrderOrRfq({}, { type: 'INVALID_TYPE' })
@@ -386,6 +409,7 @@ describe('Iterations I4 & I5: Paper Procurement Orders & Warehouse Receipts', ()
             await connectionPool.query(`
                 INSERT INTO paper_variants (id, product_id, gsm, width_mm, height_mm, finish, grain_direction, fingerprint) VALUES
                 ('var_phoenix_150_70100', 'prod_phoenix', 150, 700.00, 1000.00, 'MATTE', 'LONG_GRAIN', 'fp_phoenix_150_70100'),
+                ('var_phoenix_130_70100', 'prod_phoenix', 130, 700.00, 1000.00, 'SILK', 'LONG_GRAIN', 'fp_phoenix_130_70100'),
                 ('var_splendor_300_72102', 'prod_splendorgel', 300, 720.00, 1020.00, 'SMOOTH', 'SHORT_GRAIN', 'fp_splendor_300_72102')
                 ON DUPLICATE KEY UPDATE gsm=VALUES(gsm)
             `);
@@ -394,6 +418,7 @@ describe('Iterations I4 & I5: Paper Procurement Orders & Warehouse Receipts', ()
             await connectionPool.query(`
                 INSERT INTO supplier_paper_catalog_variants (id, tenant_id, supplier_id, variant_id, status) VALUES
                 ('spcv_test_1', 'tenant_supplier_one', 'supp_scheufelen', 'var_phoenix_150_70100', 'ACTIVE'),
+                ('spcv_test_130', 'tenant_supplier_one', 'supp_scheufelen', 'var_phoenix_130_70100', 'ACTIVE'),
                 ('spcv_test_2', 'tenant_supplier_two', 'supp_fedrigoni', 'var_splendor_300_72102', 'ACTIVE')
                 ON DUPLICATE KEY UPDATE status=VALUES(status)
             `);
@@ -408,9 +433,23 @@ describe('Iterations I4 & I5: Paper Procurement Orders & Warehouse Receipts', ()
                     price_basis, moq, order_multiple, sheets_per_pack, visibility, status, metadata_json
                 ) VALUES
                 ('off_mkt_phoenix', 'tenant_supplier_one', 'supp_scheufelen', 'var_phoenix_150_70100', 'SKU-PHX-150-MKT', 1.85, 'EUR', 'KG', 500, 50, NULL, 'MARKETPLACE', 'ACTIVE', NULL),
+                ('off_mkt_phoenix_130', 'tenant_supplier_one', 'supp_scheufelen', 'var_phoenix_130_70100', 'SKU-PHX-130-MKT', 1.85, 'EUR', 'KG', 500, 50, NULL, 'MARKETPLACE', 'ACTIVE', NULL),
                 ('off_app_splendor', 'tenant_supplier_two', 'supp_fedrigoni', 'var_splendor_300_72102', 'SKU-SPL-300-VIP', 2.40, 'EUR', 'SHEET', 1000, 500, 250, 'APPROVED_CUSTOMERS', 'ACTIVE', '{"approved_customer_ids": ["tenant_printhouse_alpha"]}'),
                 ('off_priv_phoenix', 'tenant_supplier_one', 'supp_scheufelen', 'var_phoenix_150_70100', 'SKU-PHX-150-PRIV', 1.50, 'EUR', 'KG', 1000, 100, NULL, 'PRIVATE', 'ACTIVE', NULL)
                 ON DUPLICATE KEY UPDATE price_amount=VALUES(price_amount)
+            `);
+
+            // Seed initial predictive_material_inventory for Phoenix 130
+            await connectionPool.query(`
+                INSERT INTO predictive_material_inventory (
+                    id, tenant_id, printhouse_id, node_id, material_name, material_type, paper_gsm, finish,
+                    supplier_name, cost_per_unit, current_stock_units, reserved_stock_units, available_units,
+                    reorder_point, status, operational_status
+                ) VALUES (
+                    'mat-inv-phoenix-130-reg', 'tenant_printhouse_alpha', 'node_plant_frankfurt', 'node_plant_frankfurt',
+                    'Phoenixmotion Xenon', 'PAPER', 130, 'SILK',
+                    'Scheufelen Paper Europe', 0.168, 10000, 0, 10000, 2000, 'STABLE', 'AVAILABLE'
+                ) ON DUPLICATE KEY UPDATE current_stock_units=VALUES(current_stock_units);
             `);
         });
 
@@ -725,6 +764,151 @@ describe('Iterations I4 & I5: Paper Procurement Orders & Warehouse Receipts', ()
                     idempotencyKey
                 })
             ).rejects.toThrow(/IDEMPOTENCY_PAYLOAD_MISMATCH/);
+        });
+
+        it('regression: 5,000 SHEET ordered against offer quoted at 1.95 EUR/KG yields 5,000 sheets, 455 kg, 887.25 EUR and idempotent receipt', async () => {
+            if (!isDbConfigured) return;
+
+            const actorAlpha = {
+                tenantId: 'tenant_printhouse_alpha',
+                printhouseId: 'node_plant_frankfurt',
+                userId: 'buyer-alpha-user'
+            };
+
+            // 1. Printhouse submits RFQ for 5,000 SHEET (distinct from offer pricing basis KG)
+            const rfq = await paperProcurementService.placeOrderOrRfq(actorAlpha, {
+                type: 'RFQ',
+                offerId: 'off_mkt_phoenix_130',
+                variantId: 'var_phoenix_130_70100',
+                orderedQuantity: 5000,
+                quantityBasis: 'SHEET',
+                printhouseId: 'node_plant_frankfurt',
+                buyerNotes: 'Need 5.000 sheets of 130 gsm Phoenix Silk'
+            });
+
+            expect(rfq.status).toBe('SUBMITTED');
+            expect(rfq.orderedQuantity).toBe(5000);
+            expect(rfq.orderedQuantityBasis).toBe('SHEET');
+            expect(rfq.totalSheets).toBe(5000);
+
+            // 2. Supplier quotes at 1.95 EUR/KG
+            const quoted = await paperProcurementService.transitionSupplierOrder('supp_scheufelen', rfq.id, 'QUOTE', {
+                pricePerBasis: 1.95,
+                priceBasis: 'KG',
+                expectedDeliveryDate: '2026-11-20T10:00:00Z',
+                supplierNotes: 'Quoted at 1.95 EUR/KG for 5,000 sheets'
+            });
+
+            expect(quoted.status).toBe('QUOTED');
+            expect(quoted.snapshot.pricePerBasis).toBe(1.95);
+            expect(quoted.snapshot.priceBasis).toBe('KG');
+            expect(quoted.orderedQuantity).toBe(5000);
+            expect(quoted.orderedQuantityBasis).toBe('SHEET');
+            expect(quoted.totalSheets).toBe(5000);
+
+            // Deterministic validation:
+            // 5,000 sheets * (0.7m * 1.0m * 130g/m2) = 5000 * 0.091kg = 455.00 kg
+            // 455.00 kg * 1.95 EUR/kg = 887.25 EUR
+            expect(quoted.totalAmount).toBe(887.25);
+
+            // 3. Printhouse accepts quote, converting to CONFIRMED ORDER
+            const confirmed = await paperProcurementService.acceptRfqQuote(actorAlpha, rfq.id);
+            expect(confirmed.status).toBe('CONFIRMED');
+            expect(confirmed.orderType).toBe('ORDER');
+            expect(confirmed.totalSheets).toBe(5000);
+            expect(confirmed.totalAmount).toBe(887.25);
+
+            // 4. Supplier dispatches order
+            const dispatched = await paperProcurementService.transitionSupplierOrder('supp_scheufelen', rfq.id, 'DISPATCH', {
+                carrierName: 'Dachser European Logistics',
+                trackingNumber: 'DACH-PHX-5000'
+            });
+            expect(dispatched.status).toBe('DISPATCHED');
+            expect(dispatched.deliveredSheets).toBe(5000);
+
+            // 5. Initial stock check
+            const [stockBefore] = await connectionPool.query(
+                "SELECT current_stock_units FROM predictive_material_inventory WHERE id = 'mat-inv-phoenix-130-reg'"
+            );
+            const initialStock = Number(stockBefore[0].current_stock_units);
+            expect(initialStock).toBe(10000);
+
+            // 6. Printhouse receives physical goods (5,000 sheets)
+            const idempotencyKey = `rcpt_reg_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
+            const receipt = await paperProcurementService.receiveOrderAtomic(rfq.id, actorAlpha, {
+                receivedSheets: 5000,
+                receivedQuantity: 5000,
+                idempotencyKey,
+                notes: 'Received exactly 5,000 sheets (455 kg)'
+            });
+
+            expect(receipt.ok).toBe(true);
+            expect(receipt.idempotentReplay).toBe(false);
+            expect(receipt.receivedSheets).toBe(5000);
+            expect(receipt.orderStatus).toBe('RECEIVED');
+
+            // 7. Verify stock increment: exactly +5,000 sheets
+            const [stockAfter] = await connectionPool.query(
+                "SELECT current_stock_units FROM predictive_material_inventory WHERE id = 'mat-inv-phoenix-130-reg'"
+            );
+            const newStock = Number(stockAfter[0].current_stock_units);
+            expect(newStock).toBe(initialStock + 5000);
+            expect(newStock).toBe(15000);
+
+            // 8. Idempotency test: Re-submitting the exact same receipt must NOT increase stock a second time
+            const replayReceipt = await paperProcurementService.receiveOrderAtomic(rfq.id, actorAlpha, {
+                receivedSheets: 5000,
+                receivedQuantity: 5000,
+                idempotencyKey
+            });
+
+            expect(replayReceipt.ok).toBe(true);
+            expect(replayReceipt.idempotentReplay).toBe(true);
+
+            const [stockAfterReplay] = await connectionPool.query(
+                "SELECT current_stock_units FROM predictive_material_inventory WHERE id = 'mat-inv-phoenix-130-reg'"
+            );
+            expect(Number(stockAfterReplay[0].current_stock_units)).toBe(15000);
+        });
+
+        it('regression: 5,000 KG ordered when quoted in EUR/KG follows whole-sheet rounding policy', async () => {
+            if (!isDbConfigured) return;
+
+            const actorAlpha = {
+                tenantId: 'tenant_printhouse_alpha',
+                printhouseId: 'node_plant_frankfurt',
+                userId: 'buyer-alpha-user'
+            };
+
+            // 1. Printhouse submits RFQ specifically for 5,000 KG
+            const rfq = await paperProcurementService.placeOrderOrRfq(actorAlpha, {
+                type: 'RFQ',
+                offerId: 'off_mkt_phoenix_130',
+                variantId: 'var_phoenix_130_70100',
+                orderedQuantity: 5000,
+                quantityBasis: 'KG',
+                printhouseId: 'node_plant_frankfurt',
+                buyerNotes: 'Need 5,000 KG of 130 gsm Phoenix Silk'
+            });
+
+            expect(rfq.status).toBe('SUBMITTED');
+            expect(rfq.orderedQuantity).toBe(5000);
+            expect(rfq.orderedQuantityBasis).toBe('KG');
+            // 5,000 kg / 0.091 kg/sheet = 54,945.054945... -> Math.round rounds to 54,945 whole sheets
+            expect(rfq.totalSheets).toBe(54945);
+
+            // 2. Supplier quotes at 1.95 EUR/KG
+            const quoted = await paperProcurementService.transitionSupplierOrder('supp_scheufelen', rfq.id, 'QUOTE', {
+                pricePerBasis: 1.95,
+                priceBasis: 'KG',
+                expectedDeliveryDate: '2026-11-20T10:00:00Z',
+                supplierNotes: 'Quoted at 1.95 EUR/KG for 5,000 KG (54,945 sheets)'
+            });
+
+            expect(quoted.status).toBe('QUOTED');
+            expect(quoted.totalSheets).toBe(54945);
+            // 54,945 sheets * (1.95 * 0.091) = 9,749.99 EUR
+            expect(quoted.totalAmount).toBe(9749.99);
         });
 
         it('supports partial delivery receipts tracking cumulative received balance', async () => {

@@ -190,30 +190,86 @@ Se comprobó y validó formalmente que `generatePreview` rechace tajantemente pr
 6. **Sustitución de Sustrato**: Cuando se aplica una tarifa de proveedor autenticada, el componente `SUPPLIER_PAPER_MARKET_RATE` sustituye al recargo base `MATERIAL_SURCHARGE`, evitando duplicación de costes.
 7. **Resolución en Servidor por `offerId`**: Cuando el cliente envía `offerId`, el servidor consulta la base de datos real para resolver precio, divisa y proveedor. Si el `offerId` no existe o no está autorizado, falla con `UNAUTHORIZED_SUPPLIER_OFFER`.
 
-### 3. Recorrido Integrado de Navegador Real (E2E sin Mocks)
-Ejecutado satisfactoriamente con navegador Chromium headless real (Playwright), backend Fastify/Express real (`http://127.0.0.1:8080`) y MySQL efímero real en `127.0.0.1:3307`:
-- **Cero interceptores de red**: Prohibido y verificado el uso de `page.route` o mocks de API.
-- **Autenticación real**: JWTs emitidos dinámicamente mediante autenticación contra endpoints reales del servidor.
-- **Flujo completado y evidencias fotográficas registradas en `review_artifacts_paper_supplier_real_e2e/`**:
-  - `01_printhouse_rfq_submitted_real.png`: Imprenta Alpha GmbH solicita formalmente RFQ para 5.000 hojas de Phoenix Silk 130gsm.
-  - `02_supplier_dashboard_real.png`: Proveedor Scheufelen carga métricas operativas reales desde base de datos.
-  - `03_supplier_quoted_real.png`: Proveedor cotiza formalmente la RFQ a 1.95 EUR/kg; el estado transiciona a `QUOTED` / `Cotizado` en MySQL y se emiten alertas reales de notificación.
-  - `04_printhouse_accepted_po_document_real.png`: Imprenta acepta cotización (estado `CONFIRMED`) y previsualiza documento real de Orden de Compra (PO) renderizado en iframe desde backend.
-  - `05_supplier_dispatched_real.png`: Proveedor registra transporte (Dachser European Logistics) y número de seguimiento (`DACH-882193-FRANKFURT`); estado transiciona a `DISPATCHED` / `Expedido`.
-  - `06_printhouse_goods_received_real.png`: Imprenta ejecuta recepción física e ingreso atómico en almacén; estado transiciona a `RECEIVED`.
-- **Verificación Directa contra MySQL (127.0.0.1:3307)**:
-  - `supplier_paper_procurement_orders`: 1 orden en estado `RECEIVED`, tipo `ORDER`, 54.945 hojas, importe 9.749,99 EUR.
-  - `supplier_paper_order_receipts`: 1 recepción registrada para 54.945 hojas.
-  - `predictive_material_inventory`: Stock de `mat-inv-phoenix-130` incrementado de 10.000 a 64.945 unidades.
-  - `material_inventory_events`: Evento inmutable de auditoría `PROCUREMENT_RECEIPT` registrado con `quantity_units = 54945`.
-  - Resultado final de la verificación: `ALL MYSQL VERIFICATIONS PASSED 100%`.
+### 3. Recorrido Integrado de Navegador Real en 318dfab4 & Diagnóstico de Discrepancia de Unidades
+En el commit `318dfab4`, el recorrido de navegador ejecutó exitosamente el flujo E2E contra MySQL real (3307) y Fastify (8080), pero arrojó una orden de 54.945 hojas por 9.749,99 EUR a pesar de haberse documentado como "solicitud de 5.000 hojas".
 
-### 4. Correcciones Implementadas Durante la Validación
-1. **Deriva de Zona Horaria en Sesiones**: `userSessionService.validateSession` utilizaba `new Date()` (UTC+2 CEST del host) frente a `last_activity_at` (UTC de MySQL), causando `SESSION_INACTIVE` inmediato tras el login. Se corrigió delegando el cálculo de inactividad a MySQL mediante `TIMESTAMPDIFF(SECOND, last_activity_at, NOW()) AS idle_seconds`, manteniendo la consulta en línea simple para compatibilidad con intercepciones regex en tests.
-2. **Propiedad `id` en `searchVisibleOffers`**: El servicio de aprovisionamiento devolvía `{ offerId, variantId }` omitiendo la propiedad `id`, lo que causaba el envío de `offerId: undefined` en modales de compra. Se mapeó `id: r.offer_id` en `src/api/services/paperProcurementService.js` y `selectedOffer.id || selectedOffer.offerId` en `PaperSourcingModal.tsx`.
-3. **Mapeo de Tipo en `formatOrderRow`**: `formatOrderRow` devolvía `orderType: r.order_type` en vez de `type: r.order_type`, impidiendo que `SupplierOrdersPage.tsx` reconociera el tipo `RFQ` y mostrara el botón de cotización. Se normalizó la propiedad `type`.
-4. **Unificación de Parámetros de Cotización**: `SupplierOrdersPage.tsx` enviaba `quotePricePerBasis` mientras que la validación esperaba `pricePerBasis`. Se unificó el manejo en backend (`payload.pricePerBasis ?? payload.quotePricePerBasis`) y en frontend.
-5. **Localización de Estados en Browser E2E**: Adaptados los localizadores de estado en `scripts/test_real_browser_e2e.py` para soportar etiquetas multilingües (`Cotizado`/`QUOTED`, `Confirmado`/`CONFIRMED`, `Expedido`/`DISPATCHED`, `Ingresado`/`RECEIVED`).
+#### Diagnóstico de Causa Raíz:
+1. **Inspección de la UI (`PaperSourcingModal.tsx`)**:
+   El modal fijaba de forma forzada `quantityBasis: selectedOffer.priceBasis || 'KG'` y la etiqueta `Order Quantity ({selectedOffer.priceBasis})`. Al tener Phoenix Silk una tarifa ofertada por kilogramo (`KG`), el modal no ofrecía selector de unidad y forzaba que la unidad de pedido fuera `KG`.
+2. **Payload enviado y Snapshot en Base de Datos**:
+   Al teclear `5000`, el formulario envió `{ orderedQuantity: 5000, quantityBasis: 'KG' }`. En MySQL se persistió `ordered_quantity = 5000`, `ordered_quantity_basis = 'KG'`, `snapshot_price_basis = 'KG'`, `snapshot_price_per_basis = 1.95`.
+3. **Cálculo Físico y Política de Redondeo para 5.000 KG**:
+   - Hoja Phoenix Silk 130 gsm, 700×1000 mm: Peso por pliego = $0,700\text{ m} \times 1,000\text{ m} \times 0,130\text{ kg/m}^2 = 0,091\text{ kg} = 91\text{ g}$.
+   - Cantidad en hojas para 5.000 KG: $5.000\text{ kg} / 0,091\text{ kg/hoja} = 54.945,0549\dots\text{ hojas}$.
+   - Política determinista de redondeo: `Math.round(5000 / 0.091) = 54.945` hojas físicas enteras.
+   - Importe resultante: $54.945\text{ hojas} \times (1,95\text{ EUR/kg} \times 0,091\text{ kg/hoja}) = 54.945 \times 0,17745 = 9.749,99\text{ EUR}$.
+   - Conclusión: El cálculo físico en el backend era matemáticamente impecable para una orden de 5.000 KG, pero la UI sufría un fallo de implementación al confundir la unidad de cantidad solicitada por el comprador con la unidad de tarificación del proveedor.
+
+---
+
+## Remediación y Validación Final: Separación Canónica de Unidades y Regresión E2E
+
+**Fecha**: 2026-10-23 21:05:00 CET  
+**Entorno**: MySQL 8.0.45 en `127.0.0.1:3307` (Docker aislado) + Fastify/Express real (`http://127.0.0.1:8080`) + Playwright Chromium headless.  
+
+### 1. Separación de Conceptos de Unidades (UI y Contratos)
+Se desacoplaron estrictamente los tres planos de unidades:
+1. **Cantidad Solicitada y Unidad de Cantidad**: `ordered_quantity` y `ordered_quantity_basis` (`SHEET`, `THOUSAND_SHEETS`, `PACK`, `KG`, `TONNE`).
+2. **Base de Tarifa / Cotización**: `snapshot_price_basis` (`KG`, `SHEET`, etc.) y `snapshot_price_per_basis` (EUR por unidad de base).
+3. **Unidad de Inventario en Almacén**: Siempre hojas físicas enteras (`total_sheets`, `received_sheets` en `predictive_material_inventory`).
+
+**Modificaciones en UI**:
+- `src/ui/components/printhouse/PaperSourcingModal.tsx`:
+  - Se incorporó el estado `quantityBasis` (por defecto `'SHEET'`) y el selector accesible `<select id="sourcing-quantity-basis">`.
+  - Se recalculó el desglose en tiempo real: `calculatedEstimate` computa hojas físicas totales, peso total en kg e importe estimado según la unidad seleccionada y la base de cotización.
+  - El envío de orden o RFQ transmite explícitamente `quantityBasis`.
+- `src/ui/pages/supplier/SupplierOrdersPage.tsx`:
+  - Se añadió selector explícito de base de cotización (`quotePriceBasis`) para permitir al proveedor cotizar formalmente en `KG`, `SHEET`, etc.
+
+### 2. Referencia Física y Verificación Determinista
+- **Especificación**: Phoenix Silk 130 gsm, formato 700×1000 mm.
+- **Peso unitario por hoja**: $0,700\text{ m} \times 1,000\text{ m} \times 0,130\text{ kg/m}^2 = 0,091\text{ kg}$.
+- **Escenario 1: Solicitud de 5.000 SHEET cotizadas a 1,95 EUR/KG**:
+  - Hojas físicas solicitadas: **5.000 hojas**.
+  - Peso total: $5.000 \times 0,091\text{ kg} = \mathbf{455,00\text{ kg}}$.
+  - Importe total a 1,95 EUR/KG: $455\text{ kg} \times 1,95\text{ EUR/kg} = \mathbf{887,25\text{ EUR}}$ (sin cargos adicionales).
+  - Recepción en almacén: **5.000 hojas** exactas.
+- **Escenario 2: Solicitud de 5.000 KG cotizadas a 1,95 EUR/KG (Política de redondeo a pliegos enteros)**:
+  - Hojas físicas: $\text{Math.round}(5.000 / 0,091) = \mathbf{54.945\text{ hojas}}$.
+  - Peso efectivo: $54.945 \times 0,091 = 4.999,995\text{ kg}$.
+  - Importe total: $54.945 \times (1,95 \times 0,091) = \mathbf{9.749,99\text{ EUR}}$.
+  - Recepción en almacén: **54.945 hojas**.
+
+### 3. Ejecución E2E de Navegador Real (`scripts/test_real_browser_e2e.py`)
+Recorrido completo ejecutado con éxito sin mocks ni interceptores:
+1. **RFQ Solicitada**: Imprenta solicita 5.000 SHEET con selector en `Hojas (SHEET)`.
+2. **Cotización del Proveedor**: Proveedor cotiza formalmente a 1,95 EUR/KG; estado transiciona a `QUOTED`.
+3. **Aceptación y Previsualización de PO**: Imprenta acepta la cotización; el visor oficial de Orden de Compra (`/api/admin/materials/procurement/orders/:id/preview`) refleja:
+   - Cantidad: `5000 SHEET`
+   - Total Pliegos: `5,000`
+   - Tarifa: `1.95 EUR / KG`
+   - Importe Total: `887.25 EUR`
+4. **Expedición**: Proveedor registra transporte (Dachser Logistics, tracking `DACH-882193-FRANKFURT`); estado transiciona a `DISPATCHED`.
+5. **Recepción en Almacén**: Imprenta efectúa recepción en muelle; estado transiciona a `RECEIVED`.
+6. **Comprobación en Base de Datos MySQL (127.0.0.1:3307)**:
+   - `ordered_quantity`: 5000, `ordered_quantity_basis`: 'SHEET'
+   - `snapshot_price_basis`: 'KG', `snapshot_price_per_basis`: 1.95
+   - `total_sheets`: 5000, `received_sheets`: 5000, `total_amount`: 887.25
+   - `predictive_material_inventory`: Stock incrementado exactamente de 10.000 a 15.000 (+5.000 hojas).
+   - `material_inventory_events`: Registro inmutable con `quantity_units = 5000`.
+7. **Prueba de Idempotencia en Vivo**:
+   - Se re-envió el recibo con la misma `idempotency_key`.
+   - Respuesta: `idempotentReplay: true`, `received_sheets: 5000`.
+   - Consulta posterior a `predictive_material_inventory`: Stock verificado en **15.000** (cero segundo incremento de existencias).
+
+### 4. Cobertura de Regresiones Automatizadas y Build
+- **`tests/paper_supplier_procurement_and_orders.test.js`**: **17/17 PASS** (incluye regresiones matemáticas y de integración MySQL para 5.000 SHEET vs 5.000 KG a 1,95 EUR/KG, e idempotencia estricta).
+- **`tests/paper_supplier_cost_and_documents.test.js`**: **16/16 PASS** (cálculos físicos, BPE patch, RBAC).
+- **`tests/http_real_auth_flow.test.js`**: **9/9 PASS** (regresión de autenticación y validación de sesiones JWT / inactividad MySQL en `userSessionService`).
+- **`tests/phase39_security_and_integrations.test.js`**: **49/49 PASS** (aislamiento de tenants, webhooks y BPE).
+- **`tests/phase195_backend_integrations.test.js`**: **12/12 PASS** (tasas gobernadas y contratos BPE).
+- **Build de Producción Frontend (`npm run build`)**: **PASS** (3.577 módulos transformados en 12.28s, artefactos generados en `dist/`).
+
 
 
 
