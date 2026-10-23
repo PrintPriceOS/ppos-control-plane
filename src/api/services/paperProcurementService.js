@@ -2104,6 +2104,14 @@ class PaperProcurementService {
 </body>
 </html>`;
     }
+
+    calculateSheets(quantity, basis, variant, sheetsPerPack) {
+        return calculateSheets(quantity, basis, variant, sheetsPerPack);
+    }
+
+    calculateTotalAmount(priceAmount, priceBasis, totalSheets, variant, sheetsPerPack) {
+        return calculateTotalAmount(priceAmount, priceBasis, totalSheets, variant, sheetsPerPack);
+    }
 }
 
 module.exports = new PaperProcurementService();

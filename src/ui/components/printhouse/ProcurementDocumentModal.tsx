@@ -19,7 +19,7 @@ export interface ProcurementDocumentModalProps {
     onClose: () => void;
     orderId: string | null;
     initialDocType?: 'po' | 'packing_slip';
-    fetchDocFn: (orderId: string, type: 'po' | 'packing_slip') => Promise<{ ok: boolean; data?: any; error?: string }>;
+    fetchDocFn: (orderId: string, type: 'po' | 'packing_slip') => Promise<{ ok: boolean; data?: any; error?: string | { code?: string; message?: string; validationErrors?: string[] } }>;
 }
 
 export const ProcurementDocumentModal: React.FC<ProcurementDocumentModalProps> = ({
@@ -63,7 +63,8 @@ export const ProcurementDocumentModal: React.FC<ProcurementDocumentModalProps> =
                 if (res.ok && res.data) {
                     setDocData(res.data);
                 } else {
-                    setError(res.error || t('procurement.document.error'));
+                    const errMsg = typeof res.error === 'string' ? res.error : (res.error?.message || t('procurement.document.error'));
+                    setError(errMsg);
                 }
             })
             .catch((err) => {

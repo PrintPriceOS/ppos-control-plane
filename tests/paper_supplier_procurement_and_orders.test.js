@@ -146,11 +146,118 @@ let isDbConfigured = Boolean(process.env.TEST_MYSQL_HOST && process.env.TEST_MYS
 
 describe('Iterations I4 & I5: Paper Procurement Orders & Warehouse Receipts', () => {
 
-    describe('1. Physical Calculations & Monetary Pricing', () => {
+    describe('1. Physical Calculations & Monetary Pricing & RBAC Matrix', () => {
+        const sampleVariant = {
+            width_mm: 700,
+            height_mm: 1000,
+            gsm: 130
+        }; // sheet weight = 0.7 * 1.0 * 130 / 1000 = 0.091 kg
+
+        it('calculates physical sheets accurately across SHEET, THOUSAND_SHEETS, PACK, KG, and TONNE', () => {
+            // SHEET: 5,000 sheets
+            expect(paperProcurementService.calculateSheets(5000, 'SHEET', sampleVariant)).toBe(5000);
+
+            // THOUSAND_SHEETS: 5 units -> 5,000 sheets
+            expect(paperProcurementService.calculateSheets(5, 'THOUSAND_SHEETS', sampleVariant)).toBe(5000);
+
+            // PACK (500 sheets/pack): 10 packs -> 5,000 sheets
+            expect(paperProcurementService.calculateSheets(10, 'PACK', sampleVariant, 500)).toBe(5000);
+
+            // KG: 455 kg / 0.091 kg/sheet = 5,000 sheets
+            expect(paperProcurementService.calculateSheets(455, 'KG', sampleVariant)).toBe(5000);
+
+            // TONNE: 0.455 tonnes -> 455 kg -> 5,000 sheets
+            expect(paperProcurementService.calculateSheets(0.455, 'TONNE', sampleVariant)).toBe(5000);
+
+            // Error cases
+            expect(() => paperProcurementService.calculateSheets(-10, 'SHEET', sampleVariant)).toThrow(/positive finite number/);
+            expect(() => paperProcurementService.calculateSheets(10, 'PACK', sampleVariant, 0)).toThrow(/positive integer/);
+            expect(() => paperProcurementService.calculateSheets(10, 'UNSUPPORTED_BASIS', sampleVariant)).toThrow(/Unsupported quantity basis/);
+        });
+
+        it('calculates total monetary amount across all price bases deterministically', () => {
+            const totalSheets = 5000;
+
+            // SHEET: 0.182 EUR/sheet * 5000 sheets = 910.00 EUR
+            expect(paperProcurementService.calculateTotalAmount(0.182, 'SHEET', totalSheets, sampleVariant)).toBe(910.00);
+
+            // THOUSAND_SHEETS: 182 EUR/1000 sheets = 910.00 EUR
+            expect(paperProcurementService.calculateTotalAmount(182, 'THOUSAND_SHEETS', totalSheets, sampleVariant)).toBe(910.00);
+
+            // PACK: 91 EUR / pack (500 sheets/pack) = 910.00 EUR
+            expect(paperProcurementService.calculateTotalAmount(91, 'PACK', totalSheets, sampleVariant, 500)).toBe(910.00);
+
+            // KG: 2.00 EUR/kg -> 5000 sheets * 0.091 kg = 455 kg * 2.00 = 910.00 EUR
+            expect(paperProcurementService.calculateTotalAmount(2.00, 'KG', totalSheets, sampleVariant)).toBe(910.00);
+
+            // TONNE: 2000 EUR/tonne -> 0.455 tonnes * 2000 = 910.00 EUR
+            expect(paperProcurementService.calculateTotalAmount(2000, 'TONNE', totalSheets, sampleVariant)).toBe(910.00);
+
+            // Error case
+            expect(() => paperProcurementService.calculateTotalAmount(100, 'INVALID_BASIS', totalSheets, sampleVariant)).toThrow(/Unsupported price basis/);
+        });
+
         it('validates placeOrderOrRfq payload constraints fail-closed', async () => {
             await expect(
                 paperProcurementService.placeOrderOrRfq({}, { type: 'INVALID_TYPE' })
             ).rejects.toThrow(/Invalid order type/);
+
+            await expect(
+                paperProcurementService.placeOrderOrRfq({}, { type: 'ORDER' })
+            ).rejects.toThrow(/TENANT_ID_REQUIRED/);
+
+            await expect(
+                paperProcurementService.placeOrderOrRfq({ tenantId: 't1' }, { type: 'ORDER' })
+            ).rejects.toThrow(/PRINTHOUSE_ID_REQUIRED/);
+        });
+
+        it('enforces RBAC permission hierarchy across printhouse and supplier routes', async () => {
+            const printhouseViewerToken = generateToken({
+                userId: 'buyer-viewer',
+                role: 'PRINTHOUSE_VIEWER',
+                tenantId: 'tenant_printhouse_alpha',
+                printhouseId: 'node_plant_frankfurt'
+            });
+
+            // PRINTHOUSE_VIEWER cannot place orders (POST /sourcing/orders) -> 403
+            const orderRes = await dispatch(materialsAdminRouter, {
+                method: 'POST',
+                url: '/sourcing/orders',
+                headers: { authorization: `Bearer ${printhouseViewerToken}` },
+                body: { type: 'ORDER', offerId: 'off_test' }
+            });
+            expect(orderRes.statusCode).toBe(403);
+
+            // PRINTHOUSE_VIEWER cannot accept quote -> 403
+            const acceptRes = await dispatch(materialsAdminRouter, {
+                method: 'POST',
+                url: '/procurements/paper-orders/ord_test/accept-quote',
+                headers: { authorization: `Bearer ${printhouseViewerToken}` }
+            });
+            expect(acceptRes.statusCode).toBe(403);
+
+            // PRINTHOUSE_VIEWER cannot execute warehouse receipt -> 403
+            const receiveRes = await dispatch(materialsAdminRouter, {
+                method: 'POST',
+                url: '/procurements/paper-orders/ord_test/receive',
+                headers: { authorization: `Bearer ${printhouseViewerToken}` },
+                body: { receivedSheets: 100 }
+            });
+            expect(receiveRes.statusCode).toBe(403);
+
+            // Supplier user cannot access printhouse materials routes -> 403
+            const supplierToken = generateToken({
+                userId: 'supp-user',
+                role: 'SUPPLIER_ADMIN',
+                tenantId: 'tenant_supplier_one',
+                supplierId: 'supp_scheufelen'
+            });
+            const supplierForbiddenRes = await dispatch(materialsAdminRouter, {
+                method: 'GET',
+                url: '/sourcing/offers',
+                headers: { authorization: `Bearer ${supplierToken}` }
+            });
+            expect(supplierForbiddenRes.statusCode).toBe(403);
         });
     });
 
@@ -674,6 +781,102 @@ describe('Iterations I4 & I5: Paper Procurement Orders & Warehouse Receipts', ()
             expect(afterFinal.receipts.length).toBe(2);
         });
 
+        it('handles concurrent receipt requests safely without duplicating stock', async () => {
+            if (!isDbConfigured) return;
+
+            const actorAlpha = {
+                tenantId: 'tenant_printhouse_alpha',
+                printhouseId: 'node_plant_frankfurt',
+                userId: 'receiver-alpha-user'
+            };
+
+            const order = await paperProcurementService.placeOrderOrRfq(actorAlpha, {
+                type: 'ORDER',
+                offerId: 'off_mkt_phoenix',
+                variantId: 'var_phoenix_150_70100',
+                orderedQuantity: 200,
+                quantityBasis: 'KG',
+                printhouseId: 'node_plant_frankfurt'
+            });
+
+            await paperProcurementService.transitionSupplierOrder('supp_scheufelen', order.id, 'CONFIRM');
+            await paperProcurementService.transitionSupplierOrder('supp_scheufelen', order.id, 'DISPATCH');
+
+            const orderDetail = await paperProcurementService.getSupplierOrderById('supp_scheufelen', order.id);
+            const totalSheets = orderDetail.totalSheets;
+
+            // Two concurrent receipt requests with different idempotency keys for the entire order
+            const p1 = paperProcurementService.receiveOrderAtomic(order.id, actorAlpha, {
+                receivedSheets: totalSheets,
+                receivedQuantity: 200,
+                idempotencyKey: `conc_key_1_${Date.now()}`
+            });
+            const p2 = paperProcurementService.receiveOrderAtomic(order.id, actorAlpha, {
+                receivedSheets: totalSheets,
+                receivedQuantity: 200,
+                idempotencyKey: `conc_key_2_${Date.now()}`
+            });
+
+            const results = await Promise.allSettled([p1, p2]);
+            const fulfilled = results.filter(r => r.status === 'fulfilled');
+            const rejected = results.filter(r => r.status === 'rejected');
+
+            // Due to row-level locking (SELECT ... FOR UPDATE), exactly one should succeed, and the other fails with over-receipt / already received
+            expect(fulfilled.length).toBe(1);
+            expect(rejected.length).toBe(1);
+
+            const finalOrder = await paperProcurementService.getSupplierOrderById('supp_scheufelen', order.id);
+            expect(finalOrder.receivedSheets).toBe(totalSheets);
+            expect(finalOrder.status).toBe('RECEIVED');
+        });
+
+        it('rolls back completely without stock movements or notifications on failure before commit', async () => {
+            if (!isDbConfigured) return;
+
+            const actorAlpha = {
+                tenantId: 'tenant_printhouse_alpha',
+                printhouseId: 'node_plant_frankfurt',
+                userId: 'receiver-alpha-user'
+            };
+
+            const order = await paperProcurementService.placeOrderOrRfq(actorAlpha, {
+                type: 'ORDER',
+                offerId: 'off_mkt_phoenix',
+                variantId: 'var_phoenix_150_70100',
+                orderedQuantity: 100,
+                quantityBasis: 'KG',
+                printhouseId: 'node_plant_frankfurt'
+            });
+
+            await paperProcurementService.transitionSupplierOrder('supp_scheufelen', order.id, 'CONFIRM');
+            await paperProcurementService.transitionSupplierOrder('supp_scheufelen', order.id, 'DISPATCH');
+
+            // Count receipts and events before failed attempt
+            const [receiptsBefore] = await connectionPool.query("SELECT COUNT(*) AS c FROM supplier_paper_order_receipts WHERE order_id = ?", [order.id]);
+            const [eventsBefore] = await connectionPool.query("SELECT COUNT(*) AS c FROM material_inventory_events");
+
+            // Attempt receipt with invalid non-positive receivedSheets (triggers error inside service)
+            await expect(
+                paperProcurementService.receiveOrderAtomic(order.id, actorAlpha, {
+                    receivedSheets: -50,
+                    idempotencyKey: `fail_key_${Date.now()}`
+                })
+            ).rejects.toThrow();
+
+            // Verify no receipts added
+            const [receiptsAfter] = await connectionPool.query("SELECT COUNT(*) AS c FROM supplier_paper_order_receipts WHERE order_id = ?", [order.id]);
+            expect(receiptsAfter[0].c).toBe(receiptsBefore[0].c);
+
+            // Verify no events added
+            const [eventsAfter] = await connectionPool.query("SELECT COUNT(*) AS c FROM material_inventory_events");
+            expect(eventsAfter[0].c).toBe(eventsBefore[0].c);
+
+            // Verify order status unchanged
+            const unchangedOrder = await paperProcurementService.getSupplierOrderById('supp_scheufelen', order.id);
+            expect(unchangedOrder.status).toBe('DISPATCHED');
+            expect(unchangedOrder.receivedSheets).toBe(0);
+        });
+
         it('computes verified aggregate metrics for Supplier Dashboard cards', async () => {
             if (!isDbConfigured) return;
 
@@ -717,6 +920,29 @@ describe('Iterations I4 & I5: Paper Procurement Orders & Warehouse Receipts', ()
             });
 
             expect(transitionViewerRes.statusCode).toBe(403);
+
+            // 2b. Offer creation via paperSuppliersRouter: VIEWER rejected with HTTP 403
+            const offerCreateRes = await dispatch(paperSuppliersRouter, {
+                method: 'POST',
+                url: '/offers',
+                headers: { authorization: `Bearer ${viewerToken}` },
+                body: { variantId: 'var_fake', priceAmount: 1.50 }
+            });
+            expect(offerCreateRes.statusCode).toBe(403);
+
+            // 2c. Offer deletion via paperSuppliersRouter: OPERATOR rejected with HTTP 403 (ADMIN only)
+            const operatorToken = generateToken({
+                userId: 'operator-user',
+                role: 'SUPPLIER_OPERATOR',
+                tenantId: 'tenant_supplier_one',
+                supplierId: 'supp_scheufelen'
+            });
+            const offerDeleteRes = await dispatch(paperSuppliersRouter, {
+                method: 'DELETE',
+                url: '/offers/off_fake_id',
+                headers: { authorization: `Bearer ${operatorToken}` }
+            });
+            expect(offerDeleteRes.statusCode).toBe(403);
 
             // 3. Printhouse Sourcing Search via materialsAdminRouter
             const printhouseToken = generateToken({

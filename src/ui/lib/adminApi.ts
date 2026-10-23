@@ -3003,6 +3003,8 @@ export async function resolveMarketPaperRate(params?: {
     category?: string;
     widthMm?: number;
     heightMm?: number;
+    targetCurrency?: string;
+    currency?: string;
 }) {
     const q = new URLSearchParams();
     if (params?.gsm) q.set('gsm', String(params.gsm));
@@ -3010,6 +3012,7 @@ export async function resolveMarketPaperRate(params?: {
     if (params?.category) q.set('category', params.category);
     if (params?.widthMm) q.set('widthMm', String(params.widthMm));
     if (params?.heightMm) q.set('heightMm', String(params.heightMm));
+    if (params?.targetCurrency || params?.currency) q.set('targetCurrency', params.targetCurrency || params.currency!);
     return adminFetch<{ ok: boolean; data: any }>(`/api/admin/materials/sourcing/resolve-market-rate?${q.toString()}`);
 }
 
@@ -3018,6 +3021,8 @@ export async function buildBpePaperPatch(params?: {
     interiorGsm?: number;
     coverPaperType?: string;
     coverGsm?: number;
+    targetCurrency?: string;
+    currency?: string;
 }) {
     return adminFetch<{ ok: boolean; data: any }>('/api/admin/materials/sourcing/bpe-rate-patch', {
         method: 'POST',

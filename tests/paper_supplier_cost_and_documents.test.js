@@ -157,7 +157,7 @@ describe('Iteration I6: Paper Cost Integration & Procurement Documents', () => {
             expect(coverWeight).toBeCloseTo(0.1794, 5);
         });
 
-        it('normalizes multi-basis prices to EUR/kg accurately', () => {
+        it('normalizes multi-basis prices and preserves original currency accurately', () => {
             const dims = { widthMm: 700, heightMm: 1000, gsm: 130 }; // sheet weight = 0.091 kg
 
             // KG basis: 1.85 EUR/kg -> 1.85 EUR/kg
@@ -174,14 +174,27 @@ describe('Iteration I6: Paper Cost Integration & Procurement Documents', () => {
 
             // PACK basis (500 sheets): 91 EUR / pack -> 91 / (500 * 0.091) = 2.00 EUR/kg
             expect(paperCostIntegrationService.convertPriceToKg({ priceAmount: 91, priceBasis: 'PACK', ...dims, sheetsPerPack: 500 })).toBeCloseTo(2.00, 4);
+
+            // Multi-Currency Regressions (USD and GBP): preserves currency without converting to EUR
+            const usdNorm = paperCostIntegrationService.convertPriceToKg({ priceAmount: 1500, priceBasis: 'TONNE', ...dims, currency: 'USD' });
+            expect(usdNorm.pricePerKg).toBeCloseTo(1.50, 4);
+            expect(usdNorm.currency).toBe('USD');
+
+            const gbpNorm = paperCostIntegrationService.convertPriceToKg({ priceAmount: 91, priceBasis: 'PACK', ...dims, sheetsPerPack: 500, currency: 'GBP' });
+            expect(gbpNorm.pricePerKg).toBeCloseTo(2.00, 4);
+            expect(gbpNorm.currency).toBe('GBP');
         });
     });
 
     describe('2. Industrial Job Paper Requirements & Estimation', () => {
-        it('calculates job paper requirements with 16pp signatures and waste factors', () => {
+        it('calculates job paper requirements with explicit machine fixture inputs', () => {
             const jobSpec = {
                 copies: 1000,
                 interior_pages: 96,
+                signature_size: 16,
+                interior_makeready_sheets: 600, // 6 signatures * 100 sheets
+                cover_makeready_sheets: 50,
+                run_waste_rate: 0.025, // 2.5%
                 paper_weight_interior: 130,
                 paper_weight_cover: 300,
                 press_sheet_width_mm: 700,
@@ -197,14 +210,52 @@ describe('Iteration I6: Paper Cost Integration & Procurement Documents', () => {
             expect(estimate.interior.netSheets).toBe(6000);
             expect(estimate.interior.netKg).toBeCloseTo(6000 * 0.091, 1);
 
-            // Waste: setup (6 * 100 = 600 sheets) + run waste (2.5% of 6000 = 150) = 750 scrap sheets
+            // Waste: setup (600 sheets) + run waste (2.5% of 6000 = 150) = 750 scrap sheets
             expect(estimate.interior.totalSheets).toBe(6750);
             expect(estimate.interior.estimatedCost).toBeGreaterThan(0);
 
-            // Cover: 2 covers per sheet -> 500 net sheets
+            // Cover: 2 covers per sheet -> 500 net sheets + 50 makeready + 13 run waste = 563 total
             expect(estimate.cover.netSheets).toBe(500);
             expect(estimate.cover.totalSheets).toBe(500 + 50 + 13);
             expect(estimate.totals.totalEstimatedCost).toBeCloseTo(estimate.interior.estimatedCost + estimate.cover.estimatedCost, 2);
+        });
+
+        it('does not inject phantom scrap when machine or run waste parameters are omitted', () => {
+            const cleanJob = {
+                copies: 1000,
+                interior_pages: 96,
+                signature_size: 16,
+                paper_weight_interior: 130,
+                paper_weight_cover: 300,
+                press_sheet_width_mm: 700,
+                press_sheet_height_mm: 1000
+            };
+            const est = paperCostIntegrationService.calculateJobPaperRequirements(cleanJob);
+            expect(est.interior.makereadySheets).toBe(0);
+            expect(est.interior.runWasteSheets).toBe(0);
+            expect(est.cover.makereadySheets).toBe(0);
+            expect(est.cover.runWasteSheets).toBe(0);
+            expect(est.interior.totalSheets).toBe(6000);
+            expect(est.cover.totalSheets).toBe(500);
+        });
+
+        it('derives signature imposition geometrically when explicit signatureSize is omitted', () => {
+            // A4 book (210x297 mm) on B1 press sheet (700x1000 mm):
+            // 700 / 210 = 3 cols; 1000 / 297 = 3 rows -> 9 pages per side * 2 sides = 18 pages raw capacity, clamped to 16pp folding section
+            const a4Job = {
+                copies: 500,
+                interior_pages: 64,
+                book_width_mm: 210,
+                book_height_mm: 297,
+                press_sheet_width_mm: 700,
+                press_sheet_height_mm: 1000,
+                paper_weight_interior: 80,
+                paper_weight_cover: 250
+            };
+            const est = paperCostIntegrationService.calculateJobPaperRequirements(a4Job);
+            expect(est.signatureSize).toBe(16);
+            expect(est.signatureSource).toBe('geometric_derivation');
+            expect(est.signaturesCount).toBe(4); // 64 / 16 = 4 signatures
         });
     });
 
@@ -366,15 +417,17 @@ describe('Iteration I6: Paper Cost Integration & Procurement Documents', () => {
             `);
 
             // Seed supplier offers:
-            // Offer 1 (Sappi): 1.75 EUR/kg (cheapest)
-            // Offer 2 (Stora Enso): 1.95 EUR/kg
+            // Offer 1 (Sappi EUR): 1.75 EUR/kg
+            // Offer 2 (Stora Enso EUR): 1.95 EUR/kg
+            // Offer 3 (Sappi USD): 1.50 USD/kg
             await connectionPool.query(`
                 INSERT INTO supplier_paper_offers (
                     id, tenant_id, supplier_id, variant_id, supplier_sku, price_amount, currency,
                     price_basis, moq, order_multiple, sheets_per_pack, visibility, status
                 ) VALUES
                 ('off_sappi_130', 'tenant_supp_doc_alpha', 'supp_sappi', 'var_magno_130', 'SAP-MAG-130-70100', 1.75, 'EUR', 'KG', 500, 50, NULL, 'MARKETPLACE', 'ACTIVE'),
-                ('off_stora_130', 'tenant_supp_doc_beta', 'supp_stora', 'var_lumi_130', 'STO-LUM-130-70100', 1.95, 'EUR', 'KG', 500, 50, NULL, 'MARKETPLACE', 'ACTIVE')
+                ('off_stora_130', 'tenant_supp_doc_beta', 'supp_stora', 'var_lumi_130', 'STO-LUM-130-70100', 1.95, 'EUR', 'KG', 500, 50, NULL, 'MARKETPLACE', 'ACTIVE'),
+                ('off_sappi_usd_130', 'tenant_supp_doc_alpha', 'supp_sappi', 'var_magno_130', 'SAP-MAG-USD-130', 1.50, 'USD', 'KG', 500, 50, NULL, 'MARKETPLACE', 'ACTIVE')
                 ON DUPLICATE KEY UPDATE price_amount=VALUES(price_amount)
             `);
         });
@@ -389,26 +442,79 @@ describe('Iteration I6: Paper Cost Integration & Procurement Documents', () => {
             }
         });
 
-        it('resolves the cheapest active market rate for a physical specification', async () => {
+        it('rejects comparing offers with different currencies without targetCurrency or conversion', async () => {
             if (!isDbConfigured) return;
 
-            const rateInfo = await paperCostIntegrationService.resolveMarketPaperRate(
+            await expect(paperCostIntegrationService.resolveMarketPaperRate(
                 'tenant_buyer_doc',
                 {
                     gsm: 130,
                     widthMm: 700,
                     heightMm: 1000
                 }
+            )).rejects.toThrow(/TARGET_CURRENCY_REQUIRED/);
+        });
+
+        it('resolves the cheapest active market rate filtering by target currency', async () => {
+            if (!isDbConfigured) return;
+
+            // Target EUR: selects Sappi 1.75 EUR/kg (ignores USD offer)
+            const eurRate = await paperCostIntegrationService.resolveMarketPaperRate(
+                'tenant_buyer_doc',
+                {
+                    gsm: 130,
+                    widthMm: 700,
+                    heightMm: 1000,
+                    targetCurrency: 'EUR'
+                }
+            );
+            expect(eurRate).toBeDefined();
+            expect(eurRate.supplierId).toBe('supp_sappi');
+            expect(eurRate.offerId).toBe('off_sappi_130');
+            expect(eurRate.currency).toBe('EUR');
+            expect(eurRate.pricePerKg).toBeCloseTo(1.75, 4);
+
+            // Target USD: selects Sappi 1.50 USD/kg
+            const usdRate = await paperCostIntegrationService.resolveMarketPaperRate(
+                'tenant_buyer_doc',
+                {
+                    gsm: 130,
+                    widthMm: 700,
+                    heightMm: 1000,
+                    targetCurrency: 'USD'
+                }
+            );
+            expect(usdRate).toBeDefined();
+            expect(usdRate.offerId).toBe('off_sappi_usd_130');
+            expect(usdRate.currency).toBe('USD');
+            expect(usdRate.pricePerKg).toBeCloseTo(1.50, 4);
+        });
+
+        it('resolves cross-currency comparisons with explicit and traceable exchange rates', async () => {
+            if (!isDbConfigured) return;
+
+            // 1.50 USD with 0.90 USD/EUR = 1.35 EUR/kg -> cheaper than 1.75 EUR/kg
+            const rateInfo = await paperCostIntegrationService.resolveMarketPaperRate(
+                'tenant_buyer_doc',
+                {
+                    gsm: 130,
+                    widthMm: 700,
+                    heightMm: 1000,
+                    targetCurrency: 'EUR',
+                    exchangeRates: { USD: 0.90, EUR: 1.0 }
+                }
             );
 
             expect(rateInfo).toBeDefined();
-            expect(rateInfo.supplierId).toBe('supp_sappi');
-            expect(rateInfo.offerId).toBe('off_sappi_130');
-            expect(rateInfo.sku).toBe('SAP-MAG-130-70100');
-            expect(rateInfo.pricePerKg).toBeCloseTo(1.75, 4);
+            expect(rateInfo.offerId).toBe('off_sappi_usd_130');
+            expect(rateInfo.currency).toBe('USD');
+            expect(rateInfo.pricePerKg).toBeCloseTo(1.50, 4);
+            expect(rateInfo.conversionTrace).toBeDefined();
+            expect(rateInfo.conversionTrace.exchangeRate).toBe(0.90);
+            expect(rateInfo.conversionTrace.convertedPricePerKg).toBeCloseTo(1.35, 4);
         });
 
-        it('builds a BPE paper rate patch object with provenance metadata', async () => {
+        it('builds a BPE paper rate patch object with provenance metadata and target currency', async () => {
             if (!isDbConfigured) return;
 
             const patch = await paperCostIntegrationService.buildBpePaperPatch({
@@ -416,7 +522,8 @@ describe('Iteration I6: Paper Cost Integration & Procurement Documents', () => {
                 interiorPaperType: 'couché_brillante',
                 interiorGsm: 130,
                 coverPaperType: 'couché_brillante',
-                coverGsm: 130
+                coverGsm: 130,
+                targetCurrency: 'EUR'
             });
 
             expect(patch).toBeDefined();
@@ -424,6 +531,7 @@ describe('Iteration I6: Paper Cost Integration & Procurement Documents', () => {
             expect(patch.paper_price_interior_by_kilo['couché_brillante']).toBeCloseTo(1.75, 4);
             expect(patch._metadata).toBeDefined();
             expect(patch._metadata.source).toBe('PPOS_PAPER_SUPPLIER_HUB');
+            expect(patch._metadata.currency).toBe('EUR');
             expect(patch._metadata.interior.offerId).toBe('off_sappi_130');
         });
 

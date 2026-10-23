@@ -99,27 +99,36 @@ El **Paper Supplier Hub** incorpora un panel independiente para distribuidores/f
     - Backend: 9/9 tests PASS en `tests/paper_supplier_procurement_and_orders.test.js` sobre MySQL efímero.
     - Frontend: 3/3 tests PASS en `tests/SupplierOrdersAndSourcingUI.test.tsx` y 7/7 tests PASS en `tests/SupplierPagesLoadingLoop.test.tsx`.
     - Build: `npx vite build` completado limpiamente sin advertencias de claves duplicadas (3.576 módulos).
-- [x] **I6 — Integración de coste de papel y generación de documentos canónicos**:
-  - **Cálculo Físico y Normalización de Precios (`paperCostIntegrationService.js`)**:
+- [x] **I6 — Integración de coste de papel y generación de documentos canónicos (Remediado & Endurecido)**:
+  - **Cálculo Físico y Normalización de Precios Multidivisa (`paperCostIntegrationService.js`)**:
     - Cálculo de peso exacto de pliego: $\text{area\_m}^2 \times (\text{gsm} / 1000)$.
-    - Normalización canónica a EUR/kg para todas las bases (`KG`, `TONNE`, `SHEET`, `THOUSAND_SHEETS`, `PACK`).
-    - Resolución de mejor tarifa activa en marketplace y clientes autorizados (`resolveMarketPaperRate`).
-    - Estimación industrial de pliegos y kilogramos para tiradas comerciales con signaturas de 16pp y curvas de merma de puesta a punto y tirada (`calculateJobPaperRequirements`).
-    - Generación no invasiva de parches BPE (`paper_price_interior_by_kilo`, `paper_price_cover_by_kilo`) con procedencia trazable (`buildBpePaperPatch`).
+    - Normalización canónica por base (`KG`, `TONNE`, `SHEET`, `THOUSAND_SHEETS`, `PACK`) preservando estrictamente la moneda original `{ pricePerKg, currency }` (sin etiquetar USD/GBP como EUR).
+    - Resolución de mejor tarifa activa (`resolveMarketPaperRate`) con exigencia de tipo de cambio autorizado en comparativas multidivisa o filtrado forzoso por `targetCurrency`.
+    - Estimación industrial de pliegos y kilogramos (`calculateJobPaperRequirements`) completamente parametrizada por imposición y tolerancias de máquina, derivando la imposición geométrica de corte si no se especifican constantes.
+    - Generación no invasiva de parches BPE (`buildBpePaperPatch`) gobernada exclusivamente por solicitud explícita de operador de imprenta, garantizando cero mutaciones automáticas a cotizaciones o pedidos existentes.
   - **Generación de Documentos y Motor de Impresión**:
     - Documentos canónicos estructurados e imprimibles en HTML5 con `@media print`: Orden de Compra (`PO`) y Albarán de Entrega (`PACKING_SLIP`) con desglose de recibos y datos de transporte (`generateProcurementDocument`).
     - Visualización y descarga accesible en frontend con `<ProcurementDocumentModal>` integrado en compras de imprenta y pedidos de proveedor.
     - Soporte trilingüe estricto ES/EN/DE en interfaz y documentos.
-  - **Verificación**: 9/9 tests PASS en `tests/paper_supplier_cost_and_documents.test.js`.
-- [x] **I7 — Suite de humo E2E, verificación de integridad y cierre de versión**:
+  - **Verificación**: 13/13 tests PASS en `tests/paper_supplier_cost_and_documents.test.js`.
+- [x] **I7 — Suite de humo E2E, verificación en navegador real y cierre de candidato**:
   - **Suite de Humo E2E (`scripts/smoke_paper_supplier_hub_e2e.js`)**:
     - Script standalone con 47/47 aserciones verificadas sobre MySQL 8 efímero en 5.63s sin tocar producción.
     - Abarca el ciclo de vida completo: bootstrap, migraciones 007, 162-166, oferta comercial, cotización RFQ, aceptación, despacho, recepción atómica con balance e idempotencia, inventario, albaranes, documentos y notificaciones.
+  - **Verificación E2E en Navegador Real (`scripts/test_paper_supplier_hub_browser_journey.py`)**:
+    - 6 pasos verificados en Playwright sobre servidor Vite preview con 10 capturas de pantalla en `review_artifacts_paper_supplier_e2e/`:
+      1. Imprenta formula RFQ de 5.000 pliegos Phoenix Silk.
+      2. Proveedor revisa solicitud, perfil, dashboard y cotiza a 1,95 EUR/kg.
+      3. Imprenta acepta formalmente (`CONFIRMED`) y previsualiza Orden de Compra (PO).
+      4. Proveedor expide pedido (`DISPATCHED`) con Dachser y previsualiza Albarán.
+      5. Imprenta registra recepción en almacén (`RECEIVED`) y el catálogo de inventario `/materials` refleja de inmediato el incremento físico (+5.000 unidades).
+      6. Paridad trilingüe verificada en EN y DE, y viewport móvil (390x844) verificado con cero desbordamiento horizontal.
   - **Gobernanza y Arquitectura**:
-    - Integridad de migraciones 100% verificada (`npm run migration:integrity` PASS, 170 archivos / 169 migraciones).
-    - ADR 013 (Generación de Documentos de Aprovisionamiento) y ADR 014 (Integración No Invasiva de Coste y Parcheo BPE) formalizados en `DECISIONS.md`.
-    - Build de producción `npx vite build` completado en 13.73s con 0 errores (3.577 módulos).
-    - Suite global Vitest: 28/28 tests PASS (0 FAIL). Zero modificaciones al motor `@ppos/pricing-engine` (fijado a `1f8997e`).
+    - Integridad de migraciones 100% verificada (`npm run migration:integrity` PASS, 170 archivos descubiertos / 169 migraciones SQL clasificadas / 1 archivo `.json` excluido).
+    - ADR 013, ADR 014 y ADR 015 formalizados en `DECISIONS.md`.
+    - Build de producción `npm run build` completado limpiamente con 0 errores (3.577 módulos).
+    - Suites Vitest de papel: 71 tests PASS (0 FAIL). Zero modificaciones al motor `@ppos/pricing-engine` (fijado a `1f8997e`).
+
 
 ---
 

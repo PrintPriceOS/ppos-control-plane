@@ -60,8 +60,12 @@ class PaperCostIntegrationService {
     }
 
     /**
-     * Converts a price from any supported basis into canonical price_per_kg.
+     * Converts a price from any supported basis into canonical price_per_kg in original currency.
      * Supported bases: KG, TONNE, SHEET, THOUSAND_SHEETS, PACK.
+     * 
+     * Invariants:
+     * - Preserves original currency (never converts or labels USD/GBP as EUR).
+     * - Backward-compatible: returns number if currency is not passed; returns { pricePerKg, currency } if currency is passed.
      * 
      * @param {Object} params
      * @param {number} params.priceAmount
@@ -70,9 +74,10 @@ class PaperCostIntegrationService {
      * @param {number} params.heightMm
      * @param {number} params.gsm
      * @param {number} [params.sheetsPerPack]
-     * @returns {number} Normalized price in EUR/kg (rounded to 4 decimal places)
+     * @param {string} [params.currency]
+     * @returns {number|Object} Normalized price in original currency per kg (rounded to 4 decimal places)
      */
-    convertPriceToKg({ priceAmount, priceBasis, widthMm, heightMm, gsm, sheetsPerPack = null }) {
+    convertPriceToKg({ priceAmount, priceBasis, widthMm, heightMm, gsm, sheetsPerPack = null, currency = null }) {
         const price = Number(priceAmount);
         if (!Number.isFinite(price) || price <= 0) {
             throw new Error('Price amount must be a positive finite number');
@@ -106,15 +111,37 @@ class PaperCostIntegrationService {
                 throw new Error(`Unsupported price basis: '${priceBasis}'`);
         }
 
-        return Number(pricePerKg.toFixed(4));
+        const normalizedPrice = Number(pricePerKg.toFixed(4));
+        if (currency) {
+            return {
+                pricePerKg: normalizedPrice,
+                currency: String(currency).toUpperCase()
+            };
+        }
+        return normalizedPrice;
     }
 
     /**
      * Resolves the market paper rate for given physical specifications from active,
      * authorized supplier offers for the tenant.
      * 
-     * @param {string} tenantId - Printhouse tenant
-     * @param {Object} criteria - Search criteria (gsm, finish, category, widthMm, heightMm)
+     * Currency Invariants:
+     * - Preserves original currency.
+     * - Never compares offers with different currencies without an explicit and traceable conversion rate map.
+     * - If no authorized conversion is provided, requires targetCurrency and filters offers by that currency.
+     * - Does not label USD/GBP as EUR.
+     * 
+     * @param {string|Object} tenantIdOrCriteria - Printhouse tenant or combined criteria
+     * @param {Object} [criteria] - Search criteria
+     * @param {number} [criteria.gsm]
+     * @param {string} [criteria.finish]
+     * @param {string} [criteria.category]
+     * @param {number} [criteria.widthMm]
+     * @param {number} [criteria.heightMm]
+     * @param {string} [criteria.variantId]
+     * @param {string} [criteria.targetCurrency] - Desired target currency (e.g. 'EUR', 'USD')
+     * @param {string} [criteria.currency] - Alias for targetCurrency
+     * @param {Object} [criteria.exchangeRates] - Optional explicit authorized conversion rates to targetCurrency (e.g. { USD: 0.92, EUR: 1.0 })
      * @returns {Promise<Object|null>} Resolved best offer rate with normalized pricePerKg
      */
     async resolveMarketPaperRate(tenantIdOrCriteria, criteria = {}) {
@@ -137,6 +164,11 @@ class PaperCostIntegrationService {
             heightMm = null,
             variantId = null
         } = crit;
+
+        const targetCurrency = (crit.targetCurrency || crit.currency)
+            ? String(crit.targetCurrency || crit.currency).trim().toUpperCase()
+            : null;
+        const exchangeRates = crit.exchangeRates || crit.currencyConversions || null;
 
         let whereClauses = [
             "o.deleted_at IS NULL",
@@ -172,6 +204,12 @@ class PaperCostIntegrationService {
             params.push(Number(widthMm), Number(heightMm));
         }
 
+        // If target currency specified and no multi-currency exchange rate map provided, filter in SQL
+        if (targetCurrency && !exchangeRates) {
+            whereClauses.push("o.currency = ?");
+            params.push(targetCurrency);
+        }
+
         const sql = `
             SELECT 
                 o.*,
@@ -199,20 +237,71 @@ class PaperCostIntegrationService {
             return null;
         }
 
-        // Calculate normalized price_per_kg for each candidate offer and sort ascending (best price first)
+        // If no target currency and no exchange rates specified, check currency uniformity across candidates
+        let effectiveTargetCurrency = targetCurrency;
+        if (!effectiveTargetCurrency && !exchangeRates) {
+            const distinctCurrencies = [...new Set(rows.map(r => (r.currency || '').toUpperCase()))].filter(Boolean);
+            if (distinctCurrencies.length > 1) {
+                const err = new Error(`TARGET_CURRENCY_REQUIRED: Multiple currencies (${distinctCurrencies.join(', ')}) found in active market offers without an authorized exchange rate. Specify targetCurrency to filter offers.`);
+                err.statusCode = 400;
+                err.code = 'TARGET_CURRENCY_REQUIRED';
+                throw err;
+            }
+            effectiveTargetCurrency = distinctCurrencies[0] || 'EUR';
+        }
+
+        // Calculate normalized price_per_kg for each candidate offer preserving currency
         const candidates = rows.map(r => {
             try {
-                const pricePerKg = this.convertPriceToKg({
+                const conversion = this.convertPriceToKg({
                     priceAmount: r.price_amount,
                     priceBasis: r.price_basis,
                     widthMm: r.width_mm,
                     heightMm: r.height_mm,
                     gsm: r.gsm,
-                    sheetsPerPack: r.sheets_per_pack
+                    sheetsPerPack: r.sheets_per_pack,
+                    currency: r.currency
                 });
+                const originalPricePerKg = typeof conversion === 'object' ? conversion.pricePerKg : conversion;
+                const offerCurrency = (r.currency || '').toUpperCase();
+
+                let comparablePricePerKg = originalPricePerKg;
+                let conversionTrace = null;
+
+                if (exchangeRates && effectiveTargetCurrency) {
+                    if (offerCurrency !== effectiveTargetCurrency) {
+                        const rateKey = offerCurrency;
+                        const rate = Number(exchangeRates[rateKey] ?? exchangeRates[`${offerCurrency}_TO_${effectiveTargetCurrency}`]);
+                        if (!Number.isFinite(rate) || rate <= 0) {
+                            throw new Error(`Missing authorized exchange rate for currency '${offerCurrency}' to '${effectiveTargetCurrency}'`);
+                        }
+                        comparablePricePerKg = Number((originalPricePerKg * rate).toFixed(4));
+                        conversionTrace = {
+                            originalCurrency: offerCurrency,
+                            originalPricePerKg,
+                            exchangeRate: rate,
+                            targetCurrency: effectiveTargetCurrency,
+                            convertedPricePerKg: comparablePricePerKg
+                        };
+                    } else {
+                        conversionTrace = {
+                            originalCurrency: offerCurrency,
+                            originalPricePerKg,
+                            exchangeRate: 1.0,
+                            targetCurrency: effectiveTargetCurrency,
+                            convertedPricePerKg: originalPricePerKg
+                        };
+                    }
+                } else if (effectiveTargetCurrency && offerCurrency !== effectiveTargetCurrency) {
+                    // Filter out candidates not matching effectiveTargetCurrency
+                    return null;
+                }
+
                 return {
                     ...r,
-                    pricePerKg
+                    pricePerKg: originalPricePerKg,
+                    comparablePricePerKg,
+                    conversionTrace
                 };
             } catch (err) {
                 logger.warn({ event: 'offer_price_conversion_failed', offerId: r.id, error: err.message });
@@ -224,8 +313,8 @@ class PaperCostIntegrationService {
             return null;
         }
 
-        // Sort by lowest price per kg
-        candidates.sort((a, b) => a.pricePerKg - b.pricePerKg);
+        // Sort by lowest comparable price per kg
+        candidates.sort((a, b) => a.comparablePricePerKg - b.comparablePricePerKg);
         const bestOffer = candidates[0];
 
         return {
@@ -251,56 +340,101 @@ class PaperCostIntegrationService {
             moq: Number(bestOffer.moq),
             orderMultiple: Number(bestOffer.order_multiple),
             pricePerKg: bestOffer.pricePerKg,
+            pricePerKgCurrency: bestOffer.currency,
+            conversionTrace: bestOffer.conversionTrace,
             resolvedAt: new Date().toISOString()
         };
     }
 
     /**
      * Estimates paper requirements and costs for a commercial book/print job.
-     * Uses standard industrial signature imposition and scrap curves.
+     * Incorporates real machine, imposition, and scrap parameters without imposing
+     * hardcoded universal assumptions.
+     * 
+     * Invariants:
+     * - Imposition: Uses machine/job signatureSize if provided, or derives geometrically
+     *   from sheet and trim dimensions.
+     * - Makeready & Run Waste: Uses machine profile or explicit parameters; does NOT
+     *   inject universal hardcoded constants (100 sheets / 2.5%) unless explicitly provided.
      * 
      * @param {Object} jobSpec
      * @param {number} jobSpec.copies - Run length (number of books / prints)
      * @param {number} jobSpec.interior_pages - Total page count for interior
-     * @param {number} [jobSpec.book_width_mm=148] - Finished trim width
-     * @param {number} [jobSpec.book_height_mm=210] - Finished trim height
-     * @param {number} [jobSpec.paper_weight_interior=80] - Interior GSM
-     * @param {number} [jobSpec.paper_weight_cover=250] - Cover GSM
-     * @param {string} [jobSpec.paper_type_interior='offset'] - Interior paper type
-     * @param {string} [jobSpec.paper_type_cover='mc'] - Cover paper type
-     * @param {number} [jobSpec.signature_size=16] - Pages per signature (16, 8, 4)
+     * @param {number} [jobSpec.signature_size] - Explicit signature size (e.g. 16, 8, 4)
+     * @param {number} [jobSpec.covers_per_sheet=2] - Number of covers per press sheet
+     * @param {number} [jobSpec.book_width_mm] - Trim width for geometric imposition
+     * @param {number} [jobSpec.book_height_mm] - Trim height for geometric imposition
      * @param {number} [jobSpec.press_sheet_width_mm=700] - Press sheet width
      * @param {number} [jobSpec.press_sheet_height_mm=1000] - Press sheet height
-     * @param {number} [jobSpec.rate_per_kg_interior=null] - Optional override price/kg
-     * @param {number} [jobSpec.rate_per_kg_cover=null] - Optional override price/kg
+     * @param {number} [jobSpec.interior_makeready_sheets] - Makeready setup waste sheets for interior
+     * @param {number} [jobSpec.makeready_sheets_per_signature] - Makeready setup sheets per interior signature
+     * @param {number} [jobSpec.cover_makeready_sheets] - Makeready setup waste sheets for cover
+     * @param {number} [jobSpec.run_waste_rate] - Running scrap percentage (e.g. 0.025 for 2.5%)
+     * @param {number} [jobSpec.run_waste_percentage] - Running scrap as percentage (e.g. 2.5)
+     * @param {number} [jobSpec.rate_per_kg_interior=null] - Optional price/kg in specified currency
+     * @param {number} [jobSpec.rate_per_kg_cover=null] - Optional price/kg in specified currency
+     * @param {string} [jobSpec.currency='EUR'] - Currency label
      * @returns {Object} Estimated sheets, kg, scrap, and procurement costs
      */
     calculateJobPaperRequirements(jobSpec) {
         const copies = Math.max(1, Number(jobSpec.copies) || 1);
         const interiorPages = Math.max(1, Number(jobSpec.interior_pages ?? jobSpec.interiorPages) || 1);
-        const signatureSize = Number(jobSpec.signature_size ?? jobSpec.signatureSize) || 16;
         const interiorGsm = Number(jobSpec.paper_weight_interior ?? jobSpec.interiorWeightGsm) || 80;
         const coverGsm = Number(jobSpec.paper_weight_cover ?? jobSpec.coverWeightGsm) || 250;
+        const currency = jobSpec.currency || 'EUR';
 
         const pressWidthMm = Number(jobSpec.press_sheet_width_mm) || 700;
         const pressHeightMm = Number(jobSpec.press_sheet_height_mm) || 1000;
+        const bookWidthMm = Number(jobSpec.book_width_mm || 0);
+        const bookHeightMm = Number(jobSpec.book_height_mm || 0);
 
-        // Interior Signatures calculation
-        // For a 16-page signature on a full press sheet (700x1000 or similar), 1 sheet = 1 signature (16 pages)
+        // Derive signature size from machine spec, geometry, or explicit input
+        let signatureSize = Number(jobSpec.signature_size ?? jobSpec.signatureSize ?? jobSpec.pages_per_signature ?? jobSpec.pagesPerSignature);
+        let signatureSource = 'explicit';
+
+        if (!Number.isFinite(signatureSize) || signatureSize <= 0) {
+            if (bookWidthMm > 0 && bookHeightMm > 0 && pressWidthMm > 0 && pressHeightMm > 0) {
+                // Geometric derivation: pages fitting per press sheet side
+                const horizFit = Math.floor(pressWidthMm / bookWidthMm) * Math.floor(pressHeightMm / bookHeightMm);
+                const rotFit = Math.floor(pressWidthMm / bookHeightMm) * Math.floor(pressHeightMm / bookWidthMm);
+                const pagesPerSide = Math.max(horizFit, rotFit);
+                const rawCapacity = pagesPerSide > 0 ? pagesPerSide * 2 : 16;
+                // Industrial signature folding sections fold in halves: 32, 16, 8, 4 pages
+                const binarySections = [32, 16, 8, 4];
+                signatureSize = binarySections.find(s => s <= rawCapacity) || 16;
+                signatureSource = 'geometric_derivation';
+            } else {
+                signatureSize = 16;
+                signatureSource = 'nominal_standard';
+            }
+        }
+
         const signaturesCount = Math.max(1, Math.ceil(interiorPages / signatureSize));
         const netInteriorSheets = copies * signaturesCount;
 
-        // Cover Sheets calculation
-        // Typically 2 to 4 covers fit on one press sheet; assume 2 covers per press sheet
-        const netCoverSheets = Math.ceil(copies / 2);
+        // Cover Sheets calculation: default 2 covers per press sheet unless specified
+        const coversPerSheet = Math.max(1, Number(jobSpec.covers_per_sheet ?? jobSpec.coversPerSheet) || 2);
+        const netCoverSheets = Math.ceil(copies / coversPerSheet);
 
-        // Industrial scrap allowances (makeready setup + running waste)
-        // Setup waste: 100 sheets per signature setup; 50 sheets for cover setup
-        const interiorMakereadySheets = signaturesCount * 100;
-        const coverMakereadySheets = 50;
+        // Makeready setup waste sheets: strictly driven by input parameters (0 if omitted)
+        let interiorMakereadySheets = 0;
+        if (jobSpec.interior_makeready_sheets !== undefined || jobSpec.interiorMakereadySheets !== undefined) {
+            interiorMakereadySheets = Math.max(0, Number(jobSpec.interior_makeready_sheets ?? jobSpec.interiorMakereadySheets) || 0);
+        } else if (jobSpec.makeready_sheets_per_signature !== undefined || jobSpec.makereadySheetsPerSignature !== undefined) {
+            const sheetsPerSig = Number(jobSpec.makeready_sheets_per_signature ?? jobSpec.makereadySheetsPerSignature) || 0;
+            interiorMakereadySheets = Math.max(0, signaturesCount * sheetsPerSig);
+        }
 
-        // Run waste: 2.5% of net run
-        const runWasteRate = 0.025;
+        const coverMakereadySheets = Math.max(0, Number(jobSpec.cover_makeready_sheets ?? jobSpec.coverMakereadySheets) || 0);
+
+        // Run waste rate: strictly driven by input parameters (0 if omitted)
+        let runWasteRate = 0;
+        if (jobSpec.run_waste_rate !== undefined || jobSpec.runWasteRate !== undefined) {
+            runWasteRate = Math.max(0, Number(jobSpec.run_waste_rate ?? jobSpec.runWasteRate) || 0);
+        } else if (jobSpec.run_waste_percentage !== undefined || jobSpec.runWastePercentage !== undefined) {
+            runWasteRate = Math.max(0, (Number(jobSpec.run_waste_percentage ?? jobSpec.runWastePercentage) || 0) / 100);
+        }
+
         const interiorRunWasteSheets = Math.ceil(netInteriorSheets * runWasteRate);
         const coverRunWasteSheets = Math.ceil(netCoverSheets * runWasteRate);
 
@@ -335,7 +469,11 @@ class PaperCostIntegrationService {
             copies,
             interiorPages,
             signaturesCount,
+            signatureSize,
+            signatureSource,
+            coversPerSheet,
             pressSheetDimensions: `${pressWidthMm}x${pressHeightMm} mm`,
+            currency,
             interior: {
                 gsm: interiorGsm,
                 netSheets: netInteriorSheets,
@@ -376,12 +514,18 @@ class PaperCostIntegrationService {
      * Builds a canonical BPE candidate override patch from market supplier paper rates.
      * Compatible with buildPriceCalibrationAdapter and canonical buildPrice(params, house).
      * 
+     * Invariants:
+     * - Pure in-memory calculation; zero alteration to printer_nodes.rates_json or orders.
+     * - Preserves and attaches target currency metadata.
+     * 
      * @param {string} tenantId 
      * @param {Object} options
      * @param {string} [options.interiorPaperType='offset']
      * @param {number} [options.interiorGsm=80]
      * @param {string} [options.coverPaperType='mc']
      * @param {number} [options.coverGsm=250]
+     * @param {string} [options.targetCurrency='EUR']
+     * @param {string} [options.currency='EUR']
      * @returns {Promise<Object>} Object containing candidateOverrides and metadata
      */
     async buildBpePaperPatch(tenantIdOrOptions, options = {}) {
@@ -396,16 +540,19 @@ class PaperCostIntegrationService {
         const interiorGsm = Number(opts.interiorGsm) || 80;
         const coverType = opts.coverPaperType || 'mc';
         const coverGsm = Number(opts.coverGsm) || 250;
+        const targetCurrency = String(opts.targetCurrency || opts.currency || 'EUR').toUpperCase();
+        const exchangeRates = opts.exchangeRates || opts.currencyConversions || null;
 
         const [resolvedInterior, resolvedCover] = await Promise.all([
-            this.resolveMarketPaperRate(tenantId, { gsm: interiorGsm }),
-            this.resolveMarketPaperRate(tenantId, { gsm: coverGsm })
+            this.resolveMarketPaperRate(tenantId, { gsm: interiorGsm, targetCurrency, exchangeRates }),
+            this.resolveMarketPaperRate(tenantId, { gsm: coverGsm, targetCurrency, exchangeRates })
         ]);
 
         const candidateOverrides = {};
         const snapshotMetadata = {
             source: 'PPOS_PAPER_SUPPLIER_HUB',
             tenantId,
+            currency: targetCurrency,
             resolvedAt: new Date().toISOString(),
             interior: null,
             cover: null
@@ -421,6 +568,7 @@ class PaperCostIntegrationService {
                 supplierName: resolvedInterior.supplierName,
                 sku: resolvedInterior.supplierSku,
                 pricePerKg: resolvedInterior.pricePerKg,
+                currency: resolvedInterior.currency,
                 gsm: resolvedInterior.gsm,
                 finish: resolvedInterior.finish
             };
@@ -436,6 +584,7 @@ class PaperCostIntegrationService {
                 supplierName: resolvedCover.supplierName,
                 sku: resolvedCover.supplierSku,
                 pricePerKg: resolvedCover.pricePerKg,
+                currency: resolvedCover.currency,
                 gsm: resolvedCover.gsm,
                 finish: resolvedCover.finish
             };

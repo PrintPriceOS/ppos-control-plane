@@ -254,10 +254,14 @@ async function runSmokeSuite() {
         const jobSpec = {
             copies: 1000,
             interior_pages: 96,
+            signature_size: 16,
             paper_weight_interior: 130,
             paper_weight_cover: 300,
             press_sheet_width_mm: 700,
             press_sheet_height_mm: 1000,
+            interior_makeready_sheets: 600,
+            cover_makeready_sheets: 50,
+            run_waste_rate: 0.025,
             rate_per_kg_interior: 1.75,
             rate_per_kg_cover: 2.20
         };
@@ -274,7 +278,7 @@ async function runSmokeSuite() {
         console.log('\n--- Step 5: Resolving Market Paper Rate & Building BPE Forward Rate Patch ---');
         const resolvedOffer = await paperCostIntegrationService.resolveMarketPaperRate(
             'tenant_smoke_buyer',
-            { gsm: 130, widthMm: 700, heightMm: 1000 }
+            { gsm: 130, widthMm: 700, heightMm: 1000, targetCurrency: 'EUR' }
         );
         assert(resolvedOffer.offerId === 'off_sappi_magno_130', `Cheapest offer resolved correctly to Sappi Magno Gloss (got ${resolvedOffer.offerId})`);
         assert(Math.abs(resolvedOffer.pricePerKg - 1.75) < 0.001, `Resolved price is 1.75 EUR/kg (got ${resolvedOffer.pricePerKg})`);

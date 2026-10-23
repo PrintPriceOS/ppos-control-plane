@@ -220,5 +220,38 @@
      - Ejecución integral y aislada del ciclo de vida en 12 fases sobre MySQL efímero con aserciones estrictas y reporte limpio sin mutaciones en base de datos productiva.
 - **Consecuencia**: Máxima precisión en cotizaciones industriales, desacoplamiento absoluto de `@ppos/pricing-engine`, trazabilidad completa de origen de coste y reproducibilidad en CI.
 
+---
+
+## ADR 015: Normalización Multidivisa Estricta, Parámetros Industriales Reales y Gobernanza del Parche BPE
+- **Fecha**: 2026-10-23
+- **Estado**: Aceptado
+- **Contexto**:
+  La integración de tarifas de mercado para cálculo industrial de papel presentaba riesgos de distorsión financiera y operativa si:
+  a) Se asumía implícitamente EUR o se convertían ofertas en USD/GBP sin tipo de cambio autorizado y trazable.
+  b) Se utilizaban reglas fijas de máquina (16 páginas por pliego, 100/50 de preparación, 2,5% de merma) como invariantes universales en lugar de respetar la imposición, el formato de máquina y la ficha de producción.
+  c) No se definía con rigor la gobernanza del parche BPE, generando dudas sobre una eventual mutación automática de tarifas preexistentes o pedidos en curso.
+- **Decisión**:
+  1. **Monedas y Normalización Estricta (`convertPriceToKg`, `resolveMarketPaperRate`)**:
+     - Toda normalización de precio por kilogramo conserva la moneda original de la oferta (`{ pricePerKg, currency }`).
+     - Queda terminantemente prohibido etiquetar ofertas en USD o GBP como EUR.
+     - Queda prohibido comparar o clasificar ofertas en distintas monedas para elegir "la más barata" si no se proporciona un mapa explícito y autorizado de tipos de cambio (`options.exchangeRates`).
+     - En ausencia de un mapa de cambio autorizado, el motor exige `targetCurrency` y filtra estrictamente por dicha moneda, rechazando ofertas en divisa divergente.
+     - Toda resolución registra metadatos de trazabilidad en `conversionTrace` (`sourceCurrency`, `targetCurrency`, `rateApplied`).
+  2. **Cálculo Industrial Parametrizado (`calculateJobPaperRequirements`)**:
+     - Los valores de 16 páginas por pliego, 100 pliegos de preparación interior, 50 de cubierta y 2,5% de merma se eliminan como constantes universales del motor.
+     - El cálculo acepta parámetros explícitos de producción (`pagesPerSheet`, `makereadyWasteSheets`, `runWastePercentage`).
+     - Si no se suministran, el motor deriva la imposición geométrica a partir de las dimensiones del pliego y del corte de página (acotando a signaturas binarias estándar: 32, 16, 8, 4) y aplica 0 de merma por defecto para no inventar costes ocultos.
+     - Los valores de ejemplo quedan confinados a fixtures explícitas de prueba.
+  3. **Gobernanza del Parche BPE (`buildBpePaperPatch`)**:
+     - **Consumidor**: Exclusivamente `commercialEstimationService` / módulo de cotización y presupuestación industrial.
+     - **Momento de aplicación**: Únicamente cuando un operador o administrador de la imprenta pulsa explícitamente "Aplicar tarifa de proveedor de mercado" en la confección o recálculo de una nueva cotización de trabajo.
+     - **Autorización requerida**: Roles autenticados `PRINTHOUSE_ADMIN` o `PRINTHOUSE_OPERATOR`.
+     - **Inmutabilidad de datos históricos**: El parche BPE **nunca** muta de forma automática tarifas base configuradas en la imprenta, cotizaciones ya guardadas, ni condiciones acordadas en pedidos (`orders`) existentes. Genera un objeto de actualización transitorio con metadatos auditables (`_metadata.rateSnapshot`).
+  4. **Explicación de Integridad de Migraciones (170 vs 169)**:
+     - El directorio `migrations/` contiene 170 archivos totales en disco: 169 scripts DDL/DML que terminan en `.sql` y 1 archivo de metadatos `migration-integrity-baseline.json`.
+     - El script de validación `scripts/smoke_phase183_migration_integrity.js` contabiliza los 170 archivos, excluye formalmente el archivo no migración (`.json`) y valida criptográficamente los 169 archivos `.sql` clasificados contra sus SHA-256 baseline ($169 + 1 = 170$).
+- **Consecuencia**: Cero distorsión contable multidivisa, respeto a la realidad física de cada taller e inviolabilidad de las cotizaciones y pedidos históricos.
+
+
 
 
