@@ -308,3 +308,29 @@
        3. Recargar/reiniciar PM2: `pm2 restart ppos-control-plane`.
        4. Las tablas aditivas permanecen en la base de datos sin afectar a la versión anterior ni perder los datos comerciales creados.
 - **Consecuencia**: Honestidad técnica absoluta en la cobertura de pruebas, despliegue idempotente y seguro mediante PM2 con comprobación de rutas reales y preservación garantizada de los datos de compras en producción.
+
+---
+
+## ADR 017: Sincronización Bidireccional de Materiales y Catálogo Maestro en Printhouse Setup / Materials & Paper
+- **Fecha**: 2026-10-23
+- **Estado**: Aceptado
+- **Contexto**:
+  La configuración inicial de taller (`Printhouse Setup > Materials & Paper`, accesible en `/printhouse/setup?tab=MATERIALS`) persistía materiales únicamente en la tabla `materials_catalog`, mientras que el hub SCADA de aprovisionamiento y predicción de stock (`/materials`) consultaba `predictive_material_inventory`.
+  Esto producía un silo de datos donde los materiales creados en el onboarding inicial no contaban con predicción de inventario ni permitían vincularse con las referencias del Catálogo Maestro de Papel de proveedores (`paper_variant_id`, `supplier_id`, `offer_id`), impidiendo generar peticiones de oferta (RFQ) u órdenes de compra (PO) en 1-clic desde la vista de setup.
+- **Decisión**:
+  1. **Sincronización en Backend (`printhouseMaterialService.js`)**:
+     - Al invocar `createMaterial(tenantId, siteId, payload)`: Se realiza un `INSERT INTO predictive_material_inventory` con `material_catalog_id = id`, stock inicial, lead times y punto de reorden por defecto, con cláusula `ON DUPLICATE KEY UPDATE`.
+     - Al invocar `updateMaterial`: Se propagan `material_name`, `finish`, `paper_gsm` y `supplier_name` a `predictive_material_inventory`.
+     - Al invocar `archiveMaterial`: Se actualiza `status = 'DISABLED'` y `operational_status = 'OFFLINE'` en el inventario predictivo.
+     - Se mantiene el bloque de captura de errores tolerante a fallos para preservar el aislamiento en pruebas unitarias con esquemas efímeros mínimos.
+  2. **Búsqueda y Autocompletado del Catálogo Maestro (`MaterialsPanel.tsx`)**:
+     - Se incorpora en la cabecera del formulario "Add Material to Catalog" un panel reactivo con `adminApi.searchMasterPaperDatabase` y debouncing de 250ms.
+     - Chips de consulta rápida para formatos de pliego industriales (`70x100`, `64x92`, `72x102`, `500x700`, `SRA3`) y marcas estándar (`Alaska`, `Silk`, `Algro`).
+     - Al seleccionar una variante, se autocompletan los campos del formulario (`material_name`, `gsm`, `sheet_format`, `finish_type`, `supplier_name`, `supplier_country`) y se adjuntan los identificadores en `metadata_json` (`paper_variant_id`, `paper_product_id`, `supplier_id`, `offer_id`).
+  3. **Distintivo de Enlace y Pedido en 1-Clic (`PaperSourcingModal`)**:
+     - Cada tarjeta de material en el catálogo de setup inspecciona `metadata_json`. Si está vinculado a la base de datos de papel, muestra un badge `"Vinculado a BD"` con icono `Database`.
+     - Se añade un botón de acción `"Pedir"` / `"Order Paper"` que abre directamente `<PaperSourcingModal>` con los parámetros precargados para emitir RFQ u orden de compra sin salir de Printhouse Setup.
+  4. **Paridad Lingüística y Cero Desbordamiento Visual**:
+     - Reutilización estricta de las claves i18n existentes en `es.ts`, `en.ts` y `de.ts` (`materials.dbSearch.*`, `materials.linkedToDb`, `materials.orderFromSupplier`, `materials.orderPaper`).
+     - Diseño responsive verificado sin scroll horizontal en resoluciones desktop (1280px, 1366px) y móvil (390px).
+- **Consecuencia**: Experiencia de configuración unificada entre el asistente de onboarding de taller y el ecosistema SCADA de proveedores de papel, con trazabilidad comercial garantizada y cero duplicación manual de datos.

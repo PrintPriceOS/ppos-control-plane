@@ -7,8 +7,10 @@
 import React, { useState, useEffect } from 'react';
 import { getAuthToken } from '../../../lib/authStore';
 import { useLocale } from '../../../i18n';
-import { Layers, Plus, Trash2, Link2, Unlink, AlertCircle, CheckCircle } from 'lucide-react';
+import { Layers, Plus, Trash2, Link2, Unlink, AlertCircle, CheckCircle, Search, Database, ShoppingBag, X, Loader2 } from 'lucide-react';
 import { normalizeUiError } from '../../../utils/errorUtils';
+import * as adminApi from '../../../lib/adminApi';
+import { PaperSourcingModal } from '../PaperSourcingModal';
 
 interface MaterialsPanelProps {
     sites: { siteId: string; siteName: string }[];
@@ -33,6 +35,20 @@ export const MaterialsPanel: React.FC<MaterialsPanelProps> = ({ sites, onSaved }
     const [finishType, setFinishType] = useState('UNCOATED');
     const [supplierName, setSupplierName] = useState('Generic Supplier');
     const [supplierCountry, setSupplierCountry] = useState('ES');
+
+    // Master Paper Database Search state
+    const [paperDbSearch, setPaperDbSearch] = useState('');
+    const [paperDbLoading, setPaperDbLoading] = useState(false);
+    const [paperDbResults, setPaperDbResults] = useState<adminApi.MasterPaperDatabaseItem[]>([]);
+    const [selectedDbPaper, setSelectedDbPaper] = useState<adminApi.MasterPaperDatabaseItem | null>(null);
+
+    // Paper Sourcing Modal state
+    const [isSourcingModalOpen, setIsSourcingModalOpen] = useState(false);
+    const [sourcingParams, setSourcingParams] = useState<{
+        initialSearchQuery?: string;
+        initialVariantId?: string;
+        initialOfferId?: string;
+    }>({});
 
     // Compatibility pairing states
     const [pairingMaterialId, setPairingMaterialId] = useState<string | null>(null);
@@ -93,11 +109,63 @@ export const MaterialsPanel: React.FC<MaterialsPanelProps> = ({ sites, onSaved }
         fetchMaterialsAndMachines();
     }, [selectedSiteId]);
 
+    // Master Paper Database Debounced Search
+    useEffect(() => {
+        if (!paperDbSearch.trim()) {
+            setPaperDbResults([]);
+            setPaperDbLoading(false);
+            return;
+        }
+
+        setPaperDbLoading(true);
+        const timer = setTimeout(async () => {
+            try {
+                const res = await adminApi.searchMasterPaperDatabase({ query: paperDbSearch.trim(), limit: 25 });
+                if (res?.ok && Array.isArray(res?.data?.items)) {
+                    setPaperDbResults(res.data.items);
+                } else {
+                    setPaperDbResults([]);
+                }
+            } catch (err) {
+                console.error("Failed to search master paper database:", err);
+                setPaperDbResults([]);
+            } finally {
+                setPaperDbLoading(false);
+            }
+        }, 250);
+
+        return () => clearTimeout(timer);
+    }, [paperDbSearch]);
+
+    const handleSelectDbPaper = (item: adminApi.MasterPaperDatabaseItem) => {
+        setSelectedDbPaper(item);
+        setMaterialName(`${item.productName} ${item.gsm}g ${item.sheetFormat}`);
+        setMaterialType('PAPER');
+        setSubstrateClass(item.category || 'STANDARD');
+        setGsm(item.gsm);
+        setSheetFormat(item.sheetFormat);
+        setFinishType(['UNCOATED', 'SILK', 'GLOSSY', 'MATTE'].includes((item.finish || '').toUpperCase())
+            ? item.finish.toUpperCase()
+            : 'UNCOATED');
+        setSupplierName(item.supplierName || 'Papelera del Mediterraneo (Demo)');
+        setSupplierCountry('ES');
+    };
+
     const handleCreateMaterial = async (e: React.FormEvent) => {
         e.preventDefault();
         setError(null);
         setSuccessMsg(null);
         try {
+            const metadataPayload: any = selectedDbPaper ? {
+                paper_variant_id: selectedDbPaper.variantId,
+                paper_product_id: selectedDbPaper.productId,
+                supplier_id: selectedDbPaper.supplierId,
+                offer_id: selectedDbPaper.offerId,
+                brand: selectedDbPaper.brand || selectedDbPaper.manufacturer,
+                price_per_sheet: selectedDbPaper.calculatedCostPerSheet,
+                linked_at: new Date().toISOString()
+            } : undefined;
+
             const res = await fetch(`/api/printhouse/onboarding/sites/${selectedSiteId}/materials`, {
                 method: 'POST',
                 headers: {
@@ -112,13 +180,17 @@ export const MaterialsPanel: React.FC<MaterialsPanelProps> = ({ sites, onSaved }
                     sheet_format: sheetFormat,
                     finish_type: finishType,
                     supplier_name: supplierName,
-                    supplier_country: supplierCountry
+                    supplier_country: supplierCountry,
+                    metadata_json: metadataPayload
                 })
             });
             const data = await res.json().catch(() => ({}));
             if (res.ok && data.ok) {
                 setSuccessMsg('Material catalog entry created successfully.');
                 setMaterialName('');
+                setSelectedDbPaper(null);
+                setPaperDbSearch('');
+                setPaperDbResults([]);
                 fetchMaterialsAndMachines();
                 if (onSaved) onSaved();
             } else {
@@ -239,6 +311,148 @@ export const MaterialsPanel: React.FC<MaterialsPanelProps> = ({ sites, onSaved }
                 <form onSubmit={handleCreateMaterial} className="lg:col-span-5 bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 p-5 rounded-xl flex flex-col gap-3 transition-colors">
                     <h3 className="text-sm font-bold text-zinc-900 dark:text-white m-0 mb-1">{t('setup.materials.addMaterial')}</h3>
 
+                    {/* Master Paper Database Quick Search & Autocomplete Card */}
+                    <div className="bg-white dark:bg-zinc-900 border border-red-200 dark:border-red-950/70 p-3.5 rounded-xl shadow-xs transition-colors">
+                        <div className="flex items-center justify-between mb-1.5 flex-wrap gap-1">
+                            <div className="flex items-center gap-1.5">
+                                <Database size={15} className="text-[#dc0000]" />
+                                <span className="text-xs font-bold text-zinc-900 dark:text-white uppercase tracking-wider">
+                                    {t('materials.dbSearch.title')}
+                                </span>
+                            </div>
+                            <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-red-50 dark:bg-red-950/50 text-[#dc0000] border border-red-200 dark:border-red-900">
+                                {t('materials.dbSearch.badge')}
+                            </span>
+                        </div>
+                        <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mb-2 leading-tight">
+                            {t('materials.dbSearch.subtitle')}
+                        </p>
+
+                        <div className="relative">
+                            <input
+                                id="setup-paper-db-search-input"
+                                type="text"
+                                value={paperDbSearch}
+                                onChange={(e) => setPaperDbSearch(e.target.value)}
+                                placeholder={t('materials.dbSearch.placeholder')}
+                                className={`${inputClass} pl-8 pr-7 text-xs`}
+                            />
+                            <Search size={14} className="text-zinc-400 absolute left-2.5 top-2.5 pointer-events-none" />
+                            {paperDbSearch && (
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setPaperDbSearch('');
+                                        setPaperDbResults([]);
+                                    }}
+                                    className="absolute right-2 top-2.5 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 cursor-pointer"
+                                >
+                                    <X size={14} />
+                                </button>
+                            )}
+                        </div>
+
+                        {/* Quick filter chips */}
+                        <div className="flex items-center gap-1 flex-wrap mt-2">
+                            <span className="text-[10px] text-zinc-500 font-semibold">{t('materials.dbSearch.suggestions')}</span>
+                            {['70x100', '64x92', '72x102', '500x700', 'SRA3', 'Alaska', 'Silk', 'Algro'].map((chip) => (
+                                <button
+                                    key={chip}
+                                    type="button"
+                                    onClick={() => setPaperDbSearch(chip)}
+                                    className="px-1.5 py-0.5 rounded text-[10px] font-mono font-medium bg-zinc-100 hover:bg-red-50 hover:text-red-600 dark:bg-zinc-800 dark:hover:bg-red-950/40 dark:hover:text-red-300 text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700 transition-colors cursor-pointer"
+                                >
+                                    {chip}
+                                </button>
+                            ))}
+                        </div>
+
+                        {/* Dropdown search results */}
+                        {paperDbSearch.trim().length >= 2 && (
+                            <div className="mt-2 border rounded-xl max-h-48 overflow-y-auto divide-y divide-zinc-200 dark:divide-zinc-800 bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 shadow-md">
+                                {paperDbLoading && (
+                                    <div className="p-3 text-center text-[11px] text-zinc-400 flex items-center justify-center gap-2">
+                                        <Loader2 size={14} className="animate-spin text-red-500" />
+                                        <span>{t('materials.dbSearch.searching')}</span>
+                                    </div>
+                                )}
+                                {!paperDbLoading && paperDbResults.length === 0 && (
+                                    <div className="p-3 text-center text-[11px] text-zinc-500">
+                                        {t('materials.dbSearch.noResults')}
+                                    </div>
+                                )}
+                                {!paperDbLoading && paperDbResults.map((item) => (
+                                    <div
+                                        key={item.variantId}
+                                        className={`p-2 flex items-center justify-between gap-2 hover:bg-red-50/50 dark:hover:bg-red-950/30 transition-colors cursor-pointer ${
+                                            selectedDbPaper?.variantId === item.variantId ? 'bg-red-50 dark:bg-red-950/40' : ''
+                                        }`}
+                                        onClick={() => handleSelectDbPaper(item)}
+                                    >
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex items-center space-x-1.5 flex-wrap gap-y-1">
+                                                <span className="font-bold text-xs truncate text-zinc-900 dark:text-zinc-100">
+                                                    {item.productName}
+                                                </span>
+                                                <span className="text-[9px] px-1.5 py-0.2 rounded font-bold uppercase bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border border-zinc-300 dark:border-zinc-700">
+                                                    {item.gsm} GSM
+                                                </span>
+                                                <span className="text-[9px] px-1.5 py-0.2 rounded font-bold uppercase bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+                                                    {item.sheetFormat}
+                                                </span>
+                                            </div>
+                                            <div className="flex items-center gap-2 text-[10px] text-zinc-500 mt-0.5">
+                                                <span>{item.brand || item.manufacturer || 'Standard'}</span>
+                                                <span>•</span>
+                                                <span>{item.finish}</span>
+                                                <span>•</span>
+                                                <span className="text-zinc-400 truncate max-w-[120px]">{item.supplierName}</span>
+                                            </div>
+                                        </div>
+                                        <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                                            <span className="text-[10px] font-mono font-bold text-emerald-700 dark:text-emerald-400">
+                                                {item.calculatedCostPerSheet ? `${Number(item.calculatedCostPerSheet).toFixed(4)} € / hoja` : `${item.priceAmount || 0} €`}
+                                            </span>
+                                            <button
+                                                type="button"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleSelectDbPaper(item);
+                                                }}
+                                                className="px-2 py-0.5 bg-[#dc0000] hover:bg-red-700 text-white rounded text-[9px] font-bold uppercase tracking-wider transition-colors cursor-pointer"
+                                            >
+                                                {t('materials.dbSearch.load')}
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
+                        {/* Selected linkage confirmation banner */}
+                        {selectedDbPaper && (
+                            <div className="mt-2.5 p-2 border rounded-lg flex items-center justify-between gap-2 bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800 text-emerald-900 dark:text-emerald-200">
+                                <div className="flex items-center space-x-2 min-w-0">
+                                    <CheckCircle size={15} className="text-emerald-600 flex-shrink-0" />
+                                    <div className="text-[10px] truncate">
+                                        <span className="font-bold">{t('materials.dbSearch.linkedTo')} </span>
+                                        <span>{selectedDbPaper.productName} ({selectedDbPaper.gsm}g {selectedDbPaper.sheetFormat})</span>
+                                        <span className="block text-[9px] opacity-80">
+                                            {t('materials.dbSearch.supplier')} {selectedDbPaper.supplierName} ({selectedDbPaper.supplierEmail || 'proveedor@demo-papel.pro'})
+                                        </span>
+                                    </div>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => setSelectedDbPaper(null)}
+                                    className="text-[9px] uppercase font-bold text-red-600 hover:underline cursor-pointer flex-shrink-0"
+                                >
+                                    {t('materials.dbSearch.unlink')}
+                                </button>
+                            </div>
+                        )}
+                    </div>
+
                     <div>
                         <label className={labelClass}>{t('setup.materials.name')}</label>
                         <input
@@ -354,27 +568,59 @@ export const MaterialsPanel: React.FC<MaterialsPanelProps> = ({ sites, onSaved }
                         materials.map(mat => {
                             const pairedMachineDetails = activeCompatibilities[mat.id] || [];
                             const isPairingMode = pairingMaterialId === mat.id;
+                            const meta = typeof mat.metadata_json === 'string'
+                                ? (() => { try { return JSON.parse(mat.metadata_json); } catch (e) { return {}; } })()
+                                : (mat.metadata_json || {});
+                            const isLinkedToDb = Boolean(meta.paper_variant_id || meta.paper_product_id);
 
                             return (
                                 <div key={mat.id} className="bg-zinc-50 dark:bg-zinc-900/60 p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 flex flex-col gap-3 transition-colors">
-                                    <div className="flex justify-between items-start">
-                                        <div>
-                                            <span className="text-[11px] bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 px-2 py-0.5 rounded font-semibold">
-                                                {mat.material_type}
-                                            </span>
-                                            <h4 className="text-sm font-bold text-zinc-900 dark:text-white mt-1.5 mb-0.5">{mat.material_name}</h4>
+                                    <div className="flex justify-between items-start gap-2">
+                                        <div className="min-w-0 flex-1">
+                                            <div className="flex items-center gap-1.5 flex-wrap">
+                                                <span className="text-[11px] bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 px-2 py-0.5 rounded font-semibold">
+                                                    {mat.material_type}
+                                                </span>
+                                                {isLinkedToDb && (
+                                                    <span className="text-[10px] bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 px-2 py-0.5 rounded font-bold uppercase tracking-wider flex items-center gap-1">
+                                                        <Database size={10} className="text-emerald-600" />
+                                                        {t('materials.linkedToDb')}
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <h4 className="text-sm font-bold text-zinc-900 dark:text-white mt-1.5 mb-0.5 truncate">{mat.material_name}</h4>
                                             <p className="text-xs text-zinc-500 dark:text-zinc-400 m-0">
                                                 {mat.gsm} GSM • {mat.sheet_format} • {mat.finish_type}
                                             </p>
                                         </div>
 
-                                        <button
-                                            onClick={() => handleArchiveMaterial(mat.id)}
-                                            className="text-red-500 hover:text-red-700 p-1 cursor-pointer transition-colors"
-                                            title={t('setup.materials.archive')}
-                                        >
-                                            <Trash2 size={16} />
-                                        </button>
+                                        <div className="flex items-center gap-2 flex-shrink-0">
+                                            {mat.material_type === 'PAPER' && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setSourcingParams({
+                                                            initialSearchQuery: meta.paper_variant_id ? undefined : mat.material_name,
+                                                            initialVariantId: meta.paper_variant_id || undefined,
+                                                            initialOfferId: meta.offer_id || undefined
+                                                        });
+                                                        setIsSourcingModalOpen(true);
+                                                    }}
+                                                    className="px-2 py-1 bg-[#dc0000] hover:bg-red-700 text-white rounded text-[11px] font-bold uppercase tracking-wider transition-colors flex items-center gap-1 cursor-pointer shadow-xs"
+                                                    title={t('materials.orderFromSupplier')}
+                                                >
+                                                    <ShoppingBag size={12} />
+                                                    <span>{t('materials.orderPaper')}</span>
+                                                </button>
+                                            )}
+                                            <button
+                                                onClick={() => handleArchiveMaterial(mat.id)}
+                                                className="text-red-500 hover:text-red-700 p-1 cursor-pointer transition-colors"
+                                                title={t('setup.materials.archive')}
+                                            >
+                                                <Trash2 size={16} />
+                                            </button>
+                                        </div>
                                     </div>
 
                                     {/* Machine Pairings */}
@@ -475,6 +721,21 @@ export const MaterialsPanel: React.FC<MaterialsPanelProps> = ({ sites, onSaved }
                     )}
                 </div>
             </div>
+
+            <PaperSourcingModal
+                isOpen={isSourcingModalOpen}
+                onClose={() => {
+                    setIsSourcingModalOpen(false);
+                    setSourcingParams({});
+                }}
+                onStockUpdated={() => {
+                    fetchMaterialsAndMachines();
+                    if (onSaved) onSaved();
+                }}
+                initialSearchQuery={sourcingParams.initialSearchQuery}
+                initialVariantId={sourcingParams.initialVariantId}
+                initialOfferId={sourcingParams.initialOfferId}
+            />
         </div>
     );
 };
