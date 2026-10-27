@@ -183,6 +183,7 @@ describe('BUDGET-02C-01R — Security Remediation & BPE Parity Adversarial Certi
                     printhouse_id: 'ph_dar_01',
                     customer_email: 'client@example.com',
                     delivery_country: 'ES',
+                    product_type: 'BOOK',
                     offers_snapshot: baselineBpeSnapshot
                 },
                 {
@@ -192,6 +193,7 @@ describe('BUDGET-02C-01R — Security Remediation & BPE Parity Adversarial Certi
                     printhouse_id: 'ph_other',
                     customer_email: 'client300@example.com',
                     delivery_country: 'ES',
+                    product_type: 'BOOK',
                     offers_snapshot: baselineBpeSnapshot
                 }
             ],

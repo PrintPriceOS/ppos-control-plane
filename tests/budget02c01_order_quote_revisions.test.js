@@ -82,6 +82,8 @@ describe('BUDGET-02C-01 — Governed Order Quote Revisions Certification Suite',
                     tenant_id: 'tenant_alpha',
                     printhouse_id: 'ph_dar_01',
                     customer_email: 'client@example.com',
+                    delivery_country: 'ES',
+                    product_type: 'BOOK',
                     offers_snapshot: JSON.stringify(baselineCalculationFixture)
                 },
                 {
@@ -90,6 +92,8 @@ describe('BUDGET-02C-01 — Governed Order Quote Revisions Certification Suite',
                     tenant_id: 'tenant_alpha',
                     printhouse_id: 'ph_dar_01',
                     customer_email: 'client@example.com',
+                    delivery_country: 'ES',
+                    product_type: 'BOOK',
                     offers_snapshot: JSON.stringify(baselineCalculationFixture)
                 },
                 {
@@ -98,6 +102,8 @@ describe('BUDGET-02C-01 — Governed Order Quote Revisions Certification Suite',
                     tenant_id: 'tenant_beta',
                     printhouse_id: 'ph_other',
                     customer_email: 'client@example.com',
+                    delivery_country: 'ES',
+                    product_type: 'BOOK',
                     offers_snapshot: JSON.stringify(baselineCalculationFixture)
                 }
             ],

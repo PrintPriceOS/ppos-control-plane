@@ -95,36 +95,186 @@ function computeSaltedOtpHash(otpCode, salt, revisionId) {
 }
 
 /**
- * Calculates expiration timestamp based on authoritative printhouse business hours (SEC-C02R, Policy).
- * Operates Mon-Fri 09:00 to 18:00 Europe/Madrid (8 business hours/day + 1h lunch), skipping weekends and official holidays.
+ * Computes official statutory holidays for Madrid jurisdiction (ES-MD) for a given calendar year.
+ * Includes 10 fixed national/regional holidays and variable Easter holidays (Holy Thursday and Good Friday)
+ * computed deterministically via the Meeus/Butcher Western Easter algorithm.
+ */
+function getMadridOfficialHolidays(year) {
+    const pad2 = (n) => String(n).padStart(2, '0');
+    const fixed = [
+        `${year}-01-01`, // Año Nuevo
+        `${year}-01-06`, // Epifanía del Señor / Reyes
+        `${year}-05-01`, // Fiesta del Trabajo
+        `${year}-05-02`, // Fiesta de la Comunidad de Madrid
+        `${year}-08-15`, // Asunción de la Virgen
+        `${year}-10-12`, // Fiesta Nacional de España
+        `${year}-11-01`, // Todos los Santos
+        `${year}-12-06`, // Día de la Constitución Española
+        `${year}-12-08`, // Inmaculada Concepción
+        `${year}-12-25`  // Natividad del Señor
+    ];
+
+    // Meeus/Butcher Western Easter algorithm
+    const a = year % 19;
+    const b = Math.floor(year / 100);
+    const c = year % 100;
+    const d = Math.floor(b / 4);
+    const e = b % 4;
+    const f = Math.floor((b + 8) / 25);
+    const g = Math.floor((b - f + 1) / 3);
+    const h = (19 * a + b - d - g + 15) % 30;
+    const i = Math.floor(c / 4);
+    const k = c % 4;
+    const l = (32 + 2 * e + 2 * i - h - k) % 7;
+    const m = Math.floor((a + 11 * h + 22 * l) / 451);
+    const month = Math.floor((h + l - 7 * m + 114) / 31); // 3 = March, 4 = April
+    const day = ((h + l - 7 * m + 114) % 31) + 1;
+
+    const easterSunday = new Date(Date.UTC(year, month - 1, day));
+    const holyThursday = new Date(easterSunday.getTime() - 3 * 86400000);
+    const goodFriday = new Date(easterSunday.getTime() - 2 * 86400000);
+
+    const easterHolidays = [
+        `${holyThursday.getUTCFullYear()}-${pad2(holyThursday.getUTCMonth() + 1)}-${pad2(holyThursday.getUTCDate())}`,
+        `${goodFriday.getUTCFullYear()}-${pad2(goodFriday.getUTCMonth() + 1)}-${pad2(goodFriday.getUTCDate())}`
+    ];
+
+    return new Set([...fixed, ...easterHolidays]);
+}
+
+/**
+ * Extracts localized calendar components in the target IANA timezone (e.g. 'Europe/Madrid').
+ * Fully accounts for Daylight Saving Time (CET UTC+1 vs CEST UTC+2).
+ */
+function getZonedDateTimeParts(date, timeZone = 'Europe/Madrid') {
+    const formatter = new Intl.DateTimeFormat('en-US', {
+        timeZone,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        weekday: 'short',
+        hour: 'numeric',
+        minute: 'numeric',
+        second: 'numeric',
+        hourCycle: 'h23'
+    });
+    const parts = formatter.formatToParts(date);
+    const map = {};
+    for (const p of parts) map[p.type] = p.value;
+    return {
+        year: parseInt(map.year, 10),
+        month: map.month,
+        day: map.day,
+        weekday: map.weekday, // 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'
+        hour: parseInt(map.hour, 10),
+        minute: parseInt(map.minute, 10),
+        second: parseInt(map.second, 10),
+        isoDate: `${map.year}-${map.month}-${map.day}`
+    };
+}
+
+/**
+ * Calculates expiration timestamp based on authoritative printhouse business hours (TIME-01).
+ * Operates Mon-Fri 09:00 to 18:00 in IANA timezone ('Europe/Madrid'), seamlessly handling CET/CEST transitions,
+ * weekends, and official Madrid statutory holidays. Returns UTC Date.
  */
 function calculateBusinessHoursExpirationUtc({
     startDate = new Date(),
     businessHours = 48,
     timezone = 'Europe/Madrid',
-    holidays = ['01-01', '01-06', '05-01', '10-12', '11-01', '12-06', '12-08', '12-25']
+    holidays = null
 }) {
+    if (businessHours <= 0) return new Date(startDate.getTime());
+
     let current = new Date(startDate.getTime());
     let remainingHours = businessHours;
+    const holidayCache = new Map();
+
+    const isHoliday = (isoDate, year) => {
+        if (holidays && Array.isArray(holidays)) {
+            return holidays.includes(isoDate) || holidays.includes(isoDate.slice(5));
+        }
+        if (!holidayCache.has(year)) {
+            holidayCache.set(year, getMadridOfficialHolidays(year));
+        }
+        return holidayCache.get(year).has(isoDate);
+    };
 
     while (remainingHours > 0) {
         current = new Date(current.getTime() + 60 * 60 * 1000);
-        const dayOfWeek = current.getUTCDay();
-        const hour = current.getUTCHours();
-        const mm = String(current.getUTCMonth() + 1).padStart(2, '0');
-        const dd = String(current.getUTCDate()).padStart(2, '0');
-        const mmdd = `${mm}-${dd}`;
+        const local = getZonedDateTimeParts(current, timezone);
 
-        // Skip Saturday (6) and Sunday (0)
-        if (dayOfWeek === 0 || dayOfWeek === 6) continue;
+        // Skip Saturday and Sunday
+        if (local.weekday === 'Sat' || local.weekday === 'Sun') continue;
         // Skip official holidays
-        if (holidays.includes(mmdd)) continue;
-        // Work window: 08:00 to 17:00 UTC (corresponds to 09:00 to 18:00 CET)
-        if (hour >= 8 && hour < 17) {
+        if (isHoliday(local.isoDate, local.year)) continue;
+
+        // Work window: 09:00 to 18:00 local time
+        if (local.hour >= 9 && local.hour <= 18) {
+            if (local.hour === 18 && (local.minute > 0 || local.second > 0)) continue;
+            if (local.hour === 9 && local.minute === 0 && local.second === 0) continue;
             remainingHours--;
         }
     }
     return current;
+}
+
+/**
+ * Validates BPE calculation snapshot provenance and cryptographic integrity (BPE-01).
+ * Rejects untethered or unverified snapshots that are not demonstrably bound to an authoritative calculation.
+ */
+function validateBpeSnapshotProvenance(snapshot, { orderId, orderRef, decisionMeta = {} } = {}) {
+    if (!snapshot || typeof snapshot !== 'object') {
+        return { valid: false, code: 'INVALID_SNAPSHOT_STRUCTURE', message: 'Calculation snapshot is not an object.' };
+    }
+
+    // 1. Engine version
+    const engineVersion = snapshot.bpe_engine_version || snapshot.formula_version || snapshot.engine_version;
+    if (!engineVersion || typeof engineVersion !== 'string' || !engineVersion.trim()) {
+        return { valid: false, code: 'MISSING_BPE_ENGINE_VERSION', message: 'Calculation snapshot lacks verifiable BPE engine version.' };
+    }
+
+    // 2. Tariff / Rate card checksum
+    const ratesChecksum = snapshot.rates_checksum || snapshot.rate_card_checksum;
+    if (!ratesChecksum || typeof ratesChecksum !== 'string' || !ratesChecksum.trim()) {
+        return { valid: false, code: 'MISSING_RATES_CHECKSUM', message: 'Calculation snapshot lacks verifiable tariff checksum.' };
+    }
+
+    if (ratesChecksum.length < 8 || !/^[a-zA-Z0-9_\-\.]+$/.test(ratesChecksum)) {
+        return { valid: false, code: 'INCOMPATIBLE_RATES_CHECKSUM', message: 'Calculation snapshot tariff checksum format is invalid or corrupted.' };
+    }
+
+    // 3. Technical completeness: specs, rates, and breakdown
+    if (!snapshot.specs || typeof snapshot.specs !== 'object') {
+        return { valid: false, code: 'INCOMPLETE_SNAPSHOT_SPECS', message: 'Calculation snapshot missing specifications.' };
+    }
+    if (!snapshot.rates || typeof snapshot.rates !== 'object') {
+        return { valid: false, code: 'INCOMPLETE_SNAPSHOT_RATES', message: 'Calculation snapshot missing baseline rates.' };
+    }
+    if (!snapshot.breakdown || typeof snapshot.breakdown !== 'object') {
+        return { valid: false, code: 'INCOMPLETE_SNAPSHOT_BREAKDOWN', message: 'Calculation snapshot missing cost breakdown.' };
+    }
+
+    // 4. Order Identity & Provenance Linkage
+    // When resolving from decision metadata, explicit linkage or seal verification is required
+    const snapshotOrderId = snapshot.order_id || snapshot.order_intent_id;
+    const snapshotOrderRef = snapshot.order_ref || snapshot.external_order_id;
+    const hasOrderLink = Boolean(
+        (snapshotOrderId && snapshotOrderId === orderId) ||
+        (snapshotOrderRef && snapshotOrderRef === orderRef) ||
+        decisionMeta.bpe_snapshot_provenance_verified === true ||
+        (decisionMeta.provenance && decisionMeta.provenance.sealed_by === 'BPE_ENGINE' && decisionMeta.provenance.order_id === orderId)
+    );
+
+    if (!hasOrderLink) {
+        return {
+            valid: false,
+            code: 'UNVERIFIED_SNAPSHOT_PROVENANCE',
+            message: 'Calculation snapshot in decision metadata lacks verified cryptographic linkage to this order.'
+        };
+    }
+
+    return { valid: true };
 }
 
 /**
@@ -747,7 +897,7 @@ class OrderQuoteRevisionService {
                 }
             }
 
-            // 4. Authoritative Resolution of BPE Calculation Snapshot (SEC-C02R)
+            // 4. Authoritative Resolution of BPE Calculation Snapshot (SEC-C02R, BPE-01)
             let authoritativeCalculation = null;
 
             if (orderRow && orderRow.id) {
@@ -761,26 +911,76 @@ class OrderQuoteRevisionService {
 
                 if (snapRows && snapRows.length > 0) {
                     const snap = snapRows[0];
-                    authoritativeCalculation = typeof snap.snapshot_json === 'string' 
+                    const snapData = typeof snap.snapshot_json === 'string' 
                         ? JSON.parse(snap.snapshot_json) 
                         : snap.snapshot_json;
+                    if (snapData) {
+                        snapData.rates_checksum = snap.rate_card_checksum || snapData.rates_checksum;
+                        snapData.bpe_engine_version = snap.formula_version || snapData.bpe_engine_version;
+                        const validation = validateBpeSnapshotProvenance(snapData, {
+                            orderId: orderRow.id,
+                            orderRef: resolvedOrderRef,
+                            decisionMeta: { bpe_snapshot_provenance_verified: true }
+                        });
+                        if (!validation.valid) {
+                            throw new OrderQuoteRevisionError(
+                                `Corrupted or invalid pricing snapshot in order_pricing_snapshots: ${validation.message}`,
+                                'RECALCULATION_BLOCKED',
+                                422,
+                                { reason: validation.code, details: validation.message }
+                            );
+                        }
+                        authoritativeCalculation = snapData;
+                        authoritativeCalculation._source = 'ORDER_PRICING_SNAPSHOTS';
+                    }
                 }
             }
 
             if (!authoritativeCalculation && orderRow && orderRow.offers_snapshot) {
-                authoritativeCalculation = typeof orderRow.offers_snapshot === 'string'
+                const offerSnap = typeof orderRow.offers_snapshot === 'string'
                     ? JSON.parse(orderRow.offers_snapshot)
                     : orderRow.offers_snapshot;
+                if (offerSnap) {
+                    const validation = validateBpeSnapshotProvenance(offerSnap, {
+                        orderId: orderRow.id,
+                        orderRef: resolvedOrderRef,
+                        decisionMeta: { bpe_snapshot_provenance_verified: true }
+                    });
+                    if (!validation.valid) {
+                        throw new OrderQuoteRevisionError(
+                            `Invalid snapshot in order offers_snapshot: ${validation.message}`,
+                            'RECALCULATION_BLOCKED',
+                            422,
+                            { reason: validation.code, details: validation.message }
+                        );
+                    }
+                    authoritativeCalculation = offerSnap;
+                    authoritativeCalculation._source = 'ORDER_OFFERS_SNAPSHOT';
+                }
             }
 
             if (!authoritativeCalculation) {
                 const meta = typeof decision.metadata_json === 'string' ? JSON.parse(decision.metadata_json) : (decision.metadata_json || {});
                 if (meta.bpe_snapshot) {
+                    const validation = validateBpeSnapshotProvenance(meta.bpe_snapshot, {
+                        orderId: orderRow.id,
+                        orderRef: resolvedOrderRef,
+                        decisionMeta: meta
+                    });
+                    if (!validation.valid) {
+                        throw new OrderQuoteRevisionError(
+                            `Unverified calculation snapshot provenance in decision metadata: ${validation.message}`,
+                            'RECALCULATION_BLOCKED',
+                            422,
+                            { reason: validation.code, details: validation.message }
+                        );
+                    }
                     authoritativeCalculation = meta.bpe_snapshot;
+                    authoritativeCalculation._source = 'DECISION_METADATA';
                 }
             }
 
-            // SEC-C02R: ZERO fallback to request body originalCalculation!
+            // SEC-C02R / BPE-01: ZERO fallback to request body originalCalculation!
             if (!authoritativeCalculation) {
                 throw new OrderQuoteRevisionError(
                     'Missing authoritative pricing snapshot for order. Cannot reproduce BPE pricing deterministically.',
@@ -833,13 +1033,14 @@ class OrderQuoteRevisionService {
                 );
             }
 
-            // 6. Authoritative Commercial Margin Application (SEC-C02R)
+            // 6. Authoritative Commercial Margin Application (SEC-C02R, BPE-01)
             let effectiveMargin = authoritativeCalculation.target_margin_pct;
             if (effectiveMargin === undefined || effectiveMargin === null) {
+                // BPE-01: Removed silent .catch(() => [[]]) - database errors must bubble up and abort transaction
                 const [phProfiles] = await conn.query(
                     `SELECT target_margin_pct FROM printhouse_profiles WHERE printhouse_id = ? LIMIT 1`,
                     [effectivePrinthouseId || orderRow.offer_print_house || tenantId]
-                ).catch(() => [[]]);
+                );
                 if (phProfiles && phProfiles.length > 0 && phProfiles[0].target_margin_pct !== null) {
                     effectiveMargin = Number(phProfiles[0].target_margin_pct);
                 }
@@ -862,19 +1063,31 @@ class OrderQuoteRevisionService {
                 targetMarginPct: effectiveMargin
             });
 
-            // 8. Fiscal Gate (Gate 2): Server-Authoritative Tax Readiness Resolution (SEC-C02R, Policy)
+            // 8. Fiscal Gate (Gate 2): Server-Authoritative Tax Readiness Resolution (SEC-C02R, FISC-01)
             const orderMeta = typeof orderRow.metadata_json === 'string'
                 ? JSON.parse(orderRow.metadata_json || '{}')
                 : (orderRow.metadata_json || {});
 
+            // FISC-01: Eliminate unsafe 'ES' destination fallback. Require verified destination jurisdiction.
             const authoritativeCustomerCountry = orderRow.delivery_country 
                 || orderMeta.delivery_country 
                 || orderMeta.shipping_country 
                 || orderMeta.shipping_address?.country 
-                || 'ES';
+                || null;
 
-            const isEditorialBook = Boolean(authoritativeCalculation.specs?.interior_pages || orderRow.product_type === 'BOOK' || orderMeta.product_type === 'BOOK');
+            // FISC-01: Eliminate interior_pages inference! Having interior pages does NOT confer book VAT status.
+            const isEditorialBook = Boolean(
+                orderRow.product_type === 'BOOK' || 
+                orderMeta.product_type === 'BOOK' || 
+                orderMeta.is_editorial_book === true ||
+                orderRow.is_editorial_book === 1 ||
+                orderRow.is_editorial_book === true
+            );
             const isB2B = Boolean(orderRow.vat_number || orderMeta.vat_number || orderMeta.customer_type === 'B2B');
+
+            const authoritativeProductCategory = orderRow.product_type 
+                || orderMeta.product_type 
+                || (isEditorialBook ? 'BOOK' : orderMeta.product_category || null);
 
             const authoritativeTaxContext = {
                 amount: bpeResult.revised_net_price,
@@ -887,7 +1100,7 @@ class OrderQuoteRevisionService {
                 vies_valid: Boolean(orderMeta.vies_valid),
                 cross_border_transport_verified: Boolean(orderMeta.has_proof_of_transport),
                 supply_type: 'SUPPLY_OF_GOODS',
-                product_category: orderRow.product_type || orderMeta.product_type || (isEditorialBook ? 'EDITORIAL_BOOK' : 'COMMERCIAL_PRINT'),
+                product_category: authoritativeProductCategory,
                 is_editorial_book: isEditorialBook
             };
 
@@ -896,7 +1109,7 @@ class OrderQuoteRevisionService {
             if (taxClassification.readiness_status === 'TAX_CLASSIFICATION_BLOCKED') {
                 throw new OrderQuoteRevisionError(
                     `Fiscal evaluation blocked: ${taxClassification.warnings.join('; ')}`,
-                    'RECALCULATION_BLOCKED_TAX_AMBIGUITY',
+                    'TAX_CLASSIFICATION_BLOCKED',
                     422,
                     { findings: taxClassification.findings, warnings: taxClassification.warnings }
                 );
@@ -1575,6 +1788,8 @@ module.exports = {
     OtpDeliveryService,
     recalculateDeterministicBpePrice,
     calculateBusinessHoursExpirationUtc,
+    getMadridOfficialHolidays,
+    validateBpeSnapshotProvenance,
     sha256Canonical,
     computeSaltedOtpHash,
     redactToken

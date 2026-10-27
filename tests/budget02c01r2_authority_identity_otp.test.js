@@ -649,8 +649,7 @@ describe('BUDGET-02C-01R2 — Authority, Identity & Verifiable OTP Delivery Cert
             );
         });
 
-        it('2.6: Preserves original BPE quote (1.782,30 € gross / 1.407,7301 € net) 100% immutable', async () => {
-            const originalGross = 1782.30;
+        it('2.6: Preserves original BPE baseline net price (1.407,7301 €) immutable without mixing historical commercial fixtures', async () => {
             const originalNet = 1407.7301;
 
             const revision = await service.createQuoteRevision({
