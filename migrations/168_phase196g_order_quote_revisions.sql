@@ -12,6 +12,8 @@ CREATE TABLE IF NOT EXISTS order_quote_revisions (
     id VARCHAR(64) PRIMARY KEY,
     tenant_id VARCHAR(64) NOT NULL,
     
+    printhouse_id VARCHAR(64) NOT NULL,
+    
     -- Hybrid Order References (Budget App External Reference & Internal Canonical Order)
     external_order_intent_id VARCHAR(64) NOT NULL,
     canonical_order_id VARCHAR(64) NULL,
@@ -70,6 +72,7 @@ CREATE TABLE IF NOT EXISTS order_quote_revisions (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     
     INDEX idx_oqr_tenant (tenant_id),
+    INDEX idx_oqr_printhouse (printhouse_id),
     INDEX idx_oqr_ext_intent (external_order_intent_id),
     INDEX idx_oqr_order (canonical_order_id),
     INDEX idx_oqr_decision (paper_decision_id),
@@ -92,10 +95,25 @@ CREATE TABLE IF NOT EXISTS quote_revision_tokens (
     token_prefix VARCHAR(16) NOT NULL,
     recipient_email_hash CHAR(64) NOT NULL,
     
+    -- Cryptographic Context Binding
+    bound_amount DECIMAL(12, 4) NOT NULL DEFAULT 0.0000,
+    bound_currency VARCHAR(10) NOT NULL DEFAULT 'EUR',
+    
     status ENUM('PENDING', 'CONSUMED', 'EXPIRED', 'REVOKED') NOT NULL DEFAULT 'PENDING',
     expires_at TIMESTAMP NOT NULL,
     attempt_count INT NOT NULL DEFAULT 0,
     max_attempts INT NOT NULL DEFAULT 5,
+    
+    -- Cryptographic Real OTP Challenge & Delivery Proof (SEC-C01)
+    otp_hash CHAR(64) NULL,
+    otp_salt VARCHAR(32) NULL,
+    otp_expires_at TIMESTAMP NULL,
+    otp_attempts INT NOT NULL DEFAULT 0,
+    otp_max_attempts INT NOT NULL DEFAULT 3,
+    otp_delivery_channel VARCHAR(32) NULL,
+    otp_delivery_status ENUM('NOT_APPLICABLE', 'PENDING', 'DELIVERED', 'FAILED') NOT NULL DEFAULT 'NOT_APPLICABLE',
+    otp_delivered_at TIMESTAMP NULL,
+    otp_delivery_proof_json JSON NULL,
     
     consumed_at TIMESTAMP NULL,
     consumed_ip_hash CHAR(64) NULL,
@@ -108,6 +126,7 @@ CREATE TABLE IF NOT EXISTS quote_revision_tokens (
     INDEX idx_qrt_prefix (token_prefix),
     INDEX idx_qrt_status (status),
     INDEX idx_qrt_expires_at (expires_at),
+    INDEX idx_qrt_otp_delivery (otp_delivery_status),
     UNIQUE KEY uk_qrt_token_hash (token_hash),
     
     CONSTRAINT fk_qrt_revision FOREIGN KEY (revision_id) REFERENCES order_quote_revisions(id) ON DELETE CASCADE

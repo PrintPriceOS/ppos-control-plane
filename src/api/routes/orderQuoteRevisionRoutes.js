@@ -16,30 +16,43 @@ const express = require('express');
 const router = express.Router();
 const logger = require('../services/logger').child('order-quote-revision-routes');
 const { OrderQuoteRevisionService } = require('../services/orderQuoteRevisionService');
+const { resolveActorContext, requirePrinthouseScope } = require('../middleware/auth');
 
 const revisionService = new OrderQuoteRevisionService();
 
-function resolveActorContext(req) {
-    const user = req.user || {};
-    return {
-        userId: user.id || user.userId || user.sub || 'anonymous',
-        role: user.role || 'GUEST',
-        tenantId: user.tenant_id || user.tenantId || req.headers['x-tenant-id'] || null,
-        printhouseId: user.printhouse_id || user.printhouseId || null,
-        isSuperAdmin: user.role === 'SUPER_ADMIN' || user.role === 'SYSTEM_ADMIN',
-        isAuthenticated: !!user.id || !!user.userId || !!user.sub
-    };
-}
-
 /**
  * Endpoint 1: Issue Governed Quote Revision
- * POST /api/marketplace/quote-revisions
+ * POST /api/marketplace/quote-revisions (or mounted via /api/printhouse)
+ * 
+ * Strict SEC-C05: Identity authenticated with Printhouse scope, tenant strictly resolved from trusted context.
  */
-router.post('/quote-revisions', async (req, res) => {
+router.post('/quote-revisions', requirePrinthouseScope(), async (req, res) => {
     const actor = resolveActorContext(req);
     const body = req.body || {};
 
-    const tenantId = body.tenantId || body.tenant_id || actor.tenantId;
+    // SEC-C02 & SEC-C05: Tenant resolved strictly from trusted authenticated context, NEVER from client body
+    const tenantId = actor.tenantId;
+    if (!tenantId) {
+        return res.status(403).json({
+            ok: false,
+            error: {
+                code: 'TENANT_CONTEXT_REQUIRED',
+                message: 'An authenticated tenant context is required to issue quote revisions'
+            }
+        });
+    }
+
+    const requestedTenantId = body.tenantId || body.tenant_id;
+    if (requestedTenantId && requestedTenantId !== tenantId) {
+        return res.status(403).json({
+            ok: false,
+            error: {
+                code: 'FORBIDDEN_TENANT_MISMATCH',
+                message: 'Cross-tenant quote revision issuance is strictly prohibited'
+            }
+        });
+    }
+
     const externalOrderIntentId = body.externalOrderIntentId || body.external_order_intent_id || body.orderId || body.jobId;
     const canonicalOrderId = body.canonicalOrderId || body.canonical_order_id || null;
     const paperDecisionId = body.paperDecisionId || body.paper_decision_id;
@@ -175,13 +188,38 @@ router.post('/quote-revisions/review/:token/respond', async (req, res) => {
 
 /**
  * Endpoint 4: Operator Revocation
- * POST /api/marketplace/quote-revisions/:revisionId/revoke
+ * POST /api/marketplace/quote-revisions/:revisionId/revoke (or mounted via /api/printhouse)
+ * 
+ * Strict SEC-C05: Identity authenticated with Printhouse scope, tenant strictly resolved from trusted context.
  */
-router.post('/quote-revisions/:revisionId/revoke', async (req, res) => {
+router.post('/quote-revisions/:revisionId/revoke', requirePrinthouseScope(), async (req, res) => {
     const revisionId = req.params.revisionId;
     const actor = resolveActorContext(req);
     const body = req.body || {};
-    const tenantId = body.tenantId || body.tenant_id || actor.tenantId;
+
+    // SEC-C02 & SEC-C05: Tenant resolved strictly from trusted authenticated context, NEVER from client body
+    const tenantId = actor.tenantId;
+    if (!tenantId) {
+        return res.status(403).json({
+            ok: false,
+            error: {
+                code: 'TENANT_CONTEXT_REQUIRED',
+                message: 'An authenticated tenant context is required to revoke quote revisions'
+            }
+        });
+    }
+
+    const requestedTenantId = body.tenantId || body.tenant_id;
+    if (requestedTenantId && requestedTenantId !== tenantId) {
+        return res.status(403).json({
+            ok: false,
+            error: {
+                code: 'FORBIDDEN_TENANT_MISMATCH',
+                message: 'Cross-tenant quote revision revocation is strictly prohibited'
+            }
+        });
+    }
+
     const reason = body.reason || 'Operator revocation';
 
     try {

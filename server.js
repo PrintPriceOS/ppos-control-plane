@@ -60,6 +60,7 @@ fastify.addHook('onRequest', async (request, reply) => {
     if (url.startsWith('/api/auth')) return;
     if (url.includes('/api/v2/analytics/public')) return;
     if (url.startsWith('/api/public/preflight')) return;
+    if (url.includes('/quote-revisions/review/')) return;
 
     // 3. PROTECTED ROUTES
     if (

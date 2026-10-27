@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-10-27T18:11:53.578Z",
+  "generatedAt": "2026-10-27T18:25:36.605Z",
   "hashAlgorithm": "sha256",
   "contentNormalization": "utf8-lf-v1",
   "approvedPrefixCollisions": {
@@ -2261,9 +2261,9 @@
     {
       "path": "migrations/168_phase196g_order_quote_revisions.sql",
       "prefix": "168",
-      "canonicalSha256": "a054197fb65c57d96bb1a0a3486b299921128e44dc1ba989bc67c2521a54cff5",
+      "canonicalSha256": "15032dd44f45128a4274293d3362b77a6daeb2fb12f5ad9aa2f6a2e8a21741fa",
       "contentNormalization": "utf8-lf-v1",
-      "sizeBytes": 6009,
+      "sizeBytes": 6795,
       "containsDdl": true,
       "containsDml": true,
       "containsTransaction": false,

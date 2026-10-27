@@ -52,9 +52,49 @@ describe('BUDGET-02C-01 — Governed Order Quote Revisions Certification Suite',
 
     beforeEach(() => {
         classifier = new TaxVatReadinessClassifierService();
-        service = new OrderQuoteRevisionService({ taxClassifier: classifier });
+        const mockDeliveryService = {
+            isDeliveryChannelConfigured: () => true,
+            deliverOtp: async ({ recipientEmail, otpCode, revisionId }) => {
+                return {
+                    ok: true,
+                    delivered: true,
+                    channel: 'EMAIL',
+                    destination: recipientEmail,
+                    messageId: `msg_${Date.now()}`,
+                    timestamp: new Date().toISOString()
+                };
+            }
+        };
+
+        service = new OrderQuoteRevisionService({
+            taxClassifier: classifier,
+            otpDeliveryService: mockDeliveryService
+        });
 
         mockDb = {
+            orders: [
+                {
+                    id: 'ord_can_100',
+                    order_ref: 'job_order_100',
+                    tenant_id: 'tenant_alpha',
+                    printhouse_id: 'ph_dar_01',
+                    offers_snapshot: null
+                },
+                {
+                    id: 'ord_can_200',
+                    order_ref: 'job_order_200',
+                    tenant_id: 'tenant_alpha',
+                    printhouse_id: 'ph_dar_01',
+                    offers_snapshot: null
+                },
+                {
+                    id: 'ord_can_300',
+                    order_ref: 'job_order_300',
+                    tenant_id: 'tenant_beta',
+                    printhouse_id: 'ph_other',
+                    offers_snapshot: null
+                }
+            ],
             order_paper_decisions: [
                 {
                     id: 'opd_legit_001',
@@ -110,6 +150,15 @@ describe('BUDGET-02C-01 — Governed Order Quote Revisions Certification Suite',
             query: async (sql, params = []) => {
                 const s = sql.trim().toLowerCase();
 
+                // 0. SELECT ... FROM orders
+                if (s.includes('from orders')) {
+                    const [tenantId, ref, id] = params;
+                    const matches = mockDb.orders.filter(
+                        o => o.tenant_id === tenantId && (o.order_ref === ref || o.id === id)
+                    );
+                    return [matches];
+                }
+
                 // 1. SELECT ... FROM order_paper_decisions
                 if (s.includes('from order_paper_decisions')) {
                     const [id, tenantId] = params;
@@ -149,7 +198,20 @@ describe('BUDGET-02C-01 — Governed Order Quote Revisions Certification Suite',
                         token_id: token.id,
                         token_prefix: token.token_prefix,
                         token_status: token.status,
+                        recipient_email_hash: token.recipient_email_hash,
+                        bound_amount: token.bound_amount,
+                        bound_currency: token.bound_currency || 'EUR',
+                        otp_hash: token.otp_hash,
+                        otp_salt: token.otp_salt,
+                        otp_expires_at: token.otp_expires_at,
+                        otp_attempts: token.otp_attempts || 0,
+                        otp_max_attempts: token.otp_max_attempts || 3,
+                        otp_delivery_channel: token.otp_delivery_channel || 'EMAIL',
+                        otp_delivery_status: token.otp_delivery_status || 'DELIVERED',
+                        otp_delivered_at: token.otp_delivered_at,
+                        otp_delivery_proof_json: token.otp_delivery_proof_json,
                         token_expires_at: token.expires_at,
+                        expires_at: token.expires_at,
                         attempt_count: token.attempt_count,
                         max_attempts: token.max_attempts,
                         revision_id: revision.id,
@@ -178,34 +240,35 @@ describe('BUDGET-02C-01 — Governed Order Quote Revisions Certification Suite',
                     const row = {
                         id: params[0],
                         tenant_id: params[1],
-                        external_order_intent_id: params[2],
-                        canonical_order_id: params[3],
-                        paper_decision_id: params[4],
-                        revision_number: params[5],
+                        printhouse_id: params[2],
+                        external_order_intent_id: params[3],
+                        canonical_order_id: params[4],
+                        paper_decision_id: params[5],
+                        revision_number: params[6],
                         status: 'PENDING',
-                        currency: params[6],
-                        base_net_amount: params[7],
-                        delta_net_amount: params[8],
-                        revised_net_amount: params[9],
-                        base_tax_amount: params[10],
-                        delta_tax_amount: params[11],
-                        revised_tax_amount: params[12],
-                        tax_rate_pct: params[13],
-                        base_gross_amount: params[14],
-                        delta_gross_amount: params[15],
-                        revised_gross_amount: params[16],
-                        bpe_calculation_id: params[17],
-                        bpe_engine_version: params[18],
-                        bpe_rates_checksum: params[19],
-                        snapshot_canonical_hash: params[20],
-                        breakdown_json: params[21],
-                        technical_specs_snapshot_json: params[22],
-                        applied_policies_json: params[23],
-                        tax_resolution_snapshot_json: params[24],
-                        expires_at: params[25],
-                        effective_business_hours: params[26],
-                        supplier_offer_valid_until: params[27],
-                        printhouse_timezone: params[28]
+                        currency: params[7],
+                        base_net_amount: params[8],
+                        delta_net_amount: params[9],
+                        revised_net_amount: params[10],
+                        base_tax_amount: params[11],
+                        delta_tax_amount: params[12],
+                        revised_tax_amount: params[13],
+                        tax_rate_pct: params[14],
+                        base_gross_amount: params[15],
+                        delta_gross_amount: params[16],
+                        revised_gross_amount: params[17],
+                        bpe_calculation_id: params[18],
+                        bpe_engine_version: params[19],
+                        bpe_rates_checksum: params[20],
+                        snapshot_canonical_hash: params[21],
+                        breakdown_json: params[22],
+                        technical_specs_snapshot_json: params[23],
+                        applied_policies_json: params[24],
+                        tax_resolution_snapshot_json: params[25],
+                        expires_at: params[26],
+                        effective_business_hours: params[27],
+                        supplier_offer_valid_until: params[28],
+                        printhouse_timezone: params[29]
                     };
                     mockDb.order_quote_revisions.push(row);
                     return [{ affectedRows: 1 }];
@@ -220,10 +283,21 @@ describe('BUDGET-02C-01 — Governed Order Quote Revisions Certification Suite',
                         token_hash: params[3],
                         token_prefix: params[4],
                         recipient_email_hash: params[5],
+                        bound_amount: params[6],
+                        bound_currency: 'EUR',
                         status: 'PENDING',
-                        expires_at: params[6],
-                        attempt_count: params[7] || 0,
-                        max_attempts: params[8] || 5
+                        expires_at: params[7],
+                        attempt_count: 0,
+                        max_attempts: 5,
+                        otp_hash: params[8],
+                        otp_salt: params[9],
+                        otp_expires_at: params[10],
+                        otp_attempts: 0,
+                        otp_max_attempts: 3,
+                        otp_delivery_channel: 'EMAIL',
+                        otp_delivery_status: params[11],
+                        otp_delivered_at: params[12],
+                        otp_delivery_proof_json: params[13]
                     };
                     mockDb.quote_revision_tokens.push(tokenRow);
                     return [{ affectedRows: 1 }];
@@ -246,9 +320,16 @@ describe('BUDGET-02C-01 — Governed Order Quote Revisions Certification Suite',
                 // 8. UPDATE order_quote_revisions
                 if (s.includes('update order_quote_revisions')) {
                     if (s.includes("set status = 'superseded'")) {
-                        const id = params[0];
-                        const rev = mockDb.order_quote_revisions.find(r => r.id === id);
-                        if (rev) rev.status = 'SUPERSEDED';
+                        if (s.includes('external_order_intent_id = ?')) {
+                            const [tenantId, extId] = params;
+                            mockDb.order_quote_revisions
+                                .filter(r => r.tenant_id === tenantId && r.external_order_intent_id === extId && r.status === 'PENDING')
+                                .forEach(r => r.status = 'SUPERSEDED');
+                        } else {
+                            const id = params[0];
+                            const rev = mockDb.order_quote_revisions.find(r => r.id === id);
+                            if (rev) rev.status = 'SUPERSEDED';
+                        }
                     } else if (s.includes("set status = 'expired'")) {
                         const id = params[0];
                         const rev = mockDb.order_quote_revisions.find(r => r.id === id);
@@ -274,10 +355,20 @@ describe('BUDGET-02C-01 — Governed Order Quote Revisions Certification Suite',
                 // 9. UPDATE quote_revision_tokens
                 if (s.includes('update quote_revision_tokens')) {
                     if (s.includes("set status = 'revoked'")) {
-                        const revisionId = params[0];
-                        mockDb.quote_revision_tokens
-                            .filter(t => t.revision_id === revisionId)
-                            .forEach(t => t.status = 'REVOKED');
+                        if (s.includes('where revision_id in')) {
+                            const [tenantId, extId] = params;
+                            const supersededRevIds = mockDb.order_quote_revisions
+                                .filter(r => r.tenant_id === tenantId && r.external_order_intent_id === extId && r.status === 'SUPERSEDED')
+                                .map(r => r.id);
+                            mockDb.quote_revision_tokens
+                                .filter(t => supersededRevIds.includes(t.revision_id))
+                                .forEach(t => t.status = 'REVOKED');
+                        } else {
+                            const revisionId = params[0];
+                            mockDb.quote_revision_tokens
+                                .filter(t => t.revision_id === revisionId)
+                                .forEach(t => t.status = 'REVOKED');
+                        }
                     } else if (s.includes("set status = 'expired'")) {
                         const id = params[0];
                         const t = mockDb.quote_revision_tokens.find(tok => tok.id === id);
@@ -501,12 +592,12 @@ describe('BUDGET-02C-01 — Governed Order Quote Revisions Certification Suite',
                 targetMarginPct: 18.5
             });
 
-            // Paper delta: 155.00 EUR (interior paper: 464.00 -> 619.00)
-            assert.strictEqual(res.breakdown.interior_paper_cost_delta, 155.00);
-            assert.strictEqual(res.industrial_cost_delta, 155.00);
-            assert.strictEqual(res.revised_industrial_cost, 1302.30);
-            // Net price delta: 155 / 0.815 = 190.1840 EUR
-            assert.strictEqual(res.delta_net_price, 190.1840);
+            // Paper delta: 154.68 EUR (interior paper: 464.00 -> 618.68)
+            assert.strictEqual(res.breakdown.interior_paper_cost_delta, 154.68);
+            assert.strictEqual(res.industrial_cost_delta, 154.68);
+            assert.strictEqual(res.revised_industrial_cost, 1301.98);
+            // Net price delta: 154.68 / 0.815 = 189.7914 EUR
+            assert.strictEqual(res.delta_net_price, 189.7914);
             // Frozen items
             assert.strictEqual(res.breakdown.cover_paper_cost, 75.90);
             assert.strictEqual(res.breakdown.interior_print_cost, 168.00);
@@ -564,7 +655,7 @@ describe('BUDGET-02C-01 — Governed Order Quote Revisions Certification Suite',
             assert.ok(result.token_prefix.startsWith('qrt_'));
             assert.ok(result.rawToken); // Delivered once
             assert.strictEqual(result.rawToken.length, 64); // 256 bits hex
-            assert.strictEqual(result.delta_net_amount, 190.1840);
+            assert.strictEqual(result.delta_net_amount, 189.7914);
             assert.strictEqual(result.tax_rate_pct, 4.00);
 
             // Verify in mock DB that rawToken is NEVER stored in database (Zero Plaintext Persistence)
@@ -634,6 +725,12 @@ describe('BUDGET-02C-01 — Governed Order Quote Revisions Certification Suite',
                     recipientEmail: 'client@example.com',
                     originalCalculation: baselineCalculationFixture,
                     alternativeVariant: { gsm: 120 },
+                    taxResolutionContext: {
+                        seller_country: 'ES',
+                        customer_country: 'ES',
+                        product_category: 'BOOK',
+                        is_editorial_book: true
+                    },
                     allowSupersede: false
                 }),
                 err => err instanceof OrderQuoteRevisionError && err.code === 'CONCURRENT_REVISION_PENDING' && err.statusCode === 409
@@ -737,7 +834,7 @@ describe('BUDGET-02C-01 — Governed Order Quote Revisions Certification Suite',
             const response = await service.respondToQuoteRevision({
                 rawToken: created.rawToken,
                 decision: 'ACCEPT',
-                otpCode: '123456',
+                otpCode: created._debugOtp,
                 clientIp: '198.51.100.4',
                 userAgent: 'Mozilla/5.0 TestBrowser'
             });
@@ -772,7 +869,7 @@ describe('BUDGET-02C-01 — Governed Order Quote Revisions Certification Suite',
             await service.respondToQuoteRevision({
                 rawToken: created.rawToken,
                 decision: 'ACCEPT',
-                otpCode: '123456'
+                otpCode: created._debugOtp
             });
 
             // Second response (replay attack)
@@ -780,7 +877,7 @@ describe('BUDGET-02C-01 — Governed Order Quote Revisions Certification Suite',
                 async () => service.respondToQuoteRevision({
                     rawToken: created.rawToken,
                     decision: 'ACCEPT',
-                    otpCode: '123456'
+                    otpCode: created._debugOtp
                 }),
                 err => err instanceof OrderQuoteRevisionError && err.code === 'TOKEN_ALREADY_CONSUMED' && err.statusCode === 410
             );
