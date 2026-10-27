@@ -65,6 +65,13 @@ jobs:
       run: node scripts/apply_industrial_persistence_schemas.js
     - name: Schema Integrity Check
       run: node scripts/verify-industrial-schema.js --profile=ACTIVE_INDUSTRIAL
+    - name: Real MySQL 8 Concurrency & Idempotency Certification (BUDGET-02B-01R)
+      env:
+        MYSQL_HOST: 127.0.0.1
+        MYSQL_PORT: 3306
+        MYSQL_USER: root
+        MYSQL_PASSWORD: ci_test_password
+      run: node scripts/test_budget02b01r_real_mysql_concurrency.js
     - name: Automated Tests Execution (Vitest)
       env:
         HEAD_REF: ${{ github.head_ref }}

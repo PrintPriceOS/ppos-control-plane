@@ -1,16 +1,18 @@
 -- migrations/167_phase196f_order_paper_decisions.sql
--- PrintPrice OS — Phase 196F: Governed Persistence for Printhouse Paper Decisions (BUDGET-02B-01)
+-- PrintPrice OS — Phase 196F: Governed Persistence for Printhouse Paper Decisions (BUDGET-02B-01R Remediation)
 --
 -- Formal, auditable technical decisions by assigned printhouses for job paper availability:
 -- 1. CONFIRM: Printhouse confirms requested material availability (Delta = 0).
 -- 2. PROPOSE_ALTERNATIVE: Printhouse proposes alternative technical variant from paper_variants catalog.
+--    (Always classified as REQUIRES_ECONOMIC_REVISION; client delta is unverified until BUDGET-02C).
 -- 3. REJECT: Printhouse rejects availability, reverting to baseline standard specification.
 --
 -- Strict Relational & Security Guarantees:
 -- - Internal SQL Foreign Keys to paper_variants(id) with ON DELETE RESTRICT.
 -- - Immutable embedded snapshot of requested material specifications.
 -- - External order reference isolation (no cross-database foreign keys to Budget App).
--- - Idempotency enforcement via unique index on (tenant_id, idempotency_key).
+-- - Idempotency enforcement via unique index on (tenant_id, idempotency_key) and payload_fingerprint.
+-- - Concurrency serialization via uk_opd_active_role on stored generated column active_role_slot.
 -- - Multi-tenant isolation and auditable operator metadata.
 
 CREATE TABLE IF NOT EXISTS order_paper_decisions (
@@ -50,7 +52,14 @@ CREATE TABLE IF NOT EXISTS order_paper_decisions (
     -- Versioning, Sequencing & State Machine
     decision_number INT NOT NULL DEFAULT 1,
     status ENUM('ACTIVE', 'SUPERSEDED', 'CANCELLED') NOT NULL DEFAULT 'ACTIVE',
+    
+    -- Concurrency Engine: Exactly ONE ACTIVE decision per (tenant, order_intent, paper_role)
+    active_role_slot VARCHAR(192) GENERATED ALWAYS AS (
+        IF(status = 'ACTIVE', CONCAT(tenant_id, ':', external_order_intent_id, ':', paper_role), NULL)
+    ) STORED,
+    
     idempotency_key VARCHAR(128) NOT NULL,
+    payload_fingerprint VARCHAR(64) NOT NULL,
     
     -- Audit Metadata
     metadata_json JSON NULL,
@@ -67,6 +76,7 @@ CREATE TABLE IF NOT EXISTS order_paper_decisions (
     INDEX idx_opd_order_role (tenant_id, external_order_intent_id, paper_role),
     INDEX idx_opd_created_at (created_at),
     UNIQUE KEY uk_opd_idempotency (tenant_id, idempotency_key),
+    UNIQUE KEY uk_opd_active_role (active_role_slot),
     
     -- Relational Integrity inside Control Plane MySQL
     CONSTRAINT fk_opd_requested_variant FOREIGN KEY (requested_variant_id) REFERENCES paper_variants(id) ON DELETE RESTRICT,
