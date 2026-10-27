@@ -3,8 +3,8 @@
 **Proyecto:** PrintPrice OS Control Plane  
 **Módulo:** Intelligence Layer / Quote Revisions (BUDGET-02C)  
 **PR:** #8 (`feat/budget-02c01-quote-revisions`) — **DRAFT**  
-**Commit Definitivo:** `0b7d0eb75080c3d9fe2df380bb4c90fe3499e98e`  
-**CI Actions:** [Run 40576341359](https://github.com/PrintPriceOS/ppos-control-plane/actions/runs/40576341359) (SUCCESS)  
+**Commit Definitivo:** `ec63c057b9d6e6b670d24477d1b588aaac3916d3`  
+**CI Actions:** [Run 40576907859](https://github.com/PrintPriceOS/ppos-control-plane/actions/runs/40576907859) (SUCCESS)  
 **Veredicto:** `BUDGET-02C01R4V_PASS`  
 **Restricciones Absolutas:** NO MERGE / NO DEPLOY / NO PRODUCTION CHANGES / NO PRODUCTION DATABASE CHANGES
 
@@ -36,39 +36,50 @@ Para asegurar la existencia real y tipado del contrato en MySQL 8 efímero, se i
 - Archivo: [`migrations/169_phase196h_printhouse_profiles.sql`](file:///c:/Users/KIKE/Downloads/ppos-control-plane-phase-10-intelligence-layer/migrations/169_phase196h_printhouse_profiles.sql)
 - Rollback: [`migrations/rollback/rollback_169_phase196h_printhouse_profiles.sql`](file:///c:/Users/KIKE/Downloads/ppos-control-plane-phase-10-intelligence-layer/migrations/rollback/rollback_169_phase196h_printhouse_profiles.sql)
 
-#### Definición DDL
+#### Definición DDL Real Publicada
 
 ```sql
 CREATE TABLE IF NOT EXISTS printhouse_profiles (
-  id VARCHAR(64) PRIMARY KEY,
-  tenant_id VARCHAR(64) NOT NULL,
-  printhouse_id VARCHAR(64) NOT NULL,
-  target_margin_pct DECIMAL(5, 2) NOT NULL DEFAULT 15.00,
-  timezone VARCHAR(64) NOT NULL DEFAULT 'Europe/Madrid',
-  jurisdiction VARCHAR(16) NOT NULL DEFAULT 'ES',
-  has_lunch_break TINYINT(1) NOT NULL DEFAULT 0,
-  custom_holidays_json JSON NULL,
-  business_hours_ttl INT NOT NULL DEFAULT 48,
-  status VARCHAR(32) NOT NULL DEFAULT 'active',
-  metadata_json JSON NULL,
-  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  CONSTRAINT uq_printhouse_profiles_printhouse UNIQUE (printhouse_id),
-  CONSTRAINT chk_printhouse_profiles_margin CHECK (target_margin_pct >= 0 AND target_margin_pct <= 100),
-  CONSTRAINT chk_printhouse_profiles_ttl CHECK (business_hours_ttl > 0 AND business_hours_ttl <= 720)
+    id VARCHAR(64) PRIMARY KEY,
+    tenant_id VARCHAR(64) NOT NULL,
+    printhouse_id VARCHAR(64) NOT NULL,
+    
+    -- Commercial Economics
+    target_margin_pct DECIMAL(5, 2) NULL,
+    
+    -- Operating Schedule & Calendar Governance
+    timezone VARCHAR(64) NOT NULL DEFAULT 'Europe/Madrid',
+    jurisdiction VARCHAR(16) NOT NULL DEFAULT 'ES-MD',
+    has_lunch_break TINYINT(1) NOT NULL DEFAULT 1,
+    custom_holidays_json JSON NULL,
+    business_hours_ttl INT NOT NULL DEFAULT 48,
+    
+    -- Status & Lifecycle
+    status ENUM('ACTIVE', 'SUSPENDED', 'DRAFT') NOT NULL DEFAULT 'ACTIVE',
+    metadata_json JSON NULL,
+    
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    
+    INDEX idx_pp_tenant (tenant_id),
+    INDEX idx_pp_printhouse (printhouse_id),
+    INDEX idx_pp_status (status),
+    UNIQUE KEY uk_pp_printhouse (printhouse_id),
+    CONSTRAINT chk_pp_margin CHECK (target_margin_pct IS NULL OR (target_margin_pct >= 0 AND target_margin_pct < 100)),
+    CONSTRAINT chk_pp_ttl CHECK (business_hours_ttl > 0)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 ```
 
-### 2.2 Verificación de Tipos de Columna
+### 2.2 Verificación de Tipos de Columna y Semántica Fail-Closed
 
-| Columna | Tipo de Datos MySQL 8 | Nullable | Valor por Defecto | Constraint / Validación |
+| Columna | Tipo de Datos MySQL 8 | Nullable | Valor por Defecto | Constraint / Semántica de Seguridad |
 | :--- | :--- | :--- | :--- | :--- |
-| `target_margin_pct` | `DECIMAL(5, 2)` | `NO` | `15.00` | `CHECK (>= 0 AND <= 100)` |
-| `timezone` | `VARCHAR(64)` | `NO` | `'Europe/Madrid'` | Formato IANA |
-| `jurisdiction` | `VARCHAR(16)` | `NO` | `'ES'` | Código de jurisdicción |
-| `has_lunch_break` | `TINYINT(1)` | `NO` | `0` | Boolean (0 o 1) |
-| `custom_holidays_json`| `JSON` | `YES` | `NULL` | Array JSON de strings ISO |
-| `business_hours_ttl` | `INT` | `NO` | `48` | `CHECK (> 0 AND <= 720)` |
+| `target_margin_pct` | `DECIMAL(5, 2)` | `YES` | `NULL` | `CHECK (target_margin_pct IS NULL OR (target_margin_pct >= 0 AND target_margin_pct < 100))` — Admite `NULL` explícitamente para bloquear autoritativamente el cálculo si el margen no está configurado (fallo seguro). |
+| `timezone` | `VARCHAR(64)` | `NO` | `'Europe/Madrid'` | Identificador IANA canónico para cálculos de horas hábiles. |
+| `jurisdiction` | `VARCHAR(16)` | `NO` | `'ES-MD'` | Código de jurisdicción autonómica estatutaria para calendario laboral. |
+| `has_lunch_break` | `TINYINT(1)` | `NO` | `1` | `1` = 8h efectivas con pausa (09:00-14:00, 15:00-18:00); `0` = 9h continuas. |
+| `custom_holidays_json`| `JSON` | `YES` | `NULL` | Array JSON de strings MM-DD para festivos municipales/locales. |
+| `business_hours_ttl` | `INT` | `NO` | `48` | `CHECK (business_hours_ttl > 0)` — Tiempo de vida de la oferta en horas hábiles. |
 
 ### 2.3 Ejecución de la Consulta Real del Servicio
 
