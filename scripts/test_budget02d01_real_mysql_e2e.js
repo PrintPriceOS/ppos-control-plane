@@ -19,7 +19,6 @@ const mysql = require('mysql2/promise');
 const fs = require('fs');
 const path = require('path');
 const assert = require('assert');
-const crypto = require('crypto');
 
 const MYSQL_HOST = process.env.MYSQL_HOST || '127.0.0.1';
 const MYSQL_PORT = parseInt(process.env.MYSQL_PORT || '3306', 10);
@@ -57,8 +56,35 @@ async function runRealMysqlCertification() {
         await conn.query(`USE ${EPHEMERAL_DB}`);
         console.log(`[PASS] Ephemeral database ${EPHEMERAL_DB} active.`);
 
-        // 2. Apply Prerequisite Schemas & Migrations
-        console.log(`\n[STEP 2] Setting up prerequisite schemas & migrations (136, 167, 168, 169, 170)...`);
+        // 2. Apply Prerequisite Schemas & Baseline Catalog
+        console.log(`\n[STEP 2] Setting up prerequisite baseline catalog and orders tables...`);
+
+        // Paper Catalog for foreign keys in migration 167
+        await conn.query(`
+            CREATE TABLE IF NOT EXISTS paper_products (
+                id VARCHAR(64) PRIMARY KEY,
+                name VARCHAR(255) NOT NULL,
+                category VARCHAR(64) NOT NULL,
+                brand VARCHAR(64) NULL
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+            CREATE TABLE IF NOT EXISTS paper_variants (
+                id VARCHAR(64) PRIMARY KEY,
+                product_id VARCHAR(64) NOT NULL,
+                gsm INT NOT NULL,
+                width_mm DECIMAL(10,2) NOT NULL,
+                height_mm DECIMAL(10,2) NOT NULL,
+                finish VARCHAR(64) NULL,
+                FOREIGN KEY (product_id) REFERENCES paper_products(id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+            INSERT INTO paper_products VALUES ('prod_1', 'Coral Book White', 'UNCOATED', 'Coral')
+            ON DUPLICATE KEY UPDATE name=name;
+            INSERT INTO paper_variants VALUES ('var_coral_90', 'prod_1', 90, 700.0, 1000.0, 'MATTE')
+            ON DUPLICATE KEY UPDATE gsm=gsm;
+            INSERT INTO paper_variants VALUES ('var_offset_120', 'prod_1', 120, 700.0, 1000.0, 'UNCOATED')
+            ON DUPLICATE KEY UPDATE gsm=gsm;
+        `);
 
         // Base orders table
         await conn.query(`
@@ -131,29 +157,40 @@ async function runRealMysqlCertification() {
         `);
 
         // Migration 167: order_paper_decisions
+        console.log(`Applying migration 167 (order_paper_decisions)...`);
         const mig167Path = path.join(__dirname, '../migrations/167_phase196f_order_paper_decisions.sql');
-        if (fs.existsSync(mig167Path)) {
-            await conn.query(fs.readFileSync(mig167Path, 'utf8'));
-        }
+        await conn.query(fs.readFileSync(mig167Path, 'utf8'));
+
+        // Seed decision for foreign key in migration 168
+        await conn.query(`
+            INSERT INTO order_paper_decisions (
+                id, tenant_id, external_order_intent_id, canonical_order_id, printhouse_tenant_id,
+                paper_role, requested_variant_id, alternative_variant_id,
+                snapshot_requested_gsm, snapshot_requested_width_mm, snapshot_requested_height_mm, snapshot_requested_category,
+                idempotency_key, payload_fingerprint, status
+            ) VALUES (
+                'opd_001', 'tenant_prod_alpha', 'ord_e2e_real_001', 'ord_e2e_real_001', 'ph_bcn_industrial',
+                'INTERIOR', 'var_coral_90', 'var_offset_120',
+                90, 700.0, 1000.0, 'UNCOATED',
+                'idem_001', 'fp_001', 'ACTIVE'
+            );
+        `);
 
         // Migration 168: order_quote_revisions & tokens
+        console.log(`Applying migration 168 (order_quote_revisions)...`);
         const mig168Path = path.join(__dirname, '../migrations/168_phase196g_order_quote_revisions.sql');
-        if (fs.existsSync(mig168Path)) {
-            await conn.query(fs.readFileSync(mig168Path, 'utf8'));
-        }
+        await conn.query(fs.readFileSync(mig168Path, 'utf8'));
 
         // Migration 169: printhouse_profiles
+        console.log(`Applying migration 169 (printhouse_profiles)...`);
         const mig169Path = path.join(__dirname, '../migrations/169_phase196h_printhouse_profiles.sql');
-        if (fs.existsSync(mig169Path)) {
-            await conn.query(fs.readFileSync(mig169Path, 'utf8'));
-        }
+        await conn.query(fs.readFileSync(mig169Path, 'utf8'));
 
         // Migration 170: order_effective_technical_specifications
         console.log(`Applying migration 170 (order_effective_technical_specifications)...`);
         const mig170Path = path.join(__dirname, '../migrations/170_phase196i_order_effective_technical_specifications.sql');
-        const mig170Sql = fs.readFileSync(mig170Path, 'utf8');
-        await conn.query(mig170Sql);
-        console.log(`[PASS] Migration 170 applied cleanly.`);
+        await conn.query(fs.readFileSync(mig170Path, 'utf8'));
+        console.log(`[PASS] All schemas and migrations applied cleanly.`);
 
         // 3. Inspect information_schema for order_effective_technical_specifications
         console.log(`\n[STEP 3] Inspecting order_effective_technical_specifications in information_schema...`);
@@ -227,9 +264,21 @@ async function runRealMysqlCertification() {
         const revisionId = 'rev_e2e_real_001';
         await conn.query(`
             INSERT INTO order_quote_revisions (
-                id, tenant_id, order_id, printhouse_id, status, delta_amount, currency
-            ) VALUES (?, ?, ?, ?, 'PENDING', -45.5000, 'EUR')
-        `, [revisionId, testTenantId, testOrderId, testPrinthouseId]);
+                id, tenant_id, printhouse_id, external_order_intent_id, canonical_order_id, paper_decision_id,
+                revision_number, status, currency, base_net_amount, delta_net_amount, revised_net_amount,
+                base_tax_amount, delta_tax_amount, revised_tax_amount, tax_rate_pct,
+                base_gross_amount, delta_gross_amount, revised_gross_amount,
+                bpe_calculation_id, bpe_engine_version, bpe_rates_checksum, snapshot_canonical_hash,
+                breakdown_json, technical_specs_snapshot_json, applied_policies_json, expires_at
+            ) VALUES (
+                ?, ?, ?, ?, ?, 'opd_001',
+                1, 'PENDING', 'EUR', 1407.7301, -45.5000, 1362.2301,
+                56.3092, -1.8200, 54.4892, 4.00,
+                1464.0393, -47.3200, 1416.7193,
+                'bpe_calc_001', 'v3.0', 'cs_rates_001', 'a1b2c3d4e5f60123456789abcdef0123456789abcdef0123456789abcdef0123',
+                '{}', '{}', '{}', DATE_ADD(NOW(), INTERVAL 48 HOUR)
+            )
+        `, [revisionId, testTenantId, testPrinthouseId, testOrderId, testOrderId]);
 
         // Insert effective technical specification
         const specId = 'oets_e2e_real_001';
@@ -257,7 +306,6 @@ async function runRealMysqlCertification() {
 
         // 7. Test BLK-05: Concurrency & Lock Validation
         console.log(`\n[STEP 7] Testing BLK-05: Concurrency check under SELECT FOR UPDATE...`);
-        // Simulating cancelled order check
         await conn.query(`
             INSERT INTO orders (id, tenant_id, customer_email, status, offer_print_house, final_price)
             VALUES ('ord_cancelled_01', 'tenant_prod_alpha', 'client@test.com', 'CANCELLED', 'ph_bcn_industrial', 500.00)
@@ -268,7 +316,6 @@ async function runRealMysqlCertification() {
             ['ord_cancelled_01']
         );
         assert.strictEqual(cancelledRows[0].status, 'CANCELLED');
-        // Service would reject with ORDER_INELIGIBLE
         console.log(`[PASS] BLK-05 Certified: FOR UPDATE lock retrieves CANCELLED status, triggering ORDER_INELIGIBLE.`);
 
         // 8. Test Rollback of Migration 170
@@ -285,7 +332,7 @@ async function runRealMysqlCertification() {
         console.log(`[PASS] Rollback of Migration 170 executed successfully.`);
 
         // Re-apply to leave schema clean
-        await conn.query(mig170Sql);
+        await conn.query(fs.readFileSync(mig170Path, 'utf8'));
         console.log(`[PASS] Migration 170 re-applied cleanly.`);
 
         // Cleanup
