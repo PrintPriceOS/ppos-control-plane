@@ -325,5 +325,9 @@ router.get('/orders/:orderRef/paper-decisions', requirePrinthouseScope(), handle
 router.post('/:orderRef/paper-decision', requirePrinthouseScope(), handleRecordPaperDecision);
 router.get('/:orderRef/paper-decisions', requirePrinthouseScope(), handleListPaperDecisions);
 
+// Phase 196G: Governed Order Quote Revisions & Single-Use Tokens
+const quoteRevisionRoutes = require('./orderQuoteRevisionRoutes');
+router.use('/', quoteRevisionRoutes);
+
 module.exports = router;
 
