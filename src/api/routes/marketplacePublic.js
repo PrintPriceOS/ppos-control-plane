@@ -196,8 +196,16 @@ router.get('/paper-catalog', async (req, res) => {
     const startTime = Date.now();
 
     try {
-        const tenantId = req.headers['x-tenant-id'] || req.query.tenant_id || 'ppos-production';
-        const result = await paperProcurementService.searchMasterPaperDatabase(tenantId, req.query);
+        // Server-defined authoritative tenant scope for public catalog.
+        // Client-supplied tenant_id query param and x-tenant-id header are strictly ignored to prevent tenant spoofing.
+        const PUBLIC_CATALOG_TENANT_ID = process.env.PUBLIC_MARKETPLACE_TENANT_ID || 'ppos-production';
+
+        // Sanitize query to prevent tenant injection or private parameter pollution
+        const queryParams = { ...req.query };
+        delete queryParams.tenant_id;
+        delete queryParams.tenantId;
+
+        const result = await paperProcurementService.searchMasterPaperDatabase(PUBLIC_CATALOG_TENANT_ID, queryParams);
 
         // Strip out supplier pricing, cost basis and internal wholesale attributes
         const sanitizedItems = (result.items || []).map(item => ({
@@ -217,7 +225,10 @@ router.get('/paper-catalog', async (req, res) => {
             finish: item.finish || null,
             grainDirection: item.grainDirection || 'UNKNOWN',
             isReel: item.isReel === true,
-            isAvailable: item.offerStatus ? item.offerStatus === 'ACTIVE' : true
+            // Do NOT assume available if offerStatus is missing. Stock availability is strictly subject to printhouse confirmation.
+            isAvailable: item.offerStatus === 'ACTIVE',
+            stockConfirmationRequired: true,
+            availabilityStatus: item.offerStatus === 'ACTIVE' ? 'ACTIVE' : 'PENDING_PRINTHOUSE_CONFIRMATION'
         }));
 
         const duration = Date.now() - startTime;
