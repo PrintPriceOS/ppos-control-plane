@@ -4,7 +4,7 @@ on:
   push:
     branches: [ main, v1.9.0, release/*, phase-10-intelligence-layer, phase-39.2-tenant-management-console ]
   pull_request:
-    branches: [ main, v1.9.0, phase-10-intelligence-layer, phase-39.2-tenant-management-console ]
+    branches: [ main, v1.9.0, phase-10-intelligence-layer, phase-39.2-tenant-management-console, feat/paper-supplier-hub-completion ]
 
 jobs:
   build:
