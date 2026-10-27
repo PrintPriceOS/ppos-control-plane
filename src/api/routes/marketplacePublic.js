@@ -175,4 +175,79 @@ router.get('/orders/:orderId/customer-action/:token', async (req, res) => {
     }
 });
 
+const paperProcurementService = require('../services/paperProcurementService');
+
+const CANONICAL_PAPER_CATEGORIES = [
+    'OFFSET',
+    'COATED',
+    'CARTON',
+    'DESIGN',
+    'DIGITAL',
+    'OTHER'
+];
+
+/**
+ * GET /api/marketplace/paper-catalog
+ * Public commercial paper catalog for Budget and Marketplace clients.
+ * Sanitized: wholesale prices, internal supplier margins, and credentials are strictly excluded.
+ */
+router.get('/paper-catalog', async (req, res) => {
+    const traceId = req.headers['x-trace-id'] || `trace_${uuidv4()}`;
+    const startTime = Date.now();
+
+    try {
+        const tenantId = req.headers['x-tenant-id'] || req.query.tenant_id || 'ppos-production';
+        const result = await paperProcurementService.searchMasterPaperDatabase(tenantId, req.query);
+
+        // Strip out supplier pricing, cost basis and internal wholesale attributes
+        const sanitizedItems = (result.items || []).map(item => ({
+            variantId: item.variantId,
+            productId: item.productId,
+            productName: item.productName,
+            brand: item.brand || null,
+            manufacturer: item.manufacturer || null,
+            category: item.category || 'OTHER',
+            finishSummary: item.finishSummary || item.finish || null,
+            gsm: item.gsm,
+            widthMm: item.widthMm,
+            heightMm: item.heightMm,
+            sheetFormat: item.sheetFormat || `${item.widthMm}x${item.heightMm} mm`,
+            caliperUm: item.caliperUm || null,
+            caliperMm: item.caliperMm || null,
+            finish: item.finish || null,
+            grainDirection: item.grainDirection || 'UNKNOWN',
+            isReel: item.isReel === true,
+            isAvailable: item.offerStatus ? item.offerStatus === 'ACTIVE' : true
+        }));
+
+        const duration = Date.now() - startTime;
+        console.log(`[MARKETPLACE_PUBLIC][PAPER_CATALOG] Returned ${sanitizedItems.length} items (${duration}ms)`, { traceId });
+
+        return res.json({
+            ok: true,
+            success: true,
+            data: {
+                categories: CANONICAL_PAPER_CATEGORIES,
+                total: result.total,
+                limit: result.limit,
+                offset: result.offset,
+                items: sanitizedItems
+            },
+            trace_id: traceId
+        });
+    } catch (err) {
+        const duration = Date.now() - startTime;
+        console.error(`[MARKETPLACE_PUBLIC][PAPER_CATALOG_ERROR] ${err.message}`, { traceId, duration });
+        return res.status(500).json({
+            ok: false,
+            success: false,
+            error: {
+                code: 'CATALOG_UNAVAILABLE',
+                message: 'Paper catalog service is temporarily unavailable.'
+            },
+            trace_id: traceId
+        });
+    }
+});
+
 module.exports = router;
