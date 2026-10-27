@@ -762,4 +762,165 @@ describe('BUDGET-02C-01R4 — BPE Integrity & Business Calendar Certification', 
             assert.strictEqual(new Date(revision.expires_at).toISOString(), new Date(supplierExpiration).toISOString());
         });
     });
+
+    // =========================================================================
+    // 5. BUDGET-02C-01R4V: REGRESIONES DE INTEGRIDAD DE SELLADO E INMUTABILIDAD
+    // =========================================================================
+    describe('5. BUDGET-02C-01R4V — Regresiones de Integridad de Sellado e Inmutabilidad', () => {
+        const validSealedRecord = {
+            snapshot_id: 'ops_r4v_canonical',
+            order_id: 'ord_r4_100',
+            tenant_id: 'tenant_omega',
+            status: 'SEALED',
+            sealed_by: 'BPE_ENGINE_SEALER_V3',
+            snapshot_checksum: 'sha256-dummy-valid',
+            rate_card_checksum: baselineBpeSnapshot.rates_checksum,
+            formula_version: 'v3.0',
+            final_amount: 1407.7301
+        };
+
+        it('5.1: Rejects sealed record with missing tenant_id', () => {
+            const snap = { ...validSealedRecord };
+            delete snap.tenant_id;
+            const res = validateBpeSnapshotProvenance(baselineBpeSnapshot, {
+                orderId: 'ord_r4_100',
+                tenantId: 'tenant_omega',
+                sealedRecord: snap
+            });
+            assert.strictEqual(res.valid, false);
+            assert.strictEqual(res.code, 'MISSING_SEALED_TENANT_ID');
+        });
+
+        it('5.2: Rejects sealed record with null or whitespace tenant_id', () => {
+            const snap = { ...validSealedRecord, tenant_id: '   ' };
+            const res = validateBpeSnapshotProvenance(baselineBpeSnapshot, {
+                orderId: 'ord_r4_100',
+                tenantId: 'tenant_omega',
+                sealedRecord: snap
+            });
+            assert.strictEqual(res.valid, false);
+            assert.strictEqual(res.code, 'MISSING_SEALED_TENANT_ID');
+        });
+
+        it('5.3: Rejects sealed record with missing order_id', () => {
+            const snap = { ...validSealedRecord };
+            delete snap.order_id;
+            const res = validateBpeSnapshotProvenance(baselineBpeSnapshot, {
+                orderId: 'ord_r4_100',
+                tenantId: 'tenant_omega',
+                sealedRecord: snap
+            });
+            assert.strictEqual(res.valid, false);
+            assert.strictEqual(res.code, 'MISSING_SEALED_ORDER_ID');
+        });
+
+        it('5.4: Rejects sealed record with null or whitespace order_id', () => {
+            const snap = { ...validSealedRecord, order_id: null };
+            const res = validateBpeSnapshotProvenance(baselineBpeSnapshot, {
+                orderId: 'ord_r4_100',
+                tenantId: 'tenant_omega',
+                sealedRecord: snap
+            });
+            assert.strictEqual(res.valid, false);
+            assert.strictEqual(res.code, 'MISSING_SEALED_ORDER_ID');
+        });
+
+        it('5.5: Rejects sealed record with missing snapshot_checksum', () => {
+            const snap = { ...validSealedRecord };
+            delete snap.snapshot_checksum;
+            const res = validateBpeSnapshotProvenance(baselineBpeSnapshot, {
+                orderId: 'ord_r4_100',
+                tenantId: 'tenant_omega',
+                sealedRecord: snap
+            });
+            assert.strictEqual(res.valid, false);
+            assert.strictEqual(res.code, 'MISSING_SEALED_CHECKSUM');
+        });
+
+        it('5.6: Rejects sealed record with missing rate_card_checksum', () => {
+            const snap = { ...validSealedRecord, snapshot_checksum: baseChecksum };
+            delete snap.rate_card_checksum;
+            const res = validateBpeSnapshotProvenance(baselineBpeSnapshot, {
+                orderId: 'ord_r4_100',
+                tenantId: 'tenant_omega',
+                sealedRecord: snap
+            });
+            assert.strictEqual(res.valid, false);
+            assert.strictEqual(res.code, 'MISSING_SEALED_RATE_CARD_CHECKSUM');
+        });
+
+        it('5.7: Rejects sealed record with missing formula_version', () => {
+            const snap = { ...validSealedRecord, snapshot_checksum: baseChecksum };
+            delete snap.formula_version;
+            const res = validateBpeSnapshotProvenance(baselineBpeSnapshot, {
+                orderId: 'ord_r4_100',
+                tenantId: 'tenant_omega',
+                sealedRecord: snap
+            });
+            assert.strictEqual(res.valid, false);
+            assert.strictEqual(res.code, 'MISSING_SEALED_FORMULA_VERSION');
+        });
+
+        it('5.8: Rejects sealed record with missing final_amount', () => {
+            const snap = { ...validSealedRecord, snapshot_checksum: baseChecksum };
+            delete snap.final_amount;
+            const res = validateBpeSnapshotProvenance(baselineBpeSnapshot, {
+                orderId: 'ord_r4_100',
+                tenantId: 'tenant_omega',
+                sealedRecord: snap
+            });
+            assert.strictEqual(res.valid, false);
+            assert.strictEqual(res.code, 'MISSING_SEALED_FINAL_AMOUNT');
+        });
+
+        it('5.9: Rejects snapshot payload with contradictory order reference vs sealed record', () => {
+            const contradictoryPayload = { ...baselineBpeSnapshot, order_id: 'ord_alien_999' };
+            const snap = { ...validSealedRecord, snapshot_checksum: baseChecksum };
+            const res = validateBpeSnapshotProvenance(contradictoryPayload, {
+                orderId: 'ord_r4_100',
+                tenantId: 'tenant_omega',
+                sealedRecord: snap
+            });
+            assert.strictEqual(res.valid, false);
+            assert.strictEqual(res.code, 'SNAPSHOT_ORDER_MISMATCH');
+        });
+
+        it('5.10: Rejects snapshot payload with contradictory tenant reference vs sealed record', () => {
+            const contradictoryPayload = { ...baselineBpeSnapshot, tenant_id: 'tenant_alien_999' };
+            const snap = { ...validSealedRecord, snapshot_checksum: baseChecksum };
+            const res = validateBpeSnapshotProvenance(contradictoryPayload, {
+                orderId: 'ord_r4_100',
+                tenantId: 'tenant_omega',
+                sealedRecord: snap
+            });
+            assert.strictEqual(res.valid, false);
+            assert.strictEqual(res.code, 'SNAPSHOT_TENANT_MISMATCH');
+        });
+
+        it('5.11: Validated snapshot payload is deep-frozen: mutating specs, rates, or prices throws TypeError', () => {
+            const snap = { ...validSealedRecord, snapshot_checksum: baseChecksum };
+            const res = validateBpeSnapshotProvenance(baselineBpeSnapshot, {
+                orderId: 'ord_r4_100',
+                tenantId: 'tenant_omega',
+                sealedRecord: snap
+            });
+            assert.strictEqual(res.valid, true);
+            assert.ok(res.validatedPayload, 'Must provide validatedPayload');
+
+            // Attempt post-validation mutation on base price
+            assert.throws(() => {
+                res.validatedPayload.base_net_price = 9999.00;
+            }, TypeError);
+
+            // Attempt post-validation mutation on nested specs
+            assert.throws(() => {
+                res.validatedPayload.specs.interior_pages = 500;
+            }, TypeError);
+
+            // Attempt post-validation mutation on nested rates
+            assert.throws(() => {
+                res.validatedPayload.rates.paper_waste_for_binding = 0.0;
+            }, TypeError);
+        });
+    });
 });

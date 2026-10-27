@@ -87,6 +87,20 @@ function sha256Canonical(obj) {
 }
 
 /**
+ * Recursively freezes an object and all nested properties to guarantee complete immutability.
+ */
+function deepFreeze(obj) {
+    if (!obj || typeof obj !== 'object') return obj;
+    Object.freeze(obj);
+    for (const key of Object.getOwnPropertyNames(obj)) {
+        if (obj[key] !== null && typeof obj[key] === 'object' && !Object.isFrozen(obj[key])) {
+            deepFreeze(obj[key]);
+        }
+    }
+    return obj;
+}
+
+/**
  * Computes salted OTP hash bound to a specific revision (SEC-C01).
  */
 function computeSaltedOtpHash(otpCode, salt, revisionId) {
@@ -382,15 +396,29 @@ function validateBpeSnapshotProvenance(snapshot, { orderId, orderRef, tenantId, 
         };
     }
 
-    // 6. Order Identity & Tenant Isolation Binding
-    if (tenantId && sealedRecord.tenant_id && sealedRecord.tenant_id !== tenantId) {
+    // 6. Order Identity & Tenant Isolation Binding (VALIDACIÓN 2)
+    if (!sealedRecord.tenant_id || typeof sealedRecord.tenant_id !== 'string' || !sealedRecord.tenant_id.trim()) {
+        return {
+            valid: false,
+            code: 'MISSING_SEALED_TENANT_ID',
+            message: 'Pricing snapshot record in order_pricing_snapshots lacks valid non-empty tenant_id.'
+        };
+    }
+    if (!sealedRecord.order_id || typeof sealedRecord.order_id !== 'string' || !sealedRecord.order_id.trim()) {
+        return {
+            valid: false,
+            code: 'MISSING_SEALED_ORDER_ID',
+            message: 'Pricing snapshot record in order_pricing_snapshots lacks valid non-empty order_id.'
+        };
+    }
+    if (tenantId && sealedRecord.tenant_id !== tenantId) {
         return {
             valid: false,
             code: 'SNAPSHOT_TENANT_MISMATCH',
             message: `Snapshot sealed for tenant '${sealedRecord.tenant_id}', but requested for '${tenantId}'.`
         };
     }
-    if (orderId && sealedRecord.order_id && sealedRecord.order_id !== orderId) {
+    if (orderId && sealedRecord.order_id !== orderId) {
         return {
             valid: false,
             code: 'SNAPSHOT_ORDER_MISMATCH',
@@ -405,9 +433,38 @@ function validateBpeSnapshotProvenance(snapshot, { orderId, orderRef, tenantId, 
             message: `Snapshot payload contains order '${payloadOrderId}', mismatched with requested order '${orderId}'.`
         };
     }
+    if (payloadOrderId && sealedRecord.order_id && payloadOrderId !== sealedRecord.order_id) {
+        return {
+            valid: false,
+            code: 'SNAPSHOT_ORDER_MISMATCH',
+            message: `Snapshot payload contains order '${payloadOrderId}', mismatched with sealed order '${sealedRecord.order_id}'.`
+        };
+    }
+    const payloadTenantId = snapshot.tenant_id;
+    if (payloadTenantId && tenantId && payloadTenantId !== tenantId) {
+        return {
+            valid: false,
+            code: 'SNAPSHOT_TENANT_MISMATCH',
+            message: `Snapshot payload contains tenant '${payloadTenantId}', mismatched with requested tenant '${tenantId}'.`
+        };
+    }
+    if (payloadTenantId && sealedRecord.tenant_id && payloadTenantId !== sealedRecord.tenant_id) {
+        return {
+            valid: false,
+            code: 'SNAPSHOT_TENANT_MISMATCH',
+            message: `Snapshot payload contains tenant '${payloadTenantId}', mismatched with sealed tenant '${sealedRecord.tenant_id}'.`
+        };
+    }
 
     // 7. Engine version match with sealed record
-    if (sealedRecord.formula_version && sealedRecord.formula_version !== engineVersion) {
+    if (!sealedRecord.formula_version || typeof sealedRecord.formula_version !== 'string' || !sealedRecord.formula_version.trim()) {
+        return {
+            valid: false,
+            code: 'MISSING_SEALED_FORMULA_VERSION',
+            message: 'Pricing snapshot record lacks verifiable formula_version.'
+        };
+    }
+    if (sealedRecord.formula_version !== engineVersion) {
         return {
             valid: false,
             code: 'BPE_ENGINE_VERSION_MISMATCH',
@@ -416,7 +473,14 @@ function validateBpeSnapshotProvenance(snapshot, { orderId, orderRef, tenantId, 
     }
 
     // 8. Tariff checksum match with sealed record
-    if (sealedRecord.rate_card_checksum && sealedRecord.rate_card_checksum !== ratesChecksum) {
+    if (!sealedRecord.rate_card_checksum || typeof sealedRecord.rate_card_checksum !== 'string' || !sealedRecord.rate_card_checksum.trim()) {
+        return {
+            valid: false,
+            code: 'MISSING_SEALED_RATE_CARD_CHECKSUM',
+            message: 'Pricing snapshot record lacks verifiable rate_card_checksum.'
+        };
+    }
+    if (sealedRecord.rate_card_checksum !== ratesChecksum) {
         return {
             valid: false,
             code: 'INCOMPATIBLE_RATES_CHECKSUM',
@@ -424,20 +488,39 @@ function validateBpeSnapshotProvenance(snapshot, { orderId, orderRef, tenantId, 
         };
     }
 
-    // 7. Baseline net price correspondence
+    // 9. Baseline net price correspondence
+    if (sealedRecord.final_amount === null || sealedRecord.final_amount === undefined || isNaN(Number(sealedRecord.final_amount))) {
+        return {
+            valid: false,
+            code: 'MISSING_SEALED_FINAL_AMOUNT',
+            message: 'Pricing snapshot record in order_pricing_snapshots lacks valid numeric final_amount.'
+        };
+    }
     const snapshotBaseNet = snapshot.base_net_price !== undefined ? Number(snapshot.base_net_price) : (snapshot.final_amount !== undefined ? Number(snapshot.final_amount) : null);
     const sealedFinalAmount = Number(sealedRecord.final_amount);
-    if (snapshotBaseNet !== null && !isNaN(snapshotBaseNet) && !isNaN(sealedFinalAmount)) {
-        if (Math.abs(snapshotBaseNet - sealedFinalAmount) > 0.0001) {
-            return {
-                valid: false,
-                code: 'BASELINE_AMOUNT_MISMATCH',
-                message: `Snapshot baseline net price '${snapshotBaseNet}' does not match sealed final amount '${sealedFinalAmount}'.`
-            };
-        }
+    if (snapshotBaseNet === null || isNaN(snapshotBaseNet)) {
+        return {
+            valid: false,
+            code: 'MISSING_SNAPSHOT_BASE_PRICE',
+            message: 'Calculation snapshot lacks valid baseline base_net_price or final_amount.'
+        };
+    }
+    if (Math.abs(snapshotBaseNet - sealedFinalAmount) > 0.0001) {
+        return {
+            valid: false,
+            code: 'BASELINE_AMOUNT_MISMATCH',
+            message: `Snapshot baseline net price '${snapshotBaseNet}' does not match sealed final amount '${sealedFinalAmount}'.`
+        };
     }
 
-    // 8. Cryptographic Fingerprint Integrity Check (Canonical SHA-256)
+    // 10. Cryptographic Fingerprint Integrity Check (Canonical SHA-256)
+    if (!sealedRecord.snapshot_checksum || typeof sealedRecord.snapshot_checksum !== 'string' || !sealedRecord.snapshot_checksum.trim()) {
+        return {
+            valid: false,
+            code: 'MISSING_SEALED_CHECKSUM',
+            message: 'Pricing snapshot record in order_pricing_snapshots lacks cryptographic snapshot_checksum.'
+        };
+    }
     let calculatedChecksum;
     try {
         calculatedChecksum = pricingSnapshotCanonicalizer.calculatePricingSnapshotChecksum(snapshot);
@@ -460,7 +543,7 @@ function validateBpeSnapshotProvenance(snapshot, { orderId, orderRef, tenantId, 
         } catch (_) {}
     }
 
-    if (sealedRecord.snapshot_checksum && !isMatch) {
+    if (!isMatch) {
         return {
             valid: false,
             code: 'SNAPSHOT_INTEGRITY_TAMPERED',
@@ -468,7 +551,16 @@ function validateBpeSnapshotProvenance(snapshot, { orderId, orderRef, tenantId, 
         };
     }
 
-    return { valid: true, checksum: calculatedChecksum };
+    // Return immutable deep-frozen copy of verified calculation payload to prevent any post-validation tampering
+    const validatedPayload = JSON.parse(JSON.stringify(snapshot));
+    validatedPayload._source = 'ORDER_PRICING_SNAPSHOTS';
+    if (sealedRecord.snapshot_id) {
+        validatedPayload._sealedSnapshotId = sealedRecord.snapshot_id;
+    }
+    validatedPayload._verifiedChecksum = calculatedChecksum;
+    deepFreeze(validatedPayload);
+
+    return { valid: true, checksum: calculatedChecksum, validatedPayload };
 }
 
 /**
@@ -1130,10 +1222,7 @@ class OrderQuoteRevisionService {
                                 { reason: validation.code, details: validation.message }
                             );
                         }
-                        authoritativeCalculation = calculationPayload;
-                        authoritativeCalculation._source = 'ORDER_PRICING_SNAPSHOTS';
-                        authoritativeCalculation._sealedSnapshotId = snap.snapshot_id;
-                        authoritativeCalculation._verifiedChecksum = validation.checksum;
+                        authoritativeCalculation = validation.validatedPayload || calculationPayload;
                     }
                 }
             }

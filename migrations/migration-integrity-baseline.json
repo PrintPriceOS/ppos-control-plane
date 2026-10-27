@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-10-27T18:51:07.468Z",
+  "generatedAt": "2026-10-27T20:07:56.679Z",
   "hashAlgorithm": "sha256",
   "contentNormalization": "utf8-lf-v1",
   "approvedPrefixCollisions": {
@@ -2264,6 +2264,19 @@
       "canonicalSha256": "fce8469af877acb1a70918766aa0c32b429519d7eecec776ec9d8c6aae041908",
       "contentNormalization": "utf8-lf-v1",
       "sizeBytes": 6816,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/169_phase196h_printhouse_profiles.sql",
+      "prefix": "169",
+      "canonicalSha256": "d87f3c91beac927575013ab02215d1b581bfc3e15aa6a939d87d91dea621fa48",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 2111,
       "containsDdl": true,
       "containsDml": true,
       "containsTransaction": false,
