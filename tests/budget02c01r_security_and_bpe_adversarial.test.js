@@ -151,16 +151,19 @@ describe('BUDGET-02C-01R — Security Remediation & BPE Parity Adversarial Certi
             isDeliveryChannelConfigured: () => mockDelivery.configured,
             deliverOtp: async (payload) => {
                 if (!mockDelivery.configured) {
-                    return { ok: false, delivered: false, reason: 'NO_ADAPTER_CONFIGURED' };
+                    return { ok: false, status: 'PROVIDER_MISSING', reason: 'NO_ADAPTER_CONFIGURED' };
                 }
                 deliveredOtps.push(payload);
                 return {
                     ok: true,
-                    delivered: true,
+                    status: 'PROVIDER_ACCEPTED',
                     channel: 'EMAIL',
                     destination: payload.recipientEmail,
-                    messageId: `msg_${Date.now()}`,
-                    timestamp: new Date().toISOString()
+                    proof: {
+                        provider_message_id: `msg_${Date.now()}`,
+                        accepted_at: new Date().toISOString(),
+                        handset_delivered: false
+                    }
                 };
             }
         };
@@ -178,6 +181,8 @@ describe('BUDGET-02C-01R — Security Remediation & BPE Parity Adversarial Certi
                     order_ref: 'job_order_100',
                     tenant_id: 'tenant_alpha',
                     printhouse_id: 'ph_dar_01',
+                    customer_email: 'client@example.com',
+                    delivery_country: 'ES',
                     offers_snapshot: baselineBpeSnapshot
                 },
                 {
@@ -185,6 +190,8 @@ describe('BUDGET-02C-01R — Security Remediation & BPE Parity Adversarial Certi
                     order_ref: 'job_order_300',
                     tenant_id: 'tenant_beta',
                     printhouse_id: 'ph_other',
+                    customer_email: 'client300@example.com',
+                    delivery_country: 'ES',
                     offers_snapshot: baselineBpeSnapshot
                 }
             ],
@@ -211,6 +218,8 @@ describe('BUDGET-02C-01R — Security Remediation & BPE Parity Adversarial Certi
                     paper_type: 'offset',
                     sheet_width: 640,
                     sheet_height: 900,
+                    width_mm: 640,
+                    height_mm: 900,
                     brand_name: 'Standard Offset',
                     finish_type: 'UNCOATED',
                     is_active: 1
@@ -238,11 +247,19 @@ describe('BUDGET-02C-01R — Security Remediation & BPE Parity Adversarial Certi
                 }
 
                 if (s.includes('from orders')) {
-                    const [tenantId, ref, id] = params;
-                    const matches = mockDb.orders.filter(
-                        o => o.tenant_id === tenantId && (o.order_ref === ref || o.id === id)
-                    );
-                    return [matches];
+                    if (params.length === 2) {
+                        const [ref, id] = params;
+                        const matches = mockDb.orders.filter(
+                            o => o.order_ref === ref || o.id === id
+                        );
+                        return [matches];
+                    } else {
+                        const [tenantId, ref, id] = params;
+                        const matches = mockDb.orders.filter(
+                            o => o.tenant_id === tenantId && (o.order_ref === ref || o.id === id)
+                        );
+                        return [matches];
+                    }
                 }
 
                 if (s.includes('from order_paper_decisions')) {
@@ -564,25 +581,17 @@ describe('BUDGET-02C-01R — Security Remediation & BPE Parity Adversarial Certi
             assert.strictEqual(mockDb.quote_revision_tokens[0].status, 'REVOKED');
         });
 
-        it('SEC-C01.4: Fail-closed if delivery adapter is not configured or delivery fails: acceptance blocked', async () => {
+        it('SEC-C01.4: Fail-closed if delivery adapter is not configured or delivery fails: revision creation blocked', async () => {
             mockDelivery.configured = false; // Disable delivery adapter
 
-            const created = await service.createQuoteRevision({
-                tenantId: 'tenant_alpha',
-                externalOrderIntentId: 'job_order_100',
-                paperDecisionId: 'opd_legit_001',
-                recipientEmail: 'client@example.com',
-                originalCalculation: baselineBpeSnapshot,
-                alternativeVariant: { gsm: 120, paper_type: 'offset' },
-                taxResolutionContext: { seller_country: 'ES', customer_country: 'ES', product_category: 'BOOK', is_editorial_book: true }
-            });
-
-            // Delivery status must be recorded as FAILED
-            assert.strictEqual(mockDb.quote_revision_tokens[0].otp_delivery_status, 'FAILED');
-
-            // Customer attempting to accept fails closed with OTP_DELIVERY_UNAVAILABLE (cannot satisfy 2FA)
+            // Customer revision issuance fails closed with OTP_DELIVERY_UNAVAILABLE (SEC-C01R)
             await assert.rejects(
-                () => service.respondToQuoteRevision({ rawToken: created.rawToken, decision: 'ACCEPT', otpCode: '111222' }),
+                () => service.createQuoteRevision({
+                    tenantId: 'tenant_alpha',
+                    externalOrderIntentId: 'job_order_100',
+                    paperDecisionId: 'opd_legit_001',
+                    recipientEmail: 'client@example.com'
+                }),
                 err => err.code === 'OTP_DELIVERY_UNAVAILABLE' && err.statusCode === 403
             );
         });
@@ -934,13 +943,12 @@ describe('BUDGET-02C-01R — Security Remediation & BPE Parity Adversarial Certi
     // =========================================================================
     describe('SEC-C06 — Seguridad de tokens, prevención de replay y triple compuerta', () => {
         it('SEC-C06.1: Token is cryptographically bound to recipient email hash and revision amount', async () => {
+            mockDb.orders[0].customer_email = 'verified.buyer@enterprise.com';
             const created = await service.createQuoteRevision({
                 tenantId: 'tenant_alpha',
                 externalOrderIntentId: 'job_order_100',
                 paperDecisionId: 'opd_legit_001',
                 recipientEmail: 'verified.buyer@enterprise.com',
-                originalCalculation: baselineBpeSnapshot,
-                alternativeVariant: { gsm: 120, paper_type: 'offset' },
                 taxResolutionContext: { seller_country: 'ES', customer_country: 'ES', product_category: 'BOOK', is_editorial_book: true }
             });
 

@@ -340,8 +340,8 @@ function resolveActorContext(req) {
     const actorContext = {
         userId: user.id || 'anonymous',
         role,
-        tenantId: verifiedSupplier?.tenantId || user.tenantId,
-        printhouseId: user.printhouseId,
+        tenantId: verifiedSupplier?.tenantId || user.tenantId || user.tenant_id,
+        printhouseId: user.printhouseId || user.printhouse_id,
         supplierId: effectiveSupplierId,
         activeContext: effectiveActiveContext,
         isSuperAdmin: role === 'SUPER_ADMIN',

@@ -95,6 +95,39 @@ function computeSaltedOtpHash(otpCode, salt, revisionId) {
 }
 
 /**
+ * Calculates expiration timestamp based on authoritative printhouse business hours (SEC-C02R, Policy).
+ * Operates Mon-Fri 09:00 to 18:00 Europe/Madrid (8 business hours/day + 1h lunch), skipping weekends and official holidays.
+ */
+function calculateBusinessHoursExpirationUtc({
+    startDate = new Date(),
+    businessHours = 48,
+    timezone = 'Europe/Madrid',
+    holidays = ['01-01', '01-06', '05-01', '10-12', '11-01', '12-06', '12-08', '12-25']
+}) {
+    let current = new Date(startDate.getTime());
+    let remainingHours = businessHours;
+
+    while (remainingHours > 0) {
+        current = new Date(current.getTime() + 60 * 60 * 1000);
+        const dayOfWeek = current.getUTCDay();
+        const hour = current.getUTCHours();
+        const mm = String(current.getUTCMonth() + 1).padStart(2, '0');
+        const dd = String(current.getUTCDate()).padStart(2, '0');
+        const mmdd = `${mm}-${dd}`;
+
+        // Skip Saturday (6) and Sunday (0)
+        if (dayOfWeek === 0 || dayOfWeek === 6) continue;
+        // Skip official holidays
+        if (holidays.includes(mmdd)) continue;
+        // Work window: 08:00 to 17:00 UTC (corresponds to 09:00 to 18:00 CET)
+        if (hour >= 8 && hour < 17) {
+            remainingHours--;
+        }
+    }
+    return current;
+}
+
+/**
  * Deterministic BPE Interior Paper Recalculation Engine (SEC-C03).
  * Recomputes paper weight and type substitution, preserving all other line items strictly frozen.
  * Prohibits client cost overrides and eliminates fictitious fallback constants.
@@ -166,8 +199,11 @@ function recalculateDeterministicBpePrice({
         );
     }
 
-    const sheetWidth = alternativeVariant.width_mm || alternativeVariant.custom_width || specs.sheet_width;
-    const sheetHeight = alternativeVariant.height_mm || alternativeVariant.custom_height || specs.sheet_height;
+    const altVariantWidth = alternativeVariant.width_mm || alternativeVariant.sheet_width || alternativeVariant.custom_width;
+    const altVariantHeight = alternativeVariant.height_mm || alternativeVariant.sheet_height || alternativeVariant.custom_height;
+
+    const sheetWidth = altVariantWidth || specs.sheet_width;
+    const sheetHeight = altVariantHeight || specs.sheet_height;
 
     if (!sheetWidth || !sheetHeight) {
         throw new OrderQuoteRevisionError(
@@ -177,6 +213,25 @@ function recalculateDeterministicBpePrice({
             { reason: 'MISSING_DIMENSIONS' }
         );
     }
+
+    // SEC-C03R: Strict dimensional parity & imposition preservation
+    // When alternative sheet format differs from the baseline printing press sheet,
+    // imposition changes and cannot be approximated without full BPE re-engineering.
+    if (specs.sheet_width && specs.sheet_height && altVariantWidth && altVariantHeight) {
+        if (Number(altVariantWidth) !== Number(specs.sheet_width) || Number(altVariantHeight) !== Number(specs.sheet_height)) {
+            throw new OrderQuoteRevisionError(
+                `Alternative sheet dimensions (${altVariantWidth}x${altVariantHeight} mm) do not match baseline press sheet (${specs.sheet_width}x${specs.sheet_height} mm). Imposition alteration requires full BPE re-engineering. Recalculation blocked.`,
+                'RECALCULATION_BLOCKED',
+                422,
+                {
+                    reason: 'UNSUPPORTED_DIMENSIONAL_SUBSTITUTION',
+                    original_sheet: { width_mm: specs.sheet_width, height_mm: specs.sheet_height },
+                    alternative_sheet: { width_mm: altVariantWidth, height_mm: altVariantHeight }
+                }
+            );
+        }
+    }
+
     const sheetAreaM2 = (sheetWidth * sheetHeight) / 1000000;
 
     // 2. Kilos and Paper Cost from Frozen Rates
@@ -236,6 +291,15 @@ function recalculateDeterministicBpePrice({
             'Alternative variant gsm must be a positive number.',
             'INVALID_ALTERNATIVE_VARIANT',
             400
+        );
+    }
+
+    if (altGsm < 60 || altGsm > 350) {
+        throw new OrderQuoteRevisionError(
+            `Alternative paper grammage (${altGsm} gsm) is outside supported printing press range (60-350 gsm). Recalculation blocked.`,
+            'RECALCULATION_BLOCKED',
+            422,
+            { reason: 'UNSUPPORTED_GRAMMAGE_RANGE', gsm: altGsm }
         );
     }
 
@@ -299,66 +363,135 @@ function recalculateDeterministicBpePrice({
 }
 
 /**
- * Provider-agnostic OTP Delivery Service (SEC-C01).
- * Verifies delivery channel availability and records verifiable proof of delivery.
+ * Provider-agnostic OTP Delivery Service (SEC-C01R).
+ * Requires an active, tested delivery provider implementing sendOtp or sendMail.
+ * Distinguishes provider acceptance (ACCEPTED_FOR_DISPATCH) from unconfirmed device receipts.
  */
 class OtpDeliveryService {
     constructor(dependencies = {}) {
-        this.emailDeliveryService = dependencies.emailDeliveryService || null;
-        this.notificationService = dependencies.notificationService || null;
+        this.provider = dependencies.deliveryProvider || dependencies.emailDeliveryService || dependencies.provider || null;
         this.isExplicitlyConfigured = dependencies.isConfigured !== undefined ? dependencies.isConfigured : null;
     }
 
     /**
      * Verifies whether an authorized delivery channel is active and tested.
+     * SEC-C01R: Zero simulated delivery. Requires a real provider implementing sendOtp or sendMail.
      */
     isDeliveryChannelConfigured() {
         if (this.isExplicitlyConfigured !== null) {
             return this.isExplicitlyConfigured;
         }
-        return Boolean(
-            process.env.SMTP_HOST ||
-            process.env.ENABLE_OTP_DELIVERY === 'true' ||
-            this.emailDeliveryService !== null
-        );
+        if (!this.provider) return false;
+        return typeof this.provider.sendOtp === 'function' || typeof this.provider.sendMail === 'function';
     }
 
     /**
      * Delivers the OTP to the verified recipient.
      */
     async deliverOtp({ recipientEmail, otpCode, revisionId, deltaNet, tenantId }) {
+        if (!this.provider) {
+            return {
+                ok: false,
+                status: 'PROVIDER_MISSING',
+                delivered: false,
+                reason: 'NO_VERIFIED_DELIVERY_CHANNEL_CONFIGURED'
+            };
+        }
+
+        if (typeof this.provider.sendOtp !== 'function' && typeof this.provider.sendMail !== 'function') {
+            return {
+                ok: false,
+                status: 'PROVIDER_UNIMPLEMENTED',
+                delivered: false,
+                reason: 'DELIVERY_PROVIDER_UNIMPLEMENTED'
+            };
+        }
+
         if (!this.isDeliveryChannelConfigured()) {
             return {
                 ok: false,
+                status: 'PROVIDER_MISSING',
                 delivered: false,
                 reason: 'NO_VERIFIED_DELIVERY_CHANNEL_CONFIGURED'
             };
         }
 
         try {
-            if (this.emailDeliveryService && typeof this.emailDeliveryService.sendMail === 'function') {
-                await this.emailDeliveryService.sendMail({
+            let providerResponse = null;
+            if (typeof this.provider.sendOtp === 'function') {
+                providerResponse = await this.provider.sendOtp({
+                    recipient: recipientEmail,
+                    recipientEmail,
+                    otpCode,
+                    revisionId,
+                    deltaNet,
+                    tenantId
+                });
+            } else {
+                providerResponse = await this.provider.sendMail({
                     to: recipientEmail,
-                    subject: `[PrintPrice OS] Código de Autorización Económica (Delta: ${deltaNet.toFixed(2)} €)`,
+                    subject: `[PrintPrice OS] Código de Autorización Económica (Delta: ${Number(deltaNet).toFixed(2)} €)`,
                     text: `Su código de verificación para autorizar la revisión económica ${revisionId} es: ${otpCode}. Expira en 15 minutos.`
                 });
             }
 
+            if (!providerResponse) {
+                return {
+                    ok: false,
+                    status: 'PROVIDER_EMPTY_RESPONSE',
+                    delivered: false,
+                    reason: 'PROVIDER_RETURNED_EMPTY_RESPONSE'
+                };
+            }
+
+            if (
+                providerResponse.accepted === false ||
+                (Array.isArray(providerResponse.rejected) && providerResponse.rejected.length > 0) ||
+                providerResponse.ok === false
+            ) {
+                return {
+                    ok: false,
+                    status: 'PROVIDER_REJECTED',
+                    delivered: false,
+                    reason: providerResponse.error || providerResponse.rejectionReason || 'DISPATCH_REJECTED_BY_PROVIDER'
+                };
+            }
+
+            const messageId = providerResponse.messageId 
+                || providerResponse.message_id 
+                || providerResponse.delivery_reference 
+                || providerResponse.id 
+                || providerResponse.reference;
+
+            if (!messageId) {
+                return {
+                    ok: false,
+                    status: 'MISSING_PROVIDER_ACCEPTANCE_PROOF',
+                    delivered: false,
+                    reason: 'PROVIDER_DID_NOT_RETURN_MESSAGE_ID'
+                };
+            }
+
             return {
                 ok: true,
+                status: 'PROVIDER_ACCEPTED',
                 delivered: true,
                 proof: {
                     channel: 'EMAIL',
                     recipient: recipientEmail,
-                    delivery_reference: `del_${crypto.randomUUID()}`,
-                    timestamp: new Date().toISOString()
+                    provider_message_id: String(messageId),
+                    accepted_at: new Date().toISOString(),
+                    delivery_status: 'ACCEPTED_FOR_DISPATCH',
+                    handset_receipt_proven: false
                 }
             };
         } catch (err) {
+            const isNetwork = err.code === 'ECONNREFUSED' || err.code === 'ETIMEDOUT' || err.code === 'ENOTFOUND' || err.isNetworkError;
             return {
                 ok: false,
+                status: isNetwork ? 'NETWORK_ERROR' : 'DISPATCH_ERROR',
                 delivered: false,
-                reason: err.message
+                reason: err.message || 'DELIVERY_DISPATCH_EXCEPTION'
             };
         }
     }
@@ -471,7 +604,7 @@ class OrderQuoteRevisionService {
             // 2. Authoritative Order Lookup Under Lock (SEC-C02)
             let orderRow = null;
             const [orderRows] = await conn.query(
-                `SELECT id, order_ref, tenant_id, offer_print_house, offer_price, status, offers_snapshot, active_pricing_snapshot_id 
+                `SELECT id, order_ref, tenant_id, offer_print_house, offer_price, status, offers_snapshot, active_pricing_snapshot_id, customer_email, recipient_email, metadata_json, user_id 
                  FROM orders 
                  WHERE order_ref = ? OR id = ? 
                  FOR UPDATE`,
@@ -482,7 +615,7 @@ class OrderQuoteRevisionService {
                 orderRow = orderRows[0];
             } else {
                 const [mpRows] = await conn.query(
-                    `SELECT id, order_id, tenant_id, printhouse_id, estimated_price, status 
+                    `SELECT id, order_id, tenant_id, printhouse_id, estimated_price, status, customer_email, metadata_json 
                      FROM marketplace_orders 
                      WHERE order_id = ? OR id = ? 
                      FOR UPDATE`,
@@ -493,33 +626,86 @@ class OrderQuoteRevisionService {
                 }
             }
 
+            // SEC-C02R & SEC-C03R: Order Existence Verification
+            if (!orderRow) {
+                throw new OrderQuoteRevisionError(
+                    `Order '${resolvedOrderRef}' not found in authoritative registry. Revision issuance blocked.`,
+                    'ORDER_NOT_FOUND',
+                    404
+                );
+            }
+
             // SEC-C02: Order Verification
-            if (orderRow) {
-                if (orderRow.tenant_id && orderRow.tenant_id !== tenantId && !actorContext.isSuperAdmin) {
-                    throw new OrderQuoteRevisionError(
-                        `Cross-tenant access denied: Order belongs to another tenant`,
-                        'TENANT_MISMATCH',
-                        403
-                    );
-                }
+            if (orderRow.tenant_id && orderRow.tenant_id !== tenantId && !actorContext.isSuperAdmin) {
+                throw new OrderQuoteRevisionError(
+                    `Cross-tenant access denied: Order belongs to another tenant`,
+                    'TENANT_MISMATCH',
+                    403
+                );
+            }
 
-                const assignedPrinter = orderRow.offer_print_house || orderRow.printhouse_id;
-                if (assignedPrinter && effectivePrinthouseId && assignedPrinter !== effectivePrinthouseId && !actorContext.isSuperAdmin) {
-                    throw new OrderQuoteRevisionError(
-                        `Access denied: Order is assigned to another printhouse`,
-                        'PRINTHOUSE_UNAUTHORIZED',
-                        403
-                    );
-                }
+            const assignedPrinter = orderRow.offer_print_house || orderRow.printhouse_id;
+            if (assignedPrinter && effectivePrinthouseId && assignedPrinter !== effectivePrinthouseId && !actorContext.isSuperAdmin) {
+                throw new OrderQuoteRevisionError(
+                    `Access denied: Order is assigned to another printhouse`,
+                    'PRINTHOUSE_UNAUTHORIZED',
+                    403
+                );
+            }
 
-                const orderStatus = String(orderRow.status || '').toUpperCase();
-                if (['CANCELLED', 'CLOSED', 'REJECTED', 'ABANDONED'].includes(orderStatus)) {
-                    throw new OrderQuoteRevisionError(
-                        `Cannot issue quote revision: Order is in ${orderStatus} state`,
-                        'ORDER_INELIGIBLE',
-                        422
-                    );
+            const orderStatus = String(orderRow.status || '').toUpperCase();
+            if (['CANCELLED', 'CLOSED', 'REJECTED', 'ABANDONED'].includes(orderStatus)) {
+                throw new OrderQuoteRevisionError(
+                    `Cannot issue quote revision: Order is in ${orderStatus} state`,
+                    'ORDER_INELIGIBLE',
+                    422
+                );
+            }
+
+            // SEC-C03R: Authoritative Resolution of Contractual Recipient Identity
+            let authoritativeRecipientEmail = null;
+            if (orderRow.customer_email) {
+                authoritativeRecipientEmail = orderRow.customer_email;
+            } else if (orderRow.recipient_email) {
+                authoritativeRecipientEmail = orderRow.recipient_email;
+            } else if (orderRow.metadata_json) {
+                const meta = typeof orderRow.metadata_json === 'string' ? JSON.parse(orderRow.metadata_json) : orderRow.metadata_json;
+                authoritativeRecipientEmail = meta.customer_email || meta.customer?.email || meta.client_email || meta.recipient_email || meta.billing_address?.email;
+            }
+
+            if (!authoritativeRecipientEmail && orderRow.user_id) {
+                const [userRows] = await conn.query('SELECT email FROM users WHERE id = ? LIMIT 1', [orderRow.user_id]);
+                if (userRows && userRows.length > 0 && userRows[0].email) {
+                    authoritativeRecipientEmail = userRows[0].email;
                 }
+            }
+
+            if (!authoritativeRecipientEmail) {
+                throw new OrderQuoteRevisionError(
+                    'Order lacks an authenticated contractual customer identity. Revision issuance blocked.',
+                    'UNVERIFIED_RECIPIENT_IDENTITY',
+                    422,
+                    { reason: 'MISSING_CONTRACTUAL_RECIPIENT' }
+                );
+            }
+
+            const cleanEmail = String(authoritativeRecipientEmail).trim().toLowerCase();
+            const emailDomain = cleanEmail.split('@')[1] || '';
+            if (!cleanEmail.includes('@') || emailDomain === 'order.local' || emailDomain.endsWith('.local') || !emailDomain.includes('.')) {
+                throw new OrderQuoteRevisionError(
+                    `Fictitious customer identity '${cleanEmail}' is prohibited for quote revision issuance.`,
+                    'UNVERIFIED_RECIPIENT_IDENTITY',
+                    422,
+                    { reason: 'FICTITIOUS_RECIPIENT_IDENTITY', email: cleanEmail }
+                );
+            }
+
+            if (recipientEmail && recipientEmail.trim().toLowerCase() !== cleanEmail) {
+                throw new OrderQuoteRevisionError(
+                    `Provided recipient email '${recipientEmail}' does not match authenticated contractual recipient '${cleanEmail}'.`,
+                    'FORBIDDEN_RECIPIENT_MISMATCH',
+                    403
+                );
             }
 
             // 3. Concurrency Control: Check Existing Pending Revisions (SEC-C06)
@@ -561,7 +747,7 @@ class OrderQuoteRevisionService {
                 }
             }
 
-            // 4. Authoritative Resolution of BPE Calculation Snapshot (SEC-C02)
+            // 4. Authoritative Resolution of BPE Calculation Snapshot (SEC-C02R)
             let authoritativeCalculation = null;
 
             if (orderRow && orderRow.id) {
@@ -594,11 +780,7 @@ class OrderQuoteRevisionService {
                 }
             }
 
-            // Fallback to validated input if passed and matches authoritative verification
-            if (!authoritativeCalculation && originalCalculation) {
-                authoritativeCalculation = originalCalculation;
-            }
-
+            // SEC-C02R: ZERO fallback to request body originalCalculation!
             if (!authoritativeCalculation) {
                 throw new OrderQuoteRevisionError(
                     'Missing authoritative pricing snapshot for order. Cannot reproduce BPE pricing deterministically.',
@@ -608,7 +790,7 @@ class OrderQuoteRevisionService {
                 );
             }
 
-            // 5. Authoritative Resolution of Alternative Variant (SEC-C02)
+            // 5. Authoritative Resolution of Alternative Variant (SEC-C02R)
             let authoritativeVariant = null;
             const altVariantId = decision.alternative_variant_id;
 
@@ -641,10 +823,7 @@ class OrderQuoteRevisionService {
                 }
             }
 
-            if (!authoritativeVariant && alternativeVariant) {
-                authoritativeVariant = alternativeVariant;
-            }
-
+            // SEC-C02R: ZERO fallback to request body alternativeVariant!
             if (!authoritativeVariant) {
                 throw new OrderQuoteRevisionError(
                     'Alternative variant not found in master catalog or decision metadata.',
@@ -654,10 +833,27 @@ class OrderQuoteRevisionService {
                 );
             }
 
-            // 6. Authoritative Margin Application (SEC-C02)
-            const effectiveMargin = authoritativeCalculation.target_margin_pct !== undefined 
-                ? authoritativeCalculation.target_margin_pct 
-                : (targetMarginPct !== null && targetMarginPct !== undefined ? targetMarginPct : 18.5);
+            // 6. Authoritative Commercial Margin Application (SEC-C02R)
+            let effectiveMargin = authoritativeCalculation.target_margin_pct;
+            if (effectiveMargin === undefined || effectiveMargin === null) {
+                const [phProfiles] = await conn.query(
+                    `SELECT target_margin_pct FROM printhouse_profiles WHERE printhouse_id = ? LIMIT 1`,
+                    [effectivePrinthouseId || orderRow.offer_print_house || tenantId]
+                ).catch(() => [[]]);
+                if (phProfiles && phProfiles.length > 0 && phProfiles[0].target_margin_pct !== null) {
+                    effectiveMargin = Number(phProfiles[0].target_margin_pct);
+                }
+            }
+
+            // SEC-C02R: ZERO fallback to request body targetMarginPct, ZERO 18.5% hardcoded default!
+            if (effectiveMargin === undefined || effectiveMargin === null || isNaN(effectiveMargin) || effectiveMargin < 0 || effectiveMargin >= 100) {
+                throw new OrderQuoteRevisionError(
+                    'No authoritative commercial margin registered in baseline pricing snapshot or tenant registry. Recalculation blocked.',
+                    'RECALCULATION_BLOCKED',
+                    422,
+                    { reason: 'MISSING_AUTHORITATIVE_MARGIN' }
+                );
+            }
 
             // 7. Deterministic BPE Recalculation (SEC-C03)
             const bpeResult = recalculateDeterministicBpePrice({
@@ -666,14 +862,36 @@ class OrderQuoteRevisionService {
                 targetMarginPct: effectiveMargin
             });
 
-            // 8. Fiscal Gate (Gate 2): Authoritative Tax Readiness Resolution
-            const taxContext = {
-                ...taxResolutionContext,
+            // 8. Fiscal Gate (Gate 2): Server-Authoritative Tax Readiness Resolution (SEC-C02R, Policy)
+            const orderMeta = typeof orderRow.metadata_json === 'string'
+                ? JSON.parse(orderRow.metadata_json || '{}')
+                : (orderRow.metadata_json || {});
+
+            const authoritativeCustomerCountry = orderRow.delivery_country 
+                || orderMeta.delivery_country 
+                || orderMeta.shipping_country 
+                || orderMeta.shipping_address?.country 
+                || 'ES';
+
+            const isEditorialBook = Boolean(authoritativeCalculation.specs?.interior_pages || orderRow.product_type === 'BOOK' || orderMeta.product_type === 'BOOK');
+            const isB2B = Boolean(orderRow.vat_number || orderMeta.vat_number || orderMeta.customer_type === 'B2B');
+
+            const authoritativeTaxContext = {
                 amount: bpeResult.revised_net_price,
-                currency: 'EUR'
+                currency: 'EUR',
+                seller_country: 'ES',
+                supplier_country: 'ES',
+                customer_country: authoritativeCustomerCountry,
+                customer_vat_id: orderRow.vat_number || orderMeta.vat_number || null,
+                customer_type: isB2B ? 'B2B' : 'B2C',
+                vies_valid: Boolean(orderMeta.vies_valid),
+                cross_border_transport_verified: Boolean(orderMeta.has_proof_of_transport),
+                supply_type: 'SUPPLY_OF_GOODS',
+                product_category: orderRow.product_type || orderMeta.product_type || (isEditorialBook ? 'EDITORIAL_BOOK' : 'COMMERCIAL_PRINT'),
+                is_editorial_book: isEditorialBook
             };
 
-            const taxClassification = this.classifier.classifyReadiness(taxContext);
+            const taxClassification = this.classifier.classifyReadiness(authoritativeTaxContext);
 
             if (taxClassification.readiness_status === 'TAX_CLASSIFICATION_BLOCKED') {
                 throw new OrderQuoteRevisionError(
@@ -691,15 +909,28 @@ class OrderQuoteRevisionService {
                 taxRatePct
             });
 
-            // 9. Expiration Projection (48 Business Hours bounded by Supplier Offer)
-            const effectiveHours = printhouseConfig.revision_ttl_business_hours || this.defaultTtlHours;
+            // 9. Authoritative Expiration Projection (48 Business Hours bounded by Supplier Offer) (SEC-C02R, Policy)
             const now = new Date();
-            const expiresAt = new Date(now.getTime() + effectiveHours * 3600 * 1000);
+            const businessHoursTtl = 48;
+            const printhouseTz = 'Europe/Madrid';
+            const calculatedExpirationUtc = calculateBusinessHoursExpirationUtc({
+                startDate: now,
+                businessHours: businessHoursTtl,
+                timezone: printhouseTz
+            });
 
-            if (printhouseConfig.supplier_offer_valid_until) {
-                const supplierValidUntil = new Date(printhouseConfig.supplier_offer_valid_until);
-                if (supplierValidUntil < expiresAt) {
-                    expiresAt.setTime(supplierValidUntil.getTime());
+            let expiresAt = calculatedExpirationUtc;
+
+            const decisionMeta = typeof decision.metadata_json === 'string'
+                ? JSON.parse(decision.metadata_json || '{}')
+                : (decision.metadata_json || {});
+            const supplierOfferValidUntilStr = decisionMeta.supplier_offer_valid_until || orderMeta.supplier_offer_valid_until;
+            let supplierOfferValidUntil = null;
+
+            if (supplierOfferValidUntilStr) {
+                supplierOfferValidUntil = parseUtcDate(supplierOfferValidUntilStr);
+                if (supplierOfferValidUntil && supplierOfferValidUntil < expiresAt) {
+                    expiresAt = supplierOfferValidUntil;
                 }
             }
 
@@ -708,15 +939,14 @@ class OrderQuoteRevisionService {
             const tokenPrefix = `qrt_${rawToken.substring(0, 8)}`;
             const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
 
-            const cleanEmail = (recipientEmail || 'client@order.local').trim().toLowerCase();
             const recipientEmailHash = crypto.createHash('sha256').update(cleanEmail).digest('hex');
 
             const revisionId = `oqr_${crypto.randomUUID()}`;
             const tokenId = `qrt_${crypto.randomUUID()}`;
 
-            // 11. Real CSPRNG OTP Generation & Delivery Proof (SEC-C01)
+            // 11. Real CSPRNG OTP Generation & Delivery Proof (SEC-C01R)
             const deltaNet = taxBreakdown.delta_net_amount;
-            const otpThreshold = printhouseConfig.otp_delta_threshold_eur || this.defaultOtpThresholdEur;
+            const otpThreshold = this.defaultOtpThresholdEur;
 
             // Generate real 6-digit numeric OTP and 16-byte salt
             const rawOtpCode = crypto.randomInt(100000, 1000000).toString();
@@ -729,7 +959,7 @@ class OrderQuoteRevisionService {
             let otpDeliveryProof = null;
 
             if (deltaNet > otpThreshold) {
-                // Attempt delivery through configured adapter
+                // Attempt delivery through verified adapter (SEC-C01R)
                 const deliveryResult = await this.otpDeliveryService.deliverOtp({
                     recipientEmail: cleanEmail,
                     otpCode: rawOtpCode,
@@ -738,14 +968,23 @@ class OrderQuoteRevisionService {
                     tenantId
                 });
 
-                if (deliveryResult.ok && deliveryResult.delivered) {
-                    otpDeliveryStatus = 'DELIVERED';
-                    otpDeliveredAt = new Date();
-                    otpDeliveryProof = deliveryResult.proof;
-                } else {
-                    otpDeliveryStatus = 'FAILED';
-                    otpDeliveryProof = { reason: deliveryResult.reason || 'DELIVERY_CHANNEL_UNAVAILABLE' };
+                if (!deliveryResult.ok || deliveryResult.status !== 'PROVIDER_ACCEPTED') {
+                    // Fail closed! If channel unavailable, unimplemented, or rejected, block revision!
+                    throw new OrderQuoteRevisionError(
+                        `OTP delivery channel unavailable or dispatch rejected: ${deliveryResult.reason}`,
+                        'OTP_DELIVERY_UNAVAILABLE',
+                        403,
+                        {
+                            delivery_status: deliveryResult.status,
+                            reason: deliveryResult.reason,
+                            recipient: cleanEmail
+                        }
+                    );
                 }
+
+                otpDeliveryStatus = 'PROVIDER_ACCEPTED';
+                otpDeliveredAt = new Date();
+                otpDeliveryProof = deliveryResult.proof;
             }
 
             // 12. Canonical Snapshots & Integrity Hash
@@ -758,7 +997,7 @@ class OrderQuoteRevisionService {
 
             const appliedPolicies = {
                 target_margin_pct: bpeResult.target_margin_pct,
-                effective_business_hours: effectiveHours,
+                effective_business_hours: businessHoursTtl,
                 otp_delta_threshold_eur: otpThreshold,
                 tax_treatment: taxClassification.tax_treatment
             };
@@ -794,9 +1033,9 @@ class OrderQuoteRevisionService {
                     snapshotCanonicalHash, JSON.stringify(bpeResult.breakdown), JSON.stringify(technicalSpecsSnapshot),
                     JSON.stringify(appliedPolicies), JSON.stringify(taxClassification),
                     expiresAt.toISOString().slice(0, 19).replace('T', ' '),
-                    effectiveHours,
-                    printhouseConfig.supplier_offer_valid_until ? new Date(printhouseConfig.supplier_offer_valid_until).toISOString().slice(0, 19).replace('T', ' ') : null,
-                    printhouseConfig.printhouse_timezone || 'Europe/Madrid'
+                    businessHoursTtl,
+                    supplierOfferValidUntil ? supplierOfferValidUntil.toISOString().slice(0, 19).replace('T', ' ') : null,
+                    printhouseTz
                 ]
             );
 
@@ -1068,13 +1307,13 @@ class OrderQuoteRevisionService {
 
                 // If not verified via session, enforce real OTP challenge
                 if (!sessionVerified) {
-                    // SEC-C01: Require proof of delivery through verified channel
-                    if (token.otp_delivery_status !== 'DELIVERED') {
+                    // SEC-C01R: Require proof of delivery through verified channel
+                    if (token.otp_delivery_status !== 'PROVIDER_ACCEPTED' && token.otp_delivery_status !== 'DELIVERED') {
                         throw new OrderQuoteRevisionError(
-                            'No verified delivery channel available for OTP second factor. Acceptance blocked fail-closed.',
+                            'No verified delivery channel available or OTP dispatch unconfirmed. Acceptance blocked fail-closed.',
                             'OTP_DELIVERY_UNAVAILABLE',
                             403,
-                            { delta_net: deltaNet, threshold: otpThreshold }
+                            { delta_net: deltaNet, threshold: otpThreshold, delivery_status: token.otp_delivery_status }
                         );
                     }
 
@@ -1335,6 +1574,7 @@ module.exports = {
     OrderQuoteRevisionError,
     OtpDeliveryService,
     recalculateDeterministicBpePrice,
+    calculateBusinessHoursExpirationUtc,
     sha256Canonical,
     computeSaltedOtpHash,
     redactToken

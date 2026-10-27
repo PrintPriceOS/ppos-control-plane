@@ -111,7 +111,7 @@ CREATE TABLE IF NOT EXISTS quote_revision_tokens (
     otp_attempts INT NOT NULL DEFAULT 0,
     otp_max_attempts INT NOT NULL DEFAULT 3,
     otp_delivery_channel VARCHAR(32) NULL,
-    otp_delivery_status ENUM('NOT_APPLICABLE', 'PENDING', 'DELIVERED', 'FAILED') NOT NULL DEFAULT 'NOT_APPLICABLE',
+    otp_delivery_status ENUM('NOT_APPLICABLE', 'PENDING', 'PROVIDER_ACCEPTED', 'DELIVERED', 'FAILED') NOT NULL DEFAULT 'NOT_APPLICABLE',
     otp_delivered_at TIMESTAMP NULL,
     otp_delivery_proof_json JSON NULL,
     

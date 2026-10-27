@@ -57,11 +57,14 @@ describe('BUDGET-02C-01 — Governed Order Quote Revisions Certification Suite',
             deliverOtp: async ({ recipientEmail, otpCode, revisionId }) => {
                 return {
                     ok: true,
+                    status: 'PROVIDER_ACCEPTED',
                     delivered: true,
-                    channel: 'EMAIL',
-                    destination: recipientEmail,
-                    messageId: `msg_${Date.now()}`,
-                    timestamp: new Date().toISOString()
+                    proof: {
+                        channel: 'EMAIL',
+                        destination: recipientEmail,
+                        provider_message_id: `msg_${Date.now()}`,
+                        timestamp: new Date().toISOString()
+                    }
                 };
             }
         };
@@ -78,21 +81,24 @@ describe('BUDGET-02C-01 — Governed Order Quote Revisions Certification Suite',
                     order_ref: 'job_order_100',
                     tenant_id: 'tenant_alpha',
                     printhouse_id: 'ph_dar_01',
-                    offers_snapshot: null
+                    customer_email: 'client@example.com',
+                    offers_snapshot: JSON.stringify(baselineCalculationFixture)
                 },
                 {
                     id: 'ord_can_200',
                     order_ref: 'job_order_200',
                     tenant_id: 'tenant_alpha',
                     printhouse_id: 'ph_dar_01',
-                    offers_snapshot: null
+                    customer_email: 'client@example.com',
+                    offers_snapshot: JSON.stringify(baselineCalculationFixture)
                 },
                 {
                     id: 'ord_can_300',
                     order_ref: 'job_order_300',
                     tenant_id: 'tenant_beta',
                     printhouse_id: 'ph_other',
-                    offers_snapshot: null
+                    customer_email: 'client@example.com',
+                    offers_snapshot: JSON.stringify(baselineCalculationFixture)
                 }
             ],
             order_paper_decisions: [
@@ -152,11 +158,19 @@ describe('BUDGET-02C-01 — Governed Order Quote Revisions Certification Suite',
 
                 // 0. SELECT ... FROM orders
                 if (s.includes('from orders')) {
-                    const [tenantId, ref, id] = params;
-                    const matches = mockDb.orders.filter(
-                        o => o.tenant_id === tenantId && (o.order_ref === ref || o.id === id)
-                    );
-                    return [matches];
+                    if (params.length === 2) {
+                        const [ref, id] = params;
+                        const matches = mockDb.orders.filter(
+                            o => o.order_ref === ref || o.id === id
+                        );
+                        return [matches];
+                    } else {
+                        const [tenantId, ref, id] = params;
+                        const matches = mockDb.orders.filter(
+                            o => o.tenant_id === tenantId && (o.order_ref === ref || o.id === id)
+                        );
+                        return [matches];
+                    }
                 }
 
                 // 1. SELECT ... FROM order_paper_decisions
@@ -166,6 +180,23 @@ describe('BUDGET-02C-01 — Governed Order Quote Revisions Certification Suite',
                         d => d.id === id && d.tenant_id === tenantId
                     );
                     return [matches];
+                }
+
+                // 1b. SELECT ... FROM paper_variants
+                if (s.includes('from paper_variants')) {
+                    const [id] = params;
+                    if (id === 'var_offset_120') {
+                        return [[{
+                            id: 'var_offset_120',
+                            gsm: 120,
+                            width_mm: 640,
+                            height_mm: 900,
+                            finish: 'offset',
+                            category: 'offset',
+                            product_name: 'Amber Graphic 120g'
+                        }]];
+                    }
+                    return [[]];
                 }
 
                 // 2. SELECT ... FROM order_quote_revisions WHERE tenant_id = ? AND external_order_intent_id = ? AND status = 'PENDING'

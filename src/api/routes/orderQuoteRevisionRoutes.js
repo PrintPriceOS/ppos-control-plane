@@ -56,13 +56,29 @@ router.post('/quote-revisions', requirePrinthouseScope(), async (req, res) => {
     const externalOrderIntentId = body.externalOrderIntentId || body.external_order_intent_id || body.orderId || body.jobId;
     const canonicalOrderId = body.canonicalOrderId || body.canonical_order_id || null;
     const paperDecisionId = body.paperDecisionId || body.paper_decision_id;
-    const recipientEmail = body.recipientEmail || body.recipient_email;
-    const originalCalculation = body.originalCalculation || body.original_calculation;
-    const alternativeVariant = body.alternativeVariant || body.alternative_variant;
-    const targetMarginPct = body.targetMarginPct !== undefined ? body.targetMarginPct : body.target_margin_pct;
-    const taxResolutionContext = body.taxResolutionContext || body.tax_resolution_context || {};
-    const printhouseConfig = body.printhouseConfig || body.printhouse_config || {};
+    const recipientEmail = body.recipientEmail || body.recipient_email || null;
     const allowSupersede = body.allowSupersede === true || body.allow_supersede === true;
+
+    // SEC-C02R: Strictly eliminate financial & technical authority from client body
+    if (
+        body.originalCalculation !== undefined ||
+        body.original_calculation !== undefined ||
+        body.targetMarginPct !== undefined ||
+        body.target_margin_pct !== undefined ||
+        body.alternativeVariant !== undefined ||
+        body.alternative_variant !== undefined ||
+        body.rates !== undefined ||
+        body.tariffs !== undefined ||
+        body.cost_override !== undefined
+    ) {
+        return res.status(400).json({
+            ok: false,
+            error: {
+                code: 'FINANCIAL_AUTHORITY_VIOLATION',
+                message: 'Economic calculations, variants, rates, and margins must be resolved strictly from authoritative systems of record, not request payload.'
+            }
+        });
+    }
 
     try {
         const result = await revisionService.createQuoteRevision({
@@ -70,12 +86,7 @@ router.post('/quote-revisions', requirePrinthouseScope(), async (req, res) => {
             externalOrderIntentId,
             canonicalOrderId,
             paperDecisionId,
-            originalCalculation,
-            alternativeVariant,
-            targetMarginPct,
-            taxResolutionContext,
             recipientEmail,
-            printhouseConfig,
             actorContext: actor,
             allowSupersede
         });
