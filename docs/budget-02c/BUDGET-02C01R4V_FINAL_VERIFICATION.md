@@ -3,7 +3,8 @@
 **Proyecto:** PrintPrice OS Control Plane  
 **Módulo:** Intelligence Layer / Quote Revisions (BUDGET-02C)  
 **PR:** #8 (`feat/budget-02c01-quote-revisions`) — **DRAFT**  
-**Commit Base:** `3e17159040d16090770ad04f03096b7e3b033acb`  
+**Commit Definitivo:** `0b7d0eb75080c3d9fe2df380bb4c90fe3499e98e`  
+**CI Actions:** [Run 40576341359](https://github.com/PrintPriceOS/ppos-control-plane/actions/runs/40576341359) (SUCCESS)  
 **Veredicto:** `BUDGET-02C01R4V_PASS`  
 **Restricciones Absolutas:** NO MERGE / NO DEPLOY / NO PRODUCTION CHANGES / NO PRODUCTION DATABASE CHANGES
 
