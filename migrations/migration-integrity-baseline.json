@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-10-27T16:09:15.336Z",
+  "generatedAt": "2026-10-27T18:11:53.578Z",
   "hashAlgorithm": "sha256",
   "contentNormalization": "utf8-lf-v1",
   "approvedPrefixCollisions": {
@@ -2251,6 +2251,19 @@
       "canonicalSha256": "ccb8356bcc4f459a39235f3783f0398edebb2451da7f778ce31d2d77c74444b0",
       "contentNormalization": "utf8-lf-v1",
       "sizeBytes": 4350,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/168_phase196g_order_quote_revisions.sql",
+      "prefix": "168",
+      "canonicalSha256": "a054197fb65c57d96bb1a0a3486b299921128e44dc1ba989bc67c2521a54cff5",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 6009,
       "containsDdl": true,
       "containsDml": true,
       "containsTransaction": false,
