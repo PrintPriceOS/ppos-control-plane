@@ -98,11 +98,37 @@ async function runRealMysqlCertification() {
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
         `);
 
-        // Migration 136: order_pricing_snapshots
-        const mig136Path = path.join(__dirname, '../migrations/136_phase190_order_pricing_snapshot_sealing.sql');
-        if (fs.existsSync(mig136Path)) {
-            await conn.query(fs.readFileSync(mig136Path, 'utf8'));
-        }
+        // Direct DDL for order_pricing_snapshots (Phase 190 / Migration 136 without CLI DELIMITER)
+        await conn.query(`
+            CREATE TABLE IF NOT EXISTS order_pricing_snapshots (
+              id BIGINT AUTO_INCREMENT PRIMARY KEY,
+              snapshot_id VARCHAR(64) NOT NULL,
+              order_id VARCHAR(64) NOT NULL,
+              tenant_id VARCHAR(64) NOT NULL,
+              printhouse_id VARCHAR(64) NULL,
+              quote_id VARCHAR(64) NOT NULL,
+              quote_revision INT NOT NULL,
+              snapshot_revision INT NOT NULL,
+              status ENUM('SEALED', 'SUPERSEDED', 'VOIDED') NOT NULL DEFAULT 'SEALED',
+              currency CHAR(3) NOT NULL,
+              final_amount DECIMAL(18,4) NOT NULL,
+              formula_version VARCHAR(64) NOT NULL,
+              rate_card_id VARCHAR(64) NULL,
+              rate_card_revision INT NULL,
+              rate_card_checksum VARCHAR(128) NULL,
+              snapshot_json JSON NOT NULL,
+              snapshot_checksum VARCHAR(128) NOT NULL,
+              sealed_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+              sealed_by VARCHAR(255) NOT NULL,
+              superseded_at TIMESTAMP(6) NULL,
+              superseded_by VARCHAR(255) NULL,
+              superseded_by_snapshot_id VARCHAR(64) NULL,
+              created_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+              UNIQUE KEY uq_order_snapshot_revision (order_id, snapshot_revision),
+              UNIQUE KEY uq_quote_snapshot (quote_id, quote_revision),
+              UNIQUE KEY uq_snapshot_id (snapshot_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        `);
 
         // Migration 167: order_paper_decisions
         const mig167Path = path.join(__dirname, '../migrations/167_phase196f_order_paper_decisions.sql');
