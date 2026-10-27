@@ -518,78 +518,9 @@ async function recordDecision(payload, actorContext = {}) {
         // Record canonical price before transaction to verify economic preservation
         const initialOrderPrice = order ? (order.offer_price ?? order.estimated_price ?? null) : null;
 
-        // --- 3. Idempotency Check AFTER Authorization (H-03 & R-01) ---
-        const [existingByKey] = await conn.query(
-            `SELECT * FROM order_paper_decisions WHERE tenant_id = ? AND idempotency_key = ? LIMIT 1`,
-            [tenantId, cleanIdempotencyKey]
-        );
-
-        if (existingByKey && existingByKey.length > 0) {
-            const existing = existingByKey[0];
-
-            // Verify authorized printhouse matches existing record
-            if (existing.printhouse_tenant_id !== printhouseId && !actorContext.isSuperAdmin) {
-                throw new PaperDecisionError(
-                    'Access denied: Existing decision belongs to another printhouse',
-                    'PRINTHOUSE_UNAUTHORIZED',
-                    403
-                );
-            }
-
-            // Verify full canonical payload equivalence (H-03 & R-01)
-            let existingMetadata = null;
-            if (existing.metadata_json) {
-                try {
-                    existingMetadata = typeof existing.metadata_json === 'string'
-                        ? JSON.parse(existing.metadata_json)
-                        : existing.metadata_json;
-                    if (existingMetadata && typeof existingMetadata === 'object') {
-                        delete existingMetadata.unverified_client_estimate;
-                    }
-                } catch {
-                    existingMetadata = null;
-                }
-            }
-
-            const existingHash = existing.payload_fingerprint || computeCanonicalPayloadHash({
-                externalOrderIntentId: existing.external_order_intent_id,
-                paperRole: existing.paper_role,
-                decisionAction: existing.decision_action,
-                requestedVariantId: existing.requested_variant_id,
-                alternativeVariantId: existing.alternative_variant_id,
-                estimatedCostDelta: existing.estimated_cost_delta,
-                currency: existing.currency,
-                technicalReason: existing.technical_reason,
-                printhouseNotes: existing.printhouse_notes,
-                metadata: existingMetadata
-            });
-
-            if (existingHash === canonicalHash) {
-                logger.info({
-                    event: 'IDEMPOTENT_DECISION_REPLAY',
-                    decisionId: existing.id,
-                    idempotencyKey: cleanIdempotencyKey
-                });
-                return formatDecisionResponse(existing, true);
-            } else {
-                // Reject without leaking details of the original decision (H-03 & R-01)
-                throw new PaperDecisionError(
-                    'Idempotency key collision: This key was already used for a different decision payload',
-                    'IDEMPOTENCY_KEY_COLLISION',
-                    409
-                );
-            }
-        }
-
-        // --- 4. Technical Catalog Snapshot Verification ---
-        const requestedSnapshot = await getTechnicalVariantSnapshot(conn, requestedVariantId);
-
-        let alternativeSnapshot = null;
-        if (normAction === 'PROPOSE_ALTERNATIVE' && alternativeVariantId) {
-            alternativeSnapshot = await getTechnicalVariantSnapshot(conn, alternativeVariantId);
-        }
-
-        // --- 5. Atomic Transaction & Multi-Layer Concurrency Control (H-04 & R-02) ---
+        // --- 3. Atomic Transaction & Multi-Layer Concurrency Control (H-04, R-02 & Replay Concurrency) ---
+        // Begin transaction immediately so that both idempotent replay and new decisions operate
+        // under the exact same InnoDB row-level lock and transactional consistency guarantees.
         await conn.beginTransaction();
 
         // Layer 1: Parent Order Row Lock and Mandatory Re-Verification Under Lock (R-02)
@@ -638,6 +569,79 @@ async function recordDecision(payload, actorContext = {}) {
             isSuperAdmin: actorContext.isSuperAdmin,
             contextLabel: '(under lock)'
         });
+
+        // --- 4. Idempotency Check UNDER Transactional Row Lock (H-03, R-01 & Replay Consistency) ---
+        const [existingByKey] = await conn.query(
+            `SELECT * FROM order_paper_decisions WHERE tenant_id = ? AND idempotency_key = ? LIMIT 1 FOR UPDATE`,
+            [tenantId, cleanIdempotencyKey]
+        );
+
+        if (existingByKey && existingByKey.length > 0) {
+            const existing = existingByKey[0];
+
+            // Verify authorized printhouse matches existing record
+            if (existing.printhouse_tenant_id !== printhouseId && !actorContext.isSuperAdmin) {
+                throw new PaperDecisionError(
+                    'Access denied: Existing decision belongs to another printhouse',
+                    'PRINTHOUSE_UNAUTHORIZED',
+                    403
+                );
+            }
+
+            // Verify full canonical payload equivalence (H-03 & R-01)
+            let existingMetadata = null;
+            if (existing.metadata_json) {
+                try {
+                    existingMetadata = typeof existing.metadata_json === 'string'
+                        ? JSON.parse(existing.metadata_json)
+                        : existing.metadata_json;
+                    if (existingMetadata && typeof existingMetadata === 'object') {
+                        delete existingMetadata.unverified_client_estimate;
+                    }
+                } catch {
+                    existingMetadata = null;
+                }
+            }
+
+            const existingHash = existing.payload_fingerprint || computeCanonicalPayloadHash({
+                externalOrderIntentId: existing.external_order_intent_id,
+                paperRole: existing.paper_role,
+                decisionAction: existing.decision_action,
+                requestedVariantId: existing.requested_variant_id,
+                alternativeVariantId: existing.alternative_variant_id,
+                estimatedCostDelta: existing.estimated_cost_delta,
+                currency: existing.currency,
+                technicalReason: existing.technical_reason,
+                printhouseNotes: existing.printhouse_notes,
+                metadata: existingMetadata
+            });
+
+            if (existingHash === canonicalHash) {
+                // Commit transaction to release row lock cleanly
+                await conn.commit();
+                logger.info({
+                    event: 'IDEMPOTENT_DECISION_REPLAY',
+                    decisionId: existing.id,
+                    idempotencyKey: cleanIdempotencyKey
+                });
+                return formatDecisionResponse(existing, true);
+            } else {
+                // Reject without leaking details of the original decision (H-03 & R-01)
+                throw new PaperDecisionError(
+                    'Idempotency key collision: This key was already used for a different decision payload',
+                    'IDEMPOTENCY_KEY_COLLISION',
+                    409
+                );
+            }
+        }
+
+        // --- 5. Technical Catalog Snapshot Verification (New Decision) ---
+        const requestedSnapshot = await getTechnicalVariantSnapshot(conn, requestedVariantId);
+
+        let alternativeSnapshot = null;
+        if (normAction === 'PROPOSE_ALTERNATIVE' && alternativeVariantId) {
+            alternativeSnapshot = await getTechnicalVariantSnapshot(conn, alternativeVariantId);
+        }
 
         // Layer 2: Lock existing decisions for this order & role
         const [existingDecisions] = await conn.query(

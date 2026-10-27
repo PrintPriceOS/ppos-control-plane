@@ -1170,5 +1170,75 @@ describe('BUDGET-02B-01R — Remediated Paper Decisions Domain Service & API Cer
                 }
             );
         });
+
+        it('R-02.5: rejects idempotent replay if order was CANCELLED while acquiring row lock on replay', async () => {
+            const payload = {
+                tenantId: 'tenant_books_es',
+                printhouseId: 'print_artes_graficas_madrid',
+                operatorId: 'operator_carlos',
+                jobId: 'job_bpe_1782',
+                externalOrderIntentId: 'intent_race_replay_cancel',
+                paperRole: 'INTERIOR',
+                decisionAction: 'CONFIRM',
+                requestedVariantId: 'var_coral_90_70x100',
+                idempotencyKey: 'idem_race_replay_cancel_key'
+            };
+
+            // First record legitimate decision
+            const firstResult = await orderPaperDecisionService.recordDecision(payload);
+            assert.strictEqual(firstResult.idempotent_replay, false);
+
+            // Set hook to simulate concurrent cancellation right when replay acquires order lock
+            mockDb.onOrderLock = () => {
+                const order = mockDb.orders.find(o => o.order_ref === 'job_bpe_1782');
+                order.status = 'CANCELLED';
+            };
+
+            // Replay attempt must be blocked under lock and reject with 422 ORDER_INELIGIBLE
+            await assert.rejects(
+                async () => orderPaperDecisionService.recordDecision(payload),
+                err => {
+                    assert.strictEqual(err.code, 'ORDER_INELIGIBLE');
+                    assert.strictEqual(err.statusCode, 422);
+                    assert(err.message.includes('(under lock)'), 'Replay must reject under lock when order is cancelled');
+                    return true;
+                }
+            );
+        });
+
+        it('R-02.6: rejects idempotent replay if order was REASSIGNED to another printhouse while acquiring row lock on replay', async () => {
+            const payload = {
+                tenantId: 'tenant_books_es',
+                printhouseId: 'print_artes_graficas_madrid',
+                operatorId: 'operator_carlos',
+                jobId: 'job_bpe_1782',
+                externalOrderIntentId: 'intent_race_replay_reassign',
+                paperRole: 'INTERIOR',
+                decisionAction: 'CONFIRM',
+                requestedVariantId: 'var_coral_90_70x100',
+                idempotencyKey: 'idem_race_replay_reassign_key'
+            };
+
+            // First record legitimate decision
+            const firstResult = await orderPaperDecisionService.recordDecision(payload);
+            assert.strictEqual(firstResult.idempotent_replay, false);
+
+            // Set hook to simulate concurrent reassignment right when replay acquires order lock
+            mockDb.onOrderLock = () => {
+                const order = mockDb.orders.find(o => o.order_ref === 'job_bpe_1782');
+                order.offer_print_house = 'print_rival_zaragoza';
+            };
+
+            // Replay attempt must be blocked under lock and reject with 403 PRINTHOUSE_UNAUTHORIZED
+            await assert.rejects(
+                async () => orderPaperDecisionService.recordDecision(payload, { isSuperAdmin: false }),
+                err => {
+                    assert.strictEqual(err.code, 'PRINTHOUSE_UNAUTHORIZED');
+                    assert.strictEqual(err.statusCode, 403);
+                    assert(err.message.includes('(under lock)'), 'Replay must reject under lock when order is reassigned');
+                    return true;
+                }
+            );
+        });
     });
 });

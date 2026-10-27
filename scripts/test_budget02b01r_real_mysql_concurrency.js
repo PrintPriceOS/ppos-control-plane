@@ -18,6 +18,8 @@ const mysql = require('mysql2/promise');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const mysqlClient = require('../src/api/services/mysqlClient');
+const orderPaperDecisionService = require('../src/api/services/orderPaperDecisionService');
 
 const MYSQL_HOST = process.env.MYSQL_HOST || '127.0.0.1';
 const MYSQL_PORT = parseInt(process.env.MYSQL_PORT || '3306');
@@ -61,7 +63,8 @@ async function runRealConcurrencyCertification() {
             CREATE TABLE paper_products (
                 id VARCHAR(64) PRIMARY KEY,
                 name VARCHAR(255) NOT NULL,
-                category VARCHAR(64) NOT NULL
+                category VARCHAR(64) NOT NULL,
+                brand VARCHAR(64) NULL
             ) ENGINE=InnoDB;
 
             CREATE TABLE paper_variants (
@@ -83,7 +86,7 @@ async function runRealConcurrencyCertification() {
                 status VARCHAR(32) NOT NULL
             ) ENGINE=InnoDB;
 
-            INSERT INTO paper_products VALUES ('prod_1', 'Coral Book White', 'UNCOATED');
+            INSERT INTO paper_products VALUES ('prod_1', 'Coral Book White', 'UNCOATED', 'Coral');
             INSERT INTO paper_variants VALUES ('var_coral_90', 'prod_1', 90, 700.0, 1000.0, 'MATTE');
             INSERT INTO paper_variants VALUES ('var_creator_115', 'prod_1', 115, 700.0, 1000.0, 'SILK');
             INSERT INTO orders VALUES ('ord_1', 'job_bpe_1782', 'tenant_books_es', 'print_madrid', 1782.30, 'IN_PREPARATION');
@@ -278,6 +281,132 @@ async function runRealConcurrencyCertification() {
 
         await raceConn1.end();
         await raceConn2.end();
+
+        // 6.3: Integrated Real Service Concurrency & Idempotent Replay Race against Order Cancellation
+        console.log('\n[STEP 6.3] Testing orderPaperDecisionService.recordDecision integrated replay race against order cancellation...');
+        process.env.MYSQL_HOST = MYSQL_HOST;
+        process.env.MYSQL_PORT = String(MYSQL_PORT);
+        process.env.MYSQL_USER = MYSQL_USER;
+        process.env.MYSQL_PASSWORD = MYSQL_PASSWORD;
+        process.env.MYSQL_DATABASE = EPHEMERAL_DB;
+        await mysqlClient.closePool();
+
+        // Setup orders for service replay race
+        await adminConn.query(`
+            INSERT INTO orders VALUES 
+            ('ord_svc_cancel', 'job_svc_cancel', 'tenant_books_es', 'print_madrid', 1782.30, 'IN_PREPARATION'),
+            ('ord_svc_reassign', 'job_svc_reassign', 'tenant_books_es', 'print_madrid', 1782.30, 'IN_PREPARATION')
+        `);
+
+        // Record initial decision for ord_svc_cancel via real service
+        const initialCancelDecision = await orderPaperDecisionService.recordDecision({
+            tenantId: 'tenant_books_es',
+            printhouseId: 'print_madrid',
+            operatorId: 'operator_carlos',
+            jobId: 'job_svc_cancel',
+            externalOrderIntentId: 'intent_svc_cancel_01',
+            paperRole: 'INTERIOR',
+            decisionAction: 'CONFIRM',
+            requestedVariantId: 'var_coral_90',
+            idempotencyKey: 'idem_svc_cancel_key'
+        });
+        console.log(`[PASS] Initial decision recorded via real service: id=${initialCancelDecision.id}, replay=${initialCancelDecision.idempotent_replay}`);
+
+        // Start cancellation transaction on raw connection to hold exclusive lock
+        const lockConn = await mysql.createConnection({
+            host: MYSQL_HOST, port: MYSQL_PORT, user: MYSQL_USER, password: MYSQL_PASSWORD, database: EPHEMERAL_DB
+        });
+        await lockConn.beginTransaction();
+        await lockConn.query(`SELECT id FROM orders WHERE id = 'ord_svc_cancel' FOR UPDATE`);
+        await lockConn.query(`UPDATE orders SET status = 'CANCELLED' WHERE id = 'ord_svc_cancel'`);
+
+        // Concurrently invoke orderPaperDecisionService.recordDecision with the replay key
+        let replayCancelErr = null;
+        const replayCancelPromise = orderPaperDecisionService.recordDecision({
+            tenantId: 'tenant_books_es',
+            printhouseId: 'print_madrid',
+            operatorId: 'operator_carlos',
+            jobId: 'job_svc_cancel',
+            externalOrderIntentId: 'intent_svc_cancel_01',
+            paperRole: 'INTERIOR',
+            decisionAction: 'CONFIRM',
+            requestedVariantId: 'var_coral_90',
+            idempotencyKey: 'idem_svc_cancel_key'
+        }).catch(err => {
+            replayCancelErr = err;
+        });
+
+        // Give the service call 50ms to queue behind the row lock
+        await new Promise(r => setTimeout(r, 50));
+        // Commit cancellation to release row lock
+        await lockConn.commit();
+        await replayCancelPromise;
+
+        if (!replayCancelErr || replayCancelErr.code !== 'ORDER_INELIGIBLE' || replayCancelErr.statusCode !== 422) {
+            throw new Error(`CRITICAL: Replay service call failed to reject cancelled order under lock: ${replayCancelErr ? replayCancelErr.message : 'No error'}`);
+        }
+        console.log(`[PASS] Replay service call correctly rejected under lock with 422 ORDER_INELIGIBLE: ${replayCancelErr.message}`);
+
+        // 6.4: Integrated Real Service Concurrency & Idempotent Replay Race against Printhouse Reassignment
+        console.log('\n[STEP 6.4] Testing orderPaperDecisionService.recordDecision integrated replay race against printhouse reassignment...');
+        // Record initial decision for ord_svc_reassign via real service
+        const initialReassignDecision = await orderPaperDecisionService.recordDecision({
+            tenantId: 'tenant_books_es',
+            printhouseId: 'print_madrid',
+            operatorId: 'operator_carlos',
+            jobId: 'job_svc_reassign',
+            externalOrderIntentId: 'intent_svc_reassign_01',
+            paperRole: 'INTERIOR',
+            decisionAction: 'CONFIRM',
+            requestedVariantId: 'var_coral_90',
+            idempotencyKey: 'idem_svc_reassign_key'
+        });
+        console.log(`[PASS] Initial decision recorded via real service: id=${initialReassignDecision.id}, replay=${initialReassignDecision.idempotent_replay}`);
+
+        // Start reassignment transaction on raw connection to hold lock
+        await lockConn.beginTransaction();
+        await lockConn.query(`SELECT id FROM orders WHERE id = 'ord_svc_reassign' FOR UPDATE`);
+        await lockConn.query(`UPDATE orders SET offer_print_house = 'print_malaga' WHERE id = 'ord_svc_reassign'`);
+
+        // Concurrently invoke orderPaperDecisionService.recordDecision from print_madrid with the replay key
+        let replayReassignErr = null;
+        const replayReassignPromise = orderPaperDecisionService.recordDecision({
+            tenantId: 'tenant_books_es',
+            printhouseId: 'print_madrid',
+            operatorId: 'operator_carlos',
+            jobId: 'job_svc_reassign',
+            externalOrderIntentId: 'intent_svc_reassign_01',
+            paperRole: 'INTERIOR',
+            decisionAction: 'CONFIRM',
+            requestedVariantId: 'var_coral_90',
+            idempotencyKey: 'idem_svc_reassign_key'
+        }, { isSuperAdmin: false }).catch(err => {
+            replayReassignErr = err;
+        });
+
+        // Give the service call 50ms to queue behind the row lock
+        await new Promise(r => setTimeout(r, 50));
+        // Commit reassignment to release row lock
+        await lockConn.commit();
+        await replayReassignPromise;
+
+        if (!replayReassignErr || replayReassignErr.code !== 'PRINTHOUSE_UNAUTHORIZED' || replayReassignErr.statusCode !== 403) {
+            throw new Error(`CRITICAL: Replay service call failed to reject reassigned order under lock: ${replayReassignErr ? replayReassignErr.message : 'No error'}`);
+        }
+        console.log(`[PASS] Replay service call correctly rejected under lock with 403 PRINTHOUSE_UNAUTHORIZED: ${replayReassignErr.message}`);
+
+        await lockConn.end();
+
+        // 6.5: Economic Quote Invariant Verification
+        console.log('\n[STEP 6.5] Verifying strict BPE economic quote preservation (1.782,30 €)...');
+        const [allOrders] = await adminConn.query(`SELECT id, order_ref, offer_price FROM orders`);
+        for (const ord of allOrders) {
+            if (Number(ord.offer_price) !== 1782.30) {
+                throw new Error(`CRITICAL: Order ${ord.id} (${ord.order_ref}) price was mutated: ${ord.offer_price}`);
+            }
+        }
+        console.log(`[PASS] All orders maintained exact 1.782,30 € quote invariant without mutation.`);
+        await mysqlClient.closePool();
 
         // 7. Test Idempotency Key Uniqueness on Real MySQL
         console.log(`\n[STEP 7] Testing idempotency key uniqueness constraint on real MySQL...`);
