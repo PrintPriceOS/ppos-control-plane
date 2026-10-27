@@ -38,6 +38,7 @@ const {
 } = require('../src/api/services/orderQuoteRevisionService');
 const TaxVatReadinessClassifierService = require('../src/api/services/taxVatReadinessClassifierService');
 const quoteRevisionRoutes = require('../src/api/routes/orderQuoteRevisionRoutes');
+const pricingSnapshotCanonicalizer = require('../src/api/services/pricingSnapshotCanonicalizer');
 
 function createMockReqRes({ method = 'GET', url = '/', headers = {}, query = {}, params = {}, body = {}, user = null }) {
     let statusCode = 200;
@@ -186,6 +187,7 @@ describe('BUDGET-02C-01R2 — Authority, Identity & Verifiable OTP Delivery Cert
             jwtSecret: JWT_SECRET
         });
 
+        const baseChecksum = pricingSnapshotCanonicalizer.calculatePricingSnapshotChecksum(baselineBpeSnapshot);
         mockDb = {
             orders: [
                 {
@@ -202,6 +204,33 @@ describe('BUDGET-02C-01R2 — Authority, Identity & Verifiable OTP Delivery Cert
                         delivery_country: 'ES',
                         supplier_offer_valid_until: '2026-11-15T18:00:00.000Z'
                     }
+                }
+            ],
+            order_pricing_snapshots: [
+                {
+                    snapshot_id: 'ops_100',
+                    order_id: 'ord_auth_100',
+                    tenant_id: 'tenant_alpha',
+                    printhouse_id: 'ph_madrid_01',
+                    status: 'SEALED',
+                    currency: 'EUR',
+                    final_amount: 1407.7301,
+                    formula_version: 'v3.0',
+                    rate_card_checksum: baselineBpeSnapshot.rates_checksum,
+                    snapshot_json: JSON.stringify(baselineBpeSnapshot),
+                    snapshot_checksum: baseChecksum,
+                    sealed_by: 'BPE_ENGINE_SEALER',
+                    sealed_at: new Date()
+                }
+            ],
+            printhouse_profiles: [
+                {
+                    printhouse_id: 'ph_madrid_01',
+                    target_margin_pct: 18.5,
+                    timezone: 'Europe/Madrid',
+                    jurisdiction: 'ES-MD',
+                    has_lunch_break: 1,
+                    business_hours_ttl: 48
                 }
             ],
             order_paper_decisions: [
@@ -255,6 +284,20 @@ describe('BUDGET-02C-01R2 — Authority, Identity & Verifiable OTP Delivery Cert
                 if (s.includes('from paper_variants')) {
                     const [id] = params;
                     const matches = mockDb.paper_variants.filter(v => v.id === id && v.is_active === 1);
+                    return [matches];
+                }
+
+                if (s.includes('from order_pricing_snapshots')) {
+                    const [orderId, tenantId] = params;
+                    const matches = (mockDb.order_pricing_snapshots || []).filter(
+                        snap => snap.order_id === orderId && (!tenantId || snap.tenant_id === tenantId) && snap.status === 'SEALED'
+                    );
+                    return [matches];
+                }
+
+                if (s.includes('from printhouse_profiles')) {
+                    const [phId] = params;
+                    const matches = (mockDb.printhouse_profiles || []).filter(p => p.printhouse_id === phId);
                     return [matches];
                 }
 
@@ -617,11 +660,14 @@ describe('BUDGET-02C-01R2 — Authority, Identity & Verifiable OTP Delivery Cert
         });
 
         it('2.4: Fails closed with 422 RECALCULATION_BLOCKED when margin is missing (zero 18.5% default fallback)', async () => {
-            // Remove target_margin_pct from snapshot to verify no silent fallback occurs
+            // Remove target_margin_pct from snapshot and printhouse profile to verify no silent fallback occurs
             const noMarginSnapshot = JSON.parse(JSON.stringify(baselineBpeSnapshot));
             delete noMarginSnapshot.target_margin_pct;
             mockDb.orders[0].offers_snapshot = noMarginSnapshot;
             mockDb.order_paper_decisions[0].metadata_json = { bpe_snapshot: noMarginSnapshot };
+            mockDb.printhouse_profiles[0].target_margin_pct = null;
+            mockDb.order_pricing_snapshots[0].snapshot_json = JSON.stringify(noMarginSnapshot);
+            mockDb.order_pricing_snapshots[0].snapshot_checksum = pricingSnapshotCanonicalizer.calculatePricingSnapshotChecksum(noMarginSnapshot);
 
             await assert.rejects(
                 () => service.createQuoteRevision({
@@ -637,6 +683,7 @@ describe('BUDGET-02C-01R2 — Authority, Identity & Verifiable OTP Delivery Cert
         it('2.5: Fails closed with 422 RECALCULATION_BLOCKED when pricing snapshot is missing from DB', async () => {
             mockDb.orders[0].offers_snapshot = null;
             mockDb.order_paper_decisions[0].metadata_json = {};
+            mockDb.order_pricing_snapshots = [];
 
             await assert.rejects(
                 () => service.createQuoteRevision({
@@ -645,7 +692,7 @@ describe('BUDGET-02C-01R2 — Authority, Identity & Verifiable OTP Delivery Cert
                     paperDecisionId: 'opd_legit_001',
                     recipientEmail: 'finance.director@acme-publishing.es'
                 }),
-                err => err.code === 'RECALCULATION_BLOCKED' && err.details?.reason === 'MISSING_AUTHORITATIVE_PRICING_SNAPSHOT'
+                err => err.code === 'RECALCULATION_BLOCKED' && (err.details?.reason === 'UNVERIFIED_SNAPSHOT_PROVENANCE' || err.details?.reason === 'MISSING_AUTHORITATIVE_PRICING_SNAPSHOT')
             );
         });
 

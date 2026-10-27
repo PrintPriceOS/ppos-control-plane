@@ -37,6 +37,7 @@ const {
 } = require('../src/api/services/orderQuoteRevisionService');
 const TaxVatReadinessClassifierService = require('../src/api/services/taxVatReadinessClassifierService');
 const quoteRevisionRoutes = require('../src/api/routes/orderQuoteRevisionRoutes');
+const pricingSnapshotCanonicalizer = require('../src/api/services/pricingSnapshotCanonicalizer');
 
 function createMockReqRes({ method = 'GET', url = '/', headers = {}, query = {}, params = {}, body = {}, user = null }) {
     let statusCode = 200;
@@ -174,6 +175,7 @@ describe('BUDGET-02C-01R — Security Remediation & BPE Parity Adversarial Certi
             jwtSecret: JWT_SECRET
         });
 
+        const baseChecksum = pricingSnapshotCanonicalizer.calculatePricingSnapshotChecksum(baselineBpeSnapshot);
         mockDb = {
             orders: [
                 {
@@ -195,6 +197,56 @@ describe('BUDGET-02C-01R — Security Remediation & BPE Parity Adversarial Certi
                     delivery_country: 'ES',
                     product_type: 'BOOK',
                     offers_snapshot: baselineBpeSnapshot
+                }
+            ],
+            order_pricing_snapshots: [
+                {
+                    snapshot_id: 'ops_100',
+                    order_id: 'ord_authoritative_100',
+                    tenant_id: 'tenant_alpha',
+                    printhouse_id: 'ph_dar_01',
+                    status: 'SEALED',
+                    currency: 'EUR',
+                    final_amount: 1407.7301,
+                    formula_version: 'v3.0',
+                    rate_card_checksum: baselineBpeSnapshot.rates_checksum,
+                    snapshot_json: JSON.stringify(baselineBpeSnapshot),
+                    snapshot_checksum: baseChecksum,
+                    sealed_by: 'BPE_ENGINE_SEALER',
+                    sealed_at: new Date()
+                },
+                {
+                    snapshot_id: 'ops_300',
+                    order_id: 'ord_cross_tenant_300',
+                    tenant_id: 'tenant_beta',
+                    printhouse_id: 'ph_other',
+                    status: 'SEALED',
+                    currency: 'EUR',
+                    final_amount: 1407.7301,
+                    formula_version: 'v3.0',
+                    rate_card_checksum: baselineBpeSnapshot.rates_checksum,
+                    snapshot_json: JSON.stringify(baselineBpeSnapshot),
+                    snapshot_checksum: baseChecksum,
+                    sealed_by: 'BPE_ENGINE_SEALER',
+                    sealed_at: new Date()
+                }
+            ],
+            printhouse_profiles: [
+                {
+                    printhouse_id: 'ph_dar_01',
+                    target_margin_pct: 18.5,
+                    timezone: 'Europe/Madrid',
+                    jurisdiction: 'ES-MD',
+                    has_lunch_break: 1,
+                    business_hours_ttl: 48
+                },
+                {
+                    printhouse_id: 'ph_other',
+                    target_margin_pct: 18.5,
+                    timezone: 'Europe/Madrid',
+                    jurisdiction: 'ES-MD',
+                    has_lunch_break: 1,
+                    business_hours_ttl: 48
                 }
             ],
             order_paper_decisions: [
@@ -245,6 +297,20 @@ describe('BUDGET-02C-01R — Security Remediation & BPE Parity Adversarial Certi
                 if (s.includes('from paper_variants')) {
                     const [id] = params;
                     const matches = mockDb.paper_variants.filter(v => v.id === id && v.is_active === 1);
+                    return [matches];
+                }
+
+                if (s.includes('from order_pricing_snapshots')) {
+                    const [orderId, tenantId] = params;
+                    const matches = (mockDb.order_pricing_snapshots || []).filter(
+                        snap => snap.order_id === orderId && (!tenantId || snap.tenant_id === tenantId) && snap.status === 'SEALED'
+                    );
+                    return [matches];
+                }
+
+                if (s.includes('from printhouse_profiles')) {
+                    const [phId] = params;
+                    const matches = (mockDb.printhouse_profiles || []).filter(p => p.printhouse_id === phId);
                     return [matches];
                 }
 
@@ -659,6 +725,7 @@ describe('BUDGET-02C-01R — Security Remediation & BPE Parity Adversarial Certi
             // Decision pointing to order without pricing snapshot
             mockDb.orders[0].offers_snapshot = null;
             mockDb.order_paper_decisions[0].metadata_json = {};
+            mockDb.order_pricing_snapshots = [];
 
             await assert.rejects(
                 () => service.createQuoteRevision({

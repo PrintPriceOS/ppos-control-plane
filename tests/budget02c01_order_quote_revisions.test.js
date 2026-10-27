@@ -44,11 +44,55 @@ const {
     sha256Canonical
 } = require('../src/api/services/orderQuoteRevisionService');
 const TaxVatReadinessClassifierService = require('../src/api/services/taxVatReadinessClassifierService');
+const pricingSnapshotCanonicalizer = require('../src/api/services/pricingSnapshotCanonicalizer');
 
 describe('BUDGET-02C-01 — Governed Order Quote Revisions Certification Suite', () => {
     let mockDb;
     let service;
     let classifier;
+
+    const baselineCalculationFixture = {
+        bpe_engine_version: 'v3.0',
+        rates_checksum: 'sha256-e99a8b1234567890abcdef',
+        target_margin_pct: 18.5,
+        base_production_cost: 1147.30,
+        base_net_price: 1407.7301,
+        specs: {
+            copies: 1000,
+            interior_pages: 128,
+            cover_pages: 4,
+            book_width: 148,
+            book_height: 210,
+            paper_weight_interior: 90,
+            paper_type_interior: 'offset',
+            signature: 32,
+            sheet_width: 640,
+            sheet_height: 900
+        },
+        rates: {
+            paper_price_interior_by_kilo: {
+                offset: 1.45,
+                mc: 1.55,
+                lux: 1.85
+            },
+            paper_waste_for_binding: 5.0,
+            waste_sheets_setup: 100
+        },
+        breakdown: {
+            interior_paper_cost: 464.00,
+            interior_paper_cost_revised: 619.00,
+            kilos_interior: 320,
+            kilos_interior_revised: 427,
+            cover_paper_cost: 75.90,
+            interior_print_cost: 168.00,
+            cover_print_cost: 146.00,
+            endpapers_cost: 14.40,
+            binding_cost: 279.00,
+            freight_cost: 0.00,
+            total_industrial_cost: 1147.30
+        }
+    };
+    const baselineChecksum = pricingSnapshotCanonicalizer.calculatePricingSnapshotChecksum(baselineCalculationFixture);
 
     beforeEach(() => {
         classifier = new TaxVatReadinessClassifierService();
@@ -105,6 +149,71 @@ describe('BUDGET-02C-01 — Governed Order Quote Revisions Certification Suite',
                     delivery_country: 'ES',
                     product_type: 'BOOK',
                     offers_snapshot: JSON.stringify(baselineCalculationFixture)
+                }
+            ],
+            order_pricing_snapshots: [
+                {
+                    snapshot_id: 'ops_100',
+                    order_id: 'ord_can_100',
+                    tenant_id: 'tenant_alpha',
+                    printhouse_id: 'ph_dar_01',
+                    status: 'SEALED',
+                    currency: 'EUR',
+                    final_amount: 1407.7301,
+                    formula_version: 'v3.0',
+                    rate_card_checksum: 'sha256-e99a8b1234567890abcdef',
+                    snapshot_json: JSON.stringify(baselineCalculationFixture),
+                    snapshot_checksum: baselineChecksum,
+                    sealed_by: 'BPE_ENGINE_SEALER',
+                    sealed_at: new Date()
+                },
+                {
+                    snapshot_id: 'ops_200',
+                    order_id: 'ord_can_200',
+                    tenant_id: 'tenant_alpha',
+                    printhouse_id: 'ph_dar_01',
+                    status: 'SEALED',
+                    currency: 'EUR',
+                    final_amount: 1407.7301,
+                    formula_version: 'v3.0',
+                    rate_card_checksum: 'sha256-e99a8b1234567890abcdef',
+                    snapshot_json: JSON.stringify(baselineCalculationFixture),
+                    snapshot_checksum: baselineChecksum,
+                    sealed_by: 'BPE_ENGINE_SEALER',
+                    sealed_at: new Date()
+                },
+                {
+                    snapshot_id: 'ops_300',
+                    order_id: 'ord_can_300',
+                    tenant_id: 'tenant_beta',
+                    printhouse_id: 'ph_other',
+                    status: 'SEALED',
+                    currency: 'EUR',
+                    final_amount: 1407.7301,
+                    formula_version: 'v3.0',
+                    rate_card_checksum: 'sha256-e99a8b1234567890abcdef',
+                    snapshot_json: JSON.stringify(baselineCalculationFixture),
+                    snapshot_checksum: baselineChecksum,
+                    sealed_by: 'BPE_ENGINE_SEALER',
+                    sealed_at: new Date()
+                }
+            ],
+            printhouse_profiles: [
+                {
+                    printhouse_id: 'ph_dar_01',
+                    target_margin_pct: 18.5,
+                    timezone: 'Europe/Madrid',
+                    jurisdiction: 'ES-MD',
+                    has_lunch_break: 1,
+                    business_hours_ttl: 48
+                },
+                {
+                    printhouse_id: 'ph_other',
+                    target_margin_pct: 18.5,
+                    timezone: 'Europe/Madrid',
+                    jurisdiction: 'ES-MD',
+                    has_lunch_break: 1,
+                    business_hours_ttl: 48
                 }
             ],
             order_paper_decisions: [
@@ -203,6 +312,22 @@ describe('BUDGET-02C-01 — Governed Order Quote Revisions Certification Suite',
                         }]];
                     }
                     return [[]];
+                }
+
+                // 1c. SELECT ... FROM order_pricing_snapshots
+                if (s.includes('from order_pricing_snapshots')) {
+                    const [orderId, tenantId] = params;
+                    const matches = (mockDb.order_pricing_snapshots || []).filter(
+                        snap => snap.order_id === orderId && (!tenantId || snap.tenant_id === tenantId) && snap.status === 'SEALED'
+                    );
+                    return [matches];
+                }
+
+                // 1d. SELECT ... FROM printhouse_profiles
+                if (s.includes('from printhouse_profiles')) {
+                    const [phId] = params;
+                    const matches = (mockDb.printhouse_profiles || []).filter(p => p.printhouse_id === phId);
+                    return [matches];
                 }
 
                 // 2. SELECT ... FROM order_quote_revisions WHERE tenant_id = ? AND external_order_intent_id = ? AND status = 'PENDING'
@@ -432,48 +557,6 @@ describe('BUDGET-02C-01 — Governed Order Quote Revisions Certification Suite',
 
         mysqlClient.getConnection = async () => mockConn;
     });
-
-    const baselineCalculationFixture = {
-        bpe_engine_version: 'v3.0',
-        rates_checksum: 'sha256-e99a8b1234567890abcdef',
-        target_margin_pct: 18.5,
-        base_production_cost: 1147.30,
-        base_net_price: 1407.7301,
-        specs: {
-            copies: 1000,
-            interior_pages: 128,
-            cover_pages: 4,
-            book_width: 148,
-            book_height: 210,
-            paper_weight_interior: 90,
-            paper_type_interior: 'offset',
-            signature: 32,
-            sheet_width: 640,
-            sheet_height: 900
-        },
-        rates: {
-            paper_price_interior_by_kilo: {
-                offset: 1.45,
-                mc: 1.55,
-                lux: 1.85
-            },
-            paper_waste_for_binding: 5.0,
-            waste_sheets_setup: 100
-        },
-        breakdown: {
-            interior_paper_cost: 464.00,
-            interior_paper_cost_revised: 619.00,
-            kilos_interior: 320,
-            kilos_interior_revised: 427,
-            cover_paper_cost: 75.90,
-            interior_print_cost: 168.00,
-            cover_print_cost: 146.00,
-            endpapers_cost: 14.40,
-            binding_cost: 279.00,
-            freight_cost: 0.00,
-            total_industrial_cost: 1147.30
-        }
-    };
 
     // =========================================================================
     // 1. GATE 2 — PUERTA OBLIGATORIA DE CIERRE FISCAL

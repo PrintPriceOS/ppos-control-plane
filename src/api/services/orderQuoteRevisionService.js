@@ -27,6 +27,7 @@ const jwt = require('jsonwebtoken');
 const mysqlClient = require('./mysqlClient');
 const logger = require('./logger').child('order-quote-revision-service');
 const TaxVatReadinessClassifierService = require('./taxVatReadinessClassifierService');
+const pricingSnapshotCanonicalizer = require('./pricingSnapshotCanonicalizer');
 
 const taxClassifier = new TaxVatReadinessClassifierService();
 
@@ -95,17 +96,16 @@ function computeSaltedOtpHash(otpCode, salt, revisionId) {
 }
 
 /**
- * Computes official statutory holidays for Madrid jurisdiction (ES-MD) for a given calendar year.
- * Includes 10 fixed national/regional holidays and variable Easter holidays (Holy Thursday and Good Friday)
- * computed deterministically via the Meeus/Butcher Western Easter algorithm.
+ * Computes official statutory holidays for any supported Spanish jurisdiction for a given calendar year.
+ * Includes fixed national holidays, jurisdictional holidays, and variable Easter holidays computed deterministically
+ * via the Meeus/Butcher Western Easter algorithm. Also merges any custom/municipal printhouse holidays.
  */
-function getMadridOfficialHolidays(year) {
+function getOfficialHolidaysForJurisdiction(year, jurisdiction = 'ES-MD', customHolidays = null) {
     const pad2 = (n) => String(n).padStart(2, '0');
     const fixed = [
         `${year}-01-01`, // Año Nuevo
         `${year}-01-06`, // Epifanía del Señor / Reyes
         `${year}-05-01`, // Fiesta del Trabajo
-        `${year}-05-02`, // Fiesta de la Comunidad de Madrid
         `${year}-08-15`, // Asunción de la Virgen
         `${year}-10-12`, // Fiesta Nacional de España
         `${year}-11-01`, // Todos los Santos
@@ -127,19 +127,74 @@ function getMadridOfficialHolidays(year) {
     const k = c % 4;
     const l = (32 + 2 * e + 2 * i - h - k) % 7;
     const m = Math.floor((a + 11 * h + 22 * l) / 451);
-    const month = Math.floor((h + l - 7 * m + 114) / 31); // 3 = March, 4 = April
+    const month = Math.floor((h + l - 7 * m + 114) / 31);
     const day = ((h + l - 7 * m + 114) % 31) + 1;
 
     const easterSunday = new Date(Date.UTC(year, month - 1, day));
     const holyThursday = new Date(easterSunday.getTime() - 3 * 86400000);
     const goodFriday = new Date(easterSunday.getTime() - 2 * 86400000);
+    const easterMonday = new Date(easterSunday.getTime() + 1 * 86400000);
 
-    const easterHolidays = [
-        `${holyThursday.getUTCFullYear()}-${pad2(holyThursday.getUTCMonth() + 1)}-${pad2(holyThursday.getUTCDate())}`,
-        `${goodFriday.getUTCFullYear()}-${pad2(goodFriday.getUTCMonth() + 1)}-${pad2(goodFriday.getUTCDate())}`
-    ];
+    const fmt = (d) => `${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}-${pad2(d.getUTCDate())}`;
+    const holyThursdayStr = fmt(holyThursday);
+    const goodFridayStr = fmt(goodFriday);
+    const easterMondayStr = fmt(easterMonday);
 
-    return new Set([...fixed, ...easterHolidays]);
+    const jurisdictionalHolidays = [];
+    // Good Friday is a statutory national holiday across all Spain
+    jurisdictionalHolidays.push(goodFridayStr);
+
+    const jur = String(jurisdiction || 'ES-MD').toUpperCase();
+    if (jur === 'ES-MD') {
+        jurisdictionalHolidays.push(holyThursdayStr);
+        jurisdictionalHolidays.push(`${year}-05-02`); // Fiesta de la Comunidad de Madrid
+    } else if (jur === 'ES-CT') {
+        jurisdictionalHolidays.push(easterMondayStr);
+        jurisdictionalHolidays.push(`${year}-06-24`); // Sant Joan
+        jurisdictionalHolidays.push(`${year}-09-11`); // Diada Nacional de Catalunya
+        jurisdictionalHolidays.push(`${year}-12-26`); // Sant Esteve
+    } else if (jur === 'ES-VC') {
+        jurisdictionalHolidays.push(`${year}-03-19`); // San José
+        jurisdictionalHolidays.push(easterMondayStr);
+        jurisdictionalHolidays.push(`${year}-06-24`); // Sant Joan
+        jurisdictionalHolidays.push(`${year}-10-09`); // Día de la Comunitat Valenciana
+    } else if (jur === 'ES-AN') {
+        jurisdictionalHolidays.push(`${year}-02-28`); // Día de Andalucía
+        jurisdictionalHolidays.push(holyThursdayStr);
+    } else if (jur === 'ES-GA') {
+        jurisdictionalHolidays.push(holyThursdayStr);
+        jurisdictionalHolidays.push(`${year}-05-17`); // Letras Galegas
+        jurisdictionalHolidays.push(`${year}-07-25`); // Santiago Apóstol
+    } else if (jur === 'ES-PV') {
+        jurisdictionalHolidays.push(holyThursdayStr);
+        jurisdictionalHolidays.push(easterMondayStr);
+        jurisdictionalHolidays.push(`${year}-07-25`); // Santiago Apóstol
+    } else {
+        jurisdictionalHolidays.push(holyThursdayStr);
+    }
+
+    const holidaySet = new Set([...fixed, ...jurisdictionalHolidays]);
+
+    if (customHolidays && Array.isArray(customHolidays)) {
+        for (const ch of customHolidays) {
+            if (!ch || typeof ch !== 'string') continue;
+            const str = ch.trim();
+            if (str.length === 5) {
+                holidaySet.add(`${year}-${str}`);
+            } else if (str.length === 10) {
+                holidaySet.add(str);
+            }
+        }
+    }
+
+    return holidaySet;
+}
+
+/**
+ * Backward-compatible wrapper for Madrid official holidays.
+ */
+function getMadridOfficialHolidays(year) {
+    return getOfficialHolidaysForJurisdiction(year, 'ES-MD');
 }
 
 /**
@@ -174,77 +229,108 @@ function getZonedDateTimeParts(date, timeZone = 'Europe/Madrid') {
 }
 
 /**
- * Calculates expiration timestamp based on authoritative printhouse business hours (TIME-01).
- * Operates Mon-Fri 09:00 to 18:00 in IANA timezone ('Europe/Madrid'), seamlessly handling CET/CEST transitions,
- * weekends, and official Madrid statutory holidays. Returns UTC Date.
+ * Calculates expiration timestamp based on authoritative printhouse business hours (TIME-01R).
+ * Operates Mon-Fri 09:00 to 18:00 in IANA timezone, seamlessly handling:
+ * - Minute precision (exact calculations from 09:15, 13:30, 17:45, partial starts).
+ * - Effective operating hours: 8 hours/day with 1-hour lunch break (14:00-15:00) by default,
+ *   or 9 continuous hours/day when hasLunchBreak = false.
+ * - Jurisdictional calendar of the printhouse (ES-MD, ES-CT, ES-VC, ES-AN, customHolidays).
+ * - Exact CET/CEST daylight saving transitions.
+ * - Weekends and official statutory holidays.
+ * Returns exact UTC Date.
  */
 function calculateBusinessHoursExpirationUtc({
     startDate = new Date(),
     businessHours = 48,
     timezone = 'Europe/Madrid',
-    holidays = null
-}) {
+    jurisdiction = 'ES-MD',
+    customHolidays = null,
+    hasLunchBreak = true
+} = {}) {
     if (businessHours <= 0) return new Date(startDate.getTime());
 
     let current = new Date(startDate.getTime());
-    let remainingHours = businessHours;
+    let remainingMinutes = Math.round(businessHours * 60);
     const holidayCache = new Map();
 
     const isHoliday = (isoDate, year) => {
-        if (holidays && Array.isArray(holidays)) {
-            return holidays.includes(isoDate) || holidays.includes(isoDate.slice(5));
-        }
         if (!holidayCache.has(year)) {
-            holidayCache.set(year, getMadridOfficialHolidays(year));
+            holidayCache.set(year, getOfficialHolidaysForJurisdiction(year, jurisdiction, customHolidays));
         }
         return holidayCache.get(year).has(isoDate);
     };
 
-    while (remainingHours > 0) {
-        current = new Date(current.getTime() + 60 * 60 * 1000);
-        const local = getZonedDateTimeParts(current, timezone);
+    const isWorkingDay = (local) => {
+        if (local.weekday === 'Sat' || local.weekday === 'Sun') return false;
+        if (isHoliday(local.isoDate, local.year)) return false;
+        return true;
+    };
 
-        // Skip Saturday and Sunday
-        if (local.weekday === 'Sat' || local.weekday === 'Sun') continue;
-        // Skip official holidays
-        if (isHoliday(local.isoDate, local.year)) continue;
+    while (remainingMinutes > 0) {
+        let local = getZonedDateTimeParts(current, timezone);
 
-        // Work window: 09:00 to 18:00 local time
-        if (local.hour >= 9 && local.hour <= 18) {
-            if (local.hour === 18 && (local.minute > 0 || local.second > 0)) continue;
-            if (local.hour === 9 && local.minute === 0 && local.second === 0) continue;
-            remainingHours--;
+        // 1. If not a working day (weekend or statutory holiday), advance 1 hour
+        if (!isWorkingDay(local)) {
+            current = new Date(current.getTime() + 60 * 60 * 1000);
+            continue;
         }
+
+        // 2. Working day, before 09:00 opening: advance directly to 09:00:00
+        if (local.hour < 9) {
+            const minutesToNine = (9 - local.hour) * 60 - local.minute - (local.second > 0 ? 1 : 0);
+            current = new Date(current.getTime() + Math.max(1, minutesToNine) * 60 * 1000);
+            continue;
+        }
+
+        // 3. Working day, during lunch break (14:00 - 15:00) when hasLunchBreak is true
+        if (hasLunchBreak && local.hour === 14) {
+            const minutesToFifteen = (15 - local.hour) * 60 - local.minute - (local.second > 0 ? 1 : 0);
+            current = new Date(current.getTime() + Math.max(1, minutesToFifteen) * 60 * 1000);
+            continue;
+        }
+
+        // 4. Working day, after 18:00 closing: advance 1 hour into night
+        if (local.hour >= 18) {
+            current = new Date(current.getTime() + 60 * 60 * 1000);
+            continue;
+        }
+
+        // 5. Active working segment:
+        // Segment 1: [09:00, 14:00) if hasLunchBreak, else [09:00, 18:00)
+        // Segment 2: [15:00, 18:00) if hasLunchBreak
+        let boundaryHour = 18;
+        if (hasLunchBreak && local.hour < 14) {
+            boundaryHour = 14;
+        }
+
+        const minutesLeftInSegment = (boundaryHour - local.hour) * 60 - local.minute;
+        const minutesToConsume = Math.min(remainingMinutes, minutesLeftInSegment);
+
+        current = new Date(current.getTime() + minutesToConsume * 60 * 1000);
+        remainingMinutes -= minutesToConsume;
     }
+
     return current;
 }
 
 /**
- * Validates BPE calculation snapshot provenance and cryptographic integrity (BPE-01).
- * Rejects untethered or unverified snapshots that are not demonstrably bound to an authoritative calculation.
+ * Validates BPE calculation snapshot provenance and cryptographic integrity (BPE-01R).
+ * Eliminates all self-declared provenance flags (e.g. bpe_snapshot_provenance_verified).
+ * Strictly requires verifiable evidence from order_pricing_snapshots:
+ * 1. Sealed record existence and status === 'SEALED'.
+ * 2. Non-empty sealing authority (sealed_by).
+ * 3. Exact order identity and tenant identity binding.
+ * 4. Formula version and BPE engine version correspondence.
+ * 5. Effective tariff / rate card checksum matching.
+ * 6. Baseline commercial amount correspondence.
+ * 7. Recalculated canonical SHA-256 fingerprint matching the sealed snapshot_checksum.
  */
-function validateBpeSnapshotProvenance(snapshot, { orderId, orderRef, decisionMeta = {} } = {}) {
+function validateBpeSnapshotProvenance(snapshot, { orderId, orderRef, tenantId, sealedRecord, rawPayload } = {}) {
     if (!snapshot || typeof snapshot !== 'object') {
         return { valid: false, code: 'INVALID_SNAPSHOT_STRUCTURE', message: 'Calculation snapshot is not an object.' };
     }
 
-    // 1. Engine version
-    const engineVersion = snapshot.bpe_engine_version || snapshot.formula_version || snapshot.engine_version;
-    if (!engineVersion || typeof engineVersion !== 'string' || !engineVersion.trim()) {
-        return { valid: false, code: 'MISSING_BPE_ENGINE_VERSION', message: 'Calculation snapshot lacks verifiable BPE engine version.' };
-    }
-
-    // 2. Tariff / Rate card checksum
-    const ratesChecksum = snapshot.rates_checksum || snapshot.rate_card_checksum;
-    if (!ratesChecksum || typeof ratesChecksum !== 'string' || !ratesChecksum.trim()) {
-        return { valid: false, code: 'MISSING_RATES_CHECKSUM', message: 'Calculation snapshot lacks verifiable tariff checksum.' };
-    }
-
-    if (ratesChecksum.length < 8 || !/^[a-zA-Z0-9_\-\.]+$/.test(ratesChecksum)) {
-        return { valid: false, code: 'INCOMPATIBLE_RATES_CHECKSUM', message: 'Calculation snapshot tariff checksum format is invalid or corrupted.' };
-    }
-
-    // 3. Technical completeness: specs, rates, and breakdown
+    // 1. Technical completeness: specs, rates, and breakdown
     if (!snapshot.specs || typeof snapshot.specs !== 'object') {
         return { valid: false, code: 'INCOMPLETE_SNAPSHOT_SPECS', message: 'Calculation snapshot missing specifications.' };
     }
@@ -255,26 +341,134 @@ function validateBpeSnapshotProvenance(snapshot, { orderId, orderRef, decisionMe
         return { valid: false, code: 'INCOMPLETE_SNAPSHOT_BREAKDOWN', message: 'Calculation snapshot missing cost breakdown.' };
     }
 
-    // 4. Order Identity & Provenance Linkage
-    // When resolving from decision metadata, explicit linkage or seal verification is required
-    const snapshotOrderId = snapshot.order_id || snapshot.order_intent_id;
-    const snapshotOrderRef = snapshot.order_ref || snapshot.external_order_id;
-    const hasOrderLink = Boolean(
-        (snapshotOrderId && snapshotOrderId === orderId) ||
-        (snapshotOrderRef && snapshotOrderRef === orderRef) ||
-        decisionMeta.bpe_snapshot_provenance_verified === true ||
-        (decisionMeta.provenance && decisionMeta.provenance.sealed_by === 'BPE_ENGINE' && decisionMeta.provenance.order_id === orderId)
-    );
+    // 2. Engine version presence and format
+    const engineVersion = snapshot.bpe_engine_version || snapshot.formula_version || snapshot.engine_version;
+    if (!engineVersion || typeof engineVersion !== 'string' || !engineVersion.trim()) {
+        return { valid: false, code: 'MISSING_BPE_ENGINE_VERSION', message: 'Calculation snapshot lacks verifiable BPE engine version.' };
+    }
 
-    if (!hasOrderLink) {
+    // 3. Tariff / Rate card checksum presence and format
+    const ratesChecksum = snapshot.rates_checksum || snapshot.rate_card_checksum;
+    if (!ratesChecksum || typeof ratesChecksum !== 'string' || !ratesChecksum.trim()) {
+        return { valid: false, code: 'MISSING_RATES_CHECKSUM', message: 'Calculation snapshot lacks verifiable tariff checksum.' };
+    }
+    if (ratesChecksum.length < 8 || !/^[a-zA-Z0-9_\-\.]+$/.test(ratesChecksum)) {
+        return { valid: false, code: 'INCOMPATIBLE_RATES_CHECKSUM', message: 'Calculation snapshot tariff checksum format is invalid or corrupted.' };
+    }
+
+    // 4. Authoritative database sealing evidence (BPE-01R)
+    // Elimination of self-declared flags: bpe_snapshot_provenance_verified is strictly ignored
+    if (!sealedRecord || typeof sealedRecord !== 'object') {
         return {
             valid: false,
             code: 'UNVERIFIED_SNAPSHOT_PROVENANCE',
-            message: 'Calculation snapshot in decision metadata lacks verified cryptographic linkage to this order.'
+            message: 'Calculation snapshot lacks authoritative cryptographic sealing record in order_pricing_snapshots.'
         };
     }
 
-    return { valid: true };
+    // 5. Sealed Status & Sealing Authority
+    if (sealedRecord.status !== 'SEALED') {
+        return {
+            valid: false,
+            code: 'UNVERIFIED_SNAPSHOT_STATUS',
+            message: `Snapshot status in order_pricing_snapshots is '${sealedRecord.status}', expected 'SEALED'.`
+        };
+    }
+    if (!sealedRecord.sealed_by || typeof sealedRecord.sealed_by !== 'string' || !sealedRecord.sealed_by.trim()) {
+        return {
+            valid: false,
+            code: 'MISSING_SEAL_AUTHORITY',
+            message: 'Pricing snapshot record lacks verifiable sealing authority identity (sealed_by).'
+        };
+    }
+
+    // 6. Order Identity & Tenant Isolation Binding
+    if (tenantId && sealedRecord.tenant_id && sealedRecord.tenant_id !== tenantId) {
+        return {
+            valid: false,
+            code: 'SNAPSHOT_TENANT_MISMATCH',
+            message: `Snapshot sealed for tenant '${sealedRecord.tenant_id}', but requested for '${tenantId}'.`
+        };
+    }
+    if (orderId && sealedRecord.order_id && sealedRecord.order_id !== orderId) {
+        return {
+            valid: false,
+            code: 'SNAPSHOT_ORDER_MISMATCH',
+            message: `Snapshot sealed for order '${sealedRecord.order_id}', but requested for '${orderId}'.`
+        };
+    }
+    const payloadOrderId = snapshot.order_id || snapshot.order_intent_id;
+    if (payloadOrderId && orderId && payloadOrderId !== orderId) {
+        return {
+            valid: false,
+            code: 'SNAPSHOT_ORDER_MISMATCH',
+            message: `Snapshot payload contains order '${payloadOrderId}', mismatched with requested order '${orderId}'.`
+        };
+    }
+
+    // 7. Engine version match with sealed record
+    if (sealedRecord.formula_version && sealedRecord.formula_version !== engineVersion) {
+        return {
+            valid: false,
+            code: 'BPE_ENGINE_VERSION_MISMATCH',
+            message: `Snapshot engine version '${engineVersion}' does not match sealed formula version '${sealedRecord.formula_version}'.`
+        };
+    }
+
+    // 8. Tariff checksum match with sealed record
+    if (sealedRecord.rate_card_checksum && sealedRecord.rate_card_checksum !== ratesChecksum) {
+        return {
+            valid: false,
+            code: 'INCOMPATIBLE_RATES_CHECKSUM',
+            message: `Snapshot rates checksum '${ratesChecksum}' does not match sealed rate card checksum '${sealedRecord.rate_card_checksum}'.`
+        };
+    }
+
+    // 7. Baseline net price correspondence
+    const snapshotBaseNet = snapshot.base_net_price !== undefined ? Number(snapshot.base_net_price) : (snapshot.final_amount !== undefined ? Number(snapshot.final_amount) : null);
+    const sealedFinalAmount = Number(sealedRecord.final_amount);
+    if (snapshotBaseNet !== null && !isNaN(snapshotBaseNet) && !isNaN(sealedFinalAmount)) {
+        if (Math.abs(snapshotBaseNet - sealedFinalAmount) > 0.0001) {
+            return {
+                valid: false,
+                code: 'BASELINE_AMOUNT_MISMATCH',
+                message: `Snapshot baseline net price '${snapshotBaseNet}' does not match sealed final amount '${sealedFinalAmount}'.`
+            };
+        }
+    }
+
+    // 8. Cryptographic Fingerprint Integrity Check (Canonical SHA-256)
+    let calculatedChecksum;
+    try {
+        calculatedChecksum = pricingSnapshotCanonicalizer.calculatePricingSnapshotChecksum(snapshot);
+    } catch (err) {
+        return {
+            valid: false,
+            code: 'CANONICALIZATION_FAILED',
+            message: `Failed to canonicalize calculation snapshot: ${err.message}`
+        };
+    }
+
+    let isMatch = (calculatedChecksum === sealedRecord.snapshot_checksum);
+    if (!isMatch && rawPayload && typeof rawPayload === 'object') {
+        try {
+            const rawChecksum = pricingSnapshotCanonicalizer.calculatePricingSnapshotChecksum(rawPayload);
+            if (rawChecksum === sealedRecord.snapshot_checksum) {
+                isMatch = true;
+                calculatedChecksum = rawChecksum;
+            }
+        } catch (_) {}
+    }
+
+    if (sealedRecord.snapshot_checksum && !isMatch) {
+        return {
+            valid: false,
+            code: 'SNAPSHOT_INTEGRITY_TAMPERED',
+            message: `Cryptographic fingerprint mismatch. Calculated '${calculatedChecksum}', expected sealed '${sealedRecord.snapshot_checksum}'.`
+        };
+    }
+
+    return { valid: true, checksum: calculatedChecksum };
 }
 
 /**
@@ -897,96 +1091,60 @@ class OrderQuoteRevisionService {
                 }
             }
 
-            // 4. Authoritative Resolution of BPE Calculation Snapshot (SEC-C02R, BPE-01)
+            // 4. Authoritative Resolution of BPE Calculation Snapshot (SEC-C02R, BPE-01R)
             let authoritativeCalculation = null;
 
             if (orderRow && orderRow.id) {
                 const [snapRows] = await conn.query(
-                    `SELECT snapshot_id, snapshot_json, rate_card_checksum, formula_version, final_amount 
+                    `SELECT snapshot_id, order_id, tenant_id, printhouse_id, snapshot_json, snapshot_checksum, 
+                            rate_card_checksum, formula_version, final_amount, status, sealed_by, sealed_at 
                      FROM order_pricing_snapshots 
-                     WHERE order_id = ? AND status = 'SEALED' 
+                     WHERE order_id = ? AND tenant_id = ? AND status = 'SEALED' 
                      ORDER BY snapshot_revision DESC LIMIT 1`,
-                    [orderRow.id]
+                    [orderRow.id, tenantId]
                 );
 
                 if (snapRows && snapRows.length > 0) {
                     const snap = snapRows[0];
-                    const snapData = typeof snap.snapshot_json === 'string' 
+                    const rawPayload = typeof snap.snapshot_json === 'string' 
                         ? JSON.parse(snap.snapshot_json) 
                         : snap.snapshot_json;
-                    if (snapData) {
-                        snapData.rates_checksum = snap.rate_card_checksum || snapData.rates_checksum;
-                        snapData.bpe_engine_version = snap.formula_version || snapData.bpe_engine_version;
-                        const validation = validateBpeSnapshotProvenance(snapData, {
+                    if (rawPayload) {
+                        const calculationPayload = (rawPayload && rawPayload.snapshot && typeof rawPayload.snapshot === 'object')
+                            ? rawPayload.snapshot
+                            : rawPayload;
+
+                        const validation = validateBpeSnapshotProvenance(calculationPayload, {
                             orderId: orderRow.id,
                             orderRef: resolvedOrderRef,
-                            decisionMeta: { bpe_snapshot_provenance_verified: true }
+                            tenantId,
+                            sealedRecord: snap,
+                            rawPayload
                         });
+
                         if (!validation.valid) {
                             throw new OrderQuoteRevisionError(
-                                `Corrupted or invalid pricing snapshot in order_pricing_snapshots: ${validation.message}`,
+                                `Cryptographic sealing validation failed for order_pricing_snapshots: ${validation.message}`,
                                 'RECALCULATION_BLOCKED',
                                 422,
                                 { reason: validation.code, details: validation.message }
                             );
                         }
-                        authoritativeCalculation = snapData;
+                        authoritativeCalculation = calculationPayload;
                         authoritativeCalculation._source = 'ORDER_PRICING_SNAPSHOTS';
+                        authoritativeCalculation._sealedSnapshotId = snap.snapshot_id;
+                        authoritativeCalculation._verifiedChecksum = validation.checksum;
                     }
                 }
             }
 
-            if (!authoritativeCalculation && orderRow && orderRow.offers_snapshot) {
-                const offerSnap = typeof orderRow.offers_snapshot === 'string'
-                    ? JSON.parse(orderRow.offers_snapshot)
-                    : orderRow.offers_snapshot;
-                if (offerSnap) {
-                    const validation = validateBpeSnapshotProvenance(offerSnap, {
-                        orderId: orderRow.id,
-                        orderRef: resolvedOrderRef,
-                        decisionMeta: { bpe_snapshot_provenance_verified: true }
-                    });
-                    if (!validation.valid) {
-                        throw new OrderQuoteRevisionError(
-                            `Invalid snapshot in order offers_snapshot: ${validation.message}`,
-                            'RECALCULATION_BLOCKED',
-                            422,
-                            { reason: validation.code, details: validation.message }
-                        );
-                    }
-                    authoritativeCalculation = offerSnap;
-                    authoritativeCalculation._source = 'ORDER_OFFERS_SNAPSHOT';
-                }
-            }
-
-            if (!authoritativeCalculation) {
-                const meta = typeof decision.metadata_json === 'string' ? JSON.parse(decision.metadata_json) : (decision.metadata_json || {});
-                if (meta.bpe_snapshot) {
-                    const validation = validateBpeSnapshotProvenance(meta.bpe_snapshot, {
-                        orderId: orderRow.id,
-                        orderRef: resolvedOrderRef,
-                        decisionMeta: meta
-                    });
-                    if (!validation.valid) {
-                        throw new OrderQuoteRevisionError(
-                            `Unverified calculation snapshot provenance in decision metadata: ${validation.message}`,
-                            'RECALCULATION_BLOCKED',
-                            422,
-                            { reason: validation.code, details: validation.message }
-                        );
-                    }
-                    authoritativeCalculation = meta.bpe_snapshot;
-                    authoritativeCalculation._source = 'DECISION_METADATA';
-                }
-            }
-
-            // SEC-C02R / BPE-01: ZERO fallback to request body originalCalculation!
+            // BPE-01R: Zero fallback to request body originalCalculation or unverified metadata!
             if (!authoritativeCalculation) {
                 throw new OrderQuoteRevisionError(
-                    'Missing authoritative pricing snapshot for order. Cannot reproduce BPE pricing deterministically.',
+                    'Missing cryptographically sealed pricing snapshot in order_pricing_snapshots for this order and tenant. Recalculation blocked.',
                     'RECALCULATION_BLOCKED',
                     422,
-                    { reason: 'MISSING_AUTHORITATIVE_PRICING_SNAPSHOT' }
+                    { reason: 'UNVERIFIED_SNAPSHOT_PROVENANCE' }
                 );
             }
 
@@ -1033,16 +1191,40 @@ class OrderQuoteRevisionService {
                 );
             }
 
-            // 6. Authoritative Commercial Margin Application (SEC-C02R, BPE-01)
+            // 6. Authoritative Commercial Margin & Printhouse Profile Policy (SEC-C02R, BPE-01, TIME-01R)
             let effectiveMargin = authoritativeCalculation.target_margin_pct;
-            if (effectiveMargin === undefined || effectiveMargin === null) {
-                // BPE-01: Removed silent .catch(() => [[]]) - database errors must bubble up and abort transaction
-                const [phProfiles] = await conn.query(
-                    `SELECT target_margin_pct FROM printhouse_profiles WHERE printhouse_id = ? LIMIT 1`,
-                    [effectivePrinthouseId || orderRow.offer_print_house || tenantId]
-                );
-                if (phProfiles && phProfiles.length > 0 && phProfiles[0].target_margin_pct !== null) {
-                    effectiveMargin = Number(phProfiles[0].target_margin_pct);
+            let printhouseTz = 'Europe/Madrid';
+            let printhouseJurisdiction = 'ES-MD';
+            let printhouseHasLunchBreak = true;
+            let printhouseCustomHolidays = null;
+            let businessHoursTtl = 48;
+
+            const [phProfiles] = await conn.query(
+                `SELECT target_margin_pct, timezone, jurisdiction, has_lunch_break, custom_holidays_json, business_hours_ttl 
+                 FROM printhouse_profiles 
+                 WHERE printhouse_id = ? LIMIT 1`,
+                [effectivePrinthouseId || decision.printhouse_tenant_id || orderRow.offer_print_house || orderRow.printhouse_id || tenantId]
+            );
+
+            if (phProfiles && phProfiles.length > 0) {
+                const pProfile = phProfiles[0];
+                if (pProfile.target_margin_pct !== null && pProfile.target_margin_pct !== undefined) {
+                    effectiveMargin = Number(pProfile.target_margin_pct);
+                }
+                if (pProfile.timezone) printhouseTz = pProfile.timezone;
+                if (pProfile.jurisdiction) printhouseJurisdiction = pProfile.jurisdiction;
+                if (pProfile.has_lunch_break !== undefined && pProfile.has_lunch_break !== null) {
+                    printhouseHasLunchBreak = Boolean(pProfile.has_lunch_break);
+                }
+                if (pProfile.custom_holidays_json) {
+                    try {
+                        printhouseCustomHolidays = typeof pProfile.custom_holidays_json === 'string'
+                            ? JSON.parse(pProfile.custom_holidays_json)
+                            : pProfile.custom_holidays_json;
+                    } catch (_) {}
+                }
+                if (pProfile.business_hours_ttl && Number(pProfile.business_hours_ttl) > 0) {
+                    businessHoursTtl = Number(pProfile.business_hours_ttl);
                 }
             }
 
@@ -1122,14 +1304,15 @@ class OrderQuoteRevisionService {
                 taxRatePct
             });
 
-            // 9. Authoritative Expiration Projection (48 Business Hours bounded by Supplier Offer) (SEC-C02R, Policy)
+            // 9. Authoritative Expiration Projection (TIME-01R, bounded by Supplier Offer)
             const now = new Date();
-            const businessHoursTtl = 48;
-            const printhouseTz = 'Europe/Madrid';
             const calculatedExpirationUtc = calculateBusinessHoursExpirationUtc({
                 startDate: now,
                 businessHours: businessHoursTtl,
-                timezone: printhouseTz
+                timezone: printhouseTz,
+                jurisdiction: printhouseJurisdiction,
+                customHolidays: printhouseCustomHolidays,
+                hasLunchBreak: printhouseHasLunchBreak
             });
 
             let expiresAt = calculatedExpirationUtc;
@@ -1310,6 +1493,7 @@ class OrderQuoteRevisionService {
                 revised_gross_amount: taxBreakdown.revised_gross_amount,
                 tax_rate_pct: taxRatePct,
                 expires_at: expiresAt.toISOString(),
+                effective_business_hours: businessHoursTtl,
                 token_prefix: tokenPrefix,
                 otp_delivery_status: otpDeliveryStatus,
                 rawToken, // Delivered once to the issuing caller, never logged or stored in DB plaintext
@@ -1788,6 +1972,7 @@ module.exports = {
     OtpDeliveryService,
     recalculateDeterministicBpePrice,
     calculateBusinessHoursExpirationUtc,
+    getOfficialHolidaysForJurisdiction,
     getMadridOfficialHolidays,
     validateBpeSnapshotProvenance,
     sha256Canonical,

@@ -35,6 +35,7 @@ const {
     validateBpeSnapshotProvenance
 } = require('../src/api/services/orderQuoteRevisionService');
 const TaxVatReadinessClassifierService = require('../src/api/services/taxVatReadinessClassifierService');
+const pricingSnapshotCanonicalizer = require('../src/api/services/pricingSnapshotCanonicalizer');
 
 describe('BUDGET-02C-01R3 — Fiscal Reliability, Real Calendar & BPE Snapshot Provenance Certification', () => {
     let mockDb;
@@ -42,6 +43,7 @@ describe('BUDGET-02C-01R3 — Fiscal Reliability, Real Calendar & BPE Snapshot P
     let classifier;
     let mockDelivery;
     let deliveredOtps;
+    let baseChecksum;
 
     const baselineBpeSnapshot = {
         bpe_calculation_id: 'bpe_calc_canonical_historical',
@@ -115,6 +117,7 @@ describe('BUDGET-02C-01R3 — Fiscal Reliability, Real Calendar & BPE Snapshot P
             defaultOtpThresholdEur: 50.00
         });
 
+        baseChecksum = pricingSnapshotCanonicalizer.calculatePricingSnapshotChecksum(baselineBpeSnapshot);
         mockDb = {
             orders: [
                 {
@@ -131,6 +134,23 @@ describe('BUDGET-02C-01R3 — Fiscal Reliability, Real Calendar & BPE Snapshot P
                         delivery_country: 'ES',
                         supplier_offer_valid_until: '2026-11-15T18:00:00.000Z'
                     }
+                }
+            ],
+            order_pricing_snapshots: [
+                {
+                    snapshot_id: 'ops_r3_100',
+                    order_id: 'ord_r3_100',
+                    tenant_id: 'tenant_alpha',
+                    printhouse_id: 'ph_madrid_01',
+                    status: 'SEALED',
+                    currency: 'EUR',
+                    final_amount: 1407.7301,
+                    formula_version: 'v3.0',
+                    rate_card_checksum: baselineBpeSnapshot.rates_checksum,
+                    snapshot_json: JSON.stringify(baselineBpeSnapshot),
+                    snapshot_checksum: baseChecksum,
+                    sealed_by: 'BPE_ENGINE_SEALER',
+                    sealed_at: new Date()
                 }
             ],
             order_paper_decisions: [
@@ -171,7 +191,11 @@ describe('BUDGET-02C-01R3 — Fiscal Reliability, Real Calendar & BPE Snapshot P
             printhouse_profiles: [
                 {
                     printhouse_id: 'ph_madrid_01',
-                    target_margin_pct: 18.5
+                    target_margin_pct: 18.5,
+                    timezone: 'Europe/Madrid',
+                    jurisdiction: 'ES-MD',
+                    has_lunch_break: 1,
+                    business_hours_ttl: 48
                 }
             ]
         };
@@ -191,7 +215,11 @@ describe('BUDGET-02C-01R3 — Fiscal Reliability, Real Calendar & BPE Snapshot P
                     return [row ? [row] : []];
                 }
                 if (sql.includes('SELECT') && sql.includes('FROM order_pricing_snapshots')) {
-                    return [[]]; // Default to offers_snapshot on order
+                    const [orderId, tenantId] = params;
+                    const matches = (mockDb.order_pricing_snapshots || []).filter(
+                        snap => (!orderId || snap.order_id === orderId) && (!tenantId || snap.tenant_id === tenantId) && snap.status === 'SEALED'
+                    );
+                    return [matches];
                 }
                 if (sql.includes('SELECT') && sql.includes('FROM paper_variants')) {
                     const row = mockDb.paper_variants.find(v => v.id === params[0]);
@@ -367,8 +395,9 @@ describe('BUDGET-02C-01R3 — Fiscal Reliability, Real Calendar & BPE Snapshot P
             const summerStart = new Date('2026-07-01T07:00:00.000Z'); // 09:00 CEST
             const expiration = calculateBusinessHoursExpirationUtc({
                 startDate: summerStart,
-                businessHours: 9, // 1 full workday (09:00 to 18:00)
-                timezone: 'Europe/Madrid'
+                businessHours: 9, // 1 full workday (09:00 to 18:00 without lunch break)
+                timezone: 'Europe/Madrid',
+                hasLunchBreak: false
             });
 
             // 18:00 CEST corresponds to 16:00 UTC
@@ -380,8 +409,9 @@ describe('BUDGET-02C-01R3 — Fiscal Reliability, Real Calendar & BPE Snapshot P
             const winterStart = new Date('2026-01-14T08:00:00.000Z'); // 09:00 CET
             const expiration = calculateBusinessHoursExpirationUtc({
                 startDate: winterStart,
-                businessHours: 9, // 1 full workday (09:00 to 18:00)
-                timezone: 'Europe/Madrid'
+                businessHours: 9, // 1 full workday (09:00 to 18:00 without lunch break)
+                timezone: 'Europe/Madrid',
+                hasLunchBreak: false
             });
 
             // 18:00 CET corresponds to 17:00 UTC
@@ -451,6 +481,7 @@ describe('BUDGET-02C-01R3 — Fiscal Reliability, Real Calendar & BPE Snapshot P
         it('3.1: Rejects untethered decision.metadata_json.bpe_snapshot with 422 RECALCULATION_BLOCKED', async () => {
             // Order has no snapshot stored in order table
             mockDb.orders[0].offers_snapshot = null;
+            mockDb.order_pricing_snapshots = [];
 
             // Untethered snapshot in decision metadata (lacks order linkage proof)
             const untetheredSnapshot = JSON.parse(JSON.stringify(baselineBpeSnapshot));
@@ -480,13 +511,30 @@ describe('BUDGET-02C-01R3 — Fiscal Reliability, Real Calendar & BPE Snapshot P
         it('3.2: Accepts decision.metadata_json.bpe_snapshot when order linkage is accredited', async () => {
             mockDb.orders[0].offers_snapshot = null;
 
-            // Accredited snapshot explicitly bound to order_id
+            // Accredited snapshot explicitly bound to order_id and sealed in DB
             const accreditedSnapshot = JSON.parse(JSON.stringify(baselineBpeSnapshot));
             accreditedSnapshot.order_id = 'ord_r3_100';
 
             mockDb.order_paper_decisions[0].metadata_json = {
                 bpe_snapshot: accreditedSnapshot
             };
+            mockDb.order_pricing_snapshots = [
+                {
+                    snapshot_id: 'ops_r3_100',
+                    order_id: 'ord_r3_100',
+                    tenant_id: 'tenant_alpha',
+                    printhouse_id: 'ph_madrid_01',
+                    status: 'SEALED',
+                    currency: 'EUR',
+                    final_amount: 1407.7301,
+                    formula_version: 'v3.0',
+                    rate_card_checksum: baselineBpeSnapshot.rates_checksum,
+                    snapshot_json: JSON.stringify(baselineBpeSnapshot),
+                    snapshot_checksum: baseChecksum,
+                    sealed_by: 'BPE_ENGINE_SEALER',
+                    sealed_at: new Date()
+                }
+            ];
 
             const revision = await service.createQuoteRevision({
                 tenantId: 'tenant_alpha',
@@ -523,6 +571,8 @@ describe('BUDGET-02C-01R3 — Fiscal Reliability, Real Calendar & BPE Snapshot P
             const noMarginSnapshot = JSON.parse(JSON.stringify(baselineBpeSnapshot));
             delete noMarginSnapshot.target_margin_pct;
             mockDb.orders[0].offers_snapshot = noMarginSnapshot;
+            mockDb.order_pricing_snapshots[0].snapshot_json = JSON.stringify(noMarginSnapshot);
+            mockDb.order_pricing_snapshots[0].snapshot_checksum = pricingSnapshotCanonicalizer.calculatePricingSnapshotChecksum(noMarginSnapshot);
 
             // Simulate database connection crash during printhouse_profiles query
             mockDb._simulatePrinthouseProfileDbError = true;
@@ -546,6 +596,8 @@ describe('BUDGET-02C-01R3 — Fiscal Reliability, Real Calendar & BPE Snapshot P
             const noMarginSnapshot = JSON.parse(JSON.stringify(baselineBpeSnapshot));
             delete noMarginSnapshot.target_margin_pct;
             mockDb.orders[0].offers_snapshot = noMarginSnapshot;
+            mockDb.order_pricing_snapshots[0].snapshot_json = JSON.stringify(noMarginSnapshot);
+            mockDb.order_pricing_snapshots[0].snapshot_checksum = pricingSnapshotCanonicalizer.calculatePricingSnapshotChecksum(noMarginSnapshot);
 
             // Database responds normally, but tenant has no registered margin profile
             mockDb.printhouse_profiles = [];
