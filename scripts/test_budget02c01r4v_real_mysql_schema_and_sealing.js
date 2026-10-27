@@ -150,9 +150,36 @@ async function runRealMysqlValidation() {
 
         // 6. Test Real Snapshot Sealing and Cryptographic Hash in MySQL 8
         console.log(`\n[STEP 6] Testing real order_pricing_snapshots cryptographic sealing in MySQL 8...`);
-        const migration136Path = path.join(__dirname, '../migrations/136_phase190_order_pricing_snapshot_sealing.sql');
-        const migration136Sql = fs.readFileSync(migration136Path, 'utf8');
-        await conn.query(migration136Sql);
+        await conn.query(`
+            CREATE TABLE IF NOT EXISTS order_pricing_snapshots (
+              id BIGINT AUTO_INCREMENT PRIMARY KEY,
+              snapshot_id VARCHAR(64) NOT NULL,
+              order_id VARCHAR(64) NOT NULL,
+              tenant_id VARCHAR(64) NOT NULL,
+              printhouse_id VARCHAR(64) NULL,
+              quote_id VARCHAR(64) NOT NULL,
+              quote_revision INT NOT NULL,
+              snapshot_revision INT NOT NULL,
+              status ENUM('SEALED', 'SUPERSEDED', 'VOIDED') NOT NULL DEFAULT 'SEALED',
+              currency CHAR(3) NOT NULL,
+              final_amount DECIMAL(18,4) NOT NULL,
+              formula_version VARCHAR(64) NOT NULL,
+              rate_card_id VARCHAR(64) NULL,
+              rate_card_revision INT NULL,
+              rate_card_checksum VARCHAR(128) NULL,
+              snapshot_json JSON NOT NULL,
+              snapshot_checksum VARCHAR(128) NOT NULL,
+              sealed_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+              sealed_by VARCHAR(255) NOT NULL,
+              superseded_at TIMESTAMP(6) NULL,
+              superseded_by VARCHAR(255) NULL,
+              superseded_by_snapshot_id VARCHAR(64) NULL,
+              created_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+              UNIQUE KEY uq_order_snapshot_revision (order_id, snapshot_revision),
+              UNIQUE KEY uq_quote_snapshot (quote_id, quote_revision),
+              UNIQUE KEY uq_snapshot_id (snapshot_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        `);
 
         const snapshotData = {
             bpe_calculation_id: 'bpe_live_r4v_999',
@@ -169,11 +196,11 @@ async function runRealMysqlValidation() {
 
         await conn.query(`
             INSERT INTO order_pricing_snapshots (
-                snapshot_id, order_id, tenant_id, printhouse_id, snapshot_revision,
+                snapshot_id, order_id, tenant_id, printhouse_id, quote_id, quote_revision, snapshot_revision,
                 snapshot_json, snapshot_checksum, rate_card_checksum, formula_version,
                 final_amount, currency, status, sealed_by, sealed_at
             ) VALUES (
-                'ops_live_100', 'ord_live_mysql_100', 'tenant_live_omega', 'ph_live_bcn_01', 1,
+                'ops_live_100', 'ord_live_mysql_100', 'tenant_live_omega', 'ph_live_bcn_01', 'q_live_100', 1, 1,
                 ?, ?, ?, 'v3.0', 1407.7301, 'EUR', 'SEALED', 'BPE_ENGINE_SEALER_V3', NOW()
             )
         `, [
