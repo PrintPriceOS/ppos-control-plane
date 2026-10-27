@@ -284,6 +284,9 @@ async function runRealConcurrencyCertification() {
 
         // 6.3: Integrated Real Service Concurrency & Idempotent Replay Race against Order Cancellation
         console.log('\n[STEP 6.3] Testing orderPaperDecisionService.recordDecision integrated replay race against order cancellation...');
+        const savedDatabaseUrl = process.env.DATABASE_URL;
+        const ephemeralDatabaseUrl = `mysql://${MYSQL_USER}:${MYSQL_PASSWORD}@${MYSQL_HOST}:${MYSQL_PORT}/${EPHEMERAL_DB}`;
+        process.env.DATABASE_URL = ephemeralDatabaseUrl;
         process.env.MYSQL_HOST = MYSQL_HOST;
         process.env.MYSQL_PORT = String(MYSQL_PORT);
         process.env.MYSQL_USER = MYSQL_USER;
@@ -407,6 +410,11 @@ async function runRealConcurrencyCertification() {
         }
         console.log(`[PASS] All orders maintained exact 1.782,30 € quote invariant without mutation.`);
         await mysqlClient.closePool();
+        if (savedDatabaseUrl) {
+            process.env.DATABASE_URL = savedDatabaseUrl;
+        } else {
+            delete process.env.DATABASE_URL;
+        }
 
         // 7. Test Idempotency Key Uniqueness on Real MySQL
         console.log(`\n[STEP 7] Testing idempotency key uniqueness constraint on real MySQL...`);
