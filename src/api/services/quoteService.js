@@ -162,9 +162,18 @@ class QuoteService {
                 throw new Error("Quote printer does not match order assigned printhouse");
             }
 
+            const tenantId = order.tenant_id || quote.tenant_id || (actor && actor.tenantId);
+            if (!tenantId || typeof tenantId !== 'string' || !tenantId.trim()) {
+                throw new Error("Cannot seal pricing snapshot: missing authoritative tenant_id");
+            }
+
+            const printhouseId = quote.printer_id || order.assigned_printhouse_id || order.offer_print_house || (actor && actor.printhouseId) || null;
+
             // Parse snapshot payload to extract commercial truth
-            const snapshotPayload = JSON.parse(quote.calculation_breakdown_json);
-            const snapshotDetails = snapshotPayload.snapshot;
+            const snapshotPayload = typeof quote.calculation_breakdown_json === 'string'
+                ? JSON.parse(quote.calculation_breakdown_json)
+                : (quote.calculation_breakdown_json || {});
+            const snapshotDetails = snapshotPayload.snapshot || {};
 
             // Generate canonical JSON and SHA-256 Checksum
             const canonicalizer = require('./pricingSnapshotCanonicalizer');
@@ -172,19 +181,33 @@ class QuoteService {
 
             const snapshotId = `ops_${crypto.randomUUID()}`;
 
-            // 9. Insert order_pricing_snapshot
+            const rawFinalAmount = snapshotDetails.finalSuggestedPriceRaw ?? snapshotPayload.base_net_price ?? snapshotPayload.final_amount ?? quote.final_amount ?? order.offer_price ?? 0;
+            const finalAmount = Number(rawFinalAmount);
+            if (isNaN(finalAmount)) {
+                throw new Error("Cannot seal pricing snapshot: missing valid final_amount");
+            }
+            const currency = String(snapshotDetails.quoteCurrency || snapshotPayload.currency || order.currency || 'EUR').toUpperCase().slice(0, 3);
+            const formulaVersion = String(snapshotDetails.formulaVersion || snapshotPayload.bpe_engine_version || snapshotPayload.formula_version || 'v3.0');
+            const rateCardId = snapshotDetails.rateCardId || snapshotPayload.rate_card_id || null;
+            const rateCardRevision = Number(snapshotDetails.rateCardRevision ?? snapshotPayload.rate_card_revision ?? 1);
+            const rateCardChecksum = snapshotDetails.rateCardChecksum || snapshotPayload.rates_checksum || snapshotPayload.rate_card_checksum || 'mock';
+            const quoteRevision = Number(quote.revision || 1);
+            const snapshotRevision = 1;
+            const sealedBy = (actor && (actor.userId || actor.id)) || 'system';
+
+            // 9. Insert order_pricing_snapshot with authoritative schema
             await conn.query(`
                 INSERT INTO order_pricing_snapshots (
-                    snapshot_id, order_id, quote_id, quote_revision, snapshot_revision,
+                    snapshot_id, order_id, tenant_id, printhouse_id, quote_id, quote_revision, snapshot_revision,
                     status, currency, final_amount, formula_version,
                     rate_card_id, rate_card_revision, rate_card_checksum,
                     snapshot_json, snapshot_checksum, sealed_by
-                ) VALUES (?, ?, ?, ?, ?, 'SEALED', ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, 'SEALED', ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `, [
-                snapshotId, orderId, quoteId, quote.revision || 1, 1,
-                snapshotDetails.quoteCurrency || 'EUR', snapshotDetails.finalSuggestedPriceRaw, snapshotDetails.formulaVersion || 'v1',
-                null, snapshotDetails.rateCardRevision || 1, snapshotDetails.rateCardChecksum || 'mock',
-                JSON.stringify(snapshotPayload), checksum, actor ? actor.userId : 'system'
+                snapshotId, orderId, tenantId, printhouseId, quoteId, quoteRevision, snapshotRevision,
+                currency, finalAmount, formulaVersion,
+                rateCardId, rateCardRevision, rateCardChecksum,
+                JSON.stringify(snapshotPayload), checksum, sealedBy
             ]);
 
             // 10. Mark quote ACCEPTED

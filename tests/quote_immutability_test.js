@@ -43,13 +43,13 @@ async function runTests() {
                 return [[mockDbState.order_pricing_snapshots.find(s => s.snapshot_id === params[0] && s.quote_id === params[1])]];
             }
             if (sql.includes('INSERT INTO order_pricing_snapshots')) {
-                // params: [snapshotId, orderId, quoteId, quote_revision, snapshot_revision, currency, final_amount, formula_version, rate_card_id, rate_card_revision, rate_card_checksum, snapshot_json, snapshot_checksum, sealed_by]
+                // params: [snapshotId, orderId, tenantId, printhouseId, quoteId, quoteRevision, snapshotRevision, currency, finalAmount, formulaVersion, rateCardId, rateCardRevision, rateCardChecksum, snapshotJson, snapshotChecksum, sealedBy]
                 mockDbState.order_pricing_snapshots.push({
-                    snapshot_id: params[0], order_id: params[1], quote_id: params[2], 
-                    quote_revision: params[3], snapshot_revision: params[4], status: 'SEALED',
-                    currency: params[5], final_amount: params[6], formula_version: params[7],
-                    rate_card_id: params[8], rate_card_revision: params[9], rate_card_checksum: params[10],
-                    snapshot_json: params[11], snapshot_checksum: params[12], sealed_by: params[13]
+                    snapshot_id: params[0], order_id: params[1], tenant_id: params[2], printhouse_id: params[3],
+                    quote_id: params[4], quote_revision: params[5], snapshot_revision: params[6], status: 'SEALED',
+                    currency: params[7], final_amount: params[8], formula_version: params[9],
+                    rate_card_id: params[10], rate_card_revision: params[11], rate_card_checksum: params[12],
+                    snapshot_json: params[13], snapshot_checksum: params[14], sealed_by: params[15]
                 });
                 return [{ insertId: 1 }];
             }
@@ -86,7 +86,7 @@ async function runTests() {
                 snapshot: { quoteCurrency: 'EUR', finalSuggestedPriceRaw: '123.45', formulaVersion: 'v2', rateCardRevision: 2, rateCardChecksum: 'xyz' }
             })
         }];
-        mockDbState.orders = [{ id: orderId, job_id: orderId, active_pricing_snapshot_id: null }];
+        mockDbState.orders = [{ id: orderId, job_id: orderId, tenant_id: 't1', active_pricing_snapshot_id: null }];
 
         // Run
         const res = await quoteService.acceptQuoteAndSealOrderPricing({ quoteId, orderId, actor: { userId: 'admin1' } });
@@ -133,7 +133,7 @@ async function runTests() {
         const quoteId = "q2";
         const orderId = "o2";
         mockDbState.job_quotes.push({ id: quoteId, job_id: orderId, status: 'EXPIRED' });
-        mockDbState.orders.push({ id: orderId, job_id: orderId, active_pricing_snapshot_id: null });
+        mockDbState.orders.push({ id: orderId, job_id: orderId, tenant_id: 't1', active_pricing_snapshot_id: null });
 
         try {
             await quoteService.acceptQuoteAndSealOrderPricing({ quoteId, orderId });

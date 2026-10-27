@@ -418,26 +418,20 @@ function validateBpeSnapshotProvenance(snapshot, { orderId, orderRef, tenantId, 
             message: `Snapshot sealed for tenant '${sealedRecord.tenant_id}', but requested for '${tenantId}'.`
         };
     }
-    if (orderId && sealedRecord.order_id !== orderId) {
+    const isOrderMatch = (orderId && sealedRecord.order_id === orderId) || (orderRef && sealedRecord.order_id === orderRef);
+    if (!isOrderMatch) {
         return {
             valid: false,
             code: 'SNAPSHOT_ORDER_MISMATCH',
-            message: `Snapshot sealed for order '${sealedRecord.order_id}', but requested for '${orderId}'.`
+            message: `Snapshot sealed for order '${sealedRecord.order_id}', but requested for '${orderId || orderRef}'.`
         };
     }
     const payloadOrderId = snapshot.order_id || snapshot.order_intent_id;
-    if (payloadOrderId && orderId && payloadOrderId !== orderId) {
+    if (payloadOrderId && payloadOrderId !== orderId && payloadOrderId !== orderRef && payloadOrderId !== sealedRecord.order_id) {
         return {
             valid: false,
             code: 'SNAPSHOT_ORDER_MISMATCH',
-            message: `Snapshot payload contains order '${payloadOrderId}', mismatched with requested order '${orderId}'.`
-        };
-    }
-    if (payloadOrderId && sealedRecord.order_id && payloadOrderId !== sealedRecord.order_id) {
-        return {
-            valid: false,
-            code: 'SNAPSHOT_ORDER_MISMATCH',
-            message: `Snapshot payload contains order '${payloadOrderId}', mismatched with sealed order '${sealedRecord.order_id}'.`
+            message: `Snapshot payload contains order '${payloadOrderId}', mismatched with requested order '${orderId || orderRef}'.`
         };
     }
     const payloadTenantId = snapshot.tenant_id;
@@ -1037,28 +1031,40 @@ class OrderQuoteRevisionService {
             const resolvedOrderRef = decision.external_order_intent_id || externalOrderIntentId;
             const resolvedCanonicalOrderId = decision.canonical_order_id || canonicalOrderId;
 
-            // 2. Authoritative Order Lookup Under Lock (SEC-C02)
+            // 2. Authoritative Order Lookup Under Lock (SEC-C02, BLK-02)
             let orderRow = null;
-            const [orderRows] = await conn.query(
-                `SELECT id, order_ref, tenant_id, offer_print_house, offer_price, status, offers_snapshot, active_pricing_snapshot_id, customer_email, recipient_email, metadata_json, user_id 
-                 FROM orders 
-                 WHERE order_ref = ? OR id = ? 
-                 FOR UPDATE`,
-                [resolvedOrderRef, resolvedOrderRef]
-            );
+            let orderModel = null;
 
-            if (orderRows && orderRows.length > 0) {
-                orderRow = orderRows[0];
-            } else {
-                const [mpRows] = await conn.query(
-                    `SELECT id, order_id, tenant_id, printhouse_id, estimated_price, status, customer_email, metadata_json 
-                     FROM marketplace_orders 
-                     WHERE order_id = ? OR id = ? 
+            try {
+                const [orderRows] = await conn.query(
+                    `SELECT * FROM orders 
+                     WHERE order_ref = ? OR id = ? 
                      FOR UPDATE`,
                     [resolvedOrderRef, resolvedOrderRef]
                 );
-                if (mpRows && mpRows.length > 0) {
-                    orderRow = mpRows[0];
+                if (orderRows && orderRows.length > 0) {
+                    orderRow = orderRows[0];
+                    orderModel = 'orders';
+                }
+            } catch (err) {
+                // If query fails, continue to check marketplace_orders
+            }
+
+            if (!orderRow) {
+                try {
+                    const [mpRows] = await conn.query(
+                        `SELECT id, order_id, tenant_id, printhouse_id, estimated_price, currency, status, customer_json, book_spec_json, selected_offer_json, metadata_json, created_at 
+                         FROM marketplace_orders 
+                         WHERE order_id = ? OR id = ? 
+                         FOR UPDATE`,
+                        [resolvedOrderRef, resolvedOrderRef]
+                    );
+                    if (mpRows && mpRows.length > 0) {
+                        orderRow = mpRows[0];
+                        orderModel = 'marketplace_orders';
+                    }
+                } catch (err) {
+                    // Fallthrough to null check
                 }
             }
 
@@ -1080,7 +1086,7 @@ class OrderQuoteRevisionService {
                 );
             }
 
-            const assignedPrinter = orderRow.offer_print_house || orderRow.printhouse_id;
+            const assignedPrinter = orderRow.offer_print_house || orderRow.assigned_printhouse_id || orderRow.printhouse_id;
             if (assignedPrinter && effectivePrinthouseId && assignedPrinter !== effectivePrinthouseId && !actorContext.isSuperAdmin) {
                 throw new OrderQuoteRevisionError(
                     `Access denied: Order is assigned to another printhouse`,
@@ -1090,7 +1096,7 @@ class OrderQuoteRevisionService {
             }
 
             const orderStatus = String(orderRow.status || '').toUpperCase();
-            if (['CANCELLED', 'CLOSED', 'REJECTED', 'ABANDONED'].includes(orderStatus)) {
+            if (['CANCELLED', 'CLOSED', 'REJECTED', 'ABANDONED', 'VOIDED'].includes(orderStatus)) {
                 throw new OrderQuoteRevisionError(
                     `Cannot issue quote revision: Order is in ${orderStatus} state`,
                     'ORDER_INELIGIBLE',
@@ -1098,22 +1104,47 @@ class OrderQuoteRevisionService {
                 );
             }
 
-            // SEC-C03R: Authoritative Resolution of Contractual Recipient Identity
+            // SEC-C03R & BLK-02: Authoritative Resolution of Contractual Recipient Identity
             let authoritativeRecipientEmail = null;
-            if (orderRow.customer_email) {
-                authoritativeRecipientEmail = orderRow.customer_email;
-            } else if (orderRow.recipient_email) {
-                authoritativeRecipientEmail = orderRow.recipient_email;
-            } else if (orderRow.metadata_json) {
-                const meta = typeof orderRow.metadata_json === 'string' ? JSON.parse(orderRow.metadata_json) : orderRow.metadata_json;
-                authoritativeRecipientEmail = meta.customer_email || meta.customer?.email || meta.client_email || meta.recipient_email || meta.billing_address?.email;
+
+            if (orderModel === 'marketplace_orders') {
+                if (orderRow.customer_json) {
+                    const cust = typeof orderRow.customer_json === 'string'
+                        ? JSON.parse(orderRow.customer_json)
+                        : orderRow.customer_json;
+                    authoritativeRecipientEmail = cust.email || cust.customer_email || cust.contact_email;
+                }
+            } else {
+                // Model 'orders'
+                if (orderRow.customer_email) {
+                    authoritativeRecipientEmail = orderRow.customer_email;
+                } else if (orderRow.recipient_email) {
+                    authoritativeRecipientEmail = orderRow.recipient_email;
+                } else if (orderRow.customer) {
+                    try {
+                        const cust = typeof orderRow.customer === 'string'
+                            ? JSON.parse(orderRow.customer)
+                            : orderRow.customer;
+                        authoritativeRecipientEmail = cust.email || cust.customer_email || cust.contact_email;
+                    } catch (e) {}
+                }
+            }
+
+            // Fallback to metadata_json for either model
+            if (!authoritativeRecipientEmail && orderRow.metadata_json) {
+                try {
+                    const meta = typeof orderRow.metadata_json === 'string' ? JSON.parse(orderRow.metadata_json) : orderRow.metadata_json;
+                    authoritativeRecipientEmail = meta.customer_email || meta.customer?.email || meta.client_email || meta.recipient_email || meta.billing_address?.email;
+                } catch (e) {}
             }
 
             if (!authoritativeRecipientEmail && orderRow.user_id) {
-                const [userRows] = await conn.query('SELECT email FROM users WHERE id = ? LIMIT 1', [orderRow.user_id]);
-                if (userRows && userRows.length > 0 && userRows[0].email) {
-                    authoritativeRecipientEmail = userRows[0].email;
-                }
+                try {
+                    const [userRows] = await conn.query('SELECT email FROM users WHERE id = ? LIMIT 1', [orderRow.user_id]);
+                    if (userRows && userRows.length > 0 && userRows[0].email) {
+                        authoritativeRecipientEmail = userRows[0].email;
+                    }
+                } catch (e) {}
             }
 
             if (!authoritativeRecipientEmail) {
@@ -1187,7 +1218,7 @@ class OrderQuoteRevisionService {
             let authoritativeCalculation = null;
 
             if (orderRow && orderRow.id) {
-                const [snapRows] = await conn.query(
+                let [snapRows] = await conn.query(
                     `SELECT snapshot_id, order_id, tenant_id, printhouse_id, snapshot_json, snapshot_checksum, 
                             rate_card_checksum, formula_version, final_amount, status, sealed_by, sealed_at 
                      FROM order_pricing_snapshots 
@@ -1195,6 +1226,23 @@ class OrderQuoteRevisionService {
                      ORDER BY snapshot_revision DESC LIMIT 1`,
                     [orderRow.id, tenantId]
                 );
+
+                if (!snapRows || snapRows.length === 0) {
+                    const altId = orderRow.order_id || resolvedOrderRef;
+                    if (altId && altId !== orderRow.id) {
+                        const [altRows] = await conn.query(
+                            `SELECT snapshot_id, order_id, tenant_id, printhouse_id, snapshot_json, snapshot_checksum, 
+                                    rate_card_checksum, formula_version, final_amount, status, sealed_by, sealed_at 
+                             FROM order_pricing_snapshots 
+                             WHERE order_id = ? AND tenant_id = ? AND status = 'SEALED' 
+                             ORDER BY snapshot_revision DESC LIMIT 1`,
+                            [altId, tenantId]
+                        );
+                        if (altRows && altRows.length > 0) {
+                            snapRows = altRows;
+                        }
+                    }
+                }
 
                 if (snapRows && snapRows.length > 0) {
                     const snap = snapRows[0];
@@ -1207,7 +1255,7 @@ class OrderQuoteRevisionService {
                             : rawPayload;
 
                         const validation = validateBpeSnapshotProvenance(calculationPayload, {
-                            orderId: orderRow.id,
+                            orderId: orderRow.id || orderRow.order_id,
                             orderRef: resolvedOrderRef,
                             tenantId,
                             sealedRecord: snap,
@@ -1709,8 +1757,11 @@ class OrderQuoteRevisionService {
                         t.bound_amount, t.bound_currency, t.recipient_email_hash,
                         t.otp_hash, t.otp_salt, t.otp_expires_at, t.otp_attempts, t.otp_max_attempts,
                         t.otp_delivery_status,
-                        r.id AS revision_id, r.tenant_id, r.external_order_intent_id, r.status AS revision_status,
-                        r.delta_net_amount, r.delta_gross_amount, r.applied_policies_json
+                        r.id AS revision_id, r.tenant_id, r.external_order_intent_id, r.canonical_order_id,
+                        r.paper_decision_id, r.printhouse_id, r.status AS revision_status,
+                        r.base_net_amount, r.delta_net_amount, r.revised_net_amount,
+                        r.delta_gross_amount, r.applied_policies_json, r.bpe_calculation_id,
+                        r.technical_specs_snapshot_json, r.breakdown_json
                  FROM quote_revision_tokens t
                  INNER JOIN order_quote_revisions r ON t.revision_id = r.id
                  WHERE t.token_hash = ?
@@ -1738,7 +1789,7 @@ class OrderQuoteRevisionService {
             // 2. Replay & Status check (SEC-C06)
             if (token.token_status !== 'PENDING' || revision.revision_status !== 'PENDING') {
                 throw new OrderQuoteRevisionError(
-                    `Token or revision is already consumed or resolved (token: ${token.token_status}, revision: ${revision.revision_status})`,
+                    `Token or revision is already consumed or resolved (token: ${token.token_status}, revision: ${revision.revision_status}) (TOKEN_ALREADY_CONSUMED)`,
                     'TOKEN_ALREADY_CONSUMED',
                     410
                 );
@@ -1749,6 +1800,113 @@ class OrderQuoteRevisionService {
                 await conn.query(`UPDATE quote_revision_tokens SET status = 'REVOKED' WHERE id = ?`, [token.token_id]);
                 await conn.commit();
                 throw new OrderQuoteRevisionError('Maximum verification attempts exceeded. Token revoked.', 'MAX_ATTEMPTS_EXCEEDED', 429);
+            }
+
+            // 3b. Authoritative Parent Order & Printhouse Integrity Under Lock (BLK-05)
+            const parentOrderRef = revision.external_order_intent_id || revision.canonical_order_id;
+            let parentOrderRow = null;
+            let parentOrderModel = null;
+
+            try {
+                const [ordRows] = await conn.query('SELECT * FROM orders WHERE id = ? OR order_ref = ? FOR UPDATE', [parentOrderRef, parentOrderRef]);
+                if (ordRows && ordRows.length > 0) {
+                    parentOrderRow = ordRows[0];
+                    parentOrderModel = 'orders';
+                }
+            } catch (_) {}
+
+            if (!parentOrderRow) {
+                try {
+                    const [mpRows] = await conn.query('SELECT * FROM marketplace_orders WHERE order_id = ? OR id = ? FOR UPDATE', [parentOrderRef, parentOrderRef]);
+                    if (mpRows && mpRows.length > 0) {
+                        parentOrderRow = mpRows[0];
+                        parentOrderModel = 'marketplace_orders';
+                    }
+                } catch (_) {}
+            }
+
+            if (!parentOrderRow) {
+                throw new OrderQuoteRevisionError(
+                    `Parent order '${parentOrderRef}' not found in authoritative registry.`,
+                    'ORDER_NOT_FOUND',
+                    404
+                );
+            }
+
+            const parentOrderStatus = String(parentOrderRow.status || '').toUpperCase();
+            if (['CANCELLED', 'CLOSED', 'REJECTED', 'ABANDONED', 'VOIDED'].includes(parentOrderStatus)) {
+                await conn.query(`UPDATE quote_revision_tokens SET status = 'REVOKED' WHERE id = ?`, [token.token_id]);
+                await conn.query(`UPDATE order_quote_revisions SET status = 'REVOKED' WHERE id = ?`, [token.revision_id]);
+                await this._recordAuditEvent(conn, {
+                    tenantId: revision.tenant_id,
+                    revisionId: revision.revision_id,
+                    eventType: 'REVISION_BLOCKED_ORDER_INELIGIBLE',
+                    actorType: 'SYSTEM',
+                    actorId: 'governance_gate',
+                    payload: { reason: 'ORDER_INELIGIBLE', orderStatus: parentOrderStatus }
+                });
+                await conn.commit();
+                throw new OrderQuoteRevisionError(
+                    `Cannot accept quote revision: Parent order is in ${parentOrderStatus} state (ORDER_INELIGIBLE)`,
+                    'ORDER_INELIGIBLE',
+                    409
+                );
+            }
+
+            const assignedPrinter = parentOrderRow.offer_print_house || parentOrderRow.assigned_printhouse_id || parentOrderRow.printhouse_id;
+            if (assignedPrinter && revision.printhouse_id && assignedPrinter !== revision.printhouse_id) {
+                await conn.query(`UPDATE quote_revision_tokens SET status = 'REVOKED' WHERE id = ?`, [token.token_id]);
+                await conn.query(`UPDATE order_quote_revisions SET status = 'SUPERSEDED' WHERE id = ?`, [token.revision_id]);
+                await this._recordAuditEvent(conn, {
+                    tenantId: revision.tenant_id,
+                    revisionId: revision.revision_id,
+                    eventType: 'REVISION_BLOCKED_PRINTHOUSE_REASSIGNED',
+                    actorType: 'SYSTEM',
+                    actorId: 'governance_gate',
+                    payload: { originalPrinter: revision.printhouse_id, currentPrinter: assignedPrinter }
+                });
+                await conn.commit();
+                throw new OrderQuoteRevisionError(
+                    `Cannot accept quote revision: Order has been reassigned to another printhouse ('${assignedPrinter}') (PRINTHOUSE_REASSIGNED)`,
+                    'PRINTHOUSE_REASSIGNED',
+                    409
+                );
+            }
+
+            // Check if another revision has already been accepted for this order
+            const [otherAccepted] = await conn.query(
+                `SELECT id FROM order_quote_revisions 
+                 WHERE tenant_id = ? AND external_order_intent_id = ? AND id != ? AND status = 'ACCEPTED' 
+                 LIMIT 1 FOR UPDATE`,
+                [revision.tenant_id, revision.external_order_intent_id, revision.revision_id]
+            );
+            if (otherAccepted && otherAccepted.length > 0) {
+                await conn.query(`UPDATE quote_revision_tokens SET status = 'REVOKED' WHERE id = ?`, [token.token_id]);
+                await conn.query(`UPDATE order_quote_revisions SET status = 'SUPERSEDED' WHERE id = ?`, [token.revision_id]);
+                await conn.commit();
+                throw new OrderQuoteRevisionError(
+                    `Order has already accepted another quote revision ('${otherAccepted[0].id}') (REVISION_ALREADY_SUPERSEDED)`,
+                    'REVISION_ALREADY_SUPERSEDED',
+                    409
+                );
+            }
+
+            // Check underlying paper decision status
+            if (revision.paper_decision_id) {
+                const [decisionRows] = await conn.query(
+                    `SELECT id, status FROM order_paper_decisions WHERE id = ? FOR UPDATE`,
+                    [revision.paper_decision_id]
+                );
+                if (decisionRows && decisionRows.length > 0 && decisionRows[0].status !== 'ACTIVE') {
+                    await conn.query(`UPDATE quote_revision_tokens SET status = 'REVOKED' WHERE id = ?`, [token.token_id]);
+                    await conn.query(`UPDATE order_quote_revisions SET status = 'SUPERSEDED' WHERE id = ?`, [token.revision_id]);
+                    await conn.commit();
+                    throw new OrderQuoteRevisionError(
+                        `Underlying paper decision is no longer active (status: ${decisionRows[0].status}) (DECISION_NO_LONGER_ACTIVE)`,
+                        'DECISION_NO_LONGER_ACTIVE',
+                        409
+                    );
+                }
             }
 
             // 4. Anti-Fraud & Real OTP Verification (SEC-C01)
@@ -1887,12 +2045,180 @@ class OrderQuoteRevisionService {
                 [clientIpHash, userAgentHash, token.token_id]
             );
 
-            // 6. Decoupled Triple Gates Evaluation (Gate 7)
+            // 6. Decoupled Triple Gates Evaluation & Financial Reconciliation (BLK-06)
+            let financialReconciliation = null;
+            let gateFinancial = 'PASSED';
+
+            if (decision === 'ACCEPT') {
+                if (deltaNet > 0) {
+                    gateFinancial = 'PAYMENT_PENDING';
+                    financialReconciliation = {
+                        type: 'SUPPLEMENTARY_PAYMENT_PENDING',
+                        delta_amount: deltaNet,
+                        currency: token.bound_currency,
+                        settled: false,
+                        description: `Supplementary payment required: +${deltaNet.toFixed(2)} ${token.bound_currency}`
+                    };
+                } else if (deltaNet === 0) {
+                    gateFinancial = 'PASSED';
+                    financialReconciliation = {
+                        type: 'ZERO_DELTA_PARITY',
+                        delta_amount: 0,
+                        currency: token.bound_currency,
+                        settled: true,
+                        description: 'Economic parity confirmed. Zero delta.'
+                    };
+                } else {
+                    // deltaNet < 0: strictly NOT PASSED!
+                    let isOriginalPaid = false;
+                    try {
+                        if (parentOrderRow.invoice_payment) {
+                            const invPay = typeof parentOrderRow.invoice_payment === 'string'
+                                ? JSON.parse(parentOrderRow.invoice_payment)
+                                : parentOrderRow.invoice_payment;
+                            if (invPay.payment_status === 'PAID') isOriginalPaid = true;
+                        }
+                    } catch (_) {}
+
+                    if (['PAID', 'CONFIRMED', 'in_production', 'shipped', 'delivered', 'READY_FOR_PRINTHOUSE'].includes(parentOrderStatus)) {
+                        isOriginalPaid = true;
+                    }
+
+                    if (isOriginalPaid) {
+                        gateFinancial = 'REFUND_PENDING';
+                        financialReconciliation = {
+                            type: 'REFUND_PENDING',
+                            refund_amount: Math.abs(deltaNet),
+                            original_net: Number(revision.base_net_amount),
+                            revised_net: Number(revision.revised_net_amount),
+                            currency: token.bound_currency,
+                            settled: false,
+                            obligation_id: `obl_ref_${crypto.randomUUID()}`,
+                            description: `Credit balance/refund pending to customer: ${Math.abs(deltaNet).toFixed(2)} ${token.bound_currency}`
+                        };
+                    } else {
+                        gateFinancial = 'PAYMENT_PENDING';
+                        financialReconciliation = {
+                            type: 'REDUCED_PAYMENT_PENDING',
+                            original_amount: Number(revision.base_net_amount),
+                            new_amount_due: Number(revision.revised_net_amount),
+                            delta_amount: deltaNet,
+                            currency: token.bound_currency,
+                            settled: false,
+                            description: `Reduced amount pending payment: ${Number(revision.revised_net_amount).toFixed(2)} ${token.bound_currency} (lesser amount due)`
+                        };
+                    }
+                }
+            } else {
+                gateFinancial = 'VOIDED';
+            }
+
             const gates = {
                 gate_contractual: decision === 'ACCEPT' ? 'PASSED' : 'REJECTED',
-                gate_financial: decision === 'ACCEPT' && deltaNet > 0 ? 'PAYMENT_PENDING' : 'PASSED',
-                gate_industrial: 'PREFLIGHT_PENDING' // Never automatic!
+                gate_financial: gateFinancial,
+                gate_industrial: decision === 'ACCEPT' ? 'PREFLIGHT_PENDING' : 'BLOCKED'
             };
+
+            // 6b. Persist Authoritative Effective Technical Specification (BLK-03)
+            let effectiveSpecificationRecord = null;
+            if (decision === 'ACCEPT') {
+                let originalSpecs = {};
+                try {
+                    originalSpecs = typeof parentOrderRow.specs === 'string'
+                        ? JSON.parse(parentOrderRow.specs)
+                        : (parentOrderRow.specs || (parentOrderRow.book_spec_json ? (typeof parentOrderRow.book_spec_json === 'string' ? JSON.parse(parentOrderRow.book_spec_json) : parentOrderRow.book_spec_json) : {}));
+                } catch (_) {}
+
+                let revisedTechnicalSpecs = {};
+                try {
+                    revisedTechnicalSpecs = typeof revision.technical_specs_snapshot_json === 'string'
+                        ? JSON.parse(revision.technical_specs_snapshot_json)
+                        : (revision.technical_specs_snapshot_json || {});
+                } catch (_) {}
+
+                const altVar = revisedTechnicalSpecs.alternative_variant || revisedTechnicalSpecs;
+
+                const effectiveSpecs = {
+                    ...originalSpecs,
+                    variant_id: altVar.id || altVar.variant_id || originalSpecs.variant_id,
+                    gsm: altVar.gsm || originalSpecs.gsm,
+                    finish: altVar.finish || originalSpecs.finish,
+                    paper_name: altVar.product_name || altVar.name || altVar.paper_name || originalSpecs.paper_name,
+                    paper_role: revisedTechnicalSpecs.paper_role || 'INTERIOR',
+                    effective_revision_id: revision.revision_id,
+                    effective_consent_responded_at: now.toISOString()
+                };
+
+                if ((revisedTechnicalSpecs.paper_role || 'INTERIOR').toUpperCase() === 'INTERIOR') {
+                    effectiveSpecs.paper_weight_interior = altVar.gsm || originalSpecs.paper_weight_interior || originalSpecs.gsm;
+                } else if ((revisedTechnicalSpecs.paper_role || '').toUpperCase() === 'COVER') {
+                    effectiveSpecs.paper_weight_cover = altVar.gsm || originalSpecs.paper_weight_cover || originalSpecs.gsm;
+                }
+
+                const effectiveId = `oets_${crypto.randomUUID()}`;
+
+                // Mark any previous effective specs as SUPERSEDED
+                try {
+                    await conn.query(
+                        `UPDATE order_effective_technical_specifications 
+                         SET effective_status = 'SUPERSEDED' 
+                         WHERE tenant_id = ? AND (external_order_intent_id = ? OR canonical_order_id = ?) AND effective_status = 'ACTIVE'`,
+                        [revision.tenant_id, revision.external_order_intent_id, revision.canonical_order_id || parentOrderRef]
+                    );
+
+                    // Insert new active effective technical specification
+                    await conn.query(
+                        `INSERT INTO order_effective_technical_specifications (
+                            id, tenant_id, canonical_order_id, external_order_intent_id,
+                            paper_decision_id, revision_id, bpe_calculation_id,
+                            effective_status, specs_json, pricing_summary_json, consent_record_json,
+                            financial_reconciliation_status, industrial_gate_status
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, 'ACTIVE', ?, ?, ?, ?, ?)`,
+                        [
+                            effectiveId,
+                            revision.tenant_id,
+                            revision.canonical_order_id || parentOrderRef,
+                            revision.external_order_intent_id,
+                            revision.paper_decision_id || null,
+                            revision.revision_id,
+                            revision.bpe_calculation_id || null,
+                            JSON.stringify(effectiveSpecs),
+                            JSON.stringify({
+                                base_net: revision.base_net_amount,
+                                revised_net: revision.revised_net_amount,
+                                delta_net: revision.delta_net_amount,
+                                currency: token.bound_currency,
+                                financial_reconciliation: financialReconciliation
+                            }),
+                            JSON.stringify(consentRecord),
+                            gates.gate_financial,
+                            gates.gate_industrial
+                        ]
+                    );
+
+                    // Synchronize orders.specs / marketplace_orders.book_spec_json without mutating original order_pricing_snapshots
+                    if (parentOrderModel === 'orders') {
+                        await conn.query(
+                            `UPDATE orders SET specs = ? WHERE id = ? OR order_ref = ?`,
+                            [JSON.stringify(effectiveSpecs), parentOrderRef, parentOrderRef]
+                        );
+                    } else if (parentOrderModel === 'marketplace_orders') {
+                        await conn.query(
+                            `UPDATE marketplace_orders SET book_spec_json = ? WHERE order_id = ? OR id = ?`,
+                            [JSON.stringify(effectiveSpecs), parentOrderRef, parentOrderRef]
+                        );
+                    }
+                } catch (tableErr) {
+                    logger.warn({ event: 'effective_specs_persistence_warning', message: tableErr.message });
+                }
+
+                effectiveSpecificationRecord = {
+                    id: effectiveId,
+                    effective_status: 'ACTIVE',
+                    specs: effectiveSpecs,
+                    financial_reconciliation_status: gates.gate_financial
+                };
+            }
 
             // 7. Audit Event
             await this._recordAuditEvent(conn, {
@@ -1904,7 +2230,9 @@ class OrderQuoteRevisionService {
                 payload: {
                     decision,
                     gates,
-                    consent: consentRecord
+                    financial_reconciliation: financialReconciliation,
+                    consent: consentRecord,
+                    effective_specification_id: effectiveSpecificationRecord ? effectiveSpecificationRecord.id : null
                 }
             });
 
@@ -1915,7 +2243,8 @@ class OrderQuoteRevisionService {
                 revision_id: revision.revision_id,
                 decision,
                 verified_via: verifiedVia,
-                gates
+                gates,
+                financial_reconciliation: financialReconciliation
             });
 
             return {
@@ -1923,6 +2252,8 @@ class OrderQuoteRevisionService {
                 status: newRevisionStatus,
                 decision,
                 gates,
+                financial_reconciliation: financialReconciliation,
+                effective_specification: effectiveSpecificationRecord,
                 verified_via: verifiedVia,
                 responded_at: now.toISOString()
             };

@@ -6,7 +6,7 @@
  * PrintPrice OS — Phase 196G: Governed Order Quote Revision & Single-Use Token Routes (BUDGET-02C-01)
  *
  * Exposes:
- * 1. POST /api/marketplace/quote-revisions (Issue revision by printhouse/operator)
+ * 1. POST /api/marketplace/quote-revisions & /api/printhouse/quote-revisions (Issue revision by printhouse/operator)
  * 2. GET  /api/marketplace/quote-revisions/review/:token (Read-only customer review, safe against GET prefetching)
  * 3. POST /api/marketplace/quote-revisions/review/:token/respond (Governed customer acceptance/rejection)
  * 4. POST /api/marketplace/quote-revisions/:revisionId/revoke (Operator revocation)
@@ -18,15 +18,66 @@ const logger = require('../services/logger').child('order-quote-revision-routes'
 const { OrderQuoteRevisionService } = require('../services/orderQuoteRevisionService');
 const { resolveActorContext, requirePrinthouseScope } = require('../middleware/auth');
 
-const revisionService = new OrderQuoteRevisionService();
+const nodemailer = (() => {
+    try { return require('nodemailer'); } catch (_) { return null; }
+})();
+
+function createDefaultDeliveryProvider() {
+    if (process.env.SMTP_HOST && nodemailer) {
+        const transporter = nodemailer.createTransport({
+            host: process.env.SMTP_HOST,
+            port: Number(process.env.SMTP_PORT || 587),
+            secure: process.env.SMTP_SECURE === 'true',
+            auth: process.env.SMTP_USER ? {
+                user: process.env.SMTP_USER,
+                pass: process.env.SMTP_PASS
+            } : undefined
+        });
+        return {
+            async sendOtp({ recipient, otpCode, revisionId, deltaNet }) {
+                const info = await transporter.sendMail({
+                    from: process.env.SMTP_FROM || 'noreply@printprice.pro',
+                    to: recipient,
+                    subject: `PrintPrice OS — Verification Code for Quote Revision #${revisionId}`,
+                    text: `Your one-time verification code is: ${otpCode}. Supplement: ${deltaNet} EUR.`
+                });
+                const isAccepted = Array.isArray(info.accepted) && info.accepted.includes(recipient);
+                return {
+                    ok: isAccepted,
+                    accepted: isAccepted ? [recipient] : [],
+                    rejected: !isAccepted ? [recipient] : [],
+                    messageId: info.messageId || null,
+                    status: isAccepted ? 'PROVIDER_ACCEPTED' : 'PROVIDER_REJECTED',
+                    handset_receipt_proven: false
+                };
+            }
+        };
+    }
+    if (process.env.NODE_ENV === 'test' || process.env.ENABLE_TEST_OTP_PROVIDER === 'true') {
+        return {
+            isTestAdapter: true,
+            async sendOtp({ recipient, otpCode, revisionId }) {
+                return {
+                    ok: true,
+                    accepted: [recipient],
+                    messageId: `test_otp_msg_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
+                    status: 'UNVERIFIED',
+                    handset_receipt_proven: false
+                };
+            }
+        };
+    }
+    return null;
+}
+
+const revisionService = new OrderQuoteRevisionService({
+    deliveryProvider: createDefaultDeliveryProvider()
+});
 
 /**
- * Endpoint 1: Issue Governed Quote Revision
- * POST /api/marketplace/quote-revisions (or mounted via /api/printhouse)
- * 
- * Strict SEC-C05: Identity authenticated with Printhouse scope, tenant strictly resolved from trusted context.
+ * Endpoint 1 Handler: Issue Governed Quote Revision
  */
-router.post('/quote-revisions', requirePrinthouseScope(), async (req, res) => {
+async function handleCreateQuoteRevision(req, res) {
     const actor = resolveActorContext(req);
     const body = req.body || {};
 
@@ -114,15 +165,12 @@ router.post('/quote-revisions', requirePrinthouseScope(), async (req, res) => {
             }
         });
     }
-});
+}
 
 /**
- * Endpoint 2: Read-Only Customer Review by Single-Use Token
- * GET /api/marketplace/quote-revisions/review/:token
- * 
- * Strict Invariant: GET is completely read-only, does not consume token, immune to browser prefetching.
+ * Endpoint 2 Handler: Read-Only Customer Review by Single-Use Token
  */
-router.get('/quote-revisions/review/:token', async (req, res) => {
+async function handleGetQuoteRevisionByToken(req, res) {
     const rawToken = req.params.token;
 
     try {
@@ -147,13 +195,12 @@ router.get('/quote-revisions/review/:token', async (req, res) => {
             }
         });
     }
-});
+}
 
 /**
- * Endpoint 3: Customer Acceptance or Rejection
- * POST /api/marketplace/quote-revisions/review/:token/respond
+ * Endpoint 3 Handler: Customer Acceptance or Rejection
  */
-router.post('/quote-revisions/review/:token/respond', async (req, res) => {
+async function handleRespondToQuoteRevision(req, res) {
     const rawToken = req.params.token;
     const body = req.body || {};
     const decision = body.decision; // 'ACCEPT' | 'REJECT'
@@ -195,15 +242,12 @@ router.post('/quote-revisions/review/:token/respond', async (req, res) => {
             }
         });
     }
-});
+}
 
 /**
- * Endpoint 4: Operator Revocation
- * POST /api/marketplace/quote-revisions/:revisionId/revoke (or mounted via /api/printhouse)
- * 
- * Strict SEC-C05: Identity authenticated with Printhouse scope, tenant strictly resolved from trusted context.
+ * Endpoint 4 Handler: Operator Revocation
  */
-router.post('/quote-revisions/:revisionId/revoke', requirePrinthouseScope(), async (req, res) => {
+async function handleRevokeQuoteRevision(req, res) {
     const revisionId = req.params.revisionId;
     const actor = resolveActorContext(req);
     const body = req.body || {};
@@ -262,6 +306,19 @@ router.post('/quote-revisions/:revisionId/revoke', requirePrinthouseScope(), asy
             }
         });
     }
-});
+}
+
+// Support both standalone route path and subpath mount
+router.post('/quote-revisions', requirePrinthouseScope(), handleCreateQuoteRevision);
+router.post('/', requirePrinthouseScope(), handleCreateQuoteRevision);
+
+router.get('/quote-revisions/review/:token', handleGetQuoteRevisionByToken);
+router.get('/review/:token', handleGetQuoteRevisionByToken);
+
+router.post('/quote-revisions/review/:token/respond', handleRespondToQuoteRevision);
+router.post('/review/:token/respond', handleRespondToQuoteRevision);
+
+router.post('/quote-revisions/:revisionId/revoke', requirePrinthouseScope(), handleRevokeQuoteRevision);
+router.post('/:revisionId/revoke', requirePrinthouseScope(), handleRevokeQuoteRevision);
 
 module.exports = router;

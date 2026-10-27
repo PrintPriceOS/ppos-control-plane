@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-10-27T20:07:56.679Z",
+  "generatedAt": "2026-10-27T21:23:21.027Z",
   "hashAlgorithm": "sha256",
   "contentNormalization": "utf8-lf-v1",
   "approvedPrefixCollisions": {
@@ -2277,6 +2277,19 @@
       "canonicalSha256": "d87f3c91beac927575013ab02215d1b581bfc3e15aa6a939d87d91dea621fa48",
       "contentNormalization": "utf8-lf-v1",
       "sizeBytes": 2111,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/170_phase196i_order_effective_technical_specifications.sql",
+      "prefix": "170",
+      "canonicalSha256": "e057231f0af9473c1693b7beca6fba972f6133542eaa8ac86071931c27138af2",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 2086,
       "containsDdl": true,
       "containsDml": true,
       "containsTransaction": false,
