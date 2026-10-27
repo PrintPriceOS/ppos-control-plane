@@ -174,8 +174,113 @@ async function runRealConcurrencyCertification() {
         await connA.end();
         await connB.end();
 
-        // 6. Test Idempotency Key Uniqueness on Real MySQL
-        console.log(`\n[STEP 6] Testing idempotency key uniqueness constraint on real MySQL...`);
+        // 6. Real MySQL 8 Order Cancellation & Reassignment Race Under Row Lock (R-02)
+        console.log(`\n[STEP 6] Testing Order Cancellation & Reassignment Race Under Row Lock (R-02)...`);
+        await adminConn.query(`
+            INSERT INTO orders VALUES 
+            ('ord_race_cancel', 'job_race_cancel', 'tenant_books_es', 'print_madrid', 1782.30, 'IN_PREPARATION'),
+            ('ord_race_reassign', 'job_race_reassign', 'tenant_books_es', 'print_madrid', 1782.30, 'IN_PREPARATION')
+        `);
+
+        const raceConn1 = await mysql.createConnection({
+            host: MYSQL_HOST, port: MYSQL_PORT, user: MYSQL_USER, password: MYSQL_PASSWORD, database: EPHEMERAL_DB
+        });
+        const raceConn2 = await mysql.createConnection({
+            host: MYSQL_HOST, port: MYSQL_PORT, user: MYSQL_USER, password: MYSQL_PASSWORD, database: EPHEMERAL_DB
+        });
+
+        // Test 6.1: Cancellation Race
+        console.log('Testing cancellation race: Conn 1 cancels while Conn 2 acquires lock...');
+        await raceConn1.beginTransaction();
+        await raceConn1.query(`SELECT id, status FROM orders WHERE id = 'ord_race_cancel' FOR UPDATE`);
+        await raceConn1.query(`UPDATE orders SET status = 'CANCELLED' WHERE id = 'ord_race_cancel'`);
+
+        // Conn 2 starts in parallel; will block on orders row lock until Conn 1 commits
+        let conn2LockedStatus = null;
+        let conn2RejectedWithIneligible = false;
+        const conn2Promise = (async () => {
+            await raceConn2.beginTransaction();
+            const [lockedRows] = await raceConn2.query(
+                `SELECT id, order_ref, tenant_id, offer_print_house, offer_price, status 
+                 FROM orders 
+                 WHERE id = 'ord_race_cancel' 
+                 FOR UPDATE`
+            );
+            conn2LockedStatus = lockedRows[0].status;
+            if (lockedRows[0].status === 'CANCELLED') {
+                conn2RejectedWithIneligible = true;
+                await raceConn2.rollback();
+            } else {
+                // Should never happen because Conn 1 cancelled it
+                await raceConn2.query(insertDecisionSql, ['dec_cancelled_' + Date.now(), 'key_cancelled_' + Date.now()]);
+                await raceConn2.commit();
+            }
+        })();
+
+        // Give conn 2 time to queue behind row lock, then commit conn 1
+        await new Promise(r => setTimeout(r, 50));
+        await raceConn1.commit();
+        await conn2Promise;
+
+        console.log(`[PASS] Conn 2 read locked order status: '${conn2LockedStatus}'`);
+        if (!conn2RejectedWithIneligible) {
+            throw new Error('CRITICAL R-02 FAILURE: Conn 2 failed to reject cancelled order under lock');
+        }
+        const [cancelDecRows] = await adminConn.query(
+            `SELECT COUNT(*) as cnt FROM order_paper_decisions WHERE canonical_order_id = 'job_race_cancel'`
+        );
+        if (cancelDecRows[0].cnt !== 0) {
+            throw new Error('CRITICAL R-02 FAILURE: Decision was written for cancelled order');
+        }
+        console.log(`[PASS] Zero decisions recorded for cancelled order under lock race.`);
+
+        // Test 6.2: Reassignment Race
+        console.log('Testing reassignment race: Conn 1 reassigns while Conn 2 acquires lock...');
+        await raceConn1.beginTransaction();
+        await raceConn1.query(`SELECT id, offer_print_house FROM orders WHERE id = 'ord_race_reassign' FOR UPDATE`);
+        await raceConn1.query(`UPDATE orders SET offer_print_house = 'print_barcelona' WHERE id = 'ord_race_reassign'`);
+
+        let conn2LockedPrinthouse = null;
+        let conn2RejectedWithUnauthorized = false;
+        const conn2ReassignPromise = (async () => {
+            await raceConn2.beginTransaction();
+            const [lockedRows] = await raceConn2.query(
+                `SELECT id, order_ref, tenant_id, offer_print_house, offer_price, status 
+                 FROM orders 
+                 WHERE id = 'ord_race_reassign' 
+                 FOR UPDATE`
+            );
+            conn2LockedPrinthouse = lockedRows[0].offer_print_house;
+            // Caller printhouse was 'print_madrid'; order was reassigned to 'print_barcelona'
+            if (lockedRows[0].offer_print_house !== 'print_madrid') {
+                conn2RejectedWithUnauthorized = true;
+                await raceConn2.rollback();
+            } else {
+                await raceConn2.commit();
+            }
+        })();
+
+        await new Promise(r => setTimeout(r, 50));
+        await raceConn1.commit();
+        await conn2ReassignPromise;
+
+        console.log(`[PASS] Conn 2 read locked printhouse: '${conn2LockedPrinthouse}'`);
+        if (!conn2RejectedWithUnauthorized) {
+            throw new Error('CRITICAL R-02 FAILURE: Conn 2 failed to reject reassigned order under lock');
+        }
+        const [reassignDecRows] = await adminConn.query(
+            `SELECT COUNT(*) as cnt FROM order_paper_decisions WHERE canonical_order_id = 'job_race_reassign'`
+        );
+        if (reassignDecRows[0].cnt !== 0) {
+            throw new Error('CRITICAL R-02 FAILURE: Decision was written for reassigned order');
+        }
+        console.log(`[PASS] Zero decisions recorded for reassigned order under lock race.`);
+
+        await raceConn1.end();
+        await raceConn2.end();
+
+        // 7. Test Idempotency Key Uniqueness on Real MySQL
+        console.log(`\n[STEP 7] Testing idempotency key uniqueness constraint on real MySQL...`);
         let idempotencyDupCaught = false;
         try {
             await adminConn.query(insertDecisionSql, ['dec_c_' + Date.now(), 'idem_duplicate_key']);
@@ -190,8 +295,8 @@ async function runRealConcurrencyCertification() {
             throw new Error('Expected ER_DUP_ENTRY for duplicate idempotency key on real MySQL');
         }
 
-        // 7. Test Rollback Script
-        console.log(`\n[STEP 7] Executing rollback script...`);
+        // 8. Test Rollback Script
+        console.log(`\n[STEP 8] Executing rollback script...`);
         const rollbackPath = path.resolve(__dirname, '../migrations/rollback/rollback_167_phase196f_order_paper_decisions.sql');
         const rollbackSql = fs.readFileSync(rollbackPath, 'utf8');
         await adminConn.query(rollbackSql);

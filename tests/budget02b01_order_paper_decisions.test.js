@@ -189,6 +189,10 @@ describe('BUDGET-02B-01R — Remediated Paper Decisions Domain Service & API Cer
 
                 // 2. SELECT order (lookup or row lock)
                 if (normSql.includes('FROM orders WHERE order_ref = ? OR id = ?') || normSql.includes('FROM orders WHERE id = ? FOR UPDATE')) {
+                    if (normSql.includes('FOR UPDATE') && typeof mockDb.onOrderLock === 'function') {
+                        mockDb.onOrderLock();
+                        mockDb.onOrderLock = null;
+                    }
                     const ref = params[0];
                     const ord = mockDb.orders.find(o => o.order_ref === ref || o.id === ref);
                     return ord ? [[{ ...ord }]] : [[]];
@@ -196,6 +200,10 @@ describe('BUDGET-02B-01R — Remediated Paper Decisions Domain Service & API Cer
 
                 // 3. SELECT marketplace_orders
                 if (normSql.includes('FROM marketplace_orders WHERE order_id = ? OR id = ?') || normSql.includes('FROM marketplace_orders WHERE id = ? FOR UPDATE')) {
+                    if (normSql.includes('FOR UPDATE') && typeof mockDb.onOrderLock === 'function') {
+                        mockDb.onOrderLock();
+                        mockDb.onOrderLock = null;
+                    }
                     const ref = params[0];
                     const mp = mockDb.marketplace_orders.find(o => o.order_id === ref || o.id === ref);
                     return mp ? [[{ ...mp }]] : [[]];
@@ -856,6 +864,311 @@ describe('BUDGET-02B-01R — Remediated Paper Decisions Domain Service & API Cer
             assert.strictEqual(getBody().decision.decision_action, 'CONFIRM');
             assert.strictEqual(getBody().decision.economic_status, 'DELTA_ZERO_CONFIRMED');
             assert(getBody().decision.payload_fingerprint, 'Must include canonical payload fingerprint');
+        });
+    });
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // REMEDIATION R-01: COMPLETE CANONICAL FINGERPRINTING & METADATA NORMALIZATION
+    // ─────────────────────────────────────────────────────────────────────────
+    describe('R-01 — Complete Canonical Fingerprinting & Metadata Normalization', () => {
+        it('R-01.1: detects collision when printhouseNotes is altered for the same idempotency key', async () => {
+            const key = 'idem_notes_collision_test';
+            const basePayload = {
+                tenantId: 'tenant_books_es',
+                printhouseId: 'print_artes_graficas_madrid',
+                operatorId: 'operator_carlos',
+                jobId: 'job_bpe_1782',
+                externalOrderIntentId: 'intent_notes_test',
+                paperRole: 'INTERIOR',
+                decisionAction: 'CONFIRM',
+                requestedVariantId: 'var_coral_90_70x100',
+                printhouseNotes: 'Original note: paper available in warehouse rack A',
+                idempotencyKey: key
+            };
+
+            await orderPaperDecisionService.recordDecision(basePayload);
+
+            // Replay with altered printhouseNotes
+            const alteredPayload = {
+                ...basePayload,
+                printhouseNotes: 'Altered note: paper available in rack B'
+            };
+
+            await assert.rejects(
+                async () => orderPaperDecisionService.recordDecision(alteredPayload),
+                err => {
+                    assert.strictEqual(err.code, 'IDEMPOTENCY_KEY_COLLISION');
+                    assert.strictEqual(err.statusCode, 409);
+                    assert(!err.message.includes('rack A'), 'Must not leak original notes');
+                    return true;
+                }
+            );
+        });
+
+        it('R-01.2: detects collision when metadata payload values are altered', async () => {
+            const key = 'idem_meta_collision_test';
+            const basePayload = {
+                tenantId: 'tenant_books_es',
+                printhouseId: 'print_artes_graficas_madrid',
+                operatorId: 'operator_carlos',
+                jobId: 'job_bpe_1782',
+                externalOrderIntentId: 'intent_meta_test',
+                paperRole: 'INTERIOR',
+                decisionAction: 'CONFIRM',
+                requestedVariantId: 'var_coral_90_70x100',
+                metadata: { inspection_batch: 'BATCH-2026-X', inspector_certified: true },
+                idempotencyKey: key
+            };
+
+            await orderPaperDecisionService.recordDecision(basePayload);
+
+            // Replay with different inspection_batch in metadata
+            const alteredPayload = {
+                ...basePayload,
+                metadata: { inspection_batch: 'BATCH-2026-DIFFERENT', inspector_certified: true }
+            };
+
+            await assert.rejects(
+                async () => orderPaperDecisionService.recordDecision(alteredPayload),
+                err => {
+                    assert.strictEqual(err.code, 'IDEMPOTENCY_KEY_COLLISION');
+                    assert.strictEqual(err.statusCode, 409);
+                    assert(!err.message.includes('BATCH-2026-X'), 'Must not leak original metadata');
+                    return true;
+                }
+            );
+        });
+
+        it('R-01.3: exact replay succeeds when metadata keys are unordered or notes match with whitespace trimmed', async () => {
+            const key = 'idem_meta_exact_test';
+            const payload1 = {
+                tenantId: 'tenant_books_es',
+                printhouseId: 'print_artes_graficas_madrid',
+                operatorId: 'operator_carlos',
+                jobId: 'job_bpe_1782',
+                externalOrderIntentId: 'intent_unordered_test',
+                paperRole: 'COVER',
+                decisionAction: 'CONFIRM',
+                requestedVariantId: 'var_coral_90_70x100',
+                printhouseNotes: 'Verified stock with supplier',
+                metadata: { zeta: 100, alpha: 200, beta: { sub_z: true, sub_a: 'nested' } },
+                idempotencyKey: key
+            };
+
+            // Payload 2 has same data but keys in reverse order in metadata
+            const payload2 = {
+                ...payload1,
+                printhouseNotes: 'Verified stock with supplier   ',
+                metadata: { beta: { sub_a: 'nested', sub_z: true }, alpha: 200, zeta: 100 }
+            };
+
+            const r1 = await orderPaperDecisionService.recordDecision(payload1);
+            assert.strictEqual(r1.idempotent_replay, false);
+
+            const r2 = await orderPaperDecisionService.recordDecision(payload2);
+            assert.strictEqual(r2.idempotent_replay, true);
+            assert.strictEqual(r1.id, r2.id);
+            assert.strictEqual(r1.payload_fingerprint, r2.payload_fingerprint);
+        });
+
+        it('R-01.4: rejects printhouseNotes exceeding 2000 characters and non-string types', async () => {
+            const key = 'idem_invalid_notes_test';
+            const longNotes = 'A'.repeat(2001);
+            const payload = {
+                tenantId: 'tenant_books_es',
+                printhouseId: 'print_artes_graficas_madrid',
+                operatorId: 'operator_carlos',
+                jobId: 'job_bpe_1782',
+                externalOrderIntentId: 'intent_invalid_notes',
+                paperRole: 'INTERIOR',
+                decisionAction: 'CONFIRM',
+                requestedVariantId: 'var_coral_90_70x100',
+                printhouseNotes: longNotes,
+                idempotencyKey: key
+            };
+
+            await assert.rejects(
+                async () => orderPaperDecisionService.recordDecision(payload),
+                err => {
+                    assert.strictEqual(err.code, 'INVALID_NOTES_LENGTH');
+                    assert.strictEqual(err.statusCode, 400);
+                    return true;
+                }
+            );
+
+            // Non-string notes
+            await assert.rejects(
+                async () => orderPaperDecisionService.recordDecision({ ...payload, printhouseNotes: 12345 }),
+                err => {
+                    assert.strictEqual(err.code, 'INVALID_NOTES_TYPE');
+                    assert.strictEqual(err.statusCode, 400);
+                    return true;
+                }
+            );
+        });
+
+        it('R-01.5: rejects invalid metadata types (non-object) and non-finite numbers', async () => {
+            const basePayload = {
+                tenantId: 'tenant_books_es',
+                printhouseId: 'print_artes_graficas_madrid',
+                operatorId: 'operator_carlos',
+                jobId: 'job_bpe_1782',
+                externalOrderIntentId: 'intent_invalid_meta',
+                paperRole: 'INTERIOR',
+                decisionAction: 'CONFIRM',
+                requestedVariantId: 'var_coral_90_70x100',
+                idempotencyKey: 'idem_invalid_meta_test'
+            };
+
+            // Array as metadata
+            await assert.rejects(
+                async () => orderPaperDecisionService.recordDecision({ ...basePayload, metadata: ['not', 'object'] }),
+                err => {
+                    assert.strictEqual(err.code, 'INVALID_METADATA_TYPE');
+                    assert.strictEqual(err.statusCode, 400);
+                    return true;
+                }
+            );
+
+            // NaN in metadata
+            await assert.rejects(
+                async () => orderPaperDecisionService.recordDecision({ ...basePayload, metadata: { score: NaN } }),
+                err => {
+                    assert.strictEqual(err.code, 'INVALID_METADATA_VALUE');
+                    assert.strictEqual(err.statusCode, 400);
+                    return true;
+                }
+            );
+        });
+    });
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // REMEDIATION R-02: AUTHORIZATION AND STATE UNDER SELECT FOR UPDATE LOCK
+    // ─────────────────────────────────────────────────────────────────────────
+    describe('R-02 — Authorization and Order State Verification Under SELECT FOR UPDATE Lock', () => {
+        it('R-02.1: rejects decision if order was CANCELLED while acquiring the row lock', async () => {
+            const payload = {
+                tenantId: 'tenant_books_es',
+                printhouseId: 'print_artes_graficas_madrid',
+                operatorId: 'operator_carlos',
+                jobId: 'job_bpe_1782',
+                externalOrderIntentId: 'intent_race_cancel',
+                paperRole: 'INTERIOR',
+                decisionAction: 'CONFIRM',
+                requestedVariantId: 'var_coral_90_70x100',
+                idempotencyKey: 'idem_race_cancel_01'
+            };
+
+            // Intercept the FOR UPDATE row lock to simulate concurrent cancellation
+            mockDb.onOrderLock = () => {
+                const order = mockDb.orders.find(o => o.order_ref === 'job_bpe_1782');
+                order.status = 'CANCELLED';
+            };
+
+            await assert.rejects(
+                async () => orderPaperDecisionService.recordDecision(payload),
+                err => {
+                    assert.strictEqual(err.code, 'ORDER_INELIGIBLE');
+                    assert.strictEqual(err.statusCode, 422);
+                    assert(err.message.includes('(under lock)'), 'Must indicate failure under lock acquisition');
+                    return true;
+                }
+            );
+
+            // Verify no decision was recorded in database
+            const decisions = mockDb.order_paper_decisions.filter(d => d.external_order_intent_id === 'intent_race_cancel');
+            assert.strictEqual(decisions.length, 0);
+        });
+
+        it('R-02.2: rejects decision if order was REASSIGNED to another printhouse while acquiring row lock', async () => {
+            const payload = {
+                tenantId: 'tenant_books_es',
+                printhouseId: 'print_artes_graficas_madrid',
+                operatorId: 'operator_carlos',
+                jobId: 'job_bpe_1782',
+                externalOrderIntentId: 'intent_race_reassign',
+                paperRole: 'INTERIOR',
+                decisionAction: 'CONFIRM',
+                requestedVariantId: 'var_coral_90_70x100',
+                idempotencyKey: 'idem_race_reassign_01'
+            };
+
+            // Intercept the FOR UPDATE row lock to simulate concurrent reassignment
+            mockDb.onOrderLock = () => {
+                const order = mockDb.orders.find(o => o.order_ref === 'job_bpe_1782');
+                order.offer_print_house = 'print_competitor_valencia';
+            };
+
+            await assert.rejects(
+                async () => orderPaperDecisionService.recordDecision(payload, { isSuperAdmin: false }),
+                err => {
+                    assert.strictEqual(err.code, 'PRINTHOUSE_UNAUTHORIZED');
+                    assert.strictEqual(err.statusCode, 403);
+                    assert(err.message.includes('(under lock)'), 'Must indicate failure under lock acquisition');
+                    return true;
+                }
+            );
+
+            const decisions = mockDb.order_paper_decisions.filter(d => d.external_order_intent_id === 'intent_race_reassign');
+            assert.strictEqual(decisions.length, 0);
+        });
+
+        it('R-02.3: rejects decision if order was UNASSIGNED while acquiring row lock', async () => {
+            const payload = {
+                tenantId: 'tenant_books_es',
+                printhouseId: 'print_artes_graficas_madrid',
+                operatorId: 'operator_carlos',
+                jobId: 'job_bpe_1782',
+                externalOrderIntentId: 'intent_race_unassign',
+                paperRole: 'INTERIOR',
+                decisionAction: 'CONFIRM',
+                requestedVariantId: 'var_coral_90_70x100',
+                idempotencyKey: 'idem_race_unassign_01'
+            };
+
+            mockDb.onOrderLock = () => {
+                const order = mockDb.orders.find(o => o.order_ref === 'job_bpe_1782');
+                order.offer_print_house = null;
+            };
+
+            await assert.rejects(
+                async () => orderPaperDecisionService.recordDecision(payload, { isSuperAdmin: false }),
+                err => {
+                    assert.strictEqual(err.code, 'PRINTHOUSE_UNASSIGNED');
+                    assert.strictEqual(err.statusCode, 422);
+                    assert(err.message.includes('(under lock)'));
+                    return true;
+                }
+            );
+        });
+
+        it('R-02.4: rejects decision if order tenant was changed while acquiring row lock', async () => {
+            const payload = {
+                tenantId: 'tenant_books_es',
+                printhouseId: 'print_artes_graficas_madrid',
+                operatorId: 'operator_carlos',
+                jobId: 'job_bpe_1782',
+                externalOrderIntentId: 'intent_race_tenant',
+                paperRole: 'INTERIOR',
+                decisionAction: 'CONFIRM',
+                requestedVariantId: 'var_coral_90_70x100',
+                idempotencyKey: 'idem_race_tenant_01'
+            };
+
+            mockDb.onOrderLock = () => {
+                const order = mockDb.orders.find(o => o.order_ref === 'job_bpe_1782');
+                order.tenant_id = 'tenant_completely_different';
+            };
+
+            await assert.rejects(
+                async () => orderPaperDecisionService.recordDecision(payload, { isSuperAdmin: false }),
+                err => {
+                    assert.strictEqual(err.code, 'TENANT_MISMATCH');
+                    assert.strictEqual(err.statusCode, 403);
+                    assert(err.message.includes('(under lock)'));
+                    return true;
+                }
+            );
         });
     });
 });
