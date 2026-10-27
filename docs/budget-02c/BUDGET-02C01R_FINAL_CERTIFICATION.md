@@ -6,7 +6,7 @@
 **Pull Request:** PR #8 (`feat/budget-02c01-quote-revisions`)  
 **Estado del PR:** Conservado rigurosamente en **DRAFT**  
 **Commit Auditado de Entrada:** `edad68fee97ea462c24809eea473a1d70613eaa7` (`BUDGET-02C01_FAIL_SECURITY_REVIEW`)  
-**Commit Definitivo de Cierre:** `e2e1a3a8ec81485fbd9f8e8fd95e99516113bbf0`  
+**Commit Definitivo de Cierre:** `f0d9ffd27931a900fae245e333d5964ff0d3e6d8`  
 **Dictamen de Cierre:** **`BUDGET-02C01R_PASS`**  
 
 **Restricciones Absolutas de la Misión:**
