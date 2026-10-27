@@ -165,12 +165,12 @@ async function runRealMysqlCertification() {
         await conn.query(`
             INSERT INTO order_paper_decisions (
                 id, tenant_id, external_order_intent_id, canonical_order_id, printhouse_tenant_id,
-                paper_role, requested_variant_id, alternative_variant_id,
+                operator_id, paper_role, requested_variant_id, decision_action, alternative_variant_id,
                 snapshot_requested_gsm, snapshot_requested_width_mm, snapshot_requested_height_mm, snapshot_requested_category,
                 idempotency_key, payload_fingerprint, status
             ) VALUES (
                 'opd_001', 'tenant_prod_alpha', 'ord_e2e_real_001', 'ord_e2e_real_001', 'ph_bcn_industrial',
-                'INTERIOR', 'var_coral_90', 'var_offset_120',
+                'op_user_001', 'INTERIOR', 'var_coral_90', 'PROPOSE_ALTERNATIVE', 'var_offset_120',
                 90, 700.0, 1000.0, 'UNCOATED',
                 'idem_001', 'fp_001', 'ACTIVE'
             );
