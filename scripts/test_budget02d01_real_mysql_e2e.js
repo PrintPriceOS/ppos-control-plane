@@ -125,6 +125,8 @@ async function runRealMysqlCertification() {
                 created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 INDEX idx_mo_order_id (order_id),
                 INDEX idx_mo_tenant (tenant_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
             CREATE TABLE IF NOT EXISTS production_files (
                 id VARCHAR(64) PRIMARY KEY,
                 order_ref VARCHAR(128) NULL,
@@ -460,18 +462,50 @@ async function runRealMysqlCertification() {
         console.log(`\n[STEP 8] Testing TEST-01: Mounted Fastify HTTP E2E Lifecycle against live MySQL 8...`);
         const Fastify = require('fastify');
         const httpApp = Fastify({ logger: false });
+        
+        const jwt = require('jsonwebtoken');
+        const testJwtSecret = process.env.JWT_SECRET || 'ephemeral_ci_jwt_secret_at_least_32_characters_long';
+        process.env.JWT_SECRET = testJwtSecret;
+
+        httpApp.addHook('onRequest', async (request, reply) => {
+            const authHeader = request.headers['authorization'];
+            if (authHeader && authHeader.startsWith('Bearer ')) {
+                const token = authHeader.split(' ')[1];
+                try {
+                    const decoded = jwt.verify(token, testJwtSecret, {
+                        audience: process.env.JWT_AUDIENCE || 'ppos:control',
+                        issuer: process.env.JWT_ISSUER || 'https://auth.printprice.pro'
+                    });
+                    request.raw.user = {
+                        id: decoded.sub || decoded.id,
+                        role: decoded.role,
+                        tenantId: decoded.tenant_id || decoded.tenantId,
+                        printhouseId: decoded.printhouse_id || decoded.printhouseId
+                    };
+                } catch (err) {}
+            }
+        });
+
+        await httpApp.register(require('@fastify/express'));
         httpApp.use(require('express').json());
         httpApp.use('/api/marketplace/quote-revisions', require('../src/api/routes/orderQuoteRevisionRoutes'));
         httpApp.use('/api/printhouse/orders', require('../src/api/routes/printhouseOrders'));
         httpApp.use('/api/printhouse', require('../src/api/routes/printhouseOrders'));
 
-        const jwt = require('jsonwebtoken');
-        const testJwtSecret = process.env.JWT_SECRET || 'ephemeral_ci_jwt_secret_at_least_32_characters_long';
-        process.env.JWT_SECRET = testJwtSecret;
+        const apiNotFoundFallback = (request, reply) => {
+            if (!reply.sent) reply.status(404).send({ error: 'Endpoint not found', path: request.url });
+        };
+        httpApp.all('/api/printhouse/orders', apiNotFoundFallback);
+        httpApp.all('/api/printhouse/orders/*', apiNotFoundFallback);
+        httpApp.all('/api/printhouse', apiNotFoundFallback);
+        httpApp.all('/api/printhouse/*', apiNotFoundFallback);
+
         const testAuthToken = jwt.sign({
+            sub: 'user_operator_http',
             id: 'user_operator_http',
             role: 'PRINTHOUSE_ADMIN',
-            tenantId: testTenantId,
+            tenant_id: testTenantId,
+            printhouse_id: testPrinthouseId,
             printhouseId: testPrinthouseId
         }, testJwtSecret, {
             audience: process.env.JWT_AUDIENCE || 'ppos:control',
