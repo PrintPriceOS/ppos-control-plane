@@ -269,7 +269,9 @@ class TestSandboxFinancialSettlementAdapter {
                 reason: 'Settlement voucher record lacks mandatory obligation_id binding.'
             };
         }
-        if (String(recObligationId).trim() !== String(obligationId).trim()) {
+        const matchesObligation = String(recObligationId).trim() === String(obligationId).trim() ||
+                                  (Array.isArray(trustedRecord.allowed_obligation_ids) && trustedRecord.allowed_obligation_ids.includes(String(obligationId).trim()));
+        if (!matchesObligation) {
             return {
                 verified: false,
                 code: 'OBLIGATION_MISMATCH',
@@ -294,7 +296,8 @@ class TestSandboxFinancialSettlementAdapter {
             };
         }
         const matchesOrder = String(recOrderId).trim() === String(orderId).trim() ||
-                             (alternateOrderId && String(recOrderId).trim() === String(alternateOrderId).trim());
+                             (alternateOrderId && String(recOrderId).trim() === String(alternateOrderId).trim()) ||
+                             (Array.isArray(trustedRecord.allowed_order_ids) && trustedRecord.allowed_order_ids.includes(String(orderId).trim()));
         if (!matchesOrder) {
             return {
                 verified: false,
@@ -454,58 +457,90 @@ class TestSandboxFinancialSettlementAdapter {
     }
 }
 
+function isProductionEnvironment() {
+    return (process.env.NODE_ENV || '').toLowerCase() === 'production';
+}
+
 /**
  * Factory helper to instantiate the appropriate adapter based on environment.
  */
 function createFinancialSettlementAdapter(options = {}) {
-    const isProd = (options.env || process.env.NODE_ENV) === 'production';
+    const isProd = (options.env || process.env.NODE_ENV) === 'production' || isProductionEnvironment();
     if (isProd) {
         return new ProductionFinancialSettlementAdapter(options);
     }
     return new TestSandboxFinancialSettlementAdapter(options);
 }
 
+// Immutable production singleton to prevent tampering in production
+const immutableProductionAdapter = Object.freeze(new ProductionFinancialSettlementAdapter());
+
 // Active singleton instance (defaults to current environment)
 let activeAdapter = createFinancialSettlementAdapter();
 
+function getEffectiveAdapter() {
+    // In production environment, adapter selection is strictly immutable and cannot be tampered with.
+    if (isProductionEnvironment()) {
+        return immutableProductionAdapter;
+    }
+    return activeAdapter;
+}
+
 // Facade object delegating to activeAdapter while supporting test inspection
 const adapterFacade = {
-    get adapterName() { return activeAdapter.adapterName; },
-    get provenance() { return activeAdapter.provenance; },
-    get isProduction() { return Boolean(activeAdapter.isProduction); },
+    get adapterName() { return getEffectiveAdapter().adapterName; },
+    get provenance() { return getEffectiveAdapter().provenance; },
+    get isProduction() { return Boolean(getEffectiveAdapter().isProduction); },
 
     registerVerifiedRecord(record) {
-        return activeAdapter.registerVerifiedRecord(record);
+        if (isProductionEnvironment()) {
+            throw new Error('MOCK_ADAPTER_DISABLED_IN_PRODUCTION: In-memory test registry is strictly disabled in production environment.');
+        }
+        return getEffectiveAdapter().registerVerifiedRecord(record);
     },
     clearRegistry() {
-        if (typeof activeAdapter.clearRegistry === 'function') {
-            return activeAdapter.clearRegistry();
+        if (isProductionEnvironment()) {
+            throw new Error('MOCK_ADAPTER_DISABLED_IN_PRODUCTION: In-memory test registry operations are strictly disabled in production environment.');
+        }
+        if (typeof getEffectiveAdapter().clearRegistry === 'function') {
+            return getEffectiveAdapter().clearRegistry();
         }
     },
     setProviderOutage(provider, isOutage) {
-        if (typeof activeAdapter.setProviderOutage === 'function') {
-            return activeAdapter.setProviderOutage(provider, isOutage);
+        if (typeof getEffectiveAdapter().setProviderOutage === 'function') {
+            return getEffectiveAdapter().setProviderOutage(provider, isOutage);
         }
     },
     async verifySettlement(params) {
-        return activeAdapter.verifySettlement(params);
+        return getEffectiveAdapter().verifySettlement(params);
     },
 
     // Testing and configuration helpers
     setActiveAdapter(adapter) {
+        if (isProductionEnvironment()) {
+            throw new Error('ADAPTER_SUBSTITUTION_FORBIDDEN_IN_PRODUCTION: Cannot substitute financial settlement adapter in production environment. Production adapter selection is strictly immutable.');
+        }
+        if (!adapter || typeof adapter.verifySettlement !== 'function') {
+            throw new Error('INVALID_ADAPTER: Financial settlement adapter must implement verifySettlement().');
+        }
         activeAdapter = adapter;
     },
     getActiveAdapter() {
-        return activeAdapter;
+        return getEffectiveAdapter();
     },
     resetToDefault() {
-        activeAdapter = createFinancialSettlementAdapter();
+        if (isProductionEnvironment()) {
+            activeAdapter = immutableProductionAdapter;
+        } else {
+            activeAdapter = createFinancialSettlementAdapter();
+        }
     },
 
-    // Export class definitions
+    // Export class definitions & helpers
     ProductionFinancialSettlementAdapter,
     TestSandboxFinancialSettlementAdapter,
-    createFinancialSettlementAdapter
+    createFinancialSettlementAdapter,
+    isProductionEnvironment
 };
 
 module.exports = adapterFacade;

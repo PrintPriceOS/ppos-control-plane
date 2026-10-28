@@ -245,6 +245,7 @@ async function handleSettleRefund(req, res) {
                            err.message.includes('FORBIDDEN') ? 403 :
                            err.message.includes('MOCK_ADAPTER_DISABLED_IN_PRODUCTION') ? 403 :
                            err.message.includes('TEST_ADAPTER_FORBIDDEN_IN_PRODUCTION') ? 403 :
+                           err.message.includes('ADAPTER_SUBSTITUTION_FORBIDDEN_IN_PRODUCTION') ? 403 :
                            err.message.includes('NOT_FOUND') ? 404 :
                            err.message.includes('NO_REFUND_OBLIGATION') ? 404 :
                            err.message.includes('DUPLICATE_SETTLEMENT_REFERENCE') ? 409 :

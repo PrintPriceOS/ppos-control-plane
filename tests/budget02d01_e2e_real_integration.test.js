@@ -116,7 +116,8 @@ describe('BUDGET-02D-01 — End-to-End Real Integration & Lifecycle Certificatio
                 dispatches: [],
                 marketplace_events: [],
                 job_quotes: [],
-                pricing_events: []
+                pricing_events: [],
+                financial_settlement_vouchers: []
             };
         }
 
@@ -392,6 +393,17 @@ describe('BUDGET-02D-01 — End-to-End Real Integration & Lifecycle Certificatio
                 return rows;
             }
 
+            // 11.6 SELECT from financial_settlement_vouchers
+            if (s.includes('from financial_settlement_vouchers')) {
+                if (s.includes('provider = ? and provider_voucher_id = ?')) {
+                    const [provider, voucherId] = params;
+                    return this.tables.financial_settlement_vouchers.filter(
+                        v => v.provider === provider && v.provider_voucher_id === voucherId
+                    );
+                }
+                return this.tables.financial_settlement_vouchers;
+            }
+
             // 12. INSERTS
             if (s.includes('insert into order_pricing_snapshots')) {
                 const [
@@ -503,6 +515,32 @@ describe('BUDGET-02D-01 — End-to-End Real Integration & Lifecycle Certificatio
 
             if (s.includes('insert into marketplace_events')) {
                 this.tables.marketplace_events.push({ params });
+                return { affectedRows: 1 };
+            }
+
+            if (s.includes('insert into financial_settlement_vouchers')) {
+                const [
+                    id, provider, provider_voucher_id, settlement_ref, tenant_id,
+                    canonical_order_id, effective_specification_id, obligation_id,
+                    amount_cents, currency, beneficiary, status, is_mock_sandbox,
+                    proof_metadata_json, settled_by
+                ] = params;
+                const existing = this.tables.financial_settlement_vouchers.find(
+                    v => v.provider === provider && v.provider_voucher_id === provider_voucher_id
+                );
+                if (existing) {
+                    const dupErr = new Error(`Duplicate entry '${provider}-${provider_voucher_id}' for key 'uq_provider_voucher'`);
+                    dupErr.code = 'ER_DUP_ENTRY';
+                    dupErr.errno = 1062;
+                    throw dupErr;
+                }
+                this.tables.financial_settlement_vouchers.push({
+                    id, provider, provider_voucher_id, settlement_ref, tenant_id,
+                    canonical_order_id, effective_specification_id, obligation_id,
+                    amount_cents, currency, beneficiary, status, is_mock_sandbox,
+                    proof_metadata_json, settled_by,
+                    settled_at: new Date()
+                });
                 return { affectedRows: 1 };
             }
 
@@ -2067,7 +2105,7 @@ describe('BUDGET-02D-01 — End-to-End Real Integration & Lifecycle Certificatio
             ).rejects.toThrow(/SETTLEMENT_INTEGRATION_PENDING/);
             trustedFinancialAdapter.setProviderOutage('BANK_TRANSFER_LEDGER', false);
 
-            // 11.7.4.e Registro de pruebas bloqueado en modo producción (TRUST-R4-01)
+            // 11.7.4.e Registro de pruebas y sustitución dinámica bloqueados en modo producción (TRUST-R4-01, SEC-R5-01)
             const origEnv = process.env.NODE_ENV;
             try {
                 process.env.NODE_ENV = 'production';
@@ -2077,6 +2115,34 @@ describe('BUDGET-02D-01 — End-to-End Real Integration & Lifecycle Certificatio
                 expect(() => {
                     new trustedFinancialAdapter.TestSandboxFinancialSettlementAdapter();
                 }).toThrow(/MOCK_ADAPTER_DISABLED_IN_PRODUCTION/);
+
+                // SEC-R5-01: Adaptador activo inmutable en producción - setActiveAdapter debe lanzar excepción
+                expect(() => {
+                    trustedFinancialAdapter.setActiveAdapter({
+                        verifySettlement: async () => ({ verified: true })
+                    });
+                }).toThrow(/ADAPTER_SUBSTITUTION_FORBIDDEN_IN_PRODUCTION/);
+
+                // SEC-R5-01: Inyección de adapter dinámico bloqueada en producción
+                expect(() => {
+                    marketplaceDispatchGatingService.setFinancialAdapter({
+                        verifySettlement: async () => ({ verified: true })
+                    });
+                }).toThrow(/ADAPTER_SUBSTITUTION_FORBIDDEN_IN_PRODUCTION/);
+
+                // SEC-R5-01: En modo producción, liquidación mock es rechazada y el estado permanece REFUND_PENDING
+                await expect(
+                    marketplaceDispatchGatingService.settleRefund(orderRef, {
+                        userId: 'treasury_director_01',
+                        role: 'FINANCE_DIRECTOR',
+                        tenantId,
+                        settlementRef: 'BNK_TX_2026_MOCK_PROD_ATTEMPT',
+                        provider: 'BANK_TRANSFER_LEDGER',
+                        amount: 30.00,
+                        currency: 'EUR',
+                        beneficiary: 'customer_sc11@editorial.com'
+                    })
+                ).rejects.toThrow(/SETTLEMENT_INTEGRATION_PENDING/);
             } finally {
                 process.env.NODE_ENV = origEnv;
             }

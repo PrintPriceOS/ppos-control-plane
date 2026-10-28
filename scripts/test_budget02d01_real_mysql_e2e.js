@@ -213,6 +213,11 @@ async function runRealMysqlCertification() {
         console.log(`Applying migration 170 (order_effective_technical_specifications)...`);
         const mig170Path = path.join(__dirname, '../migrations/170_phase196i_order_effective_technical_specifications.sql');
         await conn.query(fs.readFileSync(mig170Path, 'utf8'));
+
+        // Migration 171: financial_settlement_vouchers (SEC-R5-02)
+        console.log(`Applying migration 171 (financial_settlement_vouchers)...`);
+        const mig171Path = path.join(__dirname, '../migrations/171_phase196j_financial_settlement_vouchers.sql');
+        await conn.query(fs.readFileSync(mig171Path, 'utf8'));
         console.log(`[PASS] All schemas and migrations applied cleanly.`);
 
         // 3. Inspect information_schema for order_effective_technical_specifications
@@ -231,6 +236,41 @@ async function runRealMysqlCertification() {
         assert.ok(oetsColNames.includes('effective_status'), 'Missing effective_status column');
         console.log(`  ✓ Checked ${oetsCols.length} columns in order_effective_technical_specifications.`);
         console.log(`[PASS] Schema integrity confirmed for migration 170.`);
+
+        // 3.1 Inspect information_schema for financial_settlement_vouchers (SEC-R5-02)
+        console.log(`\n[STEP 3.1] Inspecting financial_settlement_vouchers in information_schema...`);
+        const [fsvCols] = await conn.query(`
+            SELECT COLUMN_NAME, DATA_TYPE, IS_NULLABLE
+            FROM information_schema.COLUMNS
+            WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'financial_settlement_vouchers'
+        `, [EPHEMERAL_DB]);
+
+        const fsvColNames = fsvCols.map(c => c.COLUMN_NAME.toLowerCase());
+        assert.ok(fsvColNames.includes('id'), 'Missing id column');
+        assert.ok(fsvColNames.includes('provider'), 'Missing provider column');
+        assert.ok(fsvColNames.includes('provider_voucher_id'), 'Missing provider_voucher_id column');
+        assert.ok(fsvColNames.includes('settlement_ref'), 'Missing settlement_ref column');
+        assert.ok(fsvColNames.includes('tenant_id'), 'Missing tenant_id column');
+        assert.ok(fsvColNames.includes('canonical_order_id'), 'Missing canonical_order_id column');
+        assert.ok(fsvColNames.includes('obligation_id'), 'Missing obligation_id column');
+        assert.ok(fsvColNames.includes('amount_cents'), 'Missing amount_cents column');
+        assert.ok(fsvColNames.includes('currency'), 'Missing currency column');
+        assert.ok(fsvColNames.includes('beneficiary'), 'Missing beneficiary column');
+        console.log(`  ✓ Checked ${fsvCols.length} columns in financial_settlement_vouchers.`);
+
+        const [fsvIndexes] = await conn.query(`
+            SELECT INDEX_NAME, NON_UNIQUE, COLUMN_NAME
+            FROM information_schema.STATISTICS
+            WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'financial_settlement_vouchers'
+            AND INDEX_NAME = 'uq_provider_voucher'
+            ORDER BY SEQ_IN_INDEX ASC
+        `, [EPHEMERAL_DB]);
+        assert.strictEqual(fsvIndexes.length, 2, 'uq_provider_voucher must index exactly 2 columns');
+        assert.strictEqual(fsvIndexes[0].NON_UNIQUE, 0, 'uq_provider_voucher must be UNIQUE');
+        assert.strictEqual(fsvIndexes[0].COLUMN_NAME.toLowerCase(), 'provider');
+        assert.strictEqual(fsvIndexes[1].COLUMN_NAME.toLowerCase(), 'provider_voucher_id');
+        console.log(`  ✓ Certified database-level UNIQUE constraint on (provider, provider_voucher_id) in MySQL 8.`);
+        console.log(`[PASS] Schema and constraint integrity confirmed for migration 171.`);
 
         // 4. Test BLK-01: Real Sealing with tenant_id in MySQL 8
         console.log(`\n[STEP 4] Testing BLK-01: BPE sealing SQL insertion with tenant_id in MySQL 8...`);
@@ -608,7 +648,7 @@ async function runRealMysqlCertification() {
         assert.strictEqual(specAfterFakeRef[0].financial_reconciliation_status, 'REFUND_PENDING');
         console.log(`  ✓ TRUST-01/02 Certified: Untrusted reference and caller signature assertions rejected; status kept as REFUND_PENDING.`);
 
-        // Step 6.6.c (TRUST-R4-01): Test registry blocked in production mode
+        // Step 6.6.c (TRUST-R4-01, SEC-R5-01): Test registry & adapter substitution blocked in production mode
         const origEnv = process.env.NODE_ENV;
         try {
             process.env.NODE_ENV = 'production';
@@ -618,10 +658,38 @@ async function runRealMysqlCertification() {
             assert.throws(() => {
                 new trustedFinancialAdapter.TestSandboxFinancialSettlementAdapter();
             }, /MOCK_ADAPTER_DISABLED_IN_PRODUCTION/);
+            assert.throws(() => {
+                trustedFinancialAdapter.setActiveAdapter({
+                    verifySettlement: async () => ({ verified: true })
+                });
+            }, /ADAPTER_SUBSTITUTION_FORBIDDEN_IN_PRODUCTION/);
+            assert.throws(() => {
+                marketplaceDispatchGatingService.setFinancialAdapter({
+                    verifySettlement: async () => ({ verified: true })
+                });
+            }, /ADAPTER_SUBSTITUTION_FORBIDDEN_IN_PRODUCTION/);
+
+            // In production, verifySettlement returns SETTLEMENT_INTEGRATION_PENDING, REFUND_SETTLED is unreachable
+            let prodBlockErr = null;
+            try {
+                await marketplaceDispatchGatingService.settleRefund(testOrderId, {
+                    userId: 'finance_mgr_01',
+                    role: 'FINANCE_DIRECTOR',
+                    tenantId: testTenantId,
+                    settlementRef: 'PROD_MOCK_ATTEMPT',
+                    provider: 'ERP_CREDIT_NOTE',
+                    amount: 45.50,
+                    currency: 'EUR',
+                    beneficiary: 'procurement@editorial.com'
+                });
+            } catch (pErr) {
+                prodBlockErr = pErr;
+            }
+            assert.ok(prodBlockErr && prodBlockErr.message.includes('SETTLEMENT_INTEGRATION_PENDING'), prodBlockErr?.message);
         } finally {
             process.env.NODE_ENV = origEnv;
         }
-        console.log(`  ✓ TRUST-R4-01 Certified: In-memory test registry strictly blocked in production mode.`);
+        console.log(`  ✓ SEC-R5-01 Certified: In-memory test registry & adapter substitution strictly blocked in production mode.`);
 
         // Step 6.6.d (TRUST-R4-01): Webhook integration not implemented
         let webhookErr = null;
@@ -823,6 +891,105 @@ async function runRealMysqlCertification() {
         );
         assert.strictEqual(specAfterSettled[0].financial_reconciliation_status, 'REFUND_SETTLED');
         console.log(`  ✓ TRUST-01/03 Certified: Accredited external settlement with trusted adapter persisted as REFUND_SETTLED in MySQL 8.`);
+
+        // 6.7.d (SEC-R5-02 & Concurrency): Two concurrent transactions attempting to consume the SAME voucher for different orders
+        console.log(`\n  [CONCURRENCY TEST] Testing concurrent consumption of the SAME voucher for two different orders...`);
+        const raceOrder1 = 'ord_race_001';
+        const raceOrder2 = 'ord_race_002';
+        const raceSpec1 = 'oets_race_001';
+        const raceSpec2 = 'oets_race_002';
+
+        await testPool.query(`
+            INSERT INTO orders (id, tenant_id, customer_email, status, offer_print_house, printhouse_id, currency, final_price)
+            VALUES (?, ?, ?, 'PENDING', ?, ?, 'EUR', 100.00), (?, ?, ?, 'PENDING', ?, ?, 'EUR', 100.00)
+            ON DUPLICATE KEY UPDATE status=status;
+        `, [raceOrder1, testTenantId, 'finance_lead@editorial.com', testPrinthouseId, testPrinthouseId,
+            raceOrder2, testTenantId, 'finance_lead@editorial.com', testPrinthouseId, testPrinthouseId]);
+
+        const racePricingSummary1 = {
+            currency: 'EUR',
+            financial_reconciliation: {
+                refund_obligation_id: 'obl_race_001',
+                refund_amount: 50.00,
+                currency: 'EUR',
+                beneficiary: 'finance_lead@editorial.com'
+            }
+        };
+        const racePricingSummary2 = {
+            currency: 'EUR',
+            financial_reconciliation: {
+                refund_obligation_id: 'obl_race_002',
+                refund_amount: 50.00,
+                currency: 'EUR',
+                beneficiary: 'finance_lead@editorial.com'
+            }
+        };
+
+        await testPool.query(`
+            INSERT INTO order_effective_technical_specifications
+            (id, tenant_id, canonical_order_id, external_order_intent_id, revision_id, effective_status, specs_json, pricing_summary_json, consent_record_json, financial_reconciliation_status, industrial_gate_status)
+            VALUES
+            (?, ?, ?, ?, 'rev_race_001', 'ACTIVE', '{}', ?, '{}', 'REFUND_PENDING', 'HOLD'),
+            (?, ?, ?, ?, 'rev_race_002', 'ACTIVE', '{}', ?, '{}', 'REFUND_PENDING', 'HOLD');
+        `, [raceSpec1, testTenantId, raceOrder1, raceOrder1, JSON.stringify(racePricingSummary1),
+            raceSpec2, testTenantId, raceOrder2, raceOrder2, JSON.stringify(racePricingSummary2)]);
+
+        trustedFinancialAdapter.registerVerifiedRecord({
+            provider: 'ERP_CREDIT_NOTE',
+            settlementRef: 'BCN_ERP_SHARED_VOUCHER_RACE',
+            obligation_id: 'obl_race_001',
+            allowed_obligation_ids: ['obl_race_001', 'obl_race_002'],
+            order_id: raceOrder1,
+            allowed_order_ids: [raceOrder1, raceOrder2],
+            tenant_id: testTenantId,
+            beneficiary: 'finance_lead@editorial.com',
+            status: 'POSTED',
+            amount: 50.00,
+            currency: 'EUR',
+            voucher_id: 'CN-SHARED-RACE-999',
+            accounting_ledger_verified: true,
+            is_test_sandbox: true
+        });
+
+        const raceResults = await Promise.allSettled([
+            marketplaceDispatchGatingService.settleRefund(raceOrder1, {
+                userId: 'finance_lead_01',
+                role: 'FINANCE_DIRECTOR',
+                tenantId: testTenantId,
+                settlementRef: 'BCN_ERP_SHARED_VOUCHER_RACE',
+                provider: 'ERP_CREDIT_NOTE',
+                amount: 50.00,
+                currency: 'EUR',
+                beneficiary: 'finance_lead@editorial.com'
+            }),
+            marketplaceDispatchGatingService.settleRefund(raceOrder2, {
+                userId: 'finance_lead_02',
+                role: 'FINANCE_DIRECTOR',
+                tenantId: testTenantId,
+                settlementRef: 'BCN_ERP_SHARED_VOUCHER_RACE',
+                provider: 'ERP_CREDIT_NOTE',
+                amount: 50.00,
+                currency: 'EUR',
+                beneficiary: 'finance_lead@editorial.com'
+            })
+        ]);
+
+        const fulfilled = raceResults.filter(r => r.status === 'fulfilled');
+        const rejected = raceResults.filter(r => r.status === 'rejected');
+
+        assert.strictEqual(fulfilled.length, 1, `Exactly 1 concurrent settlement must succeed, got ${fulfilled.length}`);
+        assert.strictEqual(rejected.length, 1, `Exactly 1 concurrent settlement must fail, got ${rejected.length}`);
+        assert.strictEqual(fulfilled[0].value.financial_reconciliation_status, 'REFUND_SETTLED');
+        assert.ok(
+            rejected[0].reason.message.includes('EVIDENCE_ALREADY_CONSUMED'),
+            `Rejection reason must be EVIDENCE_ALREADY_CONSUMED, got: ${rejected[0].reason.message}`
+        );
+
+        const [voucherRows] = await testPool.query(
+            `SELECT * FROM financial_settlement_vouchers WHERE provider = 'ERP_CREDIT_NOTE' AND provider_voucher_id = 'CN-SHARED-RACE-999'`
+        );
+        assert.strictEqual(voucherRows.length, 1, 'financial_settlement_vouchers must have exactly 1 record');
+        console.log(`  ✓ SEC-R5-02 Certified: Transactional database constraint enforced; exactly 1 concurrent order settled, 1 rejected with EVIDENCE_ALREADY_CONSUMED.`);
 
         // 6.8 (IND-01): Machine dispatch consumes effective technical version -> SUCCESS
         const dispatchResult = await marketplaceDispatchGatingService.dispatchOrder(testOrderId, 'machine_alpha_01', {

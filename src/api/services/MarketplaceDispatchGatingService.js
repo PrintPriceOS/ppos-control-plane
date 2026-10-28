@@ -24,6 +24,9 @@ class MarketplaceDispatchGatingService {
     }
 
     setFinancialAdapter(adapter) {
+        if ((process.env.NODE_ENV || '').toLowerCase() === 'production') {
+            throw new Error('ADAPTER_SUBSTITUTION_FORBIDDEN_IN_PRODUCTION: Dynamic financial adapter substitution is strictly forbidden in production. Production adapter selection is immutable.');
+        }
         this.trustedFinancialAdapter = adapter;
     }
 
@@ -792,9 +795,12 @@ class MarketplaceDispatchGatingService {
                 }
             }
 
-            // 8.5 Authoritative Verification via Trusted Financial Settlement Adapter (TRUST-01, TRUST-R4-01..03)
+            // 8.5 Authoritative Verification via Trusted Financial Settlement Adapter (TRUST-01, TRUST-R4-01..03, SEC-R5-01)
+            const isProd = (process.env.NODE_ENV || '').toLowerCase() === 'production';
+            const effectiveFinancialAdapter = isProd ? trustedFinancialAdapter : this.trustedFinancialAdapter;
+
             const targetOrderId = order.order_id || order.order_ref || order.id;
-            const adapterResult = await this.trustedFinancialAdapter.verifySettlement({
+            const adapterResult = await effectiveFinancialAdapter.verifySettlement({
                 provider: rawProvider,
                 settlementRef: settlementRef,
                 obligationId: expectedObligationId,
@@ -817,27 +823,46 @@ class MarketplaceDispatchGatingService {
                 throw new Error(`${code}: ${reason}. Status remains REFUND_PENDING (SETTLEMENT_INTEGRATION_PENDING).`);
             }
 
-            // 8.6 Anti-Collision / Replay Protection on Settlement Voucher / Reference (TRUST-03)
-            const pastEvents = await runTxQuery(
-                `SELECT order_id, order_ref, metadata_json FROM marketplace_events 
-                 WHERE event_type = 'REFUND_OBLIGATION_SETTLED'`
-            );
-            for (const ev of pastEvents) {
-                let meta = {};
-                try {
-                    meta = typeof ev.metadata_json === 'string' ? JSON.parse(ev.metadata_json) : (ev.metadata_json || {});
-                } catch (_) {}
-                const isSameRef = (meta.settlement_ref && meta.settlement_ref === settlementRef) ||
-                                  (meta.provider_voucher_id && meta.provider_voucher_id === adapterResult.voucher_id);
-                if (isSameRef) {
-                    const matchOrder = ev.order_id === order.id || ev.order_ref === orderRef || ev.order_id === canonicalRef || ev.order_ref === canonicalRef;
-                    if (!matchOrder) {
-                        throw new Error(`EVIDENCE_ALREADY_CONSUMED: Settlement reference or voucher '${settlementRef}' has already been utilized on order '${ev.order_ref || ev.order_id}'. Replay attack rejected.`);
-                    }
-                }
+            // In production, mock sandbox settlement records are strictly forbidden (SEC-R5-01)
+            if (isProd && adapterResult.is_mock_sandbox) {
+                throw new Error('MOCK_ADAPTER_DISABLED_IN_PRODUCTION: Mock sandbox settlements cannot be used to settle refunds in production.');
             }
 
-            // 9. State Transition under Lock (TRUST-01, TRUST-02, TRUST-03)
+            // 8.6 Transactional Anti-Replay & Exclusive Voucher Consumption via Database Engine Constraint (SEC-R5-02)
+            const voucherId = adapterResult.voucher_id || settlementRef;
+            const voucherDbId = `vch_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+
+            try {
+                await conn.query(
+                    `INSERT INTO financial_settlement_vouchers 
+                     (id, provider, provider_voucher_id, settlement_ref, tenant_id, canonical_order_id, effective_specification_id, obligation_id, amount_cents, currency, beneficiary, status, is_mock_sandbox, proof_metadata_json, settled_by, settled_at)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP(6))`,
+                    [
+                        voucherDbId,
+                        rawProvider,
+                        voucherId,
+                        settlementRef,
+                        order.tenant_id,
+                        canonicalRef,
+                        eff.id,
+                        expectedObligationId,
+                        expectedMinor,
+                        expectedCurrency,
+                        adapterResult.beneficiary || expectedBeneficiary,
+                        adapterResult.status || 'SETTLED',
+                        adapterResult.is_mock_sandbox ? 1 : 0,
+                        JSON.stringify(adapterResult.proof_metadata || {}),
+                        rawUserId
+                    ]
+                );
+            } catch (insertErr) {
+                if (insertErr.code === 'ER_DUP_ENTRY' || insertErr.errno === 1062 || String(insertErr.message).includes('Duplicate entry')) {
+                    throw new Error(`EVIDENCE_ALREADY_CONSUMED: Settlement voucher '${voucherId}' from provider '${rawProvider}' has already been consumed. Replay attack rejected by transactional database constraint.`);
+                }
+                throw insertErr;
+            }
+
+            // 9. State Transition under Lock within the SAME transaction (TRUST-01, TRUST-02, TRUST-03, SEC-R5-02)
             await conn.query(
                 `UPDATE order_effective_technical_specifications 
                  SET financial_reconciliation_status = 'REFUND_SETTLED', updated_at = CURRENT_TIMESTAMP 

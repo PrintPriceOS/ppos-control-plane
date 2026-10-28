@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-10-27T21:23:21.027Z",
+  "generatedAt": "2026-10-28T06:41:47.013Z",
   "hashAlgorithm": "sha256",
   "contentNormalization": "utf8-lf-v1",
   "approvedPrefixCollisions": {
@@ -2292,6 +2292,19 @@
       "sizeBytes": 2086,
       "containsDdl": true,
       "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/171_phase196j_financial_settlement_vouchers.sql",
+      "prefix": "171",
+      "canonicalSha256": "3a465e581ef6dd170a43f20721c0eeb63efd4da6c05ef6ced4044806bc1da61b",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 1981,
+      "containsDdl": true,
+      "containsDml": false,
       "containsTransaction": false,
       "statementTypes": [
         "CREATE_TABLE"
