@@ -688,7 +688,7 @@ class MarketplaceDispatchGatingService {
 
             const eff = effectiveRows[0];
 
-            // Idempotency & Replay Verification against Authoritative Table 171 (SEC-R5-02 & BUDGET-02D-01R5V)
+            // Idempotency & Replay Verification against Authoritative Table 171 (BUDGET-02D-01R5F)
             if (eff.financial_reconciliation_status === 'REFUND_SETTLED') {
                 let persistentRecord = null;
 
@@ -702,108 +702,106 @@ class MarketplaceDispatchGatingService {
                     if (voucherRows.length > 0) {
                         persistentRecord = voucherRows[0];
                     }
-                } catch (_) {}
+                } catch (dbErr) {
+                    throw new Error(`DATABASE_CONNECTION_ERROR: Failed to retrieve settlement voucher for replay: ${dbErr.message}`);
+                }
 
-                // Fallback for legacy events if table 171 record is absent
+                // Strictly fail closed if table 171 record is missing; NO reconstruction from legacy JSON events (BUDGET-02D-01R5F)
                 if (!persistentRecord) {
-                    try {
-                        const pastEvents = await runTxQuery(
-                            `SELECT metadata_json FROM marketplace_events 
-                             WHERE event_type = 'REFUND_OBLIGATION_SETTLED' 
-                             AND (order_id = ? OR order_ref = ?) 
-                             ORDER BY created_at DESC LIMIT 1`,
-                            [order.id, canonicalRef]
-                        );
-                        if (pastEvents.length > 0) {
-                            const m = typeof pastEvents[0].metadata_json === 'string'
-                                ? JSON.parse(pastEvents[0].metadata_json)
-                                : (pastEvents[0].metadata_json || {});
-                            if (m.settlement_ref) {
-                                persistentRecord = {
-                                    provider: m.provider || rawProvider,
-                                    provider_voucher_id: m.voucher_id || m.settlement_ref,
-                                    settlement_ref: m.settlement_ref,
-                                    obligation_id: m.obligation_id,
-                                    amount_cents: m.amount_cents !== undefined ? m.amount_cents : (m.amount ? Math.round(Number(m.amount) * 100) : null),
-                                    currency: m.currency,
-                                    beneficiary: m.beneficiary
-                                };
-                            }
-                        }
-                    } catch (_) {}
+                    throw new Error('HISTORICAL_SETTLEMENT_RECONCILIATION_REQUIRED: Order is marked REFUND_SETTLED but lacks an authoritative financial_settlement_vouchers record. Automatic reconstruction from legacy JSON events is forbidden. Manual/verified migration required.');
                 }
 
-                if (!persistentRecord || !persistentRecord.settlement_ref) {
-                    throw new Error('SETTLEMENT_RECORD_MISSING: Order is marked REFUND_SETTLED but no authoritative settlement record was found for replay validation.');
-                }
-
-                // 1. Settlement Reference Match
+                // 1. Mandatory Settlement Reference Match
                 const persistentRef = String(persistentRecord.settlement_ref || '').trim();
-                if (!persistentRef || persistentRef !== settlementRef) {
-                    throw new Error(`SETTLEMENT_MISMATCH: Order has already been settled with reference '${persistentRef}'. Cannot replay with different reference '${settlementRef}'.`);
+                if (!settlementRef || persistentRef !== settlementRef) {
+                    throw new Error(`SETTLEMENT_MISMATCH: Order has already been settled with reference '${persistentRef}'. Cannot replay with different or missing reference '${settlementRef}'.`);
                 }
 
-                // 2. Provider Match
+                // 2. Mandatory Tenant Match
+                const callerTenantId = String(settlementContext.tenantId || '').trim();
+                const persistentTenantId = String(persistentRecord.tenant_id || order.tenant_id || '').trim();
+                if (!callerTenantId || (persistentTenantId && callerTenantId !== persistentTenantId)) {
+                    throw new Error(`SETTLEMENT_MISMATCH: Tenant mismatch for settled order ('${persistentTenantId}' vs '${callerTenantId}').`);
+                }
+
+                // 3. Mandatory Provider Match
                 const persistentProvider = String(persistentRecord.provider || '').trim().toUpperCase();
-                if (persistentProvider && persistentProvider !== rawProvider) {
+                if (!rawProvider || persistentProvider !== rawProvider) {
                     throw new Error(`SETTLEMENT_MISMATCH: Provider mismatch for settled order ('${persistentProvider}' vs '${rawProvider}').`);
                 }
 
-                // 3. Voucher Match (Comprobante)
-                const callerVoucherId = settlementContext.voucher_id || settlementContext.voucherId ||
+                // 4. Mandatory Voucher ID (Comprobante) Match
+                const callerVoucherId = String(
+                    settlementContext.voucher_id || settlementContext.voucherId ||
                     (settlementContext.evidence && (settlementContext.evidence.voucher_id || settlementContext.evidence.voucherId)) ||
-                    (settlementContext.proof && (settlementContext.proof.voucher_id || settlementContext.proof.voucherId));
+                    (settlementContext.proof && (settlementContext.proof.voucher_id || settlementContext.proof.voucherId)) ||
+                    ''
+                ).trim();
                 const persistentVoucher = String(persistentRecord.provider_voucher_id || '').trim();
-                if (callerVoucherId && persistentVoucher && String(callerVoucherId).trim() !== persistentVoucher) {
+                if (!callerVoucherId) {
+                    throw new Error('SETTLEMENT_MISMATCH: Voucher identifier is mandatory for replay verification. Absence of fields cannot be interpreted as a match.');
+                }
+                if (callerVoucherId !== persistentVoucher) {
                     throw new Error(`SETTLEMENT_MISMATCH: Voucher mismatch for settled order ('${persistentVoucher}' vs '${callerVoucherId}').`);
                 }
 
-                // 4. Obligation ID Match
-                const callerObligationId = settlementContext.obligationId || settlementContext.obligation_id;
+                // 5. Mandatory Obligation ID Match
+                const callerObligationId = String(settlementContext.obligationId || settlementContext.obligation_id || '').trim();
                 const persistentObligation = String(persistentRecord.obligation_id || '').trim();
-                if (callerObligationId && persistentObligation && String(callerObligationId).trim() !== persistentObligation) {
+                if (!callerObligationId) {
+                    throw new Error('SETTLEMENT_MISMATCH: Obligation ID is mandatory for replay verification. Absence of fields cannot be interpreted as a match.');
+                }
+                if (callerObligationId !== persistentObligation) {
                     throw new Error(`SETTLEMENT_MISMATCH: Obligation mismatch for settled order ('${persistentObligation}' vs '${callerObligationId}').`);
                 }
 
-                // 5. Amount Match in minor units (cents)
-                if (settlementContext.amount !== undefined && settlementContext.amount !== null && settlementContext.amount !== '') {
-                    const callerAmount = Math.abs(Number(settlementContext.amount));
-                    const callerMinor = Math.round(callerAmount * 100);
-                    const persistentMinor = persistentRecord.amount_cents !== undefined && persistentRecord.amount_cents !== null
-                        ? Number(persistentRecord.amount_cents)
-                        : null;
-                    if (persistentMinor !== null && callerMinor !== persistentMinor) {
-                        throw new Error(`SETTLEMENT_MISMATCH: Settlement amount mismatch for settled order (${callerAmount} vs ${persistentMinor / 100}).`);
-                    }
+                // 6. Mandatory Amount Match in minor units (cents)
+                if (settlementContext.amount === undefined || settlementContext.amount === null || settlementContext.amount === '') {
+                    throw new Error('SETTLEMENT_MISMATCH: Settlement amount is mandatory for replay verification. Absence of fields cannot be interpreted as a match.');
+                }
+                const callerAmount = Math.abs(Number(settlementContext.amount));
+                if (isNaN(callerAmount)) {
+                    throw new Error('SETTLEMENT_MISMATCH: Settlement amount is not a valid number.');
+                }
+                const callerMinor = Math.round(callerAmount * 100);
+                const persistentMinor = Number(persistentRecord.amount_cents);
+                if (callerMinor !== persistentMinor) {
+                    throw new Error(`SETTLEMENT_MISMATCH: Settlement amount mismatch for settled order (${callerAmount} vs ${persistentMinor / 100}).`);
                 }
 
-                // 6. Currency Match
-                if (settlementContext.currency) {
-                    const callerCurrency = String(settlementContext.currency).trim().toUpperCase();
-                    const persistentCurrency = String(persistentRecord.currency || '').trim().toUpperCase();
-                    if (persistentCurrency && callerCurrency !== persistentCurrency) {
-                        throw new Error(`SETTLEMENT_MISMATCH: Settlement currency mismatch for settled order ('${persistentCurrency}' vs '${callerCurrency}').`);
-                    }
+                // 7. Mandatory Currency Match
+                if (!settlementContext.currency || !String(settlementContext.currency).trim()) {
+                    throw new Error('SETTLEMENT_MISMATCH: Settlement currency is mandatory for replay verification. Absence of fields cannot be interpreted as a match.');
+                }
+                const callerCurrency = String(settlementContext.currency).trim().toUpperCase();
+                const persistentCurrency = String(persistentRecord.currency || '').trim().toUpperCase();
+                if (callerCurrency !== persistentCurrency) {
+                    throw new Error(`SETTLEMENT_MISMATCH: Settlement currency mismatch for settled order ('${persistentCurrency}' vs '${callerCurrency}').`);
                 }
 
-                // 7. Beneficiary Match
-                if (settlementContext.beneficiary) {
-                    const callerBeneficiary = String(settlementContext.beneficiary).trim().toLowerCase();
-                    const persistentBeneficiary = String(persistentRecord.beneficiary || '').trim().toLowerCase();
-                    if (persistentBeneficiary && callerBeneficiary !== persistentBeneficiary) {
-                        throw new Error(`SETTLEMENT_MISMATCH: Settlement beneficiary mismatch for settled order ('${persistentRecord.beneficiary}' vs '${settlementContext.beneficiary}').`);
-                    }
+                // 8. Mandatory Beneficiary Match
+                if (!settlementContext.beneficiary || !String(settlementContext.beneficiary).trim()) {
+                    throw new Error('SETTLEMENT_MISMATCH: Settlement beneficiary is mandatory for replay verification. Absence of fields cannot be interpreted as a match.');
+                }
+                const callerBeneficiary = String(settlementContext.beneficiary).trim().toLowerCase();
+                const persistentBeneficiary = String(persistentRecord.beneficiary || '').trim().toLowerCase();
+                if (callerBeneficiary !== persistentBeneficiary) {
+                    throw new Error(`SETTLEMENT_MISMATCH: Settlement beneficiary mismatch for settled order ('${persistentRecord.beneficiary}' vs '${settlementContext.beneficiary}').`);
                 }
 
                 await conn.commit();
                 return {
                     ok: true,
+                    order_id: canonicalRef,
                     effective_specification_id: eff.id,
                     financial_reconciliation_status: 'REFUND_SETTLED',
                     settlement_ref: persistentRef,
-                    provider: persistentProvider || rawProvider,
-                    voucher_id: persistentRecord.provider_voucher_id || persistentRef,
-                    amount_cents: persistentRecord.amount_cents,
+                    provider: persistentProvider,
+                    voucher_id: persistentRecord.provider_voucher_id,
+                    obligation_id: persistentRecord.obligation_id,
+                    tenant_id: persistentRecord.tenant_id,
+                    amount: Number(persistentRecord.amount_cents) / 100,
+                    amount_cents: Number(persistentRecord.amount_cents),
                     currency: persistentRecord.currency,
                     beneficiary: persistentRecord.beneficiary,
                     idempotent_replay: true
@@ -923,7 +921,11 @@ class MarketplaceDispatchGatingService {
             }
 
             // 8.6 Transactional Anti-Replay & Exclusive Voucher Consumption via Database Engine Constraint (SEC-R5-02)
-            const voucherId = adapterResult.voucher_id || settlementRef;
+            const voucherId = settlementContext.voucher_id || settlementContext.voucherId ||
+                              (settlementContext.evidence && (settlementContext.evidence.voucher_id || settlementContext.evidence.voucherId)) ||
+                              (settlementContext.proof && (settlementContext.proof.voucher_id || settlementContext.proof.voucherId)) ||
+                              adapterResult.voucher_id ||
+                              settlementRef;
             const voucherDbId = `vch_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 
             try {

@@ -2327,12 +2327,14 @@ describe('BUDGET-02D-01 — End-to-End Real Integration & Lifecycle Certificatio
                 provider: 'BANK_TRANSFER_LEDGER',
                 amount: 30.00,
                 currency: 'EUR',
-                beneficiary: 'customer_sc11@editorial.com'
+                beneficiary: 'customer_sc11@editorial.com',
+                voucher_id: 'VOUCHER-BANK-2026-998877',
+                obligationId: 'obl_sc11_001'
             });
             expect(settlementResult.ok).toBe(true);
             expect(settlementResult.financial_reconciliation_status).toBe('REFUND_SETTLED');
 
-            // 11.7.6 Idempotencia: Repetición de liquidación con la misma referencia -> IDEMPOTENT SUCCESS (TRUST-03)
+            // 11.7.6 Idempotencia: Repetición idéntica con el contrato completo de 8 parámetros -> IDEMPOTENT SUCCESS (BUDGET-02D-01R5F)
             const idempotentResult = await marketplaceDispatchGatingService.settleRefund(orderRef, {
                 userId: 'treasury_director_01',
                 role: 'FINANCE_DIRECTOR',
@@ -2341,12 +2343,14 @@ describe('BUDGET-02D-01 — End-to-End Real Integration & Lifecycle Certificatio
                 provider: 'BANK_TRANSFER_LEDGER',
                 amount: 30.00,
                 currency: 'EUR',
-                beneficiary: 'customer_sc11@editorial.com'
+                beneficiary: 'customer_sc11@editorial.com',
+                voucher_id: 'VOUCHER-BANK-2026-998877',
+                obligationId: 'obl_sc11_001'
             });
             expect(idempotentResult.ok).toBe(true);
             expect(idempotentResult.idempotent_replay).toBe(true);
 
-            // 11.7.7 Intento de repetición con parámetros discordantes sobre orden ya saldada -> SETTLEMENT_MISMATCH (TRUST-03)
+            // 11.7.7 Batería Adversarial de Replay y Discrepancias (BUDGET-02D-01R5F)
             // 11.7.7.a Referencia discordante
             await expect(
                 marketplaceDispatchGatingService.settleRefund(orderRef, {
@@ -2357,7 +2361,9 @@ describe('BUDGET-02D-01 — End-to-End Real Integration & Lifecycle Certificatio
                     provider: 'BANK_TRANSFER_LEDGER',
                     amount: 30.00,
                     currency: 'EUR',
-                    beneficiary: 'customer_sc11@editorial.com'
+                    beneficiary: 'customer_sc11@editorial.com',
+                    voucher_id: 'VOUCHER-BANK-2026-998877',
+                    obligationId: 'obl_sc11_001'
                 })
             ).rejects.toThrow(/SETTLEMENT_MISMATCH/);
 
@@ -2371,7 +2377,9 @@ describe('BUDGET-02D-01 — End-to-End Real Integration & Lifecycle Certificatio
                     provider: 'STRIPE',
                     amount: 30.00,
                     currency: 'EUR',
-                    beneficiary: 'customer_sc11@editorial.com'
+                    beneficiary: 'customer_sc11@editorial.com',
+                    voucher_id: 'VOUCHER-BANK-2026-998877',
+                    obligationId: 'obl_sc11_001'
                 })
             ).rejects.toThrow(/SETTLEMENT_MISMATCH/);
 
@@ -2385,7 +2393,9 @@ describe('BUDGET-02D-01 — End-to-End Real Integration & Lifecycle Certificatio
                     provider: 'BANK_TRANSFER_LEDGER',
                     amount: 99.00,
                     currency: 'EUR',
-                    beneficiary: 'customer_sc11@editorial.com'
+                    beneficiary: 'customer_sc11@editorial.com',
+                    voucher_id: 'VOUCHER-BANK-2026-998877',
+                    obligationId: 'obl_sc11_001'
                 })
             ).rejects.toThrow(/SETTLEMENT_MISMATCH/);
 
@@ -2399,7 +2409,9 @@ describe('BUDGET-02D-01 — End-to-End Real Integration & Lifecycle Certificatio
                     provider: 'BANK_TRANSFER_LEDGER',
                     amount: 30.00,
                     currency: 'USD',
-                    beneficiary: 'customer_sc11@editorial.com'
+                    beneficiary: 'customer_sc11@editorial.com',
+                    voucher_id: 'VOUCHER-BANK-2026-998877',
+                    obligationId: 'obl_sc11_001'
                 })
             ).rejects.toThrow(/SETTLEMENT_MISMATCH/);
 
@@ -2413,7 +2425,9 @@ describe('BUDGET-02D-01 — End-to-End Real Integration & Lifecycle Certificatio
                     provider: 'BANK_TRANSFER_LEDGER',
                     amount: 30.00,
                     currency: 'EUR',
-                    beneficiary: 'adversary@fraud.com'
+                    beneficiary: 'adversary@fraud.com',
+                    voucher_id: 'VOUCHER-BANK-2026-998877',
+                    obligationId: 'obl_sc11_001'
                 })
             ).rejects.toThrow(/SETTLEMENT_MISMATCH/);
 
@@ -2428,6 +2442,7 @@ describe('BUDGET-02D-01 — End-to-End Real Integration & Lifecycle Certificatio
                     amount: 30.00,
                     currency: 'EUR',
                     beneficiary: 'customer_sc11@editorial.com',
+                    voucher_id: 'VOUCHER-BANK-2026-998877',
                     obligationId: 'fictitious_obl_999'
                 })
             ).rejects.toThrow(/SETTLEMENT_MISMATCH/);
@@ -2443,9 +2458,264 @@ describe('BUDGET-02D-01 — End-to-End Real Integration & Lifecycle Certificatio
                     amount: 30.00,
                     currency: 'EUR',
                     beneficiary: 'customer_sc11@editorial.com',
-                    voucher_id: 'VOUCHER-TAMPERED-999'
+                    voucher_id: 'VOUCHER-TAMPERED-999',
+                    obligationId: 'obl_sc11_001'
                 })
             ).rejects.toThrow(/SETTLEMENT_MISMATCH/);
+
+            // 11.7.7.h Replay sin voucher (ausencia no interpretada como coincidencia)
+            await expect(
+                marketplaceDispatchGatingService.settleRefund(orderRef, {
+                    userId: 'treasury_director_01',
+                    role: 'FINANCE_DIRECTOR',
+                    tenantId,
+                    settlementRef: 'BNK_TX_2026_998877',
+                    provider: 'BANK_TRANSFER_LEDGER',
+                    amount: 30.00,
+                    currency: 'EUR',
+                    beneficiary: 'customer_sc11@editorial.com',
+                    obligationId: 'obl_sc11_001'
+                })
+            ).rejects.toThrow(/SETTLEMENT_MISMATCH: Voucher identifier is mandatory for replay verification/);
+
+            // 11.7.7.i Replay sin obligación (ausencia no interpretada como coincidencia)
+            await expect(
+                marketplaceDispatchGatingService.settleRefund(orderRef, {
+                    userId: 'treasury_director_01',
+                    role: 'FINANCE_DIRECTOR',
+                    tenantId,
+                    settlementRef: 'BNK_TX_2026_998877',
+                    provider: 'BANK_TRANSFER_LEDGER',
+                    amount: 30.00,
+                    currency: 'EUR',
+                    beneficiary: 'customer_sc11@editorial.com',
+                    voucher_id: 'VOUCHER-BANK-2026-998877'
+                })
+            ).rejects.toThrow(/SETTLEMENT_MISMATCH: Obligation ID is mandatory for replay verification/);
+
+            // 11.7.7.j Replay sin importe o divisa (ausencia no interpretada como coincidencia)
+            await expect(
+                marketplaceDispatchGatingService.settleRefund(orderRef, {
+                    userId: 'treasury_director_01',
+                    role: 'FINANCE_DIRECTOR',
+                    tenantId,
+                    settlementRef: 'BNK_TX_2026_998877',
+                    provider: 'BANK_TRANSFER_LEDGER',
+                    currency: 'EUR',
+                    beneficiary: 'customer_sc11@editorial.com',
+                    voucher_id: 'VOUCHER-BANK-2026-998877',
+                    obligationId: 'obl_sc11_001'
+                })
+            ).rejects.toThrow(/SETTLEMENT_MISMATCH: Settlement amount is mandatory for replay verification/);
+
+            await expect(
+                marketplaceDispatchGatingService.settleRefund(orderRef, {
+                    userId: 'treasury_director_01',
+                    role: 'FINANCE_DIRECTOR',
+                    tenantId,
+                    settlementRef: 'BNK_TX_2026_998877',
+                    provider: 'BANK_TRANSFER_LEDGER',
+                    amount: 30.00,
+                    beneficiary: 'customer_sc11@editorial.com',
+                    voucher_id: 'VOUCHER-BANK-2026-998877',
+                    obligationId: 'obl_sc11_001'
+                })
+            ).rejects.toThrow(/SETTLEMENT_MISMATCH: Settlement currency is mandatory for replay verification/);
+
+            // 11.7.7.k Replay de otro tenant (SETTLEMENT_MISMATCH bajo contexto de replay y FORBIDDEN para actor no privilegiado)
+            await expect(
+                marketplaceDispatchGatingService.settleRefund(orderRef, {
+                    userId: 'treasury_director_01',
+                    role: 'SUPER_ADMIN',
+                    tenantId: 'tenant_malicious_intruder',
+                    settlementRef: 'BNK_TX_2026_998877',
+                    provider: 'BANK_TRANSFER_LEDGER',
+                    amount: 30.00,
+                    currency: 'EUR',
+                    beneficiary: 'customer_sc11@editorial.com',
+                    voucher_id: 'VOUCHER-BANK-2026-998877',
+                    obligationId: 'obl_sc11_001'
+                })
+            ).rejects.toThrow(/SETTLEMENT_MISMATCH: Tenant mismatch/);
+
+            await expect(
+                marketplaceDispatchGatingService.settleRefund(orderRef, {
+                    userId: 'treasury_director_01',
+                    role: 'FINANCE_DIRECTOR',
+                    tenantId: 'tenant_malicious_intruder',
+                    settlementRef: 'BNK_TX_2026_998877',
+                    provider: 'BANK_TRANSFER_LEDGER',
+                    amount: 30.00,
+                    currency: 'EUR',
+                    beneficiary: 'customer_sc11@editorial.com',
+                    voucher_id: 'VOUCHER-BANK-2026-998877',
+                    obligationId: 'obl_sc11_001'
+                })
+            ).rejects.toThrow(/FORBIDDEN: Tenant mismatch/);
+
+            // 11.7.7.l Dos reintentos concurrentes bajo lock
+            const [concurrentReplay1, concurrentReplay2] = await Promise.all([
+                marketplaceDispatchGatingService.settleRefund(orderRef, {
+                    userId: 'treasury_director_01',
+                    role: 'FINANCE_DIRECTOR',
+                    tenantId,
+                    settlementRef: 'BNK_TX_2026_998877',
+                    provider: 'BANK_TRANSFER_LEDGER',
+                    amount: 30.00,
+                    currency: 'EUR',
+                    beneficiary: 'customer_sc11@editorial.com',
+                    voucher_id: 'VOUCHER-BANK-2026-998877',
+                    obligationId: 'obl_sc11_001'
+                }),
+                marketplaceDispatchGatingService.settleRefund(orderRef, {
+                    userId: 'treasury_director_02',
+                    role: 'FINANCE_DIRECTOR',
+                    tenantId,
+                    settlementRef: 'BNK_TX_2026_998877',
+                    provider: 'BANK_TRANSFER_LEDGER',
+                    amount: 30.00,
+                    currency: 'EUR',
+                    beneficiary: 'customer_sc11@editorial.com',
+                    voucher_id: 'VOUCHER-BANK-2026-998877',
+                    obligationId: 'obl_sc11_001'
+                })
+            ]);
+            expect(concurrentReplay1.ok).toBe(true);
+            expect(concurrentReplay1.idempotent_replay).toBe(true);
+            expect(concurrentReplay2.ok).toBe(true);
+            expect(concurrentReplay2.idempotent_replay).toBe(true);
+
+            // 11.7.7.m Replay contra un registro histórico que solo tenga eventos JSON (sin comprobante en tabla 171)
+            const histOrderRef = 'job_sc11_historical_unmigrated';
+            const histOrderId = 'ord_sc11_hist_001';
+            const histSpecId = 'oets_sc11_hist_001';
+            if (isRealMySql) {
+                await realPool.query(`
+                    INSERT INTO orders (id, tenant_id, customer_email, status, offer_print_house, printhouse_id, currency, final_price)
+                    VALUES (?, ?, ?, 'PAID', ?, ?, 'EUR', 100.00)
+                `, [histOrderId, tenantId, 'customer_sc11@editorial.com', printhouseId, printhouseId]);
+
+                await realPool.query(`
+                    INSERT INTO order_effective_technical_specifications
+                    (id, tenant_id, canonical_order_id, external_order_intent_id, revision_id, effective_status, specs_json, pricing_summary_json, consent_record_json, financial_reconciliation_status, industrial_gate_status)
+                    VALUES
+                    (?, ?, ?, ?, 'rev_hist_001', 'ACTIVE', '{}', ?, '{}', 'REFUND_SETTLED', 'HOLD')
+                `, [histSpecId, tenantId, histOrderId, histOrderRef, JSON.stringify({
+                    delta_amount: -30.00,
+                    currency: 'EUR',
+                    financial_reconciliation: {
+                        refund_obligation_id: 'obl_sc11_hist_001',
+                        refund_amount: 30.00,
+                        currency: 'EUR',
+                        beneficiary: 'customer_sc11@editorial.com'
+                    }
+                })]);
+
+                await realPool.query(`
+                    INSERT INTO marketplace_events (id, order_id, order_ref, event_type, metadata_json)
+                    VALUES (UUID(), ?, ?, 'REFUND_OBLIGATION_SETTLED', ?)
+                `, [histOrderId, histOrderRef, JSON.stringify({ settlement_ref: 'BNK_TX_HIST_LEGACY' })]);
+            } else {
+                dbAdapter.tables.orders.push({
+                    id: histOrderId,
+                    order_ref: histOrderRef,
+                    tenant_id: tenantId,
+                    printhouse_id: printhouseId,
+                    customer_email: 'customer_sc11@editorial.com',
+                    status: 'PAID'
+                });
+                dbAdapter.tables.order_effective_technical_specifications.push({
+                    id: histSpecId,
+                    tenant_id: tenantId,
+                    canonical_order_id: histOrderId,
+                    external_order_intent_id: histOrderRef,
+                    effective_status: 'ACTIVE',
+                    financial_reconciliation_status: 'REFUND_SETTLED',
+                    industrial_gate_status: 'HOLD',
+                    specs_json: JSON.stringify(baselineCalculationFixture.specs),
+                    pricing_summary_json: JSON.stringify({
+                        delta_amount: -30.00,
+                        currency: 'EUR',
+                        financial_reconciliation: {
+                            refund_obligation_id: 'obl_sc11_hist_001',
+                            refund_amount: 30.00,
+                            currency: 'EUR',
+                            beneficiary: 'customer_sc11@editorial.com'
+                        }
+                    })
+                });
+                dbAdapter.tables.marketplace_events.push({
+                    params: [
+                        'evt_hist_mock',
+                        histOrderId,
+                        histOrderRef,
+                        'REFUND_OBLIGATION_SETTLED',
+                        JSON.stringify({ settlement_ref: 'BNK_TX_HIST_LEGACY' })
+                    ]
+                });
+            }
+
+            await expect(
+                marketplaceDispatchGatingService.settleRefund(histOrderRef, {
+                    userId: 'treasury_director_01',
+                    role: 'FINANCE_DIRECTOR',
+                    tenantId,
+                    settlementRef: 'BNK_TX_HIST_LEGACY',
+                    provider: 'BANK_TRANSFER_LEDGER',
+                    amount: 30.00,
+                    currency: 'EUR',
+                    beneficiary: 'customer_sc11@editorial.com',
+                    voucher_id: 'VOUCHER-HIST-LEGACY',
+                    obligationId: 'obl_sc11_hist_001'
+                })
+            ).rejects.toThrow(/HISTORICAL_SETTLEMENT_RECONCILIATION_REQUIRED/);
+
+            // 11.7.7.n Error SQL al recuperar el comprobante -> DATABASE_CONNECTION_ERROR
+            const targetDbForError = isRealMySql ? realPool : dbAdapter;
+            const origGetConnForErr = targetDbForError.getConnection;
+            targetDbForError.getConnection = async function() {
+                const conn = await origGetConnForErr.apply(targetDbForError, arguments);
+                const origQuery = conn.query;
+                conn.query = async function(sql) {
+                    if (typeof sql === 'string' && sql.toLowerCase().includes('from financial_settlement_vouchers')) {
+                        throw new Error('SIMULATED_SQL_REPLAY_FETCH_ERROR');
+                    }
+                    return origQuery.apply(this, arguments);
+                };
+                return conn;
+            };
+            try {
+                await expect(
+                    marketplaceDispatchGatingService.settleRefund(orderRef, {
+                        userId: 'treasury_director_01',
+                        role: 'FINANCE_DIRECTOR',
+                        tenantId,
+                        settlementRef: 'BNK_TX_2026_998877',
+                        provider: 'BANK_TRANSFER_LEDGER',
+                        amount: 30.00,
+                        currency: 'EUR',
+                        beneficiary: 'customer_sc11@editorial.com',
+                        voucher_id: 'VOUCHER-BANK-2026-998877',
+                        obligationId: 'obl_sc11_001'
+                    })
+                ).rejects.toThrow(/DATABASE_CONNECTION_ERROR/);
+            } finally {
+                targetDbForError.getConnection = origGetConnForErr;
+            }
+
+            // 11.7.7.o Inmutabilidad estricta tras todos los rechazos adversariales
+            if (isRealMySql) {
+                const [vchRows] = await realPool.query(
+                    'SELECT COUNT(*) as cnt FROM financial_settlement_vouchers WHERE canonical_order_id = ? OR canonical_order_id = ?',
+                    [orderId, orderRef]
+                );
+                expect(Number(vchRows[0].cnt)).toBe(1);
+            } else {
+                const orderVouchers = dbAdapter.tables.financial_settlement_vouchers.filter(
+                    v => v.canonical_order_id === orderId || v.canonical_order_id === orderRef
+                );
+                expect(orderVouchers.length).toBe(1);
+            }
 
             // 11.7.8 Reutilización de comprobante entre pedidos distintos -> EVIDENCE_ALREADY_CONSUMED (TRUST-03)
             const orderRef2 = 'job_sc11_intent_2';

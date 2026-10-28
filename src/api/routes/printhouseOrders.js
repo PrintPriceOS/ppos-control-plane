@@ -220,7 +220,7 @@ async function handleAuthorizeIndustrialDispatch(req, res) {
 async function handleSettleRefund(req, res) {
     const orderRef = req.params.orderRef;
     const context = resolveActorContext(req);
-    const { settlementRef, provider, transactionId, obligationId, amount, currency, beneficiary, evidence, proof, webhookEventId } = req.body || {};
+    const { settlementRef, provider, transactionId, obligationId, amount, currency, beneficiary, evidence, proof, webhookEventId, voucherId, voucher_id } = req.body || {};
 
     try {
         const result = await dispatchGating.settleRefund(orderRef, {
@@ -231,6 +231,7 @@ async function handleSettleRefund(req, res) {
             isSuperAdmin: context.isSuperAdmin,
             settlementRef: settlementRef || transactionId,
             provider,
+            voucher_id: voucher_id || voucherId || (evidence && (evidence.voucher_id || evidence.voucherId)) || (proof && (proof.voucher_id || proof.voucherId)),
             obligationId,
             amount,
             currency,
@@ -250,6 +251,7 @@ async function handleSettleRefund(req, res) {
                            err.message.includes('NO_REFUND_OBLIGATION') ? 404 :
                            err.message.includes('DUPLICATE_SETTLEMENT_REFERENCE') ? 409 :
                            err.message.includes('EVIDENCE_ALREADY_CONSUMED') ? 409 :
+                           err.message.includes('HISTORICAL_SETTLEMENT_RECONCILIATION_REQUIRED') ? 409 :
                            err.message.includes('SETTLEMENT_RECORD_MISSING') ? 409 :
                            err.message.includes('SETTLEMENT_MISMATCH') ? 409 :
                            err.message.includes('ORDER_INELIGIBLE') ? 409 :
