@@ -170,38 +170,32 @@ class MarketplaceDispatchGatingService {
                 throw new Error(`DISPATCH_BLOCKED: Revised quote payment is pending customer settlement (${finStatus}).`);
             }
 
-            // Governed Negative Delta: Pending Refund Check
+            // Governed Negative Delta: Pending Refund Check (SEC-D01)
             // An unliquidated refund obligation does NOT automatically authorize machine manufacturing.
-            // Requires independent, persisted, and verifiable industrial authorization.
+            // Requires independent, persisted, and verifiable industrial authorization in order_effective_technical_specifications.
+            // Context flags (allowDispatchWithPendingRefund, industrialAuthorization, industrialOverride) are strictly forbidden and ignored.
             if (finStatus === 'REFUND_PENDING') {
-                const isExplicitlyAuthorized = 
-                    effectiveSpecRecord.industrial_gate_status === 'AUTHORIZED' ||
-                    context.allowDispatchWithPendingRefund === true ||
-                    context.industrialAuthorization?.status === 'AUTHORIZED' ||
-                    context.industrialOverride === true;
+                const isExplicitlyAuthorized = effectiveSpecRecord.industrial_gate_status === 'AUTHORIZED';
 
                 if (!isExplicitlyAuthorized) {
                     await this.logEvent(order.id, orderRef, 'DISPATCH_BLOCKED_PENDING_REFUND_AUTHORIZATION', { 
                         financial_reconciliation_status: 'REFUND_PENDING',
-                        order_ref: orderRef
+                        order_ref: orderRef,
+                        effective_specification_id: effectiveSpecRecord.id
                     });
                     throw new Error('DISPATCH_BLOCKED: Refund settlement pending. Independent industrial authorization required for unliquidated negative delta.');
                 }
 
                 await this.logEvent(order.id, orderRef, 'DISPATCH_AUTHORIZED_WITH_PENDING_REFUND', {
-                    authorized_by: context.userId || context.industrialAuthorization?.authorized_by || 'AUTHORIZED_OPERATOR',
-                    authorization_source: effectiveSpecRecord.industrial_gate_status === 'AUTHORIZED' ? 'PERSISTED_GATE_STATUS' : 'DISPATCH_CONTEXT'
+                    authorized_by: context.userId || 'AUTHORIZED_OPERATOR',
+                    authorization_source: 'PERSISTED_GATE_STATUS',
+                    effective_specification_id: effectiveSpecRecord.id
                 });
             }
 
             const allowedFinStatuses = ['PASSED', 'SETTLED', 'REFUND_SETTLED', 'ZERO_DELTA_PARITY'];
             const isFinReconciliationPassed = allowedFinStatuses.includes(finStatus) || 
-                (finStatus === 'REFUND_PENDING' && (
-                    effectiveSpecRecord.industrial_gate_status === 'AUTHORIZED' ||
-                    context.allowDispatchWithPendingRefund === true ||
-                    context.industrialAuthorization?.status === 'AUTHORIZED' ||
-                    context.industrialOverride === true
-                ));
+                (finStatus === 'REFUND_PENDING' && effectiveSpecRecord.industrial_gate_status === 'AUTHORIZED');
 
             if (!isFinReconciliationPassed) {
                 await this.logEvent(order.id, orderRef, 'DISPATCH_BLOCKED_UNSETTLED_FINANCIAL_STATE', { financial_status: finStatus });
@@ -319,107 +313,405 @@ class MarketplaceDispatchGatingService {
     }
 
     /**
-     * Explicitly authorize industrial dispatch for an order with a pending refund (FIN-01).
-     * Grants and persists independent industrial authorization in order_effective_technical_specifications.
+     * Explicitly authorize industrial dispatch for an order with a pending refund (FIN-01 / SEC-D02).
+     * Enforces:
+     * - Authenticated identity (rejects fictitious actors like 'system_manager', 'unknown', etc.)
+     * - Whitelisted roles (SUPER_ADMIN, OPS_ADMIN, SYSTEM_ADMIN, TENANT_ADMIN, PRINTHOUSE_ADMIN, PLANT_DIRECTOR, FINANCE_DIRECTOR)
+     * - Mandatory reason / justification (min 5 chars)
+     * - Order existence & active status (blocks CANCELLED, REJECTED, REFUNDED)
+     * - Multi-tenant and printhouse isolation
+     * - Accepted and non-superseded revision
+     * - Matching effective technical specifications under transactional lock (FOR UPDATE)
+     * - Persistent audit trail in marketplace_events
      */
     async authorizeIndustrialDispatch(orderRef, authContext = {}) {
-        let canonicalRef = orderRef;
-        try {
-            const ordRows = normalizeRows(await db.query('SELECT id FROM orders WHERE id = ?', [orderRef]));
-            if (ordRows.length > 0) canonicalRef = ordRows[0].id;
-        } catch (_) {}
-
-        try {
-            const mpRows = normalizeRows(await db.query('SELECT id, order_id FROM marketplace_orders WHERE order_id = ? OR id = ?', [orderRef, orderRef]));
-            if (mpRows.length > 0) canonicalRef = mpRows[0].order_id || mpRows[0].id;
-        } catch (_) {}
-
-        const effectiveRows = normalizeRows(await db.query(
-            `SELECT * FROM order_effective_technical_specifications 
-             WHERE (external_order_intent_id = ? OR canonical_order_id = ?) AND effective_status = 'ACTIVE' 
-             ORDER BY created_at DESC LIMIT 1`,
-            [orderRef, canonicalRef]
-        ));
-        if (effectiveRows.length === 0) {
-            throw new Error('NOT_FOUND: No active effective technical specification found for this order.');
+        // 1. Authenticated Identity & Fictitious Actor Guard (SEC-D02)
+        const rawUserId = String(authContext.userId || '').trim();
+        const FORBIDDEN_ACTORS = ['system_manager', 'system_finance', 'unknown', 'anonymous', 'system', 'admin', 'test', 'null', 'undefined'];
+        if (!rawUserId || FORBIDDEN_ACTORS.includes(rawUserId.toLowerCase())) {
+            throw new Error('UNAUTHORIZED: Valid authenticated operator identity required. Fictitious system identities are rejected.');
         }
 
-        const eff = effectiveRows[0];
-        await db.query(
-            `UPDATE order_effective_technical_specifications 
-             SET industrial_gate_status = 'AUTHORIZED', updated_at = CURRENT_TIMESTAMP 
-             WHERE id = ?`,
-            [eff.id]
-        );
+        // 2. Role & Permission Whitelist (SEC-D02)
+        const role = String(authContext.role || '').toUpperCase();
+        const AUTHORIZED_INDUSTRIAL_ROLES = [
+            'SUPER_ADMIN', 'OPS_ADMIN', 'SYSTEM_ADMIN', 'TENANT_ADMIN',
+            'PRINTHOUSE_ADMIN', 'PLANT_DIRECTOR', 'FINANCE_DIRECTOR'
+        ];
+        if (!AUTHORIZED_INDUSTRIAL_ROLES.includes(role)) {
+            throw new Error(`FORBIDDEN: User role '${role || 'NONE'}' does not have industrial authorization permission.`);
+        }
 
-        await this.logEvent(eff.canonical_order_id, orderRef, 'INDUSTRIAL_DISPATCH_EXPLICITLY_AUTHORIZED', {
-            effective_specification_id: eff.id,
-            authorized_by: authContext.userId || 'system_manager',
-            role: authContext.role || 'FINANCE_MANAGER',
-            reason: authContext.reason || 'Governed negative delta manufacturing authorization',
-            authorized_at: new Date().toISOString()
-        });
+        // 3. Reason & Justification Guard (SEC-D02)
+        const reason = String(authContext.reason || '').trim();
+        if (reason.length < 5) {
+            throw new Error('BAD_REQUEST: Industrial authorization requires a justified reason (minimum 5 characters).');
+        }
 
-        return {
-            ok: true,
-            effective_specification_id: eff.id,
-            industrial_gate_status: 'AUTHORIZED',
-            authorized_by: authContext.userId || 'system_manager'
+        // 4. Order Retrieval & Active State Verification (SEC-D02)
+        let order = null;
+        let canonicalRef = orderRef;
+
+        try {
+            const ordRows = normalizeRows(await db.query('SELECT * FROM orders WHERE order_ref = ? OR id = ?', [orderRef, orderRef]));
+            if (ordRows.length > 0) {
+                order = ordRows[0];
+                canonicalRef = order.order_ref || order.id;
+            }
+        } catch (_) {}
+
+        if (!order) {
+            try {
+                const mpRows = normalizeRows(await db.query('SELECT * FROM marketplace_orders WHERE order_id = ? OR id = ?', [orderRef, orderRef]));
+                if (mpRows.length > 0) {
+                    order = mpRows[0];
+                    canonicalRef = order.order_id || order.id;
+                }
+            } catch (_) {}
+        }
+
+        if (!order) {
+            throw new Error('NOT_FOUND: Order not found for industrial authorization.');
+        }
+
+        const INELIGIBLE_STATUSES = ['CANCELLED', 'REJECTED', 'REFUNDED', 'DELETED', 'SUPERSEDED'];
+        const currentOrderStatus = (order.status || '').toUpperCase();
+        if (INELIGIBLE_STATUSES.includes(currentOrderStatus) || order.deleted_at) {
+            throw new Error(`ORDER_INELIGIBLE: Order is in an ineligible status '${currentOrderStatus}' for industrial authorization.`);
+        }
+
+        // 5. Multi-Tenant and Printhouse Isolation (SEC-D02)
+        const isSuperAdmin = role === 'SUPER_ADMIN' || role === 'SYSTEM_ADMIN' || authContext.isSuperAdmin;
+        if (!isSuperAdmin) {
+            if (authContext.tenantId && order.tenant_id && authContext.tenantId !== order.tenant_id) {
+                throw new Error('FORBIDDEN: Tenant mismatch. Cannot authorize order for a different tenant.');
+            }
+
+            const assignedPrinter = order.offer_print_house || order.assigned_printhouse_id || order.printhouse_id;
+            if (authContext.printhouseId && assignedPrinter && authContext.printhouseId !== assignedPrinter) {
+                throw new Error('FORBIDDEN: Printhouse mismatch. Cannot authorize order for a different printhouse.');
+            }
+        }
+
+        // 6. Check Accepted and Non-Superseded Quote Revision (SEC-D02)
+        let latestRevision = null;
+        try {
+            const revRows = normalizeRows(await db.query(
+                `SELECT * FROM order_quote_revisions 
+                 WHERE (external_order_intent_id = ? OR canonical_order_id = ?) 
+                 ORDER BY revision_number DESC LIMIT 1`,
+                [orderRef, canonicalRef]
+            ));
+            if (revRows.length > 0) {
+                latestRevision = revRows[0];
+                if (latestRevision.status !== 'ACCEPTED') {
+                    throw new Error(`INVALID_REVISION_STATE: Active revision is '${latestRevision.status}', must be 'ACCEPTED' to grant industrial authorization.`);
+                }
+            }
+        } catch (revErr) {
+            if (revErr.message && revErr.message.includes('INVALID_REVISION_STATE')) {
+                throw revErr;
+            }
+        }
+
+        // 7. Transactional Lock (FOR UPDATE) & State Mutation (SEC-D02)
+        let conn = null;
+        let useTransaction = false;
+        try {
+            if (typeof db.getConnection === 'function') {
+                conn = await db.getConnection();
+                if (conn && typeof conn.beginTransaction === 'function') {
+                    await conn.beginTransaction();
+                    useTransaction = true;
+                }
+            }
+        } catch (_) {
+            conn = null;
+            useTransaction = false;
+        }
+
+        const queryExecutor = async (sql, params) => {
+            if (conn) {
+                const res = await conn.query(sql, params);
+                return normalizeRows(Array.isArray(res) ? res[0] : res);
+            }
+            const res = await db.query(sql, params);
+            return normalizeRows(res);
         };
+
+        try {
+            const effectiveRows = await queryExecutor(
+                `SELECT * FROM order_effective_technical_specifications 
+                 WHERE (external_order_intent_id = ? OR canonical_order_id = ?) AND effective_status = 'ACTIVE' 
+                 ORDER BY created_at DESC LIMIT 1 FOR UPDATE`,
+                [orderRef, canonicalRef]
+            );
+
+            if (effectiveRows.length === 0) {
+                throw new Error('NOT_FOUND: No active effective technical specification found for this order.');
+            }
+
+            const eff = effectiveRows[0];
+
+            if (eff.industrial_gate_status === 'DISPATCHED') {
+                throw new Error('INVALID_STATE: Effective technical specification has already been dispatched to machines.');
+            }
+
+            if (latestRevision && eff.revision_id && eff.revision_id !== latestRevision.id) {
+                throw new Error('MISMATCH: Active effective technical specification does not match the latest accepted revision.');
+            }
+
+            if (eff.industrial_gate_status !== 'AUTHORIZED') {
+                if (conn) {
+                    await conn.query(
+                        `UPDATE order_effective_technical_specifications 
+                         SET industrial_gate_status = 'AUTHORIZED', updated_at = CURRENT_TIMESTAMP 
+                         WHERE id = ?`,
+                        [eff.id]
+                    );
+                } else {
+                    await db.query(
+                        `UPDATE order_effective_technical_specifications 
+                         SET industrial_gate_status = 'AUTHORIZED', updated_at = CURRENT_TIMESTAMP 
+                         WHERE id = ?`,
+                        [eff.id]
+                    );
+                }
+            }
+
+            // 8. Structured Persistent Audit Log (SEC-D02)
+            await this.logEvent(eff.canonical_order_id || canonicalRef, orderRef, 'INDUSTRIAL_DISPATCH_EXPLICITLY_AUTHORIZED', {
+                effective_specification_id: eff.id,
+                revision_id: eff.revision_id || latestRevision?.id || null,
+                authorized_by: rawUserId,
+                role: role,
+                tenant_id: order.tenant_id,
+                printhouse_id: order.offer_print_house || order.assigned_printhouse_id || order.printhouse_id,
+                reason: reason,
+                authorized_at: new Date().toISOString()
+            }, conn);
+
+            if (useTransaction && conn) {
+                await conn.commit();
+            }
+
+            return {
+                ok: true,
+                effective_specification_id: eff.id,
+                revision_id: eff.revision_id || latestRevision?.id || null,
+                industrial_gate_status: 'AUTHORIZED',
+                authorized_by: rawUserId,
+                role: role,
+                reason: reason
+            };
+        } catch (err) {
+            if (useTransaction && conn) {
+                try { await conn.rollback(); } catch (_) {}
+            }
+            throw err;
+        } finally {
+            if (conn && typeof conn.release === 'function') {
+                try { conn.release(); } catch (_) {}
+            }
+        }
     }
 
     /**
-     * Record execution and confirmed settlement of a refund obligation (FIN-01).
+     * Record execution and confirmed settlement of a refund obligation (FIN-01 / SEC-D02 / SEC-D03).
+     * Enforces:
+     * - Authenticated identity (rejects fictitious actors like 'system_finance', 'unknown', etc.)
+     * - Whitelisted roles (SUPER_ADMIN, OPS_ADMIN, SYSTEM_ADMIN, TENANT_ADMIN, FINANCE_DIRECTOR, FINANCE_MANAGER, PAYMENT_GATEWAY_WEBHOOK)
+     * - Real verifiable settlement reference (rejects fake local strings like 'ref_tx_*', 'mock', 'dummy')
+     * - Accredited settlement provider / source
+     * - Multi-tenant isolation
+     * - Active order and matching effective specification under transactional lock (FOR UPDATE)
+     * - When reference missing or invalid, maintains REFUND_PENDING (fails closed)
+     * - Persistent audit trail in marketplace_events
      */
     async settleRefund(orderRef, settlementContext = {}) {
-        let canonicalRef = orderRef;
-        try {
-            const ordRows = normalizeRows(await db.query('SELECT id FROM orders WHERE id = ?', [orderRef]));
-            if (ordRows.length > 0) canonicalRef = ordRows[0].id;
-        } catch (_) {}
-
-        try {
-            const mpRows = normalizeRows(await db.query('SELECT id, order_id FROM marketplace_orders WHERE order_id = ? OR id = ?', [orderRef, orderRef]));
-            if (mpRows.length > 0) canonicalRef = mpRows[0].order_id || mpRows[0].id;
-        } catch (_) {}
-
-        const effectiveRows = normalizeRows(await db.query(
-            `SELECT * FROM order_effective_technical_specifications 
-             WHERE (external_order_intent_id = ? OR canonical_order_id = ?) AND effective_status = 'ACTIVE' 
-             ORDER BY created_at DESC LIMIT 1`,
-            [orderRef, canonicalRef]
-        ));
-        if (effectiveRows.length === 0) {
-            throw new Error('NOT_FOUND: No active effective technical specification found for this order.');
+        // 1. Authenticated Identity & Fictitious Actor Guard (SEC-D02)
+        const rawUserId = String(settlementContext.userId || '').trim();
+        const FORBIDDEN_ACTORS = ['system_manager', 'system_finance', 'unknown', 'anonymous', 'system', 'admin', 'test', 'null', 'undefined'];
+        if (!rawUserId || FORBIDDEN_ACTORS.includes(rawUserId.toLowerCase())) {
+            throw new Error('UNAUTHORIZED: Valid authenticated financial operator identity required. Fictitious system identities are rejected.');
         }
 
-        const eff = effectiveRows[0];
-        await db.query(
-            `UPDATE order_effective_technical_specifications 
-             SET financial_reconciliation_status = 'REFUND_SETTLED', updated_at = CURRENT_TIMESTAMP 
-             WHERE id = ?`,
-            [eff.id]
-        );
+        // 2. Role & Permission Whitelist (SEC-D02)
+        const role = String(settlementContext.role || '').toUpperCase();
+        const AUTHORIZED_FINANCIAL_ROLES = [
+            'SUPER_ADMIN', 'OPS_ADMIN', 'SYSTEM_ADMIN', 'TENANT_ADMIN',
+            'FINANCE_DIRECTOR', 'FINANCE_MANAGER', 'PAYMENT_GATEWAY_WEBHOOK'
+        ];
+        if (!AUTHORIZED_FINANCIAL_ROLES.includes(role)) {
+            throw new Error(`FORBIDDEN: User role '${role || 'NONE'}' does not have financial refund settlement permission.`);
+        }
 
-        await this.logEvent(eff.canonical_order_id, orderRef, 'REFUND_OBLIGATION_SETTLED', {
-            effective_specification_id: eff.id,
-            settlement_ref: settlementContext.settlementRef || settlementContext.transactionId || `ref_tx_${Date.now()}`,
-            settled_by: settlementContext.userId || 'system_finance',
-            settled_at: new Date().toISOString()
-        });
+        // 3. Verifiable Real Settlement Reference Guard (SEC-D03)
+        const settlementRef = String(settlementContext.settlementRef || settlementContext.transactionId || '').trim();
+        if (!settlementRef || settlementRef.length < 6) {
+            throw new Error('INVALID_SETTLEMENT_REFERENCE: A valid settlement reference (minimum 6 characters) from an accredited accounting system or payment provider is required.');
+        }
 
-        return {
-            ok: true,
-            effective_specification_id: eff.id,
-            financial_reconciliation_status: 'REFUND_SETTLED'
+        // Reject fake local pseudo-references
+        const isPseudoRef = /^ref_tx_\d+$/i.test(settlementRef) ||
+                            /^(mock|fake|dummy|test|local|sample)/i.test(settlementRef);
+        if (isPseudoRef) {
+            throw new Error('INVALID_SETTLEMENT_REFERENCE: Fake or local pseudo-references are rejected. A verifiable settlement reference from an accredited accounting system or payment provider is required.');
+        }
+
+        const rawProvider = String(settlementContext.provider || 'BANK_TRANSFER_LEDGER').trim().toUpperCase();
+        const ACCREDITED_PROVIDERS = [
+            'STRIPE', 'ADYEN', 'BANK_TRANSFER_LEDGER', 'ERP_CREDIT_NOTE',
+            'PAYMENT_GATEWAY_WEBHOOK', 'MANUAL_BANK_RECONCILIATION'
+        ];
+        if (!ACCREDITED_PROVIDERS.includes(rawProvider)) {
+            throw new Error(`INVALID_PROVIDER: Settlement provider '${rawProvider}' is not accredited. Must be one of: ${ACCREDITED_PROVIDERS.join(', ')}.`);
+        }
+
+        // 4. Order Retrieval & Multi-Tenant Isolation (SEC-D02)
+        let order = null;
+        let canonicalRef = orderRef;
+
+        try {
+            const ordRows = normalizeRows(await db.query('SELECT * FROM orders WHERE order_ref = ? OR id = ?', [orderRef, orderRef]));
+            if (ordRows.length > 0) {
+                order = ordRows[0];
+                canonicalRef = order.order_ref || order.id;
+            }
+        } catch (_) {}
+
+        if (!order) {
+            try {
+                const mpRows = normalizeRows(await db.query('SELECT * FROM marketplace_orders WHERE order_id = ? OR id = ?', [orderRef, orderRef]));
+                if (mpRows.length > 0) {
+                    order = mpRows[0];
+                    canonicalRef = order.order_id || order.id;
+                }
+            } catch (_) {}
+        }
+
+        if (!order) {
+            throw new Error('NOT_FOUND: Order not found for refund settlement.');
+        }
+
+        const isSuperAdmin = role === 'SUPER_ADMIN' || role === 'SYSTEM_ADMIN' || settlementContext.isSuperAdmin;
+        if (!isSuperAdmin && settlementContext.tenantId && order.tenant_id && settlementContext.tenantId !== order.tenant_id) {
+            throw new Error('FORBIDDEN: Tenant mismatch. Cannot settle refund for a different tenant.');
+        }
+
+        // 5. Transactional Lock (FOR UPDATE) & State Mutation (SEC-D02)
+        let conn = null;
+        let useTransaction = false;
+        try {
+            if (typeof db.getConnection === 'function') {
+                conn = await db.getConnection();
+                if (conn && typeof conn.beginTransaction === 'function') {
+                    await conn.beginTransaction();
+                    useTransaction = true;
+                }
+            }
+        } catch (_) {
+            conn = null;
+            useTransaction = false;
+        }
+
+        const queryExecutor = async (sql, params) => {
+            if (conn) {
+                const res = await conn.query(sql, params);
+                return normalizeRows(Array.isArray(res) ? res[0] : res);
+            }
+            const res = await db.query(sql, params);
+            return normalizeRows(res);
         };
+
+        try {
+            const effectiveRows = await queryExecutor(
+                `SELECT * FROM order_effective_technical_specifications 
+                 WHERE (external_order_intent_id = ? OR canonical_order_id = ?) AND effective_status = 'ACTIVE' 
+                 ORDER BY created_at DESC LIMIT 1 FOR UPDATE`,
+                [orderRef, canonicalRef]
+            );
+
+            if (effectiveRows.length === 0) {
+                throw new Error('NOT_FOUND: No active effective technical specification found for this order.');
+            }
+
+            const eff = effectiveRows[0];
+
+            // If already settled with the same or valid status, idempotent success
+            if (eff.financial_reconciliation_status === 'REFUND_SETTLED') {
+                if (useTransaction && conn) await conn.commit();
+                return {
+                    ok: true,
+                    effective_specification_id: eff.id,
+                    financial_reconciliation_status: 'REFUND_SETTLED',
+                    settlement_ref: settlementRef,
+                    provider: rawProvider,
+                    idempotent_replay: true
+                };
+            }
+
+            if (conn) {
+                await conn.query(
+                    `UPDATE order_effective_technical_specifications 
+                     SET financial_reconciliation_status = 'REFUND_SETTLED', updated_at = CURRENT_TIMESTAMP 
+                     WHERE id = ?`,
+                    [eff.id]
+                );
+            } else {
+                await db.query(
+                    `UPDATE order_effective_technical_specifications 
+                     SET financial_reconciliation_status = 'REFUND_SETTLED', updated_at = CURRENT_TIMESTAMP 
+                     WHERE id = ?`,
+                    [eff.id]
+                );
+            }
+
+            // 6. Persistent Audit Event (SEC-D02 / SEC-D03)
+            await this.logEvent(eff.canonical_order_id || canonicalRef, orderRef, 'REFUND_OBLIGATION_SETTLED', {
+                effective_specification_id: eff.id,
+                settlement_ref: settlementRef,
+                provider: rawProvider,
+                settled_by: rawUserId,
+                role: role,
+                tenant_id: order.tenant_id,
+                settled_at: new Date().toISOString()
+            }, conn);
+
+            if (useTransaction && conn) {
+                await conn.commit();
+            }
+
+            return {
+                ok: true,
+                effective_specification_id: eff.id,
+                financial_reconciliation_status: 'REFUND_SETTLED',
+                settlement_ref: settlementRef,
+                provider: rawProvider,
+                settled_by: rawUserId
+            };
+        } catch (err) {
+            if (useTransaction && conn) {
+                try { await conn.rollback(); } catch (_) {}
+            }
+            throw err;
+        } finally {
+            if (conn && typeof conn.release === 'function') {
+                try { conn.release(); } catch (_) {}
+            }
+        }
     }
 
-    async logEvent(orderId, orderRef, type, payload = {}) {
-        await db.query(`
-            INSERT INTO marketplace_events (id, order_id, order_ref, event_type, metadata_json)
-            VALUES (UUID(), ?, ?, ?, ?)
-        `, [orderId, orderRef, type, JSON.stringify(payload)]);
+    async logEvent(orderId, orderRef, type, payload = {}, connection = null) {
+        const executor = connection || db;
+        try {
+            await executor.query(`
+                INSERT INTO marketplace_events (id, order_id, order_ref, event_type, metadata_json)
+                VALUES (UUID(), ?, ?, ?, ?)
+            `, [orderId, orderRef, type, JSON.stringify(payload)]);
+        } catch (err) {
+            logger.warn({ event: 'log_event_failed', error: err.message, type, orderRef });
+        }
     }
 }
 

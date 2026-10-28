@@ -327,24 +327,28 @@ async function runRealMysqlCertification() {
             )
         `, [specId, testTenantId, testOrderId, testOrderId, revisionId]);
 
-        // Wire mysqlClient to live ephemeral database connection
+        // Wire mysqlClient to live ephemeral database connection pool
         const mysqlClient = require('../src/api/services/mysqlClient');
         const origQuery = mysqlClient.query;
         const origGetPool = mysqlClient.getPool;
         const origGetConnection = mysqlClient.getConnection;
 
-        mysqlClient.getPool = () => ({
-            query: async (sql, params) => {
-                const [rows] = await conn.query(sql, params);
-                return [rows];
-            },
-            getConnection: async () => conn
+        const testPool = mysql.createPool({
+            host: MYSQL_HOST,
+            port: MYSQL_PORT,
+            user: MYSQL_USER,
+            password: MYSQL_PASSWORD,
+            database: EPHEMERAL_DB,
+            waitForConnections: true,
+            connectionLimit: 10
         });
+
+        mysqlClient.getPool = () => testPool;
         mysqlClient.query = async (sql, params) => {
-            const [rows] = await conn.query(sql, params);
+            const [rows] = await testPool.query(sql, params);
             return rows;
         };
-        mysqlClient.getConnection = async () => conn;
+        mysqlClient.getConnection = async () => testPool.getConnection();
 
         const persistence = require('../src/api/services/ManufacturingPersistenceService');
         const manufacturingDispatch = require('../src/api/services/ManufacturingDispatchService');
@@ -354,39 +358,143 @@ async function runRealMysqlCertification() {
 
         const marketplaceDispatchGatingService = require('../src/api/services/MarketplaceDispatchGatingService');
 
-        // 6.1 (FIN-01): Attempt dispatch with unliquidated REFUND_PENDING and NO authorization -> BLOCKED
-        let blockedError = null;
+        // 6.1 (SEC-D01): Attempt dispatch with unliquidated REFUND_PENDING and context override -> BLOCKED (flags ignored)
+        let blockedOverrideError = null;
         try {
             await marketplaceDispatchGatingService.dispatchOrder(testOrderId, 'machine_alpha_01', {
                 userId: 'op_user_001',
                 printhouseId: testPrinthouseId,
                 tenantId: testTenantId,
-                role: 'OPERATOR'
+                role: 'OPERATOR',
+                industrialOverride: true,
+                allowDispatchWithPendingRefund: true
             });
         } catch (err) {
-            blockedError = err;
+            blockedOverrideError = err;
         }
-        assert.ok(blockedError, 'Dispatch must be blocked for unliquidated negative delta without authorization');
-        assert.ok(blockedError.message.includes('Independent industrial authorization required'), blockedError.message);
-        console.log(`  ✓ FIN-01 Certified: REFUND_PENDING without explicit authorization strictly blocked machine dispatch.`);
+        assert.ok(blockedOverrideError, 'Dispatch must be blocked despite industrialOverride: true in context');
+        assert.ok(blockedOverrideError.message.includes('Independent industrial authorization required'), blockedOverrideError.message);
+        console.log(`  ✓ SEC-D01 Certified: Context flags (industrialOverride, allowDispatchWithPendingRefund) are strictly ignored in MySQL 8.`);
 
-        // 6.2 (FIN-01): Grant and persist independent industrial authorization
-        const authRecord = await marketplaceDispatchGatingService.authorizeIndustrialDispatch(testOrderId, {
-            userId: 'mgr_finance_01',
-            role: 'FINANCE_DIRECTOR',
-            reason: 'Governed negative delta credit authorization'
-        });
-        assert.strictEqual(authRecord.ok, true);
-        assert.strictEqual(authRecord.industrial_gate_status, 'AUTHORIZED');
+        // 6.2 (SEC-D02): Unauthorized operator attempts industrial authorization -> DENIED
+        let opAuthError = null;
+        try {
+            await marketplaceDispatchGatingService.authorizeIndustrialDispatch(testOrderId, {
+                userId: 'unauthorized_op',
+                role: 'OPERATOR',
+                tenantId: testTenantId,
+                printhouseId: testPrinthouseId,
+                reason: 'Operator attempting illegal authorization'
+            });
+        } catch (err) {
+            opAuthError = err;
+        }
+        assert.ok(opAuthError, 'Operator role must be denied industrial authorization');
+        assert.ok(opAuthError.message.includes('FORBIDDEN'), opAuthError.message);
+        console.log(`  ✓ SEC-D02 Certified: Unauthorized role (OPERATOR) strictly denied industrial authorization in MySQL 8.`);
 
-        const [specAfterAuth] = await conn.query(
+        // 6.3 (SEC-D02): Foreign tenant attempts industrial authorization -> DENIED
+        let foreignTenantError = null;
+        try {
+            await marketplaceDispatchGatingService.authorizeIndustrialDispatch(testOrderId, {
+                userId: 'rogue_director',
+                role: 'PLANT_DIRECTOR',
+                tenantId: 'tenant_foreign_rogue',
+                printhouseId: testPrinthouseId,
+                reason: 'Cross-tenant authorization attempt'
+            });
+        } catch (err) {
+            foreignTenantError = err;
+        }
+        assert.ok(foreignTenantError, 'Foreign tenant must be denied authorization');
+        assert.ok(foreignTenantError.message.includes('Tenant mismatch'), foreignTenantError.message);
+        console.log(`  ✓ SEC-D02 Certified: Cross-tenant isolation strictly enforced for industrial authorization in MySQL 8.`);
+
+        // 6.4 (SEC-D02): Fictitious system identity rejected
+        let fictitiousError = null;
+        try {
+            await marketplaceDispatchGatingService.authorizeIndustrialDispatch(testOrderId, {
+                userId: 'system_manager',
+                role: 'PLANT_DIRECTOR',
+                reason: 'Fictitious actor check'
+            });
+        } catch (err) {
+            fictitiousError = err;
+        }
+        assert.ok(fictitiousError, 'Fictitious system identity must be rejected');
+        assert.ok(fictitiousError.message.includes('UNAUTHORIZED'), fictitiousError.message);
+        console.log(`  ✓ SEC-D02 Certified: Fictitious identity (system_manager) strictly rejected in MySQL 8.`);
+
+        // 6.5 (SEC-D02 & Concurrency): Two concurrent authorizations execute under FOR UPDATE lock
+        const [authRes1, authRes2] = await Promise.all([
+            marketplaceDispatchGatingService.authorizeIndustrialDispatch(testOrderId, {
+                userId: 'mgr_plant_01',
+                role: 'PLANT_DIRECTOR',
+                tenantId: testTenantId,
+                printhouseId: testPrinthouseId,
+                reason: 'Concurrent authorization attempt A'
+            }),
+            marketplaceDispatchGatingService.authorizeIndustrialDispatch(testOrderId, {
+                userId: 'mgr_plant_02',
+                role: 'PLANT_DIRECTOR',
+                tenantId: testTenantId,
+                printhouseId: testPrinthouseId,
+                reason: 'Concurrent authorization attempt B'
+            })
+        ]);
+        assert.strictEqual(authRes1.ok, true);
+        assert.strictEqual(authRes2.ok, true);
+        assert.strictEqual(authRes1.industrial_gate_status, 'AUTHORIZED');
+        assert.strictEqual(authRes2.industrial_gate_status, 'AUTHORIZED');
+
+        const [specAfterAuth] = await testPool.query(
             'SELECT industrial_gate_status FROM order_effective_technical_specifications WHERE id = ?',
             [specId]
         );
         assert.strictEqual(specAfterAuth[0].industrial_gate_status, 'AUTHORIZED');
-        console.log(`  ✓ FIN-01 Certified: Independent industrial authorization persisted in MySQL 8 table.`);
+        console.log(`  ✓ SEC-D02 Certified: Concurrent authorizations under FOR UPDATE lock resolved idempotently in MySQL 8.`);
 
-        // 6.3 (FIN-01): Dispatch order now that authorization is granted -> SUCCESS
+        // 6.6 (SEC-D03): Financial settlement with fake local reference -> REJECTED, status remains REFUND_PENDING
+        let fakeRefError = null;
+        try {
+            await marketplaceDispatchGatingService.settleRefund(testOrderId, {
+                userId: 'finance_mgr_01',
+                role: 'FINANCE_DIRECTOR',
+                tenantId: testTenantId,
+                settlementRef: 'ref_tx_12345678'
+            });
+        } catch (err) {
+            fakeRefError = err;
+        }
+        assert.ok(fakeRefError, 'Fake local pseudo-reference must be rejected');
+        assert.ok(fakeRefError.message.includes('INVALID_SETTLEMENT_REFERENCE'), fakeRefError.message);
+
+        const [specAfterFakeRef] = await testPool.query(
+            'SELECT financial_reconciliation_status FROM order_effective_technical_specifications WHERE id = ?',
+            [specId]
+        );
+        assert.strictEqual(specAfterFakeRef[0].financial_reconciliation_status, 'REFUND_PENDING');
+        console.log(`  ✓ SEC-D03 Certified: Local pseudo-reference rejected; status safely kept as REFUND_PENDING.`);
+
+        // 6.7 (SEC-D03): Verifiable settlement with accredited external reference -> SUCCEEDED
+        const settlementRes = await marketplaceDispatchGatingService.settleRefund(testOrderId, {
+            userId: 'finance_mgr_01',
+            role: 'FINANCE_DIRECTOR',
+            tenantId: testTenantId,
+            settlementRef: 'BCN_ERP_CREDIT_NOTE_2026_0991',
+            provider: 'ERP_CREDIT_NOTE'
+        });
+        assert.strictEqual(settlementRes.ok, true);
+        assert.strictEqual(settlementRes.financial_reconciliation_status, 'REFUND_SETTLED');
+
+        const [specAfterSettled] = await testPool.query(
+            'SELECT financial_reconciliation_status FROM order_effective_technical_specifications WHERE id = ?',
+            [specId]
+        );
+        assert.strictEqual(specAfterSettled[0].financial_reconciliation_status, 'REFUND_SETTLED');
+        console.log(`  ✓ SEC-D03 Certified: Accredited external settlement persisted as REFUND_SETTLED in MySQL 8.`);
+
+        // 6.8 (IND-01): Machine dispatch consumes effective technical version -> SUCCESS
         const dispatchResult = await marketplaceDispatchGatingService.dispatchOrder(testOrderId, 'machine_alpha_01', {
             userId: 'op_user_001',
             printhouseId: testPrinthouseId,
@@ -395,16 +503,17 @@ async function runRealMysqlCertification() {
         });
         assert.strictEqual(dispatchResult.ok, true);
         assert.strictEqual(dispatchResult.status, 'IN_PRODUCTION');
+        assert.strictEqual(dispatchResult.effective_specification_id, specId);
 
-        const [specAfterDisp] = await conn.query(
+        const [specAfterDisp] = await testPool.query(
             'SELECT industrial_gate_status FROM order_effective_technical_specifications WHERE id = ?',
             [specId]
         );
         assert.strictEqual(specAfterDisp[0].industrial_gate_status, 'DISPATCHED');
-        console.log(`  ✓ FIN-01 Certified: Machine dispatch authorized and status updated to DISPATCHED in MySQL 8.`);
+        console.log(`  ✓ IND-01 Certified: Machine dispatch authorized and status updated to DISPATCHED in MySQL 8.`);
 
-        // 6.4 (IND-01): Strict original specifications immutability verification in MySQL 8
-        const [orderAfterDisp] = await conn.query(
+        // 6.9 (IND-01): Strict original specifications immutability verification in MySQL 8
+        const [orderAfterDisp] = await testPool.query(
             'SELECT book_spec_json FROM marketplace_orders WHERE order_id = ?',
             [testOrderId]
         );
@@ -416,12 +525,12 @@ async function runRealMysqlCertification() {
         assert.strictEqual(originalBookSpec.title, 'Original Contract Spec 135gsm');
         console.log(`  ✓ IND-01 Certified: Original order specifications in MySQL 8 remain 100% UNMUTATED.`);
 
-        // 6.5 (IND-01): Fail-closed when effective spec query fails with SQL error
+        // 6.10 (IND-01): Fail-closed when effective spec query fails with SQL error
         mysqlClient.query = async (sql, params) => {
             if (sql.includes('order_effective_technical_specifications')) {
                 throw new Error('ER_LOCK_DEADLOCK');
             }
-            const [rows] = await conn.query(sql, params);
+            const [rows] = await testPool.query(sql, params);
             return rows;
         };
 
@@ -442,7 +551,7 @@ async function runRealMysqlCertification() {
 
         // Restore query handlers
         mysqlClient.query = async (sql, params) => {
-            const [rows] = await conn.query(sql, params);
+            const [rows] = await testPool.query(sql, params);
             return rows;
         };
 
@@ -568,28 +677,83 @@ async function runRealMysqlCertification() {
                 )
             `, [testTenantId, httpOrderId, httpOrderId]);
 
-            // 8.1 Real HTTP POST dispatch attempt BEFORE authorization -> HTTP 422
+            // 8.1 Real HTTP POST dispatch attempt with industrialOverride in body BEFORE authorization -> HTTP 422
             const blockedHttpRes = await fetch(`${httpBaseUrl}/api/printhouse/orders/${httpOrderId}/dispatch`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${testAuthToken}`
                 },
-                body: JSON.stringify({ machine_id: 'press_http_01' })
+                body: JSON.stringify({ machine_id: 'press_http_01', industrialOverride: true, allowDispatchWithPendingRefund: true })
             });
-            assert.strictEqual(blockedHttpRes.status, 422, 'Dispatch without industrial authorization must return 422');
+            assert.strictEqual(blockedHttpRes.status, 422, 'Dispatch with unauthenticated context flags must return 422');
             const blockedHttpBody = await blockedHttpRes.json();
             assert.strictEqual(blockedHttpBody.ok, false);
             assert.ok(blockedHttpBody.error.includes('Independent industrial authorization required'));
-            console.log('  ✓ TEST-01 Certified: Real HTTP dispatch rejected with 422 DISPATCH_BLOCKED before authorization.');
+            console.log('  ✓ SEC-D01/SEC-D04 HTTP Certified: Real HTTP dispatch with override flags rejected with 422 DISPATCH_BLOCKED.');
 
-            // 8.2 Authorize industrial dispatch
-            await marketplaceDispatchGatingService.authorizeIndustrialDispatch(httpOrderId, {
-                userId: 'user_director_http',
-                role: 'PLANT_DIRECTOR'
+            // 8.2 Real HTTP unauthorized operator attempts authorization -> HTTP 403
+            const operatorToken = jwt.sign({
+                sub: 'user_operator_only',
+                id: 'user_operator_only',
+                role: 'OPERATOR',
+                tenant_id: testTenantId,
+                printhouse_id: testPrinthouseId
+            }, testJwtSecret, {
+                audience: process.env.JWT_AUDIENCE || 'ppos:control',
+                issuer: process.env.JWT_ISSUER || 'https://auth.printprice.pro'
             });
 
-            // 8.3 Real HTTP POST dispatch attempt AFTER authorization -> HTTP 200
+            const unauthHttpRes = await fetch(`${httpBaseUrl}/api/printhouse/orders/${httpOrderId}/authorize-industrial-dispatch`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${operatorToken}`
+                },
+                body: JSON.stringify({ reason: 'Operator unauthorized attempt' })
+            });
+            assert.strictEqual(unauthHttpRes.status, 403, 'Unauthorized operator must be rejected with 403');
+            console.log('  ✓ SEC-D02/SEC-D04 HTTP Certified: Real HTTP unauthorized operator rejected with 403 FORBIDDEN.');
+
+            // 8.3 Real HTTP cross-tenant attempt -> HTTP 403
+            const foreignTenantToken = jwt.sign({
+                sub: 'user_foreign_admin',
+                id: 'user_foreign_admin',
+                role: 'PRINTHOUSE_ADMIN',
+                tenant_id: 'tenant_foreign_evil',
+                printhouse_id: testPrinthouseId
+            }, testJwtSecret, {
+                audience: process.env.JWT_AUDIENCE || 'ppos:control',
+                issuer: process.env.JWT_ISSUER || 'https://auth.printprice.pro'
+            });
+
+            const foreignHttpRes = await fetch(`${httpBaseUrl}/api/printhouse/orders/${httpOrderId}/authorize-industrial-dispatch`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${foreignTenantToken}`
+                },
+                body: JSON.stringify({ reason: 'Cross-tenant malicious authorization' })
+            });
+            assert.strictEqual(foreignHttpRes.status, 403, 'Cross-tenant attempt must be rejected with 403');
+            console.log('  ✓ SEC-D02/SEC-D04 HTTP Certified: Real HTTP cross-tenant mismatch rejected with 403 FORBIDDEN.');
+
+            // 8.4 Real HTTP authorization by authorized manager -> HTTP 200
+            const authorizedHttpRes = await fetch(`${httpBaseUrl}/api/printhouse/orders/${httpOrderId}/authorize-industrial-dispatch`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${testAuthToken}`
+                },
+                body: JSON.stringify({ reason: 'Printhouse admin verified manufacturing specs' })
+            });
+            assert.strictEqual(authorizedHttpRes.status, 200, 'Authorized industrial dispatch must return 200');
+            const authBody = await authorizedHttpRes.json();
+            assert.strictEqual(authBody.ok, true);
+            assert.strictEqual(authBody.industrial_gate_status, 'AUTHORIZED');
+            console.log('  ✓ SEC-D02/SEC-D04 HTTP Certified: Real HTTP industrial dispatch authorized with 200 OK.');
+
+            // 8.5 Real HTTP dispatch after authorization -> HTTP 200
             const allowedHttpRes = await fetch(`${httpBaseUrl}/api/printhouse/orders/${httpOrderId}/dispatch`, {
                 method: 'POST',
                 headers: {
@@ -602,9 +766,40 @@ async function runRealMysqlCertification() {
             const allowedHttpBody = await allowedHttpRes.json();
             assert.strictEqual(allowedHttpBody.ok, true);
             assert.strictEqual(allowedHttpBody.status, 'IN_PRODUCTION');
-            console.log('  ✓ TEST-01 Certified: Real HTTP dispatch succeeded with 200 IN_PRODUCTION upon authorization.');
+            console.log('  ✓ SEC-D04 HTTP Certified: Real HTTP dispatch succeeded with 200 IN_PRODUCTION upon authorization.');
+
+            // 8.6 Real HTTP settlement with invalid/local pseudo-reference -> HTTP 422
+            const invalidSettleRes = await fetch(`${httpBaseUrl}/api/printhouse/orders/${httpOrderId}/settle-refund`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${testAuthToken}`
+                },
+                body: JSON.stringify({ settlementRef: 'ref_tx_998811' })
+            });
+            assert.strictEqual(invalidSettleRes.status, 422, 'Settlement with pseudo-reference must return 422');
+            console.log('  ✓ SEC-D03/SEC-D04 HTTP Certified: Real HTTP settlement rejected with 422 on pseudo-reference.');
+
+            // 8.7 Real HTTP settlement with accredited external reference -> HTTP 200
+            const validSettleRes = await fetch(`${httpBaseUrl}/api/printhouse/orders/${httpOrderId}/settle-refund`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${testAuthToken}`
+                },
+                body: JSON.stringify({
+                    settlementRef: 'SETTLE_STRIPE_RE_99182910',
+                    provider: 'STRIPE'
+                })
+            });
+            assert.strictEqual(validSettleRes.status, 200, 'Accredited settlement must return 200');
+            const settleBody = await validSettleRes.json();
+            assert.strictEqual(settleBody.ok, true);
+            assert.strictEqual(settleBody.financial_reconciliation_status, 'REFUND_SETTLED');
+            console.log('  ✓ SEC-D03/SEC-D04 HTTP Certified: Real HTTP settlement succeeded with 200 and REFUND_SETTLED.');
         } finally {
             await httpApp.close();
+            await testPool.end();
             mysqlClient.query = origQuery;
             mysqlClient.getPool = origGetPool;
             mysqlClient.getConnection = origGetConnection;

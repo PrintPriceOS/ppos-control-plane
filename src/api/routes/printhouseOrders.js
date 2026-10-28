@@ -179,6 +179,73 @@ router.post('/:orderRef/dispatch', requirePrinthouseScope(), async (req, res) =>
     }
 });
 
+/**
+ * Authorize Industrial Dispatch for an Order with Pending Refund (MES / FIN-01 / SEC-D02).
+ * POST /api/printhouse/orders/:orderRef/authorize-industrial-dispatch
+ */
+async function handleAuthorizeIndustrialDispatch(req, res) {
+    const orderRef = req.params.orderRef;
+    const context = resolveActorContext(req);
+    const { reason, justification } = req.body || {};
+
+    try {
+        const result = await dispatchGating.authorizeIndustrialDispatch(orderRef, {
+            userId: context.userId,
+            role: context.role,
+            tenantId: context.tenantId,
+            printhouseId: context.printhouseId,
+            isSuperAdmin: context.isSuperAdmin,
+            reason: reason || justification
+        });
+        res.json(result);
+    } catch (err) {
+        logger.error({ event: 'AUTHORIZE_INDUSTRIAL_DISPATCH_FAILED', orderRef, error: err.message });
+        const statusCode = err.message.includes('UNAUTHORIZED') ? 401 :
+                           err.message.includes('FORBIDDEN') ? 403 :
+                           err.message.includes('NOT_FOUND') ? 404 :
+                           err.message.includes('ORDER_INELIGIBLE') ? 409 :
+                           err.message.includes('BAD_REQUEST') ? 400 : 422;
+        res.status(statusCode).json({ ok: false, error: err.message });
+    }
+}
+
+/**
+ * Record Verifiable Refund Obligation Settlement (MES / FIN-01 / SEC-D02 / SEC-D03).
+ * POST /api/printhouse/orders/:orderRef/settle-refund
+ */
+async function handleSettleRefund(req, res) {
+    const orderRef = req.params.orderRef;
+    const context = resolveActorContext(req);
+    const { settlementRef, provider, transactionId } = req.body || {};
+
+    try {
+        const result = await dispatchGating.settleRefund(orderRef, {
+            userId: context.userId,
+            role: context.role,
+            tenantId: context.tenantId,
+            printhouseId: context.printhouseId,
+            isSuperAdmin: context.isSuperAdmin,
+            settlementRef: settlementRef || transactionId,
+            provider
+        });
+        res.json(result);
+    } catch (err) {
+        logger.error({ event: 'SETTLE_REFUND_FAILED', orderRef, error: err.message });
+        const statusCode = err.message.includes('UNAUTHORIZED') ? 401 :
+                           err.message.includes('FORBIDDEN') ? 403 :
+                           err.message.includes('NOT_FOUND') ? 404 :
+                           err.message.includes('INVALID_SETTLEMENT_REFERENCE') ? 422 :
+                           err.message.includes('INVALID_PROVIDER') ? 422 : 400;
+        res.status(statusCode).json({ ok: false, error: err.message });
+    }
+}
+
+router.post('/:orderRef/authorize-industrial-dispatch', requirePrinthouseScope(), handleAuthorizeIndustrialDispatch);
+router.post('/orders/:orderRef/authorize-industrial-dispatch', requirePrinthouseScope(), handleAuthorizeIndustrialDispatch);
+
+router.post('/:orderRef/settle-refund', requirePrinthouseScope(), handleSettleRefund);
+router.post('/orders/:orderRef/settle-refund', requirePrinthouseScope(), handleSettleRefund);
+
 // ─────────────────────────────────────────────────────────────────────────
 // PHASE 196F: PRINTHOUSE PAPER DECISIONS (BUDGET-02B-01)
 // ─────────────────────────────────────────────────────────────────────────

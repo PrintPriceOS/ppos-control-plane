@@ -215,6 +215,23 @@ describe('BUDGET-02D-01 — End-to-End Real Integration & Lifecycle Certificatio
 
             // 6. SELECT from order_quote_revisions
             if (s.includes('from order_quote_revisions')) {
+                if (s.includes("status in ('pending_customer_approval', 'pending')") || (s.includes("status = 'pending'") && params.length === 2)) {
+                    const [p1, p2] = params;
+                    return this.tables.order_quote_revisions.filter(
+                        r => (r.canonical_order_id === p1 || r.external_order_intent_id === p1 ||
+                              r.canonical_order_id === p2 || r.external_order_intent_id === p2) &&
+                             (r.status === 'PENDING' || r.status === 'PENDING_CUSTOMER_APPROVAL')
+                    );
+                }
+                if (s.includes('order by revision_number desc') || s.includes('canonical_order_id = ? or external_order_intent_id = ?') || s.includes('external_order_intent_id = ? or canonical_order_id = ?')) {
+                    const [p1, p2] = params;
+                    const matches = this.tables.order_quote_revisions.filter(
+                        r => (r.canonical_order_id === p1 || r.external_order_intent_id === p1 ||
+                              r.canonical_order_id === p2 || r.external_order_intent_id === p2)
+                    );
+                    matches.sort((a, b) => (b.revision_number || 0) - (a.revision_number || 0));
+                    return matches;
+                }
                 if (s.includes("status = 'accepted'") && params.length === 3) {
                     const [tenantId, orderIntentId, currentRevId] = params;
                     return this.tables.order_quote_revisions.filter(
@@ -552,7 +569,7 @@ describe('BUDGET-02D-01 — End-to-End Real Integration & Lifecycle Certificatio
             }
 
             if (s.includes('update order_effective_technical_specifications')) {
-                const [id] = params;
+                const id = params[params.length - 1];
                 const e = this.tables.order_effective_technical_specifications.find(x => x.id === id);
                 if (e) {
                     if (s.includes("industrial_gate_status = 'authorized'") || s.includes("industrial_gate_status = ?")) {
@@ -1720,27 +1737,74 @@ describe('BUDGET-02D-01 — End-to-End Real Integration & Lifecycle Certificatio
                 })
             ).rejects.toThrow(/DISPATCH_BLOCKED: Refund settlement pending. Independent industrial authorization required/);
 
-            // 11.5 FIN-01: Delta negativo (REFUND_PENDING) CON autorización en el contexto de despacho -> PERMITIDO
-            const contextAuthResult = await marketplaceDispatchGatingService.dispatchOrder(orderRef, 'node_alpha_press', {
-                userId: 'user_finance_admin',
-                printhouseId,
-                tenantId,
-                role: 'FINANCE_MANAGER',
-                allowDispatchWithPendingRefund: true
-            });
-            expect(contextAuthResult.ok).toBe(true);
-            expect(contextAuthResult.status).toBe('IN_PRODUCTION');
+            // 11.5 SEC-D01: Delta negativo (REFUND_PENDING) CON banderas de contexto no autenticadas -> ESTRICTAMENTE BLOQUEADO
+            // Banderas como allowDispatchWithPendingRefund, industrialOverride o industrialAuthorization no deben permitir bypass
+            await expect(
+                marketplaceDispatchGatingService.dispatchOrder(orderRef, 'node_alpha_press', {
+                    userId: 'user_finance_admin',
+                    printhouseId,
+                    tenantId,
+                    role: 'FINANCE_MANAGER',
+                    allowDispatchWithPendingRefund: true,
+                    industrialOverride: true,
+                    industrialAuthorization: { status: 'AUTHORIZED' }
+                })
+            ).rejects.toThrow(/DISPATCH_BLOCKED: Refund settlement pending. Independent industrial authorization required/);
 
-            // 11.6 FIN-01: Autorización independiente persistida mediante authorizeIndustrialDispatch -> PERMITIDO
+            // 11.6 SEC-D02: Pruebas adversariales de autorización industrial (RBAC, Tenancy, Identidad Ficticia, Razón)
+            // 11.6.1 Identidad ficticia (system_manager) -> DENEGADO
+            await expect(
+                marketplaceDispatchGatingService.authorizeIndustrialDispatch(orderRef, {
+                    userId: 'system_manager',
+                    role: 'PLANT_DIRECTOR',
+                    reason: 'Formal management sign-off for negative delta'
+                })
+            ).rejects.toThrow(/UNAUTHORIZED: Valid authenticated operator identity required/);
+
+            // 11.6.2 Operador sin permiso (OPERATOR / VIEWER) -> DENEGADO
+            await expect(
+                marketplaceDispatchGatingService.authorizeIndustrialDispatch(orderRef, {
+                    userId: 'user_unauthorized_op',
+                    role: 'OPERATOR',
+                    reason: 'Unauthorized operator attempting gate override'
+                })
+            ).rejects.toThrow(/FORBIDDEN: User role 'OPERATOR' does not have industrial authorization permission/);
+
+            // 11.6.3 Tenant ajeno intentando autorizar -> DENEGADO
+            await expect(
+                marketplaceDispatchGatingService.authorizeIndustrialDispatch(orderRef, {
+                    userId: 'plant_manager_rogue',
+                    role: 'PLANT_DIRECTOR',
+                    tenantId: 'tenant_foreign_hacker',
+                    printhouseId,
+                    reason: 'Cross-tenant illegal authorization attempt'
+                })
+            ).rejects.toThrow(/FORBIDDEN: Tenant mismatch/);
+
+            // 11.6.4 Razón omitida o insuficiente (< 5 chars) -> DENEGADO
+            await expect(
+                marketplaceDispatchGatingService.authorizeIndustrialDispatch(orderRef, {
+                    userId: 'plant_manager_01',
+                    role: 'PLANT_DIRECTOR',
+                    tenantId,
+                    printhouseId,
+                    reason: 'ok'
+                })
+            ).rejects.toThrow(/BAD_REQUEST: Industrial authorization requires a justified reason/);
+
+            // 11.6.5 Autorización válida por responsable acreditado -> PERSISTIDO y AUDITADO
             oetsUnpaid.industrial_gate_status = 'PREFLIGHT_PENDING';
             const authRecord = await marketplaceDispatchGatingService.authorizeIndustrialDispatch(orderRef, {
                 userId: 'plant_manager_01',
                 role: 'PLANT_DIRECTOR',
-                reason: 'Formal management sign-off for negative delta manufacturing'
+                tenantId,
+                printhouseId,
+                reason: 'Formal plant director sign-off for negative delta manufacturing'
             });
             expect(authRecord.ok).toBe(true);
             expect(authRecord.industrial_gate_status).toBe('AUTHORIZED');
 
+            // Ahora el despacho a máquina tiene éxito al verificar la decisión persistida
             const managerAuthResult = await marketplaceDispatchGatingService.dispatchOrder(orderRef, 'node_alpha_press', {
                 userId: 'user_operator',
                 printhouseId,
@@ -1750,10 +1814,34 @@ describe('BUDGET-02D-01 — End-to-End Real Integration & Lifecycle Certificatio
             expect(managerAuthResult.ok).toBe(true);
             expect(managerAuthResult.status).toBe('IN_PRODUCTION');
 
-            // 11.7 FIN-01: Reembolso liquidado y confirmado (REFUND_SETTLED) -> PERMITIDO
+            // 11.7 SEC-D03: Liquidación financiera de devolución verificable
+            // 11.7.1 Liquidación con pseudo-referencia local (ref_tx_...) -> DENEGADO
+            await expect(
+                marketplaceDispatchGatingService.settleRefund(orderRef, {
+                    userId: 'treasury_operator_01',
+                    role: 'FINANCE_DIRECTOR',
+                    tenantId,
+                    settlementRef: 'ref_tx_998877'
+                })
+            ).rejects.toThrow(/INVALID_SETTLEMENT_REFERENCE: Fake or local pseudo-references are rejected/);
+
+            // 11.7.2 Liquidación por rol no autorizado (OPERATOR) -> DENEGADO
+            await expect(
+                marketplaceDispatchGatingService.settleRefund(orderRef, {
+                    userId: 'treasury_operator_01',
+                    role: 'OPERATOR',
+                    tenantId,
+                    settlementRef: 'BNK_TX_2026_998877'
+                })
+            ).rejects.toThrow(/FORBIDDEN: User role 'OPERATOR' does not have financial refund settlement permission/);
+
+            // 11.7.3 Liquidación acreditada con referencia bancaria/ERP real -> PERMITIDO
             const settlementResult = await marketplaceDispatchGatingService.settleRefund(orderRef, {
-                settlementRef: 'bank_ref_tx_998877',
-                userId: 'treasury_operator'
+                userId: 'treasury_director_01',
+                role: 'FINANCE_DIRECTOR',
+                tenantId,
+                settlementRef: 'BNK_TX_2026_998877',
+                provider: 'BANK_TRANSFER_LEDGER'
             });
             expect(settlementResult.ok).toBe(true);
             expect(settlementResult.financial_reconciliation_status).toBe('REFUND_SETTLED');
