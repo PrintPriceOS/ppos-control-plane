@@ -18,13 +18,19 @@ function normalizeRows(res) {
     return [];
 }
 
+function isProductionEnvironment() {
+    const nodeEnv = (process.env.NODE_ENV || '').toLowerCase();
+    const pposEnv = (process.env.PPOS_ENVIRONMENT || '').toLowerCase();
+    return nodeEnv === 'production' || pposEnv === 'production';
+}
+
 class MarketplaceDispatchGatingService {
     constructor(financialAdapter = null) {
         this.trustedFinancialAdapter = financialAdapter || trustedFinancialAdapter;
     }
 
     setFinancialAdapter(adapter) {
-        if ((process.env.NODE_ENV || '').toLowerCase() === 'production') {
+        if (isProductionEnvironment()) {
             throw new Error('ADAPTER_SUBSTITUTION_FORBIDDEN_IN_PRODUCTION: Dynamic financial adapter substitution is strictly forbidden in production. Production adapter selection is immutable.');
         }
         this.trustedFinancialAdapter = adapter;
@@ -682,27 +688,111 @@ class MarketplaceDispatchGatingService {
 
             const eff = effectiveRows[0];
 
-            // Idempotency: If already settled, check that caller is referencing the same settlement
+            // Idempotency & Replay Verification against Authoritative Table 171 (SEC-R5-02 & BUDGET-02D-01R5V)
             if (eff.financial_reconciliation_status === 'REFUND_SETTLED') {
-                const pastSettlementEvents = await runTxQuery(
-                    `SELECT metadata_json FROM marketplace_events 
-                     WHERE event_type = 'REFUND_OBLIGATION_SETTLED' 
-                     AND (order_id = ? OR order_ref = ?) 
-                     ORDER BY created_at DESC LIMIT 1`,
-                    [order.id, canonicalRef]
-                );
-                let originalSettlementRef = null;
-                if (pastSettlementEvents.length > 0) {
+                let persistentRecord = null;
+
+                try {
+                    const voucherRows = await runTxQuery(
+                        `SELECT * FROM financial_settlement_vouchers 
+                         WHERE (canonical_order_id = ? OR canonical_order_id = ? OR effective_specification_id = ?) 
+                         ORDER BY settled_at DESC LIMIT 1 FOR UPDATE`,
+                        [canonicalRef, order.id, eff.id]
+                    );
+                    if (voucherRows.length > 0) {
+                        persistentRecord = voucherRows[0];
+                    }
+                } catch (_) {}
+
+                // Fallback for legacy events if table 171 record is absent
+                if (!persistentRecord) {
                     try {
-                        const m = typeof pastSettlementEvents[0].metadata_json === 'string'
-                            ? JSON.parse(pastSettlementEvents[0].metadata_json)
-                            : (pastSettlementEvents[0].metadata_json || {});
-                        originalSettlementRef = m.settlement_ref;
+                        const pastEvents = await runTxQuery(
+                            `SELECT metadata_json FROM marketplace_events 
+                             WHERE event_type = 'REFUND_OBLIGATION_SETTLED' 
+                             AND (order_id = ? OR order_ref = ?) 
+                             ORDER BY created_at DESC LIMIT 1`,
+                            [order.id, canonicalRef]
+                        );
+                        if (pastEvents.length > 0) {
+                            const m = typeof pastEvents[0].metadata_json === 'string'
+                                ? JSON.parse(pastEvents[0].metadata_json)
+                                : (pastEvents[0].metadata_json || {});
+                            if (m.settlement_ref) {
+                                persistentRecord = {
+                                    provider: m.provider || rawProvider,
+                                    provider_voucher_id: m.voucher_id || m.settlement_ref,
+                                    settlement_ref: m.settlement_ref,
+                                    obligation_id: m.obligation_id,
+                                    amount_cents: m.amount_cents !== undefined ? m.amount_cents : (m.amount ? Math.round(Number(m.amount) * 100) : null),
+                                    currency: m.currency,
+                                    beneficiary: m.beneficiary
+                                };
+                            }
+                        }
                     } catch (_) {}
                 }
 
-                if (originalSettlementRef && originalSettlementRef !== settlementRef) {
-                    throw new Error(`SETTLEMENT_MISMATCH: Order has already been settled with reference '${originalSettlementRef}'. Cannot replay with different reference '${settlementRef}'.`);
+                if (!persistentRecord || !persistentRecord.settlement_ref) {
+                    throw new Error('SETTLEMENT_RECORD_MISSING: Order is marked REFUND_SETTLED but no authoritative settlement record was found for replay validation.');
+                }
+
+                // 1. Settlement Reference Match
+                const persistentRef = String(persistentRecord.settlement_ref || '').trim();
+                if (!persistentRef || persistentRef !== settlementRef) {
+                    throw new Error(`SETTLEMENT_MISMATCH: Order has already been settled with reference '${persistentRef}'. Cannot replay with different reference '${settlementRef}'.`);
+                }
+
+                // 2. Provider Match
+                const persistentProvider = String(persistentRecord.provider || '').trim().toUpperCase();
+                if (persistentProvider && persistentProvider !== rawProvider) {
+                    throw new Error(`SETTLEMENT_MISMATCH: Provider mismatch for settled order ('${persistentProvider}' vs '${rawProvider}').`);
+                }
+
+                // 3. Voucher Match (Comprobante)
+                const callerVoucherId = settlementContext.voucher_id || settlementContext.voucherId ||
+                    (settlementContext.evidence && (settlementContext.evidence.voucher_id || settlementContext.evidence.voucherId)) ||
+                    (settlementContext.proof && (settlementContext.proof.voucher_id || settlementContext.proof.voucherId));
+                const persistentVoucher = String(persistentRecord.provider_voucher_id || '').trim();
+                if (callerVoucherId && persistentVoucher && String(callerVoucherId).trim() !== persistentVoucher) {
+                    throw new Error(`SETTLEMENT_MISMATCH: Voucher mismatch for settled order ('${persistentVoucher}' vs '${callerVoucherId}').`);
+                }
+
+                // 4. Obligation ID Match
+                const callerObligationId = settlementContext.obligationId || settlementContext.obligation_id;
+                const persistentObligation = String(persistentRecord.obligation_id || '').trim();
+                if (callerObligationId && persistentObligation && String(callerObligationId).trim() !== persistentObligation) {
+                    throw new Error(`SETTLEMENT_MISMATCH: Obligation mismatch for settled order ('${persistentObligation}' vs '${callerObligationId}').`);
+                }
+
+                // 5. Amount Match in minor units (cents)
+                if (settlementContext.amount !== undefined && settlementContext.amount !== null && settlementContext.amount !== '') {
+                    const callerAmount = Math.abs(Number(settlementContext.amount));
+                    const callerMinor = Math.round(callerAmount * 100);
+                    const persistentMinor = persistentRecord.amount_cents !== undefined && persistentRecord.amount_cents !== null
+                        ? Number(persistentRecord.amount_cents)
+                        : null;
+                    if (persistentMinor !== null && callerMinor !== persistentMinor) {
+                        throw new Error(`SETTLEMENT_MISMATCH: Settlement amount mismatch for settled order (${callerAmount} vs ${persistentMinor / 100}).`);
+                    }
+                }
+
+                // 6. Currency Match
+                if (settlementContext.currency) {
+                    const callerCurrency = String(settlementContext.currency).trim().toUpperCase();
+                    const persistentCurrency = String(persistentRecord.currency || '').trim().toUpperCase();
+                    if (persistentCurrency && callerCurrency !== persistentCurrency) {
+                        throw new Error(`SETTLEMENT_MISMATCH: Settlement currency mismatch for settled order ('${persistentCurrency}' vs '${callerCurrency}').`);
+                    }
+                }
+
+                // 7. Beneficiary Match
+                if (settlementContext.beneficiary) {
+                    const callerBeneficiary = String(settlementContext.beneficiary).trim().toLowerCase();
+                    const persistentBeneficiary = String(persistentRecord.beneficiary || '').trim().toLowerCase();
+                    if (persistentBeneficiary && callerBeneficiary !== persistentBeneficiary) {
+                        throw new Error(`SETTLEMENT_MISMATCH: Settlement beneficiary mismatch for settled order ('${persistentRecord.beneficiary}' vs '${settlementContext.beneficiary}').`);
+                    }
                 }
 
                 await conn.commit();
@@ -710,8 +800,12 @@ class MarketplaceDispatchGatingService {
                     ok: true,
                     effective_specification_id: eff.id,
                     financial_reconciliation_status: 'REFUND_SETTLED',
-                    settlement_ref: originalSettlementRef || settlementRef,
-                    provider: rawProvider,
+                    settlement_ref: persistentRef,
+                    provider: persistentProvider || rawProvider,
+                    voucher_id: persistentRecord.provider_voucher_id || persistentRef,
+                    amount_cents: persistentRecord.amount_cents,
+                    currency: persistentRecord.currency,
+                    beneficiary: persistentRecord.beneficiary,
                     idempotent_replay: true
                 };
             }
@@ -796,7 +890,7 @@ class MarketplaceDispatchGatingService {
             }
 
             // 8.5 Authoritative Verification via Trusted Financial Settlement Adapter (TRUST-01, TRUST-R4-01..03, SEC-R5-01)
-            const isProd = (process.env.NODE_ENV || '').toLowerCase() === 'production';
+            const isProd = isProductionEnvironment();
             const effectiveFinancialAdapter = isProd ? trustedFinancialAdapter : this.trustedFinancialAdapter;
 
             const targetOrderId = order.order_id || order.order_ref || order.id;

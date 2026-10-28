@@ -458,14 +458,17 @@ class TestSandboxFinancialSettlementAdapter {
 }
 
 function isProductionEnvironment() {
-    return (process.env.NODE_ENV || '').toLowerCase() === 'production';
+    const nodeEnv = (process.env.NODE_ENV || '').toLowerCase();
+    const pposEnv = (process.env.PPOS_ENVIRONMENT || '').toLowerCase();
+    return nodeEnv === 'production' || pposEnv === 'production';
 }
 
 /**
  * Factory helper to instantiate the appropriate adapter based on environment.
  */
 function createFinancialSettlementAdapter(options = {}) {
-    const isProd = (options.env || process.env.NODE_ENV) === 'production' || isProductionEnvironment();
+    const optEnv = (options.env || '').toLowerCase();
+    const isProd = optEnv === 'production' || isProductionEnvironment();
     if (isProd) {
         return new ProductionFinancialSettlementAdapter(options);
     }

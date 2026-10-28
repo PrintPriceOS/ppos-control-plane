@@ -401,6 +401,11 @@ describe('BUDGET-02D-01 — End-to-End Real Integration & Lifecycle Certificatio
                         v => v.provider === provider && v.provider_voucher_id === voucherId
                     );
                 }
+                if (s.includes('canonical_order_id = ?') || s.includes('effective_specification_id = ?')) {
+                    return this.tables.financial_settlement_vouchers.filter(
+                        v => params.includes(v.canonical_order_id) || params.includes(v.effective_specification_id)
+                    );
+                }
                 return this.tables.financial_settlement_vouchers;
             }
 
@@ -2147,6 +2152,19 @@ describe('BUDGET-02D-01 — End-to-End Real Integration & Lifecycle Certificatio
                 process.env.NODE_ENV = origEnv;
             }
 
+            // SEC-R5-01: Verificación dual de entorno productivo con PPOS_ENVIRONMENT=production
+            const origPposEnv = process.env.PPOS_ENVIRONMENT;
+            try {
+                process.env.PPOS_ENVIRONMENT = 'production';
+                expect(() => {
+                    marketplaceDispatchGatingService.setFinancialAdapter({
+                        verifySettlement: async () => ({ verified: true })
+                    });
+                }).toThrow(/ADAPTER_SUBSTITUTION_FORBIDDEN_IN_PRODUCTION/);
+            } finally {
+                process.env.PPOS_ENVIRONMENT = origPposEnv;
+            }
+
             // 11.7.4.f Adaptador productivo sin integración activa mantiene REFUND_PENDING (TRUST-R4-03)
             const prodAdapter = new trustedFinancialAdapter.ProductionFinancialSettlementAdapter();
             marketplaceDispatchGatingService.setFinancialAdapter(prodAdapter);
@@ -2328,7 +2346,8 @@ describe('BUDGET-02D-01 — End-to-End Real Integration & Lifecycle Certificatio
             expect(idempotentResult.ok).toBe(true);
             expect(idempotentResult.idempotent_replay).toBe(true);
 
-            // 11.7.7 Intento de repetición con una referencia distinta sobre orden ya saldada -> SETTLEMENT_MISMATCH (TRUST-03)
+            // 11.7.7 Intento de repetición con parámetros discordantes sobre orden ya saldada -> SETTLEMENT_MISMATCH (TRUST-03)
+            // 11.7.7.a Referencia discordante
             await expect(
                 marketplaceDispatchGatingService.settleRefund(orderRef, {
                     userId: 'treasury_director_01',
@@ -2339,6 +2358,92 @@ describe('BUDGET-02D-01 — End-to-End Real Integration & Lifecycle Certificatio
                     amount: 30.00,
                     currency: 'EUR',
                     beneficiary: 'customer_sc11@editorial.com'
+                })
+            ).rejects.toThrow(/SETTLEMENT_MISMATCH/);
+
+            // 11.7.7.b Proveedor discordante
+            await expect(
+                marketplaceDispatchGatingService.settleRefund(orderRef, {
+                    userId: 'treasury_director_01',
+                    role: 'FINANCE_DIRECTOR',
+                    tenantId,
+                    settlementRef: 'BNK_TX_2026_998877',
+                    provider: 'STRIPE',
+                    amount: 30.00,
+                    currency: 'EUR',
+                    beneficiary: 'customer_sc11@editorial.com'
+                })
+            ).rejects.toThrow(/SETTLEMENT_MISMATCH/);
+
+            // 11.7.7.c Importe discordante
+            await expect(
+                marketplaceDispatchGatingService.settleRefund(orderRef, {
+                    userId: 'treasury_director_01',
+                    role: 'FINANCE_DIRECTOR',
+                    tenantId,
+                    settlementRef: 'BNK_TX_2026_998877',
+                    provider: 'BANK_TRANSFER_LEDGER',
+                    amount: 99.00,
+                    currency: 'EUR',
+                    beneficiary: 'customer_sc11@editorial.com'
+                })
+            ).rejects.toThrow(/SETTLEMENT_MISMATCH/);
+
+            // 11.7.7.d Divisa discordante
+            await expect(
+                marketplaceDispatchGatingService.settleRefund(orderRef, {
+                    userId: 'treasury_director_01',
+                    role: 'FINANCE_DIRECTOR',
+                    tenantId,
+                    settlementRef: 'BNK_TX_2026_998877',
+                    provider: 'BANK_TRANSFER_LEDGER',
+                    amount: 30.00,
+                    currency: 'USD',
+                    beneficiary: 'customer_sc11@editorial.com'
+                })
+            ).rejects.toThrow(/SETTLEMENT_MISMATCH/);
+
+            // 11.7.7.e Beneficiario discordante
+            await expect(
+                marketplaceDispatchGatingService.settleRefund(orderRef, {
+                    userId: 'treasury_director_01',
+                    role: 'FINANCE_DIRECTOR',
+                    tenantId,
+                    settlementRef: 'BNK_TX_2026_998877',
+                    provider: 'BANK_TRANSFER_LEDGER',
+                    amount: 30.00,
+                    currency: 'EUR',
+                    beneficiary: 'adversary@fraud.com'
+                })
+            ).rejects.toThrow(/SETTLEMENT_MISMATCH/);
+
+            // 11.7.7.f Obligación discordante
+            await expect(
+                marketplaceDispatchGatingService.settleRefund(orderRef, {
+                    userId: 'treasury_director_01',
+                    role: 'FINANCE_DIRECTOR',
+                    tenantId,
+                    settlementRef: 'BNK_TX_2026_998877',
+                    provider: 'BANK_TRANSFER_LEDGER',
+                    amount: 30.00,
+                    currency: 'EUR',
+                    beneficiary: 'customer_sc11@editorial.com',
+                    obligationId: 'fictitious_obl_999'
+                })
+            ).rejects.toThrow(/SETTLEMENT_MISMATCH/);
+
+            // 11.7.7.g Comprobante discordante (voucher_id)
+            await expect(
+                marketplaceDispatchGatingService.settleRefund(orderRef, {
+                    userId: 'treasury_director_01',
+                    role: 'FINANCE_DIRECTOR',
+                    tenantId,
+                    settlementRef: 'BNK_TX_2026_998877',
+                    provider: 'BANK_TRANSFER_LEDGER',
+                    amount: 30.00,
+                    currency: 'EUR',
+                    beneficiary: 'customer_sc11@editorial.com',
+                    voucher_id: 'VOUCHER-TAMPERED-999'
                 })
             ).rejects.toThrow(/SETTLEMENT_MISMATCH/);
 

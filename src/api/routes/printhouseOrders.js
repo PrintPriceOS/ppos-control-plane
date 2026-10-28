@@ -250,6 +250,7 @@ async function handleSettleRefund(req, res) {
                            err.message.includes('NO_REFUND_OBLIGATION') ? 404 :
                            err.message.includes('DUPLICATE_SETTLEMENT_REFERENCE') ? 409 :
                            err.message.includes('EVIDENCE_ALREADY_CONSUMED') ? 409 :
+                           err.message.includes('SETTLEMENT_RECORD_MISSING') ? 409 :
                            err.message.includes('SETTLEMENT_MISMATCH') ? 409 :
                            err.message.includes('ORDER_INELIGIBLE') ? 409 :
                            err.message.includes('DATABASE_CONNECTION_ERROR') ? 503 :

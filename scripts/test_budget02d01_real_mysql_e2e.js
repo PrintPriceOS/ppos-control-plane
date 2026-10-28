@@ -885,6 +885,111 @@ async function runRealMysqlCertification() {
         assert.ok(diffRefError, 'Replay with different reference must be rejected');
         assert.ok(diffRefError.message.includes('SETTLEMENT_MISMATCH'), diffRefError.message);
 
+        // 6.7.c2 (BUDGET-02D-01R5V): Replay with divergent provider -> SETTLEMENT_MISMATCH
+        let diffProvErr = null;
+        try {
+            await marketplaceDispatchGatingService.settleRefund(testOrderId, {
+                userId: 'finance_mgr_01',
+                role: 'FINANCE_DIRECTOR',
+                tenantId: testTenantId,
+                settlementRef: 'BCN_ERP_CREDIT_NOTE_2026_0991',
+                provider: 'STRIPE',
+                amount: 45.50,
+                currency: 'EUR',
+                beneficiary: 'procurement@editorial.com'
+            });
+        } catch (err) {
+            diffProvErr = err;
+        }
+        assert.ok(diffProvErr && diffProvErr.message.includes('SETTLEMENT_MISMATCH'), 'Replay with divergent provider must throw SETTLEMENT_MISMATCH');
+
+        // 6.7.c3 (BUDGET-02D-01R5V): Replay with divergent amount -> SETTLEMENT_MISMATCH
+        let diffAmtErr = null;
+        try {
+            await marketplaceDispatchGatingService.settleRefund(testOrderId, {
+                userId: 'finance_mgr_01',
+                role: 'FINANCE_DIRECTOR',
+                tenantId: testTenantId,
+                settlementRef: 'BCN_ERP_CREDIT_NOTE_2026_0991',
+                provider: 'ERP_CREDIT_NOTE',
+                amount: 99.99,
+                currency: 'EUR',
+                beneficiary: 'procurement@editorial.com'
+            });
+        } catch (err) {
+            diffAmtErr = err;
+        }
+        assert.ok(diffAmtErr && diffAmtErr.message.includes('SETTLEMENT_MISMATCH'), 'Replay with divergent amount must throw SETTLEMENT_MISMATCH');
+
+        // 6.7.c4 (BUDGET-02D-01R5V): Replay with divergent currency -> SETTLEMENT_MISMATCH
+        let diffCurErr = null;
+        try {
+            await marketplaceDispatchGatingService.settleRefund(testOrderId, {
+                userId: 'finance_mgr_01',
+                role: 'FINANCE_DIRECTOR',
+                tenantId: testTenantId,
+                settlementRef: 'BCN_ERP_CREDIT_NOTE_2026_0991',
+                provider: 'ERP_CREDIT_NOTE',
+                amount: 45.50,
+                currency: 'USD',
+                beneficiary: 'procurement@editorial.com'
+            });
+        } catch (err) {
+            diffCurErr = err;
+        }
+        assert.ok(diffCurErr && diffCurErr.message.includes('SETTLEMENT_MISMATCH'), 'Replay with divergent currency must throw SETTLEMENT_MISMATCH');
+
+        // 6.7.c5 (BUDGET-02D-01R5V): Replay with divergent beneficiary -> SETTLEMENT_MISMATCH
+        let diffBenErr = null;
+        try {
+            await marketplaceDispatchGatingService.settleRefund(testOrderId, {
+                userId: 'finance_mgr_01',
+                role: 'FINANCE_DIRECTOR',
+                tenantId: testTenantId,
+                settlementRef: 'BCN_ERP_CREDIT_NOTE_2026_0991',
+                provider: 'ERP_CREDIT_NOTE',
+                amount: 45.50,
+                currency: 'EUR',
+                beneficiary: 'fraud_beneficiary@fake.com'
+            });
+        } catch (err) {
+            diffBenErr = err;
+        }
+        assert.ok(diffBenErr && diffBenErr.message.includes('SETTLEMENT_MISMATCH'), 'Replay with divergent beneficiary must throw SETTLEMENT_MISMATCH');
+
+        // 6.7.c6 (BUDGET-02D-01R5V): Replay with divergent voucher_id -> SETTLEMENT_MISMATCH
+        let diffVchErr = null;
+        try {
+            await marketplaceDispatchGatingService.settleRefund(testOrderId, {
+                userId: 'finance_mgr_01',
+                role: 'FINANCE_DIRECTOR',
+                tenantId: testTenantId,
+                settlementRef: 'BCN_ERP_CREDIT_NOTE_2026_0991',
+                provider: 'ERP_CREDIT_NOTE',
+                amount: 45.50,
+                currency: 'EUR',
+                beneficiary: 'procurement@editorial.com',
+                voucher_id: 'CN-2026-DIFFERENT-TAMPERED'
+            });
+        } catch (err) {
+            diffVchErr = err;
+        }
+        assert.ok(diffVchErr && diffVchErr.message.includes('SETTLEMENT_MISMATCH'), 'Replay with divergent voucher_id must throw SETTLEMENT_MISMATCH');
+
+        // 6.7.c7 (BUDGET-02D-01R5V): Dual-flag production check with PPOS_ENVIRONMENT=production
+        const origPposEnv = process.env.PPOS_ENVIRONMENT;
+        try {
+            process.env.PPOS_ENVIRONMENT = 'production';
+            assert.throws(() => {
+                marketplaceDispatchGatingService.setFinancialAdapter({
+                    verifySettlement: async () => ({ verified: true })
+                });
+            }, /ADAPTER_SUBSTITUTION_FORBIDDEN_IN_PRODUCTION/);
+        } finally {
+            process.env.PPOS_ENVIRONMENT = origPposEnv;
+        }
+        console.log(`  ✓ BUDGET-02D-01R5V Certified: Table 171 multi-dimensional replay verification and dual-flag PPOS_ENVIRONMENT=production enforced in MySQL 8.`);
+
         const [specAfterSettled] = await testPool.query(
             'SELECT financial_reconciliation_status FROM order_effective_technical_specifications WHERE id = ?',
             [specId]

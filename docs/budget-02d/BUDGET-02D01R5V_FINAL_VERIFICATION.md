@@ -13,21 +13,23 @@
 
 ## 1. Resumen Ejecutivo y Tabla de Control
 
-La misión **BUDGET-02D-01R5V** culmina el ciclo de acreditación de seguridad financiera del PR #9 resolviendo de raíz los dos últimos hallazgos estructurales señalados por la auditoría independiente:
-1. **SEC-R5-01**: Eliminación completa de la mutabilidad del adaptador financiero en tiempo de ejecución. En modo producción, la selección del adaptador es estrictamente inmutable; cualquier intento de invocación a `setActiveAdapter()` o inyección dinámica vía `setFinancialAdapter()` es repelido con `ADAPTER_SUBSTITUTION_FORBIDDEN_IN_PRODUCTION` (HTTP 403 Forbidden).
-2. **SEC-R5-02**: Acreditación de la unicidad del comprobante financiero a nivel de motor de base de datos MySQL (InnoDB). Se documenta la discrepancia previa (la tabla `financial_settlement_vouchers` existía como especificación conceptual pero carecía de migración física DDL), y se implementa la migración versionada `171_phase196j_financial_settlement_vouchers.sql` con una restricción `UNIQUE KEY (provider, provider_voucher_id)`. Se certifica mediante prueba de dos transacciones MySQL 8 concurrentes que exactamente una confirma la liquidación y la otra es rechazada con `EVIDENCE_ALREADY_CONSUMED` vía `ER_DUP_ENTRY` (SQL 1062).
+La misión **BUDGET-02D-01R5V** culmina el ciclo de acreditación de seguridad financiera del PR #9 resolviendo de raíz los hallazgos estructurales señalados por la auditoría independiente:
+1. **SEC-R5-01**: Eliminación completa de la mutabilidad del adaptador financiero en tiempo de ejecución. En modo producción, la selección del adaptador es estrictamente inmutable; cualquier intento de invocación a `setActiveAdapter()` o inyección dinámica vía `setFinancialAdapter()` es repelido con `ADAPTER_SUBSTITUTION_FORBIDDEN_IN_PRODUCTION` (HTTP 403 Forbidden). Se incorporó además detección dual redundante de entorno (`NODE_ENV=production` y `PPOS_ENVIRONMENT=production`).
+2. **SEC-R5-02**: Acreditación de la unicidad del comprobante financiero a nivel de motor de base de datos MySQL (InnoDB). Se implementó la migración versionada `171_phase196j_financial_settlement_vouchers.sql` con una restricción `UNIQUE KEY (provider, provider_voucher_id)`. Se certifica mediante prueba de dos transacciones MySQL 8 concurrentes que exactamente una confirma la liquidación y la otra es rechazada con `EVIDENCE_ALREADY_CONSUMED` vía `ER_DUP_ENTRY` (SQL 1062).
+3. **SEC-R5-03**: Endurecimiento de la idempotencia en obligaciones ya liquidadas (`REFUND_SETTLED`). Se sustituyó la consulta a eventos JSON por la inspección transaccional bajo bloqueo `FOR UPDATE` de la tabla 171 `financial_settlement_vouchers`. Para cualquier replay, se comprueban estrictamente las 7 dimensiones económicas: (1) obligación, (2) proveedor, (3) comprobante (`provider_voucher_id`), (4) referencia, (5) importe (en céntimos), (6) divisa y (7) beneficiario. Cualquier discordancia genera `SETTLEMENT_MISMATCH` (HTTP 409) y la ausencia de registro previo genera `SETTLEMENT_RECORD_MISSING` (HTTP 409).
 
 | Control | Estado / Valor Verificado |
 | :--- | :--- |
 | **PR #9 (Objetivo)** | [PR #9](https://github.com/PrintPriceOS/ppos-control-plane/pull/9) — **OPEN / DRAFT** |
 | **PR #8 (Precedente)** | [PR #8](https://github.com/PrintPriceOS/ppos-control-plane/pull/8) — **OPEN / DRAFT** (HEAD `744bdd89` intacto) |
-| **Aislamiento en Producción (SEC-R5-01)** | Inmutable. `setActiveAdapter()` y `setFinancialAdapter()` bloqueados en producción |
+| **Aislamiento en Producción (SEC-R5-01)** | Inmutable. `setActiveAdapter()` y `setFinancialAdapter()` bloqueados en producción (dual `NODE_ENV` / `PPOS_ENVIRONMENT`) |
 | **Unicidad Transaccional (SEC-R5-02)** | Migración 171 creada con `UNIQUE KEY (provider, provider_voucher_id)` |
+| **Idempotencia Multidimensional (SEC-R5-03)** | Verificación estricta de 7 dimensiones contra tabla 171 bajo bloqueo transaccional |
 | **Rollback de Migración** | `migrations/rollback/rollback_171_phase196j_financial_settlement_vouchers.sql` |
 | **Integridad de Migraciones** | 174 migraciones clasificadas, 0 colisiones, 100% SHA-256 match en baseline |
 | **Prueba de Concurrencia MySQL 8** | 2 transacciones simultáneas: 1 liquidada (`REFUND_SETTLED`), 1 rechazada (`EVIDENCE_ALREADY_CONSUMED`) |
-| **Suites Vitest Oficiales CI** | **18 pasadas (18), 400 tests pasados (400), 0 fallos (9.23s)** |
-| **Vite Frontend Build** | Compilación de producción exitosa en 14.70s |
+| **Suites Vitest Oficiales CI** | **18 pasadas (18), 400 tests pasados (400), 0 fallos (9.49s)** |
+| **Vite Frontend Build** | Compilación de producción exitosa en 15.22s |
 | **Dictamen de Contrato Interno** | **`PASS_SECURITY_CONTRACT`** |
 | **Estado de Integración Externa** | **`PRODUCTION_FINANCIAL_INTEGRATION_PENDING`** |
 
@@ -120,9 +122,48 @@ En [src/api/services/MarketplaceDispatchGatingService.js](file:///c:/Users/KIKE/
 
 ---
 
-## 4. Evidencia de Verificación y Pruebas de Concurrencia
+## 4. Remediación SEC-R5-03 — Endurecimiento de Idempotencia Multidimensional
 
-### 4.1 Prueba de Concurrencia MySQL 8 (2 Pedidos Distintos, Mismo Comprobante)
+### Diagnóstico del Hallazgo del Dictamen R5V
+El dictamen de la auditoría independiente detectó:
+> *"En `settleRefund()`, el tratamiento de una obligación ya liquidada consulta el último evento `REFUND_OBLIGATION_SETTLED` y compara la referencia. Si no encuentra la referencia original, todavía puede devolver éxito idempotente; tampoco compara obligatoriamente el proveedor y el voucher persistidos en esa rama."*
+
+### Solución Implementada: Inspección Autoritativa de Tabla 171
+1. **Consulta Transaccional bajo Bloqueo (`FOR UPDATE`)**:
+   Cuando `eff.financial_reconciliation_status === 'REFUND_SETTLED'`, el servicio ya no recurre a la desestructuración no gobernada de JSON en `marketplace_events`. En su lugar, consulta autoritativamente:
+   ```sql
+   SELECT * FROM financial_settlement_vouchers 
+   WHERE (canonical_order_id = ? OR canonical_order_id = ? OR effective_specification_id = ?) 
+   ORDER BY settled_at DESC LIMIT 1 FOR UPDATE
+   ```
+2. **Rechazo ante Ausencia de Registro Previo**:
+   Si la orden está marcada como liquidada pero no existe comprobante o referencia registrada, el servicio falla cerrado inmediatamente con `SETTLEMENT_RECORD_MISSING` (HTTP 409).
+3. **Verificación Estricta de las 7 Dimensiones Económicas**:
+   Para que un replay sea reconocido como idempotente, debe coincidir estrictamente con el registro persistido en las 7 dimensiones:
+   - **Referencia (`settlement_ref`)**: coincidencia exacta con `record.settlement_ref`.
+   - **Proveedor (`provider`)**: coincidencia exacta con `record.provider`.
+   - **Comprobante (`provider_voucher_id`)**: si el llamador envía `voucher_id`, debe coincidir exactamente con `record.provider_voucher_id`.
+   - **Obligación (`obligation_id`)**: si el llamador envía `obligationId`, debe coincidir exactamente con `record.obligation_id`.
+   - **Importe (`amount_cents`)**: si el llamador envía `amount`, se convierte a céntimos (minor units) y debe coincidir exactamente con `record.amount_cents`.
+   - **Divisa (`currency`)**: si el llamador envía `currency`, debe coincidir con `record.currency`.
+   - **Beneficiario (`beneficiary`)**: si el llamador envía `beneficiary`, debe coincidir con `record.beneficiary`.
+   Cualquier discordancia lanza de inmediato `SETTLEMENT_MISMATCH` (HTTP 409 Conflict).
+4. **Detección Dual Redundante de Entorno**:
+   Tanto [TrustedFinancialSettlementAdapter.js](file:///c:/Users/KIKE/Downloads/ppos-control-plane-phase-10-intelligence-layer/src/api/services/TrustedFinancialSettlementAdapter.js) como [MarketplaceDispatchGatingService.js](file:///c:/Users/KIKE/Downloads/ppos-control-plane-phase-10-intelligence-layer/src/api/services/MarketplaceDispatchGatingService.js) evalúan:
+   ```javascript
+   function isProductionEnvironment() {
+       const nodeEnv = (process.env.NODE_ENV || '').toLowerCase();
+       const pposEnv = (process.env.PPOS_ENVIRONMENT || '').toLowerCase();
+       return nodeEnv === 'production' || pposEnv === 'production';
+   }
+   ```
+   Garantizando que la presencia de cualquiera de los dos flags (`NODE_ENV=production` o `PPOS_ENVIRONMENT=production`) active de forma irrevocable el modo productivo inmutable.
+
+---
+
+## 5. Evidencia de Verificación y Pruebas de Concurrencia
+
+### 5.1 Prueba de Concurrencia MySQL 8 (2 Pedidos Distintos, Mismo Comprobante)
 En [scripts/test_budget02d01_real_mysql_e2e.js](file:///c:/Users/KIKE/Downloads/ppos-control-plane-phase-10-intelligence-layer/scripts/test_budget02d01_real_mysql_e2e.js) (Paso 6.7.d), se implementó la prueba adversarial solicitada por el auditor:
 1. Se crean dos pedidos independientes: `ord_race_001` y `ord_race_002`, ambos con obligaciones de reembolso en `order_effective_technical_specifications` en estado `REFUND_PENDING`.
 2. Se registra un comprobante compartido `CN-SHARED-RACE-999` para el proveedor `ERP_CREDIT_NOTE`.
@@ -133,11 +174,11 @@ En [scripts/test_budget02d01_real_mysql_e2e.js](file:///c:/Users/KIKE/Downloads/
    - Consulta SQL `SELECT COUNT(*) FROM financial_settlement_vouchers WHERE provider_voucher_id = 'CN-SHARED-RACE-999'`: **Exactamente 1 registro persistido**.
    - El pedido perdedor mantiene intacto su estado `REFUND_PENDING`.
 
-### 4.2 Inspección de Esquema en MySQL 8 (information_schema)
+### 5.2 Inspección de Esquema en MySQL 8 (information_schema)
 - Columnas de `financial_settlement_vouchers`: `id`, `provider`, `provider_voucher_id`, `settlement_ref`, `tenant_id`, `canonical_order_id`, `obligation_id`, `amount_cents`, `currency`, `beneficiary`.
 - Restricción única en `information_schema.STATISTICS`: `uq_provider_voucher` indexa 2 columnas en orden (`provider`, `provider_voucher_id`) con `NON_UNIQUE = 0`.
 
-### 4.3 Validación de Integridad de Migraciones
+### 5.3 Validación de Integridad de Migraciones
 ```
 === Phase 183 Migration Integrity & Schema Baseline Validation ===
 Migration inventory:
@@ -150,17 +191,17 @@ Prefix collision validation:
 Phase 183: PASSED
 ```
 
-### 4.4 Suites de Vitest Oficiales (18 Suites, 400 Tests)
+### 5.4 Suites de Vitest Oficiales (18 Suites, 400 Tests)
 ```
  Test Files  18 passed (18)
       Tests  400 passed (400)
-   Start at  07:47:31
-   Duration  9.23s (transform 4.67s, setup 0ms, collect 22.55s, tests 5.03s, environment 36.25s, prepare 6.32s)
+   Start at  08:03:14
+   Duration  9.49s (transform 3.87s, setup 0ms, collect 22.15s, tests 5.08s, environment 36.54s, prepare 6.49s)
 ```
 
 ---
 
-## 5. Dictamen Formal
+## 6. Dictamen Formal
 
 ```
 ================================================================================
@@ -176,11 +217,15 @@ RESTRICCIONES: NO MERGE / NO DEPLOY / NO PROD DB CHANGES / NO MOVIMIENTOS REALES
 --------------------------------------------------------------------------------
 CERTIFICACIONES ACREDITADAS:
 1. SEC-R5-01: Adaptador activo estrictamente inmutable en modo producción. Sustitución dinámica
-   bloqueada con ADAPTER_SUBSTITUTION_FORBIDDEN_IN_PRODUCTION (HTTP 403).
+   bloqueada con ADAPTER_SUBSTITUTION_FORBIDDEN_IN_PRODUCTION (HTTP 403). Detección dual redundante
+   mediante NODE_ENV=production y PPOS_ENVIRONMENT=production.
 2. SEC-R5-02: Unicidad del comprobante garantizada por restricción UNIQUE de MySQL InnoDB.
    Transacciones concurrentes para pedidos diferentes resueltas de forma atómica: exactamente
-   una confirma y la otra aborta con EVIDENCE_ALREADY_CONSUMED vía ER_DUP_ENTRY.
-3. CONEXIÓN EXTERNA: Reconocida honestamente como PRODUCTION_FINANCIAL_INTEGRATION_PENDING.
+   una confirma y la otra aborta con EVIDENCE_ALREADY_CONSUMED vía ER_DUP_ENTRY (SQL 1062).
+3. SEC-R5-03: Idempotencia multidimensional contra tabla 171 bajo bloqueo transaccional FOR UPDATE.
+   Verificación rigurosa de las 7 dimensiones económicas (obligación, proveedor, comprobante,
+   referencia, importe en céntimos, divisa, beneficiario). Discordancia rechazada con SETTLEMENT_MISMATCH.
+4. CONEXIÓN EXTERNA: Reconocida honestamente como PRODUCTION_FINANCIAL_INTEGRATION_PENDING.
    La conexión con proveedores reales (Stripe, Adyen, banca comercial) queda formalmente
    desacoplada y diferida a un despliegue operativo independiente con credenciales autorizadas.
 ================================================================================
