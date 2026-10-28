@@ -33,6 +33,23 @@ export const SupplierCatalogOffersPage: React.FC = () => {
     const isReadOnly = role === 'SUPPLIER_VIEWER';
     const isAdmin = role === 'SUPPLIER_ADMIN';
 
+    const formatGrainLabel = (grain?: string | null) => {
+        if (!grain || grain === 'UNKNOWN') return t('supplier.hub.grainUnspecified');
+        if (grain === 'LONG_GRAIN') return t('supplier.hub.grainLong');
+        if (grain === 'SHORT_GRAIN') return t('supplier.hub.grainShort');
+        return grain;
+    };
+
+    const formatFinishLabel = (finish?: string | null) => {
+        if (!finish || finish === 'UNKNOWN') return t('supplier.hub.finishUnspecified');
+        return finish;
+    };
+
+    const formatCoatingLabel = (coating?: string | null) => {
+        if (!coating || coating === 'UNKNOWN') return t('supplier.hub.coatingUnspecified');
+        return coating;
+    };
+
     const [activeTab, setActiveTab] = useState<'CATALOG' | 'OFFERS'>('CATALOG');
     const [isImportModalOpen, setIsImportModalOpen] = useState<boolean>(false);
 
@@ -1144,10 +1161,10 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                                                     </td>
                                                     <td className="p-3">
                                                         <span className="px-2.5 py-0.5 text-[10px] font-medium rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700">
-                                                            {prod.category}
+                                                            {prod.paperType || prod.category}
                                                         </span>
                                                     </td>
-                                                    <td className="p-3 text-zinc-500">{prod.finish || '—'}</td>
+                                                    <td className="p-3 text-zinc-500">{formatFinishLabel(prod.finish)}</td>
                                                     <td className="p-3 font-mono text-emerald-600 dark:text-emerald-400">
                                                         {prod.variants?.length || 0} variants
                                                     </td>
@@ -1204,11 +1221,11 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                                                                 {v.gsm} gsm
                                                             </td>
                                                             <td className="p-3 font-mono text-zinc-500">
-                                                                Caliper: {v.caliperUm ? `${v.caliperUm} µm` : (v.caliperMicrons ? `${v.caliperMicrons} µm` : '—')}
+                                                                Caliper: {v.caliperUm ? `${v.caliperUm} µm` : (v.caliperMicrons ? `${v.caliperMicrons} µm` : t('supplier.hub.thicknessPending'))}
                                                             </td>
                                                             <td className="p-3">
                                                                 <span className="text-[10px] font-mono text-zinc-400">
-                                                                    Grain: {v.grainDirection || '—'}
+                                                                    {formatFinishLabel(v.finish)} · {formatGrainLabel(v.grainDirection)}
                                                                 </span>
                                                             </td>
                                                             <td className="p-3 font-mono text-[10px] text-zinc-400">
@@ -1667,7 +1684,7 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                         <div className="p-3.5 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl text-xs">
                             <p className="font-bold text-slate-900 dark:text-white">{selectedVariant.productName}</p>
                             <p className="text-zinc-500 font-mono text-[11px] mt-0.5">
-                                {selectedVariant.gsm} gsm · {selectedVariant.widthMm} x {selectedVariant.heightMm} mm · {selectedVariant.finish || 'Standard'}
+                                {selectedVariant.paperType || selectedVariant.category || 'OTHER'} · {formatFinishLabel(selectedVariant.finish)} · {formatGrainLabel(selectedVariant.grainDirection)} · {selectedVariant.caliperUm ? `${selectedVariant.caliperUm} µm` : t('supplier.hub.thicknessPending')} · {selectedVariant.gsm} gsm · {selectedVariant.widthMm} × {selectedVariant.heightMm} mm
                             </p>
                         </div>
                     )}
@@ -1966,8 +1983,8 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                                 <span className="font-bold text-slate-900 dark:text-white">{viewingVariant.variant.productName}</span>
                             </div>
                             <div>
-                                <span className="text-[10px] text-zinc-400 uppercase block">Category / Brand</span>
-                                <span className="font-bold text-slate-900 dark:text-white">{viewingVariant.variant.category} · {viewingVariant.variant.brand || '—'}</span>
+                                <span className="text-[10px] text-zinc-400 uppercase block">{t('supplier.hub.paperTypeLabel')} / Brand</span>
+                                <span className="font-bold text-slate-900 dark:text-white">{viewingVariant.variant.paperType || viewingVariant.variant.category} · {viewingVariant.variant.brand || '—'}</span>
                             </div>
                             <div>
                                 <span className="text-[10px] text-zinc-400 uppercase block">Dimensions</span>
@@ -1980,13 +1997,23 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                             <div>
                                 <span className="text-[10px] text-zinc-400 uppercase block">Caliper (Thickness)</span>
                                 <span className="font-bold text-slate-900 dark:text-white">
-                                    {viewingVariant.variant.caliperUm ? `${viewingVariant.variant.caliperUm} µm` : '—'}
+                                    {viewingVariant.variant.caliperUm ? `${viewingVariant.variant.caliperUm} µm` : t('supplier.hub.thicknessPending')}
                                     {viewingVariant.variant.caliperMm ? ` (${viewingVariant.variant.caliperMm} mm)` : ''}
                                 </span>
                             </div>
                             <div>
-                                <span className="text-[10px] text-zinc-400 uppercase block">Grain & Finish</span>
-                                <span className="font-bold text-slate-900 dark:text-white">{viewingVariant.variant.grainDirection || '—'} · {viewingVariant.variant.finish || '—'}</span>
+                                <span className="text-[10px] text-zinc-400 uppercase block">{t('supplier.hub.coatingLabel')} &amp; {t('supplier.hub.finishLabel')}</span>
+                                <span className="font-bold text-slate-900 dark:text-white">
+                                    {formatCoatingLabel(viewingVariant.variant.coatingStatus)} · {formatFinishLabel(viewingVariant.variant.finish)}
+                                </span>
+                            </div>
+                            <div>
+                                <span className="text-[10px] text-zinc-400 uppercase block">{t('supplier.hub.grainLabel')}</span>
+                                <span className="font-bold text-slate-900 dark:text-white">{formatGrainLabel(viewingVariant.variant.grainDirection)}</span>
+                            </div>
+                            <div>
+                                <span className="text-[10px] text-zinc-400 uppercase block">{t('supplier.hub.originalCodeLabel')}</span>
+                                <span className="font-bold text-slate-900 dark:text-white">{viewingVariant.variant.originalCode || '—'}</span>
                             </div>
                             <div className="col-span-2">
                                 <span className="text-[10px] text-zinc-400 uppercase block">Technical Fingerprint</span>

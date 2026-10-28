@@ -2,9 +2,9 @@ name: PPOS Control Plane CI
 
 on:
   push:
-    branches: [ main, v1.9.0, release/*, phase-10-intelligence-layer, phase-39.2-tenant-management-console ]
+    branches: [ main, v1.9.0, release/*, phase-10-intelligence-layer, phase-39.2-tenant-management-console, feat/paper-materials-recovery-03r ]
   pull_request:
-    branches: [ main, v1.9.0, phase-10-intelligence-layer, phase-39.2-tenant-management-console, feat/paper-supplier-hub-completion, feat/budget-01-marketplace-paper-catalog, feat/budget-02c01-quote-revisions, feat/budget-02d01-e2e-remediation ]
+    branches: [ main, v1.9.0, phase-10-intelligence-layer, phase-39.2-tenant-management-console, feat/paper-supplier-hub-completion, feat/budget-01-marketplace-paper-catalog, feat/budget-02c01-quote-revisions, feat/budget-02d01-e2e-remediation, feat/spine-03r-caliper-and-engine ]
 
 jobs:
   build:
@@ -91,7 +91,7 @@ jobs:
         HEAD_REF: ${{ github.head_ref }}
         REF_NAME: ${{ github.ref_name }}
       run: |
-        npx vitest run tests/PricingWorkflowConservation.test.tsx tests/PrinthouseOnboardingAuditAndGovernance.test.tsx tests/backend_tenant_security.test.js tests/calibration_residuals_compatibility_regression.test.js tests/onboarding_checksum_integrity_regression.test.js tests/legacy_phase_marker_adapter.test.js tests/migration_092_reconciliation.test.js tests/migration_140_ephemeral_fixtures.test.js tests/migration_156_157_runner.test.js tests/phase184g_industrial_persistence_and_schema_integrity.test.js tests/migration_161_persistent_reconciliation.test.js tests/budget02b01_order_paper_decisions.test.js tests/budget02c01_order_quote_revisions.test.js tests/budget02c01r_security_and_bpe_adversarial.test.js tests/budget02c01r2_authority_identity_otp.test.js tests/budget02c01r3_fiscal_calendar_provenance.test.js tests/budget02c01r4_bpe_integrity_and_business_calendar.test.js tests/budget02d01_e2e_real_integration.test.js tests/spine02_03_engine_and_api.test.js
+        npx vitest run tests/PricingWorkflowConservation.test.tsx tests/PrinthouseOnboardingAuditAndGovernance.test.tsx tests/backend_tenant_security.test.js tests/calibration_residuals_compatibility_regression.test.js tests/onboarding_checksum_integrity_regression.test.js tests/legacy_phase_marker_adapter.test.js tests/migration_092_reconciliation.test.js tests/migration_140_ephemeral_fixtures.test.js tests/migration_156_157_runner.test.js tests/phase184g_industrial_persistence_and_schema_integrity.test.js tests/migration_161_persistent_reconciliation.test.js tests/budget02b01_order_paper_decisions.test.js tests/budget02c01_order_quote_revisions.test.js tests/budget02c01r_security_and_bpe_adversarial.test.js tests/budget02c01r2_authority_identity_otp.test.js tests/budget02c01r3_fiscal_calendar_provenance.test.js tests/budget02c01r4_bpe_integrity_and_business_calendar.test.js tests/budget02d01_e2e_real_integration.test.js tests/spine02_03_engine_and_api.test.js tests/paper_materials_recovery_03.test.js
         if [ -f tests/GuidedPrinthouseJourney.test.tsx ]; then
           echo "Running mandatory Guided Onboarding v4 journey suite..."
           npx vitest run tests/GuidedPrinthouseJourney.test.tsx
