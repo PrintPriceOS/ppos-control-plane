@@ -54,12 +54,14 @@ Se han subsanado de raíz las tres observaciones críticas señaladas por la aud
 ## 4. Estado de Publicación y CI
 
 1. **Rama Remota**: `feat/budget-02d01-e2e-remediation` en `origin`.
-2. **Pull Request Principal**: [PR #9](https://github.com/PrintPriceOS/ppos-control-plane/pull/9) en estado **OPEN / DRAFT**.
-3. **Pull Request Preservado**: [PR #8](https://github.com/PrintPriceOS/ppos-control-plane/pull/8) en estado **OPEN / DRAFT**, sin fusionar ni alterar.
-4. **Validación Local de Regresión**:
-   - 6 archivos de prueba Vitest ejecutados.
-   - 132 pruebas pasadas con 100% verde (0 fallos).
-   - Verificación sintáctica estricta en todos los archivos modificados.
+2. **Commit SHA Definitivo**: `b86fd908b5c3905e650de7cce5d5837d76d14135`
+3. **Pull Request Principal**: [PR #9](https://github.com/PrintPriceOS/ppos-control-plane/pull/9) en estado **OPEN / DRAFT**.
+4. **Pull Request Preservado**: [PR #8](https://github.com/PrintPriceOS/ppos-control-plane/pull/8) en estado **OPEN / DRAFT**, sin fusionar ni alterar.
+5. **Certificación de CI en GitHub Actions**:
+   - **Enlace de Ejecución:** [CI Run #40634783065](https://github.com/PrintPriceOS/ppos-control-plane/actions/runs/40634783065)
+   - **Resultado Global:** `SUCCESS` (100% verde)
+   - **Certificación Real MySQL 8:** 9 pasos completos ejecutados contra contenedor MySQL 8.0.46 real (esquemas DDL, índices, `SELECT FOR UPDATE`, validación de inmutabilidad contractual, compuertas negativas $\Delta < 0$, servidor Fastify HTTP montado en puerto efímero con peticiones TCP reales rechazadas con 422 y aprobadas con 200, y rollback/reaplicación limpia de migración 170).
+   - **Suite de Pruebas Vitest:** 18 archivos de prueba pasados (18/18), 400 pruebas aprobadas (400/400).
 
 ---
 
