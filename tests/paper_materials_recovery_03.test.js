@@ -415,6 +415,60 @@ describe('PAPER-MATERIALS-RECOVERY-03 — Multilingual Normalization & Determini
             expect(caliperProv.caliperSource).toBe('SUPPLIER_IMPORT');
             expect(caliperProv.caliperConfidenceStatus).toBe('REFERENCE_IMPORTED');
         });
+
+        it('enforces multi-variant shared product protection (Efalin FINE LINEN: eligible sibling resolves DESIGN/UNCOATED while excluded sibling remains OTHER/UNKNOWN)', () => {
+            // Eligible variant var_85c142a50239e312 (1020x700) has ods_materials_recovery.paper_type = DESIGN,
+            // while shared paper_products.category remains OTHER to protect excluded sibling var_9ebc604670dc6622 (1020x720)
+            const efalinEligibleVariant = {
+                variant_id: 'var_85c142a50239e312',
+                product_id: 'prod_74bc2cb3bd5e8a40',
+                product_name: 'Efalin FINE LINEN 130 (Light Blue) 120 102x70',
+                category: 'OTHER', // shared product category preserved as OTHER
+                finish_summary: 'UNCOATED',
+                finish: 'UNCOATED',
+                grain_direction: 'UNKNOWN',
+                variant_metadata_json: {
+                    original_code: 'Efalin FINE...',
+                    ods_materials_recovery: {
+                        mission: 'PAPER-MATERIALS-RECOVERY-03R',
+                        ods_paper_type: 'Dizaina',
+                        ods_coat: 'nekrītots',
+                        paper_type: 'DESIGN',
+                        coating_status: 'UNCOATED',
+                        coating_confidence: 'EXPLICIT_SOURCE',
+                        finish: 'UNCOATED'
+                    }
+                }
+            };
+
+            const efalinExcludedSibling = {
+                variant_id: 'var_9ebc604670dc6622',
+                product_id: 'prod_74bc2cb3bd5e8a40',
+                product_name: 'Efalin FINE LINEN 130 (Light Blue) 120 102x70',
+                category: 'OTHER', // shared product category preserved as OTHER
+                finish_summary: 'UNCOATED',
+                finish: 'UNCOATED',
+                grain_direction: 'UNKNOWN',
+                variant_metadata_json: {
+                    original_code: '15672130',
+                    ods_caliper_recovery: {
+                        ods_paper_type: 'Dizaina',
+                        ods_coat: '',
+                        ods_code: '15672130'
+                    }
+                }
+            };
+
+            const resolvedEligible = resolveVariantTechnicalAttributes(efalinEligibleVariant);
+            expect(resolvedEligible.paperType).toBe('DESIGN');
+            expect(resolvedEligible.coatingStatus).toBe('UNCOATED');
+            expect(resolvedEligible.finish).toBe('UNCOATED');
+
+            const resolvedExcluded = resolveVariantTechnicalAttributes(efalinExcludedSibling);
+            expect(resolvedExcluded.paperType).toBe('OTHER');
+            expect(resolvedExcluded.coatingStatus).toBe('UNKNOWN');
+            expect(resolvedExcluded.finish).toBe('UNKNOWN');
+        });
     });
 });
 

@@ -321,6 +321,7 @@ async function main() {
         const db = require('../src/api/services/mysqlClient');
         const conn = await db.getConnection();
         const BATCH_SIZE = 100;
+        const eligibleVariantIdSet = new Set(eligibleRows.map(r => r.variant_id));
 
         try {
             for (let i = 0; i < eligibleRows.length; i += BATCH_SIZE) {
@@ -359,6 +360,14 @@ async function main() {
                             throw new Error(`GRAIN_GUARD_TRIGGERED on ${item.variant_id}: grain_direction=${dbVar.grain_direction}`);
                         }
 
+                        // Multi-variant product guard (PAPER-MATERIALS-RECOVERY-04 Section 3):
+                        // Only update paper_products if ALL sibling variants of this product_id are in the eligible 943 set.
+                        const [siblingRows] = await conn.query(
+                            `SELECT id FROM paper_variants WHERE product_id = ?`,
+                            [item.product_id]
+                        );
+                        const allSiblingsEligible = siblingRows.every(s => eligibleVariantIdSet.has(s.id));
+
                         const varMeta = typeof dbVar.variant_metadata_json === 'string'
                             ? JSON.parse(dbVar.variant_metadata_json)
                             : (dbVar.variant_metadata_json || {});
@@ -366,6 +375,7 @@ async function main() {
                             ? JSON.parse(dbVar.product_metadata_json)
                             : (dbVar.product_metadata_json || {});
 
+                        const existingRec = varMeta.ods_materials_recovery || null;
                         const nextVarMeta = {
                             ...varMeta,
                             original_code: varMeta.original_code || item.ods_code || '',
@@ -385,9 +395,9 @@ async function main() {
                                 coating_confidence: item.proposed_coating_confidence,
                                 finish: item.proposed_finish,
                                 rules_applied: item.rules_applied,
-                                previous_category: dbVar.category,
-                                previous_finish: dbVar.finish,
-                                recovered_at: new Date().toISOString()
+                                previous_category: existingRec ? existingRec.previous_category : dbVar.category,
+                                previous_finish: existingRec ? existingRec.previous_finish : dbVar.finish,
+                                recovered_at: existingRec ? existingRec.recovered_at : new Date().toISOString()
                             }
                         };
 
@@ -399,21 +409,38 @@ async function main() {
                             ods_coat_raw: item.ods_coat_raw
                         };
 
-                        // Update paper_variants (ONLY finish and metadata_json; caliper_* and grain_direction untouched)
-                        await conn.query(
-                            `UPDATE paper_variants
-                             SET finish = ?, metadata_json = ?
-                             WHERE id = ? AND grain_direction = 'UNKNOWN'`,
-                            [item.proposed_finish, JSON.stringify(nextVarMeta), item.variant_id]
-                        );
+                        // Idempotency check: only write if state differs
+                        const varNeedsUpdate =
+                            dbVar.finish !== item.proposed_finish ||
+                            !existingRec ||
+                            existingRec.paper_type !== item.proposed_paper_type ||
+                            existingRec.coating_status !== item.proposed_coating_status ||
+                            existingRec.finish !== item.proposed_finish;
 
-                        // Update paper_products (category, finish_summary, metadata_json)
-                        await conn.query(
-                            `UPDATE paper_products
-                             SET category = ?, finish_summary = ?, metadata_json = ?
-                             WHERE id = ?`,
-                            [item.proposed_paper_type, item.proposed_finish, JSON.stringify(nextProdMeta), item.product_id]
-                        );
+                        if (varNeedsUpdate) {
+                            await conn.query(
+                                `UPDATE paper_variants
+                                 SET finish = ?, metadata_json = ?
+                                 WHERE id = ? AND grain_direction = 'UNKNOWN'`,
+                                [item.proposed_finish, JSON.stringify(nextVarMeta), item.variant_id]
+                            );
+                        }
+
+                        if (allSiblingsEligible) {
+                            const prodNeedsUpdate =
+                                dbVar.category !== item.proposed_paper_type ||
+                                dbVar.finish_summary !== item.proposed_finish ||
+                                prodMeta.coating_status !== item.proposed_coating_status;
+
+                            if (prodNeedsUpdate) {
+                                await conn.query(
+                                    `UPDATE paper_products
+                                     SET category = ?, finish_summary = ?, metadata_json = ?
+                                     WHERE id = ?`,
+                                    [item.proposed_paper_type, item.proposed_finish, JSON.stringify(nextProdMeta), item.product_id]
+                                );
+                            }
+                        }
                     }
                     await conn.commit();
                 } catch (batchErr) {
