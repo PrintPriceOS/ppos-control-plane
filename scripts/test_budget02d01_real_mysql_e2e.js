@@ -40,6 +40,10 @@ async function runRealMysqlCertification() {
             multipleStatements: true
         });
     } catch (err) {
+        if (process.env.CI === 'true' || process.env.PPOS_REQUIRE_REAL_MYSQL === 'true') {
+            console.error(`[FATAL] Real MySQL 8.0 server required in CI/Certification mode, but connection failed at ${MYSQL_HOST}:${MYSQL_PORT}: ${err.message}`);
+            process.exit(1);
+        }
         console.warn(`[SKIP] MySQL 8.0 server not reachable at ${MYSQL_HOST}:${MYSQL_PORT}: ${err.message}`);
         console.log('[INFO] This script is designed for live MySQL environments and executes automatically in GitHub Actions CI.');
         return;
@@ -121,6 +125,21 @@ async function runRealMysqlCertification() {
                 created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 INDEX idx_mo_order_id (order_id),
                 INDEX idx_mo_tenant (tenant_id)
+            CREATE TABLE IF NOT EXISTS production_files (
+                id VARCHAR(64) PRIMARY KEY,
+                order_ref VARCHAR(128) NULL,
+                order_id VARCHAR(128) NULL,
+                validation_status VARCHAR(64) NOT NULL DEFAULT 'VALIDATED',
+                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+            CREATE TABLE IF NOT EXISTS marketplace_events (
+                id VARCHAR(64) PRIMARY KEY,
+                order_id VARCHAR(128) NULL,
+                order_ref VARCHAR(128) NULL,
+                event_type VARCHAR(64) NOT NULL,
+                metadata_json JSON NULL,
+                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
         `);
 
@@ -242,8 +261,8 @@ async function runRealMysqlCertification() {
             ) VALUES (
                 'mkt_001', 'ord_e2e_real_001', 'tenant_prod_alpha',
                 '{"email": "procurement@editorial.com", "name": "Editorial Alpha S.L."}',
-                '{"pages": 192, "paper_weight_interior": 135}',
-                'CONFIRMED', 'ph_bcn_industrial', 1407.7301, 'ES'
+                '{"pages": 192, "paper_weight_interior": 135, "variant_id": "var_original_135", "title": "Original Contract Spec 135gsm"}',
+                'PAID', 'ph_bcn_industrial', 1407.7301, 'ES'
             )
         `);
 
@@ -259,8 +278,16 @@ async function runRealMysqlCertification() {
         assert.strictEqual(parsedCustomer.email, 'procurement@editorial.com');
         console.log(`[PASS] BLK-02 Certified: customer_json extracted seamlessly without ER_BAD_FIELD_ERROR.`);
 
-        // 6. Test BLK-03 & BLK-06: Effective spec persistence & Negative Delta Handling
-        console.log(`\n[STEP 6] Testing BLK-03 & BLK-06: Effective specifications & Negative Delta in MySQL 8...`);
+        // 6. Test FIN-01 & IND-01: Governed Negative Delta, Spec Immutability & Machine Dispatch in MySQL 8
+        console.log(`\n[STEP 6] Testing FIN-01 & IND-01: Governed Negative Delta, Spec Immutability & Dispatch in MySQL 8...`);
+        
+        // Seed validated production files
+        await conn.query(`
+            INSERT INTO production_files (id, order_ref, order_id, validation_status)
+            VALUES ('pf_real_01', 'ord_e2e_real_001', 'ord_e2e_real_001', 'VALIDATED'),
+                   ('pf_real_02', 'ord_e2e_real_001', 'ord_e2e_real_001', 'VALIDATED')
+        `);
+
         const revisionId = 'rev_e2e_real_001';
         await conn.query(`
             INSERT INTO order_quote_revisions (
@@ -272,7 +299,7 @@ async function runRealMysqlCertification() {
                 breakdown_json, technical_specs_snapshot_json, applied_policies_json, expires_at
             ) VALUES (
                 ?, ?, ?, ?, ?, 'opd_001',
-                1, 'PENDING', 'EUR', 1407.7301, -45.5000, 1362.2301,
+                1, 'ACCEPTED', 'EUR', 1407.7301, -45.5000, 1362.2301,
                 56.3092, -1.8200, 54.4892, 4.00,
                 1464.0393, -47.3200, 1416.7193,
                 'bpe_calc_001', 'v3.0', 'cs_rates_001', 'a1b2c3d4e5f60123456789abcdef0123456789abcdef0123456789abcdef0123',
@@ -280,7 +307,7 @@ async function runRealMysqlCertification() {
             )
         `, [revisionId, testTenantId, testPrinthouseId, testOrderId, testOrderId]);
 
-        // Insert effective technical specification
+        // Insert effective technical specification with REFUND_PENDING
         const specId = 'oets_e2e_real_001';
         await conn.query(`
             INSERT INTO order_effective_technical_specifications (
@@ -289,20 +316,131 @@ async function runRealMysqlCertification() {
                 financial_reconciliation_status, industrial_gate_status
             ) VALUES (
                 ?, ?, ?, ?, ?, 'ACTIVE',
-                '{"paper_role": "INTERIOR", "paper_weight_interior": 120, "paper_type": "offset"}',
+                '{"paper_role": "INTERIOR", "paper_weight_interior": 120, "variant_id": "var_offset_120", "paper_type": "offset"}',
                 '{"delta_amount": -45.50, "currency": "EUR"}',
                 '{"ip_address": "127.0.0.1", "accepted_at": "2026-10-27T22:00:00Z"}',
-                'REFUND_PENDING', 'READY_FOR_PREFLIGHT'
+                'REFUND_PENDING', 'PREFLIGHT_PENDING'
             )
         `, [specId, testTenantId, testOrderId, testOrderId, revisionId]);
 
-        const [activeSpecs] = await conn.query(
-            'SELECT * FROM order_effective_technical_specifications WHERE canonical_order_id = ? AND effective_status = ?',
-            [testOrderId, 'ACTIVE']
+        // Wire mysqlClient to live ephemeral database connection
+        const mysqlClient = require('../src/api/services/mysqlClient');
+        const origQuery = mysqlClient.query;
+        const origGetPool = mysqlClient.getPool;
+        const origGetConnection = mysqlClient.getConnection;
+
+        mysqlClient.getPool = () => ({
+            query: async (sql, params) => {
+                const [rows] = await conn.query(sql, params);
+                return [rows];
+            },
+            getConnection: async () => conn
+        });
+        mysqlClient.query = async (sql, params) => {
+            const [rows] = await conn.query(sql, params);
+            return rows;
+        };
+        mysqlClient.getConnection = async () => conn;
+
+        const persistence = require('../src/api/services/ManufacturingPersistenceService');
+        const manufacturingDispatch = require('../src/api/services/ManufacturingDispatchService');
+        persistence.createPackage = async (data) => ({ id: `pkg_${Date.now()}`, ...data });
+        persistence.updatePackage = async () => {};
+        manufacturingDispatch.createDispatch = async (pkgId, mId) => ({ id: `disp_${Date.now()}`, packageId: pkgId, machineId: mId });
+
+        const marketplaceDispatchGatingService = require('../src/api/services/MarketplaceDispatchGatingService');
+
+        // 6.1 (FIN-01): Attempt dispatch with unliquidated REFUND_PENDING and NO authorization -> BLOCKED
+        let blockedError = null;
+        try {
+            await marketplaceDispatchGatingService.dispatchOrder(testOrderId, 'machine_alpha_01', {
+                userId: 'op_user_001',
+                printhouseId: testPrinthouseId,
+                tenantId: testTenantId,
+                role: 'OPERATOR'
+            });
+        } catch (err) {
+            blockedError = err;
+        }
+        assert.ok(blockedError, 'Dispatch must be blocked for unliquidated negative delta without authorization');
+        assert.ok(blockedError.message.includes('Independent industrial authorization required'), blockedError.message);
+        console.log(`  ✓ FIN-01 Certified: REFUND_PENDING without explicit authorization strictly blocked machine dispatch.`);
+
+        // 6.2 (FIN-01): Grant and persist independent industrial authorization
+        const authRecord = await marketplaceDispatchGatingService.authorizeIndustrialDispatch(testOrderId, {
+            userId: 'mgr_finance_01',
+            role: 'FINANCE_DIRECTOR',
+            reason: 'Governed negative delta credit authorization'
+        });
+        assert.strictEqual(authRecord.ok, true);
+        assert.strictEqual(authRecord.industrial_gate_status, 'AUTHORIZED');
+
+        const [specAfterAuth] = await conn.query(
+            'SELECT industrial_gate_status FROM order_effective_technical_specifications WHERE id = ?',
+            [specId]
         );
-        assert.strictEqual(activeSpecs.length, 1);
-        assert.strictEqual(activeSpecs[0].financial_reconciliation_status, 'REFUND_PENDING');
-        console.log(`[PASS] BLK-03 & BLK-06 Certified: Effective spec persisted with REFUND_PENDING (never PASSED).`);
+        assert.strictEqual(specAfterAuth[0].industrial_gate_status, 'AUTHORIZED');
+        console.log(`  ✓ FIN-01 Certified: Independent industrial authorization persisted in MySQL 8 table.`);
+
+        // 6.3 (FIN-01): Dispatch order now that authorization is granted -> SUCCESS
+        const dispatchResult = await marketplaceDispatchGatingService.dispatchOrder(testOrderId, 'machine_alpha_01', {
+            userId: 'op_user_001',
+            printhouseId: testPrinthouseId,
+            tenantId: testTenantId,
+            role: 'OPERATOR'
+        });
+        assert.strictEqual(dispatchResult.ok, true);
+        assert.strictEqual(dispatchResult.status, 'IN_PRODUCTION');
+
+        const [specAfterDisp] = await conn.query(
+            'SELECT industrial_gate_status FROM order_effective_technical_specifications WHERE id = ?',
+            [specId]
+        );
+        assert.strictEqual(specAfterDisp[0].industrial_gate_status, 'DISPATCHED');
+        console.log(`  ✓ FIN-01 Certified: Machine dispatch authorized and status updated to DISPATCHED in MySQL 8.`);
+
+        // 6.4 (IND-01): Strict original specifications immutability verification in MySQL 8
+        const [orderAfterDisp] = await conn.query(
+            'SELECT book_spec_json FROM marketplace_orders WHERE order_id = ?',
+            [testOrderId]
+        );
+        const originalBookSpec = typeof orderAfterDisp[0].book_spec_json === 'string'
+            ? JSON.parse(orderAfterDisp[0].book_spec_json)
+            : orderAfterDisp[0].book_spec_json;
+        assert.strictEqual(originalBookSpec.paper_weight_interior, 135, 'Original paper_weight_interior must remain 135');
+        assert.strictEqual(originalBookSpec.variant_id, 'var_original_135', 'Original variant_id must remain var_original_135');
+        assert.strictEqual(originalBookSpec.title, 'Original Contract Spec 135gsm');
+        console.log(`  ✓ IND-01 Certified: Original order specifications in MySQL 8 remain 100% UNMUTATED.`);
+
+        // 6.5 (IND-01): Fail-closed when effective spec query fails with SQL error
+        mysqlClient.query = async (sql, params) => {
+            if (sql.includes('order_effective_technical_specifications')) {
+                throw new Error('ER_LOCK_DEADLOCK');
+            }
+            const [rows] = await conn.query(sql, params);
+            return rows;
+        };
+
+        let sqlFailError = null;
+        try {
+            await marketplaceDispatchGatingService.dispatchOrder(testOrderId, 'machine_alpha_01', {
+                userId: 'op_user_001',
+                printhouseId: testPrinthouseId,
+                tenantId: testTenantId,
+                role: 'OPERATOR'
+            });
+        } catch (err) {
+            sqlFailError = err;
+        }
+        assert.ok(sqlFailError, 'Must fail closed on SQL error');
+        assert.ok(sqlFailError.message.includes('Database error querying effective technical specifications'), sqlFailError.message);
+        console.log(`  ✓ IND-01 Certified: SQL query error strictly fails-closed without silent fallback.`);
+
+        // Restore query handlers
+        mysqlClient.query = async (sql, params) => {
+            const [rows] = await conn.query(sql, params);
+            return rows;
+        };
 
         // 7. Test BLK-05: Concurrency & Lock Validation
         console.log(`\n[STEP 7] Testing BLK-05: Concurrency check under SELECT FOR UPDATE...`);
@@ -318,8 +456,126 @@ async function runRealMysqlCertification() {
         assert.strictEqual(cancelledRows[0].status, 'CANCELLED');
         console.log(`[PASS] BLK-05 Certified: FOR UPDATE lock retrieves CANCELLED status, triggering ORDER_INELIGIBLE.`);
 
-        // 8. Test Rollback of Migration 170
-        console.log(`\n[STEP 8] Testing Rollback of Migration 170...`);
+        // 8. Test TEST-01: Mounted Fastify HTTP E2E Lifecycle against live MySQL 8
+        console.log(`\n[STEP 8] Testing TEST-01: Mounted Fastify HTTP E2E Lifecycle against live MySQL 8...`);
+        const Fastify = require('fastify');
+        const httpApp = Fastify({ logger: false });
+        httpApp.use(require('express').json());
+        httpApp.use('/api/marketplace/quote-revisions', require('../src/api/routes/orderQuoteRevisionRoutes'));
+        httpApp.use('/api/printhouse/orders', require('../src/api/routes/printhouseOrders'));
+        httpApp.use('/api/printhouse', require('../src/api/routes/printhouseOrders'));
+
+        const jwt = require('jsonwebtoken');
+        const testJwtSecret = process.env.JWT_SECRET || 'ephemeral_ci_jwt_secret_at_least_32_characters_long';
+        process.env.JWT_SECRET = testJwtSecret;
+        const testAuthToken = jwt.sign({
+            id: 'user_operator_http',
+            role: 'PRINTHOUSE_ADMIN',
+            tenantId: testTenantId,
+            printhouseId: testPrinthouseId
+        }, testJwtSecret, {
+            audience: process.env.JWT_AUDIENCE || 'ppos:control',
+            issuer: process.env.JWT_ISSUER || 'https://auth.printprice.pro'
+        });
+
+        const httpBaseUrl = await httpApp.listen({ port: 0, host: '127.0.0.1' });
+
+        try {
+            const httpOrderId = 'ord_http_001';
+            await conn.query(`
+                INSERT INTO marketplace_orders (
+                    id, order_id, tenant_id, customer_json, book_spec_json, status, printhouse_id, estimated_price, delivery_country
+                ) VALUES (
+                    'mkt_http_001', ?, ?,
+                    '{"email": "procurement@editorial.com", "name": "HTTP Editorial Corp"}',
+                    '{"pages": 192, "paper_weight_interior": 90, "variant_id": "var_coral_90", "title": "Original Spec"}',
+                    'PAID', ?, 1407.7301, 'ES'
+                )
+            `, [httpOrderId, testTenantId, testPrinthouseId]);
+
+            await conn.query(`
+                INSERT INTO production_files (id, order_ref, order_id, validation_status)
+                VALUES ('pf_h1', ?, ?, 'VALIDATED'),
+                       ('pf_h2', ?, ?, 'VALIDATED')
+            `, [httpOrderId, httpOrderId, httpOrderId, httpOrderId]);
+
+            await conn.query(`
+                INSERT INTO order_quote_revisions (
+                    id, tenant_id, printhouse_id, external_order_intent_id, canonical_order_id, paper_decision_id,
+                    revision_number, status, currency, base_net_amount, delta_net_amount, revised_net_amount,
+                    base_tax_amount, delta_tax_amount, revised_tax_amount, tax_rate_pct,
+                    base_gross_amount, delta_gross_amount, revised_gross_amount,
+                    bpe_calculation_id, bpe_engine_version, bpe_rates_checksum, snapshot_canonical_hash,
+                    breakdown_json, technical_specs_snapshot_json, applied_policies_json, expires_at
+                ) VALUES (
+                    'rev_http_001', ?, ?, ?, ?, 'opd_001',
+                    1, 'ACCEPTED', 'EUR', 1407.7301, -30.0000, 1377.7301,
+                    56.3092, -1.2000, 55.1092, 4.00,
+                    1464.0393, -31.2000, 1432.8393,
+                    'bpe_calc_h1', 'v3.0', 'cs_rates_001', 'a1b2c3d4e5f60123456789abcdef0123456789abcdef0123456789abcdef0123',
+                    '{}', '{}', '{}', DATE_ADD(NOW(), INTERVAL 48 HOUR)
+                )
+            `, [testTenantId, testPrinthouseId, httpOrderId, httpOrderId]);
+
+            await conn.query(`
+                INSERT INTO order_effective_technical_specifications (
+                    id, tenant_id, canonical_order_id, external_order_intent_id, revision_id,
+                    effective_status, specs_json, pricing_summary_json, consent_record_json,
+                    financial_reconciliation_status, industrial_gate_status
+                ) VALUES (
+                    'oets_http_001', ?, ?, ?, 'rev_http_001',
+                    'ACTIVE',
+                    '{"paper_role": "INTERIOR", "paper_weight_interior": 120, "variant_id": "var_offset_120"}',
+                    '{"delta_amount": -30.00, "currency": "EUR"}',
+                    '{"ip_address": "127.0.0.1"}',
+                    'REFUND_PENDING', 'PREFLIGHT_PENDING'
+                )
+            `, [testTenantId, httpOrderId, httpOrderId]);
+
+            // 8.1 Real HTTP POST dispatch attempt BEFORE authorization -> HTTP 422
+            const blockedHttpRes = await fetch(`${httpBaseUrl}/api/printhouse/orders/${httpOrderId}/dispatch`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${testAuthToken}`
+                },
+                body: JSON.stringify({ machine_id: 'press_http_01' })
+            });
+            assert.strictEqual(blockedHttpRes.status, 422, 'Dispatch without industrial authorization must return 422');
+            const blockedHttpBody = await blockedHttpRes.json();
+            assert.strictEqual(blockedHttpBody.ok, false);
+            assert.ok(blockedHttpBody.error.includes('Independent industrial authorization required'));
+            console.log('  ✓ TEST-01 Certified: Real HTTP dispatch rejected with 422 DISPATCH_BLOCKED before authorization.');
+
+            // 8.2 Authorize industrial dispatch
+            await marketplaceDispatchGatingService.authorizeIndustrialDispatch(httpOrderId, {
+                userId: 'user_director_http',
+                role: 'PLANT_DIRECTOR'
+            });
+
+            // 8.3 Real HTTP POST dispatch attempt AFTER authorization -> HTTP 200
+            const allowedHttpRes = await fetch(`${httpBaseUrl}/api/printhouse/orders/${httpOrderId}/dispatch`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${testAuthToken}`
+                },
+                body: JSON.stringify({ machine_id: 'press_http_01' })
+            });
+            assert.strictEqual(allowedHttpRes.status, 200, 'Dispatch with industrial authorization must return 200');
+            const allowedHttpBody = await allowedHttpRes.json();
+            assert.strictEqual(allowedHttpBody.ok, true);
+            assert.strictEqual(allowedHttpBody.status, 'IN_PRODUCTION');
+            console.log('  ✓ TEST-01 Certified: Real HTTP dispatch succeeded with 200 IN_PRODUCTION upon authorization.');
+        } finally {
+            await httpApp.close();
+            mysqlClient.query = origQuery;
+            mysqlClient.getPool = origGetPool;
+            mysqlClient.getConnection = origGetConnection;
+        }
+
+        // 9. Test Rollback of Migration 170
+        console.log(`\n[STEP 9] Testing Rollback of Migration 170...`);
         const rollback170Path = path.join(__dirname, '../migrations/rollback/rollback_170_phase196i_order_effective_technical_specifications.sql');
         const rollbackSql = fs.readFileSync(rollback170Path, 'utf8');
         await conn.query(rollbackSql);

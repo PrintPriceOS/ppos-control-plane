@@ -134,6 +134,19 @@ describe('BUDGET-02D-01 — End-to-End Real Integration & Lifecycle Certificatio
                 return this.tables.job_quotes.filter(q => q.id === id);
             }
 
+            // 0.5 UNION query across orders and marketplace_orders
+            if (s.includes('union') && (s.includes('from orders') || s.includes('from marketplace_orders'))) {
+                const [p1, p2, p3, p4] = params;
+                const matches = [];
+                for (const o of this.tables.orders) {
+                    if (o.order_ref === p1 || o.id === p2) matches.push({ id: o.id, order_ref: o.order_ref || o.id });
+                }
+                for (const mo of this.tables.marketplace_orders) {
+                    if (mo.order_id === p3 || mo.id === p4) matches.push({ id: mo.id, order_ref: mo.order_id || mo.id });
+                }
+                return matches;
+            }
+
             // 1. SELECT from orders / marketplace_orders
             if (s.includes('from orders')) {
                 if (params.length === 1) {
@@ -155,9 +168,15 @@ describe('BUDGET-02D-01 — End-to-End Real Integration & Lifecycle Certificatio
             }
 
             if (s.includes('from marketplace_orders')) {
+                if (params.length === 1) {
+                    const [ref] = params;
+                    return this.tables.marketplace_orders.filter(
+                        o => o.order_id === ref || o.id === ref
+                    );
+                }
                 const [ref, id] = params;
                 const matches = this.tables.marketplace_orders.filter(
-                    o => o.order_id === ref || o.id === id
+                    o => o.order_id === ref || o.id === id || o.order_id === id || o.id === ref
                 );
                 return matches;
             }
@@ -196,13 +215,19 @@ describe('BUDGET-02D-01 — End-to-End Real Integration & Lifecycle Certificatio
 
             // 6. SELECT from order_quote_revisions
             if (s.includes('from order_quote_revisions')) {
-                if (s.includes("status = 'accepted'")) {
+                if (s.includes("status = 'accepted'") && params.length === 3) {
                     const [tenantId, orderIntentId, currentRevId] = params;
                     return this.tables.order_quote_revisions.filter(
                         r => r.tenant_id === tenantId &&
                              (r.external_order_intent_id === orderIntentId || r.canonical_order_id === orderIntentId) &&
                              r.id !== currentRevId &&
                              r.status === 'ACCEPTED'
+                    );
+                }
+                if (s.includes("status = 'accepted'") && params.length === 2) {
+                    const [ref1, ref2] = params;
+                    return this.tables.order_quote_revisions.filter(
+                        r => (r.external_order_intent_id === ref1 || r.canonical_order_id === ref2 || r.external_order_intent_id === ref2 || r.canonical_order_id === ref1) && r.status === 'ACCEPTED'
                     );
                 }
                 if (s.includes("status = 'pending'") && params.length === 2) {
@@ -529,7 +554,15 @@ describe('BUDGET-02D-01 — End-to-End Real Integration & Lifecycle Certificatio
             if (s.includes('update order_effective_technical_specifications')) {
                 const [id] = params;
                 const e = this.tables.order_effective_technical_specifications.find(x => x.id === id);
-                if (e) e.industrial_gate_status = 'DISPATCHED';
+                if (e) {
+                    if (s.includes("industrial_gate_status = 'authorized'") || s.includes("industrial_gate_status = ?")) {
+                        e.industrial_gate_status = 'AUTHORIZED';
+                    } else if (s.includes("financial_reconciliation_status = 'refund_settled'") || s.includes("financial_reconciliation_status = ?")) {
+                        e.financial_reconciliation_status = 'REFUND_SETTLED';
+                    } else {
+                        e.industrial_gate_status = 'DISPATCHED';
+                    }
+                }
                 return { affectedRows: 1 };
             }
 
@@ -624,13 +657,21 @@ describe('BUDGET-02D-01 — End-to-End Real Integration & Lifecycle Certificatio
                     return rows;
                 };
                 mysqlClient.getConnection = async () => realConnectionPool.getConnection();
+                console.log(`[TEST_ENVIRONMENT_NOTICE] Running with Live Ephemeral MySQL 8 (REAL_SQL_INTEGRATION) in schema ${executionSchemaName}.`);
             } catch (connErr) {
-                // If real MySQL was expected but connection refused, fall back to transactional storage
+                if (process.env.PPOS_REQUIRE_REAL_MYSQL === 'true' || process.env.REQUIRE_REAL_MYSQL === 'true') {
+                    throw new Error(`[FAIL_CLOSED] Real MySQL 8 database is strictly required (PPOS_REQUIRE_REAL_MYSQL=true), but connection failed: ${connErr.message}`);
+                }
+                // Fall back to in-memory transactional storage only for mock test environments
                 isRealMySql = false;
             }
         }
 
         if (!isRealMySql) {
+            if (process.env.PPOS_REQUIRE_REAL_MYSQL === 'true' || process.env.REQUIRE_REAL_MYSQL === 'true') {
+                throw new Error('[FAIL_CLOSED] Real MySQL 8 database is required (PPOS_REQUIRE_REAL_MYSQL=true) but isRealMySql is false.');
+            }
+            console.log('[TEST_ENVIRONMENT_NOTICE] Running with InMemoryTransactionalStorage (MOCK/SIMULATION ENGINE). Real MySQL 8 E2E execution is accredited via scripts/test_budget02d01_real_mysql_e2e.js or PPOS_REQUIRE_REAL_MYSQL=true.');
             dbAdapter = new InMemoryTransactionalStorage();
             mysqlClient.getPool = () => ({
                 query: async (sql, params) => {
@@ -648,15 +689,19 @@ describe('BUDGET-02D-01 — End-to-End Real Integration & Lifecycle Certificatio
         classifier = new TaxVatReadinessClassifierService();
         mockDeliveryService = {
             isDeliveryChannelConfigured: () => true,
+            adapterType: 'SIMULATED_TEST_PROVIDER',
+            operationalCertification: 'UNACCREDITED_TEST_SIMULATION',
             deliverOtp: async ({ recipientEmail, otpCode, revisionId }) => {
                 return {
                     ok: true,
                     status: 'PROVIDER_ACCEPTED',
                     delivered: true,
+                    simulated: true,
                     proof: {
                         channel: 'EMAIL',
                         destination: recipientEmail,
-                        provider_message_id: `msg_${Date.now()}`,
+                        provider_message_id: `msg_sim_${Date.now()}`,
+                        provider_signature: 'SIMULATED_HMAC_TEST_SIG',
                         timestamp: new Date().toISOString()
                     }
                 };
@@ -1083,6 +1128,7 @@ describe('BUDGET-02D-01 — End-to-End Real Integration & Lifecycle Certificatio
                 product_type: 'BOOK',
                 is_editorial_book: 1,
                 customer_json: JSON.stringify({ name: 'Editor Alpha', email: 'editor@alpha.corp' }),
+                book_spec_json: JSON.stringify({ paper_weight_interior: 90, variant_id: 'var_offset_90', title: 'Original Contractual Spec 90gsm' }),
                 status: 'PAID'
             });
             dbAdapter.tables.order_pricing_snapshots.push({
@@ -1140,7 +1186,19 @@ describe('BUDGET-02D-01 — End-to-End Real Integration & Lifecycle Certificatio
         expect(originalSnapshot.snapshot_id).toBe('ops_sc6');
         expect(originalSnapshot.canonical_hash).toBe('f'.repeat(64));
 
-        // 6.2 Verificar creación de especificación técnica efectiva gobernada
+        // 6.2 IND-01: Verificar que las especificaciones originales del pedido NO fueron sobrescritas
+        const [parentOrder] = await mysqlClient.query(
+            'SELECT * FROM marketplace_orders WHERE order_id = ? OR id = ?',
+            [orderRef, orderId]
+        );
+        const originalBookSpec = typeof parentOrder.book_spec_json === 'string'
+            ? JSON.parse(parentOrder.book_spec_json)
+            : parentOrder.book_spec_json;
+        expect(originalBookSpec.paper_weight_interior).toBe(90);
+        expect(originalBookSpec.variant_id).toBe('var_offset_90');
+        expect(originalBookSpec.title).toBe('Original Contractual Spec 90gsm');
+
+        // 6.3 Verificar creación de especificación técnica efectiva gobernada como fuente autoritativa exclusiva
         const [effectiveSpec] = await mysqlClient.query(
             'SELECT * FROM order_effective_technical_specifications WHERE canonical_order_id = ?',
             [orderId]
@@ -1559,9 +1617,9 @@ describe('BUDGET-02D-01 — End-to-End Real Integration & Lifecycle Certificatio
     });
 
     // =========================================================================
-    // SCENARIO 11: Bloqueo de despacho industrial
+    // SCENARIO 11: Governed Financial Gating & Spec Fail-Closed Verification (FIN-01 & IND-01)
     // =========================================================================
-    it('11. Bloqueo de despacho industrial ante revisión pendiente o falta de liquidación financiera', async () => {
+    it('11. Bloqueo de despacho industrial ante revisión pendiente, falta de liquidación financiera o ausencia de versión técnica (FIN-01 & IND-01)', async () => {
         const orderRef = 'job_sc11_intent';
         const orderId = 'ord_sc11_001';
         const tenantId = 'tenant_alpha';
@@ -1573,8 +1631,27 @@ describe('BUDGET-02D-01 — End-to-End Real Integration & Lifecycle Certificatio
                 order_ref: orderRef,
                 tenant_id: tenantId,
                 printhouse_id: printhouseId,
-                status: 'CONFIRMED'
+                status: 'PAID'
             });
+
+            // Production files validated for gating
+            dbAdapter.tables.production_files.push(
+                { order_ref: orderRef, order_id: orderId, validation_status: 'VALIDATED' },
+                { order_ref: orderRef, order_id: orderId, validation_status: 'VALIDATED' }
+            );
+
+            // Mock manufacturing persistence for dispatch
+            persistence.getPackage = async (id) => dbAdapter.tables.manufacturing_packages.find(p => p.id === id);
+            persistence.getNode = async (id) => dbAdapter.tables.print_nodes.find(n => n.id === id);
+            persistence.createDispatch = async (data) => {
+                const dispatchId = `disp_${Date.now()}`;
+                dbAdapter.tables.dispatches.push({ id: dispatchId, ...data });
+                return { id: dispatchId, ...data };
+            };
+            persistence.updatePackage = async (id, updates) => {
+                const pkg = dbAdapter.tables.manufacturing_packages.find(p => p.id === id);
+                if (pkg) Object.assign(pkg, updates);
+            };
 
             // 11.1 Bloqueo si hay una revisión PENDING activa
             dbAdapter.tables.order_quote_revisions.push({
@@ -1594,11 +1671,11 @@ describe('BUDGET-02D-01 — End-to-End Real Integration & Lifecycle Certificatio
                 })
             ).rejects.toThrow(/DISPATCH_BLOCKED: Order has pending quote revision/);
 
-            // 11.2 Bloqueo si la revisión fue aceptada pero el pago está pendiente
+            // 11.2 Bloqueo si la revisión fue aceptada pero el pago está pendiente (Δ > 0)
             const r = dbAdapter.tables.order_quote_revisions.find(x => x.id === 'rev_sc11_pending');
             r.status = 'ACCEPTED';
 
-            dbAdapter.tables.order_effective_technical_specifications.push({
+            const oetsUnpaid = {
                 id: 'oets_sc11_unpaid',
                 tenant_id: tenantId,
                 canonical_order_id: orderId,
@@ -1607,7 +1684,8 @@ describe('BUDGET-02D-01 — End-to-End Real Integration & Lifecycle Certificatio
                 financial_reconciliation_status: 'PAYMENT_PENDING',
                 industrial_gate_status: 'PREFLIGHT_PENDING',
                 specs_json: JSON.stringify(baselineCalculationFixture.specs)
-            });
+            };
+            dbAdapter.tables.order_effective_technical_specifications.push(oetsUnpaid);
 
             await expect(
                 marketplaceDispatchGatingService.dispatchOrder(orderRef, 'node_alpha_press', {
@@ -1617,6 +1695,118 @@ describe('BUDGET-02D-01 — End-to-End Real Integration & Lifecycle Certificatio
                     role: 'OPERATOR'
                 })
             ).rejects.toThrow(/DISPATCH_BLOCKED: Revised quote payment is pending/);
+
+            // 11.3 Bloqueo si la revisión es con pago reducido pero la orden base no está pagada (REDUCED_PAYMENT_PENDING)
+            oetsUnpaid.financial_reconciliation_status = 'REDUCED_PAYMENT_PENDING';
+            await expect(
+                marketplaceDispatchGatingService.dispatchOrder(orderRef, 'node_alpha_press', {
+                    userId: 'user_operator',
+                    printhouseId,
+                    tenantId,
+                    role: 'OPERATOR'
+                })
+            ).rejects.toThrow(/REDUCED_PAYMENT_PENDING/);
+
+            // 11.4 FIN-01: Delta negativo (REFUND_PENDING) SIN autorización industrial explícita -> BLOQUEADO
+            oetsUnpaid.financial_reconciliation_status = 'REFUND_PENDING';
+            oetsUnpaid.industrial_gate_status = 'PREFLIGHT_PENDING';
+
+            await expect(
+                marketplaceDispatchGatingService.dispatchOrder(orderRef, 'node_alpha_press', {
+                    userId: 'user_operator',
+                    printhouseId,
+                    tenantId,
+                    role: 'OPERATOR'
+                })
+            ).rejects.toThrow(/DISPATCH_BLOCKED: Refund settlement pending. Independent industrial authorization required/);
+
+            // 11.5 FIN-01: Delta negativo (REFUND_PENDING) CON autorización en el contexto de despacho -> PERMITIDO
+            const contextAuthResult = await marketplaceDispatchGatingService.dispatchOrder(orderRef, 'node_alpha_press', {
+                userId: 'user_finance_admin',
+                printhouseId,
+                tenantId,
+                role: 'FINANCE_MANAGER',
+                allowDispatchWithPendingRefund: true
+            });
+            expect(contextAuthResult.ok).toBe(true);
+            expect(contextAuthResult.status).toBe('IN_PRODUCTION');
+
+            // 11.6 FIN-01: Autorización independiente persistida mediante authorizeIndustrialDispatch -> PERMITIDO
+            oetsUnpaid.industrial_gate_status = 'PREFLIGHT_PENDING';
+            const authRecord = await marketplaceDispatchGatingService.authorizeIndustrialDispatch(orderRef, {
+                userId: 'plant_manager_01',
+                role: 'PLANT_DIRECTOR',
+                reason: 'Formal management sign-off for negative delta manufacturing'
+            });
+            expect(authRecord.ok).toBe(true);
+            expect(authRecord.industrial_gate_status).toBe('AUTHORIZED');
+
+            const managerAuthResult = await marketplaceDispatchGatingService.dispatchOrder(orderRef, 'node_alpha_press', {
+                userId: 'user_operator',
+                printhouseId,
+                tenantId,
+                role: 'OPERATOR'
+            });
+            expect(managerAuthResult.ok).toBe(true);
+            expect(managerAuthResult.status).toBe('IN_PRODUCTION');
+
+            // 11.7 FIN-01: Reembolso liquidado y confirmado (REFUND_SETTLED) -> PERMITIDO
+            const settlementResult = await marketplaceDispatchGatingService.settleRefund(orderRef, {
+                settlementRef: 'bank_ref_tx_998877',
+                userId: 'treasury_operator'
+            });
+            expect(settlementResult.ok).toBe(true);
+            expect(settlementResult.financial_reconciliation_status).toBe('REFUND_SETTLED');
+
+            const settledDispatchResult = await marketplaceDispatchGatingService.dispatchOrder(orderRef, 'node_alpha_press', {
+                userId: 'user_operator',
+                printhouseId,
+                tenantId,
+                role: 'OPERATOR'
+            });
+            expect(settledDispatchResult.ok).toBe(true);
+
+            // 11.8 FIN-01: Paridad de Delta Cero (ZERO_DELTA_PARITY) -> PERMITIDO
+            oetsUnpaid.financial_reconciliation_status = 'ZERO_DELTA_PARITY';
+            const zeroDeltaResult = await marketplaceDispatchGatingService.dispatchOrder(orderRef, 'node_alpha_press', {
+                userId: 'user_operator',
+                printhouseId,
+                tenantId,
+                role: 'OPERATOR'
+            });
+            expect(zeroDeltaResult.ok).toBe(true);
+
+            // 11.9 IND-01: Revisión aceptada pero ausencia de versión técnica efectiva activa -> FAIL-CLOSED
+            oetsUnpaid.effective_status = 'SUPERSEDED'; // No active spec exists
+            await expect(
+                marketplaceDispatchGatingService.dispatchOrder(orderRef, 'node_alpha_press', {
+                    userId: 'user_operator',
+                    printhouseId,
+                    tenantId,
+                    role: 'OPERATOR'
+                })
+            ).rejects.toThrow(/DISPATCH_BLOCKED: Order has an accepted revision but no active effective technical specification was found/);
+
+            // 11.10 IND-01: Error SQL en la consulta de especificaciones efectivas -> FAIL-CLOSED (no continúa en silencio)
+            const originalQuery = mysqlClient.query;
+            mysqlClient.query = async (sql, params) => {
+                if (sql.includes('order_effective_technical_specifications')) {
+                    throw new Error('SIMULATED_SQL_CONNECTION_LOST');
+                }
+                return originalQuery(sql, params);
+            };
+
+            await expect(
+                marketplaceDispatchGatingService.dispatchOrder(orderRef, 'node_alpha_press', {
+                    userId: 'user_operator',
+                    printhouseId,
+                    tenantId,
+                    role: 'OPERATOR'
+                })
+            ).rejects.toThrow(/DISPATCH_BLOCKED: Database error querying effective technical specifications: SIMULATED_SQL_CONNECTION_LOST/);
+
+            // Restaurar query handler
+            mysqlClient.query = originalQuery;
         }
     });
 

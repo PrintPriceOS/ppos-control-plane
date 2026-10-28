@@ -56,17 +56,19 @@ class MarketplaceDispatchGatingService {
         const canonicalRef = order.order_ref || order.order_id || order.id;
 
         // Gate 0: Block dispatch if an unresolved quote revision is pending (BLK-03)
+        let pendingRevs = [];
         try {
-            const pendingRevs = normalizeRows(await db.query(
+            pendingRevs = normalizeRows(await db.query(
                 `SELECT id FROM order_quote_revisions 
                  WHERE (external_order_intent_id = ? OR canonical_order_id = ?) AND status = 'PENDING' LIMIT 1`,
                 [orderRef, canonicalRef]
             ));
-            if (pendingRevs.length > 0) {
-                throw new Error('DISPATCH_BLOCKED: Order has pending quote revision awaiting customer decision.');
-            }
         } catch (revErr) {
-            if (revErr.message && revErr.message.includes('DISPATCH_BLOCKED')) throw revErr;
+            logger.error({ event: 'revision_query_error', error: revErr.message });
+            throw new Error(`DISPATCH_BLOCKED: Error querying quote revisions: ${revErr.message}`);
+        }
+        if (pendingRevs.length > 0) {
+            throw new Error('DISPATCH_BLOCKED: Order has pending quote revision awaiting customer decision.');
         }
 
         // 2. Gate 1: Asset Readiness (Forensic Validation)
@@ -95,7 +97,25 @@ class MarketplaceDispatchGatingService {
             throw new Error('DISPATCH_BLOCKED: Production files must be validated before dispatch.');
         }
 
-        // 3. Gate 2: Financial Readiness & Authoritative Effective Specifications (BLK-03 & BLK-06)
+        // 3. Gate 2: Financial Readiness & Authoritative Effective Specifications (FIN-01 & IND-01)
+        // Check if order has an accepted quote revision
+        let acceptedRevision = null;
+        try {
+            const acceptedRows = normalizeRows(await db.query(
+                `SELECT id, revision_id, status FROM order_quote_revisions 
+                 WHERE (external_order_intent_id = ? OR canonical_order_id = ?) AND status = 'ACCEPTED' 
+                 ORDER BY created_at DESC LIMIT 1`,
+                [orderRef, canonicalRef]
+            ));
+            if (acceptedRows.length > 0) {
+                acceptedRevision = acceptedRows[0];
+            }
+        } catch (revQueryErr) {
+            logger.error({ event: 'revision_query_error', error: revQueryErr.message });
+            throw new Error(`DISPATCH_BLOCKED: Error querying quote revisions: ${revQueryErr.message}`);
+        }
+
+        // Query active effective technical specification (FAIL-CLOSED on DB errors)
         let effectiveSpecRecord = null;
         try {
             const effectiveRows = normalizeRows(await db.query(
@@ -107,18 +127,17 @@ class MarketplaceDispatchGatingService {
             if (effectiveRows.length > 0) {
                 effectiveSpecRecord = effectiveRows[0];
             }
-        } catch (_) {}
-
-        if (effectiveSpecRecord) {
-            if (effectiveSpecRecord.financial_reconciliation_status === 'PAYMENT_PENDING') {
-                await this.logEvent(order.id, orderRef, 'DISPATCH_BLOCKED_PENDING_PAYMENT', { reason: 'REVISION_PAYMENT_PENDING' });
-                throw new Error('DISPATCH_BLOCKED: Revised quote payment is pending customer settlement.');
-            }
-            if (effectiveSpecRecord.industrial_gate_status === 'BLOCKED') {
-                throw new Error('DISPATCH_BLOCKED: Industrial gate is blocked for effective specification.');
-            }
+        } catch (dbErr) {
+            logger.error({ event: 'effective_specs_query_error', error: dbErr.message });
+            throw new Error(`DISPATCH_BLOCKED: Database error querying effective technical specifications: ${dbErr.message}`);
         }
 
+        // IND-01: Prohibit silent fallback to old specs when an accepted revision exists
+        if (acceptedRevision && !effectiveSpecRecord) {
+            throw new Error('DISPATCH_BLOCKED: Order has an accepted revision but no active effective technical specification was found.');
+        }
+
+        // FIN-01: Validate Base Payment Status
         let invoicePayment = {};
         try {
             invoicePayment = typeof order.invoice_payment === 'string'
@@ -126,25 +145,82 @@ class MarketplaceDispatchGatingService {
                 : (order.invoice_payment || {});
         } catch (e) {}
 
-        const isPaid = invoicePayment.payment_status === 'PAID' || 
-                       invoicePayment.admin_override === true || 
-                       order.status === 'PAID' ||
-                       (effectiveSpecRecord && ['PASSED', 'REFUND_PENDING', 'ZERO_DELTA_PARITY'].includes(effectiveSpecRecord.financial_reconciliation_status));
+        const isBasePaid = invoicePayment.payment_status === 'PAID' || 
+                           invoicePayment.admin_override === true || 
+                           ['PAID', 'CONFIRMED', 'IN_PRODUCTION'].includes((order.status || '').toUpperCase());
 
-        if (!isPaid) {
-            await this.logEvent(order.id, orderRef, 'DISPATCH_BLOCKED_PENDING_PAYMENT', { status: invoicePayment.payment_status });
+        if (!isBasePaid) {
+            await this.logEvent(order.id, orderRef, 'DISPATCH_BLOCKED_PENDING_PAYMENT', { 
+                status: invoicePayment.payment_status || order.status 
+            });
             throw new Error('DISPATCH_BLOCKED: Order must be PAID before dispatch.');
         }
 
-        // 4. MES Transition: Consume Effective Technical Specifications (BLK-03)
+        // FIN-01: Governed Policy for Financial Reconciliation States
+        if (effectiveSpecRecord) {
+            if (effectiveSpecRecord.industrial_gate_status === 'BLOCKED') {
+                throw new Error('DISPATCH_BLOCKED: Industrial gate is blocked for effective specification.');
+            }
+
+            const finStatus = effectiveSpecRecord.financial_reconciliation_status;
+
+            // Block unliquidated customer payments
+            if (finStatus === 'PAYMENT_PENDING' || finStatus === 'REDUCED_PAYMENT_PENDING') {
+                await this.logEvent(order.id, orderRef, 'DISPATCH_BLOCKED_PENDING_PAYMENT', { reason: finStatus });
+                throw new Error(`DISPATCH_BLOCKED: Revised quote payment is pending customer settlement (${finStatus}).`);
+            }
+
+            // Governed Negative Delta: Pending Refund Check
+            // An unliquidated refund obligation does NOT automatically authorize machine manufacturing.
+            // Requires independent, persisted, and verifiable industrial authorization.
+            if (finStatus === 'REFUND_PENDING') {
+                const isExplicitlyAuthorized = 
+                    effectiveSpecRecord.industrial_gate_status === 'AUTHORIZED' ||
+                    context.allowDispatchWithPendingRefund === true ||
+                    context.industrialAuthorization?.status === 'AUTHORIZED' ||
+                    context.industrialOverride === true;
+
+                if (!isExplicitlyAuthorized) {
+                    await this.logEvent(order.id, orderRef, 'DISPATCH_BLOCKED_PENDING_REFUND_AUTHORIZATION', { 
+                        financial_reconciliation_status: 'REFUND_PENDING',
+                        order_ref: orderRef
+                    });
+                    throw new Error('DISPATCH_BLOCKED: Refund settlement pending. Independent industrial authorization required for unliquidated negative delta.');
+                }
+
+                await this.logEvent(order.id, orderRef, 'DISPATCH_AUTHORIZED_WITH_PENDING_REFUND', {
+                    authorized_by: context.userId || context.industrialAuthorization?.authorized_by || 'AUTHORIZED_OPERATOR',
+                    authorization_source: effectiveSpecRecord.industrial_gate_status === 'AUTHORIZED' ? 'PERSISTED_GATE_STATUS' : 'DISPATCH_CONTEXT'
+                });
+            }
+
+            const allowedFinStatuses = ['PASSED', 'SETTLED', 'REFUND_SETTLED', 'ZERO_DELTA_PARITY'];
+            const isFinReconciliationPassed = allowedFinStatuses.includes(finStatus) || 
+                (finStatus === 'REFUND_PENDING' && (
+                    effectiveSpecRecord.industrial_gate_status === 'AUTHORIZED' ||
+                    context.allowDispatchWithPendingRefund === true ||
+                    context.industrialAuthorization?.status === 'AUTHORIZED' ||
+                    context.industrialOverride === true
+                ));
+
+            if (!isFinReconciliationPassed) {
+                await this.logEvent(order.id, orderRef, 'DISPATCH_BLOCKED_UNSETTLED_FINANCIAL_STATE', { financial_status: finStatus });
+                throw new Error(`DISPATCH_BLOCKED: Order financial state '${finStatus}' is not settled.`);
+            }
+        }
+
+        // 4. MES Transition: Consume Authoritative Effective Technical Specifications (IND-01)
         let specs = {};
-        if (effectiveSpecRecord && effectiveSpecRecord.specs_json) {
+        if (effectiveSpecRecord) {
             try {
                 specs = typeof effectiveSpecRecord.specs_json === 'string'
                     ? JSON.parse(effectiveSpecRecord.specs_json)
                     : effectiveSpecRecord.specs_json;
-            } catch (_) {}
+            } catch (parseErr) {
+                throw new Error(`DISPATCH_BLOCKED: Malformed effective technical specifications JSON: ${parseErr.message}`);
+            }
         } else {
+            // Unrevised original order: consume original contractual specifications
             try {
                 specs = typeof order.specs === 'string'
                     ? JSON.parse(order.specs || '{}')
@@ -223,6 +299,93 @@ class MarketplaceDispatchGatingService {
             package_id: pkg.id,
             effective_specification_id: effectiveSpecRecord ? effectiveSpecRecord.id : null,
             status: 'IN_PRODUCTION'
+        };
+    }
+
+    /**
+     * Explicitly authorize industrial dispatch for an order with a pending refund (FIN-01).
+     * Grants and persists independent industrial authorization in order_effective_technical_specifications.
+     */
+    async authorizeIndustrialDispatch(orderRef, authContext = {}) {
+        const ordRows = normalizeRows(await db.query(
+            'SELECT id, order_ref FROM orders WHERE order_ref = ? OR id = ? UNION SELECT id, order_id as order_ref FROM marketplace_orders WHERE order_id = ? OR id = ?',
+            [orderRef, orderRef, orderRef, orderRef]
+        ));
+        const canonicalRef = ordRows.length > 0 ? (ordRows[0].order_ref || ordRows[0].id) : orderRef;
+
+        const effectiveRows = normalizeRows(await db.query(
+            `SELECT * FROM order_effective_technical_specifications 
+             WHERE (external_order_intent_id = ? OR canonical_order_id = ?) AND effective_status = 'ACTIVE' 
+             ORDER BY created_at DESC LIMIT 1`,
+            [orderRef, canonicalRef]
+        ));
+        if (effectiveRows.length === 0) {
+            throw new Error('NOT_FOUND: No active effective technical specification found for this order.');
+        }
+
+        const eff = effectiveRows[0];
+        await db.query(
+            `UPDATE order_effective_technical_specifications 
+             SET industrial_gate_status = 'AUTHORIZED', updated_at = CURRENT_TIMESTAMP 
+             WHERE id = ?`,
+            [eff.id]
+        );
+
+        await this.logEvent(eff.canonical_order_id, orderRef, 'INDUSTRIAL_DISPATCH_EXPLICITLY_AUTHORIZED', {
+            effective_specification_id: eff.id,
+            authorized_by: authContext.userId || 'system_manager',
+            role: authContext.role || 'FINANCE_MANAGER',
+            reason: authContext.reason || 'Governed negative delta manufacturing authorization',
+            authorized_at: new Date().toISOString()
+        });
+
+        return {
+            ok: true,
+            effective_specification_id: eff.id,
+            industrial_gate_status: 'AUTHORIZED',
+            authorized_by: authContext.userId || 'system_manager'
+        };
+    }
+
+    /**
+     * Record execution and confirmed settlement of a refund obligation (FIN-01).
+     */
+    async settleRefund(orderRef, settlementContext = {}) {
+        const ordRows = normalizeRows(await db.query(
+            'SELECT id, order_ref FROM orders WHERE order_ref = ? OR id = ? UNION SELECT id, order_id as order_ref FROM marketplace_orders WHERE order_id = ? OR id = ?',
+            [orderRef, orderRef, orderRef, orderRef]
+        ));
+        const canonicalRef = ordRows.length > 0 ? (ordRows[0].order_ref || ordRows[0].id) : orderRef;
+
+        const effectiveRows = normalizeRows(await db.query(
+            `SELECT * FROM order_effective_technical_specifications 
+             WHERE (external_order_intent_id = ? OR canonical_order_id = ?) AND effective_status = 'ACTIVE' 
+             ORDER BY created_at DESC LIMIT 1`,
+            [orderRef, canonicalRef]
+        ));
+        if (effectiveRows.length === 0) {
+            throw new Error('NOT_FOUND: No active effective technical specification found for this order.');
+        }
+
+        const eff = effectiveRows[0];
+        await db.query(
+            `UPDATE order_effective_technical_specifications 
+             SET financial_reconciliation_status = 'REFUND_SETTLED', updated_at = CURRENT_TIMESTAMP 
+             WHERE id = ?`,
+            [eff.id]
+        );
+
+        await this.logEvent(eff.canonical_order_id, orderRef, 'REFUND_OBLIGATION_SETTLED', {
+            effective_specification_id: eff.id,
+            settlement_ref: settlementContext.settlementRef || settlementContext.transactionId || `ref_tx_${Date.now()}`,
+            settled_by: settlementContext.userId || 'system_finance',
+            settled_at: new Date().toISOString()
+        });
+
+        return {
+            ok: true,
+            effective_specification_id: eff.id,
+            financial_reconciliation_status: 'REFUND_SETTLED'
         };
     }
 

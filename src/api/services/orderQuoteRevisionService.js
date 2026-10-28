@@ -2196,18 +2196,10 @@ class OrderQuoteRevisionService {
                         ]
                     );
 
-                    // Synchronize orders.specs / marketplace_orders.book_spec_json without mutating original order_pricing_snapshots
-                    if (parentOrderModel === 'orders') {
-                        await conn.query(
-                            `UPDATE orders SET specs = ? WHERE id = ? OR order_ref = ?`,
-                            [JSON.stringify(effectiveSpecs), parentOrderRef, parentOrderRef]
-                        );
-                    } else if (parentOrderModel === 'marketplace_orders') {
-                        await conn.query(
-                            `UPDATE marketplace_orders SET book_spec_json = ? WHERE order_id = ? OR id = ?`,
-                            [JSON.stringify(effectiveSpecs), parentOrderRef, parentOrderRef]
-                        );
-                    }
+                    // IND-01: Strictly preserve original contractual specifications.
+                    // DO NOT mutate orders.specs or marketplace_orders.book_spec_json.
+                    // The sole authoritative source of approved industrial specifications is
+                    // order_effective_technical_specifications, leaving the original order record intact.
                 } catch (tableErr) {
                     logger.warn({ event: 'effective_specs_persistence_warning', message: tableErr.message });
                 }
