@@ -102,7 +102,7 @@ class MarketplaceDispatchGatingService {
         let acceptedRevision = null;
         try {
             const acceptedRows = normalizeRows(await db.query(
-                `SELECT id, revision_id, status FROM order_quote_revisions 
+                `SELECT id, revision_number, status FROM order_quote_revisions 
                  WHERE (external_order_intent_id = ? OR canonical_order_id = ?) AND status = 'ACCEPTED' 
                  ORDER BY created_at DESC LIMIT 1`,
                 [orderRef, canonicalRef]
