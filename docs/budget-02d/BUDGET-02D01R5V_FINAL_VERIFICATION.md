@@ -5,8 +5,9 @@
 > **Rama de Trabajo**: `feat/budget-02d01-e2e-remediation`  
 > **Pull Request Objetivo**: [PR #9](https://github.com/PrintPriceOS/ppos-control-plane/pull/9) — **OPEN / DRAFT**  
 > **Pull Request Precedente**: [PR #8](https://github.com/PrintPriceOS/ppos-control-plane/pull/8) — **OPEN / DRAFT** (HEAD intacto en `744bdd89676c92de2c612152e1be58fe48698fd9`)  
-> **HEAD Auditado Previo (R5V)**: `9cb861d0cef87ab80f7c2fc68779a06a5c04298d`  
-> **CI Previo Acreditado**: [Run 40647899598](https://github.com/PrintPriceOS/ppos-control-plane/actions/runs/40647899598) — **SUCCESS (100% verde)**  
+> **HEAD Auditado Precedente**: `9cb861d0cef87ab80f7c2fc68779a06a5c04298d`  
+> **Commit Certificado R5F**: `985421abc725221e73e666d9a112dd24c2b7efe0`  
+> **CI GitHub Actions Certificado**: [Run 40650918753](https://github.com/PrintPriceOS/ppos-control-plane/actions/runs/40650918753) — **SUCCESS (100% verde, 3m 7s)**  
 > **Dictamen de Entrada**: `BUDGET-02D01R5V_PASS_TARGETED / BUDGET-02D01_SECURITY_REVIEW_CONDITIONAL`  
 > **Restricciones Absolutas**: **NO MERGE / NO DEPLOY / NO PRODUCTION DATABASE CHANGES / NO REAL FINANCIAL OPERATIONS**
 
@@ -27,7 +28,9 @@ La misión **BUDGET-02D-01R5F** cierra de manera definitiva la discrepancia de i
 | :--- | :--- |
 | **PR #9 (Objetivo)** | [PR #9](https://github.com/PrintPriceOS/ppos-control-plane/pull/9) — **OPEN / DRAFT** |
 | **PR #8 (Precedente)** | [PR #8](https://github.com/PrintPriceOS/ppos-control-plane/pull/8) — **OPEN / DRAFT** (HEAD `744bdd89` intacto) |
-| **HEAD Auditado Previo** | `9cb861d0cef87ab80f7c2fc68779a06a5c04298d` |
+| **HEAD Auditado Precedente** | `9cb861d0cef87ab80f7c2fc68779a06a5c04298d` |
+| **Commit Certificado R5F** | `985421abc725221e73e666d9a112dd24c2b7efe0` |
+| **CI GitHub Actions Certificado** | [Run 40650918753](https://github.com/PrintPriceOS/ppos-control-plane/actions/runs/40650918753) — **SUCCESS (100% verde)** |
 | **Autoridad de Comprobante (R5F)** | Tabla 171 soberana; prohibida reconstrucción desde JSON events |
 | **Contrato de Replay (R5F)** | 8 dimensiones obligatorias; omisión evaluada estrictamente como `SETTLEMENT_MISMATCH` |
 | **Registros Históricos sin Tabla 171** | Fail-closed con `HISTORICAL_SETTLEMENT_RECONCILIATION_REQUIRED` (HTTP 409) |
