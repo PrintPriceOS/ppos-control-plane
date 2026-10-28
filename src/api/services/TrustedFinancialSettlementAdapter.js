@@ -51,6 +51,7 @@ class ProductionFinancialSettlementAdapter {
         expectedCurrency,
         expectedBeneficiary,
         orderId,
+        alternateOrderId = null,
         tenantId,
         callerPayload = {},
         connection = null
@@ -170,6 +171,7 @@ class TestSandboxFinancialSettlementAdapter {
         expectedCurrency,
         expectedBeneficiary,
         orderId,
+        alternateOrderId = null,
         tenantId,
         callerPayload = {},
         connection = null
@@ -291,7 +293,9 @@ class TestSandboxFinancialSettlementAdapter {
                 reason: 'Settlement voucher record lacks mandatory order_id binding.'
             };
         }
-        if (String(recOrderId).trim() !== String(orderId).trim()) {
+        const matchesOrder = String(recOrderId).trim() === String(orderId).trim() ||
+                             (alternateOrderId && String(recOrderId).trim() === String(alternateOrderId).trim());
+        if (!matchesOrder) {
             return {
                 verified: false,
                 code: 'ORDER_MISMATCH',

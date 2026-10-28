@@ -793,6 +793,7 @@ class MarketplaceDispatchGatingService {
             }
 
             // 8.5 Authoritative Verification via Trusted Financial Settlement Adapter (TRUST-01, TRUST-R4-01..03)
+            const targetOrderId = order.order_id || order.order_ref || order.id;
             const adapterResult = await this.trustedFinancialAdapter.verifySettlement({
                 provider: rawProvider,
                 settlementRef: settlementRef,
@@ -800,7 +801,8 @@ class MarketplaceDispatchGatingService {
                 expectedAmount: expectedAmount,
                 expectedCurrency: expectedCurrency,
                 expectedBeneficiary: expectedBeneficiary,
-                orderId: order.id,
+                orderId: targetOrderId,
+                alternateOrderId: order.id,
                 tenantId: order.tenant_id,
                 callerPayload: settlementContext,
                 connection: conn
