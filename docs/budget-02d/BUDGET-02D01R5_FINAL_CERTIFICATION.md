@@ -5,6 +5,7 @@
 **Branch Activa:** `feat/budget-02d01-e2e-remediation`  
 **Base Commit Certificado:** `744bdd89676c92de2c612152e1be58fe48698fd9` (`feat/budget-02c01-quote-revisions`)  
 **SHA de Entrada:** `039e4a78d5c07ccc751077ea5e4611c4a274abfc`  
+**SHA de Código Certificado:** `317b8109d3516e454c839826d14ba65ed30bb846`  
 **Dictamen de Entrada:** `BUDGET-02D01R4_CONDITIONAL — TRUSTED SOURCE NOT YET CERTIFIED`  
 **Dictamen Resultante:** **`PASS_SECURITY_CONTRACT`**  
 *(Contrato y aislamiento de seguridad plenamente acreditados. No se declara PRODUCTION_READY por requerir despliegue e integración operativa out-of-band con proveedores financieros reales en fase posterior).*
