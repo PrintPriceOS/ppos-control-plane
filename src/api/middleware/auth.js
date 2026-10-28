@@ -220,6 +220,10 @@ async function requireAdmin(req, res, next) {
             features: features,
             authMode: 'JWT',
             sessionId: decoded.jti || null,
+            bffDelegated: Boolean(decoded.bff_delegated),
+            delegatedUserId: decoded.delegated_user_id ? String(decoded.delegated_user_id) : null,
+            delegatedSessionId: decoded.delegated_session_id ? String(decoded.delegated_session_id) : null,
+            delegatedOrderId: decoded.delegated_order_id ? String(decoded.delegated_order_id) : null,
             issuedAt: decoded.iat,
             expiresAt: decoded.exp
         };

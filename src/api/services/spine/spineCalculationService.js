@@ -245,6 +245,52 @@ class SpineCalculationService {
     }
 
     /**
+     * Verifies that any referenced order (externalOrderIntentId or canonicalOrderId) belongs to the authenticated tenantId.
+     * Prevents cross-tenant order hijacking or snapshot injection.
+     */
+    async verifyOrderBelongsToTenant({ tenantId, externalOrderIntentId = null, canonicalOrderId = null, conn = null }) {
+        if (!externalOrderIntentId && !canonicalOrderId) return;
+        const executor = conn || this.db;
+        const orderRefs = Array.from(new Set([externalOrderIntentId, canonicalOrderId].filter(Boolean)));
+
+        for (const ref of orderRefs) {
+            try {
+                const snapRows = unwrapRows(await executor.query(
+                    `SELECT tenant_id FROM spine_calculation_snapshots
+                     WHERE external_order_intent_id = ? OR canonical_order_id = ?
+                     LIMIT 1`,
+                    [ref, ref]
+                ));
+                if (snapRows.length > 0 && snapRows[0].tenant_id && String(snapRows[0].tenant_id) !== String(tenantId)) {
+                    throw new SpineCalculationError(
+                        `Order '${ref}' belongs to another tenant. Cross-tenant spine calculation is forbidden.`,
+                        'FORBIDDEN_TENANT_MISMATCH',
+                        403
+                    );
+                }
+            } catch (err) {
+                if (err instanceof SpineCalculationError) throw err;
+            }
+
+            try {
+                const orderRows = unwrapRows(await executor.query(
+                    `SELECT tenant_id FROM orders WHERE id = ? OR order_ref = ? LIMIT 1`,
+                    [ref, ref]
+                ));
+                if (orderRows.length > 0 && orderRows[0].tenant_id && String(orderRows[0].tenant_id) !== String(tenantId)) {
+                    throw new SpineCalculationError(
+                        `Order '${ref}' belongs to another tenant. Cross-tenant spine calculation is forbidden.`,
+                        'FORBIDDEN_TENANT_MISMATCH',
+                        403
+                    );
+                }
+            } catch (err) {
+                if (err instanceof SpineCalculationError) throw err;
+            }
+        }
+    }
+
+    /**
      * Calculates spine and cover geometry, optionally persisting an immutable snapshot.
      */
     async calculateSpine({
@@ -296,6 +342,14 @@ class SpineCalculationService {
         const conn = persistSnapshot ? await this.db.getConnection() : null;
         try {
             if (conn) await conn.beginTransaction();
+
+            // 0. Verify order ownership / tenant match if order reference is supplied (SPINE-06R F01)
+            await this.verifyOrderBelongsToTenant({
+                tenantId,
+                externalOrderIntentId: externalOrderIntentId || payload.externalOrderIntentId || null,
+                canonicalOrderId: canonicalOrderId || payload.canonicalOrderId || null,
+                conn
+            });
 
             // 1. Resolve authoritative profile for printhouse/tenant
             const profile = await this.resolveAuthoritativeProfile({

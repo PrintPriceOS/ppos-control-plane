@@ -466,11 +466,35 @@ describe('SPINE-02/03 — Paper Caliper Provenance & Control Plane Spine Engine 
                         caliper_confidence_status: 'MISSING'
                     }]
                 ]),
-                snapshots: []
+                snapshots: [],
+                controlUsers: new Map([
+                    ['usr_alpha_1', { id: 'usr_alpha_1', tenant_id: 'tenant_alpha', is_active: 1 }],
+                    ['usr_beta_1', { id: 'usr_beta_1', tenant_id: 'tenant_beta', is_active: 1 }]
+                ]),
+                orders: new Map([
+                    ['ord_alpha_999', { id: 'ord_alpha_999', tenant_id: 'tenant_alpha' }],
+                    ['ord_beta_888', { id: 'ord_beta_888', tenant_id: 'tenant_beta' }]
+                ])
             };
 
             const executeMockQuery = async (sql, params = []) => {
                 const normSql = sql.replace(/\s+/g, ' ').trim();
+                if (normSql.includes('FROM control_users WHERE id = ?')) {
+                    const u = mockDb.controlUsers.get(String(params[0]));
+                    return [u ? [u] : []];
+                }
+                if (normSql.includes('FROM spine_calculation_snapshots WHERE external_order_intent_id = ?')) {
+                    const [ref] = params;
+                    const found = mockDb.snapshots.filter(
+                        s => s.tenant_id && (s.external_order_intent_id === ref || s.canonical_order_id === ref)
+                    );
+                    return [found];
+                }
+                if (normSql.includes('FROM orders WHERE id = ?')) {
+                    const [ref] = params;
+                    const ord = mockDb.orders.get(String(ref));
+                    return [ord ? [ord] : []];
+                }
                 if (normSql.startsWith('SELECT v.*, p.name AS product_name')) {
                     const v = mockDb.variants.get(params[0]);
                     return [v ? [v] : []];
@@ -1129,6 +1153,120 @@ describe('SPINE-02/03 — Paper Caliper Provenance & Control Plane Spine Engine 
                 },
                 (err) => err.code === 'MANUFACTURING_RELEASE_BLOCKED_UNCERTIFIED_PROFILE' && err.statusCode === 422
             );
+        });
+
+        it('5.9 SPINE-06R F01: Enforces BFF service credential delegation, cross-tenant order ownership, and rejects universal service tokens without tenant/delegation', async () => {
+            const calcRoute = findRouteLayer(spineRoutes, '/calculate', 'post');
+            const calcHandler = calcRoute.stack[calcRoute.stack.length - 1].handle;
+
+            const basePayload = {
+                bindingCategory: 'SOFTCOVER_STANDARD',
+                processingType: 'GLUED',
+                trimWidthMm: 170,
+                trimHeightMm: 240,
+                segments: [{ pages: 200, variantId: 'var_gprint_100' }]
+            };
+
+            // 1. Global service credential (bpe-system-user / SYSTEM) without bff_delegated or delegated_user_id is rejected with 403 TENANT_CONTEXT_REQUIRED
+            const rawServiceCall = createMockReqRes({
+                method: 'POST',
+                url: '/calculate',
+                body: basePayload,
+                user: {
+                    id: 'bpe-system-user',
+                    role: 'SYSTEM',
+                    tenantId: 'ppos-production',
+                    bffDelegated: false,
+                    authMode: 'JWT'
+                }
+            });
+            await calcHandler(rawServiceCall.req, rawServiceCall.res);
+            assert.strictEqual(rawServiceCall.getStatusCode(), 403);
+            assert.strictEqual(rawServiceCall.getBody().error.code, 'TENANT_CONTEXT_REQUIRED');
+
+            // 2. Delegated BFF call where delegated_user_id belongs to tenant_alpha, but token claims tenant_beta -> 403 FORBIDDEN_TENANT_MISMATCH
+            const mismatchedDelegationCall = createMockReqRes({
+                method: 'POST',
+                url: '/calculate',
+                body: basePayload,
+                user: {
+                    id: 'bpe-system-user',
+                    role: 'SYSTEM',
+                    tenantId: 'tenant_beta',
+                    bffDelegated: true,
+                    delegatedUserId: 'usr_alpha_1',
+                    delegatedSessionId: 'sess_alpha_001',
+                    authMode: 'JWT'
+                }
+            });
+            await calcHandler(mismatchedDelegationCall.req, mismatchedDelegationCall.res);
+            assert.strictEqual(mismatchedDelegationCall.getStatusCode(), 403);
+            assert.strictEqual(mismatchedDelegationCall.getBody().error.code, 'FORBIDDEN_TENANT_MISMATCH');
+
+            // 3. Valid delegated BFF call for tenant_alpha (usr_alpha_1 + sess_alpha_001) -> 201 Created
+            const validDelegatedAlphaCall = createMockReqRes({
+                method: 'POST',
+                url: '/calculate',
+                body: {
+                    ...basePayload,
+                    persistSnapshot: true,
+                    externalOrderIntentId: 'oi_alpha_shared_check'
+                },
+                user: {
+                    id: 'bpe-system-user',
+                    role: 'SYSTEM',
+                    tenantId: 'tenant_alpha',
+                    bffDelegated: true,
+                    delegatedUserId: 'usr_alpha_1',
+                    delegatedSessionId: 'sess_alpha_001',
+                    authMode: 'JWT'
+                }
+            });
+            await calcHandler(validDelegatedAlphaCall.req, validDelegatedAlphaCall.res);
+            assert.strictEqual(validDelegatedAlphaCall.getStatusCode(), 201);
+            assert.strictEqual(validDelegatedAlphaCall.getBody().data.spineWidthMm, 10.5);
+
+            // 4. Cross-tenant order attempt: tenant_beta user (usr_beta_1) tries to calculate against externalOrderIntentId belonging to tenant_alpha -> 403 FORBIDDEN_TENANT_MISMATCH
+            const crossTenantOrderCall = createMockReqRes({
+                method: 'POST',
+                url: '/calculate',
+                body: {
+                    ...basePayload,
+                    persistSnapshot: true,
+                    externalOrderIntentId: 'oi_alpha_shared_check'
+                },
+                user: {
+                    id: 'bpe-system-user',
+                    role: 'SYSTEM',
+                    tenantId: 'tenant_beta',
+                    bffDelegated: true,
+                    delegatedUserId: 'usr_beta_1',
+                    delegatedSessionId: 'sess_beta_001',
+                    authMode: 'JWT'
+                }
+            });
+            await calcHandler(crossTenantOrderCall.req, crossTenantOrderCall.res);
+            assert.strictEqual(crossTenantOrderCall.getStatusCode(), 403);
+            assert.strictEqual(crossTenantOrderCall.getBody().error.code, 'FORBIDDEN_TENANT_MISMATCH');
+
+            // 5. Cross-tenant canonical order attempt: tenant_beta tries to calculate against canonicalOrderId 'ord_alpha_999' owned by tenant_alpha -> 403 FORBIDDEN_TENANT_MISMATCH
+            const crossCanonicalOrderCall = createMockReqRes({
+                method: 'POST',
+                url: '/calculate',
+                body: {
+                    ...basePayload,
+                    canonicalOrderId: 'ord_alpha_999'
+                },
+                user: {
+                    id: 'usr_beta_1',
+                    role: 'PRINTHOUSE_OPERATOR',
+                    tenantId: 'tenant_beta',
+                    authMode: 'JWT'
+                }
+            });
+            await calcHandler(crossCanonicalOrderCall.req, crossCanonicalOrderCall.res);
+            assert.strictEqual(crossCanonicalOrderCall.getStatusCode(), 403);
+            assert.strictEqual(crossCanonicalOrderCall.getBody().error.code, 'FORBIDDEN_TENANT_MISMATCH');
         });
     });
 });
