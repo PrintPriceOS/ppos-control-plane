@@ -396,16 +396,22 @@ class MarketplaceDispatchGatingService {
             let order = null;
             let canonicalRef = orderRef;
 
-            let ordRows = await runTxQuery('SELECT * FROM orders WHERE (order_ref = ? OR id = ?) FOR UPDATE', [orderRef, orderRef]);
-            if (ordRows.length > 0) {
-                order = ordRows[0];
-                canonicalRef = order.order_ref || order.id;
-            } else {
-                let mpRows = await runTxQuery('SELECT * FROM marketplace_orders WHERE (order_id = ? OR id = ?) FOR UPDATE', [orderRef, orderRef]);
-                if (mpRows.length > 0) {
-                    order = mpRows[0];
-                    canonicalRef = order.order_id || order.id;
+            try {
+                let ordRows = await runTxQuery('SELECT * FROM orders WHERE id = ? FOR UPDATE', [orderRef]);
+                if (ordRows.length > 0) {
+                    order = ordRows[0];
+                    canonicalRef = order.order_ref || order.id;
                 }
+            } catch (_) {}
+
+            if (!order) {
+                try {
+                    let mpRows = await runTxQuery('SELECT * FROM marketplace_orders WHERE (order_id = ? OR id = ?) FOR UPDATE', [orderRef, orderRef]);
+                    if (mpRows.length > 0) {
+                        order = mpRows[0];
+                        canonicalRef = order.order_id || order.id;
+                    }
+                } catch (_) {}
             }
 
             if (!order) {
@@ -616,16 +622,22 @@ class MarketplaceDispatchGatingService {
             let order = null;
             let canonicalRef = orderRef;
 
-            let ordRows = await runTxQuery('SELECT * FROM orders WHERE (order_ref = ? OR id = ?) FOR UPDATE', [orderRef, orderRef]);
-            if (ordRows.length > 0) {
-                order = ordRows[0];
-                canonicalRef = order.order_ref || order.id;
-            } else {
-                let mpRows = await runTxQuery('SELECT * FROM marketplace_orders WHERE (order_id = ? OR id = ?) FOR UPDATE', [orderRef, orderRef]);
-                if (mpRows.length > 0) {
-                    order = mpRows[0];
-                    canonicalRef = order.order_id || order.id;
+            try {
+                let ordRows = await runTxQuery('SELECT * FROM orders WHERE id = ? FOR UPDATE', [orderRef]);
+                if (ordRows.length > 0) {
+                    order = ordRows[0];
+                    canonicalRef = order.order_ref || order.id;
                 }
+            } catch (_) {}
+
+            if (!order) {
+                try {
+                    let mpRows = await runTxQuery('SELECT * FROM marketplace_orders WHERE (order_id = ? OR id = ?) FOR UPDATE', [orderRef, orderRef]);
+                    if (mpRows.length > 0) {
+                        order = mpRows[0];
+                        canonicalRef = order.order_id || order.id;
+                    }
+                } catch (_) {}
             }
 
             if (!order) {
