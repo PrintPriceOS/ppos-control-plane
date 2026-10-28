@@ -28,6 +28,8 @@ const mysqlClient = require('./mysqlClient');
 const logger = require('./logger').child('order-quote-revision-service');
 const TaxVatReadinessClassifierService = require('./taxVatReadinessClassifierService');
 const pricingSnapshotCanonicalizer = require('./pricingSnapshotCanonicalizer');
+const { executeSpineCalculation } = require('./spine/spineCalculationEngine');
+const { resolveVariantCaliperProvenance } = require('./spine/paperCaliperReconciliationService');
 
 const taxClassifier = new TaxVatReadinessClassifierService();
 
@@ -2154,6 +2156,78 @@ class OrderQuoteRevisionService {
                 } else if ((revisedTechnicalSpecs.paper_role || '').toUpperCase() === 'COVER') {
                     effectiveSpecs.paper_weight_cover = altVar.gsm || originalSpecs.paper_weight_cover || originalSpecs.gsm;
                 }
+
+                // SPINE-03: Invalidate any previous spine calculation snapshot calculated with the superseded paper!
+                // Never allow an accepted paper revision to retain cover dimensions calculated from the old paper.
+                const altCaliperProv = resolveVariantCaliperProvenance(altVar);
+                effectiveSpecs.caliper_um = altCaliperProv.caliperUm;
+                effectiveSpecs.caliper_source = altCaliperProv.caliperSource;
+                effectiveSpecs.caliper_confidence_status = altCaliperProv.caliperConfidenceStatus;
+                effectiveSpecs.previous_spine_geometry_invalidated = true;
+
+                let recalculatedSpineGeometry = null;
+                const pages = Number(effectiveSpecs.interior_pages || effectiveSpecs.pages || 0);
+                const trimW = Number(effectiveSpecs.book_width || effectiveSpecs.width_mm || 170);
+                const trimH = Number(effectiveSpecs.book_height || effectiveSpecs.height_mm || 240);
+                const bindingRaw = String(effectiveSpecs.binding_method || effectiveSpecs.binding_type || 'perfect_bound').toLowerCase();
+                const isHardcover = bindingRaw.includes('hc') || bindingRaw.includes('hardcover');
+                const isSewn = bindingRaw.includes('sewn');
+
+                if (pages > 0 && altCaliperProv.caliperUm) {
+                    try {
+                        recalculatedSpineGeometry = executeSpineCalculation({
+                            bindingCategory: isHardcover ? 'HARDCOVER' : 'SOFTCOVER_STANDARD',
+                            processingType: isSewn ? 'SEWN' : 'GLUED',
+                            trimWidthMm: trimW,
+                            trimHeightMm: trimH,
+                            segments: [{
+                                segmentIndex: 1,
+                                pages,
+                                variantId: altVar.id || altVar.variant_id || null,
+                                gsm: altVar.gsm || effectiveSpecs.gsm,
+                                caliperUm: altCaliperProv.caliperUm,
+                                caliperSource: altCaliperProv.caliperSource,
+                                caliperConfidenceStatus: altCaliperProv.caliperConfidenceStatus
+                            }],
+                            cover: {
+                                caliperUm: Number(effectiveSpecs.cover_caliper_um || 270)
+                            },
+                            hardcover: isHardcover ? {
+                                endpapersMode: 'SEPARATE',
+                                boardThicknessMm: 3.0,
+                                blockPaperCoating: (altVar.category === 'COATED' || String(altVar.finish || '').includes('COATED')) ? 'COATED' : 'UNCOATED',
+                                spineShape: 'ROUND',
+                                overhangMm: 2.5,
+                                foldingSignaturePages: 16
+                            } : null
+                        });
+                        effectiveSpecs.spine_geometry = {
+                            blockThicknessMm: recalculatedSpineGeometry.blockThickness.totalBlockWithEndpapersMm,
+                            spineWidthMm: recalculatedSpineGeometry.spineWidthMm,
+                            flatCoverWidthMm: recalculatedSpineGeometry.coverGeometry.flatCoverWidthMm,
+                            flatCoverHeightMm: recalculatedSpineGeometry.coverGeometry.flatCoverHeightMm,
+                            profileKey: recalculatedSpineGeometry.fullProfileKey,
+                            validationStatus: recalculatedSpineGeometry.manufacturingValidation.status,
+                            outputCanonicalHash: recalculatedSpineGeometry.outputCanonicalHash
+                        };
+                    } catch (_) {}
+                } else {
+                    effectiveSpecs.spine_geometry = null;
+                    effectiveSpecs.spine_recalculation_required = true;
+                }
+
+                try {
+                    await conn.query(
+                        `UPDATE spine_calculation_snapshots
+                         SET snapshot_lifecycle_status = 'INVALIDATED',
+                             superseded_at = CURRENT_TIMESTAMP(6),
+                             invalidation_reason = 'PAPER_QUOTE_REVISION_ACCEPTED'
+                         WHERE tenant_id = ?
+                           AND snapshot_lifecycle_status = 'ACTIVE'
+                           AND (external_order_intent_id = ? OR canonical_order_id = ?)`,
+                        [revision.tenant_id, revision.external_order_intent_id, revision.canonical_order_id || parentOrderRef]
+                    );
+                } catch (_) {}
 
                 const effectiveId = `oets_${crypto.randomUUID()}`;
 

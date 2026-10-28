@@ -1,0 +1,507 @@
+{
+  "schemaVersion": "1.0.0",
+  "sourceWorkbook": "Livonia print spine calculator 2.0 iekšējā lietošana.xlsx",
+  "workbookSha256Verified": true,
+  "categories": {
+    "CERTIFIED_STORED_EXCEL_SNAPSHOTS": "Exact values cached inside xl/worksheets/sheet1..5.xml of the original Livonia workbook.",
+    "FORMULA_EVALUATED_SCENARIOS": "Deterministic evaluations of the exact XML formulas extracted from sheet1..5.xml across required boundary and paper-combination test cases."
+  },
+  "fixtures": [
+    {
+      "id": "LIVONIA-S1-STORED-SEWN",
+      "provenance": "CERTIFIED_STORED_EXCEL_SNAPSHOT",
+      "sheetName": "Mīkstais sējums(Alegro)",
+      "description": "Stored default example in Sheet 1: Softcover sewn, 220 pages of 145 µm, 170x240 mm, cover 270 µm",
+      "input": {
+        "profileId": "livonia-alegro-softcover",
+        "profileVersion": "2.0.0",
+        "bindingCategory": "SOFTCOVER_STANDARD",
+        "processingType": "SEWN",
+        "trimWidthMm": 170,
+        "trimHeightMm": 240,
+        "segments": [
+          {
+            "segmentIndex": 1,
+            "pages": 220,
+            "caliperUm": 145,
+            "caliperSource": "LIVONIA_REFERENCE_IMPORT",
+            "caliperConfidenceStatus": "REFERENCE_IMPORTED"
+          },
+          {
+            "segmentIndex": 2,
+            "pages": 0,
+            "caliperUm": 0,
+            "caliperSource": "NONE",
+            "caliperConfidenceStatus": "MISSING"
+          }
+        ],
+        "cover": {
+          "caliperUm": 270
+        }
+      },
+      "expectedExcelCells": {
+        "L2_blockThicknessMm": 15.95,
+        "M2_gluedCandidateSpineMm": 17.0,
+        "N2_sewnCandidateSpineMm": 18.0,
+        "E14_spineWidthMm": 18.0,
+        "E39_netCoverWidthMm": 358.0,
+        "E16_flatCoverWidthMm": 364.0,
+        "E18_flatCoverHeightMm": 246.0
+      },
+      "expectedValidationStatus": "CERTIFIED_VALID"
+    },
+    {
+      "id": "LIVONIA-S1-STORED-GLUED",
+      "provenance": "CERTIFIED_STORED_EXCEL_SNAPSHOT",
+      "sheetName": "Mīkstais sējums(Alegro)",
+      "description": "Stored glued candidate (cell M2) in Sheet 1 when L4=2 (Līmēts): 220 pages of 145 µm, 170x240 mm",
+      "input": {
+        "profileId": "livonia-alegro-softcover",
+        "profileVersion": "2.0.0",
+        "bindingCategory": "SOFTCOVER_STANDARD",
+        "processingType": "GLUED",
+        "trimWidthMm": 170,
+        "trimHeightMm": 240,
+        "segments": [
+          {
+            "segmentIndex": 1,
+            "pages": 220,
+            "caliperUm": 145,
+            "caliperSource": "LIVONIA_REFERENCE_IMPORT",
+            "caliperConfidenceStatus": "REFERENCE_IMPORTED"
+          }
+        ],
+        "cover": {
+          "caliperUm": 270
+        }
+      },
+      "expectedExcelCells": {
+        "L2_blockThicknessMm": 15.95,
+        "M2_gluedCandidateSpineMm": 17.0,
+        "E14_spineWidthMm": 17.0,
+        "E39_netCoverWidthMm": 357.0,
+        "E16_flatCoverWidthMm": 363.0,
+        "E18_flatCoverHeightMm": 246.0
+      },
+      "expectedValidationStatus": "CERTIFIED_VALID"
+    },
+    {
+      "id": "LIVONIA-S2-STORED-FLAPS-SEWN",
+      "provenance": "CERTIFIED_STORED_EXCEL_SNAPSHOT",
+      "sheetName": "Mīk. sēj. ar atlokiem (Alegro)",
+      "description": "Stored default example in Sheet 2: Softcover with 80 mm flaps, sewn, 504 pages of 116 µm, 170x297 mm, cover 350 µm",
+      "input": {
+        "profileId": "livonia-alegro-softcover",
+        "profileVersion": "2.0.0",
+        "bindingCategory": "SOFTCOVER_WITH_FLAPS",
+        "processingType": "SEWN",
+        "trimWidthMm": 170,
+        "trimHeightMm": 297,
+        "segments": [
+          {
+            "segmentIndex": 1,
+            "pages": 504,
+            "caliperUm": 116,
+            "caliperSource": "LIVONIA_REFERENCE_IMPORT",
+            "caliperConfidenceStatus": "REFERENCE_IMPORTED"
+          },
+          {
+            "segmentIndex": 2,
+            "pages": 0,
+            "caliperUm": 0,
+            "caliperSource": "NONE",
+            "caliperConfidenceStatus": "MISSING"
+          }
+        ],
+        "cover": {
+          "caliperUm": 350,
+          "flapWidthMm": 80
+        }
+      },
+      "expectedExcelCells": {
+        "L2_blockThicknessMm": 29.232,
+        "M2_gluedCandidateSpineMm": 30.0,
+        "N2_sewnCandidateSpineMm": 32.5,
+        "E14_spineWidthMm": 32.5,
+        "B30_leftFlapMm": 80.0,
+        "C30_backPanelMm": 172.0,
+        "F30_frontPanelMm": 172.0,
+        "H30_rightFlapMm": 80.0,
+        "C33_panelAuxRefMm": 177.0,
+        "E39_netCoverWidthMm": 536.5,
+        "E16_flatCoverWidthMm": 542.5,
+        "E18_flatCoverHeightMm": 303.0
+      },
+      "expectedValidationStatus": "CERTIFIED_VALID"
+    },
+    {
+      "id": "LIVONIA-S3-STORED-HARDCOVER-ALL-4-BRANCHES",
+      "provenance": "CERTIFIED_STORED_EXCEL_SNAPSHOT",
+      "sheetName": "Ciet. sēj. + Superv. (Colibri)",
+      "description": "Stored default example in Sheet 3: Hardcover + Dust Jacket, 192 pages of 172 µm uncoated, separate endpapers (+0.6 mm), 3.0 mm board, 2.5 mm overhang, 16-page signatures, 170x240 mm, 80 mm dust jacket flaps. Includes all 4 pre-calculated spine cells (AF13..AF16).",
+      "input": {
+        "profileId": "livonia-colibri-hardcover",
+        "profileVersion": "2.0.0",
+        "bindingCategory": "HARDCOVER",
+        "processingType": "SEWN",
+        "trimWidthMm": 170,
+        "trimHeightMm": 240,
+        "segments": [
+          {
+            "segmentIndex": 1,
+            "pages": 192,
+            "caliperUm": 172,
+            "coatingType": "UNCOATED",
+            "caliperSource": "LIVONIA_REFERENCE_IMPORT",
+            "caliperConfidenceStatus": "REFERENCE_IMPORTED"
+          }
+        ],
+        "hardcover": {
+          "endpapersMode": "SEPARATE",
+          "boardThicknessMm": 3.0,
+          "blockPaperCoating": "UNCOATED",
+          "spineShape": "ROUND",
+          "overhangMm": 2.5,
+          "foldingSignaturePages": 16,
+          "dustJacket": {
+            "enabled": true,
+            "flapWidthMm": 80
+          }
+        }
+      },
+      "expectedExcelCells": {
+        "AA2_netPaperBlockMm": 16.512,
+        "AD8_endpapersAllowanceMm": 0.6,
+        "AD2_totalBlockWithEndpapersMm": 17.112,
+        "AD10_twoTimesBoardThicknessMm": 6.0,
+        "AG3_sewnSwellingBlockMm": 20.9228856,
+        "AF5_sewnRoundArcMm": 22.0,
+        "AF6_AF13_sewnRoundFinalSpineMm": 23.0,
+        "AH5_sewnSquareTheoreticalWithBoardMm": 23.112,
+        "AH6_AF14_sewnSquareFinalSpineMm": 23.0,
+        "AF10_gluedRoundArcMm": 17.5,
+        "AF11_AF15_gluedRoundFinalSpineMm": 22.5,
+        "AH10_AF16_gluedSquareFinalSpineMm": 23.5,
+        "H14_selectedSpineWidthMm": 23.0,
+        "H15_hingeScoreRastriMm": 8.0,
+        "H16_boardWidthMm": 165.0,
+        "J16_boardHeightMm": 245.0,
+        "H17_turnInNolokiMm": 19.0,
+        "E40_openBoardSpreadWidthMm": 369.0,
+        "H18_flatCoverWidthMm": 407.0,
+        "H19_flatCoverHeightMm": 283.0,
+        "P31_dustJacketPanelWidthMm": 173.0,
+        "P34_dustJacketPanelPlusHingeRefMm": 181.0,
+        "R40_dustJacketNetWidthMm": 529.0,
+        "R20_dustJacketFlatWidthWithBleedMm": 535.0,
+        "R21_dustJacketFlatHeightWithBleedMm": 251.0
+      },
+      "expectedValidationStatus": "REQUIRES_TECH_REVIEW"
+    },
+    {
+      "id": "LIVONIA-S4-STORED-FLEXI-ZERO-PAGES",
+      "provenance": "CERTIFIED_STORED_EXCEL_SNAPSHOT",
+      "sheetName": "Flexi (Colibri)",
+      "description": "Stored zero-page state in Sheet 4 (Flexi without flaps): 0 pages, separate endpapers (+0.6 mm), coated, 210x297 mm. Demonstrates why zero-page Flexi state must be flagged as non-production.",
+      "input": {
+        "profileId": "livonia-colibri-flexi",
+        "profileVersion": "2.0.0",
+        "bindingCategory": "FLEXI_STANDARD",
+        "processingType": "SEWN",
+        "trimWidthMm": 210,
+        "trimHeightMm": 297,
+        "segments": [
+          {
+            "segmentIndex": 1,
+            "pages": 0,
+            "caliperUm": 0,
+            "caliperSource": "NONE",
+            "caliperConfidenceStatus": "MISSING"
+          }
+        ],
+        "hardcover": {
+          "endpapersMode": "SEPARATE",
+          "boardThicknessMm": 1.0,
+          "blockPaperCoating": "COATED",
+          "spineShape": "ROUND",
+          "overhangMm": 3.0,
+          "foldingSignaturePages": 16
+        }
+      },
+      "expectedExcelCells": {
+        "O2_netPaperBlockMm": 0.0,
+        "N2_totalBlockWithEndpapersMm": 0.6,
+        "S2_sewnSwellingBlockMm": 1.97426,
+        "R4_sewnRoundArcMm": 2.0,
+        "R5_R12_sewnRoundFinalSpineMm": 3.0,
+        "T4_R13_sewnSquareDisabledCandidateMm": 4.0,
+        "R9_gluedRoundArcMm": 0.5,
+        "R10_R14_gluedRoundFinalSpineMm": 2.5,
+        "T9_R15_gluedSquareDisabledCandidateMm": 3.5,
+        "D14_selectedSpineWidthMm": 3.0,
+        "E41_netCoverWithoutTurnInMm": 431.0,
+        "D16_flatCoverWidthMm": 461.0,
+        "D18_flatCoverHeightMm": 333.0
+      },
+      "expectedValidationStatus": "INVALID_BLOCKED",
+      "expectedIssueCodes": [
+        "ZERO_TOTAL_PAGES",
+        "PROFILE_REQUIRES_PRINTHOUSE_TECH_APPROVAL"
+      ]
+    },
+    {
+      "id": "LIVONIA-S5-STORED-FLEXI-FLAPS-ZERO-PAGES",
+      "provenance": "CERTIFIED_STORED_EXCEL_SNAPSHOT",
+      "sheetName": "Flexi ar  atlokiem (Colibri)",
+      "description": "Stored zero-page state in Sheet 5 (Flexi with 80 mm flaps): 0 pages, endpapers from block (0 mm), coated, 210x297 mm.",
+      "input": {
+        "profileId": "livonia-colibri-flexi",
+        "profileVersion": "2.0.0",
+        "bindingCategory": "FLEXI_WITH_FLAPS",
+        "processingType": "SEWN",
+        "trimWidthMm": 210,
+        "trimHeightMm": 297,
+        "segments": [
+          {
+            "segmentIndex": 1,
+            "pages": 0,
+            "caliperUm": 0,
+            "caliperSource": "NONE",
+            "caliperConfidenceStatus": "MISSING"
+          }
+        ],
+        "cover": {
+          "flapWidthMm": 80
+        },
+        "hardcover": {
+          "endpapersMode": "FROM_BLOCK",
+          "boardThicknessMm": 1.0,
+          "blockPaperCoating": "COATED",
+          "spineShape": "ROUND",
+          "overhangMm": 3.0,
+          "foldingSignaturePages": 16
+        }
+      },
+      "expectedExcelCells": {
+        "O2_netPaperBlockMm": 0.0,
+        "N2_totalBlockWithEndpapersMm": 0.0,
+        "S2_sewnSwellingBlockMm": 1.2599,
+        "R4_sewnRoundArcMm": 1.5,
+        "R5_R12_sewnRoundFinalSpineMm": 2.5,
+        "T4_R13_sewnSquareDisabledCandidateMm": 3.5,
+        "R9_gluedRoundArcMm": 0.0,
+        "R10_R14_gluedRoundFinalSpineMm": 2.0,
+        "T9_R15_gluedSquareDisabledCandidateMm": 3.0,
+        "D16_selectedSpineWidthMm": 2.5,
+        "D18_E39_flatCoverWidthMm": 590.5,
+        "D19_A32_flatCoverHeightMm": 333.0
+      },
+      "expectedValidationStatus": "INVALID_BLOCKED",
+      "expectedIssueCodes": [
+        "ZERO_TOTAL_PAGES",
+        "FLEXI_FLAP_LATERAL_BLEED_UNVERIFIED",
+        "PROFILE_REQUIRES_PRINTHOUSE_TECH_APPROVAL"
+      ]
+    },
+    {
+      "id": "LIVONIA-S1-SAME-100GSM-THREE-PAPERS-COMPARISON",
+      "provenance": "FORMULA_EVALUATED_SCENARIO",
+      "sheetName": "Mīkstais sējums(Alegro) + Papers",
+      "description": "Demonstrates why 100 gsm is insufficient without caliper_um: 200 pages of G-Print 100g (98 µm) vs Amber Graphic 100g (122 µm) vs Munken Premium Cream 1.75 100g (175 µm), cover 250g (255 µm)",
+      "subCases": [
+        {
+          "paper": "G-Print 100 gsm (A7/C7 = 98 µm)",
+          "pages": 200,
+          "caliperUm": 98,
+          "coverCaliperUm": 255,
+          "expected_L2_blockThicknessMm": 9.8,
+          "expected_M2_gluedSpineMm": 10.5,
+          "expected_N2_sewnSpineMm": 11.5
+        },
+        {
+          "paper": "Amber Graphic 100 gsm (Z6/AB6 = 122 µm)",
+          "pages": 200,
+          "caliperUm": 122,
+          "coverCaliperUm": 255,
+          "expected_L2_blockThicknessMm": 12.2,
+          "expected_M2_gluedSpineMm": 13.0,
+          "expected_N2_sewnSpineMm": 14.0
+        },
+        {
+          "paper": "Munken Premium Cream bulk 1.75 100 gsm (A37/C37 = 175 µm)",
+          "pages": 200,
+          "caliperUm": 175,
+          "coverCaliperUm": 255,
+          "expected_L2_blockThicknessMm": 17.5,
+          "expected_M2_gluedSpineMm": 18.5,
+          "expected_N2_sewnSpineMm": 20.0
+        }
+      ]
+    },
+    {
+      "id": "LIVONIA-S1-COMBINED-TWO-PAPERS",
+      "provenance": "FORMULA_EVALUATED_SCENARIO",
+      "sheetName": "Mīkstais sējums(Alegro)",
+      "description": "Combined paper segments (Lpp. 1 + Lpp. 2): 160 pages of Munken Print Cream 1.5 90g (135 µm) + 64 pages of Multi Art Silk 130g (111 µm), 170x240 mm, cover 270 µm",
+      "input": {
+        "profileId": "livonia-alegro-softcover",
+        "bindingCategory": "SOFTCOVER_STANDARD",
+        "processingType": "SEWN",
+        "trimWidthMm": 170,
+        "trimHeightMm": 240,
+        "segments": [
+          {
+            "segmentIndex": 1,
+            "pages": 160,
+            "caliperUm": 135
+          },
+          {
+            "segmentIndex": 2,
+            "pages": 64,
+            "caliperUm": 111
+          }
+        ],
+        "cover": {
+          "caliperUm": 270
+        }
+      },
+      "expectedExcelCells": {
+        "L2_blockThicknessMm": 14.352,
+        "M2_gluedCandidateSpineMm": 15.5,
+        "N2_sewnCandidateSpineMm": 16.5,
+        "E16_flatCoverWidthMm": 362.5,
+        "E18_flatCoverHeightMm": 246.0
+      }
+    },
+    {
+      "id": "LIVONIA-S1-ODD-PAGES-WARNING",
+      "provenance": "FORMULA_EVALUATED_SCENARIO",
+      "sheetName": "Mīkstais sējums(Alegro)",
+      "description": "Odd page count (221 pages of 145 µm): physical sheet requires even pages (2 pages per leaf); engine flags ODD_PAGE_COUNT_NOT_DIVISIBLE_BY_2",
+      "input": {
+        "profileId": "livonia-alegro-softcover",
+        "bindingCategory": "SOFTCOVER_STANDARD",
+        "processingType": "GLUED",
+        "trimWidthMm": 170,
+        "trimHeightMm": 240,
+        "segments": [
+          {
+            "segmentIndex": 1,
+            "pages": 221,
+            "caliperUm": 145
+          }
+        ]
+      },
+      "expectedExcelCells": {
+        "L2_rawFormulaValueMm": 16.0225,
+        "M2_gluedCandidateSpineMm": 17.0
+      },
+      "expectedIssueCodes": [
+        "ODD_PAGE_COUNT_NOT_DIVISIBLE_BY_2"
+      ]
+    },
+    {
+      "id": "LIVONIA-S2-EXCESSIVE-FLAP-WIDTH-ERROR",
+      "provenance": "FORMULA_EVALUATED_SCENARIO",
+      "sheetName": "Mīk. sēj. ar atlokiem (Alegro)",
+      "description": "Flap width E11=155 mm on trimWidth C10=170 mm triggers B22 error (E11 > C10 - 16 => 155 > 154)",
+      "input": {
+        "profileId": "livonia-alegro-softcover",
+        "bindingCategory": "SOFTCOVER_WITH_FLAPS",
+        "processingType": "SEWN",
+        "trimWidthMm": 170,
+        "trimHeightMm": 297,
+        "segments": [
+          {
+            "segmentIndex": 1,
+            "pages": 200,
+            "caliperUm": 116
+          }
+        ],
+        "cover": {
+          "caliperUm": 350,
+          "flapWidthMm": 155
+        }
+      },
+      "expectedExcelCells": {
+        "B22_errorText": "Atloki pārāk lieli. Samazini atlokus."
+      },
+      "expectedValidationStatus": "INVALID_BLOCKED",
+      "expectedIssueCodes": [
+        "FLAP_WIDTH_EXCEEDS_LIMIT"
+      ]
+    },
+    {
+      "id": "LIVONIA-S3-EXCEEDING-MAX-SEWN-78MM",
+      "provenance": "FORMULA_EVALUATED_SCENARIO",
+      "sheetName": "Ciet. sēj. + Superv. (Colibri)",
+      "description": "Hardcover sewn block where AG3 > 78 mm (e.g. 800 pages of 172 µm -> AD2=69.4 mm, AG3=81.45 mm > 78 mm) triggers AF5='bloks par lielu', AF13='Exceeding max', B22='Grāmata pārāk bieza...'",
+      "input": {
+        "profileId": "livonia-colibri-hardcover",
+        "bindingCategory": "HARDCOVER",
+        "processingType": "SEWN",
+        "trimWidthMm": 170,
+        "trimHeightMm": 240,
+        "segments": [
+          {
+            "segmentIndex": 1,
+            "pages": 800,
+            "caliperUm": 172,
+            "coatingType": "UNCOATED"
+          }
+        ],
+        "hardcover": {
+          "endpapersMode": "SEPARATE",
+          "boardThicknessMm": 3.0,
+          "blockPaperCoating": "UNCOATED",
+          "spineShape": "ROUND",
+          "overhangMm": 2.5,
+          "foldingSignaturePages": 16
+        }
+      },
+      "expectedExcelCells": {
+        "AA2_netPaperBlockMm": 68.8,
+        "AD2_totalBlockWithEndpapersMm": 69.4,
+        "AG3_sewnSwellingBlockMm": 81.90244,
+        "AF5_arcResult": "bloks par lielu",
+        "AF13_sewnRoundResult": "Exceeding max",
+        "H14_spineWidthMm": 0,
+        "B22_errorText": "Grāmata pārāk bieza. Samazini lpp. skaitu, vai izvēlies plānāku papīru."
+      },
+      "expectedValidationStatus": "INVALID_BLOCKED",
+      "expectedIssueCodes": [
+        "BLOCK_THICKNESS_EXCEEDS_MAX_SEWN_78MM"
+      ]
+    },
+    {
+      "id": "LIVONIA-S1-MISSING-CALIPER-BLOCKED",
+      "provenance": "FORMULA_EVALUATED_SCENARIO",
+      "sheetName": "Mīkstais sējums(Alegro)",
+      "description": "Paper variant selected with gsm=100 but caliperUm=null (e.g. ambiguous Munken Premium Cream without bulk specified): blocks certified spine release",
+      "input": {
+        "profileId": "livonia-alegro-softcover",
+        "bindingCategory": "SOFTCOVER_STANDARD",
+        "processingType": "SEWN",
+        "trimWidthMm": 170,
+        "trimHeightMm": 240,
+        "segments": [
+          {
+            "segmentIndex": 1,
+            "pages": 240,
+            "gsm": 100,
+            "caliperUm": null,
+            "caliperSource": "NONE",
+            "caliperConfidenceStatus": "MISSING"
+          }
+        ],
+        "cover": {
+          "caliperUm": 270
+        }
+      },
+      "expectedValidationStatus": "INVALID_BLOCKED",
+      "expectedIssueCodes": [
+        "MISSING_SEGMENT_CALIPER"
+      ]
+    }
+  ]
+}
