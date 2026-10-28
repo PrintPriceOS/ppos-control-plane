@@ -1,0 +1,386 @@
+#!/usr/bin/env node
+'use strict';
+
+/**
+ * scripts/recover_paper_materials_07.cjs
+ *
+ * MISIÓN PAPER-MATERIALS-RECOVERY-07 — Fase 4:
+ * Investigación y acreditación de espesores pendientes (Dry-Run by Default).
+ *
+ * Strict Governance Rules (PAPER-MATERIALS-RECOVERY-07):
+ * 1. Scope: Evaluates the 288 variants with `caliper_um IS NULL` remaining after RECOVERY-06.
+ * 2. Only prepares writes for the 72 variants individually certified as `ACCREDITED_FOR_WRITE`
+ *    in `docs/architecture/RECOVERY_07_MANUFACTURER_EVIDENCE.csv`:
+ *    - 53 `MANUFACTURER_DATASHEET_VERIFIED` -> `caliper_source = 'DATASHEET_VERIFIED'`, `caliper_confidence_status = 'REFERENCE_IMPORTED'`
+ *    - 4 `SUPPLIER_REFERENCE_IMPORTED` -> `caliper_source IN ('LIVONIA_REFERENCE_IMPORT', 'SUPPLIER_IMPORT')`, `caliper_confidence_status = 'REFERENCE_IMPORTED'`
+ *    - 15 `SIBLING_FORMAT_DOCUMENTED` -> `caliper_source = 'SUPPLIER_IMPORT'`, `caliper_confidence_status = 'REFERENCE_IMPORTED'`
+ * 3. Strictly EXCLUDES from write (216 missing-caliper variants + 9 historical conflicts):
+ *    - 144 `PHYSICAL_MEASUREMENT_REQUIRED` (embossed bookbinding coverings Geltex/Efalin/Wibalin/Surbalin, multi-layer Sticotac self-adhesives, Reacto carbonless, deeply embossed/laminated boards)
+ *    - 67 `DOCUMENTATION_REQUIRED` (variants where only VSA/bulk or approximate range is published; gsm * bulk estimation is strictly prohibited)
+ *    - 5 `CONFLICT_HOLD` missing-caliper variants with contradictory ODS/sibling rows
+ *    - All 9 historical caliper conflicts (`HISTORICAL_PRESENT_CALIPER_CONFLICT`, `LIVONIA_REFERENCE_IMPORT`)
+ * 4. Compare-and-Swap (CAS) & Invariance Guards:
+ *    - Updates ONLY apply where `caliper_um IS NULL OR caliper_um <= 0` AND `id NOT IN (9 historical conflicts)`.
+ *    - Never promotes any value to `VERIFIED` without physical micrometer certification or batch-signed certificate.
+ *    - Never modifies `paper_products` classifications, `grain_direction`, `supplier_paper_offers`, prices, gsm, or dimensions.
+ * 5. Default mode is `DRY_RUN_SIMULATION` (zero production writes). Production write is locked
+ *    behind both `--execute` CLI flag AND `PAPER_MATERIALS_RECOVERY_07_APPROVED=true`.
+ */
+
+const fs = require('fs');
+const path = require('path');
+
+function parseCsvContent(text) {
+    const lines = String(text || '').trim().split(/\r?\n/);
+    if (lines.length === 0) return [];
+    const parseLine = (line) => {
+        const res = [];
+        let cur = '';
+        let inQ = false;
+        for (let i = 0; i < line.length; i++) {
+            const ch = line[i];
+            if (inQ) {
+                if (ch === '"' && line[i + 1] === '"') { cur += '"'; i++; }
+                else if (ch === '"') { inQ = false; }
+                else { cur += ch; }
+            } else {
+                if (ch === '"') { inQ = true; }
+                else if (ch === ',') { res.push(cur); cur = ''; }
+                else { cur += ch; }
+            }
+        }
+        res.push(cur);
+        return res;
+    };
+    const headers = parseLine(lines[0]);
+    return lines.slice(1).filter(Boolean).map(l => {
+        const vals = parseLine(l);
+        const obj = {};
+        headers.forEach((h, i) => { obj[h] = vals[i] || ''; });
+        return obj;
+    });
+}
+
+function escapeSql(val) {
+    if (val === null || val === undefined) return 'NULL';
+    if (typeof val === 'number') return String(val);
+    return "'" + String(val).replace(/\\/g, '\\\\').replace(/'/g, "\\'") + "'";
+}
+
+const HISTORICAL_9_CONFLICT_VARIANT_IDS = Object.freeze([
+    'var_2b0314c68f5a97c7',
+    'var_7b7e3a2a2a4a0313',
+    'var_4178aecbfa53dcf8',
+    'var_c699e6a51cd6b41f',
+    'var_5f5cae75e6f45671',
+    'var_ae7dbf443ceab19a',
+    'var_9dabfd7ac5eff6ca',
+    'var_06e1d1681e4f0989',
+    'var_e2f2e68304e9d4a1'
+]);
+
+const VALID_DB_CALIPER_SOURCES = Object.freeze([
+    'LIVONIA_REFERENCE_IMPORT',
+    'SUPPLIER_IMPORT',
+    'DATASHEET_VERIFIED',
+    'MANUAL_ADMIN',
+    'NONE'
+]);
+
+const VALID_DB_CONFIDENCE_STATUSES = Object.freeze([
+    'VERIFIED',
+    'REFERENCE_IMPORTED',
+    'ESTIMATED',
+    'CONFLICT',
+    'MISSING'
+]);
+
+const AUDIT_CATEGORY_TO_DB_ENUM_MAP = Object.freeze({
+    MANUFACTURER_DATASHEET_VERIFIED: {
+        allowed_caliper_sources: ['DATASHEET_VERIFIED'],
+        allowed_confidence_statuses: ['REFERENCE_IMPORTED'],
+        writable: true
+    },
+    SUPPLIER_REFERENCE_IMPORTED: {
+        allowed_caliper_sources: ['LIVONIA_REFERENCE_IMPORT', 'SUPPLIER_IMPORT'],
+        allowed_confidence_statuses: ['REFERENCE_IMPORTED'],
+        writable: true
+    },
+    SIBLING_FORMAT_DOCUMENTED: {
+        allowed_caliper_sources: ['SUPPLIER_IMPORT'],
+        allowed_confidence_statuses: ['REFERENCE_IMPORTED'],
+        writable: true
+    },
+    PHYSICAL_MEASUREMENT_REQUIRED: {
+        allowed_caliper_sources: ['NONE'],
+        allowed_confidence_statuses: ['MISSING'],
+        writable: false
+    },
+    CONFLICT_HOLD: {
+        allowed_caliper_sources: ['NONE', 'LIVONIA_REFERENCE_IMPORT'],
+        allowed_confidence_statuses: ['MISSING', 'REFERENCE_IMPORTED', 'CONFLICT'],
+        writable: false
+    },
+    DOCUMENTATION_REQUIRED: {
+        allowed_caliper_sources: ['NONE'],
+        allowed_confidence_statuses: ['MISSING'],
+        writable: false
+    }
+});
+
+/**
+ * Loads the three RECOVERY_07 CSV deliverables and builds the deterministic
+ * classification, evidence, and dry-run write plan.
+ */
+function buildRecovery07Plan(options = {}) {
+    const repoRoot = options.repoRoot || path.resolve(__dirname, '..');
+    const invPath = options.invPath || path.join(repoRoot, 'docs/architecture/RECOVERY_07_MISSING_CALIPER_INVENTORY.csv');
+    const evPath = options.evPath || path.join(repoRoot, 'docs/architecture/RECOVERY_07_MANUFACTURER_EVIDENCE.csv');
+    const confPath = options.confPath || path.join(repoRoot, 'docs/architecture/RECOVERY_07_CONFLICT_MATRIX.csv');
+
+    const inventoryRows = parseCsvContent(fs.readFileSync(invPath, 'utf8'));
+    const evidenceRows = parseCsvContent(fs.readFileSync(evPath, 'utf8'));
+    const conflictRows = parseCsvContent(fs.readFileSync(confPath, 'utf8'));
+
+    const conflict9Set = new Set(HISTORICAL_9_CONFLICT_VARIANT_IDS);
+    const missingConflictSet = new Set(
+        conflictRows
+            .filter(r => r.conflict_scope === 'MISSING_CALIPER_CANDIDATE_CONFLICT')
+            .map(r => r.variant_id)
+    );
+
+    const writeOperations = [];
+    for (const r of evidenceRows) {
+        if (r.validation_verdict !== 'ACCREDITED_FOR_WRITE') {
+            continue;
+        }
+        if (conflict9Set.has(r.variant_id)) {
+            throw new Error(`CRITICAL_GOVERNANCE_ERROR: Historical conflict ${r.variant_id} cannot be in evidence write list`);
+        }
+        if (missingConflictSet.has(r.variant_id)) {
+            throw new Error(`CRITICAL_GOVERNANCE_ERROR: Missing-caliper conflict ${r.variant_id} cannot be in evidence write list`);
+        }
+
+        const catRule = AUDIT_CATEGORY_TO_DB_ENUM_MAP[r.audit_category];
+        if (!catRule || !catRule.writable) {
+            throw new Error(`CRITICAL_GOVERNANCE_ERROR: Audit category ${r.audit_category} for ${r.variant_id} is not writable`);
+        }
+        if (!VALID_DB_CALIPER_SOURCES.includes(r.db_caliper_source) || !catRule.allowed_caliper_sources.includes(r.db_caliper_source)) {
+            throw new Error(`CRITICAL_ENUM_ERROR: Invalid db_caliper_source ${r.db_caliper_source} for category ${r.audit_category}`);
+        }
+        if (!VALID_DB_CONFIDENCE_STATUSES.includes(r.db_caliper_confidence_status) || !catRule.allowed_confidence_statuses.includes(r.db_caliper_confidence_status)) {
+            throw new Error(`CRITICAL_ENUM_ERROR: Invalid db_caliper_confidence_status ${r.db_caliper_confidence_status} for category ${r.audit_category}`);
+        }
+
+        const calUm = Number(r.accredited_caliper_um);
+        const gsm = Number(r.gsm);
+        if (!Number.isFinite(calUm) || calUm <= 0) {
+            throw new Error(`CRITICAL_VALUE_ERROR: Invalid caliper_um ${r.accredited_caliper_um} for ${r.variant_id}`);
+        }
+
+        writeOperations.push({
+            variant_id: r.variant_id,
+            product_id: r.product_id,
+            product_name: r.product_name,
+            priority_tier: r.priority_tier,
+            manufacturer: r.manufacturer,
+            family: r.family,
+            gsm,
+            audit_category: r.audit_category,
+            proposed_caliper_um: calUm,
+            proposed_caliper_mm: Number((calUm / 1000).toFixed(4)),
+            proposed_bulk_factor: Number((calUm / gsm).toFixed(4)),
+            caliper_source: r.db_caliper_source,
+            caliper_confidence_status: r.db_caliper_confidence_status,
+            document_title: r.document_title,
+            document_url_or_archive_ref: r.document_url_or_archive_ref,
+            document_revision_or_date: r.document_revision_or_date,
+            provenance: r.provenance,
+            ods_source_rows: r.ods_source_rows,
+            ods_code: r.ods_code,
+            technical_justification: r.technical_justification
+        });
+    }
+
+    const byAuditCategory = {
+        MANUFACTURER_DATASHEET_VERIFIED: inventoryRows.filter(r => r.audit_category === 'MANUFACTURER_DATASHEET_VERIFIED'),
+        SUPPLIER_REFERENCE_IMPORTED: inventoryRows.filter(r => r.audit_category === 'SUPPLIER_REFERENCE_IMPORTED'),
+        SIBLING_FORMAT_DOCUMENTED: inventoryRows.filter(r => r.audit_category === 'SIBLING_FORMAT_DOCUMENTED'),
+        PHYSICAL_MEASUREMENT_REQUIRED: inventoryRows.filter(r => r.audit_category === 'PHYSICAL_MEASUREMENT_REQUIRED'),
+        CONFLICT_HOLD: inventoryRows.filter(r => r.audit_category === 'CONFLICT_HOLD'),
+        DOCUMENTATION_REQUIRED: inventoryRows.filter(r => r.audit_category === 'DOCUMENTATION_REQUIRED')
+    };
+
+    const byPriorityTier = {
+        P1_INTERIOR_BOOK_PAPER: {
+            total: inventoryRows.filter(r => r.priority_tier === 'P1_INTERIOR_BOOK_PAPER').length,
+            recoverable: writeOperations.filter(r => r.priority_tier === 'P1_INTERIOR_BOOK_PAPER').length
+        },
+        P2_COVER_BOARD_AND_CARD: {
+            total: inventoryRows.filter(r => r.priority_tier === 'P2_COVER_BOARD_AND_CARD').length,
+            recoverable: writeOperations.filter(r => r.priority_tier === 'P2_COVER_BOARD_AND_CARD').length
+        },
+        P3_SPECIALTY_AND_COVERING: {
+            total: inventoryRows.filter(r => r.priority_tier === 'P3_SPECIALTY_AND_COVERING').length,
+            recoverable: writeOperations.filter(r => r.priority_tier === 'P3_SPECIALTY_AND_COVERING').length
+        }
+    };
+
+    return {
+        mission: 'PAPER-MATERIALS-RECOVERY-07',
+        status: 'RECOVERY_07_READY_FOR_WRITE_APPROVAL',
+        counts: {
+            total_missing_caliper_variants: inventoryRows.length,
+            recoverable_total: writeOperations.length,
+            held_total: inventoryRows.length - writeOperations.length,
+            manufacturer_datasheet_verified: byAuditCategory.MANUFACTURER_DATASHEET_VERIFIED.length,
+            supplier_reference_imported: byAuditCategory.SUPPLIER_REFERENCE_IMPORTED.length,
+            sibling_format_documented: byAuditCategory.SIBLING_FORMAT_DOCUMENTED.length,
+            physical_measurement_required: byAuditCategory.PHYSICAL_MEASUREMENT_REQUIRED.length,
+            conflict_hold_missing: byAuditCategory.CONFLICT_HOLD.length,
+            documentation_required: byAuditCategory.DOCUMENTATION_REQUIRED.length,
+            historical_conflicts_preserved: HISTORICAL_9_CONFLICT_VARIANT_IDS.length,
+            total_conflict_matrix_rows: conflictRows.length,
+            projected_catalog_with_caliper_after_rec07: 1236 + writeOperations.length,
+            projected_catalog_missing_caliper_after_rec07: 288 - writeOperations.length
+        },
+        byPriorityTier,
+        lists: {
+            inventoryRows,
+            evidenceRows,
+            conflictRows,
+            writeOperations,
+            byAuditCategory,
+            historical9CaliperConflicts: HISTORICAL_9_CONFLICT_VARIANT_IDS
+        }
+    };
+}
+
+/**
+ * Generates deterministic Rollback SQL for the 72 accredited variants in `writeOperations`.
+ */
+function generateRollbackSql07(plan, catalogVariants = []) {
+    const prodById = new Map(catalogVariants.map(v => [v.variant_id || v.id, v]));
+    const lines = [
+        '-- Rollback SQL for PAPER-MATERIALS-RECOVERY-07 (72 Accredited Caliper Variants)',
+        `-- Generated at: ${new Date().toISOString()}`,
+        'START TRANSACTION;'
+    ];
+
+    for (const op of plan.lists.writeOperations) {
+        const pv = prodById.get(op.variant_id) || {};
+        const calUm = pv.caliper_um !== undefined && pv.caliper_um !== null ? Number(pv.caliper_um) : null;
+        const calMm = pv.caliper_mm !== undefined && pv.caliper_mm !== null ? Number(pv.caliper_mm) : null;
+        const bulk = pv.bulk_factor !== undefined && pv.bulk_factor !== null ? Number(pv.bulk_factor) : null;
+        const src = pv.caliper_source || 'NONE';
+        const conf = pv.caliper_confidence_status || 'MISSING';
+        const meta = typeof pv.variant_metadata_json === 'string'
+            ? pv.variant_metadata_json
+            : JSON.stringify(pv.variant_metadata_json || {});
+
+        lines.push(
+            `UPDATE paper_variants SET caliper_um = ${escapeSql(calUm)}, caliper_mm = ${escapeSql(calMm)}, bulk_factor = ${escapeSql(bulk)}, caliper_source = ${escapeSql(src)}, caliper_confidence_status = ${escapeSql(conf)}, metadata_json = ${escapeSql(meta)} WHERE id = ${escapeSql(op.variant_id)};`
+        );
+    }
+
+    lines.push('COMMIT;');
+    return lines.join('\n') + '\n';
+}
+
+/**
+ * Simulates the RECOVERY-07 caliper update against an in-memory catalog snapshot (dry-run)
+ * and verifies idempotency, CAS guards, and strict preservation of historical conflicts.
+ */
+function simulateRecovery07DryRun(plan, catalogVariants) {
+    const cloned = catalogVariants.map(v => ({
+        ...v,
+        variant_id: v.variant_id || v.id
+    }));
+    const byId = new Map(cloned.map(v => [v.variant_id, v]));
+    const conflict9Set = new Set(HISTORICAL_9_CONFLICT_VARIANT_IDS);
+
+    const runPass = () => {
+        let updatedCalipers = 0;
+        let skippedAlreadyApplied = 0;
+        let blockedByCasGuard = 0;
+
+        for (const op of plan.lists.writeOperations) {
+            if (conflict9Set.has(op.variant_id)) {
+                blockedByCasGuard++;
+                continue;
+            }
+            const row = byId.get(op.variant_id);
+            if (!row) {
+                blockedByCasGuard++;
+                continue;
+            }
+
+            const currentCal = row.caliper_um !== null && row.caliper_um !== undefined ? Number(row.caliper_um) : 0;
+            if (currentCal === op.proposed_caliper_um && row.caliper_source === op.caliper_source) {
+                skippedAlreadyApplied++;
+                continue;
+            }
+            if (currentCal > 0) {
+                blockedByCasGuard++;
+                continue;
+            }
+
+            row.caliper_um = op.proposed_caliper_um;
+            row.caliper_mm = op.proposed_caliper_mm;
+            row.bulk_factor = op.proposed_bulk_factor;
+            row.caliper_source = op.caliper_source;
+            row.caliper_confidence_status = op.caliper_confidence_status;
+            updatedCalipers++;
+        }
+
+        return { updatedCalipers, skippedAlreadyApplied, blockedByCasGuard };
+    };
+
+    const pass1 = runPass();
+    const pass2 = runPass();
+
+    const finalWithCaliper = cloned.filter(v => v.caliper_um !== null && Number(v.caliper_um) > 0).length;
+    const finalMissingCaliper = cloned.length - finalWithCaliper;
+
+    return {
+        mode: 'DRY_RUN_SIMULATION',
+        production_writes_executed: 0,
+        pass1,
+        pass2,
+        idempotent: pass2.updatedCalipers === 0,
+        finalCatalogCounts: {
+            total_variants: cloned.length,
+            with_caliper: finalWithCaliper,
+            missing_caliper: finalMissingCaliper
+        }
+    };
+}
+
+if (require.main === module) {
+    const args = process.argv.slice(2);
+    if (args.includes('--execute')) {
+        if (process.env.PAPER_MATERIALS_RECOVERY_07_APPROVED !== 'true') {
+            console.error('BLOCKED: Production write is strictly prohibited during PAPER-MATERIALS-RECOVERY-07 without explicit approval.');
+            process.exit(1);
+        }
+    }
+    const plan = buildRecovery07Plan();
+    console.log(JSON.stringify({
+        mission: plan.mission,
+        status: plan.status,
+        mode: 'DRY_RUN_ONLY',
+        counts: plan.counts,
+        byPriorityTier: plan.byPriorityTier
+    }, null, 2));
+}
+
+module.exports = {
+    HISTORICAL_9_CONFLICT_VARIANT_IDS,
+    VALID_DB_CALIPER_SOURCES,
+    VALID_DB_CONFIDENCE_STATUSES,
+    AUDIT_CATEGORY_TO_DB_ENUM_MAP,
+    buildRecovery07Plan,
+    generateRollbackSql07,
+    simulateRecovery07DryRun
+};
+
