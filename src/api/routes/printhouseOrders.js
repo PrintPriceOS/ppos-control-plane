@@ -204,19 +204,23 @@ async function handleAuthorizeIndustrialDispatch(req, res) {
                            err.message.includes('FORBIDDEN') ? 403 :
                            err.message.includes('NOT_FOUND') ? 404 :
                            err.message.includes('ORDER_INELIGIBLE') ? 409 :
+                           err.message.includes('INVALID_REVISION_STATE') ? 409 :
+                           err.message.includes('INVALID_STATE') ? 409 :
+                           err.message.includes('MISMATCH') ? 409 :
+                           err.message.includes('DATABASE_CONNECTION_ERROR') ? 503 :
                            err.message.includes('BAD_REQUEST') ? 400 : 422;
         res.status(statusCode).json({ ok: false, error: err.message });
     }
 }
 
 /**
- * Record Verifiable Refund Obligation Settlement (MES / FIN-01 / SEC-D02 / SEC-D03).
+ * Record Verifiable Refund Obligation Settlement (MES / FIN-01 / SEC-D02R / SEC-D03R / SEC-D04R).
  * POST /api/printhouse/orders/:orderRef/settle-refund
  */
 async function handleSettleRefund(req, res) {
     const orderRef = req.params.orderRef;
     const context = resolveActorContext(req);
-    const { settlementRef, provider, transactionId } = req.body || {};
+    const { settlementRef, provider, transactionId, obligationId, amount, currency, evidence, proof } = req.body || {};
 
     try {
         const result = await dispatchGating.settleRefund(orderRef, {
@@ -226,7 +230,11 @@ async function handleSettleRefund(req, res) {
             printhouseId: context.printhouseId,
             isSuperAdmin: context.isSuperAdmin,
             settlementRef: settlementRef || transactionId,
-            provider
+            provider,
+            obligationId,
+            amount,
+            currency,
+            evidence: evidence || proof
         });
         res.json(result);
     } catch (err) {
@@ -234,7 +242,15 @@ async function handleSettleRefund(req, res) {
         const statusCode = err.message.includes('UNAUTHORIZED') ? 401 :
                            err.message.includes('FORBIDDEN') ? 403 :
                            err.message.includes('NOT_FOUND') ? 404 :
+                           err.message.includes('DUPLICATE_SETTLEMENT_REFERENCE') ? 409 :
+                           err.message.includes('ORDER_INELIGIBLE') ? 409 :
+                           err.message.includes('DATABASE_CONNECTION_ERROR') ? 503 :
                            err.message.includes('INVALID_SETTLEMENT_REFERENCE') ? 422 :
+                           err.message.includes('INVALID_SETTLEMENT_EVIDENCE') ? 422 :
+                           err.message.includes('UNVERIFIED_SETTLEMENT_STATUS') ? 422 :
+                           err.message.includes('OBLIGATION_MISMATCH') ? 422 :
+                           err.message.includes('AMOUNT_MISMATCH') ? 422 :
+                           err.message.includes('CURRENCY_MISMATCH') ? 422 :
                            err.message.includes('INVALID_PROVIDER') ? 422 : 400;
         res.status(statusCode).json({ ok: false, error: err.message });
     }

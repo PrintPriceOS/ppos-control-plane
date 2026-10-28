@@ -410,12 +410,48 @@ async function runRealMysqlCertification() {
         assert.ok(foreignTenantError.message.includes('Tenant mismatch'), foreignTenantError.message);
         console.log(`  ✓ SEC-D02 Certified: Cross-tenant isolation strictly enforced for industrial authorization in MySQL 8.`);
 
+        // 6.3.b (SEC-D02R): Omitted tenant for non-global operator -> DENIED
+        let omittedTenantError = null;
+        try {
+            await marketplaceDispatchGatingService.authorizeIndustrialDispatch(testOrderId, {
+                userId: 'rogue_director',
+                role: 'PLANT_DIRECTOR',
+                tenantId: '',
+                printhouseId: testPrinthouseId,
+                reason: 'Omitted tenant authorization attempt'
+            });
+        } catch (err) {
+            omittedTenantError = err;
+        }
+        assert.ok(omittedTenantError, 'Omitted tenant must be denied');
+        assert.ok(omittedTenantError.message.includes('Authenticated tenant context is mandatory'), omittedTenantError.message);
+        console.log(`  ✓ SEC-D02R Certified: Omitted tenant strictly rejected as mandatory in MySQL 8.`);
+
+        // 6.3.c (SEC-D02R): Omitted printhouse for printer operator -> DENIED
+        let omittedPrinterError = null;
+        try {
+            await marketplaceDispatchGatingService.authorizeIndustrialDispatch(testOrderId, {
+                userId: 'rogue_director',
+                role: 'PLANT_DIRECTOR',
+                tenantId: testTenantId,
+                printhouseId: '',
+                reason: 'Omitted printhouse authorization attempt'
+            });
+        } catch (err) {
+            omittedPrinterError = err;
+        }
+        assert.ok(omittedPrinterError, 'Omitted printhouse must be denied');
+        assert.ok(omittedPrinterError.message.includes('Authenticated printhouse context is mandatory'), omittedPrinterError.message);
+        console.log(`  ✓ SEC-D02R Certified: Omitted printhouse strictly rejected as mandatory in MySQL 8.`);
+
         // 6.4 (SEC-D02): Fictitious system identity rejected
         let fictitiousError = null;
         try {
             await marketplaceDispatchGatingService.authorizeIndustrialDispatch(testOrderId, {
                 userId: 'system_manager',
                 role: 'PLANT_DIRECTOR',
+                tenantId: testTenantId,
+                printhouseId: testPrinthouseId,
                 reason: 'Fictitious actor check'
             });
         } catch (err) {
@@ -424,6 +460,26 @@ async function runRealMysqlCertification() {
         assert.ok(fictitiousError, 'Fictitious system identity must be rejected');
         assert.ok(fictitiousError.message.includes('UNAUTHORIZED'), fictitiousError.message);
         console.log(`  ✓ SEC-D02 Certified: Fictitious identity (system_manager) strictly rejected in MySQL 8.`);
+
+        // 6.4.b (SEC-D04R): MySQL transactional acquisition failure -> FAIL-CLOSED
+        const origPoolGetConn = testPool.getConnection;
+        testPool.getConnection = async () => { throw new Error('SIMULATED_POOL_EXHAUSTION'); };
+        let txAcqError = null;
+        try {
+            await marketplaceDispatchGatingService.authorizeIndustrialDispatch(testOrderId, {
+                userId: 'mgr_plant_01',
+                role: 'PLANT_DIRECTOR',
+                tenantId: testTenantId,
+                printhouseId: testPrinthouseId,
+                reason: 'Attempt during database pool failure'
+            });
+        } catch (err) {
+            txAcqError = err;
+        }
+        assert.ok(txAcqError, 'Acquisition failure must fail closed');
+        assert.ok(txAcqError.message.includes('DATABASE_CONNECTION_ERROR'), txAcqError.message);
+        testPool.getConnection = origPoolGetConn;
+        console.log(`  ✓ SEC-D04R Certified: Transaction connection acquisition failure strictly fails closed in MySQL 8.`);
 
         // 6.5 (SEC-D02 & Concurrency): Two concurrent authorizations execute under FOR UPDATE lock
         const [authRes1, authRes2] = await Promise.all([
@@ -461,7 +517,8 @@ async function runRealMysqlCertification() {
                 userId: 'finance_mgr_01',
                 role: 'FINANCE_DIRECTOR',
                 tenantId: testTenantId,
-                settlementRef: 'ref_tx_12345678'
+                settlementRef: 'ref_tx_12345678',
+                provider: 'BANK_TRANSFER_LEDGER'
             });
         } catch (err) {
             fakeRefError = err;
@@ -469,30 +526,105 @@ async function runRealMysqlCertification() {
         assert.ok(fakeRefError, 'Fake local pseudo-reference must be rejected');
         assert.ok(fakeRefError.message.includes('INVALID_SETTLEMENT_REFERENCE'), fakeRefError.message);
 
+        // 6.6.b (SEC-D03R): Syntactically valid reference WITHOUT external evidence -> REJECTED, status remains REFUND_PENDING
+        let noEvidenceError = null;
+        try {
+            await marketplaceDispatchGatingService.settleRefund(testOrderId, {
+                userId: 'finance_mgr_01',
+                role: 'FINANCE_DIRECTOR',
+                tenantId: testTenantId,
+                settlementRef: 'BANKTX987654',
+                provider: 'BANK_TRANSFER_LEDGER'
+            });
+        } catch (err) {
+            noEvidenceError = err;
+        }
+        assert.ok(noEvidenceError, 'Reference alone without verifiable external evidence must be rejected');
+        assert.ok(noEvidenceError.message.includes('INVALID_SETTLEMENT_EVIDENCE'), noEvidenceError.message);
+
+        // 6.6.c (SEC-D03R): Incompatible refund amount discrepancy -> REJECTED
+        let amountMismatchError = null;
+        try {
+            await marketplaceDispatchGatingService.settleRefund(testOrderId, {
+                userId: 'finance_mgr_01',
+                role: 'FINANCE_DIRECTOR',
+                tenantId: testTenantId,
+                settlementRef: 'BCN_ERP_CREDIT_NOTE_2026_0991',
+                provider: 'ERP_CREDIT_NOTE',
+                amount: 999.00,
+                evidence: {
+                    status: 'POSTED',
+                    credit_note_id: 'CN-2026-0991',
+                    journal_entry_ref: 'JE-0991',
+                    accounting_ledger_verified: true
+                }
+            });
+        } catch (err) {
+            amountMismatchError = err;
+        }
+        assert.ok(amountMismatchError, 'Amount mismatch must be rejected');
+        assert.ok(amountMismatchError.message.includes('AMOUNT_MISMATCH'), amountMismatchError.message);
+
         const [specAfterFakeRef] = await testPool.query(
             'SELECT financial_reconciliation_status FROM order_effective_technical_specifications WHERE id = ?',
             [specId]
         );
         assert.strictEqual(specAfterFakeRef[0].financial_reconciliation_status, 'REFUND_PENDING');
-        console.log(`  ✓ SEC-D03 Certified: Local pseudo-reference rejected; status safely kept as REFUND_PENDING.`);
+        console.log(`  ✓ SEC-D03R Certified: Syntactically valid reference without verifiable proof rejected; status kept as REFUND_PENDING.`);
 
-        // 6.7 (SEC-D03): Verifiable settlement with accredited external reference -> SUCCEEDED
+        // 6.7 (SEC-D03R): Verifiable settlement with accredited external reference and verified accounting evidence -> SUCCEEDED
         const settlementRes = await marketplaceDispatchGatingService.settleRefund(testOrderId, {
             userId: 'finance_mgr_01',
             role: 'FINANCE_DIRECTOR',
             tenantId: testTenantId,
             settlementRef: 'BCN_ERP_CREDIT_NOTE_2026_0991',
-            provider: 'ERP_CREDIT_NOTE'
+            provider: 'ERP_CREDIT_NOTE',
+            amount: 30.00,
+            currency: 'EUR',
+            evidence: {
+                status: 'POSTED',
+                credit_note_id: 'CN-2026-0991',
+                journal_entry_ref: 'JE-0991',
+                accounting_ledger_verified: true
+            }
         });
         assert.strictEqual(settlementRes.ok, true);
         assert.strictEqual(settlementRes.financial_reconciliation_status, 'REFUND_SETTLED');
+
+        // 6.7.b (SEC-D03R & Concurrency): Concurrent refund settlements under FOR UPDATE lock resolve idempotently
+        const [concSettle1, concSettle2] = await Promise.all([
+            marketplaceDispatchGatingService.settleRefund(testOrderId, {
+                userId: 'finance_mgr_01',
+                role: 'FINANCE_DIRECTOR',
+                tenantId: testTenantId,
+                settlementRef: 'BCN_ERP_CREDIT_NOTE_2026_0991',
+                provider: 'ERP_CREDIT_NOTE',
+                amount: 30.00,
+                currency: 'EUR',
+                evidence: { status: 'POSTED', credit_note_id: 'CN-2026-0991' }
+            }),
+            marketplaceDispatchGatingService.settleRefund(testOrderId, {
+                userId: 'finance_mgr_02',
+                role: 'FINANCE_DIRECTOR',
+                tenantId: testTenantId,
+                settlementRef: 'BCN_ERP_CREDIT_NOTE_2026_0991',
+                provider: 'ERP_CREDIT_NOTE',
+                amount: 30.00,
+                currency: 'EUR',
+                evidence: { status: 'POSTED', credit_note_id: 'CN-2026-0991' }
+            })
+        ]);
+        assert.strictEqual(concSettle1.ok, true);
+        assert.strictEqual(concSettle2.ok, true);
+        assert.strictEqual(concSettle1.financial_reconciliation_status, 'REFUND_SETTLED');
+        assert.strictEqual(concSettle2.financial_reconciliation_status, 'REFUND_SETTLED');
 
         const [specAfterSettled] = await testPool.query(
             'SELECT financial_reconciliation_status FROM order_effective_technical_specifications WHERE id = ?',
             [specId]
         );
         assert.strictEqual(specAfterSettled[0].financial_reconciliation_status, 'REFUND_SETTLED');
-        console.log(`  ✓ SEC-D03 Certified: Accredited external settlement persisted as REFUND_SETTLED in MySQL 8.`);
+        console.log(`  ✓ SEC-D03R Certified: Accredited external settlement with accounting evidence persisted as REFUND_SETTLED in MySQL 8.`);
 
         // 6.8 (IND-01): Machine dispatch consumes effective technical version -> SUCCESS
         const dispatchResult = await marketplaceDispatchGatingService.dispatchOrder(testOrderId, 'machine_alpha_01', {
@@ -787,13 +919,13 @@ async function runRealMysqlCertification() {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${testAuthToken}`
                 },
-                body: JSON.stringify({ settlementRef: 'ref_tx_998811' })
+                body: JSON.stringify({ settlementRef: 'ref_tx_998811', provider: 'STRIPE' })
             });
             assert.strictEqual(invalidSettleRes.status, 422, 'Settlement with pseudo-reference must return 422');
             console.log('  ✓ SEC-D03/SEC-D04 HTTP Certified: Real HTTP settlement rejected with 422 on pseudo-reference.');
 
-            // 8.7 Real HTTP settlement with accredited external reference -> HTTP 200
-            const validSettleRes = await fetch(`${httpBaseUrl}/api/printhouse/orders/${httpOrderId}/settle-refund`, {
+            // 8.6.b Real HTTP settlement with syntactically valid reference WITHOUT external evidence -> HTTP 422 (SEC-D03R)
+            const noEvidenceHttpRes = await fetch(`${httpBaseUrl}/api/printhouse/orders/${httpOrderId}/settle-refund`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -802,13 +934,57 @@ async function runRealMysqlCertification() {
                 body: JSON.stringify({
                     settlementRef: 'SETTLE_STRIPE_RE_99182910',
                     provider: 'STRIPE'
+                    // No evidence object provided
+                })
+            });
+            assert.strictEqual(noEvidenceHttpRes.status, 422, 'Settlement without external evidence must return 422');
+            console.log('  ✓ SEC-D03R/SEC-D04 HTTP Certified: Real HTTP settlement without verifiable proof rejected with 422.');
+
+            // 8.6.c Real HTTP settlement with incompatible amount -> HTTP 422 (SEC-D03R)
+            const amountMismatchHttpRes = await fetch(`${httpBaseUrl}/api/printhouse/orders/${httpOrderId}/settle-refund`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${testAuthToken}`
+                },
+                body: JSON.stringify({
+                    settlementRef: 'SETTLE_STRIPE_RE_99182910',
+                    provider: 'STRIPE',
+                    amount: 999.00,
+                    evidence: {
+                        status: 'SUCCEEDED',
+                        charge_id: 'ch_http_99182910',
+                        signature_verified: true
+                    }
+                })
+            });
+            assert.strictEqual(amountMismatchHttpRes.status, 422, 'Settlement with amount mismatch must return 422');
+            console.log('  ✓ SEC-D03R/SEC-D04 HTTP Certified: Real HTTP settlement with amount mismatch rejected with 422.');
+
+            // 8.7 Real HTTP settlement with accredited external reference and verified evidence -> HTTP 200
+            const validSettleRes = await fetch(`${httpBaseUrl}/api/printhouse/orders/${httpOrderId}/settle-refund`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${testAuthToken}`
+                },
+                body: JSON.stringify({
+                    settlementRef: 'SETTLE_STRIPE_RE_99182910',
+                    provider: 'STRIPE',
+                    amount: 30.00,
+                    currency: 'EUR',
+                    evidence: {
+                        status: 'SUCCEEDED',
+                        charge_id: 'ch_http_99182910',
+                        signature_verified: true
+                    }
                 })
             });
             assert.strictEqual(validSettleRes.status, 200, 'Accredited settlement must return 200');
             const settleBody = await validSettleRes.json();
             assert.strictEqual(settleBody.ok, true);
             assert.strictEqual(settleBody.financial_reconciliation_status, 'REFUND_SETTLED');
-            console.log('  ✓ SEC-D03/SEC-D04 HTTP Certified: Real HTTP settlement succeeded with 200 and REFUND_SETTLED.');
+            console.log('  ✓ SEC-D03R/SEC-D04 HTTP Certified: Real HTTP settlement with verified evidence succeeded with 200 and REFUND_SETTLED.');
         } finally {
             await httpApp.close();
             await testPool.end();

@@ -354,6 +354,20 @@ describe('BUDGET-02D-01 — End-to-End Real Integration & Lifecycle Certificatio
                 return this.tables.print_nodes.filter(n => n.id === id);
             }
 
+            // 11.5 SELECT from marketplace_events
+            if (s.includes('from marketplace_events')) {
+                return this.tables.marketplace_events.map(ev => {
+                    const p = ev.params || [];
+                    return {
+                        id: p[0],
+                        order_id: p[1],
+                        order_ref: p[2],
+                        event_type: p[3],
+                        metadata_json: p[4]
+                    };
+                });
+            }
+
             // 12. INSERTS
             if (s.includes('insert into order_pricing_snapshots')) {
                 const [
@@ -1766,9 +1780,45 @@ describe('BUDGET-02D-01 — End-to-End Real Integration & Lifecycle Certificatio
                 marketplaceDispatchGatingService.authorizeIndustrialDispatch(orderRef, {
                     userId: 'user_unauthorized_op',
                     role: 'OPERATOR',
+                    tenantId,
+                    printhouseId,
                     reason: 'Unauthorized operator attempting gate override'
                 })
             ).rejects.toThrow(/FORBIDDEN: User role 'OPERATOR' does not have industrial authorization permission/);
+
+            // 11.6.2.b Operador con privilegio autodeclarado (isSuperAdmin: true en payload) -> DENEGADO
+            await expect(
+                marketplaceDispatchGatingService.authorizeIndustrialDispatch(orderRef, {
+                    userId: 'user_unauthorized_op',
+                    role: 'OPERATOR',
+                    isSuperAdmin: true,
+                    tenantId,
+                    printhouseId,
+                    reason: 'Unauthorized operator attempting self-declared superadmin bypass'
+                })
+            ).rejects.toThrow(/FORBIDDEN: User role 'OPERATOR' does not have industrial authorization permission/);
+
+            // 11.6.2.c Tenant omitido para operador no global -> DENEGADO (SEC-D02R)
+            await expect(
+                marketplaceDispatchGatingService.authorizeIndustrialDispatch(orderRef, {
+                    userId: 'plant_manager_01',
+                    role: 'PLANT_DIRECTOR',
+                    tenantId: '',
+                    printhouseId,
+                    reason: 'Operator omitted mandatory tenant context'
+                })
+            ).rejects.toThrow(/FORBIDDEN: Authenticated tenant context is mandatory for operator/);
+
+            // 11.6.2.d Imprenta omitida para operador de imprenta -> DENEGADO (SEC-D02R)
+            await expect(
+                marketplaceDispatchGatingService.authorizeIndustrialDispatch(orderRef, {
+                    userId: 'plant_manager_01',
+                    role: 'PLANT_DIRECTOR',
+                    tenantId,
+                    printhouseId: '',
+                    reason: 'Operator omitted mandatory printhouse context'
+                })
+            ).rejects.toThrow(/FORBIDDEN: Authenticated printhouse context is mandatory for printhouse operator/);
 
             // 11.6.3 Tenant ajeno intentando autorizar -> DENEGADO
             await expect(
@@ -1781,6 +1831,17 @@ describe('BUDGET-02D-01 — End-to-End Real Integration & Lifecycle Certificatio
                 })
             ).rejects.toThrow(/FORBIDDEN: Tenant mismatch/);
 
+            // 11.6.3.b Imprenta ajena intentando autorizar -> DENEGADO
+            await expect(
+                marketplaceDispatchGatingService.authorizeIndustrialDispatch(orderRef, {
+                    userId: 'plant_manager_01',
+                    role: 'PLANT_DIRECTOR',
+                    tenantId,
+                    printhouseId: 'ph_foreign_printhouse',
+                    reason: 'Cross-printhouse illegal authorization attempt'
+                })
+            ).rejects.toThrow(/FORBIDDEN: Printhouse mismatch/);
+
             // 11.6.4 Razón omitida o insuficiente (< 5 chars) -> DENEGADO
             await expect(
                 marketplaceDispatchGatingService.authorizeIndustrialDispatch(orderRef, {
@@ -1791,6 +1852,20 @@ describe('BUDGET-02D-01 — End-to-End Real Integration & Lifecycle Certificatio
                     reason: 'ok'
                 })
             ).rejects.toThrow(/BAD_REQUEST: Industrial authorization requires a justified reason/);
+
+            // 11.6.4.b Error de adquisición de conexión transaccional MySQL -> FAIL-CLOSED (SEC-D04R)
+            const origGetConnection = dbAdapter.getConnection;
+            dbAdapter.getConnection = async () => { throw new Error('CONNECTION_POOL_EXHAUSTED'); };
+            await expect(
+                marketplaceDispatchGatingService.authorizeIndustrialDispatch(orderRef, {
+                    userId: 'plant_manager_01',
+                    role: 'PLANT_DIRECTOR',
+                    tenantId,
+                    printhouseId,
+                    reason: 'Valid authorization reason during database outage'
+                })
+            ).rejects.toThrow(/DATABASE_CONNECTION_ERROR/);
+            dbAdapter.getConnection = origGetConnection;
 
             // 11.6.5 Autorización válida por responsable acreditado -> PERSISTIDO y AUDITADO
             oetsUnpaid.industrial_gate_status = 'PREFLIGHT_PENDING';
@@ -1814,14 +1889,15 @@ describe('BUDGET-02D-01 — End-to-End Real Integration & Lifecycle Certificatio
             expect(managerAuthResult.ok).toBe(true);
             expect(managerAuthResult.status).toBe('IN_PRODUCTION');
 
-            // 11.7 SEC-D03: Liquidación financiera de devolución verificable
+            // 11.7 SEC-D03R: Liquidación financiera de devolución verificable
             // 11.7.1 Liquidación con pseudo-referencia local (ref_tx_...) -> DENEGADO
             await expect(
                 marketplaceDispatchGatingService.settleRefund(orderRef, {
                     userId: 'treasury_operator_01',
                     role: 'FINANCE_DIRECTOR',
                     tenantId,
-                    settlementRef: 'ref_tx_998877'
+                    settlementRef: 'ref_tx_998877',
+                    provider: 'BANK_TRANSFER_LEDGER'
                 })
             ).rejects.toThrow(/INVALID_SETTLEMENT_REFERENCE: Fake or local pseudo-references are rejected/);
 
@@ -1831,20 +1907,97 @@ describe('BUDGET-02D-01 — End-to-End Real Integration & Lifecycle Certificatio
                     userId: 'treasury_operator_01',
                     role: 'OPERATOR',
                     tenantId,
-                    settlementRef: 'BNK_TX_2026_998877'
+                    settlementRef: 'BNK_TX_2026_998877',
+                    provider: 'BANK_TRANSFER_LEDGER'
                 })
             ).rejects.toThrow(/FORBIDDEN: User role 'OPERATOR' does not have financial refund settlement permission/);
 
-            // 11.7.3 Liquidación acreditada con referencia bancaria/ERP real -> PERMITIDO
+            // 11.7.2.b Liquidación con tenant omitido -> DENEGADO (SEC-D02R)
+            await expect(
+                marketplaceDispatchGatingService.settleRefund(orderRef, {
+                    userId: 'treasury_director_01',
+                    role: 'FINANCE_DIRECTOR',
+                    tenantId: '',
+                    settlementRef: 'BNK_TX_2026_998877',
+                    provider: 'BANK_TRANSFER_LEDGER'
+                })
+            ).rejects.toThrow(/FORBIDDEN: Authenticated tenant context is mandatory for financial operator/);
+
+            // 11.7.3 Referencia sintácticamente válida SIN evidencia verificable -> FAIL-CLOSED (SEC-D03R)
+            await expect(
+                marketplaceDispatchGatingService.settleRefund(orderRef, {
+                    userId: 'treasury_director_01',
+                    role: 'FINANCE_DIRECTOR',
+                    tenantId,
+                    settlementRef: 'BANKTX987654',
+                    provider: 'BANK_TRANSFER_LEDGER'
+                    // Sin objeto evidence: la mera sintaxis no prueba liquidación
+                })
+            ).rejects.toThrow(/INVALID_SETTLEMENT_EVIDENCE: Verifiable proof from an accredited financial system is mandatory/);
+
+            // 11.7.4 Liquidación con importe o moneda incompatible -> DENEGADO (SEC-D03R)
+            await expect(
+                marketplaceDispatchGatingService.settleRefund(orderRef, {
+                    userId: 'treasury_director_01',
+                    role: 'FINANCE_DIRECTOR',
+                    tenantId,
+                    settlementRef: 'BNK_TX_2026_998877',
+                    provider: 'BANK_TRANSFER_LEDGER',
+                    amount: 999.00, // Discrepancia intencionada con los 30.00 debidos
+                    evidence: {
+                        status: 'RECONCILED',
+                        bank_statement_id: 'STMT-2026-10-8877',
+                        bank_tx_id: 'BTX-998877'
+                    }
+                })
+            ).rejects.toThrow(/AMOUNT_MISMATCH/);
+
+            await expect(
+                marketplaceDispatchGatingService.settleRefund(orderRef, {
+                    userId: 'treasury_director_01',
+                    role: 'FINANCE_DIRECTOR',
+                    tenantId,
+                    settlementRef: 'BNK_TX_2026_998877',
+                    provider: 'BANK_TRANSFER_LEDGER',
+                    currency: 'USD', // Moneda incompatible
+                    evidence: {
+                        status: 'RECONCILED',
+                        bank_statement_id: 'STMT-2026-10-8877',
+                        bank_tx_id: 'BTX-998877'
+                    }
+                })
+            ).rejects.toThrow(/CURRENCY_MISMATCH/);
+
+            // 11.7.5 Liquidación acreditada con referencia real y evidencia verificada -> PERMITIDO (SEC-D03R)
             const settlementResult = await marketplaceDispatchGatingService.settleRefund(orderRef, {
                 userId: 'treasury_director_01',
                 role: 'FINANCE_DIRECTOR',
                 tenantId,
                 settlementRef: 'BNK_TX_2026_998877',
-                provider: 'BANK_TRANSFER_LEDGER'
+                provider: 'BANK_TRANSFER_LEDGER',
+                amount: 30.00,
+                currency: 'EUR',
+                evidence: {
+                    status: 'RECONCILED',
+                    bank_statement_id: 'STMT-2026-10-8877',
+                    bank_tx_id: 'BTX-2026-998877',
+                    reconciliation_protocol: 'GOVERNED_DUAL_CONTROL'
+                }
             });
             expect(settlementResult.ok).toBe(true);
             expect(settlementResult.financial_reconciliation_status).toBe('REFUND_SETTLED');
+
+            // 11.7.6 Idempotencia: Repetición de liquidación ya saldada -> IDEMPOTENT SUCCESS
+            const idempotentResult = await marketplaceDispatchGatingService.settleRefund(orderRef, {
+                userId: 'treasury_director_01',
+                role: 'FINANCE_DIRECTOR',
+                tenantId,
+                settlementRef: 'BNK_TX_2026_998877',
+                provider: 'BANK_TRANSFER_LEDGER',
+                evidence: { status: 'RECONCILED', bank_tx_id: 'BTX-2026-998877' }
+            });
+            expect(idempotentResult.ok).toBe(true);
+            expect(idempotentResult.idempotent_replay).toBe(true);
 
             const settledDispatchResult = await marketplaceDispatchGatingService.dispatchOrder(orderRef, 'node_alpha_press', {
                 userId: 'user_operator',
