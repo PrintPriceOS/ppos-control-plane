@@ -307,11 +307,16 @@ class MarketplaceDispatchGatingService {
      * Grants and persists independent industrial authorization in order_effective_technical_specifications.
      */
     async authorizeIndustrialDispatch(orderRef, authContext = {}) {
-        const ordRows = normalizeRows(await db.query(
-            'SELECT id, order_ref FROM orders WHERE order_ref = ? OR id = ? UNION SELECT id, order_id as order_ref FROM marketplace_orders WHERE order_id = ? OR id = ?',
-            [orderRef, orderRef, orderRef, orderRef]
-        ));
-        const canonicalRef = ordRows.length > 0 ? (ordRows[0].order_ref || ordRows[0].id) : orderRef;
+        let canonicalRef = orderRef;
+        try {
+            const ordRows = normalizeRows(await db.query('SELECT id FROM orders WHERE id = ?', [orderRef]));
+            if (ordRows.length > 0) canonicalRef = ordRows[0].id;
+        } catch (_) {}
+
+        try {
+            const mpRows = normalizeRows(await db.query('SELECT id, order_id FROM marketplace_orders WHERE order_id = ? OR id = ?', [orderRef, orderRef]));
+            if (mpRows.length > 0) canonicalRef = mpRows[0].order_id || mpRows[0].id;
+        } catch (_) {}
 
         const effectiveRows = normalizeRows(await db.query(
             `SELECT * FROM order_effective_technical_specifications 
@@ -351,11 +356,16 @@ class MarketplaceDispatchGatingService {
      * Record execution and confirmed settlement of a refund obligation (FIN-01).
      */
     async settleRefund(orderRef, settlementContext = {}) {
-        const ordRows = normalizeRows(await db.query(
-            'SELECT id, order_ref FROM orders WHERE order_ref = ? OR id = ? UNION SELECT id, order_id as order_ref FROM marketplace_orders WHERE order_id = ? OR id = ?',
-            [orderRef, orderRef, orderRef, orderRef]
-        ));
-        const canonicalRef = ordRows.length > 0 ? (ordRows[0].order_ref || ordRows[0].id) : orderRef;
+        let canonicalRef = orderRef;
+        try {
+            const ordRows = normalizeRows(await db.query('SELECT id FROM orders WHERE id = ?', [orderRef]));
+            if (ordRows.length > 0) canonicalRef = ordRows[0].id;
+        } catch (_) {}
+
+        try {
+            const mpRows = normalizeRows(await db.query('SELECT id, order_id FROM marketplace_orders WHERE order_id = ? OR id = ?', [orderRef, orderRef]));
+            if (mpRows.length > 0) canonicalRef = mpRows[0].order_id || mpRows[0].id;
+        } catch (_) {}
 
         const effectiveRows = normalizeRows(await db.query(
             `SELECT * FROM order_effective_technical_specifications 
