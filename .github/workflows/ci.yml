@@ -2,7 +2,7 @@ name: PPOS Control Plane CI
 
 on:
   push:
-    branches: [ main, v1.9.0, release/*, phase-10-intelligence-layer, phase-39.2-tenant-management-console, feat/paper-materials-recovery-03r ]
+    branches: [ main, v1.9.0, release/*, phase-10-intelligence-layer, phase-39.2-tenant-management-console, feat/paper-materials-recovery-03r, feat/paper-materials-recovery-05 ]
   pull_request:
     branches: [ main, v1.9.0, phase-10-intelligence-layer, phase-39.2-tenant-management-console, feat/paper-supplier-hub-completion, feat/budget-01-marketplace-paper-catalog, feat/budget-02c01-quote-revisions, feat/budget-02d01-e2e-remediation, feat/spine-03r-caliper-and-engine ]
 
