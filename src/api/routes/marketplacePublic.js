@@ -176,6 +176,7 @@ router.get('/orders/:orderId/customer-action/:token', async (req, res) => {
 });
 
 const paperProcurementService = require('../services/paperProcurementService');
+const { resolveVariantCaliperProvenance } = require('../services/spine/paperCaliperReconciliationService');
 
 const CANONICAL_PAPER_CATEGORIES = [
     'OFFSET',
@@ -208,28 +209,35 @@ router.get('/paper-catalog', async (req, res) => {
         const result = await paperProcurementService.searchMasterPaperDatabase(PUBLIC_CATALOG_TENANT_ID, queryParams);
 
         // Strip out supplier pricing, cost basis and internal wholesale attributes
-        const sanitizedItems = (result.items || []).map(item => ({
-            variantId: item.variantId,
-            productId: item.productId,
-            productName: item.productName,
-            brand: item.brand || null,
-            manufacturer: item.manufacturer || null,
-            category: item.category || 'OTHER',
-            finishSummary: item.finishSummary || item.finish || null,
-            gsm: item.gsm,
-            widthMm: item.widthMm,
-            heightMm: item.heightMm,
-            sheetFormat: item.sheetFormat || `${item.widthMm}x${item.heightMm} mm`,
-            caliperUm: item.caliperUm || null,
-            caliperMm: item.caliperMm || null,
-            finish: item.finish || null,
-            grainDirection: item.grainDirection || 'UNKNOWN',
-            isReel: item.isReel === true,
-            // Do NOT assume available if offerStatus is missing. Stock availability is strictly subject to printhouse confirmation.
-            isAvailable: item.offerStatus === 'ACTIVE',
-            stockConfirmationRequired: true,
-            availabilityStatus: item.offerStatus === 'ACTIVE' ? 'ACTIVE' : 'PENDING_PRINTHOUSE_CONFIRMATION'
-        }));
+        const sanitizedItems = (result.items || []).map(item => {
+            const caliperProv = resolveVariantCaliperProvenance(item);
+            return {
+                variantId: item.variantId,
+                productId: item.productId,
+                productName: item.productName,
+                brand: item.brand || null,
+                manufacturer: item.manufacturer || null,
+                category: item.category || 'OTHER',
+                finishSummary: item.finishSummary || item.finish || null,
+                gsm: item.gsm,
+                widthMm: item.widthMm,
+                heightMm: item.heightMm,
+                sheetFormat: item.sheetFormat || `${item.widthMm}x${item.heightMm} mm`,
+                caliperUm: caliperProv.caliperUm,
+                caliperMm: caliperProv.caliperMm,
+                bulkFactor: caliperProv.bulkFactor,
+                caliperSource: caliperProv.caliperSource,
+                caliperConfidenceStatus: caliperProv.caliperConfidenceStatus,
+                caliperRevision: caliperProv.caliperRevision,
+                finish: item.finish || null,
+                grainDirection: item.grainDirection || 'UNKNOWN',
+                isReel: item.isReel === true,
+                // Do NOT assume available if offerStatus is missing. Stock availability is strictly subject to printhouse confirmation.
+                isAvailable: item.offerStatus === 'ACTIVE',
+                stockConfirmationRequired: true,
+                availabilityStatus: item.offerStatus === 'ACTIVE' ? 'ACTIVE' : 'PENDING_PRINTHOUSE_CONFIRMATION'
+            };
+        });
 
         const duration = Date.now() - startTime;
         console.log(`[MARKETPLACE_PUBLIC][PAPER_CATALOG] Returned ${sanitizedItems.length} items (${duration}ms)`, { traceId });

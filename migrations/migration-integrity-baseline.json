@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-10-28T06:41:47.013Z",
+  "generatedAt": "2026-10-28T13:39:03.578Z",
   "hashAlgorithm": "sha256",
   "contentNormalization": "utf8-lf-v1",
   "approvedPrefixCollisions": {
@@ -2305,6 +2305,33 @@
       "sizeBytes": 1981,
       "containsDdl": true,
       "containsDml": false,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/172_phase197a_paper_caliper_and_livonia_reference.sql",
+      "prefix": "172",
+      "canonicalSha256": "96f083c4f4e263bcc4d1616ac10a76d6dbe4e2eff04bc1d0eac04453a56daa5c",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 77304,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE",
+        "ALTER_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/173_phase197b_spine_binding_profiles_and_snapshots.sql",
+      "prefix": "173",
+      "canonicalSha256": "29275551c2fc770880a4dfa66121f29859852e97bf3ec055a1118f1261b7a9ae",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 5244,
+      "containsDdl": true,
+      "containsDml": true,
       "containsTransaction": false,
       "statementTypes": [
         "CREATE_TABLE"
