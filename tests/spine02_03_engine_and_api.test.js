@@ -946,5 +946,189 @@ describe('SPINE-02/03 — Paper Caliper Provenance & Control Plane Spine Engine 
                 paperProcurementService.searchMasterPaperDatabase = origSearch;
             }
         });
+
+        it('5.7 SPINE-05 Gate 1–3: Control Plane rejects client caliperUm or gsm tampering against persisted paper_variants and downgrades unbacked VERIFIED claims', async () => {
+            const svc = new SpineCalculationService();
+
+            // 1. Client attempts to override caliperUm on persisted variant 'var_gprint_100' (DB=98 µm, client=150 µm) -> 422 CLIENT_VARIANT_CALIPER_MISMATCH
+            await assert.rejects(
+                async () => {
+                    await svc.calculateSpine({
+                        tenantId: 'tenant_alpha',
+                        payload: {
+                            bindingCategory: 'SOFTCOVER_STANDARD',
+                            processingType: 'SEWN',
+                            trimWidthMm: 170,
+                            trimHeightMm: 240,
+                            segments: [{ pages: 200, variantId: 'var_gprint_100', caliperUm: 150 }],
+                            cover: { caliperUm: 255 }
+                        }
+                    });
+                },
+                (err) => err.code === 'CLIENT_VARIANT_CALIPER_MISMATCH' && err.statusCode === 422
+            );
+
+            // 2. Client attempts to override gsm on persisted variant 'var_gprint_100' (DB=100 gsm, client=120 gsm) -> 422 CLIENT_VARIANT_GSM_MISMATCH
+            await assert.rejects(
+                async () => {
+                    await svc.calculateSpine({
+                        tenantId: 'tenant_alpha',
+                        payload: {
+                            bindingCategory: 'SOFTCOVER_STANDARD',
+                            processingType: 'SEWN',
+                            trimWidthMm: 170,
+                            trimHeightMm: 240,
+                            segments: [{ pages: 200, variantId: 'var_gprint_100', gsm: 120 }],
+                            cover: { caliperUm: 255 }
+                        }
+                    });
+                },
+                (err) => err.code === 'CLIENT_VARIANT_GSM_MISMATCH' && err.statusCode === 422
+            );
+
+            // 3. Client claims caliperConfidenceStatus: 'VERIFIED' on 'var_gprint_100' whose DB record is 'REFERENCE_IMPORTED' -> DB overrides client and emits CLIENT_PROVENANCE_OVERRIDDEN_BY_DB
+            const overriddenRes = await svc.calculateSpine({
+                tenantId: 'tenant_alpha',
+                payload: {
+                    bindingCategory: 'SOFTCOVER_STANDARD',
+                    processingType: 'GLUED',
+                    trimWidthMm: 170,
+                    trimHeightMm: 240,
+                    segments: [{
+                        pages: 200,
+                        variantId: 'var_gprint_100',
+                        caliperSource: 'MEASURED_MICROMETER',
+                        caliperConfidenceStatus: 'VERIFIED'
+                    }]
+                }
+            });
+            assert.strictEqual(overriddenRes.blockThickness.segmentBreakdown[0].caliperConfidenceStatus, 'REFERENCE_IMPORTED');
+            assert.strictEqual(overriddenRes.manufacturingValidation.caliperConfidenceSummary, 'REFERENCE_IMPORTED');
+            assert.strictEqual(overriddenRes.manufacturingValidation.canReleaseToManufacturing, false);
+            assert.ok(overriddenRes.manufacturingValidation.issues.some(i => i.code === 'CLIENT_PROVENANCE_OVERRIDDEN_BY_DB'));
+
+            // 4. Client sends raw caliperUm without variantId while claiming VERIFIED -> server downgrades to PROVISIONAL_ESTIMATED and status=PROVISIONAL_ESTIMATE
+            const unbackedRes = await svc.calculateSpine({
+                tenantId: 'tenant_alpha',
+                payload: {
+                    bindingCategory: 'SOFTCOVER_STANDARD',
+                    processingType: 'GLUED',
+                    trimWidthMm: 170,
+                    trimHeightMm: 240,
+                    segments: [{
+                        pages: 200,
+                        caliperUm: 120,
+                        caliperSource: 'MEASURED_MICROMETER',
+                        caliperConfidenceStatus: 'VERIFIED'
+                    }]
+                }
+            });
+            assert.strictEqual(unbackedRes.blockThickness.segmentBreakdown[0].caliperConfidenceStatus, 'PROVISIONAL_ESTIMATED');
+            assert.strictEqual(unbackedRes.manufacturingValidation.status, 'PROVISIONAL_ESTIMATE');
+            assert.strictEqual(unbackedRes.manufacturingValidation.canReleaseToManufacturing, false);
+            assert.ok(unbackedRes.manufacturingValidation.issues.some(i => i.code === 'UNBACKED_CLIENT_CONFIDENCE_DOWNGRADED'));
+        });
+
+        it('5.8 SPINE-05 Gate 4–6: Hardcover profile parameter enforcement and Manufacturing Release Gate (POST /calculations/:id/verify-release)', async () => {
+            const svc = new SpineCalculationService();
+
+            // 1. Hardcover without profile parameters is rejected with 422 HARDCOVER_PROFILE_PARAMETERS_REQUIRED
+            await assert.rejects(
+                async () => {
+                    await svc.calculateSpine({
+                        tenantId: 'tenant_alpha',
+                        payload: {
+                            bindingCategory: 'HARDCOVER',
+                            processingType: 'SEWN',
+                            trimWidthMm: 170,
+                            trimHeightMm: 240,
+                            segments: [{ pages: 200, variantId: 'var_munken_100_b175' }]
+                        }
+                    });
+                },
+                (err) => err.code === 'HARDCOVER_PROFILE_PARAMETERS_REQUIRED' && err.statusCode === 422
+            );
+
+            // 2. Hardcover with unauthorized boardThicknessMm (e.g. 1.75 mm) is rejected with 422 INVALID_HARDCOVER_BOARD_THICKNESS
+            await assert.rejects(
+                async () => {
+                    await svc.calculateSpine({
+                        tenantId: 'tenant_alpha',
+                        payload: {
+                            bindingCategory: 'HARDCOVER',
+                            processingType: 'SEWN',
+                            trimWidthMm: 170,
+                            trimHeightMm: 240,
+                            segments: [{ pages: 200, variantId: 'var_munken_100_b175' }],
+                            hardcover: {
+                                endpapersMode: 'SEPARATE',
+                                boardThicknessMm: 1.75,
+                                overhangMm: 2.5,
+                                foldingSignaturePages: 16,
+                                spineShape: 'ROUND'
+                            }
+                        }
+                    });
+                },
+                (err) => err.code === 'INVALID_HARDCOVER_BOARD_THICKNESS' && err.statusCode === 422
+            );
+
+            // 3. Valid Hardcover calculation succeeds as REQUIRES_TECH_APPROVAL, but verifySnapshotForManufacturingRelease blocks release
+            const hcSnap = await svc.calculateSpine({
+                tenantId: 'tenant_alpha',
+                persistSnapshot: true,
+                externalOrderIntentId: 'oi_hc_release_test',
+                payload: {
+                    bindingCategory: 'HARDCOVER',
+                    processingType: 'SEWN',
+                    trimWidthMm: 170,
+                    trimHeightMm: 240,
+                    segments: [{ pages: 200, variantId: 'var_munken_100_b175' }],
+                    hardcover: {
+                        endpapersMode: 'SEPARATE',
+                        boardThicknessMm: 2.4,
+                        overhangMm: 2.5,
+                        foldingSignaturePages: 16,
+                        spineShape: 'ROUND'
+                    }
+                }
+            });
+            assert.strictEqual(hcSnap.operationalStatus, 'REQUIRES_TECH_APPROVAL');
+            assert.strictEqual(hcSnap.manufacturingValidation.canReleaseToManufacturing, false);
+
+            await assert.rejects(
+                async () => {
+                    await svc.verifySnapshotForManufacturingRelease({
+                        tenantId: 'tenant_alpha',
+                        calculationId: hcSnap.snapshotId
+                    });
+                },
+                (err) => err.code === 'MANUFACTURING_RELEASE_BLOCKED_PROFILE_APPROVAL_REQUIRED' && err.statusCode === 422
+            );
+
+            // 4. Built-in Alegro Softcover (MATH_BRANCH_VALIDATED) with VERIFIED paper is blocked from autonomous manufacturing release until profile is PRODUCTION_CERTIFIED
+            const scSnap = await svc.calculateSpine({
+                tenantId: 'tenant_alpha',
+                persistSnapshot: true,
+                externalOrderIntentId: 'oi_sc_release_test',
+                payload: {
+                    bindingCategory: 'SOFTCOVER_STANDARD',
+                    processingType: 'GLUED',
+                    trimWidthMm: 170,
+                    trimHeightMm: 240,
+                    segments: [{ pages: 200, variantId: 'var_munken_100_b175' }]
+                }
+            });
+            assert.strictEqual(scSnap.certificationTier, 'MATH_BRANCH_VALIDATED');
+            await assert.rejects(
+                async () => {
+                    await svc.verifySnapshotForManufacturingRelease({
+                        tenantId: 'tenant_alpha',
+                        calculationId: scSnap.snapshotId
+                    });
+                },
+                (err) => err.code === 'MANUFACTURING_RELEASE_BLOCKED_UNCERTIFIED_PROFILE' && err.statusCode === 422
+            );
+        });
     });
 });

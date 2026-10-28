@@ -282,7 +282,7 @@ function resolveVariantCaliperProvenance(variantOrSegment = {}) {
 
     const resolvedSource = explicitSource && explicitSource !== 'NONE'
         ? explicitSource
-        : 'SUPPLIER_IMPORT';
+        : 'NONE';
 
     let resolvedConfidence = explicitConfidence;
     if (!resolvedConfidence || resolvedConfidence === 'MISSING') {
@@ -293,6 +293,15 @@ function resolveVariantCaliperProvenance(variantOrSegment = {}) {
         } else {
             resolvedConfidence = 'PROVISIONAL_ESTIMATED';
         }
+    } else if (
+        resolvedConfidence === 'VERIFIED' &&
+        resolvedSource !== 'MEASURED_MICROMETER' &&
+        resolvedSource !== 'MANUFACTURER_DATASHEET'
+    ) {
+        // Security invariant: VERIFIED confidence requires physical micrometer or manufacturer datasheet source
+        resolvedConfidence = (resolvedSource === 'LIVONIA_REFERENCE_IMPORT' || resolvedSource === 'SUPPLIER_IMPORT')
+            ? 'REFERENCE_IMPORTED'
+            : 'PROVISIONAL_ESTIMATED';
     }
 
     return {

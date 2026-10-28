@@ -185,4 +185,38 @@ router.get('/calculations/:id', async (req, res) => {
     }
 });
 
+/**
+ * POST /api/v1/spine/calculations/:id/verify-release
+ * Enforces SPINE-05 Gate 5: verifies whether a persisted spine calculation snapshot
+ * meets all physical caliper and profile certification requirements for manufacturing release.
+ */
+router.post('/calculations/:id/verify-release', async (req, res) => {
+    const ctx = resolveTrustedTenant(req, res);
+    if (!ctx) return;
+
+    try {
+        const body = req.body || {};
+        const releaseStatus = await spineService.verifySnapshotForManufacturingRelease({
+            tenantId: ctx.tenantId,
+            calculationId: req.params.id,
+            expectedOrderIntentId: body.externalOrderIntentId || body.canonicalOrderId || null
+        });
+
+        return res.status(200).json({
+            ok: true,
+            data: releaseStatus
+        });
+    } catch (err) {
+        const status = err instanceof SpineCalculationError ? err.statusCode : 500;
+        return res.status(status).json({
+            ok: false,
+            error: {
+                code: err.code || 'SPINE_RELEASE_VERIFICATION_FAILED',
+                message: err.message,
+                details: err.details || null
+            }
+        });
+    }
+});
+
 module.exports = router;

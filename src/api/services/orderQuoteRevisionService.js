@@ -2157,9 +2157,26 @@ class OrderQuoteRevisionService {
                     effectiveSpecs.paper_weight_cover = altVar.gsm || originalSpecs.paper_weight_cover || originalSpecs.gsm;
                 }
 
-                // SPINE-03: Invalidate any previous spine calculation snapshot calculated with the superseded paper!
+                // SPINE-03 / SPINE-05: Invalidate any previous spine calculation snapshot calculated with the superseded paper!
                 // Never allow an accepted paper revision to retain cover dimensions calculated from the old paper.
-                const altCaliperProv = resolveVariantCaliperProvenance(altVar);
+                const altVariantId = altVar.id || altVar.variant_id || null;
+                let dbAuthoritativeAltVar = null;
+                if (altVariantId) {
+                    try {
+                        const [dbVarRows] = await conn.query(
+                            `SELECT v.*, p.name AS product_name, p.brand, p.category, p.finish_summary
+                             FROM paper_variants v
+                             LEFT JOIN paper_products p ON v.product_id = p.id
+                             WHERE v.id = ? LIMIT 1`,
+                            [altVariantId]
+                        );
+                        if (dbVarRows && dbVarRows.length > 0) {
+                            dbAuthoritativeAltVar = dbVarRows[0];
+                        }
+                    } catch (_) {}
+                }
+
+                const altCaliperProv = resolveVariantCaliperProvenance(dbAuthoritativeAltVar || altVar);
                 effectiveSpecs.caliper_um = altCaliperProv.caliperUm;
                 effectiveSpecs.caliper_source = altCaliperProv.caliperSource;
                 effectiveSpecs.caliper_confidence_status = altCaliperProv.caliperConfidenceStatus;
@@ -2167,13 +2184,19 @@ class OrderQuoteRevisionService {
 
                 let recalculatedSpineGeometry = null;
                 const pages = Number(effectiveSpecs.interior_pages || effectiveSpecs.pages || 0);
-                const trimW = Number(effectiveSpecs.book_width || effectiveSpecs.width_mm || 170);
-                const trimH = Number(effectiveSpecs.book_height || effectiveSpecs.height_mm || 240);
+                const trimW = Number(effectiveSpecs.book_width || effectiveSpecs.width_mm || 0);
+                const trimH = Number(effectiveSpecs.book_height || effectiveSpecs.height_mm || 0);
                 const bindingRaw = String(effectiveSpecs.binding_method || effectiveSpecs.binding_type || 'perfect_bound').toLowerCase();
                 const isHardcover = bindingRaw.includes('hc') || bindingRaw.includes('hardcover');
                 const isSewn = bindingRaw.includes('sewn');
+                const coverCaliperRaw = effectiveSpecs.cover_caliper_um !== undefined && effectiveSpecs.cover_caliper_um !== null
+                    ? Number(effectiveSpecs.cover_caliper_um)
+                    : null;
+                const coverCaliperUm = (coverCaliperRaw !== null && Number.isFinite(coverCaliperRaw) && coverCaliperRaw > 0)
+                    ? coverCaliperRaw
+                    : null;
 
-                if (pages > 0 && altCaliperProv.caliperUm) {
+                if (pages > 0 && trimW >= 40 && trimH >= 40 && altCaliperProv.caliperUm) {
                     try {
                         recalculatedSpineGeometry = executeSpineCalculation({
                             bindingCategory: isHardcover ? 'HARDCOVER' : 'SOFTCOVER_STANDARD',
@@ -2183,22 +2206,22 @@ class OrderQuoteRevisionService {
                             segments: [{
                                 segmentIndex: 1,
                                 pages,
-                                variantId: altVar.id || altVar.variant_id || null,
-                                gsm: altVar.gsm || effectiveSpecs.gsm,
+                                variantId: altVariantId,
+                                gsm: (dbAuthoritativeAltVar && dbAuthoritativeAltVar.gsm) || altVar.gsm || effectiveSpecs.gsm,
                                 caliperUm: altCaliperProv.caliperUm,
                                 caliperSource: altCaliperProv.caliperSource,
                                 caliperConfidenceStatus: altCaliperProv.caliperConfidenceStatus
                             }],
-                            cover: {
-                                caliperUm: Number(effectiveSpecs.cover_caliper_um || 270)
-                            },
+                            cover: coverCaliperUm ? {
+                                caliperUm: coverCaliperUm
+                            } : null,
                             hardcover: isHardcover ? {
-                                endpapersMode: 'SEPARATE',
-                                boardThicknessMm: 3.0,
-                                blockPaperCoating: (altVar.category === 'COATED' || String(altVar.finish || '').includes('COATED')) ? 'COATED' : 'UNCOATED',
-                                spineShape: 'ROUND',
-                                overhangMm: 2.5,
-                                foldingSignaturePages: 16
+                                endpapersMode: effectiveSpecs.endpapers_mode || 'SEPARATE',
+                                boardThicknessMm: Number(effectiveSpecs.board_thickness_mm || 2.4),
+                                blockPaperCoating: (((dbAuthoritativeAltVar && dbAuthoritativeAltVar.category) || altVar.category) === 'COATED' || String(altVar.finish || '').includes('COATED')) ? 'COATED' : 'UNCOATED',
+                                spineShape: effectiveSpecs.spine_shape || 'ROUND',
+                                overhangMm: Number(effectiveSpecs.overhang_mm || 2.5),
+                                foldingSignaturePages: Number(effectiveSpecs.folding_signature_pages || 16)
                             } : null
                         });
                         effectiveSpecs.spine_geometry = {
@@ -2207,7 +2230,10 @@ class OrderQuoteRevisionService {
                             flatCoverWidthMm: recalculatedSpineGeometry.coverGeometry.flatCoverWidthMm,
                             flatCoverHeightMm: recalculatedSpineGeometry.coverGeometry.flatCoverHeightMm,
                             profileKey: recalculatedSpineGeometry.fullProfileKey,
+                            operationalStatus: recalculatedSpineGeometry.operationalStatus,
+                            certificationTier: recalculatedSpineGeometry.certificationTier,
                             validationStatus: recalculatedSpineGeometry.manufacturingValidation.status,
+                            canReleaseToManufacturing: recalculatedSpineGeometry.manufacturingValidation.canReleaseToManufacturing,
                             outputCanonicalHash: recalculatedSpineGeometry.outputCanonicalHash
                         };
                     } catch (_) {}

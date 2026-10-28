@@ -81,6 +81,7 @@ class SpineCalculationService {
             supportedBindingCategories: p.supportedBindingCategories,
             supportedProcessingTypes: p.supportedProcessingTypes,
             roundingStepMm: p.roundingStepMm,
+            rules: p.rules || null,
             source: 'BUILTIN_LIVONIA_V2'
         }));
 
@@ -106,6 +107,9 @@ class SpineCalculationService {
                         ? JSON.parse(row.supported_processing_types_json)
                         : row.supported_processing_types_json,
                     roundingStepMm: 0.5,
+                    rules: typeof row.rules_config_json === 'string'
+                        ? JSON.parse(row.rules_config_json)
+                        : (row.rules_config_json || null),
                     printhouseId: row.printhouse_id,
                     source: 'TENANT_CONFIGURED'
                 });
@@ -302,7 +306,9 @@ class SpineCalculationService {
                 conn
             });
 
-            // 2. Resolve each segment's paper variant from DB if variantId is given
+            // 2. Resolve each segment's paper variant from DB if variantId is given,
+            //    rejecting client caliper/gsm tampering and downgrading unbacked client claims when variantId is absent.
+            const clientDiscrepancyIssues = [];
             const enrichedSegments = [];
             for (let i = 0; i < rawSegments.length; i++) {
                 const seg = rawSegments[i] || {};
@@ -317,6 +323,59 @@ class SpineCalculationService {
 
                 if (seg.variantId) {
                     const dbVar = await this.resolveCatalogVariantProvenance(seg.variantId, conn);
+
+                    // SPINE-05 Security Gate 3: Reject client caliperUm or gsm tampering against persisted variant
+                    if (
+                        seg.caliperUm !== undefined &&
+                        seg.caliperUm !== null &&
+                        dbVar.caliperUm !== null &&
+                        Math.abs(Number(seg.caliperUm) - Number(dbVar.caliperUm)) > 0.01
+                    ) {
+                        throw new SpineCalculationError(
+                            `Segment ${i + 1} client-supplied caliperUm (${seg.caliperUm} µm) conflicts with authoritative paper_variants record '${dbVar.variantId}' (${dbVar.caliperUm} µm).`,
+                            'CLIENT_VARIANT_CALIPER_MISMATCH',
+                            422,
+                            {
+                                segmentIndex: i + 1,
+                                variantId: dbVar.variantId,
+                                clientCaliperUm: Number(seg.caliperUm),
+                                authoritativeCaliperUm: dbVar.caliperUm
+                            }
+                        );
+                    }
+
+                    if (
+                        seg.gsm !== undefined &&
+                        seg.gsm !== null &&
+                        Number(seg.gsm) > 0 &&
+                        Number(seg.gsm) !== Number(dbVar.gsm)
+                    ) {
+                        throw new SpineCalculationError(
+                            `Segment ${i + 1} client-supplied gsm (${seg.gsm}) conflicts with authoritative paper_variants record '${dbVar.variantId}' (${dbVar.gsm} gsm).`,
+                            'CLIENT_VARIANT_GSM_MISMATCH',
+                            422,
+                            {
+                                segmentIndex: i + 1,
+                                variantId: dbVar.variantId,
+                                clientGsm: Number(seg.gsm),
+                                authoritativeGsm: dbVar.gsm
+                            }
+                        );
+                    }
+
+                    // If client claims higher confidence or different provenance than persisted in paper_variants,
+                    // enforce persisted DB provenance and emit an audit warning issue
+                    if (
+                        (seg.caliperConfidenceStatus && seg.caliperConfidenceStatus !== dbVar.caliperConfidenceStatus) ||
+                        (seg.caliperSource && seg.caliperSource !== dbVar.caliperSource)
+                    ) {
+                        clientDiscrepancyIssues.push({
+                            code: 'CLIENT_PROVENANCE_OVERRIDDEN_BY_DB',
+                            severity: 'WARNING',
+                            message: `Segment ${i + 1} client-declared provenance (${seg.caliperSource || 'UNSPECIFIED'} / ${seg.caliperConfidenceStatus || 'UNSPECIFIED'}) differed from authoritative paper_variants record (${dbVar.caliperSource} / ${dbVar.caliperConfidenceStatus}) and was overridden by the server.`
+                        });
+                    }
+
                     enrichedSegments.push({
                         segmentIndex: i + 1,
                         pages,
@@ -331,6 +390,17 @@ class SpineCalculationService {
                     });
                 } else {
                     const prov = resolveVariantCaliperProvenance(seg);
+                    const hasCaliper = prov.caliperUm !== null && Number.isFinite(prov.caliperUm) && prov.caliperUm > 0;
+                    if (
+                        hasCaliper &&
+                        (seg.caliperConfidenceStatus === 'VERIFIED' || seg.caliperConfidenceStatus === 'REFERENCE_IMPORTED')
+                    ) {
+                        clientDiscrepancyIssues.push({
+                            code: 'UNBACKED_CLIENT_CONFIDENCE_DOWNGRADED',
+                            severity: 'WARNING',
+                            message: `Segment ${i + 1} supplied caliperUm (${prov.caliperUm} µm) without a persisted paper_variants ID while claiming '${seg.caliperConfidenceStatus}'. Server downgraded confidence to PROVISIONAL_ESTIMATED.`
+                        });
+                    }
                     enrichedSegments.push({
                         segmentIndex: i + 1,
                         pages,
@@ -340,16 +410,33 @@ class SpineCalculationService {
                         caliperUm: prov.caliperUm,
                         bulkFactor: prov.bulkFactor,
                         coatingType: seg.coatingType || 'UNCOATED',
-                        caliperSource: seg.caliperSource || (prov.caliperUm ? 'MANUAL_INPUT' : 'NONE'),
-                        caliperConfidenceStatus: seg.caliperConfidenceStatus || (prov.caliperUm ? 'PROVISIONAL_ESTIMATED' : 'MISSING')
+                        caliperSource: hasCaliper ? 'NONE' : 'NONE',
+                        caliperConfidenceStatus: hasCaliper ? 'PROVISIONAL_ESTIMATED' : 'MISSING'
                     });
                 }
             }
 
-            // 3. Resolve cover variant if variantId is provided
+            // 3. Resolve cover variant if variantId is provided, enforcing DB authority
             let enrichedCover = payload.cover ? { ...payload.cover } : null;
             if (enrichedCover && enrichedCover.variantId) {
                 const dbCov = await this.resolveCatalogVariantProvenance(enrichedCover.variantId, conn);
+                if (
+                    enrichedCover.caliperUm !== undefined &&
+                    enrichedCover.caliperUm !== null &&
+                    dbCov.caliperUm !== null &&
+                    Math.abs(Number(enrichedCover.caliperUm) - Number(dbCov.caliperUm)) > 0.01
+                ) {
+                    throw new SpineCalculationError(
+                        `Cover client-supplied caliperUm (${enrichedCover.caliperUm} µm) conflicts with authoritative paper_variants record '${dbCov.variantId}' (${dbCov.caliperUm} µm).`,
+                        'CLIENT_COVER_CALIPER_MISMATCH',
+                        422,
+                        {
+                            variantId: dbCov.variantId,
+                            clientCaliperUm: Number(enrichedCover.caliperUm),
+                            authoritativeCaliperUm: dbCov.caliperUm
+                        }
+                    );
+                }
                 enrichedCover = {
                     ...enrichedCover,
                     variantId: dbCov.variantId,
@@ -358,6 +445,75 @@ class SpineCalculationService {
                     caliperSource: dbCov.caliperSource,
                     caliperConfidenceStatus: dbCov.caliperConfidenceStatus
                 };
+            } else if (enrichedCover && enrichedCover.caliperUm !== undefined && enrichedCover.caliperUm !== null) {
+                const covUm = Number(enrichedCover.caliperUm);
+                if (Number.isFinite(covUm) && covUm > 0) {
+                    if (enrichedCover.caliperConfidenceStatus === 'VERIFIED' || enrichedCover.caliperConfidenceStatus === 'REFERENCE_IMPORTED') {
+                        clientDiscrepancyIssues.push({
+                            code: 'UNBACKED_COVER_CONFIDENCE_DOWNGRADED',
+                            severity: 'WARNING',
+                            message: `Cover supplied caliperUm (${covUm} µm) without a persisted paper_variants ID while claiming '${enrichedCover.caliperConfidenceStatus}'. Server downgraded cover confidence to PROVISIONAL_ESTIMATED.`
+                        });
+                    }
+                    enrichedCover = {
+                        ...enrichedCover,
+                        variantId: null,
+                        caliperUm: covUm,
+                        caliperSource: 'NONE',
+                        caliperConfidenceStatus: 'PROVISIONAL_ESTIMATED'
+                    };
+                }
+            }
+
+            // 3b. Validate Hardcover parameters against authoritative profile rules (SPINE-05 Gate 4)
+            let enrichedHardcover = payload.hardcover ? { ...payload.hardcover } : null;
+            if (bindingCategory === 'HARDCOVER') {
+                if (!enrichedHardcover || typeof enrichedHardcover !== 'object') {
+                    throw new SpineCalculationError(
+                        'HARDCOVER calculation requires explicit hardcover configuration governed by the binding profile.',
+                        'HARDCOVER_PROFILE_PARAMETERS_REQUIRED',
+                        422
+                    );
+                }
+                const rules = profile.rules || {};
+                const allowedBoards = Array.isArray(rules.allowedBoardThicknessesMm)
+                    ? rules.allowedBoardThicknessesMm.map(Number)
+                    : [1.0, 2.0, 2.4, 3.0];
+                const allowedOverhangs = Array.isArray(rules.allowedOverhangsMm)
+                    ? rules.allowedOverhangsMm.map(Number)
+                    : [2.5, 3.0];
+                const allowedSigs = Array.isArray(rules.allowedSignaturePages)
+                    ? rules.allowedSignaturePages.map(Number)
+                    : [16, 32];
+
+                const boardMm = Number(enrichedHardcover.boardThicknessMm);
+                const overhangMm = Number(enrichedHardcover.overhangMm);
+                const sigPages = Number(enrichedHardcover.foldingSignaturePages);
+
+                if (!Number.isFinite(boardMm) || !allowedBoards.some(b => Math.abs(b - boardMm) < 0.01)) {
+                    throw new SpineCalculationError(
+                        `boardThicknessMm (${enrichedHardcover.boardThicknessMm}) is not permitted by profile '${profile.fullProfileKey}'. Allowed: ${allowedBoards.join(', ')} mm.`,
+                        'INVALID_HARDCOVER_BOARD_THICKNESS',
+                        422,
+                        { allowedBoardThicknessesMm: allowedBoards }
+                    );
+                }
+                if (!Number.isFinite(overhangMm) || !allowedOverhangs.some(o => Math.abs(o - overhangMm) < 0.01)) {
+                    throw new SpineCalculationError(
+                        `overhangMm (${enrichedHardcover.overhangMm}) is not permitted by profile '${profile.fullProfileKey}'. Allowed: ${allowedOverhangs.join(', ')} mm.`,
+                        'INVALID_HARDCOVER_OVERHANG',
+                        422,
+                        { allowedOverhangsMm: allowedOverhangs }
+                    );
+                }
+                if (!Number.isInteger(sigPages) || !allowedSigs.includes(sigPages)) {
+                    throw new SpineCalculationError(
+                        `foldingSignaturePages (${enrichedHardcover.foldingSignaturePages}) is not permitted by profile '${profile.fullProfileKey}'. Allowed: ${allowedSigs.join(', ')}.`,
+                        'INVALID_HARDCOVER_SIGNATURE_PAGES',
+                        422,
+                        { allowedSignaturePages: allowedSigs }
+                    );
+                }
             }
 
             // 4. Execute pure mathematical calculation
@@ -370,10 +526,13 @@ class SpineCalculationService {
                 trimHeightMm,
                 segments: enrichedSegments,
                 cover: enrichedCover,
-                hardcover: payload.hardcover || null
+                hardcover: enrichedHardcover
             };
 
             const calculation = executeSpineCalculation(engineInput, profile);
+            if (clientDiscrepancyIssues.length > 0) {
+                calculation.manufacturingValidation.issues.push(...clientDiscrepancyIssues);
+            }
 
             // 5. Optional Snapshot Persistence & Idempotency Enforcement
             let snapshotId = null;
@@ -537,6 +696,94 @@ class SpineCalculationService {
             supersededBySnapshotId: row.superseded_by_snapshot_id,
             createdAt: row.created_at,
             ...geometry
+        };
+    }
+
+    /**
+     * Evaluates whether an order or calculation snapshot is eligible for autonomous manufacturing release (SPINE-05 Gate 5).
+     * Blocks release fail-closed if:
+     * - snapshot is missing, SUPERSEDED, or INVALIDATED
+     * - validation_status !== 'MATH_VALIDATED'
+     * - operationalStatus !== 'PRODUCTION_SAFE' (or profile is REQUIRES_TECH_APPROVAL / EXPERIMENTAL_DISABLED)
+     * - certificationTier !== 'PRODUCTION_CERTIFIED'
+     * - caliperConfidenceSummary !== 'VERIFIED'
+     * - canReleaseToManufacturing !== true
+     */
+    async verifySnapshotForManufacturingRelease({ tenantId, calculationId, expectedOrderIntentId = null }) {
+        const snapshot = await this.getCalculationById({ tenantId, calculationId });
+
+        if (snapshot.snapshotLifecycleStatus !== 'ACTIVE') {
+            throw new SpineCalculationError(
+                `Cannot release spine snapshot '${calculationId}' to manufacturing: lifecycle status is '${snapshot.snapshotLifecycleStatus}' (${snapshot.invalidationReason || 'not active'}).`,
+                'MANUFACTURING_RELEASE_BLOCKED_INACTIVE_SNAPSHOT',
+                409,
+                { snapshotId: calculationId, lifecycleStatus: snapshot.snapshotLifecycleStatus }
+            );
+        }
+
+        if (
+            expectedOrderIntentId &&
+            snapshot.externalOrderIntentId !== expectedOrderIntentId &&
+            snapshot.canonicalOrderId !== expectedOrderIntentId
+        ) {
+            throw new SpineCalculationError(
+                `Spine snapshot '${calculationId}' is bound to order '${snapshot.externalOrderIntentId || snapshot.canonicalOrderId}', not '${expectedOrderIntentId}'.`,
+                'MANUFACTURING_RELEASE_BLOCKED_ORDER_MISMATCH',
+                422
+            );
+        }
+
+        const mv = snapshot.manufacturingValidation || {};
+        if (
+            snapshot.operationalStatus === 'EXPERIMENTAL_DISABLED' ||
+            snapshot.operationalStatus === 'REQUIRES_TECH_APPROVAL'
+        ) {
+            throw new SpineCalculationError(
+                `Cannot release spine snapshot '${calculationId}' to manufacturing: profile '${snapshot.fullProfileKey}' has operationalStatus '${snapshot.operationalStatus}'.`,
+                'MANUFACTURING_RELEASE_BLOCKED_PROFILE_APPROVAL_REQUIRED',
+                422,
+                {
+                    profileKey: snapshot.fullProfileKey,
+                    operationalStatus: snapshot.operationalStatus,
+                    certificationTier: snapshot.certificationTier
+                }
+            );
+        }
+
+        if (snapshot.certificationTier !== 'PRODUCTION_CERTIFIED') {
+            throw new SpineCalculationError(
+                `Cannot release spine snapshot '${calculationId}' to manufacturing: certificationTier is '${snapshot.certificationTier}', expected 'PRODUCTION_CERTIFIED'.`,
+                'MANUFACTURING_RELEASE_BLOCKED_UNCERTIFIED_PROFILE',
+                422,
+                {
+                    profileKey: snapshot.fullProfileKey,
+                    certificationTier: snapshot.certificationTier
+                }
+            );
+        }
+
+        if (mv.caliperConfidenceSummary !== 'VERIFIED' || mv.status !== 'MATH_VALIDATED' || mv.canReleaseToManufacturing !== true) {
+            throw new SpineCalculationError(
+                `Cannot release spine snapshot '${calculationId}' to manufacturing: caliper confidence is '${mv.caliperConfidenceSummary}' and validation status is '${mv.status}'. Physical VERIFIED caliper and PRODUCTION_CERTIFIED profile are mandatory.`,
+                'MANUFACTURING_RELEASE_BLOCKED_UNVERIFIED_CALIPER',
+                422,
+                {
+                    validationStatus: mv.status,
+                    caliperConfidenceSummary: mv.caliperConfidenceSummary,
+                    canReleaseToManufacturing: mv.canReleaseToManufacturing
+                }
+            );
+        }
+
+        return {
+            authorizedForManufacturingRelease: true,
+            snapshotId: snapshot.snapshotId,
+            profileKey: snapshot.fullProfileKey,
+            certificationTier: snapshot.certificationTier,
+            spineWidthMm: snapshot.spineWidthMm,
+            flatCoverWidthMm: snapshot.coverGeometry ? snapshot.coverGeometry.flatCoverWidthMm : null,
+            flatCoverHeightMm: snapshot.coverGeometry ? snapshot.coverGeometry.flatCoverHeightMm : null,
+            outputCanonicalHash: snapshot.outputCanonicalHash
         };
     }
 
