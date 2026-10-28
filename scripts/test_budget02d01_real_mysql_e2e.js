@@ -579,7 +579,7 @@ async function runRealMysqlCertification() {
             tenantId: testTenantId,
             settlementRef: 'BCN_ERP_CREDIT_NOTE_2026_0991',
             provider: 'ERP_CREDIT_NOTE',
-            amount: 30.00,
+            amount: 45.50,
             currency: 'EUR',
             evidence: {
                 status: 'POSTED',
@@ -599,7 +599,7 @@ async function runRealMysqlCertification() {
                 tenantId: testTenantId,
                 settlementRef: 'BCN_ERP_CREDIT_NOTE_2026_0991',
                 provider: 'ERP_CREDIT_NOTE',
-                amount: 30.00,
+                amount: 45.50,
                 currency: 'EUR',
                 evidence: { status: 'POSTED', credit_note_id: 'CN-2026-0991' }
             }),
@@ -609,7 +609,7 @@ async function runRealMysqlCertification() {
                 tenantId: testTenantId,
                 settlementRef: 'BCN_ERP_CREDIT_NOTE_2026_0991',
                 provider: 'ERP_CREDIT_NOTE',
-                amount: 30.00,
+                amount: 45.50,
                 currency: 'EUR',
                 evidence: { status: 'POSTED', credit_note_id: 'CN-2026-0991' }
             })
