@@ -144,7 +144,7 @@ fastify.addHook('onRequest', async (request, reply) => {
 
             // Populate request context for both Fastify and Express (via fastify-express)
             request.user = {
-                id: decoded.sub,
+                id: String(decoded.sub),
                 email: decoded.email,
                 role: (decoded.role || 'VIEWER').toUpperCase(),
                 tenantId: decoded.tenant_id ? String(decoded.tenant_id) : null,
@@ -153,6 +153,10 @@ fastify.addHook('onRequest', async (request, reply) => {
                 sessionId: decoded.jti || null,
                 hasSupplierCapability: Boolean(decoded.has_supplier_capability || decoded.hasSupplierCapability),
                 hasPrinthouseCapability: Boolean(decoded.has_printhouse_capability || decoded.hasPrinthouseCapability),
+                bffDelegated: Boolean(decoded.bff_delegated),
+                delegatedUserId: decoded.delegated_user_id ? String(decoded.delegated_user_id) : null,
+                delegatedSessionId: decoded.delegated_session_id ? String(decoded.delegated_session_id) : null,
+                delegatedOrderId: decoded.delegated_order_id ? String(decoded.delegated_order_id) : null,
                 authMode: 'JWT'
             };
             request.raw.user = request.user;
