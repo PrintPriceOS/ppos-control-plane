@@ -997,7 +997,7 @@ async function runRealMysqlCertification() {
         assert.ok(diffVchErr && diffVchErr.message.includes('SETTLEMENT_MISMATCH'), 'Replay with divergent voucher_id must throw SETTLEMENT_MISMATCH');
 
         // 6.7.c7: Replay con obligación discordante -> SETTLEMENT_MISMATCH
-        let diffOblErr = null;
+        let replayDiffOblErr = null;
         try {
             await marketplaceDispatchGatingService.settleRefund(testOrderId, {
                 userId: 'finance_mgr_01',
@@ -1012,9 +1012,9 @@ async function runRealMysqlCertification() {
                 obligationId: 'rev_e2e_TAMPERED_999'
             });
         } catch (err) {
-            diffOblErr = err;
+            replayDiffOblErr = err;
         }
-        assert.ok(diffOblErr && diffOblErr.message.includes('SETTLEMENT_MISMATCH'), 'Replay with divergent obligationId must throw SETTLEMENT_MISMATCH');
+        assert.ok(replayDiffOblErr && replayDiffOblErr.message.includes('SETTLEMENT_MISMATCH'), 'Replay with divergent obligationId must throw SETTLEMENT_MISMATCH');
 
         // 6.7.c8: Replay sin voucher (ausencia obligatoria) -> SETTLEMENT_MISMATCH
         let missingVchErr = null;
@@ -1055,7 +1055,7 @@ async function runRealMysqlCertification() {
         assert.ok(missingOblErr && missingOblErr.message.includes('SETTLEMENT_MISMATCH') && missingOblErr.message.includes('Obligation ID is mandatory'), 'Replay without obligation must throw SETTLEMENT_MISMATCH');
 
         // 6.7.c10: Replay de otro tenant -> SETTLEMENT_MISMATCH bajo SUPER_ADMIN
-        let diffTenantErr = null;
+        let replayDiffTenantErr = null;
         try {
             await marketplaceDispatchGatingService.settleRefund(testOrderId, {
                 userId: 'super_admin_01',
@@ -1070,9 +1070,9 @@ async function runRealMysqlCertification() {
                 obligationId: 'rev_e2e_real_001'
             });
         } catch (err) {
-            diffTenantErr = err;
+            replayDiffTenantErr = err;
         }
-        assert.ok(diffTenantErr && diffTenantErr.message.includes('SETTLEMENT_MISMATCH') && diffTenantErr.message.includes('Tenant mismatch'), 'Replay with divergent tenant must throw SETTLEMENT_MISMATCH');
+        assert.ok(replayDiffTenantErr && replayDiffTenantErr.message.includes('SETTLEMENT_MISMATCH') && replayDiffTenantErr.message.includes('Tenant mismatch'), 'Replay with divergent tenant must throw SETTLEMENT_MISMATCH');
 
         // 6.7.c11: Replay contra un registro histórico que solo tenga eventos JSON (sin comprobante en tabla 171)
         const histOrderId = 'ord_hist_real_001';
@@ -1127,9 +1127,9 @@ async function runRealMysqlCertification() {
         );
 
         // 6.7.c12: Error SQL al recuperar el comprobante -> DATABASE_CONNECTION_ERROR
-        const origPoolGetConn = testPool.getConnection;
+        const outageOrigPoolGetConn = testPool.getConnection;
         testPool.getConnection = async function() {
-            const conn = await origPoolGetConn.apply(testPool, arguments);
+            const conn = await outageOrigPoolGetConn.apply(testPool, arguments);
             const origConnQuery = conn.query;
             conn.query = async function(sql) {
                 if (typeof sql === 'string' && sql.toLowerCase().includes('from financial_settlement_vouchers')) {
@@ -1157,7 +1157,7 @@ async function runRealMysqlCertification() {
         } catch (err) {
             sqlOutageErr = err;
         } finally {
-            testPool.getConnection = origPoolGetConn;
+            testPool.getConnection = outageOrigPoolGetConn;
         }
         assert.ok(
             sqlOutageErr && sqlOutageErr.message.includes('DATABASE_CONNECTION_ERROR'),
