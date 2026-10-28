@@ -5,8 +5,10 @@
 > **Rama de Trabajo**: `feat/budget-02d01-e2e-remediation`  
 > **Pull Request Objetivo**: [PR #9](https://github.com/PrintPriceOS/ppos-control-plane/pull/9) — **OPEN / DRAFT**  
 > **Pull Request Precedente**: [PR #8](https://github.com/PrintPriceOS/ppos-control-plane/pull/8) — **OPEN / DRAFT** (HEAD intacto en `744bdd89676c92de2c612152e1be58fe48698fd9`)  
-> **SHA de Referencia de Entrada**: `43a9faca28dccca3dc85b3c83ee0734fbeb524ed`  
-> **Dictamen de Entrada**: `BUDGET-02D01R5_CONDITIONAL — SECURITY CONTRACT SUBSTANTIALLY COMPLETE`  
+> **SHA de Referencia de Entrada**: `a0261ba4d439d3956c7e021e979e858f0e13fb80`  
+> **SHA Certificado Final**: `fe089e8e0f52561665b97b5298ba7da2ccc06adb`  
+> **CI Oficial GitHub Actions**: Run `40647899598` — **SUCCESS (2m 13s, 100% verde)**  
+> **Dictamen de Entrada**: `BUDGET-02D01R5V_PASS_TARGETED / BUDGET-02D01_SECURITY_REVIEW_CONDITIONAL`  
 > **Restricciones Absolutas**: **NO MERGE / NO DEPLOY / NO PRODUCTION DATABASE CHANGES / NO REAL FINANCIAL OPERATIONS**
 
 ---
@@ -22,6 +24,8 @@ La misión **BUDGET-02D-01R5V** culmina el ciclo de acreditación de seguridad f
 | :--- | :--- |
 | **PR #9 (Objetivo)** | [PR #9](https://github.com/PrintPriceOS/ppos-control-plane/pull/9) — **OPEN / DRAFT** |
 | **PR #8 (Precedente)** | [PR #8](https://github.com/PrintPriceOS/ppos-control-plane/pull/8) — **OPEN / DRAFT** (HEAD `744bdd89` intacto) |
+| **SHA Certificado Final** | `fe089e8e0f52561665b97b5298ba7da2ccc06adb` |
+| **CI Oficial GitHub Actions** | [Run 40647899598](https://github.com/PrintPriceOS/ppos-control-plane/actions/runs/40647899598) — **SUCCESS (100% verde)** |
 | **Aislamiento en Producción (SEC-R5-01)** | Inmutable. `setActiveAdapter()` y `setFinancialAdapter()` bloqueados en producción (dual `NODE_ENV` / `PPOS_ENVIRONMENT`) |
 | **Unicidad Transaccional (SEC-R5-02)** | Migración 171 creada con `UNIQUE KEY (provider, provider_voucher_id)` |
 | **Idempotencia Multidimensional (SEC-R5-03)** | Verificación estricta de 7 dimensiones contra tabla 171 bajo bloqueo transaccional |
