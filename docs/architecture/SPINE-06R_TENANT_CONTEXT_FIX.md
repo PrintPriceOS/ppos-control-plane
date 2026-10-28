@@ -2,8 +2,8 @@
 
 **Mission:** SPINE-06R — BFF/Tenancy & Paper Caliper Production Closure  
 **Repositories:**  
-- `PrintPriceOS/PrintPricePro_BookPrice` (`server/server.js`, `lib/spineApi.ts`, `components/UserMenu.tsx`, `components/BookSpineGeometryPanel.tsx`, `App.tsx`)  
-- `PrintPriceOS/ppos-control-plane` (`src/api/middleware/auth.js`, `src/api/routes/spineRoutes.js`, `src/api/services/spine/spineCalculationService.js`)
+- `PrintPriceOS/PrintPricePro_BookPrice` (`server/server.js`, `lib/spineApi.ts`, `components/UserMenu.tsx`, `components/BookSpineGeometryPanel.tsx`, `components/AdvancedPaperSelector.tsx`, `App.tsx`)  
+- `PrintPriceOS/ppos-control-plane` (`server.js`, `src/api/middleware/auth.js`, `src/api/routes/spineRoutes.js`, `src/api/services/spine/spineCalculationService.js`)
 
 ---
 
@@ -72,10 +72,10 @@ Per **SPINE-06R F01** governance rules, the following shortcuts were strictly pr
      ```
    - Strips any client-supplied `tenantId` / `tenant_id` from the request body before forwarding to Control Plane.
 
-### 3.2 Control Plane (`src/api/middleware/auth.js`, `src/api/routes/spineRoutes.js`, `src/api/services/spine/spineCalculationService.js`)
+### 3.2 Control Plane (`server.js`, `src/api/middleware/auth.js`, `src/api/routes/spineRoutes.js`, `src/api/services/spine/spineCalculationService.js`)
 
-1. **JWT Claims Extraction (`src/api/middleware/auth.js`)**:
-   - Extracts `bffDelegated` (`Boolean(decoded.bff_delegated)`), `delegatedUserId`, `delegatedSessionId`, and `delegatedOrderId` into `req.user`.
+1. **JWT Claims Extraction (`server.js` & `src/api/middleware/auth.js`)**:
+   - Both Fastify's `onRequest` hook (`server.js`) and Express `requireAdmin` (`src/api/middleware/auth.js`) extract `bffDelegated` (`Boolean(decoded.bff_delegated)`), `delegatedUserId`, `delegatedSessionId`, and `delegatedOrderId` into `req.user` (`request.user`).
 2. **Delegated Service Credential Verification (`resolveTrustedTenant` in `src/api/routes/spineRoutes.js`)**:
    - Now `async`:
    - If the caller is `bpe-system-user` / `SYSTEM` / `bffDelegated`:
@@ -107,3 +107,4 @@ Per **SPINE-06R F01** governance rules, the following shortcuts were strictly pr
 | `server/scripts/test_spine_04_integration.js` (`10/10`) | Two distinct tenants (`tenant_alpha` and `tenant_beta`) logged in via `/api/auth/login` | Isolated `pp_session_id` cookies & `sessionVault` bindings |
 | `server/scripts/test_spine_04_integration.js` (`10/10`) | Client spoofing `tenantId: 'tenant_alpha'` in body or `x-tenant-id` header while authenticated as `tenant_beta` | `403 FORBIDDEN_TENANT_MISMATCH` |
 | `server/scripts/test_spine_04_integration.js` (`10/10`) | Cross-tenant `GET /api/budget/spine/calculations/:id` and cross-tenant `externalOrderIntentId` | `403 FORBIDDEN_TENANT_MISMATCH` |
+
