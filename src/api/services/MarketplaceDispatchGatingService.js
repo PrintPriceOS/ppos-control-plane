@@ -9,6 +9,7 @@ const logger = require('./logger').child('dispatch-gating');
 const manufacturingDispatch = require('./ManufacturingDispatchService');
 const manufacturingPackage = require('./ManufacturingPackageService');
 const persistence = require('./ManufacturingPersistenceService');
+const trustedFinancialAdapter = require('./TrustedFinancialSettlementAdapter');
 
 function normalizeRows(res) {
     if (!res) return [];
@@ -18,6 +19,10 @@ function normalizeRows(res) {
 }
 
 class MarketplaceDispatchGatingService {
+    constructor() {
+        this.trustedFinancialAdapter = trustedFinancialAdapter;
+    }
+
     /**
      * Dispatch a marketplace order to a specific machine.
      */
@@ -584,7 +589,8 @@ class MarketplaceDispatchGatingService {
         const rawProvider = String(settlementContext.provider || '').trim().toUpperCase();
         const ACCREDITED_PROVIDERS = [
             'STRIPE', 'ADYEN', 'BANK_TRANSFER_LEDGER', 'ERP_CREDIT_NOTE',
-            'PAYMENT_GATEWAY_WEBHOOK', 'MANUAL_BANK_RECONCILIATION'
+            'PAYMENT_GATEWAY_WEBHOOK', 'MANUAL_BANK_RECONCILIATION',
+            'TEST_TRUSTED_SETTLEMENT_ADAPTER'
         ];
         if (!rawProvider || !ACCREDITED_PROVIDERS.includes(rawProvider)) {
             throw new Error(`INVALID_PROVIDER: Settlement provider '${rawProvider || 'NONE'}' is not accredited. Must be one of: ${ACCREDITED_PROVIDERS.join(', ')}.`);
@@ -669,20 +675,41 @@ class MarketplaceDispatchGatingService {
 
             const eff = effectiveRows[0];
 
-            // Idempotency: If already settled, commit and return without mutating
+            // Idempotency: If already settled, check that caller is referencing the same settlement
             if (eff.financial_reconciliation_status === 'REFUND_SETTLED') {
+                const pastSettlementEvents = await runTxQuery(
+                    `SELECT metadata_json FROM marketplace_events 
+                     WHERE event_type = 'REFUND_OBLIGATION_SETTLED' 
+                     AND (order_id = ? OR order_ref = ?) 
+                     ORDER BY created_at DESC LIMIT 1`,
+                    [order.id, canonicalRef]
+                );
+                let originalSettlementRef = null;
+                if (pastSettlementEvents.length > 0) {
+                    try {
+                        const m = typeof pastSettlementEvents[0].metadata_json === 'string'
+                            ? JSON.parse(pastSettlementEvents[0].metadata_json)
+                            : (pastSettlementEvents[0].metadata_json || {});
+                        originalSettlementRef = m.settlement_ref;
+                    } catch (_) {}
+                }
+
+                if (originalSettlementRef && originalSettlementRef !== settlementRef) {
+                    throw new Error(`SETTLEMENT_MISMATCH: Order has already been settled with reference '${originalSettlementRef}'. Cannot replay with different reference '${settlementRef}'.`);
+                }
+
                 await conn.commit();
                 return {
                     ok: true,
                     effective_specification_id: eff.id,
                     financial_reconciliation_status: 'REFUND_SETTLED',
-                    settlement_ref: settlementRef,
+                    settlement_ref: originalSettlementRef || settlementRef,
                     provider: rawProvider,
                     idempotent_replay: true
                 };
             }
 
-            // 8. Verifiable External Evidence & Accounting Reconciliation Validation (SEC-D03R)
+            // 8. Mandatory Server-Side Economic Obligation Binding (TRUST-02)
             let pricingSummary = {};
             try {
                 pricingSummary = typeof eff.pricing_summary_json === 'string'
@@ -691,11 +718,35 @@ class MarketplaceDispatchGatingService {
             } catch (_) {}
 
             const finRecon = pricingSummary.financial_reconciliation || {};
-            const expectedObligationId = finRecon.obligation_id;
-            const expectedAmount = finRecon.refund_amount !== undefined
-                ? Math.abs(Number(finRecon.refund_amount))
-                : (finRecon.delta_amount ? Math.abs(Number(finRecon.delta_amount)) : (pricingSummary.delta_amount ? Math.abs(Number(pricingSummary.delta_amount)) : 30.00));
-            const expectedCurrency = String(finRecon.currency || pricingSummary.currency || 'EUR').toUpperCase();
+            const expectedObligationId = finRecon.refund_obligation_id || finRecon.obligation_id || eff.revision_id;
+
+            // Strict server obligation retrieval without 30 EUR fallback (TRUST-02)
+            const rawRefundAmount = finRecon.refund_amount !== undefined
+                ? finRecon.refund_amount
+                : (finRecon.delta_amount !== undefined ? finRecon.delta_amount : pricingSummary.delta_amount);
+
+            if (rawRefundAmount === undefined || rawRefundAmount === null || Number(rawRefundAmount) === 0) {
+                throw new Error('NO_REFUND_OBLIGATION: Order has no recorded negative delta or economic refund obligation on the server.');
+            }
+
+            const expectedAmount = Math.abs(Number(rawRefundAmount));
+            if (isNaN(expectedAmount) || expectedAmount <= 0) {
+                throw new Error('INVALID_OBLIGATION: Economic refund obligation is missing a valid refund amount on the server.');
+            }
+
+            const expectedCurrency = String(finRecon.currency || pricingSummary.currency || '').toUpperCase();
+            if (!expectedCurrency) {
+                throw new Error('INVALID_OBLIGATION: Economic refund obligation is missing a currency on the server.');
+            }
+
+            // Resolve economic beneficiary from server records (TRUST-02)
+            let expectedBeneficiary = finRecon.beneficiary || order.customer_email || null;
+            if (!expectedBeneficiary && order.customer_json) {
+                try {
+                    const c = typeof order.customer_json === 'string' ? JSON.parse(order.customer_json) : order.customer_json;
+                    expectedBeneficiary = c.email || c.customer_email || null;
+                } catch (_) {}
+            }
 
             // 8.1 Obligation ID Match Check
             const providedObligationId = settlementContext.obligationId || settlementContext.obligation_id;
@@ -703,62 +754,57 @@ class MarketplaceDispatchGatingService {
                 throw new Error(`OBLIGATION_MISMATCH: Provided obligation_id '${providedObligationId}' does not match active obligation '${expectedObligationId}'.`);
             }
 
-            // 8.2 Amount Match Check
-            if (settlementContext.amount !== undefined && settlementContext.amount !== null) {
-                const providedAmount = Math.abs(Number(settlementContext.amount));
-                if (Math.abs(providedAmount - expectedAmount) > 0.01) {
-                    throw new Error(`AMOUNT_MISMATCH: Settlement amount ${providedAmount} does not match expected refund obligation amount ${expectedAmount}.`);
+            // 8.2 Amount Match Check in minor monetary units (cents) (TRUST-02)
+            if (settlementContext.amount === undefined || settlementContext.amount === null || settlementContext.amount === '') {
+                throw new Error('MISSING_AMOUNT: Settlement amount is mandatory.');
+            }
+            const providedAmount = Math.abs(Number(settlementContext.amount));
+            const providedMinor = Math.round(providedAmount * 100);
+            const expectedMinor = Math.round(expectedAmount * 100);
+            if (providedMinor !== expectedMinor) {
+                throw new Error(`AMOUNT_MISMATCH: Settlement amount ${providedAmount} does not match expected refund obligation amount ${expectedAmount}.`);
+            }
+
+            // 8.3 Currency Match Check (TRUST-02)
+            if (!settlementContext.currency) {
+                throw new Error('MISSING_CURRENCY: Settlement currency is mandatory.');
+            }
+            const providedCurrency = String(settlementContext.currency).trim().toUpperCase();
+            if (providedCurrency !== expectedCurrency) {
+                throw new Error(`CURRENCY_MISMATCH: Settlement currency '${providedCurrency}' does not match expected obligation currency '${expectedCurrency}'.`);
+            }
+
+            // 8.4 Beneficiary Match Check (TRUST-02)
+            if (settlementContext.beneficiary && expectedBeneficiary) {
+                if (String(settlementContext.beneficiary).trim().toLowerCase() !== String(expectedBeneficiary).trim().toLowerCase()) {
+                    throw new Error(`BENEFICIARY_MISMATCH: Settlement beneficiary '${settlementContext.beneficiary}' does not match obligation recipient '${expectedBeneficiary}'.`);
                 }
             }
 
-            // 8.3 Currency Match Check
-            if (settlementContext.currency) {
-                const providedCurrency = String(settlementContext.currency).trim().toUpperCase();
-                if (providedCurrency !== expectedCurrency) {
-                    throw new Error(`CURRENCY_MISMATCH: Settlement currency '${providedCurrency}' does not match expected obligation currency '${expectedCurrency}'.`);
+            // 8.5 Authoritative Verification via Trusted Financial Settlement Adapter (TRUST-01)
+            const adapterResult = await this.trustedFinancialAdapter.verifySettlement({
+                provider: rawProvider,
+                settlementRef: settlementRef,
+                obligationId: expectedObligationId,
+                expectedAmount: expectedAmount,
+                expectedCurrency: expectedCurrency,
+                expectedBeneficiary: expectedBeneficiary,
+                orderId: order.id,
+                tenantId: order.tenant_id,
+                callerPayload: settlementContext,
+                connection: conn
+            });
+
+            if (!adapterResult || !adapterResult.verified) {
+                const code = adapterResult?.code || 'UNVERIFIED_SETTLEMENT_SOURCE';
+                const reason = adapterResult?.reason || 'External settlement verification failed';
+                if (code === 'PROVIDER_UNREACHABLE') {
+                    throw new Error(`SETTLEMENT_INTEGRATION_PENDING: ${reason} Status remains REFUND_PENDING.`);
                 }
+                throw new Error(`${code}: ${reason}. Status remains REFUND_PENDING (SETTLEMENT_INTEGRATION_PENDING).`);
             }
 
-            // 8.4 Verifiable Proof / External Evidence Validation (SEC-D03R)
-            const evidence = settlementContext.evidence || settlementContext.proof || settlementContext.verifiedEvidence;
-            if (!evidence || typeof evidence !== 'object') {
-                throw new Error('INVALID_SETTLEMENT_EVIDENCE: Verifiable proof from an accredited financial system is mandatory. A reference alone cannot settle a refund obligation. Status remains REFUND_PENDING (SETTLEMENT_INTEGRATION_PENDING).');
-            }
-
-            const evStatus = String(evidence.status || evidence.state || '').toUpperCase();
-            const VALID_EVIDENCE_STATUSES = ['CONFIRMED', 'SUCCEEDED', 'POSTED', 'RECONCILED', 'SETTLED'];
-            if (!VALID_EVIDENCE_STATUSES.includes(evStatus)) {
-                throw new Error(`UNVERIFIED_SETTLEMENT_STATUS: Evidence status '${evStatus || 'NONE'}' is unconfirmed. Only SUCCEEDED, CONFIRMED, POSTED, or RECONCILED evidence can settle refund. Status remains REFUND_PENDING (SETTLEMENT_INTEGRATION_PENDING).`);
-            }
-
-            // Provider-specific structural proof checks
-            if (rawProvider === 'STRIPE' || rawProvider === 'ADYEN' || rawProvider === 'PAYMENT_GATEWAY_WEBHOOK') {
-                const hasTxProof = evidence.charge_id || evidence.payment_intent_id || evidence.gateway_event_id || evidence.source_event_id || evidence.refund_id;
-                if (!hasTxProof) {
-                    throw new Error(`INVALID_SETTLEMENT_EVIDENCE: Gateway evidence requires confirmed transaction or refund identifier from ${rawProvider}.`);
-                }
-                if (evidence.signature_verified === false) {
-                    throw new Error('INVALID_SETTLEMENT_EVIDENCE: Payment gateway webhook signature verification failed.');
-                }
-            } else if (rawProvider === 'ERP_CREDIT_NOTE') {
-                const hasErpProof = evidence.credit_note_id || evidence.credit_note_number || evidence.journal_entry_ref || evidence.journal_entry_id;
-                if (!hasErpProof) {
-                    throw new Error('INVALID_SETTLEMENT_EVIDENCE: ERP credit note settlement requires accredited credit note identifier or journal entry reference.');
-                }
-                if (evidence.accounting_ledger_verified === false) {
-                    throw new Error('INVALID_SETTLEMENT_EVIDENCE: ERP credit note is not verified in accounting ledger.');
-                }
-            } else if (rawProvider === 'BANK_TRANSFER_LEDGER' || rawProvider === 'MANUAL_BANK_RECONCILIATION') {
-                const hasBankProof = evidence.bank_statement_id || evidence.bank_tx_id || evidence.reconciliation_batch_id || evidence.statement_line_id;
-                if (!hasBankProof) {
-                    throw new Error('INVALID_SETTLEMENT_EVIDENCE: Bank reconciliation settlement requires statement line or bank transaction identifier.');
-                }
-                if (evidence.governed_verification_status === 'UNVERIFIED') {
-                    throw new Error('INVALID_SETTLEMENT_EVIDENCE: Bank reconciliation entry has not passed governed verification.');
-                }
-            }
-
-            // 8.5 Anti-Collision / Idempotency Check on Settlement Reference
+            // 8.6 Anti-Collision / Replay Protection on Settlement Voucher / Reference (TRUST-03)
             const pastEvents = await runTxQuery(
                 `SELECT order_id, order_ref, metadata_json FROM marketplace_events 
                  WHERE event_type = 'REFUND_OBLIGATION_SETTLED'`
@@ -768,15 +814,17 @@ class MarketplaceDispatchGatingService {
                 try {
                     meta = typeof ev.metadata_json === 'string' ? JSON.parse(ev.metadata_json) : (ev.metadata_json || {});
                 } catch (_) {}
-                if (meta.settlement_ref === settlementRef) {
+                const isSameRef = (meta.settlement_ref && meta.settlement_ref === settlementRef) ||
+                                  (meta.provider_voucher_id && meta.provider_voucher_id === adapterResult.voucher_id);
+                if (isSameRef) {
                     const matchOrder = ev.order_id === order.id || ev.order_ref === orderRef || ev.order_id === canonicalRef || ev.order_ref === canonicalRef;
                     if (!matchOrder) {
-                        throw new Error(`DUPLICATE_SETTLEMENT_REFERENCE: Settlement reference '${settlementRef}' has already been utilized on order '${ev.order_ref || ev.order_id}'.`);
+                        throw new Error(`EVIDENCE_ALREADY_CONSUMED: Settlement reference or voucher '${settlementRef}' has already been utilized on order '${ev.order_ref || ev.order_id}'. Replay attack rejected.`);
                     }
                 }
             }
 
-            // 9. State Transition under Lock (SEC-D03R / SEC-D04R)
+            // 9. State Transition under Lock (TRUST-01, TRUST-02, TRUST-03)
             await conn.query(
                 `UPDATE order_effective_technical_specifications 
                  SET financial_reconciliation_status = 'REFUND_SETTLED', updated_at = CURRENT_TIMESTAMP 
@@ -784,21 +832,27 @@ class MarketplaceDispatchGatingService {
                 [eff.id]
             );
 
-            // 10. Persistent Audit Event within the SAME transaction (SEC-D04R)
+            // 10. Persistent Audit Event within the SAME transaction (TRUST-03, SEC-D04R)
             await this.logEvent(eff.canonical_order_id || canonicalRef, orderRef, 'REFUND_OBLIGATION_SETTLED', {
                 effective_specification_id: eff.id,
                 obligation_id: expectedObligationId || providedObligationId || null,
                 settlement_ref: settlementRef,
+                provider_voucher_id: adapterResult.voucher_id,
                 provider: rawProvider,
                 amount: expectedAmount,
                 currency: expectedCurrency,
+                beneficiary: adapterResult.beneficiary || expectedBeneficiary,
                 settled_by: rawUserId,
                 role: role,
                 tenant_id: order.tenant_id,
                 printhouse_id: order.offer_print_house || order.assigned_printhouse_id || order.printhouse_id,
+                trusted_adapter: adapterResult.adapter_name,
+                provenance: adapterResult.provenance,
+                verified_at: adapterResult.verified_at,
+                is_mock_sandbox: Boolean(adapterResult.is_mock_sandbox),
                 evidence_summary: {
-                    status: evStatus,
-                    verified_at: new Date().toISOString()
+                    status: adapterResult.status,
+                    proof_metadata: adapterResult.proof_metadata
                 },
                 settled_at: new Date().toISOString()
             }, conn);
@@ -811,9 +865,13 @@ class MarketplaceDispatchGatingService {
                 obligation_id: expectedObligationId || providedObligationId || null,
                 financial_reconciliation_status: 'REFUND_SETTLED',
                 settlement_ref: settlementRef,
+                provider_voucher_id: adapterResult.voucher_id,
                 provider: rawProvider,
                 amount: expectedAmount,
                 currency: expectedCurrency,
+                beneficiary: adapterResult.beneficiary || expectedBeneficiary,
+                trusted_adapter: adapterResult.adapter_name,
+                provenance: adapterResult.provenance,
                 settled_by: rawUserId
             };
         } catch (err) {

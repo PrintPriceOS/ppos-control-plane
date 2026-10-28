@@ -34,6 +34,7 @@ const {
 const TaxVatReadinessClassifierService = require('../src/api/services/taxVatReadinessClassifierService');
 const pricingSnapshotCanonicalizer = require('../src/api/services/pricingSnapshotCanonicalizer');
 const marketplaceDispatchGatingService = require('../src/api/services/MarketplaceDispatchGatingService');
+const trustedFinancialAdapter = require('../src/api/services/TrustedFinancialSettlementAdapter');
 const persistence = require('../src/api/services/ManufacturingPersistenceService');
 const manufacturingDispatch = require('../src/api/services/ManufacturingDispatchService');
 
@@ -356,8 +357,17 @@ describe('BUDGET-02D-01 — End-to-End Real Integration & Lifecycle Certificatio
 
             // 11.5 SELECT from marketplace_events
             if (s.includes('from marketplace_events')) {
-                return this.tables.marketplace_events.map(ev => {
+                let rows = this.tables.marketplace_events.map(ev => {
                     const p = ev.params || [];
+                    if (p.length === 4) {
+                        return {
+                            id: 'mock_event_uuid',
+                            order_id: p[0],
+                            order_ref: p[1],
+                            event_type: p[2],
+                            metadata_json: p[3]
+                        };
+                    }
                     return {
                         id: p[0],
                         order_id: p[1],
@@ -366,6 +376,20 @@ describe('BUDGET-02D-01 — End-to-End Real Integration & Lifecycle Certificatio
                         metadata_json: p[4]
                     };
                 });
+                if (s.includes("event_type = 'refund_obligation_settled'")) {
+                    rows = rows.filter(r => r.event_type === 'REFUND_OBLIGATION_SETTLED');
+                }
+                if (params && params.length >= 2) {
+                    const [oId, oRef] = params;
+                    rows = rows.filter(r => r.order_id === oId || r.order_ref === oRef || r.order_id === oRef || r.order_ref === oId);
+                }
+                if (s.includes('order by created_at desc')) {
+                    rows = [...rows].reverse();
+                }
+                if (s.includes('limit 1')) {
+                    rows = rows.slice(0, 1);
+                }
+                return rows;
             }
 
             // 12. INSERTS
@@ -1662,6 +1686,7 @@ describe('BUDGET-02D-01 — End-to-End Real Integration & Lifecycle Certificatio
                 order_ref: orderRef,
                 tenant_id: tenantId,
                 printhouse_id: printhouseId,
+                customer_email: 'customer_sc11@editorial.com',
                 status: 'PAID'
             });
 
@@ -1714,7 +1739,17 @@ describe('BUDGET-02D-01 — End-to-End Real Integration & Lifecycle Certificatio
                 effective_status: 'ACTIVE',
                 financial_reconciliation_status: 'PAYMENT_PENDING',
                 industrial_gate_status: 'PREFLIGHT_PENDING',
-                specs_json: JSON.stringify(baselineCalculationFixture.specs)
+                specs_json: JSON.stringify(baselineCalculationFixture.specs),
+                pricing_summary_json: JSON.stringify({
+                    delta_amount: -30.00,
+                    currency: 'EUR',
+                    financial_reconciliation: {
+                        refund_obligation_id: 'obl_sc11_001',
+                        refund_amount: 30.00,
+                        currency: 'EUR',
+                        beneficiary: 'customer_sc11@editorial.com'
+                    }
+                })
             };
             dbAdapter.tables.order_effective_technical_specifications.push(oetsUnpaid);
 
@@ -1923,7 +1958,7 @@ describe('BUDGET-02D-01 — End-to-End Real Integration & Lifecycle Certificatio
                 })
             ).rejects.toThrow(/FORBIDDEN: Authenticated tenant context is mandatory for financial operator/);
 
-            // 11.7.3 Referencia sintácticamente válida SIN evidencia verificable -> FAIL-CLOSED (SEC-D03R)
+            // 11.7.3.a Importe omitido -> MISSING_AMOUNT (TRUST-02)
             await expect(
                 marketplaceDispatchGatingService.settleRefund(orderRef, {
                     userId: 'treasury_director_01',
@@ -1931,11 +1966,52 @@ describe('BUDGET-02D-01 — End-to-End Real Integration & Lifecycle Certificatio
                     tenantId,
                     settlementRef: 'BANKTX987654',
                     provider: 'BANK_TRANSFER_LEDGER'
-                    // Sin objeto evidence: la mera sintaxis no prueba liquidación
                 })
-            ).rejects.toThrow(/INVALID_SETTLEMENT_EVIDENCE: Verifiable proof from an accredited financial system is mandatory/);
+            ).rejects.toThrow(/MISSING_AMOUNT: Settlement amount is mandatory/);
 
-            // 11.7.4 Liquidación con importe o moneda incompatible -> DENEGADO (SEC-D03R)
+            // 11.7.3.b Divisa omitida -> MISSING_CURRENCY (TRUST-02)
+            await expect(
+                marketplaceDispatchGatingService.settleRefund(orderRef, {
+                    userId: 'treasury_director_01',
+                    role: 'FINANCE_DIRECTOR',
+                    tenantId,
+                    settlementRef: 'BANKTX987654',
+                    provider: 'BANK_TRANSFER_LEDGER',
+                    amount: 30.00
+                })
+            ).rejects.toThrow(/MISSING_CURRENCY: Settlement currency is mandatory/);
+
+            // 11.7.3.c Autocertificación de firma o estado por el solicitante -> RECHAZADO (TRUST-01)
+            await expect(
+                marketplaceDispatchGatingService.settleRefund(orderRef, {
+                    userId: 'treasury_director_01',
+                    role: 'FINANCE_DIRECTOR',
+                    tenantId,
+                    settlementRef: 'BANKTX987654',
+                    provider: 'BANK_TRANSFER_LEDGER',
+                    amount: 30.00,
+                    currency: 'EUR',
+                    evidence: {
+                        signature_verified: true,
+                        status: 'SUCCEEDED'
+                    }
+                })
+            ).rejects.toThrow(/UNTRUSTED_CALLER_SIGNATURE_ASSERTION/);
+
+            // 11.7.3.d Referencia no existente en el adaptador financiero confiable -> FAIL-CLOSED (TRUST-01)
+            await expect(
+                marketplaceDispatchGatingService.settleRefund(orderRef, {
+                    userId: 'treasury_director_01',
+                    role: 'FINANCE_DIRECTOR',
+                    tenantId,
+                    settlementRef: 'BANKTX987654',
+                    provider: 'BANK_TRANSFER_LEDGER',
+                    amount: 30.00,
+                    currency: 'EUR'
+                })
+            ).rejects.toThrow(/EXTERNAL_SETTLEMENT_NOT_FOUND/);
+
+            // 11.7.4.a Liquidación con importe divergente -> AMOUNT_MISMATCH (TRUST-02)
             await expect(
                 marketplaceDispatchGatingService.settleRefund(orderRef, {
                     userId: 'treasury_director_01',
@@ -1943,15 +2019,12 @@ describe('BUDGET-02D-01 — End-to-End Real Integration & Lifecycle Certificatio
                     tenantId,
                     settlementRef: 'BNK_TX_2026_998877',
                     provider: 'BANK_TRANSFER_LEDGER',
-                    amount: 999.00, // Discrepancia intencionada con los 30.00 debidos
-                    evidence: {
-                        status: 'RECONCILED',
-                        bank_statement_id: 'STMT-2026-10-8877',
-                        bank_tx_id: 'BTX-998877'
-                    }
+                    amount: 999.00, // Discrepancia con los 30.00 debidos
+                    currency: 'EUR'
                 })
             ).rejects.toThrow(/AMOUNT_MISMATCH/);
 
+            // 11.7.4.b Liquidación con divisa incompatible -> CURRENCY_MISMATCH (TRUST-02)
             await expect(
                 marketplaceDispatchGatingService.settleRefund(orderRef, {
                     userId: 'treasury_director_01',
@@ -1959,16 +2032,52 @@ describe('BUDGET-02D-01 — End-to-End Real Integration & Lifecycle Certificatio
                     tenantId,
                     settlementRef: 'BNK_TX_2026_998877',
                     provider: 'BANK_TRANSFER_LEDGER',
-                    currency: 'USD', // Moneda incompatible
-                    evidence: {
-                        status: 'RECONCILED',
-                        bank_statement_id: 'STMT-2026-10-8877',
-                        bank_tx_id: 'BTX-998877'
-                    }
+                    amount: 30.00,
+                    currency: 'USD'
                 })
             ).rejects.toThrow(/CURRENCY_MISMATCH/);
 
-            // 11.7.5 Liquidación acreditada con referencia real y evidencia verificada -> PERMITIDO (SEC-D03R)
+            // 11.7.4.c Liquidación con beneficiario divergente -> BENEFICIARY_MISMATCH (TRUST-02)
+            await expect(
+                marketplaceDispatchGatingService.settleRefund(orderRef, {
+                    userId: 'treasury_director_01',
+                    role: 'FINANCE_DIRECTOR',
+                    tenantId,
+                    settlementRef: 'BNK_TX_2026_998877',
+                    provider: 'BANK_TRANSFER_LEDGER',
+                    amount: 30.00,
+                    currency: 'EUR',
+                    beneficiary: 'malicious_actor@attacker.com'
+                })
+            ).rejects.toThrow(/BENEFICIARY_MISMATCH/);
+
+            // 11.7.4.d Proveedor externo no disponible -> SETTLEMENT_INTEGRATION_PENDING (TRUST-01 / TRUST-04)
+            trustedFinancialAdapter.setProviderOutage('BANK_TRANSFER_LEDGER', true);
+            await expect(
+                marketplaceDispatchGatingService.settleRefund(orderRef, {
+                    userId: 'treasury_director_01',
+                    role: 'FINANCE_DIRECTOR',
+                    tenantId,
+                    settlementRef: 'BNK_TX_2026_998877',
+                    provider: 'BANK_TRANSFER_LEDGER',
+                    amount: 30.00,
+                    currency: 'EUR'
+                })
+            ).rejects.toThrow(/SETTLEMENT_INTEGRATION_PENDING/);
+            trustedFinancialAdapter.setProviderOutage('BANK_TRANSFER_LEDGER', false);
+
+            // 11.7.5 Registro en el Adaptador Financiero Confiable y Liquidación Exitosa (TRUST-01)
+            trustedFinancialAdapter.registerVerifiedRecord({
+                provider: 'BANK_TRANSFER_LEDGER',
+                settlementRef: 'BNK_TX_2026_998877',
+                status: 'RECONCILED',
+                amount: 30.00,
+                currency: 'EUR',
+                beneficiary: 'customer_sc11@editorial.com',
+                voucher_id: 'VOUCHER-BANK-2026-998877',
+                is_test_sandbox: true
+            });
+
             const settlementResult = await marketplaceDispatchGatingService.settleRefund(orderRef, {
                 userId: 'treasury_director_01',
                 role: 'FINANCE_DIRECTOR',
@@ -1977,27 +2086,83 @@ describe('BUDGET-02D-01 — End-to-End Real Integration & Lifecycle Certificatio
                 provider: 'BANK_TRANSFER_LEDGER',
                 amount: 30.00,
                 currency: 'EUR',
-                evidence: {
-                    status: 'RECONCILED',
-                    bank_statement_id: 'STMT-2026-10-8877',
-                    bank_tx_id: 'BTX-2026-998877',
-                    reconciliation_protocol: 'GOVERNED_DUAL_CONTROL'
-                }
+                beneficiary: 'customer_sc11@editorial.com'
             });
             expect(settlementResult.ok).toBe(true);
             expect(settlementResult.financial_reconciliation_status).toBe('REFUND_SETTLED');
 
-            // 11.7.6 Idempotencia: Repetición de liquidación ya saldada -> IDEMPOTENT SUCCESS
+            // 11.7.6 Idempotencia: Repetición de liquidación con la misma referencia -> IDEMPOTENT SUCCESS (TRUST-03)
             const idempotentResult = await marketplaceDispatchGatingService.settleRefund(orderRef, {
                 userId: 'treasury_director_01',
                 role: 'FINANCE_DIRECTOR',
                 tenantId,
                 settlementRef: 'BNK_TX_2026_998877',
                 provider: 'BANK_TRANSFER_LEDGER',
-                evidence: { status: 'RECONCILED', bank_tx_id: 'BTX-2026-998877' }
+                amount: 30.00,
+                currency: 'EUR',
+                beneficiary: 'customer_sc11@editorial.com'
             });
             expect(idempotentResult.ok).toBe(true);
             expect(idempotentResult.idempotent_replay).toBe(true);
+
+            // 11.7.7 Intento de repetición con una referencia distinta sobre orden ya saldada -> SETTLEMENT_MISMATCH (TRUST-03)
+            await expect(
+                marketplaceDispatchGatingService.settleRefund(orderRef, {
+                    userId: 'treasury_director_01',
+                    role: 'FINANCE_DIRECTOR',
+                    tenantId,
+                    settlementRef: 'BNK_TX_2026_DIFFERENT_REF',
+                    provider: 'BANK_TRANSFER_LEDGER',
+                    amount: 30.00,
+                    currency: 'EUR',
+                    beneficiary: 'customer_sc11@editorial.com'
+                })
+            ).rejects.toThrow(/SETTLEMENT_MISMATCH/);
+
+            // 11.7.8 Reutilización de comprobante entre pedidos distintos -> EVIDENCE_ALREADY_CONSUMED (TRUST-03)
+            const orderRef2 = 'job_sc11_intent_2';
+            const orderId2 = 'ord_sc11_002';
+            dbAdapter.tables.orders.push({
+                id: orderId2,
+                order_ref: orderRef2,
+                tenant_id: tenantId,
+                printhouse_id: printhouseId,
+                customer_email: 'customer_sc11@editorial.com',
+                status: 'PAID'
+            });
+            dbAdapter.tables.order_effective_technical_specifications.push({
+                id: 'oets_sc11_unpaid_2',
+                tenant_id: tenantId,
+                canonical_order_id: orderId2,
+                external_order_intent_id: orderRef2,
+                effective_status: 'ACTIVE',
+                financial_reconciliation_status: 'REFUND_PENDING',
+                industrial_gate_status: 'PREFLIGHT_PENDING',
+                specs_json: JSON.stringify(baselineCalculationFixture.specs),
+                pricing_summary_json: JSON.stringify({
+                    delta_amount: -30.00,
+                    currency: 'EUR',
+                    financial_reconciliation: {
+                        refund_obligation_id: 'obl_sc11_002',
+                        refund_amount: 30.00,
+                        currency: 'EUR',
+                        beneficiary: 'customer_sc11@editorial.com'
+                    }
+                })
+            });
+
+            await expect(
+                marketplaceDispatchGatingService.settleRefund(orderRef2, {
+                    userId: 'treasury_director_01',
+                    role: 'FINANCE_DIRECTOR',
+                    tenantId,
+                    settlementRef: 'BNK_TX_2026_998877',
+                    provider: 'BANK_TRANSFER_LEDGER',
+                    amount: 30.00,
+                    currency: 'EUR',
+                    beneficiary: 'customer_sc11@editorial.com'
+                })
+            ).rejects.toThrow(/EVIDENCE_ALREADY_CONSUMED/);
 
             const settledDispatchResult = await marketplaceDispatchGatingService.dispatchOrder(orderRef, 'node_alpha_press', {
                 userId: 'user_operator',

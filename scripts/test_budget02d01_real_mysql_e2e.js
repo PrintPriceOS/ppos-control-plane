@@ -357,6 +357,7 @@ async function runRealMysqlCertification() {
         manufacturingDispatch.createDispatch = async (pkgId, mId) => ({ id: `disp_${Date.now()}`, packageId: pkgId, machineId: mId });
 
         const marketplaceDispatchGatingService = require('../src/api/services/MarketplaceDispatchGatingService');
+        const trustedFinancialAdapter = require('../src/api/services/TrustedFinancialSettlementAdapter');
 
         // 6.1 (SEC-D01): Attempt dispatch with unliquidated REFUND_PENDING and context override -> BLOCKED (flags ignored)
         let blockedOverrideError = null;
@@ -526,8 +527,8 @@ async function runRealMysqlCertification() {
         assert.ok(fakeRefError, 'Fake local pseudo-reference must be rejected');
         assert.ok(fakeRefError.message.includes('INVALID_SETTLEMENT_REFERENCE'), fakeRefError.message);
 
-        // 6.6.b (SEC-D03R): Syntactically valid reference WITHOUT external evidence -> REJECTED, status remains REFUND_PENDING
-        let noEvidenceError = null;
+        // 6.6.b (TRUST-02): Missing settlement amount -> REJECTED, status remains REFUND_PENDING
+        let noAmountError = null;
         try {
             await marketplaceDispatchGatingService.settleRefund(testOrderId, {
                 userId: 'finance_mgr_01',
@@ -537,12 +538,52 @@ async function runRealMysqlCertification() {
                 provider: 'BANK_TRANSFER_LEDGER'
             });
         } catch (err) {
-            noEvidenceError = err;
+            noAmountError = err;
         }
-        assert.ok(noEvidenceError, 'Reference alone without verifiable external evidence must be rejected');
-        assert.ok(noEvidenceError.message.includes('INVALID_SETTLEMENT_EVIDENCE'), noEvidenceError.message);
+        assert.ok(noAmountError, 'Settlement without amount must be rejected');
+        assert.ok(noAmountError.message.includes('MISSING_AMOUNT'), noAmountError.message);
 
-        // 6.6.c (SEC-D03R): Incompatible refund amount discrepancy -> REJECTED
+        // 6.6.c (TRUST-01): Untrusted caller signature assertion in body -> REJECTED
+        let callerSigError = null;
+        try {
+            await marketplaceDispatchGatingService.settleRefund(testOrderId, {
+                userId: 'finance_mgr_01',
+                role: 'FINANCE_DIRECTOR',
+                tenantId: testTenantId,
+                settlementRef: 'BANKTX987654',
+                provider: 'BANK_TRANSFER_LEDGER',
+                amount: 45.50,
+                currency: 'EUR',
+                evidence: {
+                    signature_verified: true,
+                    status: 'SUCCEEDED'
+                }
+            });
+        } catch (err) {
+            callerSigError = err;
+        }
+        assert.ok(callerSigError, 'Caller self-declaration of signature_verified must be rejected');
+        assert.ok(callerSigError.message.includes('UNTRUSTED_CALLER_SIGNATURE_ASSERTION'), callerSigError.message);
+
+        // 6.6.d (TRUST-01): Reference not in trusted adapter -> REJECTED
+        let notFoundError = null;
+        try {
+            await marketplaceDispatchGatingService.settleRefund(testOrderId, {
+                userId: 'finance_mgr_01',
+                role: 'FINANCE_DIRECTOR',
+                tenantId: testTenantId,
+                settlementRef: 'BANKTX987654',
+                provider: 'BANK_TRANSFER_LEDGER',
+                amount: 45.50,
+                currency: 'EUR'
+            });
+        } catch (err) {
+            notFoundError = err;
+        }
+        assert.ok(notFoundError, 'Reference not in trusted adapter must be rejected');
+        assert.ok(notFoundError.message.includes('EXTERNAL_SETTLEMENT_NOT_FOUND'), notFoundError.message);
+
+        // 6.6.e (TRUST-02): Incompatible refund amount discrepancy -> REJECTED
         let amountMismatchError = null;
         try {
             await marketplaceDispatchGatingService.settleRefund(testOrderId, {
@@ -552,12 +593,7 @@ async function runRealMysqlCertification() {
                 settlementRef: 'BCN_ERP_CREDIT_NOTE_2026_0991',
                 provider: 'ERP_CREDIT_NOTE',
                 amount: 999.00,
-                evidence: {
-                    status: 'POSTED',
-                    credit_note_id: 'CN-2026-0991',
-                    journal_entry_ref: 'JE-0991',
-                    accounting_ledger_verified: true
-                }
+                currency: 'EUR'
             });
         } catch (err) {
             amountMismatchError = err;
@@ -570,9 +606,21 @@ async function runRealMysqlCertification() {
             [specId]
         );
         assert.strictEqual(specAfterFakeRef[0].financial_reconciliation_status, 'REFUND_PENDING');
-        console.log(`  ✓ SEC-D03R Certified: Syntactically valid reference without verifiable proof rejected; status kept as REFUND_PENDING.`);
+        console.log(`  ✓ TRUST-01/02 Certified: Untrusted reference and caller signature assertions rejected; status kept as REFUND_PENDING.`);
 
-        // 6.7 (SEC-D03R): Verifiable settlement with accredited external reference and verified accounting evidence -> SUCCEEDED
+        // Register verified record in trustedFinancialAdapter (TRUST-01)
+        trustedFinancialAdapter.registerVerifiedRecord({
+            provider: 'ERP_CREDIT_NOTE',
+            settlementRef: 'BCN_ERP_CREDIT_NOTE_2026_0991',
+            status: 'POSTED',
+            amount: 45.50,
+            currency: 'EUR',
+            voucher_id: 'CN-2026-0991',
+            accounting_ledger_verified: true,
+            is_test_sandbox: true
+        });
+
+        // 6.7 (TRUST-01 / TRUST-02): Verifiable settlement via accredited trusted adapter -> SUCCEEDED
         const settlementRes = await marketplaceDispatchGatingService.settleRefund(testOrderId, {
             userId: 'finance_mgr_01',
             role: 'FINANCE_DIRECTOR',
@@ -580,18 +628,12 @@ async function runRealMysqlCertification() {
             settlementRef: 'BCN_ERP_CREDIT_NOTE_2026_0991',
             provider: 'ERP_CREDIT_NOTE',
             amount: 45.50,
-            currency: 'EUR',
-            evidence: {
-                status: 'POSTED',
-                credit_note_id: 'CN-2026-0991',
-                journal_entry_ref: 'JE-0991',
-                accounting_ledger_verified: true
-            }
+            currency: 'EUR'
         });
         assert.strictEqual(settlementRes.ok, true);
         assert.strictEqual(settlementRes.financial_reconciliation_status, 'REFUND_SETTLED');
 
-        // 6.7.b (SEC-D03R & Concurrency): Concurrent refund settlements under FOR UPDATE lock resolve idempotently
+        // 6.7.b (TRUST-03 & Concurrency): Concurrent refund settlements under FOR UPDATE lock resolve idempotently
         const [concSettle1, concSettle2] = await Promise.all([
             marketplaceDispatchGatingService.settleRefund(testOrderId, {
                 userId: 'finance_mgr_01',
@@ -600,8 +642,7 @@ async function runRealMysqlCertification() {
                 settlementRef: 'BCN_ERP_CREDIT_NOTE_2026_0991',
                 provider: 'ERP_CREDIT_NOTE',
                 amount: 45.50,
-                currency: 'EUR',
-                evidence: { status: 'POSTED', credit_note_id: 'CN-2026-0991' }
+                currency: 'EUR'
             }),
             marketplaceDispatchGatingService.settleRefund(testOrderId, {
                 userId: 'finance_mgr_02',
@@ -610,8 +651,7 @@ async function runRealMysqlCertification() {
                 settlementRef: 'BCN_ERP_CREDIT_NOTE_2026_0991',
                 provider: 'ERP_CREDIT_NOTE',
                 amount: 45.50,
-                currency: 'EUR',
-                evidence: { status: 'POSTED', credit_note_id: 'CN-2026-0991' }
+                currency: 'EUR'
             })
         ]);
         assert.strictEqual(concSettle1.ok, true);
@@ -619,12 +659,30 @@ async function runRealMysqlCertification() {
         assert.strictEqual(concSettle1.financial_reconciliation_status, 'REFUND_SETTLED');
         assert.strictEqual(concSettle2.financial_reconciliation_status, 'REFUND_SETTLED');
 
+        // 6.7.c (TRUST-03): Replay with different reference -> SETTLEMENT_MISMATCH
+        let diffRefError = null;
+        try {
+            await marketplaceDispatchGatingService.settleRefund(testOrderId, {
+                userId: 'finance_mgr_01',
+                role: 'FINANCE_DIRECTOR',
+                tenantId: testTenantId,
+                settlementRef: 'BCN_ERP_CREDIT_NOTE_DIFFERENT',
+                provider: 'ERP_CREDIT_NOTE',
+                amount: 45.50,
+                currency: 'EUR'
+            });
+        } catch (err) {
+            diffRefError = err;
+        }
+        assert.ok(diffRefError, 'Replay with different reference must be rejected');
+        assert.ok(diffRefError.message.includes('SETTLEMENT_MISMATCH'), diffRefError.message);
+
         const [specAfterSettled] = await testPool.query(
             'SELECT financial_reconciliation_status FROM order_effective_technical_specifications WHERE id = ?',
             [specId]
         );
         assert.strictEqual(specAfterSettled[0].financial_reconciliation_status, 'REFUND_SETTLED');
-        console.log(`  ✓ SEC-D03R Certified: Accredited external settlement with accounting evidence persisted as REFUND_SETTLED in MySQL 8.`);
+        console.log(`  ✓ TRUST-01/03 Certified: Accredited external settlement with trusted adapter persisted as REFUND_SETTLED in MySQL 8.`);
 
         // 6.8 (IND-01): Machine dispatch consumes effective technical version -> SUCCESS
         const dispatchResult = await marketplaceDispatchGatingService.dispatchOrder(testOrderId, 'machine_alpha_01', {
@@ -924,7 +982,7 @@ async function runRealMysqlCertification() {
             assert.strictEqual(invalidSettleRes.status, 422, 'Settlement with pseudo-reference must return 422');
             console.log('  ✓ SEC-D03/SEC-D04 HTTP Certified: Real HTTP settlement rejected with 422 on pseudo-reference.');
 
-            // 8.6.b Real HTTP settlement with syntactically valid reference WITHOUT external evidence -> HTTP 422 (SEC-D03R)
+            // 8.6.b Real HTTP settlement without amount -> HTTP 422 (TRUST-02)
             const noEvidenceHttpRes = await fetch(`${httpBaseUrl}/api/printhouse/orders/${httpOrderId}/settle-refund`, {
                 method: 'POST',
                 headers: {
@@ -934,35 +992,13 @@ async function runRealMysqlCertification() {
                 body: JSON.stringify({
                     settlementRef: 'SETTLE_STRIPE_RE_99182910',
                     provider: 'STRIPE'
-                    // No evidence object provided
                 })
             });
-            assert.strictEqual(noEvidenceHttpRes.status, 422, 'Settlement without external evidence must return 422');
-            console.log('  ✓ SEC-D03R/SEC-D04 HTTP Certified: Real HTTP settlement without verifiable proof rejected with 422.');
+            assert.strictEqual(noEvidenceHttpRes.status, 422, 'Settlement without amount must return 422');
+            console.log('  ✓ TRUST-02/SEC-D04 HTTP Certified: Real HTTP settlement without amount rejected with 422.');
 
-            // 8.6.c Real HTTP settlement with incompatible amount -> HTTP 422 (SEC-D03R)
-            const amountMismatchHttpRes = await fetch(`${httpBaseUrl}/api/printhouse/orders/${httpOrderId}/settle-refund`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${testAuthToken}`
-                },
-                body: JSON.stringify({
-                    settlementRef: 'SETTLE_STRIPE_RE_99182910',
-                    provider: 'STRIPE',
-                    amount: 999.00,
-                    evidence: {
-                        status: 'SUCCEEDED',
-                        charge_id: 'ch_http_99182910',
-                        signature_verified: true
-                    }
-                })
-            });
-            assert.strictEqual(amountMismatchHttpRes.status, 422, 'Settlement with amount mismatch must return 422');
-            console.log('  ✓ SEC-D03R/SEC-D04 HTTP Certified: Real HTTP settlement with amount mismatch rejected with 422.');
-
-            // 8.7 Real HTTP settlement with accredited external reference and verified evidence -> HTTP 200
-            const validSettleRes = await fetch(`${httpBaseUrl}/api/printhouse/orders/${httpOrderId}/settle-refund`, {
+            // 8.6.c Real HTTP caller self-declaration of signature_verified -> HTTP 422 (TRUST-01)
+            const callerSigHttpRes = await fetch(`${httpBaseUrl}/api/printhouse/orders/${httpOrderId}/settle-refund`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -975,16 +1011,63 @@ async function runRealMysqlCertification() {
                     currency: 'EUR',
                     evidence: {
                         status: 'SUCCEEDED',
-                        charge_id: 'ch_http_99182910',
                         signature_verified: true
                     }
+                })
+            });
+            assert.strictEqual(callerSigHttpRes.status, 422, 'Caller self-declaration must return 422');
+            const callerSigBody = await callerSigHttpRes.json();
+            assert.ok(callerSigBody.error.includes('UNTRUSTED_CALLER_SIGNATURE_ASSERTION'), callerSigBody.error);
+            console.log('  ✓ TRUST-01/SEC-D04 HTTP Certified: Real HTTP settlement with caller self-declared signature rejected with 422.');
+
+            // 8.6.d Real HTTP settlement with incompatible amount -> HTTP 422 (TRUST-02)
+            const amountMismatchHttpRes = await fetch(`${httpBaseUrl}/api/printhouse/orders/${httpOrderId}/settle-refund`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${testAuthToken}`
+                },
+                body: JSON.stringify({
+                    settlementRef: 'SETTLE_STRIPE_RE_99182910',
+                    provider: 'STRIPE',
+                    amount: 999.00,
+                    currency: 'EUR'
+                })
+            });
+            assert.strictEqual(amountMismatchHttpRes.status, 422, 'Settlement with amount mismatch must return 422');
+            console.log('  ✓ TRUST-02/SEC-D04 HTTP Certified: Real HTTP settlement with amount mismatch rejected with 422.');
+
+            // Register verified record in trustedFinancialAdapter (TRUST-01)
+            trustedFinancialAdapter.registerVerifiedRecord({
+                provider: 'STRIPE',
+                settlementRef: 'SETTLE_STRIPE_RE_99182910',
+                status: 'SUCCEEDED',
+                amount: 30.00,
+                currency: 'EUR',
+                voucher_id: 'ch_http_99182910',
+                signature_verified: true,
+                is_test_sandbox: true
+            });
+
+            // 8.7 Real HTTP settlement with accredited external reference via trusted adapter -> HTTP 200
+            const validSettleRes = await fetch(`${httpBaseUrl}/api/printhouse/orders/${httpOrderId}/settle-refund`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${testAuthToken}`
+                },
+                body: JSON.stringify({
+                    settlementRef: 'SETTLE_STRIPE_RE_99182910',
+                    provider: 'STRIPE',
+                    amount: 30.00,
+                    currency: 'EUR'
                 })
             });
             assert.strictEqual(validSettleRes.status, 200, 'Accredited settlement must return 200');
             const settleBody = await validSettleRes.json();
             assert.strictEqual(settleBody.ok, true);
             assert.strictEqual(settleBody.financial_reconciliation_status, 'REFUND_SETTLED');
-            console.log('  ✓ SEC-D03R/SEC-D04 HTTP Certified: Real HTTP settlement with verified evidence succeeded with 200 and REFUND_SETTLED.');
+            console.log('  ✓ TRUST-01/TRUST-02/SEC-D04 HTTP Certified: Real HTTP settlement via trusted adapter succeeded with 200 and REFUND_SETTLED.');
         } finally {
             await httpApp.close();
             await testPool.end();

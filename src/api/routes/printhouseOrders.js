@@ -220,7 +220,7 @@ async function handleAuthorizeIndustrialDispatch(req, res) {
 async function handleSettleRefund(req, res) {
     const orderRef = req.params.orderRef;
     const context = resolveActorContext(req);
-    const { settlementRef, provider, transactionId, obligationId, amount, currency, evidence, proof } = req.body || {};
+    const { settlementRef, provider, transactionId, obligationId, amount, currency, beneficiary, evidence, proof, webhookEventId } = req.body || {};
 
     try {
         const result = await dispatchGating.settleRefund(orderRef, {
@@ -234,6 +234,8 @@ async function handleSettleRefund(req, res) {
             obligationId,
             amount,
             currency,
+            beneficiary,
+            webhookEventId,
             evidence: evidence || proof
         });
         res.json(result);
@@ -242,15 +244,28 @@ async function handleSettleRefund(req, res) {
         const statusCode = err.message.includes('UNAUTHORIZED') ? 401 :
                            err.message.includes('FORBIDDEN') ? 403 :
                            err.message.includes('NOT_FOUND') ? 404 :
+                           err.message.includes('NO_REFUND_OBLIGATION') ? 404 :
                            err.message.includes('DUPLICATE_SETTLEMENT_REFERENCE') ? 409 :
+                           err.message.includes('EVIDENCE_ALREADY_CONSUMED') ? 409 :
+                           err.message.includes('SETTLEMENT_MISMATCH') ? 409 :
                            err.message.includes('ORDER_INELIGIBLE') ? 409 :
                            err.message.includes('DATABASE_CONNECTION_ERROR') ? 503 :
+                           err.message.includes('PROVIDER_UNREACHABLE') ? 503 :
+                           err.message.includes('SETTLEMENT_INTEGRATION_PENDING') ? 422 :
+                           err.message.includes('UNTRUSTED_CALLER_SIGNATURE_ASSERTION') ? 422 :
+                           err.message.includes('WEBHOOK_SIGNATURE_INVALID') ? 422 :
+                           err.message.includes('UNVERIFIED_SIGNATURE') ? 422 :
+                           err.message.includes('EXTERNAL_SETTLEMENT_NOT_FOUND') ? 422 :
+                           err.message.includes('UNVERIFIED_SETTLEMENT_SOURCE') ? 422 :
                            err.message.includes('INVALID_SETTLEMENT_REFERENCE') ? 422 :
                            err.message.includes('INVALID_SETTLEMENT_EVIDENCE') ? 422 :
                            err.message.includes('UNVERIFIED_SETTLEMENT_STATUS') ? 422 :
                            err.message.includes('OBLIGATION_MISMATCH') ? 422 :
                            err.message.includes('AMOUNT_MISMATCH') ? 422 :
+                           err.message.includes('MISSING_AMOUNT') ? 422 :
+                           err.message.includes('MISSING_CURRENCY') ? 422 :
                            err.message.includes('CURRENCY_MISMATCH') ? 422 :
+                           err.message.includes('BENEFICIARY_MISMATCH') ? 422 :
                            err.message.includes('INVALID_PROVIDER') ? 422 : 400;
         res.status(statusCode).json({ ok: false, error: err.message });
     }
