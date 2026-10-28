@@ -170,6 +170,31 @@ describe('MISIÓN PAPER-MATERIALS-RECOVERY-05V — Documentary Evidence & Write 
                 expect(fs.existsSync(path.join(repoRoot, relPath))).toBe(true);
             }
         });
+
+        it('verifies all 6 RECOVERY-06 execution artifacts and the 234-row BEFORE_AFTER diff in docs/architecture/', () => {
+            const rec06Deliverables = [
+                'docs/architecture/RECOVERY_06_PRODUCTION_PREFLIGHT.md',
+                'docs/architecture/RECOVERY_06_BACKUP_MANIFEST.md',
+                'docs/architecture/RECOVERY_06_EXECUTION_LOG.md',
+                'docs/architecture/RECOVERY_06_BEFORE_AFTER.csv',
+                'docs/architecture/RECOVERY_06_SPINE_BPE_E2E.md',
+                'docs/architecture/RECOVERY_06_FINAL_REPORT.md'
+            ];
+            for (const relPath of rec06Deliverables) {
+                expect(fs.existsSync(path.join(repoRoot, relPath))).toBe(true);
+            }
+
+            const baCsv = fs.readFileSync(path.join(repoRoot, 'docs/architecture/RECOVERY_06_BEFORE_AFTER.csv'), 'utf8').trim().split('\n');
+            // 1 header line + 234 updated variant lines = 235 lines
+            expect(baCsv).toHaveLength(235);
+
+            // Verify that var_ae7dbf443ceab19a (one of the 9 historical LIVONIA_REFERENCE_IMPORT conflicts)
+            // preserved its 225.00 um caliper and LIVONIA_REFERENCE_IMPORT source while updating finish to MATT
+            const gal250Row = baCsv.find(line => line.startsWith('var_ae7dbf443ceab19a,'));
+            expect(gal250Row).toBeDefined();
+            expect(gal250Row).toContain(',225.00,225.00,');
+            expect(gal250Row).toContain(',LIVONIA_REFERENCE_IMPORT,LIVONIA_REFERENCE_IMPORT,REFERENCE_IMPORTED,REFERENCE_IMPORTED,');
+        });
     });
 });
 

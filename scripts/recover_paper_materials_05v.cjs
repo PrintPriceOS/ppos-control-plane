@@ -74,7 +74,7 @@ const HISTORICAL_9_CONFLICT_VARIANT_IDS = Object.freeze([
     'var_4178aecbfa53dcf8',
     'var_c699e6a51cd6b41f',
     'var_5f5cae75e6f45671',
-    'var_c28fd29bf014d9f1',
+    'var_ae7dbf443ceab19a',
     'var_9dabfd7ac5eff6ca',
     'var_06e1d1681e4f0989',
     'var_e2f2e68304e9d4a1'
