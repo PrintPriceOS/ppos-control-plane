@@ -2869,7 +2869,18 @@ export const es = {
   'materials.supplierOrderHint': 'Realiza un pedido directo o solicita cotización a los proveedores conectados del sistema (ej. Papelera del Mediterraneo):',
   'materials.orderPaper': 'Pedir',
   'materials.linkedToDb': 'Vinculado a BD',
-  'materials.manualSpec': 'Manual'
+  'materials.manualSpec': 'Manual',
+  'supplier.hub.grainUnspecified': 'Grain no especificado',
+  'supplier.hub.grainLong': 'Fibra larga (LG)',
+  'supplier.hub.grainShort': 'Fibra corta (SG)',
+  'supplier.hub.finishUnspecified': 'Acabado sin especificar',
+  'supplier.hub.coatingUnspecified': 'Estucado sin especificar',
+  'supplier.hub.thicknessPending': 'Espesor pendiente',
+  'supplier.hub.paperTypeLabel': 'Tipo de papel',
+  'supplier.hub.coatingLabel': 'Estucado',
+  'supplier.hub.finishLabel': 'Acabado',
+  'supplier.hub.grainLabel': 'Sentido de fibra (Grain)',
+  'supplier.hub.originalCodeLabel': 'Código proveedor'
 } as const;
 
 export type TranslationKeys = keyof typeof es;

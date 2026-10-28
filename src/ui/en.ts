@@ -2869,7 +2869,18 @@ export const en = {
   'materials.supplierOrderHint': 'Place a direct purchase order or request volume quotes from connected system suppliers (e.g. Papelera del Mediterraneo):',
   'materials.orderPaper': 'Order',
   'materials.linkedToDb': 'Linked to DB',
-  'materials.manualSpec': 'Manual'
+  'materials.manualSpec': 'Manual',
+  'supplier.hub.grainUnspecified': 'Grain unspecified',
+  'supplier.hub.grainLong': 'Long grain (LG)',
+  'supplier.hub.grainShort': 'Short grain (SG)',
+  'supplier.hub.finishUnspecified': 'Finish unspecified',
+  'supplier.hub.coatingUnspecified': 'Coating unspecified',
+  'supplier.hub.thicknessPending': 'Thickness pending',
+  'supplier.hub.paperTypeLabel': 'Paper Type',
+  'supplier.hub.coatingLabel': 'Coating',
+  'supplier.hub.finishLabel': 'Surface Finish',
+  'supplier.hub.grainLabel': 'Grain Direction',
+  'supplier.hub.originalCodeLabel': 'Supplier Code'
 } as const;
 
 export type TranslationKeys = keyof typeof en;

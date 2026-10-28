@@ -3,6 +3,7 @@
 const crypto = require('crypto');
 const { v4: uuidv4 } = require('uuid');
 const db = require('./mysqlClient');
+const { resolveVariantTechnicalAttributes } = require('./paperMaterialsNormalizationService');
 
 /**
  * Valid price bases according to canonical contract
@@ -263,6 +264,8 @@ async function getTechnicalCatalog({ page = 1, limit = 20, search = null, catego
             p.category,
             p.brand,
             p.manufacturer,
+            p.finish_summary,
+            p.metadata_json as product_metadata_json,
             v.gsm,
             v.caliper_um,
             v.caliper_mm,
@@ -272,6 +275,7 @@ async function getTechnicalCatalog({ page = 1, limit = 20, search = null, catego
             v.grain_direction,
             v.is_reel,
             v.fingerprint,
+            v.metadata_json as variant_metadata_json,
             v.created_at,
             ${activeOffersSubquery}
             ${catalogSelect}
@@ -296,12 +300,17 @@ async function getTechnicalCatalog({ page = 1, limit = 20, search = null, catego
             supplierCatalogStatus = 'ACTIVE';
         }
 
+        const techAttrs = resolveVariantTechnicalAttributes(r);
+
         return {
             id: r.variant_id,
             productId: r.product_id,
             productName: r.product_name,
             name: r.product_name,
-            category: r.category,
+            category: techAttrs.paperType || r.category,
+            paperType: techAttrs.paperType || r.category,
+            coatingStatus: techAttrs.coatingStatus || 'UNKNOWN',
+            coatingConfidence: techAttrs.coatingConfidence || null,
             brand: r.brand,
             manufacturer: r.manufacturer,
             gsm: Number(r.gsm),
@@ -310,8 +319,10 @@ async function getTechnicalCatalog({ page = 1, limit = 20, search = null, catego
             caliperMm: r.caliper_mm ? Number(r.caliper_mm) : null,
             widthMm: Number(r.width_mm),
             heightMm: Number(r.height_mm),
-            finish: r.finish,
-            grainDirection: r.grain_direction,
+            finish: techAttrs.finish || r.finish,
+            grainDirection: techAttrs.grainDirection || r.grain_direction,
+            originalCode: techAttrs.originalCode || null,
+            proviserRaw: techAttrs.proviserRaw || null,
             isReel: Boolean(r.is_reel),
             fingerprint: r.fingerprint,
             activeOffersCount: Number(r.active_offers_count || 0),
@@ -333,6 +344,8 @@ async function getTechnicalCatalog({ page = 1, limit = 20, search = null, catego
                 brand: item.brand,
                 manufacturer: item.manufacturer,
                 category: item.category,
+                paperType: item.paperType,
+                coatingStatus: item.coatingStatus,
                 finish: item.finish,
                 variants: []
             });
@@ -360,12 +373,14 @@ async function getTechnicalVariantDetail({ variantId, tenantId, supplierId }) {
     const variantSql = `
         SELECT 
             v.*,
+            v.metadata_json as variant_metadata_json,
             p.name as product_name,
             p.category,
             p.brand,
             p.manufacturer,
             p.description as product_description,
-            p.finish_summary
+            p.finish_summary,
+            p.metadata_json as product_metadata_json
         FROM paper_variants v
         JOIN paper_products p ON v.product_id = p.id
         WHERE v.id = ?
@@ -385,23 +400,30 @@ async function getTechnicalVariantDetail({ variantId, tenantId, supplierId }) {
     `;
     const offers = await db.query(offersSql, [variantId, tenantId, supplierId]);
 
+    const techAttrs = resolveVariantTechnicalAttributes(variant);
+
     return {
         variant: {
             id: variant.id,
             productId: variant.product_id,
             productName: variant.product_name,
-            category: variant.category,
+            category: techAttrs.paperType || variant.category,
+            paperType: techAttrs.paperType || variant.category,
+            coatingStatus: techAttrs.coatingStatus || 'UNKNOWN',
+            coatingConfidence: techAttrs.coatingConfidence || null,
             brand: variant.brand,
             manufacturer: variant.manufacturer,
             productDescription: variant.product_description,
-            finishSummary: variant.finish_summary,
+            finishSummary: techAttrs.finish !== 'UNKNOWN' ? techAttrs.finish : variant.finish_summary,
             gsm: Number(variant.gsm),
             caliperUm: variant.caliper_um ? Number(variant.caliper_um) : null,
             caliperMm: variant.caliper_mm ? Number(variant.caliper_mm) : null,
             widthMm: Number(variant.width_mm),
             heightMm: Number(variant.height_mm),
-            finish: variant.finish,
-            grainDirection: variant.grain_direction,
+            finish: techAttrs.finish || variant.finish,
+            grainDirection: techAttrs.grainDirection || variant.grain_direction,
+            originalCode: techAttrs.originalCode || null,
+            proviserRaw: techAttrs.proviserRaw || null,
             isReel: Boolean(variant.is_reel),
             fingerprint: variant.fingerprint,
             createdAt: variant.created_at

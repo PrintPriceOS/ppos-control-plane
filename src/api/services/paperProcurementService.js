@@ -20,6 +20,7 @@ const db = require('./mysqlClient');
 const logger = require('./logger');
 const controlPlaneNotificationService = require('./controlPlaneNotificationService');
 const notificationDispatcherService = require('./notificationDispatcherService');
+const { resolveVariantTechnicalAttributes } = require('./paperMaterialsNormalizationService');
 
 const ALLOWED_ORDER_TYPES = ['ORDER', 'RFQ'];
 const ALLOWED_PRICE_BASES = ['KG', 'TONNE', 'SHEET', 'THOUSAND_SHEETS', 'PACK'];
@@ -404,6 +405,7 @@ class PaperProcurementService {
                 p.category,
                 p.finish_summary,
                 p.description,
+                p.metadata_json AS product_metadata_json,
                 v.gsm,
                 v.width_mm,
                 v.height_mm,
@@ -417,6 +419,7 @@ class PaperProcurementService {
                 v.finish,
                 v.grain_direction,
                 v.fingerprint,
+                v.metadata_json AS variant_metadata_json,
                 o.id AS offer_id,
                 o.supplier_id,
                 s.name AS supplier_name,
@@ -511,21 +514,28 @@ class PaperProcurementService {
             else if (widthMm === 320 && heightMm === 450) sheetFormat = 'SRA3';
             else if (widthMm === 450 && heightMm === 640) sheetFormat = '450x640 (SRA2)';
 
+            const techAttrs = resolveVariantTechnicalAttributes(r);
+
             items.push({
                 variantId: r.variant_id,
                 productId: r.product_id,
                 productName: r.product_name,
                 brand: r.brand || null,
                 manufacturer: r.manufacturer || null,
-                category: r.category || 'OTHER',
-                finishSummary: r.finish_summary || null,
+                category: techAttrs.paperType || r.category || 'OTHER',
+                paperType: techAttrs.paperType || r.category || 'OTHER',
+                coatingStatus: techAttrs.coatingStatus || 'UNKNOWN',
+                coatingConfidence: techAttrs.coatingConfidence || null,
+                finishSummary: techAttrs.finish !== 'UNKNOWN' ? techAttrs.finish : (r.finish_summary || null),
                 gsm,
                 widthMm,
                 heightMm,
                 dimensionsFormatted: `${widthMm} × ${heightMm} mm`,
                 sheetFormat,
-                finish: r.finish || 'UNCOATED',
-                grainDirection: r.grain_direction || 'UNKNOWN',
+                finish: techAttrs.finish || r.finish || 'UNKNOWN',
+                grainDirection: techAttrs.grainDirection || r.grain_direction || 'UNKNOWN',
+                originalCode: techAttrs.originalCode || null,
+                proviserRaw: techAttrs.proviserRaw || null,
                 caliperUm: r.caliper_um ? Number(r.caliper_um) : null,
                 caliper_um: r.caliper_um ? Number(r.caliper_um) : null,
                 caliper_mm: r.caliper_mm ? Number(r.caliper_mm) : null,
