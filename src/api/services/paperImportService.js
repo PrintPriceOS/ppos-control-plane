@@ -26,6 +26,7 @@ const crypto = require('crypto');
 const zlib = require('zlib');
 const { v4: uuidv4 } = require('uuid');
 const db = require('./mysqlClient');
+const { normalizeMultilingualPaperAttributes } = require('./paperMaterialsNormalizationService');
 
 const NORMALIZATION_RULES_VERSION = '1.1.0';
 
@@ -1184,12 +1185,27 @@ function normalizeRowData(rawCells, headers = [], fileRowNumber = 1) {
     if (hasTechnicalError) validationStatus = 'REJECTED';
     else if (hasTechnicalWarning || hasCommercialWarning) validationStatus = 'WARNING';
 
+    const technicalAttributes = normalizeMultilingualPaperAttributes({
+        name,
+        paperType: paperTypeStr,
+        coat: coatStr,
+        grain: grain_direction,
+        code,
+        proviser: providerStr,
+        sortiment: sortimentStr
+    });
+
     return {
         rowNumber: fileRowNumber,
         code,
         name,
         category,
         finish,
+        paperType: technicalAttributes.paperType,
+        coatingStatus: technicalAttributes.coatingStatus,
+        coatingConfidence: technicalAttributes.coatingConfidence,
+        finishNormalized: technicalAttributes.finish,
+        sortiment: technicalAttributes.sortiment,
         gsm,
         caliper_um,
         caliper_mm,
@@ -1217,7 +1233,11 @@ function normalizeRowData(rawCells, headers = [], fileRowNumber = 1) {
             formatDimensions: parsedFmt,
             rawPrice,
             priceStatus,
-            currencyDeclared: false
+            currencyDeclared: false,
+            rawPaperType: paperTypeStr || null,
+            rawCoat: coatStr || null,
+            rawSortiment: sortimentStr || null,
+            technicalAttributes
         }
     };
 }

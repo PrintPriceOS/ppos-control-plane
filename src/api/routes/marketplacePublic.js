@@ -218,6 +218,9 @@ router.get('/paper-catalog', async (req, res) => {
                 brand: item.brand || null,
                 manufacturer: item.manufacturer || null,
                 category: item.category || 'OTHER',
+                paperType: item.paperType || item.category || 'OTHER',
+                coatingStatus: item.coatingStatus || 'UNKNOWN',
+                coatingConfidence: item.coatingConfidence || null,
                 finishSummary: item.finishSummary || item.finish || null,
                 gsm: item.gsm,
                 widthMm: item.widthMm,
@@ -231,6 +234,7 @@ router.get('/paper-catalog', async (req, res) => {
                 caliperRevision: caliperProv.caliperRevision,
                 finish: item.finish || null,
                 grainDirection: item.grainDirection || 'UNKNOWN',
+                originalCode: item.originalCode || null,
                 isReel: item.isReel === true,
                 // Do NOT assume available if offerStatus is missing. Stock availability is strictly subject to printhouse confirmation.
                 isAvailable: item.offerStatus === 'ACTIVE',
