@@ -19,8 +19,12 @@ function normalizeRows(res) {
 }
 
 class MarketplaceDispatchGatingService {
-    constructor() {
-        this.trustedFinancialAdapter = trustedFinancialAdapter;
+    constructor(financialAdapter = null) {
+        this.trustedFinancialAdapter = financialAdapter || trustedFinancialAdapter;
+    }
+
+    setFinancialAdapter(adapter) {
+        this.trustedFinancialAdapter = adapter;
     }
 
     /**
@@ -719,6 +723,9 @@ class MarketplaceDispatchGatingService {
 
             const finRecon = pricingSummary.financial_reconciliation || {};
             const expectedObligationId = finRecon.refund_obligation_id || finRecon.obligation_id || eff.revision_id;
+            if (!expectedObligationId) {
+                throw new Error('MISSING_OBLIGATION_ID: Order has no recorded obligation_id on the server.');
+            }
 
             // Strict server obligation retrieval without 30 EUR fallback (TRUST-02)
             const rawRefundAmount = finRecon.refund_amount !== undefined
@@ -739,13 +746,17 @@ class MarketplaceDispatchGatingService {
                 throw new Error('INVALID_OBLIGATION: Economic refund obligation is missing a currency on the server.');
             }
 
-            // Resolve economic beneficiary from server records (TRUST-02)
+            // Resolve economic beneficiary from server records (TRUST-02, TRUST-R4-02)
             let expectedBeneficiary = finRecon.beneficiary || order.customer_email || null;
             if (!expectedBeneficiary && order.customer_json) {
                 try {
                     const c = typeof order.customer_json === 'string' ? JSON.parse(order.customer_json) : order.customer_json;
                     expectedBeneficiary = c.email || c.customer_email || null;
                 } catch (_) {}
+            }
+
+            if (!expectedBeneficiary || !String(expectedBeneficiary).trim()) {
+                throw new Error('MISSING_BENEFICIARY: Order refund obligation lacks an identifiable recipient/beneficiary on the server.');
             }
 
             // 8.1 Obligation ID Match Check
@@ -774,14 +785,14 @@ class MarketplaceDispatchGatingService {
                 throw new Error(`CURRENCY_MISMATCH: Settlement currency '${providedCurrency}' does not match expected obligation currency '${expectedCurrency}'.`);
             }
 
-            // 8.4 Beneficiary Match Check (TRUST-02)
-            if (settlementContext.beneficiary && expectedBeneficiary) {
+            // 8.4 Beneficiary Match Check (TRUST-02, TRUST-R4-02)
+            if (settlementContext.beneficiary) {
                 if (String(settlementContext.beneficiary).trim().toLowerCase() !== String(expectedBeneficiary).trim().toLowerCase()) {
                     throw new Error(`BENEFICIARY_MISMATCH: Settlement beneficiary '${settlementContext.beneficiary}' does not match obligation recipient '${expectedBeneficiary}'.`);
                 }
             }
 
-            // 8.5 Authoritative Verification via Trusted Financial Settlement Adapter (TRUST-01)
+            // 8.5 Authoritative Verification via Trusted Financial Settlement Adapter (TRUST-01, TRUST-R4-01..03)
             const adapterResult = await this.trustedFinancialAdapter.verifySettlement({
                 provider: rawProvider,
                 settlementRef: settlementRef,
@@ -798,7 +809,7 @@ class MarketplaceDispatchGatingService {
             if (!adapterResult || !adapterResult.verified) {
                 const code = adapterResult?.code || 'UNVERIFIED_SETTLEMENT_SOURCE';
                 const reason = adapterResult?.reason || 'External settlement verification failed';
-                if (code === 'PROVIDER_UNREACHABLE') {
+                if (code === 'SETTLEMENT_INTEGRATION_PENDING' || code === 'PROVIDER_UNREACHABLE') {
                     throw new Error(`SETTLEMENT_INTEGRATION_PENDING: ${reason} Status remains REFUND_PENDING.`);
                 }
                 throw new Error(`${code}: ${reason}. Status remains REFUND_PENDING (SETTLEMENT_INTEGRATION_PENDING).`);

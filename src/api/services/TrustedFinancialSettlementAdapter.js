@@ -1,85 +1,47 @@
 /**
  * TrustedFinancialSettlementAdapter.js
  * 
- * BUDGET-02D-01R4: Cierre de la frontera de confianza financiera (TRUST-01, TRUST-02, TRUST-03).
+ * BUDGET-02D-01R5: Certificación del contrato de confianza financiera (TRUST-R4-01, TRUST-R4-02, TRUST-R4-03).
  * 
- * Authoritative out-of-band verification of financial refund settlements against
- * accredited external payment providers (Stripe, Adyen), ERP accounting ledgers,
- * and banking reconciliation journals.
+ * Defines the strict financial settlement adapter contract, separating the production
+ * adapter (ProductionFinancialSettlementAdapter) from the explicit test sandbox adapter
+ * (TestSandboxFinancialSettlementAdapter).
  * 
- * CRITICAL SECURITY INVARIANT:
- * Caller-provided JSON payloads (e.g. self-declared evidence, unverified signatures,
- * or claimed SUCCEEDED states in HTTP request bodies) MUST NEVER be treated as proof of settlement.
- * Settlements must be verified against an authoritative provider query, an ingress-verified
- * webhook registry, or an authorized ERP credit note / banking statement journal.
+ * CRITICAL SECURITY INVARIANTS:
+ * 1. Test records and in-memory mocks are STRICTLY DISABLED in production environments.
+ * 2. Webhook ingress verification is declared NOT_IMPLEMENTED (fail-closed, SETTLEMENT_INTEGRATION_PENDING)
+ *    because no cryptographic ingress verification component exists in this repository.
+ * 3. Complete economic binding is mandatory: obligation_id, order_id, tenant_id, beneficiary,
+ *    amount in minor units (cents), currency, provider, status, and provider_voucher_id.
+ *    Any missing or divergent attribute fails closed with REFUND_PENDING.
+ * 4. Production financial adapter requires active external credentials and real out-of-band connectivity.
+ *    Without them, it honestly returns SETTLEMENT_INTEGRATION_PENDING, never faking calls or auto-approving.
  */
 
 const logger = require('./logger');
 
-class TrustedFinancialSettlementAdapter {
-    constructor() {
-        this.adapterName = 'TrustedFinancialSettlementAdapter';
-        this.provenance = 'AUTHORITATIVE_FINANCIAL_SETTLEMENT_ADAPTER_v1';
-        
-        // In-memory registry for authoritative server-side verified records (used by CI and test sandbox)
-        // Explicitly identified as test sandbox records — NEVER live banking transactions.
-        this._verifiedRecords = new Map();
-        
-        // Simulated provider status overrides (for testing failure modes like PROVIDER_UNREACHABLE)
-        this._providerOutages = new Set();
+/**
+ * Production Financial Settlement Adapter.
+ * Real production implementation enforcing honest fail-closed semantics when external
+ * credentials or out-of-band banking/gateway integrations are pending.
+ */
+class ProductionFinancialSettlementAdapter {
+    constructor(options = {}) {
+        this.adapterName = 'ProductionFinancialSettlementAdapter';
+        this.provenance = 'AUTHORITATIVE_PRODUCTION_FINANCIAL_SETTLEMENT_ADAPTER_v1';
+        this.isProduction = true;
     }
 
     /**
-     * Register an authoritative verified settlement record in the trusted registry.
-     * In CI/test environments, this allows tests to seed genuine server-side verified vouchers
-     * that contrast against untrusted caller-declared payloads.
+     * registerVerifiedRecord is strictly forbidden on the production adapter.
      */
-    registerVerifiedRecord(record) {
-        if (!record || !record.settlementRef) {
-            throw new Error('registerVerifiedRecord requires settlementRef');
-        }
-        const key = `${String(record.provider || '').toUpperCase()}:${String(record.settlementRef).trim()}`;
-        this._verifiedRecords.set(key, {
-            ...record,
-            registered_at: new Date().toISOString()
-        });
+    registerVerifiedRecord() {
+        throw new Error('MOCK_ADAPTER_DISABLED_IN_PRODUCTION: In-memory test registry is strictly disabled on ProductionFinancialSettlementAdapter.');
     }
 
     /**
-     * Clear registered records (used in test cleanups).
-     */
-    clearRegistry() {
-        this._verifiedRecords.clear();
-        this._providerOutages.clear();
-    }
-
-    /**
-     * Simulate a provider outage (for TRUST-04 unreachable provider testing).
-     */
-    setProviderOutage(provider, isOutage = true) {
-        const p = String(provider).toUpperCase();
-        if (isOutage) {
-            this._providerOutages.add(p);
-        } else {
-            this._providerOutages.delete(p);
-        }
-    }
-
-    /**
-     * Authoritatively verify an external settlement voucher against trusted sources.
-     * 
-     * @param {Object} params
-     * @param {string} params.provider Accredited provider name
-     * @param {string} params.settlementRef External transaction / credit note reference
-     * @param {string} params.obligationId Expected obligation identifier
-     * @param {number} params.expectedAmount Expected obligation amount
-     * @param {string} params.expectedCurrency Expected obligation currency
-     * @param {string} params.expectedBeneficiary Expected recipient (e.g. customer email)
-     * @param {string} params.orderId Internal order ID
-     * @param {string} params.tenantId Order tenant ID
-     * @param {Object} [params.callerPayload] The raw caller payload (checked for self-declared untrusted claims)
-     * @param {Object} [params.connection] Active MySQL transaction connection
-     * @returns {Promise<Object>} Verification outcome with verified proof details or rejection code
+     * Authoritatively verify an external settlement against live production providers.
+     * Enforces fail-closed semantics until real out-of-band connectivity is configured.
      */
     async verifySettlement({
         provider,
@@ -99,26 +61,149 @@ class TrustedFinancialSettlementAdapter {
         // 1. Guard against caller self-certification (TRUST-01)
         const callerEvidence = callerPayload.evidence || callerPayload.proof || callerPayload.verifiedEvidence;
         if (callerEvidence && typeof callerEvidence === 'object') {
-            // If caller claims signature_verified without authentic server ingress verification
-            if (callerEvidence.signature_verified === true && !callerEvidence._server_verified_ingress) {
+            if (callerEvidence.signature_verified === true || callerEvidence.signatureVerified === true) {
                 return {
                     verified: false,
                     code: 'UNTRUSTED_CALLER_SIGNATURE_ASSERTION',
-                    reason: 'Caller cannot self-declare signature_verified. Webhook signatures must be verified at the trusted server ingress boundary.'
+                    reason: 'Caller cannot self-declare signature_verified in request payload. Webhook signatures must be verified at trusted server ingress boundaries.'
                 };
-            }
-            // If caller passed a status of SUCCEEDED without an authoritative corroboration
-            if (callerEvidence.status && !callerEvidence._server_verified_ingress) {
-                logger.info({
-                    event: 'caller_untrusted_evidence_ignored',
-                    provider: rawProvider,
-                    settlementRef: rawRef,
-                    claimed_status: callerEvidence.status
-                });
             }
         }
 
-        // 2. Check for simulated provider outage (TRUST-04)
+        // 2. Webhook Ingress Receiver (TRUST-R4-01)
+        // No cryptographic webhook ingress component exists in this repository.
+        if (rawProvider === 'PAYMENT_GATEWAY_WEBHOOK') {
+            return {
+                verified: false,
+                code: 'WEBHOOK_INTEGRATION_NOT_IMPLEMENTED',
+                reason: 'Cryptographic webhook ingress receiver is NOT_IMPLEMENTED in this repository. Webhook-based settlements cannot be processed.'
+            };
+        }
+
+        // 3. Test sandbox provider rejection in production adapter
+        if (rawProvider === 'TEST_TRUSTED_SETTLEMENT_ADAPTER') {
+            return {
+                verified: false,
+                code: 'TEST_ADAPTER_FORBIDDEN_IN_PRODUCTION',
+                reason: 'TEST_TRUSTED_SETTLEMENT_ADAPTER cannot be processed by ProductionFinancialSettlementAdapter.'
+            };
+        }
+
+        // 4. Honest Production Connectivity (TRUST-R4-03)
+        // External banking / payment gateway / ERP out-of-band connectivity requires separate operational deployment.
+        return {
+            verified: false,
+            code: 'SETTLEMENT_INTEGRATION_PENDING',
+            reason: `Production external connectivity for financial provider '${rawProvider}' requires live credentials and certified out-of-band integration. Real financial connectivity is pending separate operational deployment. Status remains REFUND_PENDING.`
+        };
+    }
+}
+
+/**
+ * Test Sandbox Financial Settlement Adapter.
+ * Explicitly isolated sandbox adapter for CI, local tests and pre-production simulation.
+ * Inaccessible in production environments (throws MOCK_ADAPTER_DISABLED_IN_PRODUCTION).
+ */
+class TestSandboxFinancialSettlementAdapter {
+    constructor(options = {}) {
+        if (process.env.NODE_ENV === 'production') {
+            throw new Error('MOCK_ADAPTER_DISABLED_IN_PRODUCTION: TestSandboxFinancialSettlementAdapter cannot be initialized or used in a production environment.');
+        }
+        this.adapterName = 'TestSandboxFinancialSettlementAdapter';
+        this.provenance = 'TEST_TRUSTED_SETTLEMENT_ADAPTER (CI Mock Sandbox - Not a live banking transaction)';
+        this.isProduction = false;
+        this._verifiedRecords = new Map();
+        this._providerOutages = new Set();
+    }
+
+    /**
+     * Register a server-side verified settlement record in the test sandbox registry.
+     * Enforces environmental isolation.
+     */
+    registerVerifiedRecord(record) {
+        if (process.env.NODE_ENV === 'production') {
+            throw new Error('MOCK_ADAPTER_DISABLED_IN_PRODUCTION: In-memory test registry is strictly disabled in production environments.');
+        }
+        if (!record || typeof record !== 'object') {
+            throw new Error('INVALID_TEST_RECORD: Record object is required.');
+        }
+        if (!record.settlementRef) {
+            throw new Error('INVALID_TEST_RECORD: settlementRef is required.');
+        }
+        const key = `${String(record.provider || '').toUpperCase()}:${String(record.settlementRef).trim()}`;
+        this._verifiedRecords.set(key, {
+            ...record,
+            is_test_sandbox: true,
+            registered_at: new Date().toISOString()
+        });
+    }
+
+    /**
+     * Clear registered records (used in test teardowns).
+     */
+    clearRegistry() {
+        this._verifiedRecords.clear();
+        this._providerOutages.clear();
+    }
+
+    /**
+     * Simulate a provider outage (for failure mode testing).
+     */
+    setProviderOutage(provider, isOutage = true) {
+        const p = String(provider).toUpperCase();
+        if (isOutage) {
+            this._providerOutages.add(p);
+        } else {
+            this._providerOutages.delete(p);
+        }
+    }
+
+    /**
+     * Authoritatively verify an external settlement record in the test sandbox.
+     * Enforces all TRUST-R4-02 mandatory identity and economic bindings.
+     */
+    async verifySettlement({
+        provider,
+        settlementRef,
+        obligationId,
+        expectedAmount,
+        expectedCurrency,
+        expectedBeneficiary,
+        orderId,
+        tenantId,
+        callerPayload = {},
+        connection = null
+    }) {
+        if (process.env.NODE_ENV === 'production') {
+            throw new Error('MOCK_ADAPTER_DISABLED_IN_PRODUCTION: TestSandboxFinancialSettlementAdapter cannot be used in a production environment.');
+        }
+
+        const rawProvider = String(provider || '').trim().toUpperCase();
+        const rawRef = String(settlementRef || '').trim();
+
+        // 1. Guard against caller self-certification (TRUST-01)
+        const callerEvidence = callerPayload.evidence || callerPayload.proof || callerPayload.verifiedEvidence;
+        if (callerEvidence && typeof callerEvidence === 'object') {
+            if (callerEvidence.signature_verified === true || callerEvidence.signatureVerified === true) {
+                return {
+                    verified: false,
+                    code: 'UNTRUSTED_CALLER_SIGNATURE_ASSERTION',
+                    reason: 'Caller cannot self-declare signature_verified in request payload. Webhook signatures must be verified at trusted server ingress boundaries.'
+                };
+            }
+        }
+
+        // 2. Webhook Ingress (TRUST-R4-01)
+        // No cryptographic webhook ingress component exists in this repository.
+        if (rawProvider === 'PAYMENT_GATEWAY_WEBHOOK') {
+            return {
+                verified: false,
+                code: 'WEBHOOK_INTEGRATION_NOT_IMPLEMENTED',
+                reason: 'Cryptographic webhook ingress receiver is NOT_IMPLEMENTED in this repository. Webhook-based settlements cannot be processed.'
+            };
+        }
+
+        // 3. Simulated Provider Outage (TRUST-04)
         if (this._providerOutages.has(rawProvider)) {
             return {
                 verified: false,
@@ -127,33 +212,10 @@ class TrustedFinancialSettlementAdapter {
             };
         }
 
-        // 3. Resolve record from server-side trusted sources
-        // Check 3.1: In-memory authoritative registry (mock sandbox / test adapter)
+        // 4. Resolve record from test sandbox registry
         const registryKey = `${rawProvider}:${rawRef}`;
-        let trustedRecord = this._verifiedRecords.get(registryKey);
+        const trustedRecord = this._verifiedRecords.get(registryKey);
 
-        // Check 3.2: Query verified database records if connection is available
-        if (!trustedRecord && connection) {
-            try {
-                // Check if a webhook was verified at server ingress
-                const [webhookRows] = await connection.query(
-                    `SELECT metadata_json FROM marketplace_events 
-                     WHERE event_type = 'PAYMENT_WEBHOOK_INGRESS_VERIFIED' 
-                     AND order_id = ? ORDER BY created_at DESC LIMIT 1`,
-                    [orderId]
-                );
-                if (webhookRows && webhookRows.length > 0) {
-                    const parsed = typeof webhookRows[0].metadata_json === 'string'
-                        ? JSON.parse(webhookRows[0].metadata_json)
-                        : webhookRows[0].metadata_json;
-                    if (parsed.settlement_ref === rawRef && parsed.provider === rawProvider) {
-                        trustedRecord = parsed;
-                    }
-                }
-            } catch (_) {}
-        }
-
-        // 4. If no authoritative server-side record exists, reject as unverified (TRUST-01)
         if (!trustedRecord) {
             return {
                 verified: false,
@@ -162,8 +224,173 @@ class TrustedFinancialSettlementAdapter {
             };
         }
 
-        // 5. Check Cryptographic / Gateway Webhook Signature Verification (TRUST-01, TRUST-04)
-        if (rawProvider === 'STRIPE' || rawProvider === 'ADYEN' || rawProvider === 'PAYMENT_GATEWAY_WEBHOOK') {
+        // 5. Mandatory Identity & Economic Bindings (TRUST-R4-02)
+
+        // 5.1 Beneficiary Binding (Mandatory on both sides, exact match)
+        if (!expectedBeneficiary || !String(expectedBeneficiary).trim()) {
+            return {
+                verified: false,
+                code: 'MISSING_BENEFICIARY',
+                reason: 'Beneficiary is mandatory on the financial obligation. Unattributed obligations are rejected.'
+            };
+        }
+        if (!trustedRecord.beneficiary || !String(trustedRecord.beneficiary).trim()) {
+            return {
+                verified: false,
+                code: 'MISSING_BENEFICIARY',
+                reason: 'Settlement voucher record lacks mandatory beneficiary attribute.'
+            };
+        }
+        const expBenNorm = String(expectedBeneficiary).trim().toLowerCase();
+        const verBenNorm = String(trustedRecord.beneficiary).trim().toLowerCase();
+        if (expBenNorm !== verBenNorm) {
+            return {
+                verified: false,
+                code: 'BENEFICIARY_MISMATCH',
+                reason: `Voucher beneficiary '${trustedRecord.beneficiary}' does not match obligation recipient '${expectedBeneficiary}'.`
+            };
+        }
+
+        // 5.2 Obligation ID Binding (Mandatory on both sides, exact match)
+        if (!obligationId || !String(obligationId).trim()) {
+            return {
+                verified: false,
+                code: 'MISSING_OBLIGATION_ID',
+                reason: 'Obligation ID is mandatory on the financial obligation.'
+            };
+        }
+        const recObligationId = trustedRecord.obligation_id || trustedRecord.obligationId;
+        if (!recObligationId || !String(recObligationId).trim()) {
+            return {
+                verified: false,
+                code: 'MISSING_OBLIGATION_BINDING',
+                reason: 'Settlement voucher record lacks mandatory obligation_id binding.'
+            };
+        }
+        if (String(recObligationId).trim() !== String(obligationId).trim()) {
+            return {
+                verified: false,
+                code: 'OBLIGATION_MISMATCH',
+                reason: `Voucher obligation '${recObligationId}' does not match expected obligation '${obligationId}'.`
+            };
+        }
+
+        // 5.3 Canonical Order ID Binding (Mandatory on both sides, exact match)
+        if (!orderId || !String(orderId).trim()) {
+            return {
+                verified: false,
+                code: 'MISSING_ORDER_ID',
+                reason: 'Order ID is mandatory for settlement.'
+            };
+        }
+        const recOrderId = trustedRecord.order_id || trustedRecord.orderId;
+        if (!recOrderId || !String(recOrderId).trim()) {
+            return {
+                verified: false,
+                code: 'MISSING_ORDER_BINDING',
+                reason: 'Settlement voucher record lacks mandatory order_id binding.'
+            };
+        }
+        if (String(recOrderId).trim() !== String(orderId).trim()) {
+            return {
+                verified: false,
+                code: 'ORDER_MISMATCH',
+                reason: `Voucher order '${recOrderId}' does not match canonical order '${orderId}'.`
+            };
+        }
+
+        // 5.4 Tenant ID Binding (Mandatory on both sides, exact match)
+        if (!tenantId || !String(tenantId).trim()) {
+            return {
+                verified: false,
+                code: 'MISSING_TENANT_ID',
+                reason: 'Tenant ID is mandatory for settlement.'
+            };
+        }
+        const recTenantId = trustedRecord.tenant_id || trustedRecord.tenantId;
+        if (!recTenantId || !String(recTenantId).trim()) {
+            return {
+                verified: false,
+                code: 'MISSING_TENANT_BINDING',
+                reason: 'Settlement voucher record lacks mandatory tenant_id binding.'
+            };
+        }
+        if (String(recTenantId).trim() !== String(tenantId).trim()) {
+            return {
+                verified: false,
+                code: 'TENANT_MISMATCH',
+                reason: `Voucher tenant '${recTenantId}' does not match order tenant '${tenantId}'.`
+            };
+        }
+
+        // 5.5 Unique Voucher ID (Mandatory)
+        const voucherId = String(trustedRecord.voucher_id || trustedRecord.provider_voucher_id || '').trim();
+        if (!voucherId) {
+            return {
+                verified: false,
+                code: 'MISSING_VOUCHER_ID',
+                reason: 'Settlement voucher record lacks unique provider voucher identifier.'
+            };
+        }
+
+        // 5.6 Final Settlement Status (Mandatory confirmed status)
+        const recordStatus = String(trustedRecord.status || trustedRecord.state || '').toUpperCase();
+        const CONFIRMED_STATUSES = ['SUCCEEDED', 'CONFIRMED', 'POSTED', 'RECONCILED', 'SETTLED'];
+        if (!CONFIRMED_STATUSES.includes(recordStatus)) {
+            return {
+                verified: false,
+                code: 'UNVERIFIED_SETTLEMENT_STATUS',
+                reason: `External settlement voucher '${rawRef}' status is '${recordStatus || 'UNKNOWN'}', which is not in confirmed state (${CONFIRMED_STATUSES.join(', ')}).`
+            };
+        }
+
+        // 5.7 Exact Amount in Minor Units (cents)
+        if (trustedRecord.amount === undefined || trustedRecord.amount === null || isNaN(Number(trustedRecord.amount))) {
+            return {
+                verified: false,
+                code: 'MISSING_AMOUNT',
+                reason: 'Settlement voucher record lacks valid amount.'
+            };
+        }
+        const verifiedAmount = Math.abs(Number(trustedRecord.amount));
+        const verifiedMinor = Math.round(verifiedAmount * 100);
+        const expectedMinor = Math.round(Math.abs(Number(expectedAmount)) * 100);
+        if (verifiedMinor !== expectedMinor) {
+            return {
+                verified: false,
+                code: 'AMOUNT_MISMATCH',
+                reason: `External voucher amount ${verifiedAmount} does not match expected obligation amount ${expectedAmount} in minor units.`
+            };
+        }
+
+        // 5.8 Currency Match
+        const verifiedCurrency = String(trustedRecord.currency || '').trim().toUpperCase();
+        if (!verifiedCurrency) {
+            return {
+                verified: false,
+                code: 'MISSING_CURRENCY',
+                reason: 'Settlement voucher record lacks currency.'
+            };
+        }
+        if (verifiedCurrency !== String(expectedCurrency).trim().toUpperCase()) {
+            return {
+                verified: false,
+                code: 'CURRENCY_MISMATCH',
+                reason: `External voucher currency '${verifiedCurrency}' does not match expected obligation currency '${expectedCurrency}'.`
+            };
+        }
+
+        // 5.9 Provider Match
+        if (trustedRecord.provider && String(trustedRecord.provider).trim().toUpperCase() !== rawProvider) {
+            return {
+                verified: false,
+                code: 'PROVIDER_MISMATCH',
+                reason: `Voucher provider '${trustedRecord.provider}' does not match requested provider '${rawProvider}'.`
+            };
+        }
+
+        // 5.10 Cryptographic signature flags for gateway providers (if present)
+        if (rawProvider === 'STRIPE' || rawProvider === 'ADYEN') {
             if (trustedRecord.signature_verified === false) {
                 return {
                     verified: false,
@@ -180,18 +407,7 @@ class TrustedFinancialSettlementAdapter {
             }
         }
 
-        // 6. Check Confirmation Status (TRUST-01)
-        const recordStatus = String(trustedRecord.status || trustedRecord.state || '').toUpperCase();
-        const CONFIRMED_STATUSES = ['SUCCEEDED', 'CONFIRMED', 'POSTED', 'RECONCILED', 'SETTLED'];
-        if (!CONFIRMED_STATUSES.includes(recordStatus)) {
-            return {
-                verified: false,
-                code: 'UNVERIFIED_SETTLEMENT_STATUS',
-                reason: `External settlement voucher '${rawRef}' status is '${recordStatus || 'UNKNOWN'}', which is not in confirmed state (${CONFIRMED_STATUSES.join(', ')}).`
-            };
-        }
-
-        // 7. Check ERP / Bank Governed Status
+        // 5.11 ERP / Bank Ledgers
         if (rawProvider === 'ERP_CREDIT_NOTE' && trustedRecord.accounting_ledger_verified === false) {
             return {
                 verified: false,
@@ -208,61 +424,23 @@ class TrustedFinancialSettlementAdapter {
             };
         }
 
-        // 8. Economic Parameter Correspondence (TRUST-02)
-        // 8.1 Amount in minor units
-        const verifiedAmount = Math.abs(Number(trustedRecord.amount));
-        const verifiedMinor = Math.round(verifiedAmount * 100);
-        const expectedMinor = Math.round(expectedAmount * 100);
-        if (verifiedMinor !== expectedMinor) {
-            return {
-                verified: false,
-                code: 'AMOUNT_MISMATCH',
-                reason: `External voucher amount ${verifiedAmount} does not match expected obligation amount ${expectedAmount} in minor units.`
-            };
-        }
-
-        // 8.2 Currency
-        const verifiedCurrency = String(trustedRecord.currency || '').toUpperCase();
-        if (verifiedCurrency !== expectedCurrency) {
-            return {
-                verified: false,
-                code: 'CURRENCY_MISMATCH',
-                reason: `External voucher currency '${verifiedCurrency}' does not match expected obligation currency '${expectedCurrency}'.`
-            };
-        }
-
-        // 8.3 Beneficiary / Recipient
-        if (expectedBeneficiary && trustedRecord.beneficiary) {
-            const expBenNorm = String(expectedBeneficiary).trim().toLowerCase();
-            const verBenNorm = String(trustedRecord.beneficiary).trim().toLowerCase();
-            if (expBenNorm !== verBenNorm) {
-                return {
-                    verified: false,
-                    code: 'BENEFICIARY_MISMATCH',
-                    reason: `External voucher beneficiary '${trustedRecord.beneficiary}' does not match obligation recipient '${expectedBeneficiary}'.`
-                };
-            }
-        }
-
-        // 9. Successfully verified by trusted adapter
-        const voucherId = trustedRecord.voucher_id || trustedRecord.credit_note_id || trustedRecord.charge_id || trustedRecord.statement_line_id || rawRef;
-        const isMockSandbox = rawProvider === 'TEST_TRUSTED_SETTLEMENT_ADAPTER' || Boolean(trustedRecord.is_test_sandbox);
-
+        // 6. Successfully Verified in Test Sandbox
         return {
             verified: true,
             adapter_name: this.adapterName,
-            provenance: isMockSandbox
-                ? 'TEST_TRUSTED_SETTLEMENT_ADAPTER (CI Mock Sandbox - Not a live banking transaction)'
-                : this.provenance,
+            provenance: this.provenance,
             provider: rawProvider,
             settlement_ref: rawRef,
             voucher_id: voucherId,
+            obligation_id: obligationId,
+            order_id: orderId,
+            tenant_id: tenantId,
             amount: verifiedAmount,
             currency: verifiedCurrency,
-            beneficiary: trustedRecord.beneficiary || expectedBeneficiary,
+            beneficiary: String(trustedRecord.beneficiary).trim(),
             status: recordStatus,
             verified_at: new Date().toISOString(),
-            is_mock_sandbox: isMockSandbox,
+            is_mock_sandbox: true,
             proof_metadata: {
                 journal_entry_ref: trustedRecord.journal_entry_ref || null,
                 gateway_transaction_id: trustedRecord.charge_id || trustedRecord.payment_intent_id || null,
@@ -272,4 +450,58 @@ class TrustedFinancialSettlementAdapter {
     }
 }
 
-module.exports = new TrustedFinancialSettlementAdapter();
+/**
+ * Factory helper to instantiate the appropriate adapter based on environment.
+ */
+function createFinancialSettlementAdapter(options = {}) {
+    const isProd = (options.env || process.env.NODE_ENV) === 'production';
+    if (isProd) {
+        return new ProductionFinancialSettlementAdapter(options);
+    }
+    return new TestSandboxFinancialSettlementAdapter(options);
+}
+
+// Active singleton instance (defaults to current environment)
+let activeAdapter = createFinancialSettlementAdapter();
+
+// Facade object delegating to activeAdapter while supporting test inspection
+const adapterFacade = {
+    get adapterName() { return activeAdapter.adapterName; },
+    get provenance() { return activeAdapter.provenance; },
+    get isProduction() { return Boolean(activeAdapter.isProduction); },
+
+    registerVerifiedRecord(record) {
+        return activeAdapter.registerVerifiedRecord(record);
+    },
+    clearRegistry() {
+        if (typeof activeAdapter.clearRegistry === 'function') {
+            return activeAdapter.clearRegistry();
+        }
+    },
+    setProviderOutage(provider, isOutage) {
+        if (typeof activeAdapter.setProviderOutage === 'function') {
+            return activeAdapter.setProviderOutage(provider, isOutage);
+        }
+    },
+    async verifySettlement(params) {
+        return activeAdapter.verifySettlement(params);
+    },
+
+    // Testing and configuration helpers
+    setActiveAdapter(adapter) {
+        activeAdapter = adapter;
+    },
+    getActiveAdapter() {
+        return activeAdapter;
+    },
+    resetToDefault() {
+        activeAdapter = createFinancialSettlementAdapter();
+    },
+
+    // Export class definitions
+    ProductionFinancialSettlementAdapter,
+    TestSandboxFinancialSettlementAdapter,
+    createFinancialSettlementAdapter
+};
+
+module.exports = adapterFacade;

@@ -321,7 +321,7 @@ async function runRealMysqlCertification() {
             ) VALUES (
                 ?, ?, ?, ?, ?, 'ACTIVE',
                 '{"paper_role": "INTERIOR", "paper_weight_interior": 120, "variant_id": "var_offset_120", "paper_type": "offset"}',
-                '{"delta_amount": -45.50, "currency": "EUR"}',
+                '{"delta_amount": -45.50, "currency": "EUR", "financial_reconciliation": {"refund_obligation_id": "rev_e2e_real_001", "refund_amount": 45.50, "currency": "EUR", "beneficiary": "procurement@editorial.com"}}',
                 '{"ip_address": "127.0.0.1", "accepted_at": "2026-10-27T22:00:00Z"}',
                 'REFUND_PENDING', 'PREFLIGHT_PENDING'
             )
@@ -608,10 +608,146 @@ async function runRealMysqlCertification() {
         assert.strictEqual(specAfterFakeRef[0].financial_reconciliation_status, 'REFUND_PENDING');
         console.log(`  ✓ TRUST-01/02 Certified: Untrusted reference and caller signature assertions rejected; status kept as REFUND_PENDING.`);
 
-        // Register verified record in trustedFinancialAdapter (TRUST-01)
+        // Step 6.6.c (TRUST-R4-01): Test registry blocked in production mode
+        const origEnv = process.env.NODE_ENV;
+        try {
+            process.env.NODE_ENV = 'production';
+            assert.throws(() => {
+                trustedFinancialAdapter.registerVerifiedRecord({ settlementRef: 'TEST_PROD_LEAK' });
+            }, /MOCK_ADAPTER_DISABLED_IN_PRODUCTION/);
+            assert.throws(() => {
+                new trustedFinancialAdapter.TestSandboxFinancialSettlementAdapter();
+            }, /MOCK_ADAPTER_DISABLED_IN_PRODUCTION/);
+        } finally {
+            process.env.NODE_ENV = origEnv;
+        }
+        console.log(`  ✓ TRUST-R4-01 Certified: In-memory test registry strictly blocked in production mode.`);
+
+        // Step 6.6.d (TRUST-R4-01): Webhook integration not implemented
+        let webhookErr = null;
+        try {
+            await marketplaceDispatchGatingService.settleRefund(testOrderId, {
+                userId: 'finance_mgr_01',
+                role: 'FINANCE_DIRECTOR',
+                tenantId: testTenantId,
+                settlementRef: 'WH_EVT_LIVE_MOCK',
+                provider: 'PAYMENT_GATEWAY_WEBHOOK',
+                amount: 45.50,
+                currency: 'EUR',
+                beneficiary: 'procurement@editorial.com'
+            });
+        } catch (err) {
+            webhookErr = err;
+        }
+        assert.ok(webhookErr && webhookErr.message.includes('WEBHOOK_INTEGRATION_NOT_IMPLEMENTED'), webhookErr?.message);
+        console.log(`  ✓ TRUST-R4-01 Certified: Unverified webhook declared as WEBHOOK_INTEGRATION_NOT_IMPLEMENTED.`);
+
+        // Step 6.6.e (TRUST-R4-02): Comprobante sin beneficiario rechazado
+        trustedFinancialAdapter.registerVerifiedRecord({
+            provider: 'ERP_CREDIT_NOTE',
+            settlementRef: 'BCN_ERP_NO_BEN',
+            obligation_id: 'rev_e2e_real_001',
+            order_id: testOrderId,
+            tenant_id: testTenantId,
+            status: 'POSTED',
+            amount: 45.50,
+            currency: 'EUR',
+            voucher_id: 'CN-NO-BEN',
+            accounting_ledger_verified: true,
+            is_test_sandbox: true
+        });
+        let noBenErr = null;
+        try {
+            await marketplaceDispatchGatingService.settleRefund(testOrderId, {
+                userId: 'finance_mgr_01',
+                role: 'FINANCE_DIRECTOR',
+                tenantId: testTenantId,
+                settlementRef: 'BCN_ERP_NO_BEN',
+                provider: 'ERP_CREDIT_NOTE',
+                amount: 45.50,
+                currency: 'EUR',
+                beneficiary: 'procurement@editorial.com'
+            });
+        } catch (err) {
+            noBenErr = err;
+        }
+        assert.ok(noBenErr && noBenErr.message.includes('MISSING_BENEFICIARY'), noBenErr?.message);
+        console.log(`  ✓ TRUST-R4-02 Certified: Settlement record without beneficiary rejected with MISSING_BENEFICIARY.`);
+
+        // Step 6.6.f (TRUST-R4-02): Comprobante de otro tenant rechazado
+        trustedFinancialAdapter.registerVerifiedRecord({
+            provider: 'ERP_CREDIT_NOTE',
+            settlementRef: 'BCN_ERP_DIFF_TENANT',
+            obligation_id: 'rev_e2e_real_001',
+            order_id: testOrderId,
+            tenant_id: 'DIFFERENT_TENANT_XYZ',
+            beneficiary: 'procurement@editorial.com',
+            status: 'POSTED',
+            amount: 45.50,
+            currency: 'EUR',
+            voucher_id: 'CN-DIFF-TENANT',
+            accounting_ledger_verified: true,
+            is_test_sandbox: true
+        });
+        let diffTenantErr = null;
+        try {
+            await marketplaceDispatchGatingService.settleRefund(testOrderId, {
+                userId: 'finance_mgr_01',
+                role: 'FINANCE_DIRECTOR',
+                tenantId: testTenantId,
+                settlementRef: 'BCN_ERP_DIFF_TENANT',
+                provider: 'ERP_CREDIT_NOTE',
+                amount: 45.50,
+                currency: 'EUR',
+                beneficiary: 'procurement@editorial.com'
+            });
+        } catch (err) {
+            diffTenantErr = err;
+        }
+        assert.ok(diffTenantErr && diffTenantErr.message.includes('TENANT_MISMATCH'), diffTenantErr?.message);
+        console.log(`  ✓ TRUST-R4-02 Certified: Settlement voucher of divergent tenant rejected with TENANT_MISMATCH.`);
+
+        // Step 6.6.g (TRUST-R4-02): Comprobante de otra obligación rechazado
+        trustedFinancialAdapter.registerVerifiedRecord({
+            provider: 'ERP_CREDIT_NOTE',
+            settlementRef: 'BCN_ERP_DIFF_OBL',
+            obligation_id: 'OBL_DIFFERENT_999',
+            order_id: testOrderId,
+            tenant_id: testTenantId,
+            beneficiary: 'procurement@editorial.com',
+            status: 'POSTED',
+            amount: 45.50,
+            currency: 'EUR',
+            voucher_id: 'CN-DIFF-OBL',
+            accounting_ledger_verified: true,
+            is_test_sandbox: true
+        });
+        let diffOblErr = null;
+        try {
+            await marketplaceDispatchGatingService.settleRefund(testOrderId, {
+                userId: 'finance_mgr_01',
+                role: 'FINANCE_DIRECTOR',
+                tenantId: testTenantId,
+                settlementRef: 'BCN_ERP_DIFF_OBL',
+                provider: 'ERP_CREDIT_NOTE',
+                amount: 45.50,
+                currency: 'EUR',
+                beneficiary: 'procurement@editorial.com'
+            });
+        } catch (err) {
+            diffOblErr = err;
+        }
+        assert.ok(diffOblErr && diffOblErr.message.includes('OBLIGATION_MISMATCH'), diffOblErr?.message);
+        console.log(`  ✓ TRUST-R4-02 Certified: Settlement voucher of divergent obligation rejected with OBLIGATION_MISMATCH.`);
+
+        // Register verified record in trustedFinancialAdapter with ALL mandatory bindings (TRUST-01, TRUST-R4-02)
         trustedFinancialAdapter.registerVerifiedRecord({
             provider: 'ERP_CREDIT_NOTE',
             settlementRef: 'BCN_ERP_CREDIT_NOTE_2026_0991',
+            obligation_id: 'rev_e2e_real_001',
+            order_id: testOrderId,
+            tenant_id: testTenantId,
+            beneficiary: 'procurement@editorial.com',
             status: 'POSTED',
             amount: 45.50,
             currency: 'EUR',
@@ -628,7 +764,8 @@ async function runRealMysqlCertification() {
             settlementRef: 'BCN_ERP_CREDIT_NOTE_2026_0991',
             provider: 'ERP_CREDIT_NOTE',
             amount: 45.50,
-            currency: 'EUR'
+            currency: 'EUR',
+            beneficiary: 'procurement@editorial.com'
         });
         assert.strictEqual(settlementRes.ok, true);
         assert.strictEqual(settlementRes.financial_reconciliation_status, 'REFUND_SETTLED');
@@ -642,7 +779,8 @@ async function runRealMysqlCertification() {
                 settlementRef: 'BCN_ERP_CREDIT_NOTE_2026_0991',
                 provider: 'ERP_CREDIT_NOTE',
                 amount: 45.50,
-                currency: 'EUR'
+                currency: 'EUR',
+                beneficiary: 'procurement@editorial.com'
             }),
             marketplaceDispatchGatingService.settleRefund(testOrderId, {
                 userId: 'finance_mgr_02',
@@ -651,7 +789,8 @@ async function runRealMysqlCertification() {
                 settlementRef: 'BCN_ERP_CREDIT_NOTE_2026_0991',
                 provider: 'ERP_CREDIT_NOTE',
                 amount: 45.50,
-                currency: 'EUR'
+                currency: 'EUR',
+                beneficiary: 'procurement@editorial.com'
             })
         ]);
         assert.strictEqual(concSettle1.ok, true);
@@ -669,7 +808,8 @@ async function runRealMysqlCertification() {
                 settlementRef: 'BCN_ERP_CREDIT_NOTE_DIFFERENT',
                 provider: 'ERP_CREDIT_NOTE',
                 amount: 45.50,
-                currency: 'EUR'
+                currency: 'EUR',
+                beneficiary: 'procurement@editorial.com'
             });
         } catch (err) {
             diffRefError = err;
@@ -861,7 +1001,7 @@ async function runRealMysqlCertification() {
                     'oets_http_001', ?, ?, ?, 'rev_http_001',
                     'ACTIVE',
                     '{"paper_role": "INTERIOR", "paper_weight_interior": 120, "variant_id": "var_offset_120"}',
-                    '{"delta_amount": -30.00, "currency": "EUR"}',
+                    '{"delta_amount": -30.00, "currency": "EUR", "financial_reconciliation": {"refund_obligation_id": "rev_http_001", "refund_amount": 30.00, "currency": "EUR", "beneficiary": "procurement@editorial.com"}}',
                     '{"ip_address": "127.0.0.1"}',
                     'REFUND_PENDING', 'PREFLIGHT_PENDING'
                 )
@@ -1037,10 +1177,34 @@ async function runRealMysqlCertification() {
             assert.strictEqual(amountMismatchHttpRes.status, 422, 'Settlement with amount mismatch must return 422');
             console.log('  ✓ TRUST-02/SEC-D04 HTTP Certified: Real HTTP settlement with amount mismatch rejected with 422.');
 
-            // Register verified record in trustedFinancialAdapter (TRUST-01)
+            // 8.6.c Real HTTP settlement with webhook provider -> HTTP 422 WEBHOOK_INTEGRATION_NOT_IMPLEMENTED (TRUST-R4-01)
+            const webhookHttpRes = await fetch(`${httpBaseUrl}/api/printhouse/orders/${httpOrderId}/settle-refund`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${testAuthToken}`
+                },
+                body: JSON.stringify({
+                    settlementRef: 'WH_EVT_STRIPE_NOT_IMPL',
+                    provider: 'PAYMENT_GATEWAY_WEBHOOK',
+                    amount: 30.00,
+                    currency: 'EUR',
+                    beneficiary: 'procurement@editorial.com'
+                })
+            });
+            assert.strictEqual(webhookHttpRes.status, 422, 'Webhook settlement must return 422');
+            const webhookHttpBody = await webhookHttpRes.json();
+            assert.ok(webhookHttpBody.error.includes('WEBHOOK_INTEGRATION_NOT_IMPLEMENTED'), webhookHttpBody.error);
+            console.log('  ✓ TRUST-R4-01 HTTP Certified: Webhook settlement rejected with 422 WEBHOOK_INTEGRATION_NOT_IMPLEMENTED.');
+
+            // Register verified record in trustedFinancialAdapter with ALL mandatory bindings (TRUST-01, TRUST-R4-02)
             trustedFinancialAdapter.registerVerifiedRecord({
                 provider: 'STRIPE',
                 settlementRef: 'SETTLE_STRIPE_RE_99182910',
+                obligation_id: 'rev_http_001',
+                order_id: httpOrderId,
+                tenant_id: testTenantId,
+                beneficiary: 'procurement@editorial.com',
                 status: 'SUCCEEDED',
                 amount: 30.00,
                 currency: 'EUR',
@@ -1060,7 +1224,8 @@ async function runRealMysqlCertification() {
                     settlementRef: 'SETTLE_STRIPE_RE_99182910',
                     provider: 'STRIPE',
                     amount: 30.00,
-                    currency: 'EUR'
+                    currency: 'EUR',
+                    beneficiary: 'procurement@editorial.com'
                 })
             });
             assert.strictEqual(validSettleRes.status, 200, 'Accredited settlement must return 200');

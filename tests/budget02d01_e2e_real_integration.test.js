@@ -2061,15 +2061,172 @@ describe('BUDGET-02D-01 — End-to-End Real Integration & Lifecycle Certificatio
                     settlementRef: 'BNK_TX_2026_998877',
                     provider: 'BANK_TRANSFER_LEDGER',
                     amount: 30.00,
-                    currency: 'EUR'
+                    currency: 'EUR',
+                    beneficiary: 'customer_sc11@editorial.com'
                 })
             ).rejects.toThrow(/SETTLEMENT_INTEGRATION_PENDING/);
             trustedFinancialAdapter.setProviderOutage('BANK_TRANSFER_LEDGER', false);
 
-            // 11.7.5 Registro en el Adaptador Financiero Confiable y Liquidación Exitosa (TRUST-01)
+            // 11.7.4.e Registro de pruebas bloqueado en modo producción (TRUST-R4-01)
+            const origEnv = process.env.NODE_ENV;
+            try {
+                process.env.NODE_ENV = 'production';
+                expect(() => {
+                    trustedFinancialAdapter.registerVerifiedRecord({ settlementRef: 'PROD_LEAK_REF' });
+                }).toThrow(/MOCK_ADAPTER_DISABLED_IN_PRODUCTION/);
+                expect(() => {
+                    new trustedFinancialAdapter.TestSandboxFinancialSettlementAdapter();
+                }).toThrow(/MOCK_ADAPTER_DISABLED_IN_PRODUCTION/);
+            } finally {
+                process.env.NODE_ENV = origEnv;
+            }
+
+            // 11.7.4.f Adaptador productivo sin integración activa mantiene REFUND_PENDING (TRUST-R4-03)
+            const prodAdapter = new trustedFinancialAdapter.ProductionFinancialSettlementAdapter();
+            marketplaceDispatchGatingService.setFinancialAdapter(prodAdapter);
+            await expect(
+                marketplaceDispatchGatingService.settleRefund(orderRef, {
+                    userId: 'treasury_director_01',
+                    role: 'FINANCE_DIRECTOR',
+                    tenantId,
+                    settlementRef: 'BNK_TX_2026_PROD_PENDING',
+                    provider: 'STRIPE',
+                    amount: 30.00,
+                    currency: 'EUR',
+                    beneficiary: 'customer_sc11@editorial.com'
+                })
+            ).rejects.toThrow(/SETTLEMENT_INTEGRATION_PENDING/);
+            // Restore test sandbox adapter
+            marketplaceDispatchGatingService.setFinancialAdapter(trustedFinancialAdapter);
+
+            // 11.7.4.g Webhook no verificado / no implementado rechazado (TRUST-R4-01)
+            await expect(
+                marketplaceDispatchGatingService.settleRefund(orderRef, {
+                    userId: 'treasury_director_01',
+                    role: 'FINANCE_DIRECTOR',
+                    tenantId,
+                    settlementRef: 'WH_EVT_2026_UNVERIFIED',
+                    provider: 'PAYMENT_GATEWAY_WEBHOOK',
+                    amount: 30.00,
+                    currency: 'EUR',
+                    beneficiary: 'customer_sc11@editorial.com'
+                })
+            ).rejects.toThrow(/WEBHOOK_INTEGRATION_NOT_IMPLEMENTED/);
+
+            // 11.7.4.h Comprobante sin beneficiario rechazado (TRUST-R4-02)
+            trustedFinancialAdapter.registerVerifiedRecord({
+                provider: 'BANK_TRANSFER_LEDGER',
+                settlementRef: 'BNK_TX_NO_BEN',
+                obligation_id: 'obl_sc11_001',
+                order_id: orderId,
+                tenant_id: tenantId,
+                status: 'RECONCILED',
+                amount: 30.00,
+                currency: 'EUR',
+                voucher_id: 'VOUCHER-NO-BEN',
+                is_test_sandbox: true
+            });
+            await expect(
+                marketplaceDispatchGatingService.settleRefund(orderRef, {
+                    userId: 'treasury_director_01',
+                    role: 'FINANCE_DIRECTOR',
+                    tenantId,
+                    settlementRef: 'BNK_TX_NO_BEN',
+                    provider: 'BANK_TRANSFER_LEDGER',
+                    amount: 30.00,
+                    currency: 'EUR',
+                    beneficiary: 'customer_sc11@editorial.com'
+                })
+            ).rejects.toThrow(/MISSING_BENEFICIARY/);
+
+            // 11.7.4.i Comprobante de otro tenant rechazado (TRUST-R4-02)
+            trustedFinancialAdapter.registerVerifiedRecord({
+                provider: 'BANK_TRANSFER_LEDGER',
+                settlementRef: 'BNK_TX_DIFF_TENANT',
+                obligation_id: 'obl_sc11_001',
+                order_id: orderId,
+                tenant_id: 'DIFFERENT_TENANT_XYZ',
+                status: 'RECONCILED',
+                amount: 30.00,
+                currency: 'EUR',
+                beneficiary: 'customer_sc11@editorial.com',
+                voucher_id: 'VOUCHER-DIFF-TENANT',
+                is_test_sandbox: true
+            });
+            await expect(
+                marketplaceDispatchGatingService.settleRefund(orderRef, {
+                    userId: 'treasury_director_01',
+                    role: 'FINANCE_DIRECTOR',
+                    tenantId,
+                    settlementRef: 'BNK_TX_DIFF_TENANT',
+                    provider: 'BANK_TRANSFER_LEDGER',
+                    amount: 30.00,
+                    currency: 'EUR',
+                    beneficiary: 'customer_sc11@editorial.com'
+                })
+            ).rejects.toThrow(/TENANT_MISMATCH/);
+
+            // 11.7.4.j Comprobante de otra obligación rechazado (TRUST-R4-02)
+            trustedFinancialAdapter.registerVerifiedRecord({
+                provider: 'BANK_TRANSFER_LEDGER',
+                settlementRef: 'BNK_TX_DIFF_OBL',
+                obligation_id: 'obl_DIFFERENT_999',
+                order_id: orderId,
+                tenant_id: tenantId,
+                status: 'RECONCILED',
+                amount: 30.00,
+                currency: 'EUR',
+                beneficiary: 'customer_sc11@editorial.com',
+                voucher_id: 'VOUCHER-DIFF-OBL',
+                is_test_sandbox: true
+            });
+            await expect(
+                marketplaceDispatchGatingService.settleRefund(orderRef, {
+                    userId: 'treasury_director_01',
+                    role: 'FINANCE_DIRECTOR',
+                    tenantId,
+                    settlementRef: 'BNK_TX_DIFF_OBL',
+                    provider: 'BANK_TRANSFER_LEDGER',
+                    amount: 30.00,
+                    currency: 'EUR',
+                    beneficiary: 'customer_sc11@editorial.com'
+                })
+            ).rejects.toThrow(/OBLIGATION_MISMATCH/);
+
+            // 11.7.4.k Comprobante de otro pedido (order_id) rechazado (TRUST-R4-02)
+            trustedFinancialAdapter.registerVerifiedRecord({
+                provider: 'BANK_TRANSFER_LEDGER',
+                settlementRef: 'BNK_TX_DIFF_ORD',
+                obligation_id: 'obl_sc11_001',
+                order_id: 'ord_DIFFERENT_ORDER_999',
+                tenant_id: tenantId,
+                status: 'RECONCILED',
+                amount: 30.00,
+                currency: 'EUR',
+                beneficiary: 'customer_sc11@editorial.com',
+                voucher_id: 'VOUCHER-DIFF-ORD',
+                is_test_sandbox: true
+            });
+            await expect(
+                marketplaceDispatchGatingService.settleRefund(orderRef, {
+                    userId: 'treasury_director_01',
+                    role: 'FINANCE_DIRECTOR',
+                    tenantId,
+                    settlementRef: 'BNK_TX_DIFF_ORD',
+                    provider: 'BANK_TRANSFER_LEDGER',
+                    amount: 30.00,
+                    currency: 'EUR',
+                    beneficiary: 'customer_sc11@editorial.com'
+                })
+            ).rejects.toThrow(/ORDER_MISMATCH/);
+
+            // 11.7.5 Registro en el Adaptador Financiero Confiable con TODOS los vínculos válidos (TRUST-01, TRUST-R4-02)
             trustedFinancialAdapter.registerVerifiedRecord({
                 provider: 'BANK_TRANSFER_LEDGER',
                 settlementRef: 'BNK_TX_2026_998877',
+                obligation_id: 'obl_sc11_001',
+                order_id: orderId,
+                tenant_id: tenantId,
                 status: 'RECONCILED',
                 amount: 30.00,
                 currency: 'EUR',
@@ -2151,12 +2308,27 @@ describe('BUDGET-02D-01 — End-to-End Real Integration & Lifecycle Certificatio
                 })
             });
 
+            // Register a record for orderRef2 that attempts to reuse the already consumed voucher_id
+            trustedFinancialAdapter.registerVerifiedRecord({
+                provider: 'BANK_TRANSFER_LEDGER',
+                settlementRef: 'BNK_TX_2026_REUSE_ATTEMPT',
+                obligation_id: 'obl_sc11_002',
+                order_id: orderId2,
+                tenant_id: tenantId,
+                status: 'RECONCILED',
+                amount: 30.00,
+                currency: 'EUR',
+                beneficiary: 'customer_sc11@editorial.com',
+                voucher_id: 'VOUCHER-BANK-2026-998877',
+                is_test_sandbox: true
+            });
+
             await expect(
                 marketplaceDispatchGatingService.settleRefund(orderRef2, {
                     userId: 'treasury_director_01',
                     role: 'FINANCE_DIRECTOR',
                     tenantId,
-                    settlementRef: 'BNK_TX_2026_998877',
+                    settlementRef: 'BNK_TX_2026_REUSE_ATTEMPT',
                     provider: 'BANK_TRANSFER_LEDGER',
                     amount: 30.00,
                     currency: 'EUR',

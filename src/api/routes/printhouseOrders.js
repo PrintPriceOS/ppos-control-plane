@@ -243,6 +243,8 @@ async function handleSettleRefund(req, res) {
         logger.error({ event: 'SETTLE_REFUND_FAILED', orderRef, error: err.message });
         const statusCode = err.message.includes('UNAUTHORIZED') ? 401 :
                            err.message.includes('FORBIDDEN') ? 403 :
+                           err.message.includes('MOCK_ADAPTER_DISABLED_IN_PRODUCTION') ? 403 :
+                           err.message.includes('TEST_ADAPTER_FORBIDDEN_IN_PRODUCTION') ? 403 :
                            err.message.includes('NOT_FOUND') ? 404 :
                            err.message.includes('NO_REFUND_OBLIGATION') ? 404 :
                            err.message.includes('DUPLICATE_SETTLEMENT_REFERENCE') ? 409 :
@@ -252,6 +254,7 @@ async function handleSettleRefund(req, res) {
                            err.message.includes('DATABASE_CONNECTION_ERROR') ? 503 :
                            err.message.includes('PROVIDER_UNREACHABLE') ? 503 :
                            err.message.includes('SETTLEMENT_INTEGRATION_PENDING') ? 422 :
+                           err.message.includes('WEBHOOK_INTEGRATION_NOT_IMPLEMENTED') ? 422 :
                            err.message.includes('UNTRUSTED_CALLER_SIGNATURE_ASSERTION') ? 422 :
                            err.message.includes('WEBHOOK_SIGNATURE_INVALID') ? 422 :
                            err.message.includes('UNVERIFIED_SIGNATURE') ? 422 :
@@ -260,12 +263,20 @@ async function handleSettleRefund(req, res) {
                            err.message.includes('INVALID_SETTLEMENT_REFERENCE') ? 422 :
                            err.message.includes('INVALID_SETTLEMENT_EVIDENCE') ? 422 :
                            err.message.includes('UNVERIFIED_SETTLEMENT_STATUS') ? 422 :
+                           err.message.includes('MISSING_OBLIGATION') ? 422 :
                            err.message.includes('OBLIGATION_MISMATCH') ? 422 :
+                           err.message.includes('MISSING_ORDER') ? 422 :
+                           err.message.includes('ORDER_MISMATCH') ? 422 :
+                           err.message.includes('MISSING_TENANT') ? 422 :
+                           err.message.includes('TENANT_MISMATCH') ? 422 :
+                           err.message.includes('MISSING_VOUCHER_ID') ? 422 :
                            err.message.includes('AMOUNT_MISMATCH') ? 422 :
                            err.message.includes('MISSING_AMOUNT') ? 422 :
                            err.message.includes('MISSING_CURRENCY') ? 422 :
                            err.message.includes('CURRENCY_MISMATCH') ? 422 :
+                           err.message.includes('MISSING_BENEFICIARY') ? 422 :
                            err.message.includes('BENEFICIARY_MISMATCH') ? 422 :
+                           err.message.includes('PROVIDER_MISMATCH') ? 422 :
                            err.message.includes('INVALID_PROVIDER') ? 422 : 400;
         res.status(statusCode).json({ ok: false, error: err.message });
     }
