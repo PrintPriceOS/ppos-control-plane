@@ -103,7 +103,8 @@ async function runRealMysqlCertification() {
                 currency VARCHAR(16) NOT NULL DEFAULT 'EUR',
                 final_price DECIMAL(10, 4) NULL,
                 specs JSON NULL,
-                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
         `);
 
@@ -123,6 +124,7 @@ async function runRealMysqlCertification() {
                 product_type VARCHAR(64) NULL,
                 is_editorial_book TINYINT(1) NOT NULL DEFAULT 1,
                 created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                 INDEX idx_mo_order_id (order_id),
                 INDEX idx_mo_tenant (tenant_id)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

@@ -260,19 +260,35 @@ class MarketplaceDispatchGatingService {
 
         // 6. Update Order & Effective Specs Status
         if (orderModel === 'orders') {
-            await db.query(`
-                UPDATE orders 
-                SET status = 'IN_PRODUCTION',
-                    updated_at = CURRENT_TIMESTAMP
-                WHERE id = ? OR order_ref = ?
-            `, [order.id, orderRef]);
+            try {
+                await db.query(`
+                    UPDATE orders 
+                    SET status = 'IN_PRODUCTION',
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE id = ?
+                `, [order.id]);
+            } catch (_) {
+                await db.query(`
+                    UPDATE orders 
+                    SET status = 'IN_PRODUCTION'
+                    WHERE id = ?
+                `, [order.id]);
+            }
         } else {
-            await db.query(`
-                UPDATE marketplace_orders 
-                SET status = 'IN_PRODUCTION',
-                    updated_at = CURRENT_TIMESTAMP
-                WHERE id = ? OR order_id = ?
-            `, [order.id, orderRef]);
+            try {
+                await db.query(`
+                    UPDATE marketplace_orders 
+                    SET status = 'IN_PRODUCTION',
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE id = ? OR order_id = ?
+                `, [order.id, orderRef]);
+            } catch (_) {
+                await db.query(`
+                    UPDATE marketplace_orders 
+                    SET status = 'IN_PRODUCTION'
+                    WHERE id = ? OR order_id = ?
+                `, [order.id, orderRef]);
+            }
         }
 
         if (effectiveSpecRecord) {
