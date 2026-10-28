@@ -768,6 +768,18 @@ async function runRealMysqlCertification() {
             assert.strictEqual(allowedHttpBody.status, 'IN_PRODUCTION');
             console.log('  ✓ SEC-D04 HTTP Certified: Real HTTP dispatch succeeded with 200 IN_PRODUCTION upon authorization.');
 
+            // 8.5.b Real HTTP unauthorized operator attempts refund settlement -> HTTP 403
+            const unauthSettleRes = await fetch(`${httpBaseUrl}/api/printhouse/orders/${httpOrderId}/settle-refund`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${operatorToken}`
+                },
+                body: JSON.stringify({ settlementRef: 'SETTLE_STRIPE_RE_99182910', provider: 'STRIPE' })
+            });
+            assert.strictEqual(unauthSettleRes.status, 403, 'Unauthorized operator must be rejected with 403 on settlement');
+            console.log('  ✓ SEC-D02/SEC-D04 HTTP Certified: Real HTTP unauthorized operator settlement rejected with 403 FORBIDDEN.');
+
             // 8.6 Real HTTP settlement with invalid/local pseudo-reference -> HTTP 422
             const invalidSettleRes = await fetch(`${httpBaseUrl}/api/printhouse/orders/${httpOrderId}/settle-refund`, {
                 method: 'POST',

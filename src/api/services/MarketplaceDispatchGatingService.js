@@ -540,7 +540,7 @@ class MarketplaceDispatchGatingService {
         const role = String(settlementContext.role || '').toUpperCase();
         const AUTHORIZED_FINANCIAL_ROLES = [
             'SUPER_ADMIN', 'OPS_ADMIN', 'SYSTEM_ADMIN', 'TENANT_ADMIN',
-            'FINANCE_DIRECTOR', 'FINANCE_MANAGER', 'PAYMENT_GATEWAY_WEBHOOK'
+            'PRINTHOUSE_ADMIN', 'FINANCE_DIRECTOR', 'FINANCE_MANAGER', 'PAYMENT_GATEWAY_WEBHOOK'
         ];
         if (!AUTHORIZED_FINANCIAL_ROLES.includes(role)) {
             throw new Error(`FORBIDDEN: User role '${role || 'NONE'}' does not have financial refund settlement permission.`);
@@ -595,8 +595,15 @@ class MarketplaceDispatchGatingService {
         }
 
         const isSuperAdmin = role === 'SUPER_ADMIN' || role === 'SYSTEM_ADMIN' || settlementContext.isSuperAdmin;
-        if (!isSuperAdmin && settlementContext.tenantId && order.tenant_id && settlementContext.tenantId !== order.tenant_id) {
-            throw new Error('FORBIDDEN: Tenant mismatch. Cannot settle refund for a different tenant.');
+        if (!isSuperAdmin) {
+            if (settlementContext.tenantId && order.tenant_id && settlementContext.tenantId !== order.tenant_id) {
+                throw new Error('FORBIDDEN: Tenant mismatch. Cannot settle refund for a different tenant.');
+            }
+
+            const assignedPrinter = order.offer_print_house || order.assigned_printhouse_id || order.printhouse_id;
+            if (settlementContext.printhouseId && assignedPrinter && settlementContext.printhouseId !== assignedPrinter) {
+                throw new Error('FORBIDDEN: Printhouse mismatch. Cannot settle refund for a different printhouse.');
+            }
         }
 
         // 5. Transactional Lock (FOR UPDATE) & State Mutation (SEC-D02)
