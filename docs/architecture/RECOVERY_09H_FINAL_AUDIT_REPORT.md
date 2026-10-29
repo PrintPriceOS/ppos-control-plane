@@ -58,8 +58,21 @@ During `PAPER-MATERIALS-RECOVERY-09H`, all 6 audit dimensions requested before a
 - **Transactional Row Locking & Atomic CAS:** `reviewEvidence` runs inside `_withTransaction`, acquires `SELECT ... FOR UPDATE` on the target row, and executes `UPDATE paper_variant_caliper_evidence SET ... WHERE evidence_id = ? AND tenant_id = ? AND review_status IN ('DRAFT', 'PENDING_TECH_REVIEW')`. If `affectedRows === 0`, the transaction aborts with HTTP `409` (`EVIDENCE_ALREADY_REVIEWED`), preventing duplicate approvals or duplicate audit log entries under concurrent requests.
 - **Non-Mutation & Manufacturing Lock:** Approving documentary or physical micrometer evidence sets `applied_to_catalog_variant = FALSE`, returns `productiveCaliperModified: false`, leaves `paper_variants.caliper_um` untouched, and keeps `canReleaseToManufacturing = false`.
 
+### 2.4 Live Read-Only Production Preflight & Operational Security (`RECOVERY-09H-FINAL`)
+- **Live Read-Only Preflight against `MySQL Control` (`2026-10-29T11:59:09.799Z`):**
+  - Confirmed `1,524` total variants, `1,272` with caliper (`caliper_um > 0`), and `252` without caliper (`caliper_um IS NULL`).
+  - Confirmed all `9` historical conflicts are within the `1,272` variants with caliper (`0` overlap with the `252` missing calipers):
+    - `5` `Amber Graphic 100 gsm` variants (`var_2b0314c68f5a97c7`, `var_4178aecbfa53dcf8`, `var_5f5cae75e6f45671`, `var_7b7e3a2a2a4a0313`, `var_c699e6a51cd6b41f`) preserve `caliper_um = 122.00 µm` (vs ODS `119.00 µm`).
+    - `4` `Galerie Art Matt 250 gsm` variants (`var_06e1d1681e4f0989`, `var_9dabfd7ac5eff6ca`, `var_ae7dbf443ceab19a`, `var_e2f2e68304e9d4a1`) preserve `caliper_um = 225.00 µm` (vs ODS `257.00 µm`).
+    - All `9` maintain `caliper_source = 'LIVONIA_REFERENCE_IMPORT'`, `caliper_confidence_status = 'REFERENCE_IMPORTED'`, and their conflict annotations in `paper_caliper_reconciliation_candidates.notes` (`[ODS Conflict: ...]`).
+  - Confirmed `migration174TablesPresentCount = 0` in `MySQL Control` (Migration 174 not yet applied in production).
+- **Operational Security & Private PDF Directory Access:**
+  - Replaced all CLI `-u` / `-p` MySQL flags in [`docs/architecture/RECOVERY_09H_DEPLOYMENT_RUNBOOK.md`](file:///c:/Users/KIKE/Downloads/ppos-control-plane-phase-10-intelligence-layer/docs/architecture/RECOVERY_09H_DEPLOYMENT_RUNBOOK.md) with internal `mysqlClient` pool queries or an ephemeral `0600` `--defaults-extra-file` (`trap 'rm -f "$MYSQL_CNF"' EXIT`), eliminating credential exposure in process arguments, shell logs, and artifacts.
+  - Confirmed the effective PM2 user of `ppos-control-plane` (`root`, `uid=0`, `gid=0`) has full `R_OK | W_OK | X_OK` access to `/var/lib/ppos/private_evidence_store` and `/opt/printprice-os/ppos-control-plane/var/private_evidence_store` with `0700` permissions.
+
 ---
 
 ## 3. Verdict
 
-**`RECOVERY_09H_READY_FOR_DEPLOYMENT_APPROVAL`**
+**`RECOVERY_09H_FINAL_PREFLIGHT_PASS`** (`/ RECOVERY_09H_READY_FOR_DEPLOYMENT_APPROVAL`)
+

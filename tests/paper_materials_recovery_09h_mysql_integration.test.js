@@ -523,4 +523,26 @@ describe('PAPER-MATERIALS-RECOVERY-09H — Referential Integrity, Deep PDF Secur
             expect(res.skipped).toBe(true);
         }
     });
+
+    it('6. Deployment Runbook Preflight & Operational Security: verifies the 9 historical conflicts (5 Amber Graphic 122um, 4 Galerie Art Matt 225um, LIVONIA_REFERENCE_IMPORT, REFERENCE_IMPORTED, 0 in missing 252) and forbids CLI -p credentials', () => {
+        const runbookPath = path.join(process.cwd(), 'docs/architecture/RECOVERY_09H_DEPLOYMENT_RUNBOOK.md');
+        const runbook = fs.readFileSync(runbookPath, 'utf8');
+
+        // Must never claim the 9 historical conflicts have caliper_um IS NULL
+        expect(runbook).not.toMatch(/protected_conflicts_null/i);
+        expect(runbook).not.toMatch(/Historical conflicts preserved \(`caliper_um IS NULL`\)/i);
+
+        // Must verify the 5 Amber Graphic 122.00 um and 4 Galerie Art Matt 225.00 um variants
+        expect(runbook).toMatch(/amber_graphic_122um_count = 5/);
+        expect(runbook).toMatch(/galerie_art_matt_225um_count = 4/);
+        expect(runbook).toMatch(/historical_9_with_caliper = 9/);
+        expect(runbook).toMatch(/historical_9_in_missing_252 = 0/);
+        expect(runbook).toMatch(/LIVONIA_REFERENCE_IMPORT/);
+        expect(runbook).toMatch(/REFERENCE_IMPORTED/);
+        expect(runbook).toMatch(/\[ODS Conflict:/);
+
+        // Operational security: must use --defaults-extra-file and never expose -p"$DB_PASSWORD" in mysql/mysqldump commands
+        expect(runbook).toMatch(/--defaults-extra-file="\$MYSQL_CNF"/);
+        expect(runbook).not.toMatch(/-u\s+"\$DB_USER"\s+-p"\$DB_PASSWORD"/);
+    });
 });
