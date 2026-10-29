@@ -80,8 +80,11 @@ const HISTORICAL_9_CONFLICT_VARIANT_IDS = Object.freeze([
 ]);
 
 const VALID_DB_CALIPER_SOURCES = Object.freeze([
+    'MEASURED_MICROMETER',
+    'MANUFACTURER_DATASHEET',
     'LIVONIA_REFERENCE_IMPORT',
     'SUPPLIER_IMPORT',
+    'BULK_DERIVED',
     'DATASHEET_VERIFIED',
     'MANUAL_ADMIN',
     'NONE'
@@ -90,6 +93,7 @@ const VALID_DB_CALIPER_SOURCES = Object.freeze([
 const VALID_DB_CONFIDENCE_STATUSES = Object.freeze([
     'VERIFIED',
     'REFERENCE_IMPORTED',
+    'PROVISIONAL_ESTIMATED',
     'ESTIMATED',
     'CONFLICT',
     'MISSING'
@@ -97,7 +101,7 @@ const VALID_DB_CONFIDENCE_STATUSES = Object.freeze([
 
 const AUDIT_CATEGORY_TO_DB_ENUM_MAP = Object.freeze({
     MANUFACTURER_DATASHEET_VERIFIED: {
-        allowed_caliper_sources: ['DATASHEET_VERIFIED'],
+        allowed_caliper_sources: ['MANUFACTURER_DATASHEET', 'DATASHEET_VERIFIED'],
         allowed_confidence_statuses: ['REFERENCE_IMPORTED'],
         writable: true
     },

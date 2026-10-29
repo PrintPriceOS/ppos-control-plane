@@ -18,7 +18,7 @@ describe('PAPER-MATERIALS-RECOVERY-07V — Final Evidence Verification & Dry-Run
     const repoRoot = path.resolve(__dirname, '..');
     const plan = buildRecovery07Plan({ repoRoot });
 
-    it('verifies all mandatory RECOVERY_07 and RECOVERY_07V deliverables exist in docs/architecture/', () => {
+    it('verifies all mandatory RECOVERY_07, RECOVERY_07V, and RECOVERY_07W deliverables exist in docs/architecture/', () => {
         const files = [
             'docs/architecture/RECOVERY_07_MISSING_CALIPER_INVENTORY.csv',
             'docs/architecture/RECOVERY_07_MANUFACTURER_EVIDENCE.csv',
@@ -28,7 +28,14 @@ describe('PAPER-MATERIALS-RECOVERY-07V — Final Evidence Verification & Dry-Run
             'docs/architecture/RECOVERY_07V_VERIFIED_FOR_WRITE.csv',
             'docs/architecture/RECOVERY_07V_DOCUMENTATION_REQUIRED.csv',
             'docs/architecture/RECOVERY_07V_EVIDENCE_AUDIT.md',
-            'docs/architecture/RECOVERY_07V_FINAL_ASSESSMENT.md'
+            'docs/architecture/RECOVERY_07V_FINAL_ASSESSMENT.md',
+            'docs/architecture/RECOVERY_07W_PREFLIGHT.md',
+            'docs/architecture/RECOVERY_07W_SOURCE_VALIDATION.csv',
+            'docs/architecture/RECOVERY_07W_BACKUP_MANIFEST.md',
+            'docs/architecture/RECOVERY_07W_EXECUTION_LOG.md',
+            'docs/architecture/RECOVERY_07W_BEFORE_AFTER.csv',
+            'docs/architecture/RECOVERY_07W_SPINE_BPE_E2E.md',
+            'docs/architecture/RECOVERY_07W_FINAL_REPORT.md'
         ];
         for (const rel of files) {
             const fullPath = path.join(repoRoot, rel);
@@ -190,5 +197,19 @@ describe('PAPER-MATERIALS-RECOVERY-07V — Final Evidence Verification & Dry-Run
         expect(rollbackSql).toContain('START TRANSACTION;');
         expect(rollbackSql).toContain('COMMIT;');
         expect(rollbackSql.match(/UPDATE paper_variants SET/g)?.length).toBe(38);
+    });
+
+    it('verifies RECOVERY-07W Phase 1 source validation (36 EXECUTE_WRITE, 2 HOLD_DO_NOT_WRITE) and 36-row before/after audit log', () => {
+        const srcValCsv = fs.readFileSync(path.join(repoRoot, 'docs/architecture/RECOVERY_07W_SOURCE_VALIDATION.csv'), 'utf8').trim().split(/\r?\n/);
+        expect(srcValCsv.length).toBe(39); // 1 header + 38 rows
+        const execLines = srcValCsv.slice(1).filter(l => l.includes(',EXECUTE_WRITE,'));
+        const holdLines = srcValCsv.slice(1).filter(l => l.includes(',HOLD_DO_NOT_WRITE,'));
+        expect(execLines.length).toBe(36);
+        expect(holdLines.length).toBe(2);
+        expect(holdLines.some(l => l.startsWith('var_dbd5357075534e3b,'))).toBe(true);
+        expect(holdLines.some(l => l.startsWith('var_737c9a59216f4bf2,'))).toBe(true);
+
+        const baCsv = fs.readFileSync(path.join(repoRoot, 'docs/architecture/RECOVERY_07W_BEFORE_AFTER.csv'), 'utf8').trim().split(/\r?\n/);
+        expect(baCsv.length).toBe(37); // 1 header + 36 updated rows
     });
 });
