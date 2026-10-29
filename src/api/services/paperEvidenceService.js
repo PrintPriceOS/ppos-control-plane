@@ -44,6 +44,24 @@ const PENDING_CLASSIFICATIONS_337_CSV_PATH = path.resolve(
 
 const MAX_PDF_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB
 
+const DEFAULT_PRIVATE_EVIDENCE_STORE_DIR = path.resolve(
+    __dirname,
+    '../../../var/private_evidence_store'
+);
+
+function resolvePrivateEvidenceStoreDir(customRoot = null) {
+    const rawRoot = customRoot || process.env.PAPER_EVIDENCE_STORAGE_DIR || DEFAULT_PRIVATE_EVIDENCE_STORE_DIR;
+    return path.resolve(String(rawRoot));
+}
+
+function sanitizePathSegment(value, fallback = 'default') {
+    const cleaned = String(value || '')
+        .trim()
+        .replace(/[^a-zA-Z0-9_-]/g, '_')
+        .slice(0, 64);
+    return cleaned || fallback;
+}
+
 class PaperEvidenceError extends Error {
     constructor(message, code, statusCode = 400, details = null) {
         super(message);
@@ -59,6 +77,14 @@ function unwrapRows(result) {
     if (Array.isArray(result) && Array.isArray(result[0])) return result[0];
     if (Array.isArray(result)) return result;
     return [];
+}
+
+function unwrapAffectResult(result) {
+    if (!result) return { affectedRows: 0 };
+    if (Array.isArray(result) && result[0] && typeof result[0] === 'object' && !Array.isArray(result[0])) {
+        return result[0];
+    }
+    return result;
 }
 
 let cachedMissing252 = null;
@@ -146,15 +172,22 @@ function detectSourceContradictions({
 }
 
 /**
- * Validates an uploaded PDF buffer or base64 payload and computes its SHA-256 hash.
- * Accepts either ({ buffer, fileBase64, fileName, mimeType }) or positional (buffer, fileName, mimeType).
+ * Validates an uploaded PDF buffer or base64 payload, performs deep structural & active-content
+ * security inspection (beyond magic header bytes), computes its deterministic SHA-256 hash,
+ * and optionally persists it atomically to private tenant-scoped storage.
+ *
+ * Accepts either ({ buffer, fileBase64, fileName, mimeType, tenantId, persistToStore, storageRoot })
+ * or positional (buffer, fileName, mimeType).
  */
 function validateAndHashPdfDocument(arg1 = {}, arg2 = 'datasheet.pdf', arg3 = 'application/pdf') {
     const isOptionsObject = arg1 && typeof arg1 === 'object' && !Buffer.isBuffer(arg1);
     let rawBuffer = isOptionsObject ? arg1.buffer : arg1;
     const fileBase64 = isOptionsObject ? arg1.fileBase64 : null;
-    const fileName = isOptionsObject ? (arg1.fileName || 'datasheet.pdf') : (arg2 || 'datasheet.pdf');
-    const mimeType = isOptionsObject ? (arg1.mimeType || 'application/pdf') : (arg3 || 'application/pdf');
+    const rawFileName = isOptionsObject ? (arg1.fileName || 'datasheet.pdf') : (arg2 || 'datasheet.pdf');
+    const rawMimeType = isOptionsObject ? (arg1.mimeType || 'application/pdf') : (arg3 || 'application/pdf');
+    const tenantId = isOptionsObject ? (arg1.tenantId || null) : null;
+    const persistToStore = isOptionsObject && arg1.persistToStore !== undefined ? Boolean(arg1.persistToStore) : false;
+    const storageRoot = isOptionsObject ? (arg1.storageRoot || null) : null;
 
     if (!rawBuffer && fileBase64) {
         const cleaned = String(fileBase64).replace(/^data:application\/pdf;base64,/i, '').trim();
@@ -170,28 +203,207 @@ function validateAndHashPdfDocument(arg1 = {}, arg2 = 'datasheet.pdf', arg3 = 'a
             413
         );
     }
-    const headerAscii = rawBuffer.subarray(0, 5).toString('ascii');
-    if (headerAscii !== '%PDF-') {
+
+    // 1. Strict MIME type check
+    const normalizedMime = String(rawMimeType || 'application/pdf').split(';')[0].trim().toLowerCase();
+    if (normalizedMime !== 'application/pdf' && normalizedMime !== 'application/x-pdf') {
         throw new PaperEvidenceError(
-            'Uploaded file is not a valid PDF document (missing %PDF- signature).',
+            `Unsupported document MIME type '${normalizedMime}'. Only 'application/pdf' is accepted.`,
+            'INVALID_PDF_MIME_TYPE',
+            415
+        );
+    }
+
+    // 2. Strict PDF version header at byte offset 0 (%PDF-1.0 .. %PDF-2.0) — prevents polyglot preambles
+    const headerAscii = rawBuffer.subarray(0, 10).toString('ascii');
+    if (!/^%PDF-(1\.[0-7]|2\.0)/.test(headerAscii)) {
+        throw new PaperEvidenceError(
+            'Uploaded file is not a valid PDF document (missing %PDF- signature / %PDF-1.x header at offset 0).',
             'INVALID_PDF_MAGIC_SIGNATURE',
             422
         );
     }
+
+    // 3. Structural & trailer verification (%PDF-... indirect objects ... %%EOF)
+    const contentLatin1 = rawBuffer.toString('latin1');
+    const tailLatin1 = rawBuffer.subarray(Math.max(0, rawBuffer.length - 2048)).toString('latin1');
+    if (!tailLatin1.includes('%%EOF')) {
+        throw new PaperEvidenceError(
+            'Uploaded PDF document is truncated or malformed (missing %%EOF trailer marker).',
+            'INVALID_PDF_STRUCTURE_MISSING_EOF',
+            422
+        );
+    }
+
+    const hasIndirectObject = /\b\d+\s+\d+\s+obj\b/.test(contentLatin1) && /\bendobj\b/.test(contentLatin1);
+    const hasCatalogOrPage =
+        /\/Type\s*\/Catalog\b/.test(contentLatin1) ||
+        /\/Type\s*\/Pages?\b/.test(contentLatin1) ||
+        /\bxref\b/.test(contentLatin1);
+    if (!hasIndirectObject && !hasCatalogOrPage) {
+        throw new PaperEvidenceError(
+            'Uploaded file failed deep PDF structural inspection (missing indirect objects or document catalog). Header-only spoofing is rejected.',
+            'INVALID_PDF_INTERNAL_STRUCTURE',
+            422
+        );
+    }
+
+    // 4. Active / executable content & polyglot rejection
+    const forbiddenTokens = [
+        { pattern: /\/JavaScript\b/i, name: '/JavaScript' },
+        { pattern: /\/JS\b/i, name: '/JS' },
+        { pattern: /\/Launch\b/i, name: '/Launch' },
+        { pattern: /\/EmbeddedFiles\b/i, name: '/EmbeddedFiles' },
+        { pattern: /\/RichMedia\b/i, name: '/RichMedia' },
+        { pattern: /\/SubmitForm\b/i, name: '/SubmitForm' },
+        { pattern: /\/ImportData\b/i, name: '/ImportData' },
+        { pattern: /<script\b/i, name: '<script>' }
+    ];
+    for (const rule of forbiddenTokens) {
+        if (rule.pattern.test(contentLatin1)) {
+            throw new PaperEvidenceError(
+                `Security policy violation: PDF contains forbidden active or executable construct (${rule.name}).`,
+                'PDF_ACTIVE_CONTENT_FORBIDDEN',
+                422
+            );
+        }
+    }
+
+    // 5. Path-traversal-safe filename sanitization
+    const baseName = path.basename(String(rawFileName || 'datasheet.pdf')).replace(/\0/g, '');
+    let safeName = baseName.replace(/[^a-zA-Z0-9._-]/g, '_').replace(/\.{2,}/g, '_').slice(0, 180);
+    if (!safeName.toLowerCase().endsWith('.pdf')) {
+        safeName = `${safeName}.pdf`;
+    }
+
     const sha256 = crypto.createHash('sha256').update(rawBuffer).digest('hex');
-    const safeName = String(fileName || 'datasheet.pdf').replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 180);
+
+    let persistedFilePath = null;
+    let newlyCreatedOnDisk = false;
+    if (persistToStore) {
+        const persisted = persistPdfBufferToPrivateStore({
+            buffer: rawBuffer,
+            sha256,
+            tenantId: tenantId || 'global',
+            storageRoot
+        });
+        persistedFilePath = persisted.filePath;
+        newlyCreatedOnDisk = persisted.newlyCreated;
+    }
+
+    const safeTenantSegment = sanitizePathSegment(tenantId || 'global', 'global');
     return {
         fileName: safeName,
-        mimeType: mimeType || 'application/pdf',
+        mimeType: 'application/pdf',
         sizeBytes: rawBuffer.length,
         sha256,
-        storageUri: `evidence-store://sha256/${sha256}/${safeName}`
+        storageUri: `private-evidence-store://${safeTenantSegment}/${sha256}/${safeName}`,
+        persistedFilePath,
+        newlyCreatedOnDisk
     };
+}
+
+/**
+ * Persists a validated PDF buffer into the private, non-public evidence store on disk.
+ * Uses content-addressable naming (`<storageRoot>/<safeTenantId>/<sha256>.pdf`) so:
+ * - Path traversal is impossible (both segments strictly sanitized + path.resolve prefix check).
+ * - Existing verified files cannot be overwritten with different content (immutable content-addressed store).
+ * - File permissions are restricted to owner-only (`0o600`).
+ */
+function persistPdfBufferToPrivateStore({ buffer, sha256, tenantId = 'global', storageRoot = null }) {
+    if (!Buffer.isBuffer(buffer) || !/^[a-f0-9]{64}$/i.test(String(sha256 || ''))) {
+        throw new PaperEvidenceError('Invalid buffer or SHA-256 hash for private evidence storage.', 'INVALID_STORAGE_INPUT', 400);
+    }
+    const normalizedHash = String(sha256).toLowerCase();
+    const actualHash = crypto.createHash('sha256').update(buffer).digest('hex');
+    if (actualHash !== normalizedHash) {
+        throw new PaperEvidenceError(
+            'SHA-256 integrity mismatch before persisting PDF to private store.',
+            'DOCUMENT_HASH_MISMATCH',
+            422
+        );
+    }
+
+    const rootDir = resolvePrivateEvidenceStoreDir(storageRoot);
+    const safeTenantDir = sanitizePathSegment(tenantId, 'global');
+    const tenantDir = path.resolve(rootDir, safeTenantDir);
+
+    if (!tenantDir.startsWith(rootDir + path.sep)) {
+        throw new PaperEvidenceError('Path traversal detected in tenant storage directory resolution.', 'PATH_TRAVERSAL_BLOCKED', 403);
+    }
+
+    fs.mkdirSync(tenantDir, { recursive: true, mode: 0o700 });
+
+    const finalPath = path.resolve(tenantDir, `${normalizedHash}.pdf`);
+    if (!finalPath.startsWith(tenantDir + path.sep)) {
+        throw new PaperEvidenceError('Path traversal detected in evidence file path resolution.', 'PATH_TRAVERSAL_BLOCKED', 403);
+    }
+
+    if (fs.existsSync(finalPath)) {
+        // Verify existing file on disk has not been tampered with
+        const existingBytes = fs.readFileSync(finalPath);
+        const existingHash = crypto.createHash('sha256').update(existingBytes).digest('hex');
+        if (existingHash !== normalizedHash) {
+            throw new PaperEvidenceError(
+                'Integrity violation: existing stored PDF hash does not match expected content-addressable SHA-256.',
+                'STORED_DOCUMENT_INTEGRITY_VIOLATION',
+                409
+            );
+        }
+        return { filePath: finalPath, newlyCreated: false };
+    }
+
+    const tempPath = path.resolve(tenantDir, `.tmp_${normalizedHash}_${process.pid}_${ crypto.randomBytes(4).toString('hex') }.pdf`);
+    fs.writeFileSync(tempPath, buffer, { mode: 0o600 });
+    fs.renameSync(tempPath, finalPath);
+    return { filePath: finalPath, newlyCreated: true };
+}
+
+/**
+ * Safely deletes an unreferenced / orphan evidence file if a database transaction fails after writing to disk.
+ */
+function cleanupOrphanEvidenceFile(filePath, storageRoot = null) {
+    if (!filePath) return false;
+    try {
+        const rootDir = resolvePrivateEvidenceStoreDir(storageRoot);
+        const resolved = path.resolve(String(filePath));
+        if (!resolved.startsWith(rootDir + path.sep)) {
+            return false;
+        }
+        if (fs.existsSync(resolved)) {
+            fs.unlinkSync(resolved);
+            return true;
+        }
+    } catch (_) {}
+    return false;
 }
 
 class PaperEvidenceService {
     constructor(options = {}) {
         this.db = options.db || options.dbClient || db;
+        this.storageRoot = options.storageRoot || null;
+    }
+
+    async _withTransaction(fn) {
+        if (this.db && typeof this.db.getConnection === 'function') {
+            const conn = await this.db.getConnection();
+            try {
+                await conn.beginTransaction();
+                const res = await fn(conn, true);
+                await conn.commit();
+                return res;
+            } catch (err) {
+                try {
+                    await conn.rollback();
+                } catch (_) {}
+                throw err;
+            } finally {
+                try {
+                    conn.release();
+                } catch (_) {}
+            }
+        }
+        return fn(this.db, false);
     }
 
     /**
@@ -553,7 +765,10 @@ class PaperEvidenceService {
                 buffer: payload.fileBuffer,
                 fileBase64: payload.fileBase64,
                 fileName: payload.fileName || 'datasheet.pdf',
-                mimeType: payload.mimeType || 'application/pdf'
+                mimeType: payload.mimeType || 'application/pdf',
+                tenantId,
+                persistToStore: true,
+                storageRoot: this.storageRoot
             });
         } else if (payload.documentSha256 && /^[a-f0-9]{64}$/i.test(String(payload.documentSha256))) {
             pdfInfo = {
@@ -561,7 +776,9 @@ class PaperEvidenceService {
                 mimeType: 'application/pdf',
                 sizeBytes: Number(payload.documentSizeBytes || 0),
                 sha256: String(payload.documentSha256).toLowerCase(),
-                storageUri: payload.documentStorageUri || `evidence-store://sha256/${String(payload.documentSha256).toLowerCase()}`
+                storageUri: payload.documentStorageUri || `evidence-store://sha256/${String(payload.documentSha256).toLowerCase()}`,
+                persistedFilePath: null,
+                newlyCreatedOnDisk: false
             };
         } else if (payload.documentUrl) {
             const urlHash = crypto.createHash('sha256').update(String(payload.documentUrl)).digest('hex');
@@ -570,7 +787,9 @@ class PaperEvidenceService {
                 mimeType: 'application/pdf',
                 sizeBytes: 0,
                 sha256: urlHash,
-                storageUri: String(payload.documentUrl)
+                storageUri: String(payload.documentUrl),
+                persistedFilePath: null,
+                newlyCreatedOnDisk: false
             };
         } else {
             throw new PaperEvidenceError(
@@ -615,94 +834,103 @@ class PaperEvidenceService {
             : 'MANUFACTURER_DATASHEET';
         const toleranceUm = payload.nominalToleranceUm ?? payload.caliperToleranceUm ?? null;
 
-        await this.db.query(
-            `INSERT INTO paper_variant_caliper_evidence (
-                evidence_id, tenant_id, supplier_id, variant_id, product_id,
-                accreditation_track, evidence_type,
-                document_title, document_file_name, document_mime_type, document_size_bytes,
-                document_storage_uri, document_sha256,
-                manufacturer_name, supplier_channel, supplier_sku,
-                datasheet_version, datasheet_published_date, measurement_standard,
-                shade_embossing_invariance_confirmed,
-                nominal_datasheet_caliper_um, nominal_unit, nominal_tolerance_um, nominal_tolerance_pct, nominal_bulk_cm3_g,
-                proposed_effective_caliper_um, proposed_caliper_source, proposed_confidence_status,
-                has_source_contradiction, contradiction_details_json,
-                review_status, applied_to_catalog_variant, idempotency_key,
-                submitted_by, submitted_by_role, technical_notes
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'um', ?, ?, ?, ?, ?, 'REFERENCE_IMPORTED', ?, ?, ?, FALSE, ?, ?, ?, ?)`,
-            [
-                evidenceId,
-                tenantId,
-                supplierId,
-                variantId,
-                variant.product_id,
-                accreditationTrack,
-                evidenceType,
-                payload.documentTitle || `${manufacturerName} Official TDS`,
-                pdfInfo.fileName,
-                pdfInfo.mimeType,
-                pdfInfo.sizeBytes,
-                pdfInfo.storageUri,
-                pdfInfo.sha256,
-                manufacturerName,
-                payload.supplierChannel || null,
-                payload.supplierSku || null,
-                datasheetVersion,
-                datasheetPublishedDate,
-                payload.measurementStandard || 'ISO 534:2011',
-                Boolean(payload.shadeEmbossingInvarianceConfirmed),
-                nominalUm,
-                toleranceUm !== undefined && toleranceUm !== null ? Number(toleranceUm) : null,
-                payload.nominalTolerancePct !== undefined && payload.nominalTolerancePct !== null ? Number(payload.nominalTolerancePct) : null,
-                payload.nominalBulkCm3G !== undefined && payload.nominalBulkCm3G !== null ? Number(payload.nominalBulkCm3G) : Number((nominalUm / Number(variant.gsm)).toFixed(3)),
-                nominalUm,
-                proposedSource,
-                contradictionCheck.hasSourceContradiction,
-                JSON.stringify(contradictionCheck.contradictions),
-                reviewStatus,
-                idempotencyKey,
-                effectiveActorId,
-                actorRole || 'OPERATOR',
-                payload.technicalNotes || payload.notes || null
-            ]
-        );
+        try {
+            await this._withTransaction(async (executor) => {
+                await executor.query(
+                    `INSERT INTO paper_variant_caliper_evidence (
+                        evidence_id, tenant_id, supplier_id, variant_id, product_id,
+                        accreditation_track, evidence_type,
+                        document_title, document_file_name, document_mime_type, document_size_bytes,
+                        document_storage_uri, document_sha256,
+                        manufacturer_name, supplier_channel, supplier_sku,
+                        datasheet_version, datasheet_published_date, measurement_standard,
+                        shade_embossing_invariance_confirmed,
+                        nominal_datasheet_caliper_um, nominal_unit, nominal_tolerance_um, nominal_tolerance_pct, nominal_bulk_cm3_g,
+                        proposed_effective_caliper_um, proposed_caliper_source, proposed_confidence_status,
+                        has_source_contradiction, contradiction_details_json,
+                        review_status, applied_to_catalog_variant, idempotency_key,
+                        submitted_by, submitted_by_role, technical_notes
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'um', ?, ?, ?, ?, ?, 'REFERENCE_IMPORTED', ?, ?, ?, FALSE, ?, ?, ?, ?)`,
+                    [
+                        evidenceId,
+                        tenantId,
+                        supplierId,
+                        variantId,
+                        variant.product_id,
+                        accreditationTrack,
+                        evidenceType,
+                        payload.documentTitle || `${manufacturerName} Official TDS`,
+                        pdfInfo.fileName,
+                        pdfInfo.mimeType,
+                        pdfInfo.sizeBytes,
+                        pdfInfo.storageUri,
+                        pdfInfo.sha256,
+                        manufacturerName,
+                        payload.supplierChannel || null,
+                        payload.supplierSku || null,
+                        datasheetVersion,
+                        datasheetPublishedDate,
+                        payload.measurementStandard || 'ISO 534:2011',
+                        Boolean(payload.shadeEmbossingInvarianceConfirmed),
+                        nominalUm,
+                        toleranceUm !== undefined && toleranceUm !== null ? Number(toleranceUm) : null,
+                        payload.nominalTolerancePct !== undefined && payload.nominalTolerancePct !== null ? Number(payload.nominalTolerancePct) : null,
+                        payload.nominalBulkCm3G !== undefined && payload.nominalBulkCm3G !== null ? Number(payload.nominalBulkCm3G) : Number((nominalUm / Number(variant.gsm)).toFixed(3)),
+                        nominalUm,
+                        proposedSource,
+                        contradictionCheck.hasSourceContradiction,
+                        JSON.stringify(contradictionCheck.contradictions),
+                        reviewStatus,
+                        idempotencyKey,
+                        effectiveActorId,
+                        actorRole || 'OPERATOR',
+                        payload.technicalNotes || payload.notes || null
+                    ]
+                );
 
-        const auditId = `aud_cal_${crypto.randomBytes(8).toString('hex')}`;
-        await this.db.query(
-            `INSERT INTO paper_variant_caliper_audit_log (
-                audit_id, tenant_id, supplier_id, variant_id, evidence_id,
-                action_type, previous_review_status, new_review_status,
-                previous_caliper_um, new_caliper_um,
-                previous_caliper_source, new_caliper_source,
-                previous_confidence_status, new_confidence_status,
-                previous_revision, new_revision,
-                nominal_datasheet_caliper_um, document_sha256,
-                actor_user_id, actor_role, decision_reason, metadata_json
-            ) VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [
-                auditId,
-                tenantId,
-                supplierId,
-                variantId,
-                evidenceId,
-                contradictionCheck.hasSourceContradiction ? 'CONTRADICTION_FLAGGED' : 'EVIDENCE_CREATED',
-                reviewStatus,
-                variant.caliper_um,
-                variant.caliper_um, // Unchanged!
-                variant.caliper_source,
-                variant.caliper_source,
-                variant.caliper_confidence_status,
-                variant.caliper_confidence_status,
-                Number(variant.caliper_revision || 1),
-                Number(variant.caliper_revision || 1),
-                nominalUm,
-                pdfInfo.sha256,
-                effectiveActorId,
-                actorRole || 'OPERATOR',
-                'Documentary evidence registered without automatic productive caliper mutation.',
-                JSON.stringify({ contradictions: contradictionCheck.contradictions })
-            ]
-        );
+                const auditId = `aud_cal_${crypto.randomBytes(8).toString('hex')}`;
+                await executor.query(
+                    `INSERT INTO paper_variant_caliper_audit_log (
+                        audit_id, tenant_id, supplier_id, variant_id, evidence_id,
+                        action_type, previous_review_status, new_review_status,
+                        previous_caliper_um, new_caliper_um,
+                        previous_caliper_source, new_caliper_source,
+                        previous_confidence_status, new_confidence_status,
+                        previous_revision, new_revision,
+                        nominal_datasheet_caliper_um, document_sha256,
+                        actor_user_id, actor_role, decision_reason, metadata_json
+                    ) VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                    [
+                        auditId,
+                        tenantId,
+                        supplierId,
+                        variantId,
+                        evidenceId,
+                        contradictionCheck.hasSourceContradiction ? 'CONTRADICTION_FLAGGED' : 'EVIDENCE_CREATED',
+                        reviewStatus,
+                        variant.caliper_um,
+                        variant.caliper_um, // Unchanged!
+                        variant.caliper_source,
+                        variant.caliper_source,
+                        variant.caliper_confidence_status,
+                        variant.caliper_confidence_status,
+                        Number(variant.caliper_revision || 1),
+                        Number(variant.caliper_revision || 1),
+                        nominalUm,
+                        pdfInfo.sha256,
+                        effectiveActorId,
+                        actorRole || 'OPERATOR',
+                        'Documentary evidence registered without automatic productive caliper mutation.',
+                        JSON.stringify({ contradictions: contradictionCheck.contradictions })
+                    ]
+                );
+            });
+        } catch (dbErr) {
+            if (pdfInfo && pdfInfo.newlyCreatedOnDisk && pdfInfo.persistedFilePath) {
+                cleanupOrphanEvidenceFile(pdfInfo.persistedFilePath, this.storageRoot);
+            }
+            throw dbErr;
+        }
 
         const created = unwrapRows(await this.db.query(
             `SELECT * FROM paper_variant_caliper_evidence WHERE evidence_id = ? LIMIT 1`,
@@ -762,38 +990,57 @@ class PaperEvidenceService {
             buffer: fileBuffer,
             fileBase64,
             fileName,
-            mimeType
+            mimeType,
+            tenantId,
+            persistToStore: true,
+            storageRoot: this.storageRoot
         });
 
-        await this.db.query(
-            `UPDATE paper_variant_caliper_evidence
-             SET document_file_name = ?, document_mime_type = ?, document_size_bytes = ?,
-                 document_storage_uri = ?, document_sha256 = ?, updated_at = CURRENT_TIMESTAMP
-             WHERE evidence_id = ? AND tenant_id = ?`,
-            [pdfInfo.fileName, pdfInfo.mimeType, pdfInfo.sizeBytes, pdfInfo.storageUri, pdfInfo.sha256, evidenceId, tenantId]
-        );
+        try {
+            await this._withTransaction(async (executor) => {
+                const updRes = unwrapAffectResult(await executor.query(
+                    `UPDATE paper_variant_caliper_evidence
+                     SET document_file_name = ?, document_mime_type = ?, document_size_bytes = ?,
+                         document_storage_uri = ?, document_sha256 = ?, updated_at = CURRENT_TIMESTAMP
+                     WHERE evidence_id = ? AND tenant_id = ? AND review_status IN ('DRAFT', 'PENDING_TECH_REVIEW')`,
+                    [pdfInfo.fileName, pdfInfo.mimeType, pdfInfo.sizeBytes, pdfInfo.storageUri, pdfInfo.sha256, evidenceId, tenantId]
+                ));
+                if (updRes.affectedRows !== undefined && Number(updRes.affectedRows) === 0) {
+                    throw new PaperEvidenceError(
+                        `Concurrent modification detected: evidence '${evidenceId}' is no longer in DRAFT or PENDING_TECH_REVIEW state.`,
+                        'EVIDENCE_IMMUTABLE_IN_STATUS',
+                        409
+                    );
+                }
 
-        const auditId = `aud_cal_${crypto.randomBytes(8).toString('hex')}`;
-        await this.db.query(
-            `INSERT INTO paper_variant_caliper_audit_log (
-                audit_id, tenant_id, supplier_id, variant_id, evidence_id,
-                action_type, previous_review_status, new_review_status,
-                document_sha256, actor_user_id, actor_role, decision_reason
-            ) VALUES (?, ?, ?, ?, ?, 'EVIDENCE_DOCUMENT_ATTACHED', ?, ?, ?, ?, ?, ?)`,
-            [
-                auditId,
-                tenantId,
-                supplierId,
-                ev.variant_id,
-                evidenceId,
-                currentStatus,
-                currentStatus,
-                pdfInfo.sha256,
-                effectiveActorId,
-                actorRole || 'OPERATOR',
-                `Attached PDF ${pdfInfo.fileName} (SHA-256: ${pdfInfo.sha256})`
-            ]
-        );
+                const auditId = `aud_cal_${crypto.randomBytes(8).toString('hex')}`;
+                await executor.query(
+                    `INSERT INTO paper_variant_caliper_audit_log (
+                        audit_id, tenant_id, supplier_id, variant_id, evidence_id,
+                        action_type, previous_review_status, new_review_status,
+                        document_sha256, actor_user_id, actor_role, decision_reason
+                    ) VALUES (?, ?, ?, ?, ?, 'EVIDENCE_DOCUMENT_ATTACHED', ?, ?, ?, ?, ?, ?)`,
+                    [
+                        auditId,
+                        tenantId,
+                        supplierId,
+                        ev.variant_id,
+                        evidenceId,
+                        currentStatus,
+                        currentStatus,
+                        pdfInfo.sha256,
+                        effectiveActorId,
+                        actorRole || 'OPERATOR',
+                        `Attached PDF ${pdfInfo.fileName} (SHA-256: ${pdfInfo.sha256})`
+                    ]
+                );
+            });
+        } catch (dbErr) {
+            if (pdfInfo && pdfInfo.newlyCreatedOnDisk && pdfInfo.persistedFilePath) {
+                cleanupOrphanEvidenceFile(pdfInfo.persistedFilePath, this.storageRoot);
+            }
+            throw dbErr;
+        }
 
         const updated = unwrapRows(await this.db.query(
             `SELECT * FROM paper_variant_caliper_evidence WHERE evidence_id = ? LIMIT 1`,
@@ -1010,7 +1257,7 @@ class PaperEvidenceService {
     }
 
     /**
-     * Submits a DRAFT evidence record to PENDING_TECH_REVIEW.
+     * Submits a DRAFT evidence record to PENDING_TECH_REVIEW with transactional row locking and atomic CAS update.
      */
     async submitEvidenceForReview({
         tenantId,
@@ -1021,63 +1268,79 @@ class PaperEvidenceService {
         actorRole = 'OPERATOR',
         reason = null
     }) {
-        const effectiveActorId = actorUserId || actorId || 'operator';
-        const rows = unwrapRows(await this.db.query(
-            `SELECT * FROM paper_variant_caliper_evidence WHERE evidence_id = ? AND tenant_id = ? LIMIT 1`,
-            [evidenceId, tenantId]
-        ));
-        if (!rows || rows.length === 0) {
-            throw new PaperEvidenceError(`Evidence '${evidenceId}' not found for this tenant.`, 'EVIDENCE_NOT_FOUND', 404);
+        const effectiveActorId = actorUserId || actorId;
+        if (!tenantId || !effectiveActorId) {
+            throw new PaperEvidenceError('Authenticated tenant and actor identity required.', 'UNAUTHORIZED', 403);
         }
-        const ev = rows[0];
-        const currentStatus = ev.review_status || ev.status || 'DRAFT';
-        if (currentStatus === 'PENDING_TECH_REVIEW') {
-            return { evidence: ev, status: 'PENDING_TECH_REVIEW', idempotentReplay: true };
-        }
-        if (currentStatus !== 'DRAFT') {
-            throw new PaperEvidenceError(
-                `Only DRAFT evidence can be submitted for review (current: '${currentStatus}').`,
-                'INVALID_STATUS_TRANSITION',
-                409
+
+        return this._withTransaction(async (executor, isTx) => {
+            const lockClause = isTx ? ' FOR UPDATE' : '';
+            const rows = unwrapRows(await executor.query(
+                `SELECT * FROM paper_variant_caliper_evidence WHERE evidence_id = ? AND tenant_id = ? LIMIT 1${lockClause}`,
+                [evidenceId, tenantId]
+            ));
+            if (!rows || rows.length === 0) {
+                throw new PaperEvidenceError(`Evidence '${evidenceId}' not found for this tenant.`, 'EVIDENCE_NOT_FOUND', 404);
+            }
+            const ev = rows[0];
+            const currentStatus = ev.review_status || ev.status || 'DRAFT';
+            if (currentStatus === 'PENDING_TECH_REVIEW') {
+                return { evidence: ev, status: 'PENDING_TECH_REVIEW', idempotentReplay: true };
+            }
+            if (currentStatus !== 'DRAFT') {
+                throw new PaperEvidenceError(
+                    `Only DRAFT evidence can be submitted for review (current: '${currentStatus}').`,
+                    'INVALID_STATUS_TRANSITION',
+                    409
+                );
+            }
+
+            const updRes = unwrapAffectResult(await executor.query(
+                `UPDATE paper_variant_caliper_evidence
+                 SET review_status = 'PENDING_TECH_REVIEW', submitted_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+                 WHERE evidence_id = ? AND tenant_id = ? AND review_status = 'DRAFT'`,
+                [evidenceId, tenantId]
+            ));
+            if (updRes.affectedRows !== undefined && Number(updRes.affectedRows) === 0) {
+                throw new PaperEvidenceError(
+                    `Concurrent state transition detected on evidence '${evidenceId}'.`,
+                    'EVIDENCE_CONCURRENT_MODIFICATION',
+                    409
+                );
+            }
+
+            const auditId = `aud_cal_${crypto.randomBytes(8).toString('hex')}`;
+            await executor.query(
+                `INSERT INTO paper_variant_caliper_audit_log (
+                    audit_id, tenant_id, supplier_id, variant_id, evidence_id,
+                    action_type, previous_review_status, new_review_status,
+                    actor_user_id, actor_role, decision_reason
+                ) VALUES (?, ?, ?, ?, ?, 'EVIDENCE_SUBMITTED_FOR_REVIEW', 'DRAFT', 'PENDING_TECH_REVIEW', ?, ?, ?)`,
+                [
+                    auditId,
+                    tenantId,
+                    supplierId,
+                    ev.variant_id,
+                    evidenceId,
+                    effectiveActorId,
+                    actorRole || 'OPERATOR',
+                    reason || 'Evidence submitted to technologist review queue.'
+                ]
             );
-        }
 
-        await this.db.query(
-            `UPDATE paper_variant_caliper_evidence
-             SET review_status = 'PENDING_TECH_REVIEW', submitted_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
-             WHERE evidence_id = ? AND tenant_id = ?`,
-            [evidenceId, tenantId]
-        );
+            const updated = unwrapRows(await executor.query(
+                `SELECT * FROM paper_variant_caliper_evidence WHERE evidence_id = ? LIMIT 1`,
+                [evidenceId]
+            ))[0];
 
-        const auditId = `aud_cal_${crypto.randomBytes(8).toString('hex')}`;
-        await this.db.query(
-            `INSERT INTO paper_variant_caliper_audit_log (
-                audit_id, tenant_id, supplier_id, variant_id, evidence_id,
-                action_type, previous_review_status, new_review_status,
-                actor_user_id, actor_role, decision_reason
-            ) VALUES (?, ?, ?, ?, ?, 'EVIDENCE_SUBMITTED_FOR_REVIEW', 'DRAFT', 'PENDING_TECH_REVIEW', ?, ?, ?)`,
-            [
-                auditId,
-                tenantId,
-                supplierId,
-                ev.variant_id,
-                evidenceId,
-                effectiveActorId,
-                actorRole || 'OPERATOR',
-                reason || 'Evidence submitted to technologist review queue.'
-            ]
-        );
-
-        const updated = unwrapRows(await this.db.query(
-            `SELECT * FROM paper_variant_caliper_evidence WHERE evidence_id = ? LIMIT 1`,
-            [evidenceId]
-        ))[0];
-
-        return { evidence: updated, status: 'PENDING_TECH_REVIEW', idempotentReplay: false };
+            return { evidence: updated, status: 'PENDING_TECH_REVIEW', idempotentReplay: false };
+        });
     }
 
     /**
      * Technologist approval or rejection of a caliper evidence.
+     * Protected against concurrency / race conditions via transactional row locking (SELECT ... FOR UPDATE)
+     * and atomic Compare-And-Swap status guard (`WHERE ... AND review_status IN ('DRAFT', 'PENDING_TECH_REVIEW')`).
      */
     async reviewEvidence({
         tenantId,
@@ -1120,6 +1383,158 @@ class PaperEvidenceService {
             );
         }
 
+        return this._withTransaction(async (executor, isTx) => {
+            const lockClause = isTx ? ' FOR UPDATE' : '';
+            const rows = unwrapRows(await executor.query(
+                `SELECT * FROM paper_variant_caliper_evidence WHERE evidence_id = ? AND tenant_id = ? LIMIT 1${lockClause}`,
+                [evidenceId, tenantId]
+            ));
+            if (!rows || rows.length === 0) {
+                throw new PaperEvidenceError(`Evidence '${evidenceId}' not found for this tenant.`, 'EVIDENCE_NOT_FOUND', 404);
+            }
+            const ev = rows[0];
+            const currentStatus = ev.review_status || ev.status || 'PENDING_TECH_REVIEW';
+            const evType = ev.evidence_type || ev.source_kind || 'MANUFACTURER_DATASHEET_PDF';
+
+            // Segregation of Duties (SoD)
+            if (String(ev.submitted_by).trim() === String(effectiveTechId).trim()) {
+                throw new PaperEvidenceError(
+                    'Segregation of Duties violation: the user who submitted this evidence cannot approve or reject it.',
+                    'SOD_SELF_APPROVAL_FORBIDDEN',
+                    403
+                );
+            }
+
+            if (currentStatus !== 'PENDING_TECH_REVIEW' && currentStatus !== 'DRAFT') {
+                throw new PaperEvidenceError(
+                    `Evidence '${evidenceId}' is already in terminal/reviewed state '${currentStatus}'.`,
+                    'EVIDENCE_ALREADY_REVIEWED',
+                    409
+                );
+            }
+
+            let targetStatus = 'REJECTED';
+            if (normDecision === 'APPROVE') {
+                if (
+                    ev.accreditation_track === 'PHYSICAL_MICROMETER_TRACK' &&
+                    evType !== 'PHYSICAL_MICROMETER_RECORD' &&
+                    evType !== 'COMBINED_DATASHEET_AND_MICROMETER' &&
+                    !payloadAllowsNominalReferenceOnly(ev)
+                ) {
+                    throw new PaperEvidenceError(
+                        'Materials in PHYSICAL_MICROMETER_TRACK (embossed/covering/multilayer) cannot be certified via datasheet alone without an ISO 534 physical micrometer record.',
+                        'PHYSICAL_MICROMETER_REQUIRED_FOR_TRACK',
+                        422
+                    );
+                }
+
+                if (Boolean(ev.has_source_contradiction) && !acknowledgeContradiction) {
+                    throw new PaperEvidenceError(
+                        'This evidence has flagged source contradictions (> 5% delta). Technologist must explicitly pass acknowledgeContradiction=true with arbitration justification, or reject the evidence.',
+                        'UNACKNOWLEDGED_SOURCE_CONTRADICTION',
+                        409
+                    );
+                }
+
+                targetStatus =
+                    evType === 'PHYSICAL_MICROMETER_RECORD' || evType === 'COMBINED_DATASHEET_AND_MICROMETER'
+                        ? 'CERTIFIED_MEASURED'
+                        : 'APPROVED_FOR_TECHNICAL_USE';
+            }
+
+            const varRows = unwrapRows(await executor.query(
+                `SELECT * FROM paper_variants WHERE id = ? LIMIT 1`,
+                [ev.variant_id]
+            ));
+            const variant = varRows[0] || {};
+
+            const updRes = unwrapAffectResult(await executor.query(
+                `UPDATE paper_variant_caliper_evidence
+                 SET review_status = ?,
+                     approved_by_technologist = ?,
+                     approved_by_role = ?,
+                     approved_at = CURRENT_TIMESTAMP,
+                     decision_reason = ?,
+                     applied_to_catalog_variant = FALSE,
+                     updated_at = CURRENT_TIMESTAMP
+                 WHERE evidence_id = ? AND tenant_id = ? AND review_status IN ('DRAFT', 'PENDING_TECH_REVIEW')`,
+                [targetStatus, effectiveTechId, effectiveTechRole, String(effectiveReason).trim(), evidenceId, tenantId]
+            ));
+
+            if (updRes.affectedRows !== undefined && Number(updRes.affectedRows) === 0) {
+                throw new PaperEvidenceError(
+                    `Concurrent review race condition blocked: evidence '${evidenceId}' was already reviewed by another transaction.`,
+                    'EVIDENCE_ALREADY_REVIEWED',
+                    409
+                );
+            }
+
+            const auditId = `aud_cal_${crypto.randomBytes(8).toString('hex')}`;
+            await executor.query(
+                `INSERT INTO paper_variant_caliper_audit_log (
+                    audit_id, tenant_id, supplier_id, variant_id, evidence_id,
+                    action_type, previous_review_status, new_review_status,
+                    previous_caliper_um, new_caliper_um,
+                    previous_caliper_source, new_caliper_source,
+                    previous_confidence_status, new_confidence_status,
+                    previous_revision, new_revision,
+                    nominal_datasheet_caliper_um, measured_batch_caliper_um, document_sha256,
+                    actor_user_id, actor_role, decision_reason
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [
+                    auditId,
+                    tenantId,
+                    supplierId,
+                    ev.variant_id,
+                    evidenceId,
+                    normDecision === 'APPROVE' ? 'EVIDENCE_APPROVED' : 'EVIDENCE_REJECTED',
+                    currentStatus,
+                    targetStatus,
+                    variant.caliper_um ?? null,
+                    variant.caliper_um ?? null, // Strictly unchanged on paper_variants!
+                    variant.caliper_source ?? 'NONE',
+                    variant.caliper_source ?? 'NONE',
+                    variant.caliper_confidence_status ?? 'MISSING',
+                    variant.caliper_confidence_status ?? 'MISSING',
+                    Number(variant.caliper_revision || 1),
+                    Number(variant.caliper_revision || 1),
+                    ev.nominal_datasheet_caliper_um,
+                    ev.measured_batch_caliper_um,
+                    ev.document_sha256,
+                    effectiveTechId,
+                    effectiveTechRole,
+                    String(effectiveReason).trim()
+                ]
+            );
+
+            const updated = unwrapRows(await executor.query(
+                `SELECT * FROM paper_variant_caliper_evidence WHERE evidence_id = ? LIMIT 1`,
+                [evidenceId]
+            ))[0] || { ...ev, review_status: targetStatus, approved_by_technologist: effectiveTechId };
+
+            return {
+                evidenceId,
+                newStatus: targetStatus,
+                evidence: updated,
+                productiveCaliperModified: false,
+                productiveVariantCaliperModified: false,
+                canReleaseToManufacturing: false
+            };
+        });
+    }
+
+    /**
+     * Retrieves and cryptographically verifies a persisted PDF document for an evidence record
+     * within the authenticated tenant scope.
+     */
+    async getEvidenceDocumentDownload({ tenantId, evidenceId }) {
+        if (!tenantId) {
+            throw new PaperEvidenceError('Authenticated tenant context is required.', 'TENANT_REQUIRED', 403);
+        }
+        if (!evidenceId) {
+            throw new PaperEvidenceError('evidenceId is required.', 'EVIDENCE_ID_REQUIRED', 400);
+        }
+
         const rows = unwrapRows(await this.db.query(
             `SELECT * FROM paper_variant_caliper_evidence WHERE evidence_id = ? AND tenant_id = ? LIMIT 1`,
             [evidenceId, tenantId]
@@ -1128,125 +1543,131 @@ class PaperEvidenceService {
             throw new PaperEvidenceError(`Evidence '${evidenceId}' not found for this tenant.`, 'EVIDENCE_NOT_FOUND', 404);
         }
         const ev = rows[0];
-        const currentStatus = ev.review_status || ev.status || 'PENDING_TECH_REVIEW';
-        const evType = ev.evidence_type || ev.source_kind || 'MANUFACTURER_DATASHEET_PDF';
-
-        // Segregation of Duties (SoD)
-        if (String(ev.submitted_by).trim() === String(effectiveTechId).trim()) {
+        const expectedSha256 = String(ev.document_sha256 || '').toLowerCase();
+        if (!/^[a-f0-9]{64}$/.test(expectedSha256)) {
             throw new PaperEvidenceError(
-                'Segregation of Duties violation: the user who submitted this evidence cannot approve or reject it.',
-                'SOD_SELF_APPROVAL_FORBIDDEN',
-                403
+                `Evidence '${evidenceId}' does not have a verifiable SHA-256 PDF document hash.`,
+                'DOCUMENT_NOT_ATTACHED',
+                404
             );
         }
 
-        if (currentStatus !== 'PENDING_TECH_REVIEW' && currentStatus !== 'DRAFT') {
+        const rootDir = resolvePrivateEvidenceStoreDir(this.storageRoot);
+        const safeTenantDir = sanitizePathSegment(tenantId, 'global');
+        const tenantDir = path.resolve(rootDir, safeTenantDir);
+        if (!tenantDir.startsWith(rootDir + path.sep)) {
+            throw new PaperEvidenceError('Path traversal blocked.', 'PATH_TRAVERSAL_BLOCKED', 403);
+        }
+
+        const filePath = path.resolve(tenantDir, `${expectedSha256}.pdf`);
+        if (!filePath.startsWith(tenantDir + path.sep) || !fs.existsSync(filePath)) {
             throw new PaperEvidenceError(
-                `Evidence '${evidenceId}' is already in terminal/reviewed state '${currentStatus}'.`,
-                'EVIDENCE_ALREADY_REVIEWED',
+                `Private PDF file for evidence '${evidenceId}' is not present in local storage.`,
+                'DOCUMENT_FILE_NOT_FOUND_ON_DISK',
+                404
+            );
+        }
+
+        const fileBuffer = fs.readFileSync(filePath);
+        const actualSha256 = crypto.createHash('sha256').update(fileBuffer).digest('hex');
+        if (actualSha256 !== expectedSha256) {
+            throw new PaperEvidenceError(
+                `Cryptographic integrity failure: on-disk PDF SHA-256 (${actualSha256}) does not match recorded evidence hash (${expectedSha256}).`,
+                'STORED_DOCUMENT_INTEGRITY_VIOLATION',
                 409
             );
         }
 
-        let targetStatus = 'REJECTED';
-        if (normDecision === 'APPROVE') {
-            if (
-                ev.accreditation_track === 'PHYSICAL_MICROMETER_TRACK' &&
-                evType !== 'PHYSICAL_MICROMETER_RECORD' &&
-                evType !== 'COMBINED_DATASHEET_AND_MICROMETER' &&
-                !payloadAllowsNominalReferenceOnly(ev)
-            ) {
-                throw new PaperEvidenceError(
-                    'Materials in PHYSICAL_MICROMETER_TRACK (embossed/covering/multilayer) cannot be certified via datasheet alone without an ISO 534 physical micrometer record.',
-                    'PHYSICAL_MICROMETER_REQUIRED_FOR_TRACK',
-                    422
-                );
-            }
-
-            if (Boolean(ev.has_source_contradiction) && !acknowledgeContradiction) {
-                throw new PaperEvidenceError(
-                    'This evidence has flagged source contradictions (> 5% delta). Technologist must explicitly pass acknowledgeContradiction=true with arbitration justification, or reject the evidence.',
-                    'UNACKNOWLEDGED_SOURCE_CONTRADICTION',
-                    409
-                );
-            }
-
-            targetStatus =
-                evType === 'PHYSICAL_MICROMETER_RECORD' || evType === 'COMBINED_DATASHEET_AND_MICROMETER'
-                    ? 'CERTIFIED_MEASURED'
-                    : 'APPROVED_FOR_TECHNICAL_USE';
-        }
-
-        const varRows = unwrapRows(await this.db.query(
-            `SELECT * FROM paper_variants WHERE id = ? LIMIT 1`,
-            [ev.variant_id]
-        ));
-        const variant = varRows[0] || {};
-
-        await this.db.query(
-            `UPDATE paper_variant_caliper_evidence
-             SET review_status = ?,
-                 approved_by_technologist = ?,
-                 approved_by_role = ?,
-                 approved_at = CURRENT_TIMESTAMP,
-                 decision_reason = ?,
-                 applied_to_catalog_variant = FALSE,
-                 updated_at = CURRENT_TIMESTAMP
-             WHERE evidence_id = ? AND tenant_id = ?`,
-            [targetStatus, effectiveTechId, effectiveTechRole, String(effectiveReason).trim(), evidenceId, tenantId]
-        );
-
-        const auditId = `aud_cal_${crypto.randomBytes(8).toString('hex')}`;
-        await this.db.query(
-            `INSERT INTO paper_variant_caliper_audit_log (
-                audit_id, tenant_id, supplier_id, variant_id, evidence_id,
-                action_type, previous_review_status, new_review_status,
-                previous_caliper_um, new_caliper_um,
-                previous_caliper_source, new_caliper_source,
-                previous_confidence_status, new_confidence_status,
-                previous_revision, new_revision,
-                nominal_datasheet_caliper_um, measured_batch_caliper_um, document_sha256,
-                actor_user_id, actor_role, decision_reason
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [
-                auditId,
-                tenantId,
-                supplierId,
-                ev.variant_id,
-                evidenceId,
-                normDecision === 'APPROVE' ? 'EVIDENCE_APPROVED' : 'EVIDENCE_REJECTED',
-                currentStatus,
-                targetStatus,
-                variant.caliper_um ?? null,
-                variant.caliper_um ?? null, // Strictly unchanged on paper_variants!
-                variant.caliper_source ?? 'NONE',
-                variant.caliper_source ?? 'NONE',
-                variant.caliper_confidence_status ?? 'MISSING',
-                variant.caliper_confidence_status ?? 'MISSING',
-                Number(variant.caliper_revision || 1),
-                Number(variant.caliper_revision || 1),
-                ev.nominal_datasheet_caliper_um,
-                ev.measured_batch_caliper_um,
-                ev.document_sha256,
-                effectiveTechId,
-                effectiveTechRole,
-                String(effectiveReason).trim()
-            ]
-        );
-
-        const updated = unwrapRows(await this.db.query(
-            `SELECT * FROM paper_variant_caliper_evidence WHERE evidence_id = ? LIMIT 1`,
-            [evidenceId]
-        ))[0] || { ...ev, review_status: targetStatus, approved_by_technologist: effectiveTechId };
+        const safeFileName = String(ev.document_file_name || `${evidenceId}.pdf`)
+            .replace(/[^a-zA-Z0-9._-]/g, '_')
+            .slice(0, 180);
 
         return {
             evidenceId,
-            newStatus: targetStatus,
-            evidence: updated,
-            productiveCaliperModified: false,
-            productiveVariantCaliperModified: false,
-            canReleaseToManufacturing: false
+            tenantId,
+            fileName: safeFileName,
+            mimeType: 'application/pdf',
+            sizeBytes: fileBuffer.length,
+            sha256: actualSha256,
+            buffer: fileBuffer
         };
+    }
+
+    /**
+     * Scans the tenant's private evidence directory and deletes any unreferenced / orphan PDF files
+     * whose SHA-256 is not bound to any record in paper_variant_caliper_evidence or paper_variant_classification_evidence.
+     */
+    async sweepOrphanEvidenceFiles({ tenantId }) {
+        if (!tenantId) {
+            throw new PaperEvidenceError('Authenticated tenant context is required.', 'TENANT_REQUIRED', 403);
+        }
+
+        const rootDir = resolvePrivateEvidenceStoreDir(this.storageRoot);
+        const safeTenantDir = sanitizePathSegment(tenantId, 'global');
+        const tenantDir = path.resolve(rootDir, safeTenantDir);
+        if (!tenantDir.startsWith(rootDir + path.sep) || !fs.existsSync(tenantDir)) {
+            return { scannedCount: 0, deletedCount: 0, deletedFiles: [] };
+        }
+
+        const referencedHashes = new Set();
+        const calRows = unwrapRows(await this.db.query(
+            `SELECT DISTINCT document_sha256 FROM paper_variant_caliper_evidence WHERE tenant_id = ? AND document_sha256 IS NOT NULL`,
+            [tenantId]
+        ));
+        for (const r of calRows) {
+            if (r.document_sha256) referencedHashes.add(String(r.document_sha256).toLowerCase());
+        }
+        try {
+            const clsRows = unwrapRows(await this.db.query(
+                `SELECT DISTINCT document_sha256 FROM paper_variant_classification_evidence WHERE tenant_id = ? AND document_sha256 IS NOT NULL`,
+                [tenantId]
+            ));
+            for (const r of clsRows) {
+                if (r.document_sha256) referencedHashes.add(String(r.document_sha256).toLowerCase());
+            }
+        } catch (_) {}
+
+        const entries = fs.readdirSync(tenantDir);
+        let scannedCount = 0;
+        const deletedFiles = [];
+
+        for (const entry of entries) {
+            if (!entry.endsWith('.pdf')) continue;
+            scannedCount++;
+            const hashPart = entry.slice(0, -4).toLowerCase();
+            if (!referencedHashes.has(hashPart)) {
+                const fullPath = path.resolve(tenantDir, entry);
+                if (fullPath.startsWith(tenantDir + path.sep)) {
+                    fs.unlinkSync(fullPath);
+                    deletedFiles.push(entry);
+                }
+            }
+        }
+
+        return {
+            scannedCount,
+            deletedCount: deletedFiles.length,
+            deletedFiles
+        };
+    }
+
+    /**
+     * Explicit append-only immutability guard for `paper_variant_caliper_audit_log`.
+     */
+    async updateAuditLogEntry() {
+        throw new PaperEvidenceError(
+            'Audit log immutability violation: paper_variant_caliper_audit_log is strictly append-only and cannot be modified.',
+            'AUDIT_LOG_IMMUTABLE',
+            403
+        );
+    }
+
+    async deleteAuditLogEntry() {
+        throw new PaperEvidenceError(
+            'Audit log immutability violation: paper_variant_caliper_audit_log is strictly append-only and cannot be deleted.',
+            'AUDIT_LOG_IMMUTABLE',
+            403
+        );
     }
 }
 
@@ -1261,6 +1682,10 @@ module.exports = {
     PaperEvidenceService,
     PaperEvidenceError,
     MAX_PDF_SIZE_BYTES,
+    DEFAULT_PRIVATE_EVIDENCE_STORE_DIR,
+    resolvePrivateEvidenceStoreDir,
+    persistPdfBufferToPrivateStore,
+    cleanupOrphanEvidenceFile,
     detectSourceContradictions,
     validateAndHashPdfDocument,
     loadStaticInventory252,

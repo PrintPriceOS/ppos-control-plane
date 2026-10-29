@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
+import os from 'os';
 import fs from 'fs';
 import path from 'path';
 import http from 'http';
@@ -324,14 +325,26 @@ function createMockEvidenceDb() {
 
             if (norm.startsWith("UPDATE paper_variant_caliper_evidence SET review_status = 'PENDING_TECH_REVIEW'")) {
                 const [evidenceId, tenantId] = params;
-                const row = caliperEvidences.find((e) => e.evidence_id === evidenceId && e.tenant_id === tenantId);
+                const row = caliperEvidences.find(
+                    (e) =>
+                        e.evidence_id === evidenceId &&
+                        e.tenant_id === tenantId &&
+                        (!norm.includes("AND review_status = 'DRAFT'") || e.review_status === 'DRAFT')
+                );
                 if (row) row.review_status = 'PENDING_TECH_REVIEW';
                 return { affectedRows: row ? 1 : 0 };
             }
 
             if (norm.startsWith('UPDATE paper_variant_caliper_evidence SET review_status = ?')) {
                 const [newStatus, approvedBy, approvedRole, decisionReason, evidenceId, tenantId] = params;
-                const row = caliperEvidences.find((e) => e.evidence_id === evidenceId && e.tenant_id === tenantId);
+                const row = caliperEvidences.find(
+                    (e) =>
+                        e.evidence_id === evidenceId &&
+                        e.tenant_id === tenantId &&
+                        (!norm.includes("AND review_status IN ('DRAFT', 'PENDING_TECH_REVIEW')") ||
+                            e.review_status === 'DRAFT' ||
+                            e.review_status === 'PENDING_TECH_REVIEW')
+                );
                 if (row) {
                     row.review_status = newStatus;
                     row.approved_by_technologist = approvedBy;
@@ -374,10 +387,12 @@ function createMockEvidenceDb() {
 describe('PAPER-MATERIALS-RECOVERY-09 — Technical Evidence System, Metrology & Spine Governance', () => {
     let mockDb;
     let service;
+    let tempStoreDir;
 
     beforeEach(() => {
+        tempStoreDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ppos-ev-09-'));
         mockDb = createMockEvidenceDb();
-        service = new PaperEvidenceService({ dbClient: mockDb });
+        service = new PaperEvidenceService({ dbClient: mockDb, storageRoot: tempStoreDir });
     });
 
     it('1. reconciles the 337 vs 338 pending classifications discrepancy so G1..G6 sum unequivocally to 337', () => {
@@ -434,8 +449,10 @@ describe('PAPER-MATERIALS-RECOVERY-09 — Technical Evidence System, Metrology &
         expect(upSql).toContain('CREATE TABLE IF NOT EXISTS paper_variant_caliper_evidence');
         expect(upSql).toContain('CREATE TABLE IF NOT EXISTS paper_variant_caliper_audit_log');
         expect(upSql).toContain('CREATE TABLE IF NOT EXISTS paper_variant_classification_evidence');
-        expect(upSql).toContain('FOREIGN KEY (variant_id) REFERENCES paper_variants(id)');
-        expect(upSql).toContain('FOREIGN KEY (product_id) REFERENCES paper_products(id)');
+        expect(upSql).toContain('FOREIGN KEY (variant_id) REFERENCES paper_variants(id) ON DELETE RESTRICT');
+        expect(upSql).toContain('FOREIGN KEY (product_id) REFERENCES paper_products(id) ON DELETE RESTRICT');
+        expect(upSql).toContain('FOREIGN KEY (evidence_id) REFERENCES paper_variant_caliper_evidence(evidence_id) ON DELETE RESTRICT');
+        expect(upSql).not.toContain('ON DELETE CASCADE');
         expect(upSql).not.toMatch(/ALTER\s+TABLE\s+paper_variants/i);
         expect(upSql).not.toMatch(/ALTER\s+TABLE\s+paper_products/i);
 
@@ -507,7 +524,10 @@ describe('PAPER-MATERIALS-RECOVERY-09 — Technical Evidence System, Metrology &
     });
 
     it('5. registers documentary evidence with idempotency, detects >5% source contradictions, and enforces Segregation of Duties (SoD) without modifying paper_variants.caliper_um', async () => {
-        const validPdf = Buffer.from('%PDF-1.7\nOfficial Nevia Plus C1S 80g 71um Datasheet\n%%EOF', 'utf8');
+        const validPdf = Buffer.from(
+            '%PDF-1.7\n1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n2 0 obj\n<< /Type /Pages /Count 1 >>\nendobj\n%%EOF',
+            'utf8'
+        );
 
         // 1. Register first documentary evidence (71 µm) with idempotency key
         const first = await service.registerDocumentaryEvidence({
@@ -791,7 +811,10 @@ describe('PAPER-MATERIALS-RECOVERY-09 — Technical Evidence System, Metrology &
             expect(viewerPost.status).toBe(403);
 
             // 2. SUPPLIER_OPERATOR in tenant-a registers evidence
-            const validPdfB64 = Buffer.from('%PDF-1.7\nTenant A Datasheet\n%%EOF', 'utf8').toString('base64');
+            const validPdfB64 = Buffer.from(
+                '%PDF-1.7\n1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\nxref\n%%EOF',
+                'utf8'
+            ).toString('base64');
             const opPost = await fetch(`${baseUrl}/api/v1/paper-suppliers/accreditation/evidences/documentary`, {
                 method: 'POST',
                 headers: {

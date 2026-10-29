@@ -34,10 +34,12 @@
 5. [`docs/architecture/RECOVERY_09_SPINE_INTEGRATION_REPORT.md`](file:///c:/Users/KIKE/Downloads/ppos-control-plane-phase-10-intelligence-layer/docs/architecture/RECOVERY_09_SPINE_INTEGRATION_REPORT.md) — Governed 5-tier epistemic provenance integration in `paperCaliperReconciliationService.js` and `spineCalculationService.js`.
 6. [`docs/architecture/RECOVERY_09_E2E_EVIDENCE.md`](file:///c:/Users/KIKE/Downloads/ppos-control-plane-phase-10-intelligence-layer/docs/architecture/RECOVERY_09_E2E_EVIDENCE.md) — Automated unit, integration, Spine, BPE, and UI test evidence (`47/47` passing tests + `177` baselined migrations).
 7. [`docs/architecture/RECOVERY_09_FINAL_REPORT.md`](file:///c:/Users/KIKE/Downloads/ppos-control-plane-phase-10-intelligence-layer/docs/architecture/RECOVERY_09_FINAL_REPORT.md) — Final executive summary and deployment readiness verdict.
+8. [`docs/architecture/RECOVERY_09H_FINAL_AUDIT_REPORT.md`](file:///c:/Users/KIKE/Downloads/ppos-control-plane-phase-10-intelligence-layer/docs/architecture/RECOVERY_09H_FINAL_AUDIT_REPORT.md) — Final audit of referential integrity (`ON DELETE RESTRICT`), deep PDF security & private durable storage, concurrency (`SELECT ... FOR UPDATE` + CAS), and ephemeral MySQL 8 integration.
+9. [`docs/architecture/RECOVERY_09H_DEPLOYMENT_RUNBOOK.md`](file:///c:/Users/KIKE/Downloads/ppos-control-plane-phase-10-intelligence-layer/docs/architecture/RECOVERY_09H_DEPLOYMENT_RUNBOOK.md) — Production deployment runbook, backup & `SHA-256` manifest procedure, post-migration verification, smoke tests, and deterministic rollback.
 
 ---
 
 ## 3. Verdict
 
-**`RECOVERY_09_READY_FOR_DEPLOYMENT_APPROVAL`**
+**`RECOVERY_09H_READY_FOR_DEPLOYMENT_APPROVAL`**
 

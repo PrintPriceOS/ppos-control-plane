@@ -1349,6 +1349,28 @@ async function deleteTechnicalVariant({ tenantId, supplierId, actorId, role, var
         throw new Error('VARIANT_HAS_OFFERS: Cannot delete variant while commercial offers exist for it. Delete or archive your offers first.');
     }
 
+    // 2b. Check if variant has any technical accreditation evidences or metrological audit history (RECOVERY-09H)
+    try {
+        const evRes = await db.query(
+            `SELECT
+                (SELECT COUNT(*) FROM paper_variant_caliper_evidence WHERE variant_id = ?) +
+                (SELECT COUNT(*) FROM paper_variant_caliper_audit_log WHERE variant_id = ?) +
+                (SELECT COUNT(*) FROM paper_variant_classification_evidence WHERE variant_id = ?) AS total_evidences`,
+            [variantId, variantId, variantId]
+        );
+        const evRow = Array.isArray(evRes) ? (Array.isArray(evRes[0]) ? evRes[0][0] : evRes[0]) : evRes;
+        if (evRow && Number(evRow.total_evidences || 0) > 0) {
+            throw new Error(
+                'VARIANT_HAS_TECHNICAL_EVIDENCE: Cannot delete variant because it has technical accreditation evidences or metrological audit history. Archive or withdraw from your supplier catalog instead.'
+            );
+        }
+    } catch (evErr) {
+        if (evErr.message && evErr.message.startsWith('VARIANT_HAS_TECHNICAL_EVIDENCE:')) {
+            throw evErr;
+        }
+        // Ignore ER_NO_SUCH_TABLE if migration 174 is not yet applied
+    }
+
     // 3. Verify supplier originated this variant via an import batch
     const originRes = await db.query(
         `SELECT COUNT(*) as count 
@@ -1441,6 +1463,24 @@ async function retractImportBatch({ tenantId, supplierId, actorId, role, batchId
             if (otherBatchCount > 0) {
                 preservedSharedVariantsCount++;
                 continue; // Preserve shared / pre-existing technical variant
+            }
+
+            // Preserve variants that have technical accreditation evidences or metrological audit history (RECOVERY-09H)
+            let hasEvidence = false;
+            try {
+                const [evCheck] = await conn.query(
+                    `SELECT
+                        (SELECT COUNT(*) FROM paper_variant_caliper_evidence WHERE variant_id = ?) +
+                        (SELECT COUNT(*) FROM paper_variant_caliper_audit_log WHERE variant_id = ?) +
+                        (SELECT COUNT(*) FROM paper_variant_classification_evidence WHERE variant_id = ?) AS total_evidences`,
+                    [vId, vId, vId]
+                );
+                const evCount = Number(evCheck && evCheck[0]?.total_evidences || 0);
+                if (evCount > 0) hasEvidence = true;
+            } catch (_) {}
+            if (hasEvidence) {
+                preservedSharedVariantsCount++;
+                continue;
             }
 
             // Remove this supplier's offers on this variant
@@ -1700,11 +1740,28 @@ async function previewCatalogAction({ tenantId, supplierId, action = 'WITHDRAW',
 
     const blockedItems = [];
     if (action === 'DELETE') {
+        const evidenceVariantSet = new Set();
+        try {
+            const evRows = await db.query(
+                `SELECT DISTINCT variant_id FROM paper_variant_caliper_evidence WHERE variant_id IN (${placeholders})
+                 UNION
+                 SELECT DISTINCT variant_id FROM paper_variant_caliper_audit_log WHERE variant_id IN (${placeholders})
+                 UNION
+                 SELECT DISTINCT variant_id FROM paper_variant_classification_evidence WHERE variant_id IN (${placeholders})`,
+                [...targetVariantIds, ...targetVariantIds, ...targetVariantIds]
+            );
+            for (const r of (Array.isArray(evRows) ? (Array.isArray(evRows[0]) ? evRows[0] : evRows) : [])) {
+                if (r && r.variant_id) evidenceVariantSet.add(r.variant_id);
+            }
+        } catch (_) {}
+
         for (const v of (Array.isArray(vRows) ? vRows : [])) {
             if (sharedVariantSet.has(v.id)) {
                 blockedItems.push({ id: v.id, reason: 'Variant is shared with other suppliers. Hard delete is forbidden.' });
             } else if (ownOffersByVariant.has(v.id) && ownOffersByVariant.get(v.id).length > 0) {
                 blockedItems.push({ id: v.id, reason: 'Variant has commercial offers. Remove offers first.' });
+            } else if (evidenceVariantSet.has(v.id)) {
+                blockedItems.push({ id: v.id, reason: 'Variant has technical accreditation evidences or audit history. Hard delete is forbidden; archive or withdraw instead.' });
             }
         }
     } else if (action === 'ARCHIVE' || action === 'RESTORE' || action === 'WITHDRAW') {

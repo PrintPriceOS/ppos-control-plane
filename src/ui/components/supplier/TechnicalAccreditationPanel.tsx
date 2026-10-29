@@ -1185,7 +1185,18 @@ export const TechnicalAccreditationPanel: React.FC<TechnicalAccreditationPanelPr
                                                 {ev.approved_by_technologist ? ` · Approved by: ${ev.approved_by_technologist}` : ''}
                                             </div>
                                             {ev.document_sha256 && (
-                                                <div className="text-zinc-500 truncate">SHA-256: {ev.document_sha256}</div>
+                                                <div className="flex items-center justify-between gap-2 text-zinc-500">
+                                                    <span className="truncate">SHA-256: {ev.document_sha256}</span>
+                                                    <a
+                                                        href={`/api/v1/paper-suppliers/accreditation/evidences/${ev.id}/document`}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="text-red-600 dark:text-red-400 font-bold hover:underline shrink-0"
+                                                        data-testid={`download-evidence-pdf-${ev.id}`}
+                                                    >
+                                                        PDF
+                                                    </a>
+                                                </div>
                                             )}
                                             {Boolean(ev.has_source_contradiction) && (
                                                 <div className="text-red-500 font-bold">

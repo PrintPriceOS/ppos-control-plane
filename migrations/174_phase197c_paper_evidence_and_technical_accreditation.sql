@@ -10,6 +10,10 @@
 --    - Approving a datasheet or micrometer record in paper_variant_caliper_evidence DOES NOT automatically
 --      mutate paper_variants.caliper_um unless explicitly promoted through governed technologist action.
 -- 5. Separation of Caliper Accreditation vs Technical Classification (337 pending OTHER/UNKNOWN variants).
+-- 6. Referential Integrity & Evidence Preservation (RECOVERY-09H):
+--    - All foreign keys to paper_variants(id), paper_products(id), and paper_variant_caliper_evidence(evidence_id)
+--      enforce ON DELETE RESTRICT so accreditation evidences, document hashes, and metrological audit trails
+--      cannot be silently wiped out by deleting a variant or product.
 
 CREATE TABLE IF NOT EXISTS paper_variant_caliper_evidence (
     evidence_id VARCHAR(64) NOT NULL PRIMARY KEY,
@@ -122,8 +126,8 @@ CREATE TABLE IF NOT EXISTS paper_variant_caliper_evidence (
     INDEX idx_pvce_track_status (accreditation_track, review_status),
     INDEX idx_pvce_sha256 (document_sha256),
     UNIQUE KEY uk_pvce_tenant_idempotency (tenant_id, idempotency_key),
-    CONSTRAINT fk_pvce_variant FOREIGN KEY (variant_id) REFERENCES paper_variants(id) ON DELETE CASCADE,
-    CONSTRAINT fk_pvce_product FOREIGN KEY (product_id) REFERENCES paper_products(id) ON DELETE CASCADE
+    CONSTRAINT fk_pvce_variant FOREIGN KEY (variant_id) REFERENCES paper_variants(id) ON DELETE RESTRICT,
+    CONSTRAINT fk_pvce_product FOREIGN KEY (product_id) REFERENCES paper_products(id) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS paper_variant_caliper_audit_log (
@@ -164,8 +168,8 @@ CREATE TABLE IF NOT EXISTS paper_variant_caliper_audit_log (
     INDEX idx_pvcal_variant_time (variant_id, created_at),
     INDEX idx_pvcal_evidence (evidence_id),
     INDEX idx_pvcal_tenant_time (tenant_id, created_at),
-    CONSTRAINT fk_pvcal_variant FOREIGN KEY (variant_id) REFERENCES paper_variants(id) ON DELETE CASCADE,
-    CONSTRAINT fk_pvcal_evidence FOREIGN KEY (evidence_id) REFERENCES paper_variant_caliper_evidence(evidence_id) ON DELETE CASCADE
+    CONSTRAINT fk_pvcal_variant FOREIGN KEY (variant_id) REFERENCES paper_variants(id) ON DELETE RESTRICT,
+    CONSTRAINT fk_pvcal_evidence FOREIGN KEY (evidence_id) REFERENCES paper_variant_caliper_evidence(evidence_id) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS paper_variant_classification_evidence (
@@ -201,7 +205,7 @@ CREATE TABLE IF NOT EXISTS paper_variant_classification_evidence (
     INDEX idx_pvcle_tenant_variant (tenant_id, variant_id, review_status),
     INDEX idx_pvcle_variant_status (variant_id, review_status),
     UNIQUE KEY uk_pvcle_tenant_idempotency (tenant_id, idempotency_key),
-    CONSTRAINT fk_pvcle_variant FOREIGN KEY (variant_id) REFERENCES paper_variants(id) ON DELETE CASCADE,
-    CONSTRAINT fk_pvcle_product FOREIGN KEY (product_id) REFERENCES paper_products(id) ON DELETE CASCADE
+    CONSTRAINT fk_pvcle_variant FOREIGN KEY (variant_id) REFERENCES paper_variants(id) ON DELETE RESTRICT,
+    CONSTRAINT fk_pvcle_product FOREIGN KEY (product_id) REFERENCES paper_products(id) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

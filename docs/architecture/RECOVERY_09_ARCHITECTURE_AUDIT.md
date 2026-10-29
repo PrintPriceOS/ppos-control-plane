@@ -23,22 +23,25 @@ Before modifying any component, route, or service, we queried the Graphify knowl
 ## 2. Audit of the 3 Evidence & Accreditation Tables
 
 ### 2.1 Foreign Keys & Referential Integrity
-- `paper_variant_caliper_evidence.variant_id` → `FOREIGN KEY (variant_id) REFERENCES paper_variants(id) ON DELETE RESTRICT`
-- `paper_variant_caliper_evidence.product_id` → `FOREIGN KEY (product_id) REFERENCES paper_products(id) ON DELETE RESTRICT`
-- `paper_variant_caliper_audit_log.variant_id` → `FOREIGN KEY (variant_id) REFERENCES paper_variants(id) ON DELETE RESTRICT`
-- `paper_variant_classification_evidence.variant_id` → `FOREIGN KEY (variant_id) REFERENCES paper_variants(id) ON DELETE RESTRICT`
-- `paper_variant_classification_evidence.product_id` → `FOREIGN KEY (product_id) REFERENCES paper_products(id) ON DELETE RESTRICT`
+- `paper_variant_caliper_evidence.variant_id` → `CONSTRAINT fk_pvce_variant FOREIGN KEY (variant_id) REFERENCES paper_variants(id) ON DELETE RESTRICT`
+- `paper_variant_caliper_evidence.product_id` → `CONSTRAINT fk_pvce_product FOREIGN KEY (product_id) REFERENCES paper_products(id) ON DELETE RESTRICT`
+- `paper_variant_caliper_audit_log.variant_id` → `CONSTRAINT fk_pvcal_variant FOREIGN KEY (variant_id) REFERENCES paper_variants(id) ON DELETE RESTRICT`
+- `paper_variant_caliper_audit_log.evidence_id` → `CONSTRAINT fk_pvcal_evidence FOREIGN KEY (evidence_id) REFERENCES paper_variant_caliper_evidence(evidence_id) ON DELETE RESTRICT`
+- `paper_variant_classification_evidence.variant_id` → `CONSTRAINT fk_pvcle_variant FOREIGN KEY (variant_id) REFERENCES paper_variants(id) ON DELETE RESTRICT`
+- `paper_variant_classification_evidence.product_id` → `CONSTRAINT fk_pvcle_product FOREIGN KEY (product_id) REFERENCES paper_products(id) ON DELETE RESTRICT`
 
-`ON DELETE RESTRICT` prevents accidental orphan deletion of variants or products that hold metrological or documentary certification history.
+`ON DELETE RESTRICT` across all 6 foreign keys in [`migrations/174_phase197c_paper_evidence_and_technical_accreditation.sql`](file:///c:/Users/KIKE/Downloads/ppos-control-plane-phase-10-intelligence-layer/migrations/174_phase197c_paper_evidence_and_technical_accreditation.sql) prevents accidental orphan deletion of variants, products, or approved evidence records. Furthermore, [`src/api/services/paperOfferService.js`](file:///c:/Users/KIKE/Downloads/ppos-control-plane-phase-10-intelligence-layer/src/api/services/paperOfferService.js) explicitly checks for accreditation history in `deleteTechnicalVariant`, `retractImportBatch`, and `previewCatalogAction`, returning HTTP `409 Conflict` (`VARIANT_HAS_TECHNICAL_EVIDENCE`) while keeping soft catalog operations (`ARCHIVE`, `RESTORE`, `WITHDRAW` on `supplier_paper_catalog_variants`) 100% compatible.
 
 ### 2.2 Multi-Tenant & Supplier Isolation
 - Every table includes `tenant_id VARCHAR(64) NOT NULL` and `supplier_id VARCHAR(64) NULL`, indexed by `(tenant_id, variant_id, review_status)` and `(tenant_id, supplier_id, review_status)`.
-- Queries in [`PaperEvidenceService`](file:///c:/Users/KIKE/Downloads/ppos-control-plane-phase-10-intelligence-layer/src/api/services/paperEvidenceService.js) scope all reads and writes by `tenant_id`, ensuring Tenant B can never inspect or mutate Tenant A's technical evidence records.
+- Queries in [`PaperEvidenceService`](file:///c:/Users/KIKE/Downloads/ppos-control-plane-phase-10-intelligence-layer/src/api/services/paperEvidenceService.js) scope all reads and writes by `tenant_id`, ensuring Tenant B can never inspect, download, or mutate Tenant A's technical evidence records.
 
-### 2.3 Document Storage, Versioning & Retention Policy
-- Uploaded PDFs are validated in memory (`%PDF-` magic header check + `<= 10 MB` limit), hashed with deterministic `SHA-256` (`document_sha256 CHAR(64)`), and referenced via content-addressable storage URI (`evidence-store://sha256/<sha256>/<safeFileName>`).
-- Document metadata (`datasheet_version`, `datasheet_published_date`, `measurement_standard`) is mandatory on registration.
-- Evidence records in terminal/reviewed states (`APPROVED_FOR_TECHNICAL_USE`, `CERTIFIED_MEASURED`, `REJECTED`, `SUPERSEDED`) are **immutable**—attempts to overwrite their PDF attachment or re-review them fail closed with HTTP `409 Conflict`.
+### 2.3 Document Storage, Deep PDF Validation, Versioning & Retention Policy
+- Uploaded PDFs undergo deep structural validation in `validateAndHashPdfDocument` (`application/pdf` MIME check, `<= 10 MB` size limit, `%PDF-1.x` / `%PDF-2.0` header at offset 0, `%%EOF` trailer marker, internal indirect object table `1 0 obj` / `endobj` and `/Type /Catalog` or `/Type /Page`, and active-content rejection blocking `/JavaScript`, `/JS`, `/Launch`, `/EmbeddedFiles`, `/RichMedia`, `/SubmitForm`, `/ImportData`, `<script>`).
+- Verified PDFs are hashed with deterministic `SHA-256` (`document_sha256 CHAR(64)`) and persisted durably to a private content-addressable store on disk (`var/private_evidence_store/<safeTenantId>/<sha256>.pdf` with `0o600` file permissions and `0o700` directory permissions), referenced via `evidence-store://sha256/<sha256>/<safeFileName>`.
+- If the database transaction fails or rolls back during registration/attachment, `cleanupOrphanEvidenceFile` automatically removes the unreferenced file on disk, complemented by `sweepOrphanEvidenceFiles` for periodic maintenance.
+- Authenticated downloads (`GET /api/v1/paper-suppliers/accreditation/evidences/:evidenceId/document`) enforce tenant and role isolation, re-verify the on-disk file's `SHA-256` against `document_sha256` to prevent file tampering/substitution, and stream with `Content-Disposition: attachment`, `X-Content-Type-Options: nosniff`, and `Cache-Control: private, no-store, max-age=0`.
+- Evidence records in terminal/reviewed states (`APPROVED_FOR_TECHNICAL_USE`, `CERTIFIED_MEASURED`, `REJECTED`, `SUPERSEDED`) are **immutable**—protected by transactional row locking (`SELECT ... FOR UPDATE`) and atomic Compare-And-Swap (`UPDATE ... WHERE review_status IN ('DRAFT', 'PENDING_TECH_REVIEW')`) so concurrent requests fail closed with HTTP `409 Conflict`.
 
 ---
 

@@ -907,14 +907,23 @@ router.delete('/catalog/variants/:variantId', requireSupplierScope('ADMIN'), req
         const isNotFound = err.message.startsWith('VARIANT_NOT_FOUND');
         const isShared = err.message.startsWith('CANNOT_DELETE_SHARED_VARIANT');
         const hasOffers = err.message.startsWith('VARIANT_HAS_OFFERS');
+        const hasEvidence = err.message.startsWith('VARIANT_HAS_TECHNICAL_EVIDENCE');
         const notOrigin = err.message.startsWith('NOT_VARIANT_ORIGINATOR');
         const isForbidden = err.message.startsWith('FORBIDDEN');
-        const statusCode = isNotFound ? 404 : (isShared || hasOffers || notOrigin ? 409 : (isForbidden ? 403 : 500));
+        const statusCode = isNotFound ? 404 : (isShared || hasOffers || hasEvidence || notOrigin ? 409 : (isForbidden ? 403 : 500));
 
         return res.status(statusCode).json({
             ok: false,
             error: {
-                code: isNotFound ? 'VARIANT_NOT_FOUND' : (isShared ? 'CANNOT_DELETE_SHARED_VARIANT' : (hasOffers ? 'VARIANT_HAS_OFFERS' : (notOrigin ? 'NOT_VARIANT_ORIGINATOR' : 'DELETE_VARIANT_FAILED'))),
+                code: isNotFound
+                    ? 'VARIANT_NOT_FOUND'
+                    : (isShared
+                        ? 'CANNOT_DELETE_SHARED_VARIANT'
+                        : (hasOffers
+                            ? 'VARIANT_HAS_OFFERS'
+                            : (hasEvidence
+                                ? 'VARIANT_HAS_TECHNICAL_EVIDENCE'
+                                : (notOrigin ? 'NOT_VARIANT_ORIGINATOR' : 'DELETE_VARIANT_FAILED')))),
                 message: err.message
             }
         });
@@ -1602,6 +1611,31 @@ router.get('/accreditation/variants/:variantId/history', requireSupplierScope('V
     }
 });
 
+function sanitizeClientBodyIdentity(body) {
+    if (!body || typeof body !== 'object') return {};
+    const copy = { ...body };
+    delete copy.tenantId;
+    delete copy.tenant_id;
+    delete copy.supplierId;
+    delete copy.supplier_id;
+    delete copy.actorId;
+    delete copy.actorUserId;
+    delete copy.actor_user_id;
+    delete copy.actorRole;
+    delete copy.actor_role;
+    delete copy.submittedBy;
+    delete copy.submitted_by;
+    delete copy.submittedByRole;
+    delete copy.submitted_by_role;
+    delete copy.technologistUserId;
+    delete copy.approvedByTechnologist;
+    delete copy.approved_by_technologist;
+    delete copy.technologistRole;
+    delete copy.approvedByRole;
+    delete copy.approved_by_role;
+    return copy;
+}
+
 /**
  * POST /api/v1/paper-suppliers/accreditation/evidences/documentary
  * Register documentary caliper evidence (manufacturer datasheet or supplier declaration)
@@ -1611,20 +1645,23 @@ router.post('/accreditation/evidences/documentary', requireSupplierScope('OPERAT
     try {
         const context = resolveActorContext(req);
         const role = req.verifiedSupplierContext?.role || context.role;
-        const body = req.body || {};
+        const body = sanitizeClientBodyIdentity(req.body || {});
         const fileBuffer = req.file ? req.file.buffer : (body.fileBase64 ? Buffer.from(body.fileBase64, 'base64') : null);
         const fileName = req.file ? req.file.originalname : (body.fileName || null);
+        const mimeType = req.file ? req.file.mimetype : (body.mimeType || 'application/pdf');
         const idempotencyKey = req.headers['idempotency-key'] || body.idempotencyKey || null;
 
         const result = await paperEvidenceService.registerDocumentaryEvidence({
             tenantId: context.tenantId,
+            supplierId: context.supplierId,
             actorId: context.userId,
             actorRole: role,
             idempotencyKey,
             payload: {
                 ...body,
                 fileBuffer,
-                fileName
+                fileName,
+                mimeType
             }
         });
 
@@ -1640,29 +1677,58 @@ router.post('/accreditation/evidences/documentary', requireSupplierScope('OPERAT
 
 /**
  * POST /api/v1/paper-suppliers/accreditation/evidences/:evidenceId/attachment
- * Attach or update a validated PDF datasheet (<= 10 MB, %PDF- magic header, SHA-256) on an evidence record.
+ * Attach or update a validated PDF datasheet (<= 10 MB, deep PDF structure check, SHA-256) on an evidence record.
  */
 router.post('/accreditation/evidences/:evidenceId/attachment', requireSupplierScope('OPERATOR'), requireApprovedSupplier, handleEvidenceUploadMiddleware, async (req, res) => {
     try {
         const context = resolveActorContext(req);
         const role = req.verifiedSupplierContext?.role || context.role;
-        const body = req.body || {};
+        const body = sanitizeClientBodyIdentity(req.body || {});
         const fileBuffer = req.file ? req.file.buffer : (body.fileBase64 ? Buffer.from(body.fileBase64, 'base64') : null);
         const fileName = req.file ? req.file.originalname : (body.fileName || 'datasheet.pdf');
+        const mimeType = req.file ? req.file.mimetype : (body.mimeType || 'application/pdf');
 
         const result = await paperEvidenceService.attachPdfToEvidence({
             tenantId: context.tenantId,
+            supplierId: context.supplierId,
             actorId: context.userId,
             actorRole: role,
             evidenceId: req.params.evidenceId,
             fileBuffer,
-            fileName
+            fileName,
+            mimeType
         });
 
         return res.json({ ok: true, data: result });
     } catch (err) {
         console.error('[PAPER-SUPPLIERS][ATTACH-PDF-EVIDENCE-ERROR]', err);
         return sendEvidenceError(res, err, 'ATTACH_PDF_EVIDENCE_FAILED');
+    }
+});
+
+/**
+ * GET /api/v1/paper-suppliers/accreditation/evidences/:evidenceId/document
+ * Authenticated, tenant-isolated download of a verified private PDF evidence document.
+ * Re-verifies on-disk SHA-256 against recorded evidence hash before serving.
+ */
+router.get('/accreditation/evidences/:evidenceId/document', requireSupplierScope('VIEWER'), requireApprovedSupplier, async (req, res) => {
+    try {
+        const context = resolveActorContext(req);
+        const doc = await paperEvidenceService.getEvidenceDocumentDownload({
+            tenantId: context.tenantId,
+            evidenceId: req.params.evidenceId
+        });
+
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Length', String(doc.sizeBytes));
+        res.setHeader('Content-Disposition', `attachment; filename="${doc.fileName}"`);
+        res.setHeader('X-Content-Type-Options', 'nosniff');
+        res.setHeader('X-Document-SHA256', doc.sha256);
+        res.setHeader('Cache-Control', 'private, no-store, max-age=0');
+        return res.status(200).send(doc.buffer);
+    } catch (err) {
+        console.error('[PAPER-SUPPLIERS][DOWNLOAD-EVIDENCE-DOCUMENT-ERROR]', err);
+        return sendEvidenceError(res, err, 'DOWNLOAD_EVIDENCE_DOCUMENT_FAILED');
     }
 });
 
@@ -1674,11 +1740,12 @@ router.post('/accreditation/evidences/micrometer', requireSupplierScope('OPERATO
     try {
         const context = resolveActorContext(req);
         const role = req.verifiedSupplierContext?.role || context.role;
-        const body = req.body || {};
+        const body = sanitizeClientBodyIdentity(req.body || {});
         const idempotencyKey = req.headers['idempotency-key'] || body.idempotencyKey || null;
 
         const result = await paperEvidenceService.registerPhysicalMicrometerEvidence({
             tenantId: context.tenantId,
+            supplierId: context.supplierId,
             actorId: context.userId,
             actorRole: role,
             idempotencyKey,
@@ -1703,13 +1770,15 @@ router.post('/accreditation/evidences/:evidenceId/submit', requireSupplierScope(
     try {
         const context = resolveActorContext(req);
         const role = req.verifiedSupplierContext?.role || context.role;
+        const body = sanitizeClientBodyIdentity(req.body || {});
 
         const result = await paperEvidenceService.submitEvidenceForReview({
             tenantId: context.tenantId,
+            supplierId: context.supplierId,
             actorId: context.userId,
             actorRole: role,
             evidenceId: req.params.evidenceId,
-            reason: req.body?.reason || null
+            reason: body.reason || null
         });
 
         return res.json({ ok: true, data: result });
@@ -1723,21 +1792,23 @@ router.post('/accreditation/evidences/:evidenceId/submit', requireSupplierScope(
  * POST /api/v1/paper-suppliers/accreditation/evidences/:evidenceId/review
  * Approve or reject an evidence record as a qualified Technologist / Admin.
  * Enforces strict Segregation of Duties (`submitted_by !== approved_by_technologist`)
+ * using ONLY the authenticated server session identity (`resolveActorContext(req)`),
  * and does NOT automatically modify `paper_variants.caliper_um`.
  */
 router.post('/accreditation/evidences/:evidenceId/review', requireSupplierScope('ADMIN'), requireApprovedSupplier, async (req, res) => {
     try {
         const context = resolveActorContext(req);
         const role = req.verifiedSupplierContext?.role || context.role;
-        const body = req.body || {};
+        const body = sanitizeClientBodyIdentity(req.body || {});
 
         const result = await paperEvidenceService.reviewEvidence({
             tenantId: context.tenantId,
+            supplierId: context.supplierId,
             actorId: context.userId,
             actorRole: role,
             evidenceId: req.params.evidenceId,
             decision: body.decision,
-            reason: body.reason,
+            reason: body.reason || body.decisionReason,
             acknowledgeContradiction: Boolean(body.acknowledgeContradiction)
         });
 
