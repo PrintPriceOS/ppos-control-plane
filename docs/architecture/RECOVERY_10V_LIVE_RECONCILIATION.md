@@ -5,7 +5,8 @@
 **Servidor Productivo:** `212.227.79.67` (`/opt/printprice-os/ppos-control-plane`)  
 **Aplicación:** `https://control.printprice.pro`  
 **Base de Datos:** MySQL `Control` (`8.0.46-0ubuntu0.24.04.4`)  
-**Commit Auditado en GitHub y Servidor:** `3ec340cf3d616245d366ca899b3119cf9231a76c` (código productivo desplegado desde `c99c5fbc6839e3817bddd6f9faf65ecf1a398d6a`)  
+**Commit Auditado de `RECOVERY-10`:** `3ec340cf3d616245d366ca899b3119cf9231a76c` (código productivo desplegado desde `c99c5fbc6839e3817bddd6f9faf65ecf1a398d6a`)  
+**Commit de Publicación `RECOVERY-10V`:** `cfc204a9b5a948ecd0255bb6b2c89fa8ece27c31` (más el commit de cierre de esta línea)  
 **Modo de Ejecución:** **`STRICT_READ_ONLY_VERIFICATION` (`0` migraciones, `0` restauraciones, `0` cambios de código, `0` escrituras en catálogo)**  
 **Fecha/Hora de Verificación en Vivo:** `2026-10-29T14:31:08.477Z`  
 **Estado de Conciliación:** **`CONCILIADO Y CERTIFICADO (`RECOVERY_10V_PRODUCTION_CERTIFIED`)`**

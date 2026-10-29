@@ -6,6 +6,7 @@
 **Aplicación:** `https://control.printprice.pro`  
 **Base de Datos:** MySQL `Control` (`8.0.46-0ubuntu0.24.04.4`)  
 **Commit Auditado de `RECOVERY-10`:** `3ec340cf3d616245d366ca899b3119cf9231a76c`  
+**Commit de Publicación `RECOVERY-10V`:** `cfc204a9b5a948ecd0255bb6b2c89fa8ece27c31` (más el commit de cierre de esta línea)  
 **Modo de Auditoría `RECOVERY-10V`:** Solo lectura estricto (`0` migraciones, `0` restauraciones, `0` cambios de código productivo, `0` escrituras en catálogo)  
 **Dictamen Final Obligatorio:** **`RECOVERY_10V_PRODUCTION_CERTIFIED`**
 
