@@ -22,6 +22,7 @@ import {
 import { paperSupplierFetch, SupplierApiError } from '../../lib/paperSupplierApi';
 import { getUserRole, getAuthUser, getAuthToken } from '../../lib/authStore';
 import { TechnicalImportModal } from '../../components/supplier/TechnicalImportModal';
+import { TechnicalAccreditationPanel } from '../../components/supplier/TechnicalAccreditationPanel';
 import { AccessibleModal } from '../../components/AccessibleModal';
 import { StatusBadge } from '../../components/StatusBadge';
 import { useLocale } from '../../i18n';
@@ -50,7 +51,7 @@ export const SupplierCatalogOffersPage: React.FC = () => {
         return coating;
     };
 
-    const [activeTab, setActiveTab] = useState<'CATALOG' | 'OFFERS'>('CATALOG');
+    const [activeTab, setActiveTab] = useState<'CATALOG' | 'OFFERS' | 'ACCREDITATION'>('CATALOG');
     const [isImportModalOpen, setIsImportModalOpen] = useState<boolean>(false);
 
     // Catalog state
@@ -218,7 +219,7 @@ export const SupplierCatalogOffersPage: React.FC = () => {
         setIsAllMatchingSelected(false);
         if (activeTab === 'CATALOG') {
             fetchCatalog(1, catalogSearch, catalogCategory);
-        } else {
+        } else if (activeTab === 'OFFERS') {
             fetchOffers(1, offersSearch, offersStatusFilter);
         }
     }, [activeTab]);
@@ -952,7 +953,7 @@ export const SupplierCatalogOffersPage: React.FC = () => {
             )}
 
             {/* Tabs */}
-            <div className="flex border-b border-zinc-200 dark:border-zinc-800 gap-6">
+            <div className="flex flex-wrap border-b border-zinc-200 dark:border-zinc-800 gap-6">
                 <button
                     onClick={() => setActiveTab('CATALOG')}
                     className={`pb-3 text-xs font-bold uppercase tracking-wider transition-colors flex items-center gap-2 cursor-pointer ${
@@ -974,6 +975,18 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                 >
                     <DocumentTextIcon className="w-4 h-4" />
                     {t('supplier.hub.tabOffers')}
+                </button>
+                <button
+                    onClick={() => setActiveTab('ACCREDITATION')}
+                    data-testid="tab-technical-accreditation"
+                    className={`pb-3 text-xs font-bold uppercase tracking-wider transition-colors flex items-center gap-2 cursor-pointer ${
+                        activeTab === 'ACCREDITATION'
+                            ? 'border-b-2 border-red-600 text-red-600'
+                            : 'text-zinc-400 hover:text-slate-800 dark:hover:text-zinc-200'
+                    }`}
+                >
+                    <ShieldCheckIcon className="w-4 h-4" />
+                    {t('supplier.hub.tabAccreditation')}
                 </button>
             </div>
 
@@ -1668,6 +1681,14 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                         </div>
                     </div>
                 </div>
+            )}
+
+            {/* TAB 3: TECHNICAL ACCREDITATION & EVIDENCE HUB */}
+            {activeTab === 'ACCREDITATION' && (
+                <TechnicalAccreditationPanel
+                    onNotify={(msg) => setGeneralNotice(msg)}
+                    onError={(msg) => setErrorNotice(msg)}
+                />
             )}
 
             {/* CREATE / EDIT OFFER MODAL */}

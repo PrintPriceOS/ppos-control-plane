@@ -226,7 +226,27 @@ class SpineCalculationService {
             );
         }
         const row = rows[0];
-        const prov = resolveVariantCaliperProvenance(row);
+        let latestApprovedEvidence = null;
+        try {
+            const evRows = unwrapRows(await executor.query(
+                `SELECT evidence_id, evidence_type, review_status,
+                        nominal_datasheet_caliper_um, measured_batch_caliper_um,
+                        proposed_effective_caliper_um, applied_to_catalog_variant,
+                        has_source_contradiction, approved_by_technologist
+                 FROM paper_variant_caliper_evidence
+                 WHERE variant_id = ?
+                   AND review_status IN ('APPROVED_FOR_TECHNICAL_USE', 'CERTIFIED_MEASURED')
+                 ORDER BY approved_at DESC, created_at DESC
+                 LIMIT 1`,
+                [variantId]
+            ));
+            if (evRows && evRows.length > 0) {
+                latestApprovedEvidence = evRows[0];
+            }
+        } catch (_) {
+            // Additive table may not be migrated yet in legacy/mock environments; fail-safe to paper_variants record
+        }
+        const prov = resolveVariantCaliperProvenance(row, latestApprovedEvidence);
         const categoryUpper = String(row.category || '').toUpperCase();
         const finishUpper = String(row.finish || row.finish_summary || '').toUpperCase();
         const isCoated = categoryUpper === 'COATED' || finishUpper.includes('COATED') || finishUpper.includes('SILK') || finishUpper.includes('GLOSS') || finishUpper.includes('MATT');

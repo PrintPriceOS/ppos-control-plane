@@ -1476,6 +1476,278 @@ router.get('/orders/:orderId/document', requireSupplierScope('VIEWER'), requireA
     }
 });
 
+const { paperEvidenceService, PaperEvidenceError, MAX_PDF_SIZE_BYTES } = require('../services/paperEvidenceService');
+const uploadEvidencePdf = multer({
+    limits: { fileSize: MAX_PDF_SIZE_BYTES }
+});
+
+function handleEvidenceUploadMiddleware(req, res, next) {
+    uploadEvidencePdf.single('file')(req, res, (err) => {
+        if (!err) return next();
+        if (err.code === 'LIMIT_FILE_SIZE') {
+            return res.status(413).json({
+                ok: false,
+                error: {
+                    code: 'DOCUMENT_SIZE_LIMIT_EXCEEDED',
+                    message: `PDF document exceeds the maximum allowed size of ${MAX_PDF_SIZE_BYTES} bytes (10 MB).`
+                }
+            });
+        }
+        return res.status(400).json({
+            ok: false,
+            error: {
+                code: 'INVALID_MULTIPART_UPLOAD',
+                message: err.message
+            }
+        });
+    });
+}
+
+function sendEvidenceError(res, err, fallbackCode) {
+    if (err instanceof PaperEvidenceError || (err && err.code && err.statusCode)) {
+        return res.status(err.statusCode || 400).json({
+            ok: false,
+            error: {
+                code: err.code,
+                message: err.message,
+                details: err.details || null
+            }
+        });
+    }
+    return res.status(500).json({
+        ok: false,
+        error: {
+            code: fallbackCode || 'EVIDENCE_OPERATION_FAILED',
+            message: err.message
+        }
+    });
+}
+
+/**
+ * -------------------------------------------------------------
+ * ITERATION I6 (RECOVERY-09): TECHNICAL ACCREDITATION & EVIDENCE HUB
+ * -------------------------------------------------------------
+ * Invariant: Approval of documentary or physical micrometer evidence
+ * NEVER automatically modifies productive `paper_variants.caliper_um`
+ * and NEVER promotes a binding profile to PRODUCTION_CERTIFIED.
+ */
+
+/**
+ * GET /api/v1/paper-suppliers/accreditation/missing-materials
+ * List the 252 missing-caliper materials with filtering by supplier, family,
+ * priority tier, accreditation track, and live evidence status.
+ */
+router.get('/accreditation/missing-materials', requireSupplierScope('VIEWER'), requireApprovedSupplier, async (req, res) => {
+    try {
+        const context = resolveActorContext(req);
+        const result = await paperEvidenceService.listMissingCaliperMaterials({
+            tenantId: context.tenantId,
+            supplierId: context.supplierId,
+            supplier: req.query.supplier || null,
+            family: req.query.family || null,
+            priorityTier: req.query.priorityTier || null,
+            track: req.query.track || null,
+            search: req.query.search || null,
+            page: parseInt(req.query.page || '1', 10),
+            limit: parseInt(req.query.limit || '25', 10)
+        });
+        return res.json({ ok: true, data: result });
+    } catch (err) {
+        console.error('[PAPER-SUPPLIERS][ACCREDITATION-LIST-ERROR]', err);
+        return sendEvidenceError(res, err, 'ACCREDITATION_LIST_FAILED');
+    }
+});
+
+/**
+ * GET /api/v1/paper-suppliers/accreditation/variants/:variantId/evidences
+ * Query caliper evidences, classification evidences, Spine provenance, and audit log for a variant.
+ */
+router.get('/accreditation/variants/:variantId/evidences', requireSupplierScope('VIEWER'), requireApprovedSupplier, async (req, res) => {
+    try {
+        const context = resolveActorContext(req);
+        const result = await paperEvidenceService.getVariantEvidences({
+            tenantId: context.tenantId,
+            variantId: req.params.variantId
+        });
+        return res.json({ ok: true, data: result });
+    } catch (err) {
+        console.error('[PAPER-SUPPLIERS][VARIANT-EVIDENCES-ERROR]', err);
+        return sendEvidenceError(res, err, 'VARIANT_EVIDENCES_QUERY_FAILED');
+    }
+});
+
+/**
+ * GET /api/v1/paper-suppliers/accreditation/variants/:variantId/history
+ * Query immutable traceability & audit history for a variant's technical evidences.
+ */
+router.get('/accreditation/variants/:variantId/history', requireSupplierScope('VIEWER'), requireApprovedSupplier, async (req, res) => {
+    try {
+        const context = resolveActorContext(req);
+        const result = await paperEvidenceService.getVariantEvidences({
+            tenantId: context.tenantId,
+            variantId: req.params.variantId
+        });
+        return res.json({
+            ok: true,
+            data: {
+                variant: result.variant,
+                spineProvenance: result.spineProvenance,
+                caliperEvidences: result.caliperEvidences,
+                auditHistory: result.auditHistory
+            }
+        });
+    } catch (err) {
+        console.error('[PAPER-SUPPLIERS][VARIANT-HISTORY-ERROR]', err);
+        return sendEvidenceError(res, err, 'VARIANT_HISTORY_QUERY_FAILED');
+    }
+});
+
+/**
+ * POST /api/v1/paper-suppliers/accreditation/evidences/documentary
+ * Register documentary caliper evidence (manufacturer datasheet or supplier declaration)
+ * with optional PDF attachment (`file` or `fileBase64`) and idempotency key.
+ */
+router.post('/accreditation/evidences/documentary', requireSupplierScope('OPERATOR'), requireApprovedSupplier, handleEvidenceUploadMiddleware, async (req, res) => {
+    try {
+        const context = resolveActorContext(req);
+        const role = req.verifiedSupplierContext?.role || context.role;
+        const body = req.body || {};
+        const fileBuffer = req.file ? req.file.buffer : (body.fileBase64 ? Buffer.from(body.fileBase64, 'base64') : null);
+        const fileName = req.file ? req.file.originalname : (body.fileName || null);
+        const idempotencyKey = req.headers['idempotency-key'] || body.idempotencyKey || null;
+
+        const result = await paperEvidenceService.registerDocumentaryEvidence({
+            tenantId: context.tenantId,
+            actorId: context.userId,
+            actorRole: role,
+            idempotencyKey,
+            payload: {
+                ...body,
+                fileBuffer,
+                fileName
+            }
+        });
+
+        return res.status(result.idempotentReplay ? 200 : 201).json({
+            ok: true,
+            data: result
+        });
+    } catch (err) {
+        console.error('[PAPER-SUPPLIERS][REGISTER-DOCUMENTARY-EVIDENCE-ERROR]', err);
+        return sendEvidenceError(res, err, 'REGISTER_DOCUMENTARY_EVIDENCE_FAILED');
+    }
+});
+
+/**
+ * POST /api/v1/paper-suppliers/accreditation/evidences/:evidenceId/attachment
+ * Attach or update a validated PDF datasheet (<= 10 MB, %PDF- magic header, SHA-256) on an evidence record.
+ */
+router.post('/accreditation/evidences/:evidenceId/attachment', requireSupplierScope('OPERATOR'), requireApprovedSupplier, handleEvidenceUploadMiddleware, async (req, res) => {
+    try {
+        const context = resolveActorContext(req);
+        const role = req.verifiedSupplierContext?.role || context.role;
+        const body = req.body || {};
+        const fileBuffer = req.file ? req.file.buffer : (body.fileBase64 ? Buffer.from(body.fileBase64, 'base64') : null);
+        const fileName = req.file ? req.file.originalname : (body.fileName || 'datasheet.pdf');
+
+        const result = await paperEvidenceService.attachPdfToEvidence({
+            tenantId: context.tenantId,
+            actorId: context.userId,
+            actorRole: role,
+            evidenceId: req.params.evidenceId,
+            fileBuffer,
+            fileName
+        });
+
+        return res.json({ ok: true, data: result });
+    } catch (err) {
+        console.error('[PAPER-SUPPLIERS][ATTACH-PDF-EVIDENCE-ERROR]', err);
+        return sendEvidenceError(res, err, 'ATTACH_PDF_EVIDENCE_FAILED');
+    }
+});
+
+/**
+ * POST /api/v1/paper-suppliers/accreditation/evidences/micrometer
+ * Register ISO 534 physical batch micrometer measurement (10 readings + ISO 187 conditioning).
+ */
+router.post('/accreditation/evidences/micrometer', requireSupplierScope('OPERATOR'), requireApprovedSupplier, async (req, res) => {
+    try {
+        const context = resolveActorContext(req);
+        const role = req.verifiedSupplierContext?.role || context.role;
+        const body = req.body || {};
+        const idempotencyKey = req.headers['idempotency-key'] || body.idempotencyKey || null;
+
+        const result = await paperEvidenceService.registerPhysicalMicrometerEvidence({
+            tenantId: context.tenantId,
+            actorId: context.userId,
+            actorRole: role,
+            idempotencyKey,
+            payload: body
+        });
+
+        return res.status(result.idempotentReplay ? 200 : 201).json({
+            ok: true,
+            data: result
+        });
+    } catch (err) {
+        console.error('[PAPER-SUPPLIERS][REGISTER-MICROMETER-EVIDENCE-ERROR]', err);
+        return sendEvidenceError(res, err, 'REGISTER_MICROMETER_EVIDENCE_FAILED');
+    }
+});
+
+/**
+ * POST /api/v1/paper-suppliers/accreditation/evidences/:evidenceId/submit
+ * Submit a DRAFT evidence record to PENDING_TECH_REVIEW.
+ */
+router.post('/accreditation/evidences/:evidenceId/submit', requireSupplierScope('OPERATOR'), requireApprovedSupplier, async (req, res) => {
+    try {
+        const context = resolveActorContext(req);
+        const role = req.verifiedSupplierContext?.role || context.role;
+
+        const result = await paperEvidenceService.submitEvidenceForReview({
+            tenantId: context.tenantId,
+            actorId: context.userId,
+            actorRole: role,
+            evidenceId: req.params.evidenceId,
+            reason: req.body?.reason || null
+        });
+
+        return res.json({ ok: true, data: result });
+    } catch (err) {
+        console.error('[PAPER-SUPPLIERS][SUBMIT-EVIDENCE-ERROR]', err);
+        return sendEvidenceError(res, err, 'SUBMIT_EVIDENCE_FAILED');
+    }
+});
+
+/**
+ * POST /api/v1/paper-suppliers/accreditation/evidences/:evidenceId/review
+ * Approve or reject an evidence record as a qualified Technologist / Admin.
+ * Enforces strict Segregation of Duties (`submitted_by !== approved_by_technologist`)
+ * and does NOT automatically modify `paper_variants.caliper_um`.
+ */
+router.post('/accreditation/evidences/:evidenceId/review', requireSupplierScope('ADMIN'), requireApprovedSupplier, async (req, res) => {
+    try {
+        const context = resolveActorContext(req);
+        const role = req.verifiedSupplierContext?.role || context.role;
+        const body = req.body || {};
+
+        const result = await paperEvidenceService.reviewEvidence({
+            tenantId: context.tenantId,
+            actorId: context.userId,
+            actorRole: role,
+            evidenceId: req.params.evidenceId,
+            decision: body.decision,
+            reason: body.reason,
+            acknowledgeContradiction: Boolean(body.acknowledgeContradiction)
+        });
+
+        return res.json({ ok: true, data: result });
+    } catch (err) {
+        console.error('[PAPER-SUPPLIERS][REVIEW-EVIDENCE-ERROR]', err);
+        return sendEvidenceError(res, err, 'REVIEW_EVIDENCE_FAILED');
+    }
+});
+
 module.exports = router;
 
 

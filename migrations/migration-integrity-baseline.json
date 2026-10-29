@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-10-28T13:39:03.578Z",
+  "generatedAt": "2026-10-29T10:40:14.839Z",
   "hashAlgorithm": "sha256",
   "contentNormalization": "utf8-lf-v1",
   "approvedPrefixCollisions": {
@@ -2330,6 +2330,19 @@
       "canonicalSha256": "29275551c2fc770880a4dfa66121f29859852e97bf3ec055a1118f1261b7a9ae",
       "contentNormalization": "utf8-lf-v1",
       "sizeBytes": 5244,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/174_phase197c_paper_evidence_and_technical_accreditation.sql",
+      "prefix": "174",
+      "canonicalSha256": "1edba7a63ca3b3a20cb7cb5971e8e628e40e35655377b863581f90db20a0ba82",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 9709,
       "containsDdl": true,
       "containsDml": true,
       "containsTransaction": false,

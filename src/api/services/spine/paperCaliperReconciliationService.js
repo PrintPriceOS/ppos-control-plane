@@ -246,10 +246,79 @@ function evaluateVariantCaliperReconciliation(variant, referenceRows = LIVONIA_P
 }
 
 /**
+ * Classifies the 5-tier epistemic provenance of a variant's caliper and approved evidence:
+ * 1. MANUFACTURER_NOMINAL_DATASHEET ('MANUFACTURER_DATASHEET' + 'REFERENCE_IMPORTED' or 'VERIFIED')
+ * 2. SUPPLIER_IMPORTED_REFERENCE ('SUPPLIER_IMPORT' or 'LIVONIA_REFERENCE_IMPORT' + 'REFERENCE_IMPORTED')
+ * 3. PHYSICAL_BATCH_MICROMETER ('MEASURED_MICROMETER' + 'VERIFIED')
+ * 4. APPROVED_TECHNICAL_EVIDENCE (Approved evidence in paper_variant_caliper_evidence not yet promoted to paper_variants.caliper_um)
+ * 5. MANUFACTURING_RELEASE_CERTIFIED (Requires both VERIFIED caliper AND PRODUCTION_CERTIFIED binding profile — never unlocked by documentary approval alone)
+ */
+function classifyCaliperEvidenceTier(resolvedSource, resolvedConfidence, approvedEvidence = null) {
+    let provenanceTier = 'UNACCREDITED_MISSING';
+    if (resolvedSource === 'MEASURED_MICROMETER' && resolvedConfidence === 'VERIFIED') {
+        provenanceTier = 'PHYSICAL_BATCH_MICROMETER';
+    } else if (resolvedSource === 'MANUFACTURER_DATASHEET') {
+        provenanceTier = 'MANUFACTURER_NOMINAL_DATASHEET';
+    } else if (resolvedSource === 'LIVONIA_REFERENCE_IMPORT' || resolvedSource === 'SUPPLIER_IMPORT') {
+        provenanceTier = 'SUPPLIER_IMPORTED_REFERENCE';
+    } else if (resolvedConfidence === 'PROVISIONAL_ESTIMATED') {
+        provenanceTier = 'PROVISIONAL_ESTIMATE';
+    } else if (
+        approvedEvidence &&
+        (approvedEvidence.review_status === 'APPROVED_FOR_TECHNICAL_USE' ||
+         approvedEvidence.review_status === 'CERTIFIED_MEASURED' ||
+         approvedEvidence.status === 'APPROVED_FOR_TECHNICAL_USE' ||
+         approvedEvidence.status === 'CERTIFIED_MEASURED')
+    ) {
+        provenanceTier = 'APPROVED_TECHNICAL_EVIDENCE_PENDING_PROMOTION';
+    }
+
+    return {
+        provenanceTier,
+        evidenceTier: provenanceTier,
+        isManufacturerNominalDatasheet: resolvedSource === 'MANUFACTURER_DATASHEET',
+        isSupplierImportedReference: resolvedSource === 'LIVONIA_REFERENCE_IMPORT' || resolvedSource === 'SUPPLIER_IMPORT',
+        isPhysicalBatchMicrometer: resolvedSource === 'MEASURED_MICROMETER',
+        hasApprovedTechnicalEvidence: Boolean(
+            approvedEvidence &&
+            (approvedEvidence.review_status === 'APPROVED_FOR_TECHNICAL_USE' ||
+             approvedEvidence.review_status === 'CERTIFIED_MEASURED' ||
+             approvedEvidence.status === 'APPROVED_FOR_TECHNICAL_USE' ||
+             approvedEvidence.status === 'CERTIFIED_MEASURED')
+        ),
+        approvedEvidenceSummary: approvedEvidence
+            ? {
+                evidenceId: approvedEvidence.evidence_id || approvedEvidence.evidenceId || approvedEvidence.id || null,
+                evidenceType: approvedEvidence.evidence_type || approvedEvidence.evidenceType || approvedEvidence.source_kind || null,
+                reviewStatus: approvedEvidence.review_status || approvedEvidence.reviewStatus || approvedEvidence.status || null,
+                nominalDatasheetCaliperUm: approvedEvidence.nominal_datasheet_caliper_um !== undefined && approvedEvidence.nominal_datasheet_caliper_um !== null
+                    ? Number(approvedEvidence.nominal_datasheet_caliper_um)
+                    : null,
+                measuredBatchCaliperUm: approvedEvidence.measured_batch_caliper_um !== undefined && approvedEvidence.measured_batch_caliper_um !== null
+                    ? Number(approvedEvidence.measured_batch_caliper_um)
+                    : null,
+                proposedEffectiveCaliperUm: approvedEvidence.proposed_effective_caliper_um !== undefined && approvedEvidence.proposed_effective_caliper_um !== null
+                    ? Number(approvedEvidence.proposed_effective_caliper_um)
+                    : (approvedEvidence.proposed_caliper_um !== undefined && approvedEvidence.proposed_caliper_um !== null ? Number(approvedEvidence.proposed_caliper_um) : null),
+                proposedCaliperUm: approvedEvidence.proposed_effective_caliper_um !== undefined && approvedEvidence.proposed_effective_caliper_um !== null
+                    ? Number(approvedEvidence.proposed_effective_caliper_um)
+                    : (approvedEvidence.proposed_caliper_um !== undefined && approvedEvidence.proposed_caliper_um !== null ? Number(approvedEvidence.proposed_caliper_um) : null),
+                appliedToCatalogVariant: Boolean(approvedEvidence.applied_to_catalog_variant || approvedEvidence.appliedToCatalogVariant),
+                hasSourceContradiction: Boolean(approvedEvidence.has_source_contradiction || approvedEvidence.hasSourceContradiction),
+                approvedByTechnologist: approvedEvidence.approved_by_technologist || approvedEvidence.approvedByTechnologist || null
+            }
+            : null,
+        canPromoteProfileToProductionCertified: false
+    };
+}
+
+/**
  * Resolves the effective caliper and epistemic provenance of a variant or segment input.
  * Never invents a caliper from gsm or category.
+ * Accepts optional approvedEvidence from paper_variant_caliper_evidence without automatically overriding
+ * paper_variants.caliper_um unless explicitly promoted.
  */
-function resolveVariantCaliperProvenance(variantOrSegment = {}) {
+function resolveVariantCaliperProvenance(variantOrSegment = {}, approvedEvidence = null) {
     const rawCaliperUm = variantOrSegment.caliper_um !== undefined && variantOrSegment.caliper_um !== null
         ? variantOrSegment.caliper_um
         : variantOrSegment.caliperUm;
@@ -270,13 +339,15 @@ function resolveVariantCaliperProvenance(variantOrSegment = {}) {
     const bulkFactor = extractDeclaredBulkFromVariant(variantOrSegment);
 
     if (caliperUm === null || !Number.isFinite(caliperUm) || caliperUm <= 0) {
+        const tierMeta = classifyCaliperEvidenceTier('NONE', 'MISSING', approvedEvidence);
         return {
             caliperUm: null,
             caliperMm: null,
             bulkFactor,
             caliperSource: 'NONE',
             caliperConfidenceStatus: 'MISSING',
-            caliperRevision: Number(variantOrSegment.caliper_revision || variantOrSegment.caliperRevision || 1)
+            caliperRevision: Number(variantOrSegment.caliper_revision || variantOrSegment.caliperRevision || 1),
+            ...tierMeta
         };
     }
 
@@ -304,21 +375,36 @@ function resolveVariantCaliperProvenance(variantOrSegment = {}) {
             : 'PROVISIONAL_ESTIMATED';
     }
 
+    const tierMeta = classifyCaliperEvidenceTier(resolvedSource, resolvedConfidence, approvedEvidence);
+
     return {
         caliperUm: Number(caliperUm.toFixed(2)),
         caliperMm: Number((caliperUm / 1000).toFixed(4)),
         bulkFactor,
         caliperSource: resolvedSource,
         caliperConfidenceStatus: resolvedConfidence,
-        caliperRevision: Number(variantOrSegment.caliper_revision || variantOrSegment.caliperRevision || 1)
+        caliperRevision: Number(variantOrSegment.caliper_revision || variantOrSegment.caliperRevision || 1),
+        ...tierMeta
     };
 }
+
+const CALIPER_CONFIDENCE_STATUSES = Object.freeze({
+    VERIFIED: 'VERIFIED',
+    VERIFIED_DATASHEET: 'VERIFIED',
+    MEASURED_BATCH: 'VERIFIED',
+    REFERENCE_IMPORTED: 'REFERENCE_IMPORTED',
+    PROVISIONAL_ESTIMATED: 'PROVISIONAL_ESTIMATED',
+    UNVERIFIED: 'MISSING',
+    MISSING: 'MISSING'
+});
 
 module.exports = {
     LIVONIA_PAPER_REFERENCE_SUMMARY,
     LIVONIA_PAPER_REFERENCE_ROWS,
+    CALIPER_CONFIDENCE_STATUSES,
     normalizePaperFamilyName,
     extractDeclaredBulkFromVariant,
     evaluateVariantCaliperReconciliation,
+    classifyCaliperEvidenceTier,
     resolveVariantCaliperProvenance
 };
