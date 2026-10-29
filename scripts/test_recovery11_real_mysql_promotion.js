@@ -84,6 +84,7 @@ async function runRealMysqlRecovery11Validation() {
                 brand VARCHAR(128) NULL,
                 manufacturer VARCHAR(128) NULL,
                 category ENUM('CARTON', 'OFFSET', 'COATED', 'UNCOATED', 'DESIGN', 'DIGITAL', 'OTHER') NOT NULL DEFAULT 'OTHER',
+                finish_summary VARCHAR(128) NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
