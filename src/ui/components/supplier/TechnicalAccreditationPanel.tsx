@@ -56,11 +56,21 @@ export const TechnicalAccreditationPanel: React.FC<TechnicalAccreditationPanelPr
 
     // Selected Variant & Modals
     const [selectedItem, setSelectedItem] = useState<any>(null);
-    const [activeModal, setActiveModal] = useState<'DATASHEET' | 'MICROMETER' | 'REVIEW' | 'HISTORY' | null>(null);
+    const [activeModal, setActiveModal] = useState<'DATASHEET' | 'MICROMETER' | 'REVIEW' | 'PROMOTE' | 'HISTORY' | null>(null);
     const [variantHistoryData, setVariantHistoryData] = useState<any>(null);
+    const [promotionData, setPromotionData] = useState<any>(null);
+    const [promotionPreview, setPromotionPreview] = useState<any>(null);
     const [loadingHistory, setLoadingHistory] = useState<boolean>(false);
     const [submitting, setSubmitting] = useState<boolean>(false);
     const [modalError, setModalError] = useState<string | null>(null);
+
+    // Governed Promotion Form (RECOVERY-11)
+    const [promoteForm, setPromoteForm] = useState({
+        evidenceId: '',
+        actionMode: 'AUTHORIZE' as 'REQUEST' | 'AUTHORIZE' | 'REVERT',
+        reason: '',
+        acknowledgeContradiction: false
+    });
 
     // Datasheet Form
     const [datasheetForm, setDatasheetForm] = useState({
@@ -138,7 +148,7 @@ export const TechnicalAccreditationPanel: React.FC<TechnicalAccreditationPanelPr
         fetchMissingMaterials(1, search, supplierFilter, priorityFilter, trackFilter, familyFilter);
     }, []);
 
-    const loadVariantDetailAndOpen = async (item: any, mode: 'DATASHEET' | 'MICROMETER' | 'REVIEW' | 'HISTORY') => {
+    const loadVariantDetailAndOpen = async (item: any, mode: 'DATASHEET' | 'MICROMETER' | 'REVIEW' | 'PROMOTE' | 'HISTORY') => {
         setSelectedItem(item);
         setModalError(null);
         setActiveModal(mode);
@@ -168,7 +178,7 @@ export const TechnicalAccreditationPanel: React.FC<TechnicalAccreditationPanelPr
             });
         }
 
-        if (mode === 'REVIEW' || mode === 'HISTORY') {
+        if (mode === 'REVIEW' || mode === 'HISTORY' || mode === 'PROMOTE') {
             setLoadingHistory(true);
             try {
                 const res = await paperSupplierFetch<any>(
@@ -186,11 +196,104 @@ export const TechnicalAccreditationPanel: React.FC<TechnicalAccreditationPanelPr
                         });
                     }
                 }
+
+                if (mode === 'PROMOTE') {
+                    const promoRes = await paperSupplierFetch<any>(
+                        `/api/v1/paper-suppliers/accreditation/variants/${item.variantId}/promotions`
+                    );
+                    if (promoRes && promoRes.ok && promoRes.data) {
+                        setPromotionData(promoRes.data);
+                        setPromotionPreview(promoRes.data.promotionPreview || null);
+                        const initialEvId =
+                            promoRes.data.promotedEvidence?.id ||
+                            promoRes.data.approvedEvidences?.[0]?.id ||
+                            promoRes.data.promotionPreview?.evidence?.evidenceId ||
+                            '';
+                        const isPromoted = Boolean(promoRes.data.promotedEvidence);
+                        setPromoteForm({
+                            evidenceId: initialEvId,
+                            actionMode: isPromoted ? 'REVERT' : (isTechnologistOrAdmin ? 'AUTHORIZE' : 'REQUEST'),
+                            reason: '',
+                            acknowledgeContradiction: false
+                        });
+                    }
+                }
             } catch (err: any) {
                 setModalError(err.message || 'Failed to load variant evidence details.');
             } finally {
                 setLoadingHistory(false);
             }
+        }
+    };
+
+    const handleSelectPromotionEvidence = async (variantId: string, evidenceId: string) => {
+        setPromoteForm((prev) => ({ ...prev, evidenceId }));
+        if (!variantId || !evidenceId) return;
+        try {
+            const prevRes = await paperSupplierFetch<any>(
+                `/api/v1/paper-suppliers/accreditation/variants/${variantId}/evidences/${evidenceId}/promotion-preview`
+            );
+            if (prevRes && prevRes.ok && prevRes.data) {
+                setPromotionPreview(prevRes.data);
+            }
+        } catch (err: any) {
+            setModalError(err.message || 'Failed to load promotion preview.');
+        }
+    };
+
+    const handleSubmitPromotion = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!selectedItem || !promoteForm.evidenceId) return;
+        setSubmitting(true);
+        setModalError(null);
+
+        const variantId = selectedItem.variantId;
+        const evidenceId = promoteForm.evidenceId;
+        const expectedRev = promotionPreview?.variant?.currentRevision;
+
+        try {
+            let endpoint = `/api/v1/paper-suppliers/accreditation/variants/${variantId}/evidences/${evidenceId}/promotions/authorize`;
+            if (promoteForm.actionMode === 'REQUEST') {
+                endpoint = `/api/v1/paper-suppliers/accreditation/variants/${variantId}/evidences/${evidenceId}/promotions/request`;
+            } else if (promoteForm.actionMode === 'REVERT') {
+                endpoint = `/api/v1/paper-suppliers/accreditation/variants/${variantId}/evidences/${evidenceId}/promotions/revert`;
+            }
+
+            const res = await paperSupplierFetch<any>(endpoint, {
+                method: 'POST',
+                headers: {
+                    'Idempotency-Key': `promo-${promoteForm.actionMode.toLowerCase()}-${variantId}-${evidenceId}-${Date.now()}`
+                },
+                body: JSON.stringify({
+                    reason: promoteForm.reason,
+                    expectedCaliperRevision: expectedRev,
+                    acknowledgeContradiction: promoteForm.acknowledgeContradiction
+                })
+            });
+
+            if (res && res.ok) {
+                if (onNotify) {
+                    if (promoteForm.actionMode === 'REQUEST') {
+                        onNotify(
+                            `Promotion requested (${res.data.promotionRequestId}) for ${variantId}. Productive caliper remains NULL until authorized.`
+                        );
+                    } else if (promoteForm.actionMode === 'REVERT') {
+                        onNotify(
+                            `Promotion reverted for ${variantId} (restored caliper_um=${String(res.data.restoredCaliperUm)}, rev ${res.data.newRevision}).`
+                        );
+                    } else {
+                        onNotify(
+                            `Catalog caliper promoted for ${variantId}: ${res.data.newCaliperUm} µm (${res.data.newCaliperSource}, rev ${res.data.newRevision}). canReleaseToManufacturing = false.`
+                        );
+                    }
+                }
+                setActiveModal(null);
+                fetchMissingMaterials(page, search, supplierFilter, priorityFilter, trackFilter, familyFilter);
+            }
+        } catch (err: any) {
+            setModalError(err.message || 'Governed promotion operation failed.');
+        } finally {
+            setSubmitting(false);
         }
     };
 
@@ -629,9 +732,15 @@ export const TechnicalAccreditationPanel: React.FC<TechnicalAccreditationPanelPr
                                         <td className="py-3 px-4">
                                             <div className="flex flex-col gap-1 items-start">
                                                 {renderEvidenceStatusBadge(item.evidenceStatus)}
+                                                {item.appliedToCatalogVariant && (
+                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 font-mono">
+                                                        <CheckCircleIcon className="w-3 h-3" />
+                                                        {t('supplier.accreditation.promoteAppliedBadge')}
+                                                    </span>
+                                                )}
                                                 {item.latestProposedCaliperUm && (
                                                     <span className="font-mono text-[11px] text-slate-700 dark:text-zinc-300">
-                                                        Proposed: <strong>{item.latestProposedCaliperUm} µm</strong> (prod: NULL)
+                                                        Proposed: <strong>{item.latestProposedCaliperUm} µm</strong> (prod: {item.appliedToCatalogVariant ? `${item.latestProposedCaliperUm} µm` : 'NULL'})
                                                     </span>
                                                 )}
                                                 {item.hasSourceContradiction && (
@@ -670,6 +779,16 @@ export const TechnicalAccreditationPanel: React.FC<TechnicalAccreditationPanelPr
                                                         className="px-2.5 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white font-semibold text-[11px] cursor-pointer"
                                                     >
                                                         {t('supplier.accreditation.btnReview')}
+                                                    </button>
+                                                )}
+                                                {(item.evidenceCount > 0 || item.evidenceStatus === 'APPROVED_FOR_TECHNICAL_USE' || item.evidenceStatus === 'CERTIFIED_MEASURED') && (
+                                                    <button
+                                                        type="button"
+                                                        data-testid={`btn-promote-${item.variantId}`}
+                                                        onClick={() => loadVariantDetailAndOpen(item, 'PROMOTE')}
+                                                        className="px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-[11px] cursor-pointer"
+                                                    >
+                                                        {t('supplier.accreditation.btnPromote')}
                                                     </button>
                                                 )}
                                                 <button
@@ -1134,7 +1253,326 @@ export const TechnicalAccreditationPanel: React.FC<TechnicalAccreditationPanelPr
                 )}
             </AccessibleModal>
 
-            {/* MODAL 4: IMMUTABLE EVIDENCE & AUDIT HISTORY */}
+            {/* MODAL 4: GOVERNED PROMOTION OF APPROVED EVIDENCE TO CATALOG (RECOVERY-11) */}
+            <AccessibleModal
+                isOpen={activeModal === 'PROMOTE' && Boolean(selectedItem)}
+                onClose={() => setActiveModal(null)}
+                title={t('supplier.accreditation.modalPromoteTitle')}
+                maxWidthClass="max-w-3xl"
+            >
+                {selectedItem && (
+                    <form onSubmit={handleSubmitPromotion} className="space-y-4 text-xs" data-testid="promotion-modal">
+                        {/* Material Identification Header */}
+                        <div className="p-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                            <div>
+                                <div className="font-bold text-slate-900 dark:text-white text-sm">{selectedItem.displayName}</div>
+                                <div className="font-mono text-[11px] text-zinc-500 mt-0.5">
+                                    ID: {selectedItem.variantId} · SKU: {selectedItem.odsCode || 'N/A'} · {selectedItem.gsm} g/m² · {selectedItem.widthMm}×{selectedItem.heightMm} mm
+                                </div>
+                            </div>
+                            <div className="font-mono text-[11px] flex items-center gap-2">
+                                <span className="px-2 py-1 rounded-lg bg-zinc-200/70 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700">
+                                    CAS Rev: <strong>{promotionPreview?.variant?.currentRevision ?? 1}</strong> →{' '}
+                                    <strong>{promotionPreview?.comparison?.nextRevision ?? 2}</strong>
+                                </span>
+                                <span className="px-2 py-1 rounded-lg bg-red-500/15 border border-red-500/30 text-red-600 dark:text-red-400 font-bold">
+                                    canReleaseToManufacturing: false
+                                </span>
+                            </div>
+                        </div>
+
+                        {modalError && (
+                            <div className="p-3 rounded-xl bg-red-500/15 border border-red-500/40 text-red-600 dark:text-red-400 font-semibold" data-testid="promotion-modal-error">
+                                {modalError}
+                            </div>
+                        )}
+
+                        {loadingHistory ? (
+                            <div className="py-8 text-center text-zinc-400">Loading promotion contract & Spine impact preview...</div>
+                        ) : (
+                            <>
+                                {/* Candidate Evidence Selector */}
+                                <div>
+                                    <label className="block font-semibold mb-1">Approved Evidence Candidate</label>
+                                    <select
+                                        value={promoteForm.evidenceId}
+                                        onChange={(e) => handleSelectPromotionEvidence(selectedItem.variantId, e.target.value)}
+                                        className="w-full px-3 py-2 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 font-mono"
+                                        data-testid="promotion-evidence-select"
+                                    >
+                                        {(variantHistoryData?.caliperEvidences || []).map((ev: any) => (
+                                            <option key={ev.id} value={ev.id}>
+                                                {ev.id} · {ev.source_kind} · {ev.proposed_caliper_um} µm · {ev.status}
+                                                {ev.applied_to_catalog_variant ? ' [PROMOTED]' : ''}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                {/* 1. Caliper Comparison & Provenance Grid */}
+                                {promotionPreview && (
+                                    <div className="p-3.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 space-y-3" data-testid="promotion-comparison-card">
+                                        <div className="font-bold uppercase tracking-wider text-[11px] text-zinc-500">
+                                            {t('supplier.accreditation.promoteComparisonTitle')}
+                                        </div>
+                                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 font-mono">
+                                            <div className="p-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800">
+                                                <div className="text-[10px] text-zinc-500">{t('supplier.accreditation.promoteCurrentCaliper')}</div>
+                                                <div className="text-sm font-black text-slate-900 dark:text-white mt-0.5" data-testid="promo-current-caliper">
+                                                    {promotionPreview.comparison.currentCaliperUm !== null
+                                                        ? `${promotionPreview.comparison.currentCaliperUm} µm`
+                                                        : 'NULL (Missing)'}
+                                                </div>
+                                                <div className="text-[10px] text-zinc-400">
+                                                    {promotionPreview.comparison.currentSource} · {promotionPreview.comparison.currentConfidence}
+                                                </div>
+                                            </div>
+                                            <div className="p-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30">
+                                                <div className="text-[10px] text-emerald-700 dark:text-emerald-300">{t('supplier.accreditation.promoteProposedCaliper')}</div>
+                                                <div className="text-sm font-black text-emerald-700 dark:text-emerald-300 mt-0.5" data-testid="promo-proposed-caliper">
+                                                    {promotionPreview.comparison.proposedCaliperUm} µm
+                                                </div>
+                                                <div className="text-[10px] text-emerald-600 dark:text-emerald-400">
+                                                    ({promotionPreview.evidence.proposedCaliperMm} mm · Bulk {promotionPreview.evidence.proposedBulkFactor})
+                                                </div>
+                                            </div>
+                                            <div className="p-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800">
+                                                <div className="text-[10px] text-zinc-500">{t('supplier.accreditation.promoteDelta')}</div>
+                                                <div className="text-sm font-black text-slate-900 dark:text-white mt-0.5" data-testid="promo-delta">
+                                                    {promotionPreview.comparison.deltaUm !== null
+                                                        ? `${promotionPreview.comparison.deltaUm > 0 ? '+' : ''}${promotionPreview.comparison.deltaUm} µm (${promotionPreview.comparison.deltaPct}%)`
+                                                        : `+${promotionPreview.comparison.proposedCaliperUm} µm (NEW)`}
+                                                </div>
+                                                <div className="text-[10px] text-zinc-400">
+                                                    {promotionPreview.comparison.comparisonMode}
+                                                </div>
+                                            </div>
+                                            <div className="p-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800">
+                                                <div className="text-[10px] text-zinc-500">{t('supplier.accreditation.promoteSourceAndConfidence')}</div>
+                                                <div className="text-[11px] font-bold text-slate-900 dark:text-white mt-0.5">
+                                                    {promotionPreview.comparison.targetSource}
+                                                </div>
+                                                <div className="text-[10px] text-amber-600 dark:text-amber-400 font-bold">
+                                                    {promotionPreview.comparison.targetConfidence}
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {promotionPreview.evidence.documentSha256 && (
+                                            <div className="text-[11px] font-mono text-zinc-500 flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-zinc-100 dark:border-zinc-800">
+                                                <span className="truncate">
+                                                    Doc: <strong>{promotionPreview.evidence.documentTitle || promotionPreview.evidence.documentFileName}</strong> (Rev: {promotionPreview.evidence.datasheetVersion || 'N/A'})
+                                                </span>
+                                                <span className="truncate text-[10px]">
+                                                    SHA-256: {promotionPreview.evidence.documentSha256.slice(0, 24)}...
+                                                </span>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
+                                {/* 2. Spine Calculator Impact Before vs After */}
+                                {promotionPreview?.spineImpact && (
+                                    <div className="p-3.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/70 dark:bg-zinc-900/60 space-y-2.5" data-testid="promotion-spine-impact-card">
+                                        <div className="font-bold uppercase tracking-wider text-[11px] text-zinc-500">
+                                            {t('supplier.accreditation.promoteSpineImpactTitle')}
+                                        </div>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 font-mono text-[11px]">
+                                            <div className="p-2.5 rounded-lg bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800">
+                                                <div className="font-bold text-zinc-500 mb-1">{t('supplier.accreditation.promoteSpineBefore')}</div>
+                                                {promotionPreview.spineImpact.beforePromotion?.available ? (
+                                                    <div className="space-y-0.5">
+                                                        <div>
+                                                            GLUED: Block <strong>{promotionPreview.spineImpact.beforePromotion.softcover200ppGlued.netBlockMm} mm</strong> → Spine <strong>{promotionPreview.spineImpact.beforePromotion.softcover200ppGlued.spineWidthMm} mm</strong>
+                                                        </div>
+                                                        <div>
+                                                            SEWN: Block <strong>{promotionPreview.spineImpact.beforePromotion.softcover200ppSewn.netBlockMm} mm</strong> → Spine <strong>{promotionPreview.spineImpact.beforePromotion.softcover200ppSewn.spineWidthMm} mm</strong>
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <div className="text-red-600 dark:text-red-400 font-bold">
+                                                        422 MISSING_PAPER_CALIPER (caliper_um = NULL)
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <div className="p-2.5 rounded-lg bg-white dark:bg-zinc-950 border border-emerald-500/30">
+                                                <div className="font-bold text-emerald-700 dark:text-emerald-300 mb-1">{t('supplier.accreditation.promoteSpineAfter')}</div>
+                                                {promotionPreview.spineImpact.afterPromotion?.available ? (
+                                                    <div className="space-y-0.5">
+                                                        <div>
+                                                            GLUED: Block <strong>{promotionPreview.spineImpact.afterPromotion.softcover200ppGlued.netBlockMm} mm</strong> → Spine <strong>{promotionPreview.spineImpact.afterPromotion.softcover200ppGlued.spineWidthMm} mm</strong>
+                                                        </div>
+                                                        <div>
+                                                            SEWN: Block <strong>{promotionPreview.spineImpact.afterPromotion.softcover200ppSewn.netBlockMm} mm</strong> → Spine <strong>{promotionPreview.spineImpact.afterPromotion.softcover200ppSewn.spineWidthMm} mm</strong>
+                                                        </div>
+                                                        <div className="text-[10px] text-zinc-500 pt-0.5">
+                                                            Profile Tier: {promotionPreview.spineImpact.afterPromotion.profileCertificationTier} · canReleaseToManufacturing: <strong className="text-red-500">false</strong>
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <div className="text-zinc-400">N/A</div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* 3. 3-Way Segregation of Duties (SoD) & Decision Chain */}
+                                {promotionPreview?.governance?.segregationOfDuties && (
+                                    <div className="p-3.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 space-y-2" data-testid="promotion-sod-card">
+                                        <div className="font-bold uppercase tracking-wider text-[11px] text-zinc-500">
+                                            {t('supplier.accreditation.promoteSodChainTitle')}
+                                        </div>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 font-mono text-[11px]">
+                                            <div className="p-2 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800">
+                                                <div className="text-[10px] text-zinc-400">{t('supplier.accreditation.promoteStepSubmitted')}</div>
+                                                <div className="font-bold text-slate-900 dark:text-white truncate">
+                                                    {promotionPreview.governance.segregationOfDuties.submittedBy || '—'}
+                                                </div>
+                                            </div>
+                                            <div className="p-2 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800">
+                                                <div className="text-[10px] text-zinc-400">{t('supplier.accreditation.promoteStepApproved')}</div>
+                                                <div className="font-bold text-slate-900 dark:text-white truncate">
+                                                    {promotionPreview.governance.segregationOfDuties.approvedByTechnologist || 'PENDING'}
+                                                </div>
+                                            </div>
+                                            <div className="p-2 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800">
+                                                <div className="text-[10px] text-zinc-400">{t('supplier.accreditation.promoteStepRequested')}</div>
+                                                <div className="font-bold text-slate-900 dark:text-white truncate">
+                                                    {promotionPreview.governance.segregationOfDuties.requestedBy || 'Direct / Pending'}
+                                                </div>
+                                            </div>
+                                            <div className="p-2 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800">
+                                                <div className="text-[10px] text-zinc-400">{t('supplier.accreditation.promoteStepAuthorized')}</div>
+                                                <div className="font-bold text-emerald-700 dark:text-emerald-400 truncate">
+                                                    {user?.id || user?.email || 'Distinct Admin Required'}
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {(promotionPreview.governance.blockingReasons || []).length > 0 && (
+                                            <div className="p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-800 dark:text-amber-300 space-y-1 text-[11px]">
+                                                {promotionPreview.governance.blockingReasons.map((br: any, idx: number) => (
+                                                    <div key={idx} className="font-mono">
+                                                        • <strong>{br.code}:</strong> {br.message}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
+                                {/* 4. Action Selector (Request / Authorize / Revert) & Reason */}
+                                {!isReadOnly && (
+                                    <div className="space-y-3 pt-1">
+                                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                                            <button
+                                                type="button"
+                                                onClick={() => setPromoteForm({ ...promoteForm, actionMode: 'REQUEST' })}
+                                                className={`py-2 px-3 rounded-xl font-bold border text-[11px] cursor-pointer ${
+                                                    promoteForm.actionMode === 'REQUEST'
+                                                        ? 'bg-blue-600 text-white border-blue-600'
+                                                        : 'border-zinc-300 dark:border-zinc-700'
+                                                }`}
+                                                data-testid="promo-mode-request"
+                                            >
+                                                {t('supplier.accreditation.promoteBtnRequest')}
+                                            </button>
+                                            {isTechnologistOrAdmin && (
+                                                <>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setPromoteForm({ ...promoteForm, actionMode: 'AUTHORIZE' })}
+                                                        className={`py-2 px-3 rounded-xl font-bold border text-[11px] cursor-pointer ${
+                                                            promoteForm.actionMode === 'AUTHORIZE'
+                                                                ? 'bg-emerald-600 text-white border-emerald-600'
+                                                                : 'border-zinc-300 dark:border-zinc-700'
+                                                        }`}
+                                                        data-testid="promo-mode-authorize"
+                                                    >
+                                                        {t('supplier.accreditation.promoteBtnAuthorize')}
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setPromoteForm({ ...promoteForm, actionMode: 'REVERT' })}
+                                                        className={`py-2 px-3 rounded-xl font-bold border text-[11px] cursor-pointer ${
+                                                            promoteForm.actionMode === 'REVERT'
+                                                                ? 'bg-red-600 text-white border-red-600'
+                                                                : 'border-zinc-300 dark:border-zinc-700'
+                                                        }`}
+                                                        data-testid="promo-mode-revert"
+                                                    >
+                                                        {t('supplier.accreditation.promoteBtnRevert')}
+                                                    </button>
+                                                </>
+                                            )}
+                                        </div>
+
+                                        {promotionPreview?.evidence?.hasSourceContradiction && promoteForm.actionMode === 'AUTHORIZE' && (
+                                            <label className="flex items-start gap-2 cursor-pointer">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={promoteForm.acknowledgeContradiction}
+                                                    onChange={(e) =>
+                                                        setPromoteForm({ ...promoteForm, acknowledgeContradiction: e.target.checked })
+                                                    }
+                                                    className="mt-0.5"
+                                                />
+                                                <span>{t('supplier.accreditation.ackContradictionLabel')}</span>
+                                            </label>
+                                        )}
+
+                                        <div>
+                                            <label className="block font-semibold mb-1">{t('supplier.accreditation.fieldNotes')} *</label>
+                                            <textarea
+                                                rows={2}
+                                                required
+                                                placeholder="Mandatory governance justification (min 5 characters)..."
+                                                value={promoteForm.reason}
+                                                onChange={(e) => setPromoteForm({ ...promoteForm, reason: e.target.value })}
+                                                className="w-full px-3 py-2 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900"
+                                                data-testid="promo-reason-input"
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+
+                                <div className="p-2.5 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-[11px] text-zinc-600 dark:text-zinc-300">
+                                    {t('supplier.accreditation.promoteLockNotice')}
+                                </div>
+
+                                <div className="flex justify-end gap-2 pt-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => setActiveModal(null)}
+                                        className="px-4 py-2 rounded-xl border border-zinc-300 dark:border-zinc-700 font-semibold cursor-pointer"
+                                    >
+                                        Cancel
+                                    </button>
+                                    {!isReadOnly && (
+                                        <button
+                                            type="submit"
+                                            disabled={submitting || !promoteForm.evidenceId}
+                                            className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold cursor-pointer disabled:opacity-50"
+                                            data-testid="promo-submit-button"
+                                        >
+                                            {submitting
+                                                ? 'Executing...'
+                                                : promoteForm.actionMode === 'REQUEST'
+                                                ? t('supplier.accreditation.promoteBtnRequest')
+                                                : promoteForm.actionMode === 'REVERT'
+                                                ? t('supplier.accreditation.promoteBtnRevert')
+                                                : t('supplier.accreditation.promoteBtnAuthorize')}
+                                        </button>
+                                    )}
+                                </div>
+                            </>
+                        )}
+                    </form>
+                )}
+            </AccessibleModal>
+
+            {/* MODAL 5: IMMUTABLE EVIDENCE & AUDIT HISTORY */}
             <AccessibleModal
                 isOpen={activeModal === 'HISTORY' && Boolean(selectedItem)}
                 onClose={() => setActiveModal(null)}

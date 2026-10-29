@@ -2934,7 +2934,27 @@ export const es = {
   'supplier.accreditation.btnSubmitEvidence': 'Registrar y Enviar Evidencia',
   'supplier.accreditation.btnApprove': 'Aprobar Evidencia Técnica',
   'supplier.accreditation.btnReject': 'Rechazar Evidencia',
-  'supplier.accreditation.ackContradictionLabel': 'Reconozco la contradicción entre fuentes (>5%) y documento la justificación técnica abajo.'
+  'supplier.accreditation.ackContradictionLabel': 'Reconozco la contradicción entre fuentes (>5%) y documento la justificación técnica abajo.',
+  'supplier.accreditation.btnPromote': 'Promover al Catálogo',
+  'supplier.accreditation.modalPromoteTitle': 'Promoción Gobernada de Evidencia Aprobada al Catálogo (paper_variants.caliper_um)',
+  'supplier.accreditation.promoteComparisonTitle': 'Comparativa de Espesor en Catálogo y Control CAS de Revisión',
+  'supplier.accreditation.promoteCurrentCaliper': 'Espesor Actual en Catálogo',
+  'supplier.accreditation.promoteProposedCaliper': 'Espesor Efectivo Propuesto',
+  'supplier.accreditation.promoteDelta': 'Diferencia Absoluta y Porcentual',
+  'supplier.accreditation.promoteSourceAndConfidence': 'Fuente y Confianza Destino',
+  'supplier.accreditation.promoteSpineImpactTitle': 'Impacto en Spine Calculator (200 págs · 170×240 mm · Livonia Alegro 2.0.0)',
+  'supplier.accreditation.promoteSpineBefore': 'Antes de Promoción (Catálogo)',
+  'supplier.accreditation.promoteSpineAfter': 'Después de Promoción (Efectivo)',
+  'supplier.accreditation.promoteSodChainTitle': 'Segregación de Funciones Triple (SoD) y Cadena de Trazabilidad',
+  'supplier.accreditation.promoteStepSubmitted': '1. Evidencia Enviada Por',
+  'supplier.accreditation.promoteStepApproved': '2. Evidencia Aprobada Por (Tecnólogo)',
+  'supplier.accreditation.promoteStepRequested': '3. Promoción Solicitada Por',
+  'supplier.accreditation.promoteStepAuthorized': '4. Autorizador de Promoción al Catálogo',
+  'supplier.accreditation.promoteBtnRequest': 'Solicitar Promoción al Catálogo',
+  'supplier.accreditation.promoteBtnAuthorize': 'Autorizar y Aplicar al Catálogo (CAS)',
+  'supplier.accreditation.promoteBtnRevert': 'Revocar y Revertir Promoción',
+  'supplier.accreditation.promoteAppliedBadge': 'PROMOVIDO AL CATÁLOGO',
+  'supplier.accreditation.promoteLockNotice': 'Bloqueo Industrial Preservado: Promover este espesor actualiza paper_variants.caliper_um para cálculos de lomo, manteniendo canReleaseToManufacturing = false hasta cumplir la certificación de perfil y lote.'
 } as const;
 
 export type TranslationKeys = keyof typeof es;

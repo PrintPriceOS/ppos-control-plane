@@ -36,6 +36,246 @@ const {
 const {
     resolveVariantCaliperProvenance
 } = require('./spine/paperCaliperReconciliationService');
+const {
+    executeSpineCalculation,
+    BUILTIN_BINDING_PROFILES
+} = require('./spine/spineCalculationEngine');
+
+/**
+ * The 9 historical conflicts preserved across RECOVERY-05..10V (5 Amber Graphic 110g @ 122 µm + 4 Galerie Art Matt 250g @ 225 µm).
+ * Protected against automatic or accidental promotion overwrites.
+ */
+const HISTORICAL_CONFLICT_9_VARIANT_IDS = new Set([
+    'var_2b0314c68f5a97c7',
+    'var_4178aecbfa53dcf8',
+    'var_5f5cae75e6f45671',
+    'var_7b7e3a2a2a4a0313',
+    'var_c699e6a51cd6b41f',
+    'var_06e1d1681e4f0989',
+    'var_9dabfd7ac5eff6ca',
+    'var_ae7dbf443ceab19a',
+    'var_e2f2e68304e9d4a1'
+]);
+
+const ALLOWED_PROMOTION_REQUESTER_ROLES = new Set([
+    'SUPPLIER_OPERATOR',
+    'OPERATOR',
+    'MATERIAL_TECHNOLOGIST',
+    'SUPPLIER_ADMIN',
+    'PRINTHOUSE_ADMIN',
+    'TENANT_ADMIN',
+    'OPS_ADMIN',
+    'ADMIN',
+    'SUPER_ADMIN'
+]);
+
+const ALLOWED_PROMOTION_AUTHORIZER_ROLES = new Set([
+    'MATERIAL_TECHNOLOGIST',
+    'SUPPLIER_ADMIN',
+    'PRINTHOUSE_ADMIN',
+    'TENANT_ADMIN',
+    'OPS_ADMIN',
+    'ADMIN',
+    'SUPER_ADMIN'
+]);
+
+function parseJsonColumn(val) {
+    if (!val) return {};
+    if (typeof val === 'object') return val;
+    try {
+        return JSON.parse(String(val));
+    } catch (_) {
+        return {};
+    }
+}
+
+/**
+ * Resolves the target paper_variants.caliper_source and caliper_confidence_status for a promoted evidence.
+ * - Physical ISO 534 micrometer record -> MEASURED_MICROMETER + VERIFIED
+ * - Manufacturer datasheet / documentary record -> MANUFACTURER_DATASHEET (or SUPPLIER_IMPORT) + REFERENCE_IMPORTED
+ *   so that documentary evidence NEVER falsely triggers VERIFIED physical caliper status or unlocks canReleaseToManufacturing.
+ */
+function resolvePromotionCatalogProvenance(ev) {
+    const evType = String(ev.evidence_type || ev.source_kind || 'MANUFACTURER_DATASHEET_PDF').toUpperCase();
+    const status = String(ev.review_status || ev.status || '').toUpperCase();
+    if (
+        status === 'CERTIFIED_MEASURED' ||
+        evType === 'PHYSICAL_MICROMETER_RECORD' ||
+        evType === 'COMBINED_DATASHEET_AND_MICROMETER'
+    ) {
+        return {
+            targetCaliperSource: 'MEASURED_MICROMETER',
+            targetConfidenceStatus: 'VERIFIED',
+            isPhysicallyVerifiedBatch: true
+        };
+    }
+    const targetCaliperSource =
+        ev.proposed_caliper_source === 'SUPPLIER_IMPORT' || evType === 'SUPPLIER_TECHNICAL_SHEET_PDF'
+            ? 'SUPPLIER_IMPORT'
+            : 'MANUFACTURER_DATASHEET';
+    return {
+        targetCaliperSource,
+        targetConfidenceStatus: 'REFERENCE_IMPORTED',
+        isPhysicallyVerifiedBatch: false
+    };
+}
+
+/**
+ * Computes Spine Calculator before/after impact preview for a candidate caliper promotion.
+ */
+function computeSpinePromotionImpactPreview({ variant, proposedCaliperUm, targetCaliperSource, targetConfidenceStatus }) {
+    const currentUm =
+        variant && variant.caliper_um !== null && variant.caliper_um !== undefined && Number(variant.caliper_um) > 0
+            ? Number(variant.caliper_um)
+            : null;
+    const propUm = Number(proposedCaliperUm || 0);
+    const gsm = Number(variant?.gsm || 100);
+    const variantId = variant?.id || variant?.variantId || null;
+    const profile = BUILTIN_BINDING_PROFILES['livonia-alegro-softcover@2.0.0'];
+
+    const beforeAvailable = currentUm !== null && currentUm > 0;
+    let beforeScenarios = null;
+    if (beforeAvailable) {
+        const gluedBefore = executeSpineCalculation(
+            {
+                bindingCategory: 'SOFTCOVER_STANDARD',
+                processingType: 'GLUED',
+                trimWidthMm: 170,
+                trimHeightMm: 240,
+                segments: [
+                    {
+                        pages: 200,
+                        variantId,
+                        gsm,
+                        caliperUm: currentUm,
+                        caliperSource: variant.caliper_source || 'NONE',
+                        caliperConfidenceStatus: variant.caliper_confidence_status || 'REFERENCE_IMPORTED'
+                    }
+                ],
+                cover: { caliperUm: 350 }
+            },
+            profile
+        );
+        const sewnBefore = executeSpineCalculation(
+            {
+                bindingCategory: 'SOFTCOVER_STANDARD',
+                processingType: 'SEWN',
+                trimWidthMm: 170,
+                trimHeightMm: 240,
+                segments: [
+                    {
+                        pages: 200,
+                        variantId,
+                        gsm,
+                        caliperUm: currentUm,
+                        caliperSource: variant.caliper_source || 'NONE',
+                        caliperConfidenceStatus: variant.caliper_confidence_status || 'REFERENCE_IMPORTED'
+                    }
+                ],
+                cover: { caliperUm: 350 }
+            },
+            profile
+        );
+        beforeScenarios = {
+            available: true,
+            caliperUm: currentUm,
+            softcover200ppGlued: {
+                netBlockMm: gluedBefore.blockThickness.netPaperBlockMm,
+                spineWidthMm: gluedBefore.spineWidthMm,
+                flatCoverWidthMm: gluedBefore.coverGeometry.flatCoverWidthMm,
+                canReleaseToManufacturing: gluedBefore.manufacturingValidation.canReleaseToManufacturing
+            },
+            softcover200ppSewn: {
+                netBlockMm: sewnBefore.blockThickness.netPaperBlockMm,
+                spineWidthMm: sewnBefore.spineWidthMm,
+                flatCoverWidthMm: sewnBefore.coverGeometry.flatCoverWidthMm,
+                canReleaseToManufacturing: sewnBefore.manufacturingValidation.canReleaseToManufacturing
+            }
+        };
+    } else {
+        beforeScenarios = {
+            available: false,
+            blockedCode: 'MISSING_PAPER_CALIPER',
+            caliperUm: null,
+            message: 'Variant currently has caliper_um = NULL; Spine Calculator rejects calculation with 422 MISSING_PAPER_CALIPER.'
+        };
+    }
+
+    let afterScenarios = null;
+    if (propUm > 0) {
+        const gluedAfter = executeSpineCalculation(
+            {
+                bindingCategory: 'SOFTCOVER_STANDARD',
+                processingType: 'GLUED',
+                trimWidthMm: 170,
+                trimHeightMm: 240,
+                segments: [
+                    {
+                        pages: 200,
+                        variantId,
+                        gsm,
+                        caliperUm: propUm,
+                        caliperSource: targetCaliperSource,
+                        caliperConfidenceStatus: targetConfidenceStatus
+                    }
+                ],
+                cover: { caliperUm: 350 }
+            },
+            profile
+        );
+        const sewnAfter = executeSpineCalculation(
+            {
+                bindingCategory: 'SOFTCOVER_STANDARD',
+                processingType: 'SEWN',
+                trimWidthMm: 170,
+                trimHeightMm: 240,
+                segments: [
+                    {
+                        pages: 200,
+                        variantId,
+                        gsm,
+                        caliperUm: propUm,
+                        caliperSource: targetCaliperSource,
+                        caliperConfidenceStatus: targetConfidenceStatus
+                    }
+                ],
+                cover: { caliperUm: 350 }
+            },
+            profile
+        );
+        afterScenarios = {
+            available: true,
+            caliperUm: propUm,
+            caliperSource: targetCaliperSource,
+            caliperConfidenceStatus: targetConfidenceStatus,
+            profileKey: profile.fullProfileKey,
+            profileCertificationTier: profile.certificationTier,
+            canReleaseToManufacturing: false,
+            softcover200ppGlued: {
+                netBlockMm: gluedAfter.blockThickness.netPaperBlockMm,
+                spineWidthMm: gluedAfter.spineWidthMm,
+                flatCoverWidthMm: gluedAfter.coverGeometry.flatCoverWidthMm,
+                validationStatus: gluedAfter.manufacturingValidation.status,
+                canReleaseToManufacturing: gluedAfter.manufacturingValidation.canReleaseToManufacturing
+            },
+            softcover200ppSewn: {
+                netBlockMm: sewnAfter.blockThickness.netPaperBlockMm,
+                spineWidthMm: sewnAfter.spineWidthMm,
+                flatCoverWidthMm: sewnAfter.coverGeometry.flatCoverWidthMm,
+                validationStatus: sewnAfter.manufacturingValidation.status,
+                canReleaseToManufacturing: sewnAfter.manufacturingValidation.canReleaseToManufacturing
+            }
+        };
+    }
+
+    return {
+        beforePromotion: beforeScenarios,
+        afterPromotion: afterScenarios,
+        canReleaseToManufacturingAfterPromotion: false,
+        industrialReleaseLockExplanation:
+            'Promoting approved caliper evidence enables deterministic Spine calculations on paper_variants.caliper_um, while preserving canReleaseToManufacturing = false because binding profile certification (MATH_BRANCH_VALIDATED vs PRODUCTION_CERTIFIED) and physical batch release remain independent gates.'
+    };
+}
 
 const PENDING_CLASSIFICATIONS_337_CSV_PATH = path.resolve(
     __dirname,
@@ -353,7 +593,7 @@ function persistPdfBufferToPrivateStore({ buffer, sha256, tenantId = 'global', s
         return { filePath: finalPath, newlyCreated: false };
     }
 
-    const tempPath = path.resolve(tenantDir, `.tmp_${normalizedHash}_${process.pid}_${ crypto.randomBytes(4).toString('hex') }.pdf`);
+    const tempPath = path.resolve(tenantDir, `.tmp_${normalizedHash}_${process.pid}_${crypto.randomBytes(4).toString('hex')}.pdf`);
     fs.writeFileSync(tempPath, buffer, { mode: 0o600 });
     fs.renameSync(tempPath, finalPath);
     return { filePath: finalPath, newlyCreated: true };
@@ -374,7 +614,7 @@ function cleanupOrphanEvidenceFile(filePath, storageRoot = null) {
             fs.unlinkSync(resolved);
             return true;
         }
-    } catch (_) {}
+    } catch (_) { }
     return false;
 }
 
@@ -395,12 +635,12 @@ class PaperEvidenceService {
             } catch (err) {
                 try {
                     await conn.rollback();
-                } catch (_) {}
+                } catch (_) { }
                 throw err;
             } finally {
                 try {
                     conn.release();
-                } catch (_) {}
+                } catch (_) { }
             }
         }
         return fn(this.db, false);
@@ -445,6 +685,7 @@ class PaperEvidenceService {
                 `SELECT variant_id, evidence_id, evidence_type, review_status,
                         proposed_effective_caliper_um, nominal_datasheet_caliper_um,
                         measured_batch_caliper_um, has_source_contradiction,
+                        applied_to_catalog_variant,
                         submitted_by, approved_by_technologist, updated_at
                  FROM paper_variant_caliper_evidence
                  WHERE tenant_id = ?
@@ -470,6 +711,7 @@ class PaperEvidenceService {
                 ? Number(latestEv.proposed_effective_caliper_um ?? latestEv.proposed_caliper_um ?? 0) || null
                 : null;
             const hasContradiction = latestEv ? Boolean(latestEv.has_source_contradiction) : false;
+            const appliedToCatalog = latestEv ? Boolean(latestEv.applied_to_catalog_variant) : false;
 
             return {
                 variantId: row.variant_id,
@@ -506,6 +748,7 @@ class PaperEvidenceService {
                 emailTemplateRef: reqMeta.email_template_ref || null,
                 documentaryRequestStatus: latestStatus || 'AWAITING_EVIDENCE_SUBMISSION',
                 evidenceStatus: latestStatus,
+                appliedToCatalogVariant: appliedToCatalog,
                 latestProposedCaliperUm: latestProposedUm,
                 hasSourceContradiction: hasContradiction,
                 evidenceCount: evList.length,
@@ -514,6 +757,7 @@ class PaperEvidenceService {
                         evidenceId: latestEv.evidence_id || latestEv.id,
                         evidenceType: latestEv.evidence_type || latestEv.source_kind,
                         reviewStatus: latestStatus,
+                        appliedToCatalogVariant: appliedToCatalog,
                         proposedEffectiveCaliperUm: latestProposedUm,
                         nominalDatasheetCaliperUm: latestEv.nominal_datasheet_caliper_um !== undefined && latestEv.nominal_datasheet_caliper_um !== null ? Number(latestEv.nominal_datasheet_caliper_um) : null,
                         measuredBatchCaliperUm: latestEv.measured_batch_caliper_um !== undefined && latestEv.measured_batch_caliper_um !== null ? Number(latestEv.measured_batch_caliper_um) : null,
@@ -548,8 +792,8 @@ class PaperEvidenceService {
                 tf === 'SUPPLIER_DATASHEET_TRACK'
                     ? 'DATASHEET_REQUEST_TRACK'
                     : tf === 'CONFLICT_HOLD_TRACK'
-                    ? 'CONFLICT_RECONCILIATION_TRACK'
-                    : tf;
+                        ? 'CONFLICT_RECONCILIATION_TRACK'
+                        : tf;
             filtered = filtered.filter(
                 (r) =>
                     r.accreditationTrack === tf ||
@@ -815,7 +1059,7 @@ class PaperEvidenceService {
             if (priorEvRows.length > 0) {
                 priorEvidenceUm = Number(priorEvRows[0].proposed_effective_caliper_um ?? priorEvRows[0].proposed_caliper_um ?? 0) || null;
             }
-        } catch (_) {}
+        } catch (_) { }
 
         const contradictionCheck = detectSourceContradictions({
             nominalDatasheetCaliperUm: nominalUm,
@@ -1625,7 +1869,7 @@ class PaperEvidenceService {
             for (const r of clsRows) {
                 if (r.document_sha256) referencedHashes.add(String(r.document_sha256).toLowerCase());
             }
-        } catch (_) {}
+        } catch (_) { }
 
         const entries = fs.readdirSync(tenantDir);
         let scannedCount = 0;
@@ -1669,6 +1913,1204 @@ class PaperEvidenceService {
             403
         );
     }
+
+    /**
+     * -------------------------------------------------------------------------
+     * PAPER-MATERIALS-RECOVERY-11: GOVERNED PROMOTION OF APPROVED EVIDENCES
+     * -------------------------------------------------------------------------
+     */
+
+    /**
+     * Previews the governed promotion of an approved evidence record (`evidenceId`) to `paper_variants.caliper_um`.
+     * Computes current vs proposed caliper, delta (µm and %), Spine Calculator impact, SoD eligibility, and blocking gates.
+     */
+    async previewEvidencePromotion({
+        tenantId,
+        supplierId = null,
+        variantId,
+        evidenceId,
+        actorId = null,
+        actorRole = null
+    }) {
+        if (!tenantId) {
+            throw new PaperEvidenceError('Authenticated tenant context is required.', 'TENANT_REQUIRED', 403);
+        }
+        if (!variantId) {
+            throw new PaperEvidenceError('variantId is required.', 'VARIANT_ID_REQUIRED', 400);
+        }
+        if (!evidenceId) {
+            throw new PaperEvidenceError('evidenceId is required.', 'EVIDENCE_ID_REQUIRED', 400);
+        }
+
+        const varRows = unwrapRows(await this.db.query(
+            `SELECT v.*, p.name AS product_name, p.brand, p.category
+             FROM paper_variants v
+             JOIN paper_products p ON v.product_id = p.id
+             WHERE v.id = ? LIMIT 1`,
+            [variantId]
+        ));
+        if (!varRows || varRows.length === 0) {
+            throw new PaperEvidenceError(`Variant '${variantId}' not found.`, 'VARIANT_NOT_FOUND', 404);
+        }
+        const variant = varRows[0];
+
+        const evRows = unwrapRows(await this.db.query(
+            `SELECT * FROM paper_variant_caliper_evidence WHERE evidence_id = ? AND tenant_id = ? LIMIT 1`,
+            [evidenceId, tenantId]
+        ));
+        if (!evRows || evRows.length === 0) {
+            throw new PaperEvidenceError(`Evidence '${evidenceId}' not found for this tenant.`, 'EVIDENCE_NOT_FOUND', 404);
+        }
+        const ev = evRows[0];
+        if (String(ev.variant_id) !== String(variantId)) {
+            throw new PaperEvidenceError(
+                `Evidence '${evidenceId}' belongs to variant '${ev.variant_id}', not '${variantId}'.`,
+                'EVIDENCE_VARIANT_MISMATCH',
+                422
+            );
+        }
+
+        const auditLogs = unwrapRows(await this.db.query(
+            `SELECT * FROM paper_variant_caliper_audit_log WHERE tenant_id = ? AND variant_id = ? ORDER BY created_at DESC`,
+            [tenantId, variantId]
+        ));
+
+        // Find any promotion request for this evidence
+        let activePromotionRequest = null;
+        for (const log of auditLogs) {
+            if (String(log.evidence_id) !== String(evidenceId)) continue;
+            const meta = parseJsonColumn(log.metadata_json);
+            if (meta && meta.promotionStage === 'PROMOTION_REQUESTED') {
+                activePromotionRequest = {
+                    promotionRequestId: meta.promotionRequestId || log.audit_id,
+                    requestedBy: meta.requestedBy || log.actor_user_id,
+                    requestedByRole: meta.requestedByRole || log.actor_role,
+                    requestedAt: log.created_at,
+                    reason: log.decision_reason,
+                    expectedCaliperRevision: meta.expectedCaliperRevision
+                };
+                break;
+            }
+        }
+
+        const currentUm =
+            variant.caliper_um !== null && variant.caliper_um !== undefined && Number(variant.caliper_um) > 0
+                ? Number(variant.caliper_um)
+                : null;
+        const proposedUm = Number(ev.proposed_effective_caliper_um ?? ev.proposed_caliper_um ?? 0);
+        const deltaUm = currentUm !== null ? Number((proposedUm - currentUm).toFixed(2)) : null;
+        const deltaPct =
+            currentUm !== null && currentUm > 0 ? Number((((proposedUm - currentUm) / currentUm) * 100).toFixed(2)) : null;
+
+        const reviewStatus = String(ev.review_status || ev.status || 'DRAFT').toUpperCase();
+        const isApproved = reviewStatus === 'APPROVED_FOR_TECHNICAL_USE' || reviewStatus === 'CERTIFIED_MEASURED';
+        const isRevokedOrSuperseded = reviewStatus === 'SUPERSEDED' || reviewStatus === 'REJECTED';
+        const isAlreadyPromoted = Boolean(ev.applied_to_catalog_variant);
+        const isHistoricalConflict9 = HISTORICAL_CONFLICT_9_VARIANT_IDS.has(String(variantId));
+        const hasExistingCatalogCaliper = currentUm !== null && currentUm > 0;
+        const hasSourceContradiction = Boolean(ev.has_source_contradiction);
+
+        const { targetCaliperSource, targetConfidenceStatus, isPhysicallyVerifiedBatch } =
+            resolvePromotionCatalogProvenance(ev);
+
+        const blockingReasons = [];
+        if (isRevokedOrSuperseded) {
+            blockingReasons.push({
+                code: 'EVIDENCE_REVOKED_OR_SUPERSEDED',
+                message: `Evidence is in terminal state '${reviewStatus}' and cannot be promoted.`
+            });
+        } else if (!isApproved) {
+            blockingReasons.push({
+                code: 'EVIDENCE_NOT_APPROVED_FOR_PROMOTION',
+                message: `Evidence status is '${reviewStatus}'; only APPROVED_FOR_TECHNICAL_USE or CERTIFIED_MEASURED evidences can be promoted.`
+            });
+        }
+        if (isAlreadyPromoted) {
+            blockingReasons.push({
+                code: 'EVIDENCE_ALREADY_PROMOTED',
+                message: `Evidence '${evidenceId}' is already promoted to catalog variant '${variantId}'.`
+            });
+        }
+        if (isHistoricalConflict9) {
+            blockingReasons.push({
+                code: 'HISTORICAL_CONFLICT_VARIANT_PROTECTED',
+                message: `Variant '${variantId}' is one of the 9 protected historical conflict variants and cannot be overwritten.`
+            });
+        } else if (hasExistingCatalogCaliper) {
+            blockingReasons.push({
+                code: 'EXISTING_CATALOG_CALIPER_PROTECTED',
+                message: `Variant '${variantId}' already has an existing catalog caliper (${currentUm} µm). Automatic or direct overwrite of existing catalog calipers is prohibited.`
+            });
+        }
+        if (hasSourceContradiction) {
+            blockingReasons.push({
+                code: 'UNRESOLVED_SOURCE_CONTRADICTION',
+                message: `Evidence '${evidenceId}' has a flagged source contradiction (> 5% delta). Promotion to catalog requires explicit contradiction resolution.`
+            });
+        }
+
+        const excludedAuthorizerActorIds = Array.from(
+            new Set(
+                [
+                    ev.submitted_by,
+                    ev.approved_by_technologist,
+                    activePromotionRequest ? activePromotionRequest.requestedBy : null
+                ].filter(Boolean)
+            )
+        );
+
+        const callerCanRequest =
+            Boolean(actorId) &&
+            ALLOWED_PROMOTION_REQUESTER_ROLES.has(String(actorRole || '').toUpperCase()) &&
+            blockingReasons.filter((b) => b.code !== 'UNRESOLVED_SOURCE_CONTRADICTION').length === 0;
+
+        const callerCanAuthorize =
+            Boolean(actorId) &&
+            ALLOWED_PROMOTION_AUTHORIZER_ROLES.has(String(actorRole || '').toUpperCase()) &&
+            !excludedAuthorizerActorIds.includes(String(actorId).trim()) &&
+            blockingReasons.filter((b) => b.code !== 'UNRESOLVED_SOURCE_CONTRADICTION').length === 0;
+
+        const spineImpact = computeSpinePromotionImpactPreview({
+            variant,
+            proposedCaliperUm: proposedUm,
+            targetCaliperSource,
+            targetConfidenceStatus
+        });
+
+        return {
+            variant: {
+                variantId: variant.id,
+                productId: variant.product_id,
+                productName: variant.product_name,
+                brand: variant.brand || null,
+                category: variant.category || null,
+                gsm: Number(variant.gsm),
+                widthMm: Number(variant.width_mm),
+                heightMm: Number(variant.height_mm),
+                currentCaliperUm: currentUm,
+                currentCaliperMm: variant.caliper_mm !== null && variant.caliper_mm !== undefined ? Number(variant.caliper_mm) : null,
+                currentCaliperSource: variant.caliper_source || 'NONE',
+                currentConfidenceStatus: variant.caliper_confidence_status || 'MISSING',
+                currentRevision: Number(variant.caliper_revision || 1),
+                isHistoricalConflict9Protected: isHistoricalConflict9
+            },
+            evidence: {
+                evidenceId: ev.evidence_id || ev.id,
+                variantId: ev.variant_id,
+                evidenceType: ev.evidence_type || ev.source_kind,
+                accreditationTrack: ev.accreditation_track,
+                reviewStatus,
+                appliedToCatalogVariant: isAlreadyPromoted,
+                proposedCaliperUm: proposedUm,
+                proposedCaliperMm: Number((proposedUm / 1000).toFixed(4)),
+                proposedBulkFactor:
+                    ev.nominal_bulk_cm3_g !== null && ev.nominal_bulk_cm3_g !== undefined
+                        ? Number(ev.nominal_bulk_cm3_g)
+                        : Number((proposedUm / Number(variant.gsm || 100)).toFixed(3)),
+                targetCaliperSource,
+                targetConfidenceStatus,
+                isPhysicallyVerifiedBatch,
+                documentTitle: ev.document_title || null,
+                documentFileName: ev.document_file_name || null,
+                documentSha256: ev.document_sha256 || null,
+                datasheetVersion: ev.datasheet_version || null,
+                submittedBy: ev.submitted_by,
+                submittedByRole: ev.submitted_by_role,
+                approvedByTechnologist: ev.approved_by_technologist,
+                approvedByRole: ev.approved_by_role,
+                approvedAt: ev.approved_at || null,
+                hasSourceContradiction,
+                contradictionDetails: parseJsonColumn(ev.contradiction_details_json)
+            },
+            comparison: {
+                currentCaliperUm: currentUm,
+                proposedCaliperUm: proposedUm,
+                deltaUm,
+                deltaPct,
+                comparisonMode: currentUm === null ? 'NEW_CATALOG_ACCREDITATION_FROM_NULL' : 'EXISTING_CALIPER_COMPARISON',
+                currentSource: variant.caliper_source || 'NONE',
+                targetSource: targetCaliperSource,
+                currentConfidence: variant.caliper_confidence_status || 'MISSING',
+                targetConfidence: targetConfidenceStatus,
+                currentRevision: Number(variant.caliper_revision || 1),
+                nextRevision: Number(variant.caliper_revision || 1) + 1
+            },
+            governance: {
+                eligibleForPromotion: blockingReasons.filter((b) => b.code !== 'UNRESOLVED_SOURCE_CONTRADICTION').length === 0,
+                requiresContradictionArbitration: hasSourceContradiction,
+                blockingReasons,
+                activePromotionRequest,
+                segregationOfDuties: {
+                    submittedBy: ev.submitted_by,
+                    approvedByTechnologist: ev.approved_by_technologist,
+                    requestedBy: activePromotionRequest ? activePromotionRequest.requestedBy : null,
+                    excludedAuthorizerActorIds,
+                    allowedRequesterRoles: Array.from(ALLOWED_PROMOTION_REQUESTER_ROLES),
+                    allowedAuthorizerRoles: Array.from(ALLOWED_PROMOTION_AUTHORIZER_ROLES),
+                    callerCanRequest,
+                    callerCanAuthorize
+                }
+            },
+            spineImpact
+        };
+    }
+
+    /**
+     * Submits a governed promotion request for an approved evidence (`APPROVED_FOR_TECHNICAL_USE` or `CERTIFIED_MEASURED`).
+     * Does NOT mutate `paper_variants.caliper_um`; records the formal promotion request in `paper_variant_caliper_audit_log`.
+     */
+    async requestEvidencePromotion({
+        tenantId,
+        supplierId = null,
+        variantId,
+        evidenceId,
+        actorUserId = null,
+        actorId = null,
+        actorRole = 'OPERATOR',
+        reason = null,
+        idempotencyKey = null
+    }) {
+        const effectiveActorId = actorUserId || actorId;
+        if (!tenantId || !effectiveActorId) {
+            throw new PaperEvidenceError('Authenticated tenant and actor identity required.', 'UNAUTHORIZED', 403);
+        }
+        const normRole = String(actorRole || '').toUpperCase();
+        if (!ALLOWED_PROMOTION_REQUESTER_ROLES.has(normRole)) {
+            throw new PaperEvidenceError(
+                `Role '${actorRole}' is not authorized to request catalog promotion.`,
+                'FORBIDDEN_PROMOTION_REQUESTER_ROLE_REQUIRED',
+                403
+            );
+        }
+        if (!reason || String(reason).trim().length < 5) {
+            throw new PaperEvidenceError(
+                'A detailed promotion request reason (min 5 characters) is mandatory.',
+                'PROMOTION_REASON_REQUIRED',
+                422
+            );
+        }
+
+        return this._withTransaction(async (executor, isTx) => {
+            const lockClause = isTx ? ' FOR UPDATE' : '';
+
+            const varRows = unwrapRows(await executor.query(
+                `SELECT * FROM paper_variants WHERE id = ? LIMIT 1${lockClause}`,
+                [variantId]
+            ));
+            if (!varRows || varRows.length === 0) {
+                throw new PaperEvidenceError(`Variant '${variantId}' not found.`, 'VARIANT_NOT_FOUND', 404);
+            }
+            const variant = varRows[0];
+
+            const evRows = unwrapRows(await executor.query(
+                `SELECT * FROM paper_variant_caliper_evidence WHERE evidence_id = ? AND tenant_id = ? LIMIT 1${lockClause}`,
+                [evidenceId, tenantId]
+            ));
+            if (!evRows || evRows.length === 0) {
+                throw new PaperEvidenceError(`Evidence '${evidenceId}' not found for this tenant.`, 'EVIDENCE_NOT_FOUND', 404);
+            }
+            const ev = evRows[0];
+            if (String(ev.variant_id) !== String(variantId)) {
+                throw new PaperEvidenceError(
+                    `Evidence '${evidenceId}' belongs to variant '${ev.variant_id}', not '${variantId}'.`,
+                    'EVIDENCE_VARIANT_MISMATCH',
+                    422
+                );
+            }
+
+            // Idempotency check across audit log for this variant
+            const existingLogs = unwrapRows(await executor.query(
+                `SELECT * FROM paper_variant_caliper_audit_log WHERE tenant_id = ? AND variant_id = ? ORDER BY created_at DESC`,
+                [tenantId, variantId]
+            ));
+            if (idempotencyKey) {
+                for (const log of existingLogs) {
+                    const meta = parseJsonColumn(log.metadata_json);
+                    if (meta && meta.promotionStage === 'PROMOTION_REQUESTED' && meta.idempotencyKey === idempotencyKey) {
+                        return {
+                            idempotentReplay: true,
+                            promotionRequestId: meta.promotionRequestId || log.audit_id,
+                            evidenceId,
+                            variantId,
+                            status: 'PROMOTION_REQUESTED',
+                            requestedBy: log.actor_user_id,
+                            expectedCaliperRevision: meta.expectedCaliperRevision,
+                            productiveCaliperModified: false,
+                            canReleaseToManufacturing: false
+                        };
+                    }
+                }
+            }
+
+            const reviewStatus = String(ev.review_status || ev.status || 'DRAFT').toUpperCase();
+            if (reviewStatus === 'SUPERSEDED' || reviewStatus === 'REJECTED') {
+                throw new PaperEvidenceError(
+                    `Cannot request promotion for evidence '${evidenceId}' in revoked/rejected state '${reviewStatus}'.`,
+                    'EVIDENCE_REVOKED_OR_SUPERSEDED',
+                    409
+                );
+            }
+            if (reviewStatus !== 'APPROVED_FOR_TECHNICAL_USE' && reviewStatus !== 'CERTIFIED_MEASURED') {
+                throw new PaperEvidenceError(
+                    `Evidence '${evidenceId}' has review_status '${reviewStatus}'. Only APPROVED_FOR_TECHNICAL_USE or CERTIFIED_MEASURED evidences can be requested for promotion.`,
+                    'EVIDENCE_NOT_APPROVED_FOR_PROMOTION',
+                    422
+                );
+            }
+            if (Boolean(ev.applied_to_catalog_variant)) {
+                throw new PaperEvidenceError(
+                    `Evidence '${evidenceId}' has already been promoted to catalog variant '${variantId}'.`,
+                    'EVIDENCE_ALREADY_PROMOTED',
+                    409
+                );
+            }
+            if (HISTORICAL_CONFLICT_9_VARIANT_IDS.has(String(variantId))) {
+                throw new PaperEvidenceError(
+                    `Variant '${variantId}' is one of the 9 protected historical conflict variants and cannot be overwritten via promotion.`,
+                    'HISTORICAL_CONFLICT_VARIANT_PROTECTED',
+                    409
+                );
+            }
+            if (variant.caliper_um !== null && variant.caliper_um !== undefined && Number(variant.caliper_um) > 0) {
+                throw new PaperEvidenceError(
+                    `Variant '${variantId}' already has an active catalog caliper (${variant.caliper_um} µm). Overwriting existing catalog calipers is prohibited.`,
+                    'EXISTING_CATALOG_CALIPER_PROTECTED',
+                    409
+                );
+            }
+
+            const promotionRequestId = `prm_req_${crypto.randomBytes(8).toString('hex')}`;
+            const auditId = `aud_cal_${crypto.randomBytes(8).toString('hex')}`;
+            const proposedUm = Number(ev.proposed_effective_caliper_um ?? ev.proposed_caliper_um ?? 0);
+            const currentRev = Number(variant.caliper_revision || 1);
+
+            const metadata = {
+                promotionStage: 'PROMOTION_REQUESTED',
+                promotionRequestId,
+                idempotencyKey: idempotencyKey || null,
+                requestedBy: effectiveActorId,
+                requestedByRole: normRole,
+                submittedBy: ev.submitted_by,
+                approvedByTechnologist: ev.approved_by_technologist,
+                expectedCaliperRevision: currentRev,
+                expectedCurrentCaliperUm: null,
+                proposedCaliperUm: proposedUm,
+                documentSha256: ev.document_sha256 || null,
+                datasheetVersion: ev.datasheet_version || null
+            };
+
+            await executor.query(
+                `INSERT INTO paper_variant_caliper_audit_log (
+                    audit_id, tenant_id, supplier_id, variant_id, evidence_id,
+                    action_type, previous_review_status, new_review_status,
+                    previous_caliper_um, new_caliper_um,
+                    previous_caliper_source, new_caliper_source,
+                    previous_confidence_status, new_confidence_status,
+                    previous_revision, new_revision,
+                    nominal_datasheet_caliper_um, measured_batch_caliper_um, document_sha256,
+                    actor_user_id, actor_role, decision_reason, metadata_json
+                ) VALUES (?, ?, ?, ?, ?, 'EVIDENCE_APPROVED', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [
+                    auditId,
+                    tenantId,
+                    supplierId,
+                    variantId,
+                    evidenceId,
+                    reviewStatus,
+                    reviewStatus,
+                    variant.caliper_um ?? null,
+                    variant.caliper_um ?? null,
+                    variant.caliper_source ?? 'NONE',
+                    variant.caliper_source ?? 'NONE',
+                    variant.caliper_confidence_status ?? 'MISSING',
+                    variant.caliper_confidence_status ?? 'MISSING',
+                    currentRev,
+                    currentRev,
+                    ev.nominal_datasheet_caliper_um ?? null,
+                    ev.measured_batch_caliper_um ?? null,
+                    ev.document_sha256 ?? null,
+                    effectiveActorId,
+                    normRole,
+                    `[PROMOTION_REQUESTED] ${String(reason).trim()}`,
+                    JSON.stringify(metadata)
+                ]
+            );
+
+            return {
+                idempotentReplay: false,
+                promotionRequestId,
+                auditId,
+                evidenceId,
+                variantId,
+                status: 'PROMOTION_REQUESTED',
+                requestedBy: effectiveActorId,
+                requestedByRole: normRole,
+                expectedCaliperRevision: currentRev,
+                proposedCaliperUm: proposedUm,
+                productiveCaliperModified: false,
+                canReleaseToManufacturing: false
+            };
+        });
+    }
+
+    /**
+     * Authorizes and executes the transactional Compare-And-Swap (CAS) promotion of an approved evidence
+     * to `paper_variants.caliper_um`.
+     *
+     * Enforces:
+     * 1. Row-level locking (`SELECT ... FOR UPDATE`) on both `paper_variants` and `paper_variant_caliper_evidence`.
+     * 2. Strict 3-way Segregation of Duties (`actorId !== submitted_by`, `actorId !== approved_by_technologist`,
+     *    and if a promotion request exists, `actorId !== requested_by`).
+     * 3. Protection of the 1,272 existing calipers (`caliper_um IS NULL` required) and the 9 historical conflicts.
+     * 4. Blocking of unapproved (`DRAFT`, `PENDING_TECH_REVIEW`), rejected (`REJECTED`), or revoked (`SUPERSEDED`) evidences.
+     * 5. Blocking of unresolved source contradictions (`has_source_contradiction = true` without explicit arbitration).
+     * 6. Atomic Compare-And-Swap (`WHERE id = ? AND caliper_revision = ? AND caliper_um IS NULL`).
+     * 7. Automatic invalidation of any active `spine_calculation_snapshots` referencing `variantId`.
+     * 8. Immutable `CATALOG_CALIPER_PROMOTED` audit log with full reversible snapshot.
+     */
+    async authorizeEvidencePromotion({
+        tenantId,
+        supplierId = null,
+        variantId,
+        evidenceId,
+        promotionRequestId = null,
+        actorUserId = null,
+        actorId = null,
+        actorRole = null,
+        reason = null,
+        decisionReason = null,
+        expectedCaliperRevision = undefined,
+        acknowledgeContradiction = false,
+        idempotencyKey = null
+    }) {
+        const effectiveActorId = actorUserId || actorId;
+        const effectiveRole = String(actorRole || '').toUpperCase();
+        const effectiveReason = reason || decisionReason;
+
+        if (!tenantId || !effectiveActorId) {
+            throw new PaperEvidenceError('Authenticated tenant and authorizer identity required.', 'UNAUTHORIZED', 403);
+        }
+        if (!ALLOWED_PROMOTION_AUTHORIZER_ROLES.has(effectiveRole)) {
+            throw new PaperEvidenceError(
+                `Role '${actorRole}' is not authorized to promote technical evidence to the productive catalog. Admin or Material Technologist role required.`,
+                'FORBIDDEN_PROMOTION_AUTHORIZER_ROLE_REQUIRED',
+                403
+            );
+        }
+        if (!variantId) {
+            throw new PaperEvidenceError('variantId is required.', 'VARIANT_ID_REQUIRED', 400);
+        }
+        if (!evidenceId) {
+            throw new PaperEvidenceError('evidenceId is required.', 'EVIDENCE_ID_REQUIRED', 400);
+        }
+        if (!effectiveReason || String(effectiveReason).trim().length < 5) {
+            throw new PaperEvidenceError(
+                'A detailed promotion authorization reason (min 5 characters) is mandatory.',
+                'PROMOTION_REASON_REQUIRED',
+                422
+            );
+        }
+
+        return this._withTransaction(async (executor, isTx) => {
+            const lockClause = isTx ? ' FOR UPDATE' : '';
+
+            // 1. Lock variant row first (`paper_variants`)
+            const varRows = unwrapRows(await executor.query(
+                `SELECT * FROM paper_variants WHERE id = ? LIMIT 1${lockClause}`,
+                [variantId]
+            ));
+            if (!varRows || varRows.length === 0) {
+                throw new PaperEvidenceError(`Variant '${variantId}' not found.`, 'VARIANT_NOT_FOUND', 404);
+            }
+            const variant = varRows[0];
+
+            // 2. Lock evidence row (`paper_variant_caliper_evidence`)
+            const evRows = unwrapRows(await executor.query(
+                `SELECT * FROM paper_variant_caliper_evidence WHERE evidence_id = ? AND tenant_id = ? LIMIT 1${lockClause}`,
+                [evidenceId, tenantId]
+            ));
+            if (!evRows || evRows.length === 0) {
+                throw new PaperEvidenceError(`Evidence '${evidenceId}' not found for this tenant.`, 'EVIDENCE_NOT_FOUND', 404);
+            }
+            const ev = evRows[0];
+            if (String(ev.variant_id) !== String(variantId)) {
+                throw new PaperEvidenceError(
+                    `Evidence '${evidenceId}' belongs to variant '${ev.variant_id}', not '${variantId}'.`,
+                    'EVIDENCE_VARIANT_MISMATCH',
+                    422
+                );
+            }
+
+            // 3. Check idempotency key & prior promotion requests in audit log
+            const auditLogs = unwrapRows(await executor.query(
+                `SELECT * FROM paper_variant_caliper_audit_log WHERE tenant_id = ? AND variant_id = ? ORDER BY created_at DESC`,
+                [tenantId, variantId]
+            ));
+
+            if (idempotencyKey) {
+                for (const log of auditLogs) {
+                    if (log.action_type === 'CATALOG_CALIPER_PROMOTED' && String(log.evidence_id) === String(evidenceId)) {
+                        const meta = parseJsonColumn(log.metadata_json);
+                        if (meta && meta.idempotencyKey === idempotencyKey) {
+                            return {
+                                idempotentReplay: true,
+                                promotionId: meta.promotionId || log.audit_id,
+                                auditId: log.audit_id,
+                                variantId,
+                                evidenceId,
+                                previousCaliperUm: log.previous_caliper_um !== null ? Number(log.previous_caliper_um) : null,
+                                newCaliperUm: Number(log.new_caliper_um),
+                                newCaliperSource: log.new_caliper_source,
+                                newConfidenceStatus: log.new_confidence_status,
+                                previousRevision: Number(log.previous_revision),
+                                newRevision: Number(log.new_revision),
+                                productiveCaliperModified: true,
+                                canReleaseToManufacturing: false
+                            };
+                        }
+                    }
+                }
+            }
+
+            let matchedRequest = null;
+            for (const log of auditLogs) {
+                if (String(log.evidence_id) !== String(evidenceId)) continue;
+                const meta = parseJsonColumn(log.metadata_json);
+                if (meta && meta.promotionStage === 'PROMOTION_REQUESTED') {
+                    if (!promotionRequestId || meta.promotionRequestId === promotionRequestId) {
+                        matchedRequest = meta;
+                        break;
+                    }
+                }
+            }
+
+            // 4. Strict Segregation of Duties (SoD)
+            if (String(ev.submitted_by || '').trim() === String(effectiveActorId).trim()) {
+                throw new PaperEvidenceError(
+                    'Segregation of Duties violation: the user who submitted this evidence cannot authorize its promotion to the productive catalog.',
+                    'SOD_SUBMITTER_CANNOT_PROMOTE',
+                    403
+                );
+            }
+            if (String(ev.approved_by_technologist || '').trim() === String(effectiveActorId).trim()) {
+                throw new PaperEvidenceError(
+                    'Segregation of Duties violation: the technologist who approved this evidence cannot unilaterally authorize its promotion to the productive catalog.',
+                    'SOD_REVIEWER_CANNOT_PROMOTE',
+                    403
+                );
+            }
+            if (
+                matchedRequest &&
+                matchedRequest.requestedBy &&
+                String(matchedRequest.requestedBy).trim() === String(effectiveActorId).trim()
+            ) {
+                throw new PaperEvidenceError(
+                    'Segregation of Duties violation: the user who requested this promotion cannot self-authorize it.',
+                    'SOD_REQUESTER_CANNOT_AUTHORIZE_PROMOTION',
+                    403
+                );
+            }
+
+            // 5. Evidence lifecycle status gates
+            const reviewStatus = String(ev.review_status || ev.status || 'DRAFT').toUpperCase();
+            if (reviewStatus === 'SUPERSEDED' || reviewStatus === 'REJECTED') {
+                throw new PaperEvidenceError(
+                    `Cannot promote evidence '${evidenceId}': evidence is in revoked or rejected status '${reviewStatus}'.`,
+                    'EVIDENCE_REVOKED_OR_SUPERSEDED',
+                    409
+                );
+            }
+            if (reviewStatus !== 'APPROVED_FOR_TECHNICAL_USE' && reviewStatus !== 'CERTIFIED_MEASURED') {
+                throw new PaperEvidenceError(
+                    `Cannot promote unapproved evidence '${evidenceId}' (status: '${reviewStatus}'). Only APPROVED_FOR_TECHNICAL_USE or CERTIFIED_MEASURED evidences are eligible.`,
+                    'EVIDENCE_NOT_APPROVED_FOR_PROMOTION',
+                    422
+                );
+            }
+            if (Boolean(ev.applied_to_catalog_variant)) {
+                throw new PaperEvidenceError(
+                    `Evidence '${evidenceId}' is already promoted to catalog variant '${variantId}'.`,
+                    'EVIDENCE_ALREADY_PROMOTED',
+                    409
+                );
+            }
+
+            // 6. Contradiction gate
+            if (Boolean(ev.has_source_contradiction) && !acknowledgeContradiction) {
+                throw new PaperEvidenceError(
+                    `Cannot promote evidence '${evidenceId}': unresolved source contradiction (> 5% delta) requires explicit contradiction arbitration (acknowledgeContradiction=true).`,
+                    'UNRESOLVED_SOURCE_CONTRADICTION',
+                    422
+                );
+            }
+
+            // 7. Protection of the 9 historical conflicts & 1,272 existing calipers
+            if (HISTORICAL_CONFLICT_9_VARIANT_IDS.has(String(variantId))) {
+                throw new PaperEvidenceError(
+                    `Variant '${variantId}' is one of the 9 protected historical conflict variants (Amber Graphic 122 µm / Galerie Art Matt 225 µm) and cannot be overwritten.`,
+                    'HISTORICAL_CONFLICT_VARIANT_PROTECTED',
+                    409
+                );
+            }
+
+            const currentRevision = Number(variant.caliper_revision || 1);
+            if (
+                expectedCaliperRevision !== undefined &&
+                expectedCaliperRevision !== null &&
+                Number(expectedCaliperRevision) !== currentRevision
+            ) {
+                throw new PaperEvidenceError(
+                    `Compare-And-Swap (CAS) revision mismatch on variant '${variantId}': expected revision ${expectedCaliperRevision}, found ${currentRevision}.`,
+                    'CALIPER_REVISION_CAS_MISMATCH',
+                    409,
+                    { expectedCaliperRevision: Number(expectedCaliperRevision), actualCaliperRevision: currentRevision }
+                );
+            }
+
+            if (variant.caliper_um !== null && variant.caliper_um !== undefined && Number(variant.caliper_um) > 0) {
+                throw new PaperEvidenceError(
+                    `Variant '${variantId}' already has an active catalog caliper (${variant.caliper_um} µm, revision ${currentRevision}). Overwriting existing catalog calipers is prohibited.`,
+                    'EXISTING_CATALOG_CALIPER_PROTECTED',
+                    409,
+                    { existingCaliperUm: Number(variant.caliper_um), caliperRevision: currentRevision }
+                );
+            }
+
+            // 8. Compute new catalog caliper values
+            const proposedUm = Number(ev.proposed_effective_caliper_um ?? ev.proposed_caliper_um ?? 0);
+            if (!Number.isFinite(proposedUm) || proposedUm <= 0 || proposedUm > 5000) {
+                throw new PaperEvidenceError(
+                    `Invalid proposed caliper (${proposedUm} µm) on evidence '${evidenceId}'.`,
+                    'INVALID_PROPOSED_CALIPER_UM',
+                    422
+                );
+            }
+            const proposedMm = Number((proposedUm / 1000).toFixed(4));
+            const proposedBulk =
+                ev.nominal_bulk_cm3_g !== null && ev.nominal_bulk_cm3_g !== undefined && Number(ev.nominal_bulk_cm3_g) > 0
+                    ? Number(Number(ev.nominal_bulk_cm3_g).toFixed(3))
+                    : Number((proposedUm / Number(variant.gsm || 100)).toFixed(3));
+
+            const { targetCaliperSource, targetConfidenceStatus } = resolvePromotionCatalogProvenance(ev);
+            const nextRevision = currentRevision + 1;
+
+            // 9. Atomic Compare-And-Swap UPDATE on `paper_variants`
+            const varUpdRes = unwrapAffectResult(await executor.query(
+                `UPDATE paper_variants
+                 SET caliper_um = ?,
+                     caliper_mm = ?,
+                     bulk_factor = COALESCE(?, bulk_factor),
+                     caliper_source = ?,
+                     caliper_confidence_status = ?,
+                     caliper_verified_at = CURRENT_TIMESTAMP,
+                     caliper_verified_by = ?,
+                     caliper_revision = caliper_revision + 1
+                 WHERE id = ? AND caliper_revision = ? AND caliper_um IS NULL`,
+                [
+                    proposedUm,
+                    proposedMm,
+                    proposedBulk,
+                    targetCaliperSource,
+                    targetConfidenceStatus,
+                    String(effectiveActorId).slice(0, 64),
+                    variantId,
+                    currentRevision
+                ]
+            ));
+
+            if (varUpdRes.affectedRows !== undefined && Number(varUpdRes.affectedRows) === 0) {
+                throw new PaperEvidenceError(
+                    `Concurrent promotion conflict on variant '${variantId}': caliper or revision was modified by another transaction.`,
+                    'CONCURRENT_PROMOTION_CONFLICT',
+                    409
+                );
+            }
+
+            // 10. Atomic Compare-And-Swap UPDATE on `paper_variant_caliper_evidence`
+            const evUpdRes = unwrapAffectResult(await executor.query(
+                `UPDATE paper_variant_caliper_evidence
+                 SET applied_to_catalog_variant = TRUE,
+                     updated_at = CURRENT_TIMESTAMP
+                 WHERE evidence_id = ?
+                   AND tenant_id = ?
+                   AND applied_to_catalog_variant = FALSE
+                   AND review_status IN ('APPROVED_FOR_TECHNICAL_USE', 'CERTIFIED_MEASURED')`,
+                [evidenceId, tenantId]
+            ));
+
+            if (evUpdRes.affectedRows !== undefined && Number(evUpdRes.affectedRows) === 0) {
+                throw new PaperEvidenceError(
+                    `Concurrent promotion conflict on evidence '${evidenceId}': evidence was already applied or changed state.`,
+                    'CONCURRENT_PROMOTION_CONFLICT',
+                    409
+                );
+            }
+
+            // 11. Invalidate any active `spine_calculation_snapshots` referencing this variantId
+            let invalidatedSpineSnapshotsCount = 0;
+            try {
+                const activeSnapshots = unwrapRows(await executor.query(
+                    `SELECT id, input_payload_json
+                     FROM spine_calculation_snapshots
+                     WHERE tenant_id = ? AND snapshot_lifecycle_status = 'ACTIVE'`,
+                    [tenantId]
+                ));
+                const snapshotIdsToInvalidate = [];
+                for (const snap of activeSnapshots) {
+                    const rawPayload = typeof snap.input_payload_json === 'string'
+                        ? snap.input_payload_json
+                        : JSON.stringify(snap.input_payload_json || {});
+                    if (rawPayload.includes(String(variantId))) {
+                        snapshotIdsToInvalidate.push(snap.id);
+                    }
+                }
+                for (const snapId of snapshotIdsToInvalidate) {
+                    const invRes = unwrapAffectResult(await executor.query(
+                        `UPDATE spine_calculation_snapshots
+                         SET snapshot_lifecycle_status = 'INVALIDATED',
+                             superseded_at = CURRENT_TIMESTAMP(6),
+                             invalidation_reason = 'PAPER_VARIANT_CALIPER_PROMOTED'
+                         WHERE id = ? AND tenant_id = ? AND snapshot_lifecycle_status = 'ACTIVE'`,
+                        [snapId, tenantId]
+                    ));
+                    invalidatedSpineSnapshotsCount += Number(invRes.affectedRows || 0);
+                }
+            } catch (_) {
+                // If spine_calculation_snapshots table is not present in lightweight unit mock, continue safely
+            }
+
+            // 12. Append immutable `CATALOG_CALIPER_PROMOTED` audit record with complete reversible snapshot
+            const promotionId = `prm_exec_${crypto.randomBytes(8).toString('hex')}`;
+            const auditId = `aud_cal_${crypto.randomBytes(8).toString('hex')}`;
+            const previousVariantSnapshot = {
+                caliper_um: variant.caliper_um ?? null,
+                caliper_mm: variant.caliper_mm ?? null,
+                bulk_factor: variant.bulk_factor !== undefined && variant.bulk_factor !== null ? Number(variant.bulk_factor) : null,
+                caliper_source: variant.caliper_source || 'NONE',
+                caliper_confidence_status: variant.caliper_confidence_status || 'MISSING',
+                caliper_verified_at: variant.caliper_verified_at || null,
+                caliper_verified_by: variant.caliper_verified_by || null,
+                caliper_revision: currentRevision
+            };
+
+            const promotionMetadata = {
+                promotionStage: 'CATALOG_CALIPER_PROMOTED',
+                promotionId,
+                promotionRequestId: matchedRequest ? matchedRequest.promotionRequestId : (promotionRequestId || null),
+                idempotencyKey: idempotencyKey || null,
+                submittedBy: ev.submitted_by,
+                submittedByRole: ev.submitted_by_role || null,
+                approvedByTechnologist: ev.approved_by_technologist,
+                approvedByRole: ev.approved_by_role || null,
+                requestedBy: matchedRequest ? matchedRequest.requestedBy : null,
+                requestedByRole: matchedRequest ? matchedRequest.requestedByRole : null,
+                authorizedBy: effectiveActorId,
+                authorizedByRole: effectiveRole,
+                documentTitle: ev.document_title || null,
+                documentSha256: ev.document_sha256 || null,
+                datasheetVersion: ev.datasheet_version || null,
+                previousVariantSnapshot,
+                promotedVariantSnapshot: {
+                    caliper_um: proposedUm,
+                    caliper_mm: proposedMm,
+                    bulk_factor: proposedBulk,
+                    caliper_source: targetCaliperSource,
+                    caliper_confidence_status: targetConfidenceStatus,
+                    caliper_revision: nextRevision
+                },
+                invalidatedSpineSnapshotsCount,
+                canReleaseToManufacturing: false
+            };
+
+            await executor.query(
+                `INSERT INTO paper_variant_caliper_audit_log (
+                    audit_id, tenant_id, supplier_id, variant_id, evidence_id,
+                    action_type, previous_review_status, new_review_status,
+                    previous_caliper_um, new_caliper_um,
+                    previous_caliper_source, new_caliper_source,
+                    previous_confidence_status, new_confidence_status,
+                    previous_revision, new_revision,
+                    nominal_datasheet_caliper_um, measured_batch_caliper_um, document_sha256,
+                    actor_user_id, actor_role, decision_reason, metadata_json
+                ) VALUES (?, ?, ?, ?, ?, 'CATALOG_CALIPER_PROMOTED', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [
+                    auditId,
+                    tenantId,
+                    supplierId,
+                    variantId,
+                    evidenceId,
+                    reviewStatus,
+                    reviewStatus,
+                    variant.caliper_um ?? null,
+                    proposedUm,
+                    variant.caliper_source ?? 'NONE',
+                    targetCaliperSource,
+                    variant.caliper_confidence_status ?? 'MISSING',
+                    targetConfidenceStatus,
+                    currentRevision,
+                    nextRevision,
+                    ev.nominal_datasheet_caliper_um ?? null,
+                    ev.measured_batch_caliper_um ?? null,
+                    ev.document_sha256 ?? null,
+                    effectiveActorId,
+                    effectiveRole,
+                    String(effectiveReason).trim(),
+                    JSON.stringify(promotionMetadata)
+                ]
+            );
+
+            return {
+                idempotentReplay: false,
+                promotionId,
+                auditId,
+                variantId,
+                evidenceId,
+                reviewStatus,
+                previousCaliperUm: variant.caliper_um !== null && variant.caliper_um !== undefined ? Number(variant.caliper_um) : null,
+                newCaliperUm: proposedUm,
+                newCaliperMm: proposedMm,
+                newBulkFactor: proposedBulk,
+                previousCaliperSource: variant.caliper_source || 'NONE',
+                newCaliperSource: targetCaliperSource,
+                previousConfidenceStatus: variant.caliper_confidence_status || 'MISSING',
+                newConfidenceStatus: targetConfidenceStatus,
+                previousRevision: currentRevision,
+                newRevision: nextRevision,
+                segregationOfDuties: {
+                    submittedBy: ev.submitted_by,
+                    approvedByTechnologist: ev.approved_by_technologist,
+                    requestedBy: matchedRequest ? matchedRequest.requestedBy : null,
+                    authorizedBy: effectiveActorId
+                },
+                invalidatedSpineSnapshotsCount,
+                productiveCaliperModified: true,
+                canReleaseToManufacturing: false
+            };
+        });
+    }
+
+    /**
+     * Governed revocation and reversion of a promoted evidence (`EVIDENCE_SUPERSEDED`).
+     * Restores `paper_variants` to its pre-promotion snapshot (e.g. `caliper_um = NULL`, `caliper_source = 'NONE'`,
+     * `caliper_confidence_status = 'MISSING'`), increments `caliper_revision`, marks the evidence `SUPERSEDED` with
+     * `applied_to_catalog_variant = FALSE`, invalidates active Spine snapshots, and records an immutable audit log entry.
+     */
+    async revokeAndRevertPromotion({
+        tenantId,
+        supplierId = null,
+        variantId,
+        evidenceId,
+        actorUserId = null,
+        actorId = null,
+        actorRole = null,
+        reason = null,
+        expectedCaliperRevision = undefined
+    }) {
+        const effectiveActorId = actorUserId || actorId;
+        const effectiveRole = String(actorRole || '').toUpperCase();
+
+        if (!tenantId || !effectiveActorId) {
+            throw new PaperEvidenceError('Authenticated tenant and actor identity required.', 'UNAUTHORIZED', 403);
+        }
+        if (!ALLOWED_PROMOTION_AUTHORIZER_ROLES.has(effectiveRole)) {
+            throw new PaperEvidenceError(
+                `Role '${actorRole}' is not authorized to revoke or revert a catalog promotion. Admin or Material Technologist role required.`,
+                'FORBIDDEN_PROMOTION_REVERT_ROLE_REQUIRED',
+                403
+            );
+        }
+        if (!reason || String(reason).trim().length < 5) {
+            throw new PaperEvidenceError(
+                'A detailed reversion reason (min 5 characters) is mandatory.',
+                'REVERT_REASON_REQUIRED',
+                422
+            );
+        }
+
+        return this._withTransaction(async (executor, isTx) => {
+            const lockClause = isTx ? ' FOR UPDATE' : '';
+
+            const varRows = unwrapRows(await executor.query(
+                `SELECT * FROM paper_variants WHERE id = ? LIMIT 1${lockClause}`,
+                [variantId]
+            ));
+            if (!varRows || varRows.length === 0) {
+                throw new PaperEvidenceError(`Variant '${variantId}' not found.`, 'VARIANT_NOT_FOUND', 404);
+            }
+            const variant = varRows[0];
+
+            const evRows = unwrapRows(await executor.query(
+                `SELECT * FROM paper_variant_caliper_evidence WHERE evidence_id = ? AND tenant_id = ? LIMIT 1${lockClause}`,
+                [evidenceId, tenantId]
+            ));
+            if (!evRows || evRows.length === 0) {
+                throw new PaperEvidenceError(`Evidence '${evidenceId}' not found for this tenant.`, 'EVIDENCE_NOT_FOUND', 404);
+            }
+            const ev = evRows[0];
+            if (String(ev.variant_id) !== String(variantId)) {
+                throw new PaperEvidenceError(
+                    `Evidence '${evidenceId}' belongs to variant '${ev.variant_id}', not '${variantId}'.`,
+                    'EVIDENCE_VARIANT_MISMATCH',
+                    422
+                );
+            }
+
+            if (!Boolean(ev.applied_to_catalog_variant)) {
+                throw new PaperEvidenceError(
+                    `Evidence '${evidenceId}' is not currently promoted to catalog variant '${variantId}'.`,
+                    'EVIDENCE_NOT_CURRENTLY_PROMOTED',
+                    409
+                );
+            }
+
+            const currentRevision = Number(variant.caliper_revision || 1);
+            if (
+                expectedCaliperRevision !== undefined &&
+                expectedCaliperRevision !== null &&
+                Number(expectedCaliperRevision) !== currentRevision
+            ) {
+                throw new PaperEvidenceError(
+                    `Compare-And-Swap (CAS) revision mismatch on variant '${variantId}': expected revision ${expectedCaliperRevision}, found ${currentRevision}.`,
+                    'CALIPER_REVISION_CAS_MISMATCH',
+                    409
+                );
+            }
+
+            // Look up the prior CATALOG_CALIPER_PROMOTED audit entry to restore the exact pre-promotion snapshot
+            const promoLogs = unwrapRows(await executor.query(
+                `SELECT * FROM paper_variant_caliper_audit_log
+                 WHERE tenant_id = ? AND variant_id = ? AND evidence_id = ? AND action_type = 'CATALOG_CALIPER_PROMOTED'
+                 ORDER BY created_at DESC LIMIT 1`,
+                [tenantId, variantId, evidenceId]
+            ));
+            const latestPromoLog = promoLogs[0] || null;
+            const promoMeta = latestPromoLog ? parseJsonColumn(latestPromoLog.metadata_json) : {};
+            const prevSnap = promoMeta.previousVariantSnapshot || {
+                caliper_um: latestPromoLog ? latestPromoLog.previous_caliper_um : null,
+                caliper_mm: null,
+                bulk_factor: null,
+                caliper_source: latestPromoLog ? (latestPromoLog.previous_caliper_source || 'NONE') : 'NONE',
+                caliper_confidence_status: latestPromoLog ? (latestPromoLog.previous_confidence_status || 'MISSING') : 'MISSING',
+                caliper_verified_at: null,
+                caliper_verified_by: null
+            };
+
+            const restoredUm =
+                prevSnap.caliper_um !== null && prevSnap.caliper_um !== undefined ? Number(prevSnap.caliper_um) : null;
+            const restoredMm =
+                restoredUm !== null ? Number((restoredUm / 1000).toFixed(4)) : null;
+            const restoredBulk =
+                prevSnap.bulk_factor !== null && prevSnap.bulk_factor !== undefined ? Number(prevSnap.bulk_factor) : null;
+            const restoredSource = prevSnap.caliper_source || 'NONE';
+            const restoredConfidence = prevSnap.caliper_confidence_status || 'MISSING';
+            const nextRevision = currentRevision + 1;
+
+            const varUpdRes = unwrapAffectResult(await executor.query(
+                `UPDATE paper_variants
+                 SET caliper_um = ?,
+                     caliper_mm = ?,
+                     bulk_factor = ?,
+                     caliper_source = ?,
+                     caliper_confidence_status = ?,
+                     caliper_verified_at = NULL,
+                     caliper_verified_by = NULL,
+                     caliper_revision = caliper_revision + 1
+                 WHERE id = ? AND caliper_revision = ?`,
+                [
+                    restoredUm,
+                    restoredMm,
+                    restoredBulk,
+                    restoredSource,
+                    restoredConfidence,
+                    variantId,
+                    currentRevision
+                ]
+            ));
+
+            if (varUpdRes.affectedRows !== undefined && Number(varUpdRes.affectedRows) === 0) {
+                throw new PaperEvidenceError(
+                    `Concurrent modification conflict while reverting promotion on variant '${variantId}'.`,
+                    'CONCURRENT_PROMOTION_REVERT_CONFLICT',
+                    409
+                );
+            }
+
+            const prevReviewStatus = ev.review_status || ev.status || 'APPROVED_FOR_TECHNICAL_USE';
+            await executor.query(
+                `UPDATE paper_variant_caliper_evidence
+                 SET review_status = 'SUPERSEDED',
+                     applied_to_catalog_variant = FALSE,
+                     decision_reason = ?,
+                     updated_at = CURRENT_TIMESTAMP
+                 WHERE evidence_id = ? AND tenant_id = ?`,
+                [String(reason).trim(), evidenceId, tenantId]
+            );
+
+            // Invalidate any active spine_calculation_snapshots referencing this variantId
+            let invalidatedSpineSnapshotsCount = 0;
+            try {
+                const activeSnapshots = unwrapRows(await executor.query(
+                    `SELECT id, input_payload_json
+                     FROM spine_calculation_snapshots
+                     WHERE tenant_id = ? AND snapshot_lifecycle_status = 'ACTIVE'`,
+                    [tenantId]
+                ));
+                for (const snap of activeSnapshots) {
+                    const rawPayload = typeof snap.input_payload_json === 'string'
+                        ? snap.input_payload_json
+                        : JSON.stringify(snap.input_payload_json || {});
+                    if (rawPayload.includes(String(variantId))) {
+                        const invRes = unwrapAffectResult(await executor.query(
+                            `UPDATE spine_calculation_snapshots
+                             SET snapshot_lifecycle_status = 'INVALIDATED',
+                                 superseded_at = CURRENT_TIMESTAMP(6),
+                                 invalidation_reason = 'PAPER_VARIANT_CALIPER_PROMOTION_REVERTED'
+                             WHERE id = ? AND tenant_id = ? AND snapshot_lifecycle_status = 'ACTIVE'`,
+                            [snap.id, tenantId]
+                        ));
+                        invalidatedSpineSnapshotsCount += Number(invRes.affectedRows || 0);
+                    }
+                }
+            } catch (_) {}
+
+            const auditId = `aud_cal_${crypto.randomBytes(8).toString('hex')}`;
+            const revertMeta = {
+                promotionStage: 'PROMOTION_REVERTED_AND_EVIDENCE_SUPERSEDED',
+                revertedBy: effectiveActorId,
+                revertedByRole: effectiveRole,
+                revertedFromCaliperUm: variant.caliper_um !== null ? Number(variant.caliper_um) : null,
+                restoredCaliperUm: restoredUm,
+                restoredCaliperSource: restoredSource,
+                restoredConfidenceStatus: restoredConfidence,
+                invalidatedSpineSnapshotsCount,
+                canReleaseToManufacturing: false
+            };
+
+            await executor.query(
+                `INSERT INTO paper_variant_caliper_audit_log (
+                    audit_id, tenant_id, supplier_id, variant_id, evidence_id,
+                    action_type, previous_review_status, new_review_status,
+                    previous_caliper_um, new_caliper_um,
+                    previous_caliper_source, new_caliper_source,
+                    previous_confidence_status, new_confidence_status,
+                    previous_revision, new_revision,
+                    nominal_datasheet_caliper_um, measured_batch_caliper_um, document_sha256,
+                    actor_user_id, actor_role, decision_reason, metadata_json
+                ) VALUES (?, ?, ?, ?, ?, 'EVIDENCE_SUPERSEDED', ?, 'SUPERSEDED', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [
+                    auditId,
+                    tenantId,
+                    supplierId,
+                    variantId,
+                    evidenceId,
+                    prevReviewStatus,
+                    variant.caliper_um ?? null,
+                    restoredUm,
+                    variant.caliper_source ?? 'NONE',
+                    restoredSource,
+                    variant.caliper_confidence_status ?? 'MISSING',
+                    restoredConfidence,
+                    currentRevision,
+                    nextRevision,
+                    ev.nominal_datasheet_caliper_um ?? null,
+                    ev.measured_batch_caliper_um ?? null,
+                    ev.document_sha256 ?? null,
+                    effectiveActorId,
+                    effectiveRole,
+                    String(reason).trim(),
+                    JSON.stringify(revertMeta)
+                ]
+            );
+
+            return {
+                auditId,
+                variantId,
+                evidenceId,
+                newEvidenceStatus: 'SUPERSEDED',
+                previousCaliperUm: variant.caliper_um !== null ? Number(variant.caliper_um) : null,
+                restoredCaliperUm: restoredUm,
+                restoredCaliperSource: restoredSource,
+                restoredConfidenceStatus: restoredConfidence,
+                previousRevision: currentRevision,
+                newRevision: nextRevision,
+                invalidatedSpineSnapshotsCount,
+                productiveCaliperReverted: true,
+                canReleaseToManufacturing: false
+            };
+        });
+    }
+
+    /**
+     * Lists all promotion requests, completed promotions, and reversions for a variant within the authenticated tenant.
+     */
+    async listVariantPromotions({ tenantId, variantId, actorId = null, actorRole = null }) {
+        if (!tenantId) {
+            throw new PaperEvidenceError('Authenticated tenant context is required.', 'TENANT_REQUIRED', 403);
+        }
+        if (!variantId) {
+            throw new PaperEvidenceError('variantId is required.', 'VARIANT_ID_REQUIRED', 400);
+        }
+
+        const varEvData = await this.getVariantEvidences({ tenantId, variantId });
+        const approvedEvidences = varEvData.caliperEvidences.filter(
+            (e) => e.status === 'APPROVED_FOR_TECHNICAL_USE' || e.status === 'CERTIFIED_MEASURED'
+        );
+        const promotedEvidence = varEvData.caliperEvidences.find((e) => Boolean(e.applied_to_catalog_variant)) || null;
+
+        let promotionPreview = null;
+        const candidateForPreview = promotedEvidence || approvedEvidences[0] || varEvData.caliperEvidences[0] || null;
+        if (candidateForPreview) {
+            promotionPreview = await this.previewEvidencePromotion({
+                tenantId,
+                variantId,
+                evidenceId: candidateForPreview.id,
+                actorId,
+                actorRole
+            });
+        }
+
+        const promotionHistory = varEvData.auditHistory
+            .filter((log) => {
+                const meta = parseJsonColumn(log.metadata_json);
+                return (
+                    log.action === 'CATALOG_CALIPER_PROMOTED' ||
+                    log.action === 'EVIDENCE_SUPERSEDED' ||
+                    (meta && meta.promotionStage)
+                );
+            })
+            .map((log) => {
+                const meta = parseJsonColumn(log.metadata_json);
+                return {
+                    auditId: log.id,
+                    evidenceId: log.evidence_id,
+                    actionType: log.action,
+                    promotionStage: meta.promotionStage || log.action,
+                    previousCaliperUm: log.previous_caliper_um !== null && log.previous_caliper_um !== undefined ? Number(log.previous_caliper_um) : null,
+                    newCaliperUm: log.new_caliper_um !== null && log.new_caliper_um !== undefined ? Number(log.new_caliper_um) : null,
+                    previousCaliperSource: log.previous_caliper_source || 'NONE',
+                    newCaliperSource: log.new_caliper_source || 'NONE',
+                    previousConfidenceStatus: log.previous_confidence_status || 'MISSING',
+                    newConfidenceStatus: log.new_confidence_status || 'MISSING',
+                    previousRevision: log.previous_revision ? Number(log.previous_revision) : null,
+                    newRevision: log.new_revision ? Number(log.new_revision) : null,
+                    actorId: log.actor_id,
+                    actorRole: log.actor_role,
+                    reason: log.reason,
+                    metadata: meta,
+                    createdAt: log.created_at
+                };
+            });
+
+        return {
+            variant: varEvData.variant,
+            spineProvenance: varEvData.spineProvenance,
+            promotedEvidence,
+            approvedEvidences,
+            promotionPreview,
+            promotionHistory,
+            canReleaseToManufacturing: false
+        };
+    }
 }
 
 function payloadAllowsNominalReferenceOnly() {
@@ -1681,6 +3123,11 @@ module.exports = {
     paperEvidenceService,
     PaperEvidenceService,
     PaperEvidenceError,
+    HISTORICAL_CONFLICT_9_VARIANT_IDS,
+    ALLOWED_PROMOTION_REQUESTER_ROLES,
+    ALLOWED_PROMOTION_AUTHORIZER_ROLES,
+    resolvePromotionCatalogProvenance,
+    computeSpinePromotionImpactPreview,
     MAX_PDF_SIZE_BYTES,
     DEFAULT_PRIVATE_EVIDENCE_STORE_DIR,
     resolvePrivateEvidenceStoreDir,

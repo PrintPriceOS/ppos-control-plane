@@ -2934,7 +2934,27 @@ export const en = {
   'supplier.accreditation.btnSubmitEvidence': 'Register & Submit Evidence',
   'supplier.accreditation.btnApprove': 'Approve Technical Evidence',
   'supplier.accreditation.btnReject': 'Reject Evidence',
-  'supplier.accreditation.ackContradictionLabel': 'I acknowledge the >5% source contradiction and document the technical justification below.'
+  'supplier.accreditation.ackContradictionLabel': 'I acknowledge the >5% source contradiction and document the technical justification below.',
+  'supplier.accreditation.btnPromote': 'Promote to Catalog',
+  'supplier.accreditation.modalPromoteTitle': 'Governed Promotion of Approved Evidence to Catalog (paper_variants.caliper_um)',
+  'supplier.accreditation.promoteComparisonTitle': 'Catalog Caliper Comparison & CAS Revision Gate',
+  'supplier.accreditation.promoteCurrentCaliper': 'Current Catalog Caliper',
+  'supplier.accreditation.promoteProposedCaliper': 'Proposed Effective Caliper',
+  'supplier.accreditation.promoteDelta': 'Absolute & Relative Delta',
+  'supplier.accreditation.promoteSourceAndConfidence': 'Target Source & Confidence',
+  'supplier.accreditation.promoteSpineImpactTitle': 'Spine Calculator Impact (200 pp · 170×240 mm · Livonia Alegro 2.0.0)',
+  'supplier.accreditation.promoteSpineBefore': 'Before Promotion (Catalog)',
+  'supplier.accreditation.promoteSpineAfter': 'After Promotion (Effective)',
+  'supplier.accreditation.promoteSodChainTitle': '3-Way Segregation of Duties (SoD) & Traceability Chain',
+  'supplier.accreditation.promoteStepSubmitted': '1. Evidence Submitted By',
+  'supplier.accreditation.promoteStepApproved': '2. Technologist Approved By',
+  'supplier.accreditation.promoteStepRequested': '3. Promotion Requested By',
+  'supplier.accreditation.promoteStepAuthorized': '4. Catalog Promotion Authorizer',
+  'supplier.accreditation.promoteBtnRequest': 'Request Catalog Promotion',
+  'supplier.accreditation.promoteBtnAuthorize': 'Authorize & Apply to Catalog (CAS)',
+  'supplier.accreditation.promoteBtnRevert': 'Revoke & Revert Promotion',
+  'supplier.accreditation.promoteAppliedBadge': 'PROMOTED TO CATALOG',
+  'supplier.accreditation.promoteLockNotice': 'Industrial Lock Preserved: Promoting this caliper updates paper_variants.caliper_um for Spine calculations, while keeping canReleaseToManufacturing = false until profile and physical batch release gates are met.'
 } as const;
 
 export type TranslationKeys = keyof typeof en;

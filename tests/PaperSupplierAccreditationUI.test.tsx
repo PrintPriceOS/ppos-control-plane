@@ -328,6 +328,110 @@ describe('PAPER-MATERIALS-RECOVERY-09 & 09H — Paper Supplier Hub Technical Acc
                 };
             }
 
+            if (path.endsWith('/promotions')) {
+                return {
+                    ok: true,
+                    data: {
+                        variant: {
+                            variantId: 'var_dbd5357075534e3b',
+                            productName: 'Nevia Plus C1S 80g 71my 70x100',
+                            caliperUm: null,
+                            caliperRevision: 1
+                        },
+                        promotedEvidence: null,
+                        approvedEvidences: mockEvidencesState,
+                        promotionPreview: {
+                            variant: {
+                                variantId: 'var_dbd5357075534e3b',
+                                currentRevision: 1
+                            },
+                            evidence: {
+                                evidenceId: mockEvidencesState[0]?.id || 'evd_cal_nevia01',
+                                proposedCaliperMm: 0.071,
+                                proposedBulkFactor: 0.888,
+                                documentTitle: 'APP Nevia Plus C1S 80g Official TDS',
+                                documentSha256: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+                                datasheetVersion: '2026-Q4',
+                                hasSourceContradiction: false
+                            },
+                            comparison: {
+                                currentCaliperUm: null,
+                                proposedCaliperUm: 71,
+                                deltaUm: null,
+                                deltaPct: null,
+                                comparisonMode: 'NEW_CATALOG_ACCREDITATION_FROM_NULL',
+                                currentSource: 'NONE',
+                                targetSource: 'MANUFACTURER_DATASHEET',
+                                currentConfidence: 'MISSING',
+                                targetConfidence: 'REFERENCE_IMPORTED',
+                                currentRevision: 1,
+                                nextRevision: 2
+                            },
+                            governance: {
+                                eligibleForPromotion: true,
+                                blockingReasons: [],
+                                segregationOfDuties: {
+                                    submittedBy: 'operator-alice',
+                                    approvedByTechnologist: 'tech-bob',
+                                    requestedBy: 'requester-carol'
+                                }
+                            },
+                            spineImpact: {
+                                beforePromotion: { available: false, blockedCode: 'MISSING_PAPER_CALIPER' },
+                                afterPromotion: {
+                                    available: true,
+                                    profileCertificationTier: 'MATH_BRANCH_VALIDATED',
+                                    softcover200ppGlued: { netBlockMm: 7.1, spineWidthMm: 8.0 },
+                                    softcover200ppSewn: { netBlockMm: 7.1, spineWidthMm: 8.5 }
+                                }
+                            }
+                        }
+                    }
+                };
+            }
+
+            if (path.endsWith('/promotions/authorize') && options?.method === 'POST') {
+                return {
+                    ok: true,
+                    data: {
+                        promotionId: 'prm_exec_01',
+                        variantId: 'var_dbd5357075534e3b',
+                        newCaliperUm: 71,
+                        newCaliperSource: 'MANUFACTURER_DATASHEET',
+                        newRevision: 2,
+                        productiveCaliperModified: true,
+                        canReleaseToManufacturing: false
+                    }
+                };
+            }
+
+            if (path.endsWith('/promotions/request') && options?.method === 'POST') {
+                return {
+                    ok: true,
+                    data: {
+                        promotionRequestId: 'prm_req_01',
+                        variantId: 'var_dbd5357075534e3b',
+                        status: 'PROMOTION_REQUESTED',
+                        productiveCaliperModified: false,
+                        canReleaseToManufacturing: false
+                    }
+                };
+            }
+
+            if (path.endsWith('/promotions/revert') && options?.method === 'POST') {
+                return {
+                    ok: true,
+                    data: {
+                        variantId: 'var_dbd5357075534e3b',
+                        restoredCaliperUm: null,
+                        newEvidenceStatus: 'SUPERSEDED',
+                        newRevision: 3,
+                        productiveCaliperReverted: true,
+                        canReleaseToManufacturing: false
+                    }
+                };
+            }
+
             return { ok: true, data: {} };
         });
     });
@@ -510,5 +614,56 @@ describe('PAPER-MATERIALS-RECOVERY-09 & 09H — Paper Supplier Hub Technical Acc
                 screen.getByText(/No missing-caliper variants match the current filter criteria\./i)
             ).toBeInTheDocument();
         });
+    });
+
+    it('4. RECOVERY-11: renders Governed Promotion modal across EN, ES, and DE, displaying current vs proposed caliper, Spine Calculator impact, 3-way SoD chain, and executes Request / Authorize / Revert flows', async () => {
+        const locales: Locale[] = ['en', 'es', 'de'];
+
+        for (const loc of locales) {
+            const { unmount } = render(
+                <MemoryRouter>
+                    <LocaleProvider initialLocale={loc}>
+                        <SupplierCatalogOffersPage />
+                    </LocaleProvider>
+                </MemoryRouter>
+            );
+
+            fireEvent.click(screen.getByTestId('tab-technical-accreditation'));
+
+            await waitFor(() => {
+                expect(screen.getByTestId('btn-promote-var_dbd5357075534e3b')).toBeInTheDocument();
+            });
+
+            fireEvent.click(screen.getByTestId('btn-promote-var_dbd5357075534e3b'));
+
+            await waitFor(() => {
+                expect(screen.getByTestId('promotion-modal')).toBeInTheDocument();
+                expect(screen.getByTestId('promotion-comparison-card')).toBeInTheDocument();
+                expect(screen.getByTestId('promotion-spine-impact-card')).toBeInTheDocument();
+                expect(screen.getByTestId('promotion-sod-card')).toBeInTheDocument();
+            });
+
+            // Verify comparison values & Spine impact preview
+            expect(screen.getByTestId('promo-current-caliper')).toHaveTextContent(/NULL/i);
+            expect(screen.getByTestId('promo-proposed-caliper')).toHaveTextContent('71 µm');
+            expect(screen.getByText(/422 MISSING_PAPER_CALIPER/i)).toBeInTheDocument();
+            expect(screen.getByText(/8\.5 mm/i)).toBeInTheDocument();
+
+            // Submit promotion authorization
+            const reasonBox = screen.getByTestId('promo-reason-input');
+            fireEvent.change(reasonBox, {
+                target: { value: 'Authorized governed promotion of Nevia Plus C1S 80g 71um.' }
+            });
+            fireEvent.click(screen.getByTestId('promo-submit-button'));
+
+            await waitFor(() => {
+                expect(mockPaperSupplierFetch).toHaveBeenCalledWith(
+                    '/api/v1/paper-suppliers/accreditation/variants/var_dbd5357075534e3b/evidences/evd_cal_nevia01/promotions/authorize',
+                    expect.objectContaining({ method: 'POST' })
+                );
+            });
+
+            unmount();
+        }
     });
 });

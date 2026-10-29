@@ -1633,6 +1633,16 @@ function sanitizeClientBodyIdentity(body) {
     delete copy.technologistRole;
     delete copy.approvedByRole;
     delete copy.approved_by_role;
+    delete copy.requestedBy;
+    delete copy.requested_by;
+    delete copy.requestedByRole;
+    delete copy.requested_by_role;
+    delete copy.authorizedBy;
+    delete copy.authorized_by;
+    delete copy.authorizedByRole;
+    delete copy.authorized_by_role;
+    delete copy.promotedBy;
+    delete copy.promoted_by;
     return copy;
 }
 
@@ -1816,6 +1826,163 @@ router.post('/accreditation/evidences/:evidenceId/review', requireSupplierScope(
     } catch (err) {
         console.error('[PAPER-SUPPLIERS][REVIEW-EVIDENCE-ERROR]', err);
         return sendEvidenceError(res, err, 'REVIEW_EVIDENCE_FAILED');
+    }
+});
+
+/**
+ * -------------------------------------------------------------
+ * ITERATION I7 (RECOVERY-11): GOVERNED PROMOTION OF APPROVED EVIDENCES
+ * -------------------------------------------------------------
+ * Invariants:
+ * 1. Only APPROVED_FOR_TECHNICAL_USE or CERTIFIED_MEASURED evidences can be promoted.
+ * 2. Strict 3-way Segregation of Duties (`submitted_by`, `approved_by_technologist`, `requested_by`, `authorized_by`)
+ *    derived exclusively from authenticated session context (`resolveActorContext(req)`).
+ * 3. Atomic Compare-And-Swap (`FOR UPDATE` + `WHERE id = ? AND caliper_revision = ? AND caliper_um IS NULL`)
+ *    protecting the 1,272 existing calipers and 9 historical conflicts.
+ * 4. Automatic invalidation of active Spine snapshots referencing the variant, while preserving
+ *    `canReleaseToManufacturing = false`.
+ */
+
+/**
+ * GET /api/v1/paper-suppliers/accreditation/variants/:variantId/promotions
+ * Query promotion status, active requests, completed promotions, reversions, and Spine impact preview for a variant.
+ */
+router.get('/accreditation/variants/:variantId/promotions', requireSupplierScope('VIEWER'), requireApprovedSupplier, async (req, res) => {
+    try {
+        const context = resolveActorContext(req);
+        const role = req.verifiedSupplierContext?.role || context.role;
+        const result = await paperEvidenceService.listVariantPromotions({
+            tenantId: context.tenantId,
+            variantId: req.params.variantId,
+            actorId: context.userId,
+            actorRole: role
+        });
+        return res.json({ ok: true, data: result });
+    } catch (err) {
+        console.error('[PAPER-SUPPLIERS][VARIANT-PROMOTIONS-LIST-ERROR]', err);
+        return sendEvidenceError(res, err, 'VARIANT_PROMOTIONS_LIST_FAILED');
+    }
+});
+
+/**
+ * GET /api/v1/paper-suppliers/accreditation/variants/:variantId/evidences/:evidenceId/promotion-preview
+ * Preview the catalog promotion of a specific evidence record, including delta (µm / %), Spine Calculator impact,
+ * Segregation of Duties eligibility, and blocking gates.
+ */
+router.get('/accreditation/variants/:variantId/evidences/:evidenceId/promotion-preview', requireSupplierScope('VIEWER'), requireApprovedSupplier, async (req, res) => {
+    try {
+        const context = resolveActorContext(req);
+        const role = req.verifiedSupplierContext?.role || context.role;
+        const result = await paperEvidenceService.previewEvidencePromotion({
+            tenantId: context.tenantId,
+            supplierId: context.supplierId,
+            variantId: req.params.variantId,
+            evidenceId: req.params.evidenceId,
+            actorId: context.userId,
+            actorRole: role
+        });
+        return res.json({ ok: true, data: result });
+    } catch (err) {
+        console.error('[PAPER-SUPPLIERS][PROMOTION-PREVIEW-ERROR]', err);
+        return sendEvidenceError(res, err, 'PROMOTION_PREVIEW_FAILED');
+    }
+});
+
+/**
+ * POST /api/v1/paper-suppliers/accreditation/variants/:variantId/evidences/:evidenceId/promotions/request
+ * Submit a governed promotion request for an approved evidence record (`OPERATOR` or `ADMIN`).
+ * Does NOT mutate `paper_variants.caliper_um`.
+ */
+router.post('/accreditation/variants/:variantId/evidences/:evidenceId/promotions/request', requireSupplierScope('OPERATOR'), requireApprovedSupplier, async (req, res) => {
+    try {
+        const context = resolveActorContext(req);
+        const role = req.verifiedSupplierContext?.role || context.role;
+        const body = sanitizeClientBodyIdentity(req.body || {});
+        const idempotencyKey = req.headers['idempotency-key'] || body.idempotencyKey || null;
+
+        const result = await paperEvidenceService.requestEvidencePromotion({
+            tenantId: context.tenantId,
+            supplierId: context.supplierId,
+            variantId: req.params.variantId,
+            evidenceId: req.params.evidenceId,
+            actorId: context.userId,
+            actorRole: role,
+            reason: body.reason || body.decisionReason,
+            idempotencyKey
+        });
+
+        return res.status(result.idempotentReplay ? 200 : 201).json({
+            ok: true,
+            data: result
+        });
+    } catch (err) {
+        console.error('[PAPER-SUPPLIERS][PROMOTION-REQUEST-ERROR]', err);
+        return sendEvidenceError(res, err, 'PROMOTION_REQUEST_FAILED');
+    }
+});
+
+/**
+ * POST /api/v1/paper-suppliers/accreditation/variants/:variantId/evidences/:evidenceId/promotions/authorize
+ * Authorize and execute the transactional Compare-And-Swap promotion of an approved evidence to `paper_variants.caliper_um` (`ADMIN`).
+ */
+router.post('/accreditation/variants/:variantId/evidences/:evidenceId/promotions/authorize', requireSupplierScope('ADMIN'), requireApprovedSupplier, async (req, res) => {
+    try {
+        const context = resolveActorContext(req);
+        const role = req.verifiedSupplierContext?.role || context.role;
+        const body = sanitizeClientBodyIdentity(req.body || {});
+        const idempotencyKey = req.headers['idempotency-key'] || body.idempotencyKey || null;
+
+        const result = await paperEvidenceService.authorizeEvidencePromotion({
+            tenantId: context.tenantId,
+            supplierId: context.supplierId,
+            variantId: req.params.variantId,
+            evidenceId: req.params.evidenceId,
+            promotionRequestId: body.promotionRequestId || null,
+            actorId: context.userId,
+            actorRole: role,
+            reason: body.reason || body.decisionReason,
+            expectedCaliperRevision: body.expectedCaliperRevision,
+            acknowledgeContradiction: Boolean(body.acknowledgeContradiction),
+            idempotencyKey
+        });
+
+        return res.status(result.idempotentReplay ? 200 : 201).json({
+            ok: true,
+            data: result
+        });
+    } catch (err) {
+        console.error('[PAPER-SUPPLIERS][PROMOTION-AUTHORIZE-ERROR]', err);
+        return sendEvidenceError(res, err, 'PROMOTION_AUTHORIZE_FAILED');
+    }
+});
+
+/**
+ * POST /api/v1/paper-suppliers/accreditation/variants/:variantId/evidences/:evidenceId/promotions/revert
+ * Governed revocation and reversion of a promoted evidence (`ADMIN`).
+ * Restores `paper_variants.caliper_um` to its pre-promotion snapshot, marks the evidence `SUPERSEDED`,
+ * and invalidates active Spine snapshots referencing the variant.
+ */
+router.post('/accreditation/variants/:variantId/evidences/:evidenceId/promotions/revert', requireSupplierScope('ADMIN'), requireApprovedSupplier, async (req, res) => {
+    try {
+        const context = resolveActorContext(req);
+        const role = req.verifiedSupplierContext?.role || context.role;
+        const body = sanitizeClientBodyIdentity(req.body || {});
+
+        const result = await paperEvidenceService.revokeAndRevertPromotion({
+            tenantId: context.tenantId,
+            supplierId: context.supplierId,
+            variantId: req.params.variantId,
+            evidenceId: req.params.evidenceId,
+            actorId: context.userId,
+            actorRole: role,
+            reason: body.reason || body.decisionReason,
+            expectedCaliperRevision: body.expectedCaliperRevision
+        });
+
+        return res.json({ ok: true, data: result });
+    } catch (err) {
+        console.error('[PAPER-SUPPLIERS][PROMOTION-REVERT-ERROR]', err);
+        return sendEvidenceError(res, err, 'PROMOTION_REVERT_FAILED');
     }
 });
 

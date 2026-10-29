@@ -2934,7 +2934,27 @@ export const de = {
   'supplier.accreditation.btnSubmitEvidence': 'Nachweis Registrieren & Einreichen',
   'supplier.accreditation.btnApprove': 'Technischen Nachweis Genehmigen',
   'supplier.accreditation.btnReject': 'Nachweis Ablehnen',
-  'supplier.accreditation.ackContradictionLabel': 'Ich bestätige den >5% Quellenwiderspruch und dokumentiere unten die technische Begründung.'
+  'supplier.accreditation.ackContradictionLabel': 'Ich bestätige den >5% Quellenwiderspruch und dokumentiere unten die technische Begründung.',
+  'supplier.accreditation.btnPromote': 'In Katalog Übernehmen',
+  'supplier.accreditation.modalPromoteTitle': 'Gesteuerte Übernahme Genehmigter Nachweise in den Katalog (paper_variants.caliper_um)',
+  'supplier.accreditation.promoteComparisonTitle': 'Katalog-Dickenvergleich & CAS-Revisionskontrolle',
+  'supplier.accreditation.promoteCurrentCaliper': 'Aktuelle Katalogdicke',
+  'supplier.accreditation.promoteProposedCaliper': 'Vorgeschlagene Effektive Dicke',
+  'supplier.accreditation.promoteDelta': 'Absolute & Prozentuale Differenz',
+  'supplier.accreditation.promoteSourceAndConfidence': 'Ziel-Quelle & Vertrauensstatus',
+  'supplier.accreditation.promoteSpineImpactTitle': 'Auswirkung auf Spine Calculator (200 S. · 170×240 mm · Livonia Alegro 2.0.0)',
+  'supplier.accreditation.promoteSpineBefore': 'Vor Übernahme (Katalog)',
+  'supplier.accreditation.promoteSpineAfter': 'Nach Übernahme (Effektiv)',
+  'supplier.accreditation.promoteSodChainTitle': '3-Wege-Funktionstrennung (SoD) & Rückverfolgbarkeitskette',
+  'supplier.accreditation.promoteStepSubmitted': '1. Nachweis Eingereicht Von',
+  'supplier.accreditation.promoteStepApproved': '2. Technologisch Genehmigt Von',
+  'supplier.accreditation.promoteStepRequested': '3. Katalogübernahme Beantragt Von',
+  'supplier.accreditation.promoteStepAuthorized': '4. Katalog-Freigabeautorisierung',
+  'supplier.accreditation.promoteBtnRequest': 'Katalogübernahme Beantragen',
+  'supplier.accreditation.promoteBtnAuthorize': 'Autorisieren & in Katalog Übernehmen (CAS)',
+  'supplier.accreditation.promoteBtnRevert': 'Übernahme Widerrufen & Zurücksetzen',
+  'supplier.accreditation.promoteAppliedBadge': 'IM KATALOG AKTIV',
+  'supplier.accreditation.promoteLockNotice': 'Industrielle Sperre Bewahrt: Die Übernahme aktualisiert paper_variants.caliper_um für Rückenberechnungen, während canReleaseToManufacturing = false bis zur Profil- und Chargenfreigabe bestehen bleibt.'
 } as const;
 
 export type TranslationKeys = keyof typeof de;
