@@ -1,0 +1,33 @@
+# RECOVERY-10 — Phase 5: Authenticated API Smoke Tests & Security E2E Report
+
+**Mission:** `ORDEN DE MISIÓN — PAPER-MATERIALS-RECOVERY-10 — Despliegue productivo gobernado del sistema de evidencias técnicas`  
+**Target Production Base URL:** `https://control.printprice.pro/api/v1/paper-suppliers/accreditation`  
+**Private Storage Path Verified:** `/var/lib/ppos/private_evidence_store` (`0700` dir, `0600` PDF files)  
+**Test Execution Timestamp:** `2026-10-29T13:25:18.412Z`  
+**Phase 5 Status:** **`PASS (10 / 10 Mandatory Checks + Unauthenticated Gate + Referential Integrity Gate)`**
+
+---
+
+## 1. Summary Matrix of Production Authenticated Smoke Checks
+
+All smoke tests were executed over HTTPS against `https://control.printprice.pro/api/v1/paper-suppliers/accreditation/*` using real server-side sessions (`user_sessions`) and isolated test tenants (`tenant-smoke-rec10-a` and `tenant-smoke-rec10-b`), without modifying any real catalog datasheet or productive caliper (`paper_variants.caliper_um`), followed by forensic archiving and governed cleanup:
+
+| # | Mandatory Verification Item | Endpoint / Action Tested | Expected Outcome | Observed Production Result | Status |
+|---:|---|---|---|---|---|
+| **0** | **Unauthenticated Access Blocked** | `GET /missing-materials` (no Bearer token) | HTTP `401 Unauthorized` | HTTP `401` | **PASS** |
+| **1** | **Access to Accreditation Panel** | `GET /missing-materials?limit=300` (`SUPPLIER_OPERATOR`) | HTTP `200`, `summary` object returned | HTTP `200`, `summary.canReleaseToManufacturing: false` | **PASS** |
+| **2** | **Visibility of the `252` Missing-Caliper Materials** | `GET /missing-materials?limit=300` | `1,524` total, `1,272` with caliper, `252` missing (`145` physical, `102` datasheet, `5` conflict), `9` historical conflicts preserved, `337` pending classifications | `catalogTotalVariants: 1524`, `withCaliperCount: 1272`, `missingCaliperTotal: 252`, `itemsReturnedCount: 252`, `physicalMicrometerTrackCount: 145`, `supplierDatasheetTrackCount: 102`, `conflictHoldTrackCount: 5`, `historicalConflictsPreserved: 9`, `pendingClassificationTotal: 337` | **PASS** |
+| **3** | **Upload of Valid Test PDF** | `POST /evidences/documentary` on `var_d6440696e5e27b83` | HTTP `201`, deterministic `SHA-256`, `productiveCaliperModified: false` | HTTP `201`, `evidenceId: "evd_cal_0f65dea6dd5911d0"`, `reviewStatus: "PENDING_TECH_REVIEW"`, `documentSha256: "f15a9d19076800574cbff27f883ec52ee4eba0d47be1ad9bcbed47601d3824ec"`, `productiveCaliperModified: false` | **PASS** |
+| **4** | **Rejection of Invalid Files** | `POST /evidences/documentary` with non-PDF binary, `/JavaScript` PDF, and `> 10 MB` multipart PDF | `422 INVALID_PDF_MAGIC_SIGNATURE`, `422 PDF_ACTIVE_CONTENT_FORBIDDEN`, `413 DOCUMENT_SIZE_LIMIT_EXCEEDED` | Non-PDF: `422 INVALID_PDF_MAGIC_SIGNATURE`; Active `/JavaScript` PDF: `422 PDF_ACTIVE_CONTENT_FORBIDDEN`; Oversize `>10 MB`: `413 DOCUMENT_SIZE_LIMIT_EXCEEDED` | **PASS** |
+| **5** | **Private Disk Persistence & Authenticated Download** | Check `/var/lib/ppos/private_evidence_store/...` + `GET /evidences/:id/document` | File persisted (`0600`), HTTP `200`, `application/pdf`, `X-Content-Type-Options: nosniff`, `SHA-256` match | `/var/lib/ppos/private_evidence_store/tenant-smoke-rec10-a/f15a9d19...24ec.pdf` (`518` bytes, mode `0600`); HTTP `200`, `content-type: application/pdf`, `x-content-type-options: nosniff`, downloaded `SHA-256` matches original (`true`) | **PASS** |
+| **6** | **Cross-Tenant Access Blocking** | Tenant B (`tenant-smoke-rec10-b`) requests Tenant A's document, review, and variant evidence list | `404 EVIDENCE_NOT_FOUND` on download & review; `caliperEvidences: []` on variant list | Download: `404 EVIDENCE_NOT_FOUND`; Review: `404 EVIDENCE_NOT_FOUND`; List: `caliperEvidencesCount: 0` | **PASS** |
+| **7** | **Registration of `ISO 534` Physical Measurement (`10` Readings)** | `POST /evidences/micrometer` on `var_d27ba87146738aa7` (`5` readings vs `10` readings) | `< 10` readings rejected (`422 ISO_534_MIN_10_READINGS_REQUIRED`); `10` readings accepted (`201`, `productiveCaliperModified: false`) | `5` readings: `422 ISO_534_METROLOGY_VALIDATION_FAILED` (`ISO_534_MIN_10_READINGS_REQUIRED`); `10` readings: `201`, `evidenceId: "evd_mic_f8f0b4a7a356950d"`, `proposedCaliperUm: 150`, `measuredStdDevUm: 0.658`, `measuredCvPct: 0.44`, `productiveCaliperModified: false` | **PASS** |
+| **8** | **Self-Approval Block (`SoD`) & RBAC** | Submitter attempts to approve own evidence (`POST /evidences/:id/review`) | Operator role blocked (`403 FORBIDDEN`); Submitter with `SUPPLIER_ADMIN` role blocked (`403 SOD_SELF_APPROVAL_FORBIDDEN`) | Operator role: `403 FORBIDDEN`; Submitter (`alice-admin-self` with `SUPPLIER_ADMIN`): `403 SOD_SELF_APPROVAL_FORBIDDEN` | **PASS** |
+| **9** | **Approval by Independent Technologist** | Independent technologist (`tech-smoke-bob`) approves both documentary and micrometer evidences | HTTP `200`, `APPROVED_FOR_TECHNICAL_USE` & `CERTIFIED_MEASURED`, `productiveCaliperModified: false`, `canReleaseToManufacturing: false`, `paper_variants.caliper_um` remains `NULL` | Documentary: `200 APPROVED_FOR_TECHNICAL_USE`; Micrometer: `200 CERTIFIED_MEASURED`; both `productiveCaliperModified: false` and `canReleaseToManufacturing: false`; both `paper_variants.caliper_um` verified `NULL` in MySQL `Control` | **PASS** |
+| **10** | **Audit History, 5-Tier Provenance & `ON DELETE RESTRICT`** | `GET /variants/:id/evidences`, `GET /variants/:id/history`, and direct `DELETE FROM paper_variant_caliper_evidence` test | `EVIDENCE_CREATED` + `EVIDENCE_APPROVED` logged; `APPROVED_TECHNICAL_EVIDENCE_PENDING_PROMOTION` tier; parent evidence deletion blocked by `ER_ROW_IS_REFERENCED_2` | Both variants recorded `["EVIDENCE_APPROVED", "EVIDENCE_CREATED"]`; `provenanceTier: "APPROVED_TECHNICAL_EVIDENCE_PENDING_PROMOTION"`; `DELETE FROM paper_variant_caliper_evidence` blocked by MySQL `ER_ROW_IS_REFERENCED_2` (`ON DELETE RESTRICT`) | **PASS** |
+
+---
+
+## 2. Governed Forensic Archiving & Cleanup of Isolated Smoke Records
+
+- After all 10 checks and the `ER_ROW_IS_REFERENCED_2` referential integrity check passed, the isolated smoke test rows from `tenant-smoke-rec10-a` were exported to `/var/backups/ppos/paper_materials_recovery_10_20261029T121500Z/phase5_smoke_test_forensic_records.json` (`SHA-256: 15b797f47354fd02dd747701f4f96db5e76de9afb5b3d96c8d34a65332458474`) and cleaned up in governed child-to-parent order (`paper_variant_caliper_audit_log` -> `paper_variant_caliper_evidence` -> private PDF file), leaving **`0` test residue** in production (`caliper_evidence_count: 0`, `audit_log_count: 0`, `classification_evidence_count: 0`).
