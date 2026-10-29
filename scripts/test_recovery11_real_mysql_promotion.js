@@ -324,25 +324,27 @@ async function runRealMysqlRecovery11Validation() {
         );
         console.log(`  ✓ Historical conflict variant var_2b0314c68f5a97c7 protected with HISTORICAL_CONFLICT_VARIANT_PROTECTED (HTTP 409).`);
 
-        // 5. Verify Spine Calculator before promotion fails with 422 MISSING_PAPER_CALIPER
-        console.log(`\n[STEP 5] Verifying Spine Calculator before promotion (422 MISSING_PAPER_CALIPER)...`);
-        await assert.rejects(
-            () =>
-                spineService.calculateSpine({
-                    tenantId: 'tenant_rec11_alpha',
-                    actorId: 'admin_auth_03',
-                    payload: {
-                        bindingCategory: 'SOFTCOVER_STANDARD',
-                        processingType: 'GLUED',
-                        trimWidthMm: 170,
-                        trimHeightMm: 240,
-                        segments: [{ pages: 200, variantId: 'var_dbd5357075534e3b' }],
-                        cover: { caliperUm: 350 }
-                    }
-                }),
-            (err) => err.code === 'MISSING_PAPER_CALIPER' && err.statusCode === 422
+        // 5. Verify Spine Calculator before promotion fails closed with INVALID_BLOCKED / MISSING_SEGMENT_CALIPER
+        console.log(`\n[STEP 5] Verifying Spine Calculator before promotion (INVALID_BLOCKED / MISSING_SEGMENT_CALIPER)...`);
+        const spineBefore = await spineService.calculateSpine({
+            tenantId: 'tenant_rec11_alpha',
+            actorId: 'admin_auth_03',
+            payload: {
+                bindingCategory: 'SOFTCOVER_STANDARD',
+                processingType: 'GLUED',
+                trimWidthMm: 170,
+                trimHeightMm: 240,
+                segments: [{ pages: 200, variantId: 'var_dbd5357075534e3b' }],
+                cover: { caliperUm: 350 }
+            }
+        });
+        assert.strictEqual(spineBefore.manufacturingValidation.status, 'INVALID_BLOCKED');
+        assert.strictEqual(spineBefore.manufacturingValidation.canReleaseToManufacturing, false);
+        assert.ok(
+            spineBefore.manufacturingValidation.issues.some((i) => i.code === 'MISSING_SEGMENT_CALIPER'),
+            'Expected MISSING_SEGMENT_CALIPER issue on unpromoted variant'
         );
-        console.log(`  ✓ Spine Calculator rejected unpromoted variant with 422 MISSING_PAPER_CALIPER.`);
+        console.log(`  ✓ Spine Calculator blocked unpromoted variant with status=INVALID_BLOCKED (MISSING_SEGMENT_CALIPER).`);
 
         // 6. Test Concurrent `authorizeEvidencePromotion` Race Condition in Real MySQL 8
         console.log(`\n[STEP 6] Testing concurrent authorizeEvidencePromotion race-condition protection (SELECT ... FOR UPDATE + CAS)...`);
