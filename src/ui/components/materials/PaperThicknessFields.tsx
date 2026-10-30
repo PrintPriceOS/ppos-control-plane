@@ -47,11 +47,15 @@ export type ThicknessProposalBody =
         micrometerCalibrationValidUntil: string;
     };
 
-const humanize = (v?: string | null) => (v ? v.replace(/_/g, ' ') : '');
+const humanize = (v?: string | null) => {
+    if (!v) return '';
+    if (v === 'LIVONIA_REFERENCE_IMPORT') return 'REFERENCE CATALOG IMPORT';
+    return v.replace(/_/g, ' ');
+};
 
 /** Tooltip explaining GSM vs thickness. */
 export const ThicknessTooltip: React.FC = () => {
-    const { t } = useLocale();
+    const { t, locale } = useLocale();
     const text = t('materials.thickness.tooltip');
     return (
         <span className="relative inline-flex group align-middle ml-1" tabIndex={0} aria-label={text}>
@@ -68,7 +72,7 @@ export const ThicknessTooltip: React.FC = () => {
 
 /** Compact inline summary, e.g. for list rows: "122 µm" or "Not available". */
 export const PaperThicknessInline: React.FC<{ thickness?: PaperThickness | null; caliperUm?: number | null }> = ({ thickness, caliperUm }) => {
-    const { t } = useLocale();
+    const { t, locale } = useLocale();
     const um = thickness ? thickness.caliperUm : (caliperUm ?? null);
     return (
         <span data-testid="paper-thickness-inline" className="whitespace-nowrap">
@@ -99,7 +103,7 @@ export const PaperThicknessFields: React.FC<PaperThicknessFieldsProps> = ({
     onPropose,
     compact = false
 }) => {
-    const { t } = useLocale();
+    const { t, locale } = useLocale();
     const [open, setOpen] = useState(false);
     const [kind, setKind] = useState<'SUPPLIER_REPORTED' | 'PHYSICAL_MEASUREMENT'>('SUPPLIER_REPORTED');
     const [proposedUm, setProposedUm] = useState('');
@@ -124,7 +128,7 @@ export const PaperThicknessFields: React.FC<PaperThicknessFieldsProps> = ({
     const pending = thickness?.pendingProposals || [];
     const unlinked = thickness?.unlinkedProposal || null;
 
-    const labelClass = 'text-[10px] font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 flex items-center';
+    const labelClass = 'text-[10px] font-semibold tracking-wider text-zinc-500 dark:text-zinc-400 flex items-center';
     const valueClass = 'text-xs font-semibold text-zinc-900 dark:text-zinc-100 break-words';
     const inputClass = 'w-full px-2.5 py-1.5 rounded-md text-xs bg-white dark:bg-zinc-950 border border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-1 focus:ring-[#dc0000]';
 
