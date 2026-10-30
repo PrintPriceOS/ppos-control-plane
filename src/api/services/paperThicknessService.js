@@ -61,15 +61,17 @@ function buildThickness(material, variantRow, pendingEvidence) {
         caliperSource: variantRow ? (variantRow.caliper_source || 'NONE') : null,
         verificationStatus: variantRow ? (variantRow.caliper_confidence_status || 'MISSING') : null,
         isAuthoritative: Boolean(variantId && caliperUm),
-        pendingProposals: (pendingEvidence || []).map((e) => ({
-            evidenceId: e.evidence_id,
-            kind: e.evidence_type === 'PHYSICAL_MICROMETER_RECORD' ? 'PHYSICAL_MEASUREMENT' : 'SUPPLIER_REPORTED',
-            evidenceType: e.evidence_type,
-            reviewStatus: e.review_status,
-            proposedCaliperUm: e.proposed_caliper_um !== null && e.proposed_caliper_um !== undefined
-                ? Number(e.proposed_caliper_um) : null,
-            createdAt: e.created_at
-        })),
+        pendingProposals: (pendingEvidence || []).map((e) => {
+            const rawUm = e.proposed_caliper_um ?? e.proposed_effective_caliper_um;
+            return {
+                evidenceId: e.evidence_id,
+                kind: e.evidence_type === 'PHYSICAL_MICROMETER_RECORD' ? 'PHYSICAL_MEASUREMENT' : 'SUPPLIER_REPORTED',
+                evidenceType: e.evidence_type,
+                reviewStatus: e.review_status,
+                proposedCaliperUm: rawUm !== null && rawUm !== undefined ? Number(rawUm) : null,
+                createdAt: e.created_at
+            };
+        }),
         unlinkedProposal: !variantId && meta.thickness_proposal ? meta.thickness_proposal : null
     };
 }
@@ -104,7 +106,7 @@ class PaperThicknessService {
                 if (tenantId) {
                     try {
                         const eRows = unwrap(await this.db.query(
-                            `SELECT evidence_id, variant_id, evidence_type, review_status, proposed_caliper_um, created_at
+                            `SELECT evidence_id, variant_id, evidence_type, review_status, proposed_effective_caliper_um, created_at
                              FROM paper_variant_caliper_evidence
                              WHERE tenant_id = ? AND variant_id IN (${ph})
                                AND review_status IN (${PENDING_REVIEW_STATUSES.map(() => '?').join(',')})
