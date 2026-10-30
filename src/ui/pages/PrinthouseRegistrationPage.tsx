@@ -187,7 +187,7 @@ const COMMON_MACHINE_TEMPLATES: MachineTemplate[] = [
     // Large Format
     { id: "tpl-15", manufacturer: "Konica Minolta", model: "AccurioJet KM-1e", machine_type: "DIGITAL", category: "Large Format" },
     // Finishing
-    { id: "tpl-17", manufacturer: "Müller Martini", model: "Alegro Perfect Binder", machine_type: "OTHER", category: "Finishing" },
+    { id: "tpl-17", manufacturer: "Müller Martini", model: "Industrial Perfect Binder", machine_type: "OTHER", category: "Finishing" },
     { id: "tpl-19", manufacturer: "Horizon", model: "StitchLiner Mark III", machine_type: "OTHER", category: "Finishing" },
     { id: "tpl-21", manufacturer: "Bobst", model: "Novacut 106 ER", machine_type: "OTHER", category: "Finishing" },
     { id: "tpl-22", manufacturer: "Polar", model: "Titan 115 Cutter", machine_type: "OTHER", category: "Finishing" }

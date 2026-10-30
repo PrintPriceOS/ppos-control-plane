@@ -643,11 +643,13 @@ describe('PAPER-MATERIALS-RECOVERY-09 & 09H — Paper Supplier Hub Technical Acc
                 expect(screen.getByTestId('promotion-sod-card')).toBeInTheDocument();
             });
 
-            // Verify comparison values & Spine impact preview
+            // Verify comparison values & Spine impact preview (white-labeled: zero Livonia/Alegro/Colibri/Kolbus strings)
             expect(screen.getByTestId('promo-current-caliper')).toHaveTextContent(/NULL/i);
             expect(screen.getByTestId('promo-proposed-caliper')).toHaveTextContent('71 µm');
             expect(screen.getByText(/422 MISSING_PAPER_CALIPER/i)).toBeInTheDocument();
             expect(screen.getByText(/8\.5 mm/i)).toBeInTheDocument();
+            const modalText = screen.getByTestId('promotion-modal').textContent || '';
+            expect(modalText).not.toMatch(/livonia|colibri|alegro|kolbus/i);
 
             // Submit promotion authorization
             const reasonBox = screen.getByTestId('promo-reason-input');

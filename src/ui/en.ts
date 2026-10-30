@@ -2970,7 +2970,7 @@ export const en = {
   'supplier.accreditation.promoteProposedCaliper': 'Proposed Effective Caliper',
   'supplier.accreditation.promoteDelta': 'Absolute & Relative Delta',
   'supplier.accreditation.promoteSourceAndConfidence': 'Target Source & Confidence',
-  'supplier.accreditation.promoteSpineImpactTitle': 'Spine Calculator Impact (200 pp · 170×240 mm · Livonia Alegro 2.0.0)',
+  'supplier.accreditation.promoteSpineImpactTitle': 'Spine Calculator Impact (200 pp · 170×240 mm · Softcover Reference Profile)',
   'supplier.accreditation.promoteSpineBefore': 'Before Promotion (Catalog)',
   'supplier.accreditation.promoteSpineAfter': 'After Promotion (Effective)',
   'supplier.accreditation.promoteSodChainTitle': '3-Way Segregation of Duties (SoD) & Traceability Chain',

@@ -2970,7 +2970,7 @@ export const es = {
   'supplier.accreditation.promoteProposedCaliper': 'Espesor Efectivo Propuesto',
   'supplier.accreditation.promoteDelta': 'Diferencia Absoluta y Porcentual',
   'supplier.accreditation.promoteSourceAndConfidence': 'Fuente y Confianza Destino',
-  'supplier.accreditation.promoteSpineImpactTitle': 'Impacto en Spine Calculator (200 págs · 170×240 mm · Livonia Alegro 2.0.0)',
+  'supplier.accreditation.promoteSpineImpactTitle': 'Impacto en Spine Calculator (200 págs · 170×240 mm · Perfil de Referencia Rústica)',
   'supplier.accreditation.promoteSpineBefore': 'Antes de Promoción (Catálogo)',
   'supplier.accreditation.promoteSpineAfter': 'Después de Promoción (Efectivo)',
   'supplier.accreditation.promoteSodChainTitle': 'Segregación de Funciones Triple (SoD) y Cadena de Trazabilidad',

@@ -22,6 +22,12 @@ interface TechnicalAccreditationPanelProps {
     onError?: (msg: string) => void;
 }
 
+const formatCaliperSourceDisplay = (source?: string | null): string => {
+    if (!source) return 'NONE';
+    if (source === 'LIVONIA_REFERENCE_IMPORT') return 'REFERENCE_CATALOG_IMPORT';
+    return source;
+};
+
 export const TechnicalAccreditationPanel: React.FC<TechnicalAccreditationPanelProps> = ({
     onNotify,
     onError
@@ -1324,7 +1330,7 @@ export const TechnicalAccreditationPanel: React.FC<TechnicalAccreditationPanelPr
                                                         : 'NULL (Missing)'}
                                                 </div>
                                                 <div className="text-[10px] text-zinc-400">
-                                                    {promotionPreview.comparison.currentSource} · {promotionPreview.comparison.currentConfidence}
+                                                    {formatCaliperSourceDisplay(promotionPreview.comparison.currentSource)} · {promotionPreview.comparison.currentConfidence}
                                                 </div>
                                             </div>
                                             <div className="p-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30">
@@ -1350,7 +1356,7 @@ export const TechnicalAccreditationPanel: React.FC<TechnicalAccreditationPanelPr
                                             <div className="p-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800">
                                                 <div className="text-[10px] text-zinc-500">{t('supplier.accreditation.promoteSourceAndConfidence')}</div>
                                                 <div className="text-[11px] font-bold text-slate-900 dark:text-white mt-0.5">
-                                                    {promotionPreview.comparison.targetSource}
+                                                    {formatCaliperSourceDisplay(promotionPreview.comparison.targetSource)}
                                                 </div>
                                                 <div className="text-[10px] text-amber-600 dark:text-amber-400 font-bold">
                                                     {promotionPreview.comparison.targetConfidence}
