@@ -13,6 +13,7 @@ import * as adminApi from '../../../lib/adminApi';
 import { PaperSourcingModal } from '../PaperSourcingModal';
 import { CountrySelect } from '../../common/CountrySelect';
 import { SupplierSelect } from '../../common/SupplierSelect';
+import { PaperThicknessFields, ThicknessProposalBody } from '../../materials/PaperThicknessFields';
 
 interface MaterialsPanelProps {
     sites: { siteId: string; siteName: string }[];
@@ -151,6 +152,20 @@ export const MaterialsPanel: React.FC<MaterialsPanelProps> = ({ sites, onSaved }
             : 'UNCOATED');
         setSupplierName(item.supplierName || 'Papelera del Mediterraneo (Demo)');
         setSupplierCountry('ES');
+    };
+
+    // PAPER-CALIPER-UI-01: route a thickness proposal to the technical evidence workflow
+    const handleProposeThickness = async (materialId: string, body: ThicknessProposalBody) => {
+        const res = await fetch(`/api/printhouse/onboarding/sites/${selectedSiteId}/materials/${materialId}/thickness-proposals`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.ok) {
+            throw new Error(data?.message || normalizeUiError(data, t('materials.thickness.error.generic')));
+        }
+        await fetchMaterialsAndMachines();
     };
 
     const handleCreateMaterial = async (e: React.FormEvent) => {
@@ -504,6 +519,15 @@ export const MaterialsPanel: React.FC<MaterialsPanelProps> = ({ sites, onSaved }
                                 className={inputClass}
                             />
                         </div>
+                        <div className="sm:col-span-2 sm:order-none">
+                            <PaperThicknessFields
+                                compact
+                                previewLinked={Boolean(selectedDbPaper)}
+                                previewCaliperUm={selectedDbPaper ? selectedDbPaper.caliperUm : null}
+                                previewSource={selectedDbPaper ? (selectedDbPaper.caliper_source || null) : null}
+                                previewStatus={selectedDbPaper ? (selectedDbPaper.caliper_confidence_status || null) : null}
+                            />
+                        </div>
                         <div>
                             <label className={labelClass}>{t('setup.materials.format')}</label>
                             <input
@@ -594,7 +618,7 @@ export const MaterialsPanel: React.FC<MaterialsPanelProps> = ({ sites, onSaved }
                                             </div>
                                             <h4 className="text-sm font-bold text-zinc-900 dark:text-white mt-1.5 mb-0.5 truncate">{mat.material_name}</h4>
                                             <p className="text-xs text-zinc-500 dark:text-zinc-400 m-0">
-                                                {mat.gsm} GSM • {mat.sheet_format} • {mat.finish_type}
+                                                {mat.gsm} GSM • {mat.paper_thickness?.caliperUm ? `${mat.paper_thickness.caliperUm} µm` : `${t('materials.thickness.label')}: ${t('materials.thickness.notAvailable')}`} • {mat.sheet_format} • {mat.finish_type}
                                             </p>
                                         </div>
 
@@ -626,6 +650,15 @@ export const MaterialsPanel: React.FC<MaterialsPanelProps> = ({ sites, onSaved }
                                             </button>
                                         </div>
                                     </div>
+
+                                    {/* PAPER-CALIPER-UI-01: Paper thickness (read-only authoritative value + proposal) */}
+                                    {(mat.material_type === 'PAPER' || mat.material_type === 'BOARD') && (
+                                        <PaperThicknessFields
+                                            compact
+                                            thickness={mat.paper_thickness || { linkedVariantId: meta.paper_variant_id || null, isLinkedToMasterCatalog: isLinkedToDb, caliperUm: null, caliperSource: null, verificationStatus: null, isAuthoritative: false, pendingProposals: [], unlinkedProposal: null }}
+                                            onPropose={(body) => handleProposeThickness(mat.id, body)}
+                                        />
+                                    )}
 
                                     {/* Machine Pairings */}
                                     <div className="bg-white dark:bg-zinc-900/90 p-3 rounded-lg border border-zinc-200 dark:border-zinc-800">

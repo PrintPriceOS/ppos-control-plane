@@ -1997,6 +1997,14 @@ export async function releaseMaterialCapacity(dispatchId: string, nodeId: string
 
 // --- Materials MES Operator Workflows API --- //
 
+/** PAPER-CALIPER-UI-01: propose a paper thickness for a material (routed to the evidence workflow). */
+export async function proposeMaterialThickness(materialId: string, body: any) {
+    return adminFetch<{ ok: boolean, data: any }>(`/api/admin/materials/${encodeURIComponent(materialId)}/thickness-proposals`, {
+        method: 'POST',
+        body: JSON.stringify(body)
+    });
+}
+
 export async function createCatalogMaterial(payload: any) {
     return adminFetch<{ ok: boolean, data: any }>('/api/admin/materials', {
         method: 'POST',
@@ -2917,6 +2925,8 @@ export interface MasterPaperDatabaseItem {
     finish: string;
     grainDirection: string;
     caliperUm: number | null;
+    caliper_source?: string | null;
+    caliper_confidence_status?: string | null;
     isReel: boolean;
     supplierId: string;
     supplierName: string;

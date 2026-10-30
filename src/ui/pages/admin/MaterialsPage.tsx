@@ -21,6 +21,7 @@ import {
     BuildingStorefrontIcon
 } from "@heroicons/react/24/outline";
 import * as adminApi from "../../lib/adminApi";
+import { PaperThicknessFields, PaperThicknessInline, ThicknessProposalBody } from '../../components/materials/PaperThicknessFields';
 import { toDisplayText } from "../../lib/formatters";
 import { useTheme } from "../../hooks/useTheme";
 import { useLocale } from "../../i18n";
@@ -228,6 +229,16 @@ export const MaterialsPage: React.FC = () => {
             supplier_id: item.supplierId,
             offer_id: item.offerId || undefined
         }));
+    };
+
+    // PAPER-CALIPER-UI-01: route a thickness proposal to the technical evidence workflow
+    const handleProposeThickness = async (materialId: string, body: ThicknessProposalBody) => {
+        const res = await adminApi.proposeMaterialThickness(materialId, body);
+        if (!res?.ok) throw new Error((res as any)?.message || t('materials.thickness.error.generic'));
+        setActionFeedback({ type: 'success', message: t('materials.thickness.submitted') });
+        await fetchCatalog();
+        const refreshed = await adminApi.getMaterialDetail(materialId);
+        if (refreshed?.data) handleSelectMaterial(refreshed.data);
     };
 
     const handleOpenSupplierOrder = (m: any) => {
@@ -750,7 +761,7 @@ export const MaterialsPage: React.FC = () => {
                                                         <div className={`text-[10px] mt-0.5 ${isLight ? 'text-zinc-500' : 'text-zinc-400'}`}>
                                                             {m.material_type === 'PAPER' ? (
                                                                 <>
-                                                                    {m.paper_gsm ? `${m.paper_gsm} GSM` : 'N/A'} • <span className={`${isLight ? 'text-zinc-700' : 'text-zinc-300'} font-semibold`}>{m.finish || 'UNCOATED'}</span>
+                                                                    {m.paper_gsm ? `${m.paper_gsm} GSM` : 'N/A'} • <PaperThicknessInline thickness={m.paper_thickness} /> • <span className={`${isLight ? 'text-zinc-700' : 'text-zinc-300'} font-semibold`}>{m.finish || 'UNCOATED'}</span>
                                                                 </>
                                                             ) : m.material_type === 'INK' ? (
                                                                 <>
@@ -975,6 +986,20 @@ export const MaterialsPage: React.FC = () => {
                                                 <span className={`font-bold block mt-0.5 ${isLight ? 'text-zinc-900' : 'text-zinc-200'}`}>{selectedMaterial.paper_gsm ? `${selectedMaterial.paper_gsm} GSM` : 'UNSPECIFIED'}</span>
                                             </div>
                                         </div>
+
+                                        {/* PAPER-CALIPER-UI-01: Paper thickness immediately after grammage */}
+                                        {(selectedMaterial.material_type === 'PAPER' || selectedMaterial.material_type === 'BOARD') && (
+                                            <PaperThicknessFields
+                                                compact
+                                                thickness={selectedMaterial.paper_thickness || {
+                                                    linkedVariantId: selectedMaterial.metadata?.paper_variant_id || null,
+                                                    isLinkedToMasterCatalog: Boolean(selectedMaterial.metadata?.paper_variant_id),
+                                                    caliperUm: null, caliperSource: null, verificationStatus: null,
+                                                    isAuthoritative: false, pendingProposals: [], unlinkedProposal: null
+                                                }}
+                                                onPropose={(body) => handleProposeThickness(selectedMaterial.id, body)}
+                                            />
+                                        )}
 
                                         <div className="grid grid-cols-2 gap-2">
                                             <div className={`p-2.5 border rounded-xl ${isLight ? 'bg-zinc-50 border-zinc-200' : 'bg-zinc-900 border-zinc-800'}`}>
@@ -1429,6 +1454,16 @@ export const MaterialsPage: React.FC = () => {
                                     </div>
                                 )}
                             </div>
+
+                            {addMatForm.material_type === 'PAPER' && (
+                                <PaperThicknessFields
+                                    compact
+                                    previewLinked={Boolean(selectedDbPaper)}
+                                    previewCaliperUm={selectedDbPaper ? selectedDbPaper.caliperUm : null}
+                                    previewSource={selectedDbPaper ? (selectedDbPaper.caliper_source || null) : null}
+                                    previewStatus={selectedDbPaper ? (selectedDbPaper.caliper_confidence_status || null) : null}
+                                />
+                            )}
 
                             {addMatForm.material_type === 'PAPER' && (
                                 <div className="grid grid-cols-2 gap-3">

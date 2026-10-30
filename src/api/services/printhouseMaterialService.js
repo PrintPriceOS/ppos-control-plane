@@ -6,6 +6,7 @@
  */
 const db = require('./mysqlClient');
 const { v4: uuidv4 } = require('uuid');
+const { paperThicknessService, stripClientCaliperMetadata } = require('./paperThicknessService');
 
 const PROTECTED_FIELDS = [
     'id',
@@ -19,7 +20,12 @@ const PROTECTED_FIELDS = [
     'verified',
     'marketplace_enabled',
     'routing_enabled',
-    'production_enabled'
+    'production_enabled',
+    // PAPER-CALIPER-UI-01: authoritative thickness lives only on paper_variants and is
+    // changed exclusively through the technical evidence workflow.
+    'caliper_um',
+    'caliper_source',
+    'caliper_confidence_status'
 ];
 
 function checkProtectedFields(payload) {
@@ -121,7 +127,7 @@ class PrinthouseMaterialService {
              AND (JSON_EXTRACT(metadata_json, '$.archived') IS NULL OR JSON_EXTRACT(metadata_json, '$.archived') != true)`,
             [tenantId, siteId]
         );
-        return rows;
+        return paperThicknessService.attachThickness(tenantId, rows);
     }
 
     /**
@@ -134,7 +140,7 @@ class PrinthouseMaterialService {
             [materialId, tenantId, siteId]
         );
         if (rows.length === 0) return null;
-        return rows[0];
+        return paperThicknessService.attachThicknessOne(tenantId, rows[0]);
     }
 
     /**
@@ -153,6 +159,7 @@ class PrinthouseMaterialService {
                 metadata = { ...payload.metadata_json };
             }
         }
+        metadata = stripClientCaliperMetadata(metadata);
         metadata.configuration_source = 'EXPLICIT_ONBOARDING';
         metadata.configured_at = new Date().toISOString();
 
@@ -233,7 +240,7 @@ class PrinthouseMaterialService {
         }
         if (payload.metadata_json) {
             const payloadMeta = typeof payload.metadata_json === 'string' ? JSON.parse(payload.metadata_json) : payload.metadata_json;
-            metadata = { ...metadata, ...payloadMeta };
+            metadata = { ...metadata, ...stripClientCaliperMetadata(payloadMeta) };
         }
         metadata.configuration_source = 'EXPLICIT_ONBOARDING';
         metadata.configured_at = new Date().toISOString();

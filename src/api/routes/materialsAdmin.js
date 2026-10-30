@@ -8,6 +8,7 @@
 const express = require('express');
 const router = express.Router();
 const materialService = require('../services/materialAvailabilityService');
+const { paperThicknessService } = require('../services/paperThicknessService');
 const paperCostIntegrationService = require('../services/paperCostIntegrationService');
 const db = require('../services/mysqlClient');
 const logger = require('../services/logger').child('materials-route');
@@ -135,7 +136,9 @@ router.get('/', async (req, res) => {
             isSuperAdmin: scope.isSuperAdmin
         });
         
-        const materialsArray = Array.isArray(rows) ? rows : (Array.isArray(rows?.materials) ? rows.materials : []);
+        const rawMaterialsArray = Array.isArray(rows) ? rows : (Array.isArray(rows?.materials) ? rows.materials : []);
+        // PAPER-CALIPER-UI-01: read-only thickness from the linked master catalog variant
+        const materialsArray = await paperThicknessService.attachThickness(scope.tenantId, rawMaterialsArray);
         const registeredStockUnits = materialsArray.reduce((acc, m) => acc + (Number(m.current_stock_units) || 0), 0);
         const reservedCapacityLocks = materialsArray.reduce((acc, m) => acc + (Number(m.reserved_stock_units) || 0), 0);
         const netAvailablePool = registeredStockUnits - reservedCapacityLocks;
@@ -948,13 +951,41 @@ router.get('/:id', async (req, res) => {
     try {
         const scope = getScopeContext(req);
         const mat = await assertMaterialAccess(req.params.id, scope);
-        res.json({ ok: true, data: mat });
+        res.json({ ok: true, data: await paperThicknessService.attachThicknessOne(scope.tenantId, mat) });
     } catch (err) {
         if (err.statusCode) {
             return res.status(err.statusCode).json({ ok: false, error: err.message, code: err.code || err.message });
         }
         console.error(`[MATERIALS-API] Failed to fetch unit [${req.params.id}]:`, err);
         res.status(500).json({ ok: false, error: err.message, code: 'MATERIAL_DETAIL_ERROR' });
+    }
+});
+
+/**
+ * POST /api/admin/materials/:id/thickness-proposals
+ * PAPER-CALIPER-UI-01: propose a paper thickness. Linked materials create evidence in the
+ * technical accreditation workflow; unlinked materials store a non-authoritative pending note.
+ * Never modifies paper_variants.caliper_um.
+ */
+router.post('/:id/thickness-proposals', async (req, res) => {
+    try {
+        const scope = getScopeContext(req);
+        assertWritePermission(scope);
+        const mat = await assertMaterialAccess(req.params.id, scope);
+        const result = await paperThicknessService.proposeThickness({
+            tenantId: scope.tenantId,
+            actorId: scope.operatorId,
+            actorRole: scope.role,
+            material: mat,
+            body: req.body || {}
+        });
+        res.status(201).json({ ok: true, data: result });
+    } catch (err) {
+        if (err.statusCode) {
+            return res.status(err.statusCode).json({ ok: false, error: err.code || err.message, message: err.message, details: err.details });
+        }
+        console.error('[MATERIALS-API] Thickness proposal failed:', err);
+        res.status(500).json({ ok: false, error: err.message, code: 'THICKNESS_PROPOSAL_ERROR' });
     }
 });
 

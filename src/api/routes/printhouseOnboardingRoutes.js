@@ -7,6 +7,7 @@
 const express = require('express');
 const router = express.Router();
 const materialService = require('../services/printhouseMaterialService');
+const { paperThicknessService } = require('../services/paperThicknessService');
 const capacityService = require('../services/printhouseCapacityService');
 const leadTimeService = require('../services/printhouseLeadTimeService');
 const readinessService = require('../services/printhouseReadinessService');
@@ -523,6 +524,28 @@ router.get('/sites/:siteId/materials/:materialId', verifySiteAccess, wrapHandler
 router.put('/sites/:siteId/materials/:materialId', verifySiteAccess, wrapHandler(async (req, res) => {
     const material = await materialService.updateMaterial(req.user.tenantId, req.params.siteId, req.params.materialId, req.body);
     res.json({ ok: true, material });
+}));
+
+// PAPER-CALIPER-UI-01: propose a paper thickness (routed to the technical evidence workflow;
+// never overwrites the master catalog's authoritative caliper).
+router.post('/sites/:siteId/materials/:materialId/thickness-proposals', verifySiteAccess, wrapHandler(async (req, res) => {
+    const material = await materialService.getMaterial(req.user.tenantId, req.params.siteId, req.params.materialId);
+    if (!material) return res.status(404).json({ ok: false, error: 'MATERIAL_NOT_FOUND' });
+    try {
+        const result = await paperThicknessService.proposeThickness({
+            tenantId: req.user.tenantId,
+            actorId: req.user.id,
+            actorRole: req.user.role,
+            material,
+            body: req.body || {}
+        });
+        res.status(201).json({ ok: true, data: result });
+    } catch (err) {
+        if (err && err.statusCode) {
+            return res.status(err.statusCode).json({ ok: false, error: err.code || err.message, message: err.message, details: err.details });
+        }
+        throw err;
+    }
 }));
 
 router.delete('/sites/:siteId/materials/:materialId', verifySiteAccess, wrapHandler(async (req, res) => {
