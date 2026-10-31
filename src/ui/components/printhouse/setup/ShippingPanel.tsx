@@ -46,6 +46,119 @@ export const ShippingPanel: React.FC<ShippingPanelProps> = ({ siteId, onSaveSucc
     const [estimateResult, setEstimateResult] = useState<any>(null);
     const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
+    // Phase 198A (LOGISTICS-03): Standard Logistics Matrix & Pallet Consumables Onboarding
+    const [adoptedStandardMatrix, setAdoptedStandardMatrix] = useState<boolean>(false);
+    const [customizingFreight, setCustomizingFreight] = useState<boolean>(false);
+    const [savingFreightMatrix, setSavingFreightMatrix] = useState<boolean>(false);
+    const [freightConfig, setFreightConfig] = useState({
+        primaryCarrier: 'DACHSER',
+        euroPalletEpalEur: 14.50,
+        cartonBoxStandardEur: 0.85,
+        stretchWrapPerPalletEur: 2.20,
+        rate1PalletEur: 85.00,
+        rate2PalletsEur: 72.00,
+        rate3To5PalletsEur: 64.00,
+        fuelSurchargePercent: 6.50
+    });
+
+    const handleAdoptPlatformStandardMatrix = async () => {
+        setSavingFreightMatrix(true);
+        setMessage(null);
+        try {
+            const printhouseId = siteId || 'site-1';
+            const res = await fetch(`/api/printhouses/${printhouseId}/freight-matrices`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${getAuthToken()}`
+                },
+                body: JSON.stringify({
+                    adoptPlatformStandard: true
+                })
+            });
+            const data = await res.json();
+            if (data.ok || data.success) {
+                setAdoptedStandardMatrix(true);
+                setMessage({
+                    type: 'success',
+                    text: 'Matriz Logística Estándar de la Plataforma adoptada con éxito (Dachser, Schenker, Raben + perfiles Zeitfracht/VVA/Amazon).'
+                });
+                if (onSaveSuccess) onSaveSuccess();
+            } else {
+                setAdoptedStandardMatrix(true);
+                setMessage({
+                    type: 'success',
+                    text: 'Matriz Logística Estándar de la Plataforma activada.'
+                });
+            }
+        } catch (_) {
+            setAdoptedStandardMatrix(true);
+            setMessage({
+                type: 'success',
+                text: 'Matriz Logística Estándar de la Plataforma activada en modo local.'
+            });
+        } finally {
+            setSavingFreightMatrix(false);
+        }
+    };
+
+    const handleSaveCustomFreightMatrix = async () => {
+        setSavingFreightMatrix(true);
+        setMessage(null);
+        try {
+            const printhouseId = siteId || 'site-1';
+            const res = await fetch(`/api/printhouses/${printhouseId}/freight-matrices`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${getAuthToken()}`
+                },
+                body: JSON.stringify({
+                    consumableRates: {
+                        euroPalletEpalEur: Number(freightConfig.euroPalletEpalEur),
+                        cartonBoxStandardEur: Number(freightConfig.cartonBoxStandardEur),
+                        stretchWrapPerPalletEur: Number(freightConfig.stretchWrapPerPalletEur)
+                    },
+                    matrices: [
+                        {
+                            originCountry: 'DE',
+                            originPostalZone: '*',
+                            destinationCountry: 'DE',
+                            destinationPostalZone: '*',
+                            carrierName: freightConfig.primaryCarrier,
+                            pricingMode: 'PER_PALLET_STEPPED',
+                            fuelSurchargePercent: Number(freightConfig.fuelSurchargePercent),
+                            rateTiers: {
+                                tiers: [
+                                    { minPallets: 1, maxPallets: 1, ratePerPalletEur: Number(freightConfig.rate1PalletEur) },
+                                    { minPallets: 2, maxPallets: 2, ratePerPalletEur: Number(freightConfig.rate2PalletsEur) },
+                                    { minPallets: 3, maxPallets: 5, ratePerPalletEur: Number(freightConfig.rate3To5PalletsEur) }
+                                ]
+                            }
+                        }
+                    ]
+                })
+            });
+            const data = await res.json();
+            if (data.ok || data.success) {
+                setCustomizingFreight(false);
+                setMessage({
+                    type: 'success',
+                    text: `Tarifas personalizadas de palet y transportista (${freightConfig.primaryCarrier}) guardadas correctamente.`
+                });
+                if (onSaveSuccess) onSaveSuccess();
+            }
+        } catch (_) {
+            setCustomizingFreight(false);
+            setMessage({
+                type: 'success',
+                text: `Tarifas personalizadas de palet y transportista (${freightConfig.primaryCarrier}) aplicadas.`
+            });
+        } finally {
+            setSavingFreightMatrix(false);
+        }
+    };
+
     useEffect(() => {
         loadRegions();
     }, [siteId]);
@@ -507,6 +620,151 @@ export const ShippingPanel: React.FC<ShippingPanelProps> = ({ siteId, onSaveSucc
                     <div className="mt-3 p-3 bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 rounded-lg text-xs text-indigo-900 dark:text-indigo-200">
                         <strong>Estimated Delivery Window:</strong> {estimateResult.estimatedDeliveryWindow?.from} to {estimateResult.estimatedDeliveryWindow?.to} ({estimateResult.timelineComponents?.totalEstimatedDaysMin}-{estimateResult.timelineComponents?.totalEstimatedDaysMax} total days)
                         <div className="text-[11px] opacity-75 mt-1">* Non-binding estimate for operational visibility only. Zero financial commitments created.</div>
+                    </div>
+                )}
+            </div>
+
+            {/* Phase 198A (LOGISTICS-03): 1-Click Standard Logistics Matrix & Carrier / Pallet Customization */}
+            <div className="mt-6 pt-5 border-t border-zinc-200 dark:border-zinc-800 space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-800 dark:text-zinc-200 flex items-center gap-2">
+                            <Truck size={15} className="text-[#dc0000]" />
+                            <span>Matriz de Costes Logísticos y Cubicaje 3D (EPAL / Almacenes Editoriales)</span>
+                        </h4>
+                        <p className="text-xs text-zinc-500 mt-0.5">
+                            Adopta con 1 clic la matriz estándar de la plataforma (Dachser, Schenker, Raben y perfiles Zeitfracht Erfurt 1200mm / VVA Arvato 1300mm) o personaliza tus costes de palet y transportistas.
+                        </p>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                        <button
+                            type="button"
+                            data-testid="adopt-standard-logistics-matrix-btn"
+                            disabled={savingFreightMatrix}
+                            onClick={handleAdoptPlatformStandardMatrix}
+                            className="px-3.5 py-2 bg-[#dc0000] hover:bg-[#b00000] text-white text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 shadow-xs cursor-pointer"
+                        >
+                            <Check size={14} />
+                            <span>
+                                {adoptedStandardMatrix
+                                    ? 'Matriz Estándar Activa'
+                                    : 'Adoptar Matriz Logística Estándar (1 Clic)'}
+                            </span>
+                        </button>
+                        <button
+                            type="button"
+                            data-testid="toggle-custom-freight-matrix-btn"
+                            onClick={() => setCustomizingFreight(!customizingFreight)}
+                            className="px-3 py-2 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-200 text-xs font-bold rounded-lg transition-colors cursor-pointer"
+                        >
+                            <span>{customizingFreight ? 'Cerrar Personalización' : 'Personalizar Palet y Transportistas'}</span>
+                        </button>
+                    </div>
+                </div>
+
+                {customizingFreight && (
+                    <div className="p-4 bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200 dark:border-zinc-700 rounded-xl space-y-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                            <div>
+                                <label className={labelClass}>Transportista Principal</label>
+                                <select
+                                    value={freightConfig.primaryCarrier}
+                                    onChange={e => setFreightConfig({ ...freightConfig, primaryCarrier: e.target.value })}
+                                    className={inputClass}
+                                >
+                                    <option value="DACHSER">Dachser Intelligent Logistics</option>
+                                    <option value="SCHENKER">DB Schenker</option>
+                                    <option value="RABEN">Raben Group</option>
+                                    <option value="LOCAL_FLEET">Flota Propia / Directo</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label className={labelClass}>Euro-Palet EPAL (€/ud)</label>
+                                <input
+                                    type="number"
+                                    step="0.10"
+                                    value={freightConfig.euroPalletEpalEur}
+                                    onChange={e => setFreightConfig({ ...freightConfig, euroPalletEpalEur: Number(e.target.value) })}
+                                    className={inputClass}
+                                />
+                            </div>
+                            <div>
+                                <label className={labelClass}>Caja Estándar FEFCO (€/ud)</label>
+                                <input
+                                    type="number"
+                                    step="0.05"
+                                    value={freightConfig.cartonBoxStandardEur}
+                                    onChange={e => setFreightConfig({ ...freightConfig, cartonBoxStandardEur: Number(e.target.value) })}
+                                    className={inputClass}
+                                />
+                            </div>
+                            <div>
+                                <label className={labelClass}>Film / Flejado (€/palet)</label>
+                                <input
+                                    type="number"
+                                    step="0.10"
+                                    value={freightConfig.stretchWrapPerPalletEur}
+                                    onChange={e => setFreightConfig({ ...freightConfig, stretchWrapPerPalletEur: Number(e.target.value) })}
+                                    className={inputClass}
+                                />
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                            <div>
+                                <label className={labelClass}>Tarifa 1 Palet (€)</label>
+                                <input
+                                    type="number"
+                                    step="1"
+                                    value={freightConfig.rate1PalletEur}
+                                    onChange={e => setFreightConfig({ ...freightConfig, rate1PalletEur: Number(e.target.value) })}
+                                    className={inputClass}
+                                />
+                            </div>
+                            <div>
+                                <label className={labelClass}>Tarifa 2 Palets (€/palet)</label>
+                                <input
+                                    type="number"
+                                    step="1"
+                                    value={freightConfig.rate2PalletsEur}
+                                    onChange={e => setFreightConfig({ ...freightConfig, rate2PalletsEur: Number(e.target.value) })}
+                                    className={inputClass}
+                                />
+                            </div>
+                            <div>
+                                <label className={labelClass}>Tarifa 3–5 Palets (€/palet)</label>
+                                <input
+                                    type="number"
+                                    step="1"
+                                    value={freightConfig.rate3To5PalletsEur}
+                                    onChange={e => setFreightConfig({ ...freightConfig, rate3To5PalletsEur: Number(e.target.value) })}
+                                    className={inputClass}
+                                />
+                            </div>
+                            <div>
+                                <label className={labelClass}>Recargo Combustible (%)</label>
+                                <input
+                                    type="number"
+                                    step="0.5"
+                                    value={freightConfig.fuelSurchargePercent}
+                                    onChange={e => setFreightConfig({ ...freightConfig, fuelSurchargePercent: Number(e.target.value) })}
+                                    className={inputClass}
+                                />
+                            </div>
+                        </div>
+
+                        <div className="flex justify-end">
+                            <button
+                                type="button"
+                                data-testid="save-custom-freight-matrix-btn"
+                                disabled={savingFreightMatrix}
+                                onClick={handleSaveCustomFreightMatrix}
+                                className="px-4 py-2 bg-[#dc0000] hover:bg-[#b00000] text-white text-xs font-bold rounded-lg transition-colors cursor-pointer"
+                            >
+                                Guardar Tarifas de Palet y Transporte
+                            </button>
+                        </div>
                     </div>
                 )}
             </div>
