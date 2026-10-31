@@ -26,6 +26,8 @@ import { MarketplacePage } from '../src/ui/pages/admin/MarketplacePage';
 import { PreflightJobsPage } from '../src/ui/pages/preflight/PreflightJobsPage';
 import { ManufacturingQueuePage } from '../src/ui/pages/manufacturing/ManufacturingQueuePage';
 import { PublisherHubPage } from '../src/ui/pages/publisher/PublisherHubPage';
+import { FinancialOpsTab } from '../src/ui/pages/admin/FinancialOpsTab';
+import { MachinesPage } from '../src/ui/pages/os/MachinesPage';
 import { Sidebar } from '../src/ui/layout/Sidebar';
 import * as adminApi from '../src/ui/lib/adminApi';
 import { setAuthUser } from '../src/ui/lib/authStore';
@@ -241,6 +243,62 @@ describe('Dark Industrial Telemetry UI — Canonical Components & Dual-Mode Reco
         expect(approveBtn).toBeInTheDocument();
         fireEvent.click(approveBtn);
         expect(await screen.findByTestId('soft-proof-approved-banner')).toBeInTheDocument();
+    });
+
+    it('8. Renders PHASE-12A Financial Escrow & Split-Payout Engine UI and settles on signed POD', async () => {
+        renderWithProviders(<FinancialOpsTab mode="workspace" />, {
+            locale: 'es',
+            route: '/admin/financials'
+        });
+
+        expect(screen.getByTestId('financial-escrow-workspace')).toHaveAttribute('data-mode', 'workspace');
+        expect(screen.getByText('Commercial Escrow & Split-Payout Ledger')).toBeInTheDocument();
+        expect(screen.getByText('ESCROW LOCKED EUR')).toBeInTheDocument();
+        expect(screen.getByText('PENDING POD SETTLEMENT')).toBeInTheDocument();
+        expect(screen.getByText('RELEASED TO PRINTHOUSES')).toBeInTheDocument();
+        expect(screen.getByText('EPAL / CLAIM DEDUCTIONS')).toBeInTheDocument();
+
+        const settleBtn = screen.getByTestId('settle-pod-btn-PUB-ORD-2026-101');
+        expect(settleBtn).toBeInTheDocument();
+        fireEvent.click(settleBtn);
+        await screen.findByText(/€16[.,]200/);
+        expect(screen.queryByTestId('settle-pod-btn-PUB-ORD-2026-101')).not.toBeInTheDocument();
+    });
+
+    it('9. Renders PHASE-12B JDF 1.7 XML Export in ManufacturingQueuePage and PHASE-12C Predictive Maintenance in MachinesPage', async () => {
+        renderWithProviders(<ManufacturingQueuePage mode="workspace" />, {
+            locale: 'es',
+            route: '/production/queue'
+        });
+
+        const jdfBtn = screen.getByTestId('export-jdf-btn-PF-2026-082-SIG-01');
+        expect(jdfBtn).toBeInTheDocument();
+        fireEvent.click(jdfBtn);
+        expect(await screen.findByTestId('jdf-xml-preview-modal')).toBeInTheDocument();
+        expect(screen.getByTestId('jdf-xml-code-block')).toHaveTextContent('http://www.cip4.org/JDFSchema_1_1');
+
+        vi.spyOn(adminApi, 'getMachines').mockResolvedValue({
+            ok: true,
+            total: 1,
+            machines: [],
+            status: 'ONLINE',
+            timestamp: new Date().toISOString()
+        });
+
+        renderWithProviders(<MachinesPage mode="workspace" />, {
+            locale: 'es',
+            route: '/ops/machines'
+        });
+
+        expect(screen.getByTestId('predictive-maintenance-panel')).toBeInTheDocument();
+        expect(screen.getByTestId('routing-status-MACH-KOMORI-G29-B2')).toHaveTextContent(
+            'ROUTING_BLOCKED_MAINTENANCE_REQUIRED'
+        );
+
+        const resetBtn = screen.getByTestId('reset-maintenance-btn-MACH-KOMORI-G29-B2');
+        fireEvent.click(resetBtn);
+        await screen.findByText(/0\.0% WEAR/i);
+        expect(screen.getByTestId('routing-status-MACH-KOMORI-G29-B2')).toHaveTextContent('ROUTING_ENABLED');
     });
 });
 

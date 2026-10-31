@@ -20,6 +20,10 @@ const {
     dispatchImpositionJob,
     listDispatchedImpositionQueue
 } = require('../services/manufacturing/impositionEngineService');
+const {
+    generateJdfJobTicketXml,
+    processJmfTelemetrySignal
+} = require('../services/manufacturing/jdfConnectorService');
 
 function requireLogisticsControlPlaneAuth(req, res, next) {
     const role = (req.user && req.user.role) || (req.headers && req.headers['x-user-role']);
@@ -168,6 +172,44 @@ function createImpositionRouter() {
             return res.status(200).json(dispatchRecord);
         } catch (err) {
             return res.status(400).json({
+                ok: false,
+                error: err.message
+            });
+        }
+    });
+
+    // GET /api/manufacturing/imposition/:jobId/jdf-ticket.xml
+    router.get('/:jobId/jdf-ticket.xml', async (req, res) => {
+        try {
+            const jobId = req.params && req.params.jobId;
+            const ticket = generateJdfJobTicketXml({
+                ...(req.query || {}),
+                jobId
+            });
+            if (typeof res.setHeader === 'function') {
+                res.setHeader('Content-Type', 'application/vnd.cip4-jdf+xml; charset=utf-8');
+            }
+            return res.status(200).json(ticket);
+        } catch (err) {
+            return res.status(400).json({
+                ok: false,
+                error: err.message
+            });
+        }
+    });
+
+    // POST /api/manufacturing/imposition/jmf/signal
+    router.post('/jmf/signal', async (req, res) => {
+        try {
+            const tenantId =
+                (req.user && req.user.tenantId) ||
+                (req.body && req.body.tenantId) ||
+                (req.headers && req.headers['x-tenant-id']) ||
+                'tenant-default';
+            const result = processJmfTelemetrySignal(req.body || {}, { tenantId });
+            return res.status(200).json(result);
+        } catch (err) {
+            return res.status(err.statusCode || 400).json({
                 ok: false,
                 error: err.message
             });
