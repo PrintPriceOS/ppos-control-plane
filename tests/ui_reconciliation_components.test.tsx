@@ -23,6 +23,7 @@ import {
 } from '../src/ui/components/common';
 import { PricingIntelligenceTab } from '../src/ui/pages/admin/PricingIntelligenceTab';
 import { MarketplacePage } from '../src/ui/pages/admin/MarketplacePage';
+import { PreflightJobsPage } from '../src/ui/pages/preflight/PreflightJobsPage';
 import { Sidebar } from '../src/ui/layout/Sidebar';
 import * as adminApi from '../src/ui/lib/adminApi';
 import { setAuthUser } from '../src/ui/lib/authStore';
@@ -169,6 +170,27 @@ describe('Dark Industrial Telemetry UI — Canonical Components & Dual-Mode Reco
         expect(screen.getByTestId('top-summary-kpi-bar')).toBeInTheDocument();
         const emptyState = await screen.findByTestId('industrial-table-empty');
         expect(emptyState).toHaveTextContent('NO MARKETPLACE ORDERS DEFINED');
+    });
+
+    it('5. Renders PHASE-11A Preflight & Geometry Intelligence UI with trilingual support, KPIs, and AUTO-FIX', async () => {
+        renderWithProviders(<PreflightJobsPage mode="workspace" />, {
+            locale: 'de',
+            route: '/preflight/jobs'
+        });
+
+        expect(screen.getByTestId('preflight-intelligence-workspace')).toHaveAttribute('data-mode', 'workspace');
+        expect(screen.getByText('Preflight & Geometry Intelligence')).toBeInTheDocument();
+        expect(
+            screen.getByText('Automatische Beschnittzugabe-Synthese, TAC-Analyse und Buchrücken-Kalibrierung')
+        ).toBeInTheDocument();
+        expect(screen.getByText('INSPECTED FILES')).toBeInTheDocument();
+        expect(screen.getByText('CRITICAL ERRORS')).toBeInTheDocument();
+        expect(screen.getByText('AVG. TAC LEVEL')).toBeInTheDocument();
+        expect(screen.getByText('AUTO-FIX RATIO')).toBeInTheDocument();
+
+        const autoFixBtn = screen.getByTestId('auto-fix-btn-PF-2026-081');
+        expect(autoFixBtn).toBeInTheDocument();
+        fireEvent.click(autoFixBtn);
     });
 });
 
