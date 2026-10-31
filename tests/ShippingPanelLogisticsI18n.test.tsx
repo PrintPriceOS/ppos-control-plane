@@ -49,6 +49,7 @@ describe('Phase 198B & 198C (LOGISTICS-UI-01 & LOGISTICS-05) — ShippingPanel E
 
         // Verify LOGISTICS-05 Dispatch PDF controls in EN
         expect(screen.getByTestId('logistics-dispatch-documents-card')).toBeTruthy();
+        expect(screen.getByText('Download Carrier Protocol (PDF)')).toBeTruthy();
         expect(screen.getByText('Download Delivery Note (PDF)')).toBeTruthy();
         expect(screen.getByText('Print SSCC Labels (A6 Thermal / A4 4-UP)')).toBeTruthy();
     });
@@ -85,11 +86,12 @@ describe('Phase 198B & 198C (LOGISTICS-UI-01 & LOGISTICS-05) — ShippingPanel E
         expect(screen.getByText('Buchkartons im Kreuzverband')).toBeTruthy();
 
         // Verify LOGISTICS-05 Dispatch PDF controls in DE
+        expect(screen.getByText('Transportprotokoll herunterladen (PDF)')).toBeTruthy();
         expect(screen.getByText('Lieferschein herunterladen (PDF)')).toBeTruthy();
         expect(screen.getByText('SSCC-Etiketten drucken (A6 Thermo / A4 4-UP)')).toBeTruthy();
     });
 
-    it('renders Spanish (ES) LOGISTICS-05 dispatch action buttons and invokes Delivery Note & SSCC PDF endpoints on click', async () => {
+    it('renders Spanish (ES) LOGISTICS-05 dispatch action buttons and invokes Carrier Protocol, Delivery Note & SSCC PDF endpoints on click', async () => {
         const fetchMock = vi.fn().mockResolvedValue({
             ok: true,
             json: async () => ({ success: true, ok: true, regions: [] }),
@@ -103,11 +105,21 @@ describe('Phase 198B & 198C (LOGISTICS-UI-01 & LOGISTICS-05) — ShippingPanel E
             </LocaleProvider>
         );
 
+        const protoBtn = screen.getByTestId('download-carrier-protocol-pdf-btn');
         const dnBtn = screen.getByTestId('download-delivery-note-pdf-btn');
         const ssccBtn = screen.getByTestId('print-sscc-labels-pdf-btn');
 
+        expect(protoBtn.textContent).toContain('Descargar Protocolo de Transporte (PDF)');
         expect(dnBtn.textContent).toContain('Descargar Albarán de Entrega (PDF)');
         expect(ssccBtn.textContent).toContain('Imprimir Etiquetas SSCC (A6 Térmica / A4 4-UP)');
+
+        fireEvent.click(protoBtn);
+        await waitFor(() => {
+            expect(fetchMock).toHaveBeenCalledWith(
+                '/api/logistics/carrier-protocol/pdf',
+                expect.objectContaining({ method: 'GET' })
+            );
+        });
 
         fireEvent.click(dnBtn);
         await waitFor(() => {

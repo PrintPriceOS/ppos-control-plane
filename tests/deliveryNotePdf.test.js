@@ -159,6 +159,8 @@ describe('Phase 198C (LOGISTICS-05) — Automated GS1-128 SSCC Pallet Labels & D
         expect(pdfText).toContain('STRICT_LDM_NON_STACKABLE');
         expect(pdfText).toContain('0.4 LDM / Euro-Pallet 1200x800 mm');
         expect(pdfText).toContain('PALETTENSCHEIN \\(CANJE 14 DIAS\\)');
+        expect(pdfText).toContain('15.00 EUR / Euro-Pallet EPAL');
+        expect(pdfText).toContain('4002693000002');
         expect(pdfText).toContain('GT-AR 2026');
     });
 
@@ -220,5 +222,23 @@ describe('Phase 198C (LOGISTICS-05) — Automated GS1-128 SSCC Pallet Labels & D
         expect(deliveryNoteRes.headers['content-type']).toBe('application/pdf');
         expect(Buffer.isBuffer(deliveryNoteRes.body)).toBe(true);
         expect(deliveryNoteRes.body.toString('latin1').startsWith('%PDF-1.4')).toBe(true);
+
+        // 5. Valid GET /carrier-protocol/pdf returns official DIN A4 Carrier Integration Protocol PDF
+        const protocolRes = await invokeRouterEndpoint(router, {
+            method: 'GET',
+            routePath: '/carrier-protocol/pdf',
+            user: { id: 'admin-1', role: 'PRINTHOUSE_ADMIN', tenantId: 'tenant-alpha' },
+            query: {
+                carrierName: 'DACHSER SE Book Logistics'
+            }
+        });
+        expect(protocolRes.statusCode).toBe(200);
+        expect(protocolRes.headers['content-type']).toBe('application/pdf');
+        expect(protocolRes.headers['x-ppos-protocol-version']).toBe('PPOS-LOG-SLA-2026.1');
+        const protoText = protocolRes.body.toString('latin1');
+        expect(protoText.startsWith('%PDF-1.4')).toBe(true);
+        expect(protoText).toContain('PROTOCOLO DE INTEGRACION Y CONDICIONES DE SERVICIO DE TRANSPORTE');
+        expect(protoText).toContain('4002693000002');
+        expect(protoText).toContain('15,00 EUR / palet EPAL');
     });
 });

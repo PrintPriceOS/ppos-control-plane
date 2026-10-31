@@ -25,7 +25,8 @@
 const { LogisticsDatabaseService } = require('../services/logistics/logisticsDatabaseService');
 const {
     generateSsccLabelsPdf,
-    generateDeliveryNotePdf
+    generateDeliveryNotePdf,
+    generateCarrierProtocolPdf
 } = require('../services/logistics/deliveryNotePdfService');
 
 function requireLogisticsControlPlaneAuth(req, res, next) {
@@ -337,6 +338,39 @@ function createLogisticsRouter(options = {}) {
                 );
                 res.setHeader('Content-Length', String(result.buffer.length));
                 res.setHeader('X-PPOS-Page-Count', String(result.pageCount));
+            }
+
+            return res.status(200).send(result.buffer);
+        } catch (err) {
+            return res.status(err.statusCode || 400).json({
+                ok: false,
+                error: err.message
+            });
+        }
+    });
+
+    /**
+     * GET /carrier-protocol/pdf (mounted at /api/logistics/carrier-protocol/pdf)
+     * Generates the official DIN A4 Carrier Integration Protocol & Service Conditions PDF buffer.
+     */
+    router.get('/carrier-protocol/pdf', async (req, res) => {
+        try {
+            const options = {
+                ...(req.query || {}),
+                ...(req.body || {})
+            };
+
+            const result = await generateCarrierProtocolPdf(options);
+
+            if (typeof res.setHeader === 'function') {
+                res.setHeader('Content-Type', 'application/pdf');
+                res.setHeader(
+                    'Content-Disposition',
+                    'inline; filename="ppos-carrier-service-protocol-A4.pdf"'
+                );
+                res.setHeader('Content-Length', String(result.buffer.length));
+                res.setHeader('X-PPOS-Page-Count', String(result.pageCount));
+                res.setHeader('X-PPOS-Protocol-Version', result.protocolVersion);
             }
 
             return res.status(200).send(result.buffer);

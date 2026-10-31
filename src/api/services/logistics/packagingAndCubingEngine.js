@@ -59,6 +59,7 @@ const BUILTIN_WAREHOUSE_PROFILES = Object.freeze({
     ZEITFRACHT_ERFURT: Object.freeze({
         profileCode: 'ZEITFRACHT_ERFURT',
         displayName: 'Zeitfracht Medien GmbH (Erfurt Book Logistics Hub)',
+        gln: '4026635000006',
         countryCode: 'DE',
         palletStandard: 'EUR_EPAL_1200x800',
         palletFootprintLengthMm: 1200,
@@ -85,6 +86,7 @@ const BUILTIN_WAREHOUSE_PROFILES = Object.freeze({
     ARVATO_VVA_GUETERSLOH: Object.freeze({
         profileCode: 'ARVATO_VVA_GUETERSLOH',
         displayName: 'VVA — Vereinigte Verlagsauslieferung (Arvato / Bertelsmann Gütersloh)',
+        gln: '4002693000002',
         countryCode: 'DE',
         palletStandard: 'EUR_EPAL_1200x800',
         palletFootprintLengthMm: 1200,
@@ -97,6 +99,33 @@ const BUILTIN_WAREHOUSE_PROFILES = Object.freeze({
         minPerimeterSetbackMm: 20, // 2 cm retranqueo perimetral
         maxOverhangMm: 0,
         requiresFlatTopLayer: true, // Capa superior plana obligatoria para almacén robotizado
+        requiresLoadingDock: true,
+        allowsTailLift: false,
+        requiresIsbnCartonLabel: true,
+        requiresPalletContentSheet: true,
+        penalties: Object.freeze({
+            repalletizingFeePerPalletEur: 40.0,
+            nonFlatTopLayerFeePerPalletEur: 35.0,
+            overweightCartonFeePerCartonEur: 15.0,
+            unbookedSlotPenaltyEur: 128.0
+        })
+    }),
+    VVA_ARVATO_GUTERSLOH: Object.freeze({
+        profileCode: 'VVA_ARVATO_GUTERSLOH',
+        displayName: 'VVA — Vereinigte Verlagsauslieferung (Arvato / Bertelsmann Gütersloh)',
+        gln: '4002693000002',
+        countryCode: 'DE',
+        palletStandard: 'EUR_EPAL_1200x800',
+        palletFootprintLengthMm: 1200,
+        palletFootprintWidthMm: 800,
+        palletBaseHeightMm: 144,
+        palletTareWeightKg: 25.0,
+        maxTotalPalletHeightMm: 1300,
+        maxGrossPalletWeightKg: 700.0,
+        maxCartonWeightKg: 16.0,
+        minPerimeterSetbackMm: 20,
+        maxOverhangMm: 0,
+        requiresFlatTopLayer: true,
         requiresLoadingDock: true,
         allowsTailLift: false,
         requiresIsbnCartonLabel: true,

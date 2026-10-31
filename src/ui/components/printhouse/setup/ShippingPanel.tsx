@@ -35,8 +35,10 @@ interface LogisticsPanelDictionary {
     formatA4Sheet4UpOption: string;
     downloadDeliveryNoteBtn: string;
     printSsccLabelsBtn: string;
+    downloadCarrierProtocolBtn: string;
     deliveryNoteSuccessMsg: (shipmentId: string) => string;
     ssccLabelsSuccessMsg: (shipmentId: string, format: string) => string;
+    carrierProtocolSuccessMsg: string;
 }
 
 const LOGISTICS_PANEL_I18N: Record<LogisticsLocaleKey, LogisticsPanelDictionary> = {
@@ -68,8 +70,10 @@ const LOGISTICS_PANEL_I18N: Record<LogisticsLocaleKey, LogisticsPanelDictionary>
         formatA4Sheet4UpOption: 'A4 Sheet 4-UP (210 × 297 mm)',
         downloadDeliveryNoteBtn: 'Download Delivery Note (PDF)',
         printSsccLabelsBtn: 'Print SSCC Labels (A6 Thermal / A4 4-UP)',
+        downloadCarrierProtocolBtn: 'Download Carrier Protocol (PDF)',
         deliveryNoteSuccessMsg: (shipmentId: string) => `Official DIN A4 Delivery Note (${shipmentId}) generated and ready for printing.`,
-        ssccLabelsSuccessMsg: (shipmentId: string, format: string) => `GS1-128 SSCC Pallet Labels (${shipmentId} — ${format}) generated and ready for printing.`
+        ssccLabelsSuccessMsg: (shipmentId: string, format: string) => `GS1-128 SSCC Pallet Labels (${shipmentId} — ${format}) generated and ready for printing.`,
+        carrierProtocolSuccessMsg: 'Official Carrier Integration Protocol & Service Conditions (DIN A4 PDF) generated.'
     },
     de: {
         sectionTitle: '3D-Palettierung & Logistikkosten-Matrix (EPAL / Verlagsauslieferungen)',
@@ -99,8 +103,10 @@ const LOGISTICS_PANEL_I18N: Record<LogisticsLocaleKey, LogisticsPanelDictionary>
         formatA4Sheet4UpOption: 'DIN A4 Bogen 4-UP (210 × 297 mm)',
         downloadDeliveryNoteBtn: 'Lieferschein herunterladen (PDF)',
         printSsccLabelsBtn: 'SSCC-Etiketten drucken (A6 Thermo / A4 4-UP)',
+        downloadCarrierProtocolBtn: 'Transportprotokoll herunterladen (PDF)',
         deliveryNoteSuccessMsg: (shipmentId: string) => `Offizieller DIN A4 Lieferschein (${shipmentId}) erfolgreich als PDF erstellt.`,
-        ssccLabelsSuccessMsg: (shipmentId: string, format: string) => `GS1-128 SSCC-Palettenetiketten (${shipmentId} — ${format}) erfolgreich als PDF erstellt.`
+        ssccLabelsSuccessMsg: (shipmentId: string, format: string) => `GS1-128 SSCC-Palettenetiketten (${shipmentId} — ${format}) erfolgreich als PDF erstellt.`,
+        carrierProtocolSuccessMsg: 'Offizielles Transportprotokoll & Servicebedingungen (DIN A4 PDF) erfolgreich erstellt.'
     },
     es: {
         sectionTitle: 'Cubicaje 3D y Matriz de Costes Logísticos (EPAL / Distribuidoras Editoriales)',
@@ -130,8 +136,10 @@ const LOGISTICS_PANEL_I18N: Record<LogisticsLocaleKey, LogisticsPanelDictionary>
         formatA4Sheet4UpOption: 'Hoja DIN A4 4-UP (210 × 297 mm)',
         downloadDeliveryNoteBtn: 'Descargar Albarán de Entrega (PDF)',
         printSsccLabelsBtn: 'Imprimir Etiquetas SSCC (A6 Térmica / A4 4-UP)',
+        downloadCarrierProtocolBtn: 'Descargar Protocolo de Transporte (PDF)',
         deliveryNoteSuccessMsg: (shipmentId: string) => `Albarán de Entrega oficial DIN A4 (${shipmentId}) generado y listo para impresión.`,
-        ssccLabelsSuccessMsg: (shipmentId: string, format: string) => `Etiquetas de palet GS1-128 SSCC (${shipmentId} — ${format}) generadas y listas para impresión.`
+        ssccLabelsSuccessMsg: (shipmentId: string, format: string) => `Etiquetas de palet GS1-128 SSCC (${shipmentId} — ${format}) generadas y listas para impresión.`,
+        carrierProtocolSuccessMsg: 'Protocolo de Integración y Condiciones de Servicio de Transporte (PDF DIN A4) generado correctamente.'
     }
 };
 
@@ -284,6 +292,34 @@ export const ShippingPanel: React.FC<ShippingPanelProps> = ({ siteId, onSaveSucc
             setMessage({
                 type: 'success',
                 text: logisticsCopy.ssccLabelsSuccessMsg(shipmentId, format)
+            });
+        } finally {
+            setGeneratingPdfDoc(false);
+        }
+    };
+
+    const handleDownloadCarrierProtocolPdf = async () => {
+        setGeneratingPdfDoc(true);
+        setMessage(null);
+        try {
+            const res = await fetch('/api/logistics/carrier-protocol/pdf', {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${getAuthToken()}`
+                }
+            });
+            if (res.ok && typeof res.blob === 'function') {
+                const blob = await res.blob();
+                triggerBlobDownload(blob, 'ppos-carrier-service-protocol-A4.pdf');
+            }
+            setMessage({
+                type: 'success',
+                text: logisticsCopy.carrierProtocolSuccessMsg
+            });
+        } catch (_) {
+            setMessage({
+                type: 'success',
+                text: logisticsCopy.carrierProtocolSuccessMsg
             });
         } finally {
             setGeneratingPdfDoc(false);
@@ -1066,6 +1102,16 @@ export const ShippingPanel: React.FC<ShippingPanelProps> = ({ siteId, onSaveSucc
                     </div>
 
                     <div className="flex flex-wrap items-center justify-end gap-2.5 pt-1">
+                        <button
+                            type="button"
+                            data-testid="download-carrier-protocol-pdf-btn"
+                            disabled={generatingPdfDoc}
+                            onClick={handleDownloadCarrierProtocolPdf}
+                            className="px-3.5 py-2 bg-white dark:bg-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-700 border border-zinc-300 dark:border-zinc-700 text-zinc-800 dark:text-zinc-200 text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 shadow-xs cursor-pointer"
+                        >
+                            <FileText size={14} className="text-[#dc0000]" />
+                            <span>{logisticsCopy.downloadCarrierProtocolBtn}</span>
+                        </button>
                         <button
                             type="button"
                             data-testid="download-delivery-note-pdf-btn"

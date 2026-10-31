@@ -292,7 +292,8 @@ function normalizeShipmentForDocuments(shipmentId, rawInput = {}) {
 
     const defaultGlnByWarehouse = {
         ZEITFRACHT_ERFURT: '4026635000006',
-        ARVATO_VVA_GUETERSLOH: '4014519000001',
+        ARVATO_VVA_GUETERSLOH: '4002693000002',
+        VVA_ARVATO_GUTERSLOH: '4002693000002',
         AMAZON_EU_FBA_STD: '5450534000007',
         STANDARD_COMMERCIAL_DOCK: '4000001000005'
     };
@@ -314,7 +315,16 @@ function normalizeShipmentForDocuments(shipmentId, rawInput = {}) {
             city: 'Gütersloh',
             country: 'DE',
             gln: defaultGlnByWarehouse.ARVATO_VVA_GUETERSLOH,
-            dockNotice: 'SLOT BOOKED / 48H AVIS — FLAT TOP LAYER MANDATORY'
+            dockNotice: 'SLOT BOOKED / 24H AVIS — FLAT TOP LAYER MANDATORY'
+        },
+        VVA_ARVATO_GUTERSLOH: {
+            name: 'VVA — Vereinigte Verlagsauslieferung (Arvato / Bertelsmann)',
+            street: 'An der Autobahn 100',
+            postalCode: '33334',
+            city: 'Gütersloh',
+            country: 'DE',
+            gln: defaultGlnByWarehouse.VVA_ARVATO_GUTERSLOH,
+            dockNotice: 'SLOT BOOKED / 24H AVIS — FLAT TOP LAYER MANDATORY'
         }
     };
 
@@ -562,7 +572,8 @@ function normalizeShipmentForDocuments(shipmentId, rawInput = {}) {
             ldmTotal,
             taxableWeightKg,
             stackabilityMode,
-            epalExchangeDeadlineDays: 14
+            epalExchangeDeadlineDays: 14,
+            epalNonReturnPenaltyEur: 15.0
         }
     };
 }
@@ -1023,10 +1034,10 @@ async function generateDeliveryNotePdf({ shipmentId, shipmentData = {} } = {}) {
         { font: 'F1', sizePt: 7.5 }
     );
     pdf.drawTextMm(
-        'Original EPAL voucher signed by carrier & receiving warehouse required for pallet pool clearing.',
+        'Non-return after 14 calendar days is automatically billed at 15.00 EUR / Euro-Pallet EPAL (+ VAT) on next settlement.',
         15,
         epalTopY + 20.0,
-        { font: 'F1', sizePt: 6.8, colorRgb: [0.35, 0.35, 0.35] }
+        { font: 'F2', sizePt: 6.8, colorRgb: [0.35, 0.35, 0.35] }
     );
 
     // ─── 8. CMR / POD SIGNATURES, VEHICLE REGISTRATION & WAREHOUSE DOCK STAMP ──
@@ -1071,11 +1082,306 @@ async function generateDeliveryNotePdf({ shipmentId, shipmentData = {} } = {}) {
     };
 }
 
+/**
+ * Generates the official DIN A4 Portrait (210 x 297 mm) Carrier Integration Protocol & Service Conditions PDF buffer
+ * ("Protocolo de Integración y Condiciones de Servicio de Transporte").
+ *
+ * @param {object} [options]
+ * @param {string} [options.carrierName] - Optional carrier legal name to prefill.
+ * @param {string} [options.carrierVatId] - Optional carrier VAT/CIF to prefill.
+ * @param {string} [options.printhouseName] - Optional issuing printhouse name.
+ * @returns {Promise<{ buffer: Buffer, pageCount: number, protocolVersion: string }>}
+ */
+async function generateCarrierProtocolPdf(options = {}) {
+    const pdf = new VectorPdfBuilder({
+        widthMm: PAGE_FORMATS_MM.A4.widthMm,
+        heightMm: PAGE_FORMATS_MM.A4.heightMm,
+        title: 'PrintPriceOS — Carrier Integration Protocol & Service Conditions'
+    });
+
+    pdf.addPage({ widthMm: 210, heightMm: 297 });
+
+    // ─── HEADER ─────────────────────────────────────────────────────────────────
+    pdf.setFillColorRgb(0.863, 0, 0);
+    pdf.drawRectMm(12, 10, 186, 3.5, { fill: true, stroke: false });
+
+    pdf.setFillColorRgb(0, 0, 0);
+    pdf.drawTextMm('PROTOCOLO DE INTEGRACION Y CONDICIONES DE SERVICIO DE TRANSPORTE', 12, 20.0, {
+        font: 'F2',
+        sizePt: 11.5
+    });
+    pdf.drawTextMm(
+        'PrintPriceOS Industrial Logistics Governance — Binding Carrier SLA, LDM, EPAL & GS1-128 Protocol',
+        12,
+        24.8,
+        { font: 'F1', sizePt: 7.8, colorRgb: [0.3, 0.3, 0.3] }
+    );
+    pdf.drawTextMm('DOC-REF: PPOS-LOG-SLA-2026.1', 152, 24.8, {
+        font: 'F4',
+        sizePt: 7.5,
+        colorRgb: [0.863, 0, 0]
+    });
+
+    // ─── SECTION 1: VOLUMETRIC CONVERSION & LDM BILLING PARAMETERS ─────────────
+    pdf.setFillColorRgb(0.15, 0.15, 0.15);
+    pdf.drawRectMm(12, 29, 186, 6.2, { fill: true, stroke: false });
+    pdf.drawTextMm('1. PARAMETROS DE FACTURACION Y CONVERSION VOLUMETRICA (LDM & SEGREGACION DE COSTES)', 15, 33.4, {
+        font: 'F2',
+        sizePt: 7.8,
+        colorRgb: [1, 1, 1]
+    });
+
+    pdf.setFillColorRgb(0.97, 0.97, 0.97);
+    pdf.drawRectMm(12, 35.2, 186, 27.5, { fill: true, stroke: true });
+    pdf.drawTextMm(
+        '- Equivalencia unitaria LDM: 1 Euro-Palet EPAL (1200 x 800 mm) = 0.40 LDM (Metros Lineales de Carga).',
+        15,
+        40.2,
+        { font: 'F2', sizePt: 7.8 }
+    );
+    pdf.drawTextMm(
+        '- Ratio masa/volumen estandar: 1 LDM = 1,850 kg tasables  |  Masa tasable/palet = max(Masa bruta real, 740 kg).',
+        15,
+        45.0,
+        { font: 'F2', sizePt: 7.8 }
+    );
+    pdf.drawTextMm(
+        '- Apilabilidad (Strict LDM): Expediciones editoriales NO apilables en transito salvo semirremolque Doppelstock.',
+        15,
+        49.8,
+        { font: 'F1', sizePt: 7.6 }
+    );
+    pdf.drawTextMm(
+        '- Segregacion estricta de costes: La tarifa de transporte cubre exclusivamente porte, seguro y recargos (combustible/peajes).',
+        15,
+        54.6,
+        { font: 'F1', sizePt: 7.5 }
+    );
+    pdf.drawTextMm(
+        '  Los consumibles de embalaje (cajas FEFCO 0201, flejes, cantoneras, film) son coste de taller sin recargo de manipulacion.',
+        15,
+        59.0,
+        { font: 'F1', sizePt: 7.5 }
+    );
+
+    // ─── SECTION 2: EUROPEAN EDITORIAL HUBS COMPLIANCE TABLE ───────────────────
+    pdf.setFillColorRgb(0.15, 0.15, 0.15);
+    pdf.drawRectMm(12, 66, 186, 6.2, { fill: true, stroke: false });
+    pdf.drawTextMm('2. CUMPLIMIENTO OPERATIVO EN HUBS EDITORIALES EUROPEOS (REQUISITOS DE MUELLE Y AVIS)', 15, 70.4, {
+        font: 'F2',
+        sizePt: 7.8,
+        colorRgb: [1, 1, 1]
+    });
+
+    // Table Header
+    const hubTableY = 72.2;
+    pdf.setFillColorRgb(0.88, 0.88, 0.88);
+    pdf.drawRectMm(12, hubTableY, 186, 6.2, { fill: true, stroke: true });
+    pdf.drawTextMm('CENTRO DESTINO / GLN', 14, hubTableY + 4.3, { font: 'F2', sizePt: 7 });
+    pdf.drawTextMm('ALTURA MAX.', 66, hubTableY + 4.3, { font: 'F2', sizePt: 7 });
+    pdf.drawTextMm('MASA MAX.', 89, hubTableY + 4.3, { font: 'F2', sizePt: 7 });
+    pdf.drawTextMm('REQUISITO CRITICO DE MUELLE', 110, hubTableY + 4.3, { font: 'F2', sizePt: 7 });
+    pdf.drawTextMm('CITA PREVIA (AVIS)', 162, hubTableY + 4.3, { font: 'F2', sizePt: 7 });
+
+    const hubs = [
+        {
+            hub: 'Zeitfracht Erfurt',
+            gln: 'GLN: 4026635000006',
+            h: '1200 mm (incl. EPAL)',
+            w: '1000 kg / palet',
+            req: 'Retranqueo >= 30 mm (Zero Overhang)',
+            avis: 'Obligatoria >= 48 h (Tor 14)'
+        },
+        {
+            hub: 'VVA Arvato Guetersloh',
+            gln: 'GLN: 4002693000002',
+            h: '1300 mm (incl. EPAL)',
+            w: '700 kg / palet',
+            req: 'Capa superior plana obligatoria',
+            avis: 'Obligatoria >= 24 h (Portal)'
+        },
+        {
+            hub: 'Amazon EU FBA',
+            gln: 'GLN: 5450534000007',
+            h: 'Segun ASIN / 1800 mm',
+            w: '<= 15.0 kg / caja',
+            req: 'Palet EUR-1 film seguridad',
+            avis: 'Carrier Central (CARP) + PO'
+        }
+    ];
+
+    let rowY = hubTableY + 6.2;
+    for (let i = 0; i < hubs.length; i++) {
+        const h = hubs[i];
+        pdf.setFillColorRgb(i % 2 === 0 ? 1 : 0.96, i % 2 === 0 ? 1 : 0.96, i % 2 === 0 ? 1 : 0.96);
+        pdf.drawRectMm(12, rowY, 186, 10.2, { fill: true, stroke: true });
+        pdf.drawTextMm(h.hub, 14, rowY + 4.2, { font: 'F2', sizePt: 7.4 });
+        pdf.drawTextMm(h.gln, 14, rowY + 8.4, { font: 'F4', sizePt: 6.8, colorRgb: [0.25, 0.25, 0.25] });
+        pdf.drawTextMm(h.h, 66, rowY + 6.0, { font: 'F2', sizePt: 7.2 });
+        pdf.drawTextMm(h.w, 89, rowY + 6.0, { font: 'F2', sizePt: 7.2 });
+        pdf.drawTextMm(h.req, 110, rowY + 6.0, { font: 'F1', sizePt: 7.1 });
+        pdf.drawTextMm(h.avis, 162, rowY + 6.0, { font: 'F2', sizePt: 7.0, colorRgb: [0.863, 0, 0] });
+        rowY += 10.2;
+    }
+
+    // ─── SECTION 3: EPAL PALLET POOL & PALETTENSCHEIN (14 DAYS / 15.00 EUR) ────
+    const sec3Y = rowY + 3.5;
+    pdf.setFillColorRgb(0.15, 0.15, 0.15);
+    pdf.drawRectMm(12, sec3Y, 186, 6.2, { fill: true, stroke: false });
+    pdf.drawTextMm('3. CIRCUITO DE PALETERIA EPAL Y VALES DE CANJE (PALETTENSCHEIN — PLAZO 14 DIAS)', 15, sec3Y + 4.4, {
+        font: 'F2',
+        sizePt: 7.8,
+        colorRgb: [1, 1, 1]
+    });
+
+    pdf.setFillColorRgb(0.97, 0.97, 0.97);
+    pdf.drawRectMm(12, sec3Y + 6.2, 186, 24.5, { fill: true, stroke: true });
+    pdf.drawTextMm(
+        '1. Intercambio Inmediato 1:1: Entrega en muelle de igual numero de Euro-palets EPAL (1200x800 mm, UIC 435-2, Cat. A/B).',
+        15,
+        sec3Y + 11.2,
+        { font: 'F1', sizePt: 7.5 }
+    );
+    pdf.drawTextMm(
+        '2. Vale de Intercambio (Palettenschein — Plazo improrrogable de 14 dias naturales):',
+        15,
+        sec3Y + 16.2,
+        { font: 'F2', sizePt: 7.6 }
+    );
+    pdf.drawTextMm(
+        '   El transportista dispone de 14 dias naturales para restituir fisicamente el saldo deudor de palets EPAL en el taller.',
+        15,
+        sec3Y + 21.0,
+        { font: 'F1', sizePt: 7.5 }
+    );
+    pdf.drawTextMm(
+        '   RECARGO POR INCUMPLIMIENTO: Vencido el plazo de 14 dias sin restitucion, se facturara a 15,00 EUR / palet EPAL (+ IVA).',
+        15,
+        sec3Y + 26.2,
+        { font: 'F2', sizePt: 7.6, colorRgb: [0.863, 0, 0] }
+    );
+
+    // ─── SECTION 4: GS1-128 SSCC-18 TRACEABILITY & POD / CMR CONFIRMATION ─────
+    const sec4Y = sec3Y + 34.2;
+    pdf.setFillColorRgb(0.15, 0.15, 0.15);
+    pdf.drawRectMm(12, sec4Y, 186, 6.2, { fill: true, stroke: false });
+    pdf.drawTextMm('4. TRAZABILIDAD DOCUMENTAL GS1-128 SSCC-18 (NVE) Y CONFIRMACION DE ENTREGA (POD / CMR)', 15, sec4Y + 4.4, {
+        font: 'F2',
+        sizePt: 7.8,
+        colorRgb: [1, 1, 1]
+    });
+
+    pdf.setFillColorRgb(1, 1, 1);
+    pdf.drawRectMm(12, sec4Y + 6.2, 186, 23.0, { fill: true, stroke: true });
+    pdf.drawTextMm(
+        '- Etiquetado GS1-128 SSCC-18 (AI 00): Escaneo obligatorio en recogida y cross-docking. Prohibido ocultar o deteriorar etiqueta.',
+        15,
+        sec4Y + 11.2,
+        { font: 'F1', sizePt: 7.5 }
+    );
+    pdf.drawTextMm(
+        '- Confirmacion Telematica (API Webhook): Notificacion de entrega con SSCC, timestamp y GPS en plazo < 2 horas tras descarga.',
+        15,
+        sec4Y + 16.2,
+        { font: 'F1', sizePt: 7.5 }
+    );
+    pdf.drawTextMm(
+        '- Confirmacion Documental (Albaran DIN A4 / Lieferschein): Remision de copia digitalizada firmada y sellada (POD) en <= 24 horas.',
+        15,
+        sec4Y + 21.2,
+        { font: 'F1', sizePt: 7.5 }
+    );
+    pdf.drawTextMm(
+        '- Cualquier penalizacion en destino por incumplimiento de cita previa (Avis) imputable al transportista sera repercutida.',
+        15,
+        sec4Y + 26.2,
+        { font: 'F2', sizePt: 7.3, colorRgb: [0.3, 0.3, 0.3] }
+    );
+
+    // ─── SECTION 5: CARRIER ACKNOWLEDGMENT & ADHESION BLOCK ───────────────────
+    const sec5Y = sec4Y + 33.0;
+    pdf.setFillColorRgb(0.15, 0.15, 0.15);
+    pdf.drawRectMm(12, sec5Y, 186, 6.2, { fill: true, stroke: false });
+    pdf.drawTextMm('5. ACUSE DE RECIBO Y ADHESION VINCULANTE (CARRIER ADHESION & SIGNATURE)', 15, sec5Y + 4.4, {
+        font: 'F2',
+        sizePt: 7.8,
+        colorRgb: [1, 1, 1]
+    });
+
+    const boxH = 44;
+    // Left Box: Carrier Corporate Details
+    pdf.setFillColorRgb(0.98, 0.98, 0.98);
+    pdf.drawRectMm(12, sec5Y + 6.2, 92, boxH, { fill: true, stroke: true });
+    pdf.drawTextMm('DATOS DE LA EMPRESA TRANSPORTISTA:', 15, sec5Y + 11.5, {
+        font: 'F2',
+        sizePt: 7.5,
+        colorRgb: [0.863, 0, 0]
+    });
+    pdf.drawTextMm(
+        `Razon Social: ${options.carrierName || '______________________________________'}`,
+        15,
+        sec5Y + 18.5,
+        { font: 'F1', sizePt: 7.8 }
+    );
+    pdf.drawTextMm(
+        `CIF / NIF / VAT: ${options.carrierVatId || '___________________________________'}`,
+        15,
+        sec5Y + 26.5,
+        { font: 'F1', sizePt: 7.8 }
+    );
+    pdf.drawTextMm(
+        'Representante Legal / Operativo: ______________________',
+        15,
+        sec5Y + 34.5,
+        { font: 'F1', sizePt: 7.8 }
+    );
+    pdf.drawTextMm(
+        'Canal Tracking (Email / API): ________________________',
+        15,
+        sec5Y + 42.5,
+        { font: 'F1', sizePt: 7.8 }
+    );
+
+    // Right Box: Operational Conformity & Stamp
+    pdf.setFillColorRgb(1, 1, 1);
+    pdf.drawRectMm(106, sec5Y + 6.2, 92, boxH, { fill: true, stroke: true });
+    pdf.drawTextMm('CONFORMIDAD OPERATIVA (FIRMA AUTORIZADA Y SELLO):', 109, sec5Y + 11.5, {
+        font: 'F2',
+        sizePt: 7.5,
+        colorRgb: [0.863, 0, 0]
+    });
+    pdf.drawTextMm(
+        'El transportista acepta las condiciones de cubicaje LDM, reserva',
+        109,
+        sec5Y + 17.0,
+        { font: 'F1', sizePt: 7.0, colorRgb: [0.3, 0.3, 0.3] }
+    );
+    pdf.drawTextMm(
+        'de muelle, escaneo GS1-128 SSCC y canje EPAL (14 dias / 15 EUR).',
+        109,
+        sec5Y + 20.8,
+        { font: 'F1', sizePt: 7.0, colorRgb: [0.3, 0.3, 0.3] }
+    );
+    pdf.drawLineMm(110, sec5Y + 39.5, 192, sec5Y + 39.5);
+    pdf.drawTextMm('Firma, Sello y Fecha de Adhesion: ____ / ____ / 2026', 110, sec5Y + 44.5, {
+        font: 'F2',
+        sizePt: 7.2
+    });
+
+    const buffer = pdf.toBuffer();
+    return {
+        buffer,
+        pageCount: pdf.pages.length,
+        protocolVersion: 'PPOS-LOG-SLA-2026.1'
+    };
+}
+
 module.exports = {
     MM_TO_PT,
     PAGE_FORMATS_MM,
     VectorPdfBuilder,
     normalizeShipmentForDocuments,
     generateSsccLabelsPdf,
-    generateDeliveryNotePdf
+    generateDeliveryNotePdf,
+    generateCarrierProtocolPdf
 };
