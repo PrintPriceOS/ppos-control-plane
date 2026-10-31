@@ -2349,6 +2349,19 @@
       "statementTypes": [
         "CREATE_TABLE"
       ]
+    },
+    {
+      "path": "migrations/175_phase197f_paper_classification_accreditation_columns.sql",
+      "prefix": "175",
+      "canonicalSha256": "b8bcf064a943fbd6ac325fb01640fedfe86dca6c331601da9765f18ffd9ea2c9",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 3263,
+      "containsDdl": true,
+      "containsDml": false,
+      "containsTransaction": false,
+      "statementTypes": [
+        "ALTER_TABLE"
+      ]
     }
   ]
 }

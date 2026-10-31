@@ -507,9 +507,35 @@ function resolveVariantTechnicalAttributes(row = {}) {
 
     const odsMaterialsRec = varMeta.ods_materials_recovery || null;
     const odsCaliperRec = varMeta.ods_caliper_recovery || null;
-    const rawCategory = String(row.category || '').toUpperCase() || 'OTHER';
-    const rawFinish = String(row.finish || row.finish_summary || '').toUpperCase();
+    const classAccreditation = varMeta.classification_accreditation || prodMeta.classification_accreditation || null;
+    const rawCategory = String(row.category || row.raw_category || '').toUpperCase() || 'OTHER';
+    const rawFinish = String(row.finish || row.raw_finish || row.finish_summary || '').toUpperCase();
     const grainDirection = normalizeGrainDirectionToken(row.grain_direction || row.grainDirection || 'UNKNOWN');
+
+    // 0. If the variant has an authoritative governed classification promotion (`classification_accreditation`),
+    //    resolve directly from the accredited technical classification attributes.
+    if (classAccreditation && classAccreditation.paper_type) {
+        const accreditedPaperType = String(classAccreditation.paper_type).toUpperCase();
+        const accreditedCoatingStatus = String(classAccreditation.coating_status || 'UNKNOWN').toUpperCase();
+        const accreditedFinish = String(classAccreditation.finish || rawFinish || 'UNKNOWN').toUpperCase();
+        const accreditedGrain = normalizeGrainDirectionToken(
+            classAccreditation.grain_direction || grainDirection || 'UNKNOWN'
+        );
+
+        return {
+            paperType: accreditedPaperType,
+            coatingStatus: accreditedCoatingStatus,
+            coatingConfidence: classAccreditation.coating_confidence || 'ACCREDITED_EVIDENCE',
+            finish: accreditedFinish,
+            grainDirection: accreditedGrain,
+            originalCode: (odsCaliperRec && odsCaliperRec.ods_code) || varMeta.original_code || prodMeta.original_code || null,
+            proviserRaw: (odsCaliperRec && odsCaliperRec.ods_provider) || prodMeta.provider_label || null,
+            supplierLabel: (odsCaliperRec && odsCaliperRec.ods_provider) || prodMeta.provider_label || null,
+            classificationEvidenceId: classAccreditation.classification_evidence_id || null,
+            classificationPromotionId: classAccreditation.promotion_id || null,
+            isSyntheticUncoatedResolved: false
+        };
+    }
 
     // 1. If the variant has explicit PAPER-MATERIALS-RECOVERY-03 metadata (`ods_materials_recovery`),
     //    it is one of the 943 approved SAFE_UNIQUE_MATCH rows (or an explicitly imported ODS row).

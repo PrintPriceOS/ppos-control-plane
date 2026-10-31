@@ -3111,6 +3111,953 @@ class PaperEvidenceService {
             canReleaseToManufacturing: false
         };
     }
+
+    /**
+     * -------------------------------------------------------------------------
+     * PAPER-MATERIALS-RECOVERY-12: GOVERNED CLASSIFICATION EVIDENCE & PROMOTION
+     * -------------------------------------------------------------------------
+     * Symmetric 4-stage accreditation workflow for technical classifications
+     * (`paper_type`, `coating_status`, `finish`, `grain_direction`) stored in
+     * `paper_variant_classification_evidence`.
+     *
+     * Core Invariants:
+     * 1. Strictly preserves `paper_variants.caliper_um` (zero mutation to thicknesses).
+     * 2. Enforces 4-way Segregation of Duties (`submitter` !== `reviewer` !== `requester` !== `authorizer`).
+     * 3. Updates `paper_products.category`, `paper_products.finish_summary`, `paper_variants.finish`,
+     *    `paper_variants.grain_direction`, and `paper_variants.metadata_json.classification_accreditation`
+     *    atomically upon `authorizeClassificationPromotion()`.
+     */
+
+    /**
+     * Stage 1: Registers a classification evidence record in `paper_variant_classification_evidence`.
+     * Does NOT mutate `paper_products.category`, `paper_variants.finish`, or `paper_variants.caliper_um`.
+     */
+    async registerClassificationEvidence({
+        tenantId,
+        supplierId = null,
+        actorUserId = null,
+        actorId = null,
+        actorRole = 'OPERATOR',
+        idempotencyKey = null,
+        payload = {}
+    }) {
+        const effectiveActorId = actorUserId || actorId;
+        if (!tenantId || !effectiveActorId) {
+            throw new PaperEvidenceError('Authenticated tenant and actor identity required.', 'UNAUTHORIZED', 403);
+        }
+        const variantId = String(payload.variantId || '').trim();
+        if (!variantId) {
+            throw new PaperEvidenceError('variantId is required.', 'VARIANT_ID_REQUIRED', 400);
+        }
+
+        if (idempotencyKey) {
+            const existing = unwrapRows(await this.db.query(
+                `SELECT * FROM paper_variant_classification_evidence WHERE tenant_id = ? AND idempotency_key = ? LIMIT 1`,
+                [tenantId, idempotencyKey]
+            ));
+            if (existing.length > 0) {
+                const ev = existing[0];
+                return {
+                    idempotentReplay: true,
+                    classificationEvidenceId: ev.classification_evidence_id || ev.id,
+                    status: ev.review_status || ev.status,
+                    evidence: ev,
+                    productiveClassificationModified: false,
+                    productiveCaliperModified: false
+                };
+            }
+        }
+
+        const varRows = unwrapRows(await this.db.query(
+            `SELECT v.*, p.name AS product_name, p.brand, p.manufacturer, p.category AS product_category, p.finish_summary
+             FROM paper_variants v
+             JOIN paper_products p ON v.product_id = p.id
+             WHERE v.id = ? LIMIT 1`,
+            [variantId]
+        ));
+        if (!varRows || varRows.length === 0) {
+            throw new PaperEvidenceError(`Variant '${variantId}' not found.`, 'VARIANT_NOT_FOUND', 404);
+        }
+        const variant = varRows[0];
+
+        const allowedCategories = new Set(['CARTON', 'OFFSET', 'COATED', 'DESIGN', 'DIGITAL', 'OTHER']);
+        const proposedCategory = String(payload.proposedCategory || payload.proposedPaperType || payload.paperType || '').trim().toUpperCase();
+        if (!allowedCategories.has(proposedCategory)) {
+            throw new PaperEvidenceError(
+                `Invalid proposedCategory '${proposedCategory}'. Allowed: CARTON, OFFSET, COATED, DESIGN, DIGITAL, OTHER ('UNCOATED' is prohibited as a paper_type).`,
+                'INVALID_PROPOSED_CATEGORY',
+                422
+            );
+        }
+
+        const allowedCoatingStatuses = new Set(['COATED', 'DOUBLE_SIDE_COATED', 'UNCOATED', 'ONE_SIDE_COATED', 'SYNTHETIC', 'SPECIALTY', 'UNKNOWN']);
+        const proposedCoatingStatus = String(payload.proposedCoatingStatus || payload.coatingStatus || 'UNKNOWN').trim().toUpperCase();
+        if (!allowedCoatingStatuses.has(proposedCoatingStatus)) {
+            throw new PaperEvidenceError(
+                `Invalid proposedCoatingStatus '${proposedCoatingStatus}'. Allowed: COATED, DOUBLE_SIDE_COATED, UNCOATED, ONE_SIDE_COATED, SYNTHETIC, SPECIALTY, UNKNOWN.`,
+                'INVALID_PROPOSED_COATING_STATUS',
+                422
+            );
+        }
+
+        const proposedFinish = String(payload.proposedFinish || payload.finish || '').trim().toUpperCase();
+        if (!proposedFinish || proposedFinish.length > 64) {
+            throw new PaperEvidenceError(
+                'proposedFinish is required (max 64 characters).',
+                'INVALID_PROPOSED_FINISH',
+                422
+            );
+        }
+
+        const allowedGrainDirections = new Set(['LONG_GRAIN', 'SHORT_GRAIN', 'UNKNOWN']);
+        const proposedGrainDirection = String(
+            payload.proposedGrainDirection || payload.grainDirection || variant.grain_direction || 'UNKNOWN'
+        ).trim().toUpperCase();
+        if (!allowedGrainDirections.has(proposedGrainDirection)) {
+            throw new PaperEvidenceError(
+                `Invalid proposedGrainDirection '${proposedGrainDirection}'. Allowed: LONG_GRAIN, SHORT_GRAIN, UNKNOWN.`,
+                'INVALID_PROPOSED_GRAIN_DIRECTION',
+                422
+            );
+        }
+
+        const allowedSourceTypes = new Set(['MILL_DATASHEET', 'SUPPLIER_CATALOG_SPEC', 'ODS_EXPLICIT_HEADER', 'PHYSICAL_SAMPLE_INSPECTION']);
+        const evidenceSourceType = String(payload.evidenceSourceType || 'MILL_DATASHEET').trim().toUpperCase();
+        if (!allowedSourceTypes.has(evidenceSourceType)) {
+            throw new PaperEvidenceError(
+                `Invalid evidenceSourceType '${evidenceSourceType}'. Allowed: MILL_DATASHEET, SUPPLIER_CATALOG_SPEC, ODS_EXPLICIT_HEADER, PHYSICAL_SAMPLE_INSPECTION.`,
+                'INVALID_EVIDENCE_SOURCE_TYPE',
+                422
+            );
+        }
+
+        const documentTitle = String(payload.documentTitle || '').trim();
+        if (!documentTitle || documentTitle.length < 5) {
+            throw new PaperEvidenceError('documentTitle (min 5 characters) is required.', 'DOCUMENT_TITLE_REQUIRED', 422);
+        }
+
+        let pdfInfo = null;
+        if (payload.fileBuffer || payload.fileBase64) {
+            pdfInfo = validateAndHashPdfDocument({
+                buffer: payload.fileBuffer,
+                fileBase64: payload.fileBase64,
+                fileName: payload.fileName || 'classification-datasheet.pdf',
+                mimeType: payload.mimeType || 'application/pdf',
+                tenantId,
+                persistToStore: true,
+                storageRoot: this.storageRoot
+            });
+        } else if (payload.documentSha256 && /^[a-f0-9]{64}$/i.test(String(payload.documentSha256))) {
+            pdfInfo = {
+                fileName: payload.fileName || 'classification-datasheet.pdf',
+                mimeType: 'application/pdf',
+                sizeBytes: Number(payload.documentSizeBytes || 0),
+                sha256: String(payload.documentSha256).toLowerCase(),
+                storageUri: payload.documentStorageUri || `evidence-store://sha256/${String(payload.documentSha256).toLowerCase()}`,
+                persistedFilePath: null,
+                newlyCreatedOnDisk: false
+            };
+        } else if (payload.documentUrl) {
+            const urlHash = crypto.createHash('sha256').update(String(payload.documentUrl)).digest('hex');
+            pdfInfo = {
+                fileName: payload.fileName || 'remote-classification-spec.pdf',
+                mimeType: 'application/pdf',
+                sizeBytes: 0,
+                sha256: urlHash,
+                storageUri: String(payload.documentUrl),
+                persistedFilePath: null,
+                newlyCreatedOnDisk: false
+            };
+        } else {
+            throw new PaperEvidenceError(
+                'A valid PDF attachment, documentUrl, or verified 64-character SHA-256 document hash is required.',
+                'DOCUMENT_SHA256_REQUIRED',
+                422
+            );
+        }
+
+        const pendingRow = loadStaticPendingClassifications337().find((r) => r.variant_id === variantId) || null;
+        const functionalGroup = String(
+            payload.functionalGroup ||
+            (pendingRow ? pendingRow.functional_group : 'G6_SPECIALTY_SYNTHETIC_CARBONLESS_ADHESIVE')
+        ).trim();
+
+        const previousCategory = String(variant.product_category || variant.category || 'OTHER').toUpperCase();
+        const previousFinish = variant.finish || variant.finish_summary || 'UNCOATED';
+        const varMeta = parseJsonColumn(variant.metadata_json);
+        const previousCoatingStatus =
+            (varMeta.classification_accreditation && varMeta.classification_accreditation.coating_status) ||
+            (varMeta.ods_materials_recovery && varMeta.ods_materials_recovery.coating_status) ||
+            'UNKNOWN';
+        const previousGrainDirection = String(variant.grain_direction || 'UNKNOWN').toUpperCase();
+
+        const classificationEvidenceId = `evd_cls_${crypto.randomBytes(8).toString('hex')}`;
+        const reviewStatus = payload.submitForReview === false ? 'DRAFT' : 'PENDING_TECH_REVIEW';
+
+        try {
+            await this._withTransaction(async (executor) => {
+                await executor.query(
+                    `INSERT INTO paper_variant_classification_evidence (
+                        classification_evidence_id, tenant_id, supplier_id, variant_id, product_id,
+                        functional_group,
+                        previous_category, proposed_category,
+                        previous_finish, proposed_finish,
+                        previous_coating_status, proposed_coating_status,
+                        previous_grain_direction, proposed_grain_direction,
+                        evidence_source_type, document_title, document_storage_uri, document_sha256,
+                        review_status, applied_to_catalog_product, idempotency_key,
+                        submitted_by, submitted_by_role, notes, metadata_json
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, FALSE, ?, ?, ?, ?, ?)`,
+                    [
+                        classificationEvidenceId,
+                        tenantId,
+                        supplierId,
+                        variantId,
+                        variant.product_id,
+                        functionalGroup,
+                        previousCategory,
+                        proposedCategory,
+                        previousFinish,
+                        proposedFinish,
+                        previousCoatingStatus,
+                        proposedCoatingStatus,
+                        previousGrainDirection,
+                        proposedGrainDirection,
+                        evidenceSourceType,
+                        documentTitle,
+                        pdfInfo.storageUri,
+                        pdfInfo.sha256,
+                        reviewStatus,
+                        idempotencyKey,
+                        effectiveActorId,
+                        actorRole || 'OPERATOR',
+                        payload.notes || payload.technicalNotes || null,
+                        JSON.stringify({
+                            stage: 'CLASSIFICATION_EVIDENCE_REGISTERED',
+                            manufacturerName: payload.manufacturerName || variant.manufacturer || variant.brand || null,
+                            supplierChannel: payload.supplierChannel || null,
+                            datasheetVersion: payload.datasheetVersion || null
+                        })
+                    ]
+                );
+            });
+        } catch (dbErr) {
+            if (pdfInfo && pdfInfo.newlyCreatedOnDisk && pdfInfo.persistedFilePath) {
+                cleanupOrphanEvidenceFile(pdfInfo.persistedFilePath, this.storageRoot);
+            }
+            throw dbErr;
+        }
+
+        const created = unwrapRows(await this.db.query(
+            `SELECT * FROM paper_variant_classification_evidence WHERE classification_evidence_id = ? LIMIT 1`,
+            [classificationEvidenceId]
+        ))[0] || {
+            classification_evidence_id: classificationEvidenceId,
+            variant_id: variantId,
+            product_id: variant.product_id,
+            review_status: reviewStatus,
+            proposed_category: proposedCategory,
+            proposed_coating_status: proposedCoatingStatus,
+            proposed_finish: proposedFinish,
+            proposed_grain_direction: proposedGrainDirection
+        };
+
+        return {
+            idempotentReplay: false,
+            classificationEvidenceId,
+            variantId,
+            productId: variant.product_id,
+            status: reviewStatus,
+            proposedCategory,
+            proposedCoatingStatus,
+            proposedFinish,
+            proposedGrainDirection,
+            documentSha256: pdfInfo.sha256,
+            evidence: created,
+            productiveClassificationModified: false,
+            productiveCaliperModified: false
+        };
+    }
+
+    /**
+     * Stage 2: Technologist review (APPROVE or REJECT) of a classification evidence record.
+     * Enforces Segregation of Duties (`technologistUserId !== submitted_by`) and row-level locking.
+     * Does NOT mutate `paper_products.category`, `paper_variants.finish`, or `paper_variants.caliper_um`.
+     */
+    async reviewClassificationEvidence({
+        tenantId,
+        supplierId = null,
+        classificationEvidenceId,
+        evidenceId = null,
+        technologistUserId = null,
+        actorId = null,
+        technologistRole = null,
+        actorRole = null,
+        decision,
+        decisionReason = null,
+        reason = null
+    }) {
+        const effectiveEvidenceId = classificationEvidenceId || evidenceId;
+        const effectiveTechId = technologistUserId || actorId;
+        const effectiveTechRole = technologistRole || actorRole;
+        const effectiveReason = decisionReason || reason;
+
+        if (!tenantId || !effectiveTechId) {
+            throw new PaperEvidenceError('Authenticated tenant and technologist identity required.', 'UNAUTHORIZED', 403);
+        }
+        if (!effectiveEvidenceId) {
+            throw new PaperEvidenceError('classificationEvidenceId is required.', 'CLASSIFICATION_EVIDENCE_ID_REQUIRED', 400);
+        }
+
+        const allowedApproverRoles = new Set([
+            'SUPER_ADMIN',
+            'ADMIN',
+            'OPS_ADMIN',
+            'TENANT_ADMIN',
+            'PRINTHOUSE_ADMIN',
+            'SUPPLIER_ADMIN',
+            'MATERIAL_TECHNOLOGIST'
+        ]);
+        if (!allowedApproverRoles.has(String(effectiveTechRole || '').toUpperCase())) {
+            throw new PaperEvidenceError(
+                `Role '${effectiveTechRole}' is not authorized to approve or reject classification evidences. Technologist or Admin privileges required.`,
+                'FORBIDDEN_TECHNOLOGIST_ROLE_REQUIRED',
+                403
+            );
+        }
+
+        const normDecision = String(decision || '').toUpperCase();
+        if (normDecision !== 'APPROVE' && normDecision !== 'REJECT') {
+            throw new PaperEvidenceError("decision must be 'APPROVE' or 'REJECT'.", 'INVALID_REVIEW_DECISION', 400);
+        }
+        if (!effectiveReason || String(effectiveReason).trim().length < 5) {
+            throw new PaperEvidenceError(
+                'A detailed decisionReason (min 5 characters) is mandatory for approving or rejecting classification evidence.',
+                'DECISION_REASON_REQUIRED',
+                422
+            );
+        }
+
+        return this._withTransaction(async (executor, isTx) => {
+            const lockClause = isTx ? ' FOR UPDATE' : '';
+            const rows = unwrapRows(await executor.query(
+                `SELECT * FROM paper_variant_classification_evidence WHERE classification_evidence_id = ? AND tenant_id = ? LIMIT 1${lockClause}`,
+                [effectiveEvidenceId, tenantId]
+            ));
+            if (!rows || rows.length === 0) {
+                throw new PaperEvidenceError(
+                    `Classification evidence '${effectiveEvidenceId}' not found for this tenant.`,
+                    'CLASSIFICATION_EVIDENCE_NOT_FOUND',
+                    404
+                );
+            }
+            const ev = rows[0];
+            const currentStatus = String(ev.review_status || 'PENDING_TECH_REVIEW').toUpperCase();
+
+            if (String(ev.submitted_by || '').trim() === String(effectiveTechId).trim()) {
+                throw new PaperEvidenceError(
+                    'Segregation of Duties violation: the user who submitted this classification evidence cannot approve or reject it.',
+                    'SOD_SELF_APPROVAL_FORBIDDEN',
+                    403
+                );
+            }
+
+            if (currentStatus !== 'PENDING_TECH_REVIEW' && currentStatus !== 'DRAFT') {
+                throw new PaperEvidenceError(
+                    `Classification evidence '${effectiveEvidenceId}' is already in terminal/reviewed state '${currentStatus}'.`,
+                    'CLASSIFICATION_EVIDENCE_ALREADY_REVIEWED',
+                    409
+                );
+            }
+
+            const targetStatus = normDecision === 'APPROVE' ? 'APPROVED' : 'REJECTED';
+            const existingMeta = parseJsonColumn(ev.metadata_json);
+            const updatedMeta = {
+                ...existingMeta,
+                stage: normDecision === 'APPROVE' ? 'CLASSIFICATION_EVIDENCE_APPROVED' : 'CLASSIFICATION_EVIDENCE_REJECTED',
+                reviewedBy: effectiveTechId,
+                reviewedByRole: String(effectiveTechRole).toUpperCase(),
+                reviewedAt: new Date().toISOString(),
+                decisionReason: String(effectiveReason).trim()
+            };
+
+            const updRes = unwrapAffectResult(await executor.query(
+                `UPDATE paper_variant_classification_evidence
+                 SET review_status = ?,
+                     approved_by_technologist = ?,
+                     approved_by_role = ?,
+                     approved_at = CURRENT_TIMESTAMP,
+                     decision_reason = ?,
+                     applied_to_catalog_product = FALSE,
+                     metadata_json = ?,
+                     updated_at = CURRENT_TIMESTAMP
+                 WHERE classification_evidence_id = ? AND tenant_id = ? AND review_status IN ('DRAFT', 'PENDING_TECH_REVIEW')`,
+                [
+                    targetStatus,
+                    effectiveTechId,
+                    String(effectiveTechRole).toUpperCase(),
+                    String(effectiveReason).trim(),
+                    JSON.stringify(updatedMeta),
+                    effectiveEvidenceId,
+                    tenantId
+                ]
+            ));
+
+            if (updRes.affectedRows !== undefined && Number(updRes.affectedRows) === 0) {
+                throw new PaperEvidenceError(
+                    `Concurrent review race condition blocked: classification evidence '${effectiveEvidenceId}' was already reviewed.`,
+                    'CLASSIFICATION_EVIDENCE_ALREADY_REVIEWED',
+                    409
+                );
+            }
+
+            const updated = unwrapRows(await executor.query(
+                `SELECT * FROM paper_variant_classification_evidence WHERE classification_evidence_id = ? LIMIT 1`,
+                [effectiveEvidenceId]
+            ))[0] || { ...ev, review_status: targetStatus, approved_by_technologist: effectiveTechId };
+
+            return {
+                classificationEvidenceId: effectiveEvidenceId,
+                variantId: ev.variant_id,
+                productId: ev.product_id,
+                newStatus: targetStatus,
+                evidence: updated,
+                productiveClassificationModified: false,
+                productiveCaliperModified: false
+            };
+        });
+    }
+
+    /**
+     * Stage 3: Submits a governed promotion request for an `APPROVED` classification evidence record.
+     * Records `promotion_request_id`, `promotion_requested_by`, `promotion_requested_by_role`, and `promotion_request_reason`.
+     * Does NOT mutate `paper_products.category`, `paper_variants.finish`, or `paper_variants.caliper_um`.
+     */
+    async requestClassificationPromotion({
+        tenantId,
+        supplierId = null,
+        variantId,
+        classificationEvidenceId,
+        evidenceId = null,
+        actorUserId = null,
+        actorId = null,
+        actorRole = 'OPERATOR',
+        reason = null,
+        idempotencyKey = null
+    }) {
+        const effectiveEvidenceId = classificationEvidenceId || evidenceId;
+        const effectiveActorId = actorUserId || actorId;
+        if (!tenantId || !effectiveActorId) {
+            throw new PaperEvidenceError('Authenticated tenant and actor identity required.', 'UNAUTHORIZED', 403);
+        }
+        const normRole = String(actorRole || '').toUpperCase();
+        if (!ALLOWED_PROMOTION_REQUESTER_ROLES.has(normRole)) {
+            throw new PaperEvidenceError(
+                `Role '${actorRole}' is not authorized to request classification promotion.`,
+                'FORBIDDEN_PROMOTION_REQUESTER_ROLE_REQUIRED',
+                403
+            );
+        }
+        if (!variantId) {
+            throw new PaperEvidenceError('variantId is required.', 'VARIANT_ID_REQUIRED', 400);
+        }
+        if (!effectiveEvidenceId) {
+            throw new PaperEvidenceError('classificationEvidenceId is required.', 'CLASSIFICATION_EVIDENCE_ID_REQUIRED', 400);
+        }
+        if (!reason || String(reason).trim().length < 5) {
+            throw new PaperEvidenceError(
+                'A detailed promotion request reason (min 5 characters) is mandatory.',
+                'PROMOTION_REASON_REQUIRED',
+                422
+            );
+        }
+
+        return this._withTransaction(async (executor, isTx) => {
+            const lockClause = isTx ? ' FOR UPDATE' : '';
+
+            const varRows = unwrapRows(await executor.query(
+                `SELECT * FROM paper_variants WHERE id = ? LIMIT 1${lockClause}`,
+                [variantId]
+            ));
+            if (!varRows || varRows.length === 0) {
+                throw new PaperEvidenceError(`Variant '${variantId}' not found.`, 'VARIANT_NOT_FOUND', 404);
+            }
+
+            const evRows = unwrapRows(await executor.query(
+                `SELECT * FROM paper_variant_classification_evidence WHERE classification_evidence_id = ? AND tenant_id = ? LIMIT 1${lockClause}`,
+                [effectiveEvidenceId, tenantId]
+            ));
+            if (!evRows || evRows.length === 0) {
+                throw new PaperEvidenceError(
+                    `Classification evidence '${effectiveEvidenceId}' not found for this tenant.`,
+                    'CLASSIFICATION_EVIDENCE_NOT_FOUND',
+                    404
+                );
+            }
+            const ev = rowsOrFirst(evRows);
+            if (String(ev.variant_id) !== String(variantId)) {
+                throw new PaperEvidenceError(
+                    `Classification evidence '${effectiveEvidenceId}' belongs to variant '${ev.variant_id}', not '${variantId}'.`,
+                    'EVIDENCE_VARIANT_MISMATCH',
+                    422
+                );
+            }
+
+            const existingMeta = parseJsonColumn(ev.metadata_json);
+            if (idempotencyKey && existingMeta.promotionRequestIdempotencyKey === idempotencyKey && ev.promotion_request_id) {
+                return {
+                    idempotentReplay: true,
+                    promotionRequestId: ev.promotion_request_id,
+                    classificationEvidenceId: effectiveEvidenceId,
+                    variantId,
+                    productId: ev.product_id,
+                    status: 'PROMOTION_REQUESTED',
+                    requestedBy: ev.promotion_requested_by,
+                    requestedByRole: ev.promotion_requested_by_role,
+                    productiveClassificationModified: false,
+                    productiveCaliperModified: false
+                };
+            }
+
+            const reviewStatus = String(ev.review_status || 'DRAFT').toUpperCase();
+            if (reviewStatus === 'REJECTED') {
+                throw new PaperEvidenceError(
+                    `Cannot request promotion for rejected classification evidence '${effectiveEvidenceId}'.`,
+                    'CLASSIFICATION_EVIDENCE_REJECTED',
+                    409
+                );
+            }
+            if (reviewStatus !== 'APPROVED') {
+                throw new PaperEvidenceError(
+                    `Classification evidence '${effectiveEvidenceId}' has review_status '${reviewStatus}'. Only APPROVED evidences can be requested for promotion.`,
+                    'CLASSIFICATION_EVIDENCE_NOT_APPROVED',
+                    422
+                );
+            }
+            if (Boolean(ev.applied_to_catalog_product)) {
+                throw new PaperEvidenceError(
+                    `Classification evidence '${effectiveEvidenceId}' has already been promoted to catalog.`,
+                    'CLASSIFICATION_EVIDENCE_ALREADY_PROMOTED',
+                    409
+                );
+            }
+
+            const promotionRequestId = `cls_req_${crypto.randomBytes(8).toString('hex')}`;
+            const updatedMeta = {
+                ...existingMeta,
+                stage: 'CLASSIFICATION_PROMOTION_REQUESTED',
+                promotionRequestId,
+                promotionRequestIdempotencyKey: idempotencyKey || null,
+                requestedBy: effectiveActorId,
+                requestedByRole: normRole,
+                requestedAt: new Date().toISOString(),
+                requestReason: String(reason).trim()
+            };
+
+            await executor.query(
+                `UPDATE paper_variant_classification_evidence
+                 SET promotion_request_id = ?,
+                     promotion_requested_by = ?,
+                     promotion_requested_by_role = ?,
+                     promotion_requested_at = CURRENT_TIMESTAMP,
+                     promotion_request_reason = ?,
+                     metadata_json = ?,
+                     updated_at = CURRENT_TIMESTAMP
+                 WHERE classification_evidence_id = ? AND tenant_id = ?`,
+                [
+                    promotionRequestId,
+                    effectiveActorId,
+                    normRole,
+                    String(reason).trim(),
+                    JSON.stringify(updatedMeta),
+                    effectiveEvidenceId,
+                    tenantId
+                ]
+            );
+
+            return {
+                idempotentReplay: false,
+                promotionRequestId,
+                classificationEvidenceId: effectiveEvidenceId,
+                variantId,
+                productId: ev.product_id,
+                status: 'PROMOTION_REQUESTED',
+                requestedBy: effectiveActorId,
+                requestedByRole: normRole,
+                proposedCategory: ev.proposed_category,
+                proposedCoatingStatus: ev.proposed_coating_status,
+                proposedFinish: ev.proposed_finish,
+                proposedGrainDirection: ev.proposed_grain_direction || 'UNKNOWN',
+                productiveClassificationModified: false,
+                productiveCaliperModified: false
+            };
+        });
+    }
+
+    /**
+     * Stage 4: Authorizes and executes the atomic promotion of an `APPROVED` classification evidence
+     * to `Control.paper_products` (`category`, `finish_summary`) and `Control.paper_variants`
+     * (`finish`, `grain_direction`, `metadata_json.classification_accreditation`).
+     *
+     * Enforces:
+     * 1. Row-level locking (`SELECT ... FOR UPDATE`) on `paper_variants`, `paper_products`, and `paper_variant_classification_evidence`.
+     * 2. Strict 4-way Segregation of Duties (`actorId !== submitted_by`, `actorId !== approved_by_technologist`, `actorId !== promotion_requested_by`).
+     * 3. Zero mutation of `caliper_um`, `caliper_mm`, `bulk_factor`, `caliper_source`, `caliper_confidence_status`, or `caliper_revision`.
+     * 4. Atomic deactivation of the synthetic `isSyntheticOtherUncoated` bypass via both `paper_products.category` update
+     *    and `paper_variants.metadata_json.classification_accreditation`.
+     */
+    async authorizeClassificationPromotion({
+        tenantId,
+        supplierId = null,
+        variantId,
+        classificationEvidenceId,
+        evidenceId = null,
+        promotionRequestId = null,
+        actorUserId = null,
+        actorId = null,
+        actorRole = null,
+        reason = null,
+        decisionReason = null,
+        idempotencyKey = null
+    }) {
+        const effectiveEvidenceId = classificationEvidenceId || evidenceId;
+        const effectiveActorId = actorUserId || actorId;
+        const effectiveRole = String(actorRole || '').toUpperCase();
+        const effectiveReason = reason || decisionReason;
+
+        if (!tenantId || !effectiveActorId) {
+            throw new PaperEvidenceError('Authenticated tenant and authorizer identity required.', 'UNAUTHORIZED', 403);
+        }
+        if (!ALLOWED_PROMOTION_AUTHORIZER_ROLES.has(effectiveRole)) {
+            throw new PaperEvidenceError(
+                `Role '${actorRole}' is not authorized to promote technical classification to the productive catalog. Admin or Material Technologist role required.`,
+                'FORBIDDEN_PROMOTION_AUTHORIZER_ROLE_REQUIRED',
+                403
+            );
+        }
+        if (!variantId) {
+            throw new PaperEvidenceError('variantId is required.', 'VARIANT_ID_REQUIRED', 400);
+        }
+        if (!effectiveEvidenceId) {
+            throw new PaperEvidenceError('classificationEvidenceId is required.', 'CLASSIFICATION_EVIDENCE_ID_REQUIRED', 400);
+        }
+        if (!effectiveReason || String(effectiveReason).trim().length < 5) {
+            throw new PaperEvidenceError(
+                'A detailed promotion authorization reason (min 5 characters) is mandatory.',
+                'PROMOTION_REASON_REQUIRED',
+                422
+            );
+        }
+
+        return this._withTransaction(async (executor, isTx) => {
+            const lockClause = isTx ? ' FOR UPDATE' : '';
+
+            // 1. Lock variant row (`paper_variants`)
+            const varRows = unwrapRows(await executor.query(
+                `SELECT * FROM paper_variants WHERE id = ? LIMIT 1${lockClause}`,
+                [variantId]
+            ));
+            if (!varRows || varRows.length === 0) {
+                throw new PaperEvidenceError(`Variant '${variantId}' not found.`, 'VARIANT_NOT_FOUND', 404);
+            }
+            const variant = varRows[0];
+
+            // 2. Lock product row (`paper_products`)
+            const prodRows = unwrapRows(await executor.query(
+                `SELECT * FROM paper_products WHERE id = ? LIMIT 1${lockClause}`,
+                [variant.product_id]
+            ));
+            if (!prodRows || prodRows.length === 0) {
+                throw new PaperEvidenceError(`Product '${variant.product_id}' not found.`, 'PRODUCT_NOT_FOUND', 404);
+            }
+            const product = prodRows[0];
+
+            // 3. Lock classification evidence row (`paper_variant_classification_evidence`)
+            const evRows = unwrapRows(await executor.query(
+                `SELECT * FROM paper_variant_classification_evidence WHERE classification_evidence_id = ? AND tenant_id = ? LIMIT 1${lockClause}`,
+                [effectiveEvidenceId, tenantId]
+            ));
+            if (!evRows || evRows.length === 0) {
+                throw new PaperEvidenceError(
+                    `Classification evidence '${effectiveEvidenceId}' not found for this tenant.`,
+                    'CLASSIFICATION_EVIDENCE_NOT_FOUND',
+                    404
+                );
+            }
+            const ev = evRows[0];
+            if (String(ev.variant_id) !== String(variantId)) {
+                throw new PaperEvidenceError(
+                    `Classification evidence '${effectiveEvidenceId}' belongs to variant '${ev.variant_id}', not '${variantId}'.`,
+                    'EVIDENCE_VARIANT_MISMATCH',
+                    422
+                );
+            }
+
+            const existingMeta = parseJsonColumn(ev.metadata_json);
+            if (idempotencyKey && existingMeta.promotionAuthorizeIdempotencyKey === idempotencyKey && Boolean(ev.applied_to_catalog_product)) {
+                return {
+                    idempotentReplay: true,
+                    promotionId: ev.promotion_id || existingMeta.promotionId,
+                    promotionRequestId: ev.promotion_request_id || existingMeta.promotionRequestId || null,
+                    classificationEvidenceId: effectiveEvidenceId,
+                    variantId,
+                    productId: variant.product_id,
+                    previousCategory: ev.previous_category,
+                    newCategory: ev.proposed_category,
+                    previousCoatingStatus: ev.previous_coating_status || 'UNKNOWN',
+                    newCoatingStatus: ev.proposed_coating_status,
+                    previousFinish: ev.previous_finish,
+                    newFinish: ev.proposed_finish,
+                    previousGrainDirection: ev.previous_grain_direction || 'UNKNOWN',
+                    newGrainDirection: ev.proposed_grain_direction || 'UNKNOWN',
+                    productiveClassificationModified: true,
+                    productiveCaliperModified: false
+                };
+            }
+
+            // 4. Enforce 4-way Segregation of Duties (SoD)
+            if (String(ev.submitted_by || '').trim() === String(effectiveActorId).trim()) {
+                throw new PaperEvidenceError(
+                    'Segregation of Duties violation: the user who submitted this classification evidence cannot authorize its promotion.',
+                    'SOD_SUBMITTER_CANNOT_PROMOTE',
+                    403
+                );
+            }
+            if (String(ev.approved_by_technologist || '').trim() === String(effectiveActorId).trim()) {
+                throw new PaperEvidenceError(
+                    'Segregation of Duties violation: the technologist who approved this classification evidence cannot unilaterally authorize its promotion.',
+                    'SOD_REVIEWER_CANNOT_PROMOTE',
+                    403
+                );
+            }
+            const effectiveRequestedBy = ev.promotion_requested_by || existingMeta.requestedBy || null;
+            if (effectiveRequestedBy && String(effectiveRequestedBy).trim() === String(effectiveActorId).trim()) {
+                throw new PaperEvidenceError(
+                    'Segregation of Duties violation: the user who requested this classification promotion cannot self-authorize it.',
+                    'SOD_REQUESTER_CANNOT_AUTHORIZE_PROMOTION',
+                    403
+                );
+            }
+            if (
+                promotionRequestId &&
+                ev.promotion_request_id &&
+                String(ev.promotion_request_id) !== String(promotionRequestId)
+            ) {
+                throw new PaperEvidenceError(
+                    `promotionRequestId mismatch: expected '${ev.promotion_request_id}', received '${promotionRequestId}'.`,
+                    'PROMOTION_REQUEST_ID_MISMATCH',
+                    409
+                );
+            }
+
+            // 5. Evidence lifecycle status gates
+            const reviewStatus = String(ev.review_status || 'DRAFT').toUpperCase();
+            if (reviewStatus === 'REJECTED') {
+                throw new PaperEvidenceError(
+                    `Cannot promote rejected classification evidence '${effectiveEvidenceId}'.`,
+                    'CLASSIFICATION_EVIDENCE_REJECTED',
+                    409
+                );
+            }
+            if (reviewStatus !== 'APPROVED') {
+                throw new PaperEvidenceError(
+                    `Cannot promote unapproved classification evidence '${effectiveEvidenceId}' (status: '${reviewStatus}'). Only APPROVED evidences are eligible.`,
+                    'CLASSIFICATION_EVIDENCE_NOT_APPROVED',
+                    422
+                );
+            }
+            if (Boolean(ev.applied_to_catalog_product)) {
+                throw new PaperEvidenceError(
+                    `Classification evidence '${effectiveEvidenceId}' is already promoted to catalog.`,
+                    'CLASSIFICATION_EVIDENCE_ALREADY_PROMOTED',
+                    409
+                );
+            }
+
+            const newCategory = String(ev.proposed_category).toUpperCase();
+            const newCoatingStatus = String(ev.proposed_coating_status || 'UNKNOWN').toUpperCase();
+            const newFinish = String(ev.proposed_finish).toUpperCase();
+            const newGrainDirection = String(ev.proposed_grain_direction || variant.grain_direction || 'UNKNOWN').toUpperCase();
+            const promotionId = `cls_prm_${crypto.randomBytes(8).toString('hex')}`;
+            const promotedAtIso = new Date().toISOString();
+
+            const varMeta = parseJsonColumn(variant.metadata_json);
+            const previousClassificationSnapshot = {
+                product_category: product.category || 'OTHER',
+                product_finish_summary: product.finish_summary || null,
+                variant_finish: variant.finish || null,
+                variant_grain_direction: variant.grain_direction || 'UNKNOWN',
+                classification_accreditation: varMeta.classification_accreditation || null
+            };
+
+            const classificationAccreditationMeta = {
+                classification_evidence_id: effectiveEvidenceId,
+                promotion_request_id: ev.promotion_request_id || promotionRequestId || null,
+                promotion_id: promotionId,
+                functional_group: ev.functional_group,
+                paper_type: newCategory,
+                coating_status: newCoatingStatus,
+                coating_confidence: 'ACCREDITED_EVIDENCE',
+                finish: newFinish,
+                grain_direction: newGrainDirection,
+                evidence_source_type: ev.evidence_source_type,
+                document_title: ev.document_title,
+                document_sha256: ev.document_sha256,
+                submitted_by: ev.submitted_by,
+                approved_by_technologist: ev.approved_by_technologist,
+                requested_by: effectiveRequestedBy,
+                promoted_by: effectiveActorId,
+                promoted_by_role: effectiveRole,
+                promoted_at: promotedAtIso
+            };
+
+            const updatedVarMeta = {
+                ...varMeta,
+                classification_accreditation: classificationAccreditationMeta
+            };
+
+            const prodMeta = parseJsonColumn(product.metadata_json);
+            const updatedProdMeta = {
+                ...prodMeta,
+                classification_accreditation: classificationAccreditationMeta
+            };
+
+            // 6. Atomic UPDATE on `paper_products` (category, finish_summary, metadata_json)
+            const prodUpdRes = unwrapAffectResult(await executor.query(
+                `UPDATE paper_products
+                 SET category = ?,
+                     finish_summary = ?,
+                     metadata_json = ?,
+                     updated_at = CURRENT_TIMESTAMP
+                 WHERE id = ?`,
+                [
+                    newCategory,
+                    newFinish,
+                    JSON.stringify(updatedProdMeta),
+                    variant.product_id
+                ]
+            ));
+            if (prodUpdRes.affectedRows !== undefined && Number(prodUpdRes.affectedRows) === 0) {
+                throw new PaperEvidenceError(
+                    `Failed to update catalog product '${variant.product_id}' during classification promotion.`,
+                    'PRODUCT_PROMOTION_UPDATE_FAILED',
+                    409
+                );
+            }
+
+            // 7. Atomic UPDATE on `paper_variants` (finish, grain_direction, metadata_json ONLY — caliper_um strictly untouched!)
+            const varUpdRes = unwrapAffectResult(await executor.query(
+                `UPDATE paper_variants
+                 SET finish = ?,
+                     grain_direction = ?,
+                     metadata_json = ?,
+                     updated_at = CURRENT_TIMESTAMP
+                 WHERE id = ?`,
+                [
+                    newFinish,
+                    newGrainDirection,
+                    JSON.stringify(updatedVarMeta),
+                    variantId
+                ]
+            ));
+            if (varUpdRes.affectedRows !== undefined && Number(varUpdRes.affectedRows) === 0) {
+                throw new PaperEvidenceError(
+                    `Failed to update catalog variant '${variantId}' during classification promotion.`,
+                    'VARIANT_PROMOTION_UPDATE_FAILED',
+                    409
+                );
+            }
+
+            // 8. Atomic Compare-And-Swap UPDATE on `paper_variant_classification_evidence`
+            const updatedEvMeta = {
+                ...existingMeta,
+                stage: 'CATALOG_CLASSIFICATION_PROMOTED',
+                promotionId,
+                promotionRequestId: ev.promotion_request_id || promotionRequestId || null,
+                promotionAuthorizeIdempotencyKey: idempotencyKey || null,
+                authorizedBy: effectiveActorId,
+                authorizedByRole: effectiveRole,
+                authorizedAt: promotedAtIso,
+                authorizationReason: String(effectiveReason).trim(),
+                previousClassificationSnapshot,
+                promotedClassificationSnapshot: classificationAccreditationMeta,
+                caliperPreservedUnchanged: {
+                    caliper_um: variant.caliper_um ?? null,
+                    caliper_source: variant.caliper_source || 'NONE',
+                    caliper_revision: Number(variant.caliper_revision || 1)
+                }
+            };
+
+            const evUpdRes = unwrapAffectResult(await executor.query(
+                `UPDATE paper_variant_classification_evidence
+                 SET applied_to_catalog_product = TRUE,
+                     promotion_id = ?,
+                     promoted_by = ?,
+                     promoted_by_role = ?,
+                     promoted_at = CURRENT_TIMESTAMP,
+                     promotion_reason = ?,
+                     metadata_json = ?,
+                     updated_at = CURRENT_TIMESTAMP
+                 WHERE classification_evidence_id = ?
+                   AND tenant_id = ?
+                   AND applied_to_catalog_product = FALSE
+                   AND review_status = 'APPROVED'`,
+                [
+                    promotionId,
+                    effectiveActorId,
+                    effectiveRole,
+                    String(effectiveReason).trim(),
+                    JSON.stringify(updatedEvMeta),
+                    effectiveEvidenceId,
+                    tenantId
+                ]
+            ));
+
+            if (evUpdRes.affectedRows !== undefined && Number(evUpdRes.affectedRows) === 0) {
+                throw new PaperEvidenceError(
+                    `Concurrent classification promotion conflict on evidence '${effectiveEvidenceId}'.`,
+                    'CONCURRENT_CLASSIFICATION_PROMOTION_CONFLICT',
+                    409
+                );
+            }
+
+            return {
+                idempotentReplay: false,
+                promotionId,
+                promotionRequestId: ev.promotion_request_id || promotionRequestId || null,
+                classificationEvidenceId: effectiveEvidenceId,
+                variantId,
+                productId: variant.product_id,
+                reviewStatus,
+                previousCategory: product.category || 'OTHER',
+                newCategory,
+                previousCoatingStatus: ev.previous_coating_status || 'UNKNOWN',
+                newCoatingStatus,
+                previousFinish: variant.finish || 'UNCOATED',
+                newFinish,
+                previousGrainDirection: variant.grain_direction || 'UNKNOWN',
+                newGrainDirection,
+                segregationOfDuties: {
+                    submittedBy: ev.submitted_by,
+                    approvedByTechnologist: ev.approved_by_technologist,
+                    requestedBy: effectiveRequestedBy,
+                    authorizedBy: effectiveActorId
+                },
+                caliperPreservedUnchanged: {
+                    caliperUm: variant.caliper_um !== null && variant.caliper_um !== undefined ? Number(variant.caliper_um) : null,
+                    caliperSource: variant.caliper_source || 'NONE',
+                    caliperRevision: Number(variant.caliper_revision || 1)
+                },
+                productiveClassificationModified: true,
+                productiveCaliperModified: false,
+                canReleaseToManufacturing: false
+            };
+        });
+    }
+}
+
+function rowsOrFirst(rows) {
+    return Array.isArray(rows) ? rows[0] : rows;
 }
 
 function payloadAllowsNominalReferenceOnly() {
