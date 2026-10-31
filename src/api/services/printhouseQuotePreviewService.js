@@ -23,10 +23,15 @@ const buildPriceAdapter = require('./buildPriceCalibrationAdapter');
 const shippingRegionService = require('./printhouseShippingRegionService');
 const priceBookService = require('./printhousePriceBookService');
 const ruleService = require('./printhousePricingRuleService');
+const { LogisticsDatabaseService } = require('./logistics/logisticsDatabaseService');
 const { isValidIso2Country, normalizeIso2Country } = require('../../lib/countryCatalog');
 const logger = require('./logger').child('quote-preview-service');
 
 class PrinthouseQuotePreviewService {
+    constructor(options = {}) {
+        this.db = options.db || db;
+        this.logisticsService = options.logisticsService || new LogisticsDatabaseService({ db: this.db });
+    }
 
     /**
      * Generates a governed, capability-aware quote preview using canonical BPE.
@@ -59,7 +64,7 @@ class PrinthouseQuotePreviewService {
         }
         nodeQuery += ' LIMIT 1';
 
-        const [node] = await db.query(nodeQuery, nodeParams);
+        const [node] = await this.db.query(nodeQuery, nodeParams);
         if (!node) {
             const err = new Error('PRINTER_NODE_NOT_FOUND: No active printer node found for tenant.');
             err.statusCode = 404;
@@ -347,6 +352,130 @@ class PrinthouseQuotePreviewService {
         const taxAmount = 0.0;
         const taxStatus = 'NOT_APPLIED_IN_PREVIEW';
 
+        // 8b. Phase 198A (LOGISTICS-03): Intelligent 3D Cubing & Landed Logistics Quote Integration
+        let logisticsCubing = null;
+        let transportPriceBreakdown = null;
+        const requestedWarehouseProfile =
+            jobSpec.warehouse_profile_code ||
+            jobSpec.warehouseProfileCode ||
+            jobSpec.delivery_profile_code ||
+            null;
+        const requestedDestPostal =
+            jobSpec.delivery_postal_code ||
+            jobSpec.destPostal ||
+            jobSpec.destination_postal_code ||
+            null;
+        const enableCubingEngine = Boolean(
+            requestedWarehouseProfile ||
+            requestedDestPostal ||
+            jobSpec.use_logistics_cubing === true ||
+            jobSpec.useLogisticsCubing === true ||
+            deliveryCountry
+        );
+
+        if (enableCubingEngine && this.logisticsService) {
+            try {
+                const rawBind = String(jobSpec.binding_method || jobSpec.bindingCategory || 'softcover').toLowerCase();
+                let bindingCategory = 'SOFTCOVER_STANDARD';
+                let processingType = 'GLUED';
+                if (rawBind.includes('hardcover') || rawBind.includes('case')) {
+                    bindingCategory = 'HARDCOVER';
+                    processingType = rawBind.includes('glued') ? 'GLUED' : 'SEWN';
+                } else if (rawBind.includes('wire')) {
+                    bindingCategory = 'WIRE_O';
+                    processingType = 'GLUED';
+                } else if (rawBind.includes('saddle') || rawBind.includes('stitch')) {
+                    bindingCategory = 'SADDLE_STITCH';
+                    processingType = 'GLUED';
+                } else if (rawBind.includes('sewn') || rawBind.includes('thread')) {
+                    bindingCategory = 'SOFTCOVER_STANDARD';
+                    processingType = 'SEWN';
+                }
+
+                const interiorGsm = Number(jobSpec.paper_weight_interior || jobSpec.interiorGsm || 80);
+                const interiorBulk = Number(jobSpec.paper_bulk_interior || jobSpec.interiorBulk || 1.2);
+                const interiorCaliperUm = jobSpec.interior_caliper_um || jobSpec.interiorCaliperUm || null;
+                const coverGsm = Number(jobSpec.paper_weight_cover || jobSpec.coverGsm || (bindingCategory === 'HARDCOVER' ? 135 : 250));
+                const coverCaliperUm = Number(jobSpec.cover_caliper_um || jobSpec.coverCaliperUm || (bindingCategory === 'HARDCOVER' ? 135 : 280));
+
+                const landedQuote = await this.logisticsService.calculateFullLandedLogisticsQuote({
+                    printhouseId: node.id,
+                    trimWidthMm: widthMm,
+                    trimHeightMm: heightMm,
+                    bindingCategory,
+                    processingType,
+                    segments: [
+                        {
+                            segmentIndex: 1,
+                            pages: interiorPages,
+                            gsm: interiorGsm,
+                            bulk: interiorBulk,
+                            caliperUm: interiorCaliperUm
+                        }
+                    ],
+                    cover: {
+                        gsm: coverGsm,
+                        caliperUm: coverCaliperUm
+                    },
+                    hardcover: bindingCategory === 'HARDCOVER'
+                        ? {
+                            boardThicknessMm: Number(jobSpec.board_thickness_mm || jobSpec.boardThicknessMm || 2.5),
+                            boardDensityGcm3: 1.2,
+                            overhangMm: 2.5,
+                            endpapersMode: 'SEPARATE',
+                            endpapersGsm: 140
+                        }
+                        : null,
+                    quantity: copies,
+                    warehouseProfileCode: requestedWarehouseProfile || 'STANDARD_COMMERCIAL_DOCK',
+                    destCountry: deliveryCountry || 'DE',
+                    destPostal: requestedDestPostal || '*'
+                });
+
+                const summaryEur = landedQuote.landedLogisticsCostSummaryEur;
+                transportPriceBreakdown = {
+                    packagingMaterialsCostEur: summaryEur.packagingMaterialsCostEur,
+                    carrierFreightCostEur: summaryEur.carrierFreightCostEur,
+                    potentialWarehousePenaltiesEur: summaryEur.potentialWarehousePenaltiesEur,
+                    totalLandedLogisticsCostEur: summaryEur.totalLandedLogisticsCostEur,
+                    logisticsCostPerCopyEur: summaryEur.logisticsCostPerCopyEur,
+                    carrierName: landedQuote.freightQuote.carrierName,
+                    pricingMode: landedQuote.freightQuote.pricingMode
+                };
+
+                // Authoritative transport cost uses the 3D cubing landed logistics total (packaging + carrier freight)
+                // while keeping manufacturingCost 100% untouched.
+                transportCost = summaryEur.totalLandedLogisticsCostEur;
+
+                const cubing = landedQuote.cubing;
+                const lastPalletFillRatio = cubing.runOptimization.lastPalletCapacityUtilizationRatio;
+                const shouldHighlightRunOptimization =
+                    !cubing.runOptimization.isAlreadyExactFullPallet && lastPalletFillRatio < 0.60;
+
+                logisticsCubing = {
+                    warehouseProfileCode: landedQuote.warehouseProfile.profileCode,
+                    warehouseDisplayName: landedQuote.warehouseProfile.displayName,
+                    palletCount: cubing.palletStacking.orderBreakdown.totalPalletsRequired,
+                    fullPalletsCount: cubing.palletStacking.orderBreakdown.fullPalletsCount,
+                    layersPerPallet: cubing.palletStacking.fullPalletSpecs.layersPerFullPallet,
+                    cartonsPerLayer: cubing.palletStacking.layerTiling.cartonsPerLayer,
+                    booksPerCarton: cubing.cartonPacking.booksPerCarton,
+                    totalCartons: cubing.palletStacking.orderBreakdown.totalCartonsRequired,
+                    unitNetWeightKg: cubing.unitBook.weightBreakdownKg.unitNetWeightKg,
+                    grossCartonWeightKg: cubing.cartonPacking.grossCartonWeightKg,
+                    totalGrossWeightKg: cubing.palletStacking.orderBreakdown.totalShipmentGrossWeightKg,
+                    volumetricEfficiency: cubing.runOptimization.fleetEfficiency.fleetVolumetricEfficiencyRatio,
+                    weightEfficiency: cubing.runOptimization.fleetEfficiency.fleetWeightEfficiencyRatio,
+                    lastPalletCapacityRatio: lastPalletFillRatio,
+                    shouldHighlightRunOptimization,
+                    warehouseValidation: cubing.warehouseValidation,
+                    runOptimizationRecommendations: cubing.runOptimization.recommendations
+                };
+            } catch (logErr) {
+                logger.warn({ err: logErr.message }, 'Logistics 3D cubing fallback to BPE static transport reference');
+            }
+        }
+
         // 9. Compose Final Governed Selling Price
         const subtotalProduction = Number((manufacturingCost).toFixed(4));
         const finalSellingPrice = Number((subtotalProduction + transportCost + commercialMarkup + taxAmount).toFixed(2));
@@ -381,7 +510,12 @@ class PrinthouseQuotePreviewService {
         if (finishingCost > 0) breakdown.push({ label: 'Finishing & Lamination', amount: Number(finishingCost.toFixed(2)) });
         if (bindingCost > 0) breakdown.push({ label: 'Binding', amount: Number(bindingCost.toFixed(2)) });
         if (packagingCost > 0) breakdown.push({ label: 'Packaging', amount: Number(packagingCost.toFixed(2)) });
-        if (transportCost > 0) breakdown.push({ label: 'Transport Reference', amount: Number(transportCost.toFixed(2)) });
+        if (transportPriceBreakdown) {
+            breakdown.push({ label: 'Packaging Consumables (Pallets & Cartons)', amount: Number(transportPriceBreakdown.packagingMaterialsCostEur.toFixed(2)) });
+            breakdown.push({ label: `Carrier Freight (${transportPriceBreakdown.carrierName})`, amount: Number(transportPriceBreakdown.carrierFreightCostEur.toFixed(2)) });
+        } else if (transportCost > 0) {
+            breakdown.push({ label: 'Transport Reference', amount: Number(transportCost.toFixed(2)) });
+        }
         if (commercialMarkup > 0) breakdown.push({ label: 'Commercial Markup', amount: Number(commercialMarkup.toFixed(2)) });
 
         function parseEffectiveBoolean(val) {
@@ -492,12 +626,32 @@ class PrinthouseQuotePreviewService {
             rateDetails,
             isSimplifiedApproximation,
             originalJobSpec: jobSpec,
+            manufacturingPrice: Number(manufacturingCost.toFixed(2)),
+            transportPrice: transportPriceBreakdown
+                ? {
+                    totalEur: Number(transportCost.toFixed(2)),
+                    packagingMaterialsCostEur: transportPriceBreakdown.packagingMaterialsCostEur,
+                    carrierFreightCostEur: transportPriceBreakdown.carrierFreightCostEur,
+                    potentialWarehousePenaltiesEur: transportPriceBreakdown.potentialWarehousePenaltiesEur,
+                    carrierName: transportPriceBreakdown.carrierName,
+                    pricingMode: transportPriceBreakdown.pricingMode
+                }
+                : {
+                    totalEur: Number(transportCost.toFixed(2)),
+                    packagingMaterialsCostEur: 0,
+                    carrierFreightCostEur: Number(transportCost.toFixed(2)),
+                    potentialWarehousePenaltiesEur: 0
+                },
+            logisticsCubing,
             totals: {
                 manufacturing: Number(manufacturingCost.toFixed(2)),
                 finishing: Number(finishingCost.toFixed(2)),
                 binding: Number(bindingCost.toFixed(2)),
                 packaging: Number(packagingCost.toFixed(2)),
                 transport: Number(transportCost.toFixed(2)),
+                packagingMaterialsCostEur: transportPriceBreakdown ? transportPriceBreakdown.packagingMaterialsCostEur : 0,
+                carrierFreightCostEur: transportPriceBreakdown ? transportPriceBreakdown.carrierFreightCostEur : Number(transportCost.toFixed(2)),
+                potentialWarehousePenaltiesEur: transportPriceBreakdown ? transportPriceBreakdown.potentialWarehousePenaltiesEur : 0,
                 commercialMarkup: Number(commercialMarkup.toFixed(2)),
                 tax: taxAmount,
                 finalSellingPrice
@@ -517,6 +671,12 @@ class PrinthouseQuotePreviewService {
             }
         };
     }
+
+    async previewPrinthouseQuote(tenantId, jobSpec, printerNodeId = null) {
+        return this.generateQuotePreview(tenantId, jobSpec, printerNodeId);
+    }
 }
 
-module.exports = new PrinthouseQuotePreviewService();
+const defaultInstance = new PrinthouseQuotePreviewService();
+defaultInstance.PrinthouseQuotePreviewService = PrinthouseQuotePreviewService;
+module.exports = defaultInstance;

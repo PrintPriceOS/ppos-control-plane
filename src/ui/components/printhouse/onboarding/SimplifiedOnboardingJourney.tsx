@@ -1723,6 +1723,40 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
                         onAcceptProposal={handleAcceptProposal}
                         onBackToCompare={() => setCurrentStep(4)}
                     />
+
+                    {/* Phase 198A (LOGISTICS-03): Optional 1-Click Standard Logistics Matrix Adoption */}
+                    <div className="p-4 bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div className="space-y-0.5">
+                            <div className="text-xs font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5">
+                                <CheckCircle2 size={14} className="text-[#dc0000]" />
+                                <span>Matriz Logística Estándar de la Plataforma (Cubicaje 3D y Tarifas por Palet)</span>
+                            </div>
+                            <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
+                                Adopta con 1 clic las tarifas base por palet (Dachser, Schenker, Raben) y perfiles de almacén editorial (Zeitfracht Erfurt 1200mm, Arvato VVA 1300mm) sin bloquear el alta de tus 4 ofertas y precios de papel.
+                            </p>
+                        </div>
+                        <button
+                            type="button"
+                            data-testid="onboarding-adopt-standard-logistics-btn"
+                            onClick={async () => {
+                                try {
+                                    await fetch(`/api/printhouses/${printerNodeId || 'site-1'}/freight-matrices`, {
+                                        method: 'PUT',
+                                        headers: {
+                                            'Content-Type': 'application/json',
+                                            'Authorization': `Bearer ${getAuthToken()}`
+                                        },
+                                        body: JSON.stringify({ adoptPlatformStandard: true })
+                                    });
+                                } catch (_) {
+                                    // Non-blocking in offline preview
+                                }
+                            }}
+                            className="px-3.5 py-2 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 hover:bg-[#dc0000] dark:hover:bg-[#dc0000] dark:hover:text-white text-xs font-bold rounded-xl transition-colors shrink-0 cursor-pointer"
+                        >
+                            Adoptar Matriz Logística Estándar (1 Clic)
+                        </button>
+                    </div>
                 </div>
             )}
         </div>

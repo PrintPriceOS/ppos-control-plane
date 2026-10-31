@@ -2362,6 +2362,19 @@
       "statementTypes": [
         "ALTER_TABLE"
       ]
+    },
+    {
+      "path": "migrations/176_phase198a_logistics_warehouse_profiles_and_freight_matrices.sql",
+      "prefix": "176",
+      "canonicalSha256": "9cc0229852b7d1de0283381a11570293e3dbac2b0d7e3a5fc548df1ce8ef07d1",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 9119,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
     }
   ]
 }

@@ -122,4 +122,8 @@ router.get('/readiness', async (req, res) => {
     }
 });
 
+// Phase 198A (LOGISTICS-03): Delegate warehouse profiles, 3D cubing quote & printhouse freight matrices
+const logisticsRoutes = require('./logisticsRoutes');
+router.use('/', logisticsRoutes);
+
 module.exports = router;

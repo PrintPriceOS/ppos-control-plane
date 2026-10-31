@@ -386,6 +386,8 @@ const start = async () => {
             fastify.use('/api/federation', federationRouter);
             fastify.use('/api/v1/paper-suppliers', require('./src/api/routes/paperSuppliersRoutes'));
             fastify.use('/api/v1/spine', require('./src/api/routes/spineRoutes'));
+            fastify.use('/api/logistics', require('./src/api/routes/logisticsRoutes'));
+            fastify.use('/api/printhouses', require('./src/api/routes/logisticsRoutes'));
             
             // Explicitly register route groups in Fastify's radix tree so requests route through the Express middleware bridge
             const apiNotFoundFallback = (request, reply) => {
@@ -419,6 +421,10 @@ const start = async () => {
             fastify.all('/api/v1/paper-suppliers/*', apiNotFoundFallback);
             fastify.all('/api/v1/spine', apiNotFoundFallback);
             fastify.all('/api/v1/spine/*', apiNotFoundFallback);
+            fastify.all('/api/logistics', apiNotFoundFallback);
+            fastify.all('/api/logistics/*', apiNotFoundFallback);
+            fastify.all('/api/printhouses', apiNotFoundFallback);
+            fastify.all('/api/printhouses/*', apiNotFoundFallback);
 
             fastify.log.info('[ROUTES][ADMIN][REGISTERED] route=/api/admin/* mounted successfully via Express bridge');
             console.log('[ROUTES][ADMIN][REGISTERED] route=/api/admin/* mounted successfully via Express bridge');
