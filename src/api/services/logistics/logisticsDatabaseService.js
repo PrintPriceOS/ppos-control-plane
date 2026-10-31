@@ -23,6 +23,10 @@
 const mysqlClient = require('../mysqlClient');
 const {
     BUILTIN_WAREHOUSE_PROFILES,
+    TRACKING_INTEGRATION_MODES,
+    SLOT_BOOKING_MANAGEMENT_MODES,
+    STACKABILITY_HANDLING_MODES,
+    calculateOperationalShippingScenarios,
     executeLogisticsCubingCalculation
 } = require('./packagingAndCubingEngine');
 const {
@@ -31,7 +35,7 @@ const {
 } = require('../spine/spineCalculationEngine');
 
 /**
- * Built-in baseline freight matrices (mirroring Migration 176 seed rows) used as
+ * Built-in baseline freight matrices (mirroring Migration 176 & 177 seed rows) used as
  * deterministic fallback when the database returns no custom row or in offline tests.
  */
 const DEFAULT_FREIGHT_MATRICES = Object.freeze([
@@ -57,6 +61,11 @@ const DEFAULT_FREIGHT_MATRICES = Object.freeze([
         },
         fuel_surcharge_percent: 6.50,
         tail_lift_surcharge_eur: 35.00,
+        tracking_integration_mode: 'CARRIER_API',
+        slot_booking_management: 'CARRIER_MANAGED',
+        carrier_slot_buffer_days: 2,
+        stackability_handling: 'DOUBLE_DECK_SUPPORTED',
+        ldm_taxable_weight_ratio_kg: 1850.00,
         is_active: true
     }),
     Object.freeze({
@@ -81,6 +90,11 @@ const DEFAULT_FREIGHT_MATRICES = Object.freeze([
         },
         fuel_surcharge_percent: 6.50,
         tail_lift_surcharge_eur: 35.00,
+        tracking_integration_mode: 'CARRIER_API',
+        slot_booking_management: 'CARRIER_MANAGED',
+        carrier_slot_buffer_days: 2,
+        stackability_handling: 'STRICT_LDM_NON_STACKABLE',
+        ldm_taxable_weight_ratio_kg: 1850.00,
         is_active: true
     }),
     Object.freeze({
@@ -105,6 +119,11 @@ const DEFAULT_FREIGHT_MATRICES = Object.freeze([
         },
         fuel_surcharge_percent: 7.00,
         tail_lift_surcharge_eur: 38.00,
+        tracking_integration_mode: 'CARRIER_API',
+        slot_booking_management: 'CARRIER_MANAGED',
+        carrier_slot_buffer_days: 2,
+        stackability_handling: 'STRICT_LDM_NON_STACKABLE',
+        ldm_taxable_weight_ratio_kg: 1850.00,
         is_active: true
     }),
     Object.freeze({
@@ -129,6 +148,11 @@ const DEFAULT_FREIGHT_MATRICES = Object.freeze([
         },
         fuel_surcharge_percent: 8.50,
         tail_lift_surcharge_eur: 45.00,
+        tracking_integration_mode: 'CARRIER_API',
+        slot_booking_management: 'CARRIER_MANAGED',
+        carrier_slot_buffer_days: 2,
+        stackability_handling: 'DOUBLE_DECK_SUPPORTED',
+        ldm_taxable_weight_ratio_kg: 1850.00,
         is_active: true
     })
 ]);
@@ -227,11 +251,60 @@ function extractPostalPrefix(postalCode) {
 }
 
 /**
- * Evaluates a freight matrix row for a given pallet count, gross weight, and tail-lift option.
+ * Evaluates a freight matrix row for a given pallet count, floor positions, gross/taxable weight,
+ * operational scenarios (stackability / LDM, slot booking, tracking), and tail-lift option.
  */
-function evaluateFreightMatrixRow(matrixRow, { palletCount, grossWeightKg, requiresTailLift = false }) {
-    const pallets = Math.max(1, Math.ceil(Number(palletCount || 1)));
-    const weightKg = Math.max(0, Number(grossWeightKg || 0));
+function evaluateFreightMatrixRow(
+    matrixRow,
+    {
+        palletCount,
+        floorPositionsUsed = null,
+        grossWeightKg,
+        taxableWeightKg = null,
+        requiresTailLift = false
+    }
+) {
+    const physicalPallets = Math.max(1, Math.ceil(Number(palletCount || 1)));
+    const stackabilityHandling = String(
+        matrixRow.stackability_handling ||
+        matrixRow.stackabilityHandling ||
+        STACKABILITY_HANDLING_MODES.STRICT_LDM_NON_STACKABLE
+    ).toUpperCase();
+    const ldmTaxableWeightRatioKg = Number(
+        matrixRow.ldm_taxable_weight_ratio_kg ??
+        matrixRow.ldmTaxableWeightRatioKg ??
+        1850.00
+    );
+    const trackingIntegrationMode = String(
+        matrixRow.tracking_integration_mode ||
+        matrixRow.trackingIntegrationMode ||
+        TRACKING_INTEGRATION_MODES.CARRIER_API
+    ).toUpperCase();
+    const slotBookingManagement = String(
+        matrixRow.slot_booking_management ||
+        matrixRow.slotBookingManagement ||
+        SLOT_BOOKING_MANAGEMENT_MODES.CARRIER_MANAGED
+    ).toUpperCase();
+    const carrierSlotBufferDays = Number(
+        matrixRow.carrier_slot_buffer_days ??
+        matrixRow.carrierSlotBufferDays ??
+        2
+    );
+
+    const floorSpaces = floorPositionsUsed !== null && floorPositionsUsed !== undefined
+        ? Math.max(1, Math.ceil(Number(floorPositionsUsed)))
+        : physicalPallets;
+
+    const actualWeightKg = Math.max(0, Number(grossWeightKg || 0));
+    const ldmTotal = roundToPrecision(floorSpaces * 0.4, 2);
+    const ldmMinTaxableWeightKg = roundToPrecision(ldmTotal * ldmTaxableWeightRatioKg, 2);
+
+    const effectiveTaxableWeightKg = taxableWeightKg !== null && taxableWeightKg !== undefined
+        ? roundToPrecision(Number(taxableWeightKg), 2)
+        : (stackabilityHandling === STACKABILITY_HANDLING_MODES.DOUBLE_DECK_SUPPORTED
+            ? roundToPrecision(actualWeightKg, 2)
+            : roundToPrecision(Math.max(actualWeightKg, ldmMinTaxableWeightKg), 2));
+
     const pricingMode = matrixRow.pricing_mode || 'PER_PALLET_STEPPED';
     const parsedTiers = typeof matrixRow.rate_tiers_json === 'string'
         ? JSON.parse(matrixRow.rate_tiers_json)
@@ -245,16 +318,25 @@ function evaluateFreightMatrixRow(matrixRow, { palletCount, grossWeightKg, requi
             ? parsedTiers.tiers
             : (Array.isArray(parsedTiers) ? parsedTiers : []);
 
-        // Match tier where minPallets <= pallets <= maxPallets, or highest tier if pallets exceed max
+        // Match tier using floorSpaces (which equals physicalPallets unless AUTO_STACK_AT_PRINTSHOP consolidated pairs)
         appliedTier = tiers.find(
-            t => pallets >= Number(t.minPallets || 1) && pallets <= Number(t.maxPallets || 999)
+            t => floorSpaces >= Number(t.minPallets || 1) && floorSpaces <= Number(t.maxPallets || 999)
         );
         if (!appliedTier && tiers.length > 0) {
             appliedTier = tiers[tiers.length - 1];
         }
 
         const ratePerPalletEur = Number((appliedTier && appliedTier.ratePerPalletEur) || 85.0);
-        const rawPalletTotalEur = roundToPrecision(pallets * ratePerPalletEur, 2);
+        let rawPalletTotalEur = roundToPrecision(floorSpaces * ratePerPalletEur, 2);
+
+        // If tier or matrix defines a weight/LDM rate per 100kg (`ratePer100KgTaxableEur`) or non-stackable LDM floor
+        if (parsedTiers.ratePer100KgTaxableEur) {
+            const weightBasedEur = roundToPrecision(
+                (effectiveTaxableWeightKg / 100) * Number(parsedTiers.ratePer100KgTaxableEur),
+                2
+            );
+            rawPalletTotalEur = Math.max(rawPalletTotalEur, weightBasedEur);
+        }
 
         // Cap at full-truckload (FTL) flat rate when defined on the tier and advantageous
         if (appliedTier && appliedTier.ftlFlatRateEur && rawPalletTotalEur > Number(appliedTier.ftlFlatRateEur)) {
@@ -263,18 +345,20 @@ function evaluateFreightMatrixRow(matrixRow, { palletCount, grossWeightKg, requi
             baseFreightEur = rawPalletTotalEur;
         }
     } else if (pricingMode === 'PER_LDM') {
-        // 1 Euro-Pallet (1200x800 mm) = 0.4 Loading Meters (LDM) on a 2.4m wide trailer
-        const ldm = roundToPrecision(pallets * 0.4, 2);
+        // 1 Euro-Pallet floor space (1200x800 mm) = 0.4 Loading Meters (LDM) on a 2.4m wide trailer
         const ratePerLdmEur = Number(parsedTiers.ratePerLdmEur || 195.0);
         const minChargeEur = Number(parsedTiers.minChargeEur || 80.0);
-        baseFreightEur = roundToPrecision(Math.max(minChargeEur, ldm * ratePerLdmEur), 2);
-        appliedTier = { ldm, ratePerLdmEur, minChargeEur };
+        const ratePer100KgEur = parsedTiers.ratePer100KgEur ? Number(parsedTiers.ratePer100KgEur) : null;
+        const ldmChargeEur = ldmTotal * ratePerLdmEur;
+        const weightChargeEur = ratePer100KgEur ? (effectiveTaxableWeightKg / 100) * ratePer100KgEur : 0;
+        baseFreightEur = roundToPrecision(Math.max(minChargeEur, ldmChargeEur, weightChargeEur), 2);
+        appliedTier = { ldm: ldmTotal, taxableWeightKg: effectiveTaxableWeightKg, ratePerLdmEur, minChargeEur };
     } else {
-        // PER_KG_VOLUMETRIC
+        // PER_KG_VOLUMETRIC: billed on effectiveTaxableWeightKg (max of gross weight vs LDM taxable weight)
         const ratePer100KgEur = Number(parsedTiers.ratePer100KgEur || 14.5);
         const minChargeEur = Number(parsedTiers.minChargeEur || 75.0);
-        baseFreightEur = roundToPrecision(Math.max(minChargeEur, (weightKg / 100) * ratePer100KgEur), 2);
-        appliedTier = { weightKg, ratePer100KgEur, minChargeEur };
+        baseFreightEur = roundToPrecision(Math.max(minChargeEur, (effectiveTaxableWeightKg / 100) * ratePer100KgEur), 2);
+        appliedTier = { weightKg: actualWeightKg, taxableWeightKg: effectiveTaxableWeightKg, ratePer100KgEur, minChargeEur };
     }
 
     const fuelSurchargePercent = Number(matrixRow.fuel_surcharge_percent || 0);
@@ -288,6 +372,12 @@ function evaluateFreightMatrixRow(matrixRow, { palletCount, grossWeightKg, requi
         2
     );
 
+    const transitDaysMin = Number(matrixRow.transit_days_min || 2);
+    const transitDaysMax = Number(matrixRow.transit_days_max || 5);
+    const bufferDays = slotBookingManagement === SLOT_BOOKING_MANAGEMENT_MODES.CARRIER_MANAGED
+        ? carrierSlotBufferDays
+        : 0;
+
     return {
         matrixId: matrixRow.id,
         printhouseId: matrixRow.printhouse_id || null,
@@ -297,10 +387,22 @@ function evaluateFreightMatrixRow(matrixRow, { palletCount, grossWeightKg, requi
         destinationCountry: matrixRow.destination_country,
         destinationPostalZone: matrixRow.destination_postal_zone,
         pricingMode,
-        transitDaysMin: Number(matrixRow.transit_days_min || 2),
-        transitDaysMax: Number(matrixRow.transit_days_max || 5),
-        palletCountBilled: pallets,
-        grossWeightKg: roundToPrecision(weightKg, 2),
+        trackingIntegrationMode,
+        slotBookingManagement,
+        carrierSlotBufferDays,
+        stackabilityHandling,
+        ldmTaxableWeightRatioKg,
+        transitDaysMin,
+        transitDaysMax,
+        estimatedTransitDaysEffectiveMin: transitDaysMin + bufferDays,
+        estimatedTransitDaysEffectiveMax: transitDaysMax + bufferDays,
+        estimatedTransitDaysEffective: transitDaysMax + bufferDays,
+        physicalPalletCount: physicalPallets,
+        floorPositionsUsed: floorSpaces,
+        palletCountBilled: floorSpaces,
+        ldmTotal,
+        grossWeightKg: roundToPrecision(actualWeightKg, 2),
+        taxableWeightKg: effectiveTaxableWeightKg,
         appliedTier,
         baseFreightEur,
         fuelSurchargePercent,
@@ -384,7 +486,9 @@ class LogisticsDatabaseService {
         destCountry = 'DE',
         destPostal = '*',
         palletCount = 1,
+        floorPositionsUsed = null,
         grossWeightKg = 500,
+        taxableWeightKg = null,
         requiresTailLift = false
     } = {}) {
         const normOriginCountry = String(originCountry || 'DE').trim().toUpperCase();
@@ -448,7 +552,9 @@ class LogisticsDatabaseService {
 
             const evaluation = evaluateFreightMatrixRow(row, {
                 palletCount,
+                floorPositionsUsed,
                 grossWeightKg,
+                taxableWeightKg,
                 requiresTailLift
             });
 
@@ -524,6 +630,11 @@ class LogisticsDatabaseService {
                 : row.rate_tiers_json,
             fuelSurchargePercent: Number(row.fuel_surcharge_percent || 0),
             tailLiftSurchargeEur: Number(row.tail_lift_surcharge_eur || 0),
+            trackingIntegrationMode: row.tracking_integration_mode || 'CARRIER_API',
+            slotBookingManagement: row.slot_booking_management || 'CARRIER_MANAGED',
+            carrierSlotBufferDays: Number(row.carrier_slot_buffer_days ?? 2),
+            stackabilityHandling: row.stackability_handling || 'STRICT_LDM_NON_STACKABLE',
+            ldmTaxableWeightRatioKg: Number(row.ldm_taxable_weight_ratio_kg ?? 1850.00),
             isActive: Boolean(row.is_active),
             source: row.printhouse_id ? 'PRINTHOUSE_CUSTOM' : 'PLATFORM_DEFAULT'
         });
@@ -655,6 +766,11 @@ class LogisticsDatabaseService {
                 const transitDaysMax = Number(m.transitDaysMax || 3);
                 const fuelSurchargePercent = Number(m.fuelSurchargePercent || 0);
                 const tailLiftSurchargeEur = Number(m.tailLiftSurchargeEur || 0);
+                const trackingIntegrationMode = String(m.trackingIntegrationMode || m.tracking_integration_mode || 'CARRIER_API').toUpperCase();
+                const slotBookingManagement = String(m.slotBookingManagement || m.slot_booking_management || 'CARRIER_MANAGED').toUpperCase();
+                const carrierSlotBufferDays = Number(m.carrierSlotBufferDays ?? m.carrier_slot_buffer_days ?? 2);
+                const stackabilityHandling = String(m.stackabilityHandling || m.stackability_handling || 'STRICT_LDM_NON_STACKABLE').toUpperCase();
+                const ldmTaxableWeightRatioKg = Number(m.ldmTaxableWeightRatioKg ?? m.ldm_taxable_weight_ratio_kg ?? 1850.00);
                 const rateTiers = m.rateTiers || m.rate_tiers_json || {
                     tiers: [
                         { minPallets: 1, maxPallets: 1, ratePerPalletEur: 85.00 },
@@ -671,14 +787,21 @@ class LogisticsDatabaseService {
                                 id, printhouse_id, origin_country, origin_postal_zone,
                                 destination_country, destination_postal_zone, carrier_name,
                                 transit_days_min, transit_days_max, pricing_mode, rate_tiers_json,
-                                fuel_surcharge_percent, tail_lift_surcharge_eur, is_active
-                             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, TRUE)
+                                fuel_surcharge_percent, tail_lift_surcharge_eur,
+                                tracking_integration_mode, slot_booking_management, carrier_slot_buffer_days,
+                                stackability_handling, ldm_taxable_weight_ratio_kg, is_active
+                             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, TRUE)
                              ON DUPLICATE KEY UPDATE
                                 carrier_name = VALUES(carrier_name),
                                 pricing_mode = VALUES(pricing_mode),
                                 rate_tiers_json = VALUES(rate_tiers_json),
                                 fuel_surcharge_percent = VALUES(fuel_surcharge_percent),
                                 tail_lift_surcharge_eur = VALUES(tail_lift_surcharge_eur),
+                                tracking_integration_mode = VALUES(tracking_integration_mode),
+                                slot_booking_management = VALUES(slot_booking_management),
+                                carrier_slot_buffer_days = VALUES(carrier_slot_buffer_days),
+                                stackability_handling = VALUES(stackability_handling),
+                                ldm_taxable_weight_ratio_kg = VALUES(ldm_taxable_weight_ratio_kg),
                                 transit_days_min = VALUES(transit_days_min),
                                 transit_days_max = VALUES(transit_days_max),
                                 is_active = TRUE`,
@@ -695,7 +818,12 @@ class LogisticsDatabaseService {
                                 pricingMode,
                                 JSON.stringify(rateTiers),
                                 fuelSurchargePercent,
-                                tailLiftSurchargeEur
+                                tailLiftSurchargeEur,
+                                trackingIntegrationMode,
+                                slotBookingManagement,
+                                carrierSlotBufferDays,
+                                stackabilityHandling,
+                                ldmTaxableWeightRatioKg
                             ]
                         );
                     } catch (_) {
@@ -717,6 +845,11 @@ class LogisticsDatabaseService {
                     rateTiers,
                     fuelSurchargePercent,
                     tailLiftSurchargeEur,
+                    trackingIntegrationMode,
+                    slotBookingManagement,
+                    carrierSlotBufferDays,
+                    stackabilityHandling,
+                    ldmTaxableWeightRatioKg,
                     isActive: true,
                     source: 'PRINTHOUSE_CUSTOM'
                 });
@@ -820,7 +953,8 @@ class LogisticsDatabaseService {
                 : !warehouseProfile.requiresLoadingDock
         );
 
-        const freightQuote = await this.resolveFreightRate({
+        // Initial freight matrix resolution to discover carrier's operational defaults if not explicitly overridden
+        const initialFreightQuote = await this.resolveFreightRate({
             printhouseId,
             originCountry,
             originPostal,
@@ -830,6 +964,69 @@ class LogisticsDatabaseService {
             grossWeightKg: totalShipmentGrossWeightKg,
             requiresTailLift
         });
+
+        // Re-evaluate operational scenarios combining explicit caller options with resolved carrier matrix defaults
+        const effectiveOperationalScenarios = calculateOperationalShippingScenarios({
+            warehouseProfile,
+            palletStacking: cubingResult.palletStacking,
+            operationalOptions: {
+                ...(quoteParams.operationalOptions || {}),
+                stackabilityHandling:
+                    (quoteParams.operationalOptions && quoteParams.operationalOptions.stackabilityHandling) ||
+                    quoteParams.stackabilityHandling ||
+                    quoteParams.stackability_handling ||
+                    initialFreightQuote.stackabilityHandling,
+                ldmTaxableWeightRatioKg:
+                    (quoteParams.operationalOptions && quoteParams.operationalOptions.ldmTaxableWeightRatioKg) ??
+                    quoteParams.ldmTaxableWeightRatioKg ??
+                    quoteParams.ldm_taxable_weight_ratio_kg ??
+                    initialFreightQuote.ldmTaxableWeightRatioKg,
+                slotBookingManagement:
+                    (quoteParams.operationalOptions && quoteParams.operationalOptions.slotBookingManagement) ||
+                    quoteParams.slotBookingManagement ||
+                    quoteParams.slot_booking_management ||
+                    initialFreightQuote.slotBookingManagement,
+                carrierSlotBufferDays:
+                    (quoteParams.operationalOptions && quoteParams.operationalOptions.carrierSlotBufferDays) ??
+                    quoteParams.carrierSlotBufferDays ??
+                    quoteParams.carrier_slot_buffer_days ??
+                    initialFreightQuote.carrierSlotBufferDays,
+                trackingIntegrationMode:
+                    (quoteParams.operationalOptions && quoteParams.operationalOptions.trackingIntegrationMode) ||
+                    quoteParams.trackingIntegrationMode ||
+                    quoteParams.tracking_integration_mode ||
+                    initialFreightQuote.trackingIntegrationMode,
+                transitDaysMin: initialFreightQuote.transitDaysMin,
+                transitDaysMax: initialFreightQuote.transitDaysMax
+            }
+        });
+
+        cubingResult.operationalScenarios = effectiveOperationalScenarios;
+
+        // Re-evaluate freight rate with effective floor positions and taxable weight from operational scenarios
+        const freightQuote = await this.resolveFreightRate({
+            printhouseId,
+            originCountry,
+            originPostal,
+            destCountry,
+            destPostal,
+            palletCount: totalPalletsRequired,
+            floorPositionsUsed: effectiveOperationalScenarios.stackabilityAndLdm.floorPositionsUsed,
+            grossWeightKg: totalShipmentGrossWeightKg,
+            taxableWeightKg: effectiveOperationalScenarios.stackabilityAndLdm.taxableWeightKg,
+            requiresTailLift
+        });
+
+        // Synchronize effective transit days and operational modes onto freightQuote
+        freightQuote.stackabilityHandling = effectiveOperationalScenarios.stackabilityAndLdm.stackabilityModeApplied;
+        freightQuote.slotBookingManagement = effectiveOperationalScenarios.slotBookingActionPlan.managementMode;
+        freightQuote.trackingIntegrationMode = effectiveOperationalScenarios.trackingProtocol.mode;
+        freightQuote.estimatedTransitDaysEffectiveMin = effectiveOperationalScenarios.slotBookingActionPlan.estimatedTransitDaysEffectiveMin;
+        freightQuote.estimatedTransitDaysEffectiveMax = effectiveOperationalScenarios.slotBookingActionPlan.estimatedTransitDaysEffectiveMax;
+        freightQuote.estimatedTransitDaysEffective = effectiveOperationalScenarios.slotBookingActionPlan.estimatedTransitDaysEffective;
+        freightQuote.ldmTotal = effectiveOperationalScenarios.stackabilityAndLdm.ldmTotal;
+        freightQuote.floorPositionsUsed = effectiveOperationalScenarios.stackabilityAndLdm.floorPositionsUsed;
+        freightQuote.taxableWeightKg = effectiveOperationalScenarios.stackabilityAndLdm.taxableWeightKg;
 
         const packagingMaterialsEur = cubingResult.packagingMaterialsCostBreakdownEur.totalPackagingMaterialsEur;
         const carrierFreightEur = freightQuote.totalFreightEur;
@@ -843,10 +1040,38 @@ class LogisticsDatabaseService {
             4
         );
 
+        const opScenarios = cubingResult.operationalScenarios;
         const quoteSummary = {
             warehouseProfile,
             consumableRates,
             cubing: cubingResult,
+            operationalScenarios: opScenarios,
+            logisticsCubing: {
+                warehouseProfileCode: warehouseProfile.profileCode,
+                warehouseDisplayName: warehouseProfile.displayName,
+                palletCount: totalPalletsRequired,
+                fullPalletsCount: cubingResult.palletStacking.orderBreakdown.fullPalletsCount,
+                layersPerPallet: cubingResult.palletStacking.fullPalletSpecs.layersPerFullPallet,
+                cartonsPerLayer: cubingResult.palletStacking.layerTiling.cartonsPerLayer,
+                booksPerCarton: cubingResult.cartonPacking.booksPerCarton,
+                totalCartons: cubingResult.palletStacking.orderBreakdown.totalCartonsRequired,
+                unitNetWeightKg: cubingResult.unitBook.weightBreakdownKg.unitNetWeightKg,
+                grossCartonWeightKg: cubingResult.cartonPacking.grossCartonWeightKg,
+                totalGrossWeightKg: totalShipmentGrossWeightKg,
+                taxableWeightKg: opScenarios.stackabilityAndLdm.taxableWeightKg,
+                ldmTotal: opScenarios.stackabilityAndLdm.ldmTotal,
+                floorPositionsUsed: opScenarios.stackabilityAndLdm.floorPositionsUsed,
+                stackabilityModeApplied: opScenarios.stackabilityAndLdm.stackabilityModeApplied,
+                estimatedTransitDaysEffective: opScenarios.slotBookingActionPlan.estimatedTransitDaysEffective,
+                slotBookingActionPlan: opScenarios.slotBookingActionPlan,
+                trackingMode: opScenarios.trackingProtocol.mode,
+                trackingProtocol: opScenarios.trackingProtocol,
+                volumetricEfficiency: cubingResult.runOptimization.fleetEfficiency.fleetVolumetricEfficiencyRatio,
+                weightEfficiency: cubingResult.runOptimization.fleetEfficiency.fleetWeightEfficiencyRatio,
+                lastPalletCapacityRatio: cubingResult.runOptimization.lastPalletCapacityUtilizationRatio,
+                warehouseValidation: cubingResult.warehouseValidation,
+                runOptimizationRecommendations: cubingResult.runOptimization.recommendations
+            },
             freightQuote,
             landedLogisticsCostSummaryEur: {
                 packagingMaterialsCostEur: packagingMaterialsEur,

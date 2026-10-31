@@ -29,7 +29,26 @@ const {
     computeCanonicalHash
 } = require('../spine/spineCalculationEngine');
 
-const LOGISTICS_ENGINE_VERSION = '1.0.0';
+const LOGISTICS_ENGINE_VERSION = '1.1.0';
+
+/**
+ * Operational Scenario Enums (Phase 198B — LOGISTICS-04)
+ */
+const TRACKING_INTEGRATION_MODES = Object.freeze({
+    CARRIER_API: 'CARRIER_API',
+    MANUAL_PORTAL_OR_CMR: 'MANUAL_PORTAL_OR_CMR'
+});
+
+const SLOT_BOOKING_MANAGEMENT_MODES = Object.freeze({
+    CARRIER_MANAGED: 'CARRIER_MANAGED',
+    SHIPPER_MANAGED: 'SHIPPER_MANAGED'
+});
+
+const STACKABILITY_HANDLING_MODES = Object.freeze({
+    STRICT_LDM_NON_STACKABLE: 'STRICT_LDM_NON_STACKABLE',
+    DOUBLE_DECK_SUPPORTED: 'DOUBLE_DECK_SUPPORTED',
+    AUTO_STACK_AT_PRINTSHOP: 'AUTO_STACK_AT_PRINTSHOP'
+});
 
 /**
  * Authoritative Warehouse Delivery Profile Presets (DACH / EU Editorial Distribution & FBA).
@@ -1301,6 +1320,341 @@ function calculateFullPalletRunOptimization(requestedQuantity, cartonPacking, pa
 }
 
 /**
+ * STAGE 6 (Phase 198B — LOGISTICS-04): Pure function calculateOperationalShippingScenarios
+ *
+ * Models the three key LTL/FTL operational bifurcations:
+ * 1. Stackability, Floor Positions & Taxable Weight (LDM vs. Double-Deck vs. Plant Auto-Stack):
+ *    - `STRICT_LDM_NON_STACKABLE`:
+ *      Each floor position occupies 0.4 LDM (1200x800mm Euro-Pallet on a 2.4m trailer).
+ *      `taxableWeightKg = Max(grossWeightKg, ldmTotal * ldmTaxableWeightRatioKg)` (default 1850 kg/LDM -> 740 kg/pallet).
+ *    - `DOUBLE_DECK_SUPPORTED`:
+ *      Carrier uses double-deck trailers (Doppelstock horizontal beams). Billed by standard pallet floor positions
+ *      and actual scale gross weight without non-stackable LDM surcharge.
+ *    - `AUTO_STACK_AT_PRINTSHOP`:
+ *      Evaluates whether physical pallets are half-pallets eligible for 2-by-2 stacking at the printshop
+ *      before dispatch (`palletTotalHeightMm <= (maxTotalPalletHeightMm + palletBaseHeightMm) / 2` or
+ *      `cargoHeightMm <= (maxTotalPalletHeightMm - palletBaseHeightMm) / 2`, e.g. <= 600mm total height for a 1200mm ceiling,
+ *      with flat top layers / rigid caps). When eligible, pairs of half-pallets consolidate into 1 floor position
+ *      (`floorPositionsUsed = ceil(palletCount / 2)`, `ldmTotal = floorPositionsUsed * 0.4`).
+ *
+ * 2. Delivery Time-Slot Booking Governance (48h Advance Notice):
+ *    - `CARRIER_MANAGED`:
+ *      Regional destination hub (e.g. Dachser Erfurt) books the slot with the warehouse and consolidates trucks.
+ *      Adds `carrierSlotBufferDays` (default +2 business days) to standard transit lead time.
+ *    - `SHIPPER_MANAGED`:
+ *      Direct / FTL or shipper-booked delivery where the printhouse/platform must request the `Slot-Nummer`
+ *      at least `slotBookingLeadTimeHours` (48h) before unloading. Generates `slotBookingRequirement` /
+ *      `slotBookingActionPlan` with deadline and pre-filled email/portal notice payload.
+ *
+ * 3. Dual Tracking & GS1-128 / SSCC (NVE) Protocol:
+ *    - `CARRIER_API`:
+ *      Automated REST/EDI/Webhook consignment creation and 4-milestone event ingestion
+ *      (`PICKED_UP_AT_PRINTSHOP`, `IN_TRANSIT_HUB`, `OUT_FOR_DELIVERY_WITH_SLOT`, `DELIVERED_POD_SIGNED`).
+ *    - `MANUAL_PORTAL_OR_CMR`:
+ *      Generates deterministic GS1-128 SSCC / NVE pallet identifiers (`00` application identifier + 18-digit SSCC),
+ *      standardized Delivery Note (Albarán / Lieferschein) metadata, and enables manual fields for
+ *      `externalTrackingPortalUrl`, `manualTrackingId`, and `signedCmrDocumentRef`.
+ */
+function calculateOperationalShippingScenarios({
+    warehouseProfile,
+    palletStacking,
+    operationalOptions = {}
+} = {}) {
+    const wf = warehouseProfile || BUILTIN_WAREHOUSE_PROFILES.ZEITFRACHT_ERFURT;
+    const orderBreakdown = (palletStacking && palletStacking.orderBreakdown) || null;
+
+    const physicalPalletCount = Math.max(
+        1,
+        Number(
+            operationalOptions.palletCount !== undefined
+                ? operationalOptions.palletCount
+                : (orderBreakdown ? orderBreakdown.totalPalletsRequired : 1)
+        )
+    );
+
+    const grossWeightKg = roundToPrecision(
+        Number(
+            operationalOptions.grossWeightKg !== undefined
+                ? operationalOptions.grossWeightKg
+                : (orderBreakdown
+                    ? orderBreakdown.totalShipmentGrossWeightKg
+                    : (palletStacking ? palletStacking.fullPalletSpecs.grossWeightKg : 500))
+        ),
+        3
+    );
+
+    const stackabilityHandling = String(
+        operationalOptions.stackabilityHandling ||
+        operationalOptions.stackability_handling ||
+        STACKABILITY_HANDLING_MODES.STRICT_LDM_NON_STACKABLE
+    ).toUpperCase();
+
+    const ldmTaxableWeightRatioKg = Number(
+        operationalOptions.ldmTaxableWeightRatioKg ??
+        operationalOptions.ldm_taxable_weight_ratio_kg ??
+        1850.00
+    );
+
+    const maxAllowedPalletHeightMm = Number(
+        operationalOptions.maxTotalPalletHeightMm ??
+        wf.maxTotalPalletHeightMm ??
+        1200
+    );
+    const palletBaseHeightMm = Number(
+        operationalOptions.palletBaseHeightMm ??
+        wf.palletBaseHeightMm ??
+        144
+    );
+
+    // Determine individual pallet heights to evaluate printshop double-stacking eligibility
+    const fullPalletHeightMm = Number(
+        operationalOptions.palletHeightMm ??
+        (palletStacking && palletStacking.fullPalletSpecs
+            ? palletStacking.fullPalletSpecs.totalHeightMm
+            : 1100)
+    );
+    const lastPalletHeightMm = Number(
+        operationalOptions.lastPalletHeightMm ??
+        (orderBreakdown && orderBreakdown.lastPallet
+            ? orderBreakdown.lastPallet.totalHeightMm
+            : fullPalletHeightMm)
+    );
+    const isTopLayerFlat = operationalOptions.hasRigidFlatTop !== undefined
+        ? Boolean(operationalOptions.hasRigidFlatTop)
+        : (orderBreakdown && orderBreakdown.lastPallet
+            ? Boolean(orderBreakdown.lastPallet.isTopLayerFlat)
+            : true);
+
+    // Half-pallet height threshold:
+    // Two stacked pallets in plant must not exceed `maxAllowedPalletHeightMm` (e.g. 2 * 550mm = 1100mm <= 1200mm),
+    // and cargo height fits within `(maxAllowedPalletHeightMm - palletBaseHeightMm) / 2` (or total pallet height <= maxAllowedPalletHeightMm / 2).
+    const halfPalletTotalHeightLimitMm = roundToPrecision(maxAllowedPalletHeightMm / 2, 1);
+    const halfPalletCargoHeightLimitMm = roundToPrecision((maxAllowedPalletHeightMm - palletBaseHeightMm) / 2, 1);
+    const maxObservedPalletHeightMm = Math.max(fullPalletHeightMm, lastPalletHeightMm);
+    const maxObservedCargoHeightMm = Math.max(0, maxObservedPalletHeightMm - palletBaseHeightMm);
+
+    const isEligibleForPrintshopAutoStack = Boolean(
+        isTopLayerFlat &&
+        (maxObservedPalletHeightMm <= halfPalletTotalHeightLimitMm ||
+            maxObservedCargoHeightMm <= halfPalletCargoHeightLimitMm) &&
+        (grossWeightKg / physicalPalletCount) * 2 <= Number(wf.maxGrossPalletWeightKg || 1000)
+    );
+
+    let floorPositionsUsed = physicalPalletCount;
+    let stackabilityModeApplied = stackabilityHandling;
+    let consolidatedPalletPairs = 0;
+
+    if (stackabilityHandling === STACKABILITY_HANDLING_MODES.AUTO_STACK_AT_PRINTSHOP) {
+        if (isEligibleForPrintshopAutoStack && physicalPalletCount >= 2) {
+            floorPositionsUsed = Math.ceil(physicalPalletCount / 2);
+            consolidatedPalletPairs = Math.floor(physicalPalletCount / 2);
+            stackabilityModeApplied = STACKABILITY_HANDLING_MODES.AUTO_STACK_AT_PRINTSHOP;
+        } else if (isEligibleForPrintshopAutoStack && physicalPalletCount === 1) {
+            floorPositionsUsed = 1;
+            stackabilityModeApplied = STACKABILITY_HANDLING_MODES.AUTO_STACK_AT_PRINTSHOP;
+        } else {
+            // Cannot physically stack two pallets without exceeding warehouse height/weight ceiling
+            floorPositionsUsed = physicalPalletCount;
+            stackabilityModeApplied = 'AUTO_STACK_FALLBACK_NON_STACKABLE';
+        }
+    }
+
+    const ldmTotal = roundToPrecision(floorPositionsUsed * 0.4, 2);
+    const ldmEquivalentWeightKg = roundToPrecision(ldmTotal * ldmTaxableWeightRatioKg, 2);
+
+    let taxableWeightKg = grossWeightKg;
+    if (
+        stackabilityHandling === STACKABILITY_HANDLING_MODES.STRICT_LDM_NON_STACKABLE ||
+        stackabilityModeApplied === 'AUTO_STACK_FALLBACK_NON_STACKABLE'
+    ) {
+        taxableWeightKg = roundToPrecision(Math.max(grossWeightKg, ldmEquivalentWeightKg), 2);
+    } else if (stackabilityHandling === STACKABILITY_HANDLING_MODES.AUTO_STACK_AT_PRINTSHOP) {
+        // Consolidated floor spaces occupied on trailer
+        taxableWeightKg = roundToPrecision(Math.max(grossWeightKg, ldmEquivalentWeightKg), 2);
+    } else {
+        // DOUBLE_DECK_SUPPORTED: billed on actual scale gross weight and standard pallet space
+        taxableWeightKg = roundToPrecision(grossWeightKg, 2);
+    }
+
+    // 2. Slot Booking Management (48h Advance Notice)
+    const slotBookingManagement = String(
+        operationalOptions.slotBookingManagement ||
+        operationalOptions.slot_booking_management ||
+        SLOT_BOOKING_MANAGEMENT_MODES.CARRIER_MANAGED
+    ).toUpperCase();
+
+    const requiresSlotBooking = Boolean(
+        operationalOptions.requiresSlotBooking !== undefined
+            ? operationalOptions.requiresSlotBooking
+            : (wf.requiresSlotBooking !== undefined ? wf.requiresSlotBooking : true)
+    );
+
+    const slotBookingLeadTimeHours = Number(
+        operationalOptions.slotBookingLeadTimeHours ??
+        wf.slotBookingLeadTimeHours ??
+        48
+    );
+
+    const carrierSlotBufferDays = Number(
+        operationalOptions.carrierSlotBufferDays ??
+        operationalOptions.carrier_slot_buffer_days ??
+        2
+    );
+
+    const baseTransitDaysMin = Number(operationalOptions.transitDaysMin ?? 1);
+    const baseTransitDaysMax = Number(operationalOptions.transitDaysMax ?? 3);
+
+    const addedSlotBufferDays = (requiresSlotBooking && slotBookingManagement === SLOT_BOOKING_MANAGEMENT_MODES.CARRIER_MANAGED)
+        ? carrierSlotBufferDays
+        : 0;
+
+    const estimatedTransitDaysEffectiveMin = baseTransitDaysMin + addedSlotBufferDays;
+    const estimatedTransitDaysEffectiveMax = baseTransitDaysMax + addedSlotBufferDays;
+
+    const recipientNotificationEmail = wf.profileCode === 'ZEITFRACHT_ERFURT'
+        ? 'avis-wareneingang-va@zeitfracht.de'
+        : (wf.profileCode === 'ARVATO_VVA_GUETERSLOH'
+            ? 'wareneingang-avis@arvato.com'
+            : 'dock-scheduling@warehouse-hub.eu');
+
+    const totalCartons = Number(
+        operationalOptions.totalCartons ??
+        (orderBreakdown ? orderBreakdown.totalCartonsRequired : physicalPalletCount * 24)
+    );
+    const totalCopies = Number(
+        operationalOptions.requestedQuantity ??
+        (orderBreakdown ? orderBreakdown.requestedQuantity : 1000)
+    );
+
+    const slotBookingRequirement = slotBookingManagement === SLOT_BOOKING_MANAGEMENT_MODES.SHIPPER_MANAGED
+        ? {
+            required: requiresSlotBooking,
+            managementMode: SLOT_BOOKING_MANAGEMENT_MODES.SHIPPER_MANAGED,
+            advanceNoticeHours: slotBookingLeadTimeHours,
+            noticeDeadlineRule: `MUST_SUBMIT_${slotBookingLeadTimeHours}H_BEFORE_UNLOADING`,
+            unbookedPenaltyEur: Number((wf.penalties && wf.penalties.unbookedSlotPenaltyEur) || 128.00),
+            requiresSlotNumberOnDeliveryNote: true,
+            slotNumberFieldStatus: operationalOptions.assignedSlotNumber ? 'ASSIGNED' : 'PENDING_WAREHOUSE_CONFIRMATION',
+            assignedSlotNumber: operationalOptions.assignedSlotNumber || null,
+            notificationPayload: {
+                recipientEmail: recipientNotificationEmail,
+                warehouseCode: wf.profileCode,
+                warehouseName: wf.displayName,
+                subjectTemplate: `[AVIS / SLOT BOOKING ${slotBookingLeadTimeHours}h] ${wf.profileCode} — ${floorPositionsUsed} EUR-Pallets (${grossWeightKg} kg)`,
+                shipmentSummary: {
+                    physicalPalletsCount: physicalPalletCount,
+                    floorPositionsRequested: floorPositionsUsed,
+                    totalCartonsCount: totalCartons,
+                    totalCopiesCount: totalCopies,
+                    grossShipmentWeightKg: grossWeightKg,
+                    maxPalletHeightMm: maxObservedPalletHeightMm,
+                    vehicleRequirement: 'RAMP_HEIGHT_DOCK_COMPATIBLE'
+                }
+            }
+        }
+        : {
+            required: requiresSlotBooking,
+            managementMode: SLOT_BOOKING_MANAGEMENT_MODES.CARRIER_MANAGED,
+            advanceNoticeHours: slotBookingLeadTimeHours,
+            carrierBufferDaysAdded: addedSlotBufferDays,
+            noticeDeadlineRule: 'HANDLED_BY_CARRIER_DESTINATION_HUB',
+            unbookedPenaltyEur: Number((wf.penalties && wf.penalties.unbookedSlotPenaltyEur) || 128.00),
+            requiresSlotNumberOnDeliveryNote: false,
+            slotNumberFieldStatus: 'DELEGATED_TO_CARRIER',
+            assignedSlotNumber: null,
+            notificationPayload: null
+        };
+
+    // 3. Tracking Integration Mode & GS1-128 / SSCC (NVE) Metadata
+    const trackingIntegrationMode = String(
+        operationalOptions.trackingIntegrationMode ||
+        operationalOptions.tracking_integration_mode ||
+        TRACKING_INTEGRATION_MODES.CARRIER_API
+    ).toUpperCase();
+
+    const ssccPalletLabels = [];
+    for (let idx = 1; idx <= floorPositionsUsed; idx++) {
+        const serialPart = String(100000000 + idx).slice(-9);
+        const base17 = `34012345${serialPart}`;
+        // GS1 Modulo-10 check digit
+        let sum = 0;
+        for (let i = 0; i < base17.length; i++) {
+            const digit = Number(base17[base17.length - 1 - i]);
+            sum += digit * (i % 2 === 0 ? 3 : 1);
+        }
+        const checkDigit = (10 - (sum % 10)) % 10;
+        const sscc18 = `${base17}${checkDigit}`;
+        ssccPalletLabels.push({
+            palletFloorIndex: idx,
+            applicationIdentifier: '00',
+            sscc18,
+            gs1128BarcodeString: `(00)${sscc18}`
+        });
+    }
+
+    const trackingMetadata = trackingIntegrationMode === TRACKING_INTEGRATION_MODES.MANUAL_PORTAL_OR_CMR
+        ? {
+            mode: TRACKING_INTEGRATION_MODES.MANUAL_PORTAL_OR_CMR,
+            supportsAutomatedWebhooks: false,
+            labelStandard: 'GS1_128_SSCC_NVE',
+            requiresStandardDeliveryNotePdf: true,
+            manualCaptureFields: {
+                externalTrackingPortalUrl: operationalOptions.externalTrackingPortalUrl || '',
+                manualTrackingId: operationalOptions.manualTrackingId || '',
+                signedCmrDocumentRef: operationalOptions.signedCmrDocumentRef || '',
+                semiAutomaticNotificationEnabled: true
+            },
+            ssccPalletLabels,
+            milestoneStates: [
+                'DISPATCH_NOTE_GENERATED',
+                'IN_TRANSIT_MANUAL_LINK_SENT',
+                'DELIVERED_CMR_UPLOADED'
+            ]
+        }
+        : {
+            mode: TRACKING_INTEGRATION_MODES.CARRIER_API,
+            supportsAutomatedWebhooks: true,
+            labelStandard: 'GS1_128_SSCC_NVE',
+            requiresStandardDeliveryNotePdf: true,
+            manualCaptureFields: null,
+            ssccPalletLabels,
+            milestoneStates: [
+                'PICKED_UP_AT_PRINTSHOP',
+                'IN_TRANSIT_HUB',
+                'OUT_FOR_DELIVERY_WITH_SLOT',
+                'DELIVERED_POD_SIGNED'
+            ]
+        };
+
+    return {
+        stackabilityAndLdm: {
+            requestedStackabilityMode: stackabilityHandling,
+            stackabilityModeApplied,
+            isEligibleForPrintshopAutoStack,
+            physicalPalletCount,
+            consolidatedPalletPairs,
+            floorPositionsUsed,
+            ldmPerFloorPosition: 0.4,
+            ldmTotal,
+            ldmTaxableWeightRatioKg,
+            ldmEquivalentWeightKg,
+            actualGrossWeightKg: grossWeightKg,
+            taxableWeightKg
+        },
+        slotBookingActionPlan: {
+            ...slotBookingRequirement,
+            baseTransitDaysMin,
+            baseTransitDaysMax,
+            carrierSlotBufferDays: addedSlotBufferDays,
+            estimatedTransitDaysEffectiveMin,
+            estimatedTransitDaysEffectiveMax,
+            estimatedTransitDaysEffective: estimatedTransitDaysEffectiveMax
+        },
+        trackingProtocol: trackingMetadata
+    };
+}
+
+/**
  * Master Pure Orchestrator: executeLogisticsCubingCalculation(input)
  *
  * Executes all 5 deterministic stages and computes canonical SHA-256 input/output hashes
@@ -1348,6 +1702,37 @@ function executeLogisticsCubingCalculation(input = {}) {
         palletStacking
     );
 
+    // Stage 6 (Phase 198B — LOGISTICS-04): Operational Scenarios (LDM/Stackability, 48h Slot Booking, Dual Tracking)
+    const operationalScenarios = calculateOperationalShippingScenarios({
+        warehouseProfile,
+        palletStacking,
+        operationalOptions: {
+            ...(input.operationalOptions || {}),
+            stackabilityHandling:
+                (input.operationalOptions && input.operationalOptions.stackabilityHandling) ||
+                input.stackabilityHandling ||
+                input.stackability_handling,
+            ldmTaxableWeightRatioKg:
+                (input.operationalOptions && input.operationalOptions.ldmTaxableWeightRatioKg) ??
+                input.ldmTaxableWeightRatioKg ??
+                input.ldm_taxable_weight_ratio_kg,
+            slotBookingManagement:
+                (input.operationalOptions && input.operationalOptions.slotBookingManagement) ||
+                input.slotBookingManagement ||
+                input.slot_booking_management,
+            carrierSlotBufferDays:
+                (input.operationalOptions && input.operationalOptions.carrierSlotBufferDays) ??
+                input.carrierSlotBufferDays ??
+                input.carrier_slot_buffer_days,
+            trackingIntegrationMode:
+                (input.operationalOptions && input.operationalOptions.trackingIntegrationMode) ||
+                input.trackingIntegrationMode ||
+                input.tracking_integration_mode,
+            transitDaysMin: input.transitDaysMin,
+            transitDaysMax: input.transitDaysMax
+        }
+    });
+
     // Packaging materials cost breakdown (kept strictly separate from carrier freight & manufacturing)
     const unitCartonCostEur = Number(
         (input.packagingOptions && input.packagingOptions.unitCartonCostEur) || 1.25
@@ -1390,6 +1775,7 @@ function executeLogisticsCubingCalculation(input = {}) {
         palletStacking,
         warehouseValidation,
         runOptimization,
+        operationalScenarios,
         packagingMaterialsCostBreakdownEur
     };
 
@@ -1404,6 +1790,9 @@ function executeLogisticsCubingCalculation(input = {}) {
 
 module.exports = {
     LOGISTICS_ENGINE_VERSION,
+    TRACKING_INTEGRATION_MODES,
+    SLOT_BOOKING_MANAGEMENT_MODES,
+    STACKABILITY_HANDLING_MODES,
     BUILTIN_WAREHOUSE_PROFILES,
     STANDARD_CARTON_CATALOG,
     resolveWarehouseProfile,
@@ -1414,6 +1803,7 @@ module.exports = {
     calculateEuroPalletTilingAndStacking,
     validateWarehouseDeliveryConstraints,
     calculateFullPalletRunOptimization,
+    calculateOperationalShippingScenarios,
     executeLogisticsCubingCalculation
 };
 

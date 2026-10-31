@@ -2375,6 +2375,19 @@
       "statementTypes": [
         "CREATE_TABLE"
       ]
+    },
+    {
+      "path": "migrations/177_phase198b_logistics_operational_scenarios.sql",
+      "prefix": "177",
+      "canonicalSha256": "b81437d1195f733482afdfe156fd537a2883b896b4598f1d5a830311e6acd317",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 2540,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "ALTER_TABLE"
+      ]
     }
   ]
 }
