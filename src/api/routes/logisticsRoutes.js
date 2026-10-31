@@ -28,6 +28,10 @@ const {
     generateDeliveryNotePdf,
     generateCarrierProtocolPdf
 } = require('../services/logistics/deliveryNotePdfService');
+const {
+    ingestCarrierMilestone,
+    runEpalSettlementSweep
+} = require('../services/logistics/carrierMilestoneAndEpalService');
 
 function requireLogisticsControlPlaneAuth(req, res, next) {
     const role = (req.user && req.user.role) || (req.headers && req.headers['x-user-role']);
@@ -374,6 +378,73 @@ function createLogisticsRouter(options = {}) {
             }
 
             return res.status(200).send(result.buffer);
+        } catch (err) {
+            return res.status(err.statusCode || 400).json({
+                ok: false,
+                error: err.message
+            });
+        }
+    });
+
+    /**
+     * POST /carrier/milestones (mounted at /api/logistics/carrier/milestones)
+     * Telematic webhook for carrier scan events (GS1-128 SSCC-18), digital POD closure,
+     * and immediate EPAL dock exchange reporting.
+     */
+    router.post('/carrier/milestones', async (req, res) => {
+        try {
+            const body = req.body || {};
+            const authContext = {
+                userId: req.user && req.user.id,
+                role: (req.user && req.user.role) || (req.headers && req.headers['x-user-role']),
+                tenantId: req.user && req.user.tenantId,
+                printhouseId: req.user && req.user.printhouseId
+            };
+
+            const result = ingestCarrierMilestone(body, authContext);
+            return res.status(200).json({
+                ok: true,
+                success: true,
+                ...result
+            });
+        } catch (err) {
+            return res.status(err.statusCode || 400).json({
+                ok: false,
+                error: err.message
+            });
+        }
+    });
+
+    /**
+     * POST /epal/settlement-run (mounted at /api/logistics/epal/settlement-run)
+     * Runs the 14-calendar-day Euro-Pallet EPAL (Palettenschein) settlement evaluation,
+     * issuing automatic 15.00 EUR / unit (+ VAT) charges for unreturned pallets.
+     */
+    router.post('/epal/settlement-run', async (req, res) => {
+        try {
+            const body = req.body || {};
+            const authTenantId = req.user && req.user.tenantId;
+            const role = String((req.user && req.user.role) || (req.headers && req.headers['x-user-role']) || '').toUpperCase();
+
+            if (authTenantId && body.tenantId && String(authTenantId) !== String(body.tenantId) && role !== 'SUPER_ADMIN') {
+                return res.status(403).json({
+                    ok: false,
+                    error: 'FORBIDDEN_TENANT_MISMATCH: Cross-tenant EPAL settlement execution is prohibited.'
+                });
+            }
+
+            const result = runEpalSettlementSweep({
+                evaluationDate: body.evaluationDate || new Date().toISOString(),
+                tenantId: body.tenantId || authTenantId || null,
+                autoSettle: body.autoSettle !== false,
+                shipments: Array.isArray(body.shipments) ? body.shipments : null
+            });
+
+            return res.status(200).json({
+                ok: true,
+                success: true,
+                ...result
+            });
         } catch (err) {
             return res.status(err.statusCode || 400).json({
                 ok: false,
