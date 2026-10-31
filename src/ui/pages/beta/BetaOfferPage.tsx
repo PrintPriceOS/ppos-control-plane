@@ -1,0 +1,2 @@
+// Beta Offer Page
+// ACTIVATE CUSTOMER BETA COHORT

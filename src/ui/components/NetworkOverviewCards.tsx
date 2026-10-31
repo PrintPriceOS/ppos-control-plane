@@ -58,7 +58,7 @@ export const NetworkOverviewCards: React.FC<Props> = ({ stats }) => {
         },
         {
             label: "Capacity Available",
-            value: `${((stats.capacity_available_today / (stats.capacity_total_today || 1)) * 100).toFixed(0)}%`,
+            value: `${Number(((stats.capacity_available_today || 0) / (stats.capacity_total_today || 1)) * 100).toFixed(0)}%`,
             sub: `${stats.printers_full_today} Saturated nodes`,
             icon: CircleStackIcon,
             color: "text-blue-600",
@@ -74,7 +74,7 @@ export const NetworkOverviewCards: React.FC<Props> = ({ stats }) => {
         },
         {
             label: "Avg Quality",
-            value: `${(stats.avg_quality_score * 100).toFixed(0)}%`,
+            value: `${Number((stats.avg_quality_score || 0) * 100).toFixed(0)}%`,
             sub: "Network performance",
             icon: ShieldCheckIcon,
             color: "text-orange-600",
@@ -107,7 +107,7 @@ export const NetworkOverviewCards: React.FC<Props> = ({ stats }) => {
         {
             label: "Auto Dispatch",
             value: stats.dispatch?.active || 0,
-            sub: `${((stats.dispatch?.reroute_rate || 0) * 100).toFixed(1)}% Reroute`,
+            sub: `${Number((stats.dispatch?.reroute_rate || 0) * 100).toFixed(1)}% Reroute`,
             icon: RocketLaunchIcon,
             color: "text-rose-500",
             bg: "bg-rose-50"
@@ -117,9 +117,9 @@ export const NetworkOverviewCards: React.FC<Props> = ({ stats }) => {
     return (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-9 gap-4">
             {cards.map((card, idx) => (
-                <div key={idx} className="glass p-4 rounded-2xl border border-white shadow-sm hover:shadow-md transition-shadow">
+                <div key={idx} className="glass p-4 rounded-none border border-white shadow-sm hover:shadow-md transition-shadow">
                     <div className="flex items-center justify-between mb-2">
-                        <div className={`p-2 rounded-lg ${card.bg} ${card.color}`}>
+                        <div className={`p-2 rounded-none ${card.bg} ${card.color}`}>
                             <card.icon className="w-4 h-4" />
                         </div>
                         <span className="text-[9px] font-black uppercase text-slate-400 tracking-wider">

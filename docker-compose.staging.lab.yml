@@ -1,0 +1,140 @@
+# docker-compose.staging.lab.yml
+# PrintPrice OS Control Plane — Staging Laboratory Integration & Local Build
+# Used exclusively in CI and ephemeral testing to compile from source and validate lifecycle.
+
+version: '3.8'
+
+name: ppos-staging
+
+networks:
+  ppos_staging_net:
+    driver: bridge
+    internal: false
+
+volumes:
+  staging_mysql_data:
+    name: ppos_staging_mysql_data
+    driver: local
+  staging_documents_data:
+    name: ppos_staging_documents_data
+    driver: local
+
+secrets:
+  staging_db_password:
+    file: ./secrets/staging_db_password.txt
+  staging_root_password:
+    file: ./secrets/staging_root_password.txt
+  staging_jwt_secret:
+    file: ./secrets/staging_jwt_secret.txt
+
+services:
+  staging-mysql:
+    image: mysql:8.0.46
+    container_name: ppos-staging-mysql
+    restart: unless-stopped
+    command: [
+      'mysqld',
+      '--character-set-server=utf8mb4',
+      '--collation-server=utf8mb4_unicode_ci',
+      '--default-authentication-plugin=mysql_native_password',
+      '--log-bin-trust-function-creators=1',
+      '--innodb-buffer-pool-size=384M',
+      '--sql-mode=STRICT_TRANS_TABLES,NO_ENGINE_SUBSTITUTION'
+    ]
+    environment:
+      MYSQL_DATABASE: ppos_control_staging
+      MYSQL_USER: ppos_staging_usr
+      MYSQL_PASSWORD_FILE: /run/secrets/staging_db_password
+      MYSQL_ROOT_PASSWORD_FILE: /run/secrets/staging_root_password
+    secrets:
+      - staging_db_password
+      - staging_root_password
+    volumes:
+      - staging_mysql_data:/var/lib/mysql
+    networks:
+      - ppos_staging_net
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost --silent && mysql --user=ppos_staging_usr --password=$(cat /run/secrets/staging_db_password) --database=ppos_control_staging -e 'SELECT 1;' >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          cpus: '1.5'
+          memory: 1024M
+        reservations:
+          cpus: '0.25'
+          memory: 384M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  control-plane-staging:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ppos-control-plane:staging-lab
+    container_name: ppos-control-plane-staging
+    restart: unless-stopped
+    depends_on:
+      staging-mysql:
+        condition: service_healthy
+    secrets:
+      - staging_db_password
+      - staging_jwt_secret
+    volumes:
+      - staging_documents_data:/opt/printprice-os/staging-storage
+    environment:
+      NODE_ENV: staging
+      PORT: 8081
+      PPOS_CONTROL_MODE: STAGING
+      PPOS_LOG_LEVEL: info
+      MYSQL_HOST: staging-mysql
+      MYSQL_PORT: 3306
+      MYSQL_DATABASE: ppos_control_staging
+      MYSQL_USER: ppos_staging_usr
+      MYSQL_PASSWORD_FILE: /run/secrets/staging_db_password
+      JWT_SECRET_FILE: /run/secrets/staging_jwt_secret
+      JWT_AUDIENCE: ppos:control:staging
+      JWT_ISSUER: https://staging-auth.printprice.pro
+      REQUIRE_JWT_ONLY: 'true'
+      ENABLE_BREAK_GLASS_TOKEN: 'false'
+      PPOS_UPLOADS_DIR: /opt/printprice-os/staging-storage
+      CHECKLIST_ONLY_MODE: 'ACTIVE'
+      MARKETPLACE_VISIBLE: 'false'
+      LIVE_QUOTING_ALLOWED: 'false'
+      JOB_ROUTING_ALLOWED: 'false'
+      PRODUCTION_DISPATCH_ALLOWED: 'false'
+      PAYMENT_EXECUTION_ENABLED: 'false'
+      PAYOUT_EXECUTION_ENABLED: 'false'
+      REFUND_EXECUTION_ENABLED: 'false'
+      LIVE_PROVIDER_CONNECTIVITY: 'false'
+      WEBHOOK_DISPATCH_MOCK_ONLY: 'true'
+      OUTGOING_WEBHOOK_SINK_URL: 'http://127.0.0.1:9999/sink'
+    ports:
+      - "127.0.0.1:18081:8081"
+    networks:
+      - ppos_staging_net
+    healthcheck:
+      test: ["CMD", "node", "-e", "const http = require('http'); http.get('http://127.0.0.1:8081/live', (r) => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1));"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          cpus: '1.5'
+          memory: 1024M
+        reservations:
+          cpus: '0.25'
+          memory: 384M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"

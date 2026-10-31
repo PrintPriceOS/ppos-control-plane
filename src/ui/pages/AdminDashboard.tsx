@@ -2,13 +2,17 @@
 import React, { useMemo, useState } from "react";
 import { t, LocaleProvider, useLocale } from "../i18n";
 import { getAdminKey, setAdminKey, clearAdminKey } from "../lib/adminApi";
+import { isSuperAdmin } from "../lib/authStore";
 import { OverviewTab } from "./admin/OverviewTab";
 import { PricingIntelligenceTab } from "./admin/PricingIntelligenceTab";
 import { OffersTab } from "./admin/OffersTab";
-import { MarketplaceTab } from "./admin/MarketplaceTab";
-import { MarketplaceReadinessTab } from "./admin/MarketplaceReadinessTab";
+import { MarketplacePage } from "./admin/MarketplacePage";
 import { CommercialCommitmentsTab } from "./admin/CommercialCommitmentsTab";
 import { AutonomousOpsTab } from "./admin/AutonomousOpsTab";
+import { RoutingDecisionTab } from "./admin/RoutingDecisionTab";
+import { ProductionDispatchTab } from "./admin/ProductionDispatchTab";
+import { IndustrialLiveTab } from "./admin/IndustrialLiveTab";
+
 import { FinancialOpsTab } from "./admin/FinancialOpsTab";
 import TenantManagement from "./admin/TenantManagement";
 import { SuccessWorkspace } from "./admin/SuccessWorkspace";
@@ -19,6 +23,9 @@ import { ControlsTab } from "./admin/ControlsTab";
 import { NotificationsTab } from "./admin/NotificationsTab";
 import { EngagementSignalsTab } from "./admin/EngagementSignalsTab";
 import { NetworkOpsTab } from "./admin/NetworkOpsTab";
+import { FederatedNodesNetworkPanel } from "../components/FederatedNodesNetworkPanel";
+import { ProductionNodeRegistryTab } from "./admin/ProductionNodeRegistryTab";
+import { PrinthouseOnboardingPage } from "./printhouse/PrinthouseOnboardingPage";
 import {
     ChartBarIcon,
     UsersIcon,
@@ -40,10 +47,13 @@ import {
     DocumentCheckIcon,
     CpuChipIcon,
     ArrowsRightLeftIcon,
-    AdjustmentsHorizontalIcon
+    AdjustmentsHorizontalIcon,
+    TruckIcon
 } from "@heroicons/react/24/outline";
 
-type Tab = "overview" | "success" | "tenants" | "network" | "pricing" | "offers" | "marketplace" | "negotiations" | "commitments" | "autonomy" | "finance" | "notifications" | "jobs" | "errors" | "audit" | "controls" | "engagement";
+type Tab = "overview" | "success" | "tenants" | "printhouses" | "onboarding" | "network" | "pricing" | "offers" | "marketplace" | "negotiations" | "routing" | "dispatch" | "execution" | "commitments" | "autonomy" | "finance" | "notifications" | "jobs" | "errors" | "audit" | "controls" | "engagement";
+
+
 type Range = "24h" | "7d" | "30d";
 
 const AdminDashboardInner: React.FC = () => {
@@ -68,19 +78,24 @@ const AdminDashboardInner: React.FC = () => {
         setAuthKey("");
     };
 
+    const superAdmin = isSuperAdmin();
     const tabs = useMemo(
         () =>
         ([
             ["overview", t("admin.tabs.overview" as any), ChartBarIcon],
             ["success", "Success Workspace", HeartIcon],
             ["tenants", "Tenants & Subscriptions", UsersIcon],
+            ["printhouses", "Printhouses", BuildingOfficeIcon],
+            ["onboarding", "Printhouse Onboarding", WrenchScrewdriverIcon],
             ["network", "Network Operations", BuildingOfficeIcon],
             ["pricing", "Pricing Intelligence", CurrencyEuroIcon],
             ["offers", "Production Offers", QueueListIcon],
             ["marketplace", "Marketplace", BuildingStorefrontIcon],
-            ["negotiations", "Negotiation & Readiness", ArrowsRightLeftIcon],
-            ["commitments", "Commercial Commitments", DocumentCheckIcon],
-            ["autonomy", "Autonomous Operations", CpuChipIcon],
+            ["routing", "Autonomous Routing", ArrowsRightLeftIcon],
+            superAdmin && ["dispatch", "Production Dispatch", TruckIcon],
+            superAdmin && ["execution", "Execution Loop", BoltIcon],
+            superAdmin && ["commitments", "Commercial Commitments", DocumentCheckIcon],
+            superAdmin && ["autonomy", "Autonomous Operations", CpuChipIcon],
             ["finance", "Financial Operations", BanknotesIcon],
             ["notifications", "Notifications", BellIcon],
             ["jobs", t("admin.tabs.jobs" as any), QueueListIcon],
@@ -88,34 +103,35 @@ const AdminDashboardInner: React.FC = () => {
             ["audit", t("admin.tabs.audit" as any), ShieldCheckIcon],
             ["controls", t("admin.tabs.controls" as any), WrenchScrewdriverIcon],
             ["engagement", "Engagement", BoltIcon],
-        ] as Array<[Tab, string, any]>),
-        [locale]
+        ].filter(Boolean) as Array<[Tab, string, any]>),
+        [locale, superAdmin]
     );
 
     if (!isAuthorized) {
         return (
-            <div className="min-h-screen premium-gradient flex items-center justify-center p-6">
-                <div className="max-w-3xl w-full glass rounded-3xl p-10 border border-white shadow-2xl animate-slide-fade">
+            <div className="min-h-screen bg-black flex items-center justify-center p-6">
+                <div className="max-w-3xl w-full bg-white dark:bg-[#131314] border border-slate-200 dark:border-white/20 p-10 shadow-2xl">
                     <div className="flex flex-col items-center text-center gap-6">
-                        <div className="w-16 h-16 bg-primary rounded-2xl flex items-center justify-center shadow-xl shadow-primary/20">
+                        <div className="w-16 h-16 bg-primary flex items-center justify-center">
                             <ShieldCheckIcon className="w-8 h-8 text-white" />
                         </div>
                         <div>
-                            <h2 className="text-2xl font-black text-slate-900 tracking-tight">Admin Gate</h2>
+                            <h2 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">Admin Gate</h2>
                             <p className="text-sm text-slate-500 font-medium mt-2">Enter your secure API key to access control systems.</p>
                         </div>
                         <div className="w-full space-y-4">
                             <input
                                 type="password"
-                                className="w-full bg-white/50 border border-slate-200 rounded-xl px-5 py-3.5 text-center text-lg font-mono tracking-widest outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all"
+                                className="w-full bg-slate-50 dark:bg-[#131314]/5 border border-slate-200 dark:border-white/10 px-5 py-3.5 text-center text-lg font-mono tracking-widest outline-none focus:border-primary transition-all dark:text-white"
                                 placeholder="••••••••••••"
                                 value={authKey}
                                 onChange={(e) => setAuthKey(e.target.value)}
                                 onKeyDown={(e) => e.key === 'Enter' && handleConnect()}
                             />
                             <button
+                                type="button"
                                 onClick={handleConnect}
-                                className="w-full bg-slate-900 text-white rounded-xl py-4 font-black uppercase tracking-widest hover:bg-slate-800 transition-all shadow-lg active:scale-95"
+                                className="w-full py-4 bg-primary text-white font-black uppercase hover:bg-primary/90"
                             >
                                 Establish Connection
                             </button>
@@ -127,14 +143,14 @@ const AdminDashboardInner: React.FC = () => {
     }
 
     return (
-        <div className="min-h-screen bg-slate-50 premium-gradient">
-            <header className="sticky top-0 z-50 glass px-6 py-4 mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-white/20">
+        <div className="min-h-screen bg-white dark:bg-[#0e0e0f]">
+            <header className="sticky top-0 z-50 bg-white dark:bg-[#0e0e0f] border-b border-slate-200 dark:border-white/10 px-6 py-4 mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center shadow-lg shadow-primary/20">
+                    <div className="w-10 h-10 bg-primary flex items-center justify-center">
                         <ShieldCheckIcon className="w-6 h-6 text-white" />
                     </div>
                     <div>
-                        <h1 className="text-xl font-bold text-slate-900 tracking-tight leading-none">
+                        <h1 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight leading-none">
                             {t("admin.title" as any)}
                         </h1>
                         <p className="text-xs text-slate-500 mt-1 font-medium uppercase tracking-wider">
@@ -144,48 +160,48 @@ const AdminDashboardInner: React.FC = () => {
                 </div>
 
                 <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-2 bg-white/50 p-1.5 rounded-lg border border-white">
+                    <div className="flex items-center gap-2 bg-white/5 p-1.5 border border-white/10">
                         <ClockIcon className="w-4 h-4 text-slate-400 ml-1" />
                         <select
-                            className="bg-transparent text-sm font-medium text-slate-700 outline-none pr-4"
+                            className="bg-transparent text-sm font-medium text-white outline-none pr-4"
                             value={range}
                             onChange={(e) => setRange(e.target.value as Range)}
                         >
-                            <option value="24h">{t("admin.range.24h" as any)}</option>
-                            <option value="7d">{t("admin.range.7d" as any)}</option>
-                            <option value="30d">{t("admin.range.30d" as any)}</option>
+                            <option value="24h" className="bg-black text-white">{t("admin.range.24h" as any)}</option>
+                            <option value="7d" className="bg-black text-white">{t("admin.range.7d" as any)}</option>
+                            <option value="30d" className="bg-black text-white">{t("admin.range.30d" as any)}</option>
                         </select>
                     </div>
 
-                    <div className="flex items-center gap-2 bg-white/50 p-1.5 rounded-lg border border-white">
+                    <div className="flex items-center gap-2 bg-white/5 p-1.5 border border-white/10">
                         <ArrowPathIcon className={`w-4 h-4 text-slate-400 ml-1 ${refresh > 0 ? "animate-spin" : ""}`} />
                         <select
-                            className="bg-transparent text-sm font-medium text-slate-700 outline-none pr-4"
+                            className="bg-transparent text-sm font-medium text-white outline-none pr-4"
                             value={refresh}
                             onChange={(e) => setRefresh(Number(e.target.value))}
                         >
-                            <option value={0}>{ctxT("admin.refresh.off")}</option>
-                            <option value={10000}>10s</option>
-                            <option value={30000}>30s</option>
+                            <option value={0} className="bg-black text-white">{ctxT("admin.refresh.off")}</option>
+                            <option value={10000} className="bg-black text-white">10s</option>
+                            <option value={30000} className="bg-black text-white">30s</option>
                         </select>
                     </div>
 
                     {/* Language Toggle */}
-                    <div className="flex items-center gap-2 bg-white/50 p-1.5 rounded-lg border border-white">
+                    <div className="flex items-center gap-2 bg-white/5 p-1.5 border border-white/10">
                         <span className="text-xs font-bold text-slate-400 ml-1">LA</span>
                         <select
-                            className="bg-transparent text-sm font-medium text-slate-700 outline-none pr-4"
+                            className="bg-transparent text-sm font-medium text-white outline-none pr-4"
                             value={locale}
                             onChange={(e) => setLocale(e.target.value as any)}
                         >
-                            <option value="en">EN</option>
-                            <option value="es">ES</option>
+                            <option value="en" className="bg-black text-white">EN</option>
+                            <option value="es" className="bg-black text-white">ES</option>
                         </select>
                     </div>
 
                     <a
                         href="/admin/help"
-                        className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors border border-blue-100 font-medium text-sm ml-2"
+                        className="flex items-center gap-2 px-3 py-1.5 bg-blue-500/10 text-blue-500 hover:bg-blue-500/20 transition-colors border border-blue-500/20 font-black text-xs ml-2 uppercase"
                         title="Operations Knowledge Console"
                     >
                         <BookOpenIcon className="w-5 h-5" />
@@ -193,8 +209,9 @@ const AdminDashboardInner: React.FC = () => {
                     </a>
 
                     <button
+                        type="button"
                         onClick={handleDisconnect}
-                        className="p-2.5 rounded-xl bg-red-50 text-red-500 hover:bg-red-100 transition-colors border border-red-100 ml-2"
+                        className="p-2.5 bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-colors border border-red-500/20 ml-2"
                         title="Disconnect"
                     >
                         <XMarkIcon className="w-5 h-5" />
@@ -202,17 +219,17 @@ const AdminDashboardInner: React.FC = () => {
                 </div>
             </header>
 
-            <div className="max-w-7xl mx-auto px-6 pb-12">
+            <div className="max-w-[1800px] mx-auto px-6 pb-12">
                 <div className="overflow-x-auto pb-4 -mb-4 scrollbar-hide">
-                    <nav className="flex gap-1 bg-slate-200/40 p-1 rounded-xl mb-8 w-fit border border-slate-200/60 transition-all duration-300 whitespace-nowrap">
+                    <nav className="flex gap-1 bg-slate-50 dark:bg-[#131314]/5 p-1 mb-8 w-fit border border-slate-200 dark:border-white/10 transition-all duration-300 whitespace-nowrap">
                         {tabs.map(([id, label, Icon]) => (
                             <button
                                 key={id}
+                                type="button"
                                 className={[
-                                    "flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg transition-all duration-200",
                                     activeTab === id
-                                        ? "bg-white text-slate-900 shadow-sm border border-slate-200/50"
-                                        : "text-slate-500 hover:text-slate-800 hover:bg-white/30",
+                                        ? "btn-tab btn-tab-active"
+                                        : "btn-tab",
                                 ].join(" ")}
                                 onClick={() => setActiveTab(id)}
                             >
@@ -223,22 +240,29 @@ const AdminDashboardInner: React.FC = () => {
                     </nav>
                 </div>
 
-                <main className="bg-white/80 backdrop-blur-md rounded-2xl shadow-xl shadow-slate-200/50 border border-white p-6 relative overflow-hidden animate-slide-fade">
-                    {/* Background glass decoration */}
-                    <div className="absolute -top-24 -right-24 w-64 h-64 bg-primary/5 rounded-full blur-3xl pointer-events-none" />
-                    <div className="absolute -bottom-24 -left-24 w-64 h-64 bg-slate-200 rounded-full blur-3xl pointer-events-none" />
-
+                <main className="bg-white dark:bg-[#131314] border border-slate-200 dark:border-white/10 p-6 relative">
                     <div className="relative z-10">
                         {activeTab === "overview" && <OverviewTab key={`overview-${reloadKey}`} range={range} refreshMs={refresh} />}
                         {activeTab === "success" && <SuccessWorkspace key={`success-${reloadKey}`} />}
                         {activeTab === "tenants" && <TenantManagement key={`tenants-${reloadKey}`} />}
-                        {activeTab === "network" && <NetworkOpsTab key={`network-${reloadKey}`} />}
+                        {activeTab === "printhouses" && <ProductionNodeRegistryTab key={`printhouses-${reloadKey}`} />}
+                        {activeTab === "onboarding" && <PrinthouseOnboardingPage key={`onboarding-${reloadKey}`} />}
+                        {activeTab === "network" && (
+                            <div className="space-y-6">
+                                <FederatedNodesNetworkPanel />
+                                <NetworkOpsTab key={`network-${reloadKey}`} />
+                            </div>
+                        )}
                         {activeTab === "pricing" && <PricingIntelligenceTab key={`pricing-${reloadKey}`} />}
                         {activeTab === "offers" && <OffersTab key={`offers-${reloadKey}`} />}
-                        {activeTab === "marketplace" && <MarketplaceTab key={`marketplace-${reloadKey}`} />}
-                        {activeTab === "negotiations" && <MarketplaceReadinessTab key={`negotiations-${reloadKey}`} />}
+                        {activeTab === "marketplace" && <MarketplacePage key={`marketplace-${reloadKey}`} />}
                         {activeTab === "commitments" && <CommercialCommitmentsTab key={`commitments-${reloadKey}`} />}
+                        {activeTab === "routing" && <RoutingDecisionTab key={`routing-${reloadKey}`} />}
+                        {activeTab === "dispatch" && <ProductionDispatchTab key={`dispatch-${reloadKey}`} />}
+                        {activeTab === "execution" && <IndustrialLiveTab key={`execution-${reloadKey}`} />}
                         {activeTab === "autonomy" && <AutonomousOpsTab key={`autonomy-${reloadKey}`} />}
+
+
                         {activeTab === "finance" && <FinancialOpsTab key={`finance-${reloadKey}`} />}
                         {activeTab === "notifications" && <NotificationsTab key={`notifications-${reloadKey}`} refreshMs={refresh} />}
                         {activeTab === "jobs" && <JobsTab key={`jobs-${reloadKey}`} refreshMs={refresh} />}

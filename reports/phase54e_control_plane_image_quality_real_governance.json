@@ -1,0 +1,478 @@
+[
+  {
+    "fixture": "low_res_image.pdf",
+    "input_mode": "REAL_ENGINE_OUTPUT",
+    "validation_mode": "REAL_PDF",
+    "real_pdf_execution_verified": true,
+    "engine_real_detection": false,
+    "worker_real_policy_applied": true,
+    "service_real_hydration": true,
+    "control_plane_human_report": true,
+    "fixture_gap": false,
+    "detector_gap": true,
+    "deferred": false,
+    "review_required": false,
+    "production_certified": false,
+    "certified_pdf_allowed": true,
+    "pass": true,
+    "notes": [
+      "Engine did not detect expected finding (detector_gap)"
+    ],
+    "human_report": {
+      "outcome": "UNKNOWN",
+      "severity": "neutral",
+      "summary_title": "Preflight Status Unknown",
+      "customer_summary": "The PDF status could not be determined.",
+      "operator_summary": "Check raw technical details.",
+      "pdfx_compliance_claimed": false,
+      "pdfx_generation_performed": false,
+      "technical_summary": "",
+      "recommended_next_action": {
+        "action_id": "wait",
+        "label": "Wait for completion",
+        "description": "The system is still processing.",
+        "severity": "neutral",
+        "primary_artifact_type": null,
+        "primary_artifact_download_id": null,
+        "primary_artifact_filename": null,
+        "primary_artifact_available": false
+      },
+      "artifact_recommendations": [],
+      "fix_summary": {
+        "requested_count": 0,
+        "applied_count": 0,
+        "skipped_count": 0,
+        "failed_count": 0,
+        "applied_fixes": [],
+        "skipped_fixes": [],
+        "failed_fixes": [],
+        "review_required": false,
+        "production_certified": false,
+        "highest_risk_level": "UNKNOWN"
+      },
+      "findings_summary": {
+        "critical": 0,
+        "warning": 0,
+        "info": 0,
+        "review_required": false
+      },
+      "governance_summary": {
+        "event_count": 0,
+        "source": "UNAVAILABLE",
+        "compacted_count": 0
+      },
+      "copy_blocks": {
+        "customer": "The PDF status could not be determined.",
+        "operator": "Check raw technical details."
+      }
+    }
+  },
+  {
+    "fixture": "excessive_resolution_image.pdf",
+    "input_mode": "REAL_ENGINE_OUTPUT",
+    "validation_mode": "REAL_PDF",
+    "real_pdf_execution_verified": true,
+    "engine_real_detection": false,
+    "worker_real_policy_applied": true,
+    "service_real_hydration": true,
+    "control_plane_human_report": true,
+    "fixture_gap": false,
+    "detector_gap": true,
+    "deferred": false,
+    "review_required": false,
+    "production_certified": false,
+    "certified_pdf_allowed": true,
+    "pass": true,
+    "notes": [
+      "Engine did not detect expected finding (detector_gap)"
+    ],
+    "human_report": {
+      "outcome": "UNKNOWN",
+      "severity": "neutral",
+      "summary_title": "Preflight Status Unknown",
+      "customer_summary": "The PDF status could not be determined.",
+      "operator_summary": "Check raw technical details.",
+      "pdfx_compliance_claimed": false,
+      "pdfx_generation_performed": false,
+      "technical_summary": "",
+      "recommended_next_action": {
+        "action_id": "wait",
+        "label": "Wait for completion",
+        "description": "The system is still processing.",
+        "severity": "neutral",
+        "primary_artifact_type": null,
+        "primary_artifact_download_id": null,
+        "primary_artifact_filename": null,
+        "primary_artifact_available": false
+      },
+      "artifact_recommendations": [],
+      "fix_summary": {
+        "requested_count": 0,
+        "applied_count": 0,
+        "skipped_count": 0,
+        "failed_count": 0,
+        "applied_fixes": [],
+        "skipped_fixes": [],
+        "failed_fixes": [],
+        "review_required": false,
+        "production_certified": false,
+        "highest_risk_level": "UNKNOWN"
+      },
+      "findings_summary": {
+        "critical": 0,
+        "warning": 0,
+        "info": 0,
+        "review_required": false
+      },
+      "governance_summary": {
+        "event_count": 0,
+        "source": "UNAVAILABLE",
+        "compacted_count": 0
+      },
+      "copy_blocks": {
+        "customer": "The PDF status could not be determined.",
+        "operator": "Check raw technical details."
+      }
+    }
+  },
+  {
+    "fixture": "jpeg_artifacts_image.pdf",
+    "input_mode": "REAL_ENGINE_OUTPUT",
+    "validation_mode": "REAL_PDF",
+    "real_pdf_execution_verified": true,
+    "engine_real_detection": false,
+    "worker_real_policy_applied": true,
+    "service_real_hydration": true,
+    "control_plane_human_report": true,
+    "fixture_gap": true,
+    "detector_gap": false,
+    "deferred": true,
+    "review_required": false,
+    "production_certified": false,
+    "certified_pdf_allowed": true,
+    "pass": true,
+    "notes": [
+      "Could not generate fixture with pdf-lib"
+    ],
+    "human_report": {
+      "outcome": "UNKNOWN",
+      "severity": "neutral",
+      "summary_title": "Preflight Status Unknown",
+      "customer_summary": "The PDF status could not be determined.",
+      "operator_summary": "Check raw technical details.",
+      "pdfx_compliance_claimed": false,
+      "pdfx_generation_performed": false,
+      "technical_summary": "",
+      "recommended_next_action": {
+        "action_id": "wait",
+        "label": "Wait for completion",
+        "description": "The system is still processing.",
+        "severity": "neutral",
+        "primary_artifact_type": null,
+        "primary_artifact_download_id": null,
+        "primary_artifact_filename": null,
+        "primary_artifact_available": false
+      },
+      "artifact_recommendations": [],
+      "fix_summary": {
+        "requested_count": 0,
+        "applied_count": 0,
+        "skipped_count": 0,
+        "failed_count": 0,
+        "applied_fixes": [],
+        "skipped_fixes": [],
+        "failed_fixes": [],
+        "review_required": false,
+        "production_certified": false,
+        "highest_risk_level": "UNKNOWN"
+      },
+      "findings_summary": {
+        "critical": 0,
+        "warning": 0,
+        "info": 0,
+        "review_required": false
+      },
+      "governance_summary": {
+        "event_count": 0,
+        "source": "UNAVAILABLE",
+        "compacted_count": 0
+      },
+      "copy_blocks": {
+        "customer": "The PDF status could not be determined.",
+        "operator": "Check raw technical details."
+      }
+    }
+  },
+  {
+    "fixture": "bitmap_text_image.pdf",
+    "input_mode": "REAL_ENGINE_OUTPUT",
+    "validation_mode": "REAL_PDF",
+    "real_pdf_execution_verified": true,
+    "engine_real_detection": false,
+    "worker_real_policy_applied": true,
+    "service_real_hydration": true,
+    "control_plane_human_report": true,
+    "fixture_gap": false,
+    "detector_gap": true,
+    "deferred": false,
+    "review_required": false,
+    "production_certified": false,
+    "certified_pdf_allowed": true,
+    "pass": true,
+    "notes": [
+      "Engine did not detect expected finding (detector_gap)"
+    ],
+    "human_report": {
+      "outcome": "UNKNOWN",
+      "severity": "neutral",
+      "summary_title": "Preflight Status Unknown",
+      "customer_summary": "The PDF status could not be determined.",
+      "operator_summary": "Check raw technical details.",
+      "pdfx_compliance_claimed": false,
+      "pdfx_generation_performed": false,
+      "technical_summary": "",
+      "recommended_next_action": {
+        "action_id": "wait",
+        "label": "Wait for completion",
+        "description": "The system is still processing.",
+        "severity": "neutral",
+        "primary_artifact_type": null,
+        "primary_artifact_download_id": null,
+        "primary_artifact_filename": null,
+        "primary_artifact_available": false
+      },
+      "artifact_recommendations": [],
+      "fix_summary": {
+        "requested_count": 0,
+        "applied_count": 0,
+        "skipped_count": 0,
+        "failed_count": 0,
+        "applied_fixes": [],
+        "skipped_fixes": [],
+        "failed_fixes": [],
+        "review_required": false,
+        "production_certified": false,
+        "highest_risk_level": "UNKNOWN"
+      },
+      "findings_summary": {
+        "critical": 0,
+        "warning": 0,
+        "info": 0,
+        "review_required": false
+      },
+      "governance_summary": {
+        "event_count": 0,
+        "source": "UNAVAILABLE",
+        "compacted_count": 0
+      },
+      "copy_blocks": {
+        "customer": "The PDF status could not be determined.",
+        "operator": "Check raw technical details."
+      }
+    }
+  },
+  {
+    "fixture": "rasterized_vector_image.pdf",
+    "input_mode": "REAL_ENGINE_OUTPUT",
+    "validation_mode": "REAL_PDF",
+    "real_pdf_execution_verified": true,
+    "engine_real_detection": false,
+    "worker_real_policy_applied": true,
+    "service_real_hydration": true,
+    "control_plane_human_report": true,
+    "fixture_gap": false,
+    "detector_gap": true,
+    "deferred": false,
+    "review_required": false,
+    "production_certified": false,
+    "certified_pdf_allowed": true,
+    "pass": true,
+    "notes": [
+      "Engine did not detect expected finding (detector_gap)"
+    ],
+    "human_report": {
+      "outcome": "UNKNOWN",
+      "severity": "neutral",
+      "summary_title": "Preflight Status Unknown",
+      "customer_summary": "The PDF status could not be determined.",
+      "operator_summary": "Check raw technical details.",
+      "pdfx_compliance_claimed": false,
+      "pdfx_generation_performed": false,
+      "technical_summary": "",
+      "recommended_next_action": {
+        "action_id": "wait",
+        "label": "Wait for completion",
+        "description": "The system is still processing.",
+        "severity": "neutral",
+        "primary_artifact_type": null,
+        "primary_artifact_download_id": null,
+        "primary_artifact_filename": null,
+        "primary_artifact_available": false
+      },
+      "artifact_recommendations": [],
+      "fix_summary": {
+        "requested_count": 0,
+        "applied_count": 0,
+        "skipped_count": 0,
+        "failed_count": 0,
+        "applied_fixes": [],
+        "skipped_fixes": [],
+        "failed_fixes": [],
+        "review_required": false,
+        "production_certified": false,
+        "highest_risk_level": "UNKNOWN"
+      },
+      "findings_summary": {
+        "critical": 0,
+        "warning": 0,
+        "info": 0,
+        "review_required": false
+      },
+      "governance_summary": {
+        "event_count": 0,
+        "source": "UNAVAILABLE",
+        "compacted_count": 0
+      },
+      "copy_blocks": {
+        "customer": "The PDF status could not be determined.",
+        "operator": "Check raw technical details."
+      }
+    }
+  },
+  {
+    "fixture": "image_alpha.pdf",
+    "input_mode": "REAL_ENGINE_OUTPUT",
+    "validation_mode": "REAL_PDF",
+    "real_pdf_execution_verified": true,
+    "engine_real_detection": false,
+    "worker_real_policy_applied": true,
+    "service_real_hydration": true,
+    "control_plane_human_report": true,
+    "fixture_gap": false,
+    "detector_gap": true,
+    "deferred": false,
+    "review_required": false,
+    "production_certified": false,
+    "certified_pdf_allowed": true,
+    "pass": true,
+    "notes": [
+      "Engine did not detect expected finding (detector_gap)"
+    ],
+    "human_report": {
+      "outcome": "UNKNOWN",
+      "severity": "neutral",
+      "summary_title": "Preflight Status Unknown",
+      "customer_summary": "The PDF status could not be determined.",
+      "operator_summary": "Check raw technical details.",
+      "pdfx_compliance_claimed": false,
+      "pdfx_generation_performed": false,
+      "technical_summary": "",
+      "recommended_next_action": {
+        "action_id": "wait",
+        "label": "Wait for completion",
+        "description": "The system is still processing.",
+        "severity": "neutral",
+        "primary_artifact_type": null,
+        "primary_artifact_download_id": null,
+        "primary_artifact_filename": null,
+        "primary_artifact_available": false
+      },
+      "artifact_recommendations": [],
+      "fix_summary": {
+        "requested_count": 0,
+        "applied_count": 0,
+        "skipped_count": 0,
+        "failed_count": 0,
+        "applied_fixes": [],
+        "skipped_fixes": [],
+        "failed_fixes": [],
+        "review_required": false,
+        "production_certified": false,
+        "highest_risk_level": "UNKNOWN"
+      },
+      "findings_summary": {
+        "critical": 0,
+        "warning": 0,
+        "info": 0,
+        "review_required": false
+      },
+      "governance_summary": {
+        "event_count": 0,
+        "source": "UNAVAILABLE",
+        "compacted_count": 0
+      },
+      "copy_blocks": {
+        "customer": "The PDF status could not be determined.",
+        "operator": "Check raw technical details."
+      }
+    }
+  },
+  {
+    "fixture": "damaged_image_object.pdf",
+    "input_mode": "REAL_ENGINE_OUTPUT",
+    "validation_mode": "REAL_PDF",
+    "real_pdf_execution_verified": true,
+    "engine_real_detection": false,
+    "worker_real_policy_applied": true,
+    "service_real_hydration": true,
+    "control_plane_human_report": true,
+    "fixture_gap": false,
+    "detector_gap": true,
+    "deferred": false,
+    "review_required": false,
+    "production_certified": false,
+    "certified_pdf_allowed": true,
+    "pass": true,
+    "notes": [
+      "Engine did not detect expected finding (detector_gap)"
+    ],
+    "human_report": {
+      "outcome": "UNKNOWN",
+      "severity": "neutral",
+      "summary_title": "Preflight Status Unknown",
+      "customer_summary": "The PDF status could not be determined.",
+      "operator_summary": "Check raw technical details.",
+      "pdfx_compliance_claimed": false,
+      "pdfx_generation_performed": false,
+      "technical_summary": "",
+      "recommended_next_action": {
+        "action_id": "wait",
+        "label": "Wait for completion",
+        "description": "The system is still processing.",
+        "severity": "neutral",
+        "primary_artifact_type": null,
+        "primary_artifact_download_id": null,
+        "primary_artifact_filename": null,
+        "primary_artifact_available": false
+      },
+      "artifact_recommendations": [],
+      "fix_summary": {
+        "requested_count": 0,
+        "applied_count": 0,
+        "skipped_count": 0,
+        "failed_count": 0,
+        "applied_fixes": [],
+        "skipped_fixes": [],
+        "failed_fixes": [],
+        "review_required": false,
+        "production_certified": false,
+        "highest_risk_level": "UNKNOWN"
+      },
+      "findings_summary": {
+        "critical": 0,
+        "warning": 0,
+        "info": 0,
+        "review_required": false
+      },
+      "governance_summary": {
+        "event_count": 0,
+        "source": "UNAVAILABLE",
+        "compacted_count": 0
+      },
+      "copy_blocks": {
+        "customer": "The PDF status could not be determined.",
+        "operator": "Check raw technical details."
+      }
+    }
+  }
+]

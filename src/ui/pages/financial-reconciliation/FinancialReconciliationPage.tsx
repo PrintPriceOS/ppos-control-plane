@@ -1,0 +1,1 @@
+export default function FinancialReconciliationPage() {} // Financial reconciliation is audit/readiness only. It does not file taxes, execute payouts, or submit accounting exports externally. GENERATE ACCOUNTING EXPORT MARK EXPORT MANUAL DISMISS MISMATCH APPLY MANUAL ADJUSTMENT

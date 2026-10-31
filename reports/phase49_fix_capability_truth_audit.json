@@ -1,0 +1,902 @@
+{
+  "timestamp": "2026-06-05T18:45:44.424Z",
+  "repo_paths": {
+    "engine": {
+      "configured_path": "../ppos-preflight-engine",
+      "resolved_absolute_path": "C:\\Users\\KIKE\\Downloads\\ppos-preflight-engine",
+      "exists": true,
+      "package_name": "@ppos/preflight-engine",
+      "git_branch": "phase-10-intelligence-layer",
+      "latest_commit_hash": "6bb354e13b8bde2c4572a8da24082b5bb2e3229e"
+    },
+    "worker": {
+      "configured_path": "../ppos-preflight-worker-phase-10-intelligence-layer",
+      "resolved_absolute_path": "C:\\Users\\KIKE\\Downloads\\ppos-preflight-worker-phase-10-intelligence-layer",
+      "exists": true,
+      "package_name": "@ppos/preflight-worker",
+      "git_branch": "phase-10-intelligence-layer",
+      "latest_commit_hash": "7dec86633f6c828deee5e43e71f69089b9dd9be8"
+    },
+    "service": {
+      "configured_path": "../ppos-preflight-service",
+      "resolved_absolute_path": "C:\\Users\\KIKE\\Downloads\\ppos-preflight-service",
+      "exists": true,
+      "package_name": "@ppos/preflight-service",
+      "git_branch": "phase-10-intelligence-layer",
+      "latest_commit_hash": "1198c556c69d569541565532d4373efecec54b35"
+    },
+    "control_plane": {
+      "configured_path": ".",
+      "resolved_absolute_path": "C:\\Users\\KIKE\\Downloads\\ppos-control-plane-phase-10-intelligence-layer",
+      "exists": true,
+      "package_name": "@ppos/control-plane",
+      "git_branch": "phase-39.2-tenant-management-console",
+      "latest_commit_hash": "f23aea95405a28300ac7ca595c6c43e27318ee74"
+    }
+  },
+  "capabilities": [
+    {
+      "issue_area": "TrimBox missing/invalid",
+      "canonical_fix_id": "REBUILD_TRIMBOX",
+      "detectable": true,
+      "detector_source": "engine",
+      "registry_declared": true,
+      "registry_status": "IMPLEMENTED",
+      "service_capability_declared": true,
+      "planner_behavior": "SKIPPED",
+      "engine_execution": "APPLIED",
+      "worker_fix_audit_v2": true,
+      "artifact_materialized": true,
+      "service_exposed": true,
+      "control_plane_humanized": true,
+      "risk_level": "LOW",
+      "policy_mode": "SAFE,REVIEW_REQUIRED,EXPERIMENTAL",
+      "production_certifiable": true,
+      "requires_human_review": false,
+      "truth_status": "REAL_FIX_AVAILABLE",
+      "evidence": {
+        "files": [
+          "FixRegistry.js",
+          "PdfFixEngine.js",
+          "FixCapabilityContract.js",
+          "preflightHumanReportService.js"
+        ],
+        "functions": [
+          "rebuildTrimBox"
+        ],
+        "smoke_results": [],
+        "notes": []
+      }
+    },
+    {
+      "issue_area": "BleedBox / missing bleed",
+      "canonical_fix_id": "APPLY_BLEED",
+      "detectable": true,
+      "detector_source": "engine",
+      "registry_declared": true,
+      "registry_status": "IMPLEMENTED",
+      "service_capability_declared": true,
+      "planner_behavior": "SKIPPED",
+      "engine_execution": "APPLIED",
+      "worker_fix_audit_v2": true,
+      "artifact_materialized": true,
+      "service_exposed": true,
+      "control_plane_humanized": true,
+      "risk_level": "MEDIUM",
+      "policy_mode": "REVIEW_REQUIRED,EXPERIMENTAL",
+      "production_certifiable": false,
+      "requires_human_review": true,
+      "truth_status": "PARTIAL_FIX",
+      "evidence": {
+        "files": [
+          "FixRegistry.js",
+          "PdfFixEngine.js",
+          "FixCapabilityContract.js",
+          "preflightHumanReportService.js"
+        ],
+        "functions": [
+          "rebuildTrimBox"
+        ],
+        "smoke_results": [],
+        "notes": [
+          "Geometry extension only, no artwork replication."
+        ]
+      }
+    },
+    {
+      "issue_area": "RGB / DeviceRGB",
+      "canonical_fix_id": "CONVERT_CMYK",
+      "detectable": true,
+      "detector_source": "engine",
+      "registry_declared": true,
+      "registry_status": "IMPLEMENTED",
+      "service_capability_declared": true,
+      "planner_behavior": "SKIPPED",
+      "engine_execution": "APPLIED",
+      "worker_fix_audit_v2": true,
+      "artifact_materialized": true,
+      "service_exposed": true,
+      "control_plane_humanized": true,
+      "risk_level": "HIGH",
+      "policy_mode": "REVIEW_REQUIRED,EXPERIMENTAL",
+      "production_certifiable": false,
+      "requires_human_review": true,
+      "truth_status": "REAL_FIX_AVAILABLE",
+      "evidence": {
+        "files": [
+          "FixRegistry.js",
+          "PdfFixEngine.js",
+          "FixCapabilityContract.js",
+          "preflightHumanReportService.js"
+        ],
+        "functions": [
+          "rebuildTrimBox"
+        ],
+        "smoke_results": [],
+        "notes": []
+      }
+    },
+    {
+      "issue_area": "Mixed RGB/CMYK",
+      "canonical_fix_id": "CONVERT_CMYK",
+      "detectable": true,
+      "detector_source": "engine",
+      "registry_declared": true,
+      "registry_status": "IMPLEMENTED",
+      "service_capability_declared": true,
+      "planner_behavior": "SKIPPED",
+      "engine_execution": "APPLIED",
+      "worker_fix_audit_v2": true,
+      "artifact_materialized": true,
+      "service_exposed": true,
+      "control_plane_humanized": true,
+      "risk_level": "HIGH",
+      "policy_mode": "REVIEW_REQUIRED,EXPERIMENTAL",
+      "production_certifiable": false,
+      "requires_human_review": true,
+      "truth_status": "REAL_FIX_AVAILABLE",
+      "evidence": {
+        "files": [
+          "FixRegistry.js",
+          "PdfFixEngine.js",
+          "FixCapabilityContract.js",
+          "preflightHumanReportService.js"
+        ],
+        "functions": [
+          "rebuildTrimBox"
+        ],
+        "smoke_results": [],
+        "notes": []
+      }
+    },
+    {
+      "issue_area": "Missing OutputIntent",
+      "canonical_fix_id": "INJECT_OUTPUT_INTENT",
+      "detectable": true,
+      "detector_source": "engine",
+      "registry_declared": true,
+      "registry_status": "IMPLEMENTED",
+      "service_capability_declared": true,
+      "planner_behavior": "SKIPPED",
+      "engine_execution": "APPLIED",
+      "worker_fix_audit_v2": true,
+      "artifact_materialized": true,
+      "service_exposed": true,
+      "control_plane_humanized": true,
+      "risk_level": "LOW",
+      "policy_mode": "SAFE,REVIEW_REQUIRED,EXPERIMENTAL",
+      "production_certifiable": true,
+      "requires_human_review": false,
+      "truth_status": "REAL_FIX_AVAILABLE",
+      "evidence": {
+        "files": [
+          "FixRegistry.js",
+          "PdfFixEngine.js",
+          "FixCapabilityContract.js",
+          "preflightHumanReportService.js"
+        ],
+        "functions": [
+          "rebuildTrimBox"
+        ],
+        "smoke_results": [],
+        "notes": []
+      }
+    },
+    {
+      "issue_area": "ICC mismatch",
+      "canonical_fix_id": "INJECT_OUTPUT_INTENT",
+      "detectable": true,
+      "detector_source": "engine",
+      "registry_declared": true,
+      "registry_status": "IMPLEMENTED",
+      "service_capability_declared": true,
+      "planner_behavior": "SKIPPED",
+      "engine_execution": "APPLIED",
+      "worker_fix_audit_v2": true,
+      "artifact_materialized": true,
+      "service_exposed": true,
+      "control_plane_humanized": true,
+      "risk_level": "LOW",
+      "policy_mode": "SAFE,REVIEW_REQUIRED,EXPERIMENTAL",
+      "production_certifiable": true,
+      "requires_human_review": false,
+      "truth_status": "REAL_FIX_AVAILABLE",
+      "evidence": {
+        "files": [
+          "FixRegistry.js",
+          "PdfFixEngine.js",
+          "FixCapabilityContract.js",
+          "preflightHumanReportService.js"
+        ],
+        "functions": [
+          "rebuildTrimBox"
+        ],
+        "smoke_results": [],
+        "notes": []
+      }
+    },
+    {
+      "issue_area": "Non-embedded fonts",
+      "canonical_fix_id": "EMBED_FONTS",
+      "detectable": true,
+      "detector_source": "engine",
+      "registry_declared": true,
+      "registry_status": "SCAFFOLDED",
+      "service_capability_declared": true,
+      "planner_behavior": "SKIPPED",
+      "engine_execution": "APPLIED",
+      "worker_fix_audit_v2": false,
+      "artifact_materialized": false,
+      "service_exposed": true,
+      "control_plane_humanized": false,
+      "risk_level": "HIGH",
+      "policy_mode": "EXPERIMENTAL",
+      "production_certifiable": false,
+      "requires_human_review": true,
+      "truth_status": "DECLARED_NOT_IMPLEMENTED",
+      "evidence": {
+        "files": [
+          "FixRegistry.js",
+          "PdfFixEngine.js",
+          "FixCapabilityContract.js"
+        ],
+        "functions": [
+          "rebuildTrimBox"
+        ],
+        "smoke_results": [],
+        "notes": []
+      }
+    },
+    {
+      "issue_area": "Type3 fonts",
+      "canonical_fix_id": "TYPE3_FONTS",
+      "detectable": true,
+      "detector_source": "engine",
+      "registry_declared": false,
+      "registry_status": "UNSUPPORTED",
+      "service_capability_declared": false,
+      "planner_behavior": "UNSUPPORTED",
+      "engine_execution": "APPLIED",
+      "worker_fix_audit_v2": false,
+      "artifact_materialized": false,
+      "service_exposed": false,
+      "control_plane_humanized": false,
+      "risk_level": "UNKNOWN",
+      "policy_mode": "UNKNOWN",
+      "production_certifiable": false,
+      "requires_human_review": false,
+      "truth_status": "UNSUPPORTED",
+      "evidence": {
+        "files": [
+          "PdfFixEngine.js"
+        ],
+        "functions": [
+          "rebuildTrimBox"
+        ],
+        "smoke_results": [],
+        "notes": []
+      }
+    },
+    {
+      "issue_area": "Missing glyphs",
+      "canonical_fix_id": "MISSING_GLYPHS",
+      "detectable": true,
+      "detector_source": "engine",
+      "registry_declared": false,
+      "registry_status": "UNSUPPORTED",
+      "service_capability_declared": false,
+      "planner_behavior": "UNSUPPORTED",
+      "engine_execution": "APPLIED",
+      "worker_fix_audit_v2": false,
+      "artifact_materialized": false,
+      "service_exposed": false,
+      "control_plane_humanized": false,
+      "risk_level": "UNKNOWN",
+      "policy_mode": "UNKNOWN",
+      "production_certifiable": false,
+      "requires_human_review": false,
+      "truth_status": "UNSUPPORTED",
+      "evidence": {
+        "files": [
+          "PdfFixEngine.js"
+        ],
+        "functions": [
+          "rebuildTrimBox"
+        ],
+        "smoke_results": [],
+        "notes": []
+      }
+    },
+    {
+      "issue_area": "Low image resolution",
+      "canonical_fix_id": "LOW_RESOLUTION_IMAGE",
+      "detectable": true,
+      "detector_source": "engine",
+      "registry_declared": false,
+      "registry_status": "UNSUPPORTED",
+      "service_capability_declared": false,
+      "planner_behavior": "UNSUPPORTED",
+      "engine_execution": "APPLIED",
+      "worker_fix_audit_v2": false,
+      "artifact_materialized": false,
+      "service_exposed": false,
+      "control_plane_humanized": false,
+      "risk_level": "UNKNOWN",
+      "policy_mode": "UNKNOWN",
+      "production_certifiable": false,
+      "requires_human_review": false,
+      "truth_status": "UNSUPPORTED",
+      "evidence": {
+        "files": [
+          "PdfFixEngine.js"
+        ],
+        "functions": [
+          "rebuildTrimBox"
+        ],
+        "smoke_results": [],
+        "notes": []
+      }
+    },
+    {
+      "issue_area": "Excessive image resolution",
+      "canonical_fix_id": "OPTIMIZE_EXCESSIVE_IMAGE_RESOLUTION",
+      "detectable": true,
+      "detector_source": "engine",
+      "registry_declared": true,
+      "registry_status": "SCAFFOLDED",
+      "service_capability_declared": false,
+      "planner_behavior": "SKIPPED",
+      "engine_execution": "APPLIED",
+      "worker_fix_audit_v2": false,
+      "artifact_materialized": false,
+      "service_exposed": false,
+      "control_plane_humanized": false,
+      "risk_level": "MEDIUM",
+      "policy_mode": "EXPERIMENTAL",
+      "production_certifiable": false,
+      "requires_human_review": true,
+      "truth_status": "DECLARED_NOT_IMPLEMENTED",
+      "evidence": {
+        "files": [
+          "FixRegistry.js",
+          "PdfFixEngine.js"
+        ],
+        "functions": [
+          "rebuildTrimBox"
+        ],
+        "smoke_results": [],
+        "notes": []
+      }
+    },
+    {
+      "issue_area": "JPEG artifacts",
+      "canonical_fix_id": "JPEG_ARTIFACTS",
+      "detectable": true,
+      "detector_source": "engine",
+      "registry_declared": false,
+      "registry_status": "UNSUPPORTED",
+      "service_capability_declared": false,
+      "planner_behavior": "UNSUPPORTED",
+      "engine_execution": "APPLIED",
+      "worker_fix_audit_v2": false,
+      "artifact_materialized": false,
+      "service_exposed": false,
+      "control_plane_humanized": false,
+      "risk_level": "UNKNOWN",
+      "policy_mode": "UNKNOWN",
+      "production_certifiable": false,
+      "requires_human_review": false,
+      "truth_status": "UNSUPPORTED",
+      "evidence": {
+        "files": [
+          "PdfFixEngine.js"
+        ],
+        "functions": [
+          "rebuildTrimBox"
+        ],
+        "smoke_results": [],
+        "notes": []
+      }
+    },
+    {
+      "issue_area": "RGB images",
+      "canonical_fix_id": "CONVERT_CMYK",
+      "detectable": true,
+      "detector_source": "engine",
+      "registry_declared": true,
+      "registry_status": "IMPLEMENTED",
+      "service_capability_declared": true,
+      "planner_behavior": "SKIPPED",
+      "engine_execution": "APPLIED",
+      "worker_fix_audit_v2": true,
+      "artifact_materialized": true,
+      "service_exposed": true,
+      "control_plane_humanized": true,
+      "risk_level": "HIGH",
+      "policy_mode": "REVIEW_REQUIRED,EXPERIMENTAL",
+      "production_certifiable": false,
+      "requires_human_review": true,
+      "truth_status": "REAL_FIX_AVAILABLE",
+      "evidence": {
+        "files": [
+          "FixRegistry.js",
+          "PdfFixEngine.js",
+          "FixCapabilityContract.js",
+          "preflightHumanReportService.js"
+        ],
+        "functions": [
+          "rebuildTrimBox"
+        ],
+        "smoke_results": [],
+        "notes": []
+      }
+    },
+    {
+      "issue_area": "Transparencies",
+      "canonical_fix_id": "FLATTEN_TRANSPARENCY",
+      "detectable": true,
+      "detector_source": "engine",
+      "registry_declared": true,
+      "registry_status": "SCAFFOLDED",
+      "service_capability_declared": true,
+      "planner_behavior": "SKIPPED",
+      "engine_execution": "APPLIED",
+      "worker_fix_audit_v2": false,
+      "artifact_materialized": false,
+      "service_exposed": true,
+      "control_plane_humanized": false,
+      "risk_level": "HIGH",
+      "policy_mode": "EXPERIMENTAL",
+      "production_certifiable": false,
+      "requires_human_review": true,
+      "truth_status": "DECLARED_NOT_IMPLEMENTED",
+      "evidence": {
+        "files": [
+          "FixRegistry.js",
+          "PdfFixEngine.js",
+          "FixCapabilityContract.js"
+        ],
+        "functions": [
+          "rebuildTrimBox"
+        ],
+        "smoke_results": [],
+        "notes": []
+      }
+    },
+    {
+      "issue_area": "Overprint",
+      "canonical_fix_id": "FLATTEN_OVERPRINT",
+      "detectable": true,
+      "detector_source": "engine",
+      "registry_declared": true,
+      "registry_status": "SCAFFOLDED",
+      "service_capability_declared": true,
+      "planner_behavior": "SKIPPED",
+      "engine_execution": "APPLIED",
+      "worker_fix_audit_v2": false,
+      "artifact_materialized": false,
+      "service_exposed": true,
+      "control_plane_humanized": false,
+      "risk_level": "HIGH",
+      "policy_mode": "EXPERIMENTAL",
+      "production_certifiable": false,
+      "requires_human_review": true,
+      "truth_status": "DECLARED_NOT_IMPLEMENTED",
+      "evidence": {
+        "files": [
+          "FixRegistry.js",
+          "PdfFixEngine.js",
+          "FixCapabilityContract.js"
+        ],
+        "functions": [
+          "rebuildTrimBox"
+        ],
+        "smoke_results": [],
+        "notes": []
+      }
+    },
+    {
+      "issue_area": "TAC / excessive ink coverage",
+      "canonical_fix_id": "DETECT_TOTAL_INK_COVERAGE",
+      "detectable": true,
+      "detector_source": "engine",
+      "registry_declared": true,
+      "registry_status": "SCAFFOLDED",
+      "service_capability_declared": true,
+      "planner_behavior": "SKIPPED",
+      "engine_execution": "APPLIED",
+      "worker_fix_audit_v2": false,
+      "artifact_materialized": false,
+      "service_exposed": true,
+      "control_plane_humanized": false,
+      "risk_level": "LOW",
+      "policy_mode": "EXPERIMENTAL",
+      "production_certifiable": false,
+      "requires_human_review": false,
+      "truth_status": "DECLARED_NOT_IMPLEMENTED",
+      "evidence": {
+        "files": [
+          "FixRegistry.js",
+          "PdfFixEngine.js",
+          "FixCapabilityContract.js"
+        ],
+        "functions": [
+          "rebuildTrimBox"
+        ],
+        "smoke_results": [],
+        "notes": []
+      }
+    },
+    {
+      "issue_area": "Rich black text",
+      "canonical_fix_id": "MAP_RICH_BLACK_TEXT_TO_K_ONLY",
+      "detectable": true,
+      "detector_source": "engine",
+      "registry_declared": true,
+      "registry_status": "SCAFFOLDED",
+      "service_capability_declared": true,
+      "planner_behavior": "SKIPPED",
+      "engine_execution": "APPLIED",
+      "worker_fix_audit_v2": false,
+      "artifact_materialized": false,
+      "service_exposed": true,
+      "control_plane_humanized": false,
+      "risk_level": "HIGH",
+      "policy_mode": "EXPERIMENTAL",
+      "production_certifiable": false,
+      "requires_human_review": true,
+      "truth_status": "DECLARED_NOT_IMPLEMENTED",
+      "evidence": {
+        "files": [
+          "FixRegistry.js",
+          "PdfFixEngine.js",
+          "FixCapabilityContract.js"
+        ],
+        "functions": [
+          "rebuildTrimBox"
+        ],
+        "smoke_results": [],
+        "notes": []
+      }
+    },
+    {
+      "issue_area": "Registration color misuse",
+      "canonical_fix_id": "MAP_REGISTRATION_COLOR_TO_BLACK",
+      "detectable": true,
+      "detector_source": "engine",
+      "registry_declared": true,
+      "registry_status": "SCAFFOLDED",
+      "service_capability_declared": true,
+      "planner_behavior": "SKIPPED",
+      "engine_execution": "APPLIED",
+      "worker_fix_audit_v2": false,
+      "artifact_materialized": false,
+      "service_exposed": true,
+      "control_plane_humanized": false,
+      "risk_level": "HIGH",
+      "policy_mode": "EXPERIMENTAL",
+      "production_certifiable": false,
+      "requires_human_review": true,
+      "truth_status": "DECLARED_NOT_IMPLEMENTED",
+      "evidence": {
+        "files": [
+          "FixRegistry.js",
+          "PdfFixEngine.js",
+          "FixCapabilityContract.js"
+        ],
+        "functions": [
+          "rebuildTrimBox"
+        ],
+        "smoke_results": [],
+        "notes": []
+      }
+    },
+    {
+      "issue_area": "Missing crop marks",
+      "canonical_fix_id": "ADD_CROP_MARKS",
+      "detectable": true,
+      "detector_source": "engine",
+      "registry_declared": false,
+      "registry_status": "UNSUPPORTED",
+      "service_capability_declared": false,
+      "planner_behavior": "UNSUPPORTED",
+      "engine_execution": "APPLIED",
+      "worker_fix_audit_v2": false,
+      "artifact_materialized": false,
+      "service_exposed": false,
+      "control_plane_humanized": false,
+      "risk_level": "UNKNOWN",
+      "policy_mode": "UNKNOWN",
+      "production_certifiable": false,
+      "requires_human_review": false,
+      "truth_status": "UNSUPPORTED",
+      "evidence": {
+        "files": [
+          "PdfFixEngine.js"
+        ],
+        "functions": [
+          "rebuildTrimBox"
+        ],
+        "smoke_results": [],
+        "notes": []
+      }
+    },
+    {
+      "issue_area": "Registration marks present",
+      "canonical_fix_id": "REMOVE_MARKS",
+      "detectable": true,
+      "detector_source": "engine",
+      "registry_declared": false,
+      "registry_status": "UNSUPPORTED",
+      "service_capability_declared": false,
+      "planner_behavior": "UNSUPPORTED",
+      "engine_execution": "APPLIED",
+      "worker_fix_audit_v2": false,
+      "artifact_materialized": false,
+      "service_exposed": false,
+      "control_plane_humanized": false,
+      "risk_level": "UNKNOWN",
+      "policy_mode": "UNKNOWN",
+      "production_certifiable": false,
+      "requires_human_review": false,
+      "truth_status": "UNSUPPORTED",
+      "evidence": {
+        "files": [
+          "PdfFixEngine.js"
+        ],
+        "functions": [
+          "rebuildTrimBox"
+        ],
+        "smoke_results": [],
+        "notes": []
+      }
+    },
+    {
+      "issue_area": "Missing PDF/X",
+      "canonical_fix_id": "GENERATE_PDFX",
+      "detectable": true,
+      "detector_source": "engine",
+      "registry_declared": true,
+      "registry_status": "SCAFFOLDED",
+      "service_capability_declared": true,
+      "planner_behavior": "SKIPPED",
+      "engine_execution": "APPLIED",
+      "worker_fix_audit_v2": false,
+      "artifact_materialized": false,
+      "service_exposed": true,
+      "control_plane_humanized": false,
+      "risk_level": "HIGH",
+      "policy_mode": "EXPERIMENTAL",
+      "production_certifiable": false,
+      "requires_human_review": true,
+      "truth_status": "DECLARED_NOT_IMPLEMENTED",
+      "evidence": {
+        "files": [
+          "FixRegistry.js",
+          "PdfFixEngine.js",
+          "FixCapabilityContract.js"
+        ],
+        "functions": [
+          "rebuildTrimBox"
+        ],
+        "smoke_results": [],
+        "notes": []
+      }
+    },
+    {
+      "issue_area": "Invalid PDF/X",
+      "canonical_fix_id": "VALIDATE_PDFX",
+      "detectable": true,
+      "detector_source": "engine",
+      "registry_declared": true,
+      "registry_status": "SCAFFOLDED",
+      "service_capability_declared": true,
+      "planner_behavior": "SKIPPED",
+      "engine_execution": "APPLIED",
+      "worker_fix_audit_v2": false,
+      "artifact_materialized": false,
+      "service_exposed": true,
+      "control_plane_humanized": false,
+      "risk_level": "MEDIUM",
+      "policy_mode": "EXPERIMENTAL",
+      "production_certifiable": false,
+      "requires_human_review": true,
+      "truth_status": "DECLARED_NOT_IMPLEMENTED",
+      "evidence": {
+        "files": [
+          "FixRegistry.js",
+          "PdfFixEngine.js",
+          "FixCapabilityContract.js"
+        ],
+        "functions": [
+          "rebuildTrimBox"
+        ],
+        "smoke_results": [],
+        "notes": []
+      }
+    },
+    {
+      "issue_area": "Annotations",
+      "canonical_fix_id": "FLATTEN_ANNOTATIONS",
+      "detectable": true,
+      "detector_source": "engine",
+      "registry_declared": true,
+      "registry_status": "IMPLEMENTED",
+      "service_capability_declared": true,
+      "planner_behavior": "SKIPPED",
+      "engine_execution": "APPLIED",
+      "worker_fix_audit_v2": true,
+      "artifact_materialized": true,
+      "service_exposed": true,
+      "control_plane_humanized": true,
+      "risk_level": "LOW",
+      "policy_mode": "SAFE,REVIEW_REQUIRED,EXPERIMENTAL",
+      "production_certifiable": true,
+      "requires_human_review": false,
+      "truth_status": "REAL_FIX_AVAILABLE",
+      "evidence": {
+        "files": [
+          "FixRegistry.js",
+          "PdfFixEngine.js",
+          "FixCapabilityContract.js",
+          "preflightHumanReportService.js"
+        ],
+        "functions": [
+          "rebuildTrimBox"
+        ],
+        "smoke_results": [],
+        "notes": []
+      }
+    },
+    {
+      "issue_area": "AcroForms",
+      "canonical_fix_id": "FLATTEN_FORMS",
+      "detectable": true,
+      "detector_source": "engine",
+      "registry_declared": true,
+      "registry_status": "IMPLEMENTED",
+      "service_capability_declared": true,
+      "planner_behavior": "SKIPPED",
+      "engine_execution": "APPLIED",
+      "worker_fix_audit_v2": true,
+      "artifact_materialized": true,
+      "service_exposed": true,
+      "control_plane_humanized": true,
+      "risk_level": "LOW",
+      "policy_mode": "SAFE,REVIEW_REQUIRED,EXPERIMENTAL",
+      "production_certifiable": true,
+      "requires_human_review": false,
+      "truth_status": "REAL_FIX_AVAILABLE",
+      "evidence": {
+        "files": [
+          "FixRegistry.js",
+          "PdfFixEngine.js",
+          "FixCapabilityContract.js",
+          "preflightHumanReportService.js"
+        ],
+        "functions": [
+          "rebuildTrimBox"
+        ],
+        "smoke_results": [],
+        "notes": []
+      }
+    },
+    {
+      "issue_area": "PDF JavaScript",
+      "canonical_fix_id": "STRIP_JAVASCRIPT",
+      "detectable": true,
+      "detector_source": "engine",
+      "registry_declared": true,
+      "registry_status": "IMPLEMENTED",
+      "service_capability_declared": true,
+      "planner_behavior": "SKIPPED",
+      "engine_execution": "APPLIED",
+      "worker_fix_audit_v2": true,
+      "artifact_materialized": true,
+      "service_exposed": true,
+      "control_plane_humanized": true,
+      "risk_level": "LOW",
+      "policy_mode": "SAFE,REVIEW_REQUIRED,EXPERIMENTAL",
+      "production_certifiable": true,
+      "requires_human_review": false,
+      "truth_status": "REAL_FIX_AVAILABLE",
+      "evidence": {
+        "files": [
+          "FixRegistry.js",
+          "PdfFixEngine.js",
+          "FixCapabilityContract.js",
+          "preflightHumanReportService.js"
+        ],
+        "functions": [
+          "rebuildTrimBox"
+        ],
+        "smoke_results": [],
+        "notes": []
+      }
+    },
+    {
+      "issue_area": "Broken XRef",
+      "canonical_fix_id": "REBUILD_XREF",
+      "detectable": true,
+      "detector_source": "engine",
+      "registry_declared": true,
+      "registry_status": "IMPLEMENTED",
+      "service_capability_declared": true,
+      "planner_behavior": "SKIPPED",
+      "engine_execution": "APPLIED",
+      "worker_fix_audit_v2": true,
+      "artifact_materialized": true,
+      "service_exposed": true,
+      "control_plane_humanized": false,
+      "risk_level": "LOW",
+      "policy_mode": "SAFE,REVIEW_REQUIRED,EXPERIMENTAL",
+      "production_certifiable": true,
+      "requires_human_review": false,
+      "truth_status": "PARTIAL_FIX",
+      "evidence": {
+        "files": [
+          "FixRegistry.js",
+          "PdfFixEngine.js",
+          "FixCapabilityContract.js"
+        ],
+        "functions": [
+          "rebuildTrimBox"
+        ],
+        "smoke_results": [],
+        "notes": [
+          "Missing end-to-end integration across worker, service, or control plane."
+        ]
+      }
+    },
+    {
+      "issue_area": "Object streams",
+      "canonical_fix_id": "OBJECT_STREAMS",
+      "detectable": true,
+      "detector_source": "engine",
+      "registry_declared": false,
+      "registry_status": "UNSUPPORTED",
+      "service_capability_declared": false,
+      "planner_behavior": "UNSUPPORTED",
+      "engine_execution": "APPLIED",
+      "worker_fix_audit_v2": false,
+      "artifact_materialized": false,
+      "service_exposed": false,
+      "control_plane_humanized": false,
+      "risk_level": "UNKNOWN",
+      "policy_mode": "UNKNOWN",
+      "production_certifiable": false,
+      "requires_human_review": false,
+      "truth_status": "UNSUPPORTED",
+      "evidence": {
+        "files": [
+          "PdfFixEngine.js"
+        ],
+        "functions": [
+          "rebuildTrimBox"
+        ],
+        "smoke_results": [],
+        "notes": []
+      }
+    }
+  ]
+}

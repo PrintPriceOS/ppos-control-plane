@@ -1,0 +1,12 @@
+node_modules
+dist
+.git
+.agents
+graphify-out
+review_artifacts_*
+*.zip
+*.log
+*.txt
+.env
+.env.*
+secrets

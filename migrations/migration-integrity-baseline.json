@@ -1,0 +1,2367 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-29T11:20:10.174Z",
+  "hashAlgorithm": "sha256",
+  "contentNormalization": "utf8-lf-v1",
+  "approvedPrefixCollisions": {
+    "013": [
+      "migrations/013_paywall_tenant_subscriptions.sql",
+      "migrations/013_phase39_0_tenant_plan_governance.sql"
+    ],
+    "014": [
+      "migrations/014_audit_logs_indexes.sql",
+      "migrations/014_auth_password_reset_tokens.sql"
+    ],
+    "015": [
+      "migrations/015_phase76_printhouse_capabilities.sql",
+      "migrations/015_stripe_webhook_events_idempotency.sql"
+    ]
+  },
+  "migrations": [
+    {
+      "path": "migrations/001_create_schema_version.sql",
+      "prefix": "001",
+      "canonicalSha256": "cdf7dbf3c7eb31bdddf435a56aacfb3a1cb3e75bb9c4261e51049b20d08d9f42",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 466,
+      "containsDdl": true,
+      "containsDml": false,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/002_resolve_schema_drift.sql",
+      "prefix": "002",
+      "canonicalSha256": "9a8e6414ff6d9bd6ebfeb4b3470974c2a3afe7753e2a3c9a2be889cb3047decf",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 1253,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE",
+        "ALTER_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/003_preflight_orchestration.sql",
+      "prefix": "003",
+      "canonicalSha256": "8d866fafe8dbf769b2374c7ae4ec08a486c9f8d597c0d062023f8c09fd144de0",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 3506,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/004_restore_intelligence_schema.sql",
+      "prefix": "004",
+      "canonicalSha256": "039d38b0ef3c30fa6bf53c1656564174e6c3778871448c9327a2e3529f04289e",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 7128,
+      "containsDdl": true,
+      "containsDml": false,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/005_machine_detail_intelligence.sql",
+      "prefix": "005",
+      "canonicalSha256": "9fabe8b9d0566defbc1db16f595f4b3bf886f1b7169d440a8bc7ad4d2b40eac0",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 2577,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/006_industrial_preflight_console.sql",
+      "prefix": "006",
+      "canonicalSha256": "0c797728229c1aaf4c1f16207fb01541f4cd41fd59fd40e48d449ecad0dc5d76",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 2519,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/007_mes_material_orchestration.sql",
+      "prefix": "007",
+      "canonicalSha256": "a4d3d541b02b22f2e12f827e892aec3a5dd14c996640ff35a9176446c4e4f365",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 4885,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/008_enrich_preflight_job_registry.sql",
+      "prefix": "008",
+      "canonicalSha256": "73233c473dfc56b257697ffc67890baeaaadfc7460f441baf65fa41c603ca8d7",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 1663,
+      "containsDdl": false,
+      "containsDml": false,
+      "containsTransaction": false,
+      "statementTypes": []
+    },
+    {
+      "path": "migrations/009_marketplace_orchestration.sql",
+      "prefix": "009",
+      "canonicalSha256": "aebae0418fe4662bf7b26907723674f33643f4335a5ddc50cf56adb6f66b43bd",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 4128,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/010_hardened_intake_contracts.sql",
+      "prefix": "010",
+      "canonicalSha256": "a833bc19a710067622c349f27ab474ac7e03f939fef8ad20294ac492ae7c8988",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 4332,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE",
+        "ALTER_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/011_phase36_marketplace_order_schema.sql",
+      "prefix": "011",
+      "canonicalSha256": "c9f3076cdbd91ac0a16caf645cf66bfcc33c83a6b899420b656fe3a46080042c",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 3545,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/012_phase38_8_production_completion.sql",
+      "prefix": "012",
+      "canonicalSha256": "dcebf7c9b92e8a995aa9e07dfeec80b4149e9bc0de7c739566e6548504f205ab",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 713,
+      "containsDdl": true,
+      "containsDml": false,
+      "containsTransaction": false,
+      "statementTypes": [
+        "ALTER_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/013_paywall_tenant_subscriptions.sql",
+      "prefix": "013",
+      "canonicalSha256": "4eafb2319f36c56b3511dba5dddd12053c18afbcbafc66f3695e72400fc8609a",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 2805,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/013_phase39_0_tenant_plan_governance.sql",
+      "prefix": "013",
+      "canonicalSha256": "292e54a2212b3ad3be5b1d0d9844b9dd6cea0537bd7ae19c433ea54adb68a773",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 1868,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE",
+        "ALTER_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/014_audit_logs_indexes.sql",
+      "prefix": "014",
+      "canonicalSha256": "76d65ad8bc0763833b5aa8dd261d4d1a7ee17228bf27b9457c05e18fd657cb6e",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 211,
+      "containsDdl": true,
+      "containsDml": false,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_INDEX"
+      ]
+    },
+    {
+      "path": "migrations/014_auth_password_reset_tokens.sql",
+      "prefix": "014",
+      "canonicalSha256": "d8225282769df45193768bc7c7fc233ebcfe3a56f7a5125438e3ddccd21e6469",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 1230,
+      "containsDdl": true,
+      "containsDml": false,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/015_phase76_printhouse_capabilities.sql",
+      "prefix": "015",
+      "canonicalSha256": "8342606b875b6366ba151638d5d435f2c4040eafd63a05376fb67c711d1383db",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 5643,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/015_stripe_webhook_events_idempotency.sql",
+      "prefix": "015",
+      "canonicalSha256": "c8a49055de4f188059ecd57b061d4fc02146df8b34acdedb540c3f6180bf4b47",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 1656,
+      "containsDdl": true,
+      "containsDml": false,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/016_phase76c_printhouse_bindings.sql",
+      "prefix": "016",
+      "canonicalSha256": "2c92e3a7cf22a36796c448393e6804e0d74c07ac6d830f96e5d9d37e4d9ec8b5",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 1054,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/017_phase77_tenant_pilot_readiness.sql",
+      "prefix": "017",
+      "canonicalSha256": "adef5ff5bc1b69564d1744e6697a24b89a8b4973d0c980cb28674ed67ba9ed71",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 1488,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/018_phase78_usage_billing_plan_limits.sql",
+      "prefix": "018",
+      "canonicalSha256": "a47cd355530acf0b1c38041bad6edf246ce574bc2f8c84e2be68d0d2917ef5de",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 8342,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/019_phase79_live_production_monitoring_sla_dashboard.sql",
+      "prefix": "019",
+      "canonicalSha256": "8c61afedf755bf9efb519c98b77696b1e59996ee3b1de4f9bfc7bbcc18925994",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 3884,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/020_phase80_controlled_live_production_enablement.sql",
+      "prefix": "020",
+      "canonicalSha256": "78fca50887ad3e4241aa9003b607fa0bd870dda1f12245da33fb0eabe2d754fa",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 6539,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/021_phase81_live_order_operations_limited_commercial_pilot.sql",
+      "prefix": "021",
+      "canonicalSha256": "1171e253549155704a1d66a87d45465ca5babc64ed41e5a304875f19d3f67930",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 3226,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/022_phase82_customer_live_order_communications.sql",
+      "prefix": "022",
+      "canonicalSha256": "df8e0c6497bdf032c53c4c5a60a324bcb5efb63f938f60acbe236f9bc3b1a7cc",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 1611,
+      "containsDdl": true,
+      "containsDml": false,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE",
+        "CREATE_INDEX"
+      ]
+    },
+    {
+      "path": "migrations/023_phase83_partner_printhouse_live_operations_job_board.sql",
+      "prefix": "023",
+      "canonicalSha256": "89f031b7fa16e6c4dbac23fd53a46fafc2176982d04955f12dc90bc96d36cd9a",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 4200,
+      "containsDdl": true,
+      "containsDml": false,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE",
+        "CREATE_INDEX"
+      ]
+    },
+    {
+      "path": "migrations/024_phase84_admin_live_operations_command_center.sql",
+      "prefix": "024",
+      "canonicalSha256": "0de62a57fc797266575d61e8a4d06da441abdf563395da1b3166d0a0fb78daf4",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 3549,
+      "containsDdl": true,
+      "containsDml": false,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE",
+        "CREATE_INDEX"
+      ]
+    },
+    {
+      "path": "migrations/025_phase85_public_marketplace_readiness_launch_control.sql",
+      "prefix": "025",
+      "canonicalSha256": "17a2b58b9c6bda7e26ce782c664ba0a1c481f4fdbe085f3f28e0abae47ca9c89",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 3585,
+      "containsDdl": true,
+      "containsDml": false,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/026_phase86_invite_codes_schema.sql",
+      "prefix": "026",
+      "canonicalSha256": "dbf830af2786c893f72202b47881438d77cae248ea0dc1efb974c4882c384902",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 2240,
+      "containsDdl": true,
+      "containsDml": false,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/027_phase87_public_beta_observability_conversion_funnel.sql",
+      "prefix": "027",
+      "canonicalSha256": "dd328a62c3933a21cdcad6478c95addeec75c8345318068a9f22d597a18d155b",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 2402,
+      "containsDdl": true,
+      "containsDml": false,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/028_phase88_cohort_expansion_review_hardening.sql",
+      "prefix": "028",
+      "canonicalSha256": "55e43f1a1e4f21a584f59a170f93b9409599222e341a97da86b4109f11ce8d16",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 1563,
+      "containsDdl": true,
+      "containsDml": false,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/029_phase89_controlled_cohort_expansion_beta_scaleup.sql",
+      "prefix": "029",
+      "canonicalSha256": "79076ebc36a043f77442b85be58d0e5d793cf1a2441d40fc5ad66710ab94989b",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 2232,
+      "containsDdl": true,
+      "containsDml": false,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/030_phase90_public_beta_commercialization_payment_hardening.sql",
+      "prefix": "030",
+      "canonicalSha256": "1e154cf6c23bf23dde21897ef0b3d1d4c776835dd612dc561d2361b37b68691a",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 4400,
+      "containsDdl": true,
+      "containsDml": false,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/031_phase91_partner_commercial_settlement_payout_readiness.sql",
+      "prefix": "031",
+      "canonicalSha256": "b84163a56e6ac686acf45e6ce1a6d8ab593cfccfd5f43931e6a2a501f5f3bf18",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 5221,
+      "containsDdl": true,
+      "containsDml": false,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/032_phase92_financial_reconciliation_accounting_export_readiness.sql",
+      "prefix": "032",
+      "canonicalSha256": "4e9051444e3717ca4db0cf96c13fc115dd4548cecdc72e919410e7121cd898a0",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 6081,
+      "containsDdl": true,
+      "containsDml": false,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/033_phase93_tax_vat_readiness_schema.sql",
+      "prefix": "033",
+      "canonicalSha256": "3f7d94a8dbae9d05ce58f58063ffa336ae7292a7e5376534f5cddf816eadaba6",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 2947,
+      "containsDdl": true,
+      "containsDml": false,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/034_phase94_invoice_credit_note_lifecycle.sql",
+      "prefix": "034",
+      "canonicalSha256": "ada36df6a4a2a42e49bcd770459fc79a064ea90c8abe97340305c194aa13e1b2",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 3534,
+      "containsDdl": true,
+      "containsDml": false,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/035_phase95_financial_operations_readiness.sql",
+      "prefix": "035",
+      "canonicalSha256": "27fa5bdfdbc029f049e0a53c9c1571df0a2b7abd7a1bd16174ad53ee559e85d1",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 2366,
+      "containsDdl": true,
+      "containsDml": false,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/036_phase96_financial_operations_release_gates.sql",
+      "prefix": "036",
+      "canonicalSha256": "cb5f7a765058ebbf847b39a616f2694d28de557a09ac40f0c7babb840956d279",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 2304,
+      "containsDdl": true,
+      "containsDml": false,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/037_phase97_financial_operations_pilot_mode.sql",
+      "prefix": "037",
+      "canonicalSha256": "cbb8ed75f436c7ac88f59cf5da573b8e69353a5cc902088b287fcea46edcbc3a",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 3278,
+      "containsDdl": true,
+      "containsDml": false,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/038_phase98_financial_operations_partner_sandbox.sql",
+      "prefix": "038",
+      "canonicalSha256": "7c5cb8244568a87fd5b8c5750c310faa0144cbdbf6cb2f9d986ad6f11a496677",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 4045,
+      "containsDdl": true,
+      "containsDml": false,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/039_phase99_financial_operations_production_hardening.sql",
+      "prefix": "039",
+      "canonicalSha256": "7591fd70b0b2b87941bfc562b2dae6ec38618db84ac6c67e2bf143f9480189a6",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 2431,
+      "containsDdl": true,
+      "containsDml": false,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/040_phase100_controlled_production_activation_review.sql",
+      "prefix": "040",
+      "canonicalSha256": "d16f2b9bb54fa715e0ddecb6d38e5c6b5de0f6b6293f1434eb6592dd6b691d16",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 3166,
+      "containsDdl": true,
+      "containsDml": false,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/041_phase101_provider_connectivity_sandbox_readiness.sql",
+      "prefix": "041",
+      "canonicalSha256": "b333bf5aae6054d9d9d4d4f66a5c166fbd40e3f05bbe4fdbe7ab850ead66625a",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 3051,
+      "containsDdl": true,
+      "containsDml": false,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/042_phase102_provider_contract_sla_readiness.sql",
+      "prefix": "042",
+      "canonicalSha256": "7b481afc3e54c0e3ae02d2c26eb470835ea54d2ce187547721e467c91b63ce1c",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 3735,
+      "containsDdl": true,
+      "containsDml": false,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/043_phase103_provider_credential_vault_readiness.sql",
+      "prefix": "043",
+      "canonicalSha256": "3e7ab517b9066e350206341b3b710bb39633a13c860ee4fc822c378a67042427",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 4050,
+      "containsDdl": true,
+      "containsDml": false,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/044_phase104_provider_webhook_sandbox_readiness.sql",
+      "prefix": "044",
+      "canonicalSha256": "7f8d59e66b20a82c907e83dc9a69435abadd3ae6b9da9a5c150df709e86a55da",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 4396,
+      "containsDdl": true,
+      "containsDml": false,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/045_phase105_provider_event_reconciliation_readiness.sql",
+      "prefix": "045",
+      "canonicalSha256": "145b1b69413d3101f7d300f343fe21b7a675db767b644fa88c5b3731e83a1b84",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 3937,
+      "containsDdl": true,
+      "containsDml": false,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/046_phase106_provider_failure_retry_readiness.sql",
+      "prefix": "046",
+      "canonicalSha256": "48434eb92b117f059918ed55d87b87c6cc98463ed935e5894e563cc335518e78",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 4047,
+      "containsDdl": true,
+      "containsDml": false,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/047_phase107_provider_settlement_file_readiness.sql",
+      "prefix": "047",
+      "canonicalSha256": "bc9557c08765e7a22755d5ca7092e207c62278c8f6025e95e446f79ff85b248d",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 4044,
+      "containsDdl": true,
+      "containsDml": false,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/048_phase108_financial_data_retention_privacy_readiness.sql",
+      "prefix": "048",
+      "canonicalSha256": "1a8554f19c09fb99365853ebaab8c40f0575f674af6b10524a4a056692838c2e",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 3735,
+      "containsDdl": true,
+      "containsDml": false,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/049_phase109_financial_compliance_reporting_readiness.sql",
+      "prefix": "049",
+      "canonicalSha256": "213a94e1c3a68cc4cc792fcf17e0be68493b52988f323aa1625c397bd56a0c3b",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 3663,
+      "containsDdl": true,
+      "containsDml": false,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/050_phase110_financial_operations_go_live_simulation.sql",
+      "prefix": "050",
+      "canonicalSha256": "07b3316fc2f94958356069536a8f24688fa40fd59247c81b90240a53922007f3",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 3434,
+      "containsDdl": true,
+      "containsDml": false,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/051_phase111_financial_operations_pre_production_runbook.sql",
+      "prefix": "051",
+      "canonicalSha256": "8af4f8eac7bffbb9c81c86167439580b535ef74265fe20f7ba169491e68ec066",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 3750,
+      "containsDdl": true,
+      "containsDml": false,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/052_phase112_financial_operations_final_release_candidate.sql",
+      "prefix": "052",
+      "canonicalSha256": "3ab72300792a97ab80e58f34e09886c84cf00120b989c3127af0c1edb573e8f4",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 3904,
+      "containsDdl": true,
+      "containsDml": false,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/053_phase113_financial_operations_production_activation_gate.sql",
+      "prefix": "053",
+      "canonicalSha256": "2747cf6ff948a94a87198b89f6285b50bc51231cfbdaac3ff269290701cd1fae",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 4390,
+      "containsDdl": true,
+      "containsDml": false,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/054_phase16_multi_factory_federation.sql",
+      "prefix": "054",
+      "canonicalSha256": "4cef2e081e6218c2ec4c618826f808bdb1746b7301a1d9dff1b6b3aebfaf736f",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 2151,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/055_phase17_autonomous_marketplace.sql",
+      "prefix": "055",
+      "canonicalSha256": "9e232516cf1047dcbea7d6277e435c1e7ed98fd5f9041c174ffee8c6b72810b5",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 2415,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/056_phase114_controlled_production_activation_dry_run.sql",
+      "prefix": "056",
+      "canonicalSha256": "ad90ca685ba410464585dc6c106c55af0f16fccce55344b13f72b2c5844c1e83",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 5386,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/057_phase115_pre_production_operational_readiness_board.sql",
+      "prefix": "057",
+      "canonicalSha256": "d8dbcb5c30aaa05302a13ea50db905b84eceab8e011faa2e0e754d759682714e",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 4235,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/058_phase116_production_deployment_readiness_checklist.sql",
+      "prefix": "058",
+      "canonicalSha256": "e8ff811b58572cbf8ddc17ade58568a9772c2fea587f1447fb261d81003edac0",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 4108,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": true,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/059_phase117_production_deployment_dry_run_rollback_drill.sql",
+      "prefix": "059",
+      "canonicalSha256": "67ef56f31185553c8ef96277e1180a0494b8d860dbfe842f4e85f28c8c9f990e",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 3807,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/060_phase118_production_observability_incident_readiness.sql",
+      "prefix": "060",
+      "canonicalSha256": "1384a9f63ec179cd0b6c2ecff8a911e39afe1a354d3ecd38bd60b0a23614422d",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 2815,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/061_phase119_security_secrets_compliance_prelaunch_hardening.sql",
+      "prefix": "061",
+      "canonicalSha256": "e3a5605b17f951a3d4db4ee3e22ce8f406f7225859e6482eddb6cfe9fe460ae9",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 3928,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/062_phase120_final_preproduction_release_candidate.sql",
+      "prefix": "062",
+      "canonicalSha256": "75a481e0bfd2e001df818b206f9e222c940c8b139a0b05c7205bd48ceef10dba",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 3551,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/063_phase121_controlled_production_pilot_activation_gate.sql",
+      "prefix": "063",
+      "canonicalSha256": "e5c193baeed8b1b32207465ad97e3a415516ff0e68e57dcde86f1277f5861946",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 5142,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/064_phase122_internal_order_lifecycle_pilot.sql",
+      "prefix": "064",
+      "canonicalSha256": "63ef08b57ccefc07a6a69ad73ab5ea639fafcf026b1185bd75b5db2d019a4094",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 5031,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/065_phase122_1_internal_order_lifecycle_pilot_hardening.sql",
+      "prefix": "065",
+      "canonicalSha256": "31326ed579ade3139cbcca2af64e54e5a762baf2cbeca9b06e419aa94ba21b1c",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 5028,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "ALTER_TABLE",
+        "CREATE_INDEX"
+      ]
+    },
+    {
+      "path": "migrations/066_phase122_2_internal_order_lifecycle_runtime_verification.sql",
+      "prefix": "066",
+      "canonicalSha256": "bd213c697cd91500b51b47a551ab6309b8601ac708b5b2c784d92a096ba5114f",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 4819,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE",
+        "ALTER_TABLE",
+        "CREATE_INDEX"
+      ]
+    },
+    {
+      "path": "migrations/067_phase123_founding_printhouse_pilot_gate.sql",
+      "prefix": "067",
+      "canonicalSha256": "de561169d9ace2b3d2b1441f4fa7c1e9fd823e2dab30340c60855f062d202707",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 10835,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE",
+        "ALTER_TABLE",
+        "CREATE_INDEX"
+      ]
+    },
+    {
+      "path": "migrations/068_phase124_controlled_printhouse_handoff_file_package_pilot.sql",
+      "prefix": "068",
+      "canonicalSha256": "734484e832109873db7c4f7d4e59ca45b6047b2255f55cf2b994fc0e5fc303f1",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 12969,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE",
+        "ALTER_TABLE",
+        "CREATE_INDEX"
+      ]
+    },
+    {
+      "path": "migrations/069_phase125_sandbox_commercial_invoice_payment_handoff_pilot.sql",
+      "prefix": "069",
+      "canonicalSha256": "5cc8938b0aa54524d303cab04c0d5036af2a3c627bbe769617c8ff1fc2b718fd",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 11971,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE",
+        "ALTER_TABLE",
+        "CREATE_INDEX"
+      ]
+    },
+    {
+      "path": "migrations/070_phase126_pilot_evidence_review_go_no_go.sql",
+      "prefix": "070",
+      "canonicalSha256": "39368944ab61869c1c7676fa9b479291f0e1690e46776500edf1365c2681c16c",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 7635,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE",
+        "CREATE_INDEX"
+      ]
+    },
+    {
+      "path": "migrations/071_phase126_1_pilot_evidence_persistence_runtime_truth.sql",
+      "prefix": "071",
+      "canonicalSha256": "2eac1109e2385065fb3f0fc952f7371b061be497037dc414d9645dac77fa2076",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 1427,
+      "containsDdl": true,
+      "containsDml": false,
+      "containsTransaction": false,
+      "statementTypes": [
+        "ALTER_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/072_phase127_limited_beta_preparation_gate.sql",
+      "prefix": "072",
+      "canonicalSha256": "325a3da10306c75c5e5d9c0789eb99756e04c2cbb5571a25ffe344cacb2d5e6a",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 5438,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/073_phase127_1_limited_beta_preparation_persistence_truth.sql",
+      "prefix": "073",
+      "canonicalSha256": "b956f56a78074aba721ec5a17be794694c4f2a3b286bf3539bb8eb439c8d7ccc",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 5955,
+      "containsDdl": true,
+      "containsDml": false,
+      "containsTransaction": false,
+      "statementTypes": [
+        "ALTER_TABLE",
+        "CREATE_INDEX"
+      ]
+    },
+    {
+      "path": "migrations/074_phase128_invite_only_limited_beta_runtime.sql",
+      "prefix": "074",
+      "canonicalSha256": "938a0a9ff1588ecc8cbdf9b2317de6764dd7d7eb7fb7cd9334ad5d162c1a5661",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 10309,
+      "containsDdl": true,
+      "containsDml": false,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE",
+        "CREATE_INDEX"
+      ]
+    },
+    {
+      "path": "migrations/075_phase128_1_runtime_persistence_restart_recovery_drill.sql",
+      "prefix": "075",
+      "canonicalSha256": "2f2e3aa0a445f2361c04c6c109250f68929490912fa73cff1fd829947f20ae20",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 2971,
+      "containsDdl": true,
+      "containsDml": false,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE",
+        "ALTER_TABLE",
+        "CREATE_INDEX"
+      ]
+    },
+    {
+      "path": "migrations/076_phase129_first_controlled_invite_only_beta_cohort_activation.sql",
+      "prefix": "076",
+      "canonicalSha256": "f5c47a645e25c9dafe5f50348371774cebe975bb39f1a90b2b7ed543573b98cf",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 6273,
+      "containsDdl": true,
+      "containsDml": false,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE",
+        "CREATE_INDEX"
+      ]
+    },
+    {
+      "path": "migrations/077_phase130_controlled_beta_runtime_observation_monitoring.sql",
+      "prefix": "077",
+      "canonicalSha256": "ca8a29546fee2ec73c0d5ad334e33d1c819048b3456289a757d0cdced8a1761b",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 33538,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/078_phase130_0_1_runtime_observation_schema_alignment.sql",
+      "prefix": "078",
+      "canonicalSha256": "edf2de3f2f952725253136b83681097fb773bb1b59758341a6ebf23ed3bb8a9e",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 540,
+      "containsDdl": true,
+      "containsDml": false,
+      "containsTransaction": false,
+      "statementTypes": [
+        "ALTER_TABLE",
+        "CREATE_INDEX"
+      ]
+    },
+    {
+      "path": "migrations/079_phase131_controlled_beta_operational_review_exit_gate.sql",
+      "prefix": "079",
+      "canonicalSha256": "b797396800888f9a7423de24f2cfaf9a2eae8908016d670e806ae8c4129d3c95",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 18766,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/080_phase132_controlled_invite_only_expansion_preparation_gate.sql",
+      "prefix": "080",
+      "canonicalSha256": "f64cdc3a2cd46869e86c2de36ee24b42d4929ef75d0c1cf263d8435a845cf6ba",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 11263,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/081_phase133_controlled_invite_only_expansion_execution_gate.sql",
+      "prefix": "081",
+      "canonicalSha256": "f1e5a6b9f09bf3cdadcac76f1976dcd7f8a0f5bafefb30e94b83343c1e5a9c92",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 8300,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/082_phase134_controlled_invite_acceptance_participant_onboarding_gate.sql",
+      "prefix": "082",
+      "canonicalSha256": "74ef5aa99f9f47b8d1f423fcb238a3a835499f0680fb10297602df233fc8a83f",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 9927,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/083_phase135_controlled_runtime_access_session_gate.sql",
+      "prefix": "083",
+      "canonicalSha256": "b2adf02f169e80935f461f7ac4a37b84fc5c04998831be5b665139985cd26285",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 9977,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/084_phase136_runtime_activity_observation_participant_usage_audit_gate.sql",
+      "prefix": "084",
+      "canonicalSha256": "0076cd1d50d6de121c79eb672b1561bbd68c7c97abd66c6e0e85f517e57d7df6",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 14121,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/085_phase137_runtime_activity_review_cohort_health_decision_gate.sql",
+      "prefix": "085",
+      "canonicalSha256": "7e17719b14ecd5cc8c1149e20959bee0b231692bc10472c3a380bdf352ef0d27",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 3925,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/086_phase138_governed_cohort_intervention_preparation_gate.sql",
+      "prefix": "086",
+      "canonicalSha256": "b0dbadaa0ca4ca212d84b083f71ba01f00ec1b2ef0f28eb5a1ed7630e89a30e2",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 4173,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/087_phase139_governed_cohort_intervention_approval_gate.sql",
+      "prefix": "087",
+      "canonicalSha256": "b79458b727e23773e2b08ce3353738cfb95e415a1ef93d8cd422820727d5139f",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 4350,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/088_phase140_controlled_cohort_intervention_execution_gate.sql",
+      "prefix": "088",
+      "canonicalSha256": "d7ae0cc6ecf4109115fea37a51d9af2837d27e6b4fe58d7a601284aa04db4f5c",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 5549,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/089_phase141_restricted_high_risk_cohort_intervention_simulation_gate.sql",
+      "prefix": "089",
+      "canonicalSha256": "a40de6120bdfeefb5ded35e8b1d52fe8adc531904e8208fb7671e9d3cf39132b",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 5059,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/090_phase142_high_risk_cohort_intervention_simulation_review_gate.sql",
+      "prefix": "090",
+      "canonicalSha256": "7ef9a64500aa1d5a36d4aaae2985ac66e23f1f96789039c3f2ce21bde94e7da5",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 4810,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/091_phase143_high_risk_cohort_intervention_approval_preparation_gate.sql",
+      "prefix": "091",
+      "canonicalSha256": "63f5057fa0237bbb871dd0baa92397b48bb35c2af588087e352a5333246eea18",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 4308,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/092_phase144_governed_high_risk_cohort_intervention_approval_gate.sql",
+      "prefix": "092",
+      "canonicalSha256": "c4f8165a4aeccb28a1a5cbf051b81a06924ec21a0d5a6fabb76aad37642ef644",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 3505,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/093_phase144_approval_schema_contract_patch.sql",
+      "prefix": "093",
+      "canonicalSha256": "8d90f9069160ba6f51bf6a753d70e66773ee348b708545ebc2f5e5d522da2338",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 2013,
+      "containsDdl": true,
+      "containsDml": false,
+      "containsTransaction": false,
+      "statementTypes": [
+        "ALTER_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/094_phase144_approval_decision_evidence_contract_patch.sql",
+      "prefix": "094",
+      "canonicalSha256": "93c16a1669a95c9b453a6b53d30395062f0d3f45abe3d92892d31b7616ee8370",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 3382,
+      "containsDdl": true,
+      "containsDml": false,
+      "containsTransaction": false,
+      "statementTypes": [
+        "ALTER_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/095_phase144_approval_finalization_contract_patch.sql",
+      "prefix": "095",
+      "canonicalSha256": "f1c1797d0f5a4e664b716872e0b6608f35b4be2e059740942a5fa727d267e684",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 1042,
+      "containsDdl": true,
+      "containsDml": false,
+      "containsTransaction": false,
+      "statementTypes": [
+        "ALTER_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/096_phase145_controlled_high_risk_execution_readiness_gate.sql",
+      "prefix": "096",
+      "canonicalSha256": "5c26ee880624f594763c5dba372b21c22fe3cbc35e6069784cf99362928a30c5",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 3869,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/097_phase146_controlled_high_risk_cohort_intervention_execution_authorization_gate.sql",
+      "prefix": "097",
+      "canonicalSha256": "92f373ce7f8fbc02337b209bed732438f354ab1d8ede6b5651c63ecce6f7290a",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 3730,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/098_phase147_controlled_high_risk_cohort_intervention_no_op_execution_envelope_gate.sql",
+      "prefix": "098",
+      "canonicalSha256": "7cc06bedaeab44a8db4dddd12003a40804b4186538d848e24ea2a7b6c1176c3f",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 4003,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/099_phase148_controlled_high_risk_cohort_intervention_dry_run_dispatcher_gate.sql",
+      "prefix": "099",
+      "canonicalSha256": "d605ec01c814239c9275c74dc24abf33d1cdb13d382d3d4025c6c6edc7d14e9d",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 4180,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/100_phase149_controlled_high_risk_cohort_intervention_execution_plan_materialization_gate.sql",
+      "prefix": "100",
+      "canonicalSha256": "98082fc7905b5c84b09600e6339e68396ebaf70a1e76cbb9eaf01dffd55d1b64",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 4121,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/101_phase150_controlled_high_risk_cohort_intervention_execution_plan_activation_readiness_gate.sql",
+      "prefix": "101",
+      "canonicalSha256": "bcc880c3c5346b154b458ccccdf0ab53b3094cb008fcdd3255600b5cba11af58",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 4251,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/102_phase151_controlled_high_risk_cohort_intervention_execution_plan_activation_authorization_gate.sql",
+      "prefix": "102",
+      "canonicalSha256": "7e1c384034fde198212b019016376baaef4e76128d61275ed81591f1910f05b2",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 4382,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/103_phase152_controlled_high_risk_cohort_intervention_activation_lock_gate.sql",
+      "prefix": "103",
+      "canonicalSha256": "e8ad30804bc4207566c275996bd8b3fc08b19056aed4d3a6e1a77dadb3c50795",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 4499,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/104_phase153_controlled_high_risk_cohort_intervention_final_activation_go_no_go_gate.sql",
+      "prefix": "104",
+      "canonicalSha256": "e13f19df7a17e4d534956315b81e4e2203bb9c030edb7324a84bfb628bd94675",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 4694,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/105_phase154_controlled_high_risk_cohort_intervention_activation_handoff_gate.sql",
+      "prefix": "105",
+      "canonicalSha256": "a696329f55217dffa7e016c34788b5c0bbbd936aa1af5cc6af829aa68f30a1df",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 4757,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/106_phase155_controlled_high_risk_cohort_intervention_activation_token_auth_gate.sql",
+      "prefix": "106",
+      "canonicalSha256": "fc1a06bdf5b3560439ccd23529b836749adce0c307de87803e713fe78c107758",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 4900,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/107_phase156_controlled_high_risk_cohort_intervention_activation_token_env_gate.sql",
+      "prefix": "107",
+      "canonicalSha256": "6f30d08d073f9994375e661a9066bdf57ab6d141dfee003b8cdc29ac2cffb998",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 4965,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/108_phase157_controlled_high_risk_cohort_intervention_activation_token_final_apv_gate.sql",
+      "prefix": "108",
+      "canonicalSha256": "1bad95017f7fc1c05ccde6352d5bc86164d49cd199bdc9eb733bdc79ec24a21d",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 5192,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/109_phase158_controlled_high_risk_cohort_intervention_activation_token_staging_gate.sql",
+      "prefix": "109",
+      "canonicalSha256": "95cf9242038d5c47dad57f326ef0dfad12e7137b2b258dd7c993cebb99a42e54",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 4982,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/110_phase159_controlled_high_risk_cohort_intervention_activation_token_issuance_preflight_gate.sql",
+      "prefix": "110",
+      "canonicalSha256": "2c1a0c198cb3bca80fa98129813c1dc7cc2045a66de3f5c8c9c966c755d1d585",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 4728,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/111_phase160_controlled_high_risk_cohort_intervention_activation_token_issuance_gate.sql",
+      "prefix": "111",
+      "canonicalSha256": "7ddef35297a7fdd8592da152a135e66954a2b71eea32a6cc0474e45b51f2f2bb",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 4817,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/112_phase161_controlled_high_risk_cohort_intervention_activation_token_redemption_readiness_gate.sql",
+      "prefix": "112",
+      "canonicalSha256": "0f43183853b3366b3a69ccf9ff99ac1c912fc879dfb8a4675f3d208f7905c00b",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 5150,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/113_phase162_controlled_high_risk_cohort_intervention_activation_token_redemption_authorization_gate.sql",
+      "prefix": "113",
+      "canonicalSha256": "a168be6bcf608a24e7c6183f812d3d64fa55853edce6848a9aa276e99b616712",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 5207,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/114_phase163_controlled_high_risk_cohort_intervention_activation_token_redemption_envelope_gate.sql",
+      "prefix": "114",
+      "canonicalSha256": "ed47402f06d4d4013eae5d446c14d8458c59cb33e551f8ced899da4a2c0b670c",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 5400,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/115_phase164_controlled_high_risk_cohort_intervention_activation_token_redemption_final_approval_gate.sql",
+      "prefix": "115",
+      "canonicalSha256": "97c30d68944746a493d20c04c231e1dd792a13a22872152f7f15530c7809e79a",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 5576,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/116_phase165_controlled_high_risk_cohort_intervention_activation_token_redemption_lock_gate.sql",
+      "prefix": "116",
+      "canonicalSha256": "dd6e19c11abfbddad87c799cf76855cf159bbf049bebaa39a19d3bde61c85f2e",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 5388,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/117_phase166_controlled_high_risk_cohort_intervention_activation_token_redemption_unlock_eligibility_gate.sql",
+      "prefix": "117",
+      "canonicalSha256": "7ebc95f2bee19648541f9d9c0d8ee1f1876ce59eb36f0ba30ec7a79a156ff8bb",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 5080,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/118_phase166_unlock_eligibility_aux_table_name_repair.sql",
+      "prefix": "118",
+      "canonicalSha256": "1d7e544d2fd55416aa8d86f05bcc34b9333fecf95d360ce13ce3e7c881c5069e",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 1846,
+      "containsDdl": true,
+      "containsDml": false,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/119_phase167_controlled_high_risk_cohort_intervention_activation_token_redemption_unlock_approval_gate.sql",
+      "prefix": "119",
+      "canonicalSha256": "751c4c4165611d5172d4ae3102b3cc2d48ccecd8be5a5296022dc7236c829fe9",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 5517,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/120_phase168_controlled_high_risk_cohort_intervention_activation_token_redemption_unlock_final_review_gate.sql",
+      "prefix": "120",
+      "canonicalSha256": "12730de015e5bae6f2db860c6a09d2b5f75ff799172c2099ddf09e2d87a50a73",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 5832,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/121_phase169_controlled_high_risk_cohort_intervention_activation_token_redemption_unlock_seal_gate.sql",
+      "prefix": "121",
+      "canonicalSha256": "f8598772ea80a2ecdd6a9505c5b610a0b2971d13b73885e17e99cd6e16e7da5f",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 5934,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/122_phase170_controlled_high_risk_cohort_intervention_activation_token_redemption_unlock_pre_execution_freeze_gate.sql",
+      "prefix": "122",
+      "canonicalSha256": "98d940637934757da8fd5b300ac269e3f1c243a86370568c11be26509af6ab3a",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 6357,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/123_phase171_controlled_high_risk_cohort_intervention_activation_token_redemption_unlock_operator_attestation_gate.sql",
+      "prefix": "123",
+      "canonicalSha256": "2f3659c72f01f01fd427c994134ea842c551983e7c85794e180faa3cd9ada220",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 6565,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/124_phase172_controlled_high_risk_cohort_intervention_activation_token_redemption_unlock_dual_control_authorization_gate.sql",
+      "prefix": "124",
+      "canonicalSha256": "27094294a517bbc82542058c09dde40f939630a9621fc22c729d1dfdea0d4545",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 7183,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/125_phase173_controlled_high_risk_cohort_intervention_activation_token_redemption_unlock_final_human_authorization_seal_gate.sql",
+      "prefix": "125",
+      "canonicalSha256": "21e70ea456e47ba097ebab7f088793daf0aaf5366056ed7eea175b3862addc0c",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 7484,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/126_phase174_controlled_high_risk_cohort_intervention_activation_token_redemption_unlock_compliance_witness_gate.sql",
+      "prefix": "126",
+      "canonicalSha256": "46c0d8bcf865c6b6e22f80770606dbb4611f08c0f94e6b7476216e2aaf106dab",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 7527,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/127_phase175_controlled_high_risk_cohort_intervention_activation_token_redemption_unlock_risk_officer_countersign_gate.sql",
+      "prefix": "127",
+      "canonicalSha256": "faef25afccb0248d53d19cd86d25b35436170701bf3fbed0e2630b94a62f1418",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 7947,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/128_phase176_controlled_high_risk_cohort_intervention_activation_token_redemption_unlock_legal_policy_hold_confirmation_gate.sql",
+      "prefix": "128",
+      "canonicalSha256": "d65f85e10c5e5bb92330018d272b7ad030b658ce41eab611e32c384091b0a3fa",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 8369,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/129_phase177_controlled_high_risk_cohort_intervention_activation_token_redemption_unlock_emergency_rollback_authority_confirmation_gate.sql",
+      "prefix": "129",
+      "canonicalSha256": "189db8361b22a3a0c97e65f77e5f7b224817cc3d16c2973fadf8a70f6359c847",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 8782,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/130_phase176_legal_policy_hold_status_width_hotfix.sql",
+      "prefix": "130",
+      "canonicalSha256": "21f0388cd1a19b4eeaa1319996767cc156d55d85861f5b36d37efde67ecc6796",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 793,
+      "containsDdl": true,
+      "containsDml": false,
+      "containsTransaction": false,
+      "statementTypes": [
+        "ALTER_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/131_phase178_controlled_high_risk_cohort_intervention_activation_token_redemption_unlock_kill_switch_dry_run_verification_gate.sql",
+      "prefix": "131",
+      "canonicalSha256": "fc08d9d963f8f282405d5bbb877c0724bf88098f6772c603e179f23df89fe7e6",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 8465,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/132_phase179_controlled_high_risk_cohort_intervention_activation_token_redemption_unlock_final_non_execution_evidence_seal_gate.sql",
+      "prefix": "132",
+      "canonicalSha256": "af0f77f1593bd053bf8db64fffd903cfeca535d78e79698b4dcceb916dbdcec4",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 8859,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/133_phase179_final_non_execution_evidence_seal_schema_hotfix.sql",
+      "prefix": "133",
+      "canonicalSha256": "7144f58f6c31fe96339f95ac1584f70b59673ae89b2d8a747425943615085430",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 202,
+      "containsDdl": false,
+      "containsDml": false,
+      "containsTransaction": false,
+      "statementTypes": []
+    },
+    {
+      "path": "migrations/134_phase180_controlled_high_risk_cohort_intervention_activation_token_redemption_unlock_governance_readiness_closure_gate.sql",
+      "prefix": "134",
+      "canonicalSha256": "569955b8760df8b3e0446cf0be6a8f478f3d078926e861705ef78799dfa96c23",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 9092,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/135_phase185_migration_ledger_governance.sql",
+      "prefix": "135",
+      "canonicalSha256": "f0a5dfc88f224dee9116cd52234b2910436329b9ff0560c3aa3fdd852de2d20f",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 2168,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "ALTER_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/136_phase190_order_pricing_snapshot_sealing.sql",
+      "prefix": "136",
+      "canonicalSha256": "eb7a7fdf22bf24c10ff779e1795d4799847c51317bf7c5147faaa8bcfff40f9c",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 7387,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE",
+        "ALTER_TABLE",
+        "CREATE_TRIGGER",
+        "CREATE_PROCEDURE",
+        "DROP_PROCEDURE"
+      ]
+    },
+    {
+      "path": "migrations/137_phase191b_printhouse_signup_requests.sql",
+      "prefix": "137",
+      "canonicalSha256": "8b2d93a7807a899e82160d7b8a794d01d41732825f7bc440ac50cb37305235cf",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 1497,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/138_phase191c_printhouse_onboarding_profiles.sql",
+      "prefix": "138",
+      "canonicalSha256": "f05627a83b03a96338f31fca1faa0c13067612cc48c4cb8ac125637d9b9d3203",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 1979,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/139_phase191d_machine_capabilities_migration.sql",
+      "prefix": "139",
+      "canonicalSha256": "3633f42ab59a3310470e3b8ed233d6fc495e3b5011ae23bcda9ad31fe0a15e3d",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 1520,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "ALTER_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/140_phase191e_materials_capacity_leadtimes.sql",
+      "prefix": "140",
+      "canonicalSha256": "d9e1a65d8e1cb1025ed1d602232206a43768da972f505808faa96caf69cda7f3",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 3193,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE",
+        "ALTER_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/141_phase191f_governed_pricing_configuration.sql",
+      "prefix": "141",
+      "canonicalSha256": "6a23f9dc107b4437bd69ae6e715a06ea6b1693cb0937f2da3d31593c59fb0d2b",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 5076,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE",
+        "CREATE_TRIGGER"
+      ]
+    },
+    {
+      "path": "migrations/142_phase191g_shipping_and_integration_readiness.sql",
+      "prefix": "142",
+      "canonicalSha256": "45afb5c4501298b5c4a7594dfbecb5c89034cd29d90c4007732ddb35a039dc00",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 5841,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/143_phase191h_marketplace_review_and_controlled_activation.sql",
+      "prefix": "143",
+      "canonicalSha256": "9decd817f9a43a6748dfe5ca31c5696a8f80d7449e4e0d1877b4b008693bcf2f",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 3427,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/144_phase192e2_distributed_dispatch_idempotency.sql",
+      "prefix": "144",
+      "canonicalSha256": "50bbecfcf521f86aff9f29c4ced25d753196105c56df7fc5e66e27159ddf0824",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 1095,
+      "containsDdl": true,
+      "containsDml": false,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/145_phase192f_runtime_observability_kill_switches.sql",
+      "prefix": "145",
+      "canonicalSha256": "dcea3abbb0f68c7e619417fed8565b0b89f95d65d40e7c86ca0badcd96b96bf4",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 1638,
+      "containsDdl": true,
+      "containsDml": false,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/146_phase193b_calibration_session_foundation.sql",
+      "prefix": "146",
+      "canonicalSha256": "207718aa15f73fb1293e84ea85ba7d6c60010f4237a06190a276227e93400cba",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 2526,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/147_phase193c_calibration_runs.sql",
+      "prefix": "147",
+      "canonicalSha256": "d9982a7f13f28f6d1a0e6481be4c74a851de4624efa3396f49964fbca1e37b0e",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 2544,
+      "containsDdl": true,
+      "containsDml": false,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/148_phase193d_governed_pricing_acceptance.sql",
+      "prefix": "148",
+      "canonicalSha256": "39382744c6889c6b18ce08b77d35792692cf1ad4541fc9beb0fec251deafc61f",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 3295,
+      "containsDdl": true,
+      "containsDml": false,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/149_phase193h8c6111_calibration_run_status_domain_expansion.sql",
+      "prefix": "149",
+      "canonicalSha256": "3aae26488e2a49daed8a600e730a9f3edf26ba105d33f15eaa847450a365fc34",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 902,
+      "containsDdl": true,
+      "containsDml": false,
+      "containsTransaction": false,
+      "statementTypes": [
+        "ALTER_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/150_phase194_quantity_economics_and_quote_evidence.sql",
+      "prefix": "150",
+      "canonicalSha256": "307dc46dcc2de45f13f003e5d13ee1d8712240bff17ed9dbcac7637250e46745",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 2812,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/151_phase194c_multi_quantity_calibration.sql",
+      "prefix": "151",
+      "canonicalSha256": "71b2c85794638985c5ef491565a3769950c10ae602e2bb76118aa6adf237cef8",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 1279,
+      "containsDdl": true,
+      "containsDml": false,
+      "containsTransaction": false,
+      "statementTypes": [
+        "ALTER_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/152_phase194d_governed_curve_acceptance.sql",
+      "prefix": "152",
+      "canonicalSha256": "403d6958376bb42ad2ae457778b63f03b5db9ee1b85830d105473bb3de1c4bc2",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 347,
+      "containsDdl": true,
+      "containsDml": false,
+      "containsTransaction": false,
+      "statementTypes": [
+        "ALTER_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/153_phase194e_multilingual_pdf_quote_ingestion.sql",
+      "prefix": "153",
+      "canonicalSha256": "58435238ae3a70141db5eab90737c9db50c15156999abcd8a78ebe5100245e76",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 672,
+      "containsDdl": true,
+      "containsDml": false,
+      "containsTransaction": false,
+      "statementTypes": [
+        "ALTER_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/154_phase195b_machine_specific_costing.sql",
+      "prefix": "154",
+      "canonicalSha256": "81861b9177ff7e022010e891b8215adb4d8181a0d5c5a5fddbea00fd9dc103de",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 1998,
+      "containsDdl": true,
+      "containsDml": false,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE",
+        "ALTER_TABLE",
+        "CREATE_PROCEDURE",
+        "DROP_PROCEDURE"
+      ]
+    },
+    {
+      "path": "migrations/155_phase195d_machine_route_rules.sql",
+      "prefix": "155",
+      "canonicalSha256": "0040400e9d28c94681ef5873c3afe5cb0fc0992e6c1c89ff5bae99cf0ed3bbbc",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 840,
+      "containsDdl": true,
+      "containsDml": false,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/156_phase194f_tenant_notification_preferences_schema_sync.sql",
+      "prefix": "156",
+      "canonicalSha256": "88f66847540267ec82250f66617731643dadce8ea891a97ee43833f9ab168c3c",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 1779,
+      "containsDdl": true,
+      "containsDml": false,
+      "containsTransaction": false,
+      "statementTypes": [
+        "ALTER_TABLE",
+        "CREATE_PROCEDURE",
+        "DROP_PROCEDURE"
+      ]
+    },
+    {
+      "path": "migrations/157_phase194g_calibration_acceptances_nullable_provenance.sql",
+      "prefix": "157",
+      "canonicalSha256": "04cb77154e3375bba8ca2822f8f29b61554da2c3a69bbcb559ab741488c6aba5",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 365,
+      "containsDdl": true,
+      "containsDml": false,
+      "containsTransaction": false,
+      "statementTypes": [
+        "ALTER_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/158_phase195e_auth_sessions_and_mfa.sql",
+      "prefix": "158",
+      "canonicalSha256": "64a4fcdedb57bc721bab47b63291e66d491a5edd4e47f51e3efc53bd8caeced8",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 1444,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/159_phase195f_outgoing_webhooks_and_slack.sql",
+      "prefix": "159",
+      "canonicalSha256": "f50d74a24219281b47086cbac0ad3808bde6e4954ea694e45a7297c7656702f5",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 2143,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/160_phase195g_pricing_bpe_publication.sql",
+      "prefix": "160",
+      "canonicalSha256": "c886d1af7058591365b73ef58fed339b715f7aedaaedf37a6f843196ad01a8ff",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 999,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/161_phase184g_industrial_persistence_ledger.sql",
+      "prefix": "161",
+      "canonicalSha256": "f27c3228674648272c9cfe45556df17da707b6aa8556142b39a4768a5f2b1415",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 24767,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/162_phase196a_paper_suppliers_and_procurement_idempotency.sql",
+      "prefix": "162",
+      "canonicalSha256": "6b3359033c15c065877d375d81326f7e61e8e5629f8939041d401bd7bc7c0721",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 3112,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/163_phase196b_paper_products_and_import_staging.sql",
+      "prefix": "163",
+      "canonicalSha256": "24d1cc22d879d2d3a2f82de5cfd8e573172d28376b1abf4e0d375f0ad0f9c847",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 4060,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/164_phase196c_supplier_paper_offers_and_revisions.sql",
+      "prefix": "164",
+      "canonicalSha256": "f0610327325963305857105e0a616b1249cd2e1028226efd8689d0ef06c7ddfa",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 2865,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/165_phase196d_paper_supplier_offer_soft_delete_and_catalog_associations.sql",
+      "prefix": "165",
+      "canonicalSha256": "37fd3881fbcd3affe22631d7dc0e4342350a63ef4e49c007e2ee8c96eba1b250",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 2697,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE",
+        "ALTER_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/166_phase196e_supplier_paper_procurement_orders.sql",
+      "prefix": "166",
+      "canonicalSha256": "1439dbd0c90f7ad5072ae81af2b73ab2281e454df6fdcf9e7c40cfcd6ca8268a",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 3796,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/167_phase196f_order_paper_decisions.sql",
+      "prefix": "167",
+      "canonicalSha256": "ccb8356bcc4f459a39235f3783f0398edebb2451da7f778ce31d2d77c74444b0",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 4350,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/168_phase196g_order_quote_revisions.sql",
+      "prefix": "168",
+      "canonicalSha256": "fce8469af877acb1a70918766aa0c32b429519d7eecec776ec9d8c6aae041908",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 6816,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/169_phase196h_printhouse_profiles.sql",
+      "prefix": "169",
+      "canonicalSha256": "d87f3c91beac927575013ab02215d1b581bfc3e15aa6a939d87d91dea621fa48",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 2111,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/170_phase196i_order_effective_technical_specifications.sql",
+      "prefix": "170",
+      "canonicalSha256": "e057231f0af9473c1693b7beca6fba972f6133542eaa8ac86071931c27138af2",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 2086,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/171_phase196j_financial_settlement_vouchers.sql",
+      "prefix": "171",
+      "canonicalSha256": "3a465e581ef6dd170a43f20721c0eeb63efd4da6c05ef6ced4044806bc1da61b",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 1981,
+      "containsDdl": true,
+      "containsDml": false,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/172_phase197a_paper_caliper_and_livonia_reference.sql",
+      "prefix": "172",
+      "canonicalSha256": "96f083c4f4e263bcc4d1616ac10a76d6dbe4e2eff04bc1d0eac04453a56daa5c",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 77304,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE",
+        "ALTER_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/173_phase197b_spine_binding_profiles_and_snapshots.sql",
+      "prefix": "173",
+      "canonicalSha256": "29275551c2fc770880a4dfa66121f29859852e97bf3ec055a1118f1261b7a9ae",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 5244,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/174_phase197c_paper_evidence_and_technical_accreditation.sql",
+      "prefix": "174",
+      "canonicalSha256": "d1a400efe6962f0ff88beb7114ed1bb8603fff74ea7b4aa840c6ec64025e7144",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 10081,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/175_phase197f_paper_classification_accreditation_columns.sql",
+      "prefix": "175",
+      "canonicalSha256": "71d9666beed27907ce42edab1a8b474d5131fbc8b6d6682ba7f5f0091ba07316",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 3067,
+      "containsDdl": true,
+      "containsDml": false,
+      "containsTransaction": false,
+      "statementTypes": [
+        "ALTER_TABLE"
+      ]
+    }
+  ]
+}

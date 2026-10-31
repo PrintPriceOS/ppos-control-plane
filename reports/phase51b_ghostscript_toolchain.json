@@ -1,0 +1,17 @@
+{
+  "ghostscript_available_local": true,
+  "ghostscript_path_local": "C:\\Program Files\\gs\\gs10.06.0\\bin\\gswin64c.exe",
+  "ghostscript_version_local": "10.06.0",
+  "ghostscript_available_worker_runtime": false,
+  "ghostscript_path_worker_runtime": null,
+  "ghostscript_version_worker_runtime": null,
+  "ghostscript_available_service_runtime": false,
+  "ghostscript_path_service_runtime": null,
+  "ghostscript_version_service_runtime": null,
+  "runtime_checked": "host",
+  "runtime_verified": false,
+  "production_runtime_pending": true,
+  "notes": [
+    "Local Ghostscript found: 10.06.0"
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "funnel_conversion_summary": "Healthy",
+  "drop_off_summary": "Low",
+  "blocker_summary": "None",
+  "support_load_summary": "Normal",
+  "incident_rate_summary": "Zero",
+  "emergency_stop_impact_summary": "Zero",
+  "recommendation": "CONTINUE_BETA"
+}

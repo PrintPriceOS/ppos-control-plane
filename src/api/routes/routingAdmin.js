@@ -5,6 +5,8 @@ const requireAdmin = require('../middleware/requireAdmin');
 const db = require('../services/db');
 const qualityService = require('../services/printerQualityService');
 const recommendationService = require('../services/routingRecommendationService');
+const routingEngine = require('../services/routing/AutonomousRoutingEngine');
+const topologyService = require('../services/FederationTopologyService');
 
 router.use(requireAdmin);
 
@@ -169,6 +171,84 @@ router.get('/dispatch/events', async (req, res) => {
     try {
         const { rows } = await db.query('SELECT * FROM dispatch_events ORDER BY created_at DESC LIMIT 100');
         res.json(rows);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+/**
+ * POST /api/admin/routing/evaluate
+ */
+router.post('/evaluate', async (req, res) => {
+    try {
+        const { jobSpecs, origin } = req.body;
+        const decision = await routingEngine.findOptimalNode(jobSpecs, origin);
+        res.json(decision);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+/**
+ * POST /api/admin/routing/dispatch
+ */
+router.post('/dispatch', async (req, res) => {
+    try {
+        const { jobId, decisionId, reason } = req.body;
+        const result = await routingEngine.dispatchJob(jobId, decisionId, reason);
+        res.json(result);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+/**
+ * GET /api/admin/routing/map
+ */
+router.get('/map', async (req, res) => {
+    try {
+        const state = await topologyService.getMapState();
+        res.json({ ok: true, source_status: "ACTIVE", ...state });
+    } catch (err) {
+        console.warn('[ROUTING-API] /map degraded:', err.message);
+        return res.json({ 
+            ok: true, 
+            nodes: [], 
+            routes: [], 
+            connections: [],
+            warnings: [],
+            counts: { operationalNodes: 0, activeDispatches: 0, missingCoordinates: 0 },
+            source_status: "MAP_UNAVAILABLE" 
+        });
+    }
+});
+
+/**
+ * GET /api/admin/routing/heatmap
+ */
+router.get('/heatmap', async (req, res) => {
+    try {
+        const heatmap = await topologyService.getRegionalHeatmap();
+        res.json(heatmap);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+/**
+ * GET /api/admin/routing/live
+ */
+router.get('/live', async (req, res) => {
+    try {
+        // Combined feed of recent decisions and dispatch events
+        const decisions = await db.query('SELECT * FROM routing_decisions ORDER BY created_at DESC LIMIT 10');
+        const events = await db.query('SELECT * FROM manufacturing_dispatch_events ORDER BY created_at DESC LIMIT 20');
+        
+        res.json({
+            decisions,
+            events,
+            timestamp: new Date()
+        });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }

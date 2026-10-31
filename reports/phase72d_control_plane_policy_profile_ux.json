@@ -1,0 +1,349 @@
+{
+  "generated_at": "2026-06-10T18:59:55.911Z",
+  "phase": "72D",
+  "repo": "ppos-control-plane",
+  "category": "control_plane_policy_profile_ux",
+  "smoke_passed": true,
+  "governance": {
+    "profile_passed_implies_production_certified": false,
+    "panel_exposes_pii": false,
+    "panel_exposes_raw_paths": false
+  },
+  "summary": {
+    "total": 66,
+    "passed": 66,
+    "failed": 0
+  },
+  "results": [
+    {
+      "label": "1.1 profile_id from worker governance",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "1.1 source=worker_governance",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "1.1 profile_label is string",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "1.2 NONE default when no governance present",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "1.2 source=default",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "1.3 NONE profile_id treated as default",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "2.1 profile_id from pre-computed",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "2.1 profile_passed from pre-computed",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "2.1 source=pre_computed_by_worker",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "2.2 profile_passed=false preserved",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "2.2 PROFILE_BLEED_REQUIRED preserved",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "2.3 production_certified scrubbed to false",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "2.3 standard_certified scrubbed to false",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "2.3 compliance_claim_allowed scrubbed to false",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "2.4 Fresh evaluation returns profile_passed boolean",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "2.4 Fresh evaluation: production_certified=false",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "3.1 buildProfilePanel ok=true",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "3.1 policy_profile_ux present",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "3.1 active_profile.profile_id",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "3.1 profile_passed=true",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "3.1 profile_blockers is array",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "3.1 profile_warnings is array",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "3.1 audience=operator",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "3.2 ok=true for blocked profile",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "3.2 profile_passed=false",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "3.2 PROFILE_BLEED_REQUIRED in panel",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "3.2 JS blocker in panel",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "3.3 blockers_detail present for operator",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "3.3 blockers_detail not empty",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "3.3 blockers_detail[].code present",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "3.3 blockers_detail[].description present",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "3.4 audience=customer",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "3.4 no blockers_detail for customer",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "4.1 Raw filesystem paths redacted from panel output",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "4.2 No PII keys in panel output",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "5.1 production_certified=false",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "5.2 standard_certified=false",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "5.3 compliance_claim_allowed=false",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "5.4 print_ready_claim_allowed=false",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "5.5 No production_certified:true in JSON",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "5.6 No standard_certified:true in JSON",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "5.7 No compliance_claim_allowed:true in JSON",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "6.1 BLOCKER_DESCRIPTIONS has \"PROFILE_BLEED_REQUIRED\"",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "6.1 BLOCKER_DESCRIPTIONS has \"PROFILE_TAC_LIMIT_EXCEEDED\"",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "6.1 BLOCKER_DESCRIPTIONS has \"PROFILE_CMYK_REQUIRED\"",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "6.1 BLOCKER_DESCRIPTIONS has \"PROFILE_FONTS_MUST_BE_EMBEDDED\"",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "6.1 BLOCKER_DESCRIPTIONS has \"PROFILE_TYPE3_FONTS_NOT_ALLOWED\"",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "6.1 BLOCKER_DESCRIPTIONS has \"PROFILE_NO_JAVASCRIPT_VIOLATED\"",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "6.1 BLOCKER_DESCRIPTIONS has \"PROFILE_NO_EMBEDDED_FILES_VIOLATED\"",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "6.1 BLOCKER_DESCRIPTIONS has \"PROFILE_NO_LAUNCH_ACTIONS_VIOLATED\"",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "6.1 BLOCKER_DESCRIPTIONS has \"PROFILE_CROP_MARKS_REQUIRED\"",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "6.1 BLOCKER_DESCRIPTIONS has \"PROFILE_STANDARD_MISMATCH\"",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "7.1 PolicyProfilePanel.tsx exists",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "7.2 Component export present",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "7.3 profile_passed rendered",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "7.4 profile_blockers rendered",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "7.5 profile_warnings rendered",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "7.6 data-testid attributes for testing",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "7.7 Governance note in component",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "7.8 No \"✅ Production Certified\" in component",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "8.1 policyProfileService.js exists",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "8.2 getActiveProfile exported",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "8.3 evaluateProfileStatus exported",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "8.4 buildProfilePanel exported",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "8.5 production_certified:false enforcement",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "8.6 BLOCKER_DESCRIPTIONS present",
+      "pass": true,
+      "detail": null
+    }
+  ]
+}

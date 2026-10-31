@@ -1,8 +1,8 @@
 // pages/admin/OverviewTab.tsx
 import React from "react";
-import { getOverview, getQueue } from "../../lib/adminApi";
+import { getDashboardOverview, getQueue, DashboardOverviewPayload, QueuePayload } from "../../lib/adminApi";
 import { useAdminQuery } from "../../hooks/useAdminData";
-import { t } from "../../i18n";
+import { useLocale } from "../../i18n";
 import {
     Square3Stack3DIcon,
     CheckBadgeIcon,
@@ -12,7 +12,13 @@ import {
     ScaleIcon,
     QueueListIcon,
     ClockIcon,
-    CircleStackIcon
+    CircleStackIcon,
+    ShieldCheckIcon,
+    GlobeEuropeAfricaIcon,
+    DocumentTextIcon,
+    ServerStackIcon,
+    WrenchScrewdriverIcon,
+    ExclamationTriangleIcon
 } from "@heroicons/react/24/outline";
 
 type Range = "24h" | "7d" | "30d";
@@ -28,82 +34,276 @@ const COLOR_MAP: Record<string, { bg: string; text: string }> = {
     cyan: { bg: "bg-cyan-600/10", text: "text-cyan-600" },
 };
 
-const KpiCard = ({ title, value, sub, Icon, color, helpKey }: { title: string; value: string; sub?: string; Icon: any; color: keyof typeof COLOR_MAP; helpKey?: string }) => {
-    const theme = COLOR_MAP[color];
+const KpiCard = ({ title, valueRaw, suffix, Icon, color, helpKey, statusOverride }: { title: string; valueRaw: any; suffix?: string; Icon: any; color: keyof typeof COLOR_MAP; helpKey?: string; statusOverride?: string }) => {
+    const { t } = useLocale();
+    const theme = COLOR_MAP[color] || COLOR_MAP.blue;
+    const isMissing = valueRaw === null || valueRaw === undefined || statusOverride === 'UNAVAILABLE';
     return (
-        <div className="glass rounded-xl p-3.5 border border-white hover-slide flex items-start justify-between gap-2 group relative">
-            <div className="flex items-center gap-4">
-                <div className={`p-2.5 rounded-lg ${theme.bg} shrink-0`}>
-                    <Icon className={`w-5 h-5 ${theme.text}`} />
+        <div className={`glass rounded-none p-3.5 border ${isMissing ? 'border-amber-400/50 bg-amber-50/10' : 'border-white'} hover-slide flex items-start justify-between gap-2 group relative`}>
+            <div className="flex items-center gap-3 min-w-0">
+                <div className={`p-2 rounded-none ${isMissing ? 'bg-amber-500/10 text-amber-500' : theme.bg} shrink-0`}>
+                    <Icon className={`w-4 h-4 ${isMissing ? 'text-amber-500' : theme.text}`} />
                 </div>
-                <div className="min-w-0">
+                <div className="min-w-0 flex-1">
                     <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-0.5 truncate flex items-center gap-1">
                         {title}
+                        {isMissing && <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0 animate-pulse" title="Source offline / unconfirmed" />}
                     </div>
-                    <div className="flex items-baseline gap-2">
-                        <div className="text-xl font-black text-slate-900 tracking-tight">{value}</div>
-                        {sub && <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest truncate">{sub}</span>}
+                    <div className="flex items-baseline gap-1.5 truncate">
+                        {isMissing ? (
+                            <div className="text-[10px] font-bold text-amber-600 tracking-tight truncate border-b border-dashed border-amber-300">{t('dashboard.sourceUnavailable') || 'N/A — source unavailable'}</div>
+                        ) : (
+                            <>
+                                <div className="text-base sm:text-lg font-black text-slate-900 tracking-tight truncate">{String(valueRaw)}</div>
+                                {suffix && <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest truncate">{suffix}</span>}
+                            </>
+                        )}
                     </div>
                 </div>
             </div>
             {helpKey && (
                 <a
                     href={`/admin/help?doc=${helpKey}`}
-                    className="opacity-0 group-hover:opacity-100 transition-opacity text-[10px] flex items-center gap-1 bg-white border border-slate-200 text-slate-500 hover:text-blue-600 hover:border-blue-200 px-2 py-1 rounded-md shadow-sm"
+                    className="opacity-0 group-hover:opacity-100 transition-opacity text-[10px] flex items-center gap-1 bg-white border border-slate-200 text-slate-500 hover:text-blue-600 hover:border-blue-200 px-1.5 py-0.5 rounded-none shadow-none shrink-0"
                 >
-                    <div title="Explain this metric">ℹ Explain</div>
+                    <span title="Explain this metric">ℹ</span>
                 </a>
             )}
         </div>
     );
 };
 
+const PanelRow = ({ label, valueRaw, suffix, isAlert, isPositive }: { label: string; valueRaw: any; suffix?: string; isAlert?: boolean; isPositive?: boolean }) => {
+    const { t } = useLocale();
+    const isMissing = valueRaw === null || valueRaw === undefined;
+    return (
+        <div className="flex items-center justify-between py-1.5 border-b border-slate-200/60 last:border-none text-xs">
+            <span className="text-slate-600 font-medium tracking-tight truncate pr-2">{label}</span>
+            <div className="font-mono text-right shrink-0">
+                {isMissing ? (
+                    <span className="text-[10px] text-amber-600 font-semibold bg-amber-50 px-1.5 py-0.5 border border-amber-200/60">{t('dashboard.sourceUnavailableShort') || 'N/A — unavailable'}</span>
+                ) : (
+                    <span className={`font-bold ${isAlert ? 'text-red-600 bg-red-50 px-1 py-0.5' : isPositive ? 'text-emerald-600 font-black' : 'text-slate-900'}`}>{String(valueRaw)} {suffix || ''}</span>
+                )}
+            </div>
+        </div>
+    );
+};
+
 export const OverviewTab: React.FC<{ range: Range; refreshMs?: number }> = ({ range, refreshMs = 0 }) => {
-    const o = useAdminQuery(`overview:${range}`, () => getOverview(range), refreshMs);
-    const q = useAdminQuery(`queue`, () => getQueue(), refreshMs);
+    const { t } = useLocale();
+    // Query unified dashboard overview loaded with verified database production telemetry
+    const o = useAdminQuery<DashboardOverviewPayload>(`dashboardOverview`, () => getDashboardOverview(), refreshMs);
+    const q = useAdminQuery<QueuePayload>(`queue`, () => getQueue(), refreshMs);
 
     if (o.status === "loading") return (
         <div className="flex items-center justify-center py-20">
             <div className="flex flex-col items-center gap-4">
-                <div className="w-12 h-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
+                <div className="w-12 h-12 border-4 border-primary/20 border-t-primary rounded-none animate-spin" />
                 <span className="text-sm font-bold text-slate-400 uppercase tracking-widest">{t("common.loading" as any)}</span>
             </div>
         </div>
     );
 
     if (o.status === "error") return (
-        <div className="p-8 rounded-2xl bg-red-50 border border-red-100 text-center">
+        <div className="p-8 rounded-none bg-red-50 border border-red-100 text-center">
             <ExclamationTriangleIcon className="w-12 h-12 text-red-400 mx-auto mb-4" />
-            <div className="text-red-700 font-bold mb-1">Telemetry Error</div>
+            <div className="text-red-700 font-bold mb-1">{t('dashboard.missionControlError') || 'Mission Control Telemetry Error'}</div>
             <div className="text-red-500 text-sm">{o.error}</div>
         </div>
     );
 
     if (!o.data) return null;
 
-    const d = o.data;
+    const d: DashboardOverviewPayload = o.data;
+    const pref = d.preflight ?? ({} as DashboardOverviewPayload['preflight']);
+    const gov = d.governance ?? ({} as DashboardOverviewPayload['governance']);
+    const econ = d.economy ?? ({} as DashboardOverviewPayload['economy']);
+    const stor = d.storage ?? ({} as DashboardOverviewPayload['storage']);
+    const fed = d.federation ?? ({} as DashboardOverviewPayload['federation']);
+
+    const getKpi = (k: string) => d.kpis?.find(item => item.key === k) || { value: null, status: 'UNAVAILABLE' };
+
+    // Dynamically retrieve high-density KPI values mapped directly to canonical array items
+    const kJobsToday = getKpi('jobsToday');
+    const kActiveJobs = getKpi('activeJobs');
+    const kRealExtraction = getKpi('realExtraction');
+    const kCertifiable = getKpi('certifiable');
+    const kRuntimeFailures = getKpi('runtimeFailures');
+    const kArtifactStorage = getKpi('artifactStorage');
+    const kOperationalNodes = getKpi('operationalNodes');
+    const kAuditStatus = getKpi('auditStatus');
 
     return (
         <div className="space-y-6 animate-slide-fade">
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-8 gap-4">
-                <KpiCard Icon={Square3Stack3DIcon} color="blue" title="Ledger Total (DB)" value={String(d.totalJobs)} helpKey="metric-total-jobs" />
-                <KpiCard Icon={CheckBadgeIcon} color="emerald" title="SLA Success Rate" value={`${d.successRate.toFixed(1)}%`} helpKey="metric-success-rate" />
-                <KpiCard Icon={BanknotesIcon} color="emerald" title="AutoFix Value" value={`$${Math.round(d.totalValueGenerated).toLocaleString()}`} sub="USD Generated" />
-                <KpiCard Icon={ClockIcon} color="blue" title="Prepress Saved" value={`${d.totalHoursSaved.toFixed(1)} h`} sub="Time ROI" />
-                <KpiCard Icon={ArrowTrendingUpIcon} color="indigo" title="Optimization Delta" value={`${d.deltaImprovementRate.toFixed(1)}%`} />
-                <KpiCard Icon={ScaleIcon} color="violet" title="Risk Reduction" value={`${(d.avgRiskBefore - d.avgRiskAfter).toFixed(1)} pts`} sub={`${d.avgRiskBefore.toFixed(0)} → ${d.avgRiskAfter.toFixed(0)}`} />
-                <KpiCard Icon={BoltIcon} color="amber" title="Mean Latency" value={`${d.avgLatencyMs} ms`} />
-                <KpiCard Icon={QueueListIcon} color="orange" title="Live Buffer (Queue)" value={String(d.queueBacklog || 0)} helpKey="metric-queue-backlog" />
+            {/* Fail-Loud Warning Header Strip if source upstream metrics missed */}
+            {d.warnings && d.warnings.length > 0 && (
+                <div className="bg-amber-50 border border-amber-200 p-3 flex items-start gap-3">
+                    <ExclamationTriangleIcon className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+                    <div className="text-xs">
+                        <span className="font-bold text-amber-800 uppercase tracking-wide">{t('dashboard.metricDegradation') || 'Source Telemetry Degradation:'}</span>
+                        <span className="text-amber-700 ml-1">{t('dashboard.metricDegradationDesc') || 'Certain production registries are operating in fail-loud isolation state. Corresponding KPIs display N/A.'}</span>
+                        <div className="mt-1 flex flex-wrap gap-1">
+                            {d.warnings.map((w, wIdx) => (
+                                <span key={wIdx} className="bg-amber-100 text-amber-800 text-[10px] font-mono px-1.5 py-0.5 border border-amber-200">{w}</span>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* HIGH-DENSITY TOP KPI STRIPS (MANDATED 8 CARDS FROM UNIFIED ARRAY) */}
+            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8 gap-3">
+                <KpiCard Icon={Square3Stack3DIcon} color="blue" title={t('dashboard.kpiJobsToday') || 'Jobs Today'} valueRaw={kJobsToday.value} statusOverride={kJobsToday.status} helpKey="metric-jobs-today" />
+                <KpiCard Icon={QueueListIcon} color="orange" title={t('dashboard.kpiActiveJobs') || 'Active Jobs'} valueRaw={kActiveJobs.value} statusOverride={kActiveJobs.status} helpKey="metric-active-jobs" />
+                <KpiCard Icon={CheckBadgeIcon} color="emerald" title={t('dashboard.kpiRealExtraction') || 'Real Extraction'} valueRaw={kRealExtraction.value} statusOverride={kRealExtraction.status} />
+                <KpiCard Icon={ShieldCheckIcon} color="indigo" title={t('dashboard.kpiCertifiable') || 'Certifiable'} valueRaw={kCertifiable.value} statusOverride={kCertifiable.status} />
+                <KpiCard Icon={WrenchScrewdriverIcon} color="amber" title={t('dashboard.kpiRuntimeFailures') || 'Runtime Failures'} valueRaw={kRuntimeFailures.value} statusOverride={kRuntimeFailures.status} />
+                <KpiCard Icon={ServerStackIcon} color="violet" title={t('dashboard.kpiArtifactStorage') || 'Artifact Storage'} valueRaw={kArtifactStorage.value} statusOverride={kArtifactStorage.status} suffix={kArtifactStorage.value ? `${(Number(kArtifactStorage.value) / 1024 / 1024).toFixed(1)} MB` : undefined} />
+                <KpiCard Icon={GlobeEuropeAfricaIcon} color="cyan" title={t('dashboard.kpiOperationalNodes') || 'Operational Nodes'} valueRaw={kOperationalNodes.value} statusOverride={kOperationalNodes.status} />
+                <KpiCard Icon={DocumentTextIcon} color="emerald" title={t('dashboard.kpiAuditStatus') || 'Audit Status'} valueRaw={kAuditStatus.value ? String(kAuditStatus.value).toUpperCase() : null} statusOverride={kAuditStatus.status} />
             </div>
 
-            <div className="glass rounded-2xl border border-white overflow-hidden shadow-sm hover-slide">
+            {/* MISSION CONTROL PANELS (FIRST VIEWPORT OPERATIONAL COVERAGE) */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* 1. Preflight Intelligence Hub */}
+                <div className="glass rounded-none border border-white overflow-hidden flex flex-col hover-slide">
+                    <div className="px-4 py-3 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800">
+                        <div className="flex items-center gap-2">
+                            <Square3Stack3DIcon className="w-4 h-4 text-blue-400" />
+                            <span className="text-xs font-bold uppercase tracking-wider">{t('dashboard.panelPreflight') || 'Preflight Intelligence'}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                            <span className={`w-1.5 h-1.5 rounded-full ${pref.source_status === 'ACTIVE' ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`} />
+                            <span className="text-[9px] font-mono px-1.5 py-0.5 bg-blue-500/20 text-blue-300 border border-blue-500/30">{pref.source_status || 'UNAVAILABLE'}</span>
+                        </div>
+                    </div>
+                    <div className="p-4 flex-1 space-y-1 bg-white/40">
+                        <PanelRow label={t('dashboard.rowTotalAnalyzed') || 'Total Analyzed (Today)'} valueRaw={pref.jobsToday} />
+                        <PanelRow label={t('dashboard.rowActiveConcurrent') || 'Active Concurrent Tasks'} valueRaw={pref.activeJobs} />
+                        <PanelRow label={t('dashboard.rowCompletedAnalyses') || 'Completed Analyses'} valueRaw={pref.completedJobsToday} isPositive />
+                        <PanelRow label={t('dashboard.rowFailedExecutions') || 'Failed Executions'} valueRaw={pref.failedJobsToday} isAlert={pref.failedJobsToday ? pref.failedJobsToday > 0 : false} />
+                        <PanelRow label={t('dashboard.rowRealExtraction') || 'Real Extraction Contract'} valueRaw={pref.realExtractionCount} />
+                        <PanelRow label={t('dashboard.rowRuntimeEnvFailures') || 'Runtime Env Failures'} valueRaw={pref.failedRuntimeEnvironmentCount} isAlert={pref.failedRuntimeEnvironmentCount ? pref.failedRuntimeEnvironmentCount > 0 : false} />
+                        <PanelRow label={t('dashboard.rowPartialArtifacts') || 'Partial Artifact Blocks'} valueRaw={pref.partialArtifactsCount} />
+                        <PanelRow label={t('dashboard.rowMeanRiskScore') || 'Mean Document Risk Score'} valueRaw={pref.averageRiskScore} suffix="pts" />
+                        <PanelRow label={t('dashboard.rowRegistryBuffer') || 'Registry Buffer Depth'} valueRaw={pref.queueDepth} />
+                        <PanelRow label={t('dashboard.rowLatestExecution') || 'Latest Execution Tail'} valueRaw={pref.latestJobStatus} />
+                    </div>
+                </div>
+
+                {/* 2. Governance & Economy Enforcer */}
+                <div className="glass rounded-none border border-white overflow-hidden flex flex-col hover-slide">
+                    <div className="px-4 py-3 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800">
+                        <div className="flex items-center gap-2">
+                            <ShieldCheckIcon className="w-4 h-4 text-emerald-400" />
+                            <span className="text-xs font-bold uppercase tracking-wider">{t('dashboard.panelGovernance') || 'Governance & Economy'}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                            <span className={`w-1.5 h-1.5 rounded-full ${gov.source_status === 'ACTIVE' ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`} />
+                            <span className="text-[9px] font-mono px-1.5 py-0.5 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">{gov.source_status || 'UNAVAILABLE'}</span>
+                        </div>
+                    </div>
+                    <div className="p-4 flex-1 space-y-1 bg-white/40">
+                        <PanelRow label={t('dashboard.rowActivePolicies') || 'Active Swarm Policies'} valueRaw={gov.activePolicyCount} />
+                        <PanelRow label={t('dashboard.rowLatestRule') || 'Latest Rule Triggered'} valueRaw={gov.latestPolicyApplied || 'DEFAULT_STANDARD'} />
+                        <PanelRow label={t('dashboard.rowPolicyInterceptions') || 'Policy Execution Interceptions'} valueRaw={gov.jobsBlockedByPolicy} />
+                        <PanelRow label={t('dashboard.rowCertBlocked') || 'Certification Blocked Items'} valueRaw={gov.certificationBlockedCount} />
+                        <PanelRow label={t('dashboard.rowPassedCertifiable') || 'Passed Certifiable Volumes'} valueRaw={gov.jobsCertifiableCount} isPositive />
+                        <PanelRow label={t('dashboard.rowDeploymentClass') || 'Deployment Contract Class'} valueRaw={gov.deploymentContractVersion} />
+                        <PanelRow label={t('dashboard.rowAuditRegistryState') || 'Audit Trace Registry State'} valueRaw={gov.auditStatus ? String(gov.auditStatus).toUpperCase() : null} isAlert={gov.auditStatus === 'errors'} />
+                        <PanelRow label={t('dashboard.rowEstimatedValue') || 'Estimated Value Generated'} valueRaw={econ.estimatedProductionValue !== null ? `$${Number(econ.estimatedProductionValue).toLocaleString()}` : null} isPositive />
+                        <PanelRow label={t('dashboard.rowAvoidedWaste') || 'Avoided Reprint Waste ROI'} valueRaw={econ.estimatedAvoidedReprintCost !== null ? `$${Number(econ.estimatedAvoidedReprintCost).toLocaleString()}` : null} />
+                        <PanelRow label={t('dashboard.rowHoursSaved') || 'Verified Prepress Hours Saved'} valueRaw={econ.hoursSaved !== null ? `${econ.hoursSaved} hrs` : null} />
+                        <PanelRow label={t('dashboard.rowAutoFixSuccess') || 'AutoFix Success Count'} valueRaw={econ.fixSuccessCount} />
+                        <PanelRow label={t('dashboard.rowAutoFixFailures') || 'AutoFix Intercept Failures'} valueRaw={econ.fixFailureCount} isAlert={econ.fixFailureCount ? econ.fixFailureCount > 0 : false} />
+                        <PanelRow label={t('dashboard.rowQualityBenchmark') || 'Derived Quality Benchmark'} valueRaw={econ.qualityScore} suffix="/ 10.0" />
+                    </div>
+                </div>
+
+                {/* 3. Compact Map Summary Card */}
+                <div className="glass rounded-none border border-white overflow-hidden flex flex-col hover-slide">
+                    <div className="px-4 py-3 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800">
+                        <div className="flex items-center gap-2">
+                            <GlobeEuropeAfricaIcon className="w-4 h-4 text-indigo-400" />
+                            <span className="text-xs font-bold uppercase tracking-wider">{t('dashboard.panelFederation') || 'Federation Topology'}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                            <span className={`w-1.5 h-1.5 rounded-full ${fed.source_status === 'ACTIVE' ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`} />
+                            <span className="text-[9px] font-mono px-1.5 py-0.5 bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">{fed.source_status || 'UNAVAILABLE'}</span>
+                        </div>
+                    </div>
+                    <div className="p-4 flex-1 space-y-2 bg-white/40 flex flex-col justify-between">
+                        <div className="space-y-1">
+                            <PanelRow label={t('dashboard.rowVerifiedNodes') || 'Verified Swarm Nodes'} valueRaw={fed.operationalNodes} />
+                            <PanelRow label={t('dashboard.rowActiveRoutes') || 'Active Route Assignments'} valueRaw={fed.activeDispatches} />
+                            <PanelRow label={t('dashboard.rowMissingGis') || 'Missing GIS Coordinates'} valueRaw={fed.missingCoordinates} isAlert={fed.missingCoordinates ? fed.missingCoordinates > 0 : false} />
+                            <PanelRow label={t('dashboard.rowDegradedInfra') || 'Degraded Infrastructure State'} valueRaw={fed.degradedNodes} isAlert={fed.degradedNodes ? fed.degradedNodes > 0 : false} />
+                            <PanelRow label={t('dashboard.rowMeanUtilization') || 'Mean Node Utilization'} valueRaw={fed.averageUtilization !== null ? `${fed.averageUtilization}%` : null} />
+                        </div>
+
+                        {/* Interactive embedded summary map banner */}
+                        <div className="mt-4 p-3 bg-slate-900 text-slate-300 border border-slate-800 text-xs font-mono relative overflow-hidden group">
+                            <div className="absolute top-0 right-0 p-1 text-[8px] bg-slate-800 text-slate-400">EUROPE_CENTRAL</div>
+                            <div className="text-emerald-400 font-bold mb-1 flex items-center gap-1.5">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping inline-block" />
+                                {t('dashboard.consensusSecure') || 'SWARM CONSENSUS: SECURE'}
+                            </div>
+                            <div className="text-[11px] leading-tight text-slate-400">
+                                {t('dashboard.consensusDesc') || 'Dispatch clusters operating natively via decentralized machine profile coordinate inheritance maps.'}
+                            </div>
+                            <div className="mt-2.5 pt-2 border-t border-slate-800 flex items-center justify-between text-[10px]">
+                                <span>{t('dashboard.systemStatus') || 'Status:'} {d.source_status}</span>
+                                <a href="#map-section" className="text-indigo-400 hover:underline">{t('dashboard.viewGeoMap') || 'View Geographic Map ↓'}</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* LIVE OPERATIONAL EVENTS STREAM */}
+            <div className="glass rounded-none border border-white overflow-hidden">
+                <div className="px-4 py-3 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800">
+                    <div className="flex items-center gap-2">
+                        <DocumentTextIcon className="w-4 h-4 text-orange-400" />
+                        <span className="text-xs font-bold uppercase tracking-wider">{t('dashboard.liveStream') || 'Latest Operational Events Stream'}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                        <span className="text-[9px] font-mono text-slate-400 uppercase tracking-wider">{t('dashboard.liveAuditPipeline') || 'Live Audit Pipeline'}</span>
+                    </div>
+                </div>
+                <div className="divide-y divide-slate-100 bg-white/60">
+                    {d.audit?.latestEvents?.length ? (
+                        d.audit.latestEvents.map((ev, idx) => (
+                            <div key={idx} className="px-4 py-2.5 flex items-center justify-between text-xs hover:bg-white/80 transition-colors font-mono">
+                                <div className="flex items-center gap-3 min-w-0 flex-1">
+                                    <span className={`px-1.5 py-0.5 text-[9px] font-bold tracking-tight shrink-0 ${ev.status === 'SUCCESS' ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' : ev.status === 'FAILURE' ? 'bg-red-100 text-red-800 border border-red-200' : 'bg-slate-100 text-slate-800 border border-slate-200'}`}>
+                                        {ev.status}
+                                    </span>
+                                    <span className="font-bold text-slate-900 shrink-0">{ev.event}</span>
+                                    <span className="text-slate-500 text-[11px] truncate">{ev.details}</span>
+                                </div>
+                                <span className="text-slate-400 text-[10px] shrink-0 ml-3">{new Date(ev.timestamp).toLocaleTimeString()}</span>
+                            </div>
+                        ))
+                    ) : (
+                        <div className="p-4 text-center text-slate-400 text-xs italic">
+                            {t('dashboard.noOperationalLogs') || 'No operational logs retrieved in active database snapshot. System standing by.'}
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            {/* Retain live streaming buffer inspect container below operational events for detailed trace examination */}
+            <div className="glass rounded-none border border-white overflow-hidden shadow-none hover-slide mt-6" id="queue-stream">
                 <div className="px-6 py-4 bg-slate-50/50 border-b border-white flex items-center justify-between">
                     <div className="flex items-center gap-2">
                         <CircleStackIcon className="w-5 h-5 text-slate-400" />
                         <div className="font-bold text-slate-800 text-sm tracking-tight">{t("admin.queue.title" as any)}</div>
                     </div>
                     <div className="flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                        <span className="w-2 h-2 rounded-none bg-emerald-500 animate-pulse" />
                         <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Live Buffer Trace</span>
                     </div>
                 </div>
@@ -120,10 +320,3 @@ export const OverviewTab: React.FC<{ range: Range; refreshMs?: number }> = ({ ra
         </div>
     );
 };
-
-// Placeholder for ExclamationTriangleIcon if not imported from heroicons
-const ExclamationTriangleIcon = (props: any) => (
-    <svg fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" {...props}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
-    </svg>
-);

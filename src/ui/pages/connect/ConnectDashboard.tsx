@@ -44,9 +44,9 @@ export const ConnectDashboard = () => {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '24px', marginBottom: '48px' }}>
                 {[
                     { label: 'Connect Status', value: stats.status, icon: ArrowPathIcon, color: '#3b82f6' },
-                    { label: 'Quality Score', value: `${(stats.qualityScore * 100).toFixed(0)}%`, icon: ChartBarIcon, color: '#10b981' },
+                    { label: 'Quality Score', value: `${Number((stats.qualityScore || 0) * 100).toFixed(0)}%`, icon: ChartBarIcon, color: '#10b981' },
                     { label: 'Hardware Active', value: stats.machines, icon: CpuChipIcon, color: '#6366f1' },
-                    { label: 'Capacity (Today)', value: `${(stats.capacityToday * 100).toFixed(0)}%`, icon: BuildingOfficeIcon, color: '#f59e0b' }
+                    { label: 'Capacity (Today)', value: `${Number((stats.capacityToday || 0) * 100).toFixed(0)}%`, icon: BuildingOfficeIcon, color: '#f59e0b' }
                 ].map((card, i) => (
                     <div key={i} style={{
                         background: 'white', padding: '24px', borderRadius: '24px',

@@ -1,65 +1,316 @@
-// lib/adminApi.ts
-type Range = "24h" | "7d" | "30d";
+import { getAuthToken, clearAuthToken, setAuthToken, getUserTenantId, getUserPrinthouseId, getUserSupplierId, getActiveContext } from './authStore';
 
-const ADMIN_KEY_STORAGE = "ppp_admin_api_key";
 
-export const getAdminKey = () => {
-    // 1. Check local storage (manual login) - support both legacy and new keys
-    const stored = localStorage.getItem(ADMIN_KEY_STORAGE) ||
-        localStorage.getItem('admin_key') ||
-        localStorage.getItem('ppp_admin_api_key');
-    if (stored) return stored;
+const endpointBackoff = new Map<string, { failCount: number; nextAllowedTime: number }>();
 
-    // 2. Check build-time env
-    return (import.meta as any)?.env?.VITE_ADMIN_API_KEY || "";
-};
+function getFallbackForPath(path: string): any {
+    const cleanPath = path.split('?')[0];
+    
+    // Create polymorphic base array/object
+    const base: any = [];
+    base.ok = true;
+    base.source_status = "UNAVAILABLE";
+    
+    if (cleanPath.includes('/registry')) {
+        base.registry = [];
+        base.source_status = "REGISTRY_UNAVAILABLE";
+        return base;
+    }
+    if (cleanPath.includes('/signals')) {
+        base.signals = [];
+        base.source_status = "SIGNALS_UNAVAILABLE";
+        return base;
+    }
+    if (cleanPath.includes('/notifications')) {
+        base.notifications = [];
+        base.source_status = "NOTIFICATIONS_UNAVAILABLE";
+        return base;
+    }
+    if (cleanPath.includes('/anomalies')) {
+        base.anomalies = [];
+        base.source_status = "ANOMALY_SOURCE_UNAVAILABLE";
+        return base;
+    }
+    if (cleanPath.endsWith('/telemetry/overview')) {
+        base.overview = {};
+        base.metrics = {};
+        base.source_status = "DISPATCH_TELEMETRY_UNAVAILABLE";
+        return base;
+    }
+    if (cleanPath.includes('/audit')) {
+        base.events = [];
+        base.audit = [];
+        base.data = [];
+        base.count = 0;
+        base.source_status = "AUDIT_SOURCE_UNAVAILABLE";
+        return base;
+    }
+    if (cleanPath.endsWith('/network/overview')) {
+        base.overview = {};
+        base.source_status = "NETWORK_OVERVIEW_UNAVAILABLE";
+        return base;
+    }
+    if (cleanPath.endsWith('/network/capacity')) {
+        base.capacity = [];
+        base.source_status = "NETWORK_CAPACITY_UNAVAILABLE";
+        return base;
+    }
+    if (cleanPath.endsWith('/map')) {
+        base.nodes = [];
+        base.routes = [];
+        base.connections = [];
+        base.warnings = [];
+        base.counts = { operationalNodes: 0, activeDispatches: 0, missingCoordinates: 0 };
+        base.source_status = "MAP_UNAVAILABLE";
+        return base;
+    }
+    if (cleanPath.endsWith('/dispatch') || cleanPath.endsWith('/dispatch/active') || cleanPath.endsWith('/manufacturing/queue')) {
+        base.dispatches = [];
+        base.jobs = [];
+        base.counts = { pending: 0, active: 0, capacityBlocked: 0, slaAtRisk: 0, seedsFiltered: 0 };
+        base.source_status = "NO_DISPATCH_DATA";
+        return base;
+    }
+    if (cleanPath.endsWith('/telemetry/industrial')) {
+        base.telemetry = {};
+        base.source_status = "INDUSTRIAL_TELEMETRY_UNAVAILABLE";
+        return base;
+    }
+    if (cleanPath.endsWith('/economic/overview')) {
+        base.metrics = {};
+        base.overview = {};
+        base.avg_final_score = 0;
+        base.source_status = "ECONOMIC_ROUTING_UNAVAILABLE";
+        return base;
+    }
+    if (cleanPath.endsWith('/global/blocks')) {
+        base.blocks = [];
+        base.source_status = "GLOBAL_BLOCKS_UNAVAILABLE";
+        return base;
+    }
+    if (cleanPath.endsWith('/federation/status')) {
+        base.nodes = [];
+        base.activeLease = null;
+        base.localNodeId = 'unknown';
+        base.isReadOnly = false;
+        base.source_status = "FEDERATION_STATUS_UNAVAILABLE";
+        return base;
+    }
+    if (cleanPath.includes('/marketplace/auctions')) {
+        base.auctions = [];
+        base.source_status = "MARKETPLACE_AUCTIONS_UNAVAILABLE";
+        return base;
+    }
+    if (cleanPath.includes('/marketplace/ledger')) {
+        base.ledger = [];
+        base.source_status = "MARKETPLACE_LEDGER_UNAVAILABLE";
+        return base;
+    }
+    if (cleanPath.includes('/printhouse-capabilities')) {
+        base.printhouses = [];
+        base.printhouse = {};
+        base.machines = [];
+        base.media = [];
+        base.profiles = [];
+        base.readiness = { eligible: false, blockers: [] };
+        base.audit = [];
+        // Subscription endpoint fallback — default to starter plan so SubscriptionGuard degrades gracefully
+        if (cleanPath.includes('/subscription')) {
+            base.subscription = { plan_type: 'starter', billing_status: 'active', features: [], ui_tokens: {} };
+        }
+        base.source_status = "PRINTHOUSE_CAPABILITIES_UNAVAILABLE";
+        return base;
+    }
+    if (cleanPath.includes('/billing')) {
+        // Billing endpoints: safe defaults so PaywallModal can show a support message instead of crashing
+        base.ok = false;
+        base.sessionId = null;
+        base.url = null;
+        base.subscription = { plan_type: 'starter', billing_status: 'active', features: [], ui_tokens: {} };
+        base.source_status = "BILLING_UNAVAILABLE";
+        return base;
+    }
+    
+    base.data = [];
+    return base;
+}
 
-export const setAdminKey = (key: string) => {
-    localStorage.setItem(ADMIN_KEY_STORAGE, key);
-};
+export async function adminFetch<T>(path: string, options?: RequestInit & { tenantId?: string, deploymentId?: string }): Promise<T> {
+    const cleanPath = path.split('?')[0];
+    const backoff = endpointBackoff.get(cleanPath);
+    
+    if (backoff && Date.now() < backoff.nextAllowedTime) {
+        // Skip network call entirely during backoff to prevent console spam and network strain
+        return getFallbackForPath(path) as unknown as T;
+    }
 
-export const clearAdminKey = () => {
-    localStorage.removeItem(ADMIN_KEY_STORAGE);
-};
+    const token = getAuthToken();
+    const storedTenantId = getUserTenantId();
+    const storedPrinthouseId = getUserPrinthouseId();
+    const storedSupplierId = getUserSupplierId();
+    const activeContext = getActiveContext();
 
-async function adminFetch<T>(path: string, options?: RequestInit & { tenantId?: string, deploymentId?: string }): Promise<T> {
-    const key = getAdminKey();
-
+    const isFormData = options?.body instanceof FormData;
     const headers: Record<string, string> = {
-        "Content-Type": "application/json",
-        ...(key ? { "X-Admin-Api-Key": key } : {}),
-        ...(options?.tenantId ? { "X-Tenant-Id": options.tenantId } : {}),
+        "Accept": "application/json",
+        ...(isFormData ? {} : { "Content-Type": "application/json" }),
+        ...(token ? { 
+            "Authorization": `Bearer ${token}`
+        } : {}),
+        ...(options?.tenantId || storedTenantId ? { "X-Tenant-Id": options?.tenantId || storedTenantId } : {}),
+        ...(storedPrinthouseId ? { "X-Printhouse-Id": storedPrinthouseId } : {}),
+        ...(storedSupplierId ? { "X-Supplier-Id": storedSupplierId } : {}),
+        ...(activeContext ? { "X-Active-Context": activeContext } : {}),
         ...(options?.deploymentId ? { "X-Deployment-Id": options.deploymentId } : {}),
         ...(options?.headers as any || {}),
     };
 
-    const res = await fetch(path, {
-        ...options,
-        headers,
-        credentials: "include", 
-    });
 
-    if (!res.ok) {
-        const text = await res.text().catch(() => "");
-        throw new Error(`Admin API error ${res.status}: ${text || res.statusText}`);
+    if (isFormData && headers["Content-Type"]) {
+        delete headers["Content-Type"];
     }
-    return res.json() as Promise<T>;
+
+    if (process.env.NODE_ENV === 'development') {
+        console.log(`[ADMIN-FETCH][AUTH] tokenPresent=${!!token} path=${cleanPath}`);
+    }
+
+    try {
+        const res = await fetch(path, {
+            ...options,
+            headers,
+            credentials: "include", 
+        });
+
+        if (res.status === 401) {
+            clearAuthToken();
+            if (process.env.NODE_ENV === 'development') {
+                console.warn(`[ADMIN-FETCH][AUTH] 401 Unauthorized received for ${cleanPath}. Clearing stale token.`);
+            }
+            if (typeof window !== 'undefined') {
+                window.location.href = '/login';
+            }
+            const fallback: any = getFallbackForPath(path);
+            fallback.ok = false;
+            fallback.source_status = "UNAUTHORIZED";
+            fallback.error = "Session expired. Please log in again.";
+            return fallback as unknown as T;
+        }
+
+        if (!res.ok) {
+            // Tolerate 404s and intermittent service errors by activating backoff
+            const currentFails = (backoff?.failCount || 0) + 1;
+            const pauseMs = Math.min(10000 * Math.pow(2, currentFails - 1), 60000);
+            endpointBackoff.set(cleanPath, {
+                failCount: currentFails,
+                nextAllowedTime: Date.now() + pauseMs
+            });
+            
+            // Return polymorphic fallback gracefully instead of crashing/spamming
+            return getFallbackForPath(path) as unknown as T;
+        }
+
+        // On success, reset fail count
+        if (backoff) {
+            endpointBackoff.delete(cleanPath);
+        }
+        
+        const data = await res.json();
+        
+        // Polymorphic wrapping for successful arrays if callers might access object properties
+        if (Array.isArray(data)) {
+            const arrObj: any = data;
+            arrObj.ok = true;
+            arrObj.data = data;
+            arrObj.events = data;
+            arrObj.audit = data;
+            arrObj.source_status = "ACTIVE";
+            return arrObj as unknown as T;
+        }
+        
+        return data as T;
+    } catch (err: any) {
+        // Handle network disconnection or JSON parsing errors gracefully
+        const currentFails = (backoff?.failCount || 0) + 1;
+        const pauseMs = Math.min(10000 * Math.pow(2, currentFails - 1), 60000);
+        endpointBackoff.set(cleanPath, {
+            failCount: currentFails,
+            nextAllowedTime: Date.now() + pauseMs
+        });
+        
+        return getFallbackForPath(path) as unknown as T;
+    }
 }
 
+export async function verifyToken(token: string) {
+    try {
+        // We use a direct fetch here because this is the BOOTSTRAP verification call
+        // before the global token is set in the store.
+        const response = await fetch('/api/admin/telemetry/snapshot', {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Accept': 'application/json'
+            }
+        });
+
+        if (!response.ok) {
+            if (response.status === 502) {
+                throw new Error('Connection Error: 502 Bad Gateway. This usually means the backend service is restarting or Redis is unreachable.');
+            }
+            if (response.status === 401) {
+                throw new Error('Invalid access token. Please check your credentials.');
+            }
+            throw new Error(`Verification failed: ${response.status}`);
+        }
+        
+        return response.json();
+    } catch (e: any) {
+        throw new Error(e.message);
+    }
+}
+
+// Keep legacy exports for compatibility during migration if necessary, but wired to authStore
+export const getAdminKey = getAuthToken;
+export const setAdminKey = setAuthToken;
+export const clearAdminKey = clearAuthToken;
+
+export type Range = "24h" | "7d" | "30d";
+
 export type OverviewResponse = {
-    totalJobs: number;
-    successRate: number;
-    avgLatencyMs: number;
-    maxLatencyMs: number;
-    p95LatencyMs: number | null;
-    deltaImprovementRate: number;
-    costProxy: number;
-    totalValueGenerated: number;
-    totalHoursSaved: number;
-    avgRiskBefore: number;
-    avgRiskAfter: number;
-    queueBacklog: number;
-    oldestAgeSeconds: number;
+    totalJobs?: number;
+    total_jobs?: number;
+    successRate?: number;
+    success_rate?: number;
+    avgLatencyMs?: number;
+    avg_latency_ms?: number;
+    maxLatencyMs?: number;
+    max_latency_ms?: number;
+    p95LatencyMs?: number | null;
+    p95_latency_ms?: number | null;
+    deltaImprovementRate?: number;
+    delta_improvement_rate?: number;
+    costProxy?: number;
+    cost_proxy?: number;
+    totalValueGenerated?: number;
+    total_value_generated?: number;
+    totalHoursSaved?: number;
+    total_hours_saved?: number;
+    avgRiskBefore?: number;
+    avg_risk_before?: number;
+    avgRiskAfter?: number;
+    avg_risk_after?: number;
+    queueBacklog?: number;
+    queue_backlog?: number;
+    activeJobs?: number;
+    active_jobs?: number;
+    oldestAgeSeconds?: number;
+    oldest_age_seconds?: number;
+    efficiencyRate?: number;
+    efficiency_rate?: number;
+    activeWorkers?: number;
+    active_workers?: number;
+    totalWorkers?: number;
+    total_workers?: number;
 };
 
 export type TenantRow = {
@@ -98,6 +349,16 @@ export type TenantDetail = {
         fired?: string[];
     };
     notification_settings_json?: NotificationSettings;
+    plan_code?: string;
+    commercial_status?: string;
+    access_level?: string;
+    grace_started_at?: string | null;
+    grace_ends_at?: string | null;
+    grace_extended_until?: string | null;
+    limits_json?: any;
+    entitlements_json?: any;
+    module_access_json?: any;
+    governance_notes_json?: any;
 };
 
 export type JobsResponse = {
@@ -136,6 +397,90 @@ export type AuditRow = {
     governance_snapshot?: any;
 };
 
+export interface FixCoverageItem {
+    issue_code: string | null;
+    severity: string | null;
+    message: string | null;
+    fix_method: string | null;
+    repair_code?: string;
+    repair_status?: string;
+    repair_reason?: string | null;
+}
+
+export interface FixCoverage {
+    total_issues: number;
+    fixed_count: number;
+    skipped_count: number;
+    failed_count: number;
+    not_attempted_count: number;
+    fixed: FixCoverageItem[];
+    skipped: FixCoverageItem[];
+    failed: FixCoverageItem[];
+    not_attempted: FixCoverageItem[];
+}
+
+export type PreflightJob = {
+    jobId: string;
+    id?: string | number;
+    tenantId: string;
+    userId?: string;
+    filename?: string;
+    fileSize?: number;
+    policy?: string;
+    status: string;
+    type: string;
+    progress: number;
+    issueCount?: number;
+    fixCount?: number;
+    noopFix?: boolean;
+    rewritten?: boolean;
+    certificationMode?: string;
+    destructiveFixRisk?: 'NONE' | 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+    createdAt: string;
+    completedAt?: string;
+    artifacts?: any[];
+    canonicalData?: any;
+    canonicalPayload?: any;
+    sourceJobId?: string | null;
+    sourceSystem?: string | null;
+    requestedFixesCount?: number;
+    repairsCount?: number;
+    appliedFixesCount?: number;
+    skippedFixesCount?: number;
+    failedFixesCount?: number;
+    requestedFixes?: any[];
+    repairs?: any[];
+    appliedFixes?: any[];
+    skippedFixes?: any[];
+    failedFixes?: any[];
+    fixCoverage?: FixCoverage;
+    lastSeenAt?: string | null;
+    lastSyncedAt?: string | null;
+};
+
+export type PreflightJobsResponse = {
+    total: number;
+    jobs: PreflightJob[];
+    source_status?: string;
+};
+
+export type PreflightWorker = {
+    id: string;
+    name: string;
+    status: 'ONLINE' | 'BUSY' | 'OFFLINE' | 'MAINTENANCE';
+    cpuUsage: number;
+    memUsage: number;
+    activeJobs: number;
+    lastSeen: string;
+};
+
+export type PreflightQuota = {
+    tenantId: string;
+    limit: number;
+    usage: number;
+    resetAt: string;
+};
+
 export type CSWorkflow = {
     id: string;
     tenant_id: string;
@@ -150,8 +495,129 @@ export type CSWorkflow = {
     updated_at: string;
 };
 
+export type GovernanceBlock = {
+    id: string;
+    name: string;
+    status: string;
+    impact: string;
+};
+
 export async function getOverview(range: Range) {
     return adminFetch<OverviewResponse>(`/api/admin/metrics/overview?range=${range}`);
+}
+
+export type DashboardOverviewPayload = {
+    ok: boolean;
+    source_status: string;
+    timestamp: string;
+    kpis: Array<{
+        key: string;
+        label: string;
+        value: any;
+        unit?: string;
+        status: string;
+    }>;
+    preflight: {
+        source_status: string;
+        jobsToday: number | null;
+        activeJobs: number | null;
+        completedJobsToday: number | null;
+        failedJobsToday: number | null;
+        realExtractionCount: number | null;
+        failedRuntimeEnvironmentCount: number | null;
+        partialArtifactsCount: number | null;
+        averageRiskScore: number | null;
+        queueDepth: number | null;
+        latestJobStatus: string | null;
+    };
+    governance: {
+        source_status: string;
+        activePolicyCount: number | null;
+        latestPolicyApplied: string | null;
+        jobsBlockedByPolicy: number | null;
+        certificationBlockedCount: number | null;
+        jobsCertifiableCount: number | null;
+        lastGovernanceEvent: {
+            rule: string;
+            result: string;
+            action: string;
+            time: string;
+        } | null;
+        deploymentContractVersion: string;
+        auditStatus: 'clean' | 'warnings' | 'errors' | null;
+    };
+    economy: {
+        source_status: string;
+        estimatedProductionValue: number | null;
+        estimatedAvoidedReprintCost: number | null;
+        hoursSaved: number | null;
+        averageRiskScore: number | null;
+        averageMargin: number | null;
+        jobsRequiringFix: number | null;
+        fixSuccessCount: number | null;
+        fixFailureCount: number | null;
+        qualityScore: number | null;
+    };
+    storage: {
+        source_status: string;
+        artifactsCount: number | null;
+        totalSizeBytes: number | null;
+        latestArtifact: string | null;
+    };
+    audit: {
+        source_status: string;
+        latestEvents: Array<{
+            event: string;
+            status: string;
+            details: string;
+            timestamp: string;
+        }>;
+    };
+    federation: {
+        source_status: string;
+        operationalNodes: number | null;
+        activeDispatches: number | null;
+        missingCoordinates: number | null;
+        degradedNodes: number | null;
+        averageUtilization: number | null;
+    };
+    warnings?: string[];
+};
+
+export async function getDashboardOverview() {
+    return adminFetch<DashboardOverviewPayload>('/api/admin/dashboard/overview');
+}
+
+export async function getPrinthouseDashboardSummary() {
+    return adminFetch<{ ok: boolean; data: any; meta: any }>('/api/admin/printhouse/dashboard/summary');
+}
+
+export async function getPrinthouseDashboardOrders() {
+    return adminFetch<{ ok: boolean; data: any; meta: any }>('/api/admin/printhouse/dashboard/orders');
+}
+
+export async function getPrinthouseDashboardMachines() {
+    return adminFetch<{ ok: boolean; data: any; meta: any }>('/api/admin/printhouse/dashboard/machines');
+}
+
+export async function getPrinthouseDashboardQueue() {
+    return adminFetch<{ ok: boolean; data: any; meta: any }>('/api/admin/printhouse/dashboard/queue');
+}
+
+export async function getPrinthouseDashboardIncidents() {
+    return adminFetch<{ ok: boolean; data: any; meta: any }>('/api/admin/printhouse/dashboard/incidents');
+}
+
+export async function getPrinthouseDashboardActivity() {
+    return adminFetch<{ ok: boolean; data: any; meta: any }>('/api/admin/printhouse/dashboard/activity');
+}
+
+export async function getGovernanceBlocks() {
+    return adminFetch<{ ok: boolean; blocks: GovernanceBlock[] }>('/api/admin/global/blocks');
+}
+
+export async function getGlobalPolicies() {
+    return adminFetch<{ ok: boolean; policies: any[] }>('/api/admin/global/policies');
 }
 export async function getTenants(range: Range) {
     return adminFetch<TenantRow[]>(`/api/admin/metrics/tenants?range=${range}`);
@@ -206,8 +672,55 @@ export async function getJobs(params: {
     if (params.type) qs.set("type", params.type);
     qs.set("limit", String(params.limit ?? 50));
     qs.set("offset", String(params.offset ?? 0));
-    return adminFetch<JobsResponse>(`/api/admin/jobs?${qs.toString()}`);
+    
+    const res = await adminFetch<JobsResponse>(`/api/admin/jobs?${qs.toString()}`);
+    
+    // Industrial normalization to prevent frontend crashes on missing fields
+    if (res && Array.isArray(res.jobs)) {
+        res.jobs = res.jobs.map((job: any) => ({
+            ...job,
+            id: job.id ?? 'unknown',
+            tenant_id: job.tenant_id ?? 'default',
+            type: job.type ?? job.job_type ?? 'LEGACY',
+            status: job.status ?? 'UNKNOWN',
+            deployment_id: job.deployment_id ?? null,
+            asset_id: job.asset_id ?? null,
+            printhouse_id: job.printhouse_id ?? null,
+            worker_id: job.worker_id ?? null,
+            original_name: job.original_name ?? null,
+            created_at: job.created_at ?? null,
+            updated_at: job.updated_at ?? null,
+        }));
+    }
+    
+    return res;
 }
+
+export async function getJobDetail(jobId: string) {
+    return adminFetch<{ ok: boolean, job: any, trace_id?: string | null }>(`/api/admin/jobs/${jobId}`);
+}
+
+export async function getJobTimeline(jobId: string) {
+    return adminFetch<{ ok: boolean, timeline: any[], source_status?: string }>(`/api/admin/jobs/${jobId}/timeline`);
+}
+
+export async function getJobLogs(jobId: string) {
+    return adminFetch<{ ok: boolean, logs: any[], source?: string, source_status?: string }>(`/api/admin/jobs/${jobId}/logs`);
+}
+
+export async function getJobArtifacts(jobId: string) {
+    return adminFetch<{ ok: boolean, artifacts: any[], source_status?: string }>(`/api/admin/jobs/${jobId}/artifacts`);
+}
+
+export async function getJobWorkerDetails(jobId: string) {
+    return adminFetch<{ ok: boolean, worker: any, source_status?: string }>(`/api/admin/jobs/${jobId}/worker`);
+}
+
+export async function getJobResult(jobId: string) {
+    return adminFetch<{ ok: boolean, resulting_state: any, source_status?: string }>(`/api/admin/jobs/${jobId}/result`);
+}
+
+
 export async function getTopErrors(range: Range) {
     return adminFetch<TopErrorRow[]>(`/api/admin/errors/top?range=${range}`);
 }
@@ -281,15 +794,103 @@ export async function cancelJob(jobId: string, reason: string) {
     });
 }
 
+// --- Node Orchestration API ---
+export async function drainNode(nodeId: string, reason: string) {
+    return adminFetch<{ ok: boolean, nodeId: string }>(`/api/admin/control/node/${nodeId}/drain`, {
+        method: 'POST',
+        body: JSON.stringify({ reason })
+    });
+}
+
+export async function lockNode(nodeId: string, reason: string) {
+    return adminFetch<{ ok: boolean, nodeId: string }>(`/api/admin/control/node/${nodeId}/lock`, {
+        method: 'POST',
+        body: JSON.stringify({ reason })
+    });
+}
+
+export async function purgeNode(nodeId: string, reason: string) {
+    return adminFetch<{ ok: boolean, nodeId: string }>(`/api/admin/control/node/${nodeId}/purge`, {
+        method: 'POST',
+        body: JSON.stringify({ reason })
+    });
+}
+
+export async function shiftNode(sourceNodeId: string, targetNodeId: string, reason: string) {
+    return adminFetch<{ ok: boolean, sourceNodeId: string, targetNodeId: string }>(`/api/admin/control/node/${sourceNodeId}/shift`, {
+        method: 'POST',
+        body: JSON.stringify({ targetNodeId, reason })
+    });
+}
+
+
+// --- Machine Intelligence API (Phase 34) ---
+export async function getMachineFederationDetails(id: string) {
+    return adminFetch<{ ok: boolean, data: any }>(`/api/admin/federation/machines/${id}`);
+}
+
+export async function getMachineTelemetry(id: string) {
+    return adminFetch<{ ok: boolean, data: any }>(`/api/admin/telemetry/machines/${id}`);
+}
+
+export async function getMachineDispatchHistory(id: string) {
+    return adminFetch<{ ok: boolean, data: any }>(`/api/admin/dispatch/machines/${id}`);
+}
+
+export async function getMachineCapacityAnalysis(id: string) {
+    return adminFetch<{ ok: boolean, data: any }>(`/api/admin/capacity/machines/${id}`);
+}
+
+
+export type QueueStatsItem = {
+    name: string;
+    status: 'RUNNING' | 'PAUSED' | string;
+    size: number;
+    counts: {
+        waiting: number;
+        active: number;
+        completed: number;
+        failed: number;
+        delayed: number;
+    };
+};
+
+export type QueuePayload = {
+    ok?: boolean;
+    note?: string;
+    error?: string;
+    queues?: QueueStatsItem[];
+    global?: {
+        is_ready: boolean;
+        timestamp?: string;
+        error?: string;
+    };
+    active?: number;
+    active_count?: number;
+    waiting?: number;
+    waiting_count?: number;
+    delayed?: number;
+    delayed_count?: number;
+    failed?: number;
+    failed_count?: number;
+    completed?: number;
+    completed_count?: number;
+};
+
 export async function getAdminQueueStats() {
     return adminFetch<{ ok: boolean, stats: any }>(`/api/admin/control/queue/stats`);
 }
+
 export async function getQueue() {
-    return adminFetch<any>(`/api/admin/queue`);
+    return adminFetch<QueuePayload>(`/api/admin/queue`);
 }
 
 export async function getPrinters(filters: string = "") {
     return adminFetch<any[]>(`/api/admin/network/printers${filters ? '?' + filters : ''}`);
+}
+
+export async function getMachines() {
+    return adminFetch<{ ok: boolean; total: number; machines: any[]; status: string }>('/api/admin/machines');
 }
 
 export async function getNetworkOverview() {
@@ -302,6 +903,64 @@ export async function getCapacity() {
 
 export async function getHealth() {
     return adminFetch<any[]>(`/api/admin/network/health`);
+}
+
+export interface SystemHealthResponse {
+    ok: boolean;
+    status?: string;
+    statusCode?: number;
+    services?: {
+        operational?: boolean;
+    };
+    dependencies?: {
+        redis?: {
+            status: string;
+            latency: string;
+        };
+        [key: string]: any;
+    };
+    uptime_seconds?: number;
+    startTime?: number;
+    pid?: number;
+    error?: string;
+    timestamp?: string;
+}
+
+export async function getSystemHealth(): Promise<SystemHealthResponse> {
+    try {
+        const token = getAuthToken();
+        const headers: Record<string, string> = {
+            'Accept': 'application/json',
+            ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        };
+        const res = await fetch('/api/system/health', {
+            headers,
+            credentials: 'include'
+        });
+        if (res.status === 401) {
+            return { ok: false, status: 'UNAUTHORIZED', statusCode: 401 };
+        }
+        if (res.status === 403) {
+            return { ok: false, status: 'FORBIDDEN', statusCode: 403 };
+        }
+        if (!res.ok) {
+            let errorText = 'HTTP_ERROR';
+            try {
+                const errJson = await res.json();
+                if (errJson && errJson.status) errorText = errJson.status;
+            } catch (_) {
+                // Ignore parse errors on non-200 responses
+            }
+            return { ok: false, status: errorText, statusCode: res.status };
+        }
+        const data = await res.json();
+        return {
+            ...data,
+            statusCode: res.status
+        };
+    } catch (err: any) {
+        return { ok: false, status: 'UNREACHABLE', statusCode: 0 };
+    }
 }
 
 export async function getRoutingOverview() {
@@ -385,6 +1044,31 @@ export async function getAutonomyMetrics() {
     return adminFetch<any>(`/api/admin/autonomy/metrics`);
 }
 
+export async function getIndustrialIncidents() {
+    // Re-uses audit log with type OPERATIONAL_INCIDENT
+    return adminFetch<any[]>('/api/admin/audit?action=OPERATIONAL_INCIDENT&limit=50');
+}
+
+export async function getIndustrialSnapshot() {
+    return adminFetch<any>('/api/admin/telemetry/industrial');
+}
+
+export async function getNodeMESStats(nodeId: string) {
+    return adminFetch<{ ok: boolean, stats: any }>(`/api/admin/telemetry/nodes/${nodeId}/mes`);
+}
+
+export async function triggerOrchestrationAnalysis() {
+    return adminFetch<{ ok: boolean }>('/api/admin/orchestration/analyze', {
+        method: 'POST'
+    });
+}
+
+export async function triggerLifecycleProcess() {
+    return adminFetch<{ ok: boolean, results: { transitioned: number, purged: number } }>('/api/admin/preflight/artifacts/lifecycle', {
+        method: 'POST'
+    });
+}
+
 export async function getAutonomyPipelineDetail(id: string) {
     return adminFetch<any>(`/api/admin/autonomy/${id}`);
 }
@@ -442,6 +1126,26 @@ export async function getJobQuotes(jobId: string) {
     return adminFetch<any[]>(`/api/admin/pricing/jobs/${jobId}/quotes`);
 }
 
+export async function createPricingProfile(data: object) {
+    return adminFetch<{ ok: boolean, id: string }>(`/api/admin/pricing/profiles`, {
+        method: 'POST',
+        body: JSON.stringify(data)
+    });
+}
+
+export async function updatePricingProfile(id: string, data: object) {
+    return adminFetch<{ ok: boolean }>(`/api/admin/pricing/profiles/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data)
+    });
+}
+
+export async function deletePricingProfile(id: string) {
+    return adminFetch<{ ok: boolean }>(`/api/admin/pricing/profiles/${id}`, {
+        method: 'DELETE'
+    });
+}
+
 // --- Economic Routing ---
 export async function getEconomicRoutingHistory() {
     return adminFetch<any[]>(`/api/admin/routing/economic/history`);
@@ -450,6 +1154,270 @@ export async function getEconomicRoutingHistory() {
 export async function getEconomicRoutingConflicts() {
     return adminFetch<any[]>(`/api/admin/routing/economic/conflicts`);
 }
+
+export async function getRoutingRecommendations(specs: any) {
+    return adminFetch<any>(`/api/admin/routing/decision/recommend`, {
+        method: 'POST',
+        body: JSON.stringify({ specs })
+    });
+}
+
+export async function getRoutingHealth() {
+    return adminFetch<any>(`/api/admin/routing/decision/health`);
+}
+
+// --- Production Dispatch ---
+export async function getManufacturingQueue(includeSeeds?: boolean) {
+    const query = includeSeeds ? '?includeSeeds=true' : '';
+    return adminFetch<{ ok: boolean, source_status?: string, counts?: any, jobs: any[], message?: string }>(`/api/admin/manufacturing/queue${query}`);
+}
+
+export async function getDispatches() {
+    const res = await adminFetch<any>(`/api/admin/manufacturing/queue`);
+    // Map manufacturing/queue jobs to dispatches for backward compatibility with older UI
+    if (res && res.jobs) {
+        return { ok: res.ok, dispatches: res.jobs };
+    }
+    return { ok: res?.ok ?? false, dispatches: [] };
+}
+
+export async function getDispatchDetail(id: string) {
+    return adminFetch<{ ok: boolean, dispatch: any }>(`/api/admin/dispatch/${id}`);
+}
+
+export async function assignDispatch(jobId: string, recommendation: any) {
+    return adminFetch<{ ok: boolean, dispatchId: string }>(`/api/admin/dispatch/assign`, {
+        method: 'POST',
+        body: JSON.stringify({ jobId, recommendation })
+    });
+}
+
+export async function updateDispatchStatus(id: string, status: string, message?: string) {
+    return adminFetch<{ ok: boolean }>(`/api/admin/dispatch/${id}/status`, {
+        method: 'POST',
+        body: JSON.stringify({ status, message })
+    });
+}
+
+export async function rerouteDispatch(id: string, reason: string) {
+    return adminFetch<{ ok: boolean, message: string }>(`/api/admin/dispatch/${id}/reroute`, {
+        method: 'POST',
+        body: JSON.stringify({ reason })
+    });
+}
+
+export async function scoreDispatch(jobInput: any, options?: any) {
+    return adminFetch<any>(`/api/admin/dispatch/score`, {
+        method: 'POST',
+        body: JSON.stringify({ jobInput, options })
+    });
+}
+
+export async function createDispatch(jobInput: any, selectedCandidate: any, options?: any) {
+    return adminFetch<any>(`/api/admin/dispatch/create`, {
+        method: 'POST',
+        body: JSON.stringify({ jobInput, selectedCandidate, options })
+    });
+}
+
+export async function rollbackDispatch(dispatchId: string, reason: string) {
+    return adminFetch<{ ok: boolean }>(`/api/admin/dispatch/${dispatchId}/rollback`, {
+        method: 'POST',
+        body: JSON.stringify({ reason })
+    });
+}
+
+export async function getIndustrialTelemetryOverview() {
+    return adminFetch<{ ok: boolean, telemetry: any }>('/api/admin/dispatch/telemetry/overview');
+}
+
+export async function sendNodeHeartbeat(payload: any) {
+    return adminFetch<{ ok: boolean, state: string }>('/api/admin/dispatch/heartbeat', {
+        method: 'POST',
+        body: JSON.stringify(payload)
+    });
+}
+
+// --- Phase 28 — Live Autonomous Dispatch Orchestration ---
+export async function getIndustrialLiveState() {
+    return adminFetch<{ ok: boolean, stats: any }>('/api/admin/dispatch/live-state');
+}
+
+export async function getActiveDispatches() {
+    return adminFetch<{ ok: boolean, dispatches: any[] }>('/api/admin/dispatch/active');
+}
+
+export async function getSLARisks() {
+    return adminFetch<{ ok: boolean, risks: any[] }>('/api/admin/dispatch/sla-risks');
+}
+
+export async function getRerouteEvents() {
+    return adminFetch<{ ok: boolean, events: any[] }>('/api/admin/dispatch/reroutes');
+}
+
+export async function getNodeCapacityHeatmap() {
+    return adminFetch<{ ok: boolean, nodes: any[] }>('/api/admin/dispatch/capacity');
+}
+
+export async function getIndustrialNodeDetail(id: string) {
+    return adminFetch<{ ok: boolean, node: any, heartbeats: any[], dispatches: any[] }>(`/api/admin/dispatch/node/${id}`);
+}
+
+export async function triggerSLAScan() {
+    return adminFetch<{ ok: boolean, result: any }>('/api/admin/dispatch/scan', { method: 'POST' });
+}
+
+export async function triggerRebalance() {
+    return adminFetch<{ ok: boolean, result: any }>('/api/admin/dispatch/rebalance', { method: 'POST' });
+}
+
+// --- Phase 29 — Predictive Industrial Intelligence ---
+export async function getReliabilityRanking() {
+    return adminFetch<{ ok: boolean, ranking: any[] }>('/api/admin/dispatch/intelligence/reliability');
+}
+
+export async function getCongestionForecast() {
+    return adminFetch<{ ok: boolean, forecasts: any[] }>('/api/admin/dispatch/intelligence/congestion');
+}
+
+export async function getFederationIntelligence() {
+    return adminFetch<{ ok: boolean, snapshots: any[], loadDrift: any[] }>('/api/admin/dispatch/intelligence/federation');
+}
+
+export async function getOptimizationHistory() {
+    return adminFetch<{ ok: boolean, history: any[], cycles: any[] }>('/api/admin/dispatch/intelligence/optimization');
+}
+
+export async function getManufacturingPredictions() {
+    return adminFetch<{ ok: boolean, predictions: any[] }>('/api/admin/dispatch/intelligence/predictions');
+}
+
+// --- Phase 30 — Autonomous Industrial Economic Engine ---
+export async function getDispatchEconomicOverview() {
+    return adminFetch<{ ok: boolean, snapshots: any[] }>('/api/admin/dispatch/economics/overview');
+}
+
+export async function getEconomicRisk() {
+    return adminFetch<{ ok: boolean, risks: any[] }>('/api/admin/dispatch/economics/risk');
+}
+
+export async function getProfitabilityHistory() {
+    return adminFetch<{ ok: boolean, history: any[] }>('/api/admin/dispatch/economics/profitability');
+}
+
+export async function simulateEconomicRouting(jobData: any, candidateIds: string[]) {
+    return adminFetch<{ ok: boolean, simulation: any }>('/api/admin/dispatch/economics/simulator', {
+        method: 'POST',
+        body: JSON.stringify({ jobData, candidateIds })
+    });
+}
+
+export async function getNodeEconomicDetail(nodeId: string) {
+    return adminFetch<{ ok: boolean, profitability: any, pressure: any[] }>(`/api/admin/dispatch/economics/node/${nodeId}`);
+}
+
+// --- Phase 31 — Global Industrial Governance & Resilience ---
+export async function getGovernanceOverview() {
+    return adminFetch<{ ok: boolean, snapshots: any[] }>('/api/admin/dispatch/governance/overview');
+}
+
+export async function getRegionalResilience() {
+    return adminFetch<{ ok: boolean, resilience: any[] }>('/api/admin/dispatch/governance/resilience');
+}
+
+export async function getSystemicRisk() {
+    return adminFetch<{ ok: boolean, risks: any[], cascading: any[] }>('/api/admin/dispatch/governance/systemic-risk');
+}
+
+export async function runResilienceSimulation() {
+    return adminFetch<{ ok: boolean, simulation: any }>('/api/admin/dispatch/governance/simulation');
+}
+
+// --- Phase 32 — Temporal Industrial Intelligence ---
+export async function getTemporalOverview() {
+    return adminFetch<{ ok: boolean, snapshots: any[] }>('/api/admin/dispatch/temporal/overview');
+}
+
+export async function getFutureForecasts() {
+    return adminFetch<{ ok: boolean, forecasts: any[] }>('/api/admin/dispatch/temporal/futures');
+}
+
+export async function getParallelTimelines() {
+    return adminFetch<{ ok: boolean, timelines: any[] }>('/api/admin/dispatch/temporal/timelines');
+}
+
+export async function getTemporalRisk() {
+    return adminFetch<{ ok: boolean, risks: any[] }>('/api/admin/dispatch/temporal/risk');
+}
+
+// --- Phase 33 — Reality Simulation & Synthetic Operations Twin ---
+export async function getSimulationOverview() {
+    return adminFetch<{ ok: boolean, snapshots: any[] }>('/api/admin/dispatch/simulation/overview');
+}
+
+export async function runManualSimulation(type: string, config: any = {}) {
+    return adminFetch<{ ok: boolean, result: any }>('/api/admin/dispatch/simulation/run', {
+        method: 'POST',
+        body: JSON.stringify({ type, config })
+    });
+}
+
+export async function getSimulationRuns() {
+    return adminFetch<{ ok: boolean, runs: any[] }>('/api/admin/dispatch/simulation/runs');
+}
+
+export async function getSimulationRecommendations() {
+    return adminFetch<{ ok: boolean, recommendations: any[] }>('/api/admin/dispatch/simulation/recommendations');
+}
+
+export async function getFutureProjections() {
+    return adminFetch<{ ok: boolean, projections: any[] }>('/api/admin/dispatch/simulation/future-projections');
+}
+
+// --- Phase 16 — Industrial Federation & Swarm ---
+export async function getFederationHealth() {
+    return adminFetch<{ ok: boolean, health: any }>('/api/admin/federation/health');
+}
+
+export async function getFederationFactories() {
+    return adminFetch<{ ok: boolean, factories: any[] }>('/api/admin/federation/factories');
+}
+
+export async function getFederationConsensus() {
+    return adminFetch<{ ok: boolean, events: any[] }>('/api/admin/federation/consensus');
+}
+
+export async function getFederationDigitalTwin() {
+    return adminFetch<{ ok: boolean, snapshots: any[] }>('/api/admin/federation/digital-twin');
+}
+
+export async function getFederationDelegations() {
+    return adminFetch<{ ok: boolean, delegations: any[] }>('/api/admin/federation/delegations');
+}
+
+export async function getFederationRecovery() {
+    return adminFetch<{ ok: boolean, events: any[] }>('/api/admin/federation/recovery');
+}
+
+export async function rebalanceFederation() {
+    return adminFetch<{ ok: boolean, rebalanceExecuted: boolean }>('/api/admin/federation/rebalance', {
+        method: 'POST'
+    });
+}
+
+export async function recoverFederationFactory(factoryId: string) {
+    return adminFetch<{ ok: boolean, message: string }>(`/api/admin/federation/recover`, {
+        method: 'POST',
+        body: JSON.stringify({ factoryId })
+    });
+}
+
+export async function snapshotFederation() {
+    return adminFetch<{ ok: boolean, snapshot: any }>('/api/admin/federation/snapshot', {
+        method: 'POST'
+    });
+}
+
 
 // --- Engagement ---
 export async function getEngagementSignals() {
@@ -461,3 +1429,1689 @@ export async function getEngagementStats() {
     const res = await adminFetch<{ ok: boolean, stats: any[] }>(`/api/admin/engagement-stats`);
     return res.stats || [];
 }
+
+// --- Printhouses ---
+export async function getPrinthouses() {
+    const res = await adminFetch<{ ok: boolean, printhouses: any[] }>(`/api/admin/printhouses`);
+    return res.printhouses;
+}
+
+export async function createPrinthouse(data: object) {
+    return adminFetch<{ ok: boolean, id: string }>(`/api/admin/printhouses`, {
+        method: 'POST',
+        body: JSON.stringify(data)
+    });
+}
+
+export async function updatePrinthouse(mongoId: string, data: object) {
+    return adminFetch<{ ok: boolean }>(`/api/admin/printhouses/${mongoId}`, {
+        method: 'PUT',
+        body: JSON.stringify(data)
+    });
+}
+
+export async function deletePrinthouse(mongoId: string) {
+    return adminFetch<{ ok: boolean }>(`/api/admin/printhouses/${mongoId}`, {
+        method: 'DELETE'
+    });
+}
+
+// --- Orders ---
+export type OrderStatus = 'pending' | 'reviewing' | 'in_production' | 'shipped' | 'delivered' | 'cancelled' | 'FILES_PENDING' | 'FILES_VALIDATED' | 'INVOICE_PENDING' | 'PAYMENT_PENDING' | 'READY_FOR_PRINTHOUSE';
+
+export type Order = {
+    id: number;
+    order_ref: string;
+    user_id: string;
+    status: OrderStatus;
+    specs: any;
+    offer_print_house: string;
+    offer_price: number;
+    created_at: string;
+    updated_at: string;
+    production_files?: any;
+    invoice_payment?: any;
+};
+
+export type OrdersResponse = {
+    ok: boolean;
+    total: number;
+    orders: Order[];
+};
+
+export async function getOrders(params: { status?: OrderStatus; user_id?: string; limit?: number; offset?: number } = {}) {
+    const qs = new URLSearchParams();
+    if (params.status) qs.set('status', params.status);
+    if (params.user_id) qs.set('user_id', params.user_id);
+    qs.set('limit', String(params.limit ?? 50));
+    qs.set('offset', String(params.offset ?? 0));
+    return adminFetch<OrdersResponse>(`/api/admin/orders?${qs.toString()}`);
+}
+
+export async function triggerProductionFileFetch(orderRef: string) {
+    return adminFetch<{ ok: boolean, message?: string }>(`/api/admin/orders/${orderRef}/production-files/fetch`, {
+        method: 'POST'
+    });
+}
+
+export async function triggerProductionFileValidation(orderRef: string) {
+    return adminFetch<{ ok: boolean, message?: string, results?: any[] }>(`/api/admin/orders/${orderRef}/production-files/validate`, {
+        method: 'POST'
+    });
+}
+
+export async function generateOrderInvoice(orderRef: string) {
+    return adminFetch<{ ok: boolean, invoice_id?: string }>(`/api/admin/orders/${orderRef}/invoice/generate`, {
+        method: 'POST'
+    });
+}
+
+export async function getProductionFiles(orderRef: string) {
+    return adminFetch<{ ok: boolean, files: any[], repository?: any }>(`/api/admin/orders/${orderRef}/production-files`);
+}
+
+// --- Preflight Operations API --- //
+
+export async function getPreflightJobs(params: {
+    status?: string;
+    tenant?: string;
+    type?: string;
+    risk?: string;
+    largeOnly?: boolean;
+    limit?: number;
+    offset?: number;
+}): Promise<PreflightJobsResponse> {
+    const qs = new URLSearchParams();
+    if (params.status) qs.set("status", params.status);
+    if (params.tenant) qs.set("tenant", params.tenant);
+    if (params.type) qs.set("type", params.type);
+    if (params.risk) qs.set("risk", params.risk);
+    if (params.largeOnly) qs.set("largeOnly", "true");
+    qs.set("limit", String(params.limit ?? 50));
+    qs.set("offset", String(params.offset ?? 0));
+    
+    try {
+        const res = await adminFetch<any>(`/api/admin/preflight/jobs?${qs.toString()}`);
+        // Normalize: { jobs: [] } or { data: [] } or raw array
+        let rawJobs = res.jobs || res.data || (Array.isArray(res) ? res : []);
+        
+        const jobs = rawJobs.map((j: any) => ({
+            ...j,
+            jobId: j.jobId ?? j.id ?? 'unknown',
+            tenantId: j.tenantId ?? j.tenant_id ?? 'default',
+            status: j.status ?? 'UNKNOWN',
+            type: j.type ?? 'ANALYZE',
+            progress: j.progress ?? 0,
+            createdAt: j.createdAt ?? j.created_at ?? null
+        }));
+
+        const total = res.total ?? jobs.length;
+        const source_status = res.source_status?.includes('UNAVAILABLE') ? res.source_status : (res.source_status || 'PREFLIGHT_REGISTRY');
+        return { total, jobs, source_status };
+    } catch (e) {
+        console.warn(`[PREFLIGHT][UPSTREAM-MISSING] getPreflightJobs failed:`, e);
+        return { total: 0, jobs: [], source_status: 'PREFLIGHT_REGISTRY_UNAVAILABLE' };
+    }
+}
+
+export async function getIncomingConsoleConsensus(params: { limit?: number }) {
+    const pref = await getPreflightJobs(params);
+    if (pref.source_status && pref.source_status.includes('UNAVAILABLE')) {
+        const leg = await getJobs(params);
+        return {
+            total: leg?.total || 0,
+            jobs: leg?.jobs || [],
+            source_status: 'LEGACY_QUEUE'
+        };
+    }
+    return {
+        total: pref.total,
+        jobs: pref.jobs,
+        source_status: pref.source_status || 'PREFLIGHT_REGISTRY'
+    };
+}
+
+export async function getPreflightJob(jobId: string): Promise<PreflightJob | null> {
+    try {
+        const res = await adminFetch<any>(`/api/admin/preflight/jobs/${encodeURIComponent(jobId)}`);
+        // Normalize: { result: job } or raw job
+        return res.result || res.job || (res.jobId ? res : null);
+    } catch (e) {
+        console.warn(`[PREFLIGHT][UPSTREAM-MISSING] getPreflightJob(${jobId}) failed:`, e);
+        return null;
+    }
+}
+
+export async function getPreflightArtifacts(jobId: string): Promise<any[]> {
+    try {
+        const res = await adminFetch<any>(`/api/admin/preflight/jobs/${encodeURIComponent(jobId)}/artifacts`);
+        // Normalize: { artifacts: [] } or raw array
+        return res.artifacts || res.data || (Array.isArray(res) ? res : []);
+    } catch (e) {
+        console.warn(`[PREFLIGHT][UPSTREAM-MISSING] getPreflightArtifacts(${jobId}) failed:`, e);
+        return [];
+    }
+}
+
+export async function getPreflightWorkers() {
+    try {
+        const res = await adminFetch<any>(`/api/admin/preflight/health`);
+        const workers = res.workers || (Array.isArray(res) ? res : []);
+        return { ok: true, workers };
+    } catch (e) {
+        console.warn(`[PREFLIGHT][UPSTREAM-MISSING] getPreflightWorkers failed:`, e);
+        return { ok: false, workers: [] };
+    }
+}
+
+export async function getPreflightQuotas(): Promise<PreflightQuota[]> {
+    try {
+        const res = await adminFetch<any>(`/api/admin/preflight/storage`);
+        return res.quotas || (Array.isArray(res) ? res : []);
+    } catch (e) {
+        console.warn(`[PREFLIGHT][UPSTREAM-MISSING] getPreflightQuotas failed:`, e);
+        return [];
+    }
+}
+
+export async function getLargeDocumentJobs(params: { limit?: number; offset?: number }) {
+    return getPreflightJobs({ ...params, largeOnly: true });
+}
+
+export async function logAdminPreflightUiAudit(payload: any): Promise<any> {
+  const res = await adminFetch<any>('/api/admin/preflight/ui-audit', {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
+  if (!res.ok) throw new Error(res.error?.message || 'Failed to log UI audit event');
+  return res;
+}
+
+export async function getAdminPreflightJobAuditTimeline(jobId: string): Promise<any> {
+  const res = await adminFetch<any>(`/api/admin/preflight/jobs/${jobId}/audit-timeline`);
+  if (!res.ok) throw new Error(res.error?.message || 'Failed to fetch job audit timeline');
+  return res;
+}
+
+export async function getAdminPreflightPolicies(): Promise<{ ok: boolean; source?: string; policies: any[] }> {
+    try {
+        const res = await adminFetch<any>('/api/admin/preflight/policies');
+        const policies = res?.policies || (Array.isArray(res?.data) && res.data.length > 0 ? res.data : []) || [];
+        return {
+            ok: policies.length > 0 ? true : false,
+            source: res?.source || res?.source_status || 'unavailable',
+            policies
+        };
+    } catch (e) {
+        console.warn(`[PREFLIGHT][POLICIES] getAdminPreflightPolicies failed:`, e);
+        return { ok: false, source: 'error', policies: [] };
+    }
+}
+
+export async function getGlobalArtifacts(params: { tenant?: string; type?: string; limit?: number; offset?: number } = {}) {
+    const qs = new URLSearchParams();
+    if (params.tenant) qs.set("tenantId", params.tenant);
+    if (params.type) qs.set("type", params.type);
+    qs.set("limit", String(params.limit ?? 50));
+    qs.set("offset", String(params.offset ?? 0));
+    
+    try {
+        const res = await adminFetch<any>(`/api/admin/preflight/artifacts?${qs.toString()}`);
+        return res.artifacts || [];
+    } catch (e) {
+        console.warn(`[PREFLIGHT] getGlobalArtifacts failed:`, e);
+        return [];
+    }
+}
+
+export async function uploadPreflightFile(file: File, tenantId: string = 'system') {
+    const token = getAuthToken();
+    if (!token) {
+        if (typeof window !== 'undefined') {
+            window.location.href = '/login';
+        }
+        throw new Error("Session expired. Please log in again.");
+    }
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    const res = await adminFetch<any>('/api/admin/preflight/upload', {
+        method: 'POST',
+        headers: {
+            'X-Tenant-Id': tenantId,
+            'X-Trace-Id': `trace_${Date.now()}`
+        },
+        body: formData
+    });
+    
+    if (res && res.ok === false) throw new Error(res.error?.message || res.error || res.message || 'Upload failed');
+    return res.upload || res;
+}
+
+export async function createPreflightJob(data: { uploadId: string; type: string; policy?: string; tenantId?: string }) {
+    const res = await adminFetch<any>('/api/admin/preflight/jobs', {
+        method: 'POST',
+        headers: {
+            'X-Tenant-Id': data.tenantId || 'system'
+        },
+        body: JSON.stringify(data)
+    });
+    if (!res.ok) throw new Error(res.error?.message || 'Job creation failed');
+    return res.job;
+}
+
+export async function getStorageSummary(tenantId?: string) {
+    const url = tenantId ? `/api/admin/preflight/storage/${tenantId}` : '/api/admin/preflight/storage';
+    try {
+        const res = await adminFetch<any>(url);
+        return res;
+    } catch (e) {
+        console.warn(`[PREFLIGHT] getStorageSummary failed:`, e);
+        return null;
+    }
+}
+
+export async function deletePreflightArtifact(artifactId: string) {
+    const res = await adminFetch<any>(`/api/admin/preflight/artifacts/${artifactId}`, {
+        method: 'DELETE'
+    });
+    if (!res.ok) throw new Error(res.error?.message || 'Delete failed');
+    return res;
+}
+
+export async function syncPreflightJob(jobId: string) {
+    const res = await adminFetch<any>(`/api/admin/preflight/jobs/${encodeURIComponent(jobId)}/sync`, {
+        method: 'POST'
+    });
+    return res.job;
+}
+
+export async function retryPreflightJob(jobId: string) {
+    const res = await adminFetch<any>(`/api/admin/preflight/jobs/${encodeURIComponent(jobId)}/retry`, {
+        method: 'POST'
+    });
+    return res.job;
+}
+
+export async function cancelPreflightJob(jobId: string) {
+    const res = await adminFetch<any>(`/api/admin/preflight/jobs/${encodeURIComponent(jobId)}/cancel`, {
+        method: 'POST'
+    });
+    return res.job;
+}
+
+export async function runPreflightGC(dryRun: boolean = false) {
+    const res = await adminFetch<any>(`/api/admin/preflight/artifacts/gc${dryRun ? '?dryRun=true' : ''}`, {
+        method: 'POST'
+    });
+    return res.results;
+}
+
+export async function recoverStalledPreflightJobs() {
+    const res = await adminFetch<any>('/api/admin/preflight/jobs/recover-stalled', {
+        method: 'POST'
+    });
+    return res;
+}
+
+export async function getLivePolicies() {
+    const res = await getAdminPreflightPolicies();
+    return {
+        policies: res.policies || [],
+        source_status: res.source || 'UNAVAILABLE'
+    };
+}
+
+export async function getJobFindings(jobId: string) {
+    try {
+        const res = await adminFetch<any>(`/api/admin/preflight/jobs/${encodeURIComponent(jobId)}/findings`);
+        return res.findings || [];
+    } catch (e) {
+        console.warn(`[PREFLIGHT] getJobFindings(${jobId}) failed:`, e);
+        return [];
+    }
+}
+
+export async function getJobEvidence(jobId: string) {
+    try {
+        const res = await adminFetch<any>(`/api/admin/preflight/jobs/${encodeURIComponent(jobId)}/evidence`);
+        return res.evidence || null;
+    } catch (e) {
+        console.warn(`[PREFLIGHT] getJobEvidence(${jobId}) failed:`, e);
+        return null;
+    }
+}
+
+export async function triggerJobFix(jobId: string, policy?: string) {
+    const res = await adminFetch<any>(`/api/admin/preflight/jobs/${encodeURIComponent(jobId)}/fix`, {
+        method: 'POST',
+        body: JSON.stringify(policy ? { policy } : {})
+    });
+    return res.job;
+}
+
+// --- Production Notifications ---
+
+export async function getNotifications(limit = 20) {
+  const res = await adminFetch<any>(`/api/admin/notifications?limit=${limit}`);
+  return res.notifications || [];
+}
+
+export async function getUnreadNotificationsCount() {
+  const res = await adminFetch<any>('/api/admin/notifications/unread-count');
+  return res.count || 0;
+}
+
+export async function markNotificationRead(id: string) {
+  return adminFetch<any>(`/api/admin/notifications/${id}/read`, { method: 'PATCH' });
+}
+
+export async function markAllNotificationsRead() {
+  return adminFetch<any>(`/api/admin/notifications/mark-all-read`, { method: 'POST' });
+}
+
+// --- Production Financials ---
+
+export async function getProductionFinancials(packageId?: string) {
+  const url = packageId ? `/api/admin/manufacturing/financials/${packageId}` : '/api/admin/manufacturing/financials';
+  return adminFetch<any>(url);
+}
+// --- Forensics & Telemetry API --- //
+
+export type ForensicTimelineEvent = {
+    event: string;
+    timestamp: string;
+    actor: string;
+    metadata: any;
+};
+
+export type ForensicTimelineResponse = {
+    ok: boolean;
+    jobId: string;
+    traceId?: string;
+    state: string;
+    timeline: ForensicTimelineEvent[];
+};
+
+export async function getForensicTimeline(jobId: string): Promise<ForensicTimelineResponse> {
+    return adminFetch<ForensicTimelineResponse>(`/api/admin/forensics/timeline/${encodeURIComponent(jobId)}`);
+}
+
+export async function getTelemetrySnapshot(): Promise<any> {
+    const res = await adminFetch<any>('/api/admin/telemetry/snapshot');
+    return res.snapshot;
+}
+
+// --- Industrial Artifacts & Workers API --- //
+
+export async function getArtifacts(params: any = {}) {
+    const qs = new URLSearchParams(params);
+    return adminFetch<{ ok: boolean, artifacts: any[] }>(`/api/admin/artifacts?${qs.toString()}`);
+}
+
+export async function getArtifactLineage(jobId: string) {
+    return adminFetch<{ ok: boolean, lineage: any[] }>(`/api/admin/artifacts/lineage/${jobId}`);
+}
+
+export async function getWorkerFleet() {
+    return adminFetch<{ ok: boolean, fleet: any[] }>('/api/admin/workers/fleet');
+}
+
+export async function setWorkerStatus(id: string, status: string) {
+    return adminFetch<{ ok: boolean }>(`/api/admin/workers/${id}/status`, {
+        method: 'POST',
+        body: JSON.stringify({ status })
+    });
+}
+
+// --- Intelligence API --- //
+
+export async function getIntelligenceOverview() {
+    return adminFetch<{ ok: boolean, summary: any, cbStatus: any, guardrailDecisions: any }>(`/api/admin/intelligence/overview`);
+}
+
+export async function getAnomalies() {
+    return adminFetch<{ ok: boolean, anomalies: any[] }>(`/api/admin/intelligence/anomalies`);
+}
+
+// --- Economic Routing API --- //
+
+export async function getRoutingEconomicOverview() {
+    return adminFetch<{ metrics: any, avg_final_score: number }>(`/api/admin/routing/economic/overview`);
+}
+
+export async function getEconomicConflicts() {
+    return adminFetch<any[]>(`/api/admin/routing/economic/conflicts`);
+}
+
+export async function getRoutingMap() {
+    return adminFetch<{ nodes: any[], routes: any[], summary: any, counts?: any, source_status?: string }>('/api/admin/routing/map');
+}
+
+export async function getFederationMap() {
+    return adminFetch<{ nodes: any[], routes: any[], summary: any, counts?: any, source_status?: string }>('/api/admin/federation/map');
+}
+
+export async function getRoutingHeatmap() {
+    return adminFetch<any[]>('/api/admin/routing/heatmap');
+}
+
+export async function getRoutingLive() {
+    return adminFetch<any>('/api/admin/routing/live');
+}
+
+// --- Phase 34 — Live Federation Activation ---
+export async function getLiveCapacity() {
+    return adminFetch<{ ok: boolean, overview: any[] }>('/api/admin/nodes/capacity/live');
+}
+
+export async function getLiveSLARisks() {
+    return adminFetch<{ ok: boolean, risks: any[] }>('/api/admin/dispatch/sla/risks');
+}
+
+export async function getDispatchSLAEvidence(dispatchId: string) {
+    return adminFetch<{ ok: boolean, snapshot: any, evidence: any[] }>(`/api/admin/dispatch/${dispatchId}/sla-evidence`);
+}
+
+// --- Materials & Paper Catalog API (Phase 34) ---
+const normalizeMaterialsResponse = (response: any) => {
+    if (Array.isArray(response)) return response;
+    if (Array.isArray(response?.materials)) return response.materials;
+    if (Array.isArray(response?.data)) return response.data;
+    if (Array.isArray(response?.inventory)) return response.inventory;
+    if (Array.isArray(response?.items)) return response.items;
+    if (Array.isArray(response?.rows)) return response.rows;
+    return [];
+};
+
+export async function getMaterialsCatalog() {
+    const token = getAuthToken();
+    const storedTenantId = getUserTenantId();
+    const storedPrinthouseId = getUserPrinthouseId();
+    const headers: Record<string, string> = {
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+        ...(token ? { "Authorization": `Bearer ${token}` } : {}),
+        ...(storedTenantId ? { "X-Tenant-Id": storedTenantId } : {}),
+        ...(storedPrinthouseId ? { "X-Printhouse-Id": storedPrinthouseId } : {})
+    };
+
+    const res = await fetch(`/api/admin/materials?_ts=${Date.now()}`, { headers, credentials: "include" });
+    const text = await res.text();
+
+    if (!res.ok) {
+        console.error('[MATERIALS][HTTP_ERROR]', {
+            status: res.status,
+            statusText: res.statusText,
+            body: text,
+        });
+        throw new Error(`Materials API failed: ${res.status} ${text}`);
+    }
+
+    const parsed = JSON.parse(text);
+    const normalized = normalizeMaterialsResponse(parsed);
+    console.info('[MATERIALS][API][RAW]', parsed);
+    console.info('[MATERIALS][API][NORMALIZED_COUNT]', normalized.length);
+    console.info('[MATERIALS][API][FIRST]', normalized[0]);
+    return { 
+        ok: true, 
+        data: normalized,
+        materials: normalized,
+        summary: parsed?.summary || null,
+        source_status: parsed?.source_status 
+    };
+}
+
+export async function getNodeMaterialsInventory(nodeId: string) {
+    const res = await adminFetch<any>(`/api/admin/materials/node/${encodeURIComponent(nodeId)}?_ts=${Date.now()}`);
+    const normalized = normalizeMaterialsResponse(res);
+    console.info('[MATERIALS][API][NODE_RAW]', res);
+    console.info('[MATERIALS][API][NODE_NORMALIZED_COUNT]', normalized.length);
+    console.info('[MATERIALS][API][NODE_FIRST]', normalized[0]);
+    return { 
+        ok: true, 
+        data: normalized,
+        materials: normalized,
+        summary: res?.summary || null,
+        source_status: res?.source_status 
+    };
+}
+
+export async function getMaterialDetail(id: string) {
+    return adminFetch<{ ok: boolean, data: any }>(`/api/admin/materials/${encodeURIComponent(id)}`);
+}
+
+export async function reserveMaterialCapacity(dispatchId: string, nodeId: string, specs: any) {
+    return adminFetch<{ ok: boolean, reserved: boolean, material_id: string, units: number }>('/api/admin/materials/reserve', {
+        method: 'POST',
+        body: JSON.stringify({ dispatch_id: dispatchId, node_id: nodeId, specs })
+    });
+}
+
+export async function releaseMaterialCapacity(dispatchId: string, nodeId: string, specs: any) {
+    return adminFetch<{ ok: boolean, released: boolean, material_id: string, units: number }>('/api/admin/materials/release', {
+        method: 'POST',
+        body: JSON.stringify({ dispatch_id: dispatchId, node_id: nodeId, specs })
+    });
+}
+
+// --- Materials MES Operator Workflows API --- //
+
+/** PAPER-CALIPER-UI-01: propose a paper thickness for a material (routed to the evidence workflow). */
+export async function proposeMaterialThickness(materialId: string, body: any) {
+    return adminFetch<{ ok: boolean, data: any }>(`/api/admin/materials/${encodeURIComponent(materialId)}/thickness-proposals`, {
+        method: 'POST',
+        body: JSON.stringify(body)
+    });
+}
+
+export async function createCatalogMaterial(payload: any) {
+    return adminFetch<{ ok: boolean, data: any }>('/api/admin/materials', {
+        method: 'POST',
+        body: JSON.stringify(payload)
+    });
+}
+
+export async function intakeMaterialStock(id: string, payload: { quantity: number, reason?: string, supplier_batch?: string, expected_use?: string }) {
+    return adminFetch<{ ok: boolean, data: any }>(`/api/admin/materials/${encodeURIComponent(id)}/intake`, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+    });
+}
+
+export async function adjustMaterialStock(id: string, payload: { quantity_delta: number, reason: string, operator_note?: string }) {
+    return adminFetch<{ ok: boolean, data: any }>(`/api/admin/materials/${encodeURIComponent(id)}/adjust`, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+    });
+}
+
+export async function reserveMaterialStockWorkflow(id: string, payload: { quantity: number, job_id?: string, dispatch_id?: string, expiration?: string }) {
+    return adminFetch<{ ok: boolean, data: any }>(`/api/admin/materials/${encodeURIComponent(id)}/reserve`, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+    });
+}
+
+export async function releaseMaterialStockWorkflow(id: string, quantity?: number) {
+    return adminFetch<{ ok: boolean, data: any }>(`/api/admin/materials/${encodeURIComponent(id)}/release`, {
+        method: 'POST',
+        body: JSON.stringify({ quantity })
+    });
+}
+
+export async function consumeMaterialStock(id: string, payload: { quantity_consumed: number, waste_units?: number, reason?: string, job_id?: string }) {
+    return adminFetch<{ ok: boolean, data: any }>(`/api/admin/materials/${encodeURIComponent(id)}/consume`, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+    });
+}
+
+export async function createMaterialProcurementOrder(id: string, payload: { supplier_name?: string, ordered_units: number, expected_delivery_date?: string, risk?: string, notes?: string }) {
+    return adminFetch<{ ok: boolean, data: any }>(`/api/admin/materials/${encodeURIComponent(id)}/procurements`, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+    });
+}
+
+export async function receiveMaterialProcurementOrder(procurementId: string) {
+    return adminFetch<{ ok: boolean, received: boolean }>(`/api/admin/materials/procurements/${encodeURIComponent(procurementId)}/receive`, {
+        method: 'POST'
+    });
+}
+
+export async function getMaterialTimelineEvents(id: string) {
+    return adminFetch<{ ok: boolean, events: any[] }>(`/api/admin/materials/${encodeURIComponent(id)}/events`);
+}
+
+export async function getMaterialProcurementList(id: string) {
+    return adminFetch<{ ok: boolean, procurements: any[] }>(`/api/admin/materials/${encodeURIComponent(id)}/procurements`);
+}
+
+export async function getMaterialDepletionForecast(id: string) {
+    return adminFetch<{ ok: boolean, forecast: any }>(`/api/admin/materials/${encodeURIComponent(id)}/forecast`);
+}
+
+// --- Forensic Audit Explorer API (Phase 34) ---
+export interface AuditExplorerEvent {
+    id: string;
+    timestamp: string;
+    actor: string;
+    event_type: string;
+    entity_type: string;
+    entity_id: string;
+    severity: string;
+    trace_id: string;
+    source_service: string;
+    message: string;
+    metadata_json?: any;
+    tenant_id: string;
+}
+
+export async function getAuditLogs(params: Record<string, any> = {}) {
+    const qs = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => {
+        if (v !== undefined && v !== null && v !== "") {
+            qs.append(k, String(v));
+        }
+    });
+    return adminFetch<{ ok: boolean, count: number, data: AuditExplorerEvent[] }>(`/api/admin/audit?${qs.toString()}`);
+}
+
+export async function getAuditDetail(id: string) {
+    return adminFetch<{ ok: boolean, data: AuditExplorerEvent, lineage?: AuditExplorerEvent[] }>(`/api/admin/audit/${encodeURIComponent(id)}`);
+}
+
+export async function getAuditEntityTimeline(entityType: string, entityId: string) {
+    return adminFetch<{ ok: boolean, entityType: string, entityId: string, timeline: AuditExplorerEvent[] }>(`/api/admin/audit/entity/${encodeURIComponent(entityType)}/${encodeURIComponent(entityId)}`);
+}
+
+// --- Manufacturing / Production Packages API (Phase 34) ---
+export interface ProductionPackage {
+    id: string;
+    tenant_id: string;
+    source: string;
+    source_job_id: string;
+    source_artifact_id: string;
+    fixed_pdf_artifact_id?: string | null;
+    certified_pdf_artifact_id?: string | null;
+    book_spec_json?: any;
+    preflight_report_json?: any;
+    policy_id?: string;
+    status: 'DRAFT' | 'READY_FOR_DISPATCH' | 'DISPATCHED' | 'ACCEPTED_BY_PRINTER' | 'REJECTED_BY_PRINTER' | 'IN_PRODUCTION' | 'COMPLETED' | 'CANCELLED';
+    created_by_user_id: string;
+    assigned_printer_tenant_id?: string | null;
+    created_at: string;
+    updated_at: string;
+}
+
+export async function listProductionPackages(params: Record<string, any> = {}) {
+    const qs = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => {
+        if (v !== undefined && v !== null && v !== "") {
+            qs.append(k, String(v));
+        }
+    });
+    return adminFetch<{ ok: boolean, packages: ProductionPackage[] }>(`/api/admin/production/packages?${qs.toString()}`);
+}
+
+export async function getProductionPackageDetail(packageId: string) {
+    return adminFetch<{ ok: boolean, package: ProductionPackage }>(`/api/admin/production/packages/${encodeURIComponent(packageId)}`);
+}
+
+export async function updateProductionPackageStatus(packageId: string, status: string) {
+    return adminFetch<{ ok: boolean, package: ProductionPackage }>(`/api/admin/production/packages/${encodeURIComponent(packageId)}/status`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status })
+    });
+}
+
+export async function matchProductionPackageNodes(packageId: string) {
+    return adminFetch<{ ok: boolean, matches?: any[], scores?: any }>(`/api/admin/production/packages/${encodeURIComponent(packageId)}/match`, {
+        method: 'POST'
+    });
+}
+
+export async function dispatchProductionPackage(packageId: string, payload: { nodeId: string, message?: string, expiresAt?: string }) {
+    return adminFetch<{ ok: boolean, dispatch?: any }>(`/api/admin/production/packages/${encodeURIComponent(packageId)}/dispatch`, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+    });
+}
+
+export async function listProductionNodes(params: Record<string, any> = {}) {
+    const qs = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => {
+        if (v !== undefined && v !== null && v !== "") {
+            qs.append(k, String(v));
+        }
+    });
+    return adminFetch<{ ok: boolean, nodes: any[] }>(`/api/admin/production/nodes?${qs.toString()}`);
+}
+
+// --- Industrial Preflight Console API (High-Fidelity Unmocked Integration) ---
+
+export interface AdminPreflightJob {
+    jobId: string;
+    tenantId: string;
+    printhouseId?: string;
+    operatorId?: string;
+    batchId?: string;
+    status: string;
+    policy?: string;
+    type?: string;
+    progress: number;
+    fileSize: number;
+    filename?: string;
+    createdAt: string;
+    updatedAt: string;
+    canonicalData?: any;
+    sourceJobId?: string | null;
+    sourceSystem?: string | null;
+    requestedFixesCount?: number;
+    repairsCount?: number;
+    appliedFixesCount?: number;
+    skippedFixesCount?: number;
+    failedFixesCount?: number;
+    requestedFixes?: any[];
+    repairs?: any[];
+    appliedFixes?: any[];
+    skippedFixes?: any[];
+    failedFixes?: any[];
+    fixCoverage?: FixCoverage;
+    lastSeenAt?: string | null;
+    lastSyncedAt?: string | null;
+}
+
+export async function listAdminPreflightJobs(filters: Record<string, any> = {}) {
+    const qs = new URLSearchParams();
+    Object.entries(filters).forEach(([k, v]) => {
+        if (v !== undefined && v !== null && v !== "") {
+            qs.append(k, String(v));
+        }
+    });
+    const qStr = qs.toString();
+    return adminFetch<{ ok: boolean, total: number, jobs: AdminPreflightJob[], source_status?: string }>(qStr ? `/api/admin/preflight/jobs?${qStr}` : `/api/admin/preflight/jobs`);
+}
+
+export async function createAdminPreflightJob(formData: FormData, customHeaders?: Record<string, string>) {
+    const token = getAuthToken();
+    if (!token) {
+        if (typeof window !== 'undefined') {
+            window.location.href = '/login';
+        }
+        throw new Error("Session expired. Please log in again.");
+    }
+    const res = await adminFetch<any>('/api/admin/preflight/jobs', {
+        method: 'POST',
+        headers: customHeaders as any,
+        body: formData
+    });
+    if (res && res.ok === false) {
+        throw new Error(res.error || res.message || "Upstream HTTP Error: Preflight job creation failed.");
+    }
+    return res;
+}
+
+export async function getAdminPreflightJob(jobId: string) {
+    return adminFetch<{ ok: boolean, jobId: string, status: string, source_status: string, canonicalPayload?: any, registryRecord?: any }>(`/api/admin/preflight/jobs/${encodeURIComponent(jobId)}`);
+}
+
+export interface PreflightFixResponse {
+    ok: boolean;
+    jobId: string;
+    fixJobId: string;
+    status: string;
+    source_status: string;
+}
+
+export async function requestAdminPreflightFix(jobId: string, options: any = {}): Promise<PreflightFixResponse> {
+    const res = await adminFetch<any>(`/api/admin/preflight/jobs/${encodeURIComponent(jobId)}/fix`, {
+        method: 'POST',
+        body: JSON.stringify(options)
+    });
+    return {
+        ok: !!res?.ok,
+        jobId: res?.jobId || res?.child_job_id || res?.fix_job_id || jobId,
+        fixJobId: res?.fixJobId || res?.fix_job_id || res?.child_job_id || "",
+        status: res?.status || "",
+        source_status: res?.source_status || ""
+    };
+}
+
+export async function retryAdminPreflightJob(jobId: string) {
+    return adminFetch<{ ok: boolean, result?: any, source_status?: string }>(`/api/admin/preflight/jobs/${encodeURIComponent(jobId)}/retry`, {
+        method: 'POST'
+    });
+}
+
+export async function listAdminPreflightArtifacts(jobId: string) {
+    return adminFetch<{ ok: boolean, artifacts: any[], source_status?: string }>(`/api/admin/preflight/jobs/${encodeURIComponent(jobId)}/artifacts`);
+}
+
+export async function downloadAdminPreflightArtifact(jobId: string, artifactId: string, filename?: string) {
+    if (typeof artifactId !== 'string') {
+        throw new Error('artifactId must be a string');
+    }
+    const token = getAuthToken() || localStorage.getItem('ppos_control_token') || localStorage.getItem('admin_token') || '';
+    const res = await fetch(`/api/admin/preflight/jobs/${encodeURIComponent(jobId)}/artifacts/${encodeURIComponent(artifactId)}`, {
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+    });
+    if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw { status: res.status, message: `Download failed: ${res.statusText}`, ...errorData };
+    }
+    return res.blob();
+}
+
+export async function listAdminPreflightPolicies() {
+    return adminFetch<{ ok: boolean, policies: any[], source_status?: string }>('/api/admin/preflight/policies');
+}
+
+export async function listAdminPreflightBatches(filters: Record<string, any> = {}) {
+    const qs = new URLSearchParams();
+    Object.entries(filters).forEach(([k, v]) => {
+        if (v !== undefined && v !== null && v !== "") qs.append(k, String(v));
+    });
+    const qStr = qs.toString();
+    return adminFetch<{ ok: boolean, batches: any[], source_status?: string }>(qStr ? `/api/admin/preflight/batches?${qStr}` : `/api/admin/preflight/batches`);
+}
+
+export async function createAdminPreflightBatch(formData: FormData, customHeaders?: Record<string, string>) {
+    const token = getAuthToken();
+    if (!token) {
+        if (typeof window !== 'undefined') {
+            window.location.href = '/login';
+        }
+        throw new Error("Session expired. Please log in again.");
+    }
+    const res = await adminFetch<any>('/api/admin/preflight/batches', {
+        method: 'POST',
+        headers: customHeaders as any,
+        body: formData
+    });
+    if (res && res.ok === false) {
+        throw new Error(res.error || res.message || "Upstream HTTP Error: Preflight batch creation failed.");
+    }
+    return res;
+}
+
+export async function getAdminPreflightAudit(filters: Record<string, any> = {}) {
+    const qs = new URLSearchParams();
+    Object.entries(filters).forEach(([k, v]) => {
+        if (v !== undefined && v !== null && v !== "") qs.append(k, String(v));
+    });
+    const qStr = qs.toString();
+    return adminFetch<{ ok: boolean, total: number, events: any[], source_status?: string }>(qStr ? `/api/admin/preflight/audit?${qStr}` : `/api/admin/preflight/audit`);
+}
+
+export async function getAdminPreflightGovernance(filters: Record<string, any> = {}) {
+    const qs = new URLSearchParams();
+    Object.entries(filters).forEach(([k, v]) => {
+        if (v !== undefined && v !== null && v !== "") qs.append(k, String(v));
+    });
+    const qStr = qs.toString();
+    return adminFetch<{ ok: boolean, total: number, governanceEvents: any[], source_status?: string }>(qStr ? `/api/admin/preflight/governance?${qStr}` : `/api/admin/preflight/governance`);
+}
+
+// --- High-Fidelity UI Defensive Helpers for AUTOFIX Buckets ---
+
+export function normalizeFixArray(value: any): any[] {
+    if (!value) return [];
+    let arr: any[] = [];
+    if (Array.isArray(value)) {
+        arr = value;
+    } else if (typeof value === 'object') {
+        arr = [value];
+    } else if (typeof value === 'string') {
+        try {
+            const parsed = JSON.parse(value);
+            arr = Array.isArray(parsed) ? parsed : [parsed];
+        } catch (e) {
+            arr = [{ code: value, status: "COMPLETED" }];
+        }
+    }
+    return arr.map(item => {
+        if (typeof item === 'string') {
+            return { code: item, status: "COMPLETED" };
+        }
+        return item || {};
+    });
+}
+
+export function getFixCode(fix: any): string {
+    if (!fix) return "UNKNOWN";
+    if (typeof fix === 'string') return fix;
+    return fix.code || fix.id || fix.repairStrategy || "UNKNOWN";
+}
+
+export function getFixStatus(fix: any): string {
+    if (!fix) return "UNKNOWN";
+    if (typeof fix === 'string') return "COMPLETED";
+    return fix.status || "UNKNOWN";
+}
+
+export async function syncAdminPreflightRegistry(options: { tenantId?: string, limit?: number, status?: string } = {}) {
+    return adminFetch<{ ok: boolean, totalProcessed: number, successCount: number, failureCount: number, results: any[], source_status?: string }>('/api/admin/preflight/sync', {
+        method: 'POST',
+        body: JSON.stringify(options)
+    });
+}
+// --- Marketplace Order Management API --- //
+
+export async function listMarketplaceOrders(params: Record<string, any> = {}) {
+    const qs = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => {
+        if (v !== undefined && v !== null && v !== "") {
+            qs.append(k, String(v));
+        }
+    });
+    return adminFetch<{ ok: boolean, orders: any[], counts: any, total: number }>(`/api/admin/marketplace/orders?${qs.toString()}`);
+}
+
+export async function getMarketplaceOrderDetail(id: string) {
+    return adminFetch<{ ok: boolean, order: any }>(`/api/admin/marketplace/orders/${encodeURIComponent(id)}`);
+}
+
+export async function getMarketplaceOrderAuditTimeline(id: string) {
+    return adminFetch<{ ok: boolean, orderId: string, timeline: any[] }>(`/api/admin/marketplace/orders/${encodeURIComponent(id)}/audit-timeline`);
+}
+
+export async function acknowledgeMarketplaceOrder(id: string) {
+    return adminFetch<{ ok: boolean }>(`/api/admin/marketplace/orders/${encodeURIComponent(id)}/acknowledge`, {
+        method: 'POST'
+    });
+}
+
+export async function assignPrinthouseToMarketplaceOrder(id: string, printhouseId: string) {
+    return adminFetch<{ ok: boolean, order?: any }>(`/api/admin/marketplace/orders/${encodeURIComponent(id)}/assign-printhouse`, {
+        method: 'POST',
+        body: JSON.stringify({ printhouseId })
+    });
+}
+
+export async function markMarketplaceOrderPreflightRequired(id: string) {
+    return adminFetch<{ ok: boolean, order?: any }>(`/api/admin/marketplace/orders/${encodeURIComponent(id)}/preflight/mark-required`, {
+        method: 'POST'
+    });
+}
+
+export async function runMarketplaceOrderPreflight(id: string) {
+    return adminFetch<{ ok: boolean, order?: any }>(`/api/admin/marketplace/orders/${encodeURIComponent(id)}/preflight/run`, {
+        method: 'POST'
+    });
+}
+
+export async function markMarketplaceOrderPreflightPassed(id: string, result: Record<string, any> = {}) {
+    return adminFetch<{ ok: boolean, order?: any }>(`/api/admin/marketplace/orders/${encodeURIComponent(id)}/preflight/mark-passed`, {
+        method: 'POST',
+        body: JSON.stringify(result)
+    });
+}
+
+export async function markMarketplaceOrderPreflightFailed(id: string, result: Record<string, any> = {}) {
+    return adminFetch<{ ok: boolean, order?: any }>(`/api/admin/marketplace/orders/${encodeURIComponent(id)}/preflight/mark-failed`, {
+        method: 'POST',
+        body: JSON.stringify(result)
+    });
+}
+
+export async function markMarketplaceOrderPaymentReady(id: string) {
+    return adminFetch<{ ok: boolean, order?: any }>(`/api/admin/marketplace/orders/${encodeURIComponent(id)}/payment/mark-ready`, {
+        method: 'POST'
+    });
+}
+
+export async function markMarketplaceOrderPaymentBlocked(id: string, reason: string) {
+    return adminFetch<{ ok: boolean, order?: any }>(`/api/admin/marketplace/orders/${encodeURIComponent(id)}/payment/mark-blocked`, {
+        method: 'POST',
+        body: JSON.stringify({ reason })
+    });
+}
+
+export async function prepareMarketplaceOrderHandoff(id: string) {
+    return adminFetch<any>(`/api/admin/marketplace/orders/${id}/handoff/prepare`, {
+        method: 'POST'
+    });
+}
+
+// --- Phase 38.1 Printhouse Handoff Packages ---
+export async function listPrinthouseHandoffPackages(filters: Record<string, any> = {}) {
+    const qs = new URLSearchParams();
+    if (filters.status) qs.set("status", filters.status);
+    if (filters.printhouseId) qs.set("printhouseId", filters.printhouseId);
+    return adminFetch<any>(`/api/admin/marketplace/printhouse-handoff/packages?${qs.toString()}`);
+}
+
+export async function getPrinthouseHandoffPackage(orderId: string) {
+    return adminFetch<any>(`/api/admin/marketplace/orders/${orderId}/printhouse-handoff`);
+}
+
+export async function getPrinthouseHandoffTimeline(orderId: string) {
+    return adminFetch<any>(`/api/admin/marketplace/orders/${orderId}/printhouse-handoff/timeline`);
+}
+
+export async function acceptPrinthouseHandoff(orderId: string, payload: { operatorId?: string; note?: string } = {}) {
+    return adminFetch<any>(`/api/admin/marketplace/orders/${orderId}/printhouse-handoff/accept`, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+    });
+}
+
+export async function rejectPrinthouseHandoff(orderId: string, payload: { reason: string; operatorId?: string }) {
+    return adminFetch<any>(`/api/admin/marketplace/orders/${orderId}/printhouse-handoff/reject`, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+    });
+}
+
+export async function requestHandoffClarification(orderId: string, payload: { message: string; operatorId?: string }) {
+    return adminFetch<any>(`/api/admin/marketplace/orders/${orderId}/printhouse-handoff/clarification-request`, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+    });
+}
+
+// --- Phase 38.3.2 File Access ---
+
+export async function listPrinthouseHandoffFiles(orderId: string) {
+    return adminFetch<any>(`/api/admin/marketplace/orders/${orderId}/printhouse-handoff/files`);
+}
+
+export async function createPrinthouseFileAccessToken(orderId: string, fileId: string, payload?: any) {
+    return adminFetch<any>(`/api/admin/marketplace/orders/${orderId}/printhouse-handoff/files/${fileId}/access-token`, {
+        method: 'POST',
+        body: JSON.stringify(payload || {})
+    });
+}
+
+export async function getPrinthouseFileDownloadDescriptor(orderId: string, fileId: string, token: string) {
+    return adminFetch<any>(`/api/admin/marketplace/orders/${orderId}/printhouse-handoff/files/${fileId}/download-descriptor?token=${token}`);
+}
+
+export async function downloadPrinthouseFile(orderId: string, fileId: string, token: string) {
+    // We do NOT use adminFetch here because we need to explicitly handle 501, 403, and blobs without the fallback swallower
+    const currentToken = getAuthToken();
+    const res = await fetch(`/api/admin/marketplace/orders/${orderId}/printhouse-handoff/files/${fileId}/download?token=${token}`, {
+        method: 'GET',
+        headers: {
+            'Authorization': `Bearer ${currentToken}`
+        }
+    });
+
+    if (res.status === 501) {
+        return await res.json(); // returns the {ok: false, error: 'FILE_STREAMING_NOT_CONFIGURED', descriptor}
+    }
+    if (res.status === 403) {
+        return await res.json(); // returns {ok: false, error: ...}
+    }
+    if (!res.ok) {
+        return { ok: false, error: 'DOWNLOAD_FAILED', message: await res.text() };
+    }
+
+    // If 200, assume Blob for real download
+    const blob = await res.blob();
+    return { ok: true, blob };
+}
+
+export async function markMarketplaceOrderHandoffReady(id: string) {
+    return adminFetch<{ ok: boolean, order?: any }>(`/api/admin/marketplace/orders/${encodeURIComponent(id)}/handoff/mark-ready`, {
+        method: 'POST'
+    });
+}
+
+export async function requestMarketplaceOrderCustomerAction(id: string, actionType: string, message: string) {
+    return adminFetch<{ ok: boolean, order?: any }>(`/api/admin/marketplace/orders/${encodeURIComponent(id)}/request-customer-action`, {
+        method: 'POST',
+        body: JSON.stringify({ actionType, message })
+    });
+}
+
+export async function addNoteToMarketplaceOrder(id: string, note: string) {
+    return adminFetch<{ ok: boolean, order?: any }>(`/api/admin/marketplace/orders/${encodeURIComponent(id)}/internal-note`, {
+        method: 'POST',
+        body: JSON.stringify({ note })
+    });
+}
+
+export async function listMarketplaceAuditEvents(params: Record<string, any> = {}) {
+    const qs = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => {
+        if (v !== undefined && v !== null && v !== "") {
+            qs.append(k, String(v));
+        }
+    });
+    return adminFetch<{ ok: boolean, events: any[] }>(`/api/admin/marketplace/orders/audit?${qs.toString()}`);
+}
+
+export async function getMarketplaceOrder(orderId: string) {
+    return adminFetch<{ ok: boolean, order: any, files: any[], events: any[], preflightBindings: any[], readiness: any }>(`/api/marketplace/orders/${encodeURIComponent(orderId)}`);
+}
+
+export async function createMarketplaceOrder(order: any) {
+    return adminFetch<{ ok: boolean, orderId: string, status: string, requiredFiles: string[], readiness: any }>(`/api/marketplace/orders`, {
+        method: 'POST',
+        body: JSON.stringify(order)
+    });
+}
+
+export async function recomputeMarketplaceOrderReadiness(orderId: string) {
+    return adminFetch<{ ok: boolean, readiness: any }>(`/api/marketplace/orders/${encodeURIComponent(orderId)}/readiness/recompute`, {
+        method: 'POST'
+    });
+}
+
+
+
+export async function getProductionDecisionStatus(orderId: string) {
+    return adminFetch<any>(`/api/admin/marketplace/orders/${orderId}/production-decision/status`);
+}
+
+export async function recordProductionDecision(orderId: string, decision: string, reason?: string, payload: Record<string, any> = {}) {
+  return adminFetch<any>(`/api/admin/marketplace/orders/${orderId}/production-decision`, {
+    method: 'POST',
+    body: JSON.stringify({
+      decision,
+      reason,
+      ...payload,
+    }),
+  });
+}
+
+export async function getProductionQueueStatus(orderId: string) {
+    return adminFetch<any>(`/api/admin/marketplace/orders/${orderId}/production-queue/status`);
+}
+
+export async function evaluateProductionQueue(orderId: string, payload: Record<string, any> = {}) {
+    return adminFetch<any>(`/api/admin/marketplace/orders/${orderId}/production-queue/evaluate`, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+    });
+}
+
+export async function createProductionQueueEntry(orderId: string, payload: Record<string, any> = {}) {
+    return adminFetch<any>(`/api/admin/marketplace/orders/${orderId}/production-queue/create`, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+    });
+}
+
+export async function assignProductionMachine(orderId: string, machineId: string, payload: Record<string, any> = {}) {
+    return adminFetch<any>(`/api/admin/marketplace/orders/${orderId}/production-queue/assign-machine`, {
+        method: 'POST',
+        body: JSON.stringify({
+            machineId,
+            ...payload
+        })
+    });
+}
+
+export async function unassignProductionMachine(orderId: string, payload: Record<string, any> = {}) {
+    return adminFetch<any>(`/api/admin/marketplace/orders/${orderId}/production-queue/unassign-machine`, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+    });
+}
+
+export async function getProductionWorkOrderStatus(orderId: string) {
+    return adminFetch<any>(`/api/admin/marketplace/orders/${orderId}/production-work-order/status`);
+}
+
+export async function evaluateProductionWorkOrder(orderId: string) {
+    return adminFetch<any>(`/api/admin/marketplace/orders/${orderId}/production-work-order/evaluate`, {
+        method: 'POST'
+    });
+}
+
+export async function createProductionWorkOrder(orderId: string, payload: Record<string, any> = {}) {
+    return adminFetch<any>(`/api/admin/marketplace/orders/${orderId}/production-work-order/create`, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+    });
+}
+
+export async function startProductionWorkOrder(orderId: string, payload: Record<string, any> = {}) {
+    return adminFetch<any>(`/api/admin/marketplace/orders/${orderId}/production-work-order/start`, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+    });
+}
+
+export async function pauseProductionWorkOrder(orderId: string, payload: Record<string, any> = {}) {
+    return adminFetch<any>(`/api/admin/marketplace/orders/${orderId}/production-work-order/pause`, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+    });
+}
+
+export async function resumeProductionWorkOrder(orderId: string, payload: Record<string, any> = {}) {
+    return adminFetch<any>(`/api/admin/marketplace/orders/${orderId}/production-work-order/resume`, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+    });
+}
+
+export async function cancelProductionWorkOrder(orderId: string, payload: Record<string, any> = {}) {
+    return adminFetch<any>(`/api/admin/marketplace/orders/${orderId}/production-work-order/cancel`, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+    });
+}
+
+export async function getProductionProgressStatus(orderId: string) {
+    return adminFetch<any>(`/api/admin/marketplace/orders/${orderId}/production-progress/status`);
+}
+
+export async function evaluateProductionProgress(orderId: string) {
+    return adminFetch<any>(`/api/admin/marketplace/orders/${orderId}/production-progress/evaluate`, {
+        method: 'POST'
+    });
+}
+
+export async function recordProductionProgress(orderId: string, payload: Record<string, any> = {}) {
+    return adminFetch<any>(`/api/admin/marketplace/orders/${orderId}/production-progress/record`, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+    });
+}
+
+export async function pauseProductionProgress(orderId: string, payload: Record<string, any> = {}) {
+    return adminFetch<any>(`/api/admin/marketplace/orders/${orderId}/production-progress/pause`, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+    });
+}
+
+export async function resumeProductionProgress(orderId: string, payload: Record<string, any> = {}) {
+    return adminFetch<any>(`/api/admin/marketplace/orders/${orderId}/production-progress/resume`, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+    });
+}
+
+export async function markProductionCompletionReady(orderId: string, payload: Record<string, any> = {}) {
+    return adminFetch<any>(`/api/admin/marketplace/orders/${orderId}/production-progress/completion-ready`, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+    });
+}
+
+// --- Phase 38.8 Production Completion & Delivery Handoff ---
+
+export async function evaluateProductionCompletionEligibility(orderId: string) {
+    return adminFetch<any>(`/api/admin/marketplace/orders/${orderId}/production/completion-eligibility`);
+}
+
+export async function completeProductionOrder(orderId: string, payload: Record<string, any> = {}) {
+    return adminFetch<any>(`/api/admin/marketplace/orders/${orderId}/production/complete`, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+    });
+}
+
+export async function evaluateDeliveryHandoffReadiness(orderId: string) {
+    return adminFetch<any>(`/api/admin/marketplace/orders/${orderId}/delivery/handoff-readiness`);
+}
+
+export async function prepareDeliveryHandoff(orderId: string, payload: Record<string, any> = {}) {
+    return adminFetch<any>(`/api/admin/marketplace/orders/${orderId}/delivery/prepare-handoff`, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+    });
+}
+
+// --- Phase 39.0 Tenant Plan Governance ---
+
+export async function listTenantGovernance() {
+    return adminFetch<any>(`/api/admin/tenant-governance`);
+}
+
+export async function getTenantEntitlements(tenantId: string) {
+    return adminFetch<any>(`/api/admin/tenant-governance/${tenantId}/entitlements`);
+}
+
+export async function assignTenantPlan(tenantId: string, payload: Record<string, any>) {
+    return adminFetch<any>(`/api/admin/tenant-governance/${tenantId}/plan`, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+    });
+}
+
+export async function extendTenantGrace(tenantId: string, payload: Record<string, any>) {
+    return adminFetch<any>(`/api/admin/tenant-governance/${tenantId}/grace/extend`, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+    });
+}
+
+export async function evaluateTenantAction(tenantId: string, payload: Record<string, any>) {
+    return adminFetch<any>(`/api/admin/tenant-governance/${tenantId}/evaluate-action`, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+    });
+}
+
+export async function checkTenantFileLimit(tenantId: string, fileSizeBytes: number) {
+    return adminFetch<any>(`/api/admin/tenant-governance/${tenantId}/check-file-limit`, {
+        method: 'POST',
+        body: JSON.stringify({ fileSizeBytes })
+    });
+}
+
+export async function checkTenantJobLimit(tenantId: string, totalJobSizeBytes: number) {
+    return adminFetch<any>(`/api/admin/tenant-governance/${tenantId}/check-job-limit`, {
+        method: 'POST',
+        body: JSON.stringify({ totalJobSizeBytes })
+    });
+}
+
+export async function freezeTenantGraceIfExpired(tenantId: string) {
+    return adminFetch<any>(`/api/admin/tenant-governance/${tenantId}/grace/freeze-if-expired`, {
+        method: 'POST'
+    });
+}
+export async function updateTenantGovernance(tenantId: string, payload: Record<string, any>) {
+    return adminFetch<any>(`/api/admin/tenant-governance/${tenantId}`, {
+        method: 'PATCH',
+        body: JSON.stringify(payload)
+    });
+}
+
+
+export async function getAdminPreflightGovernanceLedger(jobId: string) {
+    return adminFetch<any>(`/api/admin/preflight/jobs/${jobId}/governance-ledger`);
+}
+
+export async function getAdminPreflightHumanReport(jobId: string) {
+    return adminFetch<any>(`/api/admin/preflight/jobs/${jobId}/human-report`);
+}
+
+export async function getAdminPreflightProductionHandoffPackage(jobId: string, orderId?: string) {
+    const qs = orderId ? `?orderId=${encodeURIComponent(orderId)}` : '';
+    return adminFetch<any>(`/api/admin/preflight/jobs/${jobId}/production-handoff-package${qs}`);
+}
+
+export interface FederatedNode {
+    id: string;
+    node_name: string;
+    base_url: string;
+    status: 'LIVE' | 'DEGRADED' | 'OFFLINE';
+    last_heartbeat_at: string | null;
+    current_lsn: number;
+    sync_latency_ms?: number;
+}
+
+export interface ClusterLeaseInfo {
+    lease_key: string;
+    holder_node_id: string;
+    expires_at: string;
+    version: number;
+}
+
+export interface FederationClusterStatusResponse {
+    nodes: FederatedNode[];
+    activeLease: ClusterLeaseInfo | null;
+    localNodeId: string;
+    isReadOnly: boolean;
+}
+
+export async function getFederationClusterStatus() {
+    return adminFetch<FederationClusterStatusResponse>('/api/federation/status');
+}
+
+export interface MarketplaceAuction {
+    id: string;
+    owner_node_id: string;
+    machine_category: string;
+    capacity_quantity: number;
+    reserve_price: number;
+    slot_start_time: string;
+    slot_end_time: string;
+    close_at: string;
+    status: 'OPEN' | 'MATCHED' | 'EXPIRED';
+}
+
+export interface LedgerEntry {
+    entry_id: number;
+    transaction_id: string;
+    account_id: string;
+    entry_type: 'DEBIT' | 'CREDIT';
+    asset_type: 'CURRENCY' | 'CAPACITY_UNITS';
+    amount: number;
+    parent_hash: string;
+    cryptographic_hash: string;
+    timestamp: string;
+}
+
+export async function getMarketplaceAuctions() {
+    try {
+        return await adminFetch<MarketplaceAuction[]>('/api/admin/marketplace/auctions');
+    } catch (err) {
+        return [];
+    }
+}
+
+export async function placeMarketplaceBid(auctionId: string, bidAmount: number) {
+    return adminFetch<{ ok: boolean; message?: string }>('/api/admin/marketplace/bid', {
+        method: 'POST',
+        body: JSON.stringify({ auctionId, bidAmount })
+    });
+}
+
+export async function getMarketplaceLedger() {
+    try {
+        return await adminFetch<LedgerEntry[]>('/api/admin/marketplace/ledger');
+    } catch (err) {
+        return [];
+    }
+}
+
+export async function executeFederationSimulation() {
+    return adminFetch<{
+        ok: boolean;
+        source_status: string;
+        actionTaken: string;
+        targetNode: string | null;
+        constraintsApplied: string[];
+        message: string;
+    }>('/api/admin/federation/simulation', {
+        method: 'POST'
+    });
+}
+
+export async function getFederationRegistry() {
+    return adminFetch<any>('/api/admin/federation/registry');
+}
+
+// ==========================================
+// Paper Sourcing & Procurement Hub (Phase I4-I5)
+// ==========================================
+// MASTER PAPER DATABASE SEARCH FOR PRINTHOUSES
+// ==========================================
+
+export interface MasterPaperDatabaseItem {
+    variantId: string;
+    productId: string;
+    productName: string;
+    brand: string | null;
+    manufacturer: string | null;
+    category: string;
+    finishSummary: string | null;
+    gsm: number;
+    widthMm: number;
+    heightMm: number;
+    dimensionsFormatted: string;
+    sheetFormat: string;
+    finish: string;
+    grainDirection: string;
+    caliperUm: number | null;
+    caliper_source?: string | null;
+    caliper_confidence_status?: string | null;
+    isReel: boolean;
+    supplierId: string;
+    supplierName: string;
+    supplierEmail: string;
+    offerId: string | null;
+    supplierSku: string | null;
+    priceAmount: number | null;
+    priceBasis: string | null;
+    currency: string;
+    moq: number;
+    calculatedCostPerSheet: number | null;
+    hasActiveOffer: boolean;
+}
+
+export async function searchMasterPaperDatabase(params?: {
+    query?: string;
+    gsm?: number;
+    category?: string;
+    finish?: string;
+    limit?: number;
+    offset?: number;
+}) {
+    const q = new URLSearchParams();
+    if (params?.query) q.set('query', params.query);
+    if (params?.gsm) q.set('gsm', String(params.gsm));
+    if (params?.category) q.set('category', params.category);
+    if (params?.finish) q.set('finish', params.finish);
+    if (params?.limit) q.set('limit', String(params.limit));
+    if (params?.offset) q.set('offset', String(params.offset));
+
+    return adminFetch<{ ok: boolean; data: { items: MasterPaperDatabaseItem[]; total: number; limit: number; offset: number } }>(
+        `/api/admin/materials/paper-database/search?${q.toString()}`
+    );
+}
+
+// ==========================================
+// ITERATIONS I4 & I5: PRINTHOUSE PAPER SOURCING & PROCUREMENT API
+// ==========================================
+
+export async function searchPaperSourcingOffers(params?: {
+    query?: string;
+    gsmMin?: number;
+    gsmMax?: number;
+    paperType?: string;
+    supplierId?: string;
+    limit?: number;
+    offset?: number;
+}) {
+    const q = new URLSearchParams();
+    if (params?.query) q.set('query', params.query);
+    if (params?.gsmMin) q.set('gsmMin', String(params.gsmMin));
+    if (params?.gsmMax) q.set('gsmMax', String(params.gsmMax));
+    if (params?.paperType) q.set('paperType', params.paperType);
+    if (params?.supplierId) q.set('supplierId', params.supplierId);
+    if (params?.limit) q.set('limit', String(params.limit));
+    if (params?.offset) q.set('offset', String(params.offset));
+
+    return adminFetch<{ ok: boolean; data: { items: any[]; total: number } }>(`/api/admin/materials/sourcing/offers?${q.toString()}`);
+}
+
+export async function placePaperSourcingOrder(payload: {
+    type: 'ORDER' | 'RFQ';
+    offerId: string;
+    variantId?: string;
+    orderedQuantity: number;
+    quantityBasis: string;
+    printhouseId: string;
+    buyerNotes?: string;
+    targetPrice?: number;
+}) {
+    return adminFetch<{ ok: boolean; data: any }>('/api/admin/materials/sourcing/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    });
+}
+
+export async function listPrinthousePaperOrders(params?: {
+    status?: string;
+    type?: string;
+    page?: number;
+    limit?: number;
+}) {
+    const q = new URLSearchParams();
+    if (params?.status) q.set('status', params.status);
+    if (params?.type) q.set('type', params.type);
+    if (params?.page) q.set('page', String(params.page));
+    if (params?.limit) q.set('limit', String(params.limit));
+
+    return adminFetch<{ ok: boolean; data: { items: any[]; total: number; counts: Record<string, number> } }>(`/api/admin/materials/procurements/paper-orders?${q.toString()}`);
+}
+
+export async function acceptPaperRfqQuote(orderId: string) {
+    return adminFetch<{ ok: boolean; data: any }>(`/api/admin/materials/procurements/paper-orders/${orderId}/accept-quote`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+    });
+}
+
+export async function receivePaperProcurementOrder(orderId: string, payload: {
+    receivedSheets?: number;
+    receivedQuantity?: number;
+    idempotencyKey: string;
+    notes?: string;
+    operatorId?: string;
+}) {
+    return adminFetch<{ ok: boolean; data: any }>(`/api/admin/materials/procurements/paper-orders/${orderId}/receive`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'idempotency-key': payload.idempotencyKey
+        },
+        body: JSON.stringify(payload)
+    });
+}
+
+export async function getPrinthousePaperOrderDocument(orderId: string, type: 'po' | 'packing_slip' = 'po') {
+    return adminFetch<{ ok: boolean; data: any }>(`/api/admin/materials/procurements/paper-orders/${orderId}/document?type=${type}`);
+}
+
+export async function estimateJobPaper(jobSpec: {
+    copies: number;
+    interior_pages: number;
+    paper_weight_interior?: number;
+    paper_weight_cover?: number;
+    press_sheet_width_mm?: number;
+    press_sheet_height_mm?: number;
+    rate_per_kg_interior?: number;
+    rate_per_kg_cover?: number;
+}) {
+    return adminFetch<{ ok: boolean; data: any }>('/api/admin/materials/sourcing/estimate-job-paper', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(jobSpec)
+    });
+}
+
+export async function resolveMarketPaperRate(params?: {
+    gsm?: number;
+    finish?: string;
+    category?: string;
+    widthMm?: number;
+    heightMm?: number;
+    targetCurrency?: string;
+    currency?: string;
+}) {
+    const q = new URLSearchParams();
+    if (params?.gsm) q.set('gsm', String(params.gsm));
+    if (params?.finish) q.set('finish', params.finish);
+    if (params?.category) q.set('category', params.category);
+    if (params?.widthMm) q.set('widthMm', String(params.widthMm));
+    if (params?.heightMm) q.set('heightMm', String(params.heightMm));
+    if (params?.targetCurrency || params?.currency) q.set('targetCurrency', params.targetCurrency || params.currency!);
+    return adminFetch<{ ok: boolean; data: any }>(`/api/admin/materials/sourcing/resolve-market-rate?${q.toString()}`);
+}
+
+export async function buildBpePaperPatch(params?: {
+    interiorPaperType?: string;
+    interiorGsm?: number;
+    coverPaperType?: string;
+    coverGsm?: number;
+    targetCurrency?: string;
+    currency?: string;
+}) {
+    return adminFetch<{ ok: boolean; data: any }>('/api/admin/materials/sourcing/bpe-rate-patch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(params || {})
+    });
+}
+
+export interface SystemSupplierItem {
+    id: string;
+    name: string;
+    country?: string | null;
+    contactEmail?: string | null;
+    status: string;
+    isSystem?: boolean;
+}
+
+export async function listSystemSuppliers(params?: { query?: string }) {
+    const q = new URLSearchParams();
+    if (params?.query) q.set('q', params.query);
+    return adminFetch<{ ok: boolean; data: { items: SystemSupplierItem[]; total: number } }>(
+        `/api/admin/materials/suppliers?${q.toString()}`
+    );
+}
+

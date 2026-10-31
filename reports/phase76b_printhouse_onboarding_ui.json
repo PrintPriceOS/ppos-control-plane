@@ -1,0 +1,208 @@
+{
+    "tested_at": "2026-06-10T19:59:57.965Z",
+    "status": "SUCCESS",
+    "passed": 40,
+    "failed": 0,
+    "scenarios": [
+        {
+            "label": "File exists: src/ui/types/printhouseCapabilities.ts",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "File exists: src/ui/api/printhouseCapabilitiesClient.ts",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "File exists: src/ui/pages/printhouse/PrinthouseOnboardingPage.tsx",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "File exists: src/ui/pages/printhouse/PrinthouseList.tsx",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "File exists: src/ui/pages/printhouse/PrinthouseDetailDrawer.tsx",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "File exists: src/ui/pages/printhouse/MachineCapabilityEditor.tsx",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "File exists: src/ui/pages/printhouse/MediaCatalogEditor.tsx",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "File exists: src/ui/pages/printhouse/PolicyProfileEditor.tsx",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "File exists: src/ui/pages/printhouse/SlaProfileEditor.tsx",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "File exists: src/ui/pages/printhouse/PrinthouseReadinessPanel.tsx",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "File exists: src/ui/pages/printhouse/CapabilityAuditTimeline.tsx",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "API Client exports function: listPrinthouses",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "API Client exports function: createPrinthouse",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "API Client exports function: getPrinthouse",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "API Client exports function: updatePrinthouse",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "API Client exports function: listMachines",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "API Client exports function: createMachine",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "API Client exports function: updateMachine",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "API Client exports function: listMedia",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "API Client exports function: createMedia",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "API Client exports function: updateMedia",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "API Client exports function: listPolicyProfiles",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "API Client exports function: createPolicyProfile",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "API Client exports function: updatePolicyProfile",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "API Client exports function: listSlaProfiles",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "API Client exports function: createSlaProfile",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "API Client exports function: updateSlaProfile",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "API Client exports function: getReadiness",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "API Client exports function: listCapabilityAudit",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "App.tsx contains router path /admin/printhouse-onboarding",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "App.tsx registers PrinthouseOnboardingPage component",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "Navigation configuration registers path /admin/printhouse-onboarding",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "Navigation configuration displays label \"Printhouse Onboarding\"",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "Policy editor UI warns that PDF/X and PDF/A selection does not automatically certify files",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "Policy editor UI explains that standards require validator evidence",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "Machine capability editor validates sheet widths",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "Machine capability editor validates max print width",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "Machine capability editor validates TAC percent bounds",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "Media catalog editor validates GSM > 0",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "SLA profile editor validates production days range",
+            "status": "PASS",
+            "detail": ""
+        }
+    ]
+}

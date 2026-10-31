@@ -1,0 +1,203 @@
+{
+    "tested_at": "2026-06-10T19:45:26.172Z",
+    "status": "SUCCESS",
+    "passed": 39,
+    "failed": 0,
+    "scenarios": [
+        {
+            "label": "S1: Production queue allowed",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "S1: Handoff package allowed",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "S1: No warnings",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "S1: Audit bundle generated",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "S2: Production queue blocked",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "S2: Handoff package blocked",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "S2: Handoff blocked by package readiness",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "S2: Customer report hides unapproved certified_pdf",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "S2: Wording is safe",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "S3: Operator sees probe warning badge",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "S3: Operator sees warning details",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "S3: Customer output has no standards claim",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "S4: Final download hidden",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "S4: Customer sees review/reupload instruction",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "S5: Production blocked, certified PDF hidden",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "S5: Proof status correct",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "S6: Proof gate unblocked",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "S7: API returns 400",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "S7: Correct error code returned",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "S8: Fix request allowed with approve_unsafe=true",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "S9: Production queue blocked on machine incompatibility",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "S9: Blocker is PRODUCTION_MACHINE_INCOMPATIBLE",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "S9: Mismatch reasons recorded",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "S10: Production blocked by policy failure",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "S10: Human Report shows policy failure",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "S11: Customer bundle redacts shell commands",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "S11: Customer bundle redacts internal paths",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "S11: Customer bundle redacts email addresses",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "S11: Hashes/signatures preserved",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "S12: standard_certified downgraded to production-approved",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "S12: No false PDF/X or PDF/A label",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "S13: certified.pdf regression file not customer-visible",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "S13: Label says Internal file, not Certified PDF",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "S14: Strictest blocker wins, customer visible is false",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "S14: Strictest badge selected",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "S15: Customer bundle redacts local path",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "S15: Customer bundle redacts command",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "S15: Operator bundle keeps local path",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "S15: Operator bundle keeps raw command",
+            "status": "PASS",
+            "detail": ""
+        }
+    ]
+}

@@ -1,0 +1,16 @@
+[
+  {
+    "fix_id": "EMBED_FONTS",
+    "validation_mode": "END_TO_END_GOVERNANCE_TRACES",
+    "fonts_before_propagated": true,
+    "fonts_after_propagated": true,
+    "human_report_ok": true,
+    "snapshot_governance_ok": true,
+    "readiness_gate_ok": true,
+    "payment_blocked_on_reject": true,
+    "pass": true,
+    "notes": [
+      "Validated Font Governance E2E cascade properly forces review and locks gates."
+    ]
+  }
+]

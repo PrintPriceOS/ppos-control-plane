@@ -1,0 +1,854 @@
+function buildArtifactUxLabels({ artifact, artifact_trust, human_report, audience }) {
+    const isCustomer = audience === 'customer';
+    const isOperator = audience === 'operator' || audience === 'admin';
+    const type = artifact.type || artifact.alias;
+
+    let display_label = "";
+    let short_label = "";
+    let status_badge = "";
+    let status_tone = "neutral";
+    let button_label = "";
+    let tooltip = "";
+    let description = "";
+    let customer_visible = artifact.customer_visible === true;
+    let operator_visible = true;
+    let is_primary = artifact.is_primary === true;
+    let download_allowed = artifact.downloadable !== false;
+    let warning = null;
+    let forbidden_claims = [];
+    let allowed_claims = [];
+
+    const trust = artifact_trust || {};
+    const review_required = trust.review_required === true;
+    const production_certified = trust.production_certified === true;
+    const standard_certified = trust.standard_certified === true;
+    
+    // Helper to evaluate standards evidence
+    const ev = trust.evidence || {};
+    const hasStandardsEvidence = ev.validation_performed === true && ev.validation_passed === true;
+
+    // Phase 61D: Extract structural governance
+    const structGov = human_report?.structural_metadata_governance || {};
+    const metadata_cleanup = structGov.metadata_cleanup_applied === true;
+    const object_streams_normalized = structGov.object_streams_normalized === true;
+    const internal_report = structGov.internal_standard_report_generated === true;
+
+    // Phase 62D: Extract page marks governance
+    const pmGov = human_report?.page_marks_governance || {};
+    const crop_marks_added = pmGov.crop_marks_added === true;
+    const removal_not_safe = pmGov.removal_not_safe === true;
+    const pm_review_required = pmGov.review_required === true;
+    const marks_inside_trim = pmGov.marks_inside_trim === true;
+    const insufficient_margin = pmGov.insufficient_margin === true;
+    const unsafe_geometry = pmGov.unsafe_geometry_detected === true;
+
+    // Phase 63D: Extract security/interactivity governance
+    const siGov = human_report?.security_interactivity_governance || {};
+    const active_content_removed = siGov.active_content_removed === true;
+    const interactive_content_reviewed = siGov.annotations_flattened === true || siGov.forms_flattened === true;
+    const flatten_skipped = siGov.annotation_flatten_skipped === true || siGov.form_flatten_skipped === true || siGov.unresolved_interactive_content === true;
+    const si_review_required = siGov.review_required === true;
+    const security_cleanup_applied = siGov.javascript_removed === true || siGov.launch_actions_removed === true
+        || siGov.embedded_files_removed === true || siGov.document_open_actions_removed === true
+        || siGov.page_open_actions_removed === true;
+
+    // Phase 64D: Extract ink / TAC / black / registration color governance
+    const inkGov = human_report?.ink_governance || {};
+    const ink_review_required = inkGov.review_required === true || inkGov.ink_fix_applied === true || inkGov.visual_change_expected === true;
+    const ink_color_sensitive_fix = inkGov.tac_reduction_attempted === true || inkGov.tac_reduction_applied === true
+        || inkGov.rich_black_text_mapped === true || inkGov.registration_color_mapped === true
+        || inkGov.black_text_normalized === true || inkGov.ink_fix_applied === true;
+
+    // Phase 65D: Extract selective image governance (RGB→CMYK, ICC profiles, downsampling, low-res)
+    const selImgGov = human_report?.selective_image_governance || {};
+    const sel_img_review_required = selImgGov.review_required === true || selImgGov.image_fix_applied === true || selImgGov.visual_change_expected === true;
+    const sel_img_color_managed_change = selImgGov.rgb_images_converted === true || selImgGov.image_profiles_normalized === true
+        || selImgGov.image_fix_applied === true;
+    const sel_img_resolution_warning = selImgGov.excessive_resolution_downsampled === true || selImgGov.low_res_unfixable === true;
+
+    // Phase 66D: Extract font governance (embedding, Type3, glyphs, encoding)
+    const fontGov = human_report?.font_governance || {};
+    const font_review_required = fontGov.review_required === true || fontGov.font_fix_applied === true
+        || fontGov.font_embedding_skipped === true || fontGov.type3_fonts_detected === true
+        || fontGov.font_encoding_repaired === true || fontGov.visual_change_expected === true;
+    const font_issue_unresolved = fontGov.glyphs_missing_unfixable === true || fontGov.font_source_available === false;
+
+    // Phase 67D: Extract transparency/overprint physical governance (flatten, blend modes, overprint)
+    const transPhysGov = human_report?.transparency_overprint_physical_governance || {};
+
+    // Phase 68D: Extract standards_certification_governance (safe subset — no raw paths)
+    const stdCertGov = human_report?.standards_certification_governance || {};
+    const has_full_validator_evidence = stdCertGov.validation_performed === true &&
+        stdCertGov.validation_passed === true &&
+        !!stdCertGov.validator_name &&
+        !!stdCertGov.validator_version &&
+        !!stdCertGov.standard_detected &&
+        stdCertGov.compliance_claim_allowed !== false;
+
+    // Phase 70D: Extract proof_approval_governance
+    const proofApprGov = human_report?.proof_approval_governance || {};
+    const proof_required = proofApprGov.proof_required === true;
+    const proof_status = proofApprGov.proof_status || 'NOT_REQUIRED';
+    const proof_approved = proof_status === 'APPROVED';
+    const proof_rejected = proof_status === 'REJECTED';
+    const proof_pending_customer = proof_status === 'PENDING';
+    const approval_production_blocked = proof_required && !proof_approved;
+
+    // Phase 69D: Extract visual_diff_governance (safe subset — no raw paths or local refs)
+    const visualDiffGov = human_report?.visual_diff_governance || {};
+    const visual_diff_performed = visualDiffGov.visual_diff_performed === true;
+    const visual_change_detected = visualDiffGov.visual_change_detected === true;
+    const visual_review_required = visualDiffGov.visual_review_required === true
+        || visual_change_detected
+        || (visualDiffGov.visual_diff_required === true && !visual_diff_performed);
+    const render_tool_gap = visualDiffGov.render_tool_gap === true;
+    const proof_artifacts_available = visualDiffGov.proof_artifacts_available === true;
+
+    const trans_phys_review_required = transPhysGov.review_required === true || transPhysGov.transparency_fix_applied === true
+        || transPhysGov.transparency_flattened === true || transPhysGov.blend_modes_normalized === true
+        || transPhysGov.overprint_flattened === true || transPhysGov.overprint_preview_simulated === true
+        || transPhysGov.visual_change_expected === true;
+    const trans_phys_overprint_change = transPhysGov.overprint_flattened === true || transPhysGov.overprint_preview_simulated === true;
+    const trans_phys_transparency_change = transPhysGov.transparency_flattened === true || transPhysGov.blend_modes_normalized === true;
+
+    // Phase 62F-D: Extract heavy_pdf_probe_governance
+    const heavyPdfGov = human_report?.heavy_pdf_probe_governance || {};
+    const heavy_pdf_detected = heavyPdfGov.heavy_pdf_detected === true;
+    const heavy_pdf_review_required = heavyPdfGov.review_required === true;
+    const heavy_pdf_fatal = heavyPdfGov.fatal_document_failure === true;
+    const heavy_pdf_degraded_usable = heavyPdfGov.degraded_but_usable === true;
+    const heavy_pdf_qpdf_status = heavyPdfGov.tools?.qpdf?.semantic_status;
+    const heavy_pdf_pdfimages_status = heavyPdfGov.tools?.pdfimages?.semantic_status;
+    const heavy_pdf_qpdf_warning = ['WARNING_ONLY', 'SUCCESS_WITH_WARNINGS'].includes(heavy_pdf_qpdf_status);
+    const heavy_pdf_pdfimages_warning = ['WARNING_ONLY', 'SUCCESS_WITH_WARNINGS'].includes(heavy_pdf_pdfimages_status);
+
+    const stripClaims = (str) => {
+        if (!str) return str;
+        const forbidden = ["Certified PDF", "Print-ready", "PDF/X certified", "PDF/A certified", "Standards certified", "Production ready", "Guaranteed fixed", "Fully corrected", "PDF/X validated", "PDF/A validated", "Standards validated"];
+        let result = str;
+        forbidden.forEach(c => {
+            const regex = new RegExp(c, 'gi');
+            if (regex.test(result)) {
+                forbidden_claims.push(c);
+                result = result.replace(regex, '');
+            }
+        });
+        return result.trim();
+    };
+    
+    // Check initial label for forbidden claims
+    if (isCustomer || metadata_cleanup) {
+        stripClaims(artifact.label || "");
+    }
+
+    if (metadata_cleanup) {
+        warning = "Metadata cleanup does not prove PDF/X or PDF/A compliance.";
+    }
+
+    // Phase 62D: page marks warnings for operator
+    if (crop_marks_added && isOperator) {
+        warning = warning ? warning + " Crop marks were added and require review before production." : "Crop marks were added and require review before production.";
+    }
+    if (removal_not_safe && isOperator) {
+        warning = warning ? warning + " Registration mark removal was skipped because safe removal could not be proven." : "Registration mark removal was skipped because safe removal could not be proven.";
+    }
+
+    // Phase 63D: security/interactivity warnings for operator
+    if (active_content_removed && isOperator) {
+        warning = warning ? warning + " Active/interactive content was removed for security and requires review." : "Active/interactive content was removed for security and requires review.";
+    }
+    if (flatten_skipped && isOperator) {
+        warning = warning ? warning + " Annotation/form flattening was skipped because safe appearance preservation could not be proven." : "Annotation/form flattening was skipped because safe appearance preservation could not be proven.";
+    }
+
+    if (type === 'review_pdf') {
+        if (isCustomer) {
+            display_label = "Review file";
+            short_label = "Review";
+            status_badge = "Needs review";
+            status_tone = "warning";
+            button_label = "Download review file";
+            tooltip = "This file shows the corrected result for review. It is not yet approved for production.";
+            if (review_required) {
+                // explicit marking
+            }
+        } else {
+            display_label = "Review PDF";
+            short_label = "Review";
+            status_badge = "Human review required";
+            status_tone = "warning";
+            button_label = "Download Review PDF";
+            tooltip = "Use this artifact to inspect visual or governance-sensitive changes before approval.";
+            if (trust.primary_artifact_type === 'review_pdf') is_primary = true;
+        }
+        allowed_claims.push("Needs review");
+    } else if (type === 'fixed_pdf') {
+        if (isCustomer) {
+            display_label = "Corrected file";
+            short_label = "Corrected";
+            status_badge = "Corrected";
+            status_tone = "info";
+            button_label = "Download corrected file";
+            tooltip = "This file includes automated corrections, but it may still require approval before production.";
+        } else {
+            display_label = "Fixed PDF";
+            short_label = "Fixed";
+            status_badge = "Fix output";
+            status_tone = "info";
+            button_label = "Download Fixed PDF";
+            tooltip = "This is the automated fix output. It is not necessarily production-approved.";
+        }
+        allowed_claims.push("Corrected");
+    } else if (type === 'certified_pdf') {
+        if (!production_certified) {
+            if (isCustomer) {
+                customer_visible = false;
+                display_label = "Internal file";
+                short_label = "Internal";
+                status_badge = "Internal";
+                button_label = "Download file";
+                tooltip = "This file is not production approved.";
+            } else {
+                display_label = "Certified PDF artifact";
+                short_label = "Artifact";
+                status_badge = "Not production certified";
+                status_tone = "danger";
+                button_label = "Download Artifact";
+                tooltip = "The artifact exists, but artifact_trust does not allow production certification.";
+                warning = "artifact_trust does not allow production certification. Filename alone does not certify it.";
+            }
+        } else if (production_certified && !standard_certified) {
+            if (isCustomer) {
+                display_label = "Production-approved file";
+                short_label = "Approved";
+                status_badge = "Production approved";
+                status_tone = "success";
+                button_label = "Download production-approved file";
+                tooltip = "This file is approved by internal preflight checks. It has not been independently validated as PDF/X or PDF/A.";
+            } else {
+                display_label = "Production-approved PDF";
+                short_label = "Approved";
+                status_badge = "Internal production approval";
+                status_tone = "success";
+                button_label = "Download Production-approved PDF";
+                tooltip = "Approved by internal preflight governance. Not independently validated as PDF/X or PDF/A.";
+            }
+            allowed_claims.push("Production approved");
+            allowed_claims.push("Not yet validated as PDF/X or PDF/A");
+        } else if (production_certified && standard_certified) {
+            if (!hasStandardsEvidence) {
+                // Downgrade to production approved
+                if (isCustomer) {
+                    display_label = "Production-approved file";
+                    status_badge = "Production approved";
+                    button_label = "Download production-approved file";
+                    tooltip = "This file is approved by internal preflight checks. It has not been independently validated as PDF/X or PDF/A.";
+                } else {
+                    display_label = "Production-approved PDF";
+                    status_badge = "Internal production approval";
+                    button_label = "Download Production-approved PDF";
+                    tooltip = "Standards claim present but validator evidence is missing.";
+                    warning = "STANDARD_CLAIM_WITHOUT_VALIDATOR_EVIDENCE";
+                }
+            } else {
+                const detected = ev.standard_detected || "PDF/X";
+                if (isCustomer) {
+                    display_label = "Standards-validated file";
+                    short_label = "Validated";
+                    status_badge = `${detected} validated`;
+                    status_tone = "success";
+                    button_label = "Download validated file";
+                    tooltip = "This file includes standards validation evidence.";
+                } else {
+                    display_label = "Standards-validated PDF";
+                    short_label = "Validated";
+                    status_badge = "Standards validated";
+                    status_tone = "success";
+                    button_label = "Download Standards-validated PDF";
+                    tooltip = "Validator evidence is available. Check validation report for details.";
+                }
+                allowed_claims.push("Standards validated");
+            }
+        }
+        
+        if (trust.outputintent_changed && !trust.outputintent_does_not_prove_pdfx) {
+            if (isOperator) {
+                warning = warning ? warning + " OutputIntent does not prove PDF/X." : "OutputIntent does not prove PDF/X.";
+            }
+        }
+    } else if (type === 'audit_json' || type === 'fix_audit') {
+        display_label = "Fix Audit JSON";
+        short_label = "Audit";
+        status_badge = "Technical metadata";
+        button_label = "Download Fix Audit JSON";
+        tooltip = "Technical audit trail showing fixes attempted, skipped fixes, governance decisions, and artifact trust.";
+        if (isCustomer) {
+            customer_visible = false;
+        }
+    } else if (type === 'delta_report') {
+        display_label = "Delta Report";
+        short_label = "Delta";
+        status_badge = "Differences";
+        button_label = "Download Delta Report";
+        tooltip = "Structured report showing what changed between the original and corrected files.";
+        if (isCustomer) {
+            customer_visible = false;
+        }
+    } else if (type === 'human_report' || type === 'report_json') {
+        if (internal_report) {
+            display_label = "Internal standards report";
+            short_label = "Internal Report";
+            status_badge = "Internal Governance";
+            button_label = "Download Internal Report";
+            tooltip = "Internal governance report only. Not a PDF/X or PDF/A validator certificate.";
+        } else {
+            display_label = "Human Report";
+            short_label = "Report";
+            status_badge = "Summary";
+            button_label = "Download Human Report";
+            tooltip = "Readable summary for operators and customers, including review requirements and safe recommendations.";
+        }
+        if (isCustomer) {
+            customer_visible = false;
+        }
+    } else if (type === 'validation_report') {
+        if (internal_report) {
+            display_label = "Internal standards report";
+            short_label = "Internal Report";
+            status_badge = "Internal Governance";
+            button_label = "Download Internal Report";
+            tooltip = "Internal governance report only. Not a PDF/X or PDF/A validator certificate.";
+        } else if (has_full_validator_evidence) {
+            const std = stdCertGov.standard_detected || '';
+            const isPdfa = std.toLowerCase().includes('pdf/a');
+            display_label = "Validated standards report";
+            short_label = "Validated";
+            status_badge = isPdfa ? "PDF/A validated" : "PDF/X validated";
+            status_tone = "success";
+            button_label = "Download validated standards report";
+            tooltip = `Validation passed using ${stdCertGov.validator_name} ${stdCertGov.validator_version}. Standard detected: ${std}.`;
+        } else {
+            display_label = "Standards Validation Report";
+            short_label = "Validation";
+            status_badge = "Independent Validation";
+            button_label = "Download Validation Report";
+            tooltip = "Independent validator evidence for PDF/X or PDF/A compliance, if available.";
+        }
+        if (isCustomer) {
+            customer_visible = false;
+        }
+    } else {
+        display_label = artifact.label || "Artifact";
+        status_badge = "Available";
+        button_label = "Download";
+        tooltip = "Download artifact.";
+    }
+
+    // Apply metadata cleanup / structural cleanup overrides for PDF artifacts
+    if (['certified_pdf', 'fixed_pdf', 'review_pdf'].includes(type)) {
+        if (metadata_cleanup && (!production_certified || !standard_certified || !hasStandardsEvidence)) {
+            if (type === 'certified_pdf') {
+                if (isCustomer) {
+                    display_label = "Corrected file";
+                    short_label = "Corrected";
+                } else {
+                    display_label = "Corrected artifact with metadata cleanup";
+                    short_label = "Corrected";
+                }
+                button_label = isCustomer ? "Download corrected file" : "Download Corrected artifact";
+            }
+            status_badge = isCustomer ? "Metadata cleaned" : "Structural cleanup";
+            status_tone = "info";
+            tooltip = "Metadata was cleaned to avoid unsupported certification claims. This does not prove PDF/X or PDF/A compliance.";
+        } else if (object_streams_normalized && !metadata_cleanup && (!production_certified || !standard_certified || !hasStandardsEvidence)) {
+            status_badge = "Structure cleaned";
+            tooltip = "PDF object streams were normalized. This is a structural cleanup, not standards validation.";
+        }
+
+        // Phase 62D: Page marks overrides for certified_pdf — must stay conservative
+        if (pm_review_required && type === 'certified_pdf') {
+            if (isCustomer) {
+                customer_visible = false;
+                display_label = "Internal file";
+                short_label = "Internal";
+                status_badge = "Review required";
+                status_tone = "warning";
+                button_label = "Download file";
+                tooltip = "Page mark conditions require human review. This file is not approved for production.";
+            } else {
+                status_badge = "Review required";
+                status_tone = "warning";
+                warning = warning ? warning + " Page mark review required before production." : "Page mark review required before production.";
+                tooltip = "Page mark governance requires human review before this file can be released for production.";
+            }
+        }
+
+        // Phase 62D: Crop marks added badge
+        if (crop_marks_added && ['fixed_pdf', 'certified_pdf'].includes(type)) {
+            status_badge = isCustomer ? "Crop marks added" : "Crop marks added";
+            status_tone = "warning";
+            if (isCustomer) {
+                tooltip = "Crop marks were added to help guide trimming. The file still requires review before production.";
+            } else {
+                tooltip = "Crop marks were added outside the TrimBox. Human review is required before production.";
+            }
+        }
+
+        // Phase 62D: removal_not_safe badge
+        if (removal_not_safe && !crop_marks_added) {
+            status_badge = "Review required";
+            status_tone = "warning";
+        }
+
+        // Phase 63D: Security/interactivity overrides for certified_pdf — must stay
+        // conservative; downgrade wins over any "applied" badge when review is required
+        if (si_review_required && type === 'certified_pdf') {
+            if (isCustomer) {
+                customer_visible = false;
+                display_label = "Internal file";
+                short_label = "Internal";
+                status_badge = "Review required";
+                status_tone = "warning";
+                button_label = "Download file";
+                tooltip = "Security/interactivity conditions require human review. This file is not approved for production.";
+            } else {
+                status_badge = "Review required";
+                status_tone = "warning";
+                warning = warning ? warning + " Security/interactivity review required before production." : "Security/interactivity review required before production.";
+                tooltip = "Security/interactivity governance requires human review before this file can be released for production.";
+            }
+        }
+
+        // Phase 64D: Ink/color governance overrides for certified_pdf — must stay
+        // conservative; downgrade wins over any "applied" badge when review is required
+        if (ink_review_required && type === 'certified_pdf') {
+            if (isCustomer) {
+                customer_visible = false;
+                display_label = "Internal file";
+                short_label = "Internal";
+                status_badge = "Review required";
+                status_tone = "warning";
+                button_label = "Download file";
+                tooltip = "Ink/color conditions require human review. This file is not approved for production.";
+            } else {
+                status_badge = "Review required";
+                status_tone = "warning";
+                warning = warning ? warning + " Ink/color review required before production." : "Ink/color review required before production.";
+                tooltip = "Ink/color governance requires human review before this file can be released for production.";
+            }
+        }
+
+        // Phase 65D: Selective image governance overrides for certified_pdf — must stay
+        // conservative; downgrade wins over any "applied" badge when review is required
+        if (sel_img_review_required && type === 'certified_pdf') {
+            if (isCustomer) {
+                customer_visible = false;
+                display_label = "Internal file";
+                short_label = "Internal";
+                status_badge = "Review required";
+                status_tone = "warning";
+                button_label = "Download file";
+                tooltip = "Image conditions require human review. This file is not approved for production.";
+            } else {
+                status_badge = "Review required";
+                status_tone = "warning";
+                warning = warning ? warning + " Selective image governance review required before production." : "Selective image governance review required before production.";
+                tooltip = "Selective image governance requires human review before this file can be released for production.";
+            }
+        }
+
+        // Phase 66D: Font governance overrides for certified_pdf — must stay
+        // conservative; downgrade wins over any "applied" badge when review is required
+        if ((font_review_required || font_issue_unresolved) && type === 'certified_pdf') {
+            if (isCustomer) {
+                customer_visible = false;
+                display_label = "Internal file";
+                short_label = "Internal";
+                status_badge = "Review required";
+                status_tone = "warning";
+                button_label = "Download file";
+                tooltip = "Font conditions require human review. This file is not approved for production.";
+            } else {
+                status_badge = "Review required";
+                status_tone = "warning";
+                warning = warning ? warning + " Font governance review required before production." : "Font governance review required before production.";
+                tooltip = "Font governance requires human review before this file can be released for production.";
+            }
+        }
+
+        // Phase 67D: Transparency/overprint physical governance overrides for certified_pdf —
+        // must stay conservative; downgrade wins over any "applied" badge when review is required
+        if (trans_phys_review_required && type === 'certified_pdf') {
+            if (isCustomer) {
+                customer_visible = false;
+                display_label = "Internal file";
+                short_label = "Internal";
+                status_badge = "Review required";
+                status_tone = "warning";
+                button_label = "Download file";
+                tooltip = "Transparency/overprint physical conditions require human review. This file is not approved for production.";
+            } else {
+                status_badge = "Review required";
+                status_tone = "warning";
+                warning = warning ? warning + " Transparency/overprint physical review required before production." : "Transparency/overprint physical review required before production.";
+                tooltip = "Transparency/overprint physical governance requires human review before this file can be released for production.";
+            }
+        }
+
+        // Phase 63D: Active content removed badge (fixed_pdf only — certified_pdf
+        // is governed by the conservative downgrade above)
+        if (active_content_removed && type === 'fixed_pdf') {
+            status_badge = "Active content removed";
+            status_tone = "warning";
+            if (isCustomer) {
+                tooltip = "Potentially unsafe interactive content was removed from this file for security. The file still requires review before production.";
+            } else {
+                tooltip = "JavaScript, launch actions, embedded files, or open actions were removed for security. Human review is required before production.";
+            }
+        }
+
+        // Phase 63D: Interactive content reviewed / flattening badges
+        // (review_pdf keeps its own "Needs review" badge; certified_pdf is governed
+        // by the conservative downgrade above)
+        if (interactive_content_reviewed && type === 'fixed_pdf') {
+            status_badge = "Interactive content reviewed";
+            status_tone = "warning";
+            if (isCustomer) {
+                tooltip = "Some interactive elements were simplified. This may change how the file looks and requires review.";
+            } else {
+                tooltip = "Annotations and/or form fields were flattened into the page content. Confirm appearance preservation before approving for production.";
+            }
+        }
+
+        // Phase 63D: Security cleanup badge (least specific — only set if nothing more specific applied)
+        if (security_cleanup_applied && !active_content_removed && type === 'fixed_pdf') {
+            status_badge = "Security cleanup";
+            status_tone = "info";
+        }
+
+        // Phase 63D: generic Review required badge — only when no more specific
+        // security/interactivity badge already communicates the review need
+        // (certified_pdf is governed by the conservative downgrade above)
+        if ((si_review_required || flatten_skipped) && !active_content_removed && !interactive_content_reviewed
+            && type === 'fixed_pdf') {
+            status_badge = "Review required";
+            status_tone = "warning";
+        }
+
+        // Phase 64D: Color-sensitive ink/TAC/rich-black/registration-color fix badge
+        // (fixed_pdf only — certified_pdf is governed by the conservative downgrade above)
+        if (ink_color_sensitive_fix && type === 'fixed_pdf') {
+            status_badge = "Color-sensitive fix";
+            status_tone = "warning";
+            if (isCustomer) {
+                tooltip = "Ink/color changes may affect appearance and require review.";
+            } else {
+                tooltip = "Total ink coverage, rich black text, registration color, or black text handling was adjusted. These are visual, color-affecting changes that require operator review before production.";
+            }
+        }
+
+        // Phase 64D: Ink review required badge — least specific ink badge, only when
+        // nothing more specific already communicates the review need
+        if (ink_review_required && !ink_color_sensitive_fix && type === 'fixed_pdf') {
+            status_badge = "Ink review required";
+            status_tone = "warning";
+            if (isCustomer) {
+                tooltip = "Ink/color changes may affect appearance and require review.";
+            } else {
+                tooltip = "Ink/color governance findings were detected. Human review of color appearance is required before production.";
+            }
+        }
+
+        // Phase 65D: Color-managed image change badge (RGB→CMYK conversion / ICC profile normalization)
+        // (fixed_pdf only — certified_pdf is governed by the conservative downgrade above)
+        if (sel_img_color_managed_change && type === 'fixed_pdf') {
+            status_badge = "Color-managed image change";
+            status_tone = "warning";
+            if (isCustomer) {
+                tooltip = "Some images were converted or normalized and require review.";
+            } else {
+                tooltip = "Image color conversion (RGB-to-CMYK) and/or ICC profile normalization was applied. These are visual, color-managed changes that require operator review before production.";
+            }
+        }
+
+        // Phase 65D: Resolution warning badge (downsampling / unfixable low-res)
+        if (sel_img_resolution_warning && type === 'fixed_pdf') {
+            status_badge = "Resolution warning";
+            status_tone = "warning";
+            if (isCustomer) {
+                tooltip = "Low-resolution images could not be safely improved automatically.";
+            } else {
+                tooltip = "Excessive resolution was downsampled and/or low-resolution images were detected and could not be safely upscaled. Human review of image quality is required before production.";
+            }
+        }
+
+        // Phase 65D: generic Image review required badge — least specific selective-image
+        // badge, only when nothing more specific already communicates the review need
+        if (sel_img_review_required && !sel_img_color_managed_change && !sel_img_resolution_warning && type === 'fixed_pdf') {
+            status_badge = "Image review required";
+            status_tone = "warning";
+            if (isCustomer) {
+                tooltip = "Some images were converted or normalized and require review.";
+            } else {
+                tooltip = "Selective image governance findings were detected. Human review of image appearance is required before production.";
+            }
+        }
+
+        // Phase 66D: Font issue unresolved badge — most specific font badge, for findings
+        // that were honestly flagged but could not be safely fixed automatically
+        if (font_issue_unresolved && type === 'fixed_pdf') {
+            status_badge = "Font issue unresolved";
+            status_tone = "warning";
+            if (isCustomer) {
+                tooltip = fontGov.font_source_available === false
+                    ? "Font embedding could not be completed because font sources were unavailable."
+                    : "Some font issues could not be safely fixed automatically.";
+            } else {
+                tooltip = fontGov.font_source_available === false
+                    ? "Font embedding could not be completed because the original font sources were unavailable. The file was flagged honestly rather than producing a falsely certified result, and requires operator review before production."
+                    : "Missing glyphs were detected and could not be safely repaired. The file was flagged honestly rather than inventing glyph data, and requires operator review before production.";
+            }
+        }
+
+        // Phase 66D: generic Font review required badge — least specific font badge,
+        // only when nothing more specific already communicates the review need
+        if (font_review_required && !font_issue_unresolved && type === 'fixed_pdf') {
+            status_badge = "Font review required";
+            status_tone = "warning";
+            if (isCustomer) {
+                tooltip = fontGov.type3_fonts_detected === true
+                    ? "Type3 fonts require review."
+                    : "Some fonts were not embedded.";
+            } else {
+                tooltip = "Font governance findings (embedding, subsetting, Type3 outlining, and/or encoding repair) were detected. Human review of text rendering is required before production.";
+            }
+        }
+
+        // Phase 67D: Overprint review badge — most specific, for overprint flatten/simulate
+        if (trans_phys_overprint_change && type === 'fixed_pdf') {
+            status_badge = "Overprint review";
+            status_tone = "warning";
+            if (isCustomer) {
+                tooltip = "Overprint changes require visual verification.";
+            } else {
+                tooltip = transPhysGov.overprint_preview_simulated === true
+                    ? "Overprint was flattened and simulated. Overprint simulation changes how inks interact on press; the result must be visually verified before production."
+                    : "Overprint settings were flattened. Overprint changes affect how inks interact on press and can significantly alter printed output; human visual review is required before production.";
+            }
+        }
+
+        // Phase 67D: Transparency flattened badge — for transparency/blend mode flatten
+        if (trans_phys_transparency_change && !trans_phys_overprint_change && type === 'fixed_pdf') {
+            status_badge = "Transparency flattened";
+            status_tone = "warning";
+            if (isCustomer) {
+                tooltip = "Transparency flattening may affect appearance and requires review.";
+            } else {
+                tooltip = transPhysGov.blend_modes_normalized === true
+                    ? "Transparency was flattened and blend modes were normalized. Flattening can alter how colors and layers interact visually; human review of appearance is required before production."
+                    : "Transparency was flattened. Flattening merges transparent layers and can change how the file renders; human review of appearance is required before production.";
+            }
+        }
+
+        // Phase 67D: Visual review required badge — generic, when nothing more specific triggered
+        if (trans_phys_review_required && !trans_phys_overprint_change && !trans_phys_transparency_change && type === 'fixed_pdf') {
+            status_badge = "Visual review required";
+            status_tone = "warning";
+            if (isCustomer) {
+                tooltip = "Transparency or overprint changes may affect appearance and require review.";
+            } else {
+                tooltip = "Transparency/overprint physical governance findings were detected. Human visual review is required before production.";
+            }
+        }
+
+        // Phase 69D: Visual diff governance overrides for certified_pdf — downgrade when review required
+        if (visual_review_required && type === 'certified_pdf') {
+            if (isCustomer) {
+                customer_visible = false;
+                display_label = "Internal file";
+                short_label = "Internal";
+                status_badge = "Visual review required";
+                status_tone = "warning";
+                button_label = "Download file";
+                tooltip = "Visual changes require human review. This file is not approved for production.";
+            } else {
+                status_badge = "Visual review required";
+                status_tone = "warning";
+                warning = warning
+                    ? warning + " Visual diff review required before production."
+                    : "Visual diff review required before production.";
+                tooltip = "Visual diff analysis requires human review of rendered proof before this file can be released for production.";
+            }
+        }
+
+        // Phase 69D: Visual proof available badge — for fixed_pdf and review_pdf
+        if (proof_artifacts_available && visual_diff_performed && type === 'fixed_pdf') {
+            if (!visual_change_detected) {
+                status_badge = "Visual proof available";
+                status_tone = "info";
+                if (isCustomer) {
+                    tooltip = "A rendered comparison was generated. No significant visual changes were detected.";
+                } else {
+                    tooltip = "Rendered proof artifacts are available for comparison. No significant visual changes were detected.";
+                }
+            } else {
+                status_badge = "Rendered comparison";
+                status_tone = "warning";
+                if (isCustomer) {
+                    tooltip = "A rendered comparison was generated. Visual changes were detected and require review.";
+                } else {
+                    tooltip = `Rendered comparison available. Visual changes detected — max changed pixel ratio: ${(visualDiffGov.max_changed_pixel_ratio || 0).toFixed(4)}. Human review required before production.`;
+                }
+            }
+        }
+
+        // Phase 69D: Render tool gap badge — when diff was required but tools unavailable
+        if (render_tool_gap && !visual_diff_performed && type === 'fixed_pdf') {
+            if (isOperator) {
+                warning = warning
+                    ? warning + " Rendering tools were unavailable. Visual proof could not be generated automatically."
+                    : "Rendering tools were unavailable. Visual proof could not be generated automatically.";
+            }
+        }
+
+        // Phase 70D: Proof approval governance badges
+
+        // Downgrade certified_pdf when proof approval is blocking production
+        if (approval_production_blocked && type === 'certified_pdf') {
+            if (isCustomer) {
+                customer_visible = false;
+                display_label = "Internal file";
+                short_label = "Internal";
+                status_badge = proof_rejected
+                    ? "Customer rejected — reupload required"
+                    : proof_pending_customer
+                    ? "Awaiting customer approval"
+                    : "Proof approval required";
+                status_tone = proof_rejected ? "danger" : "warning";
+                button_label = "Download file";
+                tooltip = proof_rejected
+                    ? "You rejected the rendered proof. Please reupload a corrected file."
+                    : "A rendered proof of your file requires your approval before production.";
+            } else {
+                status_badge = proof_rejected
+                    ? "Customer rejected — reupload required"
+                    : proof_pending_customer
+                    ? "Awaiting customer approval"
+                    : "Proof approval required";
+                status_tone = proof_rejected ? "danger" : "warning";
+                warning = warning
+                    ? warning + " Proof approval is required before this file can be released for production."
+                    : "Proof approval is required before this file can be released for production.";
+                tooltip = proof_rejected
+                    ? "Customer rejected the rendered proof. A new file upload is required before production can proceed."
+                    : proof_pending_customer
+                    ? "Rendered proof has been shared with the customer. Awaiting their approval decision."
+                    : "Visual changes were detected. A rendered proof must be approved by the customer before production.";
+            }
+        }
+
+        // Badge on fixed_pdf when proof was approved
+        if (proof_approved && proof_required && type === 'fixed_pdf') {
+            if (!visual_review_required) {
+                status_badge = "Customer approved";
+                status_tone = "success";
+                if (isCustomer) {
+                    tooltip = "You approved the rendered proof. This file may proceed to production upon operator review.";
+                } else {
+                    tooltip = "The customer approved the rendered proof. The visual proof gate is satisfied.";
+                }
+            }
+        }
+
+        // Badge on fixed_pdf when awaiting customer approval
+        if (proof_pending_customer && type === 'fixed_pdf' && !proof_approved) {
+            status_badge = "Awaiting customer approval";
+            status_tone = "info";
+            if (isCustomer) {
+                tooltip = "A rendered proof of your corrected file is awaiting your approval.";
+            } else {
+                tooltip = "A rendered proof has been shared with the customer and is awaiting their decision.";
+            }
+        }
+
+        // Phase 62F-D: Heavy PDF probe governance — downgrade certified_pdf when review required or fatal
+        if ((heavy_pdf_review_required || heavy_pdf_fatal) && type === 'certified_pdf') {
+            if (isCustomer) {
+                customer_visible = false;
+                display_label = "Internal file";
+                short_label = "Internal";
+                status_badge = heavy_pdf_fatal ? "Technical review required" : "Review required";
+                status_tone = heavy_pdf_fatal ? "danger" : "warning";
+                button_label = "Download file";
+                tooltip = heavy_pdf_fatal
+                    ? "The PDF may need to be re-exported if the warnings cannot be resolved."
+                    : "Automatic certification is not allowed until review is completed.";
+            } else {
+                status_badge = heavy_pdf_fatal ? "Technical review required" : "Review required";
+                status_tone = heavy_pdf_fatal ? "danger" : "warning";
+                warning = warning
+                    ? warning + " Heavy PDF probe warnings require review before production."
+                    : "Heavy PDF probe warnings require review before production.";
+                tooltip = "The file was analyzed, but one or more PDF probes returned warnings. Automatic certification is not allowed until review is completed.";
+            }
+        }
+
+        // Phase 62F-D: Heavy PDF badges for fixed_pdf/review_pdf — only when nothing more specific has set the badge
+        if (heavy_pdf_detected && ['fixed_pdf', 'review_pdf'].includes(type)) {
+            const defaultBadge = (type === 'fixed_pdf')
+                ? (isCustomer ? "Corrected" : "Fix output")
+                : (isCustomer ? "Needs review" : "Human review required");
+            if (status_badge === defaultBadge) {
+                if (heavy_pdf_fatal) {
+                    status_badge = "Technical review required";
+                    status_tone = "danger";
+                    tooltip = "The PDF may need to be re-exported if the warnings cannot be resolved.";
+                } else if (heavy_pdf_qpdf_warning || heavy_pdf_pdfimages_warning) {
+                    status_badge = "Probe warning";
+                    status_tone = "warning";
+                    tooltip = "The file was analyzed, but one or more PDF probes returned warnings. Automatic certification is not allowed until review is completed.";
+                } else if (heavy_pdf_degraded_usable || heavy_pdf_review_required) {
+                    status_badge = "Analysis warnings";
+                    status_tone = "warning";
+                    tooltip = "The file was analyzed, but one or more PDF probes returned warnings.";
+                } else {
+                    status_badge = "Heavy PDF";
+                    status_tone = "info";
+                    tooltip = isCustomer
+                        ? "This file is large and required additional analysis."
+                        : "This file exceeds the heavy PDF size threshold. Additional analysis warnings may apply if probes report issues.";
+                }
+            }
+        }
+    }
+
+    // Sanitize any remaining forbidden claims if customer
+    if (isCustomer) {
+        display_label = stripClaims(display_label);
+        button_label = stripClaims(button_label);
+        status_badge = stripClaims(status_badge);
+        tooltip = stripClaims(tooltip);
+    }
+
+    return {
+        artifact_type: type,
+        display_label,
+        short_label,
+        status_badge,
+        status_tone,
+        button_label,
+        tooltip,
+        description,
+        customer_visible,
+        operator_visible,
+        is_primary,
+        download_allowed,
+        warning,
+        forbidden_claims: [...new Set(forbidden_claims)],
+        allowed_claims: [...new Set(allowed_claims)]
+    };
+}
+
+module.exports = {
+    buildArtifactUxLabels
+};

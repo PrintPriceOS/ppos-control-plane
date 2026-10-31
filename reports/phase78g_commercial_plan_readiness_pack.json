@@ -1,0 +1,73 @@
+{
+    "tested_at": "2026-06-11T07:32:15.725Z",
+    "status": "SUCCESS",
+    "passed": 13,
+    "failed": 0,
+    "scenarios": [
+        {
+            "label": "File exists: reports/phase78_commercial_plan_readiness_checklist.md",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "File exists: reports/phase78_usage_billing_acceptance_pack.md",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "Checklist contains correct main header",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "Checklist contains Part A section",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "Checklist contains Part B section",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "Checklist contains Part C section",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "Checklist contains Part D section",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "Acceptance pack contains correct main header",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "Acceptance pack contains Executive Summary",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "Acceptance pack contains Plan Limits table",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "Acceptance pack contains Core Rules section",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "Acceptance pack contains Certification section",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "No external billing wording (stripe, charged, paid, tax, vat) in reports pack",
+            "status": "PASS",
+            "detail": ""
+        }
+    ]
+}

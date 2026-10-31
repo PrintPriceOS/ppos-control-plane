@@ -1,0 +1,300 @@
+-- Phase 136 — Runtime Activity Observation / Participant Usage Audit Gate
+-- IDEMPOTENT SCHEMA MIGRATION
+
+CREATE TABLE IF NOT EXISTS controlled_beta_runtime_activity_observation_gates (
+    observation_gate_id VARCHAR(64) PRIMARY KEY,
+    session_gate_id VARCHAR(64) NOT NULL,
+    runtime_session_id VARCHAR(64) NOT NULL,
+    acceptance_gate_id VARCHAR(64) NOT NULL,
+    participant_id VARCHAR(64) NOT NULL,
+    tenant_id VARCHAR(64) NOT NULL,
+    cohort_id VARCHAR(64) NOT NULL,
+    gate_status VARCHAR(64) NOT NULL DEFAULT 'DRAFT',
+    readiness_status VARCHAR(64) NOT NULL DEFAULT 'PENDING',
+    observation_enabled TINYINT(1) NOT NULL DEFAULT 0,
+    manual_review_required TINYINT(1) NOT NULL DEFAULT 1,
+    auto_enforcement_enabled TINYINT(1) NOT NULL DEFAULT 0,
+    auto_expansion_enabled TINYINT(1) NOT NULL DEFAULT 0,
+    auto_revocation_enabled TINYINT(1) NOT NULL DEFAULT 0,
+    full_public_enabled TINYINT(1) NOT NULL DEFAULT 0,
+    open_marketplace_enabled TINYINT(1) NOT NULL DEFAULT 0,
+    public_signup_enabled TINYINT(1) NOT NULL DEFAULT 0,
+    public_beta_enabled TINYINT(1) NOT NULL DEFAULT 0,
+    payment_execution_enabled TINYINT(1) NOT NULL DEFAULT 0,
+    provider_external_submission_enabled TINYINT(1) NOT NULL DEFAULT 0,
+    source_mutation_enabled TINYINT(1) NOT NULL DEFAULT 0,
+    kill_switch_active TINYINT(1) NOT NULL DEFAULT 0,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    blocked_at DATETIME NULL,
+    blocked_by VARCHAR(255) NULL,
+    blocked_reasons_json JSON NULL,
+    INDEX idx_cbraog_session_gate (session_gate_id),
+    INDEX idx_cbraog_session (runtime_session_id),
+    INDEX idx_cbraog_part (participant_id),
+    INDEX idx_cbraog_tenant (tenant_id),
+    INDEX idx_cbraog_cohort (cohort_id),
+    INDEX idx_cbraog_created (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS controlled_beta_runtime_activity_events (
+    activity_event_id VARCHAR(64) PRIMARY KEY,
+    observation_gate_id VARCHAR(64) NOT NULL,
+    runtime_session_id VARCHAR(64) NOT NULL,
+    session_gate_id VARCHAR(64) NOT NULL,
+    participant_id VARCHAR(64) NOT NULL,
+    tenant_id VARCHAR(64) NOT NULL,
+    cohort_id VARCHAR(64) NOT NULL,
+    event_type VARCHAR(128) NOT NULL,
+    event_status VARCHAR(64) NOT NULL,
+    feature_key VARCHAR(128) NULL,
+    action_key VARCHAR(128) NULL,
+    normalized_event_key VARCHAR(128) NULL,
+    event_severity VARCHAR(64) NOT NULL DEFAULT 'INFO',
+    occurred_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    ingested_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    metadata_json JSON NULL,
+    redaction_status VARCHAR(64) NOT NULL DEFAULT 'REDACTED',
+    INDEX idx_cbrae_obs_gate (observation_gate_id),
+    INDEX idx_cbrae_session (runtime_session_id),
+    INDEX idx_cbrae_part (participant_id),
+    INDEX idx_cbrae_tenant (tenant_id),
+    INDEX idx_cbrae_cohort (cohort_id),
+    INDEX idx_cbrae_event_type (event_type),
+    INDEX idx_cbrae_event_status (event_status),
+    INDEX idx_cbrae_occurred (occurred_at),
+    INDEX idx_cbrae_created (ingested_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS controlled_beta_runtime_activity_feature_usage (
+    feature_usage_id VARCHAR(64) PRIMARY KEY,
+    observation_gate_id VARCHAR(64) NOT NULL,
+    runtime_session_id VARCHAR(64) NOT NULL,
+    participant_id VARCHAR(64) NOT NULL,
+    tenant_id VARCHAR(64) NOT NULL,
+    cohort_id VARCHAR(64) NOT NULL,
+    feature_key VARCHAR(128) NOT NULL,
+    usage_count INT NOT NULL DEFAULT 0,
+    blocked_count INT NOT NULL DEFAULT 0,
+    allowed_count INT NOT NULL DEFAULT 0,
+    denied_count INT NOT NULL DEFAULT 0,
+    first_used_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    last_used_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    window_start_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    window_end_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_cbrafu_obs_gate (observation_gate_id),
+    INDEX idx_cbrafu_session (runtime_session_id),
+    INDEX idx_cbrafu_part (participant_id),
+    INDEX idx_cbrafu_tenant (tenant_id),
+    INDEX idx_cbrafu_cohort (cohort_id),
+    INDEX idx_cbrafu_feature (feature_key),
+    INDEX idx_cbrafu_created (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS controlled_beta_runtime_activity_daily_counters (
+    daily_counter_id VARCHAR(64) PRIMARY KEY,
+    observation_gate_id VARCHAR(64) NOT NULL,
+    participant_id VARCHAR(64) NOT NULL,
+    tenant_id VARCHAR(64) NOT NULL,
+    cohort_id VARCHAR(64) NOT NULL,
+    usage_date DATE NOT NULL,
+    total_events INT NOT NULL DEFAULT 0,
+    allowed_events INT NOT NULL DEFAULT 0,
+    blocked_events INT NOT NULL DEFAULT 0,
+    denied_events INT NOT NULL DEFAULT 0,
+    feature_count INT NOT NULL DEFAULT 0,
+    daily_action_limit INT NOT NULL DEFAULT 100,
+    daily_action_limit_status VARCHAR(64) NOT NULL DEFAULT 'OK',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_cbradc_gate_date (observation_gate_id, usage_date),
+    INDEX idx_cbradc_part (participant_id),
+    INDEX idx_cbradc_tenant (tenant_id),
+    INDEX idx_cbradc_cohort (cohort_id),
+    INDEX idx_cbradc_date (usage_date),
+    INDEX idx_cbradc_created (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS controlled_beta_runtime_activity_blocked_attempts (
+    blocked_attempt_id VARCHAR(64) PRIMARY KEY,
+    observation_gate_id VARCHAR(64) NOT NULL,
+    runtime_session_id VARCHAR(64) NOT NULL,
+    participant_id VARCHAR(64) NOT NULL,
+    tenant_id VARCHAR(64) NOT NULL,
+    cohort_id VARCHAR(64) NOT NULL,
+    feature_key VARCHAR(128) NOT NULL,
+    action_key VARCHAR(128) NULL,
+    blocked_reason VARCHAR(255) NOT NULL,
+    blocked_severity VARCHAR(64) NOT NULL DEFAULT 'MEDIUM',
+    occurred_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    details_json JSON NULL,
+    redaction_status VARCHAR(64) NOT NULL DEFAULT 'REDACTED',
+    INDEX idx_cbraba_obs_gate (observation_gate_id),
+    INDEX idx_cbraba_session (runtime_session_id),
+    INDEX idx_cbraba_part (participant_id),
+    INDEX idx_cbraba_tenant (tenant_id),
+    INDEX idx_cbraba_cohort (cohort_id),
+    INDEX idx_cbraba_feature (feature_key),
+    INDEX idx_cbraba_occurred (occurred_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS controlled_beta_runtime_activity_anomaly_signals (
+    anomaly_signal_id VARCHAR(64) PRIMARY KEY,
+    observation_gate_id VARCHAR(64) NOT NULL,
+    runtime_session_id VARCHAR(64) NOT NULL,
+    participant_id VARCHAR(64) NOT NULL,
+    tenant_id VARCHAR(64) NOT NULL,
+    cohort_id VARCHAR(64) NOT NULL,
+    anomaly_key VARCHAR(128) NOT NULL,
+    anomaly_severity VARCHAR(64) NOT NULL DEFAULT 'MEDIUM',
+    anomaly_status VARCHAR(64) NOT NULL DEFAULT 'OPEN',
+    observed_count INT NOT NULL DEFAULT 1,
+    threshold_value INT NOT NULL DEFAULT 1,
+    window_start_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    window_end_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    details_json JSON NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    resolved_at DATETIME NULL,
+    resolved_by VARCHAR(255) NULL,
+    INDEX idx_cbraas_obs_gate (observation_gate_id),
+    INDEX idx_cbraas_session (runtime_session_id),
+    INDEX idx_cbraas_part (participant_id),
+    INDEX idx_cbraas_tenant (tenant_id),
+    INDEX idx_cbraas_cohort (cohort_id),
+    INDEX idx_cbraas_status (anomaly_status),
+    INDEX idx_cbraas_created (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS controlled_beta_runtime_activity_health_signals (
+    health_signal_id VARCHAR(64) PRIMARY KEY,
+    observation_gate_id VARCHAR(64) NOT NULL,
+    runtime_session_id VARCHAR(64) NOT NULL,
+    participant_id VARCHAR(64) NOT NULL,
+    tenant_id VARCHAR(64) NOT NULL,
+    cohort_id VARCHAR(64) NOT NULL,
+    signal_key VARCHAR(128) NOT NULL,
+    signal_status VARCHAR(64) NOT NULL DEFAULT 'OK',
+    severity VARCHAR(64) NOT NULL DEFAULT 'MEDIUM',
+    observed_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    details_json JSON NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_cbrahs_obs_gate (observation_gate_id),
+    INDEX idx_cbrahs_session (runtime_session_id),
+    INDEX idx_cbrahs_part (participant_id),
+    INDEX idx_cbrahs_tenant (tenant_id),
+    INDEX idx_cbrahs_cohort (cohort_id),
+    INDEX idx_cbrahs_created (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS controlled_beta_runtime_activity_participant_summaries (
+    participant_summary_id VARCHAR(64) PRIMARY KEY,
+    observation_gate_id VARCHAR(64) NOT NULL,
+    participant_id VARCHAR(64) NOT NULL,
+    tenant_id VARCHAR(64) NOT NULL,
+    cohort_id VARCHAR(64) NOT NULL,
+    summary_window_start_at DATETIME NOT NULL,
+    summary_window_end_at DATETIME NOT NULL,
+    total_sessions INT NOT NULL DEFAULT 0,
+    total_events INT NOT NULL DEFAULT 0,
+    allowed_events INT NOT NULL DEFAULT 0,
+    blocked_events INT NOT NULL DEFAULT 0,
+    denied_events INT NOT NULL DEFAULT 0,
+    features_used_count INT NOT NULL DEFAULT 0,
+    anomaly_count INT NOT NULL DEFAULT 0,
+    health_warning_count INT NOT NULL DEFAULT 0,
+    adoption_status VARCHAR(64) NOT NULL DEFAULT 'ACTIVE',
+    risk_status VARCHAR(64) NOT NULL DEFAULT 'LOW',
+    summary_json JSON NULL,
+    redaction_status VARCHAR(64) NOT NULL DEFAULT 'REDACTED',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_cbraps_obs_gate (observation_gate_id),
+    INDEX idx_cbraps_part (participant_id),
+    INDEX idx_cbraps_tenant (tenant_id),
+    INDEX idx_cbraps_cohort (cohort_id),
+    INDEX idx_cbraps_created (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS controlled_beta_runtime_activity_cohort_summaries (
+    cohort_summary_id VARCHAR(64) PRIMARY KEY,
+    tenant_id VARCHAR(64) NOT NULL,
+    cohort_id VARCHAR(64) NOT NULL,
+    summary_window_start_at DATETIME NOT NULL,
+    summary_window_end_at DATETIME NOT NULL,
+    participant_count INT NOT NULL DEFAULT 0,
+    active_participant_count INT NOT NULL DEFAULT 0,
+    total_sessions INT NOT NULL DEFAULT 0,
+    total_events INT NOT NULL DEFAULT 0,
+    allowed_events INT NOT NULL DEFAULT 0,
+    blocked_events INT NOT NULL DEFAULT 0,
+    denied_events INT NOT NULL DEFAULT 0,
+    features_used_count INT NOT NULL DEFAULT 0,
+    anomaly_count INT NOT NULL DEFAULT 0,
+    health_warning_count INT NOT NULL DEFAULT 0,
+    adoption_status VARCHAR(64) NOT NULL DEFAULT 'ACTIVE',
+    operational_status VARCHAR(64) NOT NULL DEFAULT 'OK',
+    summary_json JSON NULL,
+    redaction_status VARCHAR(64) NOT NULL DEFAULT 'REDACTED',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_cbracs_tenant (tenant_id),
+    INDEX idx_cbracs_cohort (cohort_id),
+    INDEX idx_cbracs_created (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS controlled_beta_runtime_activity_guardrail_checks (
+    check_id VARCHAR(64) PRIMARY KEY,
+    observation_gate_id VARCHAR(64) NOT NULL,
+    check_key VARCHAR(128) NOT NULL,
+    check_status VARCHAR(64) NOT NULL DEFAULT 'PENDING',
+    severity VARCHAR(64) NOT NULL DEFAULT 'BLOCKER',
+    details_json JSON NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_cbragc_obs_gate (observation_gate_id),
+    INDEX idx_cbragc_created (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS controlled_beta_runtime_activity_findings (
+    finding_id VARCHAR(64) PRIMARY KEY,
+    observation_gate_id VARCHAR(64) NOT NULL,
+    severity VARCHAR(64) NOT NULL DEFAULT 'BLOCKER',
+    finding_key VARCHAR(128) NOT NULL,
+    finding_status VARCHAR(64) NOT NULL DEFAULT 'OPEN',
+    details_json JSON NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    resolved_at DATETIME NULL,
+    resolved_by VARCHAR(255) NULL,
+    INDEX idx_cbraf_obs_gate (observation_gate_id),
+    INDEX idx_cbraf_created (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS controlled_beta_runtime_activity_evidence_packs (
+    evidence_pack_id VARCHAR(64) PRIMARY KEY,
+    observation_gate_id VARCHAR(64) NOT NULL,
+    evidence_schema_version VARCHAR(32) NOT NULL,
+    evidence_data_json JSON NOT NULL,
+    evidence_integrity_hash VARCHAR(128) NOT NULL,
+    redaction_status VARCHAR(64) NOT NULL DEFAULT 'REDACTED',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_cbraep_obs_gate (observation_gate_id),
+    INDEX idx_cbraep_created (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS controlled_beta_runtime_activity_audits (
+    audit_id VARCHAR(64) PRIMARY KEY,
+    observation_gate_id VARCHAR(64) NOT NULL,
+    runtime_session_id VARCHAR(64) NULL,
+    activity_event_id VARCHAR(64) NULL,
+    event_type VARCHAR(128) NOT NULL,
+    actor_id VARCHAR(255) NOT NULL,
+    details_json JSON NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_cbraa_obs_gate (observation_gate_id),
+    INDEX idx_cbraa_session (runtime_session_id),
+    INDEX idx_cbraa_created (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Registry insert
+INSERT INTO schema_versions (version, applied_at, description)
+VALUES ('084', NOW(), 'Phase 136: Runtime Activity Observation / Participant Usage Audit Gate')
+ON DUPLICATE KEY UPDATE applied_at = NOW(), description = 'Phase 136: Runtime Activity Observation / Participant Usage Audit Gate';

@@ -1,25 +1,39 @@
 const db = require('./db');
 const crypto = require('crypto');
 
+const auditLogger = require('./auditLoggerService');
+
 class AuditService {
     async logAction(tenantId, action, params = {}) {
         const { jobId, policySlug, ipAddress, details } = params;
         try {
-            await db.query(`
-                INSERT INTO audit_logs (id, tenant_id, action, job_id, policy_slug, ip_address, details)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            `, [
-                crypto.randomUUID(),
-                tenantId || 'default',
-                action,
-                jobId || null,
-                policySlug || null,
-                ipAddress || '0.0.0.0',
-                details ? JSON.stringify(details) : null
-            ]);
+            await auditLogger.log({
+                type: action,
+                tenantId: tenantId || 'default',
+                userId: 'system',
+                status: 'SUCCESS',
+                metadata: {
+                    job_id: jobId || null,
+                    policy_slug: policySlug || null,
+                    ip_address: ipAddress || '0.0.0.0',
+                    details: details || null
+                }
+            });
         } catch (err) {
             console.error('[AUDIT-LOG-ERROR]', err.message);
         }
+    }
+
+    async logGuardrail(tenantId, action, rationale, details = {}) {
+        return this.logAction(tenantId, `GUARDRAIL_${action}`, {
+            details: { rationale, ...details }
+        });
+    }
+
+    async logCircuitBreaker(state, reason) {
+        return this.logAction('system', `CIRCUIT_BREAKER_${state}`, {
+            details: { reason }
+        });
     }
 
     generateSignedUrl(assetId, expiresInSeconds = 3600) {

@@ -1,0 +1,113 @@
+# Phase 88F E2E Regression
+
+```json
+{
+  "review": {
+    "id": "cer_778671ce-9bf0-4f06-b38f-9a99aa2d0cc5",
+    "tenant_id": "t_1",
+    "cohort_id": "c_1",
+    "review_status": "DECISION_RECORDED",
+    "review_decision": "APPROVED_FOR_LIMITED_EXPANSION",
+    "review_notes": "All gates passed",
+    "health_snapshot_json": {
+      "rates": {
+        "OFFER_ACCEPTED": 50
+      },
+      "dropOffs": {
+        "PREFLIGHT_COMPLETED": 1,
+        "FILES_UPLOADED": 1,
+        "PROOF_APPROVED": 1,
+        "PAYMENT_CONFIRMED": 1
+      },
+      "emergencyStops": 0,
+      "rollbacks": 0,
+      "incidents": 0,
+      "supportTickets": 0
+    },
+    "hardening_snapshot_json": null,
+    "created_by": "cp_1",
+    "created_by_role": "CONTROL_PLANE_ADMIN",
+    "reviewed_by": "cp_1",
+    "reviewed_at": "2026-06-11T19:00:20.451Z",
+    "created_at": "2026-06-11T19:00:20.448Z",
+    "updated_at": "2026-06-11T19:00:20.451Z"
+  },
+  "readiness": {
+    "is_ready": true,
+    "gates": {
+      "mandatory_actions_resolved": true,
+      "critical_actions_resolved": true,
+      "no_security_privacy_rbac_isolation_blockers": true,
+      "no_active_emergency_stop": true,
+      "no_active_rollback": true,
+      "acceptable_funnel_health": true,
+      "acceptable_incident_rate": true,
+      "acceptable_support_load": true,
+      "acceptable_preflight_upload_failure_rate": true,
+      "acceptable_proof_payment_stall_rate": true,
+      "public_marketplace_guard_active": true,
+      "full_public_disabled": true
+    },
+    "open_blockers": []
+  },
+  "audit_trail": [
+    {
+      "id": "cea_9baf9b5c-baed-4c58-9afa-edbaee206c1b",
+      "tenant_id": "t_1",
+      "cohort_id": "c_1",
+      "expansion_review_id": "cer_778671ce-9bf0-4f06-b38f-9a99aa2d0cc5",
+      "event_type": "EXPANSION_REVIEW_REQUESTED",
+      "actor_id": "cp_1",
+      "actor_role": "CONTROL_PLANE_ADMIN",
+      "metadata_json": {
+        "notes": "Ready for expansion"
+      },
+      "created_at": "2026-06-11T19:00:20.450Z"
+    },
+    {
+      "id": "cea_d811802d-74ed-4449-925c-53f4a4bedea3",
+      "tenant_id": "t_1",
+      "cohort_id": "c_1",
+      "expansion_review_id": "cer_778671ce-9bf0-4f06-b38f-9a99aa2d0cc5",
+      "hardening_action_id": "bha_ed633ec6-8389-4ff4-a817-017f66e4c23c",
+      "event_type": "HARDENING_ACTION_CREATED",
+      "actor_id": "cp_1",
+      "actor_role": "CONTROL_PLANE_ADMIN",
+      "metadata_json": {
+        "category": "SECURITY",
+        "severity": "CRITICAL",
+        "is_mandatory": true
+      },
+      "created_at": "2026-06-11T19:00:20.450Z"
+    },
+    {
+      "id": "cea_7ba59baf-8683-416c-a1f2-ec1e2cfe2613",
+      "tenant_id": "t_1",
+      "cohort_id": "c_1",
+      "expansion_review_id": "cer_778671ce-9bf0-4f06-b38f-9a99aa2d0cc5",
+      "hardening_action_id": "bha_ed633ec6-8389-4ff4-a817-017f66e4c23c",
+      "event_type": "HARDENING_ACTION_RESOLVED",
+      "actor_id": "cp_1",
+      "actor_role": "CONTROL_PLANE_ADMIN",
+      "metadata_json": {
+        "resolution_notes": "Done"
+      },
+      "created_at": "2026-06-11T19:00:20.451Z"
+    },
+    {
+      "id": "cea_83ec07e0-c104-4324-880d-30582097a0d7",
+      "tenant_id": "t_1",
+      "cohort_id": "c_1",
+      "expansion_review_id": "cer_778671ce-9bf0-4f06-b38f-9a99aa2d0cc5",
+      "event_type": "EXPANSION_DECISION_RECORDED",
+      "actor_id": "cp_1",
+      "actor_role": "CONTROL_PLANE_ADMIN",
+      "metadata_json": {
+        "decision": "APPROVED_FOR_LIMITED_EXPANSION",
+        "notes": "All gates passed"
+      },
+      "created_at": "2026-06-11T19:00:20.451Z"
+    }
+  ]
+}
+```

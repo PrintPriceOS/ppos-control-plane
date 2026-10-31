@@ -1,0 +1,28 @@
+[
+  {
+    "fix_id": "EMBED_FONTS",
+    "validation_mode": "REAL_PDF",
+    "real_pdf_execution_verified": true,
+    "ghostscript_available": true,
+    "ghostscript_version": "10.06.0",
+    "ghostscript_invoked": true,
+    "ghostscript_exit_code": 0,
+    "input_fixture": "non_embedded_font.pdf",
+    "output_artifact": "fixed_output.pdf",
+    "output_artifact_non_empty": true,
+    "fix_audit_status": "APPLIED",
+    "evidence_present": true,
+    "fonts_before": [],
+    "fonts_after": [],
+    "non_embedded_fonts_before": [
+      "Helvetica"
+    ],
+    "non_embedded_fonts_after": [],
+    "review_required": true,
+    "production_certified": false,
+    "certified_pdf_allowed": false,
+    "human_report_translated": true,
+    "pass": true,
+    "notes": []
+  }
+]

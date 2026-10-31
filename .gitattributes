@@ -1,0 +1,19 @@
+# Git line ending attributes for PPOS Control Plane
+# Phase 184F: Canonical checksum model (utf8-lf-v1)
+# SQL migration files are always stored with LF endings to guarantee
+# deterministic SHA-256 checksums across Windows/Linux/macOS.
+
+migrations/*.sql        text  eol=lf
+src/migrations/*.sql    text  eol=lf
+src/migrations/*.js     text  eol=lf
+
+# JavaScript and JSON normalized to LF
+*.js                    text  eol=lf
+*.ts                    text  eol=lf
+*.json                  text  eol=lf
+*.md                    text  eol=lf
+
+# Binary files — no normalization
+*.png                   binary
+*.jpg                   binary
+*.webp                  binary

@@ -1,0 +1,54 @@
+{
+  "generated_at": "2026-06-05T19:00:57.860Z",
+  "fixtures": [
+    {
+      "name": "missing_trimbox.pdf",
+      "description": "Page with no TrimBox",
+      "path": "C:\\Users\\KIKE\\Downloads\\ppos-control-plane-phase-10-intelligence-layer\\fixtures\\phase50b\\missing_trimbox.pdf",
+      "created": true,
+      "valid_pdf": true
+    },
+    {
+      "name": "missing_outputintent.pdf",
+      "description": "No OutputIntent",
+      "path": "C:\\Users\\KIKE\\Downloads\\ppos-control-plane-phase-10-intelligence-layer\\fixtures\\phase50b\\missing_outputintent.pdf",
+      "created": true,
+      "valid_pdf": true
+    },
+    {
+      "name": "javascript_action.pdf",
+      "description": "Contains OpenAction JS",
+      "path": "C:\\Users\\KIKE\\Downloads\\ppos-control-plane-phase-10-intelligence-layer\\fixtures\\phase50b\\javascript_action.pdf",
+      "created": true,
+      "valid_pdf": true
+    },
+    {
+      "name": "annotations.pdf",
+      "description": "Contains Text Annotation",
+      "path": "C:\\Users\\KIKE\\Downloads\\ppos-control-plane-phase-10-intelligence-layer\\fixtures\\phase50b\\annotations.pdf",
+      "created": true,
+      "valid_pdf": true
+    },
+    {
+      "name": "acroform.pdf",
+      "description": "Contains AcroForm field",
+      "path": "C:\\Users\\KIKE\\Downloads\\ppos-control-plane-phase-10-intelligence-layer\\fixtures\\phase50b\\acroform.pdf",
+      "created": true,
+      "valid_pdf": true
+    },
+    {
+      "name": "broken_xref.pdf",
+      "description": "Broken XREF",
+      "path": "C:\\Users\\KIKE\\Downloads\\ppos-control-plane-phase-10-intelligence-layer\\fixtures\\phase50b\\broken_xref.pdf",
+      "created": true,
+      "valid_pdf": true
+    },
+    {
+      "name": "missing_bleed.pdf",
+      "description": "BleedBox equals TrimBox",
+      "path": "C:\\Users\\KIKE\\Downloads\\ppos-control-plane-phase-10-intelligence-layer\\fixtures\\phase50b\\missing_bleed.pdf",
+      "created": true,
+      "valid_pdf": true
+    }
+  ]
+}

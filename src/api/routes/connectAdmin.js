@@ -1,7 +1,7 @@
 // routes/connectAdmin.js
 const express = require('express');
 const router = express.Router();
-const requireAdmin = require('../middleware/requireAdmin');
+const { requireAdmin, resolveActorContext } = require('../middleware/auth');
 const networkOpsService = require('../services/networkOpsService');
 
 router.use(requireAdmin);
@@ -24,12 +24,19 @@ router.get('/overview', async (req, res) => {
  */
 router.get('/printers', async (req, res) => {
     try {
+        const context = resolveActorContext(req);
         const filters = {
             country: req.query.country,
             status: req.query.status,
             connect_status: req.query.connect_status,
             routing_eligible: req.query.routing_eligible
         };
+
+        // Scoping: If not Super Admin, force search to their own printhouse
+        if (!context.isSuperAdmin) {
+            filters.id = context.printhouseId;
+        }
+
         const options = {
             limit: req.query.limit || 20,
             offset: req.query.offset || 0

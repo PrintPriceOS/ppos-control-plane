@@ -1,0 +1,83 @@
+{
+    "tested_at": "2026-06-11T06:51:45.004Z",
+    "status": "SUCCESS",
+    "passed": 15,
+    "failed": 0,
+    "scenarios": [
+        {
+            "label": "Acceptance pack file exists",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "Commercial readiness checklist file exists",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "Acceptance pack documents PARTNER PILOT READY state",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "Acceptance pack highlights that LIVE production is disabled",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "Acceptance pack clarifies status is PILOT_ONLY",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "Acceptance pack includes readiness evaluation domains",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "Acceptance pack lists scoped user roles matrix",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "Acceptance pack documents usage governance limits",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "Checklist checks READY_FOR_PILOT onboarding status",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "Checklist checks tenant isolation mode",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "Checklist checks workspace separation exceptions",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "Checklist checks error response sanitization",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "Checklist checks usage limits exceedance auditing",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "Checklist verifies live production is locked/blocked",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "Acceptance pack contains no false claims of live production status or preflight bypass rules",
+            "status": "PASS",
+            "detail": ""
+        }
+    ]
+}

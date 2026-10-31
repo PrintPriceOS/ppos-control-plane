@@ -1,0 +1,264 @@
+{
+  "phase": "54D",
+  "scenarios": [
+    {
+      "scenario": "1. LOW_RES_IMAGES finding",
+      "input_governance_evidence": {
+        "review_required": true,
+        "production_certified": false,
+        "certified_pdf_allowed": false,
+        "low_res_images_present": true,
+        "review_required_reasons": [
+          "LOW_RES_IMAGES"
+        ],
+        "highest_image_quality_risk": "warning"
+      },
+      "outcome": "REVIEW_REQUIRED",
+      "severity": "warning",
+      "review_required": true,
+      "production_certified": false,
+      "primary_artifact_type": "review_pdf",
+      "certified_pdf_downgraded": true,
+      "customer_wording": "The PDF contains image quality conditions that may affect print appearance. A human review is required before production.",
+      "operator_wording": "certified.pdf exists physically but is not production-certified and should not be customer-visible. The PDF contains low-resolution images. Print quality may be visibly degraded, and source images may be required.",
+      "public_report_safe": true,
+      "readiness_gate_result": null,
+      "pass": true
+    },
+    {
+      "scenario": "2. JPEG_ARTIFACTS finding",
+      "input_governance_evidence": {
+        "review_required": true,
+        "production_certified": false,
+        "certified_pdf_allowed": false,
+        "jpeg_artifacts_present": true,
+        "review_required_reasons": [
+          "JPEG_ARTIFACTS"
+        ],
+        "highest_image_quality_risk": "warning"
+      },
+      "outcome": "REVIEW_REQUIRED",
+      "severity": "warning",
+      "review_required": true,
+      "production_certified": false,
+      "primary_artifact_type": "review_pdf",
+      "certified_pdf_downgraded": true,
+      "customer_wording": "The PDF contains image quality conditions that may affect print appearance. A human review is required before production.",
+      "operator_wording": "certified.pdf exists physically but is not production-certified and should not be customer-visible. The PDF contains images with visible or suspected JPEG compression artifacts. Automatic artifact repair was not applied.",
+      "public_report_safe": true,
+      "readiness_gate_result": null,
+      "pass": true
+    },
+    {
+      "scenario": "3. BITMAP_TEXT_RISK",
+      "input_governance_evidence": {
+        "review_required": true,
+        "production_certified": false,
+        "certified_pdf_allowed": false,
+        "bitmap_text_risk": true,
+        "review_required_reasons": [
+          "BITMAP_TEXT_RISK"
+        ],
+        "highest_image_quality_risk": "critical"
+      },
+      "outcome": "REVIEW_REQUIRED",
+      "severity": "critical",
+      "review_required": true,
+      "production_certified": false,
+      "primary_artifact_type": "review_pdf",
+      "certified_pdf_downgraded": true,
+      "customer_wording": "The PDF contains image quality conditions that may affect print appearance. A human review is required before production.",
+      "operator_wording": "certified.pdf exists physically but is not production-certified and should not be customer-visible. The PDF appears to contain text rendered as bitmap imagery. This can reduce sharpness and requires review.",
+      "public_report_safe": true,
+      "readiness_gate_result": null,
+      "pass": true
+    },
+    {
+      "scenario": "4. RASTERIZED_VECTOR_RISK",
+      "input_governance_evidence": {
+        "review_required": true,
+        "production_certified": false,
+        "certified_pdf_allowed": false,
+        "rasterized_vector_risk": true,
+        "review_required_reasons": [
+          "RASTERIZED_VECTOR_RISK"
+        ]
+      },
+      "outcome": "REVIEW_REQUIRED",
+      "severity": "warning",
+      "review_required": true,
+      "production_certified": false,
+      "primary_artifact_type": "review_pdf",
+      "certified_pdf_downgraded": true,
+      "customer_wording": "The PDF contains image quality conditions that may affect print appearance. A human review is required before production.",
+      "operator_wording": "certified.pdf exists physically but is not production-certified and should not be customer-visible. The PDF appears to contain vector artwork rendered as raster imagery. Restoring vectors automatically is not supported.",
+      "public_report_safe": true,
+      "readiness_gate_result": null,
+      "pass": true
+    },
+    {
+      "scenario": "5. Unsupported UPSCALE_LOW_RES_IMAGES",
+      "input_governance_evidence": {
+        "skipped_fixes": [
+          {
+            "code": "UPSCALE_LOW_RES_IMAGES",
+            "reason": "UNSUPPORTED"
+          }
+        ],
+        "image_quality_governance": {
+          "review_required": true,
+          "production_certified": false,
+          "certified_pdf_allowed": false,
+          "low_res_images_present": true,
+          "unsupported_image_quality_fixes": [
+            "UPSCALE_LOW_RES_IMAGES"
+          ]
+        }
+      },
+      "outcome": "REVIEW_REQUIRED",
+      "severity": "warning",
+      "review_required": true,
+      "production_certified": false,
+      "primary_artifact_type": "review_pdf",
+      "certified_pdf_downgraded": true,
+      "customer_wording": "The PDF contains image quality conditions that may affect print appearance. A human review is required before production.",
+      "operator_wording": "certified.pdf exists physically but is not production-certified and should not be customer-visible. Low-resolution image upscaling is not implemented as a safe automatic operation. Source images or human review may be required. The PDF contains low-resolution images. Print quality may be visibly degraded, and source images may be required.",
+      "public_report_safe": true,
+      "readiness_gate_result": null,
+      "pass": true
+    },
+    {
+      "scenario": "6. Unsupported REPLACE_LOW_RES_IMAGES",
+      "input_governance_evidence": {
+        "skipped_fixes": [
+          {
+            "code": "REPLACE_LOW_RES_IMAGES",
+            "reason": "UNSUPPORTED"
+          }
+        ],
+        "image_quality_governance": {
+          "review_required": true,
+          "production_certified": false,
+          "certified_pdf_allowed": false,
+          "image_replacement_required": true,
+          "unsupported_image_quality_fixes": [
+            "REPLACE_LOW_RES_IMAGES"
+          ]
+        }
+      },
+      "outcome": "REVIEW_REQUIRED",
+      "severity": "warning",
+      "review_required": true,
+      "production_certified": false,
+      "primary_artifact_type": "review_pdf",
+      "certified_pdf_downgraded": true,
+      "customer_wording": "The PDF contains image quality conditions that may affect print appearance. A human review is required before production.",
+      "operator_wording": "certified.pdf exists physically but is not production-certified and should not be customer-visible. Image replacement requires source assets and was not performed automatically. The PDF may require replacement source images. Automatic image replacement was not performed.",
+      "public_report_safe": true,
+      "readiness_gate_result": null,
+      "pass": true
+    },
+    {
+      "scenario": "7. Future applied visual image rewrite fix",
+      "input_governance_evidence": {
+        "review_required": true,
+        "production_certified": false,
+        "certified_pdf_allowed": false,
+        "visual_image_rewrite_applied": true,
+        "image_rewrite_performed": true
+      },
+      "outcome": "FIXED_REVIEW_REQUIRED",
+      "severity": "warning",
+      "review_required": true,
+      "production_certified": false,
+      "primary_artifact_type": "review_pdf",
+      "certified_pdf_downgraded": true,
+      "customer_wording": "The PDF contains image quality conditions that may affect print appearance. A human review is required before production.",
+      "operator_wording": "certified.pdf exists physically but is not production-certified and should not be customer-visible. Applied structural correction: DOWNSAMPLE_EXCESSIVE_RESOLUTION Visual image rewrite was applied. This can alter image appearance.",
+      "public_report_safe": true,
+      "readiness_gate_result": null,
+      "pass": true
+    },
+    {
+      "scenario": "8. Public report sanitation",
+      "input_governance_evidence": {
+        "review_required": true,
+        "production_certified": false,
+        "certified_pdf_allowed": false,
+        "low_res_images_present": true,
+        "review_required_reasons": [
+          "LOW_RES_IMAGES"
+        ]
+      },
+      "outcome": "REVIEW_REQUIRED",
+      "severity": "warning",
+      "review_required": true,
+      "production_certified": false,
+      "primary_artifact_type": "review_pdf",
+      "certified_pdf_downgraded": true,
+      "customer_wording": "The PDF contains image quality conditions that may affect print appearance. A human review is required before production.",
+      "operator_wording": "certified.pdf exists physically but is not production-certified and should not be customer-visible. The PDF contains low-resolution images. Print quality may be visibly degraded, and source images may be required.",
+      "public_report_safe": true,
+      "readiness_gate_result": null,
+      "pass": true
+    },
+    {
+      "scenario": "9. Review decision / readiness / payment simulation (REJECTED)",
+      "input_governance_evidence": {
+        "review_required": true,
+        "production_certified": false,
+        "certified_pdf_allowed": false,
+        "low_res_images_present": true,
+        "review_required_reasons": [
+          "LOW_RES_IMAGES"
+        ]
+      },
+      "outcome": "REVIEW_REQUIRED",
+      "severity": "warning",
+      "review_required": true,
+      "production_certified": false,
+      "primary_artifact_type": "review_pdf",
+      "certified_pdf_downgraded": true,
+      "customer_wording": "The PDF contains image quality conditions that may affect print appearance. A human review is required before production.",
+      "operator_wording": "certified.pdf exists physically but is not production-certified and should not be customer-visible. The PDF contains low-resolution images. Print quality may be visibly degraded, and source images may be required.",
+      "public_report_safe": true,
+      "readiness_gate_result": {
+        "decision": "REJECTED_REQUIRES_REUPLOAD",
+        "blocks_payment": true,
+        "allows_progression": false
+      },
+      "pass": true
+    },
+    {
+      "scenario": "10. Review decision / readiness / payment simulation (APPROVED)",
+      "input_governance_evidence": {
+        "review_required": true,
+        "production_certified": false,
+        "certified_pdf_allowed": false,
+        "low_res_images_present": true,
+        "review_required_reasons": [
+          "LOW_RES_IMAGES"
+        ]
+      },
+      "outcome": "REVIEW_REQUIRED",
+      "severity": "warning",
+      "review_required": true,
+      "production_certified": false,
+      "primary_artifact_type": "review_pdf",
+      "certified_pdf_downgraded": true,
+      "customer_wording": "The PDF contains image quality conditions that may affect print appearance. A human review is required before production.",
+      "operator_wording": "certified.pdf exists physically but is not production-certified and should not be customer-visible. The PDF contains low-resolution images. Print quality may be visibly degraded, and source images may be required.",
+      "public_report_safe": true,
+      "readiness_gate_result": {
+        "decision": "APPROVED_WITH_WARNINGS",
+        "blocks_payment": false,
+        "allows_progression": true
+      },
+      "pass": true
+    }
+  ],
+  "summary": {
+    "pass": 10,
+    "fail": 0
+  }
+}

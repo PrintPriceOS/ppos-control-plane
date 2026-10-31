@@ -71,7 +71,7 @@ export const EngagementSignalsTab: React.FC = () => {
                 </div>
                 <button
                     onClick={fetchData}
-                    className="flex items-center gap-2 px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors"
+                    className="flex items-center gap-2 px-3 py-1.5 bg-white border border-slate-200 rounded-none text-sm font-medium hover:bg-slate-50 transition-colors"
                 >
                     <ArrowPathIcon className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
                     Refresh
@@ -79,8 +79,8 @@ export const EngagementSignalsTab: React.FC = () => {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                {stats.map(stat => (
-                    <div key={stat.signal_type} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                {(stats || []).map(stat => (
+                    <div key={stat.signal_type} className="bg-white p-4 rounded-none border border-slate-200 shadow-none">
                         <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{stat.signal_type}</div>
                         <div className="text-2xl font-bold text-slate-900">{stat.count}</div>
                         <div className="text-[10px] text-slate-500 mt-1">Last seen: {new Date(stat.last_seen).toLocaleDateString()}</div>
@@ -88,7 +88,7 @@ export const EngagementSignalsTab: React.FC = () => {
                 ))}
             </div>
 
-            <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+            <div className="bg-white rounded-none border border-slate-200 overflow-hidden shadow-none">
                 <div className="overflow-x-auto">
                     <table className="w-full text-left text-sm">
                         <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-medium font-mono uppercase text-[10px] tracking-wider">
@@ -101,14 +101,14 @@ export const EngagementSignalsTab: React.FC = () => {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                            {signals.length === 0 ? (
+                            {(signals || []).length === 0 ? (
                                 <tr>
                                     <td colSpan={5} className="px-4 py-12 text-center text-slate-400 italic">
                                         No engagement signals recorded yet.
                                     </td>
                                 </tr>
                             ) : (
-                                signals.map(sig => (
+                                (signals || []).map(sig => (
                                     <tr key={sig.id} className="hover:bg-slate-50 transition-colors">
                                         <td className="px-4 py-3 text-slate-500 tabular-nums text-xs">
                                             {new Date(sig.created_at).toLocaleString()}
@@ -118,7 +118,7 @@ export const EngagementSignalsTab: React.FC = () => {
                                             <div className="text-[10px] font-mono text-slate-400">{sig.tenant_id}</div>
                                         </td>
                                         <td className="px-4 py-3">
-                                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black border uppercase ${getSignalColor(sig.signal_type)}`}>
+                                            <span className={`inline-flex items-center px-2 py-0.5 rounded-none text-[10px] font-black border uppercase ${getSignalColor(sig.signal_type)}`}>
                                                 {sig.signal_type}
                                             </span>
                                         </td>
@@ -129,7 +129,7 @@ export const EngagementSignalsTab: React.FC = () => {
                                             </div>
                                         </td>
                                         <td className="px-4 py-3">
-                                            <pre className="text-[9px] bg-slate-50 p-1.5 rounded border border-slate-100 text-slate-600 font-mono max-w-[300px] truncate">
+                                            <pre className="text-[9px] bg-slate-50 p-1.5 rounded-none border border-slate-100 text-slate-600 font-mono max-w-[300px] truncate">
                                                 {JSON.stringify(typeof sig.metadata_json === 'string' ? JSON.parse(sig.metadata_json) : sig.metadata_json)}
                                             </pre>
                                         </td>

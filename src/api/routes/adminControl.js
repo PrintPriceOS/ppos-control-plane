@@ -96,7 +96,90 @@ router.get('/queue/stats', async (req, res) => {
     }
 });
 
+// --- 1.4 Node Orchestration Controls ---
+
+router.post('/node/:id/drain', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { reason } = req.body;
+        if (!reason) return res.status(400).json({ error: 'reason is required' });
+
+        const nodeControlService = require('../services/nodeControlService');
+        await nodeControlService.drainNode(id, reason);
+
+        await auditService.logAction(null, 'ADMIN_NODE_DRAIN', {
+            ipAddress: req.ip,
+            details: { nodeId: id, reason }
+        });
+        res.json({ ok: true, nodeId: id, action: 'drain' });
+    } catch (err) {
+        console.error('[ADMIN-NODE-DRAIN-ERROR]', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+router.post('/node/:id/lock', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { reason } = req.body;
+        if (!reason) return res.status(400).json({ error: 'reason is required' });
+
+        const nodeControlService = require('../services/nodeControlService');
+        await nodeControlService.lockNode(id, reason);
+
+        await auditService.logAction(null, 'ADMIN_NODE_LOCK', {
+            ipAddress: req.ip,
+            details: { nodeId: id, reason }
+        });
+        res.json({ ok: true, nodeId: id, action: 'lock' });
+    } catch (err) {
+        console.error('[ADMIN-NODE-LOCK-ERROR]', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+router.post('/node/:id/purge', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { reason } = req.body;
+        if (!reason) return res.status(400).json({ error: 'reason is required' });
+
+        const nodeControlService = require('../services/nodeControlService');
+        await nodeControlService.purgeNode(id, reason);
+
+        await auditService.logAction(null, 'ADMIN_NODE_PURGE', {
+            ipAddress: req.ip,
+            details: { nodeId: id, reason }
+        });
+        res.json({ ok: true, nodeId: id, action: 'purge' });
+    } catch (err) {
+        console.error('[ADMIN-NODE-PURGE-ERROR]', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+router.post('/node/:id/shift', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { targetNodeId, reason } = req.body;
+        if (!reason || !targetNodeId) return res.status(400).json({ error: 'targetNodeId and reason are required' });
+
+        const nodeControlService = require('../services/nodeControlService');
+        await nodeControlService.shiftNode(id, targetNodeId, reason);
+
+        await auditService.logAction(null, 'ADMIN_NODE_SHIFT', {
+            ipAddress: req.ip,
+            details: { sourceNodeId: id, targetNodeId, reason }
+        });
+        res.json({ ok: true, sourceNodeId: id, targetNodeId, action: 'shift' });
+    } catch (err) {
+        console.error('[ADMIN-NODE-SHIFT-ERROR]', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // --- 1.2 Job Controls ---
+
 
 router.post('/jobs/:id/retry', async (req, res) => {
     try {

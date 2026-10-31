@@ -1,6 +1,7 @@
 // services/networkOpsService.js
 const db = require('./db');
 const printerSyncService = require('./printerSyncService');
+const activationAdapter = require('./printhouseActivationAdapter');
 
 class NetworkOpsService {
     /**
@@ -10,17 +11,24 @@ class NetworkOpsService {
         try {
             const today = new Date().toISOString().split('T')[0];
             const yesterday = new Date(Date.now() - 86400000).toISOString();
+            const filterSql = activationAdapter.getCanonicalBulkFilterSql('g', 'MARKETPLACE_VISIBLE');
 
             const { rows: nodes } = await db.query(`
                 SELECT 
                     COUNT(*) as total,
-                    COUNT(CASE WHEN status = 'ACTIVE' THEN 1 END) as active,
-                    COUNT(CASE WHEN status = 'ACTIVE' AND connect_status = 'READY' THEN 1 END) as routing_ready,
-                    COUNT(DISTINCT country || '-' || city) as regions_covered
-                FROM printer_nodes
+                    COUNT(CASE WHEN p.status = 'ACTIVE' AND ${filterSql} THEN 1 END) as active,
+                    COUNT(CASE WHEN p.status = 'ACTIVE' AND p.connect_status = 'READY' AND ${filterSql} THEN 1 END) as routing_ready,
+                    COUNT(DISTINCT p.country || '-' || p.city) as regions_covered
+                FROM printer_nodes p
+                LEFT JOIN printhouse_activation_grants g ON p.tenant_id = g.tenant_id
             `);
 
-            const { rows: quality } = await db.query('SELECT AVG(quality_score) as avg_score FROM printer_nodes WHERE status = "ACTIVE"');
+            const { rows: quality } = await db.query(`
+                SELECT AVG(p.quality_score) as avg_score 
+                FROM printer_nodes p
+                LEFT JOIN printhouse_activation_grants g ON p.tenant_id = g.tenant_id
+                WHERE p.status = 'ACTIVE' AND ${filterSql}
+            `);
 
             const { rows: capacity } = await db.query(`
                 SELECT 
@@ -35,26 +43,27 @@ class NetworkOpsService {
             // Now using the formal sync_status field (Phase 26.3)
             const { rows: syncSummary } = await db.query(`
                 SELECT 
-                    COUNT(CASE WHEN sync_status = 'HEALTHY' THEN 1 END) as healthy,
-                    COUNT(CASE WHEN sync_status = 'STALE' THEN 1 END) as stale,
-                    COUNT(CASE WHEN sync_status = 'OFFLINE' THEN 1 END) as offline
-                FROM printer_nodes 
-                WHERE status = 'ACTIVE'
+                    COUNT(CASE WHEN p.sync_status = 'HEALTHY' THEN 1 END) as healthy,
+                    COUNT(CASE WHEN p.sync_status = 'STALE' THEN 1 END) as stale,
+                    COUNT(CASE WHEN p.sync_status = 'OFFLINE' THEN 1 END) as offline
+                FROM printer_nodes p
+                LEFT JOIN printhouse_activation_grants g ON p.tenant_id = g.tenant_id
+                WHERE p.status = 'ACTIVE' AND ${filterSql}
             `);
 
             const { rows: resMetrics } = await db.query(`
                 SELECT 
-                    COUNT(CASE WHEN reservation_status = 'ACTIVE' THEN 1 END) as active,
+                    COUNT(CASE WHEN reservation_status IN ('ACTIVE', 'PENDING', 'CONFIRMED') THEN 1 END) as active,
                     COUNT(CASE WHEN reservation_status = 'EXPIRED' THEN 1 END) as expired
-                FROM capacity_reservations
+                FROM manufacturing_capacity_reservations
                 WHERE created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
             `);
 
             const { rows: dispatchMetrics } = await db.query(`
                 SELECT 
-                    COUNT(CASE WHEN assignment_status = 'DISPATCHED' THEN 1 END) as active,
-                    COUNT(CASE WHEN dispatch_attempt > 1 THEN 1 END) / NULLIF(COUNT(*), 0) as reroute_rate
-                FROM job_assignments
+                    COUNT(CASE WHEN status IN ('ALLOCATED', 'IN_PRODUCTION') THEN 1 END) as active,
+                    COUNT(CASE WHEN status = 'REROUTED' THEN 1 END) / NULLIF(COUNT(*), 0) as reroute_rate
+                FROM manufacturing_dispatches
                 WHERE created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
             `);
 
@@ -165,11 +174,11 @@ class NetworkOpsService {
             const { rows: capacity } = await db.query('SELECT * FROM printer_capacity WHERE printer_id = ? ORDER BY date DESC LIMIT 7', [id]);
             const { rows: regions } = await db.query('SELECT * FROM printer_service_regions WHERE printer_id = ?', [id]);
             const { rows: reservations } = await db.query(
-                "SELECT * FROM capacity_reservations WHERE printer_id = ? AND reservation_status = 'ACTIVE' ORDER BY created_at DESC",
+                "SELECT * FROM manufacturing_capacity_reservations WHERE printer_id = ? AND reservation_status IN ('ACTIVE', 'PENDING', 'CONFIRMED') ORDER BY created_at DESC",
                 [id]
             );
             const { rows: assignments } = await db.query(
-                "SELECT * FROM job_assignments WHERE printer_id = ? ORDER BY created_at DESC LIMIT 10",
+                "SELECT * FROM manufacturing_dispatches WHERE print_node_id = ? ORDER BY created_at DESC LIMIT 10",
                 [id]
             );
             const { rows: economicMetrics } = await db.query(`
@@ -250,14 +259,17 @@ class NetworkOpsService {
             const { rows } = await db.query(`
                 SELECT 
                     p.country,
-                    p.city as region,
+                    p.city,
+                    p.region,
+                    p.latitude,
+                    p.longitude,
                     COUNT(p.id) as printers,
                     SUM(pc.capacity_total) as capacity_total_today,
                     SUM(pc.capacity_available) as capacity_available_today
                 FROM printer_nodes p
                 LEFT JOIN printer_capacity pc ON p.id = pc.printer_id AND pc.date = ?
                 WHERE p.status = 'ACTIVE'
-                GROUP BY p.country, p.city
+                GROUP BY p.country, p.city, p.region, p.latitude, p.longitude
             `, [today]);
 
             return rows.map(r => ({

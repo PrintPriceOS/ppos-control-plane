@@ -52,7 +52,7 @@ export const OffersTab: React.FC = () => {
                     <h2 className="text-xl font-black text-slate-900 tracking-tight">Production Offers</h2>
                     <p className="text-sm text-slate-500 font-medium">Monitor active proposals and network responsiveness.</p>
                 </div>
-                <button onClick={fetchData} className="p-2 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors">
+                <button onClick={fetchData} className="p-2 bg-white border border-slate-200 rounded-none hover:bg-slate-50 transition-colors">
                     <ArrowPathIcon className={`w-5 h-5 text-slate-400 ${loading ? 'animate-spin' : ''}`} />
                 </button>
             </div>
@@ -65,12 +65,12 @@ export const OffersTab: React.FC = () => {
                     { label: "Rejected", value: metrics.rejected || 0, icon: XCircleIcon, color: "text-rose-600", bg: "bg-rose-50" },
                     { label: "Expired", value: metrics.expired || 0, icon: ExclamationCircleIcon, color: "text-slate-600", bg: "bg-slate-50" }
                 ].map((stat, i) => (
-                    <div key={i} className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex items-center justify-between">
+                    <div key={i} className="bg-white p-4 rounded-none border border-slate-100 shadow-none flex items-center justify-between">
                         <div>
                             <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{stat.label}</div>
                             <div className="text-xl font-black text-slate-900 mt-0.5">{stat.value}</div>
                         </div>
-                        <div className={`w-10 h-10 ${stat.bg} ${stat.color} rounded-xl flex items-center justify-center`}>
+                        <div className={`w-10 h-10 ${stat.bg} ${stat.color} rounded-none flex items-center justify-center`}>
                             <stat.icon className="w-5 h-5" />
                         </div>
                     </div>
@@ -78,7 +78,7 @@ export const OffersTab: React.FC = () => {
             </div>
 
             {/* Offers Table */}
-            <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+            <div className="bg-white rounded-none border border-slate-200 overflow-hidden shadow-none">
                 <div className="overflow-x-auto">
                     <table className="w-full text-left">
                         <thead>
@@ -102,7 +102,7 @@ export const OffersTab: React.FC = () => {
                                         <div className="text-[9px] text-emerald-600 font-bold">{o.margin_pct}% Margin</div>
                                     </td>
                                     <td className="px-6 py-4">
-                                        <span className={`px-2 py-0.5 rounded-full text-[9px] font-black border uppercase tracking-wider ${getStatusColor(o.offer_status)}`}>
+                                        <span className={`px-2 py-0.5 rounded-none text-[9px] font-black border uppercase tracking-wider ${getStatusColor(o.offer_status)}`}>
                                             {o.offer_status}
                                         </span>
                                     </td>

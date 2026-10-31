@@ -1,0 +1,506 @@
+[
+  {
+    "file": "src/api/services/controlPlaneSchemaService.js",
+    "line": 40,
+    "operation": "CREATE TABLE",
+    "snippet": "CREATE TABLE IF NOT EXISTS tenants (",
+    "startupReachable": "Possible/Analyzed",
+    "requestReachable": "No"
+  },
+  {
+    "file": "src/api/services/controlPlaneSchemaService.js",
+    "line": 59,
+    "operation": "CREATE TABLE",
+    "snippet": "CREATE TABLE IF NOT EXISTS api_keys (",
+    "startupReachable": "Possible/Analyzed",
+    "requestReachable": "No"
+  },
+  {
+    "file": "src/api/services/controlPlaneSchemaService.js",
+    "line": 74,
+    "operation": "CREATE TABLE",
+    "snippet": "CREATE TABLE IF NOT EXISTS jobs (",
+    "startupReachable": "Possible/Analyzed",
+    "requestReachable": "No"
+  },
+  {
+    "file": "src/api/services/controlPlaneSchemaService.js",
+    "line": 94,
+    "operation": "CREATE TABLE",
+    "snippet": "CREATE TABLE IF NOT EXISTS metrics (",
+    "startupReachable": "Possible/Analyzed",
+    "requestReachable": "No"
+  },
+  {
+    "file": "src/api/services/controlPlaneSchemaService.js",
+    "line": 117,
+    "operation": "CREATE TABLE",
+    "snippet": "CREATE TABLE IF NOT EXISTS tenant_usage_stats (",
+    "startupReachable": "Possible/Analyzed",
+    "requestReachable": "No"
+  },
+  {
+    "file": "src/api/services/controlPlaneSchemaService.js",
+    "line": 131,
+    "operation": "CREATE TABLE",
+    "snippet": "CREATE TABLE IF NOT EXISTS tenant_plan_history (",
+    "startupReachable": "Possible/Analyzed",
+    "requestReachable": "No"
+  },
+  {
+    "file": "src/api/services/controlPlaneSchemaService.js",
+    "line": 142,
+    "operation": "CREATE TABLE",
+    "snippet": "CREATE TABLE IF NOT EXISTS tenant_alerts_history (",
+    "startupReachable": "Possible/Analyzed",
+    "requestReachable": "No"
+  },
+  {
+    "file": "src/api/services/controlPlaneSchemaService.js",
+    "line": 155,
+    "operation": "CREATE TABLE",
+    "snippet": "CREATE TABLE IF NOT EXISTS notifications (",
+    "startupReachable": "Possible/Analyzed",
+    "requestReachable": "No"
+  },
+  {
+    "file": "src/api/services/controlPlaneSchemaService.js",
+    "line": 173,
+    "operation": "CREATE TABLE",
+    "snippet": "CREATE TABLE IF NOT EXISTS control_plane_notifications (",
+    "startupReachable": "Possible/Analyzed",
+    "requestReachable": "No"
+  },
+  {
+    "file": "src/api/services/controlPlaneSchemaService.js",
+    "line": 195,
+    "operation": "CREATE TABLE",
+    "snippet": "CREATE TABLE IF NOT EXISTS notification_events (",
+    "startupReachable": "Possible/Analyzed",
+    "requestReachable": "No"
+  },
+  {
+    "file": "src/api/services/controlPlaneSchemaService.js",
+    "line": 206,
+    "operation": "CREATE TABLE",
+    "snippet": "CREATE TABLE IF NOT EXISTS tenant_notification_preferences (",
+    "startupReachable": "Possible/Analyzed",
+    "requestReachable": "No"
+  },
+  {
+    "file": "src/api/services/controlPlaneSchemaService.js",
+    "line": 222,
+    "operation": "CREATE TABLE",
+    "snippet": "CREATE TABLE IF NOT EXISTS engagement_events (",
+    "startupReachable": "Possible/Analyzed",
+    "requestReachable": "No"
+  },
+  {
+    "file": "src/api/services/controlPlaneSchemaService.js",
+    "line": 235,
+    "operation": "CREATE TABLE",
+    "snippet": "CREATE TABLE IF NOT EXISTS cs_workflows (",
+    "startupReachable": "Possible/Analyzed",
+    "requestReachable": "No"
+  },
+  {
+    "file": "src/api/services/controlPlaneSchemaService.js",
+    "line": 250,
+    "operation": "CREATE TABLE",
+    "snippet": "CREATE TABLE IF NOT EXISTS autonomous_job_pipelines (",
+    "startupReachable": "Possible/Analyzed",
+    "requestReachable": "No"
+  },
+  {
+    "file": "src/api/services/controlPlaneSchemaService.js",
+    "line": 262,
+    "operation": "CREATE TABLE",
+    "snippet": "CREATE TABLE IF NOT EXISTS pipeline_events (",
+    "startupReachable": "Possible/Analyzed",
+    "requestReachable": "No"
+  },
+  {
+    "file": "src/api/services/controlPlaneSchemaService.js",
+    "line": 275,
+    "operation": "CREATE TABLE",
+    "snippet": "CREATE TABLE IF NOT EXISTS financial_ledger_entries (",
+    "startupReachable": "Possible/Analyzed",
+    "requestReachable": "No"
+  },
+  {
+    "file": "src/api/services/controlPlaneSchemaService.js",
+    "line": 292,
+    "operation": "CREATE TABLE",
+    "snippet": "CREATE TABLE IF NOT EXISTS audit_help_analytics (",
+    "startupReachable": "Possible/Analyzed",
+    "requestReachable": "No"
+  },
+  {
+    "file": "src/api/services/controlPlaneSchemaService.js",
+    "line": 305,
+    "operation": "CREATE TABLE",
+    "snippet": "CREATE TABLE IF NOT EXISTS preflight_artifacts (",
+    "startupReachable": "Possible/Analyzed",
+    "requestReachable": "No"
+  },
+  {
+    "file": "src/api/services/controlPlaneSchemaService.js",
+    "line": 332,
+    "operation": "CREATE TABLE",
+    "snippet": "CREATE TABLE IF NOT EXISTS worker_nodes (",
+    "startupReachable": "Possible/Analyzed",
+    "requestReachable": "No"
+  },
+  {
+    "file": "src/api/services/controlPlaneSchemaService.js",
+    "line": 352,
+    "operation": "CREATE TABLE",
+    "snippet": "CREATE TABLE IF NOT EXISTS operational_incidents (",
+    "startupReachable": "Possible/Analyzed",
+    "requestReachable": "No"
+  },
+  {
+    "file": "src/api/services/controlPlaneSchemaService.js",
+    "line": 371,
+    "operation": "CREATE TABLE",
+    "snippet": "CREATE TABLE IF NOT EXISTS lifecycle_policies (",
+    "startupReachable": "Possible/Analyzed",
+    "requestReachable": "No"
+  },
+  {
+    "file": "src/api/services/controlPlaneSchemaService.js",
+    "line": 389,
+    "operation": "CREATE TABLE",
+    "snippet": "CREATE TABLE IF NOT EXISTS control_users (",
+    "startupReachable": "Possible/Analyzed",
+    "requestReachable": "No"
+  },
+  {
+    "file": "src/api/services/controlPlaneSchemaService.js",
+    "line": 408,
+    "operation": "CREATE TABLE",
+    "snippet": "CREATE TABLE IF NOT EXISTS materials_catalog (",
+    "startupReachable": "Possible/Analyzed",
+    "requestReachable": "No"
+  },
+  {
+    "file": "src/api/services/controlPlaneSchemaService.js",
+    "line": 431,
+    "operation": "CREATE TABLE",
+    "snippet": "CREATE TABLE IF NOT EXISTS predictive_material_inventory (",
+    "startupReachable": "Possible/Analyzed",
+    "requestReachable": "No"
+  },
+  {
+    "file": "src/api/services/controlPlaneSchemaService.js",
+    "line": 473,
+    "operation": "CREATE TABLE",
+    "snippet": "CREATE TABLE IF NOT EXISTS material_machine_compatibility (",
+    "startupReachable": "Possible/Analyzed",
+    "requestReachable": "No"
+  },
+  {
+    "file": "src/api/services/controlPlaneSchemaService.js",
+    "line": 489,
+    "operation": "CREATE TABLE",
+    "snippet": "CREATE TABLE IF NOT EXISTS material_inventory_events (",
+    "startupReachable": "Possible/Analyzed",
+    "requestReachable": "No"
+  },
+  {
+    "file": "src/api/services/controlPlaneSchemaService.js",
+    "line": 509,
+    "operation": "CREATE TABLE",
+    "snippet": "CREATE TABLE IF NOT EXISTS manufacturing_material_reservations (",
+    "startupReachable": "Possible/Analyzed",
+    "requestReachable": "No"
+  },
+  {
+    "file": "src/api/services/controlPlaneSchemaService.js",
+    "line": 525,
+    "operation": "CREATE TABLE",
+    "snippet": "CREATE TABLE IF NOT EXISTS material_procurements (",
+    "startupReachable": "Possible/Analyzed",
+    "requestReachable": "No"
+  },
+  {
+    "file": "src/api/services/controlPlaneSchemaService.js",
+    "line": 584,
+    "operation": "CREATE TABLE",
+    "snippet": "CREATE TABLE IF NOT EXISTS preflight_job_registry (",
+    "startupReachable": "Possible/Analyzed",
+    "requestReachable": "No"
+  },
+  {
+    "file": "src/api/services/controlPlaneSchemaService.js",
+    "line": 608,
+    "operation": "CREATE TABLE",
+    "snippet": "CREATE TABLE IF NOT EXISTS preflight_artifact_registry (",
+    "startupReachable": "Possible/Analyzed",
+    "requestReachable": "No"
+  },
+  {
+    "file": "src/api/services/controlPlaneSchemaService.js",
+    "line": 623,
+    "operation": "CREATE TABLE",
+    "snippet": "CREATE TABLE IF NOT EXISTS preflight_audit_events (",
+    "startupReachable": "Possible/Analyzed",
+    "requestReachable": "No"
+  },
+  {
+    "file": "src/api/services/controlPlaneSchemaService.js",
+    "line": 643,
+    "operation": "CREATE TABLE",
+    "snippet": "CREATE TABLE IF NOT EXISTS preflight_governance_events (",
+    "startupReachable": "Possible/Analyzed",
+    "requestReachable": "No"
+  },
+  {
+    "file": "src/api/services/controlPlaneSchemaService.js",
+    "line": 659,
+    "operation": "CREATE TABLE",
+    "snippet": "CREATE TABLE IF NOT EXISTS control_plane_preflight_human_reports (",
+    "startupReachable": "Possible/Analyzed",
+    "requestReachable": "No"
+  },
+  {
+    "file": "src/api/services/controlPlaneSchemaService.js",
+    "line": 685,
+    "operation": "CREATE TABLE",
+    "snippet": "CREATE TABLE IF NOT EXISTS control_plane_preflight_review_approvals (",
+    "startupReachable": "Possible/Analyzed",
+    "requestReachable": "No"
+  },
+  {
+    "file": "src/api/services/controlPlaneSchemaService.js",
+    "line": 707,
+    "operation": "CREATE TABLE",
+    "snippet": "CREATE TABLE IF NOT EXISTS job_marketplace_sessions (",
+    "startupReachable": "Possible/Analyzed",
+    "requestReachable": "No"
+  },
+  {
+    "file": "src/api/services/controlPlaneSchemaService.js",
+    "line": 734,
+    "operation": "CREATE TABLE",
+    "snippet": "CREATE TABLE IF NOT EXISTS manufacturing_offers (",
+    "startupReachable": "Possible/Analyzed",
+    "requestReachable": "No"
+  },
+  {
+    "file": "src/api/services/controlPlaneSchemaService.js",
+    "line": 779,
+    "operation": "CREATE TABLE",
+    "snippet": "CREATE TABLE IF NOT EXISTS marketplace_events (",
+    "startupReachable": "Possible/Analyzed",
+    "requestReachable": "No"
+  },
+  {
+    "file": "src/api/services/controlPlaneSchemaService.js",
+    "line": 843,
+    "operation": "ALTER TABLE",
+    "snippet": "await db.query(\"ALTER TABLE job_marketplace_sessions MODIFY COLUMN session_status ENUM('OPEN','SELECTED','CANCELLED','EXPIRED','FAILED') DEFAULT 'OPEN'\");",
+    "startupReachable": "Possible/Analyzed",
+    "requestReachable": "No"
+  },
+  {
+    "file": "src/api/services/controlPlaneSchemaService.js",
+    "line": 844,
+    "operation": "ALTER TABLE",
+    "snippet": "await db.query(\"ALTER TABLE manufacturing_offers MODIFY COLUMN offer_status ENUM('PENDING','SENT','VIEWED','ACCEPTED','REJECTED','EXPIRED','CANCELLED','FAILED') DEFAULT 'PENDING'\");",
+    "startupReachable": "Possible/Analyzed",
+    "requestReachable": "No"
+  },
+  {
+    "file": "src/api/services/controlPlaneSchemaService.js",
+    "line": 845,
+    "operation": "ALTER TABLE",
+    "snippet": "await db.query(\"ALTER TABLE manufacturing_offers MODIFY COLUMN production_cost DECIMAL(14,4) NULL\");",
+    "startupReachable": "Possible/Analyzed",
+    "requestReachable": "No"
+  },
+  {
+    "file": "src/api/services/controlPlaneSchemaService.js",
+    "line": 846,
+    "operation": "ALTER TABLE",
+    "snippet": "await db.query(\"ALTER TABLE manufacturing_offers MODIFY COLUMN suggested_price DECIMAL(14,4) NULL\");",
+    "startupReachable": "Possible/Analyzed",
+    "requestReachable": "No"
+  },
+  {
+    "file": "src/api/services/controlPlaneSchemaService.js",
+    "line": 847,
+    "operation": "ALTER TABLE",
+    "snippet": "await db.query(\"ALTER TABLE manufacturing_offers MODIFY COLUMN estimated_margin DECIMAL(14,4) NULL\");",
+    "startupReachable": "Possible/Analyzed",
+    "requestReachable": "No"
+  },
+  {
+    "file": "src/api/services/controlPlaneSchemaService.js",
+    "line": 848,
+    "operation": "ALTER TABLE",
+    "snippet": "await db.query(\"ALTER TABLE manufacturing_offers MODIFY COLUMN margin_pct DECIMAL(10,4) NULL\");",
+    "startupReachable": "Possible/Analyzed",
+    "requestReachable": "No"
+  },
+  {
+    "file": "src/api/services/controlPlaneSchemaService.js",
+    "line": 849,
+    "operation": "ALTER TABLE",
+    "snippet": "await db.query(\"ALTER TABLE marketplace_events MODIFY COLUMN marketplace_session_id VARCHAR(64) NULL\");",
+    "startupReachable": "Possible/Analyzed",
+    "requestReachable": "No"
+  },
+  {
+    "file": "src/api/services/controlPlaneSchemaService.js",
+    "line": 921,
+    "operation": "ALTER TABLE",
+    "snippet": "await db.query(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);",
+    "startupReachable": "Possible/Analyzed",
+    "requestReachable": "No"
+  },
+  {
+    "file": "src/api/services/controlPlaneSchemaService.js",
+    "line": 948,
+    "operation": "CREATE INDEX",
+    "snippet": "await db.query(`CREATE INDEX ${indexName} ON ${table}(${columns})`);",
+    "startupReachable": "Possible/Analyzed",
+    "requestReachable": "No"
+  },
+  {
+    "file": "src/api/services/controlPlaneSchemaService.js",
+    "line": 1032,
+    "operation": "ALTER TABLE",
+    "snippet": "await db.query(`ALTER TABLE orders MODIFY COLUMN status ${statusEnum}`);",
+    "startupReachable": "Possible/Analyzed",
+    "requestReachable": "No"
+  },
+  {
+    "file": "src/api/services/controlPlaneSchemaService.js",
+    "line": 1048,
+    "operation": "CREATE TABLE",
+    "snippet": "CREATE TABLE IF NOT EXISTS production_file_repositories (",
+    "startupReachable": "Possible/Analyzed",
+    "requestReachable": "No"
+  },
+  {
+    "file": "src/api/services/controlPlaneSchemaService.js",
+    "line": 1070,
+    "operation": "CREATE TABLE",
+    "snippet": "CREATE TABLE IF NOT EXISTS production_files (",
+    "startupReachable": "Possible/Analyzed",
+    "requestReachable": "No"
+  },
+  {
+    "file": "src/api/services/controlPlaneSchemaService.js",
+    "line": 1103,
+    "operation": "CREATE TABLE",
+    "snippet": "CREATE TABLE IF NOT EXISTS production_file_events (",
+    "startupReachable": "Possible/Analyzed",
+    "requestReachable": "No"
+  },
+  {
+    "file": "src/api/services/controlPlaneSchemaService.js",
+    "line": 1131,
+    "operation": "CREATE TABLE",
+    "snippet": "CREATE TABLE IF NOT EXISTS printhouse_payment_settings (",
+    "startupReachable": "Possible/Analyzed",
+    "requestReachable": "No"
+  },
+  {
+    "file": "src/api/services/controlPlaneSchemaService.js",
+    "line": 1150,
+    "operation": "CREATE TABLE",
+    "snippet": "CREATE TABLE IF NOT EXISTS invoices (",
+    "startupReachable": "Possible/Analyzed",
+    "requestReachable": "No"
+  },
+  {
+    "file": "src/api/services/controlPlaneSchemaService.js",
+    "line": 1189,
+    "operation": "CREATE TABLE",
+    "snippet": "CREATE TABLE IF NOT EXISTS marketplace_order_intents (",
+    "startupReachable": "Possible/Analyzed",
+    "requestReachable": "No"
+  },
+  {
+    "file": "src/api/services/controlPlaneSchemaService.js",
+    "line": 1233,
+    "operation": "CREATE TABLE",
+    "snippet": "CREATE TABLE IF NOT EXISTS marketplace_production_files (",
+    "startupReachable": "Possible/Analyzed",
+    "requestReachable": "No"
+  },
+  {
+    "file": "src/api/services/controlPlaneSchemaService.js",
+    "line": 1257,
+    "operation": "CREATE TABLE",
+    "snippet": "CREATE TABLE IF NOT EXISTS marketplace_audit_events (",
+    "startupReachable": "Possible/Analyzed",
+    "requestReachable": "No"
+  },
+  {
+    "file": "src/api/services/controlPlaneSchemaService.js",
+    "line": 1276,
+    "operation": "CREATE TABLE",
+    "snippet": "CREATE TABLE IF NOT EXISTS marketplace_offer_sessions (",
+    "startupReachable": "Possible/Analyzed",
+    "requestReachable": "No"
+  },
+  {
+    "file": "src/api/services/controlPlaneSchemaService.js",
+    "line": 1315,
+    "operation": "CREATE TABLE",
+    "snippet": "CREATE TABLE IF NOT EXISTS marketplace_orders (",
+    "startupReachable": "Possible/Analyzed",
+    "requestReachable": "No"
+  },
+  {
+    "file": "src/api/services/controlPlaneSchemaService.js",
+    "line": 1351,
+    "operation": "CREATE TABLE",
+    "snippet": "CREATE TABLE IF NOT EXISTS marketplace_order_files (",
+    "startupReachable": "Possible/Analyzed",
+    "requestReachable": "No"
+  },
+  {
+    "file": "src/api/services/controlPlaneSchemaService.js",
+    "line": 1386,
+    "operation": "CREATE TABLE",
+    "snippet": "CREATE TABLE IF NOT EXISTS marketplace_order_events (",
+    "startupReachable": "Possible/Analyzed",
+    "requestReachable": "No"
+  },
+  {
+    "file": "src/api/services/controlPlaneSchemaService.js",
+    "line": 1409,
+    "operation": "CREATE TABLE",
+    "snippet": "CREATE TABLE IF NOT EXISTS marketplace_order_preflight_bindings (",
+    "startupReachable": "Possible/Analyzed",
+    "requestReachable": "No"
+  },
+  {
+    "file": "src/api/services/controlPlaneSchemaService.js",
+    "line": 1451,
+    "operation": "CREATE TABLE",
+    "snippet": "CREATE TABLE IF NOT EXISTS tenant_resource_limits (",
+    "startupReachable": "Possible/Analyzed",
+    "requestReachable": "No"
+  },
+  {
+    "file": "src/api/services/controlPlaneSchemaService.js",
+    "line": 1469,
+    "operation": "CREATE TABLE",
+    "snippet": "CREATE TABLE IF NOT EXISTS preflight_tenant_quotas (",
+    "startupReachable": "Possible/Analyzed",
+    "requestReachable": "No"
+  },
+  {
+    "file": "src/api/services/controlPlaneSchemaService.js",
+    "line": 1481,
+    "operation": "CREATE TABLE",
+    "snippet": "CREATE TABLE IF NOT EXISTS tenant_governance_events (",
+    "startupReachable": "Possible/Analyzed",
+    "requestReachable": "No"
+  }
+]

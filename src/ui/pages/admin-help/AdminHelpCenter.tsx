@@ -67,7 +67,7 @@ export const AdminHelpCenter: React.FC = () => {
             {/* Sidebar */}
             <div className="w-full md:w-64 bg-white border-r border-slate-200 shrink-0 p-6">
                 <div className="flex items-center gap-2 mb-8">
-                    <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
+                    <div className="w-8 h-8 bg-blue-600 rounded-none flex items-center justify-center">
                         <BookOpenIcon className="w-5 h-5 text-white" />
                     </div>
                     <span className="font-bold text-slate-900 tracking-tight">Help Console</span>
@@ -76,7 +76,7 @@ export const AdminHelpCenter: React.FC = () => {
                 <nav className="space-y-1">
                     <a
                         href="/admin"
-                        className="flex items-center gap-2 px-3 py-2 text-sm text-blue-600 hover:bg-blue-50 rounded-lg mb-6 font-medium transition-colors"
+                        className="flex items-center gap-2 px-3 py-2 text-sm text-blue-600 hover:bg-blue-50 rounded-none mb-6 font-medium transition-colors"
                     >
                         <ArrowLeftIcon className="w-4 h-4" />
                         Back to Dashboard
@@ -87,7 +87,7 @@ export const AdminHelpCenter: React.FC = () => {
                         <button
                             key={cat}
                             onClick={() => setSelectedCategory(cat)}
-                            className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${selectedCategory === cat
+                            className={`w-full text-left px-3 py-2 rounded-none text-sm transition-colors ${selectedCategory === cat
                                 ? 'bg-blue-50 text-blue-700 font-medium'
                                 : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
                                 }`}
@@ -112,13 +112,13 @@ export const AdminHelpCenter: React.FC = () => {
                     <input
                         ref={searchInputRef}
                         type="text"
-                        className="block w-full pl-11 pr-14 py-4 border-slate-200 rounded-2xl leading-5 bg-white shadow-sm hover:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm transition-all"
+                        className="block w-full pl-11 pr-14 py-4 border-slate-200 rounded-none leading-5 bg-white shadow-sm hover:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm transition-all"
                         placeholder="Type to search (e.g. 'roi', 'cmyk', 'error 502')..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                     />
                     <div className="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none">
-                        <kbd className="inline-flex items-center border border-slate-200 rounded px-2 text-sm font-sans font-medium text-slate-400">
+                        <kbd className="inline-flex items-center border border-slate-200 rounded-none px-2 text-sm font-sans font-medium text-slate-400">
                             /
                         </kbd>
                     </div>
@@ -127,18 +127,18 @@ export const AdminHelpCenter: React.FC = () => {
                 {/* Results List */}
                 <div className="space-y-6">
                     <div className="flex items-center justify-between">
-                        <div className="text-sm font-semibold text-slate-900 bg-slate-100 px-3 py-1 rounded-full border border-slate-200">
+                        <div className="text-sm font-semibold text-slate-900 bg-slate-100 px-3 py-1 rounded-none border border-slate-200">
                             {results.length} article{results.length !== 1 ? 's' : ''} found in {selectedCategory}
                         </div>
                         {results.length > 0 && (
-                            <div className="text-[10px] font-bold text-blue-500 uppercase tracking-widest bg-blue-50 px-2.5 py-1 rounded-md border border-blue-100">
+                            <div className="text-[10px] font-bold text-blue-500 uppercase tracking-widest bg-blue-50 px-2.5 py-1 rounded-none border border-blue-100">
                                 Verified Documentation
                             </div>
                         )}
                     </div>
 
                     {results.length === 0 ? (
-                        <div className="text-center py-20 bg-white rounded-3xl border border-dashed border-slate-300 shadow-sm transition-all">
+                        <div className="text-center py-20 bg-white rounded-none border border-dashed border-slate-300 shadow-sm transition-all">
                             <MagnifyingGlassIcon className="w-16 h-16 text-slate-300 mx-auto mb-4" />
                             <h3 className="text-xl font-bold text-slate-900">No matching guides found</h3>
                             <p className="text-slate-500 mt-2 max-w-sm mx-auto">Try common terms like "metrics", "audit", or "fix" to see available help articles.</p>
@@ -156,10 +156,10 @@ export const AdminHelpCenter: React.FC = () => {
                                     key={doc.id}
                                     href={`/admin/help?doc=${doc.id}`}
                                     onClick={() => postHelpAnalytics({ event_type: 'search_result_clicked', article_id: doc.id, search_query: searchQuery.trim() })}
-                                    className="block bg-white border border-slate-200 rounded-2xl p-6 hover:border-blue-400 hover:shadow-xl transition-all group relative overflow-hidden"
+                                    className="block bg-white border border-slate-200 rounded-none p-6 hover:border-blue-400 hover:shadow-xl transition-all group relative overflow-hidden"
                                 >
                                     <div className="flex items-center gap-3 mb-4">
-                                        <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100 group-hover:border-blue-100 group-hover:bg-blue-50 transition-colors">
+                                        <div className="bg-slate-50 p-2.5 rounded-none border border-slate-100 group-hover:border-blue-100 group-hover:bg-blue-50 transition-colors">
                                             {getIconForType(doc.type)}
                                         </div>
                                         <div className="flex flex-col">
@@ -172,7 +172,7 @@ export const AdminHelpCenter: React.FC = () => {
                                     </p>
                                     <div className="mt-6 flex flex-wrap gap-2">
                                         {doc.keywords.slice(0, 4).map(k => (
-                                            <span key={k} className="bg-slate-50 text-slate-500 text-[11px] px-2.5 py-1 rounded-lg border border-slate-100 font-bold group-hover:bg-white group-hover:border-blue-100 transition-colors">#{k}</span>
+                                            <span key={k} className="bg-slate-50 text-slate-500 text-[11px] px-2.5 py-1 rounded-none border border-slate-100 font-bold group-hover:bg-white group-hover:border-blue-100 transition-colors">#{k}</span>
                                         ))}
                                     </div>
                                     <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-all transform translate-x-2 group-hover:translate-x-0">

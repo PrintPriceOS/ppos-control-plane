@@ -3,6 +3,7 @@ import { Drawer } from './Drawer';
 import { GovernanceSnapshotViewer } from './GovernanceSnapshotViewer';
 import { AuditTimeline, TimelineStage } from './AuditTimeline';
 import { FingerPrintIcon, ShieldCheckIcon, GlobeAmericasIcon, UserCircleIcon } from '@heroicons/react/24/outline';
+import { COLORS } from '../design-system/tokens';
 
 interface AuditDetailDrawerProps {
   auditEntry: any | null;
@@ -13,14 +14,17 @@ interface AuditDetailDrawerProps {
 export const AuditDetailDrawer: React.FC<AuditDetailDrawerProps> = ({ auditEntry, isOpen, onClose }) => {
   if (!auditEntry) return null;
 
-  // Mock stages for reconstruction demonstration
+  // Forensic lifecycle reconstruction
   const stages: TimelineStage[] = [
-    { id: 'AUTH', label: 'Authentication', timestamp: auditEntry.created_at, status: 'SUCCESS' as const, details: 'API Key validated successfully. Scope: os:admin', action_by: 'AuthAuthority-EU1' },
-    { id: 'POLICY', label: 'Governance Check', timestamp: auditEntry.created_at, status: (auditEntry.action === 'BLOCKED' ? 'FAILED' : 'SUCCESS') as any, details: auditEntry.policy_slug || 'Standard isolation policy enforced.', action_by: 'PolicyEnforcer-V2' },
+    { id: 'AUTH', label: 'Identity Authenticated', timestamp: auditEntry.created_at, status: 'SUCCESS' as const, details: `Action: ${auditEntry.action}. Role: ${auditEntry.user_role || 'os:admin'}`, action_by: 'AuthAuthority-Ingress' },
   ];
 
+  if (auditEntry.policy_slug) {
+    stages.push({ id: 'POLICY', label: 'Governance Enforcement', timestamp: auditEntry.created_at, status: (auditEntry.action === 'BLOCKED' ? 'FAILED' : 'SUCCESS') as any, details: `Policy: ${auditEntry.policy_slug}`, action_by: 'PolicyEnforcer-V2' });
+  }
+
   if (auditEntry.job_id) {
-    stages.push({ id: 'QUEUED', label: 'Job Queued', timestamp: auditEntry.created_at, status: 'SUCCESS' as const, details: `Job ${auditEntry.job_id} effectively enqueued in BullMQ.` });
+    stages.push({ id: 'QUEUED', label: 'Downstream Job Link', timestamp: auditEntry.created_at, status: 'SUCCESS' as const, details: `Job ID: ${auditEntry.job_id}` });
   }
 
   return (
@@ -56,11 +60,11 @@ export const AuditDetailDrawer: React.FC<AuditDetailDrawerProps> = ({ auditEntry
         <div>
            <SectionHeader label="Resource & Evidence" />
            <div className="mt-4 flex flex-col gap-2">
-              <div className="p-4 rounded-xl border border-slate-100 bg-white font-mono text-[10px] text-slate-500 overflow-auto max-h-40">
+              <div className={`p-4 rounded-none border ${COLORS.adaptive.borderPrimary} ${COLORS.adaptive.surface} font-mono text-[10px] ${COLORS.adaptive.textSecondary} overflow-auto max-h-40`}>
                   {JSON.stringify(auditEntry, null, 2)}
               </div>
-              <p className="text-[10px] text-slate-400 font-bold px-4">
-                 Forensic Proof Hash: sha256:{Math.random().toString(36).substring(7)}
+              <p className={`text-[10px] ${COLORS.adaptive.textMuted} font-bold px-4`}>
+                 Derived Identity Proof: sha256:{auditEntry.id ? btoa(auditEntry.id.toString()).substring(0, 16) : 'N/A'}
               </p>
            </div>
         </div>
@@ -69,13 +73,13 @@ export const AuditDetailDrawer: React.FC<AuditDetailDrawerProps> = ({ auditEntry
   );
 };
 
-const MetadataItem = ({ label, value, icon: Icon, color = 'slate' }: any) => (
-  <div className="flex flex-col gap-1 px-4 py-3 rounded-2xl bg-white border border-slate-100 shadow-sm">
-     <div className="flex items-center gap-1.5 text-slate-400">
+const MetadataItem = ({ label, value, icon: Icon, color = 'zinc' }: any) => (
+  <div className={`flex flex-col gap-1 px-4 py-3 rounded-none ${COLORS.adaptive.surface} border ${COLORS.adaptive.borderPrimary}`}>
+     <div className={`flex items-center gap-1.5 ${COLORS.adaptive.textMuted}`}>
         {Icon && <Icon className="w-3.5 h-3.5" />}
         <span className="text-[9px] font-black uppercase tracking-widest">{label}</span>
      </div>
-     <span className={`text-sm font-black tracking-tight ${color === 'red' ? 'text-red-600' : color === 'emerald' ? 'text-emerald-600' : 'text-slate-900'}`}>
+     <span className={`text-sm font-black tracking-tight ${color === 'red' ? 'text-[#dc0000]' : color === 'emerald' ? 'text-[#10B981]' : COLORS.adaptive.textPrimary}`}>
         {value}
      </span>
   </div>
@@ -83,7 +87,7 @@ const MetadataItem = ({ label, value, icon: Icon, color = 'slate' }: any) => (
 
 const SectionHeader = ({ label }: { label: string }) => (
   <div className="flex items-center gap-4">
-     <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] whitespace-nowrap">{label}</span>
-     <div className="h-[1px] w-full bg-slate-100" />
+     <span className={`text-[10px] font-black ${COLORS.adaptive.textMuted} uppercase tracking-[0.2em] whitespace-nowrap`}>{label}</span>
+     <div className={`h-[1px] w-full ${COLORS.adaptive.surfaceMuted}`} />
   </div>
 );

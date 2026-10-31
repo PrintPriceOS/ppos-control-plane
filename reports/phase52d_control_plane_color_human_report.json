@@ -1,0 +1,138 @@
+[
+  {
+    "scenario": "A. CONVERT_CMYK applied",
+    "input_governance_evidence": {
+      "color_conversion_applied": true,
+      "destructive_color_fix_applied": true,
+      "certified_pdf_allowed": false,
+      "production_certified": false
+    },
+    "outcome": "FIXED_REVIEW_REQUIRED",
+    "severity": "warning",
+    "production_certified": false,
+    "review_required": true,
+    "primary_artifact_type": "review_pdf",
+    "certified_pdf_downgraded": true,
+    "customer_wording": "The PDF contains color conditions that may affect print appearance. A human review is required before production.",
+    "operator_wording": "certified.pdf exists physically but is not production-certified and should not be customer-visible. Color conversion to CMYK was applied. Review the corrected PDF carefully because color conversion can alter appearance, ink balance, gradients, images, and brand colors.",
+    "pass": true
+  },
+  {
+    "scenario": "B. INJECT_OUTPUT_INTENT only",
+    "input_governance_evidence": {
+      "color_conversion_applied": false,
+      "destructive_color_fix_applied": false,
+      "certified_pdf_allowed": true,
+      "production_certified": true
+    },
+    "outcome": "CERTIFIED_READY",
+    "severity": "success",
+    "production_certified": true,
+    "review_required": false,
+    "primary_artifact_type": "certified_pdf",
+    "certified_pdf_downgraded": false,
+    "customer_wording": "Your PDF passed preflight and a certified production-ready file is available.",
+    "operator_wording": "File is certified for immediate production routing.",
+    "pass": true
+  },
+  {
+    "scenario": "C. INJECT_OUTPUT_INTENT + ICC risk",
+    "input_governance_evidence": {
+      "review_required_color_reasons": [
+        "ICC_MISMATCH"
+      ]
+    },
+    "outcome": "FIXED_REVIEW_REQUIRED",
+    "severity": "warning",
+    "production_certified": false,
+    "review_required": true,
+    "primary_artifact_type": "fixed_pdf",
+    "certified_pdf_downgraded": false,
+    "customer_wording": "The PDF contains color conditions that may affect print appearance. A human review is required before production.",
+    "operator_wording": "An OutputIntent profile was injected, but color profile conflicts or color risks remain and require review. The PDF contains ICC/profile inconsistencies. Color appearance may vary between devices or print workflows.",
+    "pass": true
+  },
+  {
+    "scenario": "D. REDUCE_TAC unsupported",
+    "input_governance_evidence": {
+      "review_required_color_reasons": [
+        "EXCESSIVE_TAC"
+      ]
+    },
+    "outcome": "REVIEW_REQUIRED",
+    "severity": "warning",
+    "production_certified": false,
+    "review_required": true,
+    "primary_artifact_type": null,
+    "certified_pdf_downgraded": false,
+    "customer_wording": "The PDF contains color conditions that may affect print appearance. A human review is required before production.",
+    "operator_wording": "Total ink coverage reduction is not currently implemented. A print operator must review this file. The PDF may exceed total ink coverage limits. Automatic ink reduction was not applied.",
+    "pass": true
+  },
+  {
+    "scenario": "E. MAP_RICH_BLACK_TEXT_TO_K_ONLY unsupported",
+    "input_governance_evidence": {
+      "review_required_color_reasons": [
+        "RICH_BLACK_TEXT"
+      ]
+    },
+    "outcome": "REVIEW_REQUIRED",
+    "severity": "warning",
+    "production_certified": false,
+    "review_required": true,
+    "primary_artifact_type": null,
+    "certified_pdf_downgraded": false,
+    "customer_wording": "The PDF contains color conditions that may affect print appearance. A human review is required before production.",
+    "operator_wording": "Rich black text remapping is not currently implemented. A print operator must review this file. The PDF may contain rich black text. Automatic mapping to pure black was not applied.",
+    "pass": true
+  },
+  {
+    "scenario": "F. MAP_REGISTRATION_COLOR_TO_BLACK unsupported",
+    "input_governance_evidence": {
+      "review_required_color_reasons": [
+        "REGISTRATION_COLOR_MISUSE"
+      ]
+    },
+    "outcome": "REVIEW_REQUIRED",
+    "severity": "warning",
+    "production_certified": false,
+    "review_required": true,
+    "primary_artifact_type": null,
+    "certified_pdf_downgraded": false,
+    "customer_wording": "The PDF contains color conditions that may affect print appearance. A human review is required before production.",
+    "operator_wording": "Registration color remapping is not currently implemented. A print operator must review this file. The PDF may use registration color incorrectly. Automatic remapping was not applied.",
+    "pass": true
+  },
+  {
+    "scenario": "G. Public report sanitation",
+    "input_governance_evidence": {
+      "destructive_color_fix_applied": true
+    },
+    "outcome": "FIXED_REVIEW_REQUIRED",
+    "severity": "warning",
+    "production_certified": false,
+    "review_required": true,
+    "primary_artifact_type": "review_pdf",
+    "certified_pdf_downgraded": true,
+    "customer_wording": "The PDF contains color conditions that may affect print appearance. A human review is required before production.",
+    "operator_wording": "certified.pdf exists physically but is not production-certified and should not be customer-visible. Color conversion to CMYK was applied. Review the corrected PDF carefully because color conversion can alter appearance, ink balance, gradients, images, and brand colors.",
+    "pass": true
+  },
+  {
+    "scenario": "H. Readiness / invoice gate simulation",
+    "input_governance_evidence": {
+      "review_required_color_reasons": [
+        "MIXED_RGB_CMYK"
+      ]
+    },
+    "outcome": "FIXED_REVIEW_REQUIRED",
+    "severity": "warning",
+    "production_certified": false,
+    "review_required": true,
+    "primary_artifact_type": null,
+    "certified_pdf_downgraded": false,
+    "customer_wording": "The PDF contains color conditions that may affect print appearance. A human review is required before production.",
+    "operator_wording": "The PDF contains mixed RGB and CMYK content. A human review is required before production.",
+    "pass": true
+  }
+]

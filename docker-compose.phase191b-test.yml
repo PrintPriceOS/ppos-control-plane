@@ -1,0 +1,18 @@
+# docker-compose.phase191b-test.yml
+# Isolated disposable MySQL 8 container for Phase 191B Acceptance Testing
+version: '3.8'
+
+services:
+  mysql-phase191b-test:
+    image: mysql:8.0
+    container_name: ppos-mysql-phase191b-test
+    environment:
+      MYSQL_ROOT_PASSWORD: root_test_password
+      MYSQL_DATABASE: ppos_test_phase191b
+      MYSQL_USER: ppos_test_user
+      MYSQL_PASSWORD: ppos_test_password
+    ports:
+      - "3308:3306"
+    tmpfs:
+      - /var/lib/mysql
+    command: --default-authentication-plugin=mysql_native_password

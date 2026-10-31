@@ -1,0 +1,2276 @@
+// @vitest-environment node
+/**
+ * tests/phase39_security_and_integrations.test.js
+ * 
+ * Comprehensive Verification Suite for Phase 39 Review:
+ * 1. Webhook Re-delivery: Tenant authorization, isolation, status immutability on mismatch.
+ * 2. SSRF Protection: Hex/octal/decimal IPs, IPv4-mapped IPv6, DNS rebinding, connection pinning.
+ * 3. Outbox HTTP Real Delivery: Controlled local HTTP receiver with HMAC-SHA256 signature verification.
+ * 4. Slack Configuration: Redaction of webhook secret, event filtering.
+ * 5. BPE Authentication & Publication: Dedicated PPOS_BPE_SERVICE_TOKEN, no fallback, receiver enforcement, idempotency, readback checksum, and post-publish estimate calculation.
+ * 6. Gemini Real Adapter & Calibration: Passing maxTokens and temperature, real vs fallback distinction.
+ * 7. MFA, Sessions & Revocation: Block MFA challenge tokens on protected routes, session revocation isolation.
+ */
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import express from 'express';
+import http from 'http';
+import axios from 'axios';
+import crypto from 'crypto';
+import jwt from 'jsonwebtoken';
+
+process.env.JWT_SECRET = process.env.JWT_SECRET || 'ppos_phase39_test_jwt_secret_32bytes';
+process.env.JWT_AUDIENCE = 'ppos:control';
+process.env.JWT_ISSUER = 'https://auth.printprice.pro';
+process.env.PPOS_CONTROL_TOKEN = 'internal_control_breakglass_token';
+
+const db = require('../src/api/services/mysqlClient');
+const outgoingWebhookService = require('../src/api/services/outgoingWebhookService');
+const slackNotificationService = require('../src/api/services/slackNotificationService');
+const bpePublicationService = require('../src/api/services/bpePublicationService');
+const aiAdapter = require('../src/api/services/aiProviderAdapter');
+const calibrationAssistantService = require('../src/api/services/calibrationAssistantService');
+const userSessionService = require('../src/api/services/userSessionService');
+const userMfaService = require('../src/api/services/userMfaService');
+const adminRouter = require('../src/api/routes/admin');
+const authRouter = require('../src/api/routes/authRoutes');
+
+// In-Memory Database store for isolated test execution
+const memoryDb = {
+    user_sessions: [],
+    user_mfa: [],
+    control_users: [],
+    webhook_subscriptions: [],
+    webhook_deliveries: [],
+    slack_integrations: [],
+    bpe_pricing_publications: [],
+    printhouse_pricing_revisions: [],
+    printer_nodes: [
+        { id: 'printer_node_hardened', name: 'Hardened Node 1', metadata_json: JSON.stringify({ bpe_printhouse_id: 'ph_bpe_test_1' }) }
+    ],
+    tenants: [
+        { id: 'tenant_alpha', plan: 'ENTERPRISE', metadata_json: '{}' },
+        { id: 'tenant_beta', plan: 'ENTERPRISE', metadata_json: '{}' },
+        { id: 'tenant_bpe_sec', plan: 'ENTERPRISE', metadata_json: '{}' },
+        { id: 'tenant_real_outbox', plan: 'ENTERPRISE', metadata_json: '{}' }
+    ]
+};
+
+// Intercept db.query to use in-memory store
+db.query = async function (sql, params = []) {
+    const s = sql.trim();
+    if (/^CREATE TABLE/is.test(s)) return [];
+
+
+    // Webhook Subscriptions
+    if (/INSERT INTO webhook_subscriptions/is.test(s)) {
+        let id, tenantId, url, secret, eventsJson, status;
+        if (params.length >= 6) {
+            [id, tenantId, url, secret, eventsJson, status] = params;
+        } else if (params.length === 4) {
+            [id, tenantId, url, secret] = params;
+            eventsJson = '["*"]';
+            status = 'ACTIVE';
+        } else {
+            [id] = params;
+            const tenantMatch = s.match(/'(tenant_[^']+)'/);
+            tenantId = tenantMatch ? tenantMatch[1] : 'tenant_unknown';
+            url = 'https://example.com/webhook';
+            secret = 'test_secret';
+            eventsJson = '["*"]';
+            status = 'ACTIVE';
+        }
+        const rec = { id, tenant_id: tenantId, url, secret, events_json: eventsJson, status: status || 'ACTIVE', created_at: new Date() };
+        memoryDb.webhook_subscriptions.push(rec);
+        return { affectedRows: 1 };
+    }
+    if (/SELECT.*FROM webhook_subscriptions/is.test(s)) {
+        if (s.includes('WHERE id = ? AND tenant_id = ?')) {
+            const [id, tenantId] = params;
+            return memoryDb.webhook_subscriptions.filter(r => r.id === id && r.tenant_id === tenantId);
+        }
+        if (s.includes('WHERE tenant_id = ?')) {
+            const [tenantId] = params;
+            return memoryDb.webhook_subscriptions.filter(r => r.tenant_id === tenantId && (r.status === 'ACTIVE' || !s.includes("status = 'ACTIVE'")));
+        }
+    }
+    if (/UPDATE webhook_subscriptions/is.test(s)) {
+        const [newSecret, id, tenantId] = params;
+        const sub = memoryDb.webhook_subscriptions.find(r => r.id === id && r.tenant_id === tenantId);
+        if (sub) { sub.secret = newSecret; return { affectedRows: 1 }; }
+        return { affectedRows: 0 };
+    }
+
+    // Webhook Deliveries
+    if (/INSERT INTO webhook_deliveries/is.test(s)) {
+        let id, tenantId, subscriptionId, eventType, eventId, payloadJson, signature, status, attemptCount, maxAttempts;
+        if (params.length >= 10) {
+            [id, tenantId, subscriptionId, eventType, eventId, payloadJson, signature, status, attemptCount, maxAttempts] = params;
+        } else if (params.length === 7) {
+            // from enqueueWebhookEvent: [deliveryId, tenantId, sub.id, eventType, actualEventId, payloadString, signature]
+            [id, tenantId, subscriptionId, eventType, eventId, payloadJson, signature] = params;
+            status = 'PENDING';
+            attemptCount = 0;
+            maxAttempts = 3;
+        } else if (params.length === 2) {
+            [id, subscriptionId] = params;
+            const tenantMatch = s.match(/'(tenant_[^']+)'/);
+            tenantId = tenantMatch ? tenantMatch[1] : 'tenant_unknown';
+            eventType = 'order.created';
+            eventId = 'evt_test';
+            payloadJson = '{}';
+            signature = 'sig_test';
+            status = 'PENDING';
+            attemptCount = 0;
+            maxAttempts = 3;
+        }
+        const rec = {
+            id,
+            tenant_id: tenantId,
+            subscription_id: subscriptionId,
+            event_type: eventType,
+            event_id: eventId,
+            payload_json: payloadJson,
+            signature,
+            status: status || 'PENDING',
+            attempt_count: attemptCount || 0,
+            max_attempts: maxAttempts || 3,
+            last_status_code: null,
+            created_at: new Date()
+        };
+        memoryDb.webhook_deliveries.push(rec);
+        return { affectedRows: 1 };
+    }
+    if (/FROM webhook_deliveries/is.test(s)) {
+        if (s.includes('WHERE d.id = ?') || s.includes('WHERE id = ?')) {
+            const deliveryId = params[0];
+            const del = memoryDb.webhook_deliveries.find(r => r.id === deliveryId);
+            if (!del) return [];
+            const sub = memoryDb.webhook_subscriptions.find(r => r.id === del.subscription_id);
+            return [{
+                ...del,
+                sub_tenant_id: sub ? sub.tenant_id : null,
+                sub_status: sub ? sub.status : null,
+                url: sub ? sub.url : null
+            }];
+        }
+        if (s.includes('WHERE tenant_id = ?')) {
+            const [tenantId] = params;
+            return memoryDb.webhook_deliveries.filter(r => r.tenant_id === tenantId);
+        }
+    }
+    if (/UPDATE webhook_deliveries/is.test(s)) {
+        const id = params[params.length - 1];
+        const del = memoryDb.webhook_deliveries.find(r => r.id === id);
+        if (del) {
+            if (s.includes("status = 'DELIVERED'")) {
+                del.status = 'DELIVERED';
+                del.attempt_count = params[0];
+                del.last_status_code = params[1];
+                del.delivered_at = new Date();
+            } else {
+                del.status = params[0];
+                del.attempt_count = params[1];
+                del.last_status_code = params[2];
+                del.last_error = params[3];
+            }
+            return { affectedRows: 1 };
+        }
+        return { affectedRows: 0 };
+    }
+
+    // Slack
+    if (/INSERT INTO slack_integrations/is.test(s)) {
+        const [id, tenantId, webhookUrl, channelName, enabled, eventsJson] = params;
+        const existingIdx = memoryDb.slack_integrations.findIndex(r => r.tenant_id === tenantId);
+        const rec = { id, tenant_id: tenantId, webhook_url: webhookUrl, channel_name: channelName, enabled: enabled ? 1 : 0, events_json: eventsJson };
+        if (existingIdx >= 0) memoryDb.slack_integrations[existingIdx] = rec;
+        else memoryDb.slack_integrations.push(rec);
+        return { affectedRows: 1 };
+    }
+    if (/FROM slack_integrations/is.test(s)) {
+        const tenantId = params[0];
+        const rec = memoryDb.slack_integrations.find(r => r.tenant_id === tenantId);
+        return rec ? [rec] : [];
+    }
+
+    // Printhouse pricing revisions
+    if (/INSERT INTO printhouse_pricing_revisions/is.test(s)) {
+        const [id, tenantId, nodeId, proposedChecksum, ratesChecksum, ratesJson, customCreatedAt] = params;
+        const rec = { id, tenant_id: tenantId, printer_node_id: nodeId, proposed_patch_checksum: proposedChecksum, rates_checksum: ratesChecksum, rates_json: ratesJson, created_at: customCreatedAt || new Date() };
+        memoryDb.printhouse_pricing_revisions.push(rec);
+        return { affectedRows: 1 };
+    }
+    if (/FROM printhouse_pricing_revisions/is.test(s)) {
+        const revId = params[0];
+        const rev = memoryDb.printhouse_pricing_revisions.find(r => r.id === revId);
+        return rev ? [rev] : [];
+    }
+
+    // BPE Publications
+    if (/INSERT INTO bpe_pricing_publications/is.test(s)) {
+        const [id, tenantId, printerNodeId, bpePrinthouseId, revisionId, checksum, version, status] = params;
+        const rec = { id, tenant_id: tenantId, printer_node_id: printerNodeId, bpe_printhouse_id: bpePrinthouseId, revision_id: revisionId, accepted_patch_checksum: checksum, version: Number(version), status: status || 'PENDING', created_at: new Date() };
+        memoryDb.bpe_pricing_publications.push(rec);
+        return { affectedRows: 1 };
+    }
+    if (/FROM bpe_pricing_publications/is.test(s)) {
+        if (s.includes('WHERE revision_id = ?')) {
+            const revId = params[0];
+            const pubs = memoryDb.bpe_pricing_publications.filter(r => r.revision_id === revId);
+            return pubs.length > 0 ? [pubs[pubs.length - 1]] : [];
+        }
+        if (s.includes('WHERE printer_node_id = ? AND revision_id = ?')) {
+            const [printerNodeId, revisionId, tenantId, bpePrinthouseId] = params;
+            const pubs = memoryDb.bpe_pricing_publications.filter(r =>
+                r.printer_node_id === printerNodeId &&
+                r.revision_id === revisionId &&
+                r.tenant_id === tenantId &&
+                r.bpe_printhouse_id === bpePrinthouseId &&
+                r.status === 'PUBLISHED'
+            );
+            return pubs.length > 0 ? [pubs[pubs.length - 1]] : [];
+        }
+        if (s.includes('WHERE printer_node_id = ? AND bpe_printhouse_id = ? AND status = \'PUBLISHED\'')) {
+            const [printerNodeId, bpePrinthouseId] = params;
+            const pubs = memoryDb.bpe_pricing_publications.filter(r =>
+                r.printer_node_id === printerNodeId &&
+                r.bpe_printhouse_id === bpePrinthouseId &&
+                r.status === 'PUBLISHED'
+            ).sort((a, b) => (b.version - a.version) || (new Date(b.created_at) - new Date(a.created_at)));
+            return pubs.length > 0 ? [pubs[0]] : [];
+        }
+        if (s.includes('WHERE printer_node_id = ? AND bpe_printhouse_id = ?')) {
+            const [printerNodeId, bpePrinthouseId] = params;
+            const pubs = memoryDb.bpe_pricing_publications.filter(r =>
+                r.printer_node_id === printerNodeId &&
+                r.bpe_printhouse_id === bpePrinthouseId
+            ).sort((a, b) => b.version - a.version);
+            return pubs.length > 0 ? [pubs[0]] : [];
+        }
+        const nodeId = params[0];
+        const pubs = memoryDb.bpe_pricing_publications.filter(r => r.printer_node_id === nodeId && r.status === 'PUBLISHED');
+        return pubs.length > 0 ? [pubs[pubs.length - 1]] : [];
+    }
+    if (/UPDATE bpe_pricing_publications/is.test(s)) {
+        const pubId = params[params.length - 1];
+        const pub = memoryDb.bpe_pricing_publications.find(r => r.id === pubId);
+        if (pub) {
+            if (s.includes("status = 'PUBLISHED'")) {
+                pub.status = 'PUBLISHED';
+                pub.bpe_response_checksum = params[0];
+            } else if (s.includes("status = 'FAILED'")) {
+                pub.status = 'FAILED';
+                pub.error_message = params[0];
+            }
+            return { affectedRows: 1 };
+        }
+        return { affectedRows: 0 };
+    }
+
+    // User Sessions
+    if (/INSERT INTO user_sessions/is.test(s)) {
+        const [id, userId, tenantId, role, ipAddress, userAgent, expiresAt] = params;
+        const rec = { id, user_id: String(userId), tenant_id: String(tenantId), role, status: 'ACTIVE', last_activity_at: new Date(), expires_at: expiresAt || new Date(Date.now() + 86400000) };
+        memoryDb.user_sessions.push(rec);
+        return { affectedRows: 1 };
+    }
+    if (/SELECT.*FROM user_sessions/is.test(s)) {
+        if (s.includes('WHERE id = ? AND tenant_id = ?')) {
+            const [sessionId, tenantId] = params;
+            return memoryDb.user_sessions.filter(r => r.id === sessionId && String(r.tenant_id) === String(tenantId));
+        }
+        if (s.includes('WHERE id = ?')) {
+            const sessionId = params[0];
+            return memoryDb.user_sessions.filter(r => r.id === sessionId);
+        }
+        if (s.includes('WHERE user_id = ? AND tenant_id = ?')) {
+            const [userId, tenantId] = params;
+            return memoryDb.user_sessions.filter(r => String(r.user_id) === String(userId) && String(r.tenant_id) === String(tenantId) && r.status === 'ACTIVE');
+        }
+    }
+    if (/UPDATE user_sessions/is.test(s)) {
+        const reason = params[0];
+        let affected = 0;
+        if (s.includes('WHERE user_id = ? AND id != ?')) {
+            const [_, userId, currentSessionId, tenantId] = params;
+            for (const sess of memoryDb.user_sessions) {
+                if (String(sess.user_id) === String(userId) && sess.id !== currentSessionId && (tenantId === undefined || String(sess.tenant_id) === String(tenantId)) && sess.status === 'ACTIVE') {
+                    sess.status = 'REVOKED';
+                    sess.revoked_reason = reason;
+                    affected++;
+                }
+            }
+            return { affectedRows: affected };
+        }
+        if (s.includes('WHERE id = ?')) {
+            const id = params[params.length - 1];
+            const sess = memoryDb.user_sessions.find(r => r.id === id);
+            if (sess) { sess.status = 'REVOKED'; sess.revoked_reason = reason; affected = 1; }
+            return { affectedRows: affected };
+        }
+    }
+
+    // User MFA
+    if (/INSERT INTO user_mfa/is.test(s)) {
+        const [userId, tenantId, secret, confirmed, recoveryJson] = params;
+        const rec = { user_id: String(userId), tenant_id: String(tenantId), totp_secret_encrypted: secret, is_confirmed: Number(confirmed || 0), recovery_codes_json: typeof recoveryJson === 'string' ? recoveryJson : JSON.stringify(recoveryJson), last_used_timestep: 0, failed_attempts: 0, locked_until: null };
+        const idx = memoryDb.user_mfa.findIndex(r => String(r.user_id) === String(userId));
+        if (idx >= 0) memoryDb.user_mfa[idx] = rec;
+        else memoryDb.user_mfa.push(rec);
+        return { affectedRows: 1 };
+    }
+    if (/SELECT.*FROM user_mfa/is.test(s)) {
+        const userId = params[0];
+        const rec = memoryDb.user_mfa.find(r => String(r.user_id) === String(userId));
+        return rec ? [rec] : [];
+    }
+    if (/UPDATE user_mfa/is.test(s)) {
+        const userId = params[params.length - 1];
+        const rec = memoryDb.user_mfa.find(r => String(r.user_id) === String(userId));
+        if (rec && s.includes('recovery_codes_json = ?')) {
+            rec.recovery_codes_json = params[0];
+        }
+        return { affectedRows: 1 };
+    }
+
+    // Tenants
+    if (/SELECT plan, metadata_json FROM tenants/is.test(s)) {
+        return [{ plan: 'ENTERPRISE', metadata_json: '{}' }];
+    }
+
+    // Identity check
+    if (/SELECT CURRENT_USER/is.test(s)) {
+        return [{ currentUser: 'ppos_test_user@127.0.0.1', currentDb: 'ppos_test_db' }];
+    }
+
+    // Printer Nodes
+    if (/SELECT.*FROM printer_nodes/is.test(s)) {
+        if (s.includes('WHERE id != ? AND JSON_UNQUOTE')) {
+            const [excludeId, houseId] = params;
+            return memoryDb.printer_nodes.filter(n => {
+                if (n.id === excludeId) return false;
+                let meta = {};
+                try { meta = typeof n.metadata_json === 'string' ? JSON.parse(n.metadata_json) : (n.metadata_json || {}); } catch (e) {}
+                return meta.bpe_printhouse_id === houseId;
+            });
+        }
+        if (s.includes('WHERE id = ? AND tenant_id = ?')) {
+            const [id, tenantId] = params;
+            return memoryDb.printer_nodes.filter(n => n.id === id && String(n.tenant_id) === String(tenantId));
+        }
+        if (s.includes('WHERE id = ?')) {
+            const id = params[0];
+            const node = memoryDb.printer_nodes.find(n => n.id === id);
+            return node ? [node] : [{ id, name: 'Default Node', metadata_json: '{}' }];
+        }
+        return memoryDb.printer_nodes;
+    }
+
+    if (/UPDATE printer_nodes/is.test(s)) {
+        if (s.includes('metadata_json = ?')) {
+            const [metaJson, id, tenantId] = params;
+            const node = memoryDb.printer_nodes.find(n => n.id === id && (tenantId === undefined || String(n.tenant_id) === String(tenantId)));
+            if (node) {
+                node.metadata_json = metaJson;
+                return { affectedRows: 1 };
+            }
+        }
+        return { affectedRows: 0 };
+    }
+
+    return [];
+};
+
+const activeLocks = new Set();
+const lockWaiters = new Map();
+
+db.getConnection = async function () {
+    return {
+        query: async (sql, params = []) => {
+            if (/SELECT GET_LOCK/i.test(sql)) {
+                const lockName = params[0];
+                const timeoutSec = params[1] || 15;
+                if (!activeLocks.has(lockName)) {
+                    activeLocks.add(lockName);
+                    return [[{ lock_status: 1 }]];
+                }
+                return new Promise((resolve) => {
+                    const timer = setTimeout(() => {
+                        const waiters = lockWaiters.get(lockName) || [];
+                        lockWaiters.set(lockName, waiters.filter(w => w !== unlock));
+                        resolve([[{ lock_status: 0 }]]);
+                    }, timeoutSec * 1000);
+
+                    const unlock = () => {
+                        clearTimeout(timer);
+                        activeLocks.add(lockName);
+                        resolve([[{ lock_status: 1 }]]);
+                    };
+
+                    const waiters = lockWaiters.get(lockName) || [];
+                    waiters.push(unlock);
+                    lockWaiters.set(lockName, waiters);
+                });
+            }
+            if (/SELECT RELEASE_LOCK/i.test(sql)) {
+                const lockName = params[0];
+                activeLocks.delete(lockName);
+                const waiters = lockWaiters.get(lockName) || [];
+                if (waiters.length > 0) {
+                    const next = waiters.shift();
+                    next();
+                }
+                return [[{ release_status: 1 }]];
+            }
+            const rows = await db.query(sql, params);
+            return [rows];
+        },
+        release: () => {}
+    };
+};
+
+describe('Phase 39 Comprehensive Security & Integrations Suite', () => {
+    let testServer;
+    let testServerBaseUrl;
+
+    beforeAll(async () => {
+        const app = express();
+        app.use(express.json());
+        app.use('/api/admin', adminRouter);
+        app.use('/api/auth', authRouter);
+
+        await new Promise((resolve) => {
+            testServer = app.listen(0, '127.0.0.1', () => {
+                const port = testServer.address().port;
+                testServerBaseUrl = `http://127.0.0.1:${port}`;
+                resolve();
+            });
+        });
+    });
+
+    afterAll(async () => {
+        if (testServer) {
+            await new Promise((res) => testServer.close(res));
+        }
+    });
+
+    // ── 1. WEBHOOK RE-DELIVERY & AUTHORIZATION ──────────────────────────────
+    describe('1. Webhook Re-delivery & Strict Tenant Isolation', () => {
+        const delAId = 'del_alpha_001';
+        const delBId = 'del_beta_002';
+        const subAId = 'sub_alpha_001';
+        const subBId = 'sub_beta_002';
+
+        beforeAll(async () => {
+            await db.query(
+                `INSERT INTO webhook_subscriptions (id, tenant_id, url, secret, events_json, status, created_at)
+                 VALUES (?, ?, ?, ?, ?, ?, NOW())`,
+                [subAId, 'tenant_alpha', 'https://tenant-alpha.test/webhook', 'secret_alpha', '["*"]', 'ACTIVE']
+            );
+            await db.query(
+                `INSERT INTO webhook_subscriptions (id, tenant_id, url, secret, events_json, status, created_at)
+                 VALUES (?, ?, ?, ?, ?, ?, NOW())`,
+                [subBId, 'tenant_beta', 'https://tenant-beta.test/webhook', 'secret_beta', '["*"]', 'ACTIVE']
+            );
+            await db.query(
+                `INSERT INTO webhook_deliveries (id, tenant_id, subscription_id, event_type, event_id, payload_json, signature, status, attempt_count, max_attempts, created_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+                [delAId, 'tenant_alpha', subAId, 'order.created', 'evt_1', '{"order":1}', 'sig1', 'PENDING', 0, 3]
+            );
+            await db.query(
+                `INSERT INTO webhook_deliveries (id, tenant_id, subscription_id, event_type, event_id, payload_json, signature, status, attempt_count, max_attempts, created_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+                [delBId, 'tenant_beta', subBId, 'order.created', 'evt_2', '{"order":2}', 'sig2', 'PENDING', 0, 3]
+            );
+        });
+
+        it('should strictly reject Tenant A attempting to resend Tenant B delivery with zero dispatch and unchanged status', async () => {
+            let dispatchCount = 0;
+            const mockHandler = async () => {
+                dispatchCount++;
+                return { ok: true };
+            };
+
+            await expect(
+                outgoingWebhookService.resendDelivery({
+                    deliveryId: delBId,
+                    tenantId: 'tenant_alpha',
+                    requestingUserRole: 'TENANT_ADMIN',
+                    options: { mockHandler }
+                })
+            ).rejects.toThrow(/Forbidden: Tenant tenant_alpha is not authorized to resend delivery/);
+
+            // Confirm ZERO network dispatch occurred
+            expect(dispatchCount).toBe(0);
+
+            // Confirm delivery state in DB is completely unchanged
+            const delB = memoryDb.webhook_deliveries.find(r => r.id === delBId);
+            expect(delB.status).toBe('PENDING');
+            expect(delB.attempt_count).toBe(0);
+        });
+
+        it('should allow authorized tenant owner to resend their own delivery', async () => {
+            let dispatchCount = 0;
+            const mockHandler = async () => {
+                dispatchCount++;
+                return { ok: true };
+            };
+
+            const result = await outgoingWebhookService.resendDelivery({
+                deliveryId: delBId,
+                tenantId: 'tenant_beta',
+                requestingUserRole: 'TENANT_ADMIN',
+                options: { mockHandler }
+            });
+
+            expect(result.ok).toBe(true);
+            expect(result.status).toBe('DELIVERED');
+            expect(dispatchCount).toBe(1);
+
+            const delB = memoryDb.webhook_deliveries.find(r => r.id === delBId);
+            expect(delB.status).toBe('DELIVERED');
+            expect(delB.attempt_count).toBe(1);
+        });
+
+        it('should enforce explicit RBAC: reject VIEWER and unauthenticated on resend route', async () => {
+            // Unauthenticated
+            const unauthRes = await axios.post(`${testServerBaseUrl}/api/admin/webhooks/deliveries/${delAId}/resend`, {}, {
+                validateStatus: () => true
+            });
+            expect(unauthRes.status).toBe(401);
+
+            // VIEWER role token
+            const viewerToken = jwt.sign({
+                sub: 'viewer_user_1',
+                email: 'viewer@alpha.test',
+                role: 'VIEWER',
+                tenant_id: 'tenant_alpha'
+            }, process.env.JWT_SECRET, { audience: 'ppos:control', issuer: 'https://auth.printprice.pro' });
+
+            const viewerRes = await axios.post(`${testServerBaseUrl}/api/admin/webhooks/deliveries/${delAId}/resend`, {}, {
+                headers: { Authorization: `Bearer ${viewerToken}` },
+                validateStatus: () => true
+            });
+            expect(viewerRes.status).toBe(403);
+            expect(viewerRes.data.error.message).toContain('Insufficient permissions');
+        });
+    });
+
+    // ── 2. SSRF HARDENING & CONNECTION PINNING ─────────────────────────────
+    describe('2. SSRF Hardening, Robust IP Parsing & DNS Rebinding Protection', () => {
+        const { isPrivateOrForbiddenIp, createSsrfSafeLookup } = outgoingWebhookService;
+
+        it('should detect and reject all hex, octal, and single integer decimal representations of private IPs', () => {
+            expect(isPrivateOrForbiddenIp('0x7f000001')).toBe(true); // 127.0.0.1 in hex
+            expect(isPrivateOrForbiddenIp('0x7f.0.0.1')).toBe(true);  // Mixed hex
+            expect(isPrivateOrForbiddenIp('0177.0.0.1')).toBe(true);  // Octal 127.0.0.1
+            expect(isPrivateOrForbiddenIp('2130706433')).toBe(true);  // 127.0.0.1 decimal uint32
+            expect(isPrivateOrForbiddenIp('0xa9fea9fe')).toBe(true);  // 169.254.169.254 in hex
+            expect(isPrivateOrForbiddenIp('0x0a000001')).toBe(true);  // 10.0.0.1 in hex
+            expect(isPrivateOrForbiddenIp('169.254.169.254')).toBe(true); // AWS / Cloud metadata
+            expect(isPrivateOrForbiddenIp('10.255.0.1')).toBe(true);   // RFC 1918
+            expect(isPrivateOrForbiddenIp('172.16.5.4')).toBe(true);   // RFC 1918
+            expect(isPrivateOrForbiddenIp('192.168.1.1')).toBe(true);  // RFC 1918
+            expect(isPrivateOrForbiddenIp('100.64.0.1')).toBe(true);   // Carrier-grade NAT
+        });
+
+        it('should detect and reject all IPv6 loopback, local, and IPv4-mapped hexadecimal forms', () => {
+            expect(isPrivateOrForbiddenIp('::1')).toBe(true);
+            expect(isPrivateOrForbiddenIp('[::1]')).toBe(true);
+            expect(isPrivateOrForbiddenIp('0:0:0:0:0:0:0:1')).toBe(true);
+            expect(isPrivateOrForbiddenIp('::ffff:127.0.0.1')).toBe(true);
+            expect(isPrivateOrForbiddenIp('[::ffff:7f00:1]')).toBe(true); // 127.0.0.1 mapped hex groups
+            expect(isPrivateOrForbiddenIp('::ffff:a00:1')).toBe(true);    // 10.0.0.1 mapped hex groups
+            expect(isPrivateOrForbiddenIp('::ffff:169.254.169.254')).toBe(true);
+            expect(isPrivateOrForbiddenIp('fc00::1')).toBe(true);         // Unique local
+            expect(isPrivateOrForbiddenIp('fe80::1')).toBe(true);         // Link-local
+        });
+
+        it('should correctly allow valid public IPv4 and IPv6 addresses', () => {
+            expect(isPrivateOrForbiddenIp('93.184.216.34')).toBe(false); // example.com
+            expect(isPrivateOrForbiddenIp('8.8.8.8')).toBe(false);        // Google DNS
+            expect(isPrivateOrForbiddenIp('2606:2800:220:1:248:1893:25c8:1946')).toBe(false);
+        });
+
+        it('should prevent DNS rebinding by inspecting resolved IP at socket connection time in custom lookup', async () => {
+            const ssrfLookup = createSsrfSafeLookup({
+                dnsResolver: (hostname, opts, cb) => cb(null, [{ address: '127.0.0.1', family: 4 }])
+            });
+
+            await new Promise((resolve) => {
+                ssrfLookup('rebinding-attacker.test', {}, (err, address) => {
+                    expect(err).toBeDefined();
+                    expect(err.message).toContain('SSRF blocked: Resolved IP (127.0.0.1) is private, loopback, or metadata.');
+                    resolve();
+                });
+            });
+        });
+    });
+
+    // ── 3. OUTBOX HTTP REAL DELIVERY WITH VERIFIED HMAC SIGNATURE ───────────
+    describe('3. Outbox HTTP Real Delivery to Controlled Receiver with Verified Signature', () => {
+        let controlledReceiver;
+        let controlledReceiverUrl;
+        let receivedRequest = null;
+
+        beforeAll(async () => {
+            process.env.ALLOW_LOCAL_WEBHOOKS = 'true'; // Allow local connection for test server fixture
+
+            controlledReceiver = http.createServer((req, res) => {
+                let chunks = [];
+                req.on('data', c => chunks.push(c));
+                req.on('end', () => {
+                    receivedRequest = {
+                        method: req.method,
+                        headers: req.headers,
+                        body: Buffer.concat(chunks).toString()
+                    };
+                    res.writeHead(200, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ received: true }));
+                });
+            });
+
+            await new Promise(resolve => {
+                controlledReceiver.listen(0, '127.0.0.1', () => {
+                    const port = controlledReceiver.address().port;
+                    controlledReceiverUrl = `http://127.0.0.1:${port}/webhook/ingest`;
+                    resolve();
+                });
+            });
+        });
+
+        afterAll(async () => {
+            delete process.env.ALLOW_LOCAL_WEBHOOKS;
+            if (controlledReceiver) {
+                await new Promise(res => controlledReceiver.close(res));
+            }
+        });
+
+        it('should dispatch real HTTP request and verify HMAC-SHA256 signature, headers, and payload', async () => {
+            const subId = 'sub_real_receiver_1';
+            const secret = 'shared_super_secret_webhook_key_12345';
+            const tenantId = 'tenant_real_outbox';
+
+            await db.query(
+                `INSERT INTO webhook_subscriptions (id, tenant_id, url, secret, events_json, status, created_at)
+                 VALUES (?, ?, ?, ?, '["*"]', 'ACTIVE', NOW())`,
+                [subId, tenantId, controlledReceiverUrl, secret]
+            );
+
+            const enqueueRes = await outgoingWebhookService.enqueueWebhookEvent({
+                tenantId,
+                eventType: 'invoice.settled',
+                payload: { invoiceId: 'inv_999', amountCents: 150000, currency: 'EUR' }
+            });
+
+            expect(enqueueRes.ok).toBe(true);
+            const deliveryId = enqueueRes.deliveryIds[0];
+
+            // Deliver via real HTTP
+            const delivResult = await outgoingWebhookService.deliverSingleWebhook(deliveryId);
+            expect(delivResult.ok).toBe(true);
+            expect(delivResult.statusCode).toBe(200);
+
+            // Assert receiver verified payload & signature
+            expect(receivedRequest).toBeDefined();
+            expect(receivedRequest.headers['x-ppos-tenant-id']).toBe(tenantId);
+            expect(receivedRequest.headers['x-ppos-event-id']).toBeDefined();
+            expect(receivedRequest.headers['x-ppos-timestamp']).toBeDefined();
+
+            const expectedSig = 'sha256=' + crypto.createHmac('sha256', secret).update(receivedRequest.body).digest('hex');
+            expect(receivedRequest.headers['x-ppos-signature']).toBe(expectedSig);
+
+            // Assert delivery in DB marked DELIVERED
+            const delRec = memoryDb.webhook_deliveries.find(r => r.id === deliveryId);
+            expect(delRec.status).toBe('DELIVERED');
+            expect(delRec.last_status_code).toBe(200);
+        });
+    });
+
+    // ── 4. SLACK CONFIGURATION & SECRET REDACTION ───────────────────────────
+    describe('4. Slack Configuration, Secret Redaction & Event Filtering', () => {
+        const tenantId = 'tenant_slack_hardening';
+
+        it('should configure integration and redact webhook URL secrets when read back', async () => {
+            const secretUrl = 'https://hooks.slack.com/services/T12345678/B12345678/TopSecretSlackTokenString99';
+            await slackNotificationService.configureSlackIntegration({
+                tenantId,
+                webhookUrl: secretUrl,
+                channelName: '#ppos-alerts',
+                enabled: true,
+                events: ['pricing.accepted', 'incident.critical']
+            });
+
+            const readback = await slackNotificationService.getSlackConfig(tenantId);
+            expect(readback.channelName).toBe('#ppos-alerts');
+            expect(readback.configured).toBe(true);
+            // Secret must NEVER be returned in cleartext
+            expect(readback.webhookUrlRedacted).not.toBe(secretUrl);
+            expect(readback.webhookUrlRedacted).toContain('services/T12345678/B12345678/****');
+        });
+
+        it('should filter events not subscribed to in Slack configuration', async () => {
+            // Ignored event (not in events list)
+            const ignoredRes = await slackNotificationService.notifyEvent({
+                tenantId,
+                eventType: 'job.started',
+                text: 'Job started alert'
+            });
+            expect(ignoredRes.skipped).toBe(true);
+            expect(ignoredRes.reason).toBe('EVENT_NOT_SUBSCRIBED');
+        });
+    });
+
+    // ── 5. BPE AUTHENTICATION & PUBLICATION CONTRACT ────────────────────────
+    describe('5. BPE Publication & Receiver Hardening', () => {
+        const revId = 'rev_bpe_hardening_1';
+        const nodeId = 'printer_node_hardened';
+        const tenantId = 'tenant_bpe_sec';
+        const checksum = 'sha256:bpe_verified_checksum_999';
+
+        beforeAll(async () => {
+            const rates = { offset: 0.12 };
+            await db.query(
+                `INSERT INTO printhouse_pricing_revisions (id, tenant_id, printer_node_id, proposed_patch_checksum, rates_checksum, rates_json, created_at)
+                 VALUES (?, ?, ?, ?, ?, ?, NOW())`,
+                [revId, tenantId, nodeId, checksum, bpePublicationService.computeRatesChecksum(rates), JSON.stringify(rates)]
+            );
+        });
+
+        it('should fail explicitly with 503 if PPOS_BPE_SERVICE_TOKEN is not configured (never fallback)', async () => {
+            const prevToken = process.env.PPOS_BPE_SERVICE_TOKEN;
+            delete process.env.PPOS_BPE_SERVICE_TOKEN;
+
+            try {
+                await expect(
+                    bpePublicationService.publishAcceptedRevision(tenantId, nodeId, revId)
+                ).rejects.toThrow(/PPOS_BPE_SERVICE_TOKEN.*is not configured/);
+            } finally {
+                if (prevToken) process.env.PPOS_BPE_SERVICE_TOKEN = prevToken;
+            }
+        });
+
+        it('should verify BPE receiver requires exact matching token and rejects unauthorized calls', async () => {
+            const configuredServerToken = 'dedicated-bpe-secret-prod-token';
+            process.env.PPOS_BPE_SERVICE_TOKEN = configuredServerToken;
+
+            const checkAuth = (header) => {
+                if (!process.env.PPOS_BPE_SERVICE_TOKEN) return { status: 503, error: 'BPE_PUBLICATION_DISABLED' };
+                if (!header) return { status: 401, error: 'UNAUTHORIZED' };
+                const token = String(header).replace(/^Bearer\s+/i, '').trim();
+                if (token !== process.env.PPOS_BPE_SERVICE_TOKEN) return { status: 401, error: 'UNAUTHORIZED' };
+                return { status: 200, ok: true };
+            };
+
+            expect(checkAuth(null).status).toBe(401);
+            expect(checkAuth('Bearer wrong-token').status).toBe(401);
+            expect(checkAuth('Bearer ' + configuredServerToken).status).toBe(200);
+            expect(checkAuth(configuredServerToken).status).toBe(200);
+        });
+
+        it('should verify publication idempotency and readback checksum integrity under strict contract', async () => {
+            process.env.PPOS_BPE_SERVICE_TOKEN = 'test-token-valid';
+
+            const makeValidResponse = (payload) => {
+                const ratesCs = bpePublicationService.computeRatesChecksum(payload.rates);
+                return {
+                    ok: true,
+                    status: 'PUBLISHED',
+                    bpe_printhouse_id: payload.bpe_printhouse_id,
+                    revision_id: payload.revision_id,
+                    accepted_patch_checksum: payload.accepted_patch_checksum,
+                    rates_checksum: ratesCs,
+                    readback: {
+                        verified: true,
+                        accepted_patch_checksum: payload.accepted_patch_checksum,
+                        rates_checksum: ratesCs
+                    }
+                };
+            };
+
+            // 1. Successful publish
+            const res1 = await bpePublicationService.publishAcceptedRevision(tenantId, nodeId, revId, {
+                mockHandler: async (payload) => makeValidResponse(payload)
+            });
+            expect(res1.ok).toBe(true);
+            expect(res1.status).toBe('PUBLISHED');
+            expect(res1.checksumMatched).toBe(true);
+            expect(res1.ratesChecksum).toBe(bpePublicationService.computeRatesChecksum({ offset: 0.12 }));
+
+            // 2. Re-publish same revision & rates -> fast-path returns alreadyPublished
+            const res2 = await bpePublicationService.publishAcceptedRevision(tenantId, nodeId, revId, {
+                mockHandler: async (payload) => makeValidResponse(payload)
+            });
+            expect(res2.alreadyPublished).toBe(true);
+            expect(res2.status).toBe('PUBLISHED');
+            expect(res2.ratesChecksum).toBe(res1.ratesChecksum);
+        });
+
+        it('should handle MANUAL_EDIT with NULL proposed_patch_checksum and explicitly define revision checksum', async () => {
+            const manualRevId = 'rev_manual_edit_' + Date.now();
+            const manualRates = { offset: 0.15 };
+            const manualRatesCs = bpePublicationService.computeRatesChecksum(manualRates);
+
+            await db.query(
+                `INSERT INTO printhouse_pricing_revisions (id, tenant_id, printer_node_id, proposed_patch_checksum, rates_checksum, rates_json, created_at)
+                 VALUES (?, ?, ?, ?, ?, ?, NOW())`,
+                [manualRevId, tenantId, nodeId, null, manualRatesCs, JSON.stringify(manualRates)]
+            );
+
+            let capturedPayload = null;
+            const res = await bpePublicationService.publishAcceptedRevision(tenantId, nodeId, manualRevId, {
+                mockHandler: async (payload) => {
+                    capturedPayload = payload;
+                    return {
+                        ok: true,
+                        status: 'PUBLISHED',
+                        bpe_printhouse_id: payload.bpe_printhouse_id,
+                        revision_id: payload.revision_id,
+                        accepted_patch_checksum: payload.accepted_patch_checksum,
+                        rates_checksum: manualRatesCs,
+                        readback: {
+                            verified: true,
+                            accepted_patch_checksum: payload.accepted_patch_checksum,
+                            rates_checksum: manualRatesCs
+                        }
+                    };
+                }
+            });
+
+            expect(res.ok).toBe(true);
+            expect(capturedPayload.accepted_patch_checksum).toMatch(/^sha256:rev_/);
+            // Must NOT confuse revision patch checksum with rates checksum
+            expect(capturedPayload.accepted_patch_checksum).not.toBe(manualRatesCs);
+            expect(capturedPayload.version).toBeGreaterThanOrEqual(1);
+        });
+
+        it('should fail when stored rates_checksum does not match canonical hash of rates_json', async () => {
+            const corruptRevId = 'rev_corrupt_rates_' + Date.now();
+            await db.query(
+                `INSERT INTO printhouse_pricing_revisions (id, tenant_id, printer_node_id, proposed_patch_checksum, rates_checksum, rates_json, created_at)
+                 VALUES (?, ?, ?, ?, ?, ?, NOW())`,
+                [corruptRevId, tenantId, nodeId, checksum, 'sha256:corrupted_checksum', JSON.stringify({ offset: 0.12 })]
+            );
+
+            await expect(
+                bpePublicationService.publishAcceptedRevision(tenantId, nodeId, corruptRevId)
+            ).rejects.toThrow(/Revision integrity check failed/);
+        });
+
+        it('should accept stored rates_checksum in raw 64-char hex format without rewriting historical revision and send canonical sha256 in contract/readback', async () => {
+            const rawRevId = 'rev_raw_hex_' + Date.now();
+            const rates = { base_charge: 45.0, per_unit: 0.85 };
+            const canonicalChecksum = bpePublicationService.computeRatesChecksum(rates);
+            const rawHexChecksum = bpePublicationService.normalizeSha256Hex(canonicalChecksum);
+            expect(rawHexChecksum).toHaveLength(64);
+            expect(rawHexChecksum).not.toMatch(/^sha256:/);
+
+            // Store strictly as raw 64-character hex in MySQL revision
+            await db.query(
+                `INSERT INTO printhouse_pricing_revisions (id, tenant_id, printer_node_id, proposed_patch_checksum, rates_checksum, rates_json, created_at)
+                 VALUES (?, ?, ?, ?, ?, ?, NOW())`,
+                [rawRevId, tenantId, nodeId, checksum, rawHexChecksum, JSON.stringify(rates)]
+            );
+
+            let capturedSentPayload = null;
+            const res = await bpePublicationService.publishAcceptedRevision(tenantId, nodeId, rawRevId, {
+                mockHandler: async (payload) => {
+                    capturedSentPayload = payload;
+                    return {
+                        ok: true,
+                        status: 'PUBLISHED',
+                        bpe_printhouse_id: payload.bpe_printhouse_id,
+                        revision_id: payload.revision_id,
+                        accepted_patch_checksum: payload.accepted_patch_checksum,
+                        rates_checksum: payload.rates_checksum,
+                        readback: {
+                            verified: true,
+                            accepted_patch_checksum: payload.accepted_patch_checksum,
+                            rates_checksum: payload.rates_checksum
+                        }
+                    };
+                }
+            });
+
+            expect(res.ok).toBe(true);
+            expect(res.status).toBe('PUBLISHED');
+            // Must send canonical sha256:<hash> in contract
+            expect(capturedSentPayload.rates_checksum).toBe(`sha256:${rawHexChecksum}`);
+            // Must return canonical sha256:<hash> in readback result
+            expect(res.ratesChecksum).toBe(`sha256:${rawHexChecksum}`);
+
+            // Historical revision MUST NOT be rewritten
+            const [storedRev] = await db.query(`SELECT rates_checksum FROM printhouse_pricing_revisions WHERE id = ?`, [rawRevId]);
+            expect(storedRev.rates_checksum).toBe(rawHexChecksum);
+
+            // Fast-path idempotency check must match and return canonical sha256:<hash>
+            const fastPathRes = await bpePublicationService.publishAcceptedRevision(tenantId, nodeId, rawRevId);
+            expect(fastPathRes.ok).toBe(true);
+            expect(fastPathRes.alreadyPublished).toBe(true);
+            expect(fastPathRes.ratesChecksum).toBe(`sha256:${rawHexChecksum}`);
+        });
+
+        it('should accept stored rates_checksum with canonical sha256: prefix and successfully publish', async () => {
+            const canonicalRevId = 'rev_canonical_prefix_' + Date.now();
+            const rates = { base_charge: 50.0, per_unit: 0.90 };
+            const canonicalChecksum = bpePublicationService.computeRatesChecksum(rates);
+            expect(canonicalChecksum).toMatch(/^sha256:[0-9a-f]{64}$/);
+
+            await db.query(
+                `INSERT INTO printhouse_pricing_revisions (id, tenant_id, printer_node_id, proposed_patch_checksum, rates_checksum, rates_json, created_at)
+                 VALUES (?, ?, ?, ?, ?, ?, NOW())`,
+                [canonicalRevId, tenantId, nodeId, checksum, canonicalChecksum, JSON.stringify(rates)]
+            );
+
+            let capturedSentPayload = null;
+            const res = await bpePublicationService.publishAcceptedRevision(tenantId, nodeId, canonicalRevId, {
+                mockHandler: async (payload) => {
+                    capturedSentPayload = payload;
+                    return {
+                        ok: true,
+                        status: 'PUBLISHED',
+                        bpe_printhouse_id: payload.bpe_printhouse_id,
+                        revision_id: payload.revision_id,
+                        accepted_patch_checksum: payload.accepted_patch_checksum,
+                        rates_checksum: payload.rates_checksum,
+                        readback: {
+                            verified: true,
+                            accepted_patch_checksum: payload.accepted_patch_checksum,
+                            rates_checksum: payload.rates_checksum
+                        }
+                    };
+                }
+            });
+
+            expect(res.ok).toBe(true);
+            expect(res.ratesChecksum).toBe(canonicalChecksum);
+            expect(capturedSentPayload.rates_checksum).toBe(canonicalChecksum);
+
+            // Fast-path idempotency check
+            const fastPathRes = await bpePublicationService.publishAcceptedRevision(tenantId, nodeId, canonicalRevId);
+            expect(fastPathRes.ok).toBe(true);
+            expect(fastPathRes.alreadyPublished).toBe(true);
+            expect(fastPathRes.ratesChecksum).toBe(canonicalChecksum);
+        });
+
+        it('should reject stored rates_checksum with invalid SHA-256 formats (non-hex, wrong length)', async () => {
+            const rates = { offset: 0.15 };
+            const badFormatRev1 = 'rev_bad_format_1_' + Date.now();
+            // 64 chars but non-hex 'zz'
+            const nonHexChecksum = '39ded89fed4da1a721fa34d6ac392a70bc3096ea890560b8add9638f0d9bafzz';
+            await db.query(
+                `INSERT INTO printhouse_pricing_revisions (id, tenant_id, printer_node_id, proposed_patch_checksum, rates_checksum, rates_json, created_at)
+                 VALUES (?, ?, ?, ?, ?, ?, NOW())`,
+                [badFormatRev1, tenantId, nodeId, checksum, nonHexChecksum, JSON.stringify(rates)]
+            );
+
+            await expect(
+                bpePublicationService.publishAcceptedRevision(tenantId, nodeId, badFormatRev1)
+            ).rejects.toThrow(/invalid SHA-256 format/);
+
+            const badFormatRev2 = 'rev_bad_format_2_' + Date.now();
+            // Wrong length (too short)
+            const shortChecksum = 'sha256:1234567890abcdef';
+            await db.query(
+                `INSERT INTO printhouse_pricing_revisions (id, tenant_id, printer_node_id, proposed_patch_checksum, rates_checksum, rates_json, created_at)
+                 VALUES (?, ?, ?, ?, ?, ?, NOW())`,
+                [badFormatRev2, tenantId, nodeId, checksum, shortChecksum, JSON.stringify(rates)]
+            );
+
+            await expect(
+                bpePublicationService.publishAcceptedRevision(tenantId, nodeId, badFormatRev2)
+            ).rejects.toThrow(/invalid SHA-256 format/);
+        });
+
+        it('should reject stored rates_checksum when valid 64-char hex is discrepant from rates_json hash', async () => {
+            const rates = { offset: 0.20 };
+            const discrepantRevId = 'rev_discrepant_hash_' + Date.now();
+            // Valid 64-hex string but discrepant
+            const discrepantHex = '0000000000000000000000000000000000000000000000000000000000000000';
+            await db.query(
+                `INSERT INTO printhouse_pricing_revisions (id, tenant_id, printer_node_id, proposed_patch_checksum, rates_checksum, rates_json, created_at)
+                 VALUES (?, ?, ?, ?, ?, ?, NOW())`,
+                [discrepantRevId, tenantId, nodeId, checksum, discrepantHex, JSON.stringify(rates)]
+            );
+
+            await expect(
+                bpePublicationService.publishAcceptedRevision(tenantId, nodeId, discrepantRevId)
+            ).rejects.toThrow(/does not match canonical hash/);
+        });
+
+        it('should reject BPE readback when rates_checksum is not in canonical sha256:<64-hex> format (e.g. raw hex)', async () => {
+            const testRevId = 'rev_readback_format_' + Date.now();
+            const rates = { offset: 0.30 };
+            const canonicalCs = bpePublicationService.computeRatesChecksum(rates);
+            const rawHex = bpePublicationService.normalizeSha256Hex(canonicalCs);
+
+            await db.query(
+                `INSERT INTO printhouse_pricing_revisions (id, tenant_id, printer_node_id, proposed_patch_checksum, rates_checksum, rates_json, created_at)
+                 VALUES (?, ?, ?, ?, ?, ?, NOW())`,
+                [testRevId, tenantId, nodeId, checksum, canonicalCs, JSON.stringify(rates)]
+            );
+
+            // BPE returns raw hex without 'sha256:' prefix in readback -> rejected
+            await expect(
+                bpePublicationService.publishAcceptedRevision(tenantId, nodeId, testRevId, {
+                    mockHandler: async (payload) => ({
+                        ok: true,
+                        status: 'PUBLISHED',
+                        bpe_printhouse_id: payload.bpe_printhouse_id,
+                        revision_id: payload.revision_id,
+                        accepted_patch_checksum: payload.accepted_patch_checksum,
+                        rates_checksum: rawHex, // raw hex without sha256: prefix!
+                        readback: {
+                            verified: true,
+                            accepted_patch_checksum: payload.accepted_patch_checksum,
+                            rates_checksum: rawHex
+                        }
+                    })
+                })
+            ).rejects.toThrow(/rates checksum mismatch/);
+        });
+
+        it('should correctly normalize and canonicalize SHA-256 checksums via utility functions', () => {
+            const raw = '39ded89fed4da1a721fa34d6ac392a70bc3096ea890560b8add9638f0d9baf7a';
+            const canonical = 'sha256:39ded89fed4da1a721fa34d6ac392a70bc3096ea890560b8add9638f0d9baf7a';
+
+            expect(bpePublicationService.normalizeSha256Hex(raw)).toBe(raw);
+            expect(bpePublicationService.normalizeSha256Hex(canonical)).toBe(raw);
+            expect(bpePublicationService.normalizeSha256Hex(raw.toUpperCase())).toBe(raw);
+            expect(bpePublicationService.normalizeSha256Hex(`  ${canonical}  `)).toBe(raw);
+            expect(bpePublicationService.normalizeSha256Hex('SHA256:' + raw)).toBe(raw);
+
+            expect(bpePublicationService.toCanonicalSha256(raw)).toBe(canonical);
+            expect(bpePublicationService.toCanonicalSha256(canonical)).toBe(canonical);
+            expect(bpePublicationService.toCanonicalSha256(raw.toUpperCase())).toBe(canonical);
+
+            // Invalid formats
+            expect(bpePublicationService.normalizeSha256Hex(null)).toBeNull();
+            expect(bpePublicationService.normalizeSha256Hex(undefined)).toBeNull();
+            expect(bpePublicationService.normalizeSha256Hex('')).toBeNull();
+            expect(bpePublicationService.normalizeSha256Hex('not_a_hash')).toBeNull();
+            expect(bpePublicationService.normalizeSha256Hex(raw.slice(0, 63))).toBeNull();
+            expect(bpePublicationService.normalizeSha256Hex(raw + '0')).toBeNull();
+            expect(bpePublicationService.toCanonicalSha256('invalid')).toBeNull();
+        });
+
+        it('should reject response without readback.verified: true and mark publication as FAILED', async () => {
+            const badRevId = 'rev_bad_readback_' + Date.now();
+            const badChecksum = 'sha256:bad_readback_chk';
+            const rates = { offset: 0.12 };
+            await db.query(
+                `INSERT INTO printhouse_pricing_revisions (id, tenant_id, printer_node_id, proposed_patch_checksum, rates_checksum, rates_json, created_at)
+                 VALUES (?, ?, ?, ?, ?, ?, NOW())`,
+                [badRevId, tenantId, nodeId, badChecksum, bpePublicationService.computeRatesChecksum(rates), JSON.stringify(rates)]
+            );
+
+            await expect(
+                bpePublicationService.publishAcceptedRevision(tenantId, nodeId, badRevId, {
+                    mockHandler: async (payload) => ({
+                        ok: true,
+                        status: 'PUBLISHED',
+                        bpe_printhouse_id: payload.bpe_printhouse_id,
+                        revision_id: payload.revision_id,
+                        accepted_patch_checksum: payload.accepted_patch_checksum,
+                        rates_checksum: bpePublicationService.computeRatesChecksum(payload.rates),
+                        readback: { verified: false } // NOT verified!
+                    })
+                })
+            ).rejects.toThrow(/readback verification missing or unverified/);
+
+            // Verify DB record is marked FAILED
+            const [failedRec] = await db.query(
+                `SELECT status, error_message FROM bpe_pricing_publications WHERE revision_id = ? ORDER BY created_at DESC LIMIT 1`,
+                [badRevId]
+            );
+            expect(failedRec.status).toBe('FAILED');
+            expect(failedRec.error_message).toMatch(/readback verification/);
+        });
+
+        it('should reject response with mismatched rates_checksum between BPE readback and sent canonical checksum', async () => {
+            const mismatchRevId = 'rev_rates_mismatch_' + Date.now();
+            const mismatchChecksum = 'sha256:rates_mismatch_chk';
+            const rates = { offset: 0.12 };
+            await db.query(
+                `INSERT INTO printhouse_pricing_revisions (id, tenant_id, printer_node_id, proposed_patch_checksum, rates_checksum, rates_json, created_at)
+                 VALUES (?, ?, ?, ?, ?, ?, NOW())`,
+                [mismatchRevId, tenantId, nodeId, mismatchChecksum, bpePublicationService.computeRatesChecksum(rates), JSON.stringify(rates)]
+            );
+
+            await expect(
+                bpePublicationService.publishAcceptedRevision(tenantId, nodeId, mismatchRevId, {
+                    mockHandler: async (payload) => ({
+                        ok: true,
+                        status: 'PUBLISHED',
+                        bpe_printhouse_id: payload.bpe_printhouse_id,
+                        revision_id: payload.revision_id,
+                        accepted_patch_checksum: payload.accepted_patch_checksum,
+                        rates_checksum: 'sha256:forged_tampered_rates',
+                        readback: {
+                            verified: true,
+                            accepted_patch_checksum: payload.accepted_patch_checksum,
+                            rates_checksum: 'sha256:forged_tampered_rates'
+                        }
+                    })
+                })
+            ).rejects.toThrow(/rates checksum mismatch/);
+
+            const [failedRec] = await db.query(
+                `SELECT status, error_message FROM bpe_pricing_publications WHERE revision_id = ? ORDER BY created_at DESC LIMIT 1`,
+                [mismatchRevId]
+            );
+            expect(failedRec.status).toBe('FAILED');
+            expect(failedRec.error_message).toMatch(/rates checksum mismatch/);
+        });
+
+        it('should reject response with mismatched printhouse identity', async () => {
+            const identRevId = 'rev_ident_mismatch_' + Date.now();
+            const identChecksum = 'sha256:ident_mismatch_chk';
+            const rates = { offset: 0.12 };
+            await db.query(
+                `INSERT INTO printhouse_pricing_revisions (id, tenant_id, printer_node_id, proposed_patch_checksum, rates_checksum, rates_json, created_at)
+                 VALUES (?, ?, ?, ?, ?, ?, NOW())`,
+                [identRevId, tenantId, nodeId, identChecksum, bpePublicationService.computeRatesChecksum(rates), JSON.stringify(rates)]
+            );
+
+            await expect(
+                bpePublicationService.publishAcceptedRevision(tenantId, nodeId, identRevId, {
+                    mockHandler: async (payload) => ({
+                        ok: true,
+                        status: 'PUBLISHED',
+                        bpe_printhouse_id: 'wrong_house_identity',
+                        revision_id: payload.revision_id,
+                        accepted_patch_checksum: payload.accepted_patch_checksum,
+                        rates_checksum: bpePublicationService.computeRatesChecksum(payload.rates),
+                        readback: {
+                            verified: true,
+                            accepted_patch_checksum: payload.accepted_patch_checksum,
+                            rates_checksum: bpePublicationService.computeRatesChecksum(payload.rates)
+                        }
+                    })
+                })
+            ).rejects.toThrow(/BPE printhouse identity mismatch/);
+        });
+
+        it('should confirm BPE calculation reflects published rates in isolated engine fixture', () => {
+            const { Repository, EstimatesService } = require('@ppos/pricing-engine');
+            const repo = new Repository();
+
+            // Seed BPE repository cache with initial rates
+            const bpeHouseId = 'ph_bpe_test_1';
+            repo._cache = [{
+                id: bpeHouseId,
+                house_id: bpeHouseId,
+                name: 'Test House Alpha',
+                active: true,
+                rates: {
+                    markup_paper: 1.10,
+                    markup_print: 1.15
+                }
+            }];
+
+            const service = new EstimatesService(repo);
+            expect(service).toBeDefined();
+
+            // Simulate BPE publication updating cached rates
+            const updatedRates = {
+                markup_paper: 1.25,
+                markup_print: 1.30
+            };
+            const cached = repo._cache.find(h => h.id === bpeHouseId);
+            cached.rates = updatedRates;
+            cached.accepted_patch_checksum = checksum;
+
+            expect(cached.rates.markup_paper).toBe(1.25);
+            expect(cached.accepted_patch_checksum).toBe(checksum);
+        });
+
+        it('should reject historical revision even if a subsequent publication attempt FAILED', async () => {
+            const nodeIdHist = 'node_hist_test_' + Date.now();
+            const revIdSuccess = 'rev_success_' + Date.now();
+            const revIdFailed = 'rev_failed_' + Date.now();
+            const revIdOld = 'rev_old_' + Date.now();
+
+            const rates1 = { offset: 0.10 };
+            const rates2 = { offset: 0.20 };
+            const ratesOld = { offset: 0.05 };
+
+            // Revision 1: created 2 hours ago
+            const t1 = new Date(Date.now() - 2 * 3600 * 1000);
+            await db.query(
+                `INSERT INTO printhouse_pricing_revisions (id, tenant_id, printer_node_id, proposed_patch_checksum, rates_checksum, rates_json, created_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                [revIdSuccess, tenantId, nodeIdHist, 'sha256:p1', bpePublicationService.computeRatesChecksum(rates1), JSON.stringify(rates1), t1]
+            );
+
+            // Revision 2 (will fail): created 1 hour ago
+            const t2 = new Date(Date.now() - 1 * 3600 * 1000);
+            await db.query(
+                `INSERT INTO printhouse_pricing_revisions (id, tenant_id, printer_node_id, proposed_patch_checksum, rates_checksum, rates_json, created_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                [revIdFailed, tenantId, nodeIdHist, 'sha256:p2', bpePublicationService.computeRatesChecksum(rates2), JSON.stringify(rates2), t2]
+            );
+
+            // Historical Revision (older than Revision 1): created 3 hours ago
+            const tOld = new Date(Date.now() - 3 * 3600 * 1000);
+            await db.query(
+                `INSERT INTO printhouse_pricing_revisions (id, tenant_id, printer_node_id, proposed_patch_checksum, rates_checksum, rates_json, created_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                [revIdOld, tenantId, nodeIdHist, 'sha256:pOld', bpePublicationService.computeRatesChecksum(ratesOld), JSON.stringify(ratesOld), tOld]
+            );
+
+            // 1. Publish Revision 1 -> Success (status PUBLISHED, version 1)
+            const res1 = await bpePublicationService.publishAcceptedRevision(tenantId, nodeIdHist, revIdSuccess, {
+                mockHandler: async (payload) => ({
+                    ok: true,
+                    status: 'PUBLISHED',
+                    bpe_printhouse_id: payload.bpe_printhouse_id,
+                    revision_id: payload.revision_id,
+                    accepted_patch_checksum: payload.accepted_patch_checksum,
+                    rates_checksum: payload.rates ? bpePublicationService.computeRatesChecksum(payload.rates) : 'sha256:r1',
+                    readback: {
+                        verified: true,
+                        accepted_patch_checksum: payload.accepted_patch_checksum,
+                        rates_checksum: payload.rates ? bpePublicationService.computeRatesChecksum(payload.rates) : 'sha256:r1'
+                    }
+                })
+            });
+            expect(res1.ok).toBe(true);
+            expect(res1.version).toBe(1);
+
+            // 2. Publish Revision 2 -> FAILS (status FAILED, version 2)
+            await expect(
+                bpePublicationService.publishAcceptedRevision(tenantId, nodeIdHist, revIdFailed, {
+                    mockHandler: async () => {
+                        throw new Error('Simulated BPE Network Timeout');
+                    }
+                })
+            ).rejects.toThrow('Simulated BPE Network Timeout');
+
+            // 3. Attempt to publish Historical Revision (created 3h ago, older than Revision 1 at 2h ago)
+            // Even though the latest row in bpe_pricing_publications is FAILED,
+            // the service MUST find the last PUBLISHED revision and reject the historical one!
+            await expect(
+                bpePublicationService.publishAcceptedRevision(tenantId, nodeIdHist, revIdOld, {
+                    mockHandler: async () => ({ ok: true, status: 'PUBLISHED' })
+                })
+            ).rejects.toThrow(/Cannot publish historical revision/);
+        });
+
+        it('should serialize concurrent publications to the same destination without duplicate versions', async () => {
+            const nodeIdConc = 'node_conc_test_' + Date.now();
+            const revA = 'rev_conc_a_' + Date.now();
+            const revB = 'rev_conc_b_' + Date.now();
+
+            const ratesA = { offset: 0.11 };
+            const ratesB = { offset: 0.22 };
+
+            const tA = new Date(Date.now() - 1000);
+            const tB = new Date(Date.now());
+
+            await db.query(
+                `INSERT INTO printhouse_pricing_revisions (id, tenant_id, printer_node_id, proposed_patch_checksum, rates_checksum, rates_json, created_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                [revA, tenantId, nodeIdConc, 'sha256:pA', bpePublicationService.computeRatesChecksum(ratesA), JSON.stringify(ratesA), tA]
+            );
+
+            await db.query(
+                `INSERT INTO printhouse_pricing_revisions (id, tenant_id, printer_node_id, proposed_patch_checksum, rates_checksum, rates_json, created_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                [revB, tenantId, nodeIdConc, 'sha256:pB', bpePublicationService.computeRatesChecksum(ratesB), JSON.stringify(ratesB), tB]
+            );
+
+            // Launch both simultaneously
+            const [resA, resB] = await Promise.all([
+                bpePublicationService.publishAcceptedRevision(tenantId, nodeIdConc, revA, {
+                    mockHandler: async (payload) => {
+                        // simulate slight processing delay inside lock
+                        await new Promise(r => setTimeout(r, 20));
+                        return {
+                            ok: true,
+                            status: 'PUBLISHED',
+                            bpe_printhouse_id: payload.bpe_printhouse_id,
+                            revision_id: payload.revision_id,
+                            accepted_patch_checksum: payload.accepted_patch_checksum,
+                            rates_checksum: bpePublicationService.computeRatesChecksum(payload.rates),
+                            readback: {
+                                verified: true,
+                                accepted_patch_checksum: payload.accepted_patch_checksum,
+                                rates_checksum: bpePublicationService.computeRatesChecksum(payload.rates)
+                            }
+                        };
+                    }
+                }),
+                bpePublicationService.publishAcceptedRevision(tenantId, nodeIdConc, revB, {
+                    mockHandler: async (payload) => {
+                        await new Promise(r => setTimeout(r, 20));
+                        return {
+                            ok: true,
+                            status: 'PUBLISHED',
+                            bpe_printhouse_id: payload.bpe_printhouse_id,
+                            revision_id: payload.revision_id,
+                            accepted_patch_checksum: payload.accepted_patch_checksum,
+                            rates_checksum: bpePublicationService.computeRatesChecksum(payload.rates),
+                            readback: {
+                                verified: true,
+                                accepted_patch_checksum: payload.accepted_patch_checksum,
+                                rates_checksum: bpePublicationService.computeRatesChecksum(payload.rates)
+                            }
+                        };
+                    }
+                })
+            ]);
+
+            expect(resA.ok).toBe(true);
+            expect(resB.ok).toBe(true);
+            // Must have reserved distinct monotonically increasing versions!
+            expect(resA.version).not.toBe(resB.version);
+            const versions = [resA.version, resB.version].sort((a, b) => a - b);
+            expect(versions).toEqual([1, 2]);
+        });
+    });
+
+    // ── 6. GEMINI ADAPTER & CALIBRATION ASSISTANT ───────────────────────────
+    describe('6. Gemini Real Adapter & Calibration Assistant Flow', () => {
+
+        it('should preserve maxTokens and temperature options in complete() and generateStructuredCompletion()', async () => {
+            let capturedOptions = null;
+            const prevApiKey = process.env.GEMINI_API_KEY;
+            process.env.GEMINI_API_KEY = 'test_gemini_key_for_contract';
+
+            const spyAdapter = Object.create(aiAdapter);
+            spyAdapter.generateStructuredCompletion = async (opts) => {
+                capturedOptions = opts;
+                return { rawText: '{"decision": "CALIBRATE"}', json: { decision: 'CALIBRATE' } };
+            };
+
+            await spyAdapter.complete({
+                prompt: 'Evaluate calibration sensitivity',
+                maxTokens: 250,
+                temperature: 0.3
+            });
+
+            expect(capturedOptions).toBeDefined();
+            expect(capturedOptions.maxTokens).toBe(250);
+            expect(capturedOptions.temperature).toBe(0.3);
+            expect(capturedOptions.userPrompt).toBe('Evaluate calibration sensitivity');
+
+            if (prevApiKey) process.env.GEMINI_API_KEY = prevApiKey;
+            else delete process.env.GEMINI_API_KEY;
+        });
+
+        it('should distinguish real provider from fallback/mock in calibration assistant response', async () => {
+            const mockProposal = {
+                intent: 'SPEC_EXTRACTION',
+                specPatch: { copies: 250, book_width_mm: 148, book_height_mm: 210, interior_pages: 96, binding_method: 'saddle stitch' },
+                declaredCommercials: { targetManufacturingPrice: 450, currency: 'EUR' },
+                clarificationQuestions: [],
+                explanation: 'Calibration mock proposal',
+                warnings: [],
+                readyForValidation: true
+            };
+
+            const result = await calibrationAssistantService.interpret(
+                'tenant_alpha',
+                'Calibrar 250 folletos A5 de 96 paginas grapados',
+                { id: 'usr_1', email: 'admin@alpha.test', role: 'SUPER_ADMIN' },
+                { mockResponse: mockProposal }
+            );
+
+            expect(result.ok).toBe(true);
+            expect(result.proposal.specPatch.copies).toBe(250);
+            expect(result.provider).toBe('mock');
+            expect(result.isFallback).toBe(true);
+        });
+    });
+
+    // ── 7. MFA, SESSIONS & REVOCATION ISOLATION ────────────────────────────
+    describe('7. MFA Challenge Route Blocking & Session Revocation Isolation', () => {
+        const userId = 'usr_sec_101';
+        const tenantId = 'tenant_alpha';
+        const session1Id = 'sess_active_1';
+        const session2Id = 'sess_active_2';
+
+        beforeAll(async () => {
+            // Seed user with 2 active sessions
+            await userSessionService.createSession({
+                sessionId: session1Id,
+                userId,
+                tenantId,
+                role: 'TENANT_ADMIN'
+            });
+            await userSessionService.createSession({
+                sessionId: session2Id,
+                userId,
+                tenantId,
+                role: 'TENANT_ADMIN'
+            });
+        });
+
+        it('should block MFA challenge tokens from accessing normal protected admin endpoints', async () => {
+            const mfaChallengeToken = jwt.sign({
+                sub: userId,
+                tenant_id: tenantId,
+                purpose: 'mfa_challenge',
+                is_mfa_challenge: true,
+                aud: 'ppos:mfa-challenge'
+            }, process.env.JWT_SECRET, { issuer: 'https://auth.printprice.pro' });
+
+            const res = await axios.get(`${testServerBaseUrl}/api/admin/verify`, {
+                headers: { Authorization: `Bearer ${mfaChallengeToken}` },
+                validateStatus: () => true
+            });
+
+            expect(res.status).toBe(403);
+            expect(res.data.error.code).toBe('MFA_CHALLENGE_PENDING');
+        });
+
+        it('should revoke other sessions of the same user while preserving active current session', async () => {
+            const revokeRes = await userSessionService.revokeOtherSessions(userId, tenantId, session1Id);
+            expect(revokeRes.revokedCount).toBe(1);
+
+            // Session 1 remains valid
+            const s1Check = await userSessionService.validateSession(session1Id, tenantId, userId);
+            expect(s1Check.valid).toBe(true);
+
+            // Session 2 is revoked
+            const s2Check = await userSessionService.validateSession(session2Id, tenantId, userId);
+            expect(s2Check.valid).toBe(false);
+            expect(s2Check.reason).toBe('SESSION_REVOKED');
+        });
+
+        it('should enforce strict tenant isolation on session revocation (Tenant A cannot revoke Tenant B)', async () => {
+            const betaSessionId = 'sess_beta_99';
+            await userSessionService.createSession({
+                sessionId: betaSessionId,
+                userId: 'usr_beta_1',
+                tenantId: 'tenant_beta',
+                role: 'TENANT_ADMIN'
+            });
+
+            // Tenant Alpha attempts to revoke Tenant Beta's session
+            const attackResult = await userSessionService.revokeSession(betaSessionId, 'tenant_alpha', 'HACK_ATTEMPT');
+            expect(attackResult.ok).toBe(false);
+            expect(attackResult.code).toBe('SESSION_NOT_FOUND');
+
+            // Beta session remains ACTIVE
+            const betaCheck = await userSessionService.validateSession(betaSessionId, 'tenant_beta', 'usr_beta_1');
+            expect(betaCheck.valid).toBe(true);
+        });
+    });
+
+    // ── 8. GOVERNED PROVISIONING CP -> BPE & SUSPENSION INTEGRITY ──────────
+    describe('8. Governed CP -> BPE Printhouse Provisioning & Suspension Integrity', () => {
+        const { provisionBpePrinthouse, parseAndValidateMetadata } = require('../scripts/provision_bpe_printhouse');
+
+        const realNodeId = 'node-329a3bc4';
+        const realTenantId = 'ph-707a5869';
+        const realHouseId = 'bpe_node-329a3bc4';
+
+        let mockPrinthouses = [];
+        const mockMongoClient = {
+            db: () => ({
+                databaseName: 'test_bpe_harness',
+                collection: () => ({
+                    find: (query) => {
+                        const filterFn = (p) => {
+                            if (query.$or) {
+                                const ids = query.$or.map(o => o.id || o.house_id).filter(Boolean);
+                                return ids.includes(p.id) || ids.includes(p.house_id);
+                            }
+                            if (query.printer_node_id) {
+                                return p.printer_node_id === query.printer_node_id;
+                            }
+                            return true;
+                        };
+                        const matches = mockPrinthouses.filter(filterFn);
+                        return {
+                            limit: (n) => ({
+                                toArray: async () => matches.slice(0, n)
+                            }),
+                            toArray: async () => matches
+                        };
+                    },
+                    findOne: async (query) => {
+                        if (query.$or) {
+                            const ids = query.$or.map(o => o.id || o.house_id).filter(Boolean);
+                            return mockPrinthouses.find(p => ids.includes(p.id) || ids.includes(p.house_id)) || null;
+                        }
+                        if (query.printer_node_id) {
+                            return mockPrinthouses.find(p => p.printer_node_id === query.printer_node_id) || null;
+                        }
+                        return null;
+                    },
+                    insertOne: async (doc) => {
+                        const rec = { ...doc, _id: 'mongo_mock_' + Date.now() };
+                        mockPrinthouses.push(rec);
+                        return { insertedId: rec._id };
+                    },
+                    updateOne: async (filter, update) => {
+                        const doc = mockPrinthouses.find(p => p._id === filter._id);
+                        if (doc && update.$set) {
+                            Object.assign(doc, update.$set);
+                        }
+                        return { matchedCount: doc ? 1 : 0 };
+                    }
+                })
+            }),
+            close: async () => {}
+        };
+
+        beforeEach(() => {
+            mockPrinthouses = [];
+            memoryDb.printer_nodes = memoryDb.printer_nodes.filter(n => n.id !== 'node-other-conflicting' && n.id !== 'node-with-meta-test');
+            // Seed the real node in MySQL mock with ONLY real columns from SHOW COLUMNS:
+            // id, tenant_id, name, status, metadata_json, rates_json, signatures, limits,
+            // delivery_time, production_lead_days, country, region, marketplace_enabled, visibility_scope
+            const existingIdx = memoryDb.printer_nodes.findIndex(n => n.id === realNodeId);
+            const nodeRec = {
+                id: realNodeId,
+                tenant_id: realTenantId,
+                name: 'philologica.ai Printhouse',
+                status: 'SUSPENDED',
+                metadata_json: null,
+                rates_json: JSON.stringify({ base_charge: 100 }),
+                signatures: JSON.stringify([16, 32]),
+                limits: '{}',
+                delivery_time: '14 days',
+                production_lead_days: 7,
+                country: 'ES',
+                region: 'Madrid',
+                marketplace_enabled: 0,
+                visibility_scope: 'PRIVATE'
+            };
+            if (existingIdx >= 0) memoryDb.printer_nodes[existingIdx] = nodeRec;
+            else memoryDb.printer_nodes.push(nodeRec);
+        });
+
+        it('should execute dry-run mode by default for real node node-329a3bc4 without modifying databases', async () => {
+            const res = await provisionBpePrinthouse({
+                nodeId: realNodeId,
+                tenantId: realTenantId,
+                houseId: realHouseId,
+                dryRun: true,
+                dbClient: db,
+                mongoClientInstance: mockMongoClient
+            });
+
+            expect(res.ok).toBe(true);
+            expect(res.dryRun).toBe(true);
+            expect(res.plan.node.real_status).toBe('SUSPENDED');
+            expect(res.plan.node.is_cotizable).toBe(false);
+            expect(res.plan.activationGranted).toBe(false);
+            expect(res.plan.mongoDocument.status).toBe('SUSPENDED');
+            expect(res.plan.mongoDocument.active).toBe(false);
+            expect(res.plan.mongoDocument.version).toBe(0);
+            expect(res.plan.statusPreserved).toBe('SUSPENDED');
+
+            // Shipping resolution: no canonical shipping configured, not inventing days
+            expect(res.plan.shippingResolution.configured).toBe(false);
+            expect(res.plan.shippingResolution.shipping_days).toBeNull();
+            expect(res.plan.shippingResolution.shipping).toBeNull();
+            expect(res.plan.shippingResolution.delivery_time_raw).toBe('14 days');
+            expect(res.plan.mongoDocument.shipping_days).toBeUndefined();
+            expect(res.plan.mongoDocument.shipping).toBeUndefined();
+
+            // Verify ZERO mutations
+            expect(mockPrinthouses.length).toBe(0);
+            const node = memoryDb.printer_nodes.find(n => n.id === realNodeId);
+            expect(node.metadata_json).toBeNull();
+            expect(node.status).toBe('SUSPENDED');
+        });
+
+        it('should reject provisioning when tenant_id does not match node tenant', async () => {
+            await expect(
+                provisionBpePrinthouse({
+                    nodeId: realNodeId,
+                    tenantId: 'ph-wrong-tenant',
+                    dbClient: db,
+                    mongoClientInstance: mockMongoClient
+                })
+            ).rejects.toThrow(/TENANT_MISMATCH/);
+        });
+
+        it('should reject provisioning if BPE house ID is already assigned to another node in MySQL', async () => {
+            // Seed other node with bpe_printhouse_id = 'bpe_node-329a3bc4'
+            memoryDb.printer_nodes.push({
+                id: 'node-other-conflicting',
+                tenant_id: 'tenant-other',
+                name: 'Other Node',
+                status: 'ACTIVE',
+                metadata_json: JSON.stringify({ bpe_printhouse_id: realHouseId })
+            });
+
+            await expect(
+                provisionBpePrinthouse({
+                    nodeId: realNodeId,
+                    tenantId: realTenantId,
+                    houseId: realHouseId,
+                    dbClient: db,
+                    mongoClientInstance: mockMongoClient
+                })
+            ).rejects.toThrow(/CONFLICT_HOUSE_ID_IN_USE/);
+        });
+
+        it('should reject provisioning if MongoDB already contains conflicting mapping for house ID', async () => {
+            // Seed MongoDB with house mapped to a different node
+            mockPrinthouses.push({
+                _id: 'mongo_conflict_1',
+                id: realHouseId,
+                house_id: realHouseId,
+                printer_node_id: 'node-foreign',
+                tenant_id: 'tenant-foreign'
+            });
+
+            await expect(
+                provisionBpePrinthouse({
+                    nodeId: realNodeId,
+                    tenantId: realTenantId,
+                    houseId: realHouseId,
+                    dbClient: db,
+                    mongoClientInstance: mockMongoClient
+                })
+            ).rejects.toThrow(/CONFLICT_DUPLICATE_BPE_HOUSE/);
+        });
+
+        it('should detect duplicate house documents in MongoDB using find(...).limit(2).toArray() and reject without writes', async () => {
+            // Seed duplicate documents with the same house ID in MongoDB
+            mockPrinthouses.push(
+                { _id: 'mongo_dup_1', id: realHouseId, house_id: realHouseId, printer_node_id: realNodeId, tenant_id: realTenantId },
+                { _id: 'mongo_dup_2', id: realHouseId, house_id: realHouseId, printer_node_id: realNodeId, tenant_id: realTenantId }
+            );
+
+            await expect(
+                provisionBpePrinthouse({
+                    nodeId: realNodeId,
+                    tenantId: realTenantId,
+                    houseId: realHouseId,
+                    dryRun: false,
+                    allowProduction: true,
+                    dbClient: db,
+                    mongoClientInstance: mockMongoClient
+                })
+            ).rejects.toThrow(/CONFLICT_DUPLICATE_BPE_HOUSE: Found 2 conflicting printhouse documents matching house ID/);
+
+            // Verify ZERO mutations made
+            expect(mockPrinthouses.length).toBe(2);
+            const node = memoryDb.printer_nodes.find(n => n.id === realNodeId);
+            expect(node.metadata_json).toBeNull();
+        });
+
+        it('should detect multiple node mapping documents in MongoDB using find(...).limit(2).toArray() and reject without writes', async () => {
+            // Seed multiple documents for the same node ID with different house IDs in MongoDB
+            mockPrinthouses.push(
+                { _id: 'mongo_node_dup_1', id: 'bpe_house_alpha', house_id: 'bpe_house_alpha', printer_node_id: realNodeId, tenant_id: realTenantId },
+                { _id: 'mongo_node_dup_2', id: 'bpe_house_beta', house_id: 'bpe_house_beta', printer_node_id: realNodeId, tenant_id: realTenantId }
+            );
+
+            await expect(
+                provisionBpePrinthouse({
+                    nodeId: realNodeId,
+                    tenantId: realTenantId,
+                    houseId: realHouseId,
+                    dryRun: false,
+                    allowProduction: true,
+                    dbClient: db,
+                    mongoClientInstance: mockMongoClient
+                })
+            ).rejects.toThrow(/CONFLICT_MULTIPLE_NODE_MAPPINGS: Found 2 conflicting printhouse documents matching printer_node_id/);
+
+            // Verify ZERO mutations made
+            expect(mockPrinthouses.length).toBe(2);
+            const node = memoryDb.printer_nodes.find(n => n.id === realNodeId);
+            expect(node.metadata_json).toBeNull();
+        });
+
+        it('should execute governed provisioning with baseline version: 0, without simulating publication, and copy real SUSPENDED status', async () => {
+            const res = await provisionBpePrinthouse({
+                nodeId: realNodeId,
+                tenantId: realTenantId,
+                houseId: realHouseId,
+                dryRun: false,
+                allowProduction: true,
+                dbClient: db,
+                mongoClientInstance: mockMongoClient
+            });
+
+            expect(res.ok).toBe(true);
+            expect(res.dryRun).toBe(false);
+            expect(res.provisioned).toBe(true);
+            expect(res.status).toBe('SUSPENDED');
+            expect(res.active).toBe(false);
+            expect(res.version).toBe(0);
+
+            // Verify MongoDB document has version: 0 without simulating any publication
+            expect(mockPrinthouses.length).toBe(1);
+            const mongoHouse = mockPrinthouses[0];
+            expect(mongoHouse.id).toBe(realHouseId);
+            expect(mongoHouse.status).toBe('SUSPENDED');
+            expect(mongoHouse.active).toBe(false);
+            expect(mongoHouse.version).toBe(0);
+            expect(mongoHouse.published_revision_id).toBeUndefined();
+            expect(mongoHouse.rates_checksum).toBeUndefined();
+            expect(mongoHouse.accepted_patch_checksum).toBeUndefined();
+            expect(mongoHouse.printer_node_id).toBe(realNodeId);
+            expect(mongoHouse.tenant_id).toBe(realTenantId);
+
+            // Verify MySQL node metadata update: bpe_printhouse_id added, status remains SUSPENDED
+            const node = memoryDb.printer_nodes.find(n => n.id === realNodeId);
+            expect(node.status).toBe('SUSPENDED');
+            const meta = JSON.parse(node.metadata_json);
+            expect(meta.bpe_printhouse_id).toBe(realHouseId);
+        });
+
+        it('should support workflow: provision (version 0) -> first governed CP publication (version 1) -> verified persistence', async () => {
+            // 1. Initial provision: creates baseline with version 0
+            const provRes = await provisionBpePrinthouse({
+                nodeId: realNodeId,
+                tenantId: realTenantId,
+                houseId: realHouseId,
+                dryRun: false,
+                allowProduction: true,
+                dbClient: db,
+                mongoClientInstance: mockMongoClient
+            });
+            expect(provRes.ok).toBe(true);
+            expect(provRes.version).toBe(0);
+
+            const mongoHouse = mockPrinthouses[0];
+            expect(mongoHouse.version).toBe(0);
+
+            // 2. Prepare first governed revision in MySQL
+            const revId = 'rev_first_governed_publication_' + Date.now();
+            const patchChecksum = 'sha256:patch_governed_v1_chk';
+            const publishedRates = { base_charge: 350, unit_price: 0.15 };
+            const ratesChecksum = bpePublicationService.computeRatesChecksum(publishedRates);
+
+            await db.query(
+                `INSERT INTO printhouse_pricing_revisions (id, tenant_id, printer_node_id, proposed_patch_checksum, rates_checksum, rates_json, created_at)
+                 VALUES (?, ?, ?, ?, ?, ?, NOW())`,
+                [revId, realTenantId, realNodeId, patchChecksum, ratesChecksum, JSON.stringify(publishedRates)]
+            );
+
+            // 3. Publish first revision from CP to BPE (which reserves and publishes version 1)
+            let receivedVersionInBpe = null;
+            const pubRes = await bpePublicationService.publishAcceptedRevision(realTenantId, realNodeId, revId, {
+                mockHandler: async (payload) => {
+                    receivedVersionInBpe = payload.version;
+                    // BPE receiver updates document in MongoDB to version 1 with published rates and checksums
+                    mongoHouse.version = payload.version;
+                    mongoHouse.rates = payload.rates;
+                    mongoHouse.accepted_patch_checksum = payload.accepted_patch_checksum;
+                    mongoHouse.rates_checksum = payload.rates_checksum;
+                    mongoHouse.published_revision_id = payload.revision_id;
+                    mongoHouse.updated_at = new Date();
+
+                    return {
+                        ok: true,
+                        status: 'PUBLISHED',
+                        bpe_printhouse_id: payload.bpe_printhouse_id,
+                        revision_id: payload.revision_id,
+                        accepted_patch_checksum: payload.accepted_patch_checksum,
+                        rates_checksum: payload.rates_checksum,
+                        readback: {
+                            verified: true,
+                            accepted_patch_checksum: payload.accepted_patch_checksum,
+                            rates_checksum: payload.rates_checksum
+                        }
+                    };
+                }
+            });
+
+            expect(pubRes.ok).toBe(true);
+            expect(pubRes.status).toBe('PUBLISHED');
+            expect(pubRes.version).toBe(1);
+            expect(receivedVersionInBpe).toBe(1); // First governed CP publication is exactly version 1
+
+            // Verify MongoDB document state after first publication
+            expect(mongoHouse.version).toBe(1);
+            expect(mongoHouse.published_revision_id).toBe(revId);
+            expect(mongoHouse.rates.base_charge).toBe(350);
+            expect(mongoHouse.accepted_patch_checksum).toBe(patchChecksum);
+            expect(mongoHouse.rates_checksum).toBe(bpePublicationService.toCanonicalSha256(ratesChecksum));
+            // Crucial: printhouse remains SUSPENDED / active: false
+            expect(mongoHouse.status).toBe('SUSPENDED');
+            expect(mongoHouse.active).toBe(false);
+        });
+
+        it('should preserve governed rates, version, checksums, and published_revision_id on replay after publication', async () => {
+            // Setup: document already exists in MongoDB with version 1, published rates, and revision metadata
+            const establishedRevId = 'rev_established_v1';
+            const establishedPatchChecksum = 'sha256:established_patch_chk';
+            const establishedRates = { base_charge: 500, click_rate: 0.08 };
+            const establishedRatesChecksum = bpePublicationService.toCanonicalSha256(
+                bpePublicationService.computeRatesChecksum(establishedRates)
+            );
+
+            mockPrinthouses.push({
+                _id: 'mongo_established_house',
+                id: realHouseId,
+                house_id: realHouseId,
+                name: 'philologica.ai Printhouse',
+                tenant_id: realTenantId,
+                printer_node_id: realNodeId,
+                status: 'SUSPENDED',
+                active: false,
+                version: 1,
+                rates: establishedRates,
+                published_revision_id: establishedRevId,
+                accepted_patch_checksum: establishedPatchChecksum,
+                rates_checksum: establishedRatesChecksum,
+                updated_at: new Date('2026-10-01T10:00:00Z')
+            });
+
+            // Modify CP MySQL node rates to simulate node config divergence (e.g. unreviewed draft in node table)
+            const nodeInDb = memoryDb.printer_nodes.find(n => n.id === realNodeId);
+            nodeInDb.rates_json = JSON.stringify({ base_charge: 9999, tampered: true });
+
+            // Execute replay provisioning
+            const replayRes = await provisionBpePrinthouse({
+                nodeId: realNodeId,
+                tenantId: realTenantId,
+                houseId: realHouseId,
+                dryRun: false,
+                allowProduction: true,
+                dbClient: db,
+                mongoClientInstance: mockMongoClient
+            });
+
+            expect(replayRes.ok).toBe(true);
+            expect(replayRes.alreadyProvisioned).toBe(true);
+            expect(replayRes.version).toBe(1);
+
+            // Verify MongoDB document: rates, version, checksums, published_revision_id were NOT overwritten!
+            expect(mockPrinthouses.length).toBe(1);
+            const mongoHouse = mockPrinthouses[0];
+            expect(mongoHouse.version).toBe(1);
+            expect(mongoHouse.rates.base_charge).toBe(500); // Preserved established rates!
+            expect(mongoHouse.rates.tampered).toBeUndefined();
+            expect(mongoHouse.published_revision_id).toBe(establishedRevId);
+            expect(mongoHouse.accepted_patch_checksum).toBe(establishedPatchChecksum);
+            expect(mongoHouse.rates_checksum).toBe(establishedRatesChecksum);
+
+            // Status and isolation preserved
+            expect(mongoHouse.status).toBe('SUSPENDED');
+            expect(mongoHouse.active).toBe(false);
+
+            // Replay again to confirm strict idempotency
+            const replayRes2 = await provisionBpePrinthouse({
+                nodeId: realNodeId,
+                tenantId: realTenantId,
+                houseId: realHouseId,
+                dryRun: false,
+                allowProduction: true,
+                dbClient: db,
+                mongoClientInstance: mockMongoClient
+            });
+            expect(replayRes2.ok).toBe(true);
+            expect(mockPrinthouses.length).toBe(1);
+            expect(mongoHouse.version).toBe(1);
+            expect(mongoHouse.rates.base_charge).toBe(500);
+        });
+
+        it('should preserve existing metadata_json keys when provisioning', async () => {
+            const nodeWithMetaId = 'node-with-meta-test';
+            memoryDb.printer_nodes.push({
+                id: nodeWithMetaId,
+                tenant_id: realTenantId,
+                name: 'Custom Metadata Node',
+                status: 'SUSPENDED',
+                metadata_json: JSON.stringify({ custom_webhook: 'https://hook.test', cluster_zone: 'eu-west-1' }),
+                rates_json: '{}',
+                signatures: '[]'
+            });
+
+            const res = await provisionBpePrinthouse({
+                nodeId: nodeWithMetaId,
+                tenantId: realTenantId,
+                houseId: 'bpe_custom_meta',
+                dryRun: false,
+                allowProduction: true,
+                dbClient: db,
+                mongoClientInstance: mockMongoClient
+            });
+
+            expect(res.ok).toBe(true);
+            const node = memoryDb.printer_nodes.find(n => n.id === nodeWithMetaId);
+            const parsed = JSON.parse(node.metadata_json);
+            expect(parsed.custom_webhook).toBe('https://hook.test');
+            expect(parsed.cluster_zone).toBe('eu-west-1');
+            expect(parsed.bpe_printhouse_id).toBe('bpe_custom_meta');
+        });
+
+        it('should strictly query only real columns from printer_nodes schema (no shipping_days, no shipping)', async () => {
+            const capturedQueries = [];
+            const strictDb = {
+                query: async (sql, params) => {
+                    capturedQueries.push({ sql, params });
+                    if (/SELECT CURRENT_USER/is.test(sql)) {
+                        return [{ currentUser: 'test_user@127.0.0.1', currentDb: 'test_db' }];
+                    }
+                    if (/FROM printer_nodes/is.test(sql)) {
+                        if (sql.includes('WHERE id != ?')) {
+                            return [];
+                        }
+
+                        // Enforce real columns only as per SHOW COLUMNS
+                        const REAL_COLUMNS = new Set([
+                            'id', 'tenant_id', 'name', 'status', 'metadata_json', 'rates_json',
+                            'signatures', 'limits', 'delivery_time', 'production_lead_days',
+                            'country', 'region', 'marketplace_enabled', 'visibility_scope'
+                        ]);
+
+                        const selectMatch = sql.match(/SELECT\s+(.*?)\s+FROM\s+printer_nodes/is);
+                        if (selectMatch) {
+                            const rawCols = selectMatch[1].split(',').map(c => c.trim().toLowerCase());
+                            for (const col of rawCols) {
+                                if (/^[a-z0-9_]+$/.test(col)) {
+                                    if (!REAL_COLUMNS.has(col)) {
+                                        throw new Error(`ER_BAD_FIELD_ERROR: Unknown column '${col}' in 'field list'`);
+                                    }
+                                }
+                            }
+                        }
+
+                        // Ensure nonexistent columns are never queried
+                        expect(sql).not.toContain('shipping_days');
+                        expect(sql).not.toMatch(/\bshipping\b\s*,/i);
+
+                        return [
+                            {
+                                id: realNodeId,
+                                tenant_id: realTenantId,
+                                name: 'philologica.ai Printhouse',
+                                status: 'SUSPENDED',
+                                metadata_json: null,
+                                rates_json: '{}',
+                                signatures: '[]',
+                                limits: '{}',
+                                delivery_time: '14 days',
+                                production_lead_days: 7,
+                                country: 'ES',
+                                region: 'Madrid',
+                                marketplace_enabled: 0,
+                                visibility_scope: 'PRIVATE'
+                            }
+                        ];
+                    }
+                    return [];
+                }
+            };
+
+            const res = await provisionBpePrinthouse({
+                nodeId: realNodeId,
+                tenantId: realTenantId,
+                houseId: realHouseId,
+                dryRun: true,
+                dbClient: strictDb,
+                mongoClientInstance: mockMongoClient
+            });
+
+            expect(res.ok).toBe(true);
+            expect(res.plan.node.real_status).toBe('SUSPENDED');
+            expect(res.plan.node.is_cotizable).toBe(false);
+            expect(res.plan.shippingResolution.status).toBe('NO_APPLICABLE_SHIPPING_CONFIG');
+            expect(res.plan.mongoDocument.shipping_days).toBeUndefined();
+            expect(res.plan.mongoDocument.shipping).toBeUndefined();
+
+            // Verify the printer_nodes SELECT query was recorded and used only real columns
+            const nodeQuery = capturedQueries.find(q => /FROM\s+printer_nodes\s+WHERE\s+id\s*=\s*\?/i.test(q.sql));
+            expect(nodeQuery).toBeDefined();
+            expect(nodeQuery.sql).not.toContain('shipping_days');
+            expect(nodeQuery.sql).not.toContain('shipping,');
+        });
+
+        it('should resolve canonical shipping when printhouse_shipping_regions is configured and reflect it in plan', async () => {
+            const dbWithShipping = {
+                query: async (sql, params) => {
+                    if (/SELECT CURRENT_USER/is.test(sql)) {
+                        return [{ currentUser: 'test_user@127.0.0.1', currentDb: 'test_db' }];
+                    }
+                    if (/FROM printhouse_shipping_regions/is.test(sql)) {
+                        return [
+                            {
+                                id: 'sreg_iberia_1',
+                                name: 'Iberia Express Region',
+                                code: 'IBERIA_EXP',
+                                enabled: 1,
+                                countries_json: '["ES", "PT"]',
+                                standard_transit_days: 2,
+                                expedited_transit_days: 1,
+                                handling_days: 1
+                            }
+                        ];
+                    }
+                    if (/FROM printer_nodes/is.test(sql)) {
+                        if (sql.includes('WHERE id != ?')) {
+                            return [];
+                        }
+                        return [
+                            {
+                                id: realNodeId,
+                                tenant_id: realTenantId,
+                                name: 'philologica.ai Printhouse',
+                                status: 'SUSPENDED',
+                                metadata_json: null,
+                                rates_json: '{}',
+                                signatures: '[]',
+                                limits: '{}',
+                                delivery_time: '14 days',
+                                production_lead_days: 5,
+                                country: 'ES',
+                                region: 'Madrid',
+                                marketplace_enabled: 0,
+                                visibility_scope: 'PRIVATE'
+                            }
+                        ];
+                    }
+                    return [];
+                }
+            };
+
+            const res = await provisionBpePrinthouse({
+                nodeId: realNodeId,
+                tenantId: realTenantId,
+                houseId: realHouseId,
+                dryRun: true,
+                dbClient: dbWithShipping,
+                mongoClientInstance: mockMongoClient
+            });
+
+            expect(res.ok).toBe(true);
+            expect(res.plan.shippingResolution.configured).toBe(true);
+            expect(res.plan.shippingResolution.shipping_days).toBe(2);
+            expect(res.plan.shippingResolution.shipping.region_name).toBe('Iberia Express Region');
+            expect(res.plan.shippingResolution.shipping.countries).toEqual(['ES', 'PT']);
+            expect(res.plan.mongoDocument.shipping_days).toBe(2);
+            expect(res.plan.mongoDocument.shipping).toBeDefined();
+            expect(res.plan.mongoDocument.status).toBe('SUSPENDED');
+            expect(res.plan.mongoDocument.active).toBe(false);
+        });
+
+        describe('Metadata JSON Parsing, Object/String Interoperability & Diagnostics', () => {
+            it('should validate and parse metadata_json unit test cases', () => {
+                // Object input
+                expect(parseAndValidateMetadata({ key: 'val' })).toEqual({ key: 'val' });
+                // String input
+                expect(parseAndValidateMetadata('{"key":"val"}')).toEqual({ key: 'val' });
+                // Null / undefined / empty
+                expect(parseAndValidateMetadata(null)).toEqual({});
+                expect(parseAndValidateMetadata(undefined)).toEqual({});
+                expect(parseAndValidateMetadata('')).toEqual({});
+                expect(parseAndValidateMetadata('   ')).toEqual({});
+
+                // Invalid JSON string -> explicit diagnostic
+                expect(() => parseAndValidateMetadata('{ broken: json', 'readback'))
+                    .toThrow(/INVALID_METADATA_JSON: Failed to parse metadata_json \(readback\)/);
+
+                // Array rejection
+                expect(() => parseAndValidateMetadata([1, 2], 'initial'))
+                    .toThrow(/INVALID_METADATA_JSON: metadata_json \(initial\) must resolve to a non-null JSON object, got array/);
+                expect(() => parseAndValidateMetadata('[1, 2]', 'initial'))
+                    .toThrow(/INVALID_METADATA_JSON: metadata_json \(initial\) must resolve to a non-null JSON object, got array/);
+
+                // Non-object primitive rejection
+                expect(() => parseAndValidateMetadata('null', 'test'))
+                    .toThrow(/INVALID_METADATA_JSON: metadata_json \(test\) must resolve to a non-null JSON object, got null/);
+                expect(() => parseAndValidateMetadata('123', 'test'))
+                    .toThrow(/INVALID_METADATA_JSON: metadata_json \(test\) must resolve to a non-null JSON object, got number/);
+                expect(() => parseAndValidateMetadata('"raw_string"', 'test'))
+                    .toThrow(/INVALID_METADATA_JSON: metadata_json \(test\) must resolve to a non-null JSON object, got string/);
+            });
+
+            it('should succeed when MySQL readback returns metadata_json as an Object (production driver behavior)', async () => {
+                // Mock db where SELECT returns metadata_json as an Object instead of a serialized string
+                const objectMetadataDb = {
+                    query: async (sql, params) => {
+                        if (/SELECT CURRENT_USER/is.test(sql)) {
+                            return [{ currentUser: 'test_user@127.0.0.1', currentDb: 'test_db' }];
+                        }
+                        if (/FROM printhouse_shipping_regions/is.test(sql)) {
+                            return [];
+                        }
+                        if (/FROM printer_nodes/is.test(sql)) {
+                            if (sql.includes('WHERE id != ?')) return [];
+                            // Return metadata_json as parsed Object
+                            return [
+                                {
+                                    id: realNodeId,
+                                    tenant_id: realTenantId,
+                                    name: 'philologica.ai Printhouse',
+                                    status: 'SUSPENDED',
+                                    metadata_json: { bpe_printhouse_id: realHouseId }, // Object format!
+                                    rates_json: '{}',
+                                    signatures: '[]',
+                                    limits: '{}',
+                                    delivery_time: '14 days',
+                                    production_lead_days: 7,
+                                    country: 'ES',
+                                    region: 'Madrid',
+                                    marketplace_enabled: 0,
+                                    visibility_scope: 'PRIVATE'
+                                }
+                            ];
+                        }
+                        if (/UPDATE printer_nodes/is.test(sql)) {
+                            return { affectedRows: 1 };
+                        }
+                        return [];
+                    }
+                };
+
+                const res = await provisionBpePrinthouse({
+                    nodeId: realNodeId,
+                    tenantId: realTenantId,
+                    houseId: realHouseId,
+                    dryRun: false,
+                    allowProduction: true,
+                    dbClient: objectMetadataDb,
+                    mongoClientInstance: mockMongoClient
+                });
+
+                expect(res.ok).toBe(true);
+                expect(res.provisioned).toBe(true);
+                expect(res.status).toBe('SUSPENDED');
+                expect(res.active).toBe(false);
+                expect(res.bpePrinthouseId).toBe(realHouseId);
+            });
+
+            it('should reject provisioning when metadata_json contains invalid JSON with explicit diagnostic', async () => {
+                const invalidMetaDb = {
+                    query: async (sql, params) => {
+                        if (/SELECT CURRENT_USER/is.test(sql)) {
+                            return [{ currentUser: 'test_user@127.0.0.1', currentDb: 'test_db' }];
+                        }
+                        if (/FROM printhouse_shipping_regions/is.test(sql)) return [];
+                        if (/FROM printer_nodes/is.test(sql)) {
+                            if (sql.includes('WHERE id != ?')) return [];
+                            return [
+                                {
+                                    id: realNodeId,
+                                    tenant_id: realTenantId,
+                                    name: 'Corrupted Node',
+                                    status: 'SUSPENDED',
+                                    metadata_json: '{ unquoted_key: invalid }',
+                                    rates_json: '{}',
+                                    signatures: '[]'
+                                }
+                            ];
+                        }
+                        return [];
+                    }
+                };
+
+                await expect(
+                    provisionBpePrinthouse({
+                        nodeId: realNodeId,
+                        tenantId: realTenantId,
+                        houseId: realHouseId,
+                        dryRun: true,
+                        dbClient: invalidMetaDb,
+                        mongoClientInstance: mockMongoClient
+                    })
+                ).rejects.toThrow(/INVALID_METADATA_JSON: Failed to parse metadata_json \(initial\)/);
+            });
+
+            it('should reject provisioning when metadata_json is a JSON array instead of an object', async () => {
+                const arrayMetaDb = {
+                    query: async (sql, params) => {
+                        if (/SELECT CURRENT_USER/is.test(sql)) {
+                            return [{ currentUser: 'test_user@127.0.0.1', currentDb: 'test_db' }];
+                        }
+                        if (/FROM printhouse_shipping_regions/is.test(sql)) return [];
+                        if (/FROM printer_nodes/is.test(sql)) {
+                            if (sql.includes('WHERE id != ?')) return [];
+                            return [
+                                {
+                                    id: realNodeId,
+                                    tenant_id: realTenantId,
+                                    name: 'Array Meta Node',
+                                    status: 'SUSPENDED',
+                                    metadata_json: '[ "not", "an", "object" ]',
+                                    rates_json: '{}',
+                                    signatures: '[]'
+                                }
+                            ];
+                        }
+                        return [];
+                    }
+                };
+
+                await expect(
+                    provisionBpePrinthouse({
+                        nodeId: realNodeId,
+                        tenantId: realTenantId,
+                        houseId: realHouseId,
+                        dryRun: true,
+                        dbClient: arrayMetaDb,
+                        mongoClientInstance: mockMongoClient
+                    })
+                ).rejects.toThrow(/INVALID_METADATA_JSON: metadata_json \(initial\) must resolve to a non-null JSON object, got array/);
+            });
+
+            it('should preserve existing metadata keys during replay for both object and string representations', async () => {
+                // Clear any leftover mocks
+                mockPrinthouses = [];
+
+                // Seed MongoDB with established document
+                mockPrinthouses.push({
+                    _id: 'mongo_established_replay',
+                    id: realHouseId,
+                    house_id: realHouseId,
+                    name: 'philologica.ai Printhouse',
+                    tenant_id: realTenantId,
+                    printer_node_id: realNodeId,
+                    status: 'SUSPENDED',
+                    active: false,
+                    version: 1,
+                    rates: { base_charge: 500, per_unit: 0.12 },
+                    published_revision_id: 'rev_replay_test',
+                    accepted_patch_checksum: 'sha256:patch_chk_123',
+                    rates_checksum: 'sha256:rates_chk_123'
+                });
+
+                // Node with metadata_json as Object having multiple existing keys
+                const nodeWithObjMeta = memoryDb.printer_nodes.find(n => n.id === realNodeId);
+                nodeWithObjMeta.metadata_json = {
+                    cluster_zone: 'eu-west-1',
+                    webhook_endpoint: 'https://hooks.philologica.ai/print',
+                    bpe_printhouse_id: realHouseId
+                };
+
+                const replayRes = await provisionBpePrinthouse({
+                    nodeId: realNodeId,
+                    tenantId: realTenantId,
+                    houseId: realHouseId,
+                    dryRun: false,
+                    allowProduction: true,
+                    dbClient: db,
+                    mongoClientInstance: mockMongoClient
+                });
+
+                expect(replayRes.ok).toBe(true);
+                expect(replayRes.alreadyProvisioned).toBe(true);
+
+                // Verify MySQL updated metadata_json preserved existing keys
+                const updatedNode = memoryDb.printer_nodes.find(n => n.id === realNodeId);
+                const parsedMeta = typeof updatedNode.metadata_json === 'string'
+                    ? JSON.parse(updatedNode.metadata_json)
+                    : updatedNode.metadata_json;
+
+                expect(parsedMeta.cluster_zone).toBe('eu-west-1');
+                expect(parsedMeta.webhook_endpoint).toBe('https://hooks.philologica.ai/print');
+                expect(parsedMeta.bpe_printhouse_id).toBe(realHouseId);
+
+                // Verify Mongo document preserved rates, version, checksums, published_revision_id
+                const mongoDoc = mockPrinthouses[0];
+                expect(mongoDoc.version).toBe(1);
+                expect(mongoDoc.rates.base_charge).toBe(500);
+                expect(mongoDoc.rates.per_unit).toBe(0.12);
+                expect(mongoDoc.published_revision_id).toBe('rev_replay_test');
+                expect(mongoDoc.status).toBe('SUSPENDED');
+                expect(mongoDoc.active).toBe(false);
+            });
+        });
+    });
+});

@@ -1,0 +1,63 @@
+{
+  "phase": "70D",
+  "title": "Control Plane Customer Proof Approval UX",
+  "repo": "ppos-control-plane",
+  "generated_at": "2026-06-09T00:00:00.000Z",
+  "status": "COMPLETE",
+  "smoke_result": {
+    "pass": 70,
+    "fail": 0,
+    "total": 70,
+    "result": "ALL TESTS PASSED"
+  },
+  "build_result": "SUCCESS",
+  "files_created": [
+    "src/api/services/proofApprovalUxService.js",
+    "src/ui/components/preflight/ProofApprovalPanel.tsx",
+    "scripts/smoke_phase70d_control_plane_proof_approval_ux.js",
+    "reports/phase70d_control_plane_proof_approval_ux.json",
+    "reports/phase70d_control_plane_proof_approval_ux.md"
+  ],
+  "files_modified": [
+    "src/api/services/preflightHumanReportService.js",
+    "src/api/services/artifactUxLabelService.js",
+    "src/ui/components/preflight/HumanReportPanel.tsx",
+    "src/ui/pages/public/PublicHumanReportPage.tsx"
+  ],
+  "approval_states_implemented": [
+    "PROOF_NOT_REQUIRED",
+    "PROOF_REQUIRED",
+    "PROOF_PENDING_CUSTOMER",
+    "PROOF_APPROVED",
+    "PROOF_REJECTED_REUPLOAD_REQUIRED"
+  ],
+  "artifact_ux_badges_added": [
+    "Proof approval required",
+    "Awaiting customer approval",
+    "Customer approved",
+    "Customer rejected — reupload required"
+  ],
+  "governance_policy": {
+    "proof_approval_implies_production_certified": false,
+    "proof_approval_implies_standard_certified": false,
+    "proof_approval_implies_print_ready": false,
+    "proof_approval_satisfies": "visual_proof_gate_only",
+    "rejection_requires_reupload": true,
+    "customer_feedback_operator_only": true,
+    "proof_id_operator_only": true,
+    "evidence_paths_sanitized": true
+  },
+  "acceptance_criteria": {
+    "customer_proof_approval_displayed_safely": true,
+    "customer_output_sanitized_no_raw_paths": true,
+    "customer_output_no_internal_ids": true,
+    "approval_required_blocks_production": true,
+    "rejected_proof_blocks_production": true,
+    "approved_proof_unblocks_visual_gate": true,
+    "no_production_overclaim": true,
+    "no_standards_overclaim": true,
+    "build_passes": true,
+    "smoke_passes": true
+  },
+  "input_reference": "../ppos-preflight-worker/reports/phase70b_worker_proof_approval_policy.json"
+}

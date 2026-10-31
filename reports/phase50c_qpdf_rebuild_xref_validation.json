@@ -1,0 +1,20 @@
+{
+  "fix_id": "REBUILD_XREF",
+  "validation_mode": "REAL_PDF",
+  "real_pdf_execution_verified": true,
+  "qpdf_available": true,
+  "qpdf_version": "qpdf version 12.3.2\r",
+  "qpdf_invoked": true,
+  "qpdf_exit_code": null,
+  "qpdf_repair_performed": true,
+  "input_fixture": "broken_xref_qpdf.pdf",
+  "output_artifact": "broken_xref_qpdf_output.pdf",
+  "output_artifact_non_empty": true,
+  "fix_audit_status": "APPLIED",
+  "evidence_present": true,
+  "human_report_translated": true,
+  "production_certified": true,
+  "review_required": false,
+  "pass": true,
+  "notes": []
+}

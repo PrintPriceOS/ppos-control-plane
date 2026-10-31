@@ -1,0 +1,51 @@
+{
+  "phase": "66E — End-to-End Font Governance Regression",
+  "generated_at": "2026-06-08T20:38:50.199Z",
+  "end_to_end_passed": true,
+  "layers": [
+    {
+      "layer": "Engine (66A)",
+      "present": true,
+      "passed": true
+    },
+    {
+      "layer": "Worker (66B)",
+      "present": true,
+      "passed": true
+    },
+    {
+      "layer": "Service (66C)",
+      "present": true,
+      "passed": true
+    },
+    {
+      "layer": "Control Plane Human Report (66D)",
+      "present": true,
+      "passed": true
+    },
+    {
+      "layer": "Control Plane Regression (66E)",
+      "present": true,
+      "passed": true
+    }
+  ],
+  "acceptance_criteria": {
+    "no_fake_embedded_fonts": true,
+    "missing_glyphs_not_invented": true,
+    "font_source_unavailability_honest": true,
+    "type3_fonts_always_review_required": true,
+    "evidence_preserved_end_to_end": true,
+    "review_required_propagated_end_to_end": true,
+    "font_governance_preserved_end_to_end": true,
+    "artifact_trust_remains_authoritative": true,
+    "certified_pdf_downgraded_when_review_required": true,
+    "font_fixes_never_imply_print_ready_or_certified": true,
+    "human_report_safe_and_understandable": true,
+    "artifact_ux_safe": true,
+    "public_customer_output_sanitized": true,
+    "no_pdfx_pdfa_production_standards_print_ready_claims": true,
+    "reports_generated_in_each_repo": true,
+    "aggregate_report_generated": true,
+    "all_smoke_tests_pass": true
+  }
+}

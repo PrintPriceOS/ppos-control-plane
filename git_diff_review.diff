@@ -1,0 +1,2881 @@
+diff --git a/raw_build_output.log b/raw_build_output.log
+new file mode 100644
+index 0000000..72bc25c
+--- /dev/null
++++ b/raw_build_output.log
+@@ -0,0 +1,22 @@
++npm notice run @ppos/control-plane@1.9.5 build
++npm notice run vite build
++NODE_ENV=production is not supported in the .env file. Only NODE_ENV=development is supported to create a development build of your project. If you need to set process.env.NODE_ENV, you can set it in the Vite config instead.
++[36mvite v6.4.2 [32mbuilding for production...[36m[39m
++transforming...
++[32m✓[39m 3557 modules transformed.
++rendering chunks...
++computing gzip size...
++[2mdist/[22m[32massets/favicon-BSvESAho.svg       [39m[1m[2m    1.46 kB[22m[1m[22m[2m │ gzip:   0.73 kB[22m
++[2mdist/[22m[32mindex.html                        [39m[1m[2m    2.03 kB[22m[1m[22m[2m │ gzip:   0.80 kB[22m
++[2mdist/[22m[35massets/index-CgsPkVHm.css         [39m[1m[2m  319.76 kB[22m[1m[22m[2m │ gzip:  43.55 kB[22m
++[2mdist/[22m[36massets/vendor-router--EAYNkjI.js  [39m[1m[2m   38.21 kB[22m[1m[22m[2m │ gzip:  13.79 kB[22m
++[2mdist/[22m[36massets/vendor-data-DCAy2JXq.js    [39m[1m[2m   53.34 kB[22m[1m[22m[2m │ gzip:  21.52 kB[22m
++[2mdist/[22m[36massets/vendor-icons-C1bXvJH-.js   [39m[1m[2m  124.84 kB[22m[1m[22m[2m │ gzip:  21.77 kB[22m
++[2mdist/[22m[36massets/vendor-react-rkJnIKN2.js   [39m[1m[2m  194.25 kB[22m[1m[22m[2m │ gzip:  60.73 kB[22m
++[2mdist/[22m[36massets/index-DIXy1gxx.js          [39m[1m[33m3,593.85 kB[39m[22m[2m │ gzip: 707.12 kB[22m
++[33m
++(!) Some chunks are larger than 600 kB after minification. Consider:
++- Using dynamic import() to code-split the application
++- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
++- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.[39m
++[32m✓ built in 14.18s[39m
+diff --git a/raw_vitest_output.log b/raw_vitest_output.log
+new file mode 100644
+index 0000000..cfe8b88
+--- /dev/null
++++ b/raw_vitest_output.log
+@@ -0,0 +1,1123 @@
++npm notice run @ppos/control-plane@1.9.5 npx
++npm notice run vitest run
++
++[1m[46m RUN [49m[22m [36mv3.2.0 [39m[90mC:/Users/KIKE/Downloads/ppos-control-plane-phase-10-intelligence-layer[39m
++
++ [32m✓[39m tests/migration_156_157_runner.test.js [2m([22m[2m5 tests[22m[2m)[22m[32m 16[2mms[22m[39m
++[90mstdout[2m | tests/pricingEngineClient.test.js[2m > [22m[2mPricingEngineClient Unit & Edge Cases Test Suite[2m > [22m[2m1. Preserves target_margin_pct when explicitly passed as 0
++[22m[39m[MARKETPLACE][PRICING-REQUEST] Requesting deterministic offers from Pricing Engine {
++  orderId: [1mnull[22m,
++  jobId: [32m'job_unknown'[39m,
++  tenantId: [32m'default'[39m,
++  source: [32m'BPE_MARKETPLACE_NATIVE'[39m,
++  sourceRef: [1mnull[22m,
++  traceId: [32m'trace_afddbfeb-b62d-4962-99fe-37d864602879'[39m,
++  sessionId: [1mnull[22m,
++  endpointUsed: [32m'http://127.0.0.1:8004/api/marketplace/offers'[39m
++}
++
++[90mstdout[2m | tests/pricingEngineClient.test.js[2m > [22m[2mPricingEngineClient Unit & Edge Cases Test Suite[2m > [22m[2m1. Preserves target_margin_pct when explicitly passed as 0
++[22m[39m[MARKETPLACE][PRICING-RESPONSE] Received real offers from marketplace endpoint {
++  orderId: [1mnull[22m,
++  jobId: [32m'job_unknown'[39m,
++  tenantId: [32m'default'[39m,
++  source: [32m'BPE_MARKETPLACE_NATIVE'[39m,
++  sourceRef: [1mnull[22m,
++  traceId: [32m'trace_afddbfeb-b62d-4962-99fe-37d864602879'[39m,
++  sessionId: [1mnull[22m,
++  endpointUsed: [32m'http://127.0.0.1:8004/api/marketplace/offers'[39m
++}
++
++[90mstdout[2m | tests/pricingEngineClient.test.js[2m > [22m[2mPricingEngineClient Unit & Edge Cases Test Suite[2m > [22m[2m2. Processes real production BPE response shape (production_cost, suggested_price, estimated_margin, margin_pct)
++[22m[39m[MARKETPLACE][PRICING-REQUEST] Requesting deterministic offers from Pricing Engine {
++  orderId: [1mnull[22m,
++  jobId: [32m'job_unknown'[39m,
++  tenantId: [32m'default'[39m,
++  source: [32m'BPE_MARKETPLACE_NATIVE'[39m,
++  sourceRef: [1mnull[22m,
++  traceId: [32m'trace_cf663ecb-94dd-4891-a66b-849b3b900f68'[39m,
++  sessionId: [1mnull[22m,
++  endpointUsed: [32m'http://127.0.0.1:8004/api/marketplace/offers'[39m
++}
++
++[90mstdout[2m | tests/pricingEngineClient.test.js[2m > [22m[2mPricingEngineClient Unit & Edge Cases Test Suite[2m > [22m[2m2. Processes real production BPE response shape (production_cost, suggested_price, estimated_margin, margin_pct)
++[22m[39m[MARKETPLACE][PRICING-RESPONSE] Received real offers from marketplace endpoint {
++  orderId: [1mnull[22m,
++  jobId: [32m'job_unknown'[39m,
++  tenantId: [32m'default'[39m,
++  source: [32m'BPE_MARKETPLACE_NATIVE'[39m,
++  sourceRef: [1mnull[22m,
++  traceId: [32m'trace_cf663ecb-94dd-4891-a66b-849b3b900f68'[39m,
++  sessionId: [1mnull[22m,
++  endpointUsed: [32m'http://127.0.0.1:8004/api/marketplace/offers'[39m
++}
++
++[90mstdout[2m | tests/pricingEngineClient.test.js[2m > [22m[2mPricingEngineClient Unit & Edge Cases Test Suite[2m > [22m[2m3. Rejects response when ALL offers are invalid (missing price, empty string cost, non-finite values)
++[22m[39m[MARKETPLACE][PRICING-REQUEST] Requesting deterministic offers from Pricing Engine {
++  orderId: [1mnull[22m,
++  jobId: [32m'job_unknown'[39m,
++  tenantId: [32m'default'[39m,
++  source: [32m'BPE_MARKETPLACE_NATIVE'[39m,
++  sourceRef: [1mnull[22m,
++  traceId: [32m'trace_d52603e9-267a-4b11-b8a9-57704c7c6375'[39m,
++  sessionId: [1mnull[22m,
++  endpointUsed: [32m'http://127.0.0.1:8004/api/marketplace/offers'[39m
++}
++
++[90mstderr[2m | tests/pricingEngineClient.test.js[2m > [22m[2mPricingEngineClient Unit & Edge Cases Test Suite[2m > [22m[2m3. Rejects response when ALL offers are invalid (missing price, empty string cost, non-finite values)
++[22m[39m[MARKETPLACE][PRICING-OFFER-INVALID] Dropping offer with null/empty/invalid cost or price field { offer: { id: [32m'off-noprice'[39m, production_cost: [33m100[39m } }
++[MARKETPLACE][PRICING-OFFER-INVALID] Dropping offer with null/empty/invalid cost or price field {
++  offer: { id: [32m'off-emptycost'[39m, production_cost: [32m''[39m, suggested_price: [33m150[39m }
++}
++[MARKETPLACE][PRICING-OFFER-INVALID] Dropping offer with non-finite cost/price {
++  offer: { id: [32m'off-nancost'[39m, production_cost: [33mNaN[39m, suggested_price: [33m150[39m }
++}
++[MARKETPLACE][PRICING-OFFER-INVALID] Dropping offer with null/empty/invalid cost or price field {
++  offer: { id: [32m'off-nullprice'[39m, production_cost: [33m100[39m, suggested_price: [1mnull[22m }
++}
++[MARKETPLACE][PRICING-FAILED] All offers in BPE response payload were invalid or malformed {
++  orderId: [1mnull[22m,
++  jobId: [32m'job_unknown'[39m,
++  tenantId: [32m'default'[39m,
++  source: [32m'BPE_MARKETPLACE_NATIVE'[39m,
++  sourceRef: [1mnull[22m,
++  traceId: [32m'trace_d52603e9-267a-4b11-b8a9-57704c7c6375'[39m,
++  sessionId: [1mnull[22m
++}
++
++[90mstdout[2m | tests/pricingEngineClient.test.js[2m > [22m[2mPricingEngineClient Unit & Edge Cases Test Suite[2m > [22m[2m3. Rejects response when ALL offers are invalid (missing price, empty string cost, non-finite values)
++[22m[39m[MARKETPLACE][PRICING-RESPONSE] Received real offers from marketplace endpoint {
++  orderId: [1mnull[22m,
++  jobId: [32m'job_unknown'[39m,
++  tenantId: [32m'default'[39m,
++  source: [32m'BPE_MARKETPLACE_NATIVE'[39m,
++  sourceRef: [1mnull[22m,
++  traceId: [32m'trace_d52603e9-267a-4b11-b8a9-57704c7c6375'[39m,
++  sessionId: [1mnull[22m,
++  endpointUsed: [32m'http://127.0.0.1:8004/api/marketplace/offers'[39m
++}
++
++[90mstdout[2m | tests/pricingEngineClient.test.js[2m > [22m[2mPricingEngineClient Unit & Edge Cases Test Suite[2m > [22m[2m4. Returns ok: false when BPE response explicitly indicates failure or error
++[22m[39m[MARKETPLACE][PRICING-REQUEST] Requesting deterministic offers from Pricing Engine {
++  orderId: [1mnull[22m,
++  jobId: [32m'job_unknown'[39m,
++  tenantId: [32m'default'[39m,
++  source: [32m'BPE_MARKETPLACE_NATIVE'[39m,
++  sourceRef: [1mnull[22m,
++  traceId: [32m'trace_b7e353c3-9414-4ded-9c90-62bde5f30409'[39m,
++  sessionId: [1mnull[22m,
++  endpointUsed: [32m'http://127.0.0.1:8004/api/marketplace/offers'[39m
++}
++
++[90mstdout[2m | tests/pricingEngineClient.test.js[2m > [22m[2mPricingEngineClient Unit & Edge Cases Test Suite[2m > [22m[2m4. Returns ok: false when BPE response explicitly indicates failure or error
++[22m[39m[MARKETPLACE][PRICING-RESPONSE] Received real offers from marketplace endpoint {
++  orderId: [1mnull[22m,
++  jobId: [32m'job_unknown'[39m,
++  tenantId: [32m'default'[39m,
++  source: [32m'BPE_MARKETPLACE_NATIVE'[39m,
++  sourceRef: [1mnull[22m,
++  traceId: [32m'trace_b7e353c3-9414-4ded-9c90-62bde5f30409'[39m,
++  sessionId: [1mnull[22m,
++  endpointUsed: [32m'http://127.0.0.1:8004/api/marketplace/offers'[39m
++}
++
++[90mstdout[2m | tests/pricingEngineClient.test.js[2m > [22m[2mPricingEngineClient Unit & Edge Cases Test Suite[2m > [22m[2m5. Rejects empty object {} response body without declaring success
++[22m[39m[MARKETPLACE][PRICING-REQUEST] Requesting deterministic offers from Pricing Engine {
++  orderId: [1mnull[22m,
++  jobId: [32m'job_unknown'[39m,
++  tenantId: [32m'default'[39m,
++  source: [32m'BPE_MARKETPLACE_NATIVE'[39m,
++  sourceRef: [1mnull[22m,
++  traceId: [32m'trace_e4f29429-65b5-4838-897a-c72820d99c7b'[39m,
++  sessionId: [1mnull[22m,
++  endpointUsed: [32m'http://127.0.0.1:8004/api/marketplace/offers'[39m
++}
++
++[90mstdout[2m | tests/pricingEngineClient.test.js[2m > [22m[2mPricingEngineClient Unit & Edge Cases Test Suite[2m > [22m[2m5. Rejects empty object {} response body without declaring success
++[22m[39m[MARKETPLACE][PRICING-RESPONSE] Received real offers from marketplace endpoint {
++  orderId: [1mnull[22m,
++  jobId: [32m'job_unknown'[39m,
++  tenantId: [32m'default'[39m,
++  source: [32m'BPE_MARKETPLACE_NATIVE'[39m,
++  sourceRef: [1mnull[22m,
++  traceId: [32m'trace_e4f29429-65b5-4838-897a-c72820d99c7b'[39m,
++  sessionId: [1mnull[22m,
++  endpointUsed: [32m'http://127.0.0.1:8004/api/marketplace/offers'[39m
++}
++
++ [32m✓[39m tests/pricingEngineClient.test.js [2m([22m[2m7 tests[22m[2m)[22m[32m 18[2mms[22m[39m
++ [32m✓[39m tests/preflightServiceClient.test.js [2m([22m[2m3 tests[22m[2m)[22m[32m 24[2mms[22m[39m
++[90mstdout[2m | tests/phase195_backend_integrations.test.js[2m > [22m[2mPhase 195 Backend Integrations Suite[2m > [22m[2mGoal F: Governed Rates Publication Control Plane -> BPE[2m > [22m[2mshould publish accepted revision to BPE, verify checksum readback, and support idempotency
++[22m[39m2026-10-06T13:20:15.623Z [[32mINFO[0m] [bpe-publication] generic_event: Revision rev_test_1791292815620 (patch: sha256:accepted_test_checksum_12345, rates: sha256:dda56a43a925d80d4506c72b640a290cb8837e75b8e826e524e03040cf0baccc) is already published and verified to BPE {}
++
++ [32m✓[39m tests/phase195_backend_integrations.test.js [2m([22m[2m12 tests[22m[2m)[22m[32m 165[2mms[22m[39m
++[90mstdout[2m | tests/auth.middleware.test.js[2m > [22m[2mAuth Middleware Pipeline Suite[2m > [22m[2m1. Accepts valid PPOS_CONTROL_TOKEN system authentication
++[22m[39m[CONTROL][AUTH][SERVICE-TOKEN-ACCEPTED] {
++  route: [32m'/test'[39m,
++  actor: [32m'preflight-worker'[39m,
++  tokenLength: [33m21[39m,
++  authMode: [32m'PPOS_CONTROL_TOKEN'[39m
++}
++
++[90mstdout[2m | tests/auth.middleware.test.js[2m > [22m[2mAuth Middleware Pipeline Suite[2m > [22m[2m2. Rejects invalid PPOS_CONTROL_TOKEN with 401 UNAUTHORIZED
++[22m[39m2026-10-06T13:20:15.770Z [[31mERROR[0m] [audit-logger] audit_auth_denied: [AUDIT] AUTH_DENIED | Status: FAILURE {
++  ip: [32m'127.0.0.1'[39m,
++  method: [32m'GET'[39m,
++  url: [32m'/test'[39m,
++  agent: [90mundefined[39m,
++  error: [32m'JWT Error: jwt malformed'[39m
++}
++
++[90mstderr[2m | tests/auth.middleware.test.js[2m > [22m[2mAuth Middleware Pipeline Suite[2m > [22m[2m2. Rejects invalid PPOS_CONTROL_TOKEN with 401 UNAUTHORIZED
++[22m[39m[AUTH-FAILURE] Unauthorized access attempt: JWT Error: jwt malformed from 127.0.0.1
++
++[90mstdout[2m | tests/auth.middleware.test.js[2m > [22m[2mAuth Middleware Pipeline Suite[2m > [22m[2m2. Rejects invalid PPOS_CONTROL_TOKEN with 401 UNAUTHORIZED
++[22m[39m2026-10-06T13:20:15.771Z [[31mERROR[0m] [data-adapter] query_failed: SQL Query failure: INSERT INTO api_audit_logs (event_type, tenant_id, user_id, status, metadata_json, created_at)
++     ... {
++  error: [32m'MySQL is UNCONFIGURED. Ensure MYSQL_HOST or DATABASE_URL is set in .env'[39m
++}
++
++[90mstdout[2m | tests/auth.middleware.test.js[2m > [22m[2mAuth Middleware Pipeline Suite[2m > [22m[2m2. Rejects invalid PPOS_CONTROL_TOKEN with 401 UNAUTHORIZED
++[22m[39m2026-10-06T13:20:15.772Z [[31mERROR[0m] [audit-logger] audit_persistence_failed: Failed to persist audit log to MySQL {
++  error: [32m'MySQL is UNCONFIGURED. Ensure MYSQL_HOST or DATABASE_URL is set in .env'[39m
++}
++
++[90mstderr[2m | tests/auth.middleware.test.js[2m > [22m[2mAuth Middleware Pipeline Suite[2m > [22m[2m2. Rejects invalid PPOS_CONTROL_TOKEN with 401 UNAUTHORIZED
++[22m[39m[AUDIT_LOG_WRITE_FAILED] Failed to persist audit log to api_audit_logs: MySQL is UNCONFIGURED. Ensure MYSQL_HOST or DATABASE_URL is set in .env {
++  type: [32m'AUTH_DENIED'[39m,
++  tenantId: [32m'system'[39m,
++  userId: [32m'unauthenticated'[39m,
++  status: [32m'FAILURE'[39m,
++  metadata: {
++    ip: [32m'127.0.0.1'[39m,
++    method: [32m'GET'[39m,
++    url: [32m'/test'[39m,
++    agent: [90mundefined[39m,
++    error: [32m'JWT Error: jwt malformed'[39m
++  }
++}
++
++ [32m✓[39m tests/auth.middleware.test.js [2m([22m[2m6 tests[22m[2m)[22m[32m 15[2mms[22m[39m
++[90mstdout[2m | tests/calibration_residuals_compatibility_regression.test.js[2m > [22m[2mCalibration Residuals & Compatibility Regressions[2m > [22m[2m1. Caso de 1 %: Detección estricta de confusión entre ratio 0.01 y porcentaje 1[2m > [22m[2m1.1 Single-point contract: Rechaza run.percent_residual = 0.01 cuando el error real es 1 % (1.0 percentage points)
++[22m[39m2026-10-06T13:20:15.860Z [[31mERROR[0m] [calibration-acceptance] generic_event: Calibration acceptance failed, transaction rolled back {}
++
++[90mstdout[2m | tests/calibration_residuals_compatibility_regression.test.js[2m > [22m[2mCalibration Residuals & Compatibility Regressions[2m > [22m[2m1. Caso de 1 %: Detección estricta de confusión entre ratio 0.01 y porcentaje 1[2m > [22m[2m1.2 Single-point contract: Acepta run.percent_residual = 1.0 cuando el error real es 1 %
++[22m[39m2026-10-06T13:20:15.952Z [[33mWARN[0m] [calibration-acceptance] generic_event: Failed to enqueue webhook for calibration acceptance (non-fatal): {}
++
++[90mstdout[2m | tests/calibration_residuals_compatibility_regression.test.js[2m > [22m[2mCalibration Residuals & Compatibility Regressions[2m > [22m[2m1. Caso de 1 %: Detección estricta de confusión entre ratio 0.01 y porcentaje 1[2m > [22m[2m1.2 Single-point contract: Acepta run.percent_residual = 1.0 cuando el error real es 1 %
++[22m[39m2026-10-06T13:20:16.012Z [[32mINFO[0m] [calibration-acceptance] generic_event: Calibration run accepted successfully {}
++
++[90mstdout[2m | tests/calibration_residuals_compatibility_regression.test.js[2m > [22m[2mCalibration Residuals & Compatibility Regressions[2m > [22m[2m1. Caso de 1 %: Detección estricta de confusión entre ratio 0.01 y porcentaje 1[2m > [22m[2m1.3 Multi-quantity curve contract: Acepta run.percent_residual = 0.01 (unitless ratio) y rechaza 1.0
++[22m[39m2026-10-06T13:20:16.016Z [[31mERROR[0m] [calibration-acceptance] generic_event: Calibration acceptance failed, transaction rolled back {}
++
++[90mstdout[2m | tests/calibration_residuals_compatibility_regression.test.js[2m > [22m[2mCalibration Residuals & Compatibility Regressions[2m > [22m[2m2. Tolerancias: Valores justo dentro, en el límite exacto y justo fuera[2m > [22m[2m2.1 Justo dentro: residual = 0.49 EUR (0.49 <= 0.50) es aceptado
++[22m[39m2026-10-06T13:20:16.019Z [[33mWARN[0m] [calibration-acceptance] generic_event: Failed to enqueue webhook for calibration acceptance (non-fatal): {}
++
++[90mstdout[2m | tests/calibration_residuals_compatibility_regression.test.js[2m > [22m[2mCalibration Residuals & Compatibility Regressions[2m > [22m[2m2. Tolerancias: Valores justo dentro, en el límite exacto y justo fuera[2m > [22m[2m2.1 Justo dentro: residual = 0.49 EUR (0.49 <= 0.50) es aceptado
++[22m[39m2026-10-06T13:20:16.020Z [[32mINFO[0m] [calibration-acceptance] generic_event: Calibration run accepted successfully {}
++
++[90mstdout[2m | tests/calibration_residuals_compatibility_regression.test.js[2m > [22m[2mCalibration Residuals & Compatibility Regressions[2m > [22m[2m2. Tolerancias: Valores justo dentro, en el límite exacto y justo fuera[2m > [22m[2m2.2 En el límite exacto: residual = 0.50 EUR (0.50 <= 0.50) es aceptado
++[22m[39m2026-10-06T13:20:16.023Z [[33mWARN[0m] [calibration-acceptance] generic_event: Failed to enqueue webhook for calibration acceptance (non-fatal): {}
++
++[90mstdout[2m | tests/calibration_residuals_compatibility_regression.test.js[2m > [22m[2mCalibration Residuals & Compatibility Regressions[2m > [22m[2m2. Tolerancias: Valores justo dentro, en el límite exacto y justo fuera[2m > [22m[2m2.2 En el límite exacto: residual = 0.50 EUR (0.50 <= 0.50) es aceptado
++[22m[39m2026-10-06T13:20:16.023Z [[32mINFO[0m] [calibration-acceptance] generic_event: Calibration run accepted successfully {}
++
++[90mstdout[2m | tests/calibration_residuals_compatibility_regression.test.js[2m > [22m[2mCalibration Residuals & Compatibility Regressions[2m > [22m[2m2. Tolerancias: Valores justo dentro, en el límite exacto y justo fuera[2m > [22m[2m2.3 Justo fuera: residual = 0.51 EUR (0.51 > 0.50) es rechazado por tolerancia
++[22m[39m2026-10-06T13:20:16.025Z [[31mERROR[0m] [calibration-acceptance] generic_event: Calibration acceptance failed, transaction rolled back {}
++
++[90mstdout[2m | tests/calibration_residuals_compatibility_regression.test.js[2m > [22m[2mCalibration Residuals & Compatibility Regressions[2m > [22m[2m2. Tolerancias: Valores justo dentro, en el límite exacto y justo fuera[2m > [22m[2m2.4 Tolerancia por punto en curva: objetivos 100 y 1200 EUR con tolerancia relativa 1 %, residual punto 2 = 5 EUR (5 <= 12) supera comprobación por punto
++[22m[39m2026-10-06T13:20:16.028Z [[33mWARN[0m] [calibration-acceptance] generic_event: Failed to enqueue webhook for calibration acceptance (non-fatal): {}
++
++[90mstdout[2m | tests/calibration_residuals_compatibility_regression.test.js[2m > [22m[2mCalibration Residuals & Compatibility Regressions[2m > [22m[2m2. Tolerancias: Valores justo dentro, en el límite exacto y justo fuera[2m > [22m[2m2.4 Tolerancia por punto en curva: objetivos 100 y 1200 EUR con tolerancia relativa 1 %, residual punto 2 = 5 EUR (5 <= 12) supera comprobación por punto
++[22m[39m2026-10-06T13:20:16.028Z [[32mINFO[0m] [calibration-acceptance] generic_event: Calibration run accepted successfully {}
++
++[90mstdout[2m | tests/calibration_residuals_compatibility_regression.test.js[2m > [22m[2mCalibration Residuals & Compatibility Regressions[2m > [22m[2m2. Tolerancias: Valores justo dentro, en el límite exacto y justo fuera[2m > [22m[2m2.5 Tolerancia por punto en curva: objetivos 100 y 1200 EUR con tolerancia relativa 1 %, residual punto 2 = 15 EUR (15 > 12) es rechazado
++[22m[39m2026-10-06T13:20:16.030Z [[31mERROR[0m] [calibration-acceptance] generic_event: Calibration acceptance failed, transaction rolled back {}
++
++[90mstdout[2m | tests/calibration_residuals_compatibility_regression.test.js[2m > [22m[2mCalibration Residuals & Compatibility Regressions[2m > [22m[2m3. Curva multi-cantidad: Mayor residual en tirada distinta de la primera y validación estricta de puntos[2m > [22m[2m3.1 Acepta curva cuando run.absolute_residual coincide con el máximo de la curva (0.40 EUR en Qty 500) y no con Qty 100 (0.05 EUR)
++[22m[39m2026-10-06T13:20:16.036Z [[33mWARN[0m] [calibration-acceptance] generic_event: Failed to enqueue webhook for calibration acceptance (non-fatal): {}
++
++[90mstdout[2m | tests/calibration_residuals_compatibility_regression.test.js[2m > [22m[2mCalibration Residuals & Compatibility Regressions[2m > [22m[2m3. Curva multi-cantidad: Mayor residual en tirada distinta de la primera y validación estricta de puntos[2m > [22m[2m3.1 Acepta curva cuando run.absolute_residual coincide con el máximo de la curva (0.40 EUR en Qty 500) y no con Qty 100 (0.05 EUR)
++[22m[39m2026-10-06T13:20:16.037Z [[32mINFO[0m] [calibration-acceptance] generic_event: Calibration run accepted successfully {}
++
++[90mstdout[2m | tests/calibration_residuals_compatibility_regression.test.js[2m > [22m[2mCalibration Residuals & Compatibility Regressions[2m > [22m[2m3. Curva multi-cantidad: Mayor residual en tirada distinta de la primera y validación estricta de puntos[2m > [22m[2m3.2 Rechaza curva si run.absolute_residual se asigna erróneamente al primer punto (0.05 EUR) contradiciendo el máximo de la curva (0.40 EUR)
++[22m[39m2026-10-06T13:20:16.041Z [[31mERROR[0m] [calibration-acceptance] generic_event: Calibration acceptance failed, transaction rolled back {}
++
++[90mstdout[2m | tests/calibration_residuals_compatibility_regression.test.js[2m > [22m[2mCalibration Residuals & Compatibility Regressions[2m > [22m[2m3. Curva multi-cantidad: Mayor residual en tirada distinta de la primera y validación estricta de puntos[2m > [22m[2m3.3 Rechaza curva cuando falta point_results_json en tirada multi-cantidad
++[22m[39m2026-10-06T13:20:16.044Z [[31mERROR[0m] [calibration-acceptance] generic_event: Calibration acceptance failed, transaction rolled back {}
++
++[90mstdout[2m | tests/calibration_residuals_compatibility_regression.test.js[2m > [22m[2mCalibration Residuals & Compatibility Regressions[2m > [22m[2m3. Curva multi-cantidad: Mayor residual en tirada distinta de la primera y validación estricta de puntos[2m > [22m[2m3.4 Rechaza curva cuando point_results_json es JSON malformado
++[22m[39m2026-10-06T13:20:16.047Z [[31mERROR[0m] [calibration-acceptance] generic_event: Calibration acceptance failed, transaction rolled back {}
++
++[90mstdout[2m | tests/calibration_residuals_compatibility_regression.test.js[2m > [22m[2mCalibration Residuals & Compatibility Regressions[2m > [22m[2m3. Curva multi-cantidad: Mayor residual en tirada distinta de la primera y validación estricta de puntos[2m > [22m[2m3.5 Rechaza curva cuando point_results_json tiene puntos duplicados
++[22m[39m2026-10-06T13:20:16.050Z [[31mERROR[0m] [calibration-acceptance] generic_event: Calibration acceptance failed, transaction rolled back {}
++
++[90mstdout[2m | tests/calibration_residuals_compatibility_regression.test.js[2m > [22m[2mCalibration Residuals & Compatibility Regressions[2m > [22m[2m3. Curva multi-cantidad: Mayor residual en tirada distinta de la primera y validación estricta de puntos[2m > [22m[2m3.6 Rechaza curva cuando point_results_json tiene puntos desconocidos
++[22m[39m2026-10-06T13:20:16.052Z [[31mERROR[0m] [calibration-acceptance] generic_event: Calibration acceptance failed, transaction rolled back {}
++
++[90mstdout[2m | tests/calibration_residuals_compatibility_regression.test.js[2m > [22m[2mCalibration Residuals & Compatibility Regressions[2m > [22m[2m3. Curva multi-cantidad: Mayor residual en tirada distinta de la primera y validación estricta de puntos[2m > [22m[2m3.7 Rechaza curva cuando faltan puntos en point_results_json
++[22m[39m2026-10-06T13:20:16.054Z [[31mERROR[0m] [calibration-acceptance] generic_event: Calibration acceptance failed, transaction rolled back {}
++
++ [32m✓[39m tests/calibrationAcceptanceService.test.js [2m([22m[2m11 tests[22m[2m)[22m[32m 112[2mms[22m[39m
++[90mstdout[2m | tests/calibration_residuals_compatibility_regression.test.js[2m > [22m[2mCalibration Residuals & Compatibility Regressions[2m > [22m[2m3. Curva multi-cantidad: Mayor residual en tirada distinta de la primera y validación estricta de puntos[2m > [22m[2m3.8 Rechaza curva si un punto individual en run.point_results_json tiene residual porcentual contradictorio
++[22m[39m2026-10-06T13:20:16.056Z [[31mERROR[0m] [calibration-acceptance] generic_event: Calibration acceptance failed, transaction rolled back {}
++
++[90mstdout[2m | tests/calibration_residuals_compatibility_regression.test.js[2m > [22m[2mCalibration Residuals & Compatibility Regressions[2m > [22m[2m4. Aislamiento e Integridad: Rechazo limpio sin mutación ni persistencia[2m > [22m[2m4.1 Run con absolute_residual contradictorio es rechazado sin invocar INSERT revisiones ni UPDATE printer_nodes
++[22m[39m2026-10-06T13:20:16.058Z [[31mERROR[0m] [calibration-acceptance] generic_event: Calibration acceptance failed, transaction rolled back {}
++
++[90mstdout[2m | tests/calibration_residuals_compatibility_regression.test.js[2m > [22m[2mCalibration Residuals & Compatibility Regressions[2m > [22m[2m4. Aislamiento e Integridad: Rechazo limpio sin mutación ni persistencia[2m > [22m[2m4.2 Run con percent_residual negativo o inválido es rechazado sin mutación de tarifas
++[22m[39m2026-10-06T13:20:16.060Z [[31mERROR[0m] [calibration-acceptance] generic_event: Calibration acceptance failed, transaction rolled back {}
++
++[90mstdout[2m | tests/calibration_residuals_compatibility_regression.test.js[2m > [22m[2mCalibration Residuals & Compatibility Regressions[2m > [22m[2m5. Resolución de tirada canónica (copies) y paridad en gobernanza de curva[2m > [22m[2m5.1 Servicio real con bookSpec.copies=1500 sin quantity envía tirada 1500 a evaluación principal y a gobernanza de curva (sin mockear evaluateCurveAcceptance)
++[22m[39m2026-10-06T13:20:16.065Z [[33mWARN[0m] [calibration-acceptance] generic_event: Failed to enqueue webhook for calibration acceptance (non-fatal): {}
++
++[90mstdout[2m | tests/calibration_residuals_compatibility_regression.test.js[2m > [22m[2mCalibration Residuals & Compatibility Regressions[2m > [22m[2m5. Resolución de tirada canónica (copies) y paridad en gobernanza de curva[2m > [22m[2m5.1 Servicio real con bookSpec.copies=1500 sin quantity envía tirada 1500 a evaluación principal y a gobernanza de curva (sin mockear evaluateCurveAcceptance)
++[22m[39m2026-10-06T13:20:16.066Z [[32mINFO[0m] [calibration-acceptance] generic_event: Calibration run accepted successfully {}
++
++[90mstdout[2m | tests/calibration_residuals_compatibility_regression.test.js[2m > [22m[2mCalibration Residuals & Compatibility Regressions[2m > [22m[2m5. Resolución de tirada canónica (copies) y paridad en gobernanza de curva[2m > [22m[2m5.2 Rechaza bookSpec cuando copies y quantity están ausentes (MISSING_SPEC_QUANTITY), sin sustituir por 1
++[22m[39m2026-10-06T13:20:16.071Z [[31mERROR[0m] [calibration-acceptance] generic_event: Calibration acceptance failed, transaction rolled back {}
++
++[90mstdout[2m | tests/calibration_residuals_compatibility_regression.test.js[2m > [22m[2mCalibration Residuals & Compatibility Regressions[2m > [22m[2m5. Resolución de tirada canónica (copies) y paridad en gobernanza de curva[2m > [22m[2m5.3 Rechaza bookSpec con copies y quantity contradictorios (CONTRADICTORY_SPEC_QUANTITY)
++[22m[39m2026-10-06T13:20:16.074Z [[31mERROR[0m] [calibration-acceptance] generic_event: Calibration acceptance failed, transaction rolled back {}
++
++[90mstdout[2m | tests/calibration_residuals_compatibility_regression.test.js[2m > [22m[2mCalibration Residuals & Compatibility Regressions[2m > [22m[2m5. Resolución de tirada canónica (copies) y paridad en gobernanza de curva[2m > [22m[2m5.4 Rechaza bookSpec con copies inválidos o no enteros
++[22m[39m2026-10-06T13:20:16.077Z [[31mERROR[0m] [calibration-acceptance] generic_event: Calibration acceptance failed, transaction rolled back {}
++
++[90mstdout[2m | tests/calibration_residuals_compatibility_regression.test.js[2m > [22m[2mCalibration Residuals & Compatibility Regressions[2m > [22m[2m5. Resolución de tirada canónica (copies) y paridad en gobernanza de curva[2m > [22m[2m5.5 Diagnóstico de rechazo de curva incorpora razones y cantidades evaluadas sin exponer secretos
++[22m[39m2026-10-06T13:20:16.079Z [[31mERROR[0m] [calibration-acceptance] generic_event: Calibration acceptance failed, transaction rolled back {}
++
++ [32m✓[39m tests/calibration_residuals_compatibility_regression.test.js [2m([22m[2m24 tests[22m[2m)[22m[32m 230[2mms[22m[39m
++[90mstdout[2m | tests/onboarding_checksum_integrity_regression.test.js[2m > [22m[2mOnboarding Harness Checksum Integrity & Normalization Regressions[2m > [22m[2m8. Multi-quantity Curve Harness Regressions[2m > [22m[2m8.1 Ejecuta satisfactoriamente runCurveHarnessRegressions (Suites 7-11: multi-target generation, solver contract, governance gate, zero leakage, dual point_results parsing)
++[22m[39m[REGRESSION] Running Curve Harness & Solver Contract Regressions...
++[REGRESSION] All Curve Harness & Solver Contract Regressions Passed Successfully.
++
++ [32m✓[39m tests/onboarding_checksum_integrity_regression.test.js [2m([22m[2m39 tests[22m[2m)[22m[32m 91[2mms[22m[39m
++ [32m✓[39m tests/ErrorUtilsNormalization.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 8[2mms[22m[39m
++ [32m✓[39m tests/PrinthouseOnboardingSimplifiedJourney.test.tsx [2m([22m[2m21 tests[22m[2m)[22m[33m 1606[2mms[22m[39m
++ [32m✓[39m tests/IncomingJobsManufacturing.test.tsx [2m([22m[2m5 tests[22m[2m)[22m[32m 220[2mms[22m[39m
++[90mstderr[2m | tests/SettingsPreferencesBehavior.test.tsx[2m > [22m[2mSettings Preferences Behavior & Synchronization Suite[2m > [22m[2m1. Synchronizes theme bi-directionally between Topbar and Settings
++[22m[39mAn update to Topbar inside a test was not wrapped in act(...).
++
++When testing, code that causes React state updates should be wrapped into act(...):
++
++act(() => {
++  /* fire events that update state */
++});
++/* assert on the output */
++
++This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
++An update to GlobalSettingsPage inside a test was not wrapped in act(...).
++
++When testing, code that causes React state updates should be wrapped into act(...):
++
++act(() => {
++  /* fire events that update state */
++});
++/* assert on the output */
++
++This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
++An update to GlobalSettingsPage inside a test was not wrapped in act(...).
++
++When testing, code that causes React state updates should be wrapped into act(...):
++
++act(() => {
++  /* fire events that update state */
++});
++/* assert on the output */
++
++This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
++An update to GlobalSettingsPage inside a test was not wrapped in act(...).
++
++When testing, code that causes React state updates should be wrapped into act(...):
++
++act(() => {
++  /* fire events that update state */
++});
++/* assert on the output */
++
++This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
++An update to GlobalSettingsPage inside a test was not wrapped in act(...).
++
++When testing, code that causes React state updates should be wrapped into act(...):
++
++act(() => {
++  /* fire events that update state */
++});
++/* assert on the output */
++
++This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
++
++[90mstderr[2m | tests/SettingsPreferencesBehavior.test.tsx[2m > [22m[2mSettings Preferences Behavior & Synchronization Suite[2m > [22m[2m1. Synchronizes theme bi-directionally between Topbar and Settings
++[22m[39mAn update to NotificationBell inside a test was not wrapped in act(...).
++
++When testing, code that causes React state updates should be wrapped into act(...):
++
++act(() => {
++  /* fire events that update state */
++});
++/* assert on the output */
++
++This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
++An update to GlobalSettingsPage inside a test was not wrapped in act(...).
++
++When testing, code that causes React state updates should be wrapped into act(...):
++
++act(() => {
++  /* fire events that update state */
++});
++/* assert on the output */
++
++This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
++An update to GlobalSettingsPage inside a test was not wrapped in act(...).
++
++When testing, code that causes React state updates should be wrapped into act(...):
++
++act(() => {
++  /* fire events that update state */
++});
++/* assert on the output */
++
++This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
++An update to GlobalSettingsPage inside a test was not wrapped in act(...).
++
++When testing, code that causes React state updates should be wrapped into act(...):
++
++act(() => {
++  /* fire events that update state */
++});
++/* assert on the output */
++
++This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
++An update to GlobalSettingsPage inside a test was not wrapped in act(...).
++
++When testing, code that causes React state updates should be wrapped into act(...):
++
++act(() => {
++  /* fire events that update state */
++});
++/* assert on the output */
++
++This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
++
++[90mstderr[2m | tests/SettingsPreferencesBehavior.test.tsx[2m > [22m[2mSettings Preferences Behavior & Synchronization Suite[2m > [22m[2m2. Changes Density and updates root data-density attribute and control spacing
++[22m[39mAn update to GlobalSettingsPage inside a test was not wrapped in act(...).
++
++When testing, code that causes React state updates should be wrapped into act(...):
++
++act(() => {
++  /* fire events that update state */
++});
++/* assert on the output */
++
++This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
++An update to GlobalSettingsPage inside a test was not wrapped in act(...).
++
++When testing, code that causes React state updates should be wrapped into act(...):
++
++act(() => {
++  /* fire events that update state */
++});
++/* assert on the output */
++
++This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
++An update to GlobalSettingsPage inside a test was not wrapped in act(...).
++
++When testing, code that causes React state updates should be wrapped into act(...):
++
++act(() => {
++  /* fire events that update state */
++});
++/* assert on the output */
++
++This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
++An update to GlobalSettingsPage inside a test was not wrapped in act(...).
++
++When testing, code that causes React state updates should be wrapped into act(...):
++
++act(() => {
++  /* fire events that update state */
++});
++/* assert on the output */
++
++This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
++
++ [32m✓[39m tests/PrinthouseOnboardingAuditAndGovernance.test.tsx [2m([22m[2m23 tests[22m[2m)[22m[33m 2943[2mms[22m[39m
++   [33m[2m✓[22m[39m Printhouse Calibration Onboarding - Audit, Fidelity and Governance Suite[2m > [22m5. Production Bundle & Codebase Isolation[2m > [22m5.1 tests/fixtures is NOT imported in any src/ui/ production file [33m 2321[2mms[22m[39m
++[90mstderr[2m | tests/SettingsPreferencesBehavior.test.tsx[2m > [22m[2mSettings Preferences Behavior & Synchronization Suite[2m > [22m[2m2. Changes Density and updates root data-density attribute and control spacing
++[22m[39mAn update to GlobalSettingsPage inside a test was not wrapped in act(...).
++
++When testing, code that causes React state updates should be wrapped into act(...):
++
++act(() => {
++  /* fire events that update state */
++});
++/* assert on the output */
++
++This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
++An update to GlobalSettingsPage inside a test was not wrapped in act(...).
++
++When testing, code that causes React state updates should be wrapped into act(...):
++
++act(() => {
++  /* fire events that update state */
++});
++/* assert on the output */
++
++This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
++An update to GlobalSettingsPage inside a test was not wrapped in act(...).
++
++When testing, code that causes React state updates should be wrapped into act(...):
++
++act(() => {
++  /* fire events that update state */
++});
++/* assert on the output */
++
++This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
++An update to GlobalSettingsPage inside a test was not wrapped in act(...).
++
++When testing, code that causes React state updates should be wrapped into act(...):
++
++act(() => {
++  /* fire events that update state */
++});
++/* assert on the output */
++
++This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
++
++[90mstderr[2m | tests/SettingsPreferencesBehavior.test.tsx[2m > [22m[2mSettings Preferences Behavior & Synchronization Suite[2m > [22m[2m3. Toggles UI animations and respects prefers-reduced-motion
++[22m[39mAn update to GlobalSettingsPage inside a test was not wrapped in act(...).
++
++When testing, code that causes React state updates should be wrapped into act(...):
++
++act(() => {
++  /* fire events that update state */
++});
++/* assert on the output */
++
++This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
++An update to GlobalSettingsPage inside a test was not wrapped in act(...).
++
++When testing, code that causes React state updates should be wrapped into act(...):
++
++act(() => {
++  /* fire events that update state */
++});
++/* assert on the output */
++
++This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
++An update to GlobalSettingsPage inside a test was not wrapped in act(...).
++
++When testing, code that causes React state updates should be wrapped into act(...):
++
++act(() => {
++  /* fire events that update state */
++});
++/* assert on the output */
++
++This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
++An update to GlobalSettingsPage inside a test was not wrapped in act(...).
++
++When testing, code that causes React state updates should be wrapped into act(...):
++
++act(() => {
++  /* fire events that update state */
++});
++/* assert on the output */
++
++This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
++
++[90mstderr[2m | tests/SettingsPreferencesBehavior.test.tsx[2m > [22m[2mSettings Preferences Behavior & Synchronization Suite[2m > [22m[2m3. Toggles UI animations and respects prefers-reduced-motion
++[22m[39mAn update to GlobalSettingsPage inside a test was not wrapped in act(...).
++
++When testing, code that causes React state updates should be wrapped into act(...):
++
++act(() => {
++  /* fire events that update state */
++});
++/* assert on the output */
++
++This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
++An update to GlobalSettingsPage inside a test was not wrapped in act(...).
++
++When testing, code that causes React state updates should be wrapped into act(...):
++
++act(() => {
++  /* fire events that update state */
++});
++/* assert on the output */
++
++This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
++An update to GlobalSettingsPage inside a test was not wrapped in act(...).
++
++When testing, code that causes React state updates should be wrapped into act(...):
++
++act(() => {
++  /* fire events that update state */
++});
++/* assert on the output */
++
++This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
++An update to GlobalSettingsPage inside a test was not wrapped in act(...).
++
++When testing, code that causes React state updates should be wrapped into act(...):
++
++act(() => {
++  /* fire events that update state */
++});
++/* assert on the output */
++
++This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
++
++ [32m✓[39m tests/BetaFormsOperationalHarden.test.tsx [2m([22m[2m13 tests[22m[2m)[22m[33m 765[2mms[22m[39m
++ [32m✓[39m tests/SettingsPreferencesBehavior.test.tsx [2m([22m[2m5 tests[22m[2m)[22m[33m 410[2mms[22m[39m
++[90mstdout[2m | tests/http_real_auth_flow.test.js
++[22m[39m[GLOBAL-REGISTRY] Registered Policy: gp-guardrail-baseline_v1.0.0 [ACTIVE]
++[DB-INIT] Attempting connection. 
++          DATABASE_URL set: false
++          MYSQL_HOST: DEFAULT(ppos-mysql)
++          MYSQL_USER: DEFAULT(ppos_user)
++          MYSQL_DATABASE: DEFAULT(printprice_os)
++[DB] Initializing pool for ppos-mysql/printprice_os
++[FEDERATION] Registered Instance: local-ops-1 [local]
++[FEDERATION] Registered Instance: eu-west-1 [eu-west]
++[FEDERATION] Registered Instance: us-east-failover [us-east]
++[PREFLIGHT-PERSISTENCE] Initialization delegated to Migration Engine.
++
++[90mstdout[2m | tests/http_real_mfa_flow.test.js
++[22m[39m[GLOBAL-REGISTRY] Registered Policy: gp-guardrail-baseline_v1.0.0 [ACTIVE]
++[DB-INIT] Attempting connection. 
++          DATABASE_URL set: false
++          MYSQL_HOST: DEFAULT(ppos-mysql)
++          MYSQL_USER: DEFAULT(ppos_user)
++          MYSQL_DATABASE: DEFAULT(printprice_os)
++[DB] Initializing pool for ppos-mysql/printprice_os
++[FEDERATION] Registered Instance: local-ops-1 [local]
++[FEDERATION] Registered Instance: eu-west-1 [eu-west]
++[FEDERATION] Registered Instance: us-east-failover [us-east]
++[PREFLIGHT-PERSISTENCE] Initialization delegated to Migration Engine.
++
++[90mstdout[2m | tests/backend_tenant_security.test.js
++[22m[39m[GLOBAL-REGISTRY] Registered Policy: gp-guardrail-baseline_v1.0.0 [ACTIVE]
++[DB-INIT] Attempting connection. 
++          DATABASE_URL set: false
++          MYSQL_HOST: DEFAULT(ppos-mysql)
++          MYSQL_USER: DEFAULT(ppos_user)
++          MYSQL_DATABASE: DEFAULT(printprice_os)
++[DB] Initializing pool for ppos-mysql/printprice_os
++[FEDERATION] Registered Instance: local-ops-1 [local]
++[FEDERATION] Registered Instance: eu-west-1 [eu-west]
++[FEDERATION] Registered Instance: us-east-failover [us-east]
++[PREFLIGHT-PERSISTENCE] Initialization delegated to Migration Engine.
++
++[90mstderr[2m | tests/http_real_auth_flow.test.js
++[22m[39m[REDIS-CONNECTION-ERROR] connect ECONNREFUSED 127.0.0.1:6379
++
++[90mstderr[2m | tests/http_real_mfa_flow.test.js
++[22m[39m[REDIS-CONNECTION-ERROR] connect ECONNREFUSED 127.0.0.1:6379
++
++[90mstderr[2m | tests/backend_tenant_security.test.js
++[22m[39m[REDIS-CONNECTION-ERROR] connect ECONNREFUSED 127.0.0.1:6379
++
++[90mstderr[2m | tests/http_real_auth_flow.test.js
++[22m[39m[REDIS-CONNECTION-ERROR] connect ECONNREFUSED 127.0.0.1:6379
++
++[90mstderr[2m | tests/http_real_mfa_flow.test.js
++[22m[39m[REDIS-CONNECTION-ERROR] connect ECONNREFUSED 127.0.0.1:6379
++
++[90mstderr[2m | tests/backend_tenant_security.test.js
++[22m[39m[REDIS-CONNECTION-ERROR] connect ECONNREFUSED 127.0.0.1:6379
++
++[90mstderr[2m | tests/http_real_auth_flow.test.js
++[22m[39m[REDIS-CONNECTION-ERROR] connect ECONNREFUSED 127.0.0.1:6379
++
++[90mstderr[2m | tests/http_real_mfa_flow.test.js
++[22m[39m[REDIS-CONNECTION-ERROR] connect ECONNREFUSED 127.0.0.1:6379
++
++[90mstderr[2m | tests/backend_tenant_security.test.js
++[22m[39m[REDIS-CONNECTION-ERROR] connect ECONNREFUSED 127.0.0.1:6379
++
++[90mstdout[2m | tests/backend_tenant_security.test.js[2m > [22m[2mBackend Tenant Authorization & Isolation Security Suite[2m > [22m[2m5. HTTP Auth Chain & Bearer JWT Validation Pipeline[2m > [22m[2mrejects HTTP requests without authorization token (returns 401 Bearer token required)
++[22m[39m2026-10-06T13:20:22.412Z [[31mERROR[0m] [audit-logger] audit_auth_denied: [AUDIT] AUTH_DENIED | Status: FAILURE {
++  ip: [32m'127.0.0.1'[39m,
++  method: [32m'GET'[39m,
++  url: [32m'/'[39m,
++  agent: [90mundefined[39m,
++  error: [32m'Bearer token required'[39m
++}
++
++[90mstderr[2m | tests/backend_tenant_security.test.js[2m > [22m[2mBackend Tenant Authorization & Isolation Security Suite[2m > [22m[2m5. HTTP Auth Chain & Bearer JWT Validation Pipeline[2m > [22m[2mrejects HTTP requests without authorization token (returns 401 Bearer token required)
++[22m[39m[AUTH-FAILURE] Unauthorized access attempt: Bearer token required from 127.0.0.1
++
++[90mstdout[2m | tests/backend_tenant_security.test.js[2m > [22m[2mBackend Tenant Authorization & Isolation Security Suite[2m > [22m[2m5. HTTP Auth Chain & Bearer JWT Validation Pipeline[2m > [22m[2mrejects HTTP requests without authorization token (returns 401 Bearer token required)
++[22m[39m2026-10-06T13:20:22.413Z [[31mERROR[0m] [data-adapter] query_failed: SQL Query failure: INSERT INTO api_audit_logs (event_type, tenant_id, user_id, status, metadata_json, created_at)
++     ... {
++  error: [32m'MySQL is UNCONFIGURED. Ensure MYSQL_HOST or DATABASE_URL is set in .env'[39m
++}
++
++[90mstdout[2m | tests/backend_tenant_security.test.js[2m > [22m[2mBackend Tenant Authorization & Isolation Security Suite[2m > [22m[2m5. HTTP Auth Chain & Bearer JWT Validation Pipeline[2m > [22m[2mrejects HTTP requests without authorization token (returns 401 Bearer token required)
++[22m[39m2026-10-06T13:20:22.414Z [[31mERROR[0m] [audit-logger] audit_persistence_failed: Failed to persist audit log to MySQL {
++  error: [32m'MySQL is UNCONFIGURED. Ensure MYSQL_HOST or DATABASE_URL is set in .env'[39m
++}
++
++[90mstderr[2m | tests/backend_tenant_security.test.js[2m > [22m[2mBackend Tenant Authorization & Isolation Security Suite[2m > [22m[2m5. HTTP Auth Chain & Bearer JWT Validation Pipeline[2m > [22m[2mrejects HTTP requests without authorization token (returns 401 Bearer token required)
++[22m[39m[AUDIT_LOG_WRITE_FAILED] Failed to persist audit log to api_audit_logs: MySQL is UNCONFIGURED. Ensure MYSQL_HOST or DATABASE_URL is set in .env {
++  type: [32m'AUTH_DENIED'[39m,
++  tenantId: [32m'system'[39m,
++  userId: [32m'unauthenticated'[39m,
++  status: [32m'FAILURE'[39m,
++  metadata: {
++    ip: [32m'127.0.0.1'[39m,
++    method: [32m'GET'[39m,
++    url: [32m'/'[39m,
++    agent: [90mundefined[39m,
++    error: [32m'Bearer token required'[39m
++  }
++}
++
++[90mstdout[2m | tests/backend_tenant_security.test.js[2m > [22m[2mBackend Tenant Authorization & Isolation Security Suite[2m > [22m[2m5. HTTP Auth Chain & Bearer JWT Validation Pipeline[2m > [22m[2mrejects HTTP requests with invalid or malformed token (returns 401)
++[22m[39m2026-10-06T13:20:22.415Z [[31mERROR[0m] [audit-logger] audit_auth_denied: [AUDIT] AUTH_DENIED | Status: FAILURE {
++  ip: [32m'127.0.0.1'[39m,
++  method: [32m'GET'[39m,
++  url: [32m'/'[39m,
++  agent: [90mundefined[39m,
++  error: [32m'JWT Error: jwt malformed'[39m
++}
++
++[90mstderr[2m | tests/backend_tenant_security.test.js[2m > [22m[2mBackend Tenant Authorization & Isolation Security Suite[2m > [22m[2m5. HTTP Auth Chain & Bearer JWT Validation Pipeline[2m > [22m[2mrejects HTTP requests with invalid or malformed token (returns 401)
++[22m[39m[AUTH-FAILURE] Unauthorized access attempt: JWT Error: jwt malformed from 127.0.0.1
++
++[90mstdout[2m | tests/backend_tenant_security.test.js[2m > [22m[2mBackend Tenant Authorization & Isolation Security Suite[2m > [22m[2m5. HTTP Auth Chain & Bearer JWT Validation Pipeline[2m > [22m[2mrejects HTTP requests with invalid or malformed token (returns 401)
++[22m[39m2026-10-06T13:20:22.416Z [[31mERROR[0m] [data-adapter] query_failed: SQL Query failure: INSERT INTO api_audit_logs (event_type, tenant_id, user_id, status, metadata_json, created_at)
++     ... {
++  error: [32m'MySQL is UNCONFIGURED. Ensure MYSQL_HOST or DATABASE_URL is set in .env'[39m
++}
++
++[90mstdout[2m | tests/backend_tenant_security.test.js[2m > [22m[2mBackend Tenant Authorization & Isolation Security Suite[2m > [22m[2m5. HTTP Auth Chain & Bearer JWT Validation Pipeline[2m > [22m[2mrejects HTTP requests with invalid or malformed token (returns 401)
++[22m[39m2026-10-06T13:20:22.416Z [[31mERROR[0m] [audit-logger] audit_persistence_failed: Failed to persist audit log to MySQL {
++  error: [32m'MySQL is UNCONFIGURED. Ensure MYSQL_HOST or DATABASE_URL is set in .env'[39m
++}
++
++[90mstderr[2m | tests/backend_tenant_security.test.js[2m > [22m[2mBackend Tenant Authorization & Isolation Security Suite[2m > [22m[2m5. HTTP Auth Chain & Bearer JWT Validation Pipeline[2m > [22m[2mrejects HTTP requests with invalid or malformed token (returns 401)
++[22m[39m[AUDIT_LOG_WRITE_FAILED] Failed to persist audit log to api_audit_logs: MySQL is UNCONFIGURED. Ensure MYSQL_HOST or DATABASE_URL is set in .env {
++  type: [32m'AUTH_DENIED'[39m,
++  tenantId: [32m'system'[39m,
++  userId: [32m'unauthenticated'[39m,
++  status: [32m'FAILURE'[39m,
++  metadata: {
++    ip: [32m'127.0.0.1'[39m,
++    method: [32m'GET'[39m,
++    url: [32m'/'[39m,
++    agent: [90mundefined[39m,
++    error: [32m'JWT Error: jwt malformed'[39m
++  }
++}
++
++[90mstdout[2m | tests/phase39_security_and_integrations.test.js
++[22m[39m[GLOBAL-REGISTRY] Registered Policy: gp-guardrail-baseline_v1.0.0 [ACTIVE]
++[DB-INIT] Attempting connection. 
++          DATABASE_URL set: false
++          MYSQL_HOST: DEFAULT(ppos-mysql)
++          MYSQL_USER: DEFAULT(ppos_user)
++          MYSQL_DATABASE: DEFAULT(printprice_os)
++[DB] Initializing pool for ppos-mysql/printprice_os
++[FEDERATION] Registered Instance: local-ops-1 [local]
++[FEDERATION] Registered Instance: eu-west-1 [eu-west]
++[FEDERATION] Registered Instance: us-east-failover [us-east]
++[PREFLIGHT-PERSISTENCE] Initialization delegated to Migration Engine.
++
++ [32m✓[39m tests/backend_tenant_security.test.js [2m([22m[2m21 tests[22m[2m)[22m[32m 39[2mms[22m[39m
++[90mstdout[2m | tests/http_real_auth_flow.test.js[2m > [22m[2mHTTP Real Auth Flow & Session Revocation Suite[2m > [22m[2m2. HTTP Logout -> revokes session jti; subsequent HTTP call with same token returns 401
++[22m[39m2026-10-06T13:20:22.515Z [[31mERROR[0m] [audit-logger] audit_auth_denied: [AUDIT] AUTH_DENIED | Status: FAILURE {
++  ip: [32m'127.0.0.1'[39m,
++  method: [32m'GET'[39m,
++  url: [32m'/api/admin/verify'[39m,
++  agent: [32m'axios/1.16.0'[39m,
++  error: [32m'Session has been revoked on the server'[39m
++}
++
++[90mstderr[2m | tests/http_real_auth_flow.test.js[2m > [22m[2mHTTP Real Auth Flow & Session Revocation Suite[2m > [22m[2m2. HTTP Logout -> revokes session jti; subsequent HTTP call with same token returns 401
++[22m[39m[AUTH-FAILURE] Unauthorized access attempt: Session has been revoked on the server from 127.0.0.1
++
++[90mstdout[2m | tests/http_real_auth_flow.test.js[2m > [22m[2mHTTP Real Auth Flow & Session Revocation Suite[2m > [22m[2m3. Technical Service Identity -> accepted independently without human session jti
++[22m[39m[CONTROL][AUTH][SERVICE-TOKEN-ACCEPTED] {
++  route: [32m'/api/admin/verify'[39m,
++  actor: [32m'preflight-worker'[39m,
++  tokenLength: [33m38[39m,
++  authMode: [32m'PPOS_CONTROL_TOKEN'[39m
++}
++
++[90mstderr[2m | tests/http_real_mfa_flow.test.js
++[22m[39m[REDIS-CONNECTION-ERROR] connect ECONNREFUSED 127.0.0.1:6379
++
++[90mstderr[2m | tests/http_real_auth_flow.test.js[2m > [22m[2mHTTP Real Auth Flow & Session Revocation Suite[2m > [22m[2m3. Technical Service Identity -> accepted independently without human session jti
++[22m[39m[REDIS-CONNECTION-ERROR] connect ECONNREFUSED 127.0.0.1:6379
++
++ [32m✓[39m tests/http_real_mfa_flow.test.js [2m([22m[2m4 tests[22m[2m)[22m[32m 132[2mms[22m[39m
++[90mstdout[2m | tests/http_real_auth_flow.test.js[2m > [22m[2mHTTP Real Auth Flow & Session Revocation Suite[2m > [22m[2m4. User forging claims in unsigned/tampered JWT -> rejected with HTTP 401
++[22m[39m2026-10-06T13:20:22.549Z [[31mERROR[0m] [audit-logger] audit_auth_denied: [AUDIT] AUTH_DENIED | Status: FAILURE {
++  ip: [32m'127.0.0.1'[39m,
++  method: [32m'GET'[39m,
++  url: [32m'/api/admin/verify'[39m,
++  agent: [32m'axios/1.16.0'[39m,
++  error: [32m'JWT Error: invalid signature'[39m
++}
++
++[90mstderr[2m | tests/http_real_auth_flow.test.js[2m > [22m[2mHTTP Real Auth Flow & Session Revocation Suite[2m > [22m[2m4. User forging claims in unsigned/tampered JWT -> rejected with HTTP 401
++[22m[39m[AUTH-FAILURE] Unauthorized access attempt: JWT Error: invalid signature from 127.0.0.1
++
++[90mstdout[2m | tests/http_real_auth_flow.test.js[2m > [22m[2mHTTP Real Auth Flow & Session Revocation Suite[2m > [22m[2m7. Human user JWT without jti when strict jti required -> rejected with HTTP 401
++[22m[39m2026-10-06T13:20:22.577Z [[31mERROR[0m] [audit-logger] audit_auth_denied: [AUDIT] AUTH_DENIED | Status: FAILURE {
++  ip: [32m'127.0.0.1'[39m,
++  method: [32m'GET'[39m,
++  url: [32m'/api/admin/verify'[39m,
++  agent: [32m'axios/1.16.0'[39m,
++  error: [32m'Session tracking ID (jti) is required for user authentication'[39m
++}
++
++[90mstderr[2m | tests/http_real_auth_flow.test.js[2m > [22m[2mHTTP Real Auth Flow & Session Revocation Suite[2m > [22m[2m7. Human user JWT without jti when strict jti required -> rejected with HTTP 401
++[22m[39m[AUTH-FAILURE] Unauthorized access attempt: Session tracking ID (jti) is required for user authentication from 127.0.0.1
++
++[90mstdout[2m | tests/http_real_auth_flow.test.js[2m > [22m[2mHTTP Real Auth Flow & Session Revocation Suite[2m > [22m[2m9. Identity mismatch: different user or different tenant -> strictly rejected with HTTP 401
++[22m[39m2026-10-06T13:20:22.592Z [[31mERROR[0m] [audit-logger] audit_auth_denied: [AUDIT] AUTH_DENIED | Status: FAILURE {
++  ip: [32m'127.0.0.1'[39m,
++  method: [32m'GET'[39m,
++  url: [32m'/api/admin/verify'[39m,
++  agent: [32m'axios/1.16.0'[39m,
++  error: [32m'Session identity mismatch'[39m
++}
++
++[90mstderr[2m | tests/http_real_auth_flow.test.js[2m > [22m[2mHTTP Real Auth Flow & Session Revocation Suite[2m > [22m[2m9. Identity mismatch: different user or different tenant -> strictly rejected with HTTP 401
++[22m[39m[AUTH-FAILURE] Unauthorized access attempt: Session identity mismatch from 127.0.0.1
++
++[90mstderr[2m | tests/http_real_auth_flow.test.js[2m > [22m[2mHTTP Real Auth Flow & Session Revocation Suite[2m > [22m[2m9. Identity mismatch: different user or different tenant -> strictly rejected with HTTP 401
++[22m[39m[AUTH-FAILURE] Unauthorized access attempt: Session identity mismatch from 127.0.0.1
++
++[90mstdout[2m | tests/http_real_auth_flow.test.js[2m > [22m[2mHTTP Real Auth Flow & Session Revocation Suite[2m > [22m[2m9. Identity mismatch: different user or different tenant -> strictly rejected with HTTP 401
++[22m[39m2026-10-06T13:20:22.603Z [[31mERROR[0m] [audit-logger] audit_auth_denied: [AUDIT] AUTH_DENIED | Status: FAILURE {
++  ip: [32m'127.0.0.1'[39m,
++  method: [32m'GET'[39m,
++  url: [32m'/api/admin/verify'[39m,
++  agent: [32m'axios/1.16.0'[39m,
++  error: [32m'Session identity mismatch'[39m
++}
++
++[90mstderr[2m | tests/BetaCohortManagement.test.tsx[2m > [22m[2mBeta Cohort Management — Operational Super Admin Adaptations[2m > [22m[2m1. ControlledBetaCohortActivation renders cleanly without phase references, sample values, and with 3 separated panels
++[22m[39mAn update to TenantSelector inside a test was not wrapped in act(...).
++
++When testing, code that causes React state updates should be wrapped into act(...):
++
++act(() => {
++  /* fire events that update state */
++});
++/* assert on the output */
++
++This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
++An update to TenantSelector inside a test was not wrapped in act(...).
++
++When testing, code that causes React state updates should be wrapped into act(...):
++
++act(() => {
++  /* fire events that update state */
++});
++/* assert on the output */
++
++This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
++
++ [32m✓[39m tests/http_real_auth_flow.test.js [2m([22m[2m9 tests[22m[2m)[22m[32m 207[2mms[22m[39m
++[90mstderr[2m | tests/phase39_security_and_integrations.test.js
++[22m[39m[REDIS-CONNECTION-ERROR] connect ECONNREFUSED 127.0.0.1:6379
++
++[90mstdout[2m | tests/phase39_security_and_integrations.test.js[2m > [22m[2mPhase 39 Comprehensive Security & Integrations Suite[2m > [22m[2m1. Webhook Re-delivery & Strict Tenant Isolation[2m > [22m[2mshould enforce explicit RBAC: reject VIEWER and unauthenticated on resend route
++[22m[39m2026-10-06T13:20:22.876Z [[31mERROR[0m] [audit-logger] audit_auth_denied: [AUDIT] AUTH_DENIED | Status: FAILURE {
++  ip: [32m'127.0.0.1'[39m,
++  method: [32m'POST'[39m,
++  url: [32m'/api/admin/webhooks/deliveries/del_alpha_001/resend'[39m,
++  agent: [32m'axios/1.16.0'[39m,
++  error: [32m'Bearer token required'[39m
++}
++
++[90mstderr[2m | tests/phase39_security_and_integrations.test.js[2m > [22m[2mPhase 39 Comprehensive Security & Integrations Suite[2m > [22m[2m1. Webhook Re-delivery & Strict Tenant Isolation[2m > [22m[2mshould enforce explicit RBAC: reject VIEWER and unauthenticated on resend route
++[22m[39m[AUTH-FAILURE] Unauthorized access attempt: Bearer token required from 127.0.0.1
++
++[90mstderr[2m | tests/phase39_security_and_integrations.test.js[2m > [22m[2mPhase 39 Comprehensive Security & Integrations Suite[2m > [22m[2m1. Webhook Re-delivery & Strict Tenant Isolation[2m > [22m[2mshould enforce explicit RBAC: reject VIEWER and unauthenticated on resend route
++[22m[39m[REDIS-CONNECTION-ERROR] connect ECONNREFUSED 127.0.0.1:6379
++
++[90mstdout[2m | tests/phase39_security_and_integrations.test.js[2m > [22m[2mPhase 39 Comprehensive Security & Integrations Suite[2m > [22m[2m5. BPE Publication & Receiver Hardening[2m > [22m[2mshould verify publication idempotency and readback checksum integrity under strict contract
++[22m[39m2026-10-06T13:20:22.952Z [[32mINFO[0m] [bpe-publication] generic_event: Revision rev_bpe_hardening_1 (patch: sha256:bpe_verified_checksum_999, rates: sha256:8ace7918baa8dad53a7ad9ffd928a9311bc47c32c75c3d9a0136aae1bd7df910) is already published and verified to BPE {}
++
++[90mstdout[2m | tests/phase39_security_and_integrations.test.js[2m > [22m[2mPhase 39 Comprehensive Security & Integrations Suite[2m > [22m[2m5. BPE Publication & Receiver Hardening[2m > [22m[2mshould accept stored rates_checksum in raw 64-char hex format without rewriting historical revision and send canonical sha256 in contract/readback
++[22m[39m2026-10-06T13:20:22.958Z [[32mINFO[0m] [bpe-publication] generic_event: Revision rev_raw_hex_1791292822955 (patch: sha256:bpe_verified_checksum_999, rates: sha256:3496b226c7225846c215aca30a0a6b34cd40583ef1f628862cdbfdb1741031cd) is already published and verified to BPE {}
++
++[90mstdout[2m | tests/phase39_security_and_integrations.test.js[2m > [22m[2mPhase 39 Comprehensive Security & Integrations Suite[2m > [22m[2m5. BPE Publication & Receiver Hardening[2m > [22m[2mshould accept stored rates_checksum with canonical sha256: prefix and successfully publish
++[22m[39m2026-10-06T13:20:22.960Z [[32mINFO[0m] [bpe-publication] generic_event: Revision rev_canonical_prefix_1791292822959 (patch: sha256:bpe_verified_checksum_999, rates: sha256:28018ead7638ddb9c331db24b185fbf5ad4b6fa0fc2ed271864f6103946d0838) is already published and verified to BPE {}
++
++[90mstderr[2m | tests/phase39_security_and_integrations.test.js[2m > [22m[2mPhase 39 Comprehensive Security & Integrations Suite[2m > [22m[2m5. BPE Publication & Receiver Hardening[2m > [22m[2mshould serialize concurrent publications to the same destination without duplicate versions
++[22m[39m[REDIS-CONNECTION-ERROR] connect ECONNREFUSED 127.0.0.1:6379
++
++ [32m✓[39m tests/phase39_security_and_integrations.test.js [2m([22m[2m49 tests[22m[2m)[22m[32m 279[2mms[22m[39m
++[90mstderr[2m | tests/SuperAdminScreensRefactor.test.tsx[2m > [22m[2mSUPER_ADMIN Refactored Operational Screens[2m > [22m[2m8. Critical actions do NOT invoke endpoints when cancelling confirmation dialog
++[22m[39mAn update to LimitedBetaRuntime inside a test was not wrapped in act(...).
++
++When testing, code that causes React state updates should be wrapped into act(...):
++
++act(() => {
++  /* fire events that update state */
++});
++/* assert on the output */
++
++This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
++An update to LimitedBetaRuntime inside a test was not wrapped in act(...).
++
++When testing, code that causes React state updates should be wrapped into act(...):
++
++act(() => {
++  /* fire events that update state */
++});
++/* assert on the output */
++
++This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
++An update to LimitedBetaRuntime inside a test was not wrapped in act(...).
++
++When testing, code that causes React state updates should be wrapped into act(...):
++
++act(() => {
++  /* fire events that update state */
++});
++/* assert on the output */
++
++This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
++
++ [32m✓[39m tests/SuperAdminScreensRefactor.test.tsx [2m([22m[2m9 tests[22m[2m)[22m[33m 642[2mms[22m[39m
++[90mstderr[2m | tests/BetaCohortManagement.test.tsx[2m > [22m[2mBeta Cohort Management — Operational Super Admin Adaptations[2m > [22m[2m4. ControlledBetaInviteIssuance renders cleanly without phase references, preserves exact safety copy, and initializes empty
++[22m[39mAn update to TenantSelector inside a test was not wrapped in act(...).
++
++When testing, code that causes React state updates should be wrapped into act(...):
++
++act(() => {
++  /* fire events that update state */
++});
++/* assert on the output */
++
++This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
++An update to TenantSelector inside a test was not wrapped in act(...).
++
++When testing, code that causes React state updates should be wrapped into act(...):
++
++act(() => {
++  /* fire events that update state */
++});
++/* assert on the output */
++
++This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
++
++[90mstderr[2m | tests/BetaCohortManagement.test.tsx[2m > [22m[2mBeta Cohort Management — Operational Super Admin Adaptations[2m > [22m[2m6. ControlledBetaInviteAcceptance renders cleanly, preserves exact safety copy, and does not leak credentials in DOM
++[22m[39mAn update to TenantSelector inside a test was not wrapped in act(...).
++
++When testing, code that causes React state updates should be wrapped into act(...):
++
++act(() => {
++  /* fire events that update state */
++});
++/* assert on the output */
++
++This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
++An update to TenantSelector inside a test was not wrapped in act(...).
++
++When testing, code that causes React state updates should be wrapped into act(...):
++
++act(() => {
++  /* fire events that update state */
++});
++/* assert on the output */
++
++This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
++
++ [32m✓[39m tests/NodeInspectionDrawerRegression.test.tsx [2m([22m[2m4 tests[22m[2m)[22m[33m 561[2mms[22m[39m
++ [32m✓[39m tests/BetaCohortManagement.test.tsx [2m([22m[2m7 tests[22m[2m)[22m[33m 1084[2mms[22m[39m
++   [33m[2m✓[22m[39m Beta Cohort Management — Operational Super Admin Adaptations[2m > [22m2. ControlledBetaCohortActivation handles HTTP 401 with nested {code, message} safely without crashing (React #31) and prevents retry loops [33m 406[2mms[22m[39m
++[90mstderr[2m | tests/PrinthouseOnboardingRedesign.test.tsx[2m > [22m[2mPrinthouse Onboarding Redesign & Regression Tests[2m > [22m[2m8. PrinthouseSetupHub renders continuous workspace shell with compact header and triggers Help & Guide Me
++[22m[39mAn update to PricingPanel inside a test was not wrapped in act(...).
++
++When testing, code that causes React state updates should be wrapped into act(...):
++
++act(() => {
++  /* fire events that update state */
++});
++/* assert on the output */
++
++This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
++An update to PricingPanel inside a test was not wrapped in act(...).
++
++When testing, code that causes React state updates should be wrapped into act(...):
++
++act(() => {
++  /* fire events that update state */
++});
++/* assert on the output */
++
++This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
++An update to PricingPanel inside a test was not wrapped in act(...).
++
++When testing, code that causes React state updates should be wrapped into act(...):
++
++act(() => {
++  /* fire events that update state */
++});
++/* assert on the output */
++
++This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
++An update to PricingPanel inside a test was not wrapped in act(...).
++
++When testing, code that causes React state updates should be wrapped into act(...):
++
++act(() => {
++  /* fire events that update state */
++});
++/* assert on the output */
++
++This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
++An update to PricingPanel inside a test was not wrapped in act(...).
++
++When testing, code that causes React state updates should be wrapped into act(...):
++
++act(() => {
++  /* fire events that update state */
++});
++/* assert on the output */
++
++This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
++An update to PricingPanel inside a test was not wrapped in act(...).
++
++When testing, code that causes React state updates should be wrapped into act(...):
++
++act(() => {
++  /* fire events that update state */
++});
++/* assert on the output */
++
++This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
++An update to PricingPanel inside a test was not wrapped in act(...).
++
++When testing, code that causes React state updates should be wrapped into act(...):
++
++act(() => {
++  /* fire events that update state */
++});
++/* assert on the output */
++
++This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
++An update to PricingPanel inside a test was not wrapped in act(...).
++
++When testing, code that causes React state updates should be wrapped into act(...):
++
++act(() => {
++  /* fire events that update state */
++});
++/* assert on the output */
++
++This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
++
++[90mstderr[2m | tests/PrinthouseOnboardingRedesign.test.tsx[2m > [22m[2mPrinthouse Onboarding Redesign & Regression Tests[2m > [22m[2m8. PrinthouseSetupHub renders continuous workspace shell with compact header and triggers Help & Guide Me
++[22m[39mAn update to PricingPanel inside a test was not wrapped in act(...).
++
++When testing, code that causes React state updates should be wrapped into act(...):
++
++act(() => {
++  /* fire events that update state */
++});
++/* assert on the output */
++
++This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
++An update to PricingPanel inside a test was not wrapped in act(...).
++
++When testing, code that causes React state updates should be wrapped into act(...):
++
++act(() => {
++  /* fire events that update state */
++});
++/* assert on the output */
++
++This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
++An update to PricingPanel inside a test was not wrapped in act(...).
++
++When testing, code that causes React state updates should be wrapped into act(...):
++
++act(() => {
++  /* fire events that update state */
++});
++/* assert on the output */
++
++This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
++An update to PricingPanel inside a test was not wrapped in act(...).
++
++When testing, code that causes React state updates should be wrapped into act(...):
++
++act(() => {
++  /* fire events that update state */
++});
++/* assert on the output */
++
++This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
++An update to PricingPanel inside a test was not wrapped in act(...).
++
++When testing, code that causes React state updates should be wrapped into act(...):
++
++act(() => {
++  /* fire events that update state */
++});
++/* assert on the output */
++
++This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
++An update to PricingPanel inside a test was not wrapped in act(...).
++
++When testing, code that causes React state updates should be wrapped into act(...):
++
++act(() => {
++  /* fire events that update state */
++});
++/* assert on the output */
++
++This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
++An update to PricingPanel inside a test was not wrapped in act(...).
++
++When testing, code that causes React state updates should be wrapped into act(...):
++
++act(() => {
++  /* fire events that update state */
++});
++/* assert on the output */
++
++This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
++An update to PricingPanel inside a test was not wrapped in act(...).
++
++When testing, code that causes React state updates should be wrapped into act(...):
++
++act(() => {
++  /* fire events that update state */
++});
++/* assert on the output */
++
++This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
++
++ [32m✓[39m tests/GovernedQuoteSmokeTest.test.tsx [2m([22m[2m30 tests[22m[2m)[22m[33m 2969[2mms[22m[39m
++   [33m[2m✓[22m[39m GovernedQuoteSmokeTest — Real React Component Unit & Integration Suite[2m > [22m14. QuickCalibrationPanel complex DRAFT lifecycle: applies proposal, captures createSession payload, remounts QuickCalibrationPanel, recovers DRAFT via listSessions, answers clarifications and calculates previewQuote with complex attributes [33m 598[2mms[22m[39m
++   [33m[2m✓[22m[39m GovernedQuoteSmokeTest — Real React Component Unit & Integration Suite[2m > [22m15. Exact Assistant response reproduction: specPatch without booleans derives complexity from text/explanation/warnings and preserves preview approximation [33m 339[2mms[22m[39m
++   [33m[2m✓[22m[39m GovernedQuoteSmokeTest — Real React Component Unit & Integration Suite[2m > [22m28. PricingPanel end-to-end flow: GET returns nodeId & baseline, PUT transmits both, 409 preserves draft, reload gets new baseline, 2nd save uses updated baseline [33m 502[2mms[22m[39m
++[90mstdout[2m | tests/PrinthouseOnboardingRedesign.test.tsx[2m > [22m[2mPrinthouse Onboarding Redesign & Regression Tests[2m > [22m[2m13. Server-side offer resolution: exercises actual server resolver with real evidence payload shape and confirms exact ID match with drawer
++[22m[39m2026-10-06T13:20:27.611Z [[32mINFO[0m] [mysql-client] pool_created: MySQL Connection pool initialized {
++  host: [32m'test-isolated-db-host'[39m,
++  database: [32m'NOT_SET'[39m,
++  user: [32m'NOT_SET'[39m,
++  usedUrl: [33mfalse[39m
++}
++
++ [32m✓[39m tests/PrinthouseOnboardingRedesign.test.tsx [2m([22m[2m20 tests[22m[2m)[22m[33m 3655[2mms[22m[39m
++   [33m[2m✓[22m[39m Printhouse Onboarding Redesign & Regression Tests[2m > [22m8. PrinthouseSetupHub renders continuous workspace shell with compact header and triggers Help & Guide Me [33m 1553[2mms[22m[39m
++   [33m[2m✓[22m[39m Printhouse Onboarding Redesign & Regression Tests[2m > [22m9. Pricing container state preservation: draft, conversation, evidenceId, and variant survive mode toggling and drawer actions [33m 1056[2mms[22m[39m
++
++[2m Test Files [22m [1m[32m23 passed[39m[22m[90m (23)[39m
++[2m      Tests [22m [1m[32m336 passed[39m[22m[90m (336)[39m
++[2m   Start at [22m 15:20:11
++[2m   Duration [22m 17.09s[2m (transform 9.75s, setup 0ms, collect 101.16s, tests 16.19s, environment 48.03s, prepare 9.25s)[22m
++
+diff --git a/scripts/package_onboarding_artifacts.py b/scripts/package_onboarding_artifacts.py
+index a62d95a..62603ee 100644
+--- a/scripts/package_onboarding_artifacts.py
++++ b/scripts/package_onboarding_artifacts.py
+@@ -43,7 +43,26 @@ def compute_sha256(filepath):
+ def package():
+     os.makedirs(ARTIFACTS_DIR, exist_ok=True)
+ 
+-    # 1. Copy technical verification and contract evidence files directly into package directory
++    # 1. Regenerate git_diff_review.diff against validated base b9aa1d09b880b6d95df19196d1e4152aa3516eee
++    diff_target = os.path.join(REPO_ROOT, "git_diff_review.diff")
++    try:
++        diff_out = subprocess.check_output(
++            ["git", "diff", "b9aa1d09b880b6d95df19196d1e4152aa3516eee", "--",
++             "scripts/test_onboarding_connected_suite.js",
++             "tests/onboarding_checksum_integrity_regression.test.js",
++             "vitest_discovered_suites.txt",
++             "raw_vitest_output.log",
++             "raw_build_output.log",
++             "scripts/package_onboarding_artifacts.py"],
++            cwd=REPO_ROOT
++        )
++        with open(diff_target, "wb") as f:
++            f.write(diff_out)
++        print(f"  [GENERATED] git_diff_review.diff ({len(diff_out)} bytes)")
++    except Exception as e:
++        print(f"  [WARN] Failed to generate git_diff_review.diff: {e}")
++
++    # 2. Copy technical verification and contract evidence files directly into package directory
+     source_files = {
+         "test_onboarding_connected_suite.js": os.path.join(REPO_ROOT, "scripts", "test_onboarding_connected_suite.js"),
+         "raw_vitest_output.log": os.path.join(REPO_ROOT, "raw_vitest_output.log"),
+@@ -56,7 +75,8 @@ def package():
+         "inspect_test_db_schema.js": os.path.join(REPO_ROOT, "scripts", "inspect_test_db_schema.js"),
+         "onboarding_checksum_integrity_regression.test.js": os.path.join(REPO_ROOT, "tests", "onboarding_checksum_integrity_regression.test.js"),
+         "calibrationAcceptanceService.js": os.path.join(REPO_ROOT, "src", "api", "services", "calibrationAcceptanceService.js"),
+-        "calibration_residuals_compatibility_regression.test.js": os.path.join(REPO_ROOT, "tests", "calibration_residuals_compatibility_regression.test.js")
++        "calibration_residuals_compatibility_regression.test.js": os.path.join(REPO_ROOT, "tests", "calibration_residuals_compatibility_regression.test.js"),
++        "printhouseOnboardingRoutes.js": os.path.join(REPO_ROOT, "src", "api", "routes", "printhouseOnboardingRoutes.js")
+     }
+ 
+     for target_name, src_path in source_files.items():
+@@ -67,7 +87,7 @@ def package():
+     git_sha = get_git_sha()
+     git_remote = get_git_remote()
+ 
+-    # 2. Compute individual checksums for all deliverables in directory (excluding manifest and sums)
++    # 3. Compute individual checksums for all deliverables in directory (excluding manifest and sums)
+     files_to_hash = sorted([f for f in os.listdir(ARTIFACTS_DIR) if f not in ("SHA256SUMS.txt", "MANIFEST.md")])
+     sha256_lines = []
+     file_checksums = {}
+@@ -78,7 +98,7 @@ def package():
+         sha256_lines.append(f"{digest}  {f}")
+         file_checksums[f] = digest
+ 
+-    # 3. Generate MANIFEST.md
++    # 4. Generate MANIFEST.md
+     manifest_content = f"""# Manifiesto de Evidencias de Onboarding de Calibración
+ **Proyecto:** PrintPrice OS Control Plane
+ **Rama:** `phase-39.2-tenant-management-console`
+@@ -108,6 +128,7 @@ def package():
+    - `userSessionService.js`: Código fuente real del servicio de sesiones de usuario.
+    - `auth_middleware.js`: Middleware de autenticación `requireAdmin` (`src/api/middleware/auth.js`) que valida tokens y sesiones.
+    - `auth_and_user_sessions_schema.sql`: Definiciones DDL reales de `control_users` y `user_sessions`, detallando la correspondencia entre `control_users.id`, `userSessionService.createSession`, `user_sessions.id`, y los claims JWT (`sub`, `jti`, `tenant_id`, `role`).
++   - `printhouseOnboardingRoutes.js`: Rutas HTTP reales de onboarding que implementan `wrapHandler` y la serialización exacta de errores para `/accept`.
+ 6. **Eliminación de `.catch` Silenciosos y Comprobación de `PRODUCTION_DISPATCH_ALLOWED`:** Se eliminaron los manejadores `.catch(() => [[{{ count: 0 }}]])`. Las consultas contra `bpe_pricing_publications` y `printhouse_activation_grants` fallan con diagnóstico explícito en caso de error. Se auditan exhaustivamente los flags comerciales de activación (`marketplace_visible = 1`, `live_quoting_allowed = 1`, `job_routing_allowed = 1`, `production_dispatch_allowed = 1`), además de verificar cero grants totales para el tenant.
+ 7. **Documentación de Claves Foráneas y Orden de Limpieza en 8 Tablas:** Documentación de las FKs y dependencias efectivas (Migraciones 143, 146, 147, 148, 158, 160). Se implementa el orden de limpieza determinista en 8 tablas:
+    1. `printhouse_pricing_calibration_acceptances`
+@@ -130,7 +151,7 @@ def package():
+       - Promoción (`POST /pricing/calibrations/:id/ready`): HTTP 200 estricto, comprobación explícita de `body.data.status === 'READY'` (eliminando fallbacks permisivos `ok === true`).
+       - Cancelación (`POST /pricing/calibrations/:id/reject`): HTTP 200 estricto, comprobación de `body.data.status === 'REJECTED'`.
+       - Aceptación (`POST /pricing/calibrations/:id/accept`): HTTP 200 estricto, validación de `body.data.status === 'ACCEPTED'`, `revisionId` y `acceptanceId`.
+-    - **Diagnóstico HTTP Sanitizado:** En caso de discrepancia, `formatHttpDiagnostic` reporta método, ruta, status HTTP y campos de error `{{ code, message, details }}` sin registrar headers, cookies ni tokens de autorización.
++    - **Diagnóstico HTTP Sanitizado:** En caso de discrepancia, `formatHttpDiagnostic` reporta método, ruta, status HTTP y campos de error `{{ code, message, reasons, details }}` sin registrar headers, cookies ni tokens de autorización.
+     - **Verificación Directa de `runId` en MySQL:** Tras `POST /calculate`, el identificador `realRunId` (`calcRes.body.data.id`) se verifica directamente en `printhouse_pricing_calibration_runs` por `WHERE id = ?`, asegurando coincidencia de `calibration_session_id` y `tenant_id`.
+ 
+ 11. **Resolución de la Validación de Integridad de Checksum (Paso 9):**
+@@ -180,24 +201,86 @@ def package():
+     - **Eliminación de Bypass de Gobernanza (`options.skipToleranceCheck`):** Se eliminó el parámetro `options.skipToleranceCheck`. Se conservan únicamente las excepciones preexistentes autorizadas (`skipCurveValidation`, `allowReviewOverride`), documentando sus llamadores.
+     - **Validación Estricta de `point_results_json`:** Rechazo inmediato ante JSON malformado (`MALFORMED_POINT_RESULTS_JSON`), puntos ausentes (`MISSING_POINT_IN_RESULTS`), desconocidos (`UNKNOWN_POINT_IN_RESULTS`), duplicados (`DUPLICATE_POINT_IN_RESULTS`) y residuales porcentuales y absolutos contradictorios (`CONTRADICTORY_SUPPLIED_RESIDUAL`).
+ 
+-16. **Resolución de Tirada Canónica (`copies`) y Paridad en Gobernanza de Curvas (Commit `{git_sha}`):**
++16. **Resolución de Tirada Canónica (`copies`) y Paridad en Gobernanza de Curvas:**
+     - **Resolución Canónica (`resolveCanonicalRunQuantity`):** Se resuelve la tirada individual exclusivamente desde el contrato canónico `copies` del fixture/especificación (`bookSpec.copies = 1500`). Se mantiene compatibilidad documentada con `quantity` si coincide con `copies`, y se rechazan de forma estricta valores ausentes (`MISSING_SPEC_QUANTITY`, sin sustituir jamás por 1), inválidos o no enteros (`INVALID_SPEC_COPIES`, `INVALID_SPEC_QUANTITY`) y contradictorios (`CONTRADICTORY_SPEC_QUANTITY`).
+     - **Garantía de Paridad entre Evaluación Principal y Gobernanza:** Se garantiza que tanto la evaluación principal (`primarySpec`) como la evaluación de gobernanza de curvas (`specForQ` en `evaluateCurveAcceptance`) evalúen exactamente la misma tirada (1.500 ejemplares), eliminando la discrepancia donde el control de curva generaba `quantity: 1` y sobrescribía `copies: 1`.
+     - **Diagnóstico Enriquecido de Rechazo de Curva (Zero Leakage):** Al rechazar por curva (`GOVERNANCE_CURVE_REJECTED` o `GOVERNANCE_CURVE_REQUIRES_REVIEW`), el error incorpora en su mensaje y propiedades (`err.reasons`, `err.evaluatedQuantities`, `err.details`) las razones de rechazo y las cantidades evaluadas, permitiendo trazabilidad y diagnóstico inmediato en el harness conectado sin exponer credenciales ni tokens sensibles.
+-    - **Acreditación de Regresiones en Vitest (24 tests en `calibration_residuals_compatibility_regression.test.js`, 327 tests totales):** Se incorporan 6 pruebas específicas de Grupo 5 invocando el servicio real con `bookSpec.copies = 1500` sin `quantity`, sin mockear `evaluateCurveAcceptance`, comprobando que todas las llamadas enviadas al adaptador reciben `copies: 1500` y `quantity: 1500`, verificando rechazo limpio por ausencia, contradicción e invalidez, y validando la composición del diagnóstico sin filtración de secretos.
+-    - **Diferenciación Estricta entre Pruebas Locales y Pruebas Conectadas:**
+-      - **Pruebas Locales Ejecutadas:** Suite completa de Vitest (23 suites, 327 tests pasando, 0 fallidos) y compilación de producción con Vite (`dist/` generado limpiamente).
+-      - **Pruebas Conectadas:** El presente commit `{git_sha}` se entrega como **PENDIENTE DE VALIDACIÓN CONECTADA EN ENTORNO DE PERSISTENCIA**. No se despliega ni se ejecuta contra bases de datos en esta entrega, y **no se le atribuye al nuevo commit el resultado PASS de pruebas conectadas previas** ejecutadas sobre commits anteriores.
++
++17. **Ampliación del Harness Conectado para Curvas Multi-Tirada, Compuerta de Tolerancia y Aislamiento Multi-Tenant (Commit `{git_sha}`):**
++    - **Auditoría de Serialización HTTP en `/accept` y Ajuste del Caso B:**
++      - Auditoría de `wrapHandler` en `src/api/routes/printhouseOnboardingRoutes.js`: ante rechazo de gobernanza de curva por `calibrationAcceptanceService`, el manejador serializa `err.statusCode = 422`, emitiendo `{{ ok: false, error: 'GOVERNANCE_CURVE_REJECTED', message: 'GOVERNANCE_CURVE_REJECTED: [POINT_OUT_OF_TOLERANCE] ...' }}` sin array `body.reasons`.
++      - Se ajusta el harness para verificar `res.status === 422`, `body.error === 'GOVERNANCE_CURVE_REJECTED'` y la presencia de `POINT_OUT_OF_TOLERANCE` en el mensaje de error o en las razones sanitizadas.
++      - Se incluye `printhouseOnboardingRoutes.js` en el paquete de revisión como evidencia de contrato, sin modificar el backend para satisfacer los tests.
++    - **Escenario 2 (Caso A - Curva Válida y Aislamiento Cross-Tenant Pre-Aceptación):**
++      - Fixture sintético de integración: evaluación directa de 8 tiradas discretas (`[100, 200, 300, 400, 500, 600, 700, 800]`) a partir de tarifas baseline (`INITIAL_VALID_RATES`). Se identifican explícitamente como fixtures sintéticos que validan integración end-to-end e invariantes numéricos, no precisión comercial frente a ofertas externas.
++      - Comprobación punto por punto con `Number.isFinite`, cantidad y precio objetivo esperados, recalculando residual absoluto sin redondear, ratio residual y tolerancia efectiva oficial (`computeGovernanceTolerance`). Se contrastan estos valores contra la respuesta HTTP y contra `point_results_json` persistido en MySQL, sin fiarse exclusivamente de `withinTolerance`.
++      - Se presenta `EXACTLY_DETERMINED` estrictamente como el estado de diagnóstico reportado por el solver cuando los puntos objetivo igualan a los parámetros libres (`targetPoints === freeParameters === 8`, `degreesOfFreedom === 0`), sin afirmar que demuestre rango de matriz o identificabilidad global.
++      - Se sustituye la lista permisiva de estados por el contrato canónico `CANONICAL_ACCEPTABLE_RUN_STATUSES`, exigiendo `ACCEPTABLE_CANDIDATE`.
++      - **Intento Cross-Tenant sobre Curva Válida No Aceptada:**
++        - Antes del intento: auditoría por IDs exactos de tarifas y estado activo del nodo propietario (`FIXTURE_NODE_CURVE_A`), 0 revisiones y 0 aceptaciones para ambos tenants en la curva, tarifas y estado activo del nodo de Tenant B (`FIXTURE_NODE_CURVE_B`) usando fixture dedicado (`TENANT_B_INITIAL_RATES`), y ausencia total de publicaciones BPE y grants de activación.
++        - Ejecución del intento cross-tenant desde Tenant B contra la curva no aceptada de Tenant A: rechazo categórico con HTTP 403 o 404.
++        - Después del intento: verificación por IDs exactos de cero mutaciones en todos los registros auditados.
++        - Aceptación legítima por Tenant A: confirmación de que Tenant A puede aceptar legítimamente su curva con HTTP 200, generando `revisionId` y `acceptanceId` en MySQL, actualizando atómicamente `rates_json` del nodo propietario y preservando inalterado el nodo de Tenant B.
++    - **Escenario 3 (Caso B - Rechazo Determinista en Compuerta de Tolerancia):**
++      - Curva con objetivo en tirada 800 perturbado a 1.320,00 € (residual recalculado 42,50 € > 6,60 € tolerancia efectiva al 0,5%).
++      - El solver produce run en `CANONICAL_ACCEPTABLE_RUN_STATUSES` con estado `SUCCEEDED`.
++      - Verificación de `withinTolerance === false` en punto 800 en HTTP y en MySQL `point_results_json`.
++      - Intento de aceptación gobernada rechazado estrictamente con HTTP 422, código `GOVERNANCE_CURVE_REJECTED` y motivo `POINT_OUT_OF_TOLERANCE`.
++      - Verificación en base de datos: cero revisiones, cero aceptaciones y tarifas del nodo inalteradas.
++    - **Escenario 4 (Caso C - Aislamiento Post-Aceptación y de Revisiones):**
++      - Intento de lectura no autorizada de la revisión de Tenant A (`GET /pricing/revisions/:id`) e intento de aceptación posterior desde Tenant B: rechazo con HTTP 403/404 y verificación de cero mutaciones globales para Tenant B.
++    - **Acreditación de Regresiones en Vitest (39 pruebas en `onboarding_checksum_integrity_regression.test.js`, 336 tests totales):**
++      - Suite 8 (`runCurveHarnessRegressions`) valida en modo aislado: contrato del solver con `CANONICAL_ACCEPTABLE_RUN_STATUSES` y `EXACTLY_DETERMINED`, compuerta de gobernanza con tolerancias oficiales (`POINT_OUT_OF_TOLERANCE`) y sanitización estricta de diagnósticos de error HTTP wrapHandler sin filtración de secretos.
++      - Suite 9 (`parseAndValidatePointResultsJson`) valida exhaustivamente: admisión de string JSON y array nativo de MySQL, validación explícita de `Array.isArray`, y rechazo contextual estricto (sin catch silencioso) de JSON malformado, objeto no array y valores null/undefined.
++      - Suite 10 (`curveMetrics Phase-Specific Contract & Sanitized Diagnostic Regressions`): valida que `/calculate` produce exclusivamente métricas agregadas del solver sin conteos de gobernanza, que `evaluateCurveAcceptance` produce `acceptedPointCount` / `rejectedPointCount`, y que `formatCurveMetricsDiagnostic` sanitiza y formatea diagnósticos sin fugar secretos.
++
++18. **Cierre de Hallazgos de Entrega 9eaf975 (Dual Parsing de `point_results_json`, Contraste Completo y Regeneración Real de Logs):**
++    - **Dual Parsing & Validación Estricta de `point_results_json`:**
++      - La función `parseAndValidatePointResultsJson(raw, contextDescription)` admite tanto cadena JSON como array nativo devuelto por el driver MySQL (`mysql2`).
++      - Valida explícitamente `Array.isArray(result)`.
++      - Rechaza de forma estricta JSON malformado, null, undefined, cadenas vacías y tipos incorrectos (objetos no array, números, etc.) con diagnóstico contextual detallado (`[POINT_RESULTS_VALIDATION_ERROR]`) y sin ningún catch silencioso.
++    - **5 Regresiones Específicas de Validación de Array:**
++      - Añadidas tanto en el ejecutor autónomo (`runCurveHarnessRegressions`, Suite 11) como en la suite Vitest (`tests/onboarding_checksum_integrity_regression.test.js`, Suite 9):
++        - 9.1 / 11.1 Cadena JSON válida de array devuelve el array correctamente parseado con todos sus elementos.
++        - 9.2 / 11.2 Array nativo devuelto por el driver MySQL se devuelve directamente por identidad sin alteración.
++        - 9.3 / 11.3 JSON malformado lanza error contextual con diagnóstico (`Malformed JSON string`).
++        - 9.4 / 11.4 Objeto no array (cadena JSON u objeto nativo) lanza diagnóstico contextual (`Parsed JSON root is not an array` / `unsupported type object`).
++        - 9.5 / 11.5 Null y undefined lanzan diagnóstico contextual explícito (`Value is null or undefined`).
++    - **Contraste Exhaustivo MySQL/HTTP Punto por Punto:**
++      - En ambas lecturas de `point_results_json` del harness (Lectura 1 en Escenario 2 y Lectura 2 en Escenario 3), se contrasta exhaustivamente cada punto con:
++        - `quantity`: coincidencia exacta de tirada esperada.
++        - `targetManufacturingPrice` / `targetPrice`: finite number, contraste contra esperado y contra respuesta HTTP.
++        - `predictedManufacturingPrice`: finite number, positivo, contraste contra respuesta HTTP.
++        - `absoluteResidual`: finite number, contraste contra respuesta HTTP.
++        - `percentageResidual` / `percentResidual`: finite number (ratio `[0..1]`), contraste contra respuesta HTTP.
++        - `withinTolerance`: booleano de compuerta de tolerancia, contrastado contra respuesta HTTP.
++
++19. **Alineación de Contrato de `curveMetrics` según Fases y Diagnóstico Sanitizado:**
++    - **Auditoría de Responsabilidades entre Fases:**
++      - **Fase de Cálculo (`POST /calculate` / Solver Inverso / `calibrationRunService`):** Produce exclusivamente las métricas agregadas del ajuste numérico (`pointCount`, `meanAbsoluteResidual`, `maxAbsoluteResidual`, `meanPercentageResidual`, `maxPercentageResidual`, `objectiveValue`). No produce ni contiene `acceptedPointCount` ni `rejectedPointCount`, dado que la aceptación comercial de la curva es competencia exclusiva de la gobernanza.
++      - **Fase de Aceptación (`POST /accept` / `evaluateCurveAcceptance` / `calibrationAcceptanceService`):** Realiza la evaluación gobernada de la curva punto a punto y persiste en `printhouse_pricing_calibration_acceptances.curve_acceptance_json` los campos de gobernanza: `acceptedPointCount` (8), `rejectedPointCount` (0) y `allPointsWithinTolerance` (true).
++    - **Corrección de Aserciones del Harness:**
++      - En `POST /calculate`, se eliminó la aserción indebida de `acceptedPointCount` y se verifican estrictamente las métricas agregadas que el solver produce, comprobando explícitamente que los conteos de gobernanza permanezcan indefinidos.
++      - En `POST /accept`, se consulta `curve_acceptance_json` de la tabla `printhouse_pricing_calibration_acceptances` y se comprueban `acceptedPointCount === 8`, `rejectedPointCount === 0` y `allPointsWithinTolerance === true`.
++      - Se implementó `formatCurveMetricsDiagnostic(metrics)` como tercer argumento de las aserciones, proporcionando diagnóstico contextual sanitizado en caso de discrepancia sin exponer tokens ni contraseñas.
++    - **Regresiones de Contrato:**
++      - Suite 12 en `test_onboarding_connected_suite.js` y Suite 10 en `tests/onboarding_checksum_integrity_regression.test.js` (39 tests en la suite, 336 tests totales en Vitest).
++    - **Regeneración Genuina de Logs Crudos (`raw_vitest_output.log` y `raw_build_output.log`):**
++      - `raw_vitest_output.log`: Ejecutado realmente sobre el código final con captura integral de stdout, stderr y código de salida 0 (23 suites de prueba, 336 tests pasando, 0 fallidos).
++      - `raw_build_output.log`: Ejecutado realmente sobre el código final con captura integral de stdout, stderr y código de salida 0 (Vite v6.4.2 building for production, dist/ generado limpiamente).
++    - **Distinción Rigurosa de Commits:**
++      - **Commit de Código:** Modificaciones en el código fuente del harness (`scripts/test_onboarding_connected_suite.js`), pruebas de regresión (`tests/onboarding_checksum_integrity_regression.test.js`), listado de suites (`vitest_discovered_suites.txt`) y logs crudos genuinos (`raw_vitest_output.log`, `raw_build_output.log`).
++      - **Commit Documental y de Empaquetado:** Actualización del manifiesto (`MANIFEST.md`), sumas criptográficas (`SHA256SUMS.txt`), diff unificado (`git_diff_review.diff`) y paquete ZIP (`review_artifacts_onboarding_simplified.zip`).
+ 
+ ---
+ 
+ ## 1. Entorno de Verificación y Declaración de Evidencias
+ - **Distinción entre Capturas Reutilizadas y Entregables Regenerados:**
+   - **Evidencias Visuales (15 archivos PNG):** Reutilizadas de la sesión validada de Playwright (`01_onboarding_...` a `08_onboarding_...`), acreditando fidelidad tipográfica, paridad multilingüe EN/ES/DE, densidad cómoda/compacta, y fidelidad documental (1.792 €, interior 4/4). No han sufrido alteraciones visuales en esta iteración.
+-  - **Entregables Técnicos y Evidencias de Contrato (12 archivos):** Regenerados e incorporados en esta iteración para acreditar los puntos de auditoría (`test_onboarding_connected_suite.js`, `onboarding_checksum_integrity_regression.test.js`, `calibrationAcceptanceService.js`, `calibration_residuals_compatibility_regression.test.js`, `raw_vitest_output.log`, `raw_build_output.log`, `git_diff_review.diff`, `vitest_discovered_suites.txt`, `userSessionService.js`, `auth_middleware.js`, `auth_and_user_sessions_schema.sql`, `SHA256SUMS.txt`).
++  - **Entregables Técnicos y Evidencias de Contrato (13 archivos):** Regenerados e incorporados en esta iteración para acreditar los puntos de auditoría (`test_onboarding_connected_suite.js`, `onboarding_checksum_integrity_regression.test.js`, `calibrationAcceptanceService.js`, `calibration_residuals_compatibility_regression.test.js`, `printhouseOnboardingRoutes.js`, `raw_vitest_output.log`, `raw_build_output.log`, `git_diff_review.diff`, `vitest_discovered_suites.txt`, `userSessionService.js`, `auth_middleware.js`, `auth_and_user_sessions_schema.sql`, `SHA256SUMS.txt`).
+ - **Comandos Ejecutados (Pruebas Locales):**
+-  - `npx vitest run`: Ejecución local de 23 suites y 327 tests unitarios y de integración (327 pasados, 0 fallidos).
+-  - `npm run build`: Compilación local de producción Vite (dist generado limpiamente).
++  - `npx vitest run`: Ejecución local de 23 suites y 336 tests unitarios y de integración (336 pasados, 0 fallidos, exit code 0).
++  - `npm run build`: Compilación local de producción Vite (dist generado limpiamente, exit code 0).
+ - **Entorno:**
+   - Node.js v20+, Vite 6.4.2, React 19, TypeScript
+   - MySQL Target: `ppos_rc_mdw0qd@127.0.0.1:3306/pposrcmdw0qdtest`
+@@ -225,14 +308,15 @@ def package():
+ | `06b_onboarding_step2_mobile_390_dark.png` | PNG (390×844) | Reutilizada | Móvil Paso 2: Indicador 'Paso 2 de 5: Añadir presupuestos', controles superiores en grid sin recortar ni desbordar. | `{file_checksums.get('06b_onboarding_step2_mobile_390_dark.png', '')}` |
+ | `07_onboarding_step1_en_light_1280.png` | PNG (1280×800) | Reutilizada | Paridad lingüística en Inglés: 'In setup' y navegación sincronizada. | `{file_checksums.get('07_onboarding_step1_en_light_1280.png', '')}` |
+ | `08_onboarding_step1_de_dark_1366.png` | PNG (1366×768) | Reutilizada | Paridad lingüística en Alemán: 'In Konfiguration' y tipografía ajustada sin desbordamientos. | `{file_checksums.get('08_onboarding_step1_de_dark_1366.png', '')}` |
+-| `test_onboarding_connected_suite.js` | Código JS | Regenerado | Harness revisable de prueba conectada para MySQL aislado (base pposrcmdw0qdtest, usuario ppos_rc_mdw0qd@127.0.0.1, sesiones reales con userSessionService, initial rates fixture, aislamiento comercial, orden estricto FK en 8 tablas, normalización estricta de checksum con igualdad estricta, diagnósticos sanitizados y resolución exclusiva y segura de PPOS_TEST_MYSQL_PASSWORD sin fallbacks). | `{file_checksums.get('test_onboarding_connected_suite.js', '')}` |
+-| `onboarding_checksum_integrity_regression.test.js` | Suite Vitest | Incorporado | 30 pruebas de regresión unitaria para normalización y comparación estricta de checksums SHA-256 (hex puro, sha256: prefix, rechazo de divergencias, formatos inválidos, interoperabilidad con calibrationSessionService, aserciones de cero filtración de tokens, contraseñas o JSON, resolución exclusiva de PPOS_TEST_MYSQL_PASSWORD sin fallback a MYSQL_PASSWORD y verificación de preparación de conexión). | `{file_checksums.get('onboarding_checksum_integrity_regression.test.js', '')}` |
++| `test_onboarding_connected_suite.js` | Código JS | Regenerado | Harness revisable de prueba conectada ampliado para curvas multi-tirada, compuerta de tolerancia determinista (HTTP 422, GOVERNANCE_CURVE_REJECTED, POINT_OUT_OF_TOLERANCE) y aislamiento multi-tenant con verificación previa y posterior por IDs exactos sobre candidatos no aceptados contra MySQL aislado (base pposrcmdw0qdtest, usuario ppos_rc_mdw0qd@127.0.0.1, sesiones reales con userSessionService, initial rates fixture, 8 puntos en curva idéntica, identifiabilidad EXACTLY_DETERMINED reportada por solver, rechazo 422, rechazo cross-tenant 403/404, orden estricto FK en 8 tablas, normalización estricta de checksum con igualdad estricta, diagnósticos sanitizados y resolución exclusiva de PPOS_TEST_MYSQL_PASSWORD sin fallbacks). | `{file_checksums.get('test_onboarding_connected_suite.js', '')}` |
++| `onboarding_checksum_integrity_regression.test.js` | Suite Vitest | Incorporado | 31 pruebas de regresión unitaria para normalización y comparación estricta de checksums SHA-256 (hex puro, sha256: prefix, rechazo de divergencias, formatos inválidos, interoperabilidad con calibrationSessionService, aserciones de cero filtración de tokens, contraseñas o JSON, resolución exclusiva de PPOS_TEST_MYSQL_PASSWORD sin fallback a MYSQL_PASSWORD, verificación de preparación de conexión y Suite 8 con regresiones aisladas del harness de curvas). | `{file_checksums.get('onboarding_checksum_integrity_regression.test.js', '')}` |
+ | `calibrationAcceptanceService.js` | Evidencia de Código | Incorporado | Servicio de aceptación gobernada de calibraciones con resolución canónica de tirada (copies), paridad entre evaluación principal y gobernanza de curvas, evaluación de tolerancias punto por punto, validación estricta de point_results_json, cálculo sobre valores sin redondear, preservación de ratios históricos y aislamiento transaccional estricto. | `{file_checksums.get('calibrationAcceptanceService.js', '')}` |
+ | `calibration_residuals_compatibility_regression.test.js` | Suite Vitest | Incorporado | 24 pruebas de regresión unitaria y de servicio para residuales: tirada canónica copies=1500 sin mock de evaluateCurveAcceptance, rechazo de tiradas ausentes/contradictorias/inválidas, diagnóstico enriquecido sin secretos, discriminación estricta 1% vs 0.01, tolerancias en el límite exacto, tolerancia por punto en curvas (100 y 1200 EUR) y validación estricta de point_results_json. | `{file_checksums.get('calibration_residuals_compatibility_regression.test.js', '')}` |
+-| `raw_vitest_output.log` | Log original | Regenerado | Log completo de ejecución de Vitest: 23 suites y 327 pruebas pasadas (100% éxito). | `{file_checksums.get('raw_vitest_output.log', '')}` |
++| `printhouseOnboardingRoutes.js` | Evidencia de Contrato | Incorporado | Archivo de rutas de onboarding oficial (`src/api/routes/printhouseOnboardingRoutes.js`) que implementa `wrapHandler` con serialización real de errores HTTP 422 para `/pricing/calibrations/:id/accept`, acreditando que el código de backend se mantiene intacto. | `{file_checksums.get('printhouseOnboardingRoutes.js', '')}` |
++| `raw_vitest_output.log` | Log original | Regenerado | Log completo de ejecución de Vitest: 23 suites y 328 pruebas pasadas (100% éxito). | `{file_checksums.get('raw_vitest_output.log', '')}` |
+ | `raw_build_output.log` | Log original | Regenerado | Log completo de compilación de producción con Vite (`dist/` generado limpiamente). | `{file_checksums.get('raw_build_output.log', '')}` |
+-| `git_diff_review.diff` | Diff original | Regenerado | Diff completo de todas las modificaciones de código respecto al commit base `f13bba6`. | `{file_checksums.get('git_diff_review.diff', '')}` |
+-| `vitest_discovered_suites.txt` | Texto | Regenerado | Desglose verificado de los 23 archivos descubiertos por Vitest con el conteo exacto de tests por suite (suma: 327). | `{file_checksums.get('vitest_discovered_suites.txt', '')}` |
++| `git_diff_review.diff` | Diff original | Regenerado | Diff completo de todas las modificaciones de código respecto a la base validada `b9aa1d09b880b6d95df19196d1e4152aa3516eee`. | `{file_checksums.get('git_diff_review.diff', '')}` |
++| `vitest_discovered_suites.txt` | Texto | Regenerado | Desglose verificado de los 23 archivos descubiertos por Vitest con el conteo exacto de tests por suite (suma: 328). | `{file_checksums.get('vitest_discovered_suites.txt', '')}` |
+ | `userSessionService.js` | Evidencia de Código | Incorporado | Servicio oficial de sesiones de usuario (`src/api/services/userSessionService.js`), acreditando parámetros, creación y validación estricta de identidades en capa de aplicación. | `{file_checksums.get('userSessionService.js', '')}` |
+ | `auth_middleware.js` | Evidencia de Código | Incorporado | Middleware de autenticación oficial `requireAdmin` (`src/api/middleware/auth.js`), acreditando la verificación de tokens JWT contra `user_sessions.id` (`jti`) y validación de `user_id`. | `{file_checksums.get('auth_middleware.js', '')}` |
+ | `auth_and_user_sessions_schema.sql` | Evidencia DDL | Incorporado | Definiciones DDL de `control_users` y `user_sessions`, documentando la correspondencia de identificadores y aclarando que la integridad referencial se asegura en aplicación sin FK relacional. | `{file_checksums.get('auth_and_user_sessions_schema.sql', '')}` |
+@@ -241,13 +325,13 @@ def package():
+ ---
+ 
+ ## 3. Invariantes Comprobados en la Suite de Tests
+-- **Vitest**: 23 suites descubiertas y ejecutadas, 327 tests unitarios y de integración pasando (100% éxito).
++- **Vitest**: 23 suites descubiertas y ejecutadas, 328 tests unitarios y de integración pasando (100% éxito).
+ - **Validación Matemática**: Validación exhaustiva con `Number.isFinite` que rechaza `NaN`, `Infinity`, `-Infinity`, ceros engañosos y números negativos en cliente y servidor.
+ - **Regresión Negativa de Comparación**: Se ha verificado que un presupuesto positivo con respuesta del motor ausente (`null`), incompleta o malformada (`0` o negativa) nunca muestra estado calibrado, muestra aviso de cálculo incompleto, visualiza guiones `—` con insignia 'Sin cálculo' y bloquea estrictamente el botón de avance a la propuesta.
+ - **Cancelación Limpia y Fixture Baseline**: Verificación de que la cancelación y los accesos fallidos entre tenants preservan estrictamente las tarifas iniciales válidas (`INITIAL_VALID_RATES`).
+ - **Aislamiento Comercial**: Cero publicaciones en marketplace y cero activación de grants durante la calibración, con verificación de `production_dispatch_allowed`, `marketplace_visible`, `job_routing_allowed` y `live_quoting_allowed`.
+ - **Aislamiento Multi-Tenant**: Verificada la propagación inviolable de `tenantId` y `printerNodeId` en todo el ciclo con sesiones reales y acreditación de `userSessionService.validateSession()`.
+-- **Build de Producción**: Compilación limpia con Vite (`dist/` generado en 11.75s).
++- **Build de Producción**: Compilación limpia con Vite (`dist/` generado en 12.18s).
+ """
+ 
+     manifest_path = os.path.join(ARTIFACTS_DIR, "MANIFEST.md")
+diff --git a/scripts/test_onboarding_connected_suite.js b/scripts/test_onboarding_connected_suite.js
+index 2e68829..7020c54 100644
+--- a/scripts/test_onboarding_connected_suite.js
++++ b/scripts/test_onboarding_connected_suite.js
+@@ -146,6 +146,15 @@ const bcrypt = require('bcrypt');
+ const mysqlClient = require('../src/api/services/mysqlClient');
+ const userSessionService = require('../src/api/services/userSessionService');
+ const printhouseOnboardingRoutes = require('../src/api/routes/printhouseOnboardingRoutes');
++const pricingAdapter = require('../src/api/services/buildPriceCalibrationAdapter');
++const deterministicSolver = require('../src/api/services/deterministicInversePricingSolver');
++const calibrationAcceptanceService = require('../src/api/services/calibrationAcceptanceService');
++const {
++    DEFAULT_ACCEPTANCE_TOLERANCE_ABSOLUTE,
++    DEFAULT_ACCEPTANCE_TOLERANCE_PERCENT,
++    CANONICAL_ACCEPTABLE_RUN_STATUSES,
++    computeGovernanceTolerance
++} = require('../src/api/services/calibrationGovernanceTolerances');
+ 
+ // ── 2. CANONICAL STRINGIFY & CHECKSUM UTILITIES ──
+ function canonicalStringify(obj) {
+@@ -500,6 +509,406 @@ function runChecksumIntegrityRegressions() {
+     console.log('[REGRESSION] All 6 Checksum Integrity & Connection Scope Regression Suites Passed Successfully (Zero Leakage Verified).');
+ }
+ 
++/**
++ * Safely parses and validates point_results_json returned by MySQL or API.
++ * MySQL/mysql2 may return JSON columns as a parsed JavaScript object/array or as a raw JSON string.
++ *
++ * Requirements:
++ * - Accepts both raw JSON string and native JavaScript Array.
++ * - Explicitly validates that the resolved value is an Array (Array.isArray).
++ * - Rejects null, undefined, invalid JSON strings, and non-array types (objects, numbers, etc.)
++ * - Rejection produces contextual diagnostic with contextDescription, received type, and error reason.
++ * - Zero silent catch.
++ *
++ * @param {any} raw
++ * @param {string} contextDescription
++ * @returns {Array<object>}
++ */
++function parseAndValidatePointResultsJson(raw, contextDescription = 'point_results_json') {
++    if (raw === null || raw === undefined) {
++        throw new Error(`[POINT_RESULTS_VALIDATION_ERROR] ${contextDescription}: Value is null or undefined`);
++    }
++
++    if (Array.isArray(raw)) {
++        return raw;
++    }
++
++    if (typeof raw === 'string') {
++        const trimmed = raw.trim();
++        if (trimmed.length === 0) {
++            throw new Error(`[POINT_RESULTS_VALIDATION_ERROR] ${contextDescription}: Empty string received`);
++        }
++        let parsed;
++        try {
++            parsed = JSON.parse(trimmed);
++        } catch (jsonErr) {
++            throw new Error(`[POINT_RESULTS_VALIDATION_ERROR] ${contextDescription}: Malformed JSON string (${jsonErr.message})`);
++        }
++        if (!Array.isArray(parsed)) {
++            const receivedType = parsed === null ? 'null' : typeof parsed;
++            throw new Error(`[POINT_RESULTS_VALIDATION_ERROR] ${contextDescription}: Parsed JSON root is not an array (received: ${receivedType})`);
++        }
++        return parsed;
++    }
++
++    const valType = typeof raw;
++    throw new Error(`[POINT_RESULTS_VALIDATION_ERROR] ${contextDescription}: Expected string or array, received unsupported type ${valType}`);
++}
++
++/**
++ * Formats a sanitized, safe diagnostic string representing curveMetrics.
++ * Extracts only recognized numerical and boolean metric attributes, excluding
++ * nested secrets, tokens, or arbitrary objects.
++ *
++ * @param {any} metrics
++ * @returns {string}
++ */
++function formatCurveMetricsDiagnostic(metrics) {
++    if (!metrics || typeof metrics !== 'object') {
++        return `curveMetrics is null or not an object (received: ${metrics === null ? 'null' : typeof metrics})`;
++    }
++    const safeKeys = [
++        'pointCount',
++        'meanAbsoluteResidual',
++        'maxAbsoluteResidual',
++        'meanPercentageResidual',
++        'maxPercentageResidual',
++        'objectiveValue',
++        'acceptedPointCount',
++        'rejectedPointCount',
++        'allPointsWithinTolerance'
++    ];
++    const sanitized = {};
++    for (const key of safeKeys) {
++        if (key in metrics) {
++            sanitized[key] = metrics[key];
++        }
++    }
++    return JSON.stringify(sanitized);
++}
++
++function deepMergeRates(target, source) {
++    const out = JSON.parse(JSON.stringify(target || {}));
++    for (const key of Object.keys(source || {})) {
++        if (source[key] && typeof source[key] === 'object' && !Array.isArray(source[key])) {
++            out[key] = deepMergeRates(out[key] || {}, source[key]);
++        } else {
++            out[key] = source[key];
++        }
++    }
++    return out;
++}
++
++/**
++ * Executes standalone regression suites for curve multi-targets, solver contracts,
++ * governance tolerance evaluation gate, and safe diagnostics formatting:
++ * 7. Synthetic curve target generation and structure (monotonic total price, non-increasing unit cost).
++ * 8. Multi-quantity solver contract, identifiability (EXACTLY_DETERMINED) and unitless residual ratios.
++ * 9. Governed curve acceptance gate (Valid Curve -> ACCEPTABLE vs Perturbed -> REJECTED with POINT_OUT_OF_TOLERANCE).
++ * 10. Sanitized diagnostic formatting and zero secret/token leakage.
++ */
++function runCurveHarnessRegressions() {
++    console.log('[REGRESSION] Running Curve Harness & Solver Contract Regressions...');
++
++    const CURVE_BOOK_SPEC = {
++        copies: 500,
++        interior_pages: 96,
++        book_width_mm: 148,
++        book_height_mm: 210,
++        interior_print: '4/4',
++        cover_print: '4/0',
++        paper_type_interior: 'offset',
++        paper_weight_interior: 90,
++        paper_type_cover: 'mc',
++        paper_weight_cover: 250,
++        binding_method: 'perfect bound',
++        delivery_country: 'DE'
++    };
++
++    const CURVE_QUANTITIES = [100, 200, 300, 400, 500, 600, 700, 800];
++
++    // Suite 7: Synthetic curve target generation and structure
++    const syntheticTargets = CURVE_QUANTITIES.map(q => {
++        const fwd = pricingAdapter.evaluateForwardPrice({ ...CURVE_BOOK_SPEC, copies: q }, INITIAL_VALID_RATES, {}, {});
++        return {
++            quantity: q,
++            targetManufacturingPrice: Number(fwd.predictedManufacturingPrice.toFixed(2)),
++            targetBasis: 'MANUFACTURING_PRICE',
++            currency: 'EUR'
++        };
++    });
++
++    if (syntheticTargets.length !== 8) {
++        throw new Error('Regression 7a failed: Expected exactly 8 synthetic targets');
++    }
++    for (let i = 0; i < syntheticTargets.length; i++) {
++        const t = syntheticTargets[i];
++        if (!Number.isInteger(t.quantity) || t.quantity < 1) throw new Error(`Regression 7b failed: Target ${i} has invalid quantity`);
++        if (!Number.isFinite(t.targetManufacturingPrice) || t.targetManufacturingPrice <= 0) throw new Error(`Regression 7c failed: Target ${i} has invalid price`);
++        if (t.targetBasis !== 'MANUFACTURING_PRICE') throw new Error(`Regression 7d failed: Target ${i} basis must be MANUFACTURING_PRICE`);
++        if (i > 0) {
++            const prev = syntheticTargets[i - 1];
++            if (t.quantity <= prev.quantity) throw new Error(`Regression 7e failed: Quantities must be strictly ascending`);
++            if (t.targetManufacturingPrice <= prev.targetManufacturingPrice) throw new Error(`Regression 7f failed: Total prices must be monotonic`);
++            const prevUnit = prev.targetManufacturingPrice / prev.quantity;
++            const curUnit = t.targetManufacturingPrice / t.quantity;
++            if (curUnit > prevUnit + 1e-4) throw new Error(`Regression 7g failed: Unit price must be non-increasing (${curUnit} > ${prevUnit})`);
++        }
++    }
++
++    // Suite 8: Solver multi-quantity contract, identifiability and residuals
++    const solverSession = {
++        bookSpec: CURVE_BOOK_SPEC,
++        currentRatesSnapshot: INITIAL_VALID_RATES,
++        multiTargets: syntheticTargets
++    };
++    const solverRes = deterministicSolver.solveMultiQuantity(solverSession);
++    if (!CANONICAL_ACCEPTABLE_RUN_STATUSES.includes(solverRes.status)) {
++        throw new Error(`Regression 8a failed: Expected status in CANONICAL_ACCEPTABLE_RUN_STATUSES (${CANONICAL_ACCEPTABLE_RUN_STATUSES.join(', ')}), got: ${solverRes.status}`);
++    }
++    if (solverRes.status !== 'ACCEPTABLE_CANDIDATE') {
++        throw new Error(`Regression 8a.2 failed: Expected ACCEPTABLE_CANDIDATE solver status for baseline-derived synthetic curve, got: ${solverRes.status}`);
++    }
++    if (!solverRes.identifiabilityReport || solverRes.identifiabilityReport.status !== 'EXACTLY_DETERMINED') {
++        throw new Error(`Regression 8b failed: Identifiability status reported by solver must be EXACTLY_DETERMINED, got: ${solverRes.identifiabilityReport?.status}`);
++    }
++    if (solverRes.identifiabilityReport.freeParameterCount !== 8 || solverRes.identifiabilityReport.targetPointCount !== 8) {
++        throw new Error(`Regression 8c failed: Expected 8 free parameters and 8 targets`);
++    }
++    if (!Array.isArray(solverRes.pointResults) || solverRes.pointResults.length !== 8) {
++        throw new Error(`Regression 8d failed: pointResults must be array of 8 points`);
++    }
++    for (let i = 0; i < solverRes.pointResults.length; i++) {
++        const pt = solverRes.pointResults[i];
++        const expQ = CURVE_QUANTITIES[i];
++        const expTargetPrice = syntheticTargets[i].targetManufacturingPrice;
++
++        if (!Number.isInteger(pt.quantity) || pt.quantity !== expQ) {
++            throw new Error(`Regression 8e.1 failed: Point ${i} quantity must match expected ${expQ}`);
++        }
++        if (!Number.isFinite(pt.targetManufacturingPrice) || Math.abs(pt.targetManufacturingPrice - expTargetPrice) > 0.01) {
++            throw new Error(`Regression 8e.2 failed: Point ${i} target price must match expected ${expTargetPrice}`);
++        }
++        if (!Number.isFinite(pt.predictedManufacturingPrice) || pt.predictedManufacturingPrice <= 0) {
++            throw new Error(`Regression 8e.3 failed: Point ${i} predicted price must be finite and positive`);
++        }
++
++        const unroundedAbsRes = Math.abs(pt.predictedManufacturingPrice - pt.targetManufacturingPrice);
++        const unroundedRatioRes = pt.targetManufacturingPrice > 0 ? unroundedAbsRes / pt.targetManufacturingPrice : 0;
++        const effTol = computeGovernanceTolerance(pt.targetManufacturingPrice, DEFAULT_ACCEPTANCE_TOLERANCE_ABSOLUTE, DEFAULT_ACCEPTANCE_TOLERANCE_PERCENT);
++
++        if (Math.abs(pt.absoluteResidual - unroundedAbsRes) > 0.001) {
++            throw new Error(`Regression 8e.4 failed: Point ${i} absolute residual (${pt.absoluteResidual}) contradicts recalculated (${unroundedAbsRes})`);
++        }
++        if (Math.abs(pt.percentageResidual - unroundedRatioRes) > 0.0001) {
++            throw new Error(`Regression 8e.5 failed: Point ${i} percentage residual ratio (${pt.percentageResidual}) contradicts recalculated (${unroundedRatioRes})`);
++        }
++        if (pt.withinTolerance !== (pt.absoluteResidual <= effTol)) {
++            throw new Error(`Regression 8e.6 failed: Point ${i} withinTolerance flag contradicts official tolerance check`);
++        }
++    }
++    if (solverRes.absoluteResidual !== solverRes.curveMetrics.maxAbsoluteResidual) {
++        throw new Error(`Regression 8h failed: solver absoluteResidual must match curveMetrics.maxAbsoluteResidual`);
++    }
++    if (solverRes.percentResidual !== solverRes.curveMetrics.maxPercentageResidual) {
++        throw new Error(`Regression 8i failed: solver percentResidual must match curveMetrics.maxPercentageResidual`);
++    }
++
++    // Suite 9: Governance tolerance evaluation gate (Valid Curve vs Out-of-Tolerance)
++    const validCurveSessionDb = {
++        book_spec_json: CURVE_BOOK_SPEC,
++        multi_targets_json: syntheticTargets,
++        target_manufacturing_price: syntheticTargets[0].targetManufacturingPrice
++    };
++    const resultingRates = deepMergeRates(INITIAL_VALID_RATES, solverRes.proposedPatch);
++    const nodeConfig = { signatures: null, production_lead_days: 7, delivery_time: 2 };
++    const validGovernance = calibrationAcceptanceService.evaluateCurveAcceptance(
++        validCurveSessionDb,
++        { identifiability_json: solverRes.identifiabilityReport },
++        resultingRates,
++        CURVE_BOOK_SPEC,
++        nodeConfig
++    );
++    if (validGovernance.status !== 'ACCEPTABLE') {
++        throw new Error(`Regression 9a failed: Valid curve must evaluate to ACCEPTABLE, got: ${validGovernance.status} (reasons: ${validGovernance.reasons.join(', ')})`);
++    }
++    if (validGovernance.reasons.length !== 0) {
++        throw new Error(`Regression 9b failed: Valid curve must have zero rejection reasons`);
++    }
++
++    // Perturbed curve: Point 800 set to 1320.00 EUR (baseline is 1364.50 EUR, q=700 is 1267.00 EUR)
++    // Monotonic: 1320 > 1267; Unit non-increasing: 1320/800 = 1.65 < 1267/700 = 1.81.
++    // Residual at 800: ~42.50 EUR > 6.60 EUR effective tolerance.
++    const perturbedTargets = syntheticTargets.map(t => t.quantity === 800 ? { ...t, targetManufacturingPrice: 1320.00 } : { ...t });
++    const perturbedSessionDb = {
++        book_spec_json: CURVE_BOOK_SPEC,
++        multi_targets_json: perturbedTargets,
++        target_manufacturing_price: perturbedTargets[0].targetManufacturingPrice
++    };
++    const perturbedSolverRes = deterministicSolver.solveMultiQuantity({
++        bookSpec: CURVE_BOOK_SPEC,
++        currentRatesSnapshot: INITIAL_VALID_RATES,
++        multiTargets: perturbedTargets
++    });
++    if (!CANONICAL_ACCEPTABLE_RUN_STATUSES.includes(perturbedSolverRes.status) || perturbedSolverRes.status !== 'SUCCEEDED') {
++        throw new Error(`Regression 9c failed: Expected perturbed solver to produce SUCCEEDED run in CANONICAL_ACCEPTABLE_RUN_STATUSES, got: ${perturbedSolverRes.status}`);
++    }
++    const pt800Solver = perturbedSolverRes.pointResults.find(p => p.quantity === 800);
++    if (!pt800Solver || pt800Solver.withinTolerance !== false) {
++        throw new Error(`Regression 9d failed: Point 800 must have withinTolerance: false in solver`);
++    }
++
++    const perturbedGovernance = calibrationAcceptanceService.evaluateCurveAcceptance(
++        perturbedSessionDb,
++        { identifiability_json: perturbedSolverRes.identifiabilityReport },
++        deepMergeRates(INITIAL_VALID_RATES, perturbedSolverRes.proposedPatch),
++        CURVE_BOOK_SPEC,
++        nodeConfig
++    );
++    if (perturbedGovernance.status !== 'REJECTED') {
++        throw new Error(`Regression 9e failed: Perturbed curve must evaluate to REJECTED, got: ${perturbedGovernance.status}`);
++    }
++    if (!perturbedGovernance.reasons.includes('POINT_OUT_OF_TOLERANCE')) {
++        throw new Error(`Regression 9f failed: Perturbed curve reasons must include POINT_OUT_OF_TOLERANCE, got: [${perturbedGovernance.reasons.join(', ')}]`);
++    }
++    if (perturbedGovernance.curveMetrics.rejectedPointCount !== 1) {
++        throw new Error(`Regression 9g failed: Expected exactly 1 rejected point, got: ${perturbedGovernance.curveMetrics.rejectedPointCount}`);
++    }
++
++    // Suite 10: Sanitized diagnostic formatting and zero secret leakage
++    // Test with real Express wrapHandler error response shape: { ok: false, error: '...', message: '...' }
++    const testDiagResReal = {
++        status: 422,
++        body: {
++            ok: false,
++            error: 'GOVERNANCE_CURVE_REJECTED',
++            message: 'GOVERNANCE_CURVE_REJECTED: [POINT_OUT_OF_TOLERANCE] (quantities: [100, 200, 300, 400, 500, 600, 700, 800])',
++            unauthorizedSecret: 'super_secret_db_password_123',
++            authorizationHeader: 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9'
++        }
++    };
++    const formattedDiag = formatHttpDiagnostic('POST', '/api/printhouse/onboarding/pricing/calibrations/cal-test/accept', testDiagResReal);
++    if (!formattedDiag.includes('HTTP 422') || !formattedDiag.includes('GOVERNANCE_CURVE_REJECTED') || !formattedDiag.includes('POINT_OUT_OF_TOLERANCE')) {
++        throw new Error(`Regression 10a failed: Formatted diagnostic must contain HTTP 422, error code, and extracted reason POINT_OUT_OF_TOLERANCE`);
++    }
++    if (formattedDiag.includes('super_secret_db_password_123') || formattedDiag.includes('Bearer eyJhbGciOi')) {
++        throw new Error(`Regression 10b failed: Formatted diagnostic leaked secrets or tokens`);
++    }
++
++    // Suite 11: parseAndValidatePointResultsJson regressions (string JSON, array nativo, JSON malformado, objeto no array, null)
++    const validArrayFixture = [{ quantity: 100, targetManufacturingPrice: 50.0, predictedManufacturingPrice: 50.0, withinTolerance: true }];
++    const validJsonStrFixture = JSON.stringify(validArrayFixture);
++
++    // 11.1 String JSON: parses correctly to array
++    const resStringJson = parseAndValidatePointResultsJson(validJsonStrFixture, 'Regression 11.1');
++    if (!Array.isArray(resStringJson) || resStringJson.length !== 1 || resStringJson[0].quantity !== 100) {
++        throw new Error('Regression 11.1 failed: Valid JSON string must parse to expected array');
++    }
++
++    // 11.2 Array nativo: returns directly without re-parsing
++    const resNativeArray = parseAndValidatePointResultsJson(validArrayFixture, 'Regression 11.2');
++    if (!Array.isArray(resNativeArray) || resNativeArray !== validArrayFixture) {
++        throw new Error('Regression 11.2 failed: Native array must be returned directly');
++    }
++
++    // 11.3 JSON malformado: throws contextual error
++    let malformedCaught = false;
++    try {
++        parseAndValidatePointResultsJson('[{"quantity": 100, broken', 'Regression 11.3');
++    } catch (e) {
++        malformedCaught = true;
++        if (!e.message.includes('Malformed JSON string')) {
++            throw new Error(`Regression 11.3 failed: Unexpected error message: ${e.message}`);
++        }
++    }
++    if (!malformedCaught) {
++        throw new Error('Regression 11.3 failed: Malformed JSON string must throw contextual error');
++    }
++
++    // 11.4 Objeto no array (tanto en string JSON como objeto nativo)
++    let nonArrayObjCaught1 = false;
++    try {
++        parseAndValidatePointResultsJson('{"quantity": 100}', 'Regression 11.4a');
++    } catch (e) {
++        nonArrayObjCaught1 = true;
++        if (!e.message.includes('Parsed JSON root is not an array')) {
++            throw new Error(`Regression 11.4a failed: Unexpected error message: ${e.message}`);
++        }
++    }
++    if (!nonArrayObjCaught1) {
++        throw new Error('Regression 11.4a failed: Non-array JSON object string must throw contextual error');
++    }
++
++    let nonArrayObjCaught2 = false;
++    try {
++        parseAndValidatePointResultsJson({ quantity: 100 }, 'Regression 11.4b');
++    } catch (e) {
++        nonArrayObjCaught2 = true;
++        if (!e.message.includes('unsupported type object')) {
++            throw new Error(`Regression 11.4b failed: Unexpected error message: ${e.message}`);
++        }
++    }
++    if (!nonArrayObjCaught2) {
++        throw new Error('Regression 11.4b failed: Non-array native object must throw contextual error');
++    }
++
++    // 11.5 Null y undefined: throws contextual error
++    let nullCaught = false;
++    try {
++        parseAndValidatePointResultsJson(null, 'Regression 11.5');
++    } catch (e) {
++        nullCaught = true;
++        if (!e.message.includes('null or undefined')) {
++            throw new Error(`Regression 11.5 failed: Unexpected error message: ${e.message}`);
++        }
++    }
++    if (!nullCaught) {
++        throw new Error('Regression 11.5 failed: Null must throw contextual error');
++    }
++
++    // Suite 12: curveMetrics contract differentiation & diagnostic sanitization
++    // 12.1 Solver curveMetrics strictly contains aggregate metrics and NO acceptance counts
++    if (solverRes.curveMetrics.pointCount !== 8) {
++        throw new Error(`Regression 12.1a failed: solverRes.curveMetrics.pointCount must be 8`);
++    }
++    if (!Number.isFinite(solverRes.curveMetrics.meanAbsoluteResidual) || !Number.isFinite(solverRes.curveMetrics.maxAbsoluteResidual)) {
++        throw new Error(`Regression 12.1b failed: solverRes.curveMetrics residuals must be finite numbers`);
++    }
++    if (solverRes.curveMetrics.acceptedPointCount !== undefined || solverRes.curveMetrics.rejectedPointCount !== undefined) {
++        throw new Error(`Regression 12.1c failed: solverRes.curveMetrics must not contain acceptedPointCount or rejectedPointCount`);
++    }
++
++    // 12.2 evaluateCurveAcceptance strictly produces acceptance counts
++    if (validGovernance.curveMetrics.acceptedPointCount !== 8 || validGovernance.curveMetrics.rejectedPointCount !== 0) {
++        throw new Error(`Regression 12.2 failed: evaluateCurveAcceptance must produce acceptedPointCount=8 and rejectedPointCount=0`);
++    }
++    if (validGovernance.curveMetrics.allPointsWithinTolerance !== true) {
++        throw new Error(`Regression 12.3 failed: evaluateCurveAcceptance must produce allPointsWithinTolerance=true`);
++    }
++
++    // 12.3 formatCurveMetricsDiagnostic produces sanitized JSON without secret leakage
++    const dirtyMetrics = {
++        pointCount: 8,
++        meanAbsoluteResidual: 0.12,
++        acceptedPointCount: 8,
++        rejectedPointCount: 0,
++        unauthorizedPassword: 'db_secret_leak_123',
++        token: 'Bearer eyJsecret'
++    };
++    const formattedMetricsDiag = formatCurveMetricsDiagnostic(dirtyMetrics);
++    if (!formattedMetricsDiag.includes('"pointCount":8') || !formattedMetricsDiag.includes('"acceptedPointCount":8')) {
++        throw new Error(`Regression 12.4a failed: formatCurveMetricsDiagnostic missing expected keys`);
++    }
++    if (formattedMetricsDiag.includes('db_secret_leak_123') || formattedMetricsDiag.includes('eyJsecret')) {
++        throw new Error(`Regression 12.4b failed: formatCurveMetricsDiagnostic leaked unauthorized secrets`);
++    }
++    if (!formatCurveMetricsDiagnostic(null).includes('null or not an object')) {
++        throw new Error(`Regression 12.5 failed: formatCurveMetricsDiagnostic must handle null safely`);
++    }
++
++    console.log('[REGRESSION] All Curve Harness & Solver Contract Regressions Passed Successfully.');
++}
++
+ // ── 3. CANONICAL INDUSTRIAL RATES FIXTURE & CONSUMED KEYS DOCUMENTATION ──
+ // Strictly compatible with @ppos/pricing-engine and src/api/services/buildPriceCalibrationAdapter.js.
+ // Documented keys consumed by canonical forward pricing engine and inverse pricing solver:
+@@ -555,6 +964,17 @@ const INITIAL_VALID_RATES = {
+ const INITIAL_RATES_JSON_STR = canonicalStringify(INITIAL_VALID_RATES);
+ const INITIAL_RATES_CHECKSUM = computeCanonicalRatesChecksum(INITIAL_VALID_RATES);
+ 
++// Dedicated fixture for Tenant B to verify cross-tenant isolation and node integrity
++const TENANT_B_INITIAL_RATES = {
++    ...INITIAL_VALID_RATES,
++    interior_full_colour_fixed: { '32p': 92, '16p': 56, '8p': 32, '4p': 18 },
++    interior_full_colour_var: { '32p': 38, '16p': 22, '8p': 13, '4p': 7 },
++    cover_fixed_by_colours: { '1': 28, '2': 40, '3': 56, '4': 72, '5': 88 },
++    cover_var_per_1000_by_colours: { '1': 11, '2': 15, '3': 22, '4': 28, '5': 35 }
++};
++const TENANT_B_INITIAL_RATES_JSON_STR = canonicalStringify(TENANT_B_INITIAL_RATES);
++const TENANT_B_RATES_CHECKSUM = computeCanonicalRatesChecksum(TENANT_B_INITIAL_RATES);
++
+ const EXECUTION_TAG = 'test_onb_' + Date.now().toString(36) + '_' + crypto.randomBytes(3).toString('hex');
+ const tracker = {
+     tenants: new Set(),
+@@ -689,10 +1109,22 @@ function formatHttpDiagnostic(method, path, res) {
+     const status = res.status;
+     const body = res.body || {};
+     // Extract sanitized error fields, strictly suppressing any Authorization headers or tokens
++    let reasons = body.reasons || body.details?.reasons || (Array.isArray(body.details) ? body.details : undefined);
++    if (!reasons && typeof body.message === 'string') {
++        const match = body.message.match(/\[([A-Z0-9_, ]+)\]/);
++        if (match) {
++            reasons = match[1].split(',').map(s => s.trim());
++        }
++    }
++    const evaluatedQuantities = body.evaluatedQuantities || body.details?.evaluatedQuantities || undefined;
++    const pointCount = body.details?.pointCount || undefined;
+     const sanitized = {
+         status,
+         code: body.error?.code || body.code || (typeof body.error === 'string' ? body.error : undefined),
+         message: body.error?.message || body.message || (typeof body.error === 'string' ? body.error : undefined),
++        reasons,
++        evaluatedQuantities,
++        pointCount,
+         details: body.error?.details || body.details || undefined
+     };
+     return `[${method} ${path} -> HTTP ${status}] ${JSON.stringify(sanitized)}`;
+@@ -1001,6 +1433,28 @@ async function performDeterministicCleanup(directConn) {
+     }
+ }
+ 
++async function seedPrinterNode(directConn, nodeId, tenantId, name, ratesJsonStr, nodeColSet) {
++    const nodeFields = ['id', 'tenant_id', 'name'];
++    const nodeVals = [nodeId, tenantId, name];
++    if (nodeColSet.has('email')) {
++        nodeFields.push('email');
++        nodeVals.push(`${nodeId}@test-connected.local`);
++    }
++    if (nodeColSet.has('status')) {
++        nodeFields.push('status');
++        nodeVals.push('ACTIVE');
++    }
++    if (nodeColSet.has('rates_json')) {
++        nodeFields.push('rates_json');
++        nodeVals.push(ratesJsonStr);
++    }
++    await directConn.query(
++        `INSERT INTO printer_nodes (${nodeFields.join(',')}) VALUES (${nodeVals.map(() => '?').join(',')})`,
++        nodeVals
++    );
++    tracker.printerNodes.add(nodeId);
++}
++
+ // ── 6. MAIN CONNECTED ONBOARDING VALIDATION ──
+ async function runConnectedSuite() {
+     console.log(`\n================================================================`);
+@@ -1063,26 +1517,7 @@ async function runConnectedSuite() {
+         const [nodeCols] = await directConn.query('SHOW COLUMNS FROM printer_nodes');
+         const nodeColSet = new Set(nodeCols.map(c => c.Field));
+ 
+-        const nodeFields = ['id', 'tenant_id', 'name'];
+-        const nodeVals = [FIXTURE_NODE_A, FIXTURE_TENANT_A, `Node ${EXECUTION_TAG}`];
+-        if (nodeColSet.has('email')) {
+-            nodeFields.push('email');
+-            nodeVals.push(`${FIXTURE_NODE_A}@test-connected.local`);
+-        }
+-        if (nodeColSet.has('status')) {
+-            nodeFields.push('status');
+-            nodeVals.push('ACTIVE');
+-        }
+-        if (nodeColSet.has('rates_json')) {
+-            nodeFields.push('rates_json');
+-            nodeVals.push(INITIAL_RATES_JSON_STR);
+-        }
+-
+-        await directConn.query(
+-            `INSERT INTO printer_nodes (${nodeFields.join(',')}) VALUES (${nodeVals.map(() => '?').join(',')})`,
+-            nodeVals
+-        );
+-        tracker.printerNodes.add(FIXTURE_NODE_A);
++        await seedPrinterNode(directConn, FIXTURE_NODE_A, FIXTURE_TENANT_A, `Node ${EXECUTION_TAG}`, INITIAL_RATES_JSON_STR, nodeColSet);
+         assert(true, `Created printer node ${FIXTURE_NODE_A} for ${FIXTURE_TENANT_A} with initial valid rates fixture`);
+ 
+         // Generate authentic server sessions and valid JWTs with real user accounts
+@@ -1483,6 +1918,745 @@ async function runConnectedSuite() {
+             finalNodeIntegrity.storedNormalized !== normalizeSha256Hex(INITIAL_RATES_CHECKSUM),
+             `Node rates_json successfully transitioned from baseline to calibrated`
+         );
++        console.log(`\n  [SCENARIO 1 COMPLETE] Single-Point Validated Onboarding Flow Passed Successfully (57 Assertions).\n`);
++
++        // ══════════════════════════════════════════════════════════════════════════════
++        // ══════════════════════════════════════════════════════════════════════════════
++        // ── SCENARIO 2 (CASO A): MULTI-QUANTITY VALID CURVE ACCEPTANCE & CROSS-TENANT ISOLATION ──
++        // ══════════════════════════════════════════════════════════════════════════════
++        console.log(`\n================================================================`);
++        console.log(`  SCENARIO 2 (CASO A): MULTI-QUANTITY VALID CURVE & ISOLATION    `);
++        console.log(`================================================================`);
++
++        const FIXTURE_NODE_CURVE_A = `node_${EXECUTION_TAG}_curve_a`;
++        await seedPrinterNode(directConn, FIXTURE_NODE_CURVE_A, FIXTURE_TENANT_A, `Node Curve A ${EXECUTION_TAG}`, INITIAL_RATES_JSON_STR, nodeColSet);
++        assert(true, `Created dedicated curve node ${FIXTURE_NODE_CURVE_A} seeded with initial valid rates baseline`);
++
++        // Seed dedicated printer node for Tenant B using Tenant B's own fixture
++        const FIXTURE_NODE_CURVE_B = `node_${EXECUTION_TAG}_curve_b`;
++        await seedPrinterNode(directConn, FIXTURE_NODE_CURVE_B, FIXTURE_TENANT_B, `Node Curve B ${EXECUTION_TAG}`, TENANT_B_INITIAL_RATES_JSON_STR, nodeColSet);
++        assert(true, `Created dedicated curve node ${FIXTURE_NODE_CURVE_B} for Tenant B seeded with dedicated rates fixture`);
++
++        // Baseline rates check on FIXTURE_NODE_CURVE_A
++        const [curveNodeBaselineA] = await directConn.query(
++            `SELECT status, rates_json FROM printer_nodes WHERE id = ?`,
++            [FIXTURE_NODE_CURVE_A]
++        );
++        assert(curveNodeBaselineA[0].status === 'ACTIVE', `Curve node A status initialized as ACTIVE`);
++        const curveNodeChecksumA = computeCanonicalRatesChecksum(curveNodeBaselineA[0].rates_json);
++        const curveNodeIntegrityA = verifyRatesChecksumIntegrity(curveNodeChecksumA, INITIAL_RATES_CHECKSUM);
++        assert(curveNodeIntegrityA.valid === true, `Curve node A initialized with baseline rates checksum`);
++
++        // Baseline rates check on FIXTURE_NODE_CURVE_B
++        const [curveNodeBaselineB] = await directConn.query(
++            `SELECT status, rates_json FROM printer_nodes WHERE id = ?`,
++            [FIXTURE_NODE_CURVE_B]
++        );
++        assert(curveNodeBaselineB[0].status === 'ACTIVE', `Curve node B status initialized as ACTIVE`);
++        const curveNodeChecksumB = computeCanonicalRatesChecksum(curveNodeBaselineB[0].rates_json);
++        const curveNodeIntegrityB = verifyRatesChecksumIntegrity(curveNodeChecksumB, TENANT_B_RATES_CHECKSUM);
++        assert(curveNodeIntegrityB.valid === true, `Curve node B initialized with dedicated Tenant B rates checksum`);
++
++        // Canonical Industrial Book Spec (identical across all 8 points)
++        const CURVE_BOOK_SPEC = {
++            copies: 500,
++            interior_pages: 96,
++            book_width_mm: 148,
++            book_height_mm: 210,
++            interior_print: '4/4',
++            cover_print: '4/0',
++            paper_type_interior: 'offset',
++            paper_weight_interior: 90,
++            paper_type_cover: 'mc',
++            paper_weight_cover: 250,
++            binding_method: 'perfect bound',
++            delivery_country: 'DE'
++        };
++
++        // Generate synthetic multi-targets for 8 distinct print runs from baseline rates
++        // Requirements: >= 3 distinct print runs, exact forward evaluation parity
++        // Synthetic integration fixture: validates end-to-end integration and invariants, not accuracy against independent external quotes.
++        const CURVE_QUANTITIES = [100, 200, 300, 400, 500, 600, 700, 800];
++        const validCurveTargets = CURVE_QUANTITIES.map(q => {
++            const fwd = pricingAdapter.evaluateForwardPrice({ ...CURVE_BOOK_SPEC, copies: q }, INITIAL_VALID_RATES, {}, {});
++            return {
++                quantity: q,
++                targetManufacturingPrice: Number(fwd.predictedManufacturingPrice.toFixed(2)),
++                targetBasis: 'MANUFACTURING_PRICE',
++                currency: 'EUR'
++            };
++        });
++        assert(validCurveTargets.length === 8, `Generated synthetic curve targets with 8 distinct print runs (>= 3 required)`);
++        assert(validCurveTargets.every(t => Number.isInteger(t.quantity) && t.quantity > 0), `All curve target quantities are strictly positive integers`);
++        assert(validCurveTargets.every(t => Number.isFinite(t.targetManufacturingPrice) && t.targetManufacturingPrice > 0), `All curve target prices are finite strictly positive numbers`);
++
++        // Create Curve Calibration Session (Contract: POST /pricing/calibrations -> HTTP 201)
++        const curveSessionPayload = {
++            printerNodeId: FIXTURE_NODE_CURVE_A,
++            referenceBookName: 'Synthetic Multi-Quantity Calibration Curve (8 Points)',
++            bookSpec: CURVE_BOOK_SPEC,
++            multiTargets: validCurveTargets,
++            currency: 'EUR',
++            includesPaper: true,
++            includesBinding: true,
++            includesFinishing: true,
++            includesPackaging: true
++        };
++
++        const curveCreateRes = await httpRequest(
++            serverUrl,
++            'POST',
++            '/api/printhouse/onboarding/pricing/calibrations',
++            tokenA,
++            curveSessionPayload
++        );
++        assert(curveCreateRes.status === 201, `Curve calibration session created with HTTP 201`, formatHttpDiagnostic('POST', '/api/printhouse/onboarding/pricing/calibrations', curveCreateRes));
++        assert(curveCreateRes.body && curveCreateRes.body.ok === true && curveCreateRes.body.data?.id, `Curve session ID received`);
++        const curveSessionId = curveCreateRes.body.data.id;
++        tracker.sessionIds.add(curveSessionId);
++        assert(curveCreateRes.body.data.status === 'DRAFT', `Curve session status is strictly DRAFT`);
++
++        // Promote Curve Session to READY (Contract: POST /:id/ready -> HTTP 200)
++        const curveReadyRes = await httpRequest(
++            serverUrl,
++            'POST',
++            `/api/printhouse/onboarding/pricing/calibrations/${curveSessionId}/ready`,
++            tokenA
++        );
++        assert(curveReadyRes.status === 200, `POST /ready on curve session returned HTTP 200`, formatHttpDiagnostic('POST', `/api/printhouse/onboarding/pricing/calibrations/${curveSessionId}/ready`, curveReadyRes));
++        assert(curveReadyRes.body?.data?.status === 'READY', `Curve session status in body.data is strictly READY`);
++
++        // Calculate Curve Run (Contract: POST /:id/calculate -> HTTP 201)
++        const curveCalcRes = await httpRequest(
++            serverUrl,
++            'POST',
++            `/api/printhouse/onboarding/pricing/calibrations/${curveSessionId}/calculate`,
++            tokenA
++        );
++        assert(curveCalcRes.status === 201, `Curve calculation returned HTTP 201`, formatHttpDiagnostic('POST', `/api/printhouse/onboarding/pricing/calibrations/${curveSessionId}/calculate`, curveCalcRes));
++        const curveRunData = curveCalcRes.body?.data;
++        assert(curveRunData && typeof curveRunData.id === 'string', `Valid curve run ID received: ${curveRunData?.id}`);
++        const curveRunId = curveRunData.id;
++        tracker.runIds.add(curveRunId);
++
++        // Verification of solver contract: replace permissive list with canonical contract
++        assert(CANONICAL_ACCEPTABLE_RUN_STATUSES.includes(curveRunData.status),
++            `Curve run status (${curveRunData.status}) is in CANONICAL_ACCEPTABLE_RUN_STATUSES`);
++        assert(curveRunData.status === 'ACCEPTABLE_CANDIDATE',
++            `Curve run status for baseline-derived synthetic curve is strictly ACCEPTABLE_CANDIDATE`);
++        assert(Array.isArray(curveRunData.pointResults) && curveRunData.pointResults.length === 8,
++            `pointResults contains 8 evaluated points`);
++
++        // Check individual point quantities, prices, residuals, and tolerances against official policy
++        for (let i = 0; i < curveRunData.pointResults.length; i++) {
++            const pt = curveRunData.pointResults[i];
++            const expQ = CURVE_QUANTITIES[i];
++            const expTarget = validCurveTargets[i].targetManufacturingPrice;
++            const ptTarget = pt.targetManufacturingPrice ?? pt.targetPrice;
++
++            assert(Number.isInteger(pt.quantity) && pt.quantity === expQ, `Point ${i} quantity matches expected ${expQ}`);
++            assert(Number.isFinite(ptTarget) && Math.abs(ptTarget - expTarget) < 0.01,
++                `Point ${i} (q=${expQ}) target price is finite and matches expected ${expTarget} EUR`);
++            assert(Number.isFinite(pt.predictedManufacturingPrice) && pt.predictedManufacturingPrice > 0,
++                `Point ${i} (q=${expQ}) predicted manufacturing price is finite and positive: ${pt.predictedManufacturingPrice} EUR`);
++
++            // Recalculate unrounded absolute residual and ratio residual
++            const recalculatedAbsRes = Math.abs(pt.predictedManufacturingPrice - ptTarget);
++            const recalculatedRatioRes = ptTarget > 0 ? recalculatedAbsRes / ptTarget : 0;
++            const effTol = computeGovernanceTolerance(ptTarget, DEFAULT_ACCEPTANCE_TOLERANCE_ABSOLUTE, DEFAULT_ACCEPTANCE_TOLERANCE_PERCENT);
++
++            assert(Number.isFinite(pt.absoluteResidual) && Math.abs(pt.absoluteResidual - recalculatedAbsRes) < 0.01,
++                `Point ${i} absolute residual (${pt.absoluteResidual} EUR) verified against recalculated (${recalculatedAbsRes.toFixed(4)} EUR)`);
++            assert(Number.isFinite(pt.percentageResidual) && Math.abs(pt.percentageResidual - recalculatedRatioRes) < 0.001,
++                `Point ${i} percentage residual ratio (${pt.percentageResidual}) verified against recalculated (${recalculatedRatioRes.toFixed(6)})`);
++            assert(recalculatedAbsRes <= effTol,
++                `Point ${i} (q=${expQ}) absolute residual (${recalculatedAbsRes.toFixed(4)}) is within effective tolerance (${effTol.toFixed(4)} EUR)`);
++            assert(pt.withinTolerance === true,
++                `Point ${i} (q=${expQ}) withinTolerance flag is true and verified against governance tolerance`);
++        }
++
++        // Check aggregate residuals and curve metrics strictly according to /calculate solver contract
++        const calcMetrics = curveRunData.curveMetrics;
++        const metricsDiag = formatCurveMetricsDiagnostic(calcMetrics);
++
++        assert(calcMetrics && typeof calcMetrics === 'object',
++            `curveRunData.curveMetrics object present in /calculate response`,
++            metricsDiag);
++        assert(calcMetrics.pointCount === 8,
++            `curveMetrics.pointCount is 8 in /calculate response`,
++            metricsDiag);
++        assert(Number.isFinite(calcMetrics.meanAbsoluteResidual) && calcMetrics.meanAbsoluteResidual >= 0,
++            `curveMetrics.meanAbsoluteResidual is finite non-negative number`,
++            metricsDiag);
++        assert(Number.isFinite(calcMetrics.maxAbsoluteResidual) && calcMetrics.maxAbsoluteResidual >= 0,
++            `curveMetrics.maxAbsoluteResidual is finite non-negative number`,
++            metricsDiag);
++        assert(Number.isFinite(calcMetrics.meanPercentageResidual) && calcMetrics.meanPercentageResidual >= 0,
++            `curveMetrics.meanPercentageResidual is finite non-negative number`,
++            metricsDiag);
++        assert(Number.isFinite(calcMetrics.maxPercentageResidual) && calcMetrics.maxPercentageResidual >= 0,
++            `curveMetrics.maxPercentageResidual is finite non-negative number`,
++            metricsDiag);
++        assert(Number.isFinite(calcMetrics.objectiveValue) && calcMetrics.objectiveValue >= 0,
++            `curveMetrics.objectiveValue is finite non-negative number`,
++            metricsDiag);
++
++        // Acceptance counts belong strictly to governance/acceptance phase, verify absence in solver /calculate phase
++        assert(calcMetrics.acceptedPointCount === undefined && calcMetrics.rejectedPointCount === undefined,
++            `Solver /calculate curveMetrics strictly does not produce acceptance counts (governance responsibility)`,
++            metricsDiag);
++
++        assert(typeof curveRunData.absoluteResidual === 'number' && Math.abs(curveRunData.absoluteResidual - calcMetrics.maxAbsoluteResidual) < 0.01,
++            `run.absolute_residual (${curveRunData.absoluteResidual}) matches curveMetrics.maxAbsoluteResidual`,
++            metricsDiag);
++        assert(typeof curveRunData.percentResidual === 'number' && Math.abs(curveRunData.percentResidual - calcMetrics.maxPercentageResidual) < 0.001,
++            `run.percent_residual (${curveRunData.percentResidual}) matches curveMetrics.maxPercentageResidual (ratio [0..1])`,
++            metricsDiag);
++
++        // Solver diagnostic state: EXACTLY_DETERMINED reported when targetPoints === freeParams === 8 (dof = 0)
++        // Does not assert mathematical proof of matrix rank or global identifiability.
++        assert(curveRunData.identifiabilityReport && curveRunData.identifiabilityReport.status === 'EXACTLY_DETERMINED',
++            `identifiabilityReport status reported by solver is EXACTLY_DETERMINED (targetPoints=8, freeParams=8)`);
++        assert(curveRunData.identifiabilityReport.degreesOfFreedom === 0,
++            `identifiability degrees of freedom is 0`);
++
++        // Direct DB verification of run record and contrast persisted point_results_json
++        const [curveRunRows] = await directConn.query(
++            `SELECT id, calibration_session_id, tenant_id, status, point_results_json, curve_metrics_json, identifiability_json 
++             FROM printhouse_pricing_calibration_runs 
++             WHERE id = ?`,
++            [curveRunId]
++        );
++        assert(curveRunRows.length === 1, `Curve run record verified in MySQL by exact runId (${curveRunId})`);
++        assert(curveRunRows[0].calibration_session_id === curveSessionId, `Run session ID matches`);
++        assert(curveRunRows[0].tenant_id === FIXTURE_TENANT_A, `Run tenant ID matches Tenant A`);
++        assert(curveRunRows[0].point_results_json !== null, `point_results_json persisted in MySQL`);
++        assert(curveRunRows[0].curve_metrics_json !== null, `curve_metrics_json persisted in MySQL`);
++        assert(curveRunRows[0].identifiability_json !== null, `identifiability_json persisted in MySQL`);
++
++        const dbPointResults = parseAndValidatePointResultsJson(curveRunRows[0].point_results_json, 'Scenario 2 curveRunRows[0].point_results_json');
++        assert(Array.isArray(dbPointResults) && dbPointResults.length === 8,
++            `Persisted point_results_json contains exactly 8 points`);
++        for (let i = 0; i < dbPointResults.length; i++) {
++            const dbPt = dbPointResults[i];
++            const expQ = CURVE_QUANTITIES[i];
++            const expTarget = validCurveTargets[i].targetManufacturingPrice;
++            const httpPt = curveRunData.pointResults[i];
++            const httpTarget = httpPt.targetManufacturingPrice ?? httpPt.targetPrice;
++            const dbTarget = dbPt.targetManufacturingPrice ?? dbPt.targetPrice;
++            const httpRatio = httpPt.percentageResidual !== undefined ? httpPt.percentageResidual : httpPt.percentResidual;
++            const dbRatio = dbPt.percentageResidual !== undefined ? dbPt.percentageResidual : dbPt.percentResidual;
++
++            assert(dbPt.quantity === expQ, `MySQL Point ${i} quantity matches ${expQ}`);
++            assert(Number.isFinite(dbTarget) && Math.abs(dbTarget - expTarget) < 0.01,
++                `MySQL Point ${i} target price is finite and matches expected ${expTarget} EUR`);
++            assert(Number.isFinite(dbTarget) && Math.abs(dbTarget - httpTarget) < 0.01,
++                `MySQL Point ${i} target price matches HTTP response (${httpTarget} EUR)`);
++            assert(Number.isFinite(dbPt.predictedManufacturingPrice) && Math.abs(dbPt.predictedManufacturingPrice - httpPt.predictedManufacturingPrice) < 0.001,
++                `MySQL Point ${i} predicted price matches HTTP response`);
++            assert(Number.isFinite(dbPt.absoluteResidual) && Math.abs(dbPt.absoluteResidual - httpPt.absoluteResidual) < 0.001,
++                `MySQL Point ${i} absolute residual matches HTTP response`);
++            assert(Number.isFinite(dbRatio) && Math.abs(dbRatio - httpRatio) < 0.0001,
++                `MySQL Point ${i} percentage residual ratio matches HTTP response`);
++            assert(dbPt.withinTolerance === true, `MySQL Point ${i} withinTolerance is true`);
++        }
++
++        // ──────────────────────────────────────────────────────────────────────────
++        // ── CROSS-TENANT ATTEMPT ON UNACCEPTED VALID CURVE CANDIDATE ──
++        // ──────────────────────────────────────────────────────────────────────────
++        console.log(`\n  [AUDIT BEFORE CROSS-TENANT ATTEMPT] Verifying exact IDs before unauthorized attempt`);
++
++        // 1. Owner node A: status and baseline rates untouched
++        const [preNodeA] = await directConn.query(
++            `SELECT status, rates_json FROM printer_nodes WHERE id = ?`,
++            [FIXTURE_NODE_CURVE_A]
++        );
++        assert(preNodeA[0].status === 'ACTIVE', `Pre-attempt: Owner node A status is ACTIVE`);
++        const preChecksumA = computeCanonicalRatesChecksum(preNodeA[0].rates_json);
++        const preIntegrityA = verifyRatesChecksumIntegrity(preChecksumA, INITIAL_RATES_CHECKSUM);
++        assert(preIntegrityA.valid === true, `Pre-attempt: Owner node A rates remain untouched baseline`);
++
++        // 2. Tenant B node: status and dedicated rates untouched
++        const [preNodeB] = await directConn.query(
++            `SELECT status, rates_json FROM printer_nodes WHERE id = ?`,
++            [FIXTURE_NODE_CURVE_B]
++        );
++        assert(preNodeB[0].status === 'ACTIVE', `Pre-attempt: Tenant B node status is ACTIVE`);
++        const preChecksumB = computeCanonicalRatesChecksum(preNodeB[0].rates_json);
++        const preIntegrityB = verifyRatesChecksumIntegrity(preChecksumB, TENANT_B_RATES_CHECKSUM);
++        assert(preIntegrityB.valid === true, `Pre-attempt: Tenant B node rates match dedicated fixture`);
++
++        // 3. Revisions and acceptances for both tenants: zero on curve node and session
++        const [preRevsCurveA] = await directConn.query(
++            `SELECT COUNT(*) as count FROM printhouse_pricing_revisions WHERE printer_node_id = ?`,
++            [FIXTURE_NODE_CURVE_A]
++        );
++        assert(preRevsCurveA[0].count === 0, `Pre-attempt: Zero pricing revisions on curve node A`);
++
++        const [preAccsCurveA] = await directConn.query(
++            `SELECT COUNT(*) as count FROM printhouse_pricing_calibration_acceptances WHERE calibration_session_id = ?`,
++            [curveSessionId]
++        );
++        assert(preAccsCurveA[0].count === 0, `Pre-attempt: Zero calibration acceptances for curve session`);
++
++        const [preRevsTenantB] = await directConn.query(
++            `SELECT COUNT(*) as count FROM printhouse_pricing_revisions WHERE tenant_id = ?`,
++            [FIXTURE_TENANT_B]
++        );
++        assert(preRevsTenantB[0].count === 0, `Pre-attempt: Zero pricing revisions for Tenant B`);
++
++        const [preAccsTenantB] = await directConn.query(
++            `SELECT COUNT(*) as count FROM printhouse_pricing_calibration_acceptances WHERE tenant_id = ?`,
++            [FIXTURE_TENANT_B]
++        );
++        assert(preAccsTenantB[0].count === 0, `Pre-attempt: Zero calibration acceptances for Tenant B`);
++
++        // 4. Absence of BPE publications and activation grants
++        const [preBpe] = await directConn.query(
++            `SELECT COUNT(*) as count FROM bpe_pricing_publications WHERE tenant_id IN (?, ?) OR printer_node_id IN (?, ?)`,
++            [FIXTURE_TENANT_A, FIXTURE_TENANT_B, FIXTURE_NODE_CURVE_A, FIXTURE_NODE_CURVE_B]
++        );
++        assert(preBpe[0].count === 0, `Pre-attempt: Zero BPE publications across tenants and curve nodes`);
++
++        const [preGrants] = await directConn.query(
++            `SELECT COUNT(*) as count FROM printhouse_activation_grants WHERE tenant_id IN (?, ?)`,
++            [FIXTURE_TENANT_A, FIXTURE_TENANT_B]
++        );
++        assert(preGrants[0].count === 0, `Pre-attempt: Zero activation grants across both tenants`);
++
++        // 5. Execute cross-tenant acceptance attempt by Tenant B on Tenant A's unaccepted curve run
++        console.log(`\n  [CROSS-TENANT EXECUTION] Tenant B attempting to accept Tenant A's unaccepted curve candidate`);
++        const crossTenantAttemptRes = await httpRequest(
++            serverUrl,
++            'POST',
++            `/api/printhouse/onboarding/pricing/calibrations/${curveSessionId}/accept`,
++            tokenB,
++            {
++                runId: curveRunId,
++                acceptanceNotes: 'Unauthorized cross-tenant attempt on unaccepted curve candidate'
++            }
++        );
++        assert(crossTenantAttemptRes.status === 403 || crossTenantAttemptRes.status === 404,
++            `Cross-tenant curve acceptance strictly rejected with HTTP ${crossTenantAttemptRes.status}`,
++            formatHttpDiagnostic('POST', `/api/printhouse/onboarding/pricing/calibrations/${curveSessionId}/accept`, crossTenantAttemptRes));
++
++        // 6. Post-attempt audit by exact IDs: verify zero mutations
++        console.log(`\n  [AUDIT AFTER CROSS-TENANT ATTEMPT] Verifying zero mutations by exact IDs`);
++        const [postNodeA] = await directConn.query(
++            `SELECT status, rates_json FROM printer_nodes WHERE id = ?`,
++            [FIXTURE_NODE_CURVE_A]
++        );
++        assert(postNodeA[0].status === 'ACTIVE', `Post-attempt: Owner node A status preserved as ACTIVE`);
++        const postChecksumA = computeCanonicalRatesChecksum(postNodeA[0].rates_json);
++        const postIntegrityA = verifyRatesChecksumIntegrity(postChecksumA, INITIAL_RATES_CHECKSUM);
++        assert(postIntegrityA.valid === true, `Post-attempt: Owner node A rates strictly unmutated`);
++
++        const [postNodeB] = await directConn.query(
++            `SELECT status, rates_json FROM printer_nodes WHERE id = ?`,
++            [FIXTURE_NODE_CURVE_B]
++        );
++        assert(postNodeB[0].status === 'ACTIVE', `Post-attempt: Tenant B node status preserved as ACTIVE`);
++        const postChecksumB = computeCanonicalRatesChecksum(postNodeB[0].rates_json);
++        const postIntegrityB = verifyRatesChecksumIntegrity(postChecksumB, TENANT_B_RATES_CHECKSUM);
++        assert(postIntegrityB.valid === true, `Post-attempt: Tenant B node rates strictly unmutated`);
++
++        const [postRevsCurveA] = await directConn.query(
++            `SELECT COUNT(*) as count FROM printhouse_pricing_revisions WHERE printer_node_id = ?`,
++            [FIXTURE_NODE_CURVE_A]
++        );
++        assert(postRevsCurveA[0].count === 0, `Post-attempt: Zero pricing revisions created on curve node A`);
++
++        const [postAccsCurveA] = await directConn.query(
++            `SELECT COUNT(*) as count FROM printhouse_pricing_calibration_acceptances WHERE calibration_session_id = ?`,
++            [curveSessionId]
++        );
++        assert(postAccsCurveA[0].count === 0, `Post-attempt: Zero calibration acceptances created for curve session`);
++
++        const [postRevsTenantB] = await directConn.query(
++            `SELECT COUNT(*) as count FROM printhouse_pricing_revisions WHERE tenant_id = ?`,
++            [FIXTURE_TENANT_B]
++        );
++        assert(postRevsTenantB[0].count === 0, `Post-attempt: Zero pricing revisions created for Tenant B`);
++
++        const [postAccsTenantB] = await directConn.query(
++            `SELECT COUNT(*) as count FROM printhouse_pricing_calibration_acceptances WHERE tenant_id = ?`,
++            [FIXTURE_TENANT_B]
++        );
++        assert(postAccsTenantB[0].count === 0, `Post-attempt: Zero calibration acceptances created for Tenant B`);
++
++        const [postBpe] = await directConn.query(
++            `SELECT COUNT(*) as count FROM bpe_pricing_publications WHERE tenant_id IN (?, ?) OR printer_node_id IN (?, ?)`,
++            [FIXTURE_TENANT_A, FIXTURE_TENANT_B, FIXTURE_NODE_CURVE_A, FIXTURE_NODE_CURVE_B]
++        );
++        assert(postBpe[0].count === 0, `Post-attempt: Zero BPE publications persisted`);
++
++        const [postGrants] = await directConn.query(
++            `SELECT COUNT(*) as count FROM printhouse_activation_grants WHERE tenant_id IN (?, ?)`,
++            [FIXTURE_TENANT_A, FIXTURE_TENANT_B]
++        );
++        assert(postGrants[0].count === 0, `Post-attempt: Zero activation grants created`);
++
++        // ──────────────────────────────────────────────────────────────────────────
++        // ── LEGITIMATE ACCEPTANCE BY TENANT A ──
++        // ──────────────────────────────────────────────────────────────────────────
++        console.log(`\n  [LEGITIMATE ACCEPTANCE] Tenant A accepting valid curve run`);
++        const curveAcceptRes = await httpRequest(
++            serverUrl,
++            'POST',
++            `/api/printhouse/onboarding/pricing/calibrations/${curveSessionId}/accept`,
++            tokenA,
++            {
++                runId: curveRunId,
++                acceptanceNotes: 'Multi-quantity curve verified under official MySQL isolated suite',
++                acceptedBy: 'operator_connected_audit'
++            }
++        );
++        assert(curveAcceptRes.status === 200, `Curve acceptance registered with HTTP 200`, formatHttpDiagnostic('POST', `/api/printhouse/onboarding/pricing/calibrations/${curveSessionId}/accept`, curveAcceptRes));
++        assert(curveAcceptRes.body?.ok === true && curveAcceptRes.body?.data?.status === 'ACCEPTED',
++            `Curve acceptance status is strictly ACCEPTED`);
++        const curveRevId = curveAcceptRes.body.data.revisionId;
++        assert(typeof curveRevId === 'string' && curveRevId.length > 0, `Curve revision created: ${curveRevId}`);
++        tracker.revisionIds.add(curveRevId);
++        const curveAccId = curveAcceptRes.body.data.acceptanceId;
++        assert(typeof curveAccId === 'string' && curveAccId.length > 0, `Curve acceptance record created: ${curveAccId}`);
++        tracker.acceptanceIds.add(curveAccId);
++
++        // Post-acceptance audit by exact IDs in MySQL
++        const [curveRevs] = await directConn.query(
++            `SELECT id, printer_node_id, source_type, rates_json, rates_checksum 
++             FROM printhouse_pricing_revisions 
++             WHERE printer_node_id = ?`,
++            [FIXTURE_NODE_CURVE_A]
++        );
++        assert(curveRevs.length === 1, `Exactly 1 revision created for curve node A`);
++        assert(curveRevs[0].id === curveRevId, `Revision ID matches accepted ID`);
++        const storedCurveRates = curveRevs[0].rates_json;
++        const expectedCurveChecksum = computeCanonicalRatesChecksum(storedCurveRates);
++        const curveChecksumIntegrity = verifyRatesChecksumIntegrity(curveRevs[0].rates_checksum, expectedCurveChecksum);
++        assert(curveChecksumIntegrity.valid === true, `Curve revision rates_checksum strictly matches canonical SHA-256`);
++
++        const [curveAccRows] = await directConn.query(
++            `SELECT id, calibration_session_id, calibration_run_id, pricing_revision_id, curve_acceptance_json 
++             FROM printhouse_pricing_calibration_acceptances 
++             WHERE pricing_revision_id = ?`,
++            [curveRevId]
++        );
++        assert(curveAccRows.length === 1, `Acceptance record verified in MySQL for curve revision`);
++        if (curveAccRows[0]?.id) tracker.acceptanceIds.add(curveAccRows[0].id);
++
++        // Verification of acceptance-phase curve metrics: evaluateCurveAcceptance persists acceptedPointCount & rejectedPointCount
++        const rawCurveAccJson = curveAccRows[0].curve_acceptance_json;
++        assert(rawCurveAccJson !== null && rawCurveAccJson !== undefined,
++            `curve_acceptance_json persisted in printhouse_pricing_calibration_acceptances`);
++        const parsedCurveAcc = typeof rawCurveAccJson === 'string' ? JSON.parse(rawCurveAccJson) : rawCurveAccJson;
++        const govMetrics = parsedCurveAcc?.curveMetrics;
++        const govMetricsDiag = formatCurveMetricsDiagnostic(govMetrics);
++
++        assert(govMetrics && typeof govMetrics === 'object',
++            `curveMetrics present in persisted curve_acceptance_json`,
++            govMetricsDiag);
++        assert(govMetrics.pointCount === 8,
++            `Governance curveMetrics.pointCount is 8 in acceptance record`,
++            govMetricsDiag);
++        assert(govMetrics.acceptedPointCount === 8,
++            `All 8 points accepted in acceptance-phase curveMetrics (acceptedPointCount === 8)`,
++            govMetricsDiag);
++        assert(govMetrics.rejectedPointCount === 0,
++            `Zero points rejected in acceptance-phase curveMetrics (rejectedPointCount === 0)`,
++            govMetricsDiag);
++        assert(govMetrics.allPointsWithinTolerance === true,
++            `allPointsWithinTolerance is true in acceptance-phase curveMetrics`,
++            govMetricsDiag);
++
++        // Verify curve node status and rates update in MySQL
++        const [curveNodeFinal] = await directConn.query(
++            `SELECT status, rates_json FROM printer_nodes WHERE id = ?`,
++            [FIXTURE_NODE_CURVE_A]
++        );
++        assert(curveNodeFinal[0].status === 'ACTIVE', `Curve node A status preserved as ACTIVE`);
++        const finalCurveNodeChecksum = computeCanonicalRatesChecksum(curveNodeFinal[0].rates_json);
++        const finalCurveNodeIntegrity = verifyRatesChecksumIntegrity(finalCurveNodeChecksum, expectedCurveChecksum);
++        assert(finalCurveNodeIntegrity.valid === true, `Curve node A rates_json updated to accepted calibrated document`);
++
++        // Verify Tenant B node rates remain strictly untouched and match dedicated fixture
++        const [curveNodeBFinal] = await directConn.query(
++            `SELECT status, rates_json FROM printer_nodes WHERE id = ?`,
++            [FIXTURE_NODE_CURVE_B]
++        );
++        assert(curveNodeBFinal[0].status === 'ACTIVE', `Tenant B node status preserved as ACTIVE`);
++        const finalCurveNodeBChecksum = computeCanonicalRatesChecksum(curveNodeBFinal[0].rates_json);
++        const finalCurveNodeBIntegrity = verifyRatesChecksumIntegrity(finalCurveNodeBChecksum, TENANT_B_RATES_CHECKSUM);
++        assert(finalCurveNodeBIntegrity.valid === true, `Tenant B node rates strictly preserved following Tenant A acceptance`);
++
++        // Verify zero revisions and zero acceptances created for Tenant B
++        const [tenantBRevsAfter] = await directConn.query(
++            `SELECT COUNT(*) as count FROM printhouse_pricing_revisions WHERE tenant_id = ?`,
++            [FIXTURE_TENANT_B]
++        );
++        assert(tenantBRevsAfter[0].count === 0, `Zero pricing revisions created for Tenant B after legitimate acceptance`);
++
++        const [tenantBAccsAfter] = await directConn.query(
++            `SELECT COUNT(*) as count FROM printhouse_pricing_calibration_acceptances WHERE tenant_id = ?`,
++            [FIXTURE_TENANT_B]
++        );
++        assert(tenantBAccsAfter[0].count === 0, `Zero calibration acceptances created for Tenant B after legitimate acceptance`);
++
++        // Assert zero commercial leakage on curve nodes and tenants
++        const [curveBpe] = await directConn.query(
++            `SELECT COUNT(*) as count FROM bpe_pricing_publications WHERE printer_node_id IN (?, ?)`,
++            [FIXTURE_NODE_CURVE_A, FIXTURE_NODE_CURVE_B]
++        );
++        assert(curveBpe[0].count === 0, `Zero records in bpe_pricing_publications for curve nodes`);
++
++        const [curveGrants] = await directConn.query(
++            `SELECT COUNT(*) as count FROM printhouse_activation_grants WHERE tenant_id IN (?, ?)`,
++            [FIXTURE_TENANT_A, FIXTURE_TENANT_B]
++        );
++        assert(curveGrants[0].count === 0, `Zero total activation grants for either tenant`);
++        console.log(`\n  [SCENARIO 2 COMPLETE] Multi-Quantity Valid Curve Accepted & Cross-Tenant Isolation Verified.\n`);
++
++        // ══════════════════════════════════════════════════════════════════════════════
++        // ── SCENARIO 3 (CASO B): OUT-OF-TOLERANCE CURVE REJECTION GATE ──
++        // ══════════════════════════════════════════════════════════════════════════════
++        console.log(`\n================================================================`);
++        console.log(`  SCENARIO 3 (CASO B): OUT-OF-TOLERANCE CURVE REJECTION GATE    `);
++        console.log(`================================================================`);
++
++        const FIXTURE_NODE_REJECT_A = `node_${EXECUTION_TAG}_reject_a`;
++        await seedPrinterNode(directConn, FIXTURE_NODE_REJECT_A, FIXTURE_TENANT_A, `Node Reject ${EXECUTION_TAG}`, INITIAL_RATES_JSON_STR, nodeColSet);
++        assert(true, `Created dedicated rejection node ${FIXTURE_NODE_REJECT_A} with baseline rates`);
++
++        // Baseline rates check on FIXTURE_NODE_REJECT_A
++        const [rejectNodeBaseline] = await directConn.query(
++            `SELECT rates_json FROM printer_nodes WHERE id = ?`,
++            [FIXTURE_NODE_REJECT_A]
++        );
++        const rejectNodeChecksum = computeCanonicalRatesChecksum(rejectNodeBaseline[0].rates_json);
++        const rejectNodeIntegrity = verifyRatesChecksumIntegrity(rejectNodeChecksum, INITIAL_RATES_CHECKSUM);
++        assert(rejectNodeIntegrity.valid === true, `Rejection node initialized with baseline rates checksum`);
++
++        // Construct 8 targets with point 800 perturbed downward to 1320.00 EUR (baseline is ~1364.50 EUR, q=700 is 1267.00 EUR).
++        // Total price is strictly monotonic (1320 > 1267) and unit cost is non-increasing (1320/800 = 1.65 < 1267/700 = 1.81).
++        // Solver converges to SUCCEEDED, but point 800 residual (~42.50 EUR) exceeds governance tolerance (~6.60 EUR).
++        const outOfToleranceTargets = CURVE_QUANTITIES.map(q => {
++            const fwd = pricingAdapter.evaluateForwardPrice({ ...CURVE_BOOK_SPEC, copies: q }, INITIAL_VALID_RATES, {}, {});
++            let p = Number(fwd.predictedManufacturingPrice.toFixed(2));
++            if (q === 800) {
++                p = 1320.00;
++            }
++            return {
++                quantity: q,
++                targetManufacturingPrice: p,
++                targetBasis: 'MANUFACTURING_PRICE',
++                currency: 'EUR'
++            };
++        });
++
++        const rejectSessionPayload = {
++            printerNodeId: FIXTURE_NODE_REJECT_A,
++            referenceBookName: 'Synthetic Out-of-Tolerance Curve Fixture',
++            bookSpec: CURVE_BOOK_SPEC,
++            multiTargets: outOfToleranceTargets,
++            currency: 'EUR',
++            includesPaper: true,
++            includesBinding: true,
++            includesFinishing: true,
++            includesPackaging: true
++        };
++
++        const rejectCreateRes = await httpRequest(
++            serverUrl,
++            'POST',
++            '/api/printhouse/onboarding/pricing/calibrations',
++            tokenA,
++            rejectSessionPayload
++        );
++        assert(rejectCreateRes.status === 201, `Rejection session created with HTTP 201`, formatHttpDiagnostic('POST', '/api/printhouse/onboarding/pricing/calibrations', rejectCreateRes));
++        const rejectSessionId = rejectCreateRes.body.data.id;
++        tracker.sessionIds.add(rejectSessionId);
++
++        const rejectReadyRes = await httpRequest(
++            serverUrl,
++            'POST',
++            `/api/printhouse/onboarding/pricing/calibrations/${rejectSessionId}/ready`,
++            tokenA
++        );
++        assert(rejectReadyRes.status === 200, `POST /ready on rejection session returned HTTP 200`, formatHttpDiagnostic('POST', `/api/printhouse/onboarding/pricing/calibrations/${rejectSessionId}/ready`, rejectReadyRes));
++        assert(rejectReadyRes.body?.data?.status === 'READY', `Rejection session promoted to READY`);
++
++        const rejectCalcRes = await httpRequest(
++            serverUrl,
++            'POST',
++            `/api/printhouse/onboarding/pricing/calibrations/${rejectSessionId}/calculate`,
++            tokenA
++        );
++        assert(rejectCalcRes.status === 201, `Solver calculated run for rejection session with HTTP 201`, formatHttpDiagnostic('POST', `/api/printhouse/onboarding/pricing/calibrations/${rejectSessionId}/calculate`, rejectCalcRes));
++        const rejectRunData = rejectCalcRes.body?.data;
++        assert(rejectRunData && typeof rejectRunData.id === 'string', `Valid run ID received for rejection session`);
++        const rejectRunId = rejectRunData.id;
++        tracker.runIds.add(rejectRunId);
++
++        // Assert solver status SUCCEEDED (canonical status contract) and verify point 800 is outside tolerance
++        assert(CANONICAL_ACCEPTABLE_RUN_STATUSES.includes(rejectRunData.status),
++            `Perturbed run status (${rejectRunData.status}) is in CANONICAL_ACCEPTABLE_RUN_STATUSES`);
++        assert(rejectRunData.status === 'SUCCEEDED', `Perturbed solver produced run with status SUCCEEDED`);
++
++        const pt800 = rejectRunData.pointResults?.find(p => p.quantity === 800);
++        assert(pt800 !== undefined, `Point q=800 present in solver pointResults`);
++        assert(Number.isInteger(pt800.quantity) && pt800.quantity === 800, `Point q=800 quantity is integer 800`);
++        const pt800Target = pt800.targetManufacturingPrice ?? pt800.targetPrice;
++        assert(Number.isFinite(pt800Target) && pt800Target === 1320.00, `Point q=800 target price is finite 1320.00 EUR`);
++        assert(Number.isFinite(pt800.predictedManufacturingPrice) && pt800.predictedManufacturingPrice > 0,
++            `Point q=800 predicted price is finite: ${pt800.predictedManufacturingPrice} EUR`);
++
++        // Recalculate unrounded residual and effective tolerance using official policy
++        const pt800AbsRes = Math.abs(pt800.predictedManufacturingPrice - 1320.00);
++        const pt800EffTol = computeGovernanceTolerance(1320.00, DEFAULT_ACCEPTANCE_TOLERANCE_ABSOLUTE, DEFAULT_ACCEPTANCE_TOLERANCE_PERCENT);
++        assert(pt800AbsRes > 20.0, `Point q=800 recalculated absolute residual (${pt800AbsRes.toFixed(4)} EUR) strictly exceeds 20.00 EUR`);
++        assert(pt800AbsRes > pt800EffTol, `Point q=800 absolute residual strictly exceeds effective tolerance (${pt800EffTol.toFixed(4)} EUR)`);
++        assert(pt800.withinTolerance === false, `Point q=800 correctly marked as withinTolerance: false by solver`);
++
++        // Direct DB verification of perturbed run record in MySQL
++        const [rejectRunRows] = await directConn.query(
++            `SELECT id, status, point_results_json FROM printhouse_pricing_calibration_runs WHERE id = ?`,
++            [rejectRunId]
++        );
++        const dbRejectPts = parseAndValidatePointResultsJson(rejectRunRows[0].point_results_json, 'Scenario 3 rejectRunRows[0].point_results_json');
++        assert(Array.isArray(dbRejectPts) && dbRejectPts.length === 8,
++            `Persisted perturbed point_results_json contains exactly 8 points`);
++
++        // Contrast each point between MySQL and HTTP for perturbed run
++        for (let i = 0; i < dbRejectPts.length; i++) {
++            const dbPt = dbRejectPts[i];
++            const httpPt = rejectRunData.pointResults?.find(p => p.quantity === dbPt.quantity);
++            assert(httpPt !== undefined, `MySQL perturbed point q=${dbPt.quantity} found in HTTP response`);
++
++            const dbTarget = dbPt.targetManufacturingPrice ?? dbPt.targetPrice;
++            const httpTarget = httpPt.targetManufacturingPrice ?? httpPt.targetPrice;
++            const dbRatio = dbPt.percentageResidual !== undefined ? dbPt.percentageResidual : dbPt.percentResidual;
++            const httpRatio = httpPt.percentageResidual !== undefined ? httpPt.percentageResidual : httpPt.percentResidual;
++
++            assert(Number.isFinite(dbTarget) && Math.abs(dbTarget - httpTarget) < 0.01,
++                `MySQL perturbed point q=${dbPt.quantity} target price matches HTTP response (${httpTarget} EUR)`);
++            assert(Number.isFinite(dbPt.predictedManufacturingPrice) && Math.abs(dbPt.predictedManufacturingPrice - httpPt.predictedManufacturingPrice) < 0.001,
++                `MySQL perturbed point q=${dbPt.quantity} predicted price matches HTTP response`);
++            assert(Number.isFinite(dbPt.absoluteResidual) && Math.abs(dbPt.absoluteResidual - httpPt.absoluteResidual) < 0.001,
++                `MySQL perturbed point q=${dbPt.quantity} absolute residual matches HTTP response`);
++            assert(Number.isFinite(dbRatio) && Math.abs(dbRatio - httpRatio) < 0.0001,
++                `MySQL perturbed point q=${dbPt.quantity} percentage residual ratio matches HTTP response`);
++            assert(dbPt.withinTolerance === httpPt.withinTolerance,
++                `MySQL perturbed point q=${dbPt.quantity} withinTolerance matches HTTP response`);
++        }
++
++        const dbPt800 = dbRejectPts.find(p => p.quantity === 800);
++        assert(dbPt800 && dbPt800.withinTolerance === false, `MySQL persisted point q=800 has withinTolerance: false`);
++        const dbPt800Target = dbPt800.targetManufacturingPrice ?? dbPt800.targetPrice;
++        assert(Number.isFinite(dbPt800Target) && Math.abs(dbPt800Target - 1320.00) < 0.01,
++            `MySQL persisted point q=800 target price is finite 1320.00 EUR`);
++        assert(Math.abs(dbPt800.predictedManufacturingPrice - pt800.predictedManufacturingPrice) < 0.001,
++            `MySQL persisted point q=800 predicted price matches HTTP response`);
++        assert(Math.abs(dbPt800.absoluteResidual - pt800.absoluteResidual) < 0.001,
++            `MySQL persisted point q=800 absolute residual matches HTTP response`);
++        const dbPt800Ratio = dbPt800.percentageResidual !== undefined ? dbPt800.percentageResidual : dbPt800.percentResidual;
++        const httpPt800Ratio = pt800.percentageResidual !== undefined ? pt800.percentageResidual : pt800.percentResidual;
++        assert(Number.isFinite(dbPt800Ratio) && Math.abs(dbPt800Ratio - httpPt800Ratio) < 0.0001,
++            `MySQL persisted point q=800 percentage residual ratio matches HTTP response`);
++
++        // Attempt Governed Acceptance: MUST be rejected by curve tolerance gate with HTTP 422
++        // Contract: wrapHandler serializes err.statusCode=422, error=err.code ('GOVERNANCE_CURVE_REJECTED'), message=err.message
++        const rejectAcceptRes = await httpRequest(
++            serverUrl,
++            'POST',
++            `/api/printhouse/onboarding/pricing/calibrations/${rejectSessionId}/accept`,
++            tokenA,
++            {
++                runId: rejectRunId,
++                acceptanceNotes: 'Unauthorized attempt to accept out-of-tolerance curve'
++            }
++        );
++        assert(rejectAcceptRes.status === 422, `Out-of-tolerance curve acceptance strictly rejected with HTTP 422`, formatHttpDiagnostic('POST', `/api/printhouse/onboarding/pricing/calibrations/${rejectSessionId}/accept`, rejectAcceptRes));
++
++        // Assert error code from real Express wrapHandler serialization: body.error or body.code
++        const receivedErrorCode = rejectAcceptRes.body?.error || rejectAcceptRes.body?.code;
++        assert(receivedErrorCode === 'GOVERNANCE_CURVE_REJECTED',
++            `Rejection error code is strictly GOVERNANCE_CURVE_REJECTED (received: ${receivedErrorCode})`);
++
++        // Verify specific reason POINT_OUT_OF_TOLERANCE from response message or parsed reasons
++        const responseMsg = typeof rejectAcceptRes.body?.message === 'string' ? rejectAcceptRes.body.message : '';
++        const parsedReasons = rejectAcceptRes.body?.reasons || (responseMsg.match(/\[([A-Z0-9_, ]+)\]/)?.[1]?.split(',').map(s => s.trim())) || [];
++        const hasPointOutOfTol = parsedReasons.includes('POINT_OUT_OF_TOLERANCE') || responseMsg.includes('POINT_OUT_OF_TOLERANCE');
++        assert(hasPointOutOfTol === true, `Rejection diagnostic strictly contains POINT_OUT_OF_TOLERANCE: "${responseMsg}"`);
++        console.log(`  ✓ Sanitized Governance Diagnostic: ${formatHttpDiagnostic('POST', `/api/printhouse/onboarding/pricing/calibrations/${rejectSessionId}/accept`, rejectAcceptRes)}`);
++
++        // Verify zero revisions and zero acceptances created in MySQL
++        const [noRevs] = await directConn.query(
++            `SELECT COUNT(*) as count FROM printhouse_pricing_revisions WHERE printer_node_id = ?`,
++            [FIXTURE_NODE_REJECT_A]
++        );
++        assert(noRevs[0].count === 0, `Zero pricing revisions created following out-of-tolerance rejection`);
++
++        const [noAccs] = await directConn.query(
++            `SELECT COUNT(*) as count FROM printhouse_pricing_calibration_acceptances WHERE calibration_session_id = ?`,
++            [rejectSessionId]
++        );
++        assert(noAccs[0].count === 0, `Zero calibration acceptances created for rejected session`);
++
++        // Verify node rates remain strictly untouched and match INITIAL_RATES_CHECKSUM
++        const [nodeRejectState] = await directConn.query(
++            `SELECT rates_json FROM printer_nodes WHERE id = ?`,
++            [FIXTURE_NODE_REJECT_A]
++        );
++        const nodeRejectChecksum = computeCanonicalRatesChecksum(nodeRejectState[0].rates_json);
++        const nodeRejectIntegrity = verifyRatesChecksumIntegrity(nodeRejectChecksum, INITIAL_RATES_CHECKSUM);
++        assert(nodeRejectIntegrity.valid === true, `Rejection node rates_json remains strictly identical to baseline fixture`);
++        console.log(`\n  [SCENARIO 3 COMPLETE] Out-of-Tolerance Curve Rejected with Zero Residuals.\n`);
++
++        // ══════════════════════════════════════════════════════════════════════════════
++        // ── SCENARIO 4 (CASO C): CROSS-TENANT POST-ACCEPTANCE & REVISION ISOLATION ──
++        // ══════════════════════════════════════════════════════════════════════════════
++        console.log(`\n================================================================`);
++        console.log(`  SCENARIO 4 (CASO C): CROSS-TENANT REVISION & AUDIT ISOLATION  `);
++        console.log(`================================================================`);
++
++        // Tenant B attempts to read Tenant A's revision via GET /pricing/revisions/:revisionId
++        const crossRevRead = await httpRequest(
++            serverUrl,
++            'GET',
++            `/api/printhouse/onboarding/pricing/revisions/${curveRevId}`,
++            tokenB
++        );
++        assert(crossRevRead.status === 403 || crossRevRead.status === 404,
++            `Cross-tenant read of Tenant A revision strictly rejected with HTTP ${crossRevRead.status}`);
++
++        // Tenant B attempts to accept already-accepted session
++        const crossCurveAccept = await httpRequest(
++            serverUrl,
++            'POST',
++            `/api/printhouse/onboarding/pricing/calibrations/${curveSessionId}/accept`,
++            tokenB,
++            {
++                runId: curveRunId,
++                acceptanceNotes: 'Cross-tenant unauthorized acceptance attempt on curve run'
++            }
++        );
++        assert(crossCurveAccept.status === 403 || crossCurveAccept.status === 404,
++            `Cross-tenant curve acceptance on accepted session rejected with HTTP ${crossCurveAccept.status}`,
++            formatHttpDiagnostic('POST', `/api/printhouse/onboarding/pricing/calibrations/${curveSessionId}/accept`, crossCurveAccept));
++
++        // Verify zero revisions created for Tenant B across all scenarios
++        const [finalTenantBRevs] = await directConn.query(
++            `SELECT COUNT(*) as count FROM printhouse_pricing_revisions WHERE tenant_id = ?`,
++            [FIXTURE_TENANT_B]
++        );
++        assert(finalTenantBRevs[0].count === 0, `Zero pricing revisions created for Tenant B across all scenarios`);
++
++        // Verify zero acceptances created for Tenant B across all scenarios
++        const [finalTenantBAccs] = await directConn.query(
++            `SELECT COUNT(*) as count FROM printhouse_pricing_calibration_acceptances WHERE tenant_id = ?`,
++            [FIXTURE_TENANT_B]
++        );
++        assert(finalTenantBAccs[0].count === 0, `Zero calibration acceptances created for Tenant B across all scenarios`);
++        console.log(`\n  [SCENARIO 4 COMPLETE] Cross-Tenant Curve Isolation Verified with Zero Mutations.\n`);
+ 
+     } catch (err) {
+         mainError = err;
+@@ -1543,16 +2717,20 @@ module.exports = {
+     verifyRatesChecksumIntegrity,
+     computeCanonicalRatesChecksum,
+     canonicalStringify,
+-    runChecksumIntegrityRegressions
++    parseAndValidatePointResultsJson,
++    formatCurveMetricsDiagnostic,
++    runChecksumIntegrityRegressions,
++    runCurveHarnessRegressions
+ };
+ 
+ if (require.main === module) {
+     if (isRegressionMode) {
+         try {
+             runChecksumIntegrityRegressions();
++            runCurveHarnessRegressions();
+             process.exit(0);
+         } catch (err) {
+-            console.error(`\n[FATAL] Checksum regressions failed: ${err.message}`);
++            console.error(`\n[FATAL] Regressions failed: ${err.message}`);
+             process.exit(1);
+         }
+     } else {
+diff --git a/tests/onboarding_checksum_integrity_regression.test.js b/tests/onboarding_checksum_integrity_regression.test.js
+index 19b21e3..9d1c8e4 100644
+--- a/tests/onboarding_checksum_integrity_regression.test.js
++++ b/tests/onboarding_checksum_integrity_regression.test.js
+@@ -8,7 +8,10 @@ const {
+     canonicalStringify,
+     resolveConnectedMysqlPassword,
+     getDirectMysqlConnectionConfig,
+-    REQUIRED_MYSQL
++    REQUIRED_MYSQL,
++    parseAndValidatePointResultsJson,
++    formatCurveMetricsDiagnostic,
++    runCurveHarnessRegressions
+ } = require('../scripts/test_onboarding_connected_suite');
+ 
+ describe('Onboarding Harness Checksum Integrity & Normalization Regressions', () => {
+@@ -395,4 +398,181 @@ describe('Onboarding Harness Checksum Integrity & Normalization Regressions', ()
+             expect(resolveBody).not.toMatch(/process\.env\.MYSQL_PASSWORD/);
+         });
+     });
++
++    describe('8. Multi-quantity Curve Harness Regressions', () => {
++        test('8.1 Ejecuta satisfactoriamente runCurveHarnessRegressions (Suites 7-11: multi-target generation, solver contract, governance gate, zero leakage, dual point_results parsing)', () => {
++            expect(() => runCurveHarnessRegressions()).not.toThrow();
++        });
++    });
++
++    describe('9. parseAndValidatePointResultsJson (Dual parsing, validación estricta de array y rechazo contextual)', () => {
++        const fixtureArray = [
++            { quantity: 100, targetManufacturingPrice: 50.0, predictedManufacturingPrice: 50.0, withinTolerance: true },
++            { quantity: 500, targetManufacturingPrice: 200.0, predictedManufacturingPrice: 200.0, withinTolerance: true }
++        ];
++
++        test('9.1 Cadena JSON válida de array devuelve el array correctamente parseado con todos sus elementos', () => {
++            const jsonStr = JSON.stringify(fixtureArray);
++            const parsed = parseAndValidatePointResultsJson(jsonStr, 'Test 9.1 JSON String');
++            expect(Array.isArray(parsed)).toBe(true);
++            expect(parsed).toHaveLength(2);
++            expect(parsed[0].quantity).toBe(100);
++            expect(parsed[1].quantity).toBe(500);
++        });
++
++        test('9.2 Array nativo devuelto por MySQL driver es devuelto directamente sin alteración', () => {
++            const result = parseAndValidatePointResultsJson(fixtureArray, 'Test 9.2 Native Array');
++            expect(Array.isArray(result)).toBe(true);
++            expect(result).toBe(fixtureArray);
++            expect(result).toHaveLength(2);
++        });
++
++        test('9.3 JSON malformado es rechazado con error contextual que incluye diagnóstico y sin catch silencioso', () => {
++            const malformed = '[{"quantity": 100, "broken":';
++            expect(() => parseAndValidatePointResultsJson(malformed, 'Test 9.3 Malformed JSON')).toThrowError(
++                /\[POINT_RESULTS_VALIDATION_ERROR\] Test 9.3 Malformed JSON: Malformed JSON string/
++            );
++        });
++
++        test('9.4 Objeto no array (tanto cadena JSON como objeto nativo) es rechazado con diagnóstico contextual', () => {
++            const nonArrayJson = '{"quantity": 100, "price": 50}';
++            expect(() => parseAndValidatePointResultsJson(nonArrayJson, 'Test 9.4a JSON Object')).toThrowError(
++                /\[POINT_RESULTS_VALIDATION_ERROR\] Test 9.4a JSON Object: Parsed JSON root is not an array \(received: object\)/
++            );
++
++            const nonArrayNative = { quantity: 100, price: 50 };
++            expect(() => parseAndValidatePointResultsJson(nonArrayNative, 'Test 9.4b Native Object')).toThrowError(
++                /\[POINT_RESULTS_VALIDATION_ERROR\] Test 9.4b Native Object: Expected string or array, received unsupported type object/
++            );
++        });
++
++        test('9.5 Null y undefined son rechazados explícitamente con diagnóstico contextual claro', () => {
++            expect(() => parseAndValidatePointResultsJson(null, 'Test 9.5a Null Value')).toThrowError(
++                /\[POINT_RESULTS_VALIDATION_ERROR\] Test 9.5a Null Value: Value is null or undefined/
++            );
++            expect(() => parseAndValidatePointResultsJson(undefined, 'Test 9.5b Undefined Value')).toThrowError(
++                /\[POINT_RESULTS_VALIDATION_ERROR\] Test 9.5b Undefined Value: Value is null or undefined/
++            );
++        });
++    });
++
++    describe('10. curveMetrics Phase-Specific Contract & Sanitized Diagnostic Regressions', () => {
++        test('10.1 Solver /calculate produce métricas agregadas y NO incluye acceptedPointCount ni rejectedPointCount', () => {
++            const deterministicSolver = require('../src/api/services/deterministicInversePricingSolver');
++            const BOOK_SPEC = {
++                format: '148x210',
++                pages: 72,
++                runWastePercentage: 0.05,
++                copies: 1500,
++                colorsFront: 4,
++                colorsBack: 4,
++                paper: 'offset',
++                paperGsm: 90,
++                coverColorsFront: 4,
++                coverColorsBack: 0,
++                coverPaper: 'mc',
++                coverGsm: 250,
++                lamination: 'matt',
++                binding: 'pb'
++            };
++            const TARGETS = [
++                { quantity: 100, targetManufacturingPrice: 50.0 },
++                { quantity: 200, targetManufacturingPrice: 80.0 }
++            ];
++            const rates = {
++                interior_full_colour_fixed: { '16p': 100 },
++                interior_full_colour_var: { '16p': 50 },
++                cover_fixed_by_colours: { '4': 40 },
++                cover_var_per_1000_by_colours: { '4': 30 },
++                lam_fixed: { matt: 20 },
++                lam_var_per_1000: { matt: 15 },
++                binding_pb_fixed_by_sections: { '5': 25 },
++                binding_pb_var_per_1000_by_sections: { '5': 10 },
++                paper_interior_fixed_by_colours: 50,
++                paper_interior_var_per_1000_by_colours: 20,
++                paper_cover_fixed_by_colours: 30,
++                paper_cover_var_per_1000_by_colours: 15,
++                paper_waste_for_binding: { pb: 0.04 },
++                paper_price_interior_by_kilo: { offset: 1.2 },
++                paper_price_cover_by_kilo: { mc: 1.5 }
++            };
++
++            const solverRes = deterministicSolver.solveMultiQuantity({
++                bookSpec: BOOK_SPEC,
++                currentRatesSnapshot: rates,
++                multiTargets: TARGETS
++            });
++
++            expect(solverRes.curveMetrics).toBeDefined();
++            expect(solverRes.curveMetrics.pointCount).toBe(2);
++            expect(typeof solverRes.curveMetrics.meanAbsoluteResidual).toBe('number');
++            expect(typeof solverRes.curveMetrics.maxAbsoluteResidual).toBe('number');
++            expect(typeof solverRes.curveMetrics.meanPercentageResidual).toBe('number');
++            expect(typeof solverRes.curveMetrics.maxPercentageResidual).toBe('number');
++            expect(typeof solverRes.curveMetrics.objectiveValue).toBe('number');
++
++            // Crucial: acceptance counts are strictly undefined in solver /calculate phase
++            expect(solverRes.curveMetrics.acceptedPointCount).toBeUndefined();
++            expect(solverRes.curveMetrics.rejectedPointCount).toBeUndefined();
++        });
++
++        test('10.2 evaluateCurveAcceptance produce métricas de aceptación de gobernanza', () => {
++            const acceptanceService = require('../src/api/services/calibrationAcceptanceService');
++            const session = {
++                book_spec_json: { copies: 100 },
++                multi_targets_json: [{ quantity: 100, targetManufacturingPrice: 50.0 }],
++                target_manufacturing_price: 50.0
++            };
++            const run = { identifiability_json: { status: 'EXACTLY_DETERMINED' } };
++            const rates = {
++                interior_full_colour_fixed: { '16p': 100 },
++                interior_full_colour_var: { '16p': 50 },
++                cover_fixed_by_colours: { '4': 40 },
++                cover_var_per_1000_by_colours: { '4': 30 },
++                lam_fixed: { matt: 20 },
++                lam_var_per_1000: { matt: 15 },
++                binding_pb_fixed_by_sections: { '5': 25 },
++                binding_pb_var_per_1000_by_sections: { '5': 10 },
++                paper_interior_fixed_by_colours: 50,
++                paper_interior_var_per_1000_by_colours: 20,
++                paper_cover_fixed_by_colours: 30,
++                paper_cover_var_per_1000_by_colours: 15,
++                paper_waste_for_binding: { pb: 0.04 },
++                paper_price_interior_by_kilo: { offset: 1.2 },
++                paper_price_cover_by_kilo: { mc: 1.5 }
++            };
++            const bookSpec = { copies: 100, pages: 16 };
++            const nodeConfig = { signatures: null, production_lead_days: 7, delivery_time: 2 };
++
++            const govRes = acceptanceService.evaluateCurveAcceptance(session, run, rates, bookSpec, nodeConfig);
++            expect(govRes.curveMetrics).toBeDefined();
++            expect(typeof govRes.curveMetrics.acceptedPointCount).toBe('number');
++            expect(typeof govRes.curveMetrics.rejectedPointCount).toBe('number');
++            expect(typeof govRes.curveMetrics.allPointsWithinTolerance).toBe('boolean');
++        });
++
++        test('10.3 formatCurveMetricsDiagnostic sanitiza claves conocidas sin fugar secretos ni anidamientos no autorizados', () => {
++            const rawMetrics = {
++                pointCount: 8,
++                meanAbsoluteResidual: 0.042,
++                maxAbsoluteResidual: 0.125,
++                acceptedPointCount: 8,
++                rejectedPointCount: 0,
++                secretPassword: 'super_secret_db_pass',
++                bearerToken: 'Bearer eyJhbGciOiJIUzI1Ni...'
++            };
++
++            const diag = formatCurveMetricsDiagnostic(rawMetrics);
++            expect(diag).toContain('"pointCount":8');
++            expect(diag).toContain('"maxAbsoluteResidual":0.125');
++            expect(diag).toContain('"acceptedPointCount":8');
++            expect(diag).not.toContain('super_secret_db_pass');
++            expect(diag).not.toContain('Bearer eyJhbGciOiJIUzI1Ni');
++
++            // Handles non-object values safely
++            expect(formatCurveMetricsDiagnostic(null)).toContain('null or not an object');
++            expect(formatCurveMetricsDiagnostic(undefined)).toContain('null or not an object');
++            expect(formatCurveMetricsDiagnostic('string_val')).toContain('null or not an object');
++        });
++    });
+ });
+diff --git a/vitest_discovered_suites.txt b/vitest_discovered_suites.txt
+index 75521af..7264adf 100644
+--- a/vitest_discovered_suites.txt
++++ b/vitest_discovered_suites.txt
+@@ -1,6 +1,6 @@
+ ======================================================================
+   PRINTPRICE OS: LISTADO EFECTIVO DE SUITES DESCUBIERTAS POR VITEST   
+-  Total archivos de test: 23 | Total pruebas: 327
++  Total archivos de test: 23 | Total pruebas: 336
+ ======================================================================
+ 
+  1. tests/migration_156_157_runner.test.js (5 tests)
+@@ -25,8 +25,8 @@
+ 20. tests/BetaCohortManagement.test.tsx (7 tests)
+ 21. tests/GovernedQuoteSmokeTest.test.tsx (30 tests)
+ 22. tests/PrinthouseOnboardingRedesign.test.tsx (20 tests)
+-23. tests/onboarding_checksum_integrity_regression.test.js (30 tests)
++23. tests/onboarding_checksum_integrity_regression.test.js (39 tests)
+ 
+ ----------------------------------------------------------------------
+-TOTAL: 23 test files | 327 passed tests | 0 failed
++TOTAL: 23 test files | 336 passed tests | 0 failed
+ ----------------------------------------------------------------------

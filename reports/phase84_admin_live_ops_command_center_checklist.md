@@ -1,0 +1,26 @@
+# Phase 84 Command Center Checklist
+
+- [x] 1. Command center route available
+- [x] 2. Overview counters active
+- [x] 3. Live order queue active
+- [x] 4. SLA risk queue active
+- [x] 5. Incident queue active
+- [x] 6. Blocked handoff queue active
+- [x] 7. Customer action queue active
+- [x] 8. Partner action queue active
+- [x] 9. Rollback queue active
+- [x] 10. Revocation impact view active
+- [x] 11. Escalation workflow active
+- [x] 12. Pause/resume controls active
+- [x] 13. Rollback controls active
+- [x] 14. Revocation controls active
+- [x] 15. Reassignment request available
+- [x] 16. Handoff review available
+- [x] 17. Completion evidence review available
+- [x] 18. RBAC enforced
+- [x] 19. Tenant isolation enforced
+- [x] 20. Command actions audited
+- [x] 21. Forbidden silent overrides blocked
+- [x] 22. No guaranteed delivery wording
+- [x] 23. No false certification/print-ready wording
+- [x] 24. Public marketplace launch disabled

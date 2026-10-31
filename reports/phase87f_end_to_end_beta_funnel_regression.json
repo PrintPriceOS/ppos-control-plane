@@ -1,0 +1,62 @@
+{
+  "counts": {
+    "INVITED": 1,
+    "REDEEMED": 1,
+    "REGISTERED": 1,
+    "ACTIVATED": 1,
+    "OFFER_REQUESTED": 0,
+    "OFFER_GENERATED": 15,
+    "OFFER_ACCEPTED": 1,
+    "ORDER_CREATED": 1,
+    "FILES_UPLOADED": 1,
+    "PREFLIGHT_COMPLETED": 1,
+    "PROOF_APPROVED": 1,
+    "PAYMENT_CONFIRMED": 0,
+    "LIVE_PIPELINE_ENTERED": 1,
+    "PARTNER_ACCEPTED": 1,
+    "PRODUCTION_STARTED": 0,
+    "COMPLETED": 1
+  },
+  "rates": {
+    "REDEEMED": 100,
+    "REGISTERED": 100,
+    "ACTIVATED": 100,
+    "OFFER_REQUESTED": 0,
+    "OFFER_GENERATED": 0,
+    "OFFER_ACCEPTED": 6.666666666666667,
+    "ORDER_CREATED": 100,
+    "FILES_UPLOADED": 100,
+    "PREFLIGHT_COMPLETED": 100,
+    "PROOF_APPROVED": 100,
+    "PAYMENT_CONFIRMED": 0,
+    "LIVE_PIPELINE_ENTERED": 0,
+    "PARTNER_ACCEPTED": 100,
+    "PRODUCTION_STARTED": 0,
+    "COMPLETED": 0
+  },
+  "dropOffs": {
+    "REDEEMED": 0,
+    "REGISTERED": 0,
+    "ACTIVATED": 0,
+    "OFFER_REQUESTED": 1,
+    "OFFER_GENERATED": 0,
+    "OFFER_ACCEPTED": 14,
+    "ORDER_CREATED": 0,
+    "FILES_UPLOADED": 0,
+    "PREFLIGHT_COMPLETED": 0,
+    "PROOF_APPROVED": 0,
+    "PAYMENT_CONFIRMED": 1,
+    "LIVE_PIPELINE_ENTERED": 0,
+    "PARTNER_ACCEPTED": 0,
+    "PRODUCTION_STARTED": 1,
+    "COMPLETED": 0
+  },
+  "blockers": {
+    "total_blockers": 0,
+    "details": []
+  },
+  "supportTickets": 1,
+  "incidents": 1,
+  "emergencyStops": 1,
+  "rollbacks": 1
+}

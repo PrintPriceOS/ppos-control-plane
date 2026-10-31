@@ -3,10 +3,12 @@
 module.exports = async function v2AuthMiddleware(req, res, next) {
     console.log(`[V2-AUTH-STUB] Bypassing auth for ${req.method} ${req.originalUrl}`);
     
-    // Mock tenant data
+    // Resolve tenant from authenticated user context
+    const tenantId = req.user?.tenantId || 'system';
+    
     req.tenant = {
-        id: 'tenant_bootstrap_mock',
-        name: 'Bootstrap Mock'
+        id: tenantId,
+        name: `Resolved Tenant (${tenantId})`
     };
     
     next();

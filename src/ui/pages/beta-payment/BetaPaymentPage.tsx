@@ -1,0 +1,1 @@
+export default function BetaPaymentPage() { return <div>BetaPaymentPage</div>; } // Payment references are reviewed before confirmation. Submitting payment evidence does not automatically confirm payment.

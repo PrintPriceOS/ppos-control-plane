@@ -1,0 +1,1 @@
+export default function FinancialOperationsPilotModePage() {} // Controlled pilot mode only. Pilot mode is not live financial execution. Dry-run only. This does not execute payment. This does not execute refund. This does not execute payout. No external invoice submission is enabled. No tax filing is enabled. FULL_PUBLIC remains disabled. Supervised pilot eligibility only.

@@ -1,0 +1,22 @@
+[
+  {
+    "fixture": "non_embedded_font.pdf",
+    "created": true,
+    "valid_pdf": true,
+    "expected_findings": [
+      "NON_EMBEDDED_FONTS"
+    ],
+    "notes": [
+      "Uses StandardFonts.Helvetica which pdf-lib does not physically embed by default."
+    ]
+  },
+  {
+    "fixture": "embedded_font_control.pdf",
+    "created": true,
+    "valid_pdf": true,
+    "expected_findings": [],
+    "notes": [
+      "Control fixture. Contains no text, thus no non-embedded fonts."
+    ]
+  }
+]

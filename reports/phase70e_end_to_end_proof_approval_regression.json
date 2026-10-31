@@ -1,0 +1,273 @@
+{
+  "phase": "70E",
+  "repo": "ppos-control-plane",
+  "generated_at": "2026-06-09T18:08:50.039Z",
+  "input_mode": "SERVICE_REPORT",
+  "total": 10,
+  "passed": 10,
+  "failed": 0,
+  "status": "PASS",
+  "results": [
+    {
+      "name": "1. PROOF_NOT_REQUIRED — no visual changes, no proof governance end-to-end (regression)",
+      "passed": true,
+      "errors": [],
+      "outcome": "FIXED_REVIEW_REQUIRED",
+      "review_required": true,
+      "production_certified": false,
+      "standard_certified": false,
+      "proof_approval_governance": {
+        "proof_required": false,
+        "proof_available": false,
+        "proof_status": "NOT_REQUIRED",
+        "visual_change_detected": false,
+        "review_required": false,
+        "production_certified": false,
+        "standard_certified": false
+      },
+      "proof_approval_ux_operator_state": "PROOF_NOT_REQUIRED",
+      "proof_approval_ux_customer_state": "PROOF_NOT_REQUIRED",
+      "proof_approval_ux_production_blocked": false
+    },
+    {
+      "name": "2. PROOF_REQUIRED — visual change detected, proof not available, production blocked end-to-end (regression)",
+      "passed": true,
+      "errors": [],
+      "outcome": "FIXED_REVIEW_REQUIRED",
+      "review_required": true,
+      "production_certified": false,
+      "standard_certified": false,
+      "proof_approval_governance": {
+        "proof_required": true,
+        "proof_available": false,
+        "proof_status": "NOT_REQUIRED",
+        "visual_change_detected": true,
+        "review_required": true,
+        "production_certified": false,
+        "standard_certified": false
+      },
+      "proof_approval_ux_operator_state": "PROOF_REQUIRED",
+      "proof_approval_ux_customer_state": "PROOF_REQUIRED",
+      "proof_approval_ux_production_blocked": true
+    },
+    {
+      "name": "3. PROOF_PENDING_CUSTOMER — proof sent to customer, awaiting decision, production blocked end-to-end (regression)",
+      "passed": true,
+      "errors": [],
+      "outcome": "FIXED_REVIEW_REQUIRED",
+      "review_required": true,
+      "production_certified": false,
+      "standard_certified": false,
+      "proof_approval_governance": {
+        "proof_required": true,
+        "proof_available": true,
+        "proof_status": "PENDING",
+        "visual_change_detected": true,
+        "review_required": true,
+        "production_certified": false,
+        "standard_certified": false
+      },
+      "proof_approval_ux_operator_state": "PROOF_PENDING_CUSTOMER",
+      "proof_approval_ux_customer_state": "PROOF_PENDING_CUSTOMER",
+      "proof_approval_ux_production_blocked": true
+    },
+    {
+      "name": "4. PROOF_APPROVED — customer approved proof, visual gate satisfied, no production overclaim end-to-end (regression)",
+      "passed": true,
+      "errors": [],
+      "outcome": "FIXED_REVIEW_REQUIRED",
+      "review_required": true,
+      "production_certified": false,
+      "standard_certified": false,
+      "proof_approval_governance": {
+        "proof_required": true,
+        "proof_available": true,
+        "proof_status": "APPROVED",
+        "visual_change_detected": true,
+        "review_required": false,
+        "production_certified": false,
+        "standard_certified": false
+      },
+      "proof_approval_ux_operator_state": "PROOF_APPROVED",
+      "proof_approval_ux_customer_state": "PROOF_APPROVED",
+      "proof_approval_ux_production_blocked": false
+    },
+    {
+      "name": "5. PROOF_REJECTED_REUPLOAD_REQUIRED — customer rejected proof, production blocked, reupload required end-to-end (regression)",
+      "passed": true,
+      "errors": [],
+      "outcome": "FIXED_REVIEW_REQUIRED",
+      "review_required": true,
+      "production_certified": false,
+      "standard_certified": false,
+      "proof_approval_governance": {
+        "proof_required": true,
+        "proof_available": true,
+        "proof_status": "REJECTED",
+        "visual_change_detected": true,
+        "review_required": true,
+        "production_certified": false,
+        "standard_certified": false
+      },
+      "proof_approval_ux_operator_state": "PROOF_REJECTED_REUPLOAD_REQUIRED",
+      "proof_approval_ux_customer_state": "PROOF_REJECTED_REUPLOAD_REQUIRED",
+      "proof_approval_ux_production_blocked": true
+    },
+    {
+      "name": "6. Conservative merge — REJECTED wins over APPROVED from multiple governance sources end-to-end (regression)",
+      "passed": true,
+      "errors": [],
+      "outcome": "FIXED_REVIEW_REQUIRED",
+      "review_required": true,
+      "production_certified": false,
+      "standard_certified": false,
+      "proof_approval_governance": {
+        "proof_required": true,
+        "proof_available": true,
+        "proof_status": "REJECTED",
+        "visual_change_detected": true,
+        "review_required": true,
+        "production_certified": false,
+        "standard_certified": false
+      },
+      "proof_approval_ux_operator_state": "PROOF_REJECTED_REUPLOAD_REQUIRED",
+      "proof_approval_ux_customer_state": "PROOF_REJECTED_REUPLOAD_REQUIRED",
+      "proof_approval_ux_production_blocked": true
+    },
+    {
+      "name": "7. Multi-source extraction — proof_approval_governance nested in fix_summary propagates end-to-end (regression)",
+      "passed": true,
+      "errors": [],
+      "outcome": "FIXED_REVIEW_REQUIRED",
+      "review_required": true,
+      "production_certified": false,
+      "standard_certified": false,
+      "proof_approval_governance": {
+        "proof_required": true,
+        "proof_available": true,
+        "proof_status": "PENDING",
+        "visual_change_detected": true,
+        "review_required": true,
+        "production_certified": false,
+        "standard_certified": false
+      },
+      "proof_approval_ux_operator_state": "PROOF_PENDING_CUSTOMER",
+      "proof_approval_ux_customer_state": "PROOF_PENDING_CUSTOMER",
+      "proof_approval_ux_production_blocked": true
+    },
+    {
+      "name": "8. Customer output sanitized — proof_id, customer_feedback, raw paths not exposed to customer end-to-end (regression)",
+      "passed": true,
+      "errors": [],
+      "outcome": "FIXED_REVIEW_REQUIRED",
+      "review_required": true,
+      "production_certified": false,
+      "standard_certified": false,
+      "proof_approval_governance": {
+        "proof_required": true,
+        "proof_available": true,
+        "proof_status": "REJECTED",
+        "visual_change_detected": true,
+        "review_required": true,
+        "production_certified": false,
+        "standard_certified": false
+      },
+      "proof_approval_ux_operator_state": "PROOF_REJECTED_REUPLOAD_REQUIRED",
+      "proof_approval_ux_customer_state": "PROOF_REJECTED_REUPLOAD_REQUIRED",
+      "proof_approval_ux_production_blocked": true
+    },
+    {
+      "name": "9. Overclaim regression — PROOF_APPROVED never implies production_certified or standard_certified end-to-end (regression)",
+      "passed": true,
+      "errors": [],
+      "outcome": "FIXED_REVIEW_REQUIRED",
+      "review_required": true,
+      "production_certified": false,
+      "standard_certified": false,
+      "proof_approval_governance": {
+        "proof_required": true,
+        "proof_available": true,
+        "proof_status": "APPROVED",
+        "visual_change_detected": true,
+        "review_required": false,
+        "production_certified": false,
+        "standard_certified": false
+      },
+      "proof_approval_ux_operator_state": "PROOF_APPROVED",
+      "proof_approval_ux_customer_state": "PROOF_APPROVED",
+      "proof_approval_ux_production_blocked": false
+    },
+    {
+      "name": "10. Golden path — complete proof approval lifecycle, all acceptance criteria met end-to-end (regression)",
+      "passed": true,
+      "errors": [],
+      "outcome": "FIXED_REVIEW_REQUIRED",
+      "review_required": true,
+      "production_certified": false,
+      "standard_certified": false,
+      "proof_approval_governance": {
+        "proof_required": true,
+        "proof_available": true,
+        "proof_status": "APPROVED",
+        "visual_change_detected": true,
+        "review_required": false,
+        "production_certified": false,
+        "standard_certified": false
+      },
+      "proof_approval_ux_operator_state": "PROOF_APPROVED",
+      "proof_approval_ux_customer_state": "PROOF_APPROVED",
+      "proof_approval_ux_production_blocked": false
+    }
+  ],
+  "end_to_end": {
+    "phase": "70E — End-to-End Proof Approval Regression",
+    "generated_at": "2026-06-09T18:08:50.041Z",
+    "end_to_end_passed": true,
+    "control_plane_passed": true,
+    "upstream_present": true,
+    "status": "PASS",
+    "layers": [
+      {
+        "layer": "Engine (70A)",
+        "present": true,
+        "passed": true
+      },
+      {
+        "layer": "Worker (70B)",
+        "present": true,
+        "passed": true
+      },
+      {
+        "layer": "Service (70C)",
+        "present": true,
+        "passed": true
+      },
+      {
+        "layer": "Control Plane Proof Approval UX (70D)",
+        "present": true,
+        "passed": true
+      },
+      {
+        "layer": "Control Plane Regression (70E)",
+        "present": true,
+        "passed": true
+      }
+    ],
+    "acceptance_criteria": {
+      "proof_required_when_visual_changes_exist": true,
+      "production_blocked_until_proof_approval": true,
+      "proof_approval_unlocks_only_proof_gate": true,
+      "rejection_triggers_reupload": true,
+      "customer_output_sanitized": true,
+      "conservative_merge_rejected_wins": true,
+      "multi_source_defensive_extraction_correct": true,
+      "proof_approval_no_production_overclaim": true,
+      "proof_approval_no_standards_overclaim": true,
+      "no_raw_paths_or_internal_ids_leak": true,
+      "certified_pdf_downgraded_on_pending_or_rejected": true,
+      "reports_generated_in_each_repo": true,
+      "aggregate_report_generated": true,
+      "all_smoke_tests_pass": true
+    }
+  }
+}

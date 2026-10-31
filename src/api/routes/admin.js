@@ -1,30 +1,12 @@
 // routes/admin.js
 const express = require("express");
-const requireAdmin = require("../middleware/requireAdmin");
-const db = require("../services/db");
+const { requireAdmin, resolveActorContext, requireRole } = require("../middleware/auth");
+const db = require("../services/mysqlClient");
 
 const router = express.Router();
-router.use(requireAdmin);
+router.use(express.json()); // Ensure req.body is parsed for POST requests
 
-// Import sub-routers
-const connectAdminRouter = require('./connectAdmin');
-const routingAdminRouter = require('./routingAdmin');
-const marketplaceAdminRouter = require('./marketplaceAdmin');
-const economicRoutingAdminRouter = require('./economicRoutingAdmin');
-const pricingAdminRouter = require('./pricingAdmin');
-const offersAdminRouter = require('./offersAdmin');
-const negotiationAdminRouter = require('./negotiationAdmin');
-const commercialCommitmentAdminRouter = require('./commercialCommitmentAdmin');
-const autonomyAdminRouter = require('./autonomyAdmin');
-const autonomyFinanceRouter = require('./autonomyFinanceAdmin');
-const adminControlRoutes = require('./adminControl');
-
-router.use((req, res, next) => {
-  console.log(`[DEBUG-ADMIN-ROUTER] Incoming: ${req.method} ${req.originalUrl} | BasePath: ${req.baseUrl} | Path: ${req.path}`);
-  next();
-});
-
-// Test Trace Route
+// PUBLIC DIAGNOSTICS (No Auth)
 router.get('/test-trace', (req, res) => {
   res.json({
     ok: true,
@@ -35,20 +17,508 @@ router.get('/test-trace', (req, res) => {
   });
 });
 
+router.get('/test-headers', (req, res) => {
+  res.json({
+    ok: true,
+    headers: req.headers,
+    authHeaderFound: !!req.headers['authorization'],
+    authHeaderValue: req.headers['authorization'] ? 'PRESENT (HIDDEN)' : 'MISSING'
+  });
+});
+
+router.use(requireAdmin);
+
+// PROTECTED DIAGNOSTICS (Require Auth)
+router.get('/verify', (req, res) => {
+  res.json({
+    ok: true,
+    message: 'Token Validated',
+    user: req.user
+  });
+});
+
+router.get('/routes/debug', (req, res) => {
+  res.json({
+    ok: true,
+    mountedGroups: [
+      '/machines (Forensic Machine Intelligence)',
+      '/connect',
+      '/network',
+      '/routing/economic',
+      '/routing',
+      '/marketplace/ready',
+      '/marketplace',
+      '/governance',
+      '/civilization',
+      '/interplanetary',
+      '/reality',
+      '/singularity',
+      '/pricing',
+      '/offers',
+      '/commercial',
+      '/autonomous',
+      '/finance',
+      '/control',
+      '/intelligence',
+      '/optimization',
+      '/learning',
+      '/optimization-autonomy',
+      '/agents',
+      '/federation',
+      '/global',
+      '/printhouses',
+      '/orders',
+      '/preflight (Jobs & Policies)',
+      '/production/notifications',
+      '/manufacturing/notifications',
+      '/production',
+      '/manufacturing',
+      '/forensics',
+      '/telemetry',
+      '/artifacts',
+      '/workers',
+      '/orchestration',
+      '/provisioning',
+      '/routing/decision',
+      '/dispatch',
+      '/nodes',
+      '/predictive',
+      '/anomaly',
+      '/economic',
+      '/materials',
+      '/audit',
+      '/jobs'
+    ],
+    timestamp: new Date().toISOString()
+  });
+});
+
+router.use((req, res, next) => {
+  const context = resolveActorContext(req);
+  const path = req.path;
+  const method = req.method;
+
+  // 1. Scoped Worker Access Control
+  if (context.role === 'WORKER_AGENT') {
+    const isAllowedMachineEndpoint = 
+      (method === 'POST' && path === '/workers/heartbeat') || 
+      (method === 'POST' && path === '/artifacts/register');
+
+    if (!isAllowedMachineEndpoint) {
+      return res.status(403).json({ 
+        ok: false, 
+        error: { code: 'FORBIDDEN', message: 'Machine account restricted to heartbeat and artifact registration.' } 
+      });
+    }
+  }
+
+  // 1.5 Global Admin Routes Protection
+  const isGlobalAdmin = context.isSuperAdmin || context.role === 'OPS_ADMIN' || context.role === 'SYSTEM_ADMIN';
+  if (!isGlobalAdmin) {
+    const isGlobalOnlyPath = 
+      (path.startsWith('/tenants') && !path.includes('/notification-preferences')) ||
+      (path.startsWith('/audit') && path !== '/audit') ||
+      path.startsWith('/federation') ||
+      path.startsWith('/global') ||
+      path.startsWith('/financial-operations') ||
+      path.startsWith('/financials') ||
+      path.startsWith('/pre-production') ||
+      path.startsWith('/deployment') ||
+      path.startsWith('/operations') ||
+      path.startsWith('/prelaunch') ||
+      path.startsWith('/preproduction') ||
+      path.startsWith('/production/pilot-activation') ||
+      path.startsWith('/production/internal-order-lifecycle') ||
+      path.startsWith('/production/founding-printhouse-pilot') ||
+      path.startsWith('/production/sandbox-commercial-pilot') ||
+      path.startsWith('/production/pilot-evidence-review') ||
+      path.startsWith('/beta') ||
+      path.startsWith('/financial-reconciliation') ||
+      path.startsWith('/cs-workflows') ||
+      path.startsWith('/engagement-signals') ||
+      path.startsWith('/engagement-stats') ||
+      path.startsWith('/routing') ||
+      path === '/routes/debug';
+
+    if (isGlobalOnlyPath) {
+      return res.status(403).json({
+        ok: false,
+        error: { code: 'FORBIDDEN', message: 'Access denied: Route restricted to global system administrators.' }
+      });
+    }
+  }
+
+  // 2. Suppress Noise for frequent endpoints in Production
+  const isFrequent = [
+    '/workers/heartbeat',
+    '/telemetry/industrial',
+    '/production/notifications',
+    '/manufacturing/notifications'
+  ].includes(path);
+
+  const showDebug = process.env.PPOS_DEBUG_ADMIN_ROUTER === 'true';
+
+  if (showDebug && !isFrequent) {
+    console.log(`[DEBUG-ADMIN-ROUTER] Incoming: ${method} ${req.originalUrl} | BasePath: ${req.baseUrl} | Path: ${path}`);
+  }
+
+  next();
+});
+
+// Import sub-routers
+const connectAdminRouter = require('./connectAdmin');
+const routingAdminRouter = require('./routingAdmin');
+const marketplaceAdminRouter = require('./marketplaceAdmin');
+const governanceAdminRouter = require('./governanceAdmin');
+const civilizationAdminRouter = require('./civilizationAdmin');
+const interplanetaryAdminRouter = require('./interplanetaryAdmin');
+const realityAdminRouter = require('./realityAdmin');
+const singularityAdminRouter = require('./singularityAdmin');
+const economicRoutingAdminRouter = require('./economicRoutingAdmin');
+const pricingAdminRouter = require('./pricingAdmin');
+const offersAdminRouter = require('./offersAdmin');
+const negotiationAdminRouter = require('./negotiationAdmin');
+const commercialCommitmentAdminRouter = require('./commercialCommitmentAdmin');
+const autonomyAdminRouter = require('./autonomyAdmin');
+const autonomyFinanceRouter = require('./autonomyFinanceAdmin');
+const adminControlRoutes = require('./adminControl');
+const intelligenceAdminRouter = require('./intelligenceAdmin');
+const optimizationAdminRouter = require('./optimizationAdmin');
+const learningAdminRouter = require('./learningAdmin');
+const optimizationAutonomyAdminRouter = require('./optimizationAutonomyAdmin');
+const agentAdminRouter = require('./agentAdmin');
+const federationAdminRouter = require('./federationAdmin');
+const globalGovernanceAdminRouter = require('./globalGovernanceAdmin');
+const printhousesAdminRouter = require('./printhousesAdmin');
+const printhouseCapabilitiesRouter = require('./printhouseCapabilities');
+const ordersAdminRouter = require('./ordersAdmin');
+const adminPreflightJobsRouter = require('./adminPreflightJobs');
+const preflightAdminRouter = require('./adminPreflight');
+const productionAdminRouter = require('./adminProduction');
+const notificationsRouter = require('./notifications');
+const forensicsAdminRouter = require('./forensicsAdmin');
+const telemetryAdminRouter = require('./telemetryAdmin');
+const artifactAdminRouter = require('./artifactAdmin');
+const workerAdminRouter = require('./workerAdmin');
+const orchestrationAdminRouter = require('./orchestrationAdmin');
+const industrialProvisioningAdminRouter = require('./industrialProvisioningAdmin');
+const industrialRoutingAdminRouter = require('./industrialRoutingAdmin');
+const productionDispatchAdminRouter = require('./productionDispatchAdmin');
+const machineDetailsAdminRouter = require('./machineDetailsAdmin');
+const adminAssetsRouter = require('./adminAssets');
+const adminMarketplaceOrdersRouter = require('./adminMarketplaceOrders');
+const adminMarketplacePrinthouseHandoffRouter = require('./adminMarketplacePrinthouseHandoff');
+const adminTenantGovernanceRouter = require('./adminTenantGovernance');
+const adminTenantPilotRouter = require('./adminTenantPilot');
+const adminTenantBillingRouter = require('./adminTenantBilling');
+const adminProductionMonitoringRouter = require('./adminProductionMonitoring');
+const adminBillingRouter = require('./adminBilling');
+
+// Financial Operations Routers
+const adminFinancialOperationsComplianceReporting = require('./adminFinancialOperationsComplianceReporting');
+const adminFinancialOperationsDataRetentionPrivacy = require('./adminFinancialOperationsDataRetentionPrivacy');
+const adminFinancialOperationsFinalReleaseCandidate = require('./adminFinancialOperationsFinalReleaseCandidate');
+const adminFinancialOperationsGoLiveSimulation = require('./adminFinancialOperationsGoLiveSimulation');
+const adminFinancialOperationsPartnerSandbox = require('./adminFinancialOperationsPartnerSandbox');
+const adminFinancialOperationsPilotMode = require('./adminFinancialOperationsPilotMode');
+const adminFinancialOperationsPreProductionRunbook = require('./adminFinancialOperationsPreProductionRunbook');
+const adminFinancialOperationsProductionActivationReview = require('./adminFinancialOperationsProductionActivationReview');
+const adminFinancialOperationsProductionHardening = require('./adminFinancialOperationsProductionHardening');
+const adminFinancialOperationsProviderContractSla = require('./adminFinancialOperationsProviderContractSla');
+const adminFinancialOperationsProviderCredentialVault = require('./adminFinancialOperationsProviderCredentialVault');
+const adminFinancialOperationsProviderEventReconciliation = require('./adminFinancialOperationsProviderEventReconciliation');
+const adminFinancialOperationsProviderFailureRetry = require('./adminFinancialOperationsProviderFailureRetry');
+const adminFinancialOperationsProviderSandbox = require('./adminFinancialOperationsProviderSandbox');
+const adminFinancialOperationsProviderSettlementFiles = require('./adminFinancialOperationsProviderSettlementFiles');
+const adminFinancialOperationsProviderWebhookSandbox = require('./adminFinancialOperationsProviderWebhookSandbox');
+const adminFinancialOperationsReadiness = require('./adminFinancialOperationsReadiness');
+const adminFinancialOperationsReleaseGates = require('./adminFinancialOperationsReleaseGates');
+const adminFinancialReconciliation = require('./adminFinancialReconciliation');
+const adminGovernedInvoices = require('./adminGovernedInvoices');
+const adminPartnerSettlement = require('./adminPartnerSettlement');
+const adminTaxVatReadiness = require('./adminTaxVatReadiness');
+const adminProductionActivationGateRouter = require('./financialOperationsProductionActivationAdmin');
+const financialOperationsProductionActivationDryRunAdmin = require('./financialOperationsProductionActivationDryRunAdmin');
+const preProductionOperationalReadinessBoardAdmin = require('./preProductionOperationalReadinessBoardAdmin');
+const productionDeploymentReadinessChecklistAdmin = require('./productionDeploymentReadinessChecklistAdmin');
+const productionDeploymentDryRunAdmin = require('./productionDeploymentDryRunAdmin');
+const productionObservabilityIncidentReadinessAdmin = require('./productionObservabilityIncidentReadinessAdmin');
+const prelaunchSecurityComplianceHardeningAdmin = require('./prelaunchSecurityComplianceHardeningAdmin');
+const finalPreproductionReleaseCandidateAdmin = require('./finalPreproductionReleaseCandidateAdmin');
+const controlledProductionPilotActivationAdmin = require('./controlledProductionPilotActivationAdmin');
+const internalOrderLifecyclePilotAdmin = require('./internalOrderLifecyclePilotAdmin');
+const internalOrderLifecycleRuntimeVerificationAdmin = require('./internalOrderLifecycleRuntimeVerificationAdmin');
+const foundingPrinthousePilotGateAdmin = require('./foundingPrinthousePilotGateAdmin');
+const controlledPrinthouseHandoffPackageAdmin = require('./controlledPrinthouseHandoffPackageAdmin');
+const sandboxCommercialPilotAdmin = require('./sandboxCommercialPilotAdmin');
+const pilotEvidenceReviewGoNoGoAdmin = require('./pilotEvidenceReviewGoNoGoAdmin');
+const limitedBetaPreparationGateAdmin = require('./limitedBetaPreparationGateAdmin');
+const limitedBetaRuntimeAdmin = require('./limitedBetaRuntimeAdmin');
+const controlledBetaCohortActivationAdmin = require('./controlledBetaCohortActivationAdmin');
+const controlledBetaRuntimeObservationAdmin = require('./controlledBetaRuntimeObservationAdmin');
+const controlledBetaOperationalReviewAdmin = require('./controlledBetaOperationalReviewAdmin');
+const controlledBetaExpansionPreparationAdmin = require('./controlledBetaExpansionPreparationAdmin');
+const controlledBetaInviteIssuanceAdmin = require('./controlledBetaInviteIssuanceAdmin');
+const controlledBetaInviteAcceptanceAdmin = require('./controlledBetaInviteAcceptanceAdmin');
+const controlledBetaRuntimeSessionAdmin = require('./controlledBetaRuntimeSessionAdmin');
+const controlledBetaRuntimeActivityObservationAdmin = require('./controlledBetaRuntimeActivityObservationAdmin');
+const controlledBetaRuntimeActivityReviewAdmin = require('./controlledBetaRuntimeActivityReviewAdmin');
+const controlledBetaCohortInterventionPreparationAdmin = require('./controlledBetaCohortInterventionPreparationAdmin');
+const controlledBetaCohortInterventionApprovalAdmin = require('./controlledBetaCohortInterventionApprovalAdmin');
+const controlledBetaCohortInterventionExecutionAdmin = require('./controlledBetaCohortInterventionExecutionAdmin');
+const controlledBetaCohortInterventionSimulationReviewAdmin = require('./controlledBetaCohortInterventionSimulationReviewAdmin');
+const controlledBetaCohortInterventionApprovalPreparationAdmin = require('./controlledBetaCohortInterventionApprovalPreparationAdmin');
+const controlledBetaCohortInterventionExecutionReadinessAdmin = require('./controlledBetaCohortInterventionExecutionReadinessAdmin');
+const controlledBetaCohortInterventionExecutionAuthorizationAdmin = require('./controlledBetaCohortInterventionExecutionAuthorizationAdmin');
+const controlledBetaCohortInterventionExecutionEnvelopeAdmin = require('./controlledBetaCohortInterventionExecutionEnvelopeAdmin');
+const controlledBetaCohortInterventionExecutionDispatcherAdmin = require('./controlledBetaCohortInterventionExecutionDispatcherAdmin');
+const controlledBetaCohortInterventionExecutionPlanAdmin = require('./controlledBetaCohortInterventionExecutionPlanAdmin');
+const controlledBetaCohortInterventionExecutionPlanActivationReadinessAdmin = require('./controlledBetaCohortInterventionExecutionPlanActivationReadinessAdmin');
+const controlledBetaCohortInterventionExecutionPlanActivationAuthorizationAdmin = require('./controlledBetaCohortInterventionExecutionPlanActivationAuthorizationAdmin');
+const controlledBetaCohortInterventionExecutionPlanActivationLockAdmin = require('./controlledBetaCohortInterventionExecutionPlanActivationLockAdmin');
+const controlledBetaCohortInterventionExecutionPlanActivationDecisionAdmin = require('./controlledBetaCohortInterventionExecutionPlanActivationDecisionAdmin');
+const controlledBetaCohortInterventionExecutionPlanActivationHandoffAdmin = require('./controlledBetaCohortInterventionExecutionPlanActivationHandoffAdmin');
+const controlledBetaCohortInterventionExecutionPlanActivationTokenAuthAdmin = require('./controlledBetaCohortInterventionExecutionPlanActivationTokenAuthAdmin');
+const controlledBetaCohortInterventionExecutionPlanActivationTokenEnvAdmin = require('./controlledBetaCohortInterventionExecutionPlanActivationTokenEnvAdmin');
+const controlledBetaCohortInterventionExecutionPlanActivationTokenFinalApvAdmin = require('./controlledBetaCohortInterventionExecutionPlanActivationTokenFinalApvAdmin');
+const controlledBetaCohortInterventionExecutionPlanActivationTokenStagingAdmin = require('./controlledBetaCohortInterventionExecutionPlanActivationTokenStagingAdmin');
+const controlledBetaCohortInterventionExecutionPlanActivationTokenPreflightAdmin = require('./controlledBetaCohortInterventionExecutionPlanActivationTokenPreflightAdmin');
+const controlledBetaCohortInterventionExecutionPlanActivationTokenIssuanceAdmin = require('./controlledBetaCohortInterventionExecutionPlanActivationTokenIssuanceAdmin');
+const controlledBetaCohortInterventionExecutionPlanActivationTokenRedemptionReadinessAdmin = require('./controlledBetaCohortInterventionExecutionPlanActivationTokenRedemptionReadinessAdmin');
+const controlledBetaCohortInterventionExecutionPlanActivationTokenRedemptionAuthorizationAdmin = require('./controlledBetaCohortInterventionExecutionPlanActivationTokenRedemptionAuthorizationAdmin');
+const controlledBetaCohortInterventionExecutionPlanActivationTokenRedemptionEnvelopeAdmin = require('./controlledBetaCohortInterventionExecutionPlanActivationTokenRedemptionEnvelopeAdmin');
+const controlledBetaCohortInterventionExecutionPlanActivationTokenRedemptionFinalApprovalAdmin = require('./controlledBetaCohortInterventionExecutionPlanActivationTokenRedemptionFinalApprovalAdmin');
+const controlledBetaCohortInterventionExecutionPlanActivationTokenRedemptionLockAdmin = require('./controlledBetaCohortInterventionExecutionPlanActivationTokenRedemptionLockAdmin');
+const controlledBetaCohortInterventionExecutionPlanActivationTokenRedemptionUnlockEligibilityAdmin = require('./controlledBetaCohortInterventionExecutionPlanActivationTokenRedemptionUnlockEligibilityAdmin');
+const controlledBetaCohortInteremptionExecutionPlanActivationTokenRedemptionUnlockApprovalAdmin = require('./controlledBetaCohortInterventionExecutionPlanActivationTokenRedemptionUnlockApprovalAdmin');
+const controlledBetaCohortInterventionExecutionPlanActivationTokenRedemptionUnlockFinalReviewAdmin = require('./controlledBetaCohortInterventionExecutionPlanActivationTokenRedemptionUnlockFinalReviewAdmin');
+const controlledBetaCohortInterventionExecutionPlanActivationTokenRedemptionUnlockSealAdmin = require('./controlledBetaCohortInterventionExecutionPlanActivationTokenRedemptionUnlockSealAdmin');
+const controlledBetaCohortInterventionExecutionPlanActivationTokenRedemptionUnlockPreExecutionFreezeAdmin = require('./controlledBetaCohortInterventionExecutionPlanActivationTokenRedemptionUnlockPreExecutionFreezeAdmin');
+const controlledBetaCohortInterventionExecutionPlanActivationTokenRedemptionUnlockOperatorAttestationAdmin = require('./controlledBetaCohortInterventionExecutionPlanActivationTokenRedemptionUnlockOperatorAttestationAdmin');
+const controlledBetaCohortInterventionExecutionPlanActivationTokenRedemptionUnlockDualControlAuthorizationAdmin = require('./controlledBetaCohortInterventionExecutionPlanActivationTokenRedemptionUnlockDualControlAuthorizationAdmin');
+const controlledBetaCohortInterventionExecutionPlanActivationTokenRedemptionUnlockFinalHumanAuthorizationSealAdmin = require('./controlledBetaCohortInterventionExecutionPlanActivationTokenRedemptionUnlockFinalHumanAuthorizationSealAdmin');
+const controlledBetaCohortInterventionExecutionPlanActivationTokenRedemptionUnlockComplianceWitnessAdmin = require('./controlledBetaCohortInterventionExecutionPlanActivationTokenRedemptionUnlockComplianceWitnessAdmin');
+const controlledBetaCohortInterventionExecutionPlanActivationTokenRedemptionUnlockRiskOfficerCountersignAdmin = require('./controlledBetaCohortInterventionExecutionPlanActivationTokenRedemptionUnlockRiskOfficerCountersignAdmin');
+const controlledBetaCohortInterventionExecutionPlanActivationTokenRedemptionUnlockLegalPolicyHoldAdmin = require('./controlledBetaCohortInterventionExecutionPlanActivationTokenRedemptionUnlockLegalPolicyHoldAdmin');
+const controlledBetaCohortInterventionExecutionPlanActivationTokenRedemptionUnlockEmergencyRollbackAuthorityAdmin = require('./controlledBetaCohortInterventionExecutionPlanActivationTokenRedemptionUnlockEmergencyRollbackAuthorityAdmin');
+const controlledBetaCohortInterventionExecutionPlanActivationTokenRedemptionUnlockKillSwitchDryRunAdmin = require('./controlledBetaCohortInterventionExecutionPlanActivationTokenRedemptionUnlockKillSwitchDryRunAdmin');
+const controlledBetaCohortInterventionExecutionPlanActivationTokenRedemptionUnlockFinalNonExecutionEvidenceSealAdmin = require('./controlledBetaCohortInterventionExecutionPlanActivationTokenRedemptionUnlockFinalNonExecutionEvidenceSealAdmin');
+const controlledBetaCohortInterventionExecutionPlanActivationTokenRedemptionUnlockGovernanceReadinessClosureAdmin = require('./controlledBetaCohortInterventionExecutionPlanActivationTokenRedemptionUnlockGovernanceReadinessClosureAdmin');
+
+
+
+
 /**
- * Mount Sub-routers (Top Priority)
+ * Mount Sub-routers (Core)
  */
-router.use('/network', connectAdminRouter);
-router.use('/routing/economic', economicRoutingAdminRouter); // Important: more specific first
+
+// Moved Financial Operations and Root catch-alls to the bottom of the router mounts
+
+router.use('/beta/runtime-observation', controlledBetaRuntimeObservationAdmin);
+router.use('/beta/operational-review', controlledBetaOperationalReviewAdmin);
+router.use('/beta/expansion-preparation', controlledBetaExpansionPreparationAdmin);
+router.use('/beta/invite-issuance', controlledBetaInviteIssuanceAdmin);
+router.use('/beta/invite-acceptance', controlledBetaInviteAcceptanceAdmin);
+router.use('/beta/runtime-sessions', controlledBetaRuntimeSessionAdmin);
+router.use('/beta/runtime-activity', controlledBetaRuntimeActivityObservationAdmin);
+router.use('/beta/runtime-reviews', controlledBetaRuntimeActivityReviewAdmin);
+router.use('/beta/cohort-interventions', controlledBetaCohortInterventionPreparationAdmin);
+router.use('/beta/cohort-intervention-approvals', controlledBetaCohortInterventionApprovalAdmin);
+router.use('/beta/cohort-intervention-executions', controlledBetaCohortInterventionExecutionAdmin);
+router.use('/beta/cohort-intervention-simulation-reviews', controlledBetaCohortInterventionSimulationReviewAdmin);
+router.use('/beta/cohort-intervention-approval-preparations', controlledBetaCohortInterventionApprovalPreparationAdmin);
+router.use('/beta/cohort-intervention-readiness', controlledBetaCohortInterventionExecutionReadinessAdmin);
+router.use('/beta/cohort-intervention-auth', controlledBetaCohortInterventionExecutionAuthorizationAdmin);
+router.use('/beta/cohort-intervention-envelope', controlledBetaCohortInterventionExecutionEnvelopeAdmin);
+router.use('/beta/cohort-intervention-dispatcher', controlledBetaCohortInterventionExecutionDispatcherAdmin);
+router.use('/beta/cohort-intervention-plan', controlledBetaCohortInterventionExecutionPlanAdmin);
+router.use('/beta/cohort-intervention-activation-readiness', controlledBetaCohortInterventionExecutionPlanActivationReadinessAdmin);
+router.use('/beta/cohort-intervention-activation-authorization', controlledBetaCohortInterventionExecutionPlanActivationAuthorizationAdmin);
+router.use('/beta/cohort-intervention-activation-lock', controlledBetaCohortInterventionExecutionPlanActivationLockAdmin);
+router.use('/beta/cohort-intervention-activation-decision', controlledBetaCohortInterventionExecutionPlanActivationDecisionAdmin);
+router.use('/beta/cohort-intervention-activation-handoff', controlledBetaCohortInterventionExecutionPlanActivationHandoffAdmin);
+router.use('/beta/cohort-intervention-activation-token-auth', controlledBetaCohortInterventionExecutionPlanActivationTokenAuthAdmin);
+router.use('/beta/cohort-intervention-activation-token-env', controlledBetaCohortInterventionExecutionPlanActivationTokenEnvAdmin);
+router.use('/beta/cohort-intervention-activation-token-final-apv', controlledBetaCohortInterventionExecutionPlanActivationTokenFinalApvAdmin);
+router.use('/beta/cohort-intervention-activation-token-staging', controlledBetaCohortInterventionExecutionPlanActivationTokenStagingAdmin);
+router.use('/beta/cohort-intervention-activation-token-preflight', controlledBetaCohortInterventionExecutionPlanActivationTokenPreflightAdmin);
+router.use('/beta/cohort-intervention-activation-token-issuance', controlledBetaCohortInterventionExecutionPlanActivationTokenIssuanceAdmin);
+router.use('/beta/cohort-intervention-activation-token-redemption-readiness', controlledBetaCohortInterventionExecutionPlanActivationTokenRedemptionReadinessAdmin);
+router.use('/beta/cohort-intervention-activation-token-redemption-authorization', controlledBetaCohortInterventionExecutionPlanActivationTokenRedemptionAuthorizationAdmin);
+router.use('/beta/cohort-intervention-activation-token-redemption-envelope', controlledBetaCohortInterventionExecutionPlanActivationTokenRedemptionEnvelopeAdmin);
+router.use('/beta/cohort-intervention-activation-token-redemption-final-approval', controlledBetaCohortInterventionExecutionPlanActivationTokenRedemptionFinalApprovalAdmin);
+router.use('/beta/cohort-intervention-activation-token-redemption-lock', controlledBetaCohortInterventionExecutionPlanActivationTokenRedemptionLockAdmin);
+router.use('/beta/cohort-intervention-activation-token-redemption-unlock-eligibility', controlledBetaCohortInterventionExecutionPlanActivationTokenRedemptionUnlockEligibilityAdmin);
+router.use('/beta/cohort-intervention-activation-token-redemption-unlock-approval', controlledBetaCohortInteremptionExecutionPlanActivationTokenRedemptionUnlockApprovalAdmin);
+router.use('/beta/cohort-intervention-activation-token-redemption-unlock-final-review', controlledBetaCohortInterventionExecutionPlanActivationTokenRedemptionUnlockFinalReviewAdmin);
+router.use('/beta/cohort-intervention-activation-token-redemption-unlock-seal', controlledBetaCohortInterventionExecutionPlanActivationTokenRedemptionUnlockSealAdmin);
+router.use('/beta/cohort-intervention-activation-token-redemption-unlock-pre-execution-freeze', controlledBetaCohortInterventionExecutionPlanActivationTokenRedemptionUnlockPreExecutionFreezeAdmin);
+router.use('/beta/cohort-intervention-activation-token-redemption-unlock-operator-attestation', controlledBetaCohortInterventionExecutionPlanActivationTokenRedemptionUnlockOperatorAttestationAdmin);
+router.use('/beta/cohort-intervention-activation-token-redemption-unlock-dual-control-authorization', controlledBetaCohortInterventionExecutionPlanActivationTokenRedemptionUnlockDualControlAuthorizationAdmin);
+router.use('/beta/cohort-intervention/activation-token-redemption-unlock-final-human-authorization-seal', controlledBetaCohortInterventionExecutionPlanActivationTokenRedemptionUnlockFinalHumanAuthorizationSealAdmin);
+router.use('/beta/cohort-intervention/activation-token-redemption-unlock-compliance-witness', controlledBetaCohortInterventionExecutionPlanActivationTokenRedemptionUnlockComplianceWitnessAdmin);
+router.use('/beta/cohort-intervention/activation-token-redemption-unlock-risk-officer-countersign', controlledBetaCohortInterventionExecutionPlanActivationTokenRedemptionUnlockRiskOfficerCountersignAdmin);
+router.use('/beta/cohort-intervention/activation-token-redemption-unlock-legal-policy-hold', controlledBetaCohortInterventionExecutionPlanActivationTokenRedemptionUnlockLegalPolicyHoldAdmin);
+router.use('/beta/cohort-intervention/activation-token-redemption-unlock-emergency-rollback-authority', controlledBetaCohortInterventionExecutionPlanActivationTokenRedemptionUnlockEmergencyRollbackAuthorityAdmin);
+router.use('/beta/cohort-intervention/activation-token-redemption-unlock-kill-switch-dry-run', controlledBetaCohortInterventionExecutionPlanActivationTokenRedemptionUnlockKillSwitchDryRunAdmin);
+router.use('/beta/cohort-intervention/activation-token-redemption-unlock-final-non-execution-evidence-seal', controlledBetaCohortInterventionExecutionPlanActivationTokenRedemptionUnlockFinalNonExecutionEvidenceSealAdmin);
+router.use('/beta/cohort-intervention/activation-token-redemption-unlock-governance-readiness-closure', controlledBetaCohortInterventionExecutionPlanActivationTokenRedemptionUnlockGovernanceReadinessClosureAdmin);
+
+
+// Phase 141 — Restricted High-Risk Cohort Intervention Simulation Gate
+(() => {
+  const simulationBuilderSvc = require('../services/cohortInterventionSimulationBuilderService').serviceInstance || require('../services/cohortInterventionSimulationBuilderService');
+  const simulationImpactSvc = require('../services/cohortInterventionSimulationImpactAnalysisService').serviceInstance || require('../services/cohortInterventionSimulationImpactAnalysisService');
+  const simulationRollbackSvc = require('../services/cohortInterventionSimulationRollbackPreviewService').serviceInstance || require('../services/cohortInterventionSimulationRollbackPreviewService');
+  const simulationOperatorSvc = require('../services/cohortInterventionSimulationOperatorConfirmationService').serviceInstance || require('../services/cohortInterventionSimulationOperatorConfirmationService');
+  const simulationRunnerSvc = require('../services/cohortInterventionSimulationRunnerService').serviceInstance || require('../services/cohortInterventionSimulationRunnerService');
+  const simulationEvidenceSvc = require('../services/cohortInterventionSimulationEvidencePackService').serviceInstance || require('../services/cohortInterventionSimulationEvidencePackService');
+
+  // POST /api/admin/beta/cohort-intervention-simulations — create simulation from Phase 140 execution
+  router.post('/beta/cohort-intervention-simulations', resolveActorContext, async (req, res) => {
+    try {
+      const { execution_id, simulation_type } = req.body;
+      if (!execution_id || !simulation_type) {
+        return res.status(400).json({ error: 'execution_id and simulation_type are required' });
+      }
+      const result = await simulationBuilderSvc.createSimulation(execution_id, simulation_type, req.actorId || 'admin');
+      res.status(201).json({ ok: true, ...result });
+    } catch (e) {
+      res.status(400).json({ error: e.message });
+    }
+  });
+
+  // GET /api/admin/beta/cohort-intervention-simulations/:id
+  router.get('/beta/cohort-intervention-simulations/:id', async (req, res) => {
+    try {
+      const simulation = await simulationBuilderSvc.getSimulation(req.params.id);
+      if (!simulation) return res.status(404).json({ error: 'Simulation not found' });
+      const steps = await simulationBuilderSvc.getSteps(req.params.id);
+      res.json({ ok: true, simulation, steps });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // POST /api/admin/beta/cohort-intervention-simulations/:id/impact-analysis
+  router.post('/beta/cohort-intervention-simulations/:id/impact-analysis', resolveActorContext, async (req, res) => {
+    try {
+      const result = await simulationImpactSvc.generateImpactAnalysis(req.params.id, req.actorId || 'admin');
+      res.json({ ok: true, ...result });
+    } catch (e) {
+      res.status(400).json({ error: e.message });
+    }
+  });
+
+  // POST /api/admin/beta/cohort-intervention-simulations/:id/rollback-preview
+  router.post('/beta/cohort-intervention-simulations/:id/rollback-preview', resolveActorContext, async (req, res) => {
+    try {
+      const result = await simulationRollbackSvc.generateRollbackPreview(req.params.id, req.actorId || 'admin');
+      res.json({ ok: true, ...result });
+    } catch (e) {
+      res.status(400).json({ error: e.message });
+    }
+  });
+
+  // POST /api/admin/beta/cohort-intervention-simulations/:id/operator-confirmation
+  router.post('/beta/cohort-intervention-simulations/:id/operator-confirmation', resolveActorContext, async (req, res) => {
+    try {
+      const { signatory_name, confirmation_phrase } = req.body;
+      const result = await simulationOperatorSvc.confirmSimulation(req.params.id, req.actorId || 'admin', signatory_name, confirmation_phrase);
+      res.json({ ok: true, ...result });
+    } catch (e) {
+      res.status(400).json({ error: e.message });
+    }
+  });
+
+  // POST /api/admin/beta/cohort-intervention-simulations/:id/run
+  router.post('/beta/cohort-intervention-simulations/:id/run', resolveActorContext, async (req, res) => {
+    try {
+      const result = await simulationRunnerSvc.runSimulation(req.params.id, req.actorId || 'admin');
+      res.json({ ok: true, ...result });
+    } catch (e) {
+      res.status(400).json({ error: e.message });
+    }
+  });
+
+  // GET /api/admin/beta/cohort-intervention-simulations/:id/evidence
+  router.get('/beta/cohort-intervention-simulations/:id/evidence', async (req, res) => {
+    try {
+      const evidence = await simulationEvidenceSvc.getEvidence(req.params.id);
+      if (!evidence) return res.status(404).json({ error: 'Evidence not found' });
+      res.json({ ok: true, evidence });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+})();
+
 router.use('/routing', routingAdminRouter);
-router.use('/marketplace/ready', negotiationAdminRouter); // Important: more specific first
 router.use('/marketplace', marketplaceAdminRouter);
+router.use('/governance', governanceAdminRouter);
+router.use('/civilization', civilizationAdminRouter);
+router.use('/interplanetary', interplanetaryAdminRouter);
+router.use('/reality', realityAdminRouter);
+router.use('/singularity', singularityAdminRouter);
 router.use('/pricing', pricingAdminRouter);
 router.use('/offers', offersAdminRouter);
 router.use('/commercial', commercialCommitmentAdminRouter);
-router.use('/autonomy', autonomyAdminRouter);
+router.use('/autonomous', autonomyAdminRouter);
 router.use('/finance', autonomyFinanceRouter);
 router.use('/control', adminControlRoutes);
+router.use('/intelligence', intelligenceAdminRouter);
+router.use('/optimization', optimizationAdminRouter);
+router.use('/learning', learningAdminRouter);
+router.use('/optimization-autonomy', optimizationAutonomyAdminRouter);
+router.use('/agents', agentAdminRouter);
+router.use('/federation', federationAdminRouter);
+router.use('/global', globalGovernanceAdminRouter);
+router.use('/printhouses', printhousesAdminRouter);
+router.use('/printhouse-capabilities', printhouseCapabilitiesRouter);
+router.get('/machine-templates', async (req, res) => {
+  try {
+    const query = (req.query.q || '').trim().toLowerCase();
+    const templates = printhouseCapabilitiesRouter.MACHINE_TEMPLATES || [];
+    const filtered = templates.filter(t => 
+        (t.manufacturer || '').toLowerCase().includes(query) || 
+        (t.model || '').toLowerCase().includes(query)
+    );
+    res.json({ ok: true, templates: filtered });
+  } catch (err) {
+    console.error('[ADMIN-ROUTER] Error listing templates:', err);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+router.use('/orders', ordersAdminRouter);
+router.use('/preflight', adminPreflightJobsRouter);
+router.use('/preflight', preflightAdminRouter);
+router.use('/notifications', require('./adminNotifications'));
+router.use('/production/notifications', notificationsRouter);
+router.use('/manufacturing/notifications', notificationsRouter);
+router.use('/production', productionAdminRouter);
+router.use('/manufacturing', productionAdminRouter);
+router.use('/forensics', forensicsAdminRouter);
+router.use('/telemetry', telemetryAdminRouter);
+router.use('/artifacts', artifactAdminRouter);
+router.use('/workers', workerAdminRouter);
+router.use('/orchestration', orchestrationAdminRouter);
+router.use('/provisioning', industrialProvisioningAdminRouter);
+router.use('/routing/decision', industrialRoutingAdminRouter); // Autonomous Routing
+router.use('/dispatch', productionDispatchAdminRouter); // Execution Layer
+router.use('/assets', adminAssetsRouter); // Production Asset Management
+router.use('/nodes', require('./printNodeAgentAdmin')); // Agent Layer
+router.use('/predictive', require('./predictiveAdmin')); // Forecasting Layer
+router.use('/anomaly', require('./anomalyAdmin')); // Anomaly & Drift Layer
+router.use('/economic', require('./economicAdmin')); // Economic Optimization Layer
+router.use('/machines', require('./machinesAdmin')); // Machine Fleet Layer
+router.use('/materials', require('./materialsAdmin')); // Materials & Paper Catalog
+router.use('/audit', require('./auditExplorerAdmin')); // Forensic Audit Explorer
+router.use('/jobs', require('./jobsAdmin')); // Forensic Jobs Observability Layer
+router.use('/dashboard', require('./adminDashboard')); // Production Mission Control Layer
+router.use('/printhouse/dashboard', require('./printhouseDashboard')); // Dedicated Printhouse Dashboard API
+router.use('/observability', require('./adminOnboardingObservability')); // Phase 6: De-mocking Observability
+
+
 
 function rangeToInterval(range) {
   // soporta: 24h, 7d, 30d
@@ -60,12 +530,22 @@ function rangeToInterval(range) {
   }
 }
 
+
 // GET /api/admin/metrics/overview?range=24h
 router.get("/metrics/overview", async (req, res) => {
   const interval = rangeToInterval(req.query.range);
+  const context = resolveActorContext(req);
+  
+  let filterSql = '';
+  const params = [];
+  
+  if (context.isPrinthouseUser) {
+    filterSql = 'AND printhouse_id = ?';
+    params.push(context.printhouseId);
+  }
 
   try {
-    const { rows: [overview] } = await db.query(
+    const overviewRows = await db.query(
       `
       SELECT 
         COUNT(*) as total_jobs,
@@ -78,11 +558,14 @@ router.get("/metrics/overview", async (req, res) => {
         AVG(risk_score_before) as avg_risk_before,
         AVG(risk_score_after) as avg_risk_after
       FROM metrics
-      WHERE created_at >= NOW() - ${interval};
-      `
+      WHERE created_at >= NOW() - ${interval} ${filterSql};
+      `,
+      params
     );
 
-    const { rows: [improve] } = await db.query(
+    const overview = overviewRows[0] || {};
+
+    const improveRows = await db.query(
       `
       SELECT 
         ((SUM(CASE WHEN delta_score > 0 THEN 1 ELSE 0 END) / NULLIF(COUNT(*),0)) * 100) as improvement_rate
@@ -91,15 +574,18 @@ router.get("/metrics/overview", async (req, res) => {
         AND created_at >= NOW() - ${interval};
       `
     );
+    const improve = improveRows[0] || {};
 
-    const { rows: [queueStats] } = await db.query(
+    const queueStatsRows = await db.query(
       `
       SELECT 
         SUM(CASE WHEN status IN ('QUEUED', 'RUNNING', 'FAILED') THEN 1 ELSE 0 END) as backlog,
+        SUM(CASE WHEN status = 'RUNNING' THEN 1 ELSE 0 END) as active_jobs,
         COALESCE(TIMESTAMPDIFF(SECOND, MIN(CASE WHEN status = 'QUEUED' THEN created_at ELSE NULL END), NOW()), 0) as oldest_age_seconds
       FROM jobs;
       `
     );
+    const queueStats = queueStatsRows[0] || {};
 
     res.json({
       totalJobs: Number(overview.total_jobs || 0),
@@ -114,6 +600,7 @@ router.get("/metrics/overview", async (req, res) => {
       avgRiskBefore: Number(overview.avg_risk_before || 0),
       avgRiskAfter: Number(overview.avg_risk_after || 0),
       queueBacklog: Number(queueStats?.backlog || 0),
+      activeJobs: Number(queueStats?.active_jobs || 0),
       oldestAgeSeconds: Number(queueStats?.oldest_age_seconds || 0)
     });
   } catch (err) {
@@ -127,7 +614,7 @@ router.get("/metrics/tenants", async (req, res) => {
   const interval = rangeToInterval(req.query.range || "7d");
 
   try {
-    const { rows } = await db.query(
+    const rows = await db.query(
       `
       SELECT 
         tenant_id,
@@ -163,17 +650,20 @@ router.get("/metrics/tenants", async (req, res) => {
 // GET /api/admin/tenants - Detailed tenant list for management (Phase 19)
 router.get("/tenants", async (req, res) => {
   try {
-    const { rows } = await db.query(`
+    const rows = await db.query(`
       SELECT 
         id, name, status, plan, rate_limit_rpm, 
         plan_expires_at, last_active_at, daily_job_limit, 
-        max_batch_size, created_at, metadata_json
+        max_batch_size, created_at, metadata_json,
+        plan_code, commercial_status, access_level,
+        grace_started_at, grace_ends_at, grace_extended_until,
+        limits_json, entitlements_json, module_access_json, governance_notes_json
       FROM tenants
       ORDER BY last_active_at DESC, created_at DESC;
     `);
 
     // Fetch API Keys count per tenant
-    const { rows: keyCounts } = await db.query(`
+    const keyCounts = await db.query(`
       SELECT tenant_id, COUNT(*) as key_count
       FROM api_keys
       WHERE revoked = FALSE
@@ -181,7 +671,7 @@ router.get("/tenants", async (req, res) => {
     `);
 
     // Fetch Daily Job Usage (Phase 19.5)
-    const { rows: usageCounts } = await db.query(`
+    const usageCounts = await db.query(`
       SELECT tenant_id, COUNT(*) as daily_count
       FROM jobs
       WHERE created_at >= CURDATE()
@@ -217,7 +707,7 @@ router.post("/tenants/:id", async (req, res) => {
 
   try {
     // 1. Get current state for history (Phase 20)
-    const { rows: [current] } = await db.query('SELECT plan, status FROM tenants WHERE id = ?', [id]);
+    const [current] = await db.query('SELECT plan, status FROM tenants WHERE id = ?', [id]);
     if (!current) return res.status(404).json({ ok: false, error: 'Tenant not found' });
 
     // 2. Perform Update
@@ -266,7 +756,7 @@ router.get("/tenants/:id/usage", async (req, res) => {
   const days = Math.min(Number(req.query.days || 7), 30);
 
   try {
-    const { rows } = await db.query(`
+    const rows = await db.query(`
       SELECT date, jobs_count, batches_count, value_generated, hours_saved
       FROM tenant_usage_stats
       WHERE tenant_id = ?
@@ -286,7 +776,7 @@ router.get("/tenants/:id/timeline", async (req, res) => {
   const { id } = req.params;
 
   try {
-    const { rows } = await db.query(`
+    const rows = await db.query(`
       (SELECT 'ALERT' as type, alert_type as event, details_json as details, created_at as timestamp 
        FROM tenant_alerts_history WHERE tenant_id = ?)
       UNION ALL
@@ -327,7 +817,7 @@ router.get("/tenants/:id/billing/:year/:month", async (req, res) => {
     const nextDayDate = new Date(new Date(endDate).getTime() + 24 * 60 * 60 * 1000).toISOString().split('T')[0];
     const endTsLimit = `${nextDayDate} 00:00:00`;
 
-    const { rows: stats } = await db.query(`
+    const stats = await db.query(`
       SELECT 
         SUM(jobs_count) as total_jobs,
         SUM(batches_count) as total_batches,
@@ -345,11 +835,11 @@ router.get("/tenants/:id/billing/:year/:month", async (req, res) => {
     `, [id, startDate, nextDayDate, id, startDate, nextDayDate, id, startDate, nextDayDate]);
 
     // Enhanced metrics: Policy distribution (as object)
-    const { rows: policies } = await db.query(`
-      SELECT policy_slug, COUNT(*) as count
-      FROM audit_logs
+    const policies = await db.query(`
+      SELECT JSON_EXTRACT(metadata_json, '$.policy_slug') as policy_slug, COUNT(*) as count
+      FROM api_audit_logs
       WHERE tenant_id = ? AND created_at >= ? AND created_at < ?
-        AND policy_slug IS NOT NULL
+        AND JSON_EXTRACT(metadata_json, '$.policy_slug') IS NOT NULL
       GROUP BY policy_slug
       ORDER BY count DESC
     `, [id, startTs, endTsLimit]);
@@ -382,64 +872,14 @@ router.get("/tenants/:id/billing/:year/:month", async (req, res) => {
   }
 });
 
-// GET /api/admin/jobs?status=FAILED&tenant=...&limit=50&offset=0
-router.get("/jobs", async (req, res) => {
-  const status = req.query.status || null;
-  const limit = Math.min(Number(req.query.limit || 50), 200);
-  const offset = Math.max(Number(req.query.offset || 0), 0);
-
-  try {
-    const queueOperator = require("../adapters/queueOperator");
-    
-    // Phase 7.3: Fetch real jobs from BullMQ
-    const realJobs = await queueOperator.getJobs(undefined, limit, offset);
-    
-    if (realJobs && realJobs.length > 0) {
-      const stats = await queueOperator.getAdminStats();
-      const queueStat = stats.queues[0] || {};
-      
-      return res.json({
-        total: queueStat.size || realJobs.length,
-        jobs: realJobs.map(j => ({
-          id: j.id,
-          tenant_id: j.data?.tenantId || 'system',
-          type: j.name,
-          status: j.status,
-          progress: j.progress || 0,
-          error: j.error,
-          created_at: j.created_at,
-          updated_at: j.finished_at || j.created_at
-        }))
-      });
-    }
-
-    // Fallback to mock / DB logic
-    const { rows: [countRow] } = await db.query(
-      `SELECT COUNT(*) as total FROM jobs;`,
-      []
-    );
-
-    const { rows } = await db.query(
-      `SELECT id, tenant_id, type, status, progress, error, created_at, updated_at FROM jobs LIMIT ? OFFSET ?;`,
-      [limit, offset]
-    );
-
-    res.json({
-      total: Number(countRow?.total || 0),
-      jobs: rows
-    });
-  } catch (err) {
-    console.error('[ADMIN-API] Error in Jobs API:', err);
-    res.status(500).json({ ok: false, error: err.message });
-  }
-});
+// GET /api/admin/jobs implementation delegated to jobsAdmin.js router
 
 // GET /api/admin/errors/top?range=24h
 router.get("/errors/top", async (req, res) => {
   const interval = rangeToInterval(req.query.range || "7d");
 
   try {
-    const { rows } = await db.query(
+    const rows = await db.query(
       `
     SELECT
     COALESCE(JSON_UNQUOTE(JSON_EXTRACT(error, '$.code')), 'UNKNOWN') as error_code,
@@ -466,59 +906,7 @@ router.get("/errors/top", async (req, res) => {
   }
 });
 
-// GET /api/admin/audit?tenant_id=...&limit=100
-router.get("/audit", async (req, res) => {
-  const tenant = req.query.tenant_id || null;
-  const jobId = req.query.job_id || null;
-  const requestId = req.query.request_id || null;
-  const action = req.query.action || null;
-  const limit = Math.min(Number(req.query.limit || 100), 500);
-
-  const where = [];
-  const params = [];
-
-  if (tenant) { where.push("tenant_id = ?"); params.push(tenant); }
-  if (jobId) { where.push("resource_id = ? AND resource_type = 'JOB'"); params.push(jobId); }
-  if (requestId) { where.push("request_id = ?"); params.push(requestId); }
-  if (action) { where.push("action = ?"); params.push(action); }
-
-  const whereSql = where.length ? `WHERE ${where.join(" AND ")} ` : "";
-
-  try {
-    const { rows } = await db.query(
-      `
-      SELECT 
-        id, request_id, tenant_id, deployment_id, action, 
-        resource_type, resource_id as job_id, ip_address, 
-        user_role, governance_snapshot, created_at
-      FROM api_audit_log
-      ${whereSql}
-      ORDER BY created_at DESC
-      LIMIT ?;
-    `,
-      [...params, limit]
-    );
-
-    res.json(rows);
-  } catch (err) {
-    console.error('[ADMIN-API] Error fetching audit logs:', err);
-    res.status(500).json({ ok: false, error: err.message });
-  }
-});
-
-// GET /api/admin/audit/:requestId - Detailed trace for a specific correlation key
-router.get("/audit/trace/:requestId", async (req, res) => {
-  const { requestId } = req.params;
-  try {
-    const { rows } = await db.query(
-      `SELECT * FROM api_audit_log WHERE request_id = ? ORDER BY created_at ASC`,
-      [requestId]
-    );
-    res.json(rows);
-  } catch (err) {
-    res.status(500).json({ ok: false, error: err.message });
-  }
-});
+// Delegated to canonical auditExplorerAdmin router mounted at top priority under /audit
 
 // GET /api/admin/queue  (stats BullMQ)
 router.get("/queue", async (_req, res) => {
@@ -544,7 +932,7 @@ router.post("/help/analytics", async (req, res) => {
   }
 
   try {
-    const { rows } = await db.query(
+    const result = await db.query(
       `
       INSERT INTO audit_help_analytics(event_type, article_id, search_query, tenant_id, user_id)
     VALUES(?, ?, ?, ?, ?)
@@ -552,93 +940,14 @@ router.post("/help/analytics", async (req, res) => {
       [event_type, article_id || null, search_query || null, tenant_id || null, user_id || null]
     );
 
-    res.json({ ok: true, id: rows.insertId });
+    res.json({ ok: true, id: result.insertId });
   } catch (err) {
     console.error('[ADMIN-API] Error saving help analytics:', err);
     res.status(500).json({ ok: false, error: err.message });
   }
 });
 
-/**
- * PHASE 21.1: Notification Management
- */
 
-// GET /api/admin/notifications
-router.get("/notifications", async (req, res) => {
-  const { tenant_id, status, event_type, channel, limit = 50, offset = 0 } = req.query;
-  const where = [];
-  const params = [];
-
-  if (tenant_id) { where.push("tenant_id = ?"); params.push(tenant_id); }
-  if (status) { where.push("status = ?"); params.push(status); }
-  if (event_type) { where.push("event_type = ?"); params.push(event_type); }
-  if (channel) { where.push("channel = ?"); params.push(channel); }
-
-  const whereSql = where.length ? `WHERE ${where.join(" AND ")}` : "";
-
-  try {
-    const { rows: notifications } = await db.query(`
-      SELECT * FROM notifications 
-      ${whereSql} 
-      ORDER BY created_at DESC 
-      LIMIT ? OFFSET ?
-    `, [...params, Number(limit), Number(offset)]);
-
-    const { rows: [count] } = await db.query(`SELECT COUNT(*) as total FROM notifications ${whereSql}`, params);
-
-    res.json({
-      ok: true,
-      notifications,
-      total: count.total
-    });
-  } catch (err) {
-    console.error('[ADMIN-API] Error fetching notifications:', err);
-    res.status(500).json({ ok: false, error: err.message });
-  }
-});
-
-// GET /api/admin/notifications/:id
-router.get("/notifications/:id", async (req, res) => {
-  try {
-    const { rows: [notification] } = await db.query("SELECT * FROM notifications WHERE id = ?", [req.params.id]);
-    if (!notification) return res.status(404).json({ ok: false, error: "Not found" });
-
-    const { rows: events } = await db.query("SELECT * FROM notification_events WHERE notification_id = ? ORDER BY created_at ASC", [req.params.id]);
-
-    res.json({
-      ok: true,
-      notification,
-      events
-    });
-  } catch (err) {
-    res.status(500).json({ ok: false, error: err.message });
-  }
-});
-
-// POST /api/admin/notifications/:id/resend
-router.post("/notifications/:id/resend", async (req, res) => {
-  try {
-    const { rows: [notification] } = await db.query("SELECT * FROM notifications WHERE id = ?", [req.params.id]);
-    if (!notification) return res.status(404).json({ ok: false, error: "Not found" });
-
-    // Mark as pending and reset attempts
-    await db.query("UPDATE notifications SET status = 'PENDING', attempt_count = 0, last_error = NULL WHERE id = ?", [req.params.id]);
-
-    // Track resent event
-    await db.query(`
-        INSERT INTO notification_events (notification_id, event, metadata_json)
-        VALUES (?, ?, ?)
-    `, [req.params.id, 'NOTIFICATION_RESENT', JSON.stringify({ trigger: 'admin_manual' })]);
-
-    // Re-enqueue
-    const queue = require("../services/queue");
-    await queue.notificationQueue.add('deliver', { notificationId: req.params.id });
-
-    res.json({ ok: true, message: "Notification re-enqueued for delivery." });
-  } catch (err) {
-    res.status(500).json({ ok: false, error: err.message });
-  }
-});
 
 // POST /api/admin/notifications/:id/cancel
 router.post("/notifications/:id/cancel", async (req, res) => {
@@ -657,9 +966,20 @@ router.post("/notifications/:id/cancel", async (req, res) => {
 
 // GET /api/admin/tenants/:id/notification-preferences
 router.get("/tenants/:id/notification-preferences", async (req, res) => {
+  const context = resolveActorContext(req);
+  const targetTenantId = req.params.id;
+
+  if (!context.isSuperAdmin && context.tenantId !== targetTenantId) {
+    return res.status(403).json({ ok: false, error: "FORBIDDEN: Cross-tenant notification preference access denied" });
+  }
+
   try {
-    const { rows: [prefs] } = await db.query("SELECT * FROM tenant_notification_preferences WHERE tenant_id = ?", [req.params.id]);
-    res.json({ ok: true, prefs: prefs || null });
+    const rows = await db.query("SELECT * FROM tenant_notification_preferences WHERE tenant_id = ?", [targetTenantId]);
+    let prefs = (rows && rows.length > 0) ? rows[0] : null;
+    if (prefs) {
+      prefs.email_enabled = Boolean(prefs.email_order_alerts || prefs.email_qc_alerts || prefs.email_sla_alerts);
+    }
+    res.json({ ok: true, prefs });
   } catch (err) {
     res.status(500).json({ ok: false, error: err.message });
   }
@@ -667,21 +987,94 @@ router.get("/tenants/:id/notification-preferences", async (req, res) => {
 
 // PUT /api/admin/tenants/:id/notification-preferences
 router.put("/tenants/:id/notification-preferences", async (req, res) => {
-  const { id } = req.params;
+  const context = resolveActorContext(req);
+  const targetTenantId = req.params.id;
+
+  if (!context.isSuperAdmin && context.tenantId !== targetTenantId) {
+    return res.status(403).json({ ok: false, error: "FORBIDDEN: Cross-tenant notification preference update denied" });
+  }
+
+  // Validate editing permissions (Tenant Admin, Printhouse Admin, Printhouse Operator or Super Admin)
+  const allowedRoles = ['SUPER_ADMIN', 'TENANT_ADMIN', 'PRINTHOUSE_ADMIN', 'PRINTHOUSE_OPERATOR'];
+  if (!context.isSuperAdmin && !allowedRoles.includes(context.role)) {
+    return res.status(403).json({ ok: false, error: "FORBIDDEN: Insufficient permissions to edit notification preferences" });
+  }
+
   const body = req.body;
 
-  const fields = Object.keys(body).filter(k => k !== 'tenant_id' && k !== 'created_at' && k !== 'updated_at');
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return res.status(400).json({ ok: false, error: "Invalid request payload" });
+  }
+
+  // Strict whitelist of permitted notification preference fields
+  const ALLOWED_FIELDS = [
+    'webhook_enabled',
+    'email_order_alerts',
+    'email_qc_alerts',
+    'email_sla_alerts',
+    'email_recipients_json',
+    'webhook_endpoint'
+  ];
+
+  // Reject unknown keys strictly before constructing SQL
+  const bodyKeys = Object.keys(body);
+  const unknownKeys = bodyKeys.filter(k => !ALLOWED_FIELDS.includes(k));
+  if (unknownKeys.length > 0) {
+    return res.status(400).json({ 
+      ok: false, 
+      error: `UNKNOWN_FIELDS_REJECTED: Fields not allowed in notification preferences: ${unknownKeys.join(', ')}` 
+    });
+  }
+
+  const fields = bodyKeys.filter(k => k !== 'tenant_id' && k !== 'created_at' && k !== 'updated_at');
   if (fields.length === 0) return res.status(400).json({ ok: false, error: "No fields to update" });
 
-  const setClause = fields.map(f => `${f} = ?`).join(", ");
-  const values = fields.map(f => (f === 'email_recipients_json' ? JSON.stringify(body[f]) : body[f]));
+  // Validate types and values
+  for (const field of fields) {
+    const val = body[field];
+    if (['email_order_alerts', 'email_qc_alerts', 'email_sla_alerts', 'webhook_enabled'].includes(field)) {
+      if (typeof val !== 'boolean' && val !== 0 && val !== 1) {
+        return res.status(400).json({ ok: false, error: `INVALID_TYPE: Field ${field} must be boolean or 0/1` });
+      }
+    } else if (field === 'email_recipients_json') {
+      if (!Array.isArray(val) && typeof val !== 'string' && val !== null) {
+        return res.status(400).json({ ok: false, error: `INVALID_TYPE: Field ${field} must be array, JSON string or null` });
+      }
+      if (Array.isArray(val)) {
+        const isValidEmails = val.every(item => typeof item === 'string' && item.includes('@'));
+        if (!isValidEmails) {
+          return res.status(400).json({ ok: false, error: `INVALID_STRUCTURE: Field email_recipients_json array must contain valid email strings` });
+        }
+      }
+    } else if (field === 'webhook_endpoint') {
+      if (val !== null && typeof val !== 'string') {
+        return res.status(400).json({ ok: false, error: `INVALID_TYPE: Field ${field} must be a string or null` });
+      }
+    }
+  }
+
+  const values = fields.map(f => {
+    const v = body[f];
+    if (f === 'email_recipients_json') {
+      return typeof v === 'object' && v !== null ? JSON.stringify(v) : v;
+    }
+    if (typeof v === 'boolean') {
+      return v ? 1 : 0;
+    }
+    return v;
+  });
 
   try {
-    await db.query(`
-            INSERT INTO tenant_notification_preferences (tenant_id, ${fields.join(", ")})
-            VALUES (?, ${fields.map(() => "?").join(", ")})
-            ON DUPLICATE KEY UPDATE ${setClause}
-        `, [id, ...values, ...values]);
+    const insertPlaceholders = fields.map(() => '?');
+    const updateClause = fields.map(f => `${f} = VALUES(${f})`).join(', ');
+
+    const sql = `
+      INSERT INTO tenant_notification_preferences (tenant_id, ${fields.join(', ')})
+      VALUES (?, ${insertPlaceholders.join(', ')})
+      ON DUPLICATE KEY UPDATE ${updateClause}
+    `;
+
+    await db.query(sql, [targetTenantId, ...values]);
 
     res.json({ ok: true });
   } catch (err) {
@@ -692,7 +1085,7 @@ router.put("/tenants/:id/notification-preferences", async (req, res) => {
 // GET /api/admin/engagement-signals
 router.get('/engagement-signals', async (req, res) => {
   try {
-    const { rows } = await db.query(`
+    const rows = await db.query(`
             SELECT 
                 ee.*,
                 t.name as tenant_name
@@ -710,11 +1103,11 @@ router.get('/engagement-signals', async (req, res) => {
 // GET /api/admin/engagement-stats
 router.get('/engagement-stats', async (req, res) => {
   try {
-    const { rows } = await db.query(`
+    const rows = await db.query(`
             SELECT 
                 signal_type, 
                 COUNT(*) as count,
-                MAX(created_at) as last_seen
+                COUNT(DISTINCT tenant_id) as unique_tenants
             FROM engagement_events
             GROUP BY signal_type
         `);
@@ -727,7 +1120,7 @@ router.get('/engagement-stats', async (req, res) => {
 // GET /api/admin/cs-workflows
 router.get('/cs-workflows', async (req, res) => {
   try {
-    const { rows } = await db.query(`
+    const rows = await db.query(`
             SELECT 
                 cw.*,
                 t.name as tenant_name
@@ -743,6 +1136,206 @@ router.get('/cs-workflows', async (req, res) => {
 });
 
 // Sub-routers moved to the top for priority matching
+
+// ---------------------------------------------------------
+// RE-MOUNT Root Sub-routers and Financial Operations AT THE BOTTOM
+// These use '/' as base path, which can act as catch-alls and swallow other routes
+// if placed too high in the middleware chain.
+// ---------------------------------------------------------
+router.use('/connect', connectAdminRouter);
+router.use('/network', require('./networkOpsAdmin'));
+router.use('/routing/economic', economicRoutingAdminRouter); // Important: more specific first
+router.use('/marketplace/ready', negotiationAdminRouter); // Important: more specific first
+router.use('/marketplace/orders', adminMarketplaceOrdersRouter);
+router.use('/marketplace/printhouse-handoff', adminMarketplacePrinthouseHandoffRouter);
+router.use('/tenant-governance', adminTenantGovernanceRouter);
+router.use('/tenant-pilots', adminTenantPilotRouter);
+router.use('/tenant-billing', adminTenantBillingRouter);
+router.use('/billing', adminBillingRouter);           // Stripe Paywall Billing
+router.use('/production-monitoring', adminProductionMonitoringRouter);
+
+router.use('/', machineDetailsAdminRouter); // Forensic Machine Intelligence
+
+// Mount Financial Operations Sub-routers under /financial-operations
+router.use('/financial-operations', adminFinancialOperationsComplianceReporting);
+router.use('/financial-operations', adminFinancialOperationsDataRetentionPrivacy);
+router.use('/financial-operations', adminFinancialOperationsFinalReleaseCandidate);
+router.use('/financial-operations', adminFinancialOperationsGoLiveSimulation);
+router.use('/financial-operations', adminFinancialOperationsPartnerSandbox);
+router.use('/financial-operations', adminFinancialOperationsPilotMode);
+router.use('/financial-operations', adminFinancialOperationsPreProductionRunbook);
+router.use('/financial-operations', adminFinancialOperationsProductionActivationReview);
+router.use('/financial-operations', adminFinancialOperationsProductionHardening);
+router.use('/financial-operations', adminFinancialOperationsProviderContractSla);
+router.use('/financial-operations', adminFinancialOperationsProviderCredentialVault);
+router.use('/financial-operations', adminFinancialOperationsProviderEventReconciliation);
+router.use('/financial-operations', adminFinancialOperationsProviderFailureRetry);
+router.use('/financial-operations', adminFinancialOperationsProviderSandbox);
+router.use('/financial-operations', adminFinancialOperationsProviderSettlementFiles);
+router.use('/financial-operations', adminFinancialOperationsProviderWebhookSandbox);
+router.use('/financial-operations', adminFinancialOperationsReadiness);
+router.use('/financial-operations', adminFinancialOperationsReleaseGates);
+router.use('/financials/activation', adminProductionActivationGateRouter);
+router.use('/financials/activation-dry-run', financialOperationsProductionActivationDryRunAdmin);
+router.use('/pre-production/readiness-board', preProductionOperationalReadinessBoardAdmin);
+router.use('/deployment/readiness', productionDeploymentReadinessChecklistAdmin);
+router.use('/deployment/dry-run', productionDeploymentDryRunAdmin);
+router.use('/operations/incident-readiness', productionObservabilityIncidentReadinessAdmin);
+router.use('/prelaunch/security-compliance', prelaunchSecurityComplianceHardeningAdmin);
+router.use('/preproduction/release-candidate', finalPreproductionReleaseCandidateAdmin);
+router.use('/production/pilot-activation', controlledProductionPilotActivationAdmin);
+router.use('/production/internal-order-lifecycle-pilot', internalOrderLifecyclePilotAdmin);
+router.use('/production/internal-order-lifecycle-runtime-verification', internalOrderLifecycleRuntimeVerificationAdmin);
+router.use('/production/founding-printhouse-pilot', foundingPrinthousePilotGateAdmin);
+router.use('/production/printhouse-handoff-package', controlledPrinthouseHandoffPackageAdmin);
+router.use('/production/sandbox-commercial-pilot', sandboxCommercialPilotAdmin);
+router.use('/production/pilot-evidence-review', pilotEvidenceReviewGoNoGoAdmin);
+router.use('/beta/preparation-gate', limitedBetaPreparationGateAdmin);
+router.use('/beta/runtime', limitedBetaRuntimeAdmin);
+router.use('/beta/cohort-activation', controlledBetaCohortActivationAdmin);
+
+
+
+router.use('/financial-reconciliation', adminFinancialReconciliation);
+router.use('/', adminGovernedInvoices);
+router.use('/', adminPartnerSettlement);
+router.use('/', adminTaxVatReadiness);
+
+// ── Outgoing Webhooks Endpoints (Goal C) ──────────────────────────────────
+const outgoingWebhookService = require('../services/outgoingWebhookService');
+
+router.get('/webhooks/subscriptions', async (req, res) => {
+    try {
+        const subs = await outgoingWebhookService.listSubscriptions(req.user.tenantId);
+        res.json({ ok: true, data: subs });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
+router.post('/webhooks/subscriptions', requireRole('TENANT_ADMIN'), async (req, res) => {
+    try {
+        const sub = await outgoingWebhookService.createSubscription({
+            tenantId: req.user.tenantId,
+            url: req.body.url,
+            events: req.body.events || ['*']
+        });
+        res.status(201).json({ ok: true, data: sub });
+    } catch (err) {
+        res.status(400).json({ ok: false, error: err.message });
+    }
+});
+
+router.post('/webhooks/subscriptions/:id/rotate-secret', requireRole('TENANT_ADMIN'), async (req, res) => {
+    try {
+        const result = await outgoingWebhookService.rotateSecret(req.params.id, req.user.tenantId);
+        res.json({ ok: true, data: result });
+    } catch (err) {
+        res.status(400).json({ ok: false, error: err.message });
+    }
+});
+
+router.get('/webhooks/deliveries', async (req, res) => {
+    try {
+        const deliveries = await outgoingWebhookService.listDeliveries(req.user.tenantId);
+        res.json({ ok: true, data: deliveries });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
+router.post('/webhooks/deliveries/:id/resend', requireRole('TENANT_ADMIN'), async (req, res) => {
+    try {
+        const result = await outgoingWebhookService.resendDelivery({
+            deliveryId: req.params.id,
+            tenantId: req.user.tenantId,
+            requestingUserRole: req.user.role
+        });
+        res.json({ ok: true, data: result });
+    } catch (err) {
+        const status = err.statusCode || (err.message.includes('not found') ? 404 : (err.message.includes('Forbidden') || err.message.includes('not authorized') ? 403 : 500));
+        res.status(status).json({ ok: false, error: err.message });
+    }
+});
+
+router.post('/webhooks/test', requireRole('TENANT_ADMIN'), async (req, res) => {
+    try {
+        const result = await outgoingWebhookService.enqueueWebhookEvent({
+            tenantId: req.user.tenantId,
+            eventType: 'test.ping',
+            payload: { timestamp: new Date().toISOString(), message: 'Control Plane Webhook Test Event' }
+        });
+        res.json({ ok: true, data: result });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
+// ── Slack Alerts Endpoints (Goal D) ───────────────────────────────────────
+const slackNotificationService = require('../services/slackNotificationService');
+
+router.get('/notifications/slack', async (req, res) => {
+    try {
+        const config = await slackNotificationService.getSlackConfig(req.user.tenantId);
+        res.json({ ok: true, data: config });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
+router.post('/notifications/slack', requireRole('TENANT_ADMIN'), async (req, res) => {
+    try {
+        const config = await slackNotificationService.configureSlackIntegration({
+            tenantId: req.user.tenantId,
+            webhookUrl: req.body.webhookUrl,
+            channelName: req.body.channelName,
+            enabled: req.body.enabled,
+            events: req.body.events
+        });
+        res.json({ ok: true, data: config });
+    } catch (err) {
+        res.status(400).json({ ok: false, error: err.message });
+    }
+});
+
+router.post('/notifications/slack/test', requireRole('TENANT_ADMIN'), async (req, res) => {
+    try {
+        const result = await slackNotificationService.testSlackIntegration(req.user.tenantId);
+        res.json({ ok: true, data: result });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
+// ── Governed Pricing BPE Publication Endpoints (Goal F) ───────────────────
+const bpePublicationService = require('../services/bpePublicationService');
+
+router.post('/printhouses/:nodeId/publish-rates', requireRole('TENANT_ADMIN'), async (req, res) => {
+    try {
+        const { revisionId } = req.body || {};
+        if (!revisionId) {
+            return res.status(400).json({ ok: false, error: 'revisionId is required' });
+        }
+        const publication = await bpePublicationService.publishAcceptedRevision(
+            req.user.tenantId,
+            req.params.nodeId,
+            revisionId
+        );
+        res.json({ ok: true, data: publication });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
+router.get('/printhouses/:nodeId/publications/latest', async (req, res) => {
+    try {
+        const pub = await bpePublicationService.getLatestPublication(req.params.nodeId);
+        res.json({ ok: true, data: pub });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
 
 // Diagnostic Catch-all for Admin
 router.all(/^(.*)$/, (req, res) => {

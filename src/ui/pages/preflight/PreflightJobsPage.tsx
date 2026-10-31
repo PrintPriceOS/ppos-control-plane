@@ -1,0 +1,610 @@
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+// ... (rest of imports remain identical)
+import { 
+  QueueListIcon, 
+  FunnelIcon, 
+  ClockIcon, 
+  CheckCircleIcon, 
+  XCircleIcon, 
+  ArrowPathIcon, 
+  MagnifyingGlassIcon,
+  ExclamationTriangleIcon,
+  DocumentIcon,
+  ChevronRightIcon,
+  CloudArrowUpIcon,
+  RectangleStackIcon,
+  ShieldCheckIcon,
+  DocumentCheckIcon,
+  BuildingOfficeIcon
+} from "@heroicons/react/24/outline";
+import { 
+  listAdminPreflightJobs, 
+  listAdminPreflightBatches, 
+  getAdminPreflightAudit, 
+  getAdminPreflightGovernance, 
+  getStorageSummary, 
+  getAdminPreflightPolicies,
+  AdminPreflightJob 
+} from "../../lib/adminApi";
+import { useAdminQuery } from "../../hooks/useAdminData";
+import { DataTable } from "../../components/DataTable";
+import { StatusBadge } from "../../components/StatusBadge";
+import { PreflightUploadPanel } from "../../components/PreflightUploadPanel";
+import { BackgroundJobProgress } from "../../components/BackgroundJobProgress";
+import { short } from "../../lib/formatters";
+import { collectFindings, mapPhase10Status } from "../../lib/preflightStatusHelpers";
+import { useLocale } from "../../i18n";
+
+export const PreflightJobsPage: React.FC = () => {
+  const { t } = useLocale();
+  const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState<'JOBS' | 'BATCHES' | 'AUDIT' | 'GOVERNANCE'>('JOBS');
+  
+  // High-Density Filters supporting full operational scoping
+  const [filter, setFilter] = useState({
+    tenant: '',
+    printhouse: '',
+    status: '',
+    type: '',
+    policy: ''
+  });
+
+  // Queries
+  const jobsQ = useAdminQuery(
+    `admin:preflight:jobs:${JSON.stringify(filter)}`, 
+    () => listAdminPreflightJobs({ 
+      tenant: filter.tenant || undefined,
+      printhouse: filter.printhouse || undefined,
+      status: filter.status || undefined,
+      type: filter.type || undefined,
+      policy: filter.policy || undefined
+    }), 
+    10000
+  );
+
+  const batchesQ = useAdminQuery(
+    `admin:preflight:batches:${JSON.stringify(filter)}`, 
+    () => listAdminPreflightBatches({ 
+      tenant: filter.tenant || undefined
+    }), 
+    20000
+  );
+
+  const auditQ = useAdminQuery(
+    `admin:preflight:audit:${JSON.stringify(filter)}`, 
+    () => getAdminPreflightAudit({ 
+      tenant: filter.tenant || undefined,
+      status: filter.status || undefined
+    }), 
+    20000
+  );
+
+  const governanceQ = useAdminQuery(
+    `admin:preflight:governance:${JSON.stringify(filter)}`, 
+    () => getAdminPreflightGovernance({ 
+      tenant: filter.tenant || undefined
+    }), 
+    20000
+  );
+
+  const storageQ = useAdminQuery('preflight:storage:global', () => getStorageSummary(), 30000);
+  const policiesQ = useAdminQuery('preflight:policies:admin', () => getAdminPreflightPolicies(), 30000);
+
+  // Accelerated dynamic polling (1500ms) with clean unmount/cleanup if any job in the list is active
+  useEffect(() => {
+    const jobs = jobsQ.data?.jobs || [];
+    const hasActiveJob = jobs.some((j: any) => {
+      const statusUpper = (j.status || '').toUpperCase();
+      return statusUpper === 'PROCESSING' || statusUpper === 'QUEUED';
+    });
+    if (hasActiveJob) {
+      const intervalId = setInterval(() => {
+        jobsQ.refetch();
+      }, 1500);
+      return () => clearInterval(intervalId);
+    }
+  }, [jobsQ.data?.jobs]);
+
+  const policiesData = policiesQ.data;
+  const policiesList = policiesData?.policies || [];
+  const isPoliciesUnavailable = policiesData && policiesList.length === 0;
+  const isPoliciesDegraded = policiesData?.source?.includes('FALLBACK') || policiesData?.source?.includes('UNAVAILABLE') || policiesData?.source?.includes('error');
+
+  const formatSize = (bytes?: number) => {
+    if (!bytes) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat(Number((bytes || 0) / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
+  // Determine global up-to-date source status to expose failures transparently
+  const currentSourceStatus = jobsQ.data?.source_status || 'LIVE_UPSTREAM';
+  const isDegraded = currentSourceStatus.includes('UNAVAILABLE') || currentSourceStatus.includes('FALLBACK') || currentSourceStatus.includes('UNSUPPORTED');
+
+  return (
+    <div className="space-y-6 font-manrope">
+      {/* Top Banner / Dashboard Header */}
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-black text-slate-900 dark:text-[#ECECF1] tracking-tight">
+              {t('preflight.title') || 'Industrial Preflight Console'}
+            </h1>
+            <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-none border ${isDegraded ? 'bg-amber-500/10 border-amber-500/30' : 'bg-primary/10 border-primary/20'}`}>
+              <div className={`w-1.5 h-1.5 rounded-none animate-pulse ${isDegraded ? 'bg-amber-500' : 'bg-primary'}`} />
+              <span className={`text-[9px] font-black uppercase tracking-widest ${isDegraded ? 'text-amber-500' : 'text-primary'}`}>
+                {isDegraded ? `DEGRADED: ${currentSourceStatus}` : (t('preflight.upstreamDirect') || 'Upstream Contract Direct')}
+              </span>
+            </div>
+          </div>
+          <p className="text-sm font-medium text-slate-500 dark:text-zinc-400 mt-1 max-w-2xl">
+            {t('preflight.subtitle') || 'High-density administrative interface proxying unmocked job operations, array batches, and forensic audit telemetry directly onto the canonical V2 contract layer.'}
+          </p>
+        </div>
+        
+        <div className="flex items-center gap-4">
+          {/* Global Storage Quota Card */}
+          <div className="hidden lg:flex flex-col items-end glass px-4 py-2 rounded-none border border-white/20 dark:border-white/5">
+            <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{t('preflight.quotaUsage') || 'Global Quota Usage'}</div>
+            <div className="flex items-baseline gap-1">
+              <span className="text-sm font-black text-slate-800 dark:text-[#ECECF1]">
+                {storageQ.data ? Number((storageQ.data.totalBytes || 0) / (1024*1024*1024)).toFixed(2) : '0.00'} GB
+              </span>
+              <span className="text-[9px] font-bold text-slate-400">{t('preflight.allocated') || 'allocated'}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {isPoliciesUnavailable ? (
+        <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-none flex items-center gap-3 text-red-500">
+          <ExclamationTriangleIcon className="w-5 h-5 flex-shrink-0" />
+          <div className="text-xs font-bold flex-1">
+            {t('preflight.policiesUnavailable') || 'Real preflight policies are unavailable. Transformation is disabled until upstream policy catalog is restored.'}
+          </div>
+        </div>
+      ) : isPoliciesDegraded ? (
+        <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-none flex items-center gap-3 text-amber-500">
+          <ExclamationTriangleIcon className="w-5 h-5 flex-shrink-0" />
+          <div className="text-xs font-bold flex-1">
+            {t('preflight.policiesDegraded') || 'Upstream policy catalog is unreachable. Using authoritative local versioned contract fallbacks for transformation enablement.'}
+          </div>
+        </div>
+      ) : null}
+
+      <div className="mt-4">
+        <PreflightUploadPanel 
+          onSuccess={() => {
+            jobsQ.refetch();
+            batchesQ.refetch();
+            auditQ.refetch();
+            governanceQ.refetch();
+            storageQ.refetch();
+          }}
+        />
+      </div>
+
+      <div className="mt-4 mb-2">
+        <BackgroundJobProgress />
+      </div>
+
+      {/* Tabs Layout */}
+      <div className="flex items-center justify-between border-b ppos-border flex-wrap gap-4 bg-slate-50/50 dark:bg-[#131314]/20 p-1">
+        <div className="flex items-center gap-1">
+          <button 
+            onClick={() => setActiveTab('JOBS')}
+            className={`flex items-center gap-2 px-4 py-2.5 text-xs font-black uppercase tracking-wider transition-all border-b-2 ${activeTab === 'JOBS' ? 'border-primary text-primary bg-white dark:bg-[#1e1e20]/40 shadow-xs' : 'border-transparent text-slate-500 hover:text-slate-800 dark:text-zinc-400 dark:hover:text-white'}`}
+          >
+            <QueueListIcon className="w-4 h-4" />
+            <span>{t('preflight.tabJobs') || 'Jobs Registry'} ({jobsQ.data?.total ?? 0})</span>
+          </button>
+          <button 
+            onClick={() => setActiveTab('BATCHES')}
+            className={`flex items-center gap-2 px-4 py-2.5 text-xs font-black uppercase tracking-wider transition-all border-b-2 ${activeTab === 'BATCHES' ? 'border-primary text-primary bg-white dark:bg-[#1e1e20]/40 shadow-xs' : 'border-transparent text-slate-500 hover:text-slate-800 dark:text-zinc-400 dark:hover:text-white'}`}
+          >
+            <RectangleStackIcon className="w-4 h-4" />
+            <span>{t('preflight.tabBatches') || 'Batches Pipeline'} ({batchesQ.data?.batches?.length ?? 0})</span>
+          </button>
+          <button 
+            onClick={() => setActiveTab('AUDIT')}
+            className={`flex items-center gap-2 px-4 py-2.5 text-xs font-black uppercase tracking-wider transition-all border-b-2 ${activeTab === 'AUDIT' ? 'border-primary text-primary bg-white dark:bg-[#1e1e20]/40 shadow-xs' : 'border-transparent text-slate-500 hover:text-slate-800 dark:text-zinc-400 dark:hover:text-white'}`}
+          >
+            <ShieldCheckIcon className="w-4 h-4" />
+            <span>{t('preflight.tabAudit') || 'Audit Ledger'}</span>
+          </button>
+          <button 
+            onClick={() => setActiveTab('GOVERNANCE')}
+            className={`flex items-center gap-2 px-4 py-2.5 text-xs font-black uppercase tracking-wider transition-all border-b-2 ${activeTab === 'GOVERNANCE' ? 'border-primary text-primary bg-white dark:bg-[#1e1e20]/40 shadow-xs' : 'border-transparent text-slate-500 hover:text-slate-800 dark:text-zinc-400 dark:hover:text-white'}`}
+          >
+            <DocumentCheckIcon className="w-4 h-4" />
+            <span>{t('preflight.tabGovernance') || 'Governance Matrix'}</span>
+          </button>
+        </div>
+
+        {/* Action Refetch */}
+        <button 
+          onClick={() => {
+            if (activeTab === 'JOBS') jobsQ.refetch();
+            if (activeTab === 'BATCHES') batchesQ.refetch();
+            if (activeTab === 'AUDIT') auditQ.refetch();
+            if (activeTab === 'GOVERNANCE') governanceQ.refetch();
+          }}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-bold text-slate-400 hover:text-slate-700 dark:hover:text-white transition-colors cursor-pointer"
+          title="Force telemetry refresh"
+        >
+          <ArrowPathIcon className={`w-3.5 h-3.5 ${jobsQ.status === 'refetching' || batchesQ.status === 'refetching' ? 'animate-spin text-primary' : ''}`} />
+          <span className="uppercase tracking-widest">{t('jobs.refresh') || 'Refresh'}</span>
+        </button>
+      </div>
+
+      {/* High-Density Universal Filter Bar */}
+      <div className="glass p-3 rounded-none border ppos-border flex flex-wrap items-center gap-3">
+        <div className="flex-1 min-w-[180px] relative">
+          <MagnifyingGlassIcon className="absolute left-2.5 top-2.5 w-4 h-4 text-slate-400" />
+          <input 
+            type="text" 
+            placeholder={t('preflight.filterTenant') || 'Filter Scope by Tenant ID...'} 
+            value={filter.tenant}
+            onChange={(e) => setFilter({ ...filter, tenant: e.target.value })}
+            className="w-full ppos-surface-muted border-none rounded-none pl-8 pr-3 py-1.5 text-xs font-bold text-slate-700 dark:text-[#ECECF1] placeholder:text-slate-400 focus:ring-1 focus:ring-primary/30 outline-none"
+          />
+        </div>
+
+        <div className="flex-1 min-w-[160px] relative">
+          <BuildingOfficeIcon className="absolute left-2.5 top-2.5 w-4 h-4 text-slate-400" />
+          <input 
+            type="text" 
+            placeholder={t('preflight.filterPrinthouse') || 'Filter Printhouse Scope...'} 
+            value={filter.printhouse}
+            onChange={(e) => setFilter({ ...filter, printhouse: e.target.value })}
+            className="w-full ppos-surface-muted border-none rounded-none pl-8 pr-3 py-1.5 text-xs font-bold text-slate-700 dark:text-[#ECECF1] placeholder:text-slate-400 focus:ring-1 focus:ring-primary/30 outline-none"
+          />
+        </div>
+        
+        <div className="flex items-center gap-2 flex-wrap">
+          <select 
+            value={filter.status}
+            onChange={(e) => setFilter({ ...filter, status: e.target.value })}
+            className="ppos-surface-muted border-none rounded-none px-2.5 py-1.5 text-[11px] font-black text-slate-500 dark:text-zinc-400 uppercase tracking-wider outline-none cursor-pointer"
+          >
+            <option value="">{t('preflight.statusAll') || 'Status: All'}</option>
+            <option value="COMPLETED">Completed</option>
+            <option value="COMPLETED_WITH_FINDINGS">Completed with Findings</option>
+            <option value="DEGRADED">Degraded</option>
+            <option value="PARTIAL">Partial</option>
+            <option value="PARTIAL_ARTIFACTS">Partial Artifacts</option>
+            <option value="PROCESSING">Processing</option>
+            <option value="FAILED">Failed</option>
+            <option value="FAILED_RUNTIME_ENVIRONMENT">Environment Failure</option>
+            <option value="PENDING">Pending</option>
+          </select>
+
+          <select 
+            value={filter.type}
+            onChange={(e) => setFilter({ ...filter, type: e.target.value })}
+            className="ppos-surface-muted border-none rounded-none px-2.5 py-1.5 text-[11px] font-black text-slate-500 dark:text-zinc-400 uppercase tracking-wider outline-none cursor-pointer"
+          >
+            <option value="">{t('preflight.typeAll') || 'Type: All'}</option>
+            <option value="ANALYZE">Analyze</option>
+            <option value="AUTOFIX">Autofix</option>
+            <option value="CERTIFY">Certify</option>
+          </select>
+
+          <select 
+            value={filter.policy}
+            onChange={(e) => setFilter({ ...filter, policy: e.target.value })}
+            className="ppos-surface-muted border-none rounded-none px-2.5 py-1.5 text-[11px] font-black text-slate-500 dark:text-zinc-400 uppercase tracking-wider outline-none cursor-pointer max-w-[160px] truncate"
+          >
+            <option value="">{t('preflight.policyAll') || 'Policy: All'}</option>
+            {(policiesData?.policies || []).map((p: any) => {
+              const canonicalId = p.id || p.policy_id;
+              const displayName = p.name || p.id;
+              return (
+                <option key={canonicalId} value={canonicalId}>
+                  {displayName}
+                </option>
+              );
+            })}
+          </select>
+
+          {(filter.tenant || filter.printhouse || filter.status || filter.type || filter.policy) && (
+            <button 
+              onClick={() => setFilter({ tenant: '', printhouse: '', status: '', type: '', policy: '' })}
+              className="px-2 py-1.5 text-[10px] font-black text-red-500 uppercase tracking-wider hover:underline cursor-pointer"
+            >
+              {t('preflight.resetFilters') || 'Reset Filters'}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Main Table View Panel */}
+      <div id="preflight-jobs-table" className="mt-2">
+        {activeTab === 'JOBS' && (
+          <DataTable 
+            isLoading={jobsQ.status === 'loading'}
+            data={jobsQ.data?.jobs || []}
+            onRowClick={(j) => navigate(`/preflight/jobs/${j.jobId}`)}
+            columns={[
+              {
+                header: t('preflight.thJobPayload') || 'Job Payload',
+                accessor: (j) => {
+                  const fullJobId = j.jobId || j.id || j.sourceJobId || '—';
+                  return (
+                    <div className="flex flex-col py-0.5">
+                      <div className="flex items-center gap-1.5">
+                        <span 
+                          className="font-mono text-[10px] font-bold text-primary break-all whitespace-normal" 
+                          title={fullJobId}
+                        >
+                          #{fullJobId}
+                        </span>
+                        {j.batchId && (
+                          <span className="px-1 py-0.2 bg-slate-100 dark:bg-white/5 text-[8px] font-bold text-slate-400 rounded-none uppercase flex-shrink-0">
+                            {t('preflight.batch') || 'Batch'}
+                          </span>
+                        )}
+                      </div>
+                      <span className="font-medium text-slate-600 dark:text-zinc-400 truncate max-w-[220px] block" title={j.filename}>
+                        {j.filename || (t('preflight.untitled') || 'Untitled.pdf')}
+                      </span>
+                    </div>
+                  );
+                }
+              },
+              {
+                header: t('preflight.thTenantIdentity') || 'Tenant Identity',
+                accessor: (j) => (
+                  <div className="flex flex-col">
+                    <span className="font-bold text-xs text-slate-700 dark:text-[#ECECF1]">{j.tenantId}</span>
+                    {j.printhouseId && (
+                      <span className="text-[9px] font-bold text-slate-400 flex items-center gap-1 mt-0.5">
+                        <BuildingOfficeIcon className="w-2.5 h-2.5" />
+                        {j.printhouseId}
+                      </span>
+                    )}
+                  </div>
+                )
+              },
+              {
+                header: t('preflight.thTypePolicy') || 'Type / Scope Policy',
+                accessor: (j) => (
+                  <div className="flex flex-col gap-0.5">
+                    <span className="px-1.5 py-0.5 rounded-none bg-slate-100 dark:bg-[#131314]/5 text-[9px] font-black uppercase text-slate-600 dark:text-zinc-400 tracking-wider w-fit">
+                      {j.type || 'ANALYZE'}
+                    </span>
+                    <span className="text-[10px] font-bold text-slate-400 truncate max-w-[120px]" title={j.policy || 'Standard Baseline'}>
+                      {j.policy || 'Standard Baseline'}
+                    </span>
+                  </div>
+                )
+              },
+              {
+                header: t('preflight.thPayloadSize') || 'Payload Size',
+                accessor: (j) => <span className="text-xs font-mono font-bold text-slate-500">{formatSize(j.fileSize)}</span>
+              },
+              {
+                header: t('preflight.thStatusFidelity') || 'Status & Fidelity',
+                align: 'center',
+                accessor: (j: any) => {
+                  const p = j.progress || (['COMPLETED', 'COMPLETED_WITH_FINDINGS', 'COMPLETED_WITH_REVIEW', 'SUCCESS_WITH_FINDINGS', 'REVIEW_REQUIRED', 'AUTOFIX_REVIEW_REQUIRED'].includes(j.status) ? 100 : (['FAILED', 'DEGRADED', 'CANCELLED'].includes(j.status) ? 100 : (j.status === 'QUEUED' ? 5 : 20)));
+                  return (
+                  <div className="flex flex-col items-center gap-0.5 min-w-[120px]">
+                    <StatusBadge status={j.status || 'PENDING'} />
+                    {p > 0 && p < 100 && (
+                      <div className="w-full bg-slate-200 dark:bg-white/10 h-1.5 mt-1 overflow-hidden">
+                        <div className="bg-primary h-full transition-all duration-500 ease-out" style={{ width: `${p}%` }} />
+                      </div>
+                    )}
+                    <span className="text-[9px] font-manrope text-[#8F96A3] uppercase tracking-tighter mt-0.5 block truncate max-w-[120px]" title={j.sourceSystem || 'Registry'}>
+                      {j.sourceSystem || 'Registry'} • {j.canonicalData?.status ? 'Sync' : 'Init'}
+                    </span>
+                    {(j.lastSyncedAt || j.lastSeenAt) && (
+                      <span className="text-[8px] font-mono text-slate-400 block" title={`Freshness: ${j.lastSyncedAt || j.lastSeenAt}`}>
+                        {short(j.lastSyncedAt || j.lastSeenAt || '', 12)}
+                      </span>
+                    )}
+                  </div>
+                  );
+                }
+              },
+              {
+                header: t('preflight.thDiagnostics') || 'Diagnostics / Fix Result',
+                accessor: (j: any) => {
+                  if (j.type === 'AUTOFIX') {
+                    const applied = j.appliedFixesCount ?? 0;
+                    const skipped = j.skippedFixesCount ?? 0;
+                    const failed = j.failedFixesCount ?? 0;
+
+                    if (process.env.NODE_ENV === 'development') {
+                      console.log('[CONTROL][PREFLIGHT][UI][AUTOFIX-BUCKETS]', {
+                        jobId: j.jobId,
+                        appliedFixesCount: applied,
+                        skippedFixesCount: skipped,
+                        failedFixesCount: failed
+                      });
+                    }
+
+                    // Preserve Monolith visual language: dark-safe, dense, no rounded/glassmorphism
+                    let badgeColor = 'bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-zinc-400 border-slate-200 dark:border-white/10';
+                    if (failed > 0) {
+                      badgeColor = 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20';
+                    } else if (skipped > 0) {
+                      badgeColor = 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20';
+                    } else if (applied > 0) {
+                      badgeColor = 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20';
+                    }
+
+                    return (
+                      <div className="flex flex-col gap-1">
+                        <div className={`flex items-center gap-1 px-1.5 py-0.5 rounded-none border text-[9px] font-black uppercase tracking-wider w-fit ${badgeColor}`}>
+                          <span>{t('preflight.fixResult') || 'Fix Result'}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 text-[9px] font-bold text-slate-500 dark:text-zinc-400">
+                          <span title="Applied Fixes">A: <strong className="text-slate-800 dark:text-white">{applied}</strong></span>
+                          <span title="Skipped Fixes">S: <strong className="text-slate-800 dark:text-white">{skipped}</strong></span>
+                          <span title="Failed Fixes">F: <strong className={failed > 0 ? 'text-red-500' : 'text-slate-800 dark:text-white'}>{failed}</strong></span>
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  const info = j.canonicalData || j;
+                  const findings = collectFindings(info);
+                  const issues = findings.length;
+                  const fixes = info?.fixes?.length || info?.repairs?.length || 0;
+                  return (
+                    <div className="flex items-center gap-3 text-[10px]">
+                      <div className="flex flex-col">
+                        <span className="text-[8px] text-slate-400 uppercase font-black tracking-widest">{t('preflight.issues') || 'Issues'}</span>
+                        <span className="font-bold text-slate-700 dark:text-[#ECECF1]">{issues}</span>
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-[8px] text-slate-400 uppercase font-black tracking-widest">{t('preflight.fixes') || 'Fixes'}</span>
+                        <span className="font-bold text-emerald-600">{fixes}</span>
+                      </div>
+                    </div>
+                  );
+                }
+              },
+              {
+                header: t('preflight.thTimeline') || 'Timeline',
+                accessor: (j) => (
+                  <div className="flex flex-col text-[10px] text-slate-400 font-medium">
+                    <span className="text-slate-600 dark:text-zinc-300 font-bold">
+                      {new Date(j.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                    </span>
+                    <span className="font-mono text-[9px]">{new Date(j.createdAt).toLocaleTimeString()}</span>
+                  </div>
+                )
+              },
+              {
+                header: '',
+                accessor: () => <ChevronRightIcon className="w-4 h-4 text-slate-300" />,
+                className: 'w-8'
+              }
+            ]}
+          />
+        )}
+
+        {activeTab === 'BATCHES' && (
+          <DataTable 
+            isLoading={batchesQ.status === 'loading'}
+            data={batchesQ.data?.batches || []}
+            columns={[
+              {
+                header: t('preflight.batchId') || 'Batch ID',
+                accessor: (b) => <span className="font-mono text-xs font-bold text-primary">#{short(b.id || b.batchId, 12)}</span>
+              },
+              {
+                header: t('preflight.tenantArray') || 'Tenant Array',
+                accessor: (b) => <span className="font-bold text-xs text-slate-700 dark:text-[#ECECF1]">{b.tenantId || 'system'}</span>
+              },
+              {
+                header: t('preflight.stagedJobsCount') || 'Staged Jobs Count',
+                accessor: (b) => <span className="font-bold text-xs text-slate-600 dark:text-zinc-300">{b.jobIds?.length || b.jobs?.length || 0} {t('preflight.registered') || 'Registered'}</span>
+              },
+              {
+                header: t('preflight.executionStatus') || 'Execution Status',
+                align: 'center',
+                accessor: (b) => <StatusBadge status={b.status || 'PROPAGATED'} />
+              },
+              {
+                header: t('preflight.timestamp') || 'Timestamp',
+                accessor: (b) => <span className="text-xs font-mono text-slate-400">{b.createdAt ? new Date(b.createdAt).toLocaleString() : 'N/A'}</span>
+              }
+            ]}
+          />
+        )}
+
+        {activeTab === 'AUDIT' && (
+          <DataTable 
+            isLoading={auditQ.status === 'loading'}
+            data={auditQ.data?.events || []}
+            columns={[
+              {
+                header: t('preflight.auditIdTrace') || 'Audit ID / Trace',
+                accessor: (e) => (
+                  <div className="flex flex-col">
+                    <span className="font-mono text-xs font-bold text-slate-700 dark:text-white">#{e.id}</span>
+                    <span className="font-mono text-[9px] text-slate-400">{short(e.trace_id || 'N/A', 10)}</span>
+                  </div>
+                )
+              },
+              {
+                header: t('preflight.thTenantIdentity') || 'Tenant Identity',
+                accessor: (e) => <span className="font-bold text-xs text-primary">{e.tenant_id}</span>
+              },
+              {
+                header: t('preflight.operationAction') || 'Operation Action',
+                accessor: (e) => <span className="font-black text-xs text-slate-700 dark:text-[#ECECF1] tracking-wide">{e.action}</span>
+              },
+              {
+                header: t('preflight.resolutionStatus') || 'Resolution Status',
+                align: 'center',
+                accessor: (e) => <StatusBadge status={e.status || 'SUCCESS'} />
+              },
+              {
+                header: t('preflight.messageTrail') || 'Message Trail',
+                accessor: (e) => <span className="text-xs text-slate-500 max-w-xs truncate block">{e.message || 'Execution OK'}</span>
+              },
+              {
+                header: t('preflight.loggedAt') || 'Logged At',
+                accessor: (e) => <span className="font-mono text-[10px] text-slate-400">{new Date(e.created_at).toLocaleString()}</span>
+              }
+            ]}
+          />
+        )}
+
+        {activeTab === 'GOVERNANCE' && (
+          <DataTable 
+            isLoading={governanceQ.status === 'loading'}
+            data={governanceQ.data?.governanceEvents || []}
+            columns={[
+              {
+                header: t('preflight.eventLedgerId') || 'Event Ledger ID',
+                accessor: (g) => <span className="font-mono text-xs font-bold">#{g.id}</span>
+              },
+              {
+                header: t('preflight.tenantTarget') || 'Tenant Target',
+                accessor: (g) => <span className="font-bold text-xs text-primary">{g.tenant_id}</span>
+              },
+              {
+                header: t('preflight.rulePolicySlug') || 'Rule Policy Slug',
+                accessor: (g) => <span className="font-bold text-xs text-slate-800 dark:text-white">{g.rule_slug}</span>
+              },
+              {
+                header: t('preflight.evaluationStatus') || 'Evaluation Status',
+                align: 'center',
+                accessor: (g) => <StatusBadge status={g.evaluation_result || 'PASSED'} />
+              },
+              {
+                header: t('preflight.enforcedAction') || 'Enforced Action',
+                accessor: (g) => <span className="font-mono text-xs text-slate-500">{g.enforcement_action || 'LOGGED_ONLY'}</span>
+              },
+              {
+                header: t('preflight.registeredTimestamp') || 'Registered Timestamp',
+                accessor: (g) => <span className="font-mono text-[10px] text-slate-400">{new Date(g.created_at).toLocaleString()}</span>
+              }
+            ]}
+          />
+        )}
+      </div>
+
+      {/* Fail-Loud Error Surface */}
+      {(jobsQ.error || batchesQ.error) && (
+        <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-none flex items-center gap-3 text-red-500">
+          <ExclamationTriangleIcon className="w-5 h-5 flex-shrink-0" />
+          <div className="text-xs font-bold flex-1">
+            {t('preflight.gatewayCriticalError') || 'Upstream Gateway integration encountered a critical error:'} {jobsQ.error || batchesQ.error}
+          </div>
+          <button onClick={() => { jobsQ.refetch(); batchesQ.refetch(); }} className="text-xs font-black uppercase tracking-wider underline">
+            {t('preflight.executeRetry') || 'Execute Retry'}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+};

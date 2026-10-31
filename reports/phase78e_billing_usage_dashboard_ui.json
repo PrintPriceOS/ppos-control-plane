@@ -1,0 +1,118 @@
+{
+    "tested_at": "2026-06-11T07:06:25.707Z",
+    "status": "SUCCESS",
+    "passed": 22,
+    "failed": 0,
+    "scenarios": [
+        {
+            "label": "File exists: src/ui/types/billingUsage.ts",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "File exists: src/ui/api/billingUsageClient.ts",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "File exists: src/ui/pages/billing/BillingEventsTimeline.tsx",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "File exists: src/ui/pages/billing/BillingUsageDashboardPage.tsx",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "File exists: src/ui/pages/billing/CommercialPlanList.tsx",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "File exists: src/ui/pages/billing/OverageSummaryPanel.tsx",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "File exists: src/ui/pages/billing/QuotaDecisionPanel.tsx",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "File exists: src/ui/pages/billing/TenantEntitlementPanel.tsx",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "File exists: src/ui/pages/billing/UsageCountersPanel.tsx",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "API Client exports function: getCommercialPlans",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "API Client exports function: createOrUpdateCommercialPlan",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "API Client exports function: getTenantEntitlement",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "API Client exports function: assignPlanToTenant",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "API Client exports function: updateTenantBillingStatus",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "API Client exports function: getTenantUsage",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "API Client exports function: getTenantBillingEvents",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "API Client exports function: applyManualAdjustment",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "App.tsx contains router path /admin/billing-usage",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "App.tsx registers BillingUsageDashboardPage component",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "controlPlaneNavigation.ts registers path link to /admin/billing-usage",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "controlPlaneNavigation.ts registers id billing-usage",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "No forbidden words (stripe, invoice, payment, tax, vat, charged, paid) found in UI components",
+            "status": "PASS",
+            "detail": ""
+        }
+    ]
+}

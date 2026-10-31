@@ -16,7 +16,7 @@ interface Props {
 
 export const NetworkCapacityTable: React.FC<Props> = ({ data }) => {
     return (
-        <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+        <div className="bg-white rounded-none border border-slate-200 overflow-hidden shadow-sm">
             <div className="px-6 py-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
                 <h3 className="font-black text-slate-900 uppercase tracking-wider text-xs flex items-center gap-2">
                     <MapPinIcon className="w-4 h-4 text-slate-400" />
@@ -40,15 +40,15 @@ export const NetworkCapacityTable: React.FC<Props> = ({ data }) => {
                                     <div className="font-bold text-slate-900">{reg.region}, {reg.country}</div>
                                 </td>
                                 <td className="px-6 py-4 text-center">
-                                    <span className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded-md font-bold text-xs border border-slate-200">
+                                    <span className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded-none font-bold text-xs border border-slate-200">
                                         {reg.printers}
                                     </span>
                                 </td>
                                 <td className="px-6 py-4">
                                     <div className="flex items-center gap-2">
-                                        <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden min-w-[80px]">
+                                        <div className="flex-1 h-1.5 bg-slate-100 rounded-none overflow-hidden min-w-[80px]">
                                             <div
-                                                className={`h-full rounded-full transition-all duration-500 ${reg.capacity_utilization_pct > 80 ? 'bg-rose-500' :
+                                                className={`h-full rounded-none transition-all duration-500 ${reg.capacity_utilization_pct > 80 ? 'bg-rose-500' :
                                                         reg.capacity_utilization_pct > 50 ? 'bg-amber-500' :
                                                             'bg-emerald-500'
                                                     }`}

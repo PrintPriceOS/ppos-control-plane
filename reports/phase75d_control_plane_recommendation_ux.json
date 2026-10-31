@@ -1,0 +1,31 @@
+{
+  "ok": true,
+  "passed": true,
+  "compiled_at": "2026-06-10T19:32:53.660Z",
+  "recommendation_governance": {
+    "recommendation_signals": {
+      "fixability": "COMPLETE",
+      "risk_level": "HIGH",
+      "visual_sensitivity": "HIGH",
+      "missing_tool": null,
+      "validator_required": true,
+      "operator_review_reason": "Potentially destructive profile conversion required."
+    },
+    "recommended_next_actions": [
+      {
+        "action_id": "CONVERT_CMYK",
+        "label": "Convert to CMYK",
+        "description": "Convert color space safely.",
+        "severity": "warning"
+      }
+    ],
+    "unsafe_auto_actions": [
+      "CONVERT_CMYK"
+    ],
+    "human_review_actions": [
+      "MANUAL_VISUAL_INSPECTION"
+    ],
+    "production_certified": false,
+    "standard_certified": false
+  }
+}

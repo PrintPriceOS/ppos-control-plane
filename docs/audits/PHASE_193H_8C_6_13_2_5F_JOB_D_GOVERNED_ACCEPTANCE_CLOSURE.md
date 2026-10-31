@@ -1,0 +1,139 @@
+# PHASE 193H.8C.6.13.2.5F — GOVERNED JOB D (PB/4 ALTERNATIVE) ACCEPTANCE & REVISION 4 CLOSURE
+
+```text
+================================================================================
+PHASE 193H.8C.6.13.2.5F: GOVERNED JOB D (PB/4 ALTERNATIVE) ACCEPTANCE CLOSURE
+STATUS: PASS / CLOSED ✅
+STAGE 1 CONTROLLED BETA: AUTHORIZED
+UNRESTRICTED PRODUCTION: NOT_AUTHORIZED
+OPERATIONAL MODE: CANONICAL PRODUCTION EVIDENCE & REVISION 4 SEALING
+================================================================================
+```
+
+---
+
+## 1. Executive Summary & Job D Disambiguation
+
+- **Original Job D (192 pages / 12 sections)**: Evaluated in Phase 6.13.2.5C with target €1,790.14 against Revision 3. It correctly failed closed with `BELOW_REACHABLE_FLOOR` because the target fell below the demonstrated minimum reachable price of **€2,091.40** (target: €1,790.14, current: €2,259.13, minimumReachablePrice: €2,091.40, maximumReachablePrice: €3,848.21, distance to reachable range: €301.26). Session `cal-ad0bd0d5` and Run `crun-a8203c3d` remain immutable historical records.
+- **Job D — Reachability-Guided PB/4 Alternative (64 pages / 4 sections)**: Selected via the Phase 6.13.2.5D Pre-Calibration Reachability Gate, evaluated with real BPE commercial target **€939.66**, successfully calibrated in `crun-70aa6d5c`, and accepted into **Revision 4** (`prev-1b6d9af1`).
+
+---
+
+## 2. Upstream Bug Remediation & Parser Invariant
+
+A frontend semantic bug was identified and remediated in the Budget interface (`components/AssistantChat.tsx`).
+- **Defect**: The heuristic parser was forcing `endpapers = "standard"` whenever user text contained words like "endpapers" or "guardas", even when `binding_method` was `perfect bound`.
+- **Invariant Enforcement**:
+  - `perfect_bound` $\rightarrow$ `endpapers = "none"`
+  - `perfect_bound` $\rightarrow$ `endpapers_print = "none"`
+- **Commit Reference**: `475b875` (`fix: keep perfect bound endpapers disabled`).
+- **Deployment**: Production bundle rebuilt and verified; corrected BPE payload validated.
+
+---
+
+## 3. Validated Commercial Reference & Market Evidence
+
+- **Source Type**: `BPE_MARKETPLACE_NATIVE`
+- **Book Specification**:
+  - **Copies**: `750`
+  - **Dimensions**: `170 × 240 mm`
+  - **Interior Pages**: `64` (4 sections of 16p)
+  - **Interior Print**: `4/4` CMYK
+  - **Interior Paper**: `offset 115 gsm`
+  - **Cover Paper**: `mc 250 gsm`
+  - **Cover Print**: `4/0`
+  - **Binding Method**: `perfect bound`
+  - **Lamination / Endpapers**: None (`endpapers = "none"`, `endpapers_print = "none"`)
+  - **Delivery Country**: `ES`
+- **Canonical Marketplace Offers**:
+  - ADV (`adv-2025`): `€831.38`
+  - DAR (`dar-2025`): `€845.94`
+  - POZ (`poz-2025`): `€939.66`
+- **Selected Calibration Target**: **`€939.66`**
+
+---
+
+## 4. Pre-Calibration Reachability Verification
+
+Evaluated against active baseline **Revision 3** (`prev-3c025b51` / `727caec4...`):
+- **Gate Status**: **`REACHABLE`**
+- **Current Forward Price**: `€844.53`
+- **Reachable Span**: `€788.52` – `€1,375.21`
+- **Active Paths (8 total)**:
+  - **Historically Locked (6)**: `cover_fixed_by_colours.4`, `cover_var_per_1000_by_colours.4`, `interior_full_colour_fixed.16p`, `interior_full_colour_var.16p`, `paper_price_cover_by_kilo.mc`, `paper_price_interior_by_kilo.offset`
+  - **Novel Calibratable (2)**: `binding_pb_fixed_by_sections.4`, `binding_pb_var_per_1000_by_sections.4`
+- **Zero-Anchor Blockers**: `0` (`unqualifiedZeroAnchors: []`).
+
+---
+
+## 5. Governed Production Calibration Run
+
+- **Calibration Session**: `cal-adc1df15`
+- **Calibration Run**: `crun-70aa6d5c`
+- **Run Status**: **`SUCCEEDED`**
+- **Engine Price Before**: `€844.53`
+- **Engine Price After**: `€939.63`
+- **Target Price**: `€939.66`
+- **Absolute Residual**: `€0.03`
+- **Percent Residual**: `0.0032%`
+- **Evaluations Count**: `14`
+- **Proposed & Accepted Patch**:
+  - `binding_pb_fixed_by_sections.4`: `0.1640 → 0.4285`
+  - `binding_pb_var_per_1000_by_sections.4`: `58.8000 → 153.6329`
+- **Locked Path Governance**: All 6 historical locked paths were excluded from the accepted patch and remained protected by incremental-locking governance.
+
+---
+
+## 6. Governed Acceptance & Revision 4 Lineage
+
+- **Acceptance ID**: `pacc-fcd1c952`
+- **New Active Revision**: `prev-1b6d9af1` (Revision 4)
+- **Parent Revision Pointer**: `prev-3c025b51` (Revision 3)
+- **New Canonical Live Rates Checksum**:
+  ```text
+  39ded89fed4da1a721fa34d6ac392a70bc3096ea890560b8add9638f0d9baf7a
+  ```
+
+### Lineage Chain:
+```text
+prev-ffb9b4a5 (Revision 1)
+      ↓
+prev-0f4796c9 (Revision 2)
+      ↓
+prev-3c025b51 (Revision 3)
+      ↓
+prev-1b6d9af1 (Revision 4)  ← ACTIVE CANONICAL BASELINE
+```
+
+### Production Verification Ledger:
+- `sessionAccepted = true`
+- `revisionMatchesLive = true`
+- `acceptanceMatchesLive = true`
+- `baselineMatchesRun = true`
+- `lineageCorrect = true`
+- `sourceSessionCorrect = true`
+- `sourceRunCorrect = true`
+
+---
+
+## 7. Governance Policy & Baseline Freezing
+
+1. **Governed Production Rates Mutation**: One authorized governed production rates mutation occurred as part of Revision 4 acceptance (`UPDATE printer_nodes SET rates_json = ...`). Zero additional calibrations or rate mutations occurred after Revision 4 acceptance.
+2. **Deprecated Synthetic Evidence**: The earlier exploratory candidate explore table utilizing synthetic `overrideRates` is deprecated and superseded by canonical production evidence above.
+3. **Canonical Working Baseline**: All subsequent work must treat **Revision 4** (`prev-1b6d9af1` / `39ded89fed4da1a721fa34d6ac392a70bc3096ea890560b8add9638f0d9baf7a`) as the canonical active baseline.
+4. **Immutability of Historical Evidence**: Session `cal-adc1df15` is terminally `ACCEPTED` and locked.
+5. **Stage Boundary**: Stage 1 Controlled Beta remains **AUTHORIZED**; Unrestricted Production remains **NOT_AUTHORIZED**.
+
+---
+
+## 8. Final Status
+
+```text
+================================================================================
+PHASE 6.13.2.5D: PASS
+PHASE 6.13.2.5E: PASS
+PHASE 6.13.2.5F: PASS / CLOSED
+ACTIVE REVISION: prev-1b6d9af1 (Revision 4)
+ACTIVE CHECKSUM: 39ded89fed4da1a721fa34d6ac392a70bc3096ea890560b8add9638f0d9baf7a
+================================================================================
+```

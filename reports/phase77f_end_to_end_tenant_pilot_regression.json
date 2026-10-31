@@ -1,0 +1,159 @@
+{
+    "timestamp": "2026-06-11T06:51:05.009Z",
+    "overall_status": "SUCCESS",
+    "scenarios_run": 21,
+    "passed_assertions": 30,
+    "failed_assertions": 0,
+    "results": [
+        {
+            "label": "S1: Tenant Pilot record successfully created",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "S1: Initial status is CONFIGURED",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "S2: ready_for_partner_pilot is false",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "S2: Blocked by incomplete onboarding",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "S3: Printhouse domain passed",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "S3: Capabilities domain passed",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "S3: Still blocked overall",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "S4: Blocks due to missing tenant governance",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "S5: Blocks due to missing resource limits",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "S5: Evaluation passes with all tables mapped",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "S6: Admin can manage pilot",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "S6: Tenant admin cannot manage pilot",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "S7: Operator can view operator details",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "S7: Customer cannot view operator details",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "S7: Customer can view customer safe preflight reports",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "S8: Order verification correctly throws access isolation error",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "S9: Job verification throws isolation error",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "S10: File verification throws isolation error",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "S11: Printhouse verification throws isolation error",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "S12: Sanitized HTTP code is 403",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "S12: Sanitized error is ACCESS_DENIED",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "S12: Generic message returned",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "S13: 5 orders allowed under 15 limit",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "S14: 20 orders blocked",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "S15: 8 daily jobs allowed under 10 limit",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "S16: 12 daily jobs blocked",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "S17: 200MB file size allowed under 250MB limit",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "S18: 300MB file size blocked",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "S19: Live activation fails due to strict block-by-design policy",
+            "status": "PASS",
+            "detail": ""
+        },
+        {
+            "label": "S20: live_production_enabled remains 0 (disabled)",
+            "status": "PASS",
+            "detail": ""
+        }
+    ]
+}

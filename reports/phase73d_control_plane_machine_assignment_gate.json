@@ -1,0 +1,78 @@
+{
+  "generated_at": "2026-06-10T19:18:42.038Z",
+  "phase": "73D",
+  "repo": "ppos-control-plane",
+  "smoke_passed": true,
+  "summary": {
+    "total": 13,
+    "passed": 13,
+    "failed": 0
+  },
+  "results": [
+    {
+      "label": "1.1 Eligible on compatible machine",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "1.1 No blockers on compatible machine",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "1.1 Preflight warnings preserved",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "1.2 Ineligible on incompatible machine",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "1.2 Blocked by PRODUCTION_MACHINE_INCOMPATIBLE",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "1.2 Incompatibility reason propagated as warning",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "2.1 Throws on incompatible machine assignment",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "2.1 Throw message is PRODUCTION_MACHINE_INCOMPATIBLE",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "2.2 Succeeds on compatible machine assignment",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "2.2 Queue status is MACHINE_ASSIGNED",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "3.1 MachineCompatibilityPanel.tsx file exists",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "3.1 Exports MachineCompatibilityPanel function",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "3.1 Includes compatibility-badge test ID",
+      "pass": true,
+      "detail": null
+    }
+  ]
+}

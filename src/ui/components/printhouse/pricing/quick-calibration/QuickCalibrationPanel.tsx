@@ -1,0 +1,974 @@
+/**
+ * src/ui/components/printhouse/pricing/quick-calibration/QuickCalibrationPanel.tsx
+ *
+ * Phase 193F — Quick Pricing Calibration Master Workflow Orchestrator
+ *
+ * Coordinates:
+ * 1. Session state management (193B DRAFT -> READY).
+ * 2. Conversational assistant integration (193E assistant/chat -> Zero-write proposal).
+ * 3. Structured specification review & explicit Apply.
+ * 4. Deterministic inverse solver calculation (193C calculate).
+ * 5. Rate comparison & AI run explanation (193E explain-run).
+ * 6. Governed acceptance & revision recording (193D accept).
+ *
+ * Security & Governance Invariants:
+ * - Zero client-side pricing mathematics or patch generation.
+ * - Zero auto-persistence on chat messages.
+ * - Zero activation grant mutation.
+ * - Uses canonical getAuthToken().
+ */
+import React, { useState, useEffect, useRef } from 'react';
+import { printhouseCalibrationApi, computeBookSpecChecksum } from '../../../../lib/printhouseCalibrationApi';
+import { GuidedCalibrationWizard } from './GuidedCalibrationWizard';
+import { GovernedQuoteSmokeTest } from './GovernedQuoteSmokeTest';
+import { CalibrationStructuredSummary } from './CalibrationStructuredSummary';
+import { CalibrationCommercialDeclaration } from './CalibrationCommercialDeclaration';
+import { CalibrationRunSummary } from './CalibrationRunSummary';
+import { CalibrationRateComparison } from './CalibrationRateComparison';
+import { CalibrationWarnings } from './CalibrationWarnings';
+import { CalibrationAcceptanceModal } from './CalibrationAcceptanceModal';
+import { PricingRevisionHistoryModal } from './PricingRevisionHistoryModal';
+import { CalibrationSessionsHistoryModal } from './CalibrationSessionsHistoryModal';
+import { CommercialCalibrationPanel } from './CommercialCalibrationPanel';
+import { isValidIso2Country } from '../../../../lib/countryCatalog';
+import { useLocale } from '../../../../i18n';
+import { 
+    Sparkles, RefreshCw, Calculator, ShieldCheck, CheckCircle2, 
+    AlertTriangle, History, ArrowRight, X, Layers, CheckCircle, 
+    Sliders, ChevronDown, ChevronUp, BookOpen 
+} from 'lucide-react';
+
+interface QuickCalibrationPanelProps {
+    printerNodeId?: string;
+    printerNodeName?: string;
+    onAccepted?: () => void;
+}
+
+export const QuickCalibrationPanel: React.FC<QuickCalibrationPanelProps> = ({
+    printerNodeId,
+    printerNodeName = 'Production Node',
+    onAccepted
+}) => {
+    const { t } = useLocale();
+    // ── Workflow States ──
+    const [session, setSession] = useState<any | null>(null);
+    const [loadingSession, setLoadingSession] = useState(false);
+    const [activeRun, setActiveRun] = useState<any | null>(null);
+    const [calculating, setCalculating] = useState(false);
+    const [explaining, setExplaining] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [successMessage, setSuccessMessage] = useState<string | null>(null);
+    const successTimerRef = useRef<any>(null);
+    const isMountedRef = useRef<boolean>(true);
+
+    useEffect(() => {
+        isMountedRef.current = true;
+        return () => {
+            isMountedRef.current = false;
+            if (successTimerRef.current) {
+                clearTimeout(successTimerRef.current);
+            }
+        };
+    }, []);
+    const [showAdvanced, setShowAdvanced] = useState(false);
+
+    // ── Conversational & Proposal State (In-Memory) ──
+    const [messages, setMessages] = useState<Array<{ role: 'user' | 'assistant' | 'system'; text: string; timestamp?: string }>>([]);
+    const [sendingChat, setSendingChat] = useState(false);
+    const [activeProposal, setActiveProposal] = useState<any | null>(null);
+    const [aiUnavailable, setAiUnavailable] = useState(false);
+    const [activeQuoteEvidence, setActiveQuoteEvidence] = useState<any | null>(null);
+    const [selectedVariantId, setSelectedVariantId] = useState<string | undefined>(undefined);
+
+    // ── Local Editable Draft Spec & Commercials (Initially Clean / Empty) ──
+    const [draftSpec, setDraftSpec] = useState<any>({
+        copies: undefined,
+        book_width_mm: undefined,
+        book_height_mm: undefined,
+        interior_pages: undefined,
+        interior_print: undefined,
+        paper_type_interior: undefined,
+        paper_weight_interior: undefined,
+        cover_print: undefined,
+        paper_type_cover: undefined,
+        paper_weight_cover: undefined,
+        lamination: undefined,
+        binding_method: undefined,
+        delivery_country: undefined
+    });
+
+    const [draftCommercials, setDraftCommercials] = useState<any>({
+        targetManufacturingPrice: null,
+        currency: 'EUR',
+        transportPricePerKg: null,
+        transportCurrency: 'EUR',
+        includesPaper: null,
+        includesBinding: null,
+        includesFinishing: null,
+        includesPackaging: null
+    });
+
+    // ── Tracking Metadata ──
+    const [extractedFields, setExtractedFields] = useState<string[]>([]);
+    const [confirmedFields, setConfirmedFields] = useState<string[]>([]);
+
+    // ── Modals Visibility ──
+    const [showAcceptModal, setShowAcceptModal] = useState(false);
+    const [accepting, setAccepting] = useState(false);
+    const [showHistoryModal, setShowHistoryModal] = useState(false);
+    const [showSessionsModal, setShowSessionsModal] = useState(false);
+    const [showCommercialModal, setShowCommercialModal] = useState(false);
+
+    // ── Variant Selection & Price Coherence Synchronization ──
+    useEffect(() => {
+        if (activeQuoteEvidence?.offers && activeQuoteEvidence.offers.length > 0) {
+            const targetVid = selectedVariantId || (activeQuoteEvidence.offers[0]?.variantId || 'variant-0');
+            const matched = activeQuoteEvidence.offers.find((off: any, idx: number) =>
+                (off.variantId || `variant-${idx}`) === targetVid
+            ) || activeQuoteEvidence.offers[0];
+
+            if (matched) {
+                if (matched.manufacturingPrice != null && Number(matched.manufacturingPrice) > 0) {
+                    const newPrice = Number(matched.manufacturingPrice);
+                    setDraftCommercials((prev: any) => {
+                        if (prev.targetManufacturingPrice !== newPrice) {
+                            return { ...prev, targetManufacturingPrice: newPrice };
+                        }
+                        return prev;
+                    });
+                }
+                if (matched.quantity && Number(matched.quantity) > 0) {
+                    const newCopies = Number(matched.quantity);
+                    setDraftSpec((prev: any) => {
+                        if (prev.copies !== newCopies) {
+                            return { ...prev, copies: newCopies };
+                        }
+                        return prev;
+                    });
+                }
+            }
+        }
+    }, [selectedVariantId, activeQuoteEvidence]);
+
+    // ── Session and Active Run Rehydration (Phase 193H.8C.6.11.3) ──
+    useEffect(() => {
+        let isCancelled = false;
+
+        const rehydrateSession = async () => {
+            if (!printerNodeId) return;
+
+            setLoadingSession(true);
+            try {
+                const sessionList = await printhouseCalibrationApi.listSessions(printerNodeId);
+                if (isCancelled) return;
+
+                if (Array.isArray(sessionList) && sessionList.length > 0) {
+                    // Filter for this printerNodeId if present
+                    const nodeSessions = sessionList.filter((s: any) => !printerNodeId || s.printerNodeId === printerNodeId);
+                    
+                    // Recency-First Selection: Evaluate newest session (nodeSessions is ordered updated_at DESC, created_at DESC)
+                    const chosenSession = nodeSessions[0];
+
+                    if (chosenSession) {
+                        setSession(chosenSession);
+
+                        // Populate local draft state from restored session
+                        if (chosenSession.bookSpec) {
+                            setDraftSpec(chosenSession.bookSpec);
+                            setExtractedFields(Object.keys(chosenSession.bookSpec));
+                            setConfirmedFields(Object.keys(chosenSession.bookSpec));
+                        }
+                        setDraftCommercials({
+                            targetManufacturingPrice: chosenSession.targetManufacturingPrice ?? null,
+                            currency: chosenSession.currency || 'EUR',
+                            transportPricePerKg: chosenSession.transportPricePerKg ?? null,
+                            transportCurrency: chosenSession.transportCurrency || 'EUR',
+                            includesPaper: chosenSession.includesPaper ?? null,
+                            includesBinding: chosenSession.includesBinding ?? null,
+                            includesFinishing: chosenSession.includesFinishing ?? null,
+                            includesPackaging: chosenSession.includesPackaging ?? null
+                        });
+
+                        // Rehydrate runs ONLY for CALCULATED or READY sessions when checksum matches
+                        if (chosenSession.status === 'CALCULATED' || chosenSession.status === 'READY') {
+                            try {
+                                const runs = await printhouseCalibrationApi.listRuns(chosenSession.id);
+                                if (!isCancelled && Array.isArray(runs) && runs.length > 0) {
+                                    // Runs are ordered started_at DESC; latest run is runs[0]
+                                    const latestRun = runs[0];
+                                    const expectedChecksum = await computeBookSpecChecksum(chosenSession.bookSpec);
+                                    if (!isCancelled) {
+                                        const runChecksum = latestRun.sessionInputChecksum || latestRun.session_input_checksum;
+                                        if (!expectedChecksum || !runChecksum || expectedChecksum !== runChecksum) {
+                                            setActiveRun(null);
+                                        } else {
+                                            setActiveRun(latestRun);
+                                        }
+                                    }
+                                } else if (!isCancelled) {
+                                    setActiveRun(null);
+                                }
+                            } catch (runErr) {
+                                console.error('Failed to rehydrate calibration runs:', runErr);
+                                if (!isCancelled) setActiveRun(null);
+                            }
+                        } else if (!isCancelled) {
+                            // ACCEPTED or DRAFT sessions for new offers do NOT present an old active run
+                            setActiveRun(null);
+                        }
+                    }
+                }
+            } catch (err: any) {
+                if (!isCancelled) {
+                    console.error('Failed to rehydrate calibration session:', err);
+                }
+            } finally {
+                if (!isCancelled) {
+                    setLoadingSession(false);
+                }
+            }
+        };
+
+        // Reset state on node change and rehydrate
+        setSession(null);
+        setActiveRun(null);
+        rehydrateSession();
+
+        return () => {
+            isCancelled = true;
+        };
+    }, [printerNodeId]);
+
+    // Helper: Normalizes bookSpec taxonomy fields to canonical backend contract
+    const canonicalizeBookSpec = (spec: any) => {
+        if (!spec || typeof spec !== 'object') return spec;
+        const normalized = { ...spec };
+
+        // 1. Lamination: 'gloss' | 'matt' | 'varnish' | null
+        if (normalized.lamination !== undefined && normalized.lamination !== null) {
+            const rawLam = String(normalized.lamination).toLowerCase().trim();
+            if (rawLam === 'gloss' || rawLam === 'glossy') {
+                normalized.lamination = 'gloss';
+            } else if (rawLam === 'matt' || rawLam === 'matte') {
+                normalized.lamination = 'matt';
+            } else if (rawLam === 'varnish') {
+                normalized.lamination = 'varnish';
+            } else if (rawLam === '' || rawLam === 'none' || rawLam === 'null') {
+                normalized.lamination = null;
+            }
+        }
+
+        // 2. Paper Types
+        if (normalized.paper_type_interior) {
+            const pt = String(normalized.paper_type_interior).toLowerCase().trim();
+            if (pt === 'coated' || pt === 'gloss' || pt === 'matt') normalized.paper_type_interior = 'mc';
+            else if (pt === 'uncoated' || pt === 'woodfree') normalized.paper_type_interior = 'offset';
+            else normalized.paper_type_interior = pt;
+        }
+        if (normalized.paper_type_cover) {
+            const pt = String(normalized.paper_type_cover).toLowerCase().trim();
+            if (pt === 'coated') normalized.paper_type_cover = 'mc';
+            else normalized.paper_type_cover = pt;
+        }
+
+        // 3. Binding Method
+        if (normalized.binding_method) {
+            const bm = String(normalized.binding_method).toLowerCase().trim();
+            if (bm === 'perfect' || bm === 'pb') normalized.binding_method = 'perfect bound';
+            else if (bm === 'sewn' || bm === 'thread-sewn') normalized.binding_method = 'thread sewn';
+            else if (bm === 'case' || bm === 'casebound' || bm === 'hardback') normalized.binding_method = 'hardcover';
+            else normalized.binding_method = bm;
+        }
+
+        // 4. Print Specifications
+        if (normalized.interior_print) {
+            const match = String(normalized.interior_print).match(/\b([1-4]\/[1-4])\b/);
+            if (match) normalized.interior_print = match[1];
+        }
+        if (normalized.cover_print) {
+            const match = String(normalized.cover_print).match(/\b([1-5]\/[0-5])\b/);
+            if (match) normalized.cover_print = match[1];
+        }
+
+        // 5. Delivery country ISO-2
+        if (normalized.delivery_country) {
+            normalized.delivery_country = String(normalized.delivery_country).toUpperCase().trim();
+        }
+
+        return normalized;
+    };
+
+    // Helper: Validates whether local draft satisfies Phase 193B mandatory contract
+    const validateDraftForCreation = (spec: any, comms: any): { valid: boolean; missing: string[] } => {
+        const missing: string[] = [];
+        if (!spec.copies || spec.copies < 1) missing.push('Copies (positive integer)');
+        if (!spec.book_width_mm) missing.push('Width mm');
+        if (!spec.book_height_mm) missing.push('Height mm');
+        if (!spec.interior_pages || spec.interior_pages < 1) missing.push('Interior pages');
+        if (!spec.interior_print) missing.push('Interior print (1/1, 2/2, 4/4)');
+        if (!spec.paper_type_interior) missing.push('Interior paper type');
+        if (!spec.paper_weight_interior) missing.push('Interior paper weight');
+        if (!spec.cover_print) missing.push('Cover print');
+        if (!spec.paper_type_cover) missing.push('Cover paper type');
+        if (!spec.paper_weight_cover) missing.push('Cover paper weight');
+        if (!spec.binding_method) missing.push('Binding method');
+        if (!spec.delivery_country || !isValidIso2Country(spec.delivery_country)) {
+            missing.push('Delivery country (valid 2-letter ISO code)');
+        }
+
+        if (!comms.targetManufacturingPrice || comms.targetManufacturingPrice <= 0) {
+            missing.push('Known Manufacturing Price (> 0 EUR)');
+        }
+        if (comms.includesPaper === null || comms.includesPaper === undefined) missing.push('includesPaper flag');
+        if (comms.includesBinding === null || comms.includesBinding === undefined) missing.push('includesBinding flag');
+        if (comms.includesFinishing === null || comms.includesFinishing === undefined) missing.push('includesFinishing flag');
+        if (comms.includesPackaging === null || comms.includesPackaging === undefined) missing.push('includesPackaging flag');
+
+        return { valid: missing.length === 0, missing };
+    };
+
+    // ── 1. Conversational Chat (193E Zero-Write) ──
+    const handleSendMessage = async (text: string, evidenceId?: string, variantId?: string) => {
+        setSendingChat(true);
+        setError(null);
+        if (variantId !== undefined) {
+            setSelectedVariantId(variantId);
+        }
+
+        // Append user message locally
+        const userMsg = { role: 'user' as const, text, timestamp: new Date().toISOString() };
+        setMessages(prev => [...prev, userMsg]);
+
+        try {
+            let result: any;
+            const effectiveVariantId = variantId !== undefined ? variantId : selectedVariantId;
+            if (session?.id && session.status !== 'ACCEPTED' && session.status !== 'REJECTED') {
+                result = await printhouseCalibrationApi.assistantChat(session.id, text, evidenceId, effectiveVariantId);
+            } else {
+                result = await printhouseCalibrationApi.interpretPreSession(text, evidenceId, effectiveVariantId);
+            }
+
+            setAiUnavailable(false);
+
+            if (result && result.proposal) {
+                setActiveProposal(result.proposal);
+
+                const assistantMsg = {
+                    role: 'assistant' as const,
+                    text: result.proposal.explanation || 'I have extracted the book specifications for your review.',
+                    timestamp: new Date().toISOString(),
+                    proposal: result.proposal
+                };
+                setMessages(prev => [...prev, assistantMsg]);
+
+                // Track extracted fields in memory
+                if (result.proposal.specPatch) {
+                    const extracted = Object.keys(result.proposal.specPatch);
+                    setExtractedFields(extracted);
+                    // Update in-memory draft with extracted fields immediately for review
+                    setDraftSpec((prev: any) => ({ ...prev, ...result.proposal.specPatch }));
+                }
+                if (result.proposal.declaredCommercials) {
+                    setDraftCommercials((prev: any) => ({ ...prev, ...result.proposal.declaredCommercials }));
+                }
+            }
+        } catch (err: any) {
+            if (err.code === 'AI_PROVIDER_UNAVAILABLE' || err.code === 'AI_PROVIDER_TIMEOUT' || err.code === 'AI_RATE_LIMITED' || err.status === 503 || err.status === 504 || err.status === 429) {
+                setAiUnavailable(true);
+                const systemMsg = {
+                    role: 'assistant' as const,
+                    text: 'The AI assistant is temporarily busy. Your setup is completely safe and nothing has been saved. You can try sending again in a moment, or continue entering your job details in Step 2.',
+                    timestamp: new Date().toISOString()
+                };
+                setMessages(prev => [...prev, systemMsg]);
+            } else {
+                setError(err.message || 'Error communicating with assistant');
+            }
+        } finally {
+            setSendingChat(false);
+        }
+    };
+
+    // ── 2. Explicit Apply / Save (193B Session Creation / Update) ──
+    const handleApplyProposal = async (proposal: any): Promise<any | null> => {
+        setError(null);
+        const mergedSpec = { ...draftSpec, ...(proposal?.specPatch || {}) };
+        const newSpec = canonicalizeBookSpec(mergedSpec);
+        const newComms = { ...draftCommercials, ...(proposal?.declaredCommercials || {}) };
+
+        setDraftSpec(newSpec);
+        setDraftCommercials(newComms);
+
+        const validation = validateDraftForCreation(newSpec, newComms);
+        if (!validation.valid) {
+            setError(`Cannot persist session yet. Missing mandatory fields: ${validation.missing.join(', ')}`);
+            if (proposal?.specPatch) {
+                setExtractedFields(Object.keys(proposal.specPatch));
+            }
+            return null;
+        }
+
+        try {
+            let persistedSession: any;
+            if (!session?.id || session.status === 'ACCEPTED' || session.status === 'REJECTED') {
+                // Explicit creation of a separate DRAFT session for new quote offer
+                persistedSession = await printhouseCalibrationApi.createSession({
+                    printerNodeId,
+                    referenceBookName: proposal?.referenceBookName || draftSpec.referenceBookName || 'New Quote Offer Calibration',
+                    bookSpec: newSpec,
+                    targetManufacturingPrice: Number(newComms.targetManufacturingPrice),
+                    currency: newComms.currency || 'EUR',
+                    transportPricePerKg: newComms.transportPricePerKg ? Number(newComms.transportPricePerKg) : null,
+                    transportCurrency: newComms.transportCurrency || 'EUR',
+                    includesPaper: newComms.includesPaper,
+                    includesBinding: newComms.includesBinding,
+                    includesFinishing: newComms.includesFinishing,
+                    includesPackaging: newComms.includesPackaging
+                });
+                setSession(persistedSession);
+                setActiveRun(null);
+            } else if (session.status === 'DRAFT') {
+                // Guard: Only update if session is in editable DRAFT status
+                persistedSession = await printhouseCalibrationApi.updateDraftSession(session.id, {
+                    bookSpec: newSpec,
+                    targetManufacturingPrice: Number(newComms.targetManufacturingPrice),
+                    currency: newComms.currency || 'EUR',
+                    transportPricePerKg: newComms.transportPricePerKg ? Number(newComms.transportPricePerKg) : null,
+                    transportCurrency: newComms.transportCurrency || 'EUR',
+                    includesPaper: newComms.includesPaper,
+                    includesBinding: newComms.includesBinding,
+                    includesFinishing: newComms.includesFinishing,
+                    includesPackaging: newComms.includesPackaging
+                });
+                setSession(persistedSession);
+            } else {
+                // Session is READY or CALCULATED
+                persistedSession = session;
+            }
+            setConfirmedFields(Object.keys(newSpec).filter(k => newSpec[k] !== undefined && newSpec[k] !== null && newSpec[k] !== ''));
+            setExtractedFields([]);
+            setActiveProposal(null);
+            setSuccessMessage('Specifications verified and saved to calibration session.');
+            if (successTimerRef.current) {
+                clearTimeout(successTimerRef.current);
+            }
+            successTimerRef.current = setTimeout(() => {
+                if (isMountedRef.current) {
+                    setSuccessMessage(null);
+                }
+            }, 4000);
+            return persistedSession;
+        } catch (err: any) {
+            setError(err.message || 'Failed to save calibration session');
+            return null;
+        }
+    };
+
+    // ── 3. Clarification Answer & Apply (Phase 193H.4 Merge Preservation) ──
+    const handleApplyClarifications = (answers: Record<string, string>) => {
+        const readableSummaryParts: string[] = [];
+
+        setDraftSpec((prevSpec: any) => {
+            const updatedSpec = { ...prevSpec };
+
+            setDraftCommercials((prevComms: any) => {
+                const updatedComms = { ...prevComms };
+
+                Object.entries(answers).forEach(([field, answer]) => {
+                    if (!answer || !answer.trim()) return;
+
+                    readableSummaryParts.push(answer);
+
+                    if (field.startsWith('includes')) {
+                        const val = answer.toLowerCase().includes('yes') || answer.toLowerCase().includes('included') || answer.toLowerCase().includes('net') || answer.toLowerCase().includes('excluding');
+                        updatedComms[field] = val;
+                    } else if (field === 'cover_structure' || field === 'cover_type') {
+                        if (answer.toLowerCase().includes('self-cover') || answer.toLowerCase().includes('self cover')) {
+                            updatedSpec.paper_weight_cover = updatedSpec.paper_weight_interior || 130;
+                            updatedSpec.paper_type_cover = updatedSpec.paper_type_interior || 'mc';
+                            updatedSpec.cover_print = updatedSpec.interior_print || '4/4';
+                        } else if (answer.toLowerCase().includes('separate') || answer.toLowerCase().includes('300')) {
+                            updatedSpec.paper_weight_cover = 300;
+                            updatedSpec.paper_type_cover = 'mc';
+                            updatedSpec.cover_print = '4/0';
+                        }
+                    } else if (field === 'price_vat' || field === 'tax_inclusion') {
+                        const isNet = answer.toLowerCase().includes('net') || answer.toLowerCase().includes('excluding');
+                        updatedComms.isNetPrice = isNet;
+                    } else if (field === 'delivery_country' || field === 'destination') {
+                        const match = answer.match(/\b([A-Z]{2})\b/i);
+                        if (match) updatedSpec.delivery_country = match[1].toUpperCase();
+                    } else if (field === 'interior_print' || field === 'interiorPrint') {
+                        const match = answer.match(/\b([1-4]\/[1-4])\b/);
+                        if (match) updatedSpec.interior_print = match[1];
+                        else if (answer.toLowerCase().includes('mono') || answer.toLowerCase().includes('1/1')) updatedSpec.interior_print = '1/1';
+                        else if (answer.toLowerCase().includes('full') || answer.toLowerCase().includes('4/4')) updatedSpec.interior_print = '4/4';
+                    } else if (field === 'cover_print' || field === 'coverPrint') {
+                        const match = answer.match(/\b([1-5]\/[0-5])\b/);
+                        if (match) updatedSpec.cover_print = match[1];
+                    } else if (field === 'lamination' || field === 'finishing') {
+                        const rawLam = answer.toLowerCase().trim();
+                        if (rawLam.includes('gloss')) updatedSpec.lamination = 'gloss';
+                        else if (rawLam.includes('matt') || rawLam.includes('matte')) updatedSpec.lamination = 'matt';
+                        else if (rawLam.includes('varnish')) updatedSpec.lamination = 'varnish';
+                        else if (rawLam.includes('none') || rawLam.includes('no')) updatedSpec.lamination = null;
+                    } else if (field === 'transportPricePerKg' || field === 'transport' || field === 'transportation') {
+                        const matchKg = answer.match(/(\d+(?:\.\d+)?)\s*(?:€|\$|eur)?\s*\/\s*kg/i);
+                        if (matchKg) {
+                            updatedComms.transportPricePerKg = parseFloat(matchKg[1]);
+                        } else {
+                            updatedComms.transportPricePerKg = null;
+                        }
+                    } else {
+                        // Only copy field if it is not a raw option string assigned to a numeric/enum field
+                        if (field in updatedSpec) {
+                            updatedSpec[field] = answer;
+                        } else if (field in updatedComms) {
+                            updatedComms[field] = answer;
+                        }
+                    }
+                });
+
+                return updatedComms;
+            });
+
+            return updatedSpec;
+        });
+
+        // Add human-readable user message trace to conversation
+        if (readableSummaryParts.length > 0) {
+            const userMsg = {
+                role: 'user' as const,
+                text: readableSummaryParts.join('; '),
+                timestamp: new Date().toISOString()
+            };
+            setMessages(prev => [...prev, userMsg]);
+        }
+
+        // Dismiss answered clarification questions from active proposal
+        setActiveProposal((prev: any) => {
+            if (!prev) return null;
+            return {
+                ...prev,
+                clarificationQuestions: []
+            };
+        });
+    };
+
+    // ── 4. Mark Ready (193B Transition) ──
+    const handleMarkReady = async (): Promise<any | null> => {
+        setError(null);
+        if (!session?.id) return null;
+
+        // Strict guard: Only DRAFT sessions can ever transition to READY
+        if (session.status !== 'DRAFT') {
+            return session;
+        }
+
+        // Persist latest draft values first (update DRAFT)
+        const workingSession = await handleApplyProposal({ specPatch: draftSpec, declaredCommercials: draftCommercials });
+
+        if (!workingSession?.id) return null;
+        if (workingSession.status !== 'DRAFT') return workingSession;
+
+        try {
+            const updated = await printhouseCalibrationApi.markSessionReady(workingSession.id);
+            setSession(updated);
+            setSuccessMessage('Session marked READY. You can now calculate pricing.');
+            setTimeout(() => setSuccessMessage(null), 3000);
+            return updated;
+        } catch (err: any) {
+            setError(err.message || 'Failed to mark session ready');
+            return null;
+        }
+    };
+
+    // ── 5. Calculate Starting Pricing (193C Deterministic Solver) ──
+    const handleCalculate = async () => {
+        if (calculating) return;
+        setCalculating(true);
+        setError(null);
+        try {
+            let readySession = session;
+            if (readySession?.status === 'DRAFT') {
+                readySession = await handleMarkReady();
+            }
+
+            if (!readySession?.id || readySession.status !== 'READY') {
+                return;
+            }
+
+            const run = await printhouseCalibrationApi.calculateCalibration(readySession.id);
+            setActiveRun(run);
+
+            // Synchronously refresh session state from server to capture transition to CALCULATED
+            try {
+                const refreshedSession = await printhouseCalibrationApi.getSession(readySession.id);
+                if (refreshedSession) {
+                    setSession(refreshedSession);
+                }
+            } catch (sessionFetchErr) {
+                console.warn('Failed to refresh session after calculate:', sessionFetchErr);
+            }
+
+            setSuccessMessage(`Calibration completed with residual of ${run.absolute_residual} EUR.`);
+            setTimeout(() => setSuccessMessage(null), 4000);
+        } catch (err: any) {
+            setError(err.message || 'Pricing calibration calculation failed.');
+        } finally {
+            setCalculating(false);
+        }
+    };
+
+    // ── 6. Governed Acceptance (193D Revision Creation) ──
+    const handleAcceptanceConfirm = async () => {
+        if (!session?.id || !activeRun?.id || accepting) return;
+        setAccepting(true);
+        setError(null);
+        try {
+            const accepted = await printhouseCalibrationApi.acceptCalibrationRun(session.id, activeRun.id);
+            setSession(accepted);
+            setShowAcceptModal(false);
+            setSuccessMessage(`Calibration run accepted! Immutable revision created.`);
+            setTimeout(() => setSuccessMessage(null), 5000);
+            onAccepted?.();
+        } catch (err: any) {
+            let userMsg = err.message || 'Failed to accept calibration run';
+            if (err.code === 'BASELINE_DRIFT_DETECTED') {
+                userMsg = 'Underlying rates have changed since this calibration run was calculated. Please re-run calibration.';
+            } else if (err.code === 'CALIBRATION_ACCEPTANCE_TOLERANCE_EXCEEDED') {
+                userMsg = 'Proposal residual exceeds permitted acceptance tolerance.';
+            } else if (err.code === 'PROPOSED_PATCH_INTEGRITY_FAILURE' || String(err.message).includes('PROPOSED_PATCH_INTEGRITY_FAILURE')) {
+                userMsg = 'This calculation was created with an older pricing model and cannot be accepted safely. Recalculate it using the current pricing model.';
+                setShowSupersedeAction(true);
+            }
+            setError(userMsg);
+        } finally {
+            setAccepting(false);
+        }
+    };
+
+    // ── 7. Governed Supersession & Recalibration Flow (Phase 193H.8C.6.11.3.6.6) ──
+    const [superseding, setSuperseding] = useState(false);
+    const [showSupersedeAction, setShowSupersedeAction] = useState(false);
+
+    const handleSupersedeAndRecalibrate = async () => {
+        if (!session?.id) return;
+        setSuperseding(true);
+        setError(null);
+        try {
+            const result = await printhouseCalibrationApi.supersedeSession(session.id, 'SUPERSEDED_BY_NEW_PRICING_MODEL');
+            if (result?.newSession) {
+                setSession(result.newSession);
+                setActiveRun(null);
+                setShowAcceptModal(false);
+                setShowSupersedeAction(false);
+                setSuccessMessage('Previous calculation superseded. Ready to run new calibration with current pricing model.');
+                setTimeout(() => setSuccessMessage(null), 5000);
+            }
+        } catch (err: any) {
+            setError(err.message || 'Failed to supersede calibration session');
+        } finally {
+            setSuperseding(false);
+        }
+    };
+
+    // ── Rate Comparison Mapper ──
+    const getRateComparisonItems = () => {
+        const patch = activeRun?.proposedPatch || (typeof activeRun?.proposed_patch_json === 'string'
+            ? JSON.parse(activeRun.proposed_patch_json)
+            : activeRun?.proposed_patch_json);
+        if (!patch) return [];
+
+        const items: any[] = [];
+        if (patch.interior_full_colour_fixed?.['16p']) {
+            items.push({
+                path: 'interior_full_colour_fixed.16p',
+                category: 'Interior Print',
+                label: '16p Signature Fixed Setup',
+                currentValue: 120.0,
+                proposedValue: patch.interior_full_colour_fixed['16p'],
+                unit: '€',
+                status: 'CALIBRATED'
+            });
+        }
+        if (patch.paper_price_interior_by_kilo?.['offset']) {
+            items.push({
+                path: 'paper_price_interior_by_kilo.offset',
+                category: 'Paper',
+                label: 'Interior Offset Paper / kg',
+                currentValue: 1.15,
+                proposedValue: patch.paper_price_interior_by_kilo['offset'],
+                unit: '€/kg',
+                status: 'CALIBRATED'
+            });
+        }
+        if (patch.binding_perfect_bound_fixed) {
+            items.push({
+                path: 'binding_perfect_bound_fixed',
+                category: 'Binding',
+                label: 'Perfect Binding Fixed Setup',
+                currentValue: 150.0,
+                proposedValue: patch.binding_perfect_bound_fixed,
+                unit: '€',
+                status: 'CALIBRATED'
+            });
+        }
+        return items;
+    };
+
+    const isReadyForCalculation = session?.status === 'READY';
+    const isCalculated = session?.status === 'CALCULATED';
+    const isAccepted = session?.status === 'ACCEPTED';
+    const isRunAcceptanceEligible = activeRun?.status === 'SUCCEEDED' || activeRun?.status === 'CONVERGED' || activeRun?.status === 'UNDERDETERMINED_ANCHOR' || activeRun?.status === 'ACCEPTABLE_CANDIDATE';
+    const canAccept = isCalculated && isRunAcceptanceEligible;
+
+    // Canonical finite number helper
+    const targetPriceVal = Number(activeRun?.targetPrice ?? activeRun?.target_price ?? draftCommercials.targetManufacturingPrice ?? 0);
+    const predictedPriceVal = Number(activeRun?.enginePriceAfter ?? activeRun?.predicted_manufacturing_price ?? 0);
+    const residualVal = Number(activeRun?.absoluteResidual ?? activeRun?.absolute_residual ?? 0);
+
+    return (
+        <div className="space-y-2.5">
+            {/* Header / Secondary Utilities Bar */}
+            <div className="flex items-center justify-between gap-3 px-1">
+                {/* Node info if available, no empty parentheses */}
+                {printerNodeId ? (
+                    <span className="text-[11px] text-zinc-500 font-medium">
+                        {t('pricing.calibration.target') || 'Calibration Target'}: <strong className="text-zinc-700 dark:text-zinc-300 font-semibold">{printerNodeName && printerNodeName !== 'Production Node' ? printerNodeName : printerNodeId}</strong>
+                    </span>
+                ) : <span />}
+
+                {/* Secondary Actions (Drawer / Modal Triggers) */}
+                <div className="flex items-center gap-1.5 flex-wrap">
+                    <button
+                        type="button"
+                        onClick={() => setShowCommercialModal(!showCommercialModal)}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition-colors flex items-center gap-1.5 cursor-pointer ${
+                            showCommercialModal 
+                                ? 'bg-indigo-600 border-indigo-500 text-white' 
+                                : 'bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 text-indigo-600 dark:text-indigo-400'
+                        }`}
+                        title={t('pricing.action.calibrateQuote') || 'Calibrate from this quote'}
+                        aria-label={t('pricing.action.calibrateQuote') || 'Calibrate from this quote'}
+                    >
+                        <Sliders size={13} />
+                        <span>{t('pricing.action.calibrateQuoteBtn') || 'Calibrate Quote'}</span>
+                    </button>
+
+                    <button
+                        type="button"
+                        onClick={() => setShowSessionsModal(true)}
+                        className="px-2.5 py-1 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-700/80 text-zinc-700 dark:text-zinc-200 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer"
+                        title={t('pricing.action.previousSessions') || 'Previous calibrated sessions'}
+                        aria-label={t('pricing.action.previousSessions') || 'Previous calibrated sessions'}
+                    >
+                        <BookOpen size={13} className="text-[#dc0000]" />
+                        <span>{t('pricing.action.calibratedBooks') || 'Calibrated Books'}</span>
+                    </button>
+
+                    <button
+                        type="button"
+                        onClick={() => setShowAdvanced(!showAdvanced)}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition-colors flex items-center gap-1.5 cursor-pointer ${
+                            showAdvanced 
+                                ? 'bg-zinc-100 dark:bg-zinc-800 border-zinc-300 dark:border-zinc-600 text-zinc-900 dark:text-white' 
+                                : 'bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 text-zinc-700 dark:text-zinc-300'
+                        }`}
+                    >
+                        <Sliders size={13} />
+                        <span>{showAdvanced ? (t('pricing.action.hideAdvanced') || 'Hide Advanced') : (t('pricing.action.advancedDetails') || 'Advanced Details')}</span>
+                    </button>
+
+                    <button
+                        type="button"
+                        onClick={() => setShowHistoryModal(true)}
+                        className="px-2.5 py-1 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-700/80 text-zinc-700 dark:text-zinc-200 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer"
+                    >
+                        <History size={13} className="text-zinc-500" />
+                        <span>{t('pricing.action.revisions') || 'Revisions'}</span>
+                    </button>
+                </div>
+            </div>
+
+            {/* Commercial Calibration Panel (Phase 195F-R Mounted UI) */}
+            {showCommercialModal && (
+                <div className="animate-in fade-in duration-200">
+                    <CommercialCalibrationPanel
+                        printerNodeId={printerNodeId}
+                        bookSpec={draftSpec}
+                        onClose={() => setShowCommercialModal(false)}
+                    />
+                </div>
+            )}
+
+            {/* Notifications */}
+            {showSupersedeAction && (
+                <div className="p-4 bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-700 rounded-xl space-y-3">
+                    <div className="flex items-start gap-2.5">
+                        <AlertTriangle size={18} className="text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                        <div>
+                            <h4 className="text-xs font-bold text-amber-900 dark:text-amber-200">
+                                Pricing Model Upgrade Required
+                            </h4>
+                            <p className="text-xs text-amber-800/90 dark:text-amber-300/90 mt-0.5">
+                                This calibration calculation was computed with a legacy pricing engine contract and cannot be accepted safely under current integrity rules. Supersede this calculation to generate a new run using current zero-anchor recovery and dynamic signature paths.
+                            </p>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-3 pt-1">
+                        <button
+                            type="button"
+                            onClick={handleSupersedeAndRecalibrate}
+                            disabled={superseding}
+                            className="px-4 py-2 bg-amber-600 hover:bg-amber-700 disabled:bg-zinc-400 text-white rounded-lg text-xs font-bold transition-colors flex items-center gap-2 shadow-xs"
+                        >
+                            <RefreshCw size={14} className={superseding ? 'animate-spin' : ''} />
+                            <span>{superseding ? 'Upgrading Session...' : 'Recalculate with Current Pricing Model'}</span>
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {error && !showSupersedeAction && (
+                <div className="p-3.5 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 rounded-xl text-xs text-red-900 dark:text-red-200 flex items-center gap-2 font-medium">
+                    <AlertTriangle size={16} className="text-red-600 shrink-0" />
+                    <span>{error}</span>
+                </div>
+            )}
+            {successMessage && (
+                <div className="p-3.5 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-xl text-xs text-emerald-900 dark:text-emerald-200 flex items-center gap-2 font-medium">
+                    <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
+                    <span>{successMessage}</span>
+                </div>
+            )}
+
+            {/* Loading / Rehydrating State Gate */}
+            {loadingSession ? (
+                <div className="p-8 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl flex flex-col items-center justify-center text-center space-y-3 min-h-[280px]">
+                    <div className="w-7 h-7 border-2 border-[#dc0000] border-t-transparent rounded-full animate-spin" />
+                    <span className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                        Restoring calibration workspace...
+                    </span>
+                </div>
+            ) : (
+                /* Primary Guided Stepper View (Phase 193H) */
+                <GuidedCalibrationWizard
+                    printerNodeId={printerNodeId}
+                    printerNodeName={printerNodeName}
+                    draftSpec={draftSpec}
+                    setDraftSpec={setDraftSpec}
+                    draftCommercials={draftCommercials}
+                    setDraftCommercials={setDraftCommercials}
+                    messages={messages}
+                    onSendMessage={handleSendMessage}
+                    sendingChat={sendingChat}
+                    activeProposal={activeProposal}
+                    aiUnavailable={aiUnavailable}
+                    onApplyProposal={handleApplyProposal}
+                    onApplyClarifications={handleApplyClarifications}
+                    session={session}
+                    activeRun={activeRun}
+                    isReady={isReadyForCalculation}
+                    isCalculated={isCalculated}
+                    isAccepted={isAccepted}
+                    canAccept={canAccept}
+                    isRunAcceptanceEligible={isRunAcceptanceEligible}
+                    onMarkReady={handleMarkReady}
+                    onCalculate={handleCalculate}
+                    onAccept={() => setShowAcceptModal(true)}
+                    calculating={calculating}
+                    error={error}
+                    activeQuoteEvidence={activeQuoteEvidence}
+                    setActiveQuoteEvidence={setActiveQuoteEvidence}
+                    selectedVariantId={selectedVariantId}
+                    setSelectedVariantId={setSelectedVariantId}
+                />
+            )}
+
+            {/* Advanced / Power User Drawer (Progressive Disclosure) */}
+            {showAdvanced && (
+                <div className="mt-8 pt-6 border-t border-zinc-200 dark:border-zinc-800 space-y-6 animate-in fade-in duration-200">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <h4 className="text-sm font-bold text-zinc-900 dark:text-white">
+                                Advanced Physical Specification & Provenance Matrix
+                            </h4>
+                            <p className="text-xs text-zinc-500">
+                                Low-level parameter mapping and inverse solver calibration telemetry.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <CalibrationStructuredSummary
+                            spec={draftSpec}
+                            onFieldChange={(field, val) => setDraftSpec((prev: any) => ({ ...prev, [field]: val }))}
+                            extractedFields={extractedFields}
+                            confirmedFields={confirmedFields}
+                            readOnly={isAccepted}
+                        />
+
+                        <CalibrationCommercialDeclaration
+                            commercials={draftCommercials}
+                            onChange={(field, val) => setDraftCommercials((prev: any) => ({ ...prev, [field]: val }))}
+                            readOnly={isAccepted}
+                            missingInclusions={draftCommercials.includesPaper === null || draftCommercials.includesBinding === null}
+                        />
+                    </div>
+
+                    <CalibrationWarnings
+                        warnings={session?.warnings_json ? JSON.parse(session.warnings_json) : []}
+                        residual={residualVal}
+                        isCalculated={isCalculated}
+                    />
+
+                    {activeRun && (
+                        <div className="space-y-6">
+                            <CalibrationRunSummary
+                                run={activeRun}
+                                transportPricePerKg={draftCommercials.transportPricePerKg}
+                                onExplain={async () => {}}
+                                explaining={explaining}
+                            />
+
+                            <CalibrationRateComparison
+                                items={getRateComparisonItems()}
+                            />
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* Governed Acceptance Confirmation Modal */}
+            {activeRun && (
+                <CalibrationAcceptanceModal
+                    isOpen={showAcceptModal}
+                    onClose={() => setShowAcceptModal(false)}
+                    onConfirm={handleAcceptanceConfirm}
+                    accepting={accepting}
+                    nodeName={printerNodeName}
+                    bookName={'Reference Book'}
+                    targetPrice={Number.isFinite(targetPriceVal) ? targetPriceVal : 0}
+                    predictedPrice={Number.isFinite(predictedPriceVal) ? predictedPriceVal : 0}
+                    residual={Number.isFinite(residualVal) ? residualVal : 0}
+                    error={error}
+                />
+            )}
+
+            {/* Read-Only Revision History Drawer */}
+            <PricingRevisionHistoryModal
+                isOpen={showHistoryModal}
+                onClose={() => setShowHistoryModal(false)}
+                printerNodeId={printerNodeId}
+            />
+
+            {/* Read-Only Calibration Sessions & Books History Drawer */}
+            <CalibrationSessionsHistoryModal
+                isOpen={showSessionsModal}
+                onClose={() => setShowSessionsModal(false)}
+                printerNodeId={printerNodeId}
+            />
+        </div>
+    );
+};

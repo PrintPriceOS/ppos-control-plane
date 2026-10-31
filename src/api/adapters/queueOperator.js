@@ -6,6 +6,7 @@ const { Queue, Job } = require('bullmq');
 const connection = require('./redisConnection');
 
 const PPOS_QUEUE_NAME = process.env.PPOS_QUEUE_NAME || 'preflight_async_queue';
+const PPOS_LARGE_QUEUE_NAME = 'preflight_large_document';
 
 // Local cache for queue instances
 const queues = {};
@@ -18,71 +19,50 @@ function getQueue(name = PPOS_QUEUE_NAME) {
 }
 
 const queueOperator = {
+    getQueue,
     pauseQueue: async (queueName = PPOS_QUEUE_NAME) => {
-        try {
-            const queue = getQueue(queueName);
-            await queue.pause();
-            console.log(`[QUEUE-OPERATOR] Paused queue: ${queueName}`);
-            return { ok: true, message: `Queue ${queueName} paused` };
-        } catch (err) {
-            console.error(`[QUEUE-OPERATOR] Failed to pause ${queueName}:`, err.message);
-            return { ok: false, error: err.message };
-        }
+        const q = getQueue(queueName);
+        await q.pause();
+        return { ok: true };
     },
-
     resumeQueue: async (queueName = PPOS_QUEUE_NAME) => {
-        try {
-            const queue = getQueue(queueName);
-            await queue.resume();
-            console.log(`[QUEUE-OPERATOR] Resumed queue: ${queueName}`);
-            return { ok: true, message: `Queue ${queueName} resumed` };
-        } catch (err) {
-            console.error(`[QUEUE-OPERATOR] Failed to resume ${queueName}:`, err.message);
-            return { ok: false, error: err.message };
-        }
+        const q = getQueue(queueName);
+        await q.resume();
+        return { ok: true };
     },
-
     drainQueue: async (queueName = PPOS_QUEUE_NAME) => {
-        try {
-            const queue = getQueue(queueName);
-            await queue.drain();
-            console.log(`[QUEUE-OPERATOR] Drained queue: ${queueName}`);
-            return { ok: true, message: `Queue ${queueName} drained` };
-        } catch (err) {
-            console.error(`[QUEUE-OPERATOR] Failed to drain ${queueName}:`, err.message);
-            return { ok: false, error: err.message };
-        }
+        const q = getQueue(queueName);
+        await q.drain();
+        return { ok: true };
     },
-
-    getAdminStats: async (queueName = PPOS_QUEUE_NAME) => {
+    getAdminStats: async () => {
         try {
-            const queue = getQueue(queueName);
-            const [counts, isPaused] = await Promise.all([
-                queue.getJobCounts('waiting', 'active', 'completed', 'failed', 'delayed'),
-                queue.isPaused()
-            ]);
+            const queueNames = [PPOS_QUEUE_NAME, PPOS_LARGE_QUEUE_NAME];
+            const stats = await Promise.all(queueNames.map(async name => {
+                const q = getQueue(name);
+                const [counts, isPaused] = await Promise.all([
+                    q.getJobCounts('waiting', 'active', 'completed', 'failed', 'delayed'),
+                    q.isPaused()
+                ]);
+                return {
+                    name,
+                    status: isPaused ? 'PAUSED' : 'RUNNING',
+                    size: counts.waiting + counts.active,
+                    counts: counts
+                };
+            }));
 
             return {
-                queues: [
-                    { 
-                        name: queueName, 
-                        status: isPaused ? 'PAUSED' : 'RUNNING', 
-                        size: counts.waiting + counts.active,
-                        counts: counts
-                    }
-                ],
+                queues: stats,
                 global: {
                     is_ready: true,
                     timestamp: new Date().toISOString()
                 }
             };
         } catch (err) {
-            console.warn('[QUEUE-OPERATOR] Real stats failed, returning fallback mock:', err.message);
             return {
-                queues: [
-                    { name: queueName, status: 'UNKNOWN', size: 0, error: err.message }
-                ],
-                global: { is_ready: false }
+                queues: [],
+                global: { is_ready: false, error: err.message }
             };
         }
     },

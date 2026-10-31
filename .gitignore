@@ -1,5 +1,12 @@
-node_modules
+node_modules/
 .env
 dist
 .DS_Store
 *.log
+scratch/
+.gemini/
+*.tar
+*.tar.gz
+*.sql.gz
+review_artifacts*/
+

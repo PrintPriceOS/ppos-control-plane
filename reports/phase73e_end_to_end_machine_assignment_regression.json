@@ -1,0 +1,58 @@
+{
+  "generated_at": "2026-06-10T19:18:54.313Z",
+  "phase": "73E",
+  "repo": "ppos-control-plane",
+  "smoke_passed": true,
+  "summary": {
+    "total": 9,
+    "passed": 9,
+    "failed": 0
+  },
+  "results": [
+    {
+      "label": "73D Control Plane report loaded",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "73D: smoke_passed=true",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "2.1 Compatible machine assignment is accepted",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "2.1 Queue status transitions to MACHINE_ASSIGNED",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "2.1 Preflight compatibility warnings preserved",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "2.2 Throws error on incompatible machine assignment",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "2.2 Blocked with PRODUCTION_MACHINE_INCOMPATIBLE",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "2.3 Queue creation with incompatible machine throws error",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "label": "2.3 Throws PRODUCTION_MACHINE_INCOMPATIBLE",
+      "pass": true,
+      "detail": null
+    }
+  ]
+}

@@ -1,0 +1,180 @@
+{
+  "timestamp": "2026-06-07T05:46:33.563Z",
+  "scenarios": [
+    {
+      "stepName": "1. Preflight Review Required",
+      "readiness_ready": false,
+      "blockers": [
+        "MISSING_COVER_SLOT",
+        "PREFLIGHT_REVIEW_DECISION_REQUIRED_INTERIOR_PDF"
+      ],
+      "warnings": [],
+      "invoiceAllowed": false,
+      "invoiceReason": "Order is not ready for invoice/payment progression.",
+      "paymentLinkAllowed": false,
+      "paymentConfirmAllowed": false,
+      "unlockAllowed": false,
+      "unlockReason": "MISSING_INVOICE,MISSING_PAYMENT,INVOICE_GATE_NOT_READY,INVOICE_GATE_BLOCKERS_EXIST",
+      "queueEligible": false,
+      "queueReason": "HANDOFF_PACKAGE_NOT_FOUND",
+      "checks": [
+        "✅ Readiness is false",
+        "✅ Invoice blocked",
+        "✅ Payment link blocked",
+        "✅ Unlock blocked",
+        "✅ Queue blocked"
+      ]
+    },
+    {
+      "stepName": "2. Operator Rejects Review",
+      "readiness_ready": false,
+      "blockers": [
+        "MISSING_COVER_SLOT",
+        "PREFLIGHT_REVIEW_REJECTED_REUPLOAD_REQUIRED_INTERIOR_PDF"
+      ],
+      "warnings": [],
+      "invoiceAllowed": false,
+      "invoiceReason": "Order is not ready for invoice/payment progression.",
+      "paymentLinkAllowed": false,
+      "paymentConfirmAllowed": false,
+      "unlockAllowed": false,
+      "unlockReason": "MISSING_INVOICE,MISSING_PAYMENT,INVOICE_GATE_NOT_READY,INVOICE_GATE_BLOCKERS_EXIST",
+      "queueEligible": false,
+      "queueReason": "HANDOFF_PACKAGE_NOT_FOUND",
+      "checks": [
+        "✅ Readiness is false",
+        "✅ Blocker PREFLIGHT_REVIEW_REJECTED_REUPLOAD_REQUIRED present",
+        "✅ Invoice blocked"
+      ]
+    },
+    {
+      "stepName": "3. Customer Action Created",
+      "checks": [
+        "✅ Customer action created safely",
+        "✅ Token preview is safe"
+      ]
+    },
+    {
+      "stepName": "4. UX Sanitation Check",
+      "checks": [
+        "✅ Customer UX says remediation required",
+        "✅ No operator summary in customer UX",
+        "✅ Mapped to Interior PDF safely",
+        "✅ No raw token internals in customer UX"
+      ]
+    },
+    {
+      "stepName": "5. Replacement File Uploaded",
+      "readiness_ready": false,
+      "blockers": [
+        "PREFLIGHT_UNACCEPTABLE_INTERIOR_PDF",
+        "PREFLIGHT_REVIEW_REJECTED_REUPLOAD_REQUIRED_INTERIOR_PDF",
+        "PREFLIGHT_UNACCEPTABLE_COVER_PDF",
+        "PREFLIGHT_REVIEW_REJECTED_REUPLOAD_REQUIRED_COVER_PDF"
+      ],
+      "warnings": [],
+      "invoiceAllowed": false,
+      "invoiceReason": "Order is not ready for invoice/payment progression.",
+      "paymentLinkAllowed": false,
+      "paymentConfirmAllowed": false,
+      "unlockAllowed": false,
+      "unlockReason": "MISSING_INVOICE,MISSING_PAYMENT",
+      "queueEligible": false,
+      "queueReason": "HANDOFF_PACKAGE_NOT_FOUND",
+      "checks": [
+        "✅ Readiness is false after upload",
+        "✅ Blocker PENDING or UNACCEPTABLE present",
+        "✅ Invoice remains blocked after upload"
+      ]
+    },
+    {
+      "stepName": "6. Replacement Preflight Requires Review",
+      "readiness_ready": false,
+      "blockers": [
+        "PREFLIGHT_REVIEW_DECISION_REQUIRED_INTERIOR_PDF",
+        "PREFLIGHT_REVIEW_DECISION_REQUIRED_COVER_PDF"
+      ],
+      "warnings": [],
+      "invoiceAllowed": false,
+      "invoiceReason": "Order is not ready for invoice/payment progression.",
+      "paymentLinkAllowed": false,
+      "paymentConfirmAllowed": false,
+      "unlockAllowed": false,
+      "unlockReason": "MISSING_INVOICE,MISSING_PAYMENT",
+      "queueEligible": false,
+      "queueReason": "HANDOFF_PACKAGE_NOT_FOUND",
+      "checks": [
+        "✅ Readiness is false",
+        "✅ Blocker PREFLIGHT_REVIEW_DECISION_REQUIRED present",
+        "✅ Invoice remains blocked pending review"
+      ]
+    },
+    {
+      "stepName": "7. Operator Approves with Warnings",
+      "readiness_ready": true,
+      "blockers": [],
+      "warnings": [
+        "PREFLIGHT_APPROVED_WITH_WARNINGS_INTERIOR_PDF",
+        "PREFLIGHT_APPROVED_WITH_WARNINGS_COVER_PDF"
+      ],
+      "invoiceAllowed": true,
+      "invoiceReason": "",
+      "paymentLinkAllowed": true,
+      "paymentConfirmAllowed": true,
+      "unlockAllowed": true,
+      "unlockReason": "",
+      "queueEligible": false,
+      "queueReason": "HANDOFF_PACKAGE_NOT_FOUND",
+      "checks": [
+        "✅ Readiness is true after approval",
+        "✅ Old rejection blocker removed",
+        "✅ Warning preserved",
+        "✅ Invoice generation allowed"
+      ]
+    },
+    {
+      "stepName": "8. Payment Check",
+      "readiness_ready": true,
+      "blockers": [],
+      "warnings": [
+        "PREFLIGHT_APPROVED_WITH_WARNINGS_INTERIOR_PDF",
+        "PREFLIGHT_APPROVED_WITH_WARNINGS_COVER_PDF"
+      ],
+      "invoiceAllowed": true,
+      "invoiceReason": "",
+      "paymentLinkAllowed": true,
+      "paymentConfirmAllowed": true,
+      "unlockAllowed": true,
+      "unlockReason": "",
+      "queueEligible": false,
+      "queueReason": "HANDOFF_PACKAGE_NOT_FOUND",
+      "checks": [
+        "✅ Payment link allowed"
+      ]
+    },
+    {
+      "stepName": "9. Payment Confirmation",
+      "checks": [
+        "✅ Payment confirmation succeeded"
+      ]
+    },
+    {
+      "stepName": "10. Production Unlock",
+      "checks": [
+        "✅ Production unlocked"
+      ]
+    },
+    {
+      "stepName": "11. Production Queue Eligibility",
+      "checks": [
+        "✅ Queue is eligible",
+        "✅ Warnings are preserved in queue check"
+      ],
+      "warnings": [
+        "FILE_ACCESS_NOT_VERIFIED_BY_AUDIT",
+        "PREFLIGHT_APPROVED_WITH_WARNINGS_INTERIOR_PDF",
+        "PREFLIGHT_APPROVED_WITH_WARNINGS_COVER_PDF"
+      ]
+    }
+  ]
+}

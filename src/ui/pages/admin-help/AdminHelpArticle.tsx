@@ -33,11 +33,11 @@ export const AdminHelpArticle: React.FC = () => {
     if (!doc) {
         return (
             <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6 text-center">
-                <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm max-w-md">
+                <div className="bg-white p-8 rounded-none border border-slate-200 shadow-sm max-w-md">
                     <BookOpenIcon className="w-12 h-12 text-slate-400 mx-auto mb-4" />
                     <h2 className="text-xl font-bold text-slate-900 mb-2">Document not found</h2>
                     <p className="text-slate-600 mb-6">The knowledge base article you are looking for does not exist or has been removed.</p>
-                    <a href="/admin/help" className="inline-block bg-blue-600 text-white px-5 py-2.5 rounded-lg font-medium hover:bg-blue-700 transition">
+                    <a href="/admin/help" className="inline-block bg-blue-600 text-white px-5 py-2.5 rounded-none font-medium hover:bg-blue-700 transition">
                         Back to Help Center
                     </a>
                 </div>
@@ -67,7 +67,7 @@ export const AdminHelpArticle: React.FC = () => {
                 {doc.dashboardPath && (
                     <a
                         href={doc.dashboardPath}
-                        className="text-sm border border-slate-200 bg-white hover:bg-slate-50 shadow-sm px-4 py-2 rounded-lg text-slate-700 font-medium flex items-center gap-2 transition"
+                        className="text-sm border border-slate-200 bg-white hover:bg-slate-50 shadow-sm px-4 py-2 rounded-none text-slate-700 font-medium flex items-center gap-2 transition"
                     >
                         <span>Open in Cockpit</span>
                         <ArrowTopRightOnSquareIcon className="w-4 h-4" />
@@ -79,11 +79,11 @@ export const AdminHelpArticle: React.FC = () => {
 
                 {/* Fallback Banner */}
                 {doc.id === 'error-generic' && new URLSearchParams(window.location.search).get('doc') !== 'error-generic' && (
-                    <div className="mb-6 bg-amber-50 border border-amber-200 p-4 rounded-xl flex gap-3 text-amber-800 items-start shadow-sm animate-slide-fade">
+                    <div className="mb-6 bg-amber-50 border border-amber-200 p-4 rounded-none flex gap-3 text-amber-800 items-start shadow-sm animate-slide-fade">
                         <ExclamationTriangleIcon className="w-5 h-5 shrink-0 mt-0.5 text-amber-500" />
                         <div>
                             <h4 className="font-bold text-sm uppercase tracking-widest mb-1">Specific documentation not found</h4>
-                            <p className="text-sm">We couldn't find a dedicated guide for exactly <code className="bg-amber-100 px-1 rounded font-bold">{new URLSearchParams(window.location.search).get('doc')?.replace('error-', '')}</code>. Displaying the generic troubleshooting steps instead.</p>
+                            <p className="text-sm">We couldn't find a dedicated guide for exactly <code className="bg-amber-100 px-1 rounded-none font-bold">{new URLSearchParams(window.location.search).get('doc')?.replace('error-', '')}</code>. Displaying the generic troubleshooting steps instead.</p>
                         </div>
                     </div>
                 )}
@@ -91,7 +91,7 @@ export const AdminHelpArticle: React.FC = () => {
                 {/* Article Hero */}
                 <div className="mb-10">
                     <div className="flex items-center gap-3 mb-4">
-                        <div className="bg-white border border-slate-200 p-2 rounded-lg shadow-sm">
+                        <div className="bg-white border border-slate-200 p-2 rounded-none shadow-sm">
                             {getIconForType(doc.type)}
                         </div>
                         <div className="uppercase tracking-wider text-sm font-bold text-slate-500">
@@ -110,7 +110,7 @@ export const AdminHelpArticle: React.FC = () => {
                     <div className="md:col-span-2 space-y-8">
 
                         {/* dynamic Body rendered safely */}
-                        <div className="bg-white border border-slate-200 rounded-2xl p-6 md:p-8 shadow-sm">
+                        <div className="bg-white border border-slate-200 rounded-none p-6 md:p-8 shadow-sm">
                             <h2 className="text-lg font-bold text-slate-900 mb-4 border-b border-slate-100 pb-3">What are we looking at?</h2>
                             <div
                                 className="prose prose-slate prose-blue max-w-none prose-headings:font-bold prose-headings:text-slate-900 prose-p:text-slate-700 prose-li:text-slate-700 prose-a:text-blue-600"
@@ -120,7 +120,7 @@ export const AdminHelpArticle: React.FC = () => {
                                         .replace(/\*(.*?)\*/g, '<em>$1</em>')
                                         .replace(/\n/g, '<br/>')
                                         .replace(/- (.*?)(?=<br\/>|$)/g, '<li class="ml-4 list-disc">$1</li>')
-                                        .replace(/`([^`]+)`/g, '<code class="bg-slate-100 text-slate-800 px-1 py-0.5 rounded text-sm">$1</code>')
+                                        .replace(/`([^`]+)`/g, '<code class="bg-slate-100 text-slate-800 px-1 py-0.5 rounded-none text-sm">$1</code>')
                                 }}
                             />
                         </div>
@@ -132,7 +132,7 @@ export const AdminHelpArticle: React.FC = () => {
 
                         {/* Take Action / Related Actions */}
                         {doc.relatedActions && doc.relatedActions.length > 0 && (
-                            <div className="bg-blue-600 rounded-2xl p-6 shadow-sm border border-blue-500 text-white">
+                            <div className="bg-blue-600 rounded-none p-6 shadow-sm border border-blue-500 text-white">
                                 <h3 className="text-sm font-bold uppercase tracking-wider mb-4 flex items-center gap-2">
                                     <CommandLineIcon className="w-4 h-4 text-blue-200" />
                                     Take Action
@@ -142,7 +142,7 @@ export const AdminHelpArticle: React.FC = () => {
                                         <a
                                             key={i}
                                             href={action.url}
-                                            className="block w-full text-left bg-blue-700/50 hover:bg-blue-800 border border-blue-500 rounded-lg px-4 py-3 text-sm font-medium transition-colors shadow-sm group"
+                                            className="block w-full text-left bg-blue-700/50 hover:bg-blue-800 border border-blue-500 rounded-none px-4 py-3 text-sm font-medium transition-colors shadow-sm group"
                                         >
                                             <div className="flex justify-between items-center">
                                                 <span>{action.label}</span>
@@ -156,11 +156,11 @@ export const AdminHelpArticle: React.FC = () => {
 
                         {/* Applies To */}
                         {doc.appliesTo && doc.appliesTo.length > 0 && (
-                            <div className="bg-slate-900 border border-slate-700 rounded-2xl p-6 shadow-sm">
+                            <div className="bg-slate-900 border border-slate-700 rounded-none p-6 shadow-sm">
                                 <h3 className="text-sm font-bold text-white uppercase tracking-wider mb-3">Applies To</h3>
                                 <div className="flex flex-wrap gap-2">
                                     {doc.appliesTo.map(role => (
-                                        <span key={role} className="bg-slate-800 text-slate-300 border border-slate-700 text-xs px-2.5 py-1 rounded-md font-medium">
+                                        <span key={role} className="bg-slate-800 text-slate-300 border border-slate-700 text-xs px-2.5 py-1 rounded-none font-medium">
                                             {role}
                                         </span>
                                     ))}
@@ -170,25 +170,25 @@ export const AdminHelpArticle: React.FC = () => {
 
                         {/* Thresholds / Status Card */}
                         {(doc.normal || doc.warning || doc.critical) && (
-                            <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+                            <div className="bg-white border border-slate-200 rounded-none p-6 shadow-sm">
                                 <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-4">Metric Thresholds</h3>
                                 <ul className="space-y-3">
                                     {doc.normal && (
                                         <li className="flex justify-between items-center text-sm">
                                             <span className="text-slate-500">Normal</span>
-                                            <span className="font-mono bg-green-50 text-green-700 font-bold px-2 py-1 rounded-md">{doc.normal}</span>
+                                            <span className="font-mono bg-green-50 text-green-700 font-bold px-2 py-1 rounded-none">{doc.normal}</span>
                                         </li>
                                     )}
                                     {doc.warning && (
                                         <li className="flex justify-between items-center text-sm">
                                             <span className="text-slate-500">Warning</span>
-                                            <span className="font-mono bg-amber-50 text-amber-700 font-bold px-2 py-1 rounded-md">{doc.warning}</span>
+                                            <span className="font-mono bg-amber-50 text-amber-700 font-bold px-2 py-1 rounded-none">{doc.warning}</span>
                                         </li>
                                     )}
                                     {doc.critical && (
                                         <li className="flex justify-between items-center text-sm">
                                             <span className="text-slate-500">Critical</span>
-                                            <span className="font-mono bg-red-50 text-red-700 font-bold px-2 py-1 rounded-md">{doc.critical}</span>
+                                            <span className="font-mono bg-red-50 text-red-700 font-bold px-2 py-1 rounded-none">{doc.critical}</span>
                                         </li>
                                     )}
                                 </ul>
@@ -197,7 +197,7 @@ export const AdminHelpArticle: React.FC = () => {
 
                         {/* Action Card */}
                         {doc.action && doc.action.length > 0 && (
-                            <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm border-l-4 border-l-blue-500">
+                            <div className="bg-white border border-slate-200 rounded-none p-6 shadow-sm border-l-4 border-l-blue-500">
                                 <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-4 flex items-center gap-2">
                                     <CommandLineIcon className="w-4 h-4 text-blue-500" />
                                     Recommended Actions
@@ -214,7 +214,7 @@ export const AdminHelpArticle: React.FC = () => {
                         )}
 
                         {/* Meta Card */}
-                        <div className="bg-slate-100 rounded-2xl p-5 text-xs text-slate-500">
+                        <div className="bg-slate-100 rounded-none p-5 text-xs text-slate-500">
                             <div className="mb-2"><strong>ID:</strong> `{doc.id}`</div>
                             {doc.lastUpdated && <div><strong>Last updated:</strong> {doc.lastUpdated}</div>}
 
@@ -233,17 +233,17 @@ export const AdminHelpArticle: React.FC = () => {
                         </div>
 
                         {/* Feedback Loop */}
-                        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm text-center">
+                        <div className="bg-white border border-slate-200 rounded-none p-6 shadow-sm text-center">
                             <h3 className="text-sm font-bold text-slate-900 mb-3">Was this article helpful?</h3>
                             <div className="flex justify-center gap-3 mb-4">
                                 <button
                                     onClick={() => postHelpAnalytics({ event_type: 'helpful_yes', article_id: doc.id })}
-                                    className="px-4 py-2 border border-slate-200 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50 hover:text-green-600 hover:border-green-200 transition-colors">
+                                    className="px-4 py-2 border border-slate-200 rounded-none text-sm font-medium text-slate-600 hover:bg-slate-50 hover:text-green-600 hover:border-green-200 transition-colors">
                                     👍 Yes
                                 </button>
                                 <button
                                     onClick={() => postHelpAnalytics({ event_type: 'helpful_no', article_id: doc.id })}
-                                    className="px-4 py-2 border border-slate-200 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50 hover:text-red-600 hover:border-red-200 transition-colors">
+                                    className="px-4 py-2 border border-slate-200 rounded-none text-sm font-medium text-slate-600 hover:bg-slate-50 hover:text-red-600 hover:border-red-200 transition-colors">
                                     👎 No
                                 </button>
                             </div>

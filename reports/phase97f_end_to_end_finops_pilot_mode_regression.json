@@ -1,0 +1,17 @@
+{
+  "passed": [
+    "SC1: Use Phase 96-style approved release gate",
+    "SC2: Create controlled pilot program",
+    "SC3: Activate pilot program manually",
+    "SC4: Create pilot run",
+    "SC5: Evaluate pilot run eligibility",
+    "SC6: Execute dry-run only",
+    "SC7: Generate monitoring summary",
+    "SC8: Detect no incidents for healthy run",
+    "SC9: Generate export preview",
+    "SC10: Verify no real payment/refund/payout/external execution enabled",
+    "SC11: Verify source records remain unchanged",
+    "SC12: Verify audit timeline includes all program, run, dry-run, and monitoring events"
+  ],
+  "failed": []
+}

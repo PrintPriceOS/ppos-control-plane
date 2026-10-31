@@ -1,0 +1,33 @@
+{
+  "passed": [
+    "SC1: Reconciliation run created",
+    "SC2: Ledger snapshots generated for payments/refunds/settlements/platform fees",
+    "SC3: Raw provider payload hidden/hashed",
+    "SC4: Payment amount mismatch detected",
+    "SC5: Currency mismatch detected",
+    "SC6: Refund not applied to settlement detected",
+    "SC7: Payout ready with hold detected",
+    "SC8: Payout executed without evidence detected",
+    "SC17: Export batch created",
+    "SC9: Critical mismatch blocks export readiness",
+    "SC10: Mismatch acknowledged",
+    "SC11: Mismatch resolved",
+    "SC12: Mismatch dismissed requires reason",
+    "SC13: Manual adjustment created",
+    "SC15: Partner cannot approve adjustment",
+    "SC14: Manual adjustment approved by finance/admin",
+    "SC16: Adjustment creates ledger adjustment row",
+    "SC18: Export readiness passes after blockers resolved",
+    "SC19: CSV export generated",
+    "SC20: JSON export generated",
+    "SC21: Export includes totals and row count",
+    "SC22: Export does not mutate payment/settlement source state",
+    "SC23: Mark manual export requires evidence",
+    "SC24: No external accounting submission occurs",
+    "SC25: No tax filing occurs",
+    "SC26: FULL_PUBLIC remains disabled",
+    "SC27: No forbidden claims",
+    "SC28: Build remains valid"
+  ],
+  "failed": []
+}

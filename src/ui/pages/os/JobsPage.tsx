@@ -1,109 +1,288 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { QueueListIcon, FunnelIcon, ClockIcon, ArrowTopRightOnSquareIcon, CheckCircleIcon, XCircleIcon, ArrowPathIcon, MagnifyingGlassIcon } from "@heroicons/react/24/outline";
-import { getJobs } from "../../lib/adminApi";
+import { getIncomingConsoleConsensus, syncAdminPreflightRegistry } from "../../lib/adminApi";
 import { useAdminQuery } from "../../hooks/useAdminData";
 import { DataTable } from "../../components/DataTable";
-import { JobDetailDrawer } from "../../components/JobDetailDrawer";
+import { short } from "../../lib/formatters";
+import { safeArray } from "../../lib/display";
+import { useLocale } from "../../i18n";
 
 export const JobsPage: React.FC = () => {
-  const [selectedJob, setSelectedJob] = React.useState<any | null>(null);
-  const q = useAdminQuery("jobs:global", () => getJobs({ limit: 50 }), 10000);
+  const { t } = useLocale();
+  const navigate = useNavigate();
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncStatusMsg, setSyncStatusMsg] = useState<string | null>(null);
+
+  // Fetch canonical preflight jobs with optional legacy queue operator fallback
+  const q = useAdminQuery("jobs:global:consensus", () => getIncomingConsoleConsensus({ limit: 50 }), 10000);
+
+  const handleForceSync = async () => {
+    setIsSyncing(true);
+    setSyncStatusMsg("Initiating global reconciliation...");
+    try {
+      const res = await syncAdminPreflightRegistry({ limit: 50 });
+      setSyncStatusMsg(`Reconciled ${res.totalProcessed ?? 0} jobs (${res.successCount ?? 0} updated, ${res.failureCount ?? 0} failed).`);
+      await q.refetch();
+    } catch (err: any) {
+      setSyncStatusMsg(`Sync rejected: ${err.message || 'Upstream Gateway unreachable'}`);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const sStr = (v: any): string => {
+    if (!v) return '';
+    if (typeof v === 'object') {
+      const msg = v.message || v.code || v.error || JSON.stringify(v);
+      return typeof msg === 'object' ? JSON.stringify(msg) : String(msg);
+    }
+    return String(v);
+  };
+
+  const jobs = safeArray(q.data?.jobs || (q.data as any)?.data);
+  const sourceStatus = q.data?.source_status || 'PREFLIGHT_REGISTRY';
+  const isLedgerOnline = sourceStatus === 'PERSISTENT_REGISTRY' || sourceStatus === 'LIVE_UPSTREAM' || sourceStatus === 'PREFLIGHT_REGISTRY';
+
+  // Active Pipes = count of jobs with status PROCESSING/QUEUED/RUNNING
+  const activePipesCount = jobs.filter(j => {
+    const s = String(j.status || '').toUpperCase();
+    return s === 'PROCESSING' || s === 'QUEUED' || s === 'RUNNING';
+  }).length;
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-4">
+      {/* High-Density Header Section */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 pb-2 border-b border-zinc-200 dark:border-zinc-800">
         <div>
-          <h1 className="text-2xl font-black text-slate-900 tracking-tight">Jobs & Pipeline Visibility</h1>
-          <p className="text-sm text-slate-500 font-medium">Real-time status of all preflight and autofix requests across the regional BullMQ stack.</p>
+          <h1 className="text-2xl font-black text-slate-900 dark:text-zinc-100 tracking-tight">
+            {t('jobs.title') || 'Incoming Manufacturing Jobs'}
+          </h1>
+          <p className="text-sm font-medium text-slate-500 dark:text-zinc-400 mt-1">
+            {t('jobs.subtitle') || 'Operational Cockpit — Production Dispatch'}
+          </p>
+        </div>
+        <div className="flex items-center gap-2 text-[10px] font-mono text-zinc-400 dark:text-zinc-500 flex-wrap">
+          <span>Active Pipes: <strong className="text-zinc-900 dark:text-zinc-200">{activePipesCount}</strong></span>
+          <span>•</span>
+          <span>Ledger Indexing: <strong className={isLedgerOnline ? "text-emerald-600 dark:text-emerald-500" : "text-amber-500"}>{isLedgerOnline ? 'Online' : 'Degraded'}</strong></span>
+          <span>•</span>
+          <span className={`px-2.5 py-0.5 border rounded-full font-bold ${sourceStatus === 'LEGACY_QUEUE' ? 'bg-amber-50 border-amber-300 text-amber-800 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-900/60' : 'bg-primary/10 border-primary/20 text-primary'}`}>
+            {sourceStatus}
+          </span>
         </div>
       </div>
-      <div className="glass p-4 rounded-2xl border border-white flex items-center gap-4 italic-text-off">
+
+      {/* Compressed Operational Toolbar */}
+      <div className="p-3 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xs flex items-center gap-3 font-mono text-xs">
           <div className="flex-1 relative">
-              <MagnifyingGlassIcon className="absolute left-3 top-2.5 w-5 h-5 text-slate-400" />
+              <MagnifyingGlassIcon className="absolute left-3 top-2.5 w-4 h-4 text-zinc-400 dark:text-zinc-500" />
               <input 
                   type="text" 
-                  placeholder="Filter by Job ID, Tenant ID, or Type..." 
-                  className="w-full bg-slate-50 border-none rounded-xl pl-10 pr-4 py-2 text-sm font-bold text-slate-700 placeholder:text-slate-400 focus:ring-2 focus:ring-primary/20"
+                  placeholder="Filter signature by canonical ID, Tenant, or Action DTO..." 
+                  className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl pl-9 pr-3 py-2 text-xs font-medium text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 dark:placeholder:text-zinc-600 focus:outline-none focus:border-[#dc0000] transition-all"
               />
           </div>
-          <div className="flex items-center gap-2">
-            <button className="px-4 py-2 bg-slate-50 rounded-xl border border-slate-100 flex items-center gap-2 text-xs font-black text-slate-500 uppercase tracking-widest leading-none">
-                <FunnelIcon className="w-4 h-4" />
-                <span>Status: All</span>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <button className="px-3 py-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 text-zinc-600 dark:text-zinc-400 font-bold uppercase tracking-wide leading-none transition-colors text-[11px] rounded-xl cursor-pointer">
+                Status: All
             </button>
-            <button className="px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-black uppercase tracking-widest leading-none shadow-lg shadow-slate-900/10 active:scale-95 transition-all">
-                Force Redispatch
+            <button 
+              disabled={isSyncing}
+              onClick={handleForceSync} 
+              className="flex items-center gap-1.5 px-3.5 py-2 bg-zinc-900 dark:bg-zinc-800 hover:bg-zinc-800 dark:hover:bg-zinc-700 text-white dark:text-zinc-200 font-bold uppercase tracking-wide leading-none transition-colors text-[11px] disabled:opacity-50 rounded-xl cursor-pointer shadow-xs"
+              title="Force full upstream Gateway synchronization"
+            >
+                {isSyncing && <ArrowPathIcon className="w-3.5 h-3.5 animate-spin" />}
+                <span>{isSyncing ? 'Syncing...' : 'Force Sync'}</span>
             </button>
           </div>
       </div>
 
-      <DataTable 
-        isLoading={q.status === 'loading'}
-        data={q.data?.jobs || []}
-        onRowClick={(j) => setSelectedJob(j)}
-        columns={[
-          {
-            header: 'Job ID',
-            accessor: (j) => <span className="font-mono text-xs">{j.id.slice(0, 16)}...</span>
-          },
-          {
-            header: 'Tenant',
-            accessor: (j) => <span className="font-bold text-slate-600">{j.tenant_id}</span>
-          },
-          {
-            header: 'Type',
-            accessor: (j) => (
-              <span className="px-2 py-0.5 rounded bg-slate-100 text-[10px] font-black uppercase text-slate-500 tracking-wider">
-                {j.type}
-              </span>
-            )
-          },
-          {
-            header: 'Status',
-            accessor: (j) => (
-              <div className="flex items-center gap-2">
-                {j.status === 'COMPLETED' ? (
-                  <CheckCircleIcon className="w-4 h-4 text-emerald-500" />
-                ) : j.status === 'FAILED' ? (
-                  <XCircleIcon className="w-4 h-4 text-red-500" />
-                ) : (
-                  <ArrowPathIcon className="w-4 h-4 text-blue-500 animate-spin" />
-                )}
-                <span className={`text-[10px] font-black uppercase tracking-widest ${
-                  j.status === 'COMPLETED' ? 'text-emerald-600' : 
-                  j.status === 'FAILED' ? 'text-red-600' : 'text-blue-600'
-                }`}>
-                  {j.status}
-                </span>
-              </div>
-            )
-          },
-          {
-            header: 'Created At',
-            accessor: (j) => (
-              <div className="flex items-center gap-2 text-slate-400 font-medium text-xs">
-                 <ClockIcon className="w-3.5 h-3.5" />
-                 {new Date(j.created_at).toLocaleTimeString()}
-               </div>
-            ),
-            className: 'text-right'
-          },
-          {
-            header: '',
-            accessor: () => (
-              <button className="p-2 rounded-lg text-slate-300 hover:text-primary transition-colors">
-                <ArrowTopRightOnSquareIcon className="w-4 h-4" />
-              </button>
-            ),
-            className: 'w-10'
-          }
-        ]}
-      />
-      <JobDetailDrawer 
-        job={selectedJob}
-        isOpen={!!selectedJob}
-        onClose={() => setSelectedJob(null)}
-      />
+      {syncStatusMsg && (
+        <div className="p-3 bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl flex items-center justify-between text-[11px] font-mono text-zinc-700 dark:text-zinc-300 animate-fade-in">
+          <span>{syncStatusMsg}</span>
+          <button onClick={() => setSyncStatusMsg(null)} className="text-zinc-400 hover:text-zinc-900 dark:hover:text-white font-bold cursor-pointer">×</button>
+        </div>
+      )}
+
+      {/* Primary Payload Rendering */}
+      {jobs.length === 0 && q.status === 'success' ? (
+        <div className="p-12 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xs text-center font-mono text-xs text-zinc-400 dark:text-zinc-600">
+          No canonical preflight jobs registered yet.
+        </div>
+      ) : (
+        <DataTable 
+          isLoading={q.status === 'loading'}
+          data={jobs}
+          compact={true}
+          onRowClick={(j) => {
+            const primaryJobId = j.jobId && j.jobId !== 'unknown' ? j.jobId : j.id;
+            if (primaryJobId) {
+              navigate(`/preflight/jobs/${encodeURIComponent(primaryJobId)}`);
+            }
+          }}
+          rowClassName={(j) => {
+            const canonical = j.canonicalData || j.canonicalPayload || {};
+            const result = canonical.result || canonical || {};
+            const st = String(result.analysis_status || j.status || '').toUpperCase();
+            if (st.includes('FAIL') || j.error) return 'bg-red-50/40 dark:bg-red-950/20 border-l-2 border-[#dc0000]';
+            if (st === 'COMPLETED') return 'opacity-90 hover:opacity-100 transition-opacity';
+            return '';
+          }}
+          columns={[
+            {
+              header: 'Job ID',
+              accessor: (j) => {
+                // Never show numeric queue IDs as primary job ID when canonical jobId exists.
+                const isCanonical = j.jobId && j.jobId !== 'unknown';
+                const displayId = isCanonical ? j.jobId : (j.id ?? '---');
+                const isQuiet = j.status === 'COMPLETED';
+                return (
+                  <div className="flex flex-col">
+                    <span className={`font-mono text-xs ${isQuiet ? 'text-zinc-400 dark:text-zinc-500 font-normal' : 'text-zinc-900 dark:text-zinc-100 font-bold'}`}>
+                      {short(displayId, 18)}
+                    </span>
+                    {j.filename && (
+                      <span className="text-[9px] text-zinc-400 font-manrope truncate max-w-[140px]" title={j.filename}>
+                        {j.filename}
+                      </span>
+                    )}
+                  </div>
+                );
+              }
+            },
+            {
+              header: 'Tenant scope',
+              accessor: (j) => {
+                const tenantId = j.tenantId || j.tenant_id || 'system';
+                const isQuiet = j.status === 'COMPLETED';
+                return (
+                  <span className={`font-mono text-[11px] ${isQuiet ? 'text-zinc-400 dark:text-zinc-600' : 'text-zinc-700 dark:text-zinc-300 font-bold'}`}>
+                    {sStr(tenantId)}
+                  </span>
+                );
+              }
+            },
+            {
+              header: 'Task Profile',
+              accessor: (j) => {
+                const isQuiet = j.status === 'COMPLETED';
+                return (
+                  <span className={`px-2 py-0.5 border rounded-full text-[9px] font-bold uppercase tracking-wide ${
+                    isQuiet ? 'border-zinc-200 dark:border-zinc-800/60 bg-transparent text-zinc-400 dark:text-zinc-600' : 
+                    'border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900 text-zinc-900 dark:text-zinc-200'
+                  }`}>
+                    {sStr(j.type || 'ANALYZE')}
+                  </span>
+                );
+              }
+            },
+            {
+              header: 'Status Consensus',
+              accessor: (j) => {
+                const canonical = j.canonicalData || j.canonicalPayload || {};
+                const result = canonical.result || canonical || {};
+                const consensusStatus = result.analysis_status || j.status || 'UNKNOWN';
+                const isQuiet = consensusStatus === 'COMPLETED';
+                const isFail = String(consensusStatus).toUpperCase().includes('FAIL');
+                return (
+                  <div className="flex items-center gap-1.5 font-mono truncate max-w-[150px]" title={consensusStatus}>
+                    <span className={`w-2.5 h-2.5 rounded-full border shrink-0 ${
+                      isQuiet ? 'bg-emerald-600/40 border-emerald-700/30' : 
+                      isFail ? 'bg-[#dc0000] border-red-800 font-bold' : 'bg-sky-500 border-sky-700 animate-pulse'
+                    }`} />
+                    <span className={`text-[10px] font-bold uppercase tracking-wide leading-none truncate ${
+                      isQuiet ? 'text-emerald-700/60 dark:text-emerald-500/50 font-normal' : 
+                      isFail ? 'text-[#dc0000] dark:text-red-400 font-bold' : 'text-sky-700 dark:text-sky-400'
+                    }`}>
+                      {sStr(consensusStatus)}
+                    </span>
+                  </div>
+                );
+              }
+            },
+            {
+              header: 'Telemetry Indicators',
+              accessor: (j) => {
+                const canonical = j.canonicalData || j.canonicalPayload || {};
+                const result = canonical.result || canonical || {};
+                
+                // Risk: result.risk_score ?? result.summary?.risk_score
+                const riskVal = result.risk_score ?? result.summary?.risk_score ?? '---';
+                // Issues: result.summary?.issue_count
+                const issuesVal = result.summary?.issue_count ?? result.issue_count ?? '---';
+                // Fidelity: result.extractionFidelity
+                const fidelityVal = result.extractionFidelity || 'DEGRADED';
+                
+                // Artifacts: READY / PARTIAL / NONE
+                let artStatus = 'NONE';
+                const artsObj = safeArray(j.artifacts || canonical.artifacts);
+                if (artsObj.length > 0) {
+                  artStatus = 'READY';
+                } else if (result.artifactIntegrity && result.artifactIntegrity.ready) {
+                  artStatus = 'READY';
+                } else if (result.analysis_status === 'PARTIAL_ARTIFACTS') {
+                  artStatus = 'PARTIAL';
+                }
+
+                return (
+                  <div className="flex flex-wrap items-center gap-1 font-mono text-[9px] select-none">
+                    <span className="px-1.5 py-0.5 rounded-md bg-zinc-50 text-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-800" title="Computed Risk Score">
+                      R:{riskVal}
+                    </span>
+                    <span className="px-1.5 py-0.5 rounded-md bg-zinc-50 text-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-800" title="Identified Diagnostic Issues">
+                      issues:{issuesVal}
+                    </span>
+                    <span className={`px-2 py-0.5 rounded-full border font-bold ${
+                      fidelityVal === 'REAL_EXTRACTION' ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-900/60' :
+                      'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-900/60'
+                    }`} title="Extraction Pipeline Fidelity">
+                      fidelity:{fidelityVal}
+                    </span>
+                    <span className={`px-2 py-0.5 rounded-full border ${
+                      artStatus === 'READY' ? 'bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-950/40 dark:text-sky-400 dark:border-sky-900/60' :
+                      'bg-zinc-50 text-zinc-400 border-zinc-200 dark:bg-zinc-900 dark:text-zinc-600 dark:border-zinc-800'
+                    }`} title="Carrier Artifact Readiness">
+                      artifacts:{artStatus}
+                    </span>
+                    {result.certifiable !== undefined && (
+                      <span className={`px-2 py-0.5 rounded-full border font-bold ${
+                        result.certifiable ? 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/40 dark:text-purple-400 dark:border-purple-900/60' :
+                        'bg-zinc-50 text-zinc-400 border-zinc-200 dark:bg-zinc-900 dark:text-zinc-600 dark:border-zinc-800'
+                      }`} title="Forensic Certifiability Consensus">
+                        cert:{result.certifiable ? 'YES' : 'NO'}
+                      </span>
+                    )}
+                  </div>
+                );
+              }
+            },
+            {
+              header: 'Ingress TS',
+              accessor: (j) => {
+                const ts = j.createdAt || j.created_at;
+                const isQuiet = j.status === 'COMPLETED';
+                return (
+                  <span className={`font-mono text-[10px] ${isQuiet ? 'text-zinc-400 dark:text-zinc-600' : 'text-zinc-500 dark:text-zinc-400'}`}>
+                    {ts ? new Date(ts).toISOString().split('T')[1]?.substring(0, 8) : '---'}
+                  </span>
+                );
+              },
+              className: 'text-right'
+            },
+            {
+              header: '',
+              accessor: () => (
+                <button className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-900 dark:text-zinc-600 dark:hover:text-zinc-300 transition-colors cursor-pointer">
+                  <ArrowTopRightOnSquareIcon className="w-3.5 h-3.5" />
+                </button>
+              ),
+              className: 'w-8 text-center'
+            }
+          ]}
+        />
+      )}
     </div>
   );
 };

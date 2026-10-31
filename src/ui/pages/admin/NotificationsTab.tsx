@@ -10,6 +10,7 @@ import {
     InformationCircleIcon,
     MagnifyingGlassIcon
 } from "@heroicons/react/24/outline";
+import { adminFetch } from "../../lib/adminApi";
 
 interface Notification {
     id: string;
@@ -44,8 +45,7 @@ export const NotificationsTab: React.FC<{ refreshMs: number }> = ({ refreshMs })
     const fetchNotifications = async () => {
         try {
             const query = filterStatus ? `?status=${filterStatus}` : "";
-            const res = await fetch(`/api/admin/notifications${query}`);
-            const data = await res.json();
+            const data = await adminFetch<any>(`/api/admin/notifications${query}`);
             if (data.ok) setNotifications(data.notifications);
         } catch (err) {
             console.error("Failed to fetch notifications", err);
@@ -56,8 +56,7 @@ export const NotificationsTab: React.FC<{ refreshMs: number }> = ({ refreshMs })
 
     const fetchDetail = async (id: string) => {
         try {
-            const res = await fetch(`/api/admin/notifications/${id}`);
-            const data = await res.json();
+            const data = await adminFetch<any>(`/api/admin/notifications/${id}`);
             if (data.ok) setDetail(data);
         } catch (err) {
             console.error("Failed to fetch notification detail", err);
@@ -67,7 +66,7 @@ export const NotificationsTab: React.FC<{ refreshMs: number }> = ({ refreshMs })
     const handleResend = async (id: string) => {
         if (!confirm("Are you sure you want to resend this notification?")) return;
         try {
-            const res = await fetch(`/api/admin/notifications/${id}/resend`, { method: "POST" });
+            const res = await adminFetch<any>(`/api/admin/notifications/${id}/resend`, { method: "POST" });
             if (res.ok) {
                 alert("Resend triggered");
                 fetchNotifications();
@@ -81,7 +80,7 @@ export const NotificationsTab: React.FC<{ refreshMs: number }> = ({ refreshMs })
     const handleCancel = async (id: string) => {
         if (!confirm("Cancel this pending notification?")) return;
         try {
-            const res = await fetch(`/api/admin/notifications/${id}/cancel`, { method: "POST" });
+            const res = await adminFetch<any>(`/api/admin/notifications/${id}/cancel`, { method: "POST" });
             if (res.ok) {
                 fetchNotifications();
                 if (selectedId === id) fetchDetail(id);
@@ -106,12 +105,12 @@ export const NotificationsTab: React.FC<{ refreshMs: number }> = ({ refreshMs })
 
     const getStatusStyle = (status: string) => {
         switch (status) {
-            case 'SENT': return "bg-emerald-50 text-emerald-700 border-emerald-100";
-            case 'FAILED': return "bg-red-50 text-red-700 border-red-100";
-            case 'PENDING': return "bg-amber-50 text-amber-700 border-amber-100";
-            case 'SUPPRESSED': return "bg-slate-50 text-slate-500 border-slate-100";
-            case 'CANCELED': return "bg-slate-100 text-slate-400 border-slate-200";
-            default: return "bg-gray-50 text-gray-600";
+            case 'SENT': return "bg-emerald-50 text-emerald-700 border-emerald-100 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-900/30";
+            case 'FAILED': return "bg-red-50 text-red-700 border-red-100 dark:bg-red-950/30 dark:text-red-400 dark:border-red-900/30";
+            case 'PENDING': return "bg-amber-50 text-amber-700 border-amber-100 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-900/30";
+            case 'SUPPRESSED': return "bg-slate-50 text-slate-500 border-slate-100 dark:bg-slate-900/30 dark:text-zinc-400 dark:border-slate-800/30";
+            case 'CANCELED': return "bg-slate-100 text-slate-400 border-slate-200 dark:bg-slate-900/50 dark:text-zinc-500 dark:border-slate-800/50";
+            default: return "bg-gray-50 text-gray-600 dark:bg-gray-900/30 dark:text-gray-400";
         }
     };
 
@@ -130,14 +129,14 @@ export const NotificationsTab: React.FC<{ refreshMs: number }> = ({ refreshMs })
         <div className="flex flex-col gap-6">
             <div className="flex items-center justify-between">
                 <div>
-                    <h2 className="text-lg font-bold text-slate-900">Platform Notifications</h2>
-                    <p className="text-sm text-slate-500">Audit trail and delivery status for tenant alerts.</p>
+                    <h2 className="text-lg font-bold text-slate-900 dark:text-white">Platform Notifications</h2>
+                    <p className="text-sm text-slate-500 dark:text-zinc-400">Audit trail and delivery status for tenant alerts.</p>
                 </div>
                 <div className="flex gap-2">
                     <select
                         value={filterStatus}
                         onChange={(e) => setFilterStatus(e.target.value)}
-                        className="bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-sm font-medium outline-none focus:ring-2 focus:ring-primary/20"
+                        className="ppos-surface border ppos-border rounded-none px-3 py-1.5 text-sm font-medium outline-none focus:ring-2 focus:ring-primary/20 text-slate-800 dark:text-zinc-200"
                     >
                         <option value="">All Statuses</option>
                         <option value="PENDING">Pending</option>
@@ -148,7 +147,7 @@ export const NotificationsTab: React.FC<{ refreshMs: number }> = ({ refreshMs })
                     </select>
                     <button
                         onClick={fetchNotifications}
-                        className="p-2 hover:bg-slate-100 rounded-lg transition-colors text-slate-500"
+                        className="p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-none transition-colors text-slate-500"
                     >
                         <ArrowPathIcon className="w-5 h-5" />
                     </button>
@@ -156,10 +155,10 @@ export const NotificationsTab: React.FC<{ refreshMs: number }> = ({ refreshMs })
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div className="lg:col-span-2 overflow-hidden bg-white rounded-xl border border-slate-200">
+                <div className="lg:col-span-2 overflow-hidden ppos-surface rounded-none border ppos-border">
                     <div className="overflow-x-auto">
                         <table className="w-full text-left text-sm">
-                            <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-medium font-mono uppercase text-[10px] tracking-wider">
+                            <thead className="ppos-surface-muted border-b ppos-border text-slate-500 dark:text-zinc-400 font-medium font-mono uppercase text-[10px] tracking-wider">
                                 <tr>
                                     <th className="px-4 py-3">Tenant</th>
                                     <th className="px-4 py-3">Channel / Event</th>
@@ -169,7 +168,7 @@ export const NotificationsTab: React.FC<{ refreshMs: number }> = ({ refreshMs })
                                     <th className="px-4 py-3"></th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-slate-100">
+                            <tbody className="divide-y divide-slate-100 dark:divide-white/5">
                                 {loading ? (
                                     <tr><td colSpan={5} className="px-4 py-8 text-center text-slate-400">Loading notifications...</td></tr>
                                 ) : notifications.length === 0 ? (
@@ -178,19 +177,19 @@ export const NotificationsTab: React.FC<{ refreshMs: number }> = ({ refreshMs })
                                     notifications.map(n => (
                                         <tr
                                             key={n.id}
-                                            className={`hover:bg-slate-50 transition-colors cursor-pointer ${selectedId === n.id ? 'bg-primary/5' : ''}`}
+                                            className={`hover:bg-slate-50 dark:hover:bg-white/5 transition-colors cursor-pointer ${selectedId === n.id ? 'bg-primary/5' : ''}`}
                                             onClick={() => setSelectedId(n.id)}
                                         >
-                                            <td className="px-4 py-3 font-medium text-slate-700">{n.tenant_id}</td>
+                                            <td className="px-4 py-3 font-medium text-slate-700 dark:text-zinc-300">{n.tenant_id}</td>
                                             <td className="px-4 py-3">
                                                 <div className="flex items-center gap-1.5 mb-0.5">
-                                                    <span className="text-[9px] font-black bg-slate-100 text-slate-500 px-1 rounded border border-slate-200 uppercase tracking-tighter">{n.channel}</span>
-                                                    <div className="font-bold text-slate-900 text-[11px] truncate">{n.event_type}</div>
+                                                    <span className="text-[9px] font-black ppos-surface-muted text-slate-500 dark:text-zinc-400 px-1 rounded-none border ppos-border uppercase tracking-tighter">{n.channel}</span>
+                                                    <div className="font-bold text-slate-900 dark:text-white text-[11px] truncate">{n.event_type}</div>
                                                 </div>
                                                 <div className="text-slate-500 text-[10px] truncate max-w-[200px] font-medium">{n.subject}</div>
                                             </td>
                                             <td className="px-4 py-3 text-center">
-                                                <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] font-black border ${getStatusStyle(n.status)}`}>
+                                                <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-none text-[10px] font-black border ${getStatusStyle(n.status)}`}>
                                                     {getStatusIcon(n.status)}
                                                     {n.status}
                                                 </span>
@@ -202,7 +201,7 @@ export const NotificationsTab: React.FC<{ refreshMs: number }> = ({ refreshMs })
                                             <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
                                                 <button
                                                     onClick={() => setSelectedId(n.id)}
-                                                    className="p-1 hover:bg-slate-200 rounded-md text-slate-400 hover:text-slate-600"
+                                                    className="p-1 hover:bg-slate-200 dark:hover:bg-white/5 rounded-none text-slate-400 hover:text-slate-600"
                                                 >
                                                     <MagnifyingGlassIcon className="w-4 h-4" />
                                                 </button>
@@ -215,19 +214,19 @@ export const NotificationsTab: React.FC<{ refreshMs: number }> = ({ refreshMs })
                     </div>
                 </div>
 
-                <div className="lg:col-span-1 border border-slate-200 rounded-xl bg-slate-50/50 flex flex-col min-h-[500px]">
+                <div className="lg:col-span-1 border ppos-border rounded-none ppos-surface flex flex-col min-h-[500px]">
                     {detail ? (
                         <div className="flex flex-col h-full animate-slide-fade">
-                            <div className="p-4 border-b border-slate-200 bg-white rounded-t-xl flex justify-between items-start">
+                            <div className="p-4 border-b ppos-border ppos-surface-muted rounded-none flex justify-between items-start">
                                 <div>
                                     <div className="text-[10px] font-black text-primary uppercase tracking-widest mb-1">{detail.notification.channel} Channel</div>
-                                    <h3 className="font-bold text-slate-900">{detail.notification.event_type}</h3>
+                                    <h3 className="font-bold text-slate-900 dark:text-white">{detail.notification.event_type}</h3>
                                 </div>
                                 <div className="flex gap-1">
                                     {(detail.notification.status === 'FAILED' || detail.notification.status === 'SENT') && (
                                         <button
                                             onClick={() => handleResend(detail.notification.id)}
-                                            className="p-1.5 bg-primary text-white rounded-lg shadow-sm hover:scale-105 transition-all"
+                                            className="p-1.5 bg-primary text-white rounded-none shadow-none hover:scale-105 transition-all"
                                             title="Resend"
                                         >
                                             <ArrowPathIcon className="w-4 h-4" />
@@ -236,7 +235,7 @@ export const NotificationsTab: React.FC<{ refreshMs: number }> = ({ refreshMs })
                                     {detail.notification.status === 'PENDING' && (
                                         <button
                                             onClick={() => handleCancel(detail.notification.id)}
-                                            className="p-1.5 bg-red-500 text-white rounded-lg shadow-sm hover:scale-105 transition-all"
+                                            className="p-1.5 bg-red-500 text-white rounded-none shadow-none hover:scale-105 transition-all"
                                             title="Cancel"
                                         >
                                             <NoSymbolIcon className="w-4 h-4" />
@@ -248,14 +247,14 @@ export const NotificationsTab: React.FC<{ refreshMs: number }> = ({ refreshMs })
                             <div className="flex-1 overflow-y-auto p-4 space-y-6">
                                 <div>
                                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Audit Timeline</label>
-                                    <div className="relative pl-4 space-y-4 border-l-2 border-slate-200 ml-1">
+                                    <div className="relative pl-4 space-y-4 border-l-2 ppos-border ml-1">
                                         {detail.events.map(ev => (
                                             <div key={ev.id} className="relative">
-                                                <div className="absolute -left-[21px] top-1.5 w-3 h-3 bg-white border-2 border-slate-300 rounded-full" />
-                                                <div className="text-[11px] font-bold text-slate-800">{ev.event}</div>
+                                                <div className="absolute -left-[21px] top-1.5 w-3 h-3 ppos-surface border-2 ppos-border rounded-none" />
+                                                <div className="text-[11px] font-bold text-slate-800 dark:text-zinc-200">{ev.event}</div>
                                                 <div className="text-[10px] text-slate-500 tabular-nums">{new Date(ev.created_at).toLocaleString()}</div>
                                                 {ev.metadata_json && (
-                                                    <pre className="mt-1 text-[9px] bg-white p-1.5 rounded border border-slate-100 overflow-x-auto text-slate-600 font-mono">
+                                                    <pre className="mt-1 text-[9px] ppos-surface-muted p-1.5 rounded-none border ppos-border overflow-x-auto text-slate-600 dark:text-zinc-400 font-mono">
                                                         {JSON.stringify(typeof ev.metadata_json === 'string' ? JSON.parse(ev.metadata_json) : ev.metadata_json, null, 2)}
                                                     </pre>
                                                 )}
@@ -265,29 +264,29 @@ export const NotificationsTab: React.FC<{ refreshMs: number }> = ({ refreshMs })
                                 </div>
 
                                 {detail.notification.last_error && (
-                                    <div className="bg-red-50 border border-red-100 p-3 rounded-lg">
-                                        <div className="flex items-center gap-2 text-red-700 font-bold mb-1 text-[11px]">
+                                    <div className="bg-red-50 dark:bg-red-950/30 border border-red-100 dark:border-red-900/30 p-3 rounded-none">
+                                        <div className="flex items-center gap-2 text-red-700 dark:text-red-400 font-bold mb-1 text-[11px]">
                                             <InformationCircleIcon className="w-4 h-4" />
                                             Last Error
                                         </div>
-                                        <div className="text-[10px] font-mono text-red-600 break-words">{detail.notification.last_error}</div>
+                                        <div className="text-[10px] font-mono text-red-600 dark:text-red-400 break-words">{detail.notification.last_error}</div>
                                     </div>
                                 )}
 
                                 <div>
                                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Payload</label>
-                                    <pre className="text-[10px] bg-slate-900 text-emerald-400 p-3 rounded-lg border border-slate-800 overflow-x-auto font-mono">
+                                    <pre className="text-[10px] bg-slate-900 text-emerald-400 p-3 rounded-none border border-slate-800 overflow-x-auto font-mono">
                                         {JSON.stringify(typeof detail.notification.payload_json === 'string' ? JSON.parse(detail.notification.payload_json) : detail.notification.payload_json, null, 2)}
                                     </pre>
                                 </div>
 
                                 {detail.notification.status === 'FAILED' && detail.notification.scheduled_at && (
-                                    <div className="bg-amber-50 border border-amber-100 p-3 rounded-lg">
-                                        <div className="flex items-center gap-2 text-amber-700 font-bold mb-1 text-[11px]">
+                                    <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-100 dark:border-amber-900/30 p-3 rounded-none">
+                                        <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400 font-bold mb-1 text-[11px]">
                                             <ClockIcon className="w-4 h-4" />
                                             Next Attempt Scheduled
                                         </div>
-                                        <div className="text-[10px] text-amber-600 font-mono">
+                                        <div className="text-[10px] text-amber-600 dark:text-amber-400 font-mono">
                                             {new Date(detail.notification.scheduled_at).toLocaleString()}
                                         </div>
                                     </div>
@@ -295,7 +294,7 @@ export const NotificationsTab: React.FC<{ refreshMs: number }> = ({ refreshMs })
 
                                 <div>
                                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Dedupe Key</label>
-                                    <div className="text-[10px] font-mono text-slate-400 break-all bg-white px-2 py-1.5 rounded border border-slate-200">{detail.notification.dedupe_key}</div>
+                                    <div className="text-[10px] font-mono text-slate-400 break-all ppos-surface-muted px-2 py-1.5 rounded-none border ppos-border">{detail.notification.dedupe_key}</div>
                                 </div>
                             </div>
                         </div>

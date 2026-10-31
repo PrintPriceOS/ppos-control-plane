@@ -1,0 +1,911 @@
+[
+  {
+    "scenario": "certified.pdf filename only",
+    "report": {
+      "ok": true,
+      "job_id": "job1",
+      "generated_at": "2026-06-06T03:33:55.411Z",
+      "source_status": "LOCAL",
+      "report": {
+        "outcome": "UNKNOWN",
+        "severity": "neutral",
+        "summary_title": "Preflight Status Unknown",
+        "customer_summary": "The PDF status could not be determined.",
+        "operator_summary": "Check raw technical details.",
+        "pdfx_compliance_claimed": false,
+        "pdfa_compliance_claimed": false,
+        "standard_claimed": null,
+        "standard_certified": false,
+        "validation_performed": false,
+        "validation_passed": false,
+        "validator_name": null,
+        "validator_version": null,
+        "pdfx_generation_performed": false,
+        "technical_summary": "",
+        "recommended_next_action": {
+          "action_id": "wait",
+          "label": "Wait for completion",
+          "description": "The system is still processing.",
+          "severity": "neutral",
+          "primary_artifact_type": null,
+          "primary_artifact_download_id": null,
+          "primary_artifact_filename": null,
+          "primary_artifact_available": false
+        },
+        "artifact_recommendations": [
+          {
+            "type": "certified_pdf",
+            "filename": "certified.pdf",
+            "label": "certified_pdf",
+            "downloadable": true,
+            "production_certified": false,
+            "standard_certified": false,
+            "customer_visible": false,
+            "artifact_role": "REVIEW_REQUIRED",
+            "recommended_use": "Internal review only.",
+            "is_primary": null,
+            "is_customer_safe": false,
+            "warning": "Not production-certified and should not be customer-visible.",
+            "download_id": "certified_pdf",
+            "secondary_aliases": []
+          }
+        ],
+        "fix_summary": {
+          "requested_count": 0,
+          "applied_count": 0,
+          "skipped_count": 0,
+          "failed_count": 0,
+          "applied_fixes": [],
+          "skipped_fixes": [],
+          "failed_fixes": [],
+          "review_required": true,
+          "production_certified": false,
+          "highest_risk_level": "UNKNOWN"
+        },
+        "findings_summary": {
+          "critical": 0,
+          "warning": 0,
+          "info": 0,
+          "review_required": true
+        },
+        "artifact_trust": {
+          "production_certified": false,
+          "standard_certified": false,
+          "customer_visible": false
+        },
+        "governance_summary": {
+          "event_count": 0,
+          "source": "UNAVAILABLE",
+          "compacted_count": 0
+        },
+        "copy_blocks": {
+          "customer": "The PDF status could not be determined.",
+          "operator": "Check raw technical details."
+        }
+      }
+    }
+  },
+  {
+    "scenario": "review_pdf primary",
+    "report": {
+      "ok": true,
+      "job_id": "job2",
+      "generated_at": "2026-06-06T03:33:55.413Z",
+      "source_status": "LOCAL",
+      "report": {
+        "outcome": "UNKNOWN",
+        "severity": "neutral",
+        "summary_title": "Preflight Status Unknown",
+        "customer_summary": "The PDF status could not be determined.",
+        "operator_summary": "Check raw technical details.",
+        "pdfx_compliance_claimed": false,
+        "pdfa_compliance_claimed": false,
+        "standard_claimed": null,
+        "standard_certified": false,
+        "validation_performed": false,
+        "validation_passed": false,
+        "validator_name": null,
+        "validator_version": null,
+        "pdfx_generation_performed": false,
+        "technical_summary": "",
+        "recommended_next_action": {
+          "action_id": "wait",
+          "label": "Wait for completion",
+          "description": "The system is still processing.",
+          "severity": "neutral",
+          "primary_artifact_type": null,
+          "primary_artifact_download_id": null,
+          "primary_artifact_filename": null,
+          "primary_artifact_available": false
+        },
+        "artifact_recommendations": [
+          {
+            "type": "certified_pdf",
+            "filename": "certified.pdf",
+            "label": "certified_pdf",
+            "downloadable": true,
+            "production_certified": false,
+            "standard_certified": false,
+            "customer_visible": false,
+            "artifact_role": "REVIEW_REQUIRED",
+            "recommended_use": "Internal review only.",
+            "is_primary": false,
+            "is_customer_safe": false,
+            "warning": "Not production-certified and should not be customer-visible.",
+            "download_id": "certified_pdf",
+            "secondary_aliases": []
+          },
+          {
+            "type": "review_pdf",
+            "filename": "review.pdf",
+            "label": "review_pdf",
+            "downloadable": true,
+            "production_certified": false,
+            "standard_certified": false,
+            "customer_visible": false,
+            "artifact_role": "INTERNAL",
+            "recommended_use": "Internal review only.",
+            "is_primary": true,
+            "is_customer_safe": false,
+            "warning": null,
+            "download_id": "review_pdf",
+            "secondary_aliases": []
+          }
+        ],
+        "fix_summary": {
+          "requested_count": 0,
+          "applied_count": 0,
+          "skipped_count": 0,
+          "failed_count": 0,
+          "applied_fixes": [],
+          "skipped_fixes": [],
+          "failed_fixes": [],
+          "review_required": true,
+          "production_certified": false,
+          "highest_risk_level": "UNKNOWN"
+        },
+        "findings_summary": {
+          "critical": 0,
+          "warning": 0,
+          "info": 0,
+          "review_required": true
+        },
+        "artifact_trust": {
+          "primary_artifact_type": "review_pdf",
+          "review_required": true,
+          "certified_pdf_allowed": false
+        },
+        "governance_summary": {
+          "event_count": 0,
+          "source": "UNAVAILABLE",
+          "compacted_count": 0
+        },
+        "copy_blocks": {
+          "customer": "The PDF status could not be determined.",
+          "operator": "Check raw technical details."
+        }
+      }
+    }
+  },
+  {
+    "scenario": "fixed_pdf primary",
+    "report": {
+      "ok": true,
+      "job_id": "job3",
+      "generated_at": "2026-06-06T03:33:55.413Z",
+      "source_status": "LOCAL",
+      "report": {
+        "outcome": "UNKNOWN",
+        "severity": "neutral",
+        "summary_title": "Preflight Status Unknown",
+        "customer_summary": "The PDF status could not be determined.",
+        "operator_summary": "Check raw technical details.",
+        "pdfx_compliance_claimed": false,
+        "pdfa_compliance_claimed": false,
+        "standard_claimed": null,
+        "standard_certified": false,
+        "validation_performed": false,
+        "validation_passed": false,
+        "validator_name": null,
+        "validator_version": null,
+        "pdfx_generation_performed": false,
+        "technical_summary": "",
+        "recommended_next_action": {
+          "action_id": "wait",
+          "label": "Wait for completion",
+          "description": "The system is still processing.",
+          "severity": "neutral",
+          "primary_artifact_type": null,
+          "primary_artifact_download_id": null,
+          "primary_artifact_filename": null,
+          "primary_artifact_available": false
+        },
+        "artifact_recommendations": [
+          {
+            "type": "fixed_pdf",
+            "filename": "fixed.pdf",
+            "label": "fixed_pdf",
+            "downloadable": true,
+            "production_certified": false,
+            "standard_certified": false,
+            "customer_visible": false,
+            "artifact_role": "INTERNAL",
+            "recommended_use": "Internal review only.",
+            "is_primary": true,
+            "is_customer_safe": false,
+            "warning": null,
+            "download_id": "fixed_pdf",
+            "secondary_aliases": []
+          }
+        ],
+        "fix_summary": {
+          "requested_count": 0,
+          "applied_count": 0,
+          "skipped_count": 0,
+          "failed_count": 0,
+          "applied_fixes": [],
+          "skipped_fixes": [],
+          "failed_fixes": [],
+          "review_required": true,
+          "production_certified": false,
+          "highest_risk_level": "UNKNOWN"
+        },
+        "findings_summary": {
+          "critical": 0,
+          "warning": 0,
+          "info": 0,
+          "review_required": true
+        },
+        "artifact_trust": {
+          "trust_level": "FIXED_READY",
+          "primary_artifact_type": "fixed_pdf",
+          "production_certified": false,
+          "standard_certified": false
+        },
+        "governance_summary": {
+          "event_count": 0,
+          "source": "UNAVAILABLE",
+          "compacted_count": 0
+        },
+        "copy_blocks": {
+          "customer": "The PDF status could not be determined.",
+          "operator": "Check raw technical details."
+        }
+      }
+    }
+  },
+  {
+    "scenario": "production-certified but not standards-certified",
+    "report": {
+      "ok": true,
+      "job_id": "job4",
+      "generated_at": "2026-06-06T03:33:55.414Z",
+      "source_status": "LOCAL",
+      "report": {
+        "outcome": "UNKNOWN",
+        "severity": "neutral",
+        "summary_title": "Preflight Status Unknown",
+        "customer_summary": "The PDF status could not be determined.",
+        "operator_summary": "Check raw technical details.",
+        "pdfx_compliance_claimed": false,
+        "pdfa_compliance_claimed": false,
+        "standard_claimed": null,
+        "standard_certified": false,
+        "validation_performed": false,
+        "validation_passed": false,
+        "validator_name": null,
+        "validator_version": null,
+        "pdfx_generation_performed": false,
+        "technical_summary": "",
+        "recommended_next_action": {
+          "action_id": "wait",
+          "label": "Wait for completion",
+          "description": "The system is still processing.",
+          "severity": "neutral",
+          "primary_artifact_type": null,
+          "primary_artifact_download_id": null,
+          "primary_artifact_filename": null,
+          "primary_artifact_available": false
+        },
+        "artifact_recommendations": [
+          {
+            "type": "certified_pdf",
+            "filename": "certified.pdf",
+            "label": "certified_pdf",
+            "downloadable": true,
+            "production_certified": false,
+            "standard_certified": false,
+            "customer_visible": false,
+            "artifact_role": "REVIEW_REQUIRED",
+            "recommended_use": "Internal review only.",
+            "is_primary": true,
+            "is_customer_safe": false,
+            "warning": "Not production-certified and should not be customer-visible.",
+            "download_id": "certified_pdf",
+            "secondary_aliases": []
+          }
+        ],
+        "fix_summary": {
+          "requested_count": 0,
+          "applied_count": 0,
+          "skipped_count": 0,
+          "failed_count": 0,
+          "applied_fixes": [],
+          "skipped_fixes": [],
+          "failed_fixes": [],
+          "review_required": true,
+          "production_certified": true,
+          "highest_risk_level": "UNKNOWN"
+        },
+        "findings_summary": {
+          "critical": 0,
+          "warning": 0,
+          "info": 0,
+          "review_required": true
+        },
+        "artifact_trust": {
+          "primary_artifact_type": "certified_pdf",
+          "production_certified": true,
+          "standard_certified": false,
+          "customer_visible": true
+        },
+        "governance_summary": {
+          "event_count": 0,
+          "source": "UNAVAILABLE",
+          "compacted_count": 0
+        },
+        "copy_blocks": {
+          "customer": "The PDF status could not be determined.",
+          "operator": "Check raw technical details."
+        }
+      }
+    }
+  },
+  {
+    "scenario": "standards-certified with complete evidence",
+    "report": {
+      "ok": true,
+      "job_id": "job5",
+      "generated_at": "2026-06-06T03:33:55.414Z",
+      "source_status": "LOCAL",
+      "report": {
+        "outcome": "UNKNOWN",
+        "severity": "neutral",
+        "summary_title": "Preflight Status Unknown",
+        "customer_summary": "The PDF status could not be determined.",
+        "operator_summary": "Check raw technical details.",
+        "pdfx_compliance_claimed": true,
+        "pdfa_compliance_claimed": false,
+        "standard_claimed": null,
+        "standard_certified": true,
+        "validation_performed": false,
+        "validation_passed": false,
+        "validator_name": null,
+        "validator_version": null,
+        "pdfx_generation_performed": false,
+        "technical_summary": "",
+        "recommended_next_action": {
+          "action_id": "wait",
+          "label": "Wait for completion",
+          "description": "The system is still processing.",
+          "severity": "neutral",
+          "primary_artifact_type": null,
+          "primary_artifact_download_id": null,
+          "primary_artifact_filename": null,
+          "primary_artifact_available": false
+        },
+        "artifact_recommendations": [
+          {
+            "type": "certified_pdf",
+            "filename": "certified.pdf",
+            "label": "certified_pdf",
+            "downloadable": true,
+            "production_certified": false,
+            "standard_certified": false,
+            "customer_visible": false,
+            "artifact_role": "REVIEW_REQUIRED",
+            "recommended_use": "Internal review only.",
+            "is_primary": true,
+            "is_customer_safe": false,
+            "warning": "Not production-certified and should not be customer-visible.",
+            "download_id": "certified_pdf",
+            "secondary_aliases": []
+          }
+        ],
+        "fix_summary": {
+          "requested_count": 0,
+          "applied_count": 0,
+          "skipped_count": 0,
+          "failed_count": 0,
+          "applied_fixes": [],
+          "skipped_fixes": [],
+          "failed_fixes": [],
+          "review_required": true,
+          "production_certified": true,
+          "highest_risk_level": "UNKNOWN"
+        },
+        "findings_summary": {
+          "critical": 0,
+          "warning": 0,
+          "info": 0,
+          "review_required": true
+        },
+        "artifact_trust": {
+          "primary_artifact_type": "certified_pdf",
+          "production_certified": true,
+          "standard_certified": true,
+          "customer_visible": true,
+          "pdfx_compliance_claimed": true,
+          "evidence": {
+            "validation_performed": true,
+            "validation_passed": true,
+            "validator_name": "pdfToolbox",
+            "validator_version": "13",
+            "standard_detected": "PDF/X-4",
+            "validation_report_available": true,
+            "compliance_claim_allowed": true
+          }
+        },
+        "governance_summary": {
+          "event_count": 0,
+          "source": "UNAVAILABLE",
+          "compacted_count": 0
+        },
+        "copy_blocks": {
+          "customer": "The PDF status could not be determined.",
+          "operator": "Check raw technical details."
+        }
+      }
+    }
+  },
+  {
+    "scenario": "standards-certified claim without evidence",
+    "report": {
+      "ok": true,
+      "job_id": "job6",
+      "generated_at": "2026-06-06T03:33:55.414Z",
+      "source_status": "LOCAL",
+      "report": {
+        "outcome": "UNKNOWN",
+        "severity": "neutral",
+        "summary_title": "Preflight Status Unknown",
+        "customer_summary": "The PDF status could not be determined.",
+        "operator_summary": "Check raw technical details.",
+        "pdfx_compliance_claimed": false,
+        "pdfa_compliance_claimed": false,
+        "standard_claimed": null,
+        "standard_certified": false,
+        "validation_performed": false,
+        "validation_passed": false,
+        "validator_name": null,
+        "validator_version": null,
+        "pdfx_generation_performed": false,
+        "technical_summary": "",
+        "recommended_next_action": {
+          "action_id": "wait",
+          "label": "Wait for completion",
+          "description": "The system is still processing.",
+          "severity": "neutral",
+          "primary_artifact_type": null,
+          "primary_artifact_download_id": null,
+          "primary_artifact_filename": null,
+          "primary_artifact_available": false
+        },
+        "artifact_recommendations": [
+          {
+            "type": "certified_pdf",
+            "filename": "certified.pdf",
+            "label": "certified_pdf",
+            "downloadable": true,
+            "production_certified": false,
+            "standard_certified": false,
+            "customer_visible": false,
+            "artifact_role": "REVIEW_REQUIRED",
+            "recommended_use": "Internal review only.",
+            "is_primary": null,
+            "is_customer_safe": false,
+            "warning": "Not production-certified and should not be customer-visible.",
+            "download_id": "certified_pdf",
+            "secondary_aliases": []
+          }
+        ],
+        "fix_summary": {
+          "requested_count": 0,
+          "applied_count": 0,
+          "skipped_count": 0,
+          "failed_count": 0,
+          "applied_fixes": [],
+          "skipped_fixes": [],
+          "failed_fixes": [],
+          "review_required": true,
+          "production_certified": true,
+          "highest_risk_level": "UNKNOWN"
+        },
+        "findings_summary": {
+          "critical": 0,
+          "warning": 0,
+          "info": 0,
+          "review_required": true
+        },
+        "artifact_trust": {
+          "production_certified": true,
+          "standard_certified": false,
+          "pdfx_compliance_claimed": false,
+          "pdfa_compliance_claimed": false,
+          "warnings": [
+            "STANDARD_CLAIM_WITHOUT_VALIDATOR_EVIDENCE"
+          ]
+        },
+        "governance_summary": {
+          "event_count": 0,
+          "source": "UNAVAILABLE",
+          "compacted_count": 0
+        },
+        "copy_blocks": {
+          "customer": "The PDF status could not be determined.",
+          "operator": "Check raw technical details."
+        }
+      }
+    }
+  },
+  {
+    "scenario": "OutputIntent only",
+    "report": {
+      "ok": true,
+      "job_id": "job7",
+      "generated_at": "2026-06-06T03:33:55.414Z",
+      "source_status": "LOCAL",
+      "report": {
+        "outcome": "UNKNOWN",
+        "severity": "neutral",
+        "summary_title": "Preflight Status Unknown",
+        "customer_summary": "The PDF status could not be determined.",
+        "operator_summary": "Check raw technical details.",
+        "pdfx_compliance_claimed": false,
+        "pdfa_compliance_claimed": false,
+        "standard_claimed": null,
+        "standard_certified": false,
+        "validation_performed": false,
+        "validation_passed": false,
+        "validator_name": null,
+        "validator_version": null,
+        "pdfx_generation_performed": false,
+        "technical_summary": "",
+        "recommended_next_action": {
+          "action_id": "wait",
+          "label": "Wait for completion",
+          "description": "The system is still processing.",
+          "severity": "neutral",
+          "primary_artifact_type": null,
+          "primary_artifact_download_id": null,
+          "primary_artifact_filename": null,
+          "primary_artifact_available": false
+        },
+        "artifact_recommendations": [
+          {
+            "type": "certified_pdf",
+            "filename": "certified.pdf",
+            "label": "certified_pdf",
+            "downloadable": true,
+            "production_certified": false,
+            "standard_certified": false,
+            "customer_visible": false,
+            "artifact_role": "REVIEW_REQUIRED",
+            "recommended_use": "Internal review only.",
+            "is_primary": null,
+            "is_customer_safe": false,
+            "warning": "Not production-certified and should not be customer-visible.",
+            "download_id": "certified_pdf",
+            "secondary_aliases": []
+          }
+        ],
+        "fix_summary": {
+          "requested_count": 0,
+          "applied_count": 0,
+          "skipped_count": 0,
+          "failed_count": 0,
+          "applied_fixes": [],
+          "skipped_fixes": [],
+          "failed_fixes": [],
+          "review_required": true,
+          "production_certified": false,
+          "highest_risk_level": "UNKNOWN"
+        },
+        "findings_summary": {
+          "critical": 0,
+          "warning": 0,
+          "info": 0,
+          "review_required": true
+        },
+        "artifact_trust": {
+          "warnings": [
+            "OutputIntent does not prove PDF/X"
+          ]
+        },
+        "governance_summary": {
+          "event_count": 0,
+          "source": "UNAVAILABLE",
+          "compacted_count": 0
+        },
+        "copy_blocks": {
+          "customer": "The PDF status could not be determined.",
+          "operator": "Check raw technical details."
+        }
+      }
+    }
+  },
+  {
+    "scenario": "blocked governance domains",
+    "report": {
+      "ok": true,
+      "job_id": "job8",
+      "generated_at": "2026-06-06T03:33:55.414Z",
+      "source_status": "LOCAL",
+      "report": {
+        "outcome": "UNKNOWN",
+        "severity": "neutral",
+        "summary_title": "Preflight Status Unknown",
+        "customer_summary": "The PDF status could not be determined.",
+        "operator_summary": "Check raw technical details.",
+        "pdfx_compliance_claimed": false,
+        "pdfa_compliance_claimed": false,
+        "standard_claimed": null,
+        "standard_certified": false,
+        "validation_performed": false,
+        "validation_passed": false,
+        "validator_name": null,
+        "validator_version": null,
+        "pdfx_generation_performed": false,
+        "technical_summary": "",
+        "recommended_next_action": {
+          "action_id": "wait",
+          "label": "Wait for completion",
+          "description": "The system is still processing.",
+          "severity": "neutral",
+          "primary_artifact_type": null,
+          "primary_artifact_download_id": null,
+          "primary_artifact_filename": null,
+          "primary_artifact_available": false
+        },
+        "artifact_recommendations": [
+          {
+            "type": "certified_pdf",
+            "filename": "certified.pdf",
+            "label": "certified_pdf",
+            "downloadable": true,
+            "production_certified": false,
+            "standard_certified": false,
+            "customer_visible": false,
+            "artifact_role": "REVIEW_REQUIRED",
+            "recommended_use": "Internal review only.",
+            "is_primary": false,
+            "is_customer_safe": false,
+            "warning": "Not production-certified and should not be customer-visible.",
+            "download_id": "certified_pdf",
+            "secondary_aliases": []
+          },
+          {
+            "type": "review_pdf",
+            "filename": "review.pdf",
+            "label": "review_pdf",
+            "downloadable": true,
+            "production_certified": false,
+            "standard_certified": false,
+            "customer_visible": false,
+            "artifact_role": "INTERNAL",
+            "recommended_use": "Internal review only.",
+            "is_primary": true,
+            "is_customer_safe": false,
+            "warning": null,
+            "download_id": "review_pdf",
+            "secondary_aliases": []
+          }
+        ],
+        "fix_summary": {
+          "requested_count": 0,
+          "applied_count": 0,
+          "skipped_count": 0,
+          "failed_count": 0,
+          "applied_fixes": [],
+          "skipped_fixes": [],
+          "failed_fixes": [],
+          "review_required": true,
+          "production_certified": false,
+          "highest_risk_level": "UNKNOWN"
+        },
+        "findings_summary": {
+          "critical": 0,
+          "warning": 0,
+          "info": 0,
+          "review_required": true
+        },
+        "artifact_trust": {
+          "primary_artifact_type": "review_pdf",
+          "review_required": true,
+          "production_certified": false,
+          "blocked_by_governance_domains": [
+            "color",
+            "fonts"
+          ]
+        },
+        "governance_summary": {
+          "event_count": 0,
+          "source": "UNAVAILABLE",
+          "compacted_count": 0
+        },
+        "copy_blocks": {
+          "customer": "The PDF status could not be determined.",
+          "operator": "Check raw technical details."
+        }
+      }
+    }
+  },
+  {
+    "scenario": "customer_visible conflict",
+    "report": {
+      "ok": true,
+      "job_id": "job9",
+      "generated_at": "2026-06-06T03:33:55.415Z",
+      "source_status": "LOCAL",
+      "report": {
+        "outcome": "UNKNOWN",
+        "severity": "neutral",
+        "summary_title": "Preflight Status Unknown",
+        "customer_summary": "The PDF status could not be determined.",
+        "operator_summary": "Check raw technical details.",
+        "pdfx_compliance_claimed": false,
+        "pdfa_compliance_claimed": false,
+        "standard_claimed": null,
+        "standard_certified": false,
+        "validation_performed": false,
+        "validation_passed": false,
+        "validator_name": null,
+        "validator_version": null,
+        "pdfx_generation_performed": false,
+        "technical_summary": "",
+        "recommended_next_action": {
+          "action_id": "wait",
+          "label": "Wait for completion",
+          "description": "The system is still processing.",
+          "severity": "neutral",
+          "primary_artifact_type": null,
+          "primary_artifact_download_id": null,
+          "primary_artifact_filename": null,
+          "primary_artifact_available": false
+        },
+        "artifact_recommendations": [
+          {
+            "type": "certified_pdf",
+            "filename": "certified.pdf",
+            "label": "certified_pdf",
+            "downloadable": true,
+            "production_certified": false,
+            "standard_certified": false,
+            "customer_visible": false,
+            "artifact_role": "REVIEW_REQUIRED",
+            "recommended_use": "Internal review only.",
+            "is_primary": null,
+            "is_customer_safe": false,
+            "warning": "Not production-certified and should not be customer-visible.",
+            "download_id": "certified_pdf",
+            "secondary_aliases": []
+          }
+        ],
+        "fix_summary": {
+          "requested_count": 0,
+          "applied_count": 0,
+          "skipped_count": 0,
+          "failed_count": 0,
+          "applied_fixes": [],
+          "skipped_fixes": [],
+          "failed_fixes": [],
+          "review_required": true,
+          "production_certified": false,
+          "highest_risk_level": "UNKNOWN"
+        },
+        "findings_summary": {
+          "critical": 0,
+          "warning": 0,
+          "info": 0,
+          "review_required": true
+        },
+        "artifact_trust": {
+          "customer_visible": false
+        },
+        "governance_summary": {
+          "event_count": 0,
+          "source": "UNAVAILABLE",
+          "compacted_count": 0
+        },
+        "copy_blocks": {
+          "customer": "The PDF status could not be determined.",
+          "operator": "Check raw technical details."
+        }
+      }
+    }
+  },
+  {
+    "scenario": "public report sanitation",
+    "report": {
+      "ok": true,
+      "job_id": "job10",
+      "generated_at": "2026-06-06T03:33:55.415Z",
+      "source_status": "LOCAL",
+      "report": {
+        "outcome": "UNKNOWN",
+        "severity": "neutral",
+        "summary_title": "Preflight Status Unknown",
+        "customer_summary": "The PDF status could not be determined.",
+        "operator_summary": "Check raw technical details.",
+        "pdfx_compliance_claimed": false,
+        "pdfa_compliance_claimed": false,
+        "standard_claimed": null,
+        "standard_certified": false,
+        "validation_performed": false,
+        "validation_passed": false,
+        "validator_name": null,
+        "validator_version": null,
+        "pdfx_generation_performed": false,
+        "technical_summary": "",
+        "recommended_next_action": {
+          "action_id": "wait",
+          "label": "Wait for completion",
+          "description": "The system is still processing.",
+          "severity": "neutral",
+          "primary_artifact_type": null,
+          "primary_artifact_download_id": null,
+          "primary_artifact_filename": null,
+          "primary_artifact_available": false
+        },
+        "artifact_recommendations": [
+          {
+            "type": "certified_pdf",
+            "filename": "certified.pdf",
+            "label": "certified_pdf",
+            "downloadable": true,
+            "production_certified": false,
+            "standard_certified": false,
+            "customer_visible": false,
+            "artifact_role": "REVIEW_REQUIRED",
+            "recommended_use": "Internal review only.",
+            "is_primary": null,
+            "is_customer_safe": false,
+            "warning": "Not production-certified and should not be customer-visible.",
+            "download_id": "certified_pdf",
+            "secondary_aliases": []
+          }
+        ],
+        "fix_summary": {
+          "requested_count": 0,
+          "applied_count": 0,
+          "skipped_count": 0,
+          "failed_count": 0,
+          "applied_fixes": [],
+          "skipped_fixes": [],
+          "failed_fixes": [],
+          "review_required": true,
+          "production_certified": false,
+          "highest_risk_level": "UNKNOWN"
+        },
+        "findings_summary": {
+          "critical": 0,
+          "warning": 0,
+          "info": 0,
+          "review_required": true
+        },
+        "artifact_trust": {
+          "evidence": {}
+        },
+        "governance_summary": {
+          "event_count": 0,
+          "source": "UNAVAILABLE",
+          "compacted_count": 0
+        },
+        "copy_blocks": {
+          "customer": "The PDF status could not be determined.",
+          "operator": "Check raw technical details."
+        }
+      }
+    }
+  }
+]

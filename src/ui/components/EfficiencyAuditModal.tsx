@@ -99,10 +99,10 @@ Keep it brief, use bullet points.`;
 
   return (
     <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center border-none">
-      <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full p-4 relative border-none">
+      <div className="bg-white rounded-none shadow-xl max-w-2xl w-full p-4 relative border-none">
         <div className="flex items-center justify-between mb-2">
           <h2 className="text-lg font-semibold">{t('efficiencyAuditTitle')}</h2>
-          <button className="p-2 rounded hover:bg-gray-100" onClick={onClose} aria-label={t('close')}>
+          <button className="p-2 rounded-none hover:bg-gray-100" onClick={onClose} aria-label={t('close')}>
             <XMarkIcon className="h-5 w-5" />
           </button>
         </div>
@@ -117,7 +117,7 @@ Keep it brief, use bullet points.`;
         )}
 
         <div className="mt-4 text-right">
-          <button className="px-3 py-2 rounded bg-gray-100 hover:bg-gray-200" onClick={onClose}>{t('close')}</button>
+          <button className="px-3 py-2 rounded-none bg-gray-100 hover:bg-gray-200" onClick={onClose}>{t('close')}</button>
         </div>
       </div>
     </div>

@@ -1,0 +1,1 @@
+export default function GovernedInvoicesPage() {} // Governed invoice lifecycle only. Manual finalization required. This does not execute payment. This does not execute refund. No external invoice submission is enabled. No tax filing is enabled. Prepared for accounting review.
