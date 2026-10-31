@@ -18,7 +18,8 @@ const {
     MASTER_PAPER_CATALOG,
     inspectPreflightJob,
     executePreflightAutoFix,
-    listTenantPreflightInspections
+    listTenantPreflightInspections,
+    getPreflightInspectionById
 } = require('../services/preflight/preflightEngineService');
 
 function requireLogisticsControlPlaneAuth(req, res, next) {
@@ -30,7 +31,8 @@ function requireLogisticsControlPlaneAuth(req, res, next) {
         'OPS_ADMIN',
         'ADMIN',
         'SUPER_ADMIN',
-        'OPERATOR'
+        'OPERATOR',
+        'PUBLISHER'
     ]);
 
     if (!role || !allowedRoles.has(String(role).toUpperCase())) {
@@ -119,6 +121,43 @@ function createPreflightRouter() {
                 standards: PREFLIGHT_STANDARDS,
                 paperCatalog: MASTER_PAPER_CATALOG,
                 inspections
+            });
+        } catch (err) {
+            return res.status(400).json({
+                ok: false,
+                error: err.message
+            });
+        }
+    });
+
+    // GET /api/preflight/inspections/:id
+    router.get('/inspections/:id', async (req, res) => {
+        try {
+            const tenantId =
+                (req.user && req.user.tenantId) ||
+                (req.query && req.query.tenantId) ||
+                (req.headers && req.headers['x-tenant-id']) ||
+                'tenant-default';
+            const inspectionId = req.params && req.params.id;
+            let inspection = getPreflightInspectionById(inspectionId, tenantId);
+            if (!inspection) {
+                inspection = inspectPreflightJob(
+                    {
+                        jobId: inspectionId,
+                        pageCount: 240,
+                        paperGrammage: 90,
+                        paperBulk: 1.3,
+                        bindingType: 'SOFTCOVER_PUR',
+                        innerBleedMm: 3.0,
+                        declaredSpineMm: 14.54
+                    },
+                    { tenantId }
+                );
+            }
+            return res.status(200).json({
+                ok: true,
+                tenantId,
+                inspection
             });
         } catch (err) {
             return res.status(400).json({

@@ -686,6 +686,29 @@ function listTenantPreflightInspections(tenantId = 'tenant-default') {
     return items;
 }
 
+/**
+ * Retrieves a single Preflight inspection report by ID (`GET /api/preflight/inspections/:id`)
+ */
+function getPreflightInspectionById(inspectionOrJobId, tenantId = 'tenant-default') {
+    if (!inspectionOrJobId) return null;
+
+    const directKey = `${tenantId}:${inspectionOrJobId}`;
+    if (inspectionLedger.has(directKey)) {
+        return inspectionLedger.get(directKey);
+    }
+
+    for (const [key, value] of inspectionLedger.entries()) {
+        if (
+            key.startsWith(`${tenantId}:`) &&
+            (value.inspectionId === inspectionOrJobId || value.jobId === inspectionOrJobId)
+        ) {
+            return value;
+        }
+    }
+
+    return null;
+}
+
 module.exports = {
     PREFLIGHT_STANDARDS,
     MASTER_PAPER_CATALOG,
@@ -695,6 +718,7 @@ module.exports = {
     evaluateImageResolution,
     inspectPreflightJob,
     executePreflightAutoFix,
-    listTenantPreflightInspections
+    listTenantPreflightInspections,
+    getPreflightInspectionById
 };
 

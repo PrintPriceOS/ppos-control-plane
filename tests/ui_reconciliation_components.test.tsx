@@ -25,6 +25,7 @@ import { PricingIntelligenceTab } from '../src/ui/pages/admin/PricingIntelligenc
 import { MarketplacePage } from '../src/ui/pages/admin/MarketplacePage';
 import { PreflightJobsPage } from '../src/ui/pages/preflight/PreflightJobsPage';
 import { ManufacturingQueuePage } from '../src/ui/pages/manufacturing/ManufacturingQueuePage';
+import { PublisherHubPage } from '../src/ui/pages/publisher/PublisherHubPage';
 import { Sidebar } from '../src/ui/layout/Sidebar';
 import * as adminApi from '../src/ui/lib/adminApi';
 import { setAuthUser } from '../src/ui/lib/authStore';
@@ -208,6 +209,38 @@ describe('Dark Industrial Telemetry UI — Canonical Components & Dual-Mode Reco
         expect(screen.getByText('TOTAL SETUP WASTE')).toBeInTheDocument();
         expect(screen.getByTestId('header-primary-action-btn')).toHaveTextContent('COMPOSE SIGNATURES');
         expect(screen.getAllByText(/978-3-8365-9102-7/).length).toBeGreaterThan(0);
+    });
+
+    it('7. Renders PHASE-11C Publisher Operations Hub UI with 3D Soft-Proofing Viewer, 6-stage timeline, and APPROVE FOR PRESS', async () => {
+        renderWithProviders(<PublisherHubPage mode="workspace" />, {
+            locale: 'es',
+            route: '/publisher/hub'
+        });
+
+        expect(screen.getByTestId('publisher-hub-workspace')).toHaveAttribute('data-mode', 'workspace');
+        expect(screen.getByText('Publisher Operations Hub')).toBeInTheDocument();
+        expect(screen.getByText('ACTIVE TITLES')).toBeInTheDocument();
+        expect(screen.getByText('AWAITING APPROVAL')).toBeInTheDocument();
+        expect(screen.getByText('COPIES IN PRESS')).toBeInTheDocument();
+        expect(screen.getByText('ON-TIME DELIVERY %')).toBeInTheDocument();
+
+        // 3D Soft-Proofing Viewer & 6-stage Manufacturing Timeline
+        expect(screen.getByTestId('soft-proofing-viewer-3d')).toBeInTheDocument();
+        expect(screen.getByTestId('parametric-3d-book-mesh')).toBeInTheDocument();
+        expect(screen.getByTestId('timeline-step-PREFLIGHT_VALIDATED')).toBeInTheDocument();
+        expect(screen.getByTestId('timeline-step-DISPATCHED_AND_DELIVERED')).toBeInTheDocument();
+
+        // Self-service Document Center links
+        expect(screen.getByTestId('download-signed-pod-btn')).toHaveAttribute(
+            'href',
+            '/api/logistics/shipments/SHP-2026-9901/delivery-note/pdf'
+        );
+
+        // Telematic formal sign-off ("APPROVE FOR PRESS")
+        const approveBtn = screen.getByTestId('btn-approve-for-press');
+        expect(approveBtn).toBeInTheDocument();
+        fireEvent.click(approveBtn);
+        expect(await screen.findByTestId('soft-proof-approved-banner')).toBeInTheDocument();
     });
 });
 
