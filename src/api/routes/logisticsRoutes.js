@@ -9,6 +9,8 @@
  * - GET  /api/logistics/warehouses
  * - GET  /api/logistics/warehouses/:code
  * - POST /api/logistics/calculate-quote
+ * - POST /api/logistics/shipments/:id/labels/sscc-pdf
+ * - GET  /api/logistics/shipments/:id/delivery-note/pdf
  * - GET  /api/printhouses/:id/freight-matrices
  * - PUT  /api/printhouses/:id/freight-matrices
  *
@@ -21,6 +23,10 @@
  */
 
 const { LogisticsDatabaseService } = require('../services/logistics/logisticsDatabaseService');
+const {
+    generateSsccLabelsPdf,
+    generateDeliveryNotePdf
+} = require('../services/logistics/deliveryNotePdfService');
 
 function requireLogisticsControlPlaneAuth(req, res, next) {
     const role = (req.user && req.user.role) || (req.headers && req.headers['x-user-role']);
@@ -259,6 +265,88 @@ function createLogisticsRouter(options = {}) {
     router.put('/printhouses/:id/freight-matrices', handlePutFreightMatrices);
     router.get('/:id/freight-matrices', handleGetFreightMatrices);
     router.put('/:id/freight-matrices', handlePutFreightMatrices);
+
+    /**
+     * POST /shipments/:id/labels/sscc-pdf (mounted at /api/logistics/shipments/:id/labels/sscc-pdf)
+     * Generates GS1-128 SSCC-18 pallet labels in binary PDF buffer (A6 1-page-per-pallet default, or ?format=A4_SHEET_4UP).
+     */
+    router.post('/shipments/:id/labels/sscc-pdf', async (req, res) => {
+        try {
+            const shipmentId = req.params.id;
+            const format = (req.query && req.query.format) || (req.body && req.body.format) || 'A6';
+            const body = req.body || {};
+
+            // Enforce tenant isolation against shipment tenantId if specified
+            const authTenantId = req.user && req.user.tenantId;
+            const role = String((req.user && req.user.role) || (req.headers && req.headers['x-user-role']) || '').toUpperCase();
+            if (authTenantId && body.tenantId && String(authTenantId) !== String(body.tenantId) && role !== 'SUPER_ADMIN') {
+                return res.status(403).json({
+                    ok: false,
+                    error: 'FORBIDDEN_TENANT_MISMATCH: Cross-tenant shipment label generation is prohibited.'
+                });
+            }
+
+            const result = await generateSsccLabelsPdf({
+                shipmentId,
+                format,
+                shipmentData: body
+            });
+
+            if (typeof res.setHeader === 'function') {
+                res.setHeader('Content-Type', 'application/pdf');
+                res.setHeader(
+                    'Content-Disposition',
+                    `inline; filename="sscc-labels-${shipmentId}-${result.format}.pdf"`
+                );
+                res.setHeader('Content-Length', String(result.buffer.length));
+                res.setHeader('X-PPOS-Label-Format', result.format);
+                res.setHeader('X-PPOS-Page-Count', String(result.pageCount));
+            }
+
+            return res.status(200).send(result.buffer);
+        } catch (err) {
+            return res.status(err.statusCode || 400).json({
+                ok: false,
+                error: err.message
+            });
+        }
+    });
+
+    /**
+     * GET /shipments/:id/delivery-note/pdf (mounted at /api/logistics/shipments/:id/delivery-note/pdf)
+     * Generates the official DIN A4 Delivery Note / Lieferschein / Albarán de Entrega in binary PDF buffer.
+     */
+    router.get('/shipments/:id/delivery-note/pdf', async (req, res) => {
+        try {
+            const shipmentId = req.params.id;
+            const shipmentData = {
+                ...(req.query || {}),
+                ...(req.body || {})
+            };
+
+            const result = await generateDeliveryNotePdf({
+                shipmentId,
+                shipmentData
+            });
+
+            if (typeof res.setHeader === 'function') {
+                res.setHeader('Content-Type', 'application/pdf');
+                res.setHeader(
+                    'Content-Disposition',
+                    `inline; filename="delivery-note-${shipmentId}.pdf"`
+                );
+                res.setHeader('Content-Length', String(result.buffer.length));
+                res.setHeader('X-PPOS-Page-Count', String(result.pageCount));
+            }
+
+            return res.status(200).send(result.buffer);
+        } catch (err) {
+            return res.status(err.statusCode || 400).json({
+                ok: false,
+                error: err.message
+            });
+        }
+    });
 
     return router;
 }
