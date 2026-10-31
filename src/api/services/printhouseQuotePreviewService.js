@@ -429,7 +429,13 @@ class PrinthouseQuotePreviewService {
                     quantity: copies,
                     warehouseProfileCode: requestedWarehouseProfile || 'STANDARD_COMMERCIAL_DOCK',
                     destCountry: deliveryCountry || 'DE',
-                    destPostal: requestedDestPostal || '*'
+                    destPostal: requestedDestPostal || '*',
+                    stackabilityHandling: jobSpec.stackability_handling || jobSpec.stackabilityHandling,
+                    ldmTaxableWeightRatioKg: jobSpec.ldm_taxable_weight_ratio_kg ?? jobSpec.ldmTaxableWeightRatioKg,
+                    slotBookingManagement: jobSpec.slot_booking_management || jobSpec.slotBookingManagement,
+                    carrierSlotBufferDays: jobSpec.carrier_slot_buffer_days ?? jobSpec.carrierSlotBufferDays,
+                    trackingIntegrationMode: jobSpec.tracking_integration_mode || jobSpec.trackingIntegrationMode,
+                    operationalOptions: jobSpec.operationalOptions || jobSpec.operational_options || {}
                 });
 
                 const summaryEur = landedQuote.landedLogisticsCostSummaryEur;
@@ -440,7 +446,10 @@ class PrinthouseQuotePreviewService {
                     totalLandedLogisticsCostEur: summaryEur.totalLandedLogisticsCostEur,
                     logisticsCostPerCopyEur: summaryEur.logisticsCostPerCopyEur,
                     carrierName: landedQuote.freightQuote.carrierName,
-                    pricingMode: landedQuote.freightQuote.pricingMode
+                    pricingMode: landedQuote.freightQuote.pricingMode,
+                    taxableWeightKg: landedQuote.freightQuote.taxableWeightKg,
+                    ldmTotal: landedQuote.freightQuote.ldmTotal,
+                    floorPositionsUsed: landedQuote.freightQuote.floorPositionsUsed
                 };
 
                 // Authoritative transport cost uses the 3D cubing landed logistics total (packaging + carrier freight)
@@ -448,6 +457,7 @@ class PrinthouseQuotePreviewService {
                 transportCost = summaryEur.totalLandedLogisticsCostEur;
 
                 const cubing = landedQuote.cubing;
+                const opScenarios = cubing.operationalScenarios || landedQuote.operationalScenarios;
                 const lastPalletFillRatio = cubing.runOptimization.lastPalletCapacityUtilizationRatio;
                 const shouldHighlightRunOptimization =
                     !cubing.runOptimization.isAlreadyExactFullPallet && lastPalletFillRatio < 0.60;
@@ -464,6 +474,14 @@ class PrinthouseQuotePreviewService {
                     unitNetWeightKg: cubing.unitBook.weightBreakdownKg.unitNetWeightKg,
                     grossCartonWeightKg: cubing.cartonPacking.grossCartonWeightKg,
                     totalGrossWeightKg: cubing.palletStacking.orderBreakdown.totalShipmentGrossWeightKg,
+                    taxableWeightKg: opScenarios.stackabilityAndLdm.taxableWeightKg,
+                    ldmTotal: opScenarios.stackabilityAndLdm.ldmTotal,
+                    floorPositionsUsed: opScenarios.stackabilityAndLdm.floorPositionsUsed,
+                    stackabilityModeApplied: opScenarios.stackabilityAndLdm.stackabilityModeApplied,
+                    estimatedTransitDaysEffective: opScenarios.slotBookingActionPlan.estimatedTransitDaysEffective,
+                    slotBookingActionPlan: opScenarios.slotBookingActionPlan,
+                    trackingMode: opScenarios.trackingProtocol.mode,
+                    trackingProtocol: opScenarios.trackingProtocol,
                     volumetricEfficiency: cubing.runOptimization.fleetEfficiency.fleetVolumetricEfficiencyRatio,
                     weightEfficiency: cubing.runOptimization.fleetEfficiency.fleetWeightEfficiencyRatio,
                     lastPalletCapacityRatio: lastPalletFillRatio,
@@ -471,6 +489,8 @@ class PrinthouseQuotePreviewService {
                     warehouseValidation: cubing.warehouseValidation,
                     runOptimizationRecommendations: cubing.runOptimization.recommendations
                 };
+
+                estimatedDeliveryDays = opScenarios.slotBookingActionPlan.estimatedTransitDaysEffective;
             } catch (logErr) {
                 logger.warn({ err: logErr.message }, 'Logistics 3D cubing fallback to BPE static transport reference');
             }

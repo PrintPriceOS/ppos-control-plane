@@ -193,7 +193,8 @@ function createLogisticsRouter(options = {}) {
             return res.json({
                 ok: true,
                 success: true,
-                quote
+                quote,
+                logisticsCubing: quote.logisticsCubing
             });
         } catch (err) {
             const status = err.message && err.message.startsWith('WAREHOUSE_PROFILE_NOT_FOUND')
