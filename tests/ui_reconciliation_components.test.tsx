@@ -24,6 +24,7 @@ import {
 import { PricingIntelligenceTab } from '../src/ui/pages/admin/PricingIntelligenceTab';
 import { MarketplacePage } from '../src/ui/pages/admin/MarketplacePage';
 import { PreflightJobsPage } from '../src/ui/pages/preflight/PreflightJobsPage';
+import { ManufacturingQueuePage } from '../src/ui/pages/manufacturing/ManufacturingQueuePage';
 import { Sidebar } from '../src/ui/layout/Sidebar';
 import * as adminApi from '../src/ui/lib/adminApi';
 import { setAuthUser } from '../src/ui/lib/authStore';
@@ -191,6 +192,22 @@ describe('Dark Industrial Telemetry UI — Canonical Components & Dual-Mode Reco
         const autoFixBtn = screen.getByTestId('auto-fix-btn-PF-2026-081');
         expect(autoFixBtn).toBeInTheDocument();
         fireEvent.click(autoFixBtn);
+    });
+
+    it('6. Renders PHASE-11B Dynamic Imposition & Production Queue UI with KPIs and signature table', async () => {
+        renderWithProviders(<ManufacturingQueuePage mode="workspace" />, {
+            locale: 'es',
+            route: '/production/queue'
+        });
+
+        expect(screen.getByTestId('manufacturing-queue-workspace')).toHaveAttribute('data-mode', 'workspace');
+        expect(screen.getByText('Dynamic Imposition & Production Queue')).toBeInTheDocument();
+        expect(screen.getByText('TOTAL SIGNATURES')).toBeInTheDocument();
+        expect(screen.getByText('PLATE CONSUMPTION')).toBeInTheDocument();
+        expect(screen.getByText('AVG. PAPER EFFICIENCY %')).toBeInTheDocument();
+        expect(screen.getByText('TOTAL SETUP WASTE')).toBeInTheDocument();
+        expect(screen.getByTestId('header-primary-action-btn')).toHaveTextContent('COMPOSE SIGNATURES');
+        expect(screen.getAllByText(/978-3-8365-9102-7/).length).toBeGreaterThan(0);
     });
 });
 
