@@ -4,7 +4,7 @@ on:
   push:
     branches: [ feat/op02b1v-staging-runbook-validation, feat/op02b2b-plesk-staging-adaptation ]
   pull_request:
-    branches: [ phase-39.2-tenant-management-console ]
+    branches: [ main, phase-39.2-tenant-management-console ]
 
 jobs:
   staging-lab-certification:

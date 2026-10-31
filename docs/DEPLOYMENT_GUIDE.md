@@ -50,10 +50,10 @@ REDIS_URL=redis://localhost:6379
 ## Installation
 
 ```bash
-# 1. Clone
+# 1. Clone canonical repository and checkout main
 git clone https://github.com/PrintPriceOS/ppos-control-plane.git
 cd ppos-control-plane
-git checkout phase-10-intelligence-layer
+git checkout main
 
 # 2. Install dependencies
 npm ci
@@ -61,7 +61,10 @@ npm ci
 # 3. Build frontend
 npm run build
 
-# 4. Create log directory
+# 4. Sync production frontend assets to Plesk httpdocs (Production Host: 212.227.79.67)
+rsync -a --delete dist/ /var/www/vhosts/printprice.pro/control.printprice.pro/httpdocs/
+
+# 5. Create log directory
 mkdir -p logs
 ```
 
