@@ -31,7 +31,7 @@ ALTER TABLE paper_variant_classification_evidence
         'ODS_EXPLICIT_HEADER',
         'PHYSICAL_SAMPLE_INSPECTION'
     ) NOT NULL DEFAULT 'MILL_DATASHEET',
-    ADD COLUMN IF NOT EXISTS previous_coating_status ENUM(
+    ADD COLUMN previous_coating_status ENUM(
         'COATED',
         'DOUBLE_SIDE_COATED',
         'UNCOATED',
@@ -40,25 +40,25 @@ ALTER TABLE paper_variant_classification_evidence
         'SPECIALTY',
         'UNKNOWN'
     ) NOT NULL DEFAULT 'UNKNOWN' AFTER proposed_finish,
-    ADD COLUMN IF NOT EXISTS previous_grain_direction ENUM(
+    ADD COLUMN previous_grain_direction ENUM(
         'LONG_GRAIN',
         'SHORT_GRAIN',
         'UNKNOWN'
     ) NOT NULL DEFAULT 'UNKNOWN' AFTER proposed_coating_status,
-    ADD COLUMN IF NOT EXISTS proposed_grain_direction ENUM(
+    ADD COLUMN proposed_grain_direction ENUM(
         'LONG_GRAIN',
         'SHORT_GRAIN',
         'UNKNOWN'
     ) NOT NULL DEFAULT 'UNKNOWN' AFTER previous_grain_direction,
-    ADD COLUMN IF NOT EXISTS promotion_request_id VARCHAR(64) NULL AFTER approved_at,
-    ADD COLUMN IF NOT EXISTS promotion_requested_by VARCHAR(128) NULL AFTER promotion_request_id,
-    ADD COLUMN IF NOT EXISTS promotion_requested_by_role VARCHAR(64) NULL AFTER promotion_requested_by,
-    ADD COLUMN IF NOT EXISTS promotion_requested_at TIMESTAMP NULL AFTER promotion_requested_by_role,
-    ADD COLUMN IF NOT EXISTS promotion_request_reason VARCHAR(512) NULL AFTER promotion_requested_at,
-    ADD COLUMN IF NOT EXISTS promotion_id VARCHAR(64) NULL AFTER promotion_request_reason,
-    ADD COLUMN IF NOT EXISTS promoted_by VARCHAR(128) NULL AFTER promotion_id,
-    ADD COLUMN IF NOT EXISTS promoted_by_role VARCHAR(64) NULL AFTER promoted_by,
-    ADD COLUMN IF NOT EXISTS promoted_at TIMESTAMP NULL AFTER promoted_by_role,
-    ADD COLUMN IF NOT EXISTS promotion_reason VARCHAR(512) NULL AFTER promoted_at,
-    ADD COLUMN IF NOT EXISTS metadata_json JSON NULL AFTER notes;
+    ADD COLUMN promotion_request_id VARCHAR(64) NULL AFTER approved_at,
+    ADD COLUMN promotion_requested_by VARCHAR(128) NULL AFTER promotion_request_id,
+    ADD COLUMN promotion_requested_by_role VARCHAR(64) NULL AFTER promotion_requested_by,
+    ADD COLUMN promotion_requested_at TIMESTAMP NULL AFTER promotion_requested_by_role,
+    ADD COLUMN promotion_request_reason VARCHAR(512) NULL AFTER promotion_requested_at,
+    ADD COLUMN promotion_id VARCHAR(64) NULL AFTER promotion_request_reason,
+    ADD COLUMN promoted_by VARCHAR(128) NULL AFTER promotion_id,
+    ADD COLUMN promoted_by_role VARCHAR(64) NULL AFTER promoted_by,
+    ADD COLUMN promoted_at TIMESTAMP NULL AFTER promoted_by_role,
+    ADD COLUMN promotion_reason VARCHAR(512) NULL AFTER promoted_at,
+    ADD COLUMN metadata_json JSON NULL AFTER notes;
 
