@@ -92,6 +92,87 @@ const SENSITIVE_WORKSHOP_COST_FIELDS = Object.freeze([
 
 // In-memory store seeded with canonical multi-tenant editorial editions
 const publisherOrdersStore = new Map();
+const publisherNotificationsOutbox = [];
+
+const PUBLISHER_NOTIFICATION_EVENTS = Object.freeze({
+    SOFT_PROOF_READY_FOR_REVIEW: 'SOFT_PROOF_READY_FOR_REVIEW',
+    PROOF_SIGNED_AND_QUEUED: 'PROOF_SIGNED_AND_QUEUED',
+    PROOF_CORRECTION_REQUESTED: 'PROOF_CORRECTION_REQUESTED',
+    EDITION_ON_PRESS: 'EDITION_ON_PRESS'
+});
+
+/**
+ * Emits a structured transactional notification (Email + Webhook outbox) scoped strictly to `publisherTenantId`.
+ */
+function dispatchPublisherLifecycleNotification({
+    publisherTenantId = 'tenant-publisher-penguin',
+    orderId,
+    isbn,
+    title,
+    eventType = PUBLISHER_NOTIFICATION_EVENTS.SOFT_PROOF_READY_FOR_REVIEW,
+    recipientEmail = 'production@publisher-partner.com',
+    metadata = {}
+} = {}) {
+    const notificationId = `PUB-NOTIF-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
+    const subjectMap = {
+        [PUBLISHER_NOTIFICATION_EVENTS.SOFT_PROOF_READY_FOR_REVIEW]: `[PrintPrice OS] 3D Soft-Proof Ready for Sign-Off — ${title} (${isbn})`,
+        [PUBLISHER_NOTIFICATION_EVENTS.PROOF_SIGNED_AND_QUEUED]: `[PrintPrice OS] Digital Sign-Off Confirmed (APPROVE FOR PRESS) — ${title} (${isbn})`,
+        [PUBLISHER_NOTIFICATION_EVENTS.PROOF_CORRECTION_REQUESTED]: `[PrintPrice OS] Pre-Press Correction Requested — ${title} (${isbn})`,
+        [PUBLISHER_NOTIFICATION_EVENTS.EDITION_ON_PRESS]: `[PrintPrice OS] Edition Entered Press Run — ${title} (${isbn})`
+    };
+
+    const record = {
+        notificationId,
+        publisherTenantId,
+        orderId,
+        isbn,
+        title,
+        eventType,
+        channel: 'TRANSACTIONAL_EMAIL_AND_WEBHOOK',
+        recipientEmail,
+        subject: subjectMap[eventType] || `[PrintPrice OS] Editorial Update — ${orderId}`,
+        actionUrl: `https://control.printprice.pro/publisher/hub?orderId=${encodeURIComponent(
+            orderId || ''
+        )}`,
+        metadata,
+        deliveryStatus: 'DISPATCHED',
+        dispatchedAt: new Date().toISOString()
+    };
+
+    publisherNotificationsOutbox.unshift(record);
+    return record;
+}
+
+/**
+ * Lists transactional notifications strictly isolated by `publisherTenantId`.
+ */
+function listPublisherLifecycleNotifications({
+    publisherTenantId = 'tenant-publisher-penguin'
+} = {}) {
+    ensureTenantSeeded(publisherTenantId);
+    const existing = publisherNotificationsOutbox.filter(
+        n => n.publisherTenantId === publisherTenantId
+    );
+    if (existing.length === 0) {
+        dispatchPublisherLifecycleNotification({
+            publisherTenantId,
+            orderId: 'PUB-ORD-2026-101',
+            isbn: '978-3-8365-9102-7',
+            title: 'Atlas de Arquitectura Industrial Europea',
+            eventType: PUBLISHER_NOTIFICATION_EVENTS.SOFT_PROOF_READY_FOR_REVIEW,
+            metadata: { calculatedSpineMm: 27.66, bindingType: 'HARDCOVER_SEWN' }
+        });
+        dispatchPublisherLifecycleNotification({
+            publisherTenantId,
+            orderId: 'PUB-ORD-2026-102',
+            isbn: '978-84-9066-801-6',
+            title: 'Crónicas del Diseño Tipográfico Suizo',
+            eventType: PUBLISHER_NOTIFICATION_EVENTS.EDITION_ON_PRESS,
+            metadata: { currentStage: 'ON_PRESS_PRINTING', printRunCopies: 5000 }
+        });
+    }
+    return publisherNotificationsOutbox.filter(n => n.publisherTenantId === publisherTenantId);
+}
 
 function buildDefaultOrdersForTenant(publisherTenantId = 'tenant-publisher-penguin') {
     const spine240Pur = calculateTheoreticalSpine({
@@ -526,6 +607,23 @@ function submitProofApproval({
 
     publisherOrdersStore.set(`${publisherTenantId}:${order.orderId}`, order);
 
+    const notification = dispatchPublisherLifecycleNotification({
+        publisherTenantId,
+        orderId: order.orderId,
+        isbn: order.isbn,
+        title: order.title,
+        eventType:
+            normalizedDecision === 'APPROVED'
+                ? PUBLISHER_NOTIFICATION_EVENTS.PROOF_SIGNED_AND_QUEUED
+                : PUBLISHER_NOTIFICATION_EVENTS.PROOF_CORRECTION_REQUESTED,
+        metadata: {
+            decision: normalizedDecision,
+            digitalSignatureHash,
+            approvedByUserId: userId,
+            calculatedSpineMm: order.calculatedSpineMm
+        }
+    });
+
     return {
         ok: true,
         orderId: order.orderId,
@@ -533,6 +631,7 @@ function submitProofApproval({
         proofStatus: order.proofStatus,
         currentStage: order.currentStage,
         proofApprovalRecord: order.proofApprovalRecord,
+        notification,
         order: sanitizeOrderForRole(order, role)
     };
 }
@@ -614,17 +713,31 @@ function createPublisherOrder(payload = {}, actorContext = {}) {
     };
 
     publisherOrdersStore.set(`${publisherTenantId}:${orderId}`, newOrder);
+    dispatchPublisherLifecycleNotification({
+        publisherTenantId,
+        orderId: newOrder.orderId,
+        isbn: newOrder.isbn,
+        title: newOrder.title,
+        eventType: PUBLISHER_NOTIFICATION_EVENTS.SOFT_PROOF_READY_FOR_REVIEW,
+        metadata: {
+            calculatedSpineMm: newOrder.calculatedSpineMm,
+            bindingType: newOrder.bindingType
+        }
+    });
     return sanitizeOrderForRole(newOrder, actorContext.role || 'PUBLISHER');
 }
 
 module.exports = {
     MANUFACTURING_TIMELINE_MILESTONES,
     SENSITIVE_WORKSHOP_COST_FIELDS,
+    PUBLISHER_NOTIFICATION_EVENTS,
     getPublisherOrders,
     getPublisherOrderDetail,
     getPublisherTimeline,
     submitProofApproval,
     createPublisherOrder,
+    dispatchPublisherLifecycleNotification,
+    listPublisherLifecycleNotifications,
     sanitizeOrderForRole
 };
 

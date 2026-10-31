@@ -22,7 +22,8 @@ const {
     getPublisherOrderDetail,
     getPublisherTimeline,
     submitProofApproval,
-    createPublisherOrder
+    createPublisherOrder,
+    listPublisherLifecycleNotifications
 } = require('../services/publisher/publisherHubService');
 
 function resolvePublisherTenantId(req) {
@@ -243,6 +244,26 @@ function createPublisherRouter() {
             });
 
             return res.status(200).json(result);
+        } catch (err) {
+            return res.status(err.statusCode || 400).json({
+                ok: false,
+                error: err.message
+            });
+        }
+    });
+
+    // GET /api/publisher/notifications
+    router.get('/notifications', async (req, res) => {
+        try {
+            const publisherTenantId = resolvePublisherTenantId(req);
+            const notifications = listPublisherLifecycleNotifications({
+                publisherTenantId
+            });
+            return res.status(200).json({
+                ok: true,
+                publisherTenantId,
+                notifications
+            });
         } catch (err) {
             return res.status(err.statusCode || 400).json({
                 ok: false,

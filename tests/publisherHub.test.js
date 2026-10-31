@@ -4,11 +4,13 @@ import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
 const {
     SENSITIVE_WORKSHOP_COST_FIELDS,
+    PUBLISHER_NOTIFICATION_EVENTS,
     getPublisherOrders,
     getPublisherOrderDetail,
     getPublisherTimeline,
     submitProofApproval,
-    createPublisherOrder
+    createPublisherOrder,
+    listPublisherLifecycleNotifications
 } = require('../src/api/services/publisher/publisherHubService');
 const { requirePublisherHubAuth } = require('../src/api/routes/publisherRoutes');
 
@@ -137,6 +139,31 @@ describe('PHASE-11C — Publisher B2B Hub & 3D Soft-Proofing Engine', () => {
         expect(telemetry.logisticsTracking.documents.deliveryNotePdfUrl).toBe(
             '/api/logistics/shipments/SHP-2026-9901/delivery-note/pdf'
         );
+    });
+
+    it('4. Emits transactional Email/Webhook notifications scoped strictly by publisherTenantId on 3D proof sign-off', () => {
+        const notifications = listPublisherLifecycleNotifications({
+            publisherTenantId: 'tenant-publisher-penguin'
+        });
+
+        expect(notifications.length).toBeGreaterThanOrEqual(1);
+        expect(
+            notifications.some(
+                n =>
+                    n.eventType === PUBLISHER_NOTIFICATION_EVENTS.PROOF_SIGNED_AND_QUEUED &&
+                    n.orderId === 'PUB-ORD-2026-101'
+            )
+        ).toBe(true);
+
+        // Ensure another tenant does not see Penguin's notifications
+        const otherTenantNotifications = listPublisherLifecycleNotifications({
+            publisherTenantId: 'tenant-publisher-suhrkamp'
+        });
+        expect(
+            otherTenantNotifications.every(
+                n => n.publisherTenantId === 'tenant-publisher-suhrkamp'
+            )
+        ).toBe(true);
     });
 });
 
