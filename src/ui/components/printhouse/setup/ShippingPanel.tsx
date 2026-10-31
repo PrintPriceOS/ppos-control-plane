@@ -3,6 +3,73 @@ import { Truck, Plus, X, Search, Globe, Check, AlertTriangle } from 'lucide-reac
 import { getAuthToken } from '../../../lib/authStore';
 import { useLocale } from '../../../i18n';
 import { COUNTRIES, REGION_PRESETS, getCountryName, getCountryDisplayName } from '../../../lib/countryCatalog';
+import { PalletDiagramPreview } from './PalletDiagramPreview';
+
+type LogisticsLocaleKey = 'en' | 'de';
+
+interface LogisticsPanelDictionary {
+    sectionTitle: string;
+    sectionSubtitle: string;
+    adoptPlatformStandardBtn: string;
+    adoptedStandardActiveBtn: string;
+    customizeFreightBtn: string;
+    closeCustomizeFreightBtn: string;
+    savePalletAndFreightBtn: string;
+    primaryCarrierLabel: string;
+    localFleetOption: string;
+    euroPalletEpalLabel: string;
+    cartonBoxStandardLabel: string;
+    stretchWrapLabel: string;
+    rate1PalletLabel: string;
+    rate2PalletsLabel: string;
+    rate3To5PalletsLabel: string;
+    fuelSurchargeLabel: string;
+    adoptedSuccessMsg: string;
+    customSavedSuccessMsg: (carrier: string) => string;
+}
+
+const LOGISTICS_PANEL_I18N: Record<LogisticsLocaleKey, LogisticsPanelDictionary> = {
+    en: {
+        sectionTitle: '3D Cubing & Logistics Cost Matrix (EPAL / Book Warehouses)',
+        sectionSubtitle: 'Adopt the platform standard matrix in 1 click (Dachser, Schenker, Raben + Zeitfracht Erfurt 1200mm / VVA Arvato 1300mm profiles) or customize your pallet & carrier rates.',
+        adoptPlatformStandardBtn: 'Adopt Platform Standard (1-Click)',
+        adoptedStandardActiveBtn: 'Platform Standard Active',
+        customizeFreightBtn: 'Customize Pallets & Carriers',
+        closeCustomizeFreightBtn: 'Close Customization',
+        savePalletAndFreightBtn: 'Save Pallet & Freight Rates',
+        primaryCarrierLabel: 'Primary Carrier',
+        localFleetOption: 'Own Fleet / Direct Delivery',
+        euroPalletEpalLabel: 'Euro-Pallet EPAL (€/unit)',
+        cartonBoxStandardLabel: 'Standard Carton FEFCO (€/unit)',
+        stretchWrapLabel: 'Stretch Wrap / Strapping (€/pallet)',
+        rate1PalletLabel: '1 Pallet Rate (€)',
+        rate2PalletsLabel: '2 Pallets Rate (€/pallet)',
+        rate3To5PalletsLabel: '3–5 Pallets Rate (€/pallet)',
+        fuelSurchargeLabel: 'Fuel Surcharge (%)',
+        adoptedSuccessMsg: 'Platform Standard Logistics Matrix adopted successfully (Dachser, Schenker, Raben + Zeitfracht/VVA/Amazon profiles).',
+        customSavedSuccessMsg: (carrier: string) => `Custom pallet and carrier rates (${carrier}) saved successfully.`
+    },
+    de: {
+        sectionTitle: '3D-Palettierung & Logistikkosten-Matrix (EPAL / Verlagsauslieferungen)',
+        sectionSubtitle: 'Übernehmen Sie mit 1 Klick die Plattform-Standardmatrix (Dachser, Schenker, Raben + Zeitfracht Erfurt 1200mm / VVA Arvato 1300mm Profile) oder passen Sie Ihre Paletten- und Frachttarife an.',
+        adoptPlatformStandardBtn: 'Plattform-Standard übernehmen (1-Klick)',
+        adoptedStandardActiveBtn: 'Plattform-Standard aktiv',
+        customizeFreightBtn: 'Paletten & Speditionen anpassen',
+        closeCustomizeFreightBtn: 'Anpassung schließen',
+        savePalletAndFreightBtn: 'Paletten- & Frachttarife speichern',
+        primaryCarrierLabel: 'Hauptspedition',
+        localFleetOption: 'Eigener Fuhrpark / Direktfahrt',
+        euroPalletEpalLabel: 'EPAL-Europalette (€/Stk)',
+        cartonBoxStandardLabel: 'Standardkarton FEFCO (€/Stk)',
+        stretchWrapLabel: 'Stretchfolie / Umreifung (€/Palette)',
+        rate1PalletLabel: '1-Paletten-Tarif (€)',
+        rate2PalletsLabel: '2-Paletten-Tarif (€/Palette)',
+        rate3To5PalletsLabel: '3–5-Paletten-Tarif (€/Palette)',
+        fuelSurchargeLabel: 'Treibstoffzuschlag (%)',
+        adoptedSuccessMsg: 'Plattform-Standard-Logistikmatrix erfolgreich übernommen (Dachser, Schenker, Raben + Zeitfracht/VVA/Amazon-Profile).',
+        customSavedSuccessMsg: (carrier: string) => `Benutzerdefinierte Paletten- und Frachttarife (${carrier}) erfolgreich gespeichert.`
+    }
+};
 
 interface ShippingRegion {
     id: string;
@@ -24,7 +91,8 @@ interface ShippingPanelProps {
 }
 
 export const ShippingPanel: React.FC<ShippingPanelProps> = ({ siteId, onSaveSuccess }) => {
-    const { t } = useLocale();
+    const { t, locale } = useLocale();
+    const logisticsCopy = LOGISTICS_PANEL_I18N[locale === 'de' ? 'de' : 'en'];
     const [regions, setRegions] = useState<ShippingRegion[]>([]);
     const [loading, setLoading] = useState<boolean>(true);
     const [showAddForm, setShowAddForm] = useState<boolean>(false);
@@ -81,21 +149,21 @@ export const ShippingPanel: React.FC<ShippingPanelProps> = ({ siteId, onSaveSucc
                 setAdoptedStandardMatrix(true);
                 setMessage({
                     type: 'success',
-                    text: 'Matriz Logística Estándar de la Plataforma adoptada con éxito (Dachser, Schenker, Raben + perfiles Zeitfracht/VVA/Amazon).'
+                    text: logisticsCopy.adoptedSuccessMsg
                 });
                 if (onSaveSuccess) onSaveSuccess();
             } else {
                 setAdoptedStandardMatrix(true);
                 setMessage({
                     type: 'success',
-                    text: 'Matriz Logística Estándar de la Plataforma activada.'
+                    text: logisticsCopy.adoptedSuccessMsg
                 });
             }
         } catch (_) {
             setAdoptedStandardMatrix(true);
             setMessage({
                 type: 'success',
-                text: 'Matriz Logística Estándar de la Plataforma activada en modo local.'
+                text: logisticsCopy.adoptedSuccessMsg
             });
         } finally {
             setSavingFreightMatrix(false);
@@ -144,7 +212,7 @@ export const ShippingPanel: React.FC<ShippingPanelProps> = ({ siteId, onSaveSucc
                 setCustomizingFreight(false);
                 setMessage({
                     type: 'success',
-                    text: `Tarifas personalizadas de palet y transportista (${freightConfig.primaryCarrier}) guardadas correctamente.`
+                    text: logisticsCopy.customSavedSuccessMsg(freightConfig.primaryCarrier)
                 });
                 if (onSaveSuccess) onSaveSuccess();
             }
@@ -152,7 +220,7 @@ export const ShippingPanel: React.FC<ShippingPanelProps> = ({ siteId, onSaveSucc
             setCustomizingFreight(false);
             setMessage({
                 type: 'success',
-                text: `Tarifas personalizadas de palet y transportista (${freightConfig.primaryCarrier}) aplicadas.`
+                text: logisticsCopy.customSavedSuccessMsg(freightConfig.primaryCarrier)
             });
         } finally {
             setSavingFreightMatrix(false);
@@ -624,16 +692,16 @@ export const ShippingPanel: React.FC<ShippingPanelProps> = ({ siteId, onSaveSucc
                 )}
             </div>
 
-            {/* Phase 198A (LOGISTICS-03): 1-Click Standard Logistics Matrix & Carrier / Pallet Customization */}
+            {/* Phase 198A / LOGISTICS-UI-01: 1-Click Standard Logistics Matrix, PalletCustomization & 3D Isometric Blueprint */}
             <div className="mt-6 pt-5 border-t border-zinc-200 dark:border-zinc-800 space-y-4">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div>
                         <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-800 dark:text-zinc-200 flex items-center gap-2">
                             <Truck size={15} className="text-[#dc0000]" />
-                            <span>Matriz de Costes Logísticos y Cubicaje 3D (EPAL / Almacenes Editoriales)</span>
+                            <span>{logisticsCopy.sectionTitle}</span>
                         </h4>
                         <p className="text-xs text-zinc-500 mt-0.5">
-                            Adopta con 1 clic la matriz estándar de la plataforma (Dachser, Schenker, Raben y perfiles Zeitfracht Erfurt 1200mm / VVA Arvato 1300mm) o personaliza tus costes de palet y transportistas.
+                            {logisticsCopy.sectionSubtitle}
                         </p>
                     </div>
 
@@ -648,8 +716,8 @@ export const ShippingPanel: React.FC<ShippingPanelProps> = ({ siteId, onSaveSucc
                             <Check size={14} />
                             <span>
                                 {adoptedStandardMatrix
-                                    ? 'Matriz Estándar Activa'
-                                    : 'Adoptar Matriz Logística Estándar (1 Clic)'}
+                                    ? logisticsCopy.adoptedStandardActiveBtn
+                                    : logisticsCopy.adoptPlatformStandardBtn}
                             </span>
                         </button>
                         <button
@@ -658,7 +726,11 @@ export const ShippingPanel: React.FC<ShippingPanelProps> = ({ siteId, onSaveSucc
                             onClick={() => setCustomizingFreight(!customizingFreight)}
                             className="px-3 py-2 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-200 text-xs font-bold rounded-lg transition-colors cursor-pointer"
                         >
-                            <span>{customizingFreight ? 'Cerrar Personalización' : 'Personalizar Palet y Transportistas'}</span>
+                            <span>
+                                {customizingFreight
+                                    ? logisticsCopy.closeCustomizeFreightBtn
+                                    : logisticsCopy.customizeFreightBtn}
+                            </span>
                         </button>
                     </div>
                 </div>
@@ -667,7 +739,7 @@ export const ShippingPanel: React.FC<ShippingPanelProps> = ({ siteId, onSaveSucc
                     <div className="p-4 bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200 dark:border-zinc-700 rounded-xl space-y-4">
                         <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
                             <div>
-                                <label className={labelClass}>Transportista Principal</label>
+                                <label className={labelClass}>{logisticsCopy.primaryCarrierLabel}</label>
                                 <select
                                     value={freightConfig.primaryCarrier}
                                     onChange={e => setFreightConfig({ ...freightConfig, primaryCarrier: e.target.value })}
@@ -676,11 +748,11 @@ export const ShippingPanel: React.FC<ShippingPanelProps> = ({ siteId, onSaveSucc
                                     <option value="DACHSER">Dachser Intelligent Logistics</option>
                                     <option value="SCHENKER">DB Schenker</option>
                                     <option value="RABEN">Raben Group</option>
-                                    <option value="LOCAL_FLEET">Flota Propia / Directo</option>
+                                    <option value="LOCAL_FLEET">{logisticsCopy.localFleetOption}</option>
                                 </select>
                             </div>
                             <div>
-                                <label className={labelClass}>Euro-Palet EPAL (€/ud)</label>
+                                <label className={labelClass}>{logisticsCopy.euroPalletEpalLabel}</label>
                                 <input
                                     type="number"
                                     step="0.10"
@@ -690,7 +762,7 @@ export const ShippingPanel: React.FC<ShippingPanelProps> = ({ siteId, onSaveSucc
                                 />
                             </div>
                             <div>
-                                <label className={labelClass}>Caja Estándar FEFCO (€/ud)</label>
+                                <label className={labelClass}>{logisticsCopy.cartonBoxStandardLabel}</label>
                                 <input
                                     type="number"
                                     step="0.05"
@@ -700,7 +772,7 @@ export const ShippingPanel: React.FC<ShippingPanelProps> = ({ siteId, onSaveSucc
                                 />
                             </div>
                             <div>
-                                <label className={labelClass}>Film / Flejado (€/palet)</label>
+                                <label className={labelClass}>{logisticsCopy.stretchWrapLabel}</label>
                                 <input
                                     type="number"
                                     step="0.10"
@@ -713,7 +785,7 @@ export const ShippingPanel: React.FC<ShippingPanelProps> = ({ siteId, onSaveSucc
 
                         <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
                             <div>
-                                <label className={labelClass}>Tarifa 1 Palet (€)</label>
+                                <label className={labelClass}>{logisticsCopy.rate1PalletLabel}</label>
                                 <input
                                     type="number"
                                     step="1"
@@ -723,7 +795,7 @@ export const ShippingPanel: React.FC<ShippingPanelProps> = ({ siteId, onSaveSucc
                                 />
                             </div>
                             <div>
-                                <label className={labelClass}>Tarifa 2 Palets (€/palet)</label>
+                                <label className={labelClass}>{logisticsCopy.rate2PalletsLabel}</label>
                                 <input
                                     type="number"
                                     step="1"
@@ -733,7 +805,7 @@ export const ShippingPanel: React.FC<ShippingPanelProps> = ({ siteId, onSaveSucc
                                 />
                             </div>
                             <div>
-                                <label className={labelClass}>Tarifa 3–5 Palets (€/palet)</label>
+                                <label className={labelClass}>{logisticsCopy.rate3To5PalletsLabel}</label>
                                 <input
                                     type="number"
                                     step="1"
@@ -743,7 +815,7 @@ export const ShippingPanel: React.FC<ShippingPanelProps> = ({ siteId, onSaveSucc
                                 />
                             </div>
                             <div>
-                                <label className={labelClass}>Recargo Combustible (%)</label>
+                                <label className={labelClass}>{logisticsCopy.fuelSurchargeLabel}</label>
                                 <input
                                     type="number"
                                     step="0.5"
@@ -762,11 +834,14 @@ export const ShippingPanel: React.FC<ShippingPanelProps> = ({ siteId, onSaveSucc
                                 onClick={handleSaveCustomFreightMatrix}
                                 className="px-4 py-2 bg-[#dc0000] hover:bg-[#b00000] text-white text-xs font-bold rounded-lg transition-colors cursor-pointer"
                             >
-                                Guardar Tarifas de Palet y Transporte
+                                {logisticsCopy.savePalletAndFreightBtn}
                             </button>
                         </div>
                     </div>
                 )}
+
+                {/* 3D Isometric Euro-Pallet Blueprint Preview */}
+                <PalletDiagramPreview locale={locale} maxHeightMm={1200} perimeterSetbackMm={30} />
             </div>
         </div>
     );
