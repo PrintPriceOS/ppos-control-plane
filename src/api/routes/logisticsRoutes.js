@@ -30,7 +30,12 @@ const {
 } = require('../services/logistics/deliveryNotePdfService');
 const {
     ingestCarrierMilestone,
-    runEpalSettlementSweep
+    listPublisherPodNotifications,
+    runEpalSettlementSweep,
+    startEpalSettlementScheduler,
+    stopEpalSettlementScheduler,
+    getEpalSettlementSchedulerStatus,
+    consolidateOrderLandedCost
 } = require('../services/logistics/carrierMilestoneAndEpalService');
 
 function requireLogisticsControlPlaneAuth(req, res, next) {
@@ -440,6 +445,114 @@ function createLogisticsRouter(options = {}) {
                 shipments: Array.isArray(body.shipments) ? body.shipments : null
             });
 
+            return res.status(200).json({
+                ok: true,
+                success: true,
+                ...result
+            });
+        } catch (err) {
+            return res.status(err.statusCode || 400).json({
+                ok: false,
+                error: err.message
+            });
+        }
+    });
+
+    /**
+     * GET /epal/scheduler-status (mounted at /api/logistics/epal/scheduler-status)
+     * Returns the live status of the automated daily 14-day EPAL settlement cron daemon.
+     */
+    router.get('/epal/scheduler-status', async (req, res) => {
+        try {
+            const status = getEpalSettlementSchedulerStatus();
+            return res.status(200).json({
+                ok: true,
+                success: true,
+                scheduler: status
+            });
+        } catch (err) {
+            return res.status(err.statusCode || 500).json({
+                ok: false,
+                error: err.message
+            });
+        }
+    });
+
+    /**
+     * POST /epal/scheduler-control (mounted at /api/logistics/epal/scheduler-control)
+     * Starts or stops the automated daily EPAL settlement scheduler.
+     */
+    router.post('/epal/scheduler-control', async (req, res) => {
+        try {
+            const body = req.body || {};
+            const action = String(body.action || 'START').trim().toUpperCase();
+            let scheduler;
+            if (action === 'STOP') {
+                scheduler = stopEpalSettlementScheduler();
+            } else {
+                scheduler = startEpalSettlementScheduler({
+                    intervalMs: body.intervalMs,
+                    runOnBoot: Boolean(body.runImmediately)
+                });
+            }
+            return res.status(200).json({
+                ok: true,
+                success: true,
+                scheduler
+            });
+        } catch (err) {
+            return res.status(err.statusCode || 400).json({
+                ok: false,
+                error: err.message
+            });
+        }
+    });
+
+    /**
+     * GET /notifications/publisher-pod (mounted at /api/logistics/notifications/publisher-pod)
+     * Lists automatic publisher POD delivery notifications & outgoing webhook dispatches.
+     */
+    router.get('/notifications/publisher-pod', async (req, res) => {
+        try {
+            const authTenantId = req.user && req.user.tenantId;
+            const queryTenantId = (req.query && req.query.tenantId) || authTenantId || null;
+            const shipmentId = (req.query && req.query.shipmentId) || null;
+
+            const notifications = listPublisherPodNotifications({
+                tenantId: queryTenantId,
+                shipmentId
+            });
+
+            return res.status(200).json({
+                ok: true,
+                success: true,
+                count: notifications.length,
+                notifications
+            });
+        } catch (err) {
+            return res.status(err.statusCode || 400).json({
+                ok: false,
+                error: err.message
+            });
+        }
+    });
+
+    /**
+     * POST /landed-cost/consolidate (mounted at /api/logistics/landed-cost/consolidate)
+     * Consolidates manufacturing, packaging consumables, actual vs quoted carrier freight,
+     * and overdue 14-day EPAL Palettenschein settlement charges (`EPAL-SETTLE-*`) into the order balance.
+     */
+    router.post('/landed-cost/consolidate', async (req, res) => {
+        try {
+            const body = req.body || {};
+            const authContext = {
+                userId: req.user && req.user.id,
+                role: (req.user && req.user.role) || (req.headers && req.headers['x-user-role']),
+                tenantId: req.user && req.user.tenantId,
+                printhouseId: req.user && req.user.printhouseId
+            };
+
+            const result = await consolidateOrderLandedCost(body, authContext);
             return res.status(200).json({
                 ok: true,
                 success: true,

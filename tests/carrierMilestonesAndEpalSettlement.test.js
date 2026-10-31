@@ -10,7 +10,12 @@ const {
     EPAL_VOUCHER_STATES,
     ensureShipmentLedgerRecord,
     ingestCarrierMilestone,
+    listPublisherPodNotifications,
     runEpalSettlementSweep,
+    startEpalSettlementScheduler,
+    stopEpalSettlementScheduler,
+    getEpalSettlementSchedulerStatus,
+    consolidateOrderLandedCost,
     clearShipmentLedgerForTesting
 } = require('../src/api/services/logistics/carrierMilestoneAndEpalService');
 
@@ -275,5 +280,101 @@ describe('Phase 198D (LOGISTICS-06) — Carrier Telematic Milestones (POD) & 14-
         expect(settlementRes.body.ok).toBe(true);
         expect(settlementRes.body.summary.totalUnreturnedPalletsBilled).toBe(3);
         expect(settlementRes.body.summary.totalNetBilledEur).toBe(45.00);
+    });
+
+    it('Test 4 (LOGISTICS-07): Automated EPAL Daily Cron Scheduler, Publisher POD Notifications, and Consolidated Landed Cost Reconciliation', async () => {
+        const router = createLogisticsRouter();
+
+        // 1. Start automated daily EPAL settlement scheduler with immediate run
+        const schedulerStartRes = await invokeRouterEndpoint(router, {
+            method: 'POST',
+            routePath: '/epal/scheduler-control',
+            user: { id: 'admin-1', role: 'PRINTHOUSE_ADMIN', tenantId: 'tenant-munich' },
+            body: {
+                action: 'START',
+                intervalMs: 60000,
+                runImmediately: true
+            }
+        });
+        expect(schedulerStartRes.statusCode).toBe(200);
+        expect(schedulerStartRes.body.scheduler.active).toBe(true);
+        expect(schedulerStartRes.body.scheduler.cronExpression).toBe('0 0 * * *');
+        expect(schedulerStartRes.body.scheduler.totalRunsCount).toBe(1);
+
+        // 2. Ingest DELIVERED_POD milestone -> verify automatic Publisher POD notification & webhook payload
+        const podMilestoneRes = await invokeRouterEndpoint(router, {
+            method: 'POST',
+            routePath: '/carrier/milestones',
+            user: { id: 'op-1', role: 'PRINTHOUSE_OPERATOR', tenantId: 'tenant-munich' },
+            body: {
+                shipmentId: 'SHP-POD-NOTIFY-901',
+                tenantId: 'tenant-munich',
+                poNumber: 'PO-VERLAG-2026-88',
+                isbn: '978-3-442-15123-4',
+                publisherEmail: 'herstellung@verlag-muenchen.de',
+                milestone: 'DELIVERED_POD',
+                sscc: '(00) 0 8412345 000000001 0',
+                closeAllPallets: true,
+                dispatchTimestamp: '2026-10-01T08:00:00.000Z',
+                unloadedAt: '2026-10-02T11:00:00.000Z',
+                timestamp: '2026-10-02T11:20:00.000Z',
+                deliveredEpalPallets: 4,
+                exchangedAtDockPallets: 2,
+                receiverName: 'VVA Arvato Wareneingang'
+            }
+        });
+        expect(podMilestoneRes.statusCode).toBe(200);
+        expect(podMilestoneRes.body.publisherNotification).toBeDefined();
+        expect(podMilestoneRes.body.publisherNotification.eventType).toBe('logistics.shipment.delivered_pod');
+        expect(podMilestoneRes.body.publisherNotification.recipientEmail).toBe('herstellung@verstellung@verlag-muenchen.de'.replace('herstellung@verstellung@', 'herstellung@'));
+        expect(podMilestoneRes.body.publisherNotification.subjectByLocale.DE).toContain('Zustellung bestätigt');
+        expect(podMilestoneRes.body.publisherNotification.payload.documents.deliveryNotePdfUrl).toBe(
+            '/api/logistics/shipments/SHP-POD-NOTIFY-901/delivery-note/pdf'
+        );
+
+        const listNotifRes = await invokeRouterEndpoint(router, {
+            method: 'GET',
+            routePath: '/notifications/publisher-pod',
+            user: { id: 'op-1', role: 'PRINTHOUSE_OPERATOR', tenantId: 'tenant-munich' },
+            query: { shipmentId: 'SHP-POD-NOTIFY-901' }
+        });
+        expect(listNotifRes.statusCode).toBe(200);
+        expect(listNotifRes.body.count).toBe(1);
+
+        // 3. Consolidate Order Landed Cost after 20 days (4 delivered - 2 exchanged = 2 overdue EPAL pallets -> 30.00 EUR net)
+        const landedRes = await invokeRouterEndpoint(router, {
+            method: 'POST',
+            routePath: '/landed-cost/consolidate',
+            user: { id: 'admin-1', role: 'PRINTHOUSE_ADMIN', tenantId: 'tenant-munich' },
+            body: {
+                orderId: 'ORD-2026-901',
+                shipmentId: 'SHP-POD-NOTIFY-901',
+                tenantId: 'tenant-munich',
+                evaluationDate: '2026-10-25T12:00:00.000Z',
+                quantity: 2000,
+                manufacturingCostEur: 3200.00,
+                packagingMaterialsCostEur: 95.00,
+                quotedCarrierFreightEur: 240.00,
+                actualCarrierFreightEur: 255.00,
+                epalAllocationMode: 'CARRIER_FREIGHT_DEDUCTION'
+            }
+        });
+        expect(landedRes.statusCode).toBe(200);
+        expect(landedRes.body.ok).toBe(true);
+        expect(landedRes.body.costSegregation.manufacturingCostEur).toBe(3200.00);
+        expect(landedRes.body.costSegregation.packagingMaterialsCostEur).toBe(95.00);
+        expect(landedRes.body.costSegregation.freightVarianceEur).toBe(15.00);
+        expect(landedRes.body.epalSettlementReconciliation.isOverdue).toBe(true);
+        expect(landedRes.body.epalSettlementReconciliation.outstandingEpalPallets).toBe(2);
+        expect(landedRes.body.epalSettlementReconciliation.epalNetChargeEur).toBe(30.00);
+        // 255.00 EUR actual freight - 30.00 EUR overdue EPAL deduction = 225.00 EUR net payable to carrier
+        expect(landedRes.body.epalSettlementReconciliation.netPayableToCarrierEur).toBe(225.00);
+        // Consolidated order total: 3200.00 manufacturing + (95.00 packaging + 255.00 freight) = 3550.00 EUR
+        expect(landedRes.body.consolidatedTotalsEur.consolidatedLogisticsNetEur).toBe(350.00);
+        expect(landedRes.body.consolidatedTotalsEur.consolidatedOrderTotalNetEur).toBe(3550.00);
+        expect(landedRes.body.consolidatedTotalsEur.consolidatedLandedCostPerCopyEur).toBe(1.775);
+
+        stopEpalSettlementScheduler();
+        expect(getEpalSettlementSchedulerStatus().active).toBe(false);
     });
 });

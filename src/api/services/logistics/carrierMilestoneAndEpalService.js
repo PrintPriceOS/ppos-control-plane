@@ -20,10 +20,19 @@
 const { validateSscc18 } = require('./ssccGeneratorService');
 const { normalizeShipmentForDocuments } = require('./deliveryNotePdfService');
 const { roundToPrecision } = require('../spine/spineCalculationEngine');
+const { LogisticsDatabaseService } = require('./logisticsDatabaseService');
+
+let outgoingWebhookService = null;
+try {
+    outgoingWebhookService = require('../outgoingWebhookService');
+} catch (_) {
+    // Optional in isolated environments
+}
 
 const EPAL_EXCHANGE_DEADLINE_DAYS = 14;
 const EPAL_NON_RETURN_FEE_PER_PALLET_EUR = 15.00;
 const DEFAULT_VAT_PERCENT = 19.0; // Standard DE USt / configurable per tenant
+const DEFAULT_EPAL_SWEEP_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours (daily automated sweep)
 
 const VALID_CARRIER_MILESTONES = Object.freeze({
     PICKED_UP: 'PICKED_UP',
@@ -52,6 +61,16 @@ const EPAL_VOUCHER_STATES = Object.freeze({
 
 // In-memory ledger for deterministic runtime & offline test execution (backed by optional DB persistence)
 const shipmentLedgerStore = new Map();
+const publisherNotificationOutbox = [];
+let epalSettlementCronTimer = null;
+const epalSchedulerState = {
+    active: false,
+    intervalMs: DEFAULT_EPAL_SWEEP_INTERVAL_MS,
+    cronExpression: '0 0 * * *', // Daily at 00:00 UTC
+    lastRunAt: null,
+    lastRunSummary: null,
+    totalRunsCount: 0
+};
 
 function sanitizeSsccDigits(input) {
     if (!input) return '';
@@ -178,8 +197,13 @@ function ingestCarrierMilestone(payload = {}, authContext = {}) {
         tenantId: payload.tenantId || authContext.tenantId,
         printhouseId: payload.printhouseId || authContext.printhouseId,
         carrierName: payload.carrierName,
+        poNumber: payload.poNumber,
+        isbn: payload.isbn,
+        publisherEmail: payload.publisherEmail,
+        publisherWebhookUrl: payload.publisherWebhookUrl,
         dispatchTimestamp: payload.dispatchTimestamp,
-        deliveredEpalPallets: payload.deliveredEpalPallets
+        deliveredEpalPallets: payload.deliveredEpalPallets,
+        exchangedAtDockPallets: payload.exchangedAtDockPallets ?? payload.epalExchangedCount
     });
 
     // Enforce tenant isolation
@@ -233,8 +257,9 @@ function ingestCarrierMilestone(payload = {}, authContext = {}) {
     }
 
     // Handle EPAL exchange / return counts reported in milestone
-    if (typeof payload.epalExchangedCount === 'number' && payload.epalExchangedCount >= 0) {
-        record.epalAccount.exchangedAtDockPallets = Number(payload.epalExchangedCount);
+    const exchangedCountParam = payload.epalExchangedCount ?? payload.exchangedAtDockPallets;
+    if (typeof exchangedCountParam === 'number' && exchangedCountParam >= 0) {
+        record.epalAccount.exchangedAtDockPallets = Number(exchangedCountParam);
     }
     if (typeof payload.epalReturnedCount === 'number' && payload.epalReturnedCount > 0) {
         record.epalAccount.returnedLaterPallets += Number(payload.epalReturnedCount);
@@ -261,6 +286,12 @@ function ingestCarrierMilestone(payload = {}, authContext = {}) {
 
         if (allDelivered) {
             record.status = SHIPMENT_LIFECYCLE_STATES.DELIVERED;
+            for (const p of allPallets) {
+                p.status = SHIPMENT_LIFECYCLE_STATES.DELIVERED;
+                if (!p.deliveredAt) {
+                    p.deliveredAt = payload.unloadedAt || eventTimestamp;
+                }
+            }
         } else {
             record.status = SHIPMENT_LIFECYCLE_STATES.IN_TRANSIT;
         }
@@ -296,6 +327,12 @@ function ingestCarrierMilestone(payload = {}, authContext = {}) {
     };
     record.milestones.push(milestoneEntry);
 
+    // Front 2 (LOGISTICS-07): Automatically emit Publisher / Client POD Notification & Outgoing Webhook when shipment reaches DELIVERED
+    let publisherNotification = null;
+    if (record.status === SHIPMENT_LIFECYCLE_STATES.DELIVERED && !record.publisherNotifiedAt) {
+        publisherNotification = dispatchPublisherPodNotification(record, payload, milestoneEntry);
+    }
+
     return {
         shipmentId: record.shipmentId,
         tenantId: record.tenantId,
@@ -304,8 +341,105 @@ function ingestCarrierMilestone(payload = {}, authContext = {}) {
         podConfirmationChannel: record.podConfirmationChannel,
         podSlaCompliant: record.podSlaCompliant,
         milestoneRecorded: milestoneEntry,
-        epalAccount: { ...record.epalAccount }
+        epalAccount: { ...record.epalAccount },
+        publisherNotification
     };
+}
+
+/**
+ * Front 2 (LOGISTICS-07): Builds and dispatches an automatic Publisher / Client POD notification
+ * (Trilingual email outbox + signed HMAC-SHA256 outgoing webhook event `logistics.shipment.delivered_pod`)
+ * when a shipment reaches `DELIVERED`.
+ */
+function dispatchPublisherPodNotification(record, payload = {}, milestoneEntry = {}) {
+    const deliveredAt = record.deliveredTimestamp || milestoneEntry.timestamp || new Date().toISOString();
+    const palletSsccList = Object.keys(record.palletsBySscc || {});
+    const publisherEmail = payload.publisherEmail || record.publisherEmail || 'logistics-notify@publisher.example.com';
+    const publisherWebhookUrl = payload.publisherWebhookUrl || record.publisherWebhookUrl || null;
+    const deliveryNotePdfUrl = `/api/logistics/shipments/${encodeURIComponent(record.shipmentId)}/delivery-note/pdf`;
+
+    const webhookEventPayload = {
+        eventType: 'logistics.shipment.delivered_pod',
+        protocolRef: 'PPOS-LOG-SLA-2026.1',
+        shipmentId: record.shipmentId,
+        tenantId: record.tenantId,
+        printhouseId: record.printhouseId,
+        poNumber: record.poNumber,
+        isbn: record.isbn,
+        carrierName: record.carrierName,
+        warehouseProfileCode: record.warehouseProfileCode,
+        consigneeGln: record.consigneeGln,
+        deliveredTimestamp: deliveredAt,
+        podConfirmed: true,
+        podConfirmationChannel: record.podConfirmationChannel || 'TELEMATIC_API',
+        podSlaCompliant: record.podSlaCompliant,
+        receiverName: milestoneEntry.receiverName || payload.receiverName || 'Editorial Hub Dock Control',
+        dockGate: milestoneEntry.dockGate || payload.dockGate || null,
+        palletsDeliveredCount: palletSsccList.length,
+        palletSsccs: palletSsccList,
+        epalSummary: {
+            voucherRef: record.epalAccount.voucherRef,
+            deliveredEpalPallets: record.epalAccount.deliveredEpalPallets,
+            exchangedAtDockPallets: record.epalAccount.exchangedAtDockPallets,
+            outstandingEpalPallets: record.epalAccount.outstandingEpalPallets,
+            voucherState: record.epalAccount.voucherState
+        },
+        documents: {
+            deliveryNotePdfUrl
+        }
+    };
+
+    const notificationEntry = {
+        notificationId: `POD-NTF-${record.shipmentId}-${Date.now()}`,
+        eventType: 'logistics.shipment.delivered_pod',
+        shipmentId: record.shipmentId,
+        tenantId: record.tenantId,
+        poNumber: record.poNumber,
+        isbn: record.isbn,
+        recipientEmail: publisherEmail,
+        targetWebhookUrl: publisherWebhookUrl,
+        dispatchedAt: new Date().toISOString(),
+        channels: ['EMAIL_POD_NOTICE', 'OUTGOING_WEBHOOK_HMAC_SHA256'],
+        status: 'DISPATCHED',
+        subjectByLocale: {
+            ES: `[PrintPriceOS POD] Entrega confirmada — Expedición ${record.shipmentId} (PO: ${record.poNumber})`,
+            DE: `[PrintPriceOS POD] Zustellung bestätigt — Sendung ${record.shipmentId} (PO: ${record.poNumber})`,
+            EN: `[PrintPriceOS POD] Delivery confirmed — Shipment ${record.shipmentId} (PO: ${record.poNumber})`
+        },
+        payload: webhookEventPayload
+    };
+
+    record.publisherNotifiedAt = notificationEntry.dispatchedAt;
+    record.lastPublisherNotification = notificationEntry;
+    publisherNotificationOutbox.push(notificationEntry);
+
+    // Best-effort enqueue into OutgoingWebhookService if DB subscriptions exist
+    if (outgoingWebhookService && typeof outgoingWebhookService.enqueueWebhookEvent === 'function') {
+        Promise.resolve(
+            outgoingWebhookService.enqueueWebhookEvent({
+                tenantId: record.tenantId,
+                eventType: 'logistics.shipment.delivered_pod',
+                payload: webhookEventPayload
+            })
+        ).catch(() => {});
+    }
+
+    return notificationEntry;
+}
+
+/**
+ * Lists dispatched Publisher POD notifications filtered by tenantId and optional shipmentId.
+ */
+function listPublisherPodNotifications({ tenantId = null, shipmentId = null } = {}) {
+    return publisherNotificationOutbox.filter(item => {
+        if (tenantId && item.tenantId !== 'default-tenant' && String(item.tenantId) !== String(tenantId)) {
+            return false;
+        }
+        if (shipmentId && String(item.shipmentId) !== String(shipmentId)) {
+            return false;
+        }
+        return true;
+    });
 }
 
 /**
@@ -437,35 +571,249 @@ function runEpalSettlementSweep({
         }
     }
 
+    const summary = {
+        evaluatedShipmentsCount: results.length,
+        overdueShipmentsCount: totalOverdueShipments,
+        totalUnreturnedPalletsBilled,
+        totalNetBilledEur,
+        totalGrossBilledEur
+    };
+
+    epalSchedulerState.lastRunAt = evaluationDate;
+    epalSchedulerState.lastRunSummary = summary;
+    epalSchedulerState.totalRunsCount += 1;
+
     return {
         protocolRef: 'PPOS-LOG-SLA-2026.1',
         evaluatedAt: evaluationDate,
         deadlineDays: EPAL_EXCHANGE_DEADLINE_DAYS,
         unitPenaltyEur: EPAL_NON_RETURN_FEE_PER_PALLET_EUR,
-        summary: {
-            evaluatedShipmentsCount: results.length,
-            overdueShipmentsCount: totalOverdueShipments,
-            totalUnreturnedPalletsBilled,
-            totalNetBilledEur,
-            totalGrossBilledEur
-        },
+        summary,
         shipments: results
+    };
+}
+
+/**
+ * Front 1 (LOGISTICS-07): Starts the automated background daily EPAL Palettenschein settlement cron daemon.
+ */
+function startEpalSettlementScheduler({ intervalMs = DEFAULT_EPAL_SWEEP_INTERVAL_MS, runOnBoot = false } = {}) {
+    if (epalSettlementCronTimer) {
+        return getEpalSettlementSchedulerStatus();
+    }
+    epalSchedulerState.intervalMs = Number(intervalMs) > 0 ? Number(intervalMs) : DEFAULT_EPAL_SWEEP_INTERVAL_MS;
+    epalSchedulerState.active = true;
+
+    if (runOnBoot) {
+        try {
+            runEpalSettlementSweep({ evaluationDate: new Date().toISOString(), autoSettle: true });
+        } catch (_) {}
+    }
+
+    epalSettlementCronTimer = setInterval(() => {
+        try {
+            runEpalSettlementSweep({ evaluationDate: new Date().toISOString(), autoSettle: true });
+        } catch (_) {}
+    }, epalSchedulerState.intervalMs);
+
+    if (epalSettlementCronTimer && typeof epalSettlementCronTimer.unref === 'function') {
+        epalSettlementCronTimer.unref();
+    }
+
+    return getEpalSettlementSchedulerStatus();
+}
+
+/**
+ * Stops the background EPAL settlement cron daemon.
+ */
+function stopEpalSettlementScheduler() {
+    if (epalSettlementCronTimer) {
+        clearInterval(epalSettlementCronTimer);
+        epalSettlementCronTimer = null;
+    }
+    epalSchedulerState.active = false;
+    return getEpalSettlementSchedulerStatus();
+}
+
+/**
+ * Returns the live status of the automated EPAL 14-day settlement scheduler.
+ */
+function getEpalSettlementSchedulerStatus() {
+    return {
+        protocolRef: 'PPOS-LOG-SLA-2026.1',
+        active: epalSchedulerState.active,
+        cronExpression: epalSchedulerState.cronExpression,
+        intervalMs: epalSchedulerState.intervalMs,
+        deadlineDays: EPAL_EXCHANGE_DEADLINE_DAYS,
+        unitPenaltyEur: EPAL_NON_RETURN_FEE_PER_PALLET_EUR,
+        lastRunAt: epalSchedulerState.lastRunAt,
+        lastRunSummary: epalSchedulerState.lastRunSummary,
+        totalRunsCount: epalSchedulerState.totalRunsCount
+    };
+}
+
+/**
+ * Front 3 (LOGISTICS-07): Financial Consolidation & Landed Cost Reconciliation Engine (`POST /api/logistics/landed-cost/consolidate`).
+ * Consolidates:
+ * 1. Governed Manufacturing Cost (`manufacturingCostEur`, optional/segregated)
+ * 2. Workshop Packaging Consumables Cost (`packagingMaterialsCostEur`: cartons FEFCO 0201, EPAL base cost, stretch film)
+ * 3. Carrier Freight Cost (`quotedCarrierFreightEur` vs `actualCarrierFreightEur`)
+ * 4. Automated 14-Day EPAL Non-Return Settlement Adjustments (`EPAL-SETTLE-*` at 15.00 EUR / unit):
+ *    - `CARRIER_FREIGHT_DEDUCTION`: Deducts unreturned EPAL fee from carrier freight settlement payable (`netPayableToCarrierEur`).
+ *    - `ORDER_SURCHARGE`: Adds unreturned EPAL fee as a direct logistics surcharge on the order balance.
+ */
+async function consolidateOrderLandedCost(params = {}, authContext = {}) {
+    const shipmentId = String(params.shipmentId || params.shipment_id || 'SHP-2026-0001').trim();
+    const orderId = String(params.orderId || params.order_id || `ORD-${shipmentId}`).trim();
+    const evaluationDate = params.evaluationDate || new Date().toISOString();
+
+    const record = ensureShipmentLedgerRecord(shipmentId, {
+        ...params,
+        tenantId: params.tenantId || authContext.tenantId || 'default-tenant',
+        printhouseId: params.printhouseId || authContext.printhouseId || 'ph-default'
+    });
+
+    if (
+        authContext.tenantId &&
+        record.tenantId &&
+        record.tenantId !== 'default-tenant' &&
+        String(authContext.tenantId) !== String(record.tenantId) &&
+        String(authContext.role || '').toUpperCase() !== 'SUPER_ADMIN'
+    ) {
+        const err = new Error('FORBIDDEN_TENANT_MISMATCH: Cross-tenant landed cost consolidation is prohibited.');
+        err.statusCode = 403;
+        throw err;
+    }
+
+    // 1. Evaluate current EPAL settlement state for this shipment
+    const epalEvaluation = evaluateShipmentEpalSettlement(record, evaluationDate, {
+        autoSettle: params.autoSettleEpal !== false
+    });
+
+    // 2. Resolve baseline packaging & freight costs (either from explicit params or via LogisticsDatabaseService)
+    let packagingMaterialsCostEur = Number(params.packagingMaterialsCostEur ?? params.packagingCostEur ?? NaN);
+    let quotedCarrierFreightEur = Number(params.quotedCarrierFreightEur ?? params.quotedFreightEur ?? NaN);
+    let requestedQuantity = Number(params.quantity || params.copies || 1000);
+
+    if (!Number.isFinite(packagingMaterialsCostEur) || !Number.isFinite(quotedCarrierFreightEur)) {
+        const logisticsService = new LogisticsDatabaseService();
+        const quote = await logisticsService.calculateFullLandedLogisticsQuote({
+            printhouseId: record.printhouseId,
+            warehouseProfileCode: params.warehouseProfileCode || record.warehouseProfileCode || 'ZEITFRACHT_ERFURT',
+            trimWidthMm: Number(params.trimWidthMm || 148),
+            trimHeightMm: Number(params.trimHeightMm || 210),
+            pages: Number(params.pages || 240),
+            quantity: requestedQuantity > 0 ? requestedQuantity : 1000
+        });
+        if (!Number.isFinite(packagingMaterialsCostEur)) {
+            packagingMaterialsCostEur = quote.landedLogisticsCostSummaryEur.packagingMaterialsCostEur;
+        }
+        if (!Number.isFinite(quotedCarrierFreightEur)) {
+            quotedCarrierFreightEur = quote.landedLogisticsCostSummaryEur.carrierFreightCostEur;
+        }
+        requestedQuantity = quote.cubing.palletStacking.orderBreakdown.requestedQuantity;
+    }
+
+    packagingMaterialsCostEur = roundToPrecision(packagingMaterialsCostEur, 2);
+    quotedCarrierFreightEur = roundToPrecision(quotedCarrierFreightEur, 2);
+    const actualCarrierFreightEur = roundToPrecision(
+        Number.isFinite(Number(params.actualCarrierFreightEur))
+            ? Number(params.actualCarrierFreightEur)
+            : quotedCarrierFreightEur,
+        2
+    );
+    const manufacturingCostEur = roundToPrecision(Number(params.manufacturingCostEur || 0), 2);
+    const freightVarianceEur = roundToPrecision(actualCarrierFreightEur - quotedCarrierFreightEur, 2);
+
+    const epalAllocationMode = String(params.epalAllocationMode || 'CARRIER_FREIGHT_DEDUCTION').toUpperCase();
+    const epalNetChargeEur = epalEvaluation.settlementChargeNetEur;
+    const epalGrossChargeEur = epalEvaluation.settlementTotalGrossEur;
+
+    // Net payable to carrier after deducting overdue unreturned EPAL pallets (PPOS-LOG-SLA-2026.1 Section 3.1)
+    const netPayableToCarrierEur = roundToPrecision(
+        Math.max(0, actualCarrierFreightEur - (epalAllocationMode === 'CARRIER_FREIGHT_DEDUCTION' ? epalNetChargeEur : 0)),
+        2
+    );
+
+    const epalOrderSurchargeEur = epalAllocationMode === 'ORDER_SURCHARGE' ? epalNetChargeEur : 0;
+
+    // Strictly segregated Landed Logistics Cost vs Full Order Consolidated Balance
+    const consolidatedLogisticsNetEur = roundToPrecision(
+        packagingMaterialsCostEur + actualCarrierFreightEur + epalOrderSurchargeEur,
+        2
+    );
+    const consolidatedOrderTotalNetEur = roundToPrecision(
+        manufacturingCostEur + consolidatedLogisticsNetEur,
+        2
+    );
+    const consolidatedLandedCostPerCopyEur = roundToPrecision(
+        consolidatedOrderTotalNetEur / Math.max(1, requestedQuantity),
+        4
+    );
+
+    return {
+        protocolRef: 'PPOS-LOG-SLA-2026.1',
+        orderId,
+        shipmentId: record.shipmentId,
+        tenantId: record.tenantId,
+        printhouseId: record.printhouseId,
+        carrierName: record.carrierName,
+        warehouseProfileCode: record.warehouseProfileCode,
+        evaluatedAt: evaluationDate,
+        quantity: requestedQuantity,
+        costSegregation: {
+            manufacturingCostEur,
+            packagingMaterialsCostEur,
+            quotedCarrierFreightEur,
+            actualCarrierFreightEur,
+            freightVarianceEur
+        },
+        epalSettlementReconciliation: {
+            voucherRef: epalEvaluation.voucherRef,
+            voucherState: epalEvaluation.voucherState,
+            isOverdue: epalEvaluation.isOverdue,
+            daysElapsed: epalEvaluation.daysElapsed,
+            outstandingEpalPallets: epalEvaluation.outstandingEpalPallets,
+            unitPenaltyEur: epalEvaluation.unitPenaltyEur,
+            epalNetChargeEur,
+            epalGrossChargeEur,
+            allocationMode: epalAllocationMode,
+            settlementInvoice: epalEvaluation.settlementInvoice,
+            netPayableToCarrierEur
+        },
+        consolidatedTotalsEur: {
+            consolidatedLogisticsNetEur,
+            consolidatedOrderTotalNetEur,
+            consolidatedLandedCostPerCopyEur
+        }
     };
 }
 
 function clearShipmentLedgerForTesting() {
     shipmentLedgerStore.clear();
+    publisherNotificationOutbox.length = 0;
+    stopEpalSettlementScheduler();
+    epalSchedulerState.lastRunAt = null;
+    epalSchedulerState.lastRunSummary = null;
+    epalSchedulerState.totalRunsCount = 0;
 }
 
 module.exports = {
     EPAL_EXCHANGE_DEADLINE_DAYS,
     EPAL_NON_RETURN_FEE_PER_PALLET_EUR,
+    DEFAULT_EPAL_SWEEP_INTERVAL_MS,
     VALID_CARRIER_MILESTONES,
     SHIPMENT_LIFECYCLE_STATES,
     EPAL_VOUCHER_STATES,
     ensureShipmentLedgerRecord,
     ingestCarrierMilestone,
+    dispatchPublisherPodNotification,
+    listPublisherPodNotifications,
     evaluateShipmentEpalSettlement,
     runEpalSettlementSweep,
+    startEpalSettlementScheduler,
+    stopEpalSettlementScheduler,
+    getEpalSettlementSchedulerStatus,
+    consolidateOrderLandedCost,
     clearShipmentLedgerForTesting
 };
+

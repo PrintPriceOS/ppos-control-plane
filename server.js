@@ -47,6 +47,10 @@ const federationRouter = require('./src/api/routes/adminFederationCluster');
 const federationConsensusService = require('./src/api/services/federationConsensusService');
 const federationSyncService = require('./src/api/services/federationSyncService');
 const outgoingWebhookService = require('./src/api/services/outgoingWebhookService');
+const {
+    startEpalSettlementScheduler,
+    stopEpalSettlementScheduler
+} = require('./src/api/services/logistics/carrierMilestoneAndEpalService');
 
 // Security: Admin Auth Hook
 fastify.addHook('onRequest', async (request, reply) => {
@@ -511,6 +515,10 @@ const start = async () => {
         } else {
             console.warn('[BOOT] Federation consensus, sync loops, and webhook worker deferred due to schema compatibility status.');
         }
+
+        // Start automated daily 14-day EPAL Palettenschein settlement cron daemon (LOGISTICS-07)
+        startEpalSettlementScheduler();
+        console.log('[BOOT] Automated daily 14-day EPAL settlement scheduler initiated.');
         
         if (typeof process.send === 'function') {
             process.send('ready');
@@ -536,6 +544,7 @@ const gracefulShutdown = async (signal) => {
         await federationConsensusService.stop();
         await federationSyncService.stop();
         outgoingWebhookService.stopWorker();
+        stopEpalSettlementScheduler();
     } catch (err) {
         console.error('[SHUTDOWN] Error stopping background daemons:', err.message);
     }
