@@ -103,25 +103,25 @@ export const MarketplaceAuditTab: React.FC = () => {
 
     return (
         <div className="space-y-6 animate-slide-fade">
-            <div className="flex flex-col lg:flex-row gap-4 p-4 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10">
+            <div className="flex flex-col lg:flex-row gap-4 p-4 bg-[#14161a] border border-[#1f2228] rounded-xl">
                 <div className="flex-1 relative group">
-                    <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-primary transition-colors" />
+                    <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-[#dc2626] transition-colors" />
                     <input
-                        className="w-full bg-white dark:bg-[#0e0e0f] border border-slate-200 dark:border-white/10 rounded-none pl-10 pr-4 py-2.5 text-xs font-bold uppercase tracking-tight outline-none focus:border-primary transition-all dark:text-white"
+                        className="w-full bg-[#0a0b0d] border border-[#1f2228] rounded-lg pl-10 pr-4 py-2.5 text-xs font-bold uppercase tracking-tight outline-none focus:border-[#dc2626] transition-all text-white placeholder-slate-500"
                         placeholder="Search by Order Ref (PPOS-OI...) or Intent ID (oi_...)"
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && fetchEvents()}
                     />
                     {showSearchHint && (
-                        <p className="text-[10px] text-amber-500 font-bold uppercase tracking-tight mt-1">
+                        <p className="text-[10px] text-amber-400 font-bold uppercase tracking-tight mt-1">
                             Search supports Public Ref or Order Intent ID.
                         </p>
                     )}
                 </div>
                 <div className="flex gap-4 items-start">
                     <select
-                        className="bg-white dark:bg-[#0e0e0f] border border-slate-200 dark:border-white/10 px-4 py-2 text-[10px] font-black uppercase tracking-widest outline-none dark:text-white focus:border-primary transition-colors"
+                        className="bg-[#0a0b0d] border border-[#1f2228] rounded-lg px-4 py-2.5 text-[10px] font-black uppercase tracking-widest outline-none text-white focus:border-[#dc2626] transition-colors"
                         value={eventType}
                         onChange={(e) => setEventType(e.target.value)}
                     >
@@ -139,49 +139,49 @@ export const MarketplaceAuditTab: React.FC = () => {
                     <button 
                         type="button"
                         onClick={fetchEvents} 
-                        className="p-2 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 hover:bg-slate-50 dark:hover:bg-white/10 transition-colors"
+                        className="p-2.5 bg-[#0a0b0d] border border-[#1f2228] rounded-lg hover:bg-[#181b20] transition-colors cursor-pointer"
                     >
                         <ArrowPathIcon className={`w-5 h-5 text-slate-400 ${loading ? 'animate-spin' : ''}`} />
                     </button>
                 </div>
             </div>
 
-            <div className="bg-white dark:bg-[#131314] border border-slate-200 dark:border-white/10 overflow-hidden shadow-none">
+            <div className="bg-[#14161a] border border-[#1f2228] rounded-xl overflow-hidden">
                 <div className="overflow-x-auto overflow-y-auto max-h-[600px] custom-scrollbar">
                     <table className="w-full text-sm text-left border-collapse">
-                        <thead className="bg-slate-50/50 dark:bg-white/5 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest border-b border-slate-200 dark:border-white/10 sticky top-0 z-10">
+                        <thead className="bg-[#0f1013] text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b border-[#1f2228] sticky top-0 z-10">
                             <tr>
-                                <th className="py-4 px-6 bg-inherit">Timestamp</th>
-                                <th className="py-4 px-6 bg-inherit">Event Type</th>
-                                <th className="py-4 px-6 bg-inherit">Reference</th>
-                                <th className="py-4 px-6 bg-inherit">Actor</th>
-                                <th className="py-4 px-6 bg-inherit">Detail / Payload</th>
+                                <th className="py-4 px-6 bg-[#0f1013]">Timestamp</th>
+                                <th className="py-4 px-6 bg-[#0f1013]">Event Type</th>
+                                <th className="py-4 px-6 bg-[#0f1013]">Reference</th>
+                                <th className="py-4 px-6 bg-[#0f1013]">Actor</th>
+                                <th className="py-4 px-6 bg-[#0f1013]">Detail / Payload</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-100 dark:divide-white/5">
+                        <tbody className="divide-y divide-[#1f2228]">
                             {loading && events.length === 0 ? (
                                 <tr>
                                     <td colSpan={5} className="py-24 text-center">
-                                        <ArrowPathIcon className="w-8 h-8 text-primary animate-spin mx-auto mb-4" />
+                                        <ArrowPathIcon className="w-8 h-8 text-[#dc2626] animate-spin mx-auto mb-4" />
                                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Hydrating audit stream...</p>
                                     </td>
                                 </tr>
                             ) : events.length === 0 ? (
                                 <tr>
                                     <td colSpan={5} className="py-24 text-center">
-                                        <ShieldCheckIcon className="w-12 h-12 text-slate-100 dark:text-white/5 mx-auto mb-4" />
-                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">No audit events discovered</p>
+                                        <ShieldCheckIcon className="w-12 h-12 text-slate-600 mx-auto mb-4" />
+                                        <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">NO AUDIT EVENTS DEFINED</p>
                                     </td>
                                 </tr>
                             ) : events.map((e) => (
-                                <tr key={e.id} className="hover:bg-slate-50/50 dark:hover:bg-white/5 transition-colors group">
+                                <tr key={e.id} className="hover:bg-[#181b20] transition-colors group">
                                     <td className="py-4 px-6 whitespace-nowrap">
                                         <div className="flex flex-col gap-0.5">
-                                            <div className="flex items-center gap-2 text-slate-900 dark:text-white text-[10px] font-black tracking-tight">
+                                            <div className="flex items-center gap-2 text-white font-mono text-[10px] font-black tracking-tight">
                                                 <ClockIcon className="w-3.5 h-3.5 text-slate-400" />
                                                 {safeDate(e.createdAt)}
                                             </div>
-                                            <div className="text-[9px] text-slate-400 font-bold ml-5 uppercase">
+                                            <div className="text-[9px] text-slate-400 font-mono ml-5 uppercase">
                                                 {formatTime(e.createdAt)}
                                             </div>
                                         </div>
@@ -196,21 +196,21 @@ export const MarketplaceAuditTab: React.FC = () => {
                                     </td>
                                     <td className="py-4 px-6">
                                         <div className="flex items-center gap-2">
-                                            <CubeIcon className="w-3.5 h-3.5 text-slate-400 opacity-40" />
-                                            <div className="font-mono text-[10px] font-black text-slate-600 dark:text-slate-400 group-hover:text-primary transition-colors">
+                                            <CubeIcon className="w-3.5 h-3.5 text-slate-500" />
+                                            <div className="font-mono text-[10px] font-black text-slate-300 group-hover:text-white transition-colors">
                                                 {safeText(e.entityRef || e.publicRef || short(e.entityId, 12))}
                                             </div>
                                         </div>
                                     </td>
                                     <td className="py-4 px-6">
-                                        <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-tight text-slate-700 dark:text-slate-300">
-                                            <FingerPrintIcon className="w-3.5 h-3.5 opacity-40 text-primary" />
+                                        <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-tight text-slate-300">
+                                            <FingerPrintIcon className="w-3.5 h-3.5 text-[#dc2626]" />
                                             {e.actorId === 'bpe-system-user' ? 'SYSTEM' : (e.actorId || 'ANONYMOUS')}
                                         </div>
                                     </td>
                                     <td className="py-4 px-6">
                                         <div 
-                                            className="text-[10px] text-slate-500 dark:text-slate-400 font-medium max-w-sm xl:max-w-md truncate cursor-help group-hover:text-slate-900 dark:group-hover:text-slate-200 transition-colors" 
+                                            className="text-[10px] text-slate-400 font-mono max-w-sm xl:max-w-md truncate cursor-help group-hover:text-slate-200 transition-colors" 
                                             title={formatPayloadTitle(e.payload)}
                                         >
                                             {getPayloadSummary(e.payload)}

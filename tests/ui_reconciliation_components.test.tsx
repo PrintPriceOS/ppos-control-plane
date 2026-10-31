@@ -22,6 +22,7 @@ import {
     INDUSTRIAL_TELEMETRY_TOKENS
 } from '../src/ui/components/common';
 import { PricingIntelligenceTab } from '../src/ui/pages/admin/PricingIntelligenceTab';
+import { MarketplacePage } from '../src/ui/pages/admin/MarketplacePage';
 import { Sidebar } from '../src/ui/layout/Sidebar';
 import * as adminApi from '../src/ui/lib/adminApi';
 import { setAuthUser } from '../src/ui/lib/authStore';
@@ -49,6 +50,7 @@ describe('Dark Industrial Telemetry UI — Canonical Components & Dual-Mode Reco
         vi.spyOn(adminApi, 'getPricingProfiles').mockResolvedValue([]);
         vi.spyOn(adminApi, 'getEconomicRoutingHistory').mockResolvedValue([]);
         vi.spyOn(adminApi, 'getEconomicRoutingConflicts').mockResolvedValue([]);
+        vi.spyOn(adminApi, 'listMarketplaceOrders').mockResolvedValue({ orders: [], counts: { filesUploaded: 0 } });
     });
 
     it('1. Exports canonical Dark Industrial Telemetry tokens and renders StatusBadge states', () => {
@@ -155,6 +157,18 @@ describe('Dark Industrial Telemetry UI — Canonical Components & Dual-Mode Reco
         expect(pricingNavLink).toBeInTheDocument();
         expect(pricingNavLink?.className).toContain('rounded-full');
         expect(pricingNavLink?.className).toContain('bg-[#dc2626]');
+    });
+
+    it('4. Applies Dark Industrial Telemetry UI across /ops/marketplace and its sub-tabs', async () => {
+        renderWithProviders(<MarketplacePage mode="workspace" />, {
+            locale: 'en',
+            route: '/ops/marketplace'
+        });
+
+        expect(screen.getByTestId('marketplace-workspace')).toHaveAttribute('data-mode', 'workspace');
+        expect(screen.getByTestId('top-summary-kpi-bar')).toBeInTheDocument();
+        const emptyState = await screen.findByTestId('industrial-table-empty');
+        expect(emptyState).toHaveTextContent('NO MARKETPLACE ORDERS DEFINED');
     });
 });
 

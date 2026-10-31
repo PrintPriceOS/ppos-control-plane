@@ -17,6 +17,7 @@ import {
 } from "@heroicons/react/24/outline";
 import { safeTime, safeDate } from "../../lib/formatters";
 import { useLocale } from "../../i18n";
+import { TopSummaryKpiBar, IndustrialTable, StatusBadge } from "../../components/common";
 
 // --- Defensive Helpers ---
 
@@ -32,16 +33,16 @@ const getSpecSummary = (order: any) => {
 
 const getFileState = (order: any) => {
     const files = order?.productionFiles || [];
-    if (files.length === 0) return { label: "Missing", color: "bg-red-100 text-red-700" };
+    if (files.length === 0) return { label: "Missing", color: "bg-rose-500/15 text-rose-400 border border-rose-500/30" };
 
     const hasInterior = files.some((f: any) => f.kind?.includes("INTERIOR"));
     const hasCover = files.some((f: any) => f.kind?.includes("COVER"));
 
-    if (hasInterior && hasCover) return { label: "Interior + Cover", color: "bg-emerald-100 text-emerald-700" };
-    if (hasInterior) return { label: "Interior Only", color: "bg-amber-100 text-amber-700" };
-    if (hasCover) return { label: "Cover Only", color: "bg-amber-100 text-amber-700" };
+    if (hasInterior && hasCover) return { label: "Interior + Cover", color: "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30" };
+    if (hasInterior) return { label: "Interior Only", color: "bg-amber-500/15 text-amber-400 border border-amber-500/30" };
+    if (hasCover) return { label: "Cover Only", color: "bg-amber-500/15 text-amber-400 border border-amber-500/30" };
 
-    return { label: `${files.length} Files`, color: "bg-blue-100 text-blue-700" };
+    return { label: `${files.length} Files`, color: "bg-blue-500/15 text-blue-400 border border-blue-500/30" };
 };
 
 const getTotalLabel = (order: any) => {
@@ -87,14 +88,14 @@ const isNewOrder = (order: any) => {
 };
 
 const getStatusStyle = (status: string, order?: any) => {
-    if (order?.controlPlane?.acknowledged) return 'bg-emerald-50 text-emerald-700 border-emerald-100';
+    if (order?.controlPlane?.acknowledged) return 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30';
     switch (status) {
-        case 'ACKNOWLEDGED': return 'bg-emerald-50 text-emerald-700 border-emerald-100';
-        case 'FILES_UPLOADED': return 'bg-indigo-50 text-indigo-700 border-indigo-100';
-        case 'SIGNED': return 'bg-blue-50 text-blue-700 border-blue-100';
-        case 'READY': return 'bg-emerald-50 text-emerald-700 border-emerald-100';
-        case 'BLOCKED': return 'bg-red-50 text-red-700 border-red-100';
-        default: return 'bg-slate-50 text-slate-700 border-slate-200';
+        case 'ACKNOWLEDGED': return 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30';
+        case 'FILES_UPLOADED': return 'bg-blue-500/15 text-blue-400 border-blue-500/30';
+        case 'SIGNED': return 'bg-blue-500/15 text-blue-400 border-blue-500/30';
+        case 'READY': return 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30';
+        case 'BLOCKED': return 'bg-rose-500/15 text-rose-400 border-rose-500/30';
+        default: return 'bg-[#181b20] text-slate-300 border-[#1f2228]';
     }
 };
 
@@ -124,152 +125,164 @@ export const OrderIntakeTab: React.FC = () => {
     };
 
     const kpis = [
-        { label: t('marketplace.kpiNewOrders') || 'New Orders', value: orders.filter(o => isNewOrder(o)).length, icon: InboxStackIcon, color: 'text-blue-600' },
-        { label: t('marketplace.kpiFilesUploaded') || 'Files Uploaded', value: counts.filesUploaded || 0, icon: DocumentTextIcon, color: 'text-indigo-600' },
-        { label: t('marketplace.kpiPreflightReq') || 'Preflight Required', value: orders.filter(o => o.preflight?.status === 'REQUIRED').length, icon: ExclamationTriangleIcon, color: 'text-amber-600' },
-        { label: t('marketplace.kpiPaymentBlocked') || 'Payment Blocked', value: orders.filter(o => o.payment?.status === 'BLOCKED').length, icon: CreditCardIcon, color: 'text-red-600' },
-        { label: t('marketplace.kpiReadyHandoff') || 'Ready for Handoff', value: orders.filter(o => o.readiness === 'READY').length, icon: ShieldCheckIcon, color: 'text-emerald-600' },
-        { label: t('marketplace.kpiBlockedOrders') || 'Blocked Orders', value: orders.filter(o => o.readiness === 'BLOCKED').length, icon: ExclamationCircleIcon, color: 'text-red-500' },
+        { label: t('marketplace.kpiNewOrders') || 'NEW ORDERS', value: orders.filter(o => isNewOrder(o)).length, icon: InboxStackIcon, accent: 'blue' as const },
+        { label: t('marketplace.kpiFilesUploaded') || 'FILES UPLOADED', value: counts.filesUploaded || 0, icon: DocumentTextIcon, accent: 'blue' as const },
+        { label: t('marketplace.kpiReadyHandoff') || 'READY FOR HANDOFF', value: orders.filter(o => o.readiness === 'READY').length, icon: ShieldCheckIcon, accent: 'emerald' as const },
+        { label: t('marketplace.kpiBlockedOrders') || 'BLOCKED ORDERS', value: orders.filter(o => o.readiness === 'BLOCKED' || o.payment?.status === 'BLOCKED').length, icon: ExclamationCircleIcon, accent: 'rose' as const },
     ];
 
     return (
         <div className="space-y-6">
-            {/* KPI Cards */}
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-                {kpis.map((kpi, i) => (
-                    <div key={i} className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 p-4 rounded-none shadow-none">
-                        <div className="flex items-center justify-between mb-2">
-                            <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest leading-none">{kpi.label}</span>
-                            <kpi.icon className={`w-4 h-4 ${kpi.color}`} />
-                        </div>
-                        <div className="text-2xl font-black text-slate-900 dark:text-white leading-none">{kpi.value}</div>
-                    </div>
-                ))}
-            </div>
+            {/* Canonical TopSummaryKpiBar */}
+            <TopSummaryKpiBar items={kpis} />
 
             {/* Filter / Search Bar */}
-            <div className="flex items-center justify-between gap-4 p-4 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10">
+            <div className="flex items-center justify-between gap-4 p-4 bg-[#14161a] border border-[#1f2228] rounded-xl">
                 <div className="relative flex-1 max-w-md group">
                     <MagnifyingGlassIcon className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                     <input
                         type="text"
                         placeholder={t('marketplace.searchPlaceholder') || 'Filter by Order Ref, Email or ID...'}
-                        className="w-full pl-9 pr-4 py-2 bg-white dark:bg-[#0e0e0f] border border-slate-200 dark:border-white/10 rounded-none text-xs font-bold uppercase tracking-widest focus:border-primary outline-none dark:text-white"
+                        className="w-full pl-9 pr-4 py-2 bg-[#0a0b0d] border border-[#1f2228] rounded-lg text-xs font-bold uppercase tracking-widest focus:border-[#dc2626] outline-none text-white placeholder-slate-500"
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && fetchOrders()}
                     />
                 </div>
-                <button onClick={fetchOrders} className="p-2 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 hover:bg-slate-50 dark:hover:bg-white/10 transition-colors shadow-none cursor-pointer" title={t('jobs.refresh') || 'Refresh'}>
+                <button
+                    onClick={fetchOrders}
+                    className="p-2 bg-[#0a0b0d] border border-[#1f2228] rounded-lg hover:bg-[#181b20] transition-colors cursor-pointer"
+                    title={t('jobs.refresh') || 'Refresh'}
+                >
                     <ArrowPathIcon className={`w-5 h-5 text-slate-400 ${loading ? 'animate-spin' : ''}`} />
                 </button>
             </div>
 
-            {/* Orders Table */}
-            <div className="bg-white dark:bg-[#131314] border border-slate-200 dark:border-white/10 rounded-none overflow-hidden shadow-none overflow-x-auto">
-                <table id="marketplace-orders-table" className="w-full text-left border-collapse min-w-[1200px]">
-                    <thead>
-                        <tr className="bg-slate-50/50 dark:bg-white/5 border-b border-slate-200 dark:border-white/10 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">
-                            <th className="px-4 py-4">{t('marketplace.thPublicRef') || 'Public Ref'}</th>
-                            <th className="px-4 py-4">{t('marketplace.thCreated') || 'Created'}</th>
-                            <th className="px-4 py-4">{t('marketplace.thCustomer') || 'Customer / Session'}</th>
-                            <th className="px-4 py-4">{t('marketplace.thSpecs') || 'Specs'}</th>
-                            <th className="px-4 py-4">{t('marketplace.thPrinter') || 'Printer / Printhouse'}</th>
-                            <th className="px-4 py-4">{t('marketplace.thFiles') || 'Files'}</th>
-                            <th className="px-4 py-4">{t('marketplace.thPreflight') || 'Preflight'}</th>
-                            <th className="px-4 py-4">{t('marketplace.thPayment') || 'Payment'}</th>
-                            <th className="px-4 py-4">{t('marketplace.thTotal') || 'Total'}</th>
-                            <th className="px-4 py-4">{t('marketplace.thStatus') || 'Operational Status'}</th>
-                            <th className="px-4 py-4 text-right">{t('marketplace.thActions') || 'Actions'}</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 dark:divide-white/5">
-                        {loading ? (
-                            Array(5).fill(0).map((_, i) => (
-                                <tr key={i} className="animate-pulse">
-                                    <td colSpan={11} className="px-4 py-8 bg-slate-50/20 dark:bg-white/5"></td>
-                                </tr>
-                            ))
-                        ) : orders.length === 0 ? (
-                            <tr>
-                                <td colSpan={11} className="px-4 py-20 text-center">
-                                    <InboxStackIcon className="w-12 h-12 text-slate-200 dark:text-white/10 mx-auto mb-3" />
-                                    <p className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">{t('marketplace.emptyOrders') || 'No marketplace orders found'}</p>
-                                </td>
-                            </tr>
-                        ) : orders.map((order) => {
+            {/* Canonical IndustrialTable for Marketplace Orders */}
+            <IndustrialTable
+                title={t('marketplace.activeOrdersTitle') || 'MARKETPLACE ORDER INTAKE LEDGER'}
+                subtitle={`${orders.length} ${t('marketplace.ordersCount') || 'ORDERS RECORDED'}`}
+                data={orders}
+                loading={loading}
+                emptyEntityName="MARKETPLACE ORDERS"
+                rowKey={(order) => order.orderIntentId}
+                columns={[
+                    {
+                        key: 'publicRef',
+                        header: t('marketplace.thPublicRef') || 'PUBLIC REF',
+                        render: (order) => (
+                            <span className="font-mono font-black text-white tracking-tight">{order.publicRef}</span>
+                        )
+                    },
+                    {
+                        key: 'created',
+                        header: t('marketplace.thCreated') || 'CREATED',
+                        render: (order) => (
+                            <span className="font-mono text-xs text-slate-400 whitespace-nowrap">{safeDate(order.createdAt)}</span>
+                        )
+                    },
+                    {
+                        key: 'customer',
+                        header: t('marketplace.thCustomer') || 'CUSTOMER / SESSION',
+                        render: (order) => (
+                            <div>
+                                <div className="font-bold text-white">{order.customer?.name || 'Anonymous'}</div>
+                                <div className="text-[10px] text-slate-400 font-mono lowercase truncate max-w-[150px]">{order.customer?.email || 'N/A'}</div>
+                            </div>
+                        )
+                    },
+                    {
+                        key: 'specs',
+                        header: t('marketplace.thSpecs') || 'SPECS',
+                        render: (order) => (
+                            <span className="font-mono text-xs text-slate-300 max-w-[200px] truncate block">{getSpecSummary(order)}</span>
+                        )
+                    },
+                    {
+                        key: 'printer',
+                        header: t('marketplace.thPrinter') || 'PRINTER / PRINTHOUSE',
+                        render: (order) => (
+                            <div>
+                                <div className="font-black text-white uppercase tracking-tight">{getPrinterName(order)}</div>
+                                <div className="text-[9px] text-slate-400 font-mono uppercase tracking-tighter">PH-ID: {order.offer?.printerId || 'N/A'}</div>
+                            </div>
+                        )
+                    },
+                    {
+                        key: 'files',
+                        header: t('marketplace.thFiles') || 'FILES',
+                        render: (order) => {
                             const fileState = getFileState(order);
                             return (
-                                <tr key={order.orderIntentId} className="hover:bg-slate-50 dark:hover:bg-white/5 transition-colors group text-xs">
-                                    <td className="px-4 py-5 font-black text-slate-900 dark:text-white tracking-tight">
-                                        {order.publicRef}
-                                    </td>
-                                    <td className="px-4 py-5 whitespace-nowrap text-slate-500 dark:text-slate-400 font-medium">
-                                        {safeDate(order.createdAt)}
-                                    </td>
-                                    <td className="px-4 py-5">
-                                        <div className="font-bold text-slate-900 dark:text-white">{order.customer?.name || 'Anonymous'}</div>
-                                        <div className="text-[10px] text-slate-400 font-medium lowercase truncate max-w-[150px]">{order.customer?.email || 'N/A'}</div>
-                                    </td>
-                                    <td className="px-4 py-5 font-medium text-slate-600 dark:text-slate-400 max-w-[200px] truncate">
-                                        {getSpecSummary(order)}
-                                    </td>
-                                    <td className="px-4 py-5">
-                                        <div className="font-black text-slate-700 dark:text-slate-300 uppercase tracking-tight">{getPrinterName(order)}</div>
-                                        <div className="text-[9px] text-slate-400 font-bold uppercase tracking-tighter">PH-ID: {order.offer?.printerId || 'N/A'}</div>
-                                    </td>
-                                    <td className="px-4 py-5">
-                                        <span className={`px-2 py-0.5 font-black text-[9px] uppercase tracking-widest ${fileState.color}`}>
-                                            {fileState.label}
-                                        </span>
-                                    </td>
-                                    <td className="px-4 py-5">
-                                        <span className={`px-2 py-0.5 font-black text-[9px] uppercase tracking-widest ${order.preflight?.status === 'PASSED' ? 'bg-emerald-100 text-emerald-700' :
-                                                order.preflight?.status === 'REQUIRED' ? 'bg-amber-100 text-amber-700' :
-                                                    'bg-slate-100 text-slate-400'
-                                            }`}>
-                                            {order.preflight?.status?.replace(/_/g, ' ') || 'NOT STARTED'}
-                                        </span>
-                                    </td>
-                                    <td className="px-4 py-5">
-                                        <span className={`px-2 py-0.5 font-black text-[9px] uppercase tracking-widest ${order.payment?.status === 'PAID' ? 'bg-emerald-100 text-emerald-700' :
-                                                order.payment?.status === 'BLOCKED' ? 'bg-red-100 text-red-700' :
-                                                    'bg-slate-100 text-slate-400'
-                                            }`}>
-                                            {order.payment?.status?.replace(/_/g, ' ') || 'NOT STARTED'}
-                                        </span>
-                                    </td>
-                                    <td className="px-4 py-5 font-black text-slate-900 dark:text-white">
-                                        {getTotalLabel(order)}
-                                    </td>
-                                    <td className="px-4 py-5 space-y-1">
-                                        <div className={`px-2 py-0.5 rounded-none text-[9px] font-black uppercase tracking-wider border inline-block ${getStatusStyle(order.status, order)}`}>
-                                            {order.status}
-                                        </div>
-                                        <div className="text-[8px] text-slate-400 font-bold uppercase tracking-tighter block">
-                                            Stage: {order.lifecycle || 'UNKNOWN'}
-                                        </div>
-                                    </td>
-                                    <td className="px-4 py-5 text-right">
-                                        <button
-                                            onClick={() => setSelectedOrderId(order.orderIntentId)}
-                                            className="px-3 py-1.5 bg-slate-900 text-white text-[9px] font-black uppercase tracking-widest hover:bg-primary transition-all shadow-sm cursor-pointer"
-                                        >
-                                            {t('marketplace.viewOrder') || 'View Order'}
-                                        </button>
-                                    </td>
-                                </tr>
+                                <span className={`px-2.5 py-0.5 rounded-full font-black text-[9px] uppercase tracking-widest ${fileState.color}`}>
+                                    {fileState.label}
+                                </span>
                             );
-                        })}
-                    </tbody>
-                </table>
-            </div>
+                        }
+                    },
+                    {
+                        key: 'preflight',
+                        header: t('marketplace.thPreflight') || 'PREFLIGHT',
+                        render: (order) => (
+                            <StatusBadge
+                                status={order.preflight?.status === 'PASSED' ? 'ACTIVE' : order.preflight?.status === 'REQUIRED' ? 'QUEUED' : 'INACTIVE'}
+                                label={order.preflight?.status?.replace(/_/g, ' ') || 'NOT STARTED'}
+                            />
+                        )
+                    },
+                    {
+                        key: 'payment',
+                        header: t('marketplace.thPayment') || 'PAYMENT',
+                        render: (order) => (
+                            <StatusBadge
+                                status={order.payment?.status === 'PAID' ? 'HEALTHY' : order.payment?.status === 'BLOCKED' ? 'OFFLINE' : 'INACTIVE'}
+                                label={order.payment?.status?.replace(/_/g, ' ') || 'NOT STARTED'}
+                            />
+                        )
+                    },
+                    {
+                        key: 'total',
+                        header: t('marketplace.thTotal') || 'TOTAL',
+                        render: (order) => (
+                            <span className="font-mono font-black text-white">{getTotalLabel(order)}</span>
+                        )
+                    },
+                    {
+                        key: 'status',
+                        header: t('marketplace.thStatus') || 'OPERATIONAL STATUS',
+                        render: (order) => (
+                            <div className="space-y-1">
+                                <StatusBadge
+                                    status={order.controlPlane?.acknowledged || order.status === 'READY' ? 'ACTIVE' : order.status === 'BLOCKED' ? 'OFFLINE' : 'QUEUED'}
+                                    label={order.status}
+                                />
+                                <div className="text-[9px] text-slate-400 font-mono uppercase tracking-tighter block">
+                                    Stage: {order.lifecycle || 'UNKNOWN'}
+                                </div>
+                            </div>
+                        )
+                    },
+                    {
+                        key: 'actions',
+                        header: t('marketplace.thActions') || 'ACTIONS',
+                        align: 'right',
+                        render: (order) => (
+                            <button
+                                onClick={() => setSelectedOrderId(order.orderIntentId)}
+                                className="px-3 py-1.5 rounded-lg bg-white text-[#0a0b0d] text-[10px] font-black uppercase tracking-widest hover:bg-slate-200 transition-all cursor-pointer"
+                            >
+                                {t('marketplace.viewOrder') || 'View Order'}
+                            </button>
+                        )
+                    }
+                ]}
+            />
 
             {/* Detail Drawer */}
             {selectedOrderId && (
                 <div className="fixed inset-0 z-[60] overflow-hidden flex justify-end">
-                    <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setSelectedOrderId(null)} />
-                    <div className="relative w-full max-w-3xl bg-white dark:bg-[#0e0e0f] shadow-2xl h-full flex flex-col animate-slide-in-right">
+                    <div className="absolute inset-0 bg-black/70 backdrop-blur-xs" onClick={() => setSelectedOrderId(null)} />
+                    <div className="relative w-full max-w-3xl bg-[#14161a] border-l border-[#1f2228] shadow-2xl h-full flex flex-col animate-slide-in-right">
                         <OrderDetailDrawer id={selectedOrderId} onClose={() => setSelectedOrderId(null)} onRefresh={fetchOrders} />
                     </div>
                 </div>

@@ -648,12 +648,12 @@ export const MarketplacePrinthouseHandoffTab: React.FC = () => {
 
     const getStatusColor = (status: string) => {
         switch (status) {
-            case 'PRINTHOUSE_ACCEPTED': return 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20';
-            case 'PRINTHOUSE_REJECTED': return 'bg-red-50 text-red-700 border-red-200 dark:bg-red-500/10 dark:text-red-400 dark:border-red-500/20';
-            case 'CLARIFICATION_REQUESTED': return 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-500/10 dark:text-amber-400 dark:border-amber-500/20';
+            case 'PRINTHOUSE_ACCEPTED': return 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30';
+            case 'PRINTHOUSE_REJECTED': return 'bg-rose-500/15 text-rose-400 border-rose-500/30';
+            case 'CLARIFICATION_REQUESTED': return 'bg-amber-500/15 text-amber-400 border-amber-500/30';
             case 'PRINTHOUSE_HANDOFF_READY':
-            case 'DISPATCH_PACKAGE_CREATED': return 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-500/10 dark:text-blue-400 dark:border-blue-500/20';
-            default: return 'bg-slate-50 text-slate-700 border-slate-200 dark:bg-white/5 dark:text-slate-400 dark:border-white/10';
+            case 'DISPATCH_PACKAGE_CREATED': return 'bg-blue-500/15 text-blue-400 border-blue-500/30';
+            default: return 'bg-[#181b20] text-slate-300 border-[#1f2228]';
         }
     };
 
@@ -663,15 +663,15 @@ export const MarketplacePrinthouseHandoffTab: React.FC = () => {
     };
 
     return (
-        <div className="flex flex-col lg:flex-row h-full min-h-[600px] border border-slate-200 dark:border-white/10 animate-slide-fade">
+        <div className="flex flex-col lg:flex-row h-full min-h-[600px] border border-[#1f2228] rounded-xl overflow-hidden animate-slide-fade">
             {/* Left Panel: Dense Table */}
-            <div className={`flex-1 flex flex-col min-w-0 bg-white dark:bg-[#131314] ${selectedOrderId ? 'hidden lg:flex lg:w-1/2 xl:w-2/3 border-r border-slate-200 dark:border-white/10' : ''}`}>
-                <div className="p-4 border-b border-slate-200 dark:border-white/10 flex items-center justify-between bg-slate-50 dark:bg-white/5">
+            <div className={`flex-1 flex flex-col min-w-0 bg-[#14161a] ${selectedOrderId ? 'hidden lg:flex lg:w-1/2 xl:w-2/3 border-r border-[#1f2228]' : ''}`}>
+                <div className="p-4 border-b border-[#1f2228] flex items-center justify-between bg-[#0a0b0d]">
                     <div className="flex items-center gap-2">
-                        <ArchiveBoxIcon className="w-5 h-5 text-primary" />
-                        <h2 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest">Handoff Packages</h2>
+                        <ArchiveBoxIcon className="w-5 h-5 text-[#dc2626]" />
+                        <h2 className="text-sm font-black text-white uppercase tracking-widest">Handoff Packages</h2>
                     </div>
-                    <button onClick={fetchPackages} className="p-1.5 hover:bg-slate-200 dark:hover:bg-white/10 text-slate-500 transition-colors">
+                    <button onClick={fetchPackages} className="p-1.5 rounded-lg bg-[#14161a] border border-[#1f2228] hover:bg-[#181b20] text-slate-400 transition-colors cursor-pointer">
                         <ArrowPathIcon className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
                     </button>
                 </div>
@@ -680,36 +680,36 @@ export const MarketplacePrinthouseHandoffTab: React.FC = () => {
                     {loading ? (
                         <div className="p-8 text-center text-xs font-bold text-slate-400 uppercase tracking-widest">Loading packages...</div>
                     ) : packages.length === 0 ? (
-                        <div className="p-8 text-center text-xs font-bold text-slate-400 uppercase tracking-widest">No handoff packages found</div>
+                        <div className="p-16 text-center text-xs font-black text-slate-500 uppercase tracking-[0.2em]">NO HANDOFF PACKAGES DEFINED</div>
                     ) : (
                         <table className="w-full text-left text-[11px] whitespace-nowrap">
-                            <thead className="bg-slate-50 dark:bg-white/5 sticky top-0 uppercase font-black text-slate-500 dark:text-slate-400 tracking-wider">
+                            <thead className="bg-[#0f1013] sticky top-0 uppercase font-bold text-slate-400 tracking-wider">
                                 <tr>
-                                    <th className="px-4 py-3 border-b border-slate-200 dark:border-white/10">Status</th>
-                                    <th className="px-4 py-3 border-b border-slate-200 dark:border-white/10">Package ID</th>
-                                    <th className="px-4 py-3 border-b border-slate-200 dark:border-white/10">Order ID</th>
-                                    <th className="px-4 py-3 border-b border-slate-200 dark:border-white/10">Printhouse</th>
-                                    <th className="px-4 py-3 border-b border-slate-200 dark:border-white/10">Files</th>
-                                    <th className="px-4 py-3 border-b border-slate-200 dark:border-white/10">Created</th>
+                                    <th className="px-4 py-3 border-b border-[#1f2228]">Status</th>
+                                    <th className="px-4 py-3 border-b border-[#1f2228]">Package ID</th>
+                                    <th className="px-4 py-3 border-b border-[#1f2228]">Order ID</th>
+                                    <th className="px-4 py-3 border-b border-[#1f2228]">Printhouse</th>
+                                    <th className="px-4 py-3 border-b border-[#1f2228]">Files</th>
+                                    <th className="px-4 py-3 border-b border-[#1f2228]">Created</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-slate-100 dark:divide-white/5 font-medium text-slate-700 dark:text-slate-300">
+                            <tbody className="divide-y divide-[#1f2228] font-medium text-slate-300">
                                 {packages.map(pkg => (
                                     <tr 
                                         key={pkg.packageId} 
                                         onClick={() => loadDetail(pkg.orderId)}
-                                        className={`cursor-pointer hover:bg-slate-50 dark:hover:bg-white/5 transition-colors ${selectedOrderId === pkg.orderId ? 'bg-primary/5 dark:bg-primary/10' : ''}`}
+                                        className={`cursor-pointer hover:bg-[#181b20] transition-colors ${selectedOrderId === pkg.orderId ? 'bg-[#181b20] border-l-2 border-l-[#dc2626]' : ''}`}
                                     >
-                                        <td className="px-4 py-2">
-                                            <span className={`px-2 py-0.5 text-[9px] font-black uppercase tracking-widest border ${getStatusColor(pkg.dispatchStatus)}`}>
+                                        <td className="px-4 py-3">
+                                            <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest border ${getStatusColor(pkg.dispatchStatus)}`}>
                                                 {pkg.dispatchStatus?.replace(/_/g, ' ')}
                                             </span>
                                         </td>
-                                        <td className="px-4 py-2 font-mono text-[10px]">{pkg.packageId}</td>
-                                        <td className="px-4 py-2 font-mono text-[10px]">{pkg.orderId}</td>
-                                        <td className="px-4 py-2 uppercase truncate max-w-[150px]">{pkg.printhouse?.name || pkg.printhouse?.id || '—'}</td>
-                                        <td className="px-4 py-2">{pkg.files?.length || 0}</td>
-                                        <td className="px-4 py-2 text-slate-500">{formatDate(pkg.createdAt)}</td>
+                                        <td className="px-4 py-3 font-mono text-[10px] text-white">{pkg.packageId}</td>
+                                        <td className="px-4 py-3 font-mono text-[10px] text-slate-300">{pkg.orderId}</td>
+                                        <td className="px-4 py-3 uppercase truncate max-w-[150px] text-white font-bold">{pkg.printhouse?.name || pkg.printhouse?.id || '—'}</td>
+                                        <td className="px-4 py-3 font-mono">{pkg.files?.length || 0}</td>
+                                        <td className="px-4 py-3 text-slate-400 font-mono">{formatDate(pkg.createdAt)}</td>
                                     </tr>
                                 ))}
                             </tbody>
@@ -720,12 +720,12 @@ export const MarketplacePrinthouseHandoffTab: React.FC = () => {
 
             {/* Right Panel: Forensic Drawer */}
             {selectedOrderId && (
-                <div className="flex-1 lg:w-1/2 xl:w-1/3 flex flex-col bg-white dark:bg-[#131314] min-w-0">
-                    <div className="p-4 border-b border-slate-200 dark:border-white/10 flex justify-between items-center bg-slate-50 dark:bg-white/5">
-                        <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest truncate mr-4">
+                <div className="flex-1 lg:w-1/2 xl:w-1/3 flex flex-col bg-[#14161a] min-w-0">
+                    <div className="p-4 border-b border-[#1f2228] flex justify-between items-center bg-[#0a0b0d]">
+                        <h3 className="text-sm font-black text-white uppercase tracking-widest truncate mr-4">
                             Package Detail
                         </h3>
-                        <button onClick={() => setSelectedOrderId(null)} className="text-slate-400 hover:text-slate-600 lg:hidden">
+                        <button onClick={() => setSelectedOrderId(null)} className="text-slate-400 hover:text-white lg:hidden">
                             <XCircleIcon className="w-6 h-6" />
                         </button>
                     </div>
