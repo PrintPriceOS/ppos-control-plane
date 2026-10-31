@@ -121,13 +121,13 @@
 }
 
 .dark {
-  --ppos-bg: #0e0e0f;
-  --ppos-surface: #131314;
-  --ppos-surface-muted: #1a1a1b;
-  --ppos-border: rgba(255,255,255,0.10);
+  --ppos-bg: #0a0b0d;
+  --ppos-surface: #14161a;
+  --ppos-surface-muted: #0f1013;
+  --ppos-border: #1f2228;
   --ppos-text: #f4f4f5;
-  --ppos-text-muted: #a1a1aa;
-  --ppos-accent: #dc0000;
+  --ppos-text-muted: #94a3b8;
+  --ppos-accent: #dc2626;
 }
 
 .ppos-bg { background-color: var(--ppos-bg); }

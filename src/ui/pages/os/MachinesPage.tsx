@@ -17,6 +17,7 @@ import { getMachines, getPrinthouses } from '../../lib/adminApi';
 import { StatusBadge } from '../../components/StatusBadge';
 import { MachineCapabilityEditor } from '../printhouse/MachineCapabilityEditor';
 import { listMachines } from '../../api/printhouseCapabilitiesClient';
+import { SharedModuleProps, TopSummaryKpiBar, HeaderActionGroup } from '../../components/common';
 
 interface Machine {
     id: string;
@@ -43,7 +44,11 @@ interface Machine {
     missingProfileFields: string[];
 }
 
-export const MachinesPage: React.FC = () => {
+export const MachinesPage: React.FC<SharedModuleProps> = ({
+    mode = 'workspace',
+    onNextStep,
+    onPrevStep
+}) => {
     const [search, setSearch] = useState('');
     const [filterStatus, setFilterStatus] = useState<string>('ALL');
     
@@ -104,56 +109,48 @@ export const MachinesPage: React.FC = () => {
     }, [rawMachines]);
 
     return (
-        <div className="space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-2">
-                <div className="flex items-center gap-4">
-                    <h1 className="text-2xl font-black text-zinc-900 dark:text-zinc-100 tracking-tight">Industrial Machines</h1>
-                    {q.data?.timestamp && (
-                        <div className="hidden md:flex items-center gap-1.5 px-2.5 py-0.5 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-full text-[9px] font-bold text-zinc-500 uppercase tracking-widest">
-                            <ClockIcon className="w-3 h-3" />
-                            <span>Sync: {new Date(q.data.timestamp).toLocaleTimeString()}</span>
-                        </div>
-                    )}
-                </div>
-                 <div className="flex items-center gap-2">
-                    <button 
-                      onClick={() => {
-                          setEditingMachine(null);
-                          setSelectedPrinthouseId('');
-                          setIsOnboardOpen(true);
-                      }}
-                      className="px-4 py-2 bg-[#dc0000] hover:bg-[#dc0000]/90 text-white text-xs font-bold rounded-xl shadow-xs transition-colors uppercase tracking-wider cursor-pointer"
+        <div className="space-y-6" data-testid="machines-workspace" data-mode={mode}>
+            <HeaderActionGroup
+                title="Industrial Machines"
+                subtitle="Machinery fleet, maximum sheet format, throughput speed and live connection state."
+                mode={mode}
+                primaryActionLabel="ONBOARD FLEET UNIT"
+                onPrimaryAction={() => {
+                    setEditingMachine(null);
+                    setSelectedPrinthouseId('');
+                    setIsOnboardOpen(true);
+                }}
+                secondaryActions={
+                    <button
+                        onClick={() => q.refetch()}
+                        className="p-2 rounded-lg border border-slate-200 dark:border-[#1f2228] bg-white dark:bg-[#14161a] hover:bg-slate-50 dark:hover:bg-[#181b20] transition-colors text-slate-400 cursor-pointer"
+                        title="Force Telemetry Refresh"
                     >
-                      + Onboard Fleet Unit
+                        <ArrowPathIcon className={`w-4 h-4 ${q.isFetching ? 'animate-spin' : ''}`} />
                     </button>
-                    <button 
-                      onClick={() => q.refetch()}
-                      className="p-2 rounded-xl border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors text-zinc-500 dark:text-zinc-400 cursor-pointer"
-                      title="Force Telemetry Refresh"
-                    >
-                      <ArrowPathIcon className={`w-4 h-4 ${q.isFetching ? 'animate-spin' : ''}`} />
-                    </button>
-                 </div>
-            </div>
+                }
+            />
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {[
-                    { label: 'Total Fleet', value: rawMachines.length, icon: CpuChipIcon, config: { bg: "bg-zinc-50 dark:bg-zinc-900", text: "text-zinc-500 dark:text-zinc-400" } },
-                    { label: 'Active Nodes', value: activeNodes, icon: SignalIcon, config: { bg: "bg-emerald-50 dark:bg-emerald-950/40", text: "text-emerald-500 dark:text-emerald-400" } },
-                    { label: 'Avg. Uptime', value: avgUptime ? `${avgUptime}%` : 'N/A', icon: BoltIcon, config: { bg: "bg-sky-50 dark:bg-sky-950/30", text: "text-sky-500 dark:text-sky-400" } },
-                    { label: 'Grid Efficiency', value: avgEfficiency ? `${avgEfficiency}%` : 'N/A', icon: ScaleIcon, config: { bg: "bg-amber-50 dark:bg-amber-950/40", text: "text-amber-500 dark:text-amber-400" } },
-                ].map((stat, i) => (
-                    <div key={i} className="bg-white dark:bg-[#18181b] p-4 rounded-2xl border border-zinc-200 dark:border-zinc-800 flex items-center gap-3 shadow-2xs">
-                        <div className={`p-2.5 rounded-xl ${stat.config.bg} ${stat.config.text}`}>
-                            <stat.icon className="w-5 h-5" />
-                        </div>
-                        <div>
-                            <p className="text-[9px] font-bold text-zinc-400 uppercase tracking-widest leading-none mb-1">{stat.label}</p>
-                            <p className="text-lg font-black text-zinc-900 dark:text-zinc-100 tracking-tighter leading-none">{stat.value}</p>
-                        </div>
-                    </div>
-                ))}
-            </div>
+            <TopSummaryKpiBar
+                items={[
+                    { id: 'total-fleet', label: 'TOTAL FLEET', value: rawMachines.length, icon: CpuChipIcon, accent: 'blue' },
+                    { id: 'active-nodes', label: 'ACTIVE NODES', value: activeNodes, icon: SignalIcon, accent: 'emerald' },
+                    { id: 'avg-uptime', label: 'AVG. UPTIME', value: avgUptime ? `${avgUptime}%` : 'N/A', icon: BoltIcon, accent: 'amber' },
+                    { id: 'grid-efficiency', label: 'GRID EFFICIENCY', value: avgEfficiency ? `${avgEfficiency}%` : 'N/A', icon: ScaleIcon, accent: 'rose' }
+                ]}
+            />
+
+            {mode === 'onboarding' && (
+                <div data-testid="machines-onboarding-footer" className="flex justify-end pt-2">
+                    <button
+                        type="button"
+                        onClick={onNextStep}
+                        className="px-5 py-2 rounded-full bg-[#dc2626] hover:bg-[#e11d48] text-white text-xs font-black uppercase tracking-wider cursor-pointer"
+                    >
+                        Save & Continue
+                    </button>
+                </div>
+            )}
 
             <div className="flex flex-col md:flex-row items-center gap-3 bg-white dark:bg-[#18181b] p-2 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-2xs">
                 <div className="relative flex-1 w-full">

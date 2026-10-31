@@ -287,9 +287,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
                             <NavLink
                                 key={sec.key}
                                 to={targetUrl}
-                                className={`flex items-start gap-2.5 px-2.5 py-1.5 text-xs font-medium rounded-lg transition-colors group ${
+                                className={`flex items-start gap-2.5 px-3 py-1.5 text-xs font-medium rounded-full transition-colors group ${
                                     isSubActive
-                                        ? 'bg-[#dc0000] text-white font-semibold shadow-2xs'
+                                        ? 'bg-[#dc2626] text-white font-semibold shadow-2xs'
                                         : 'text-slate-500 dark:text-zinc-400 hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5'
                                 }`}
                             >
@@ -320,9 +320,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 to={item.path}
                 title={effectiveCollapsed ? itemLabel : undefined}
                 className={({ isActive }) => [
-                  `flex items-center ${effectiveCollapsed ? 'justify-center px-2' : 'justify-between px-3'} py-2.5 text-xs font-medium transition-all duration-100 group rounded-xl`,
+                  `flex items-center ${effectiveCollapsed ? 'justify-center px-2' : 'justify-between px-3'} py-2.5 text-xs font-medium transition-all duration-100 group rounded-full`,
                   isActive
-                    ? "bg-[#dc0000] text-white font-semibold shadow-2xs"
+                    ? "bg-[#dc2626] text-white font-semibold shadow-2xs"
                     : "text-slate-500 dark:text-zinc-400 hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5"
                 ].join(" ")}
               >

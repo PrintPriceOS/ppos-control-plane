@@ -28,6 +28,7 @@ import { adminFetch } from '../../lib/adminApi';
 import { paperSupplierFetch } from '../../lib/paperSupplierApi';
 import { CountrySelect } from '../../components/common/CountrySelect';
 import { TimezoneSelect } from '../../components/common/TimezoneSelect';
+import { SharedModuleProps } from '../../components/common';
 import {
     Cog6ToothIcon,
     GlobeAltIcon,
@@ -68,7 +69,7 @@ const Toggle: React.FC<{ checked: boolean; onChange: () => void; id?: string }> 
     </button>
 );
 
-export const GlobalSettingsPage: React.FC = () => {
+export const GlobalSettingsPage: React.FC<SharedModuleProps> = ({ mode = 'workspace', onNextStep }) => {
     const { locale, setLocale, t } = useLocale();
     const [active, setActive] = useState<Section>('general');
     const [saved, setSaved] = useState(false);

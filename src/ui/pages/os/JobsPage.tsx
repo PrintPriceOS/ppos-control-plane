@@ -7,8 +7,9 @@ import { DataTable } from "../../components/DataTable";
 import { short } from "../../lib/formatters";
 import { safeArray } from "../../lib/display";
 import { useLocale } from "../../i18n";
+import { SharedModuleProps } from "../../components/common";
 
-export const JobsPage: React.FC = () => {
+export const JobsPage: React.FC<SharedModuleProps> = ({ mode = 'workspace' }) => {
   const { t } = useLocale();
   const navigate = useNavigate();
   const [isSyncing, setIsSyncing] = useState(false);
