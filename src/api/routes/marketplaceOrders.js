@@ -504,18 +504,39 @@ router.post('/:orderId/payment/wire-proof', requireMarketplaceOrAdmin, uploadMid
                 uploadedBy: req.user?.id || 'CUSTOMER'
             }
         };
+        metadata.productionStage = metadata.productionStage || 'ON_PRESS_PRINTING';
+        metadata.activeStageIndex = metadata.activeStageIndex || 2;
 
         try {
             await mysqlClient.query(
-                'UPDATE marketplace_orders SET payment_status = ?, metadata_json = ?, updated_at = NOW() WHERE order_id = ?',
+                `UPDATE marketplace_orders
+                 SET payment_status = ?,
+                     status = CASE WHEN status IN ('AWAITING_PAYMENT', 'OFFER_SELECTED', 'INVOICED', 'DRAFT') THEN 'IN_PRODUCTION' ELSE status END,
+                     escrow_status = CASE WHEN escrow_status = 'UNFUNDED' THEN 'ESCROW_FUNDED' ELSE escrow_status END,
+                     metadata_json = ?,
+                     updated_at = NOW()
+                 WHERE order_id = ?`,
                 [metadata.payment.status, JSON.stringify(metadata), orderId]
             );
             await marketplaceOrderService.appendOrderEvent(orderId, {
                 type: 'WIRE_TRANSFER_PROOF_UPLOADED',
                 actorType: 'CUSTOMER',
                 actorId: req.user?.id || 'CUSTOMER',
-                payload: { proofId, originalName, reference, uploadedAt }
+                payload: { proofId, originalName, reference, uploadedAt, orderStatus: 'IN_PRODUCTION' }
             });
+        } catch (_) {}
+
+        try {
+            const customerPortalRoutes = require('./customerPortalRoutes');
+            if (typeof customerPortalRoutes.updateCustomerOrderRuntimeState === 'function') {
+                customerPortalRoutes.updateCustomerOrderRuntimeState(orderId, {
+                    status: 'IN_PRODUCTION',
+                    paymentStatus: metadata.payment.status,
+                    escrowStatus: 'ESCROW_FUNDED',
+                    productionStage: 'ON_PRESS_PRINTING',
+                    activeStageIndex: 2
+                });
+            }
         } catch (_) {}
 
         return res.status(200).json({
@@ -523,6 +544,7 @@ router.post('/:orderId/payment/wire-proof', requireMarketplaceOrAdmin, uploadMid
             orderId,
             proofId,
             status: 'PAYMENT_PROOF_UNDER_REVIEW',
+            orderStatus: 'IN_PRODUCTION',
             reconciliationCode: reference,
             paymentStatus: metadata.payment.status,
             wireProof: metadata.payment.wireProof
@@ -530,6 +552,31 @@ router.post('/:orderId/payment/wire-proof', requireMarketplaceOrAdmin, uploadMid
     } catch (err) {
         logger.error({ event: 'api_wire_proof_upload_failed', orderId, error: err.message });
         return res.status(500).json({ ok: false, error: 'WIRE_PROOF_UPLOAD_FAILED', message: err.message });
+    }
+});
+
+/**
+ * 12. POST /api/marketplace/orders/:orderId/payment/webhook
+ * PHASE-15: Stripe Checkout / SEPA / Admin Payment Confirmation Webhook.
+ * Automatically transitions order from AWAITING_PAYMENT to IN_PRODUCTION and locks Escrow funds.
+ */
+router.post('/:orderId/payment/webhook', requireMarketplaceOrAdmin, async (req, res) => {
+    const { orderId } = req.params;
+    try {
+        const result = await invoicePaymentService.confirmMarketplaceOrderPayment(
+            orderId,
+            req.body || {},
+            { operatorId: req.user?.id || 'STRIPE_WEBHOOK' }
+        );
+        return res.status(200).json(result);
+    } catch (err) {
+        logger.error({ event: 'api_payment_webhook_failed', orderId, error: err.message });
+        const statusCode = err.statusCode || (err.message === 'ORDER_NOT_FOUND' ? 404 : 500);
+        return res.status(statusCode).json({
+            ok: false,
+            error: err.message,
+            message: err.message
+        });
     }
 });
 

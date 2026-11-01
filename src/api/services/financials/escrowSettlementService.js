@@ -251,12 +251,19 @@ async function syncEscrowLedgerFromMySQL(tenantId = 'tenant-default') {
             );
 
             const existing = escrowLedgerCache.get(key) || {};
+            let bookSpec = {};
+            try {
+                bookSpec = typeof row.book_spec_json === 'string'
+                    ? JSON.parse(row.book_spec_json)
+                    : (row.book_spec_json || {});
+            } catch (_) {}
+
             const mapped = {
                 escrowId: existing.escrowId || `ESC-${row.order_id}`,
                 tenantId: row.tenant_id || tenantId,
                 orderId: row.order_id,
-                isbn: existing.isbn || '978-84-9066-801-6',
-                title: existing.title || `Marketplace Order ${row.order_id}`,
+                isbn: bookSpec.isbn || existing.isbn || '978-84-9066-801-6',
+                title: bookSpec.title || bookSpec.bookTitle || existing.title || `Editorial Edition ${row.order_id}`,
                 publisherTenantId: row.customer_id || 'publisher-checkout',
                 printhouseId: row.printhouse_id || 'ph-default',
                 carrierCode: existing.carrierCode || 'DACHSER_DE',

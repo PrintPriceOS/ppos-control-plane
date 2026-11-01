@@ -20,8 +20,93 @@ const marketplaceOrderService = require('../services/marketplaceOrderService');
 const { getPublisherOrders, getPublisherTimeline } = require('../services/publisher/publisherHubService');
 const logger = require('../services/logger').child('customer-portal-router');
 
-// In-memory store with MySQL fallback for B2B Customer Shipping Book & Fiscal Profile
+// In-memory store with MySQL persistence for B2B Customer Shipping Book & Fiscal Profile
 const customerProfileStore = new Map();
+let customerProfileTableReady = false;
+
+async function ensureCustomerProfileTable() {
+    if (customerProfileTableReady) return;
+    try {
+        await mysqlClient.query(`
+            CREATE TABLE IF NOT EXISTS customer_b2b_profiles (
+                customer_key VARCHAR(191) NOT NULL PRIMARY KEY,
+                email VARCHAR(191) NULL,
+                tenant_id VARCHAR(128) NULL,
+                fiscal_json JSON NULL,
+                addresses_json JSON NULL,
+                vat_validation_json JSON NULL,
+                updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+        `);
+        customerProfileTableReady = true;
+    } catch (_) {
+        // Non-fatal in isolated unit tests when MySQL is offline
+    }
+}
+
+async function loadCustomerProfileFromMySQL(customerKey, email = '') {
+    await ensureCustomerProfileTable();
+    try {
+        const rows = await mysqlClient.query(
+            'SELECT * FROM customer_b2b_profiles WHERE customer_key = ? OR (email IS NOT NULL AND email = ?) LIMIT 1',
+            [customerKey, email]
+        );
+        if (rows && rows.length > 0) {
+            const row = rows[0];
+            const parseJson = (val, fb) => {
+                if (val && typeof val === 'object') return val;
+                if (typeof val === 'string') {
+                    try { return JSON.parse(val); } catch (_) { return fb; }
+                }
+                return fb;
+            };
+            const defaults = getDefaultCustomerProfile(customerKey, email);
+            const fiscal = parseJson(row.fiscal_json, defaults.fiscal);
+            const addresses = parseJson(row.addresses_json, defaults.addresses);
+            const profile = {
+                customerKey: row.customer_key || customerKey,
+                email: row.email || email,
+                tenantId: row.tenant_id || 'tenant-default',
+                fiscal,
+                fiscalProfile: fiscal,
+                addresses,
+                shippingAddresses: addresses,
+                updatedAt: row.updated_at ? new Date(row.updated_at).toISOString() : new Date().toISOString()
+            };
+            customerProfileStore.set(customerKey, profile);
+            return profile;
+        }
+    } catch (_) {}
+    return null;
+}
+
+async function persistCustomerProfileToMySQL(customerKey, profile, vatValidation = null) {
+    await ensureCustomerProfileTable();
+    try {
+        await mysqlClient.query(
+            `INSERT INTO customer_b2b_profiles (
+                customer_key, email, tenant_id, fiscal_json, addresses_json, vat_validation_json, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, NOW())
+            ON DUPLICATE KEY UPDATE
+                email = VALUES(email),
+                tenant_id = VALUES(tenant_id),
+                fiscal_json = VALUES(fiscal_json),
+                addresses_json = VALUES(addresses_json),
+                vat_validation_json = VALUES(vat_validation_json),
+                updated_at = NOW()`,
+            [
+                customerKey,
+                profile.email || profile.fiscal?.billingEmail || null,
+                profile.tenantId || 'tenant-default',
+                JSON.stringify(profile.fiscal || {}),
+                JSON.stringify(profile.addresses || []),
+                vatValidation ? JSON.stringify(vatValidation) : null
+            ]
+        );
+    } catch (_) {
+        // Non-fatal in isolated unit tests when MySQL is offline
+    }
+}
 
 const EU_VAT_PATTERNS = {
     ES: /^ES[A-Z0-9]\d{7}[A-Z0-9]$/i,
@@ -481,6 +566,7 @@ function mapMarketplaceOrderToCustomerHubOrder(order) {
     const unitPrice = copies > 0 ? Math.round((total / copies) * 100) / 100 : 0;
 
     const isFilesRequired = String(order.status || '').toUpperCase() === 'FILES_REQUIRED';
+    const rawMeta = order.metadata || {};
     return {
         orderId: order.orderId,
         publicRef: order.publicRef || order.externalOrderRef || order.orderId,
@@ -490,6 +576,9 @@ function mapMarketplaceOrderToCustomerHubOrder(order) {
         updatedAt: order.updatedAt || new Date().toISOString(),
         estimatedDeliveryDate: specs.estimatedDeliveryDate || new Date(Date.now() + 10 * 86400000).toISOString().slice(0, 10),
         status: order.status || 'OFFER_SELECTED',
+        productionStage: order.productionStage || rawMeta.productionStage || null,
+        activeStageIndex: order.activeStageIndex || rawMeta.activeStageIndex || null,
+        shipment: order.shipment || rawMeta.shipment || null,
         paymentStatus: order.payment?.status || 'PENDING',
         paymentMethod: order.payment?.method || 'BANK_TRANSFER_B2B',
         bankTransferReference: order.payment?.bankTransferReference || `PPOS-ORD-${String(order.orderId).replace(/[^A-Za-z0-9]/g, '').slice(-8).toUpperCase()}`,
@@ -604,17 +693,27 @@ function calculateReprintPricing(sourceOrder, newCopies) {
  */
 function buildCustomerOrderTrackingPayload(order) {
     const status = String(order.status || 'IN_PRODUCTION').toUpperCase();
-    const isDelivered = ['DELIVERED', 'COMPLETED', 'DISPATCHED_AND_DELIVERED'].includes(status);
-    const isShipped = isDelivered || ['SHIPPED', 'IN_TRANSIT'].includes(status);
-    const isPaymentPending = ['AWAITING_PAYMENT', 'DRAFT', 'OFFER_SELECTED'].includes(status) && order.paymentStatus !== 'CONFIRMED';
+    const prodStage = String(order.productionStage || '').toUpperCase();
+    const isDelivered = ['DELIVERED', 'DISPATCHED_AND_DELIVERED'].includes(status) || prodStage.includes('DELIVERED');
+    const isShipped = isDelivered || ['SHIPPED', 'IN_TRANSIT'].includes(status) || prodStage.includes('TRANSIT') || prodStage.includes('STAGE_05');
+    const isPaymentPending = ['AWAITING_PAYMENT', 'DRAFT', 'OFFER_SELECTED', 'FILES_REQUIRED'].includes(status) && !['CONFIRMED', 'PAID', 'WIRE_PROOF_UPLOADED'].includes(String(order.paymentStatus || '').toUpperCase());
 
     // 5 Canonical Industrial Stages requested:
-    // 1. Preflight Aprobado -> 2. En Imprenta (Planchas / Tirada) -> 3. Encuadernación -> 4. Paletizado EPAL -> 5. En Tránsito / POD
-    let activeStageIndex = 2; // Default: En Imprenta
-    if (isPaymentPending) activeStageIndex = 1;
-    else if (status.includes('BINDING')) activeStageIndex = 3;
-    else if (status.includes('PALLET')) activeStageIndex = 4;
-    else if (isShipped) activeStageIndex = 5;
+    // 1. Preflight Approved -> 2. On Press (Plates & Print Run) -> 3. Binding & Finishing -> 4. EPAL Palletization -> 5. In Transit / POD
+    let activeStageIndex = Number(order.activeStageIndex) || 2;
+    if (!order.activeStageIndex) {
+        if (isPaymentPending || status === 'QUEUED' || status === 'REVIEWING' || prodStage.includes('STAGE_01') || prodStage.includes('PREFLIGHT')) {
+            activeStageIndex = 1;
+        } else if (isShipped) {
+            activeStageIndex = 5;
+        } else if (status === 'COMPLETED' || status.includes('PALLET') || prodStage.includes('STAGE_04') || prodStage.includes('PALLET')) {
+            activeStageIndex = 4;
+        } else if (status.includes('BINDING') || prodStage.includes('STAGE_03') || prodStage.includes('BINDING')) {
+            activeStageIndex = 3;
+        } else {
+            activeStageIndex = 2;
+        }
+    }
 
     const stages = [
         {
@@ -666,8 +765,9 @@ function buildCustomerOrderTrackingPayload(order) {
         }
     ];
 
-    const shipmentId = `SHP-2026-${String(order.orderId).replace(/[^0-9]/g, '').slice(-4) || '9901'}`;
-    const trackingNumber = `DACHSER-EU-${String(order.orderId).replace(/[^A-Za-z0-9]/g, '').slice(-6).toUpperCase()}88`;
+    const shipmentId = order.shipment?.shipmentId || `SHP-2026-${String(order.orderId).replace(/[^0-9]/g, '').slice(-4) || '9901'}`;
+    const trackingNumber = order.shipment?.tracking_number || order.shipment?.trackingNumber || `DACHSER-EU-${String(order.orderId).replace(/[^A-Za-z0-9]/g, '').slice(-6).toUpperCase()}88`;
+    const carrierName = order.shipment?.carrier || order.shipment?.carrierName || 'Dachser European Logistics B2B';
     const sscc18 = '003401234500000018';
 
     const timeline = stages.map(s => ({
@@ -693,7 +793,7 @@ function buildCustomerOrderTrackingPayload(order) {
         timeline,
         carrier: {
             carrierCode: 'DACHSER_DE',
-            carrierName: 'Dachser European Logistics B2B',
+            carrierName,
             serviceLevel: 'Targospeed 48h Book Pallet',
             trackingNumber,
             trackingCode: trackingNumber,
@@ -710,7 +810,7 @@ function buildCustomerOrderTrackingPayload(order) {
         },
         telemetry: {
             shipmentId,
-            carrierName: 'Dachser European Logistics B2B',
+            carrierName,
             carrierService: 'Targospeed 48h Book Pallet',
             trackingCode: trackingNumber,
             trackingUrl: `https://elogistics.dachser.com/tracking?ref=${encodeURIComponent(trackingNumber)}`,
@@ -900,6 +1000,23 @@ function createCustomerPortalRouter() {
             };
 
             // Persist in MySQL marketplace_orders if available
+            const initialStatus = reuseApprovedFiles ? 'AWAITING_PAYMENT' : 'FILES_REQUIRED';
+            const invoiceObj = {
+                invoiceNumber: `PPOS-INV-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${suffix}`,
+                status: 'ISSUED_AWAITING_PAYMENT',
+                issuedAt: nowIso,
+                amount: recalculatedTotals.total,
+                currency: recalculatedTotals.currency,
+                en16931Available: true
+            };
+            const preflightObj = {
+                ...sourceOrder.preflight,
+                status: reuseApprovedFiles ? 'PASSED' : 'PENDING',
+                approvedForPress: reuseApprovedFiles,
+                files: reuseApprovedFiles ? (sourceOrder.preflight?.files || []) : [],
+                reusedFromOrderId: sourceOrder.orderId,
+                preflightBypassed: reuseApprovedFiles
+            };
             try {
                 await marketplaceOrderService.createOrder({
                     orderId: newOrderId,
@@ -935,9 +1052,16 @@ function createCustomerPortalRouter() {
                     metadata: {
                         isReprint: true,
                         reprintedFromOrderId: sourceOrder.orderId,
-                        preflightBypassedWithApprovedFiles: reuseApprovedFiles
+                        reprintPurpose,
+                        preflightBypassedWithApprovedFiles: reuseApprovedFiles,
+                        invoice: invoiceObj,
+                        preflight: preflightObj
                     }
                 });
+                await mysqlClient.query(
+                    'UPDATE marketplace_orders SET status = ? WHERE order_id = ?',
+                    [initialStatus, newOrderId]
+                );
             } catch (_) {
                 // Continue with in-memory runtime store if DB is mocked/offline
             }
@@ -951,7 +1075,7 @@ function createCustomerPortalRouter() {
                 createdAt: nowIso,
                 updatedAt: nowIso,
                 estimatedDeliveryDate: new Date(Date.now() + 9 * 86400000).toISOString().slice(0, 10),
-                status: reuseApprovedFiles ? 'AWAITING_PAYMENT' : 'FILES_REQUIRED',
+                status: initialStatus,
                 paymentStatus: 'PENDING',
                 paymentMethod: req.body?.paymentMethod || 'BANK_TRANSFER_B2B',
                 bankTransferReference,
@@ -959,22 +1083,8 @@ function createCustomerPortalRouter() {
                 reprintedFromOrderId: sourceOrder.orderId,
                 specs: clonedSpecs,
                 totals: recalculatedTotals,
-                invoice: {
-                    invoiceNumber: `PPOS-INV-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${suffix}`,
-                    status: 'ISSUED_AWAITING_PAYMENT',
-                    issuedAt: nowIso,
-                    amount: recalculatedTotals.total,
-                    currency: recalculatedTotals.currency,
-                    en16931Available: true
-                },
-                preflight: {
-                    ...sourceOrder.preflight,
-                    status: reuseApprovedFiles ? 'PASSED' : 'PENDING',
-                    approvedForPress: reuseApprovedFiles,
-                    files: reuseApprovedFiles ? (sourceOrder.preflight?.files || []) : [],
-                    reusedFromOrderId: sourceOrder.orderId,
-                    preflightBypassed: reuseApprovedFiles
-                }
+                invoice: invoiceObj,
+                preflight: preflightObj
             };
 
             const normalizedNewOrder = normalizeOrderForPortalClient(newOrder);
@@ -1045,12 +1155,141 @@ function createCustomerPortalRouter() {
     });
 
     /**
+     * 3.5. POST /api/customer/orders/:orderId/stage
+     * Bidirectional Workshop ↔ Customer Portal Timeline Sync:
+     * Updates the industrial production stage (1..5), status, operator notes, and carrier shipment telemetry.
+     */
+    router.post('/orders/:orderId/stage', async (req, res) => {
+        const orderId = req.params.orderId;
+        try {
+            const ctx = resolveCustomerContext(req);
+            const baseline = buildBaselineCustomerOrders(ctx.email);
+            const normalizedRef = String(orderId).replace(/_/g, '-');
+
+            let order =
+                runtimeCustomerOrders.get(orderId) ||
+                baseline.find(o => o.orderId === orderId || o.publicRef === orderId || o.publicRef === normalizedRef);
+
+            if (!order) {
+                try {
+                    const dbOrder = await marketplaceOrderService.getOrder(orderId);
+                    if (dbOrder) {
+                        order = mapMarketplaceOrderToCustomerHubOrder(dbOrder);
+                    }
+                } catch (_) {}
+            }
+
+            if (!order && String(orderId).startsWith('ORD_')) {
+                order = { ...baseline[0], orderId };
+            }
+
+            if (!order) {
+                return res.status(404).json({
+                    ok: false,
+                    error: 'ORDER_NOT_FOUND',
+                    message: `Order '${orderId}' not found for stage transition.`
+                });
+            }
+
+            const rawStage = String(req.body?.stage || req.body?.status || '').toUpperCase();
+            const explicitStep = Number(req.body?.step || req.body?.activeStageIndex || 0);
+            const shipment = req.body?.shipment || null;
+            const operatorNotes = req.body?.operator_notes || req.body?.operatorNotes || null;
+
+            let nextStatus = order.status || 'IN_PRODUCTION';
+            let nextStageKey = order.productionStage || 'ON_PRESS_PRINTING';
+            let nextStep = explicitStep || order.activeStageIndex || 2;
+
+            if (explicitStep === 1 || ['QUEUED', 'REVIEWING', 'PREFLIGHT_APPROVED', 'STAGE_01', 'STAGE_01_PREFLIGHT'].includes(rawStage)) {
+                nextStep = 1;
+                nextStageKey = 'PREFLIGHT_APPROVED';
+                nextStatus = 'IN_PRODUCTION';
+            } else if (explicitStep === 2 || ['ACCEPTED', 'IN_PREPRESS', 'IN_PRODUCTION', 'ON_PRESS', 'ON_PRESS_PRINTING', 'STAGE_02', 'STAGE_02_ON_PRESS'].includes(rawStage)) {
+                nextStep = 2;
+                nextStageKey = 'ON_PRESS_PRINTING';
+                nextStatus = 'IN_PRODUCTION';
+            } else if (explicitStep === 3 || ['BINDING', 'BINDING_AND_FINISHING', 'STAGE_03', 'STAGE_03_BINDING'].includes(rawStage)) {
+                nextStep = 3;
+                nextStageKey = 'BINDING_AND_FINISHING';
+                nextStatus = 'IN_PRODUCTION';
+            } else if (explicitStep === 4 || ['COMPLETED', 'PALLETIZED', 'EPAL_PALLETIZATION', 'STAGE_04', 'STAGE_04_PALLETIZATION'].includes(rawStage)) {
+                nextStep = 4;
+                nextStageKey = 'EPAL_PALLETIZATION';
+                nextStatus = 'IN_PRODUCTION';
+            } else if (explicitStep === 5 || ['SHIPPED', 'IN_TRANSIT', 'IN_TRANSIT_AND_POD', 'STAGE_05', 'STAGE_05_IN_TRANSIT'].includes(rawStage)) {
+                nextStep = 5;
+                nextStageKey = 'IN_TRANSIT_AND_POD';
+                nextStatus = 'IN_TRANSIT';
+            } else if (['DELIVERED', 'DISPATCHED_AND_DELIVERED'].includes(rawStage)) {
+                nextStep = 5;
+                nextStageKey = 'DELIVERED';
+                nextStatus = 'DELIVERED';
+            }
+
+            const nowIso = new Date().toISOString();
+            const updatedOrder = {
+                ...order,
+                status: nextStatus,
+                productionStage: nextStageKey,
+                activeStageIndex: nextStep,
+                shipment: shipment ? { ...(order.shipment || {}), ...shipment } : order.shipment,
+                operatorNotes: operatorNotes || order.operatorNotes,
+                updatedAt: nowIso
+            };
+
+            const normalizedUpdated = normalizeOrderForPortalClient(updatedOrder);
+            runtimeCustomerOrders.set(order.orderId, normalizedUpdated);
+
+            // Persist stage transition to MySQL marketplace_orders
+            try {
+                const rows = await mysqlClient.query(
+                    'SELECT metadata_json FROM marketplace_orders WHERE order_id = ? OR external_order_ref = ? LIMIT 1',
+                    [order.orderId, orderId]
+                );
+                const meta = rows && rows[0] && rows[0].metadata_json
+                    ? (typeof rows[0].metadata_json === 'string' ? JSON.parse(rows[0].metadata_json) : rows[0].metadata_json)
+                    : {};
+                meta.productionStage = nextStageKey;
+                meta.activeStageIndex = nextStep;
+                if (shipment) meta.shipment = { ...(meta.shipment || {}), ...shipment };
+                if (operatorNotes) meta.operatorNotes = operatorNotes;
+                meta.stageUpdatedAt = nowIso;
+
+                await mysqlClient.query(
+                    'UPDATE marketplace_orders SET status = ?, metadata_json = ?, updated_at = NOW() WHERE order_id = ? OR external_order_ref = ?',
+                    [nextStatus, JSON.stringify(meta), order.orderId, orderId]
+                );
+            } catch (_) {}
+
+            const trackingPayload = buildCustomerOrderTrackingPayload(normalizedUpdated);
+            return res.status(200).json({
+                ok: true,
+                orderId: normalizedUpdated.orderId,
+                status: nextStatus,
+                productionStage: nextStageKey,
+                activeStageIndex: nextStep,
+                tracking: trackingPayload
+            });
+        } catch (err) {
+            logger.error({ event: 'customer_order_stage_update_failed', orderId, error: err.message });
+            return res.status(500).json({ ok: false, error: 'CUSTOMER_ORDER_STAGE_UPDATE_FAILED', message: err.message });
+        }
+    });
+
+    /**
      * 4. GET /api/customer/profile
      * Returns customer's B2B Shipping Address Book (with dock conditions) and Fiscal & Billing Data.
      */
     router.get('/profile', async (req, res) => {
         const ctx = resolveCustomerContext(req);
         const key = ctx.customerId || ctx.email || 'default-customer';
+        const dbProfile = await loadCustomerProfileFromMySQL(key, ctx.email);
+        if (dbProfile) {
+            return res.status(200).json({
+                ok: true,
+                profile: dbProfile
+            });
+        }
         if (!customerProfileStore.has(key)) {
             customerProfileStore.set(key, getDefaultCustomerProfile(key, ctx.email));
         }
@@ -1067,7 +1306,10 @@ function createCustomerPortalRouter() {
     router.put('/profile', async (req, res) => {
         const ctx = resolveCustomerContext(req);
         const key = ctx.customerId || ctx.email || 'default-customer';
-        const existing = customerProfileStore.get(key) || getDefaultCustomerProfile(key, ctx.email);
+        const existing =
+            (await loadCustomerProfileFromMySQL(key, ctx.email)) ||
+            customerProfileStore.get(key) ||
+            getDefaultCustomerProfile(key, ctx.email);
         const body = req.body || {};
 
         let updatedFiscal = existing.fiscal;
@@ -1105,6 +1347,9 @@ function createCustomerPortalRouter() {
 
         const updatedProfile = {
             ...existing,
+            customerKey: key,
+            email: ctx.email,
+            tenantId: ctx.tenantId,
             fiscal: updatedFiscal,
             fiscalProfile: updatedFiscal,
             addresses: updatedAddresses,
@@ -1113,6 +1358,7 @@ function createCustomerPortalRouter() {
         };
 
         customerProfileStore.set(key, updatedProfile);
+        await persistCustomerProfileToMySQL(key, updatedProfile, vatValidation);
 
         return res.status(200).json({
             ok: true,
@@ -1124,10 +1370,27 @@ function createCustomerPortalRouter() {
     return router;
 }
 
+function updateCustomerOrderRuntimeState(orderId, patch = {}) {
+    if (!orderId) return null;
+    const existing = runtimeCustomerOrders.get(orderId);
+    if (existing) {
+        const merged = normalizeOrderForPortalClient({
+            ...existing,
+            ...patch,
+            updatedAt: new Date().toISOString()
+        });
+        runtimeCustomerOrders.set(orderId, merged);
+        return merged;
+    }
+    return null;
+}
+
 const defaultRouter = createCustomerPortalRouter();
 defaultRouter.createCustomerPortalRouter = createCustomerPortalRouter;
 defaultRouter.validateEuVatNumber = validateEuVatNumber;
 defaultRouter.calculateReprintPricing = calculateReprintPricing;
 defaultRouter.buildCustomerOrderTrackingPayload = buildCustomerOrderTrackingPayload;
+defaultRouter.runtimeCustomerOrders = runtimeCustomerOrders;
+defaultRouter.updateCustomerOrderRuntimeState = updateCustomerOrderRuntimeState;
 
 module.exports = defaultRouter;

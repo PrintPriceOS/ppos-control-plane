@@ -169,10 +169,26 @@ describe('B2B Customer Self-Service Hub — End-to-End Transactional Verificatio
     const proofData = await proofRes.json();
     expect(proofData.ok).toBe(true);
     expect(proofData.status).toBe('PAYMENT_PROOF_UNDER_REVIEW');
+    expect(proofData.orderStatus).toBe('IN_PRODUCTION');
     expect(proofData.reconciliationCode).toBe(`PPOS-${testOrderId}`);
+
+    // Step 2D: Trigger Stripe/Payment Confirmation Webhook to lock Escrow & confirm payment
+    const webhookRes = await fetch(`${baseUrl}/api/marketplace/orders/${testOrderId}/payment/webhook`, {
+      method: 'POST',
+      headers: authHeaders,
+      body: JSON.stringify({
+        stripePaymentIntentId: 'pi_live_b2b_8912_confirmed',
+        confirmedBy: 'STRIPE_WEBHOOK',
+      }),
+    });
+    expect(webhookRes.status).toBe(200);
+    const webhookData = await webhookRes.json();
+    expect(webhookData.ok).toBe(true);
+    expect(webhookData.paymentStatus).toBe('CONFIRMED');
+    expect(webhookData.operationalStatus).toBe('READY_FOR_PRODUCTION');
   });
 
-  it('3. Validates EU VIES VAT fiscal data, manages dock requirements, and downloads normative EN 16931 XML e-Invoices (Facturae 3.2.2 & XRechnung 3.0)', async () => {
+  it('3. Validates EU VIES VAT fiscal data, manages dock requirements, downloads normative EN 16931 XML e-Invoices, and syncs 5-stage workshop transitions', async () => {
     // Step 3A: Update Fiscal Profile with EU VIES VAT + DIR3 + Leitweg-ID + Dock logistics
     const profileRes = await fetch(`${baseUrl}/api/customer/profile`, {
       method: 'PUT',
@@ -222,7 +238,7 @@ describe('B2B Customer Self-Service Hub — End-to-End Transactional Verificatio
     expect(xrechnungXml).toContain('xrechnung_3.0');
 
     // Step 3D: Verify 5-Stage Live Logistics & Signed POD Telemetry
-    const trackingRes = await fetch(`${baseUrl}/api/customer/orders/ORD_2026_8841/tracking`, {
+    const trackingRes = await fetch(`${baseUrl}/api/customer/orders/ORD_2026_101/tracking`, {
       headers: authHeaders,
     });
     expect(trackingRes.status).toBe(200);
@@ -231,5 +247,38 @@ describe('B2B Customer Self-Service Hub — End-to-End Transactional Verificatio
     expect(trackingBody.timeline).toHaveLength(5);
     expect(trackingBody.pod.available).toBe(true);
     expect(trackingBody.pod.digitalSignatureHash).toContain('eIDAS-SHA256');
+
+    // Step 3E: Advance Workshop Stage from Stage 2 (On Press) -> Stage 3 (Binding) -> Stage 4 (Palletization) -> Stage 5 (In Transit)
+    const stage3Res = await fetch(`${baseUrl}/api/customer/orders/ORD_2026_101/stage`, {
+      method: 'POST',
+      headers: authHeaders,
+      body: JSON.stringify({
+        stage: 'STAGE_03_BINDING',
+        operatorNotes: 'PUR reactive binding started on Muller Martini line',
+      }),
+    });
+    expect(stage3Res.status).toBe(200);
+    const stage3Body = await stage3Res.json();
+    expect(stage3Body.ok).toBe(true);
+    expect(stage3Body.activeStageIndex).toBe(3);
+    expect(stage3Body.tracking.activeStageIndex).toBe(3);
+
+    const stage5Res = await fetch(`${baseUrl}/api/customer/orders/ORD_2026_101/stage`, {
+      method: 'POST',
+      headers: authHeaders,
+      body: JSON.stringify({
+        status: 'SHIPPED',
+        shipment: {
+          carrier: 'Dachser European Logistics B2B',
+          tracking_number: 'DACHSER-EU-991044',
+        },
+      }),
+    });
+    expect(stage5Res.status).toBe(200);
+    const stage5Body = await stage5Res.json();
+    expect(stage5Body.ok).toBe(true);
+    expect(stage5Body.activeStageIndex).toBe(5);
+    expect(stage5Body.status).toBe('IN_TRANSIT');
+    expect(stage5Body.tracking.carrier.trackingNumber).toBe('DACHSER-EU-991044');
   });
 });

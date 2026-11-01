@@ -919,7 +919,9 @@ async function confirmMarketplaceOrderPayment(orderId, payload = {}, options = {
     const updatedMetadata = {
         ...metadata,
         payment: updatedPayment,
-        controlPlane: updatedControlPlane
+        controlPlane: updatedControlPlane,
+        productionStage: metadata.productionStage || 'ON_PRESS_PRINTING',
+        activeStageIndex: metadata.activeStageIndex || 2
     };
 
     try {
@@ -942,6 +944,19 @@ async function confirmMarketplaceOrderPayment(orderId, payload = {}, options = {
     } catch (_) {
         await persistMetadataAndStatus(orderId, updatedMetadata, 'READY_FOR_PRODUCTION');
     }
+
+    try {
+        const customerPortalRoutes = require('../routes/customerPortalRoutes');
+        if (typeof customerPortalRoutes.updateCustomerOrderRuntimeState === 'function') {
+            customerPortalRoutes.updateCustomerOrderRuntimeState(orderId, {
+                status: 'IN_PRODUCTION',
+                paymentStatus: 'PAID',
+                escrowStatus,
+                productionStage: 'ON_PRESS_PRINTING',
+                activeStageIndex: 2
+            });
+        }
+    } catch (_) {}
 
     // Automatically synchronize with the MySQL commercial settlement & escrow engine
     let settlementRecord = null;
