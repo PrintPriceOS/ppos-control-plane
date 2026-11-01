@@ -273,4 +273,48 @@ router.get('/paper-catalog', async (req, res) => {
     }
 });
 
+/**
+ * POST /api/marketplace/sessions/:sessionId/select
+ * Also mounted at /api/public/marketplace/sessions/:sessionId/select via server.js
+ * Atomically selects the winning offer on a marketplace session and creates
+ * the canonical order (`ORD_...`) in `marketplace_orders` with required file slots.
+ */
+router.post('/sessions/:sessionId/select', async (req, res) => {
+    const traceId = req.headers['x-trace-id'] || `trace_${uuidv4()}`;
+    const { sessionId } = req.params;
+    const body = req.body || {};
+    const targetOfferId = body.offer_id || body.offerId || body.selectedOfferId;
+    const selectionMode = body.selection_mode || body.selectionMode || 'CUSTOMER_CHECKOUT';
+
+    if (!targetOfferId) {
+        return res.status(400).json({
+            ok: false,
+            error: 'MISSING_OFFER_ID',
+            message: 'offer_id or offerId is required to select an offer.'
+        });
+    }
+
+    try {
+        const result = await marketplaceService.selectOffer(sessionId, targetOfferId, selectionMode, body);
+        return res.status(200).json({
+            ok: true,
+            selection_confirmed: true,
+            sessionId,
+            selectedOfferId: targetOfferId,
+            orderId: result?.marketplaceOrder?.orderId || null,
+            order: result?.marketplaceOrder || null,
+            session: result?.session || null,
+            requiredFiles: ['INTERIOR_PDF', 'COVER_PDF'],
+            trace_id: traceId
+        });
+    } catch (err) {
+        const status = err.status || (err.message === 'MARKETPLACE_SESSION_NOT_FOUND' || err.message === 'MARKETPLACE_OFFER_NOT_FOUND' ? 404 : 500);
+        return res.status(status).json({
+            ok: false,
+            error: err.message,
+            trace_id: traceId
+        });
+    }
+});
+
 module.exports = router;

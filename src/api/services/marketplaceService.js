@@ -424,10 +424,10 @@ class MarketplaceService {
     }
 
     /**
-     * Executes robust transactional offer selection override.
-     * Note: Prepares handoff point but intentionally refrains from auto-dispatching manufacturing operations yet.
+     * Executes robust transactional offer selection override and atomically provisions
+     * the corresponding order in `marketplace_orders` (`ORD_...`) with required file slots.
      */
-    async selectOffer(sessionId, offerId, selectionMode = 'ADMIN_OVERRIDE') {
+    async selectOffer(sessionId, offerId, selectionMode = 'ADMIN_OVERRIDE', extraContext = {}) {
         const pool = mysqlClient.getPool();
         const conn = await pool.getConnection();
         await conn.beginTransaction();
@@ -500,11 +500,81 @@ class MarketplaceService {
 
             console.log(`[MARKETPLACE][OFFER-SELECTED] Winning marketplace proposal locked transactionally`, logCtx);
 
-            // Returns complete session handoff contract
-            return await this.getSessionDetail(sessionId);
+            // 7. PHASE-15: Atomically materialize/update the order in `marketplace_orders` (`ORD_...`)
+            // so it immediately appears in `/ops/marketplace` with required file slots.
+            const marketplaceOrderService = require('./marketplaceOrderService');
+            const safeParse = (str) => {
+                if (typeof str === 'string') {
+                    try { return JSON.parse(str); } catch (_) { return {}; }
+                }
+                return str || {};
+            };
+
+            const sessionMeta = safeParse(session.metadata_json);
+            const orderCtx = sessionMeta.orderContext || {};
+            const canonicalOrderId =
+                extraContext.orderId ||
+                session.source_ref ||
+                session.order_id ||
+                orderCtx.order_ref ||
+                `ORD_${Date.now()}_${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+
+            const rawEst = safeParse(targetOffer.raw_estimate_json);
+            const printhouseId = targetOffer.printer_id || targetOffer.house_id || extraContext.printhouseId || 'ph-default';
+            const tenantId = targetOffer.tenant_id || session.tenant_id || extraContext.tenantId || 'default';
+            const subtotalManufacturingEur = Number(
+                extraContext.subtotalManufacturingEur ??
+                targetOffer.suggested_price ??
+                targetOffer.production_cost ??
+                0
+            );
+            const packagingHandlingEur = Number(extraContext.packagingHandlingEur ?? rawEst.packaging_eur ?? 0);
+            const shippingFreightEur = Number(extraContext.shippingFreightEur ?? rawEst.shipping_eur ?? 0);
+
+            const marketplaceOrder = await marketplaceOrderService.createOrder({
+                orderId: String(canonicalOrderId),
+                externalOrderRef: String(canonicalOrderId),
+                pricingSessionId: sessionId,
+                sessionId,
+                selectedOfferId: offerId,
+                tenantId,
+                printhouseId,
+                customerId: extraContext.customerId || orderCtx.user_id || null,
+                currency: targetOffer.currency || 'EUR',
+                estimatedPrice: subtotalManufacturingEur,
+                subtotalManufacturingEur,
+                packagingHandlingEur,
+                shippingFreightEur,
+                taxRatePct: extraContext.taxRatePct ?? 21.0,
+                paymentMethod: extraContext.paymentMethod || 'BANK_TRANSFER_B2B',
+                settlementModality: extraContext.settlementModality || 'MODALITY_A_ESCROW_MOR',
+                platformFeePct: extraContext.platformFeePct ?? 10.0,
+                bookSpec: extraContext.bookSpec || orderCtx.specs || orderCtx,
+                customer: extraContext.customer || orderCtx.customer || {
+                    name: extraContext.customerName || 'Publisher Checkout',
+                    email: extraContext.customerEmail || 'publisher@printprice.pro'
+                },
+                selectedOffer: {
+                    id: offerId,
+                    offerId,
+                    printerId: printhouseId,
+                    printhouseId,
+                    printerName: targetOffer.printer_name || printhouseId,
+                    totalPrice: subtotalManufacturingEur,
+                    currency: targetOffer.currency || 'EUR',
+                    leadTimeDays: targetOffer.lead_time_days || 5
+                }
+            });
+
+            // Returns complete session handoff contract enriched with marketplaceOrder
+            const detail = await this.getSessionDetail(sessionId);
+            return {
+                ...detail,
+                marketplaceOrder
+            };
         } catch (err) {
-            await conn.rollback();
-            conn.release();
+            try { await conn.rollback(); } catch (_) {}
+            try { conn.release(); } catch (_) {}
             console.error(`[MARKETPLACE][ORCHESTRATION-FAILED] Selection process failed transactionally: ${err.message}`, { sessionId, offerId });
             throw err;
         }

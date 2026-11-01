@@ -35,14 +35,63 @@ const getFileState = (order: any) => {
     const files = order?.productionFiles || [];
     if (files.length === 0) return { label: "Missing", color: "bg-rose-500/15 text-rose-400 border border-rose-500/30" };
 
-    const hasInterior = files.some((f: any) => f.kind?.includes("INTERIOR"));
-    const hasCover = files.some((f: any) => f.kind?.includes("COVER"));
+    // Strictly verify status === "UPLOADED" (or ACCEPTED / COMPLETED) so empty REQUIRED slots do not show false positives
+    const uploadedFiles = files.filter((f: any) => f.status === "UPLOADED" || f.status === "COMPLETED" || f.status === "ACCEPTED" || f.status === "ACCEPTED_WITH_WARNINGS");
+    if (uploadedFiles.length === 0) {
+        return { label: "Awaiting Upload", color: "bg-rose-500/15 text-rose-400 border border-rose-500/30" };
+    }
+
+    const hasInterior = uploadedFiles.some((f: any) => f.kind?.includes("INTERIOR"));
+    const hasCover = uploadedFiles.some((f: any) => f.kind?.includes("COVER"));
 
     if (hasInterior && hasCover) return { label: "Interior + Cover", color: "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30" };
     if (hasInterior) return { label: "Interior Only", color: "bg-amber-500/15 text-amber-400 border border-amber-500/30" };
     if (hasCover) return { label: "Cover Only", color: "bg-amber-500/15 text-amber-400 border border-amber-500/30" };
 
-    return { label: `${files.length} Files`, color: "bg-blue-500/15 text-blue-400 border border-blue-500/30" };
+    return { label: `${uploadedFiles.length} Files`, color: "bg-blue-500/15 text-blue-400 border border-blue-500/30" };
+};
+
+const getPaymentBadgeInfo = (order: any) => {
+    const methodRaw = String(order?.payment?.method || order?.payment_method || "BANK_TRANSFER_B2B").toUpperCase();
+    const channel = methodRaw.includes("STRIPE") ? "STRIPE" : "WIRE";
+    const rawStatus = String(order?.payment?.status || order?.payment_status || "PENDING").toUpperCase();
+    const escrowStatus = String(order?.settlement?.escrowStatus || order?.escrow_status || "").toUpperCase();
+
+    if (rawStatus === "CONFIRMED" || rawStatus === "PAID" || rawStatus === "PAYMENT_CONFIRMED") {
+        if (escrowStatus === "ESCROW_FUNDED" || escrowStatus === "FUNDS_LOCKED_ON_PROOF_APPROVAL") {
+            return { channel, statusLabel: "ESCROW_HELD", badgeStatus: "HEALTHY" as const };
+        }
+        return { channel, statusLabel: "CONFIRMED", badgeStatus: "HEALTHY" as const };
+    }
+    if (rawStatus === "BLOCKED") {
+        return { channel, statusLabel: "BLOCKED", badgeStatus: "OFFLINE" as const };
+    }
+    if (channel === "WIRE") {
+        return { channel, statusLabel: "AWAITING_WIRE", badgeStatus: "QUEUED" as const };
+    }
+    return { channel, statusLabel: rawStatus, badgeStatus: "INACTIVE" as const };
+};
+
+const getSettlementInfo = (order: any) => {
+    const s = order?.settlement || {};
+    const modality = s.modality || order?.settlement_modality || "MODALITY_A_ESCROW_MOR";
+    const isDirect = modality === "MODALITY_B_DIRECT_COMMISSION";
+    const modalityLabel = isDirect ? "DIRECT COMMISSION" : "ESCROW MoR";
+    const totalEur = Number(order?.totals?.total || order?.offer?.totalPrice || 0);
+    const feePct = Number(s.platformFeePct ?? 10);
+    const feeEur = Number(s.platformFeeEur ?? Math.round((Number(order?.totals?.subtotal || totalEur) * (feePct / 100)) * 100) / 100);
+    const netPayoutEur = Number(s.netPrinthousePayoutEur ?? Math.max(0, totalEur - feeEur));
+    const escrowStatus = s.escrowStatus || "UNFUNDED";
+    return {
+        modality,
+        isDirect,
+        modalityLabel,
+        totalEur,
+        feePct,
+        feeEur,
+        netPayoutEur,
+        escrowStatus
+    };
 };
 
 const getTotalLabel = (order: any) => {
@@ -66,6 +115,9 @@ const getDisplayFiles = (order: any) => {
             filename: m.filename,
             sizeBytes: m.sizeBytes,
             status: m.status,
+            sourceType: m.sourceType || "DIRECT_UPLOAD",
+            externalUrl: m.externalUrl || null,
+            ingestionStatus: m.ingestionStatus || m.status,
             createdAt: m.createdAt,
             checksum: m.checksum,
             kind: m.kind
@@ -75,7 +127,10 @@ const getDisplayFiles = (order: any) => {
     return legacy.map((l: any) => ({
         filename: l.filename,
         sizeBytes: 0,
-        status: l.status || "UPLOADED",
+        status: l.status || "REQUIRED",
+        sourceType: l.sourceType || "DIRECT_UPLOAD",
+        externalUrl: l.externalUrl || null,
+        ingestionStatus: l.ingestionStatus || l.status || "REQUIRED",
         createdAt: order.createdAt,
         checksum: null,
         kind: l.kind
@@ -124,11 +179,43 @@ export const OrderIntakeTab: React.FC = () => {
         }
     };
 
+    const handleQuickConfirmWire = async (orderId: string) => {
+        if (!confirm('Confirm B2B Bank Wire Transfer receipt for this order?')) return;
+        try {
+            const res = await adminApi.confirmMarketplaceOrderWirePayment(orderId);
+            if (res.ok) fetchOrders();
+        } catch (err) {
+            console.error('Failed to confirm wire transfer:', err);
+        }
+    };
+
+    const handleQuickAcknowledge = async (orderId: string) => {
+        try {
+            const res = await adminApi.acknowledgeMarketplaceOrder(orderId);
+            if (res.ok) fetchOrders();
+        } catch (err) {
+            console.error('Failed to acknowledge order:', err);
+        }
+    };
+
+    const filesUploadedCount = counts.filesUploaded ?? orders.filter(o => {
+        const files = o?.productionFiles || [];
+        return files.some((f: any) => f.status === 'UPLOADED' || f.status === 'COMPLETED' || f.status === 'ACCEPTED');
+    }).length;
+
+    const readyForHandoffCount = orders.filter(o =>
+        o.readiness === 'READY' || o.status === 'READY_FOR_PRODUCTION' || o.status === 'READY'
+    ).length;
+
+    const blockedOrdersCount = orders.filter(o =>
+        o.readiness === 'BLOCKED' || o.status === 'BLOCKED' || o.payment?.status === 'BLOCKED'
+    ).length;
+
     const kpis = [
         { label: t('marketplace.kpiNewOrders') || 'NEW ORDERS', value: orders.filter(o => isNewOrder(o)).length, icon: InboxStackIcon, accent: 'blue' as const },
-        { label: t('marketplace.kpiFilesUploaded') || 'FILES UPLOADED', value: counts.filesUploaded || 0, icon: DocumentTextIcon, accent: 'blue' as const },
-        { label: t('marketplace.kpiReadyHandoff') || 'READY FOR HANDOFF', value: orders.filter(o => o.readiness === 'READY').length, icon: ShieldCheckIcon, accent: 'emerald' as const },
-        { label: t('marketplace.kpiBlockedOrders') || 'BLOCKED ORDERS', value: orders.filter(o => o.readiness === 'BLOCKED' || o.payment?.status === 'BLOCKED').length, icon: ExclamationCircleIcon, accent: 'rose' as const },
+        { label: t('marketplace.kpiFilesUploaded') || 'FILES UPLOADED', value: filesUploadedCount, icon: DocumentTextIcon, accent: 'blue' as const },
+        { label: t('marketplace.kpiReadyHandoff') || 'READY FOR HANDOFF', value: readyForHandoffCount, icon: ShieldCheckIcon, accent: 'emerald' as const },
+        { label: t('marketplace.kpiBlockedOrders') || 'BLOCKED ORDERS', value: blockedOrdersCount, icon: ExclamationCircleIcon, accent: 'rose' as const },
     ];
 
     return (
@@ -233,12 +320,50 @@ export const OrderIntakeTab: React.FC = () => {
                     {
                         key: 'payment',
                         header: t('marketplace.thPayment') || 'PAYMENT',
-                        render: (order) => (
-                            <StatusBadge
-                                status={order.payment?.status === 'PAID' ? 'HEALTHY' : order.payment?.status === 'BLOCKED' ? 'OFFLINE' : 'INACTIVE'}
-                                label={order.payment?.status?.replace(/_/g, ' ') || 'NOT STARTED'}
-                            />
-                        )
+                        render: (order) => {
+                            const pay = getPaymentBadgeInfo(order);
+                            return (
+                                <div className="space-y-1">
+                                    <div className="flex items-center gap-1.5">
+                                        <span className="px-1.5 py-0.5 rounded bg-[#181b20] border border-[#1f2228] text-[8px] font-mono font-black text-slate-300 uppercase tracking-widest">
+                                            {pay.channel}
+                                        </span>
+                                        <StatusBadge
+                                            status={pay.badgeStatus}
+                                            label={pay.statusLabel}
+                                        />
+                                    </div>
+                                    {order?.payment?.bankTransferReference && (
+                                        <div className="text-[9px] text-slate-400 font-mono truncate max-w-[140px]">
+                                            Ref: {order.payment.bankTransferReference}
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        }
+                    },
+                    {
+                        key: 'settlement',
+                        header: t('marketplace.thSettlement') || 'SETTLEMENT',
+                        render: (order) => {
+                            const s = getSettlementInfo(order);
+                            return (
+                                <div className="space-y-1">
+                                    <span className={`inline-block px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest border ${
+                                        s.isDirect
+                                            ? 'bg-amber-500/15 text-amber-400 border-amber-500/30'
+                                            : 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
+                                    }`}>
+                                        {s.modalityLabel}
+                                    </span>
+                                    <div className="text-[9px] font-mono text-slate-300 space-y-0.5">
+                                        <div>Gross: <span className="text-white font-bold">€{s.totalEur.toFixed(2)}</span></div>
+                                        <div className="text-slate-400">Fee ({s.feePct}%): -€{s.feeEur.toFixed(2)}</div>
+                                        <div className="text-emerald-400 font-bold">Net PH: €{s.netPayoutEur.toFixed(2)}</div>
+                                    </div>
+                                </div>
+                            );
+                        }
                     },
                     {
                         key: 'total',
@@ -253,7 +378,7 @@ export const OrderIntakeTab: React.FC = () => {
                         render: (order) => (
                             <div className="space-y-1">
                                 <StatusBadge
-                                    status={order.controlPlane?.acknowledged || order.status === 'READY' ? 'ACTIVE' : order.status === 'BLOCKED' ? 'OFFLINE' : 'QUEUED'}
+                                    status={order.controlPlane?.acknowledged || order.status === 'READY' || order.status === 'READY_FOR_PRODUCTION' ? 'ACTIVE' : order.status === 'BLOCKED' ? 'OFFLINE' : 'QUEUED'}
                                     label={order.status}
                                 />
                                 <div className="text-[9px] text-slate-400 font-mono uppercase tracking-tighter block">
@@ -266,14 +391,38 @@ export const OrderIntakeTab: React.FC = () => {
                         key: 'actions',
                         header: t('marketplace.thActions') || 'ACTIONS',
                         align: 'right',
-                        render: (order) => (
-                            <button
-                                onClick={() => setSelectedOrderId(order.orderIntentId)}
-                                className="px-3 py-1.5 rounded-lg bg-white text-[#0a0b0d] text-[10px] font-black uppercase tracking-widest hover:bg-slate-200 transition-all cursor-pointer"
-                            >
-                                {t('marketplace.viewOrder') || 'View Order'}
-                            </button>
-                        )
+                        render: (order) => {
+                            const pay = getPaymentBadgeInfo(order);
+                            const acknowledged = isOrderAcknowledged(order);
+                            return (
+                                <div className="flex items-center justify-end gap-1.5">
+                                    {pay.statusLabel === 'AWAITING_WIRE' && (
+                                        <button
+                                            onClick={() => handleQuickConfirmWire(order.orderIntentId)}
+                                            className="px-2.5 py-1.5 rounded-lg bg-amber-500/20 border border-amber-500/40 text-amber-300 text-[9px] font-black uppercase tracking-widest hover:bg-amber-500/30 transition-all cursor-pointer"
+                                            title="Confirm B2B Bank Transfer"
+                                        >
+                                            Confirm Wire
+                                        </button>
+                                    )}
+                                    {!acknowledged && (
+                                        <button
+                                            onClick={() => handleQuickAcknowledge(order.orderIntentId)}
+                                            className="px-2.5 py-1.5 rounded-lg bg-emerald-600 text-white text-[9px] font-black uppercase tracking-widest hover:bg-emerald-500 transition-all cursor-pointer"
+                                            title="Accept to Production"
+                                        >
+                                            Accept
+                                        </button>
+                                    )}
+                                    <button
+                                        onClick={() => setSelectedOrderId(order.orderIntentId)}
+                                        className="px-3 py-1.5 rounded-lg bg-white text-[#0a0b0d] text-[10px] font-black uppercase tracking-widest hover:bg-slate-200 transition-all cursor-pointer"
+                                    >
+                                        {t('marketplace.viewOrder') || 'Inspect'}
+                                    </button>
+                                </div>
+                            );
+                        }
                     }
                 ]}
             />
@@ -380,6 +529,15 @@ const OrderDetailDrawer: React.FC<{ id: string, onClose: () => void, onRefresh: 
         if (!confirm('Mark this payment as verified and manually approved?')) return;
         try {
             const res = await adminApi.markMarketplaceOrderPaymentReady(id);
+            if (res.ok) { fetchDetail(); onRefresh(); }
+        } catch (err) { console.error(err); }
+    };
+
+    const handleConfirmWireTransfer = async () => {
+        const wireRef = prompt("Confirm B2B Bank Transfer Reference:", order?.payment?.bankTransferReference || `PPOS-${order?.publicRef || id}`);
+        if (wireRef === null) return;
+        try {
+            const res = await adminApi.confirmMarketplaceOrderWirePayment(id, { bankTransferReference: wireRef });
             if (res.ok) { fetchDetail(); onRefresh(); }
         } catch (err) { console.error(err); }
     };
@@ -505,27 +663,63 @@ const OrderDetailDrawer: React.FC<{ id: string, onClose: () => void, onRefresh: 
                         </div>
                     </section>
                     <section className="space-y-4">
-                        <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Quotation Totals</h4>
-                        <div className="bg-slate-900 text-white p-5 space-y-4 shadow-lg">
-                            <div className="flex justify-between items-end border-b border-white/10 pb-3">
-                                <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Final Amount</div>
-                                <div className="text-2xl font-black">{getTotalLabel(order)}</div>
-                            </div>
-                            <div className="space-y-2">
-                                <div className="flex justify-between text-[10px] font-bold">
-                                    <span className="text-slate-400 uppercase">Subtotal</span>
-                                    <span>{order.totals?.subtotal || 0}</span>
+                        <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Financial & Settlement Breakdown</h4>
+                        {(() => {
+                            const s = getSettlementInfo(order);
+                            const pay = getPaymentBadgeInfo(order);
+                            return (
+                                <div className="bg-slate-900 text-white p-5 space-y-4 shadow-lg border border-white/10">
+                                    <div className="flex justify-between items-end border-b border-white/10 pb-3">
+                                        <div>
+                                            <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Order Value</div>
+                                            <span className={`inline-block mt-1 px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest border ${
+                                                s.isDirect
+                                                    ? 'bg-amber-500/15 text-amber-400 border-amber-500/30'
+                                                    : 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
+                                            }`}>
+                                                {s.modalityLabel}
+                                            </span>
+                                        </div>
+                                        <div className="text-2xl font-black font-mono">{getTotalLabel(order)}</div>
+                                    </div>
+                                    <div className="space-y-1.5 font-mono">
+                                        <div className="flex justify-between text-[10px] font-bold">
+                                            <span className="text-slate-400 uppercase">Manufacturing</span>
+                                            <span>€{Number(order.totals?.subtotalManufacturingEur ?? order.totals?.subtotal ?? 0).toFixed(2)}</span>
+                                        </div>
+                                        <div className="flex justify-between text-[10px] font-bold">
+                                            <span className="text-slate-400 uppercase">Packaging & Handling</span>
+                                            <span>€{Number(order.totals?.packagingHandlingEur ?? 0).toFixed(2)}</span>
+                                        </div>
+                                        <div className="flex justify-between text-[10px] font-bold">
+                                            <span className="text-slate-400 uppercase">Shipping Freight</span>
+                                            <span>€{Number(order.totals?.shippingFreightEur ?? order.totals?.shipping ?? 0).toFixed(2)}</span>
+                                        </div>
+                                        <div className="flex justify-between text-[10px] font-bold border-b border-white/10 pb-2">
+                                            <span className="text-slate-400 uppercase">VAT ({Number(order.totals?.taxRatePct ?? 21)}%)</span>
+                                            <span>€{Number(order.totals?.taxAmountEur ?? order.totals?.tax ?? 0).toFixed(2)}</span>
+                                        </div>
+                                        <div className="flex justify-between text-[10px] font-bold pt-1 text-amber-400">
+                                            <span className="uppercase">PrintPrice Fee ({s.feePct}%)</span>
+                                            <span>-€{s.feeEur.toFixed(2)}</span>
+                                        </div>
+                                        <div className="flex justify-between text-xs font-black text-emerald-400 pt-1">
+                                            <span className="uppercase">Net Printhouse Payout</span>
+                                            <span>€{s.netPayoutEur.toFixed(2)}</span>
+                                        </div>
+                                    </div>
+                                    <div className="pt-2 border-t border-white/10 flex items-center justify-between text-[9px] font-mono text-slate-400">
+                                        <span>Channel: <strong className="text-white">{pay.channel}</strong> ({pay.statusLabel})</span>
+                                        <span>Escrow: <strong className="text-white">{s.escrowStatus}</strong></span>
+                                    </div>
+                                    {order.payment?.bankTransferReference && (
+                                        <div className="text-[9px] font-mono text-amber-300 bg-amber-500/10 border border-amber-500/20 px-2.5 py-1.5 rounded">
+                                            Wire Ref: <strong>{order.payment.bankTransferReference}</strong>
+                                        </div>
+                                    )}
                                 </div>
-                                <div className="flex justify-between text-[10px] font-bold">
-                                    <span className="text-slate-400 uppercase">Tax</span>
-                                    <span>{order.totals?.tax || 0}</span>
-                                </div>
-                                <div className="flex justify-between text-[10px] font-bold">
-                                    <span className="text-slate-400 uppercase">Shipping</span>
-                                    <span>{order.totals?.shipping || 0}</span>
-                                </div>
-                            </div>
-                        </div>
+                            );
+                        })()}
                     </section>
                 </div>
 
@@ -558,28 +752,39 @@ const OrderDetailDrawer: React.FC<{ id: string, onClose: () => void, onRefresh: 
                     </h4>
                     <div className="grid grid-cols-1 gap-3">
                         {getDisplayFiles(order).length > 0 ? (
-                            getDisplayFiles(order).map((file: any, i: number) => (
-                                <div key={i} className="bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 p-3 flex items-center justify-between group">
-                                    <div className="flex items-center gap-3 overflow-hidden">
-                                        <div className="p-2 bg-white dark:bg-white/10 text-slate-400">
-                                            <DocumentTextIcon className="w-4 h-4" />
-                                        </div>
-                                        <div className="truncate">
-                                            <div className="text-[10px] font-black text-slate-900 dark:text-white uppercase truncate">{file.filename}</div>
-                                            <div className="flex items-center gap-2 text-[8px] text-slate-400 font-bold uppercase tracking-tight">
-                                                <span>{file.kind}</span>
-                                                {file.sizeBytes > 0 && <span>• {(file.sizeBytes / 1024 / 1024).toFixed(2)} MB</span>}
-                                                {file.checksum && <span className="truncate max-w-[100px]"> • {file.checksum}</span>}
+                            getDisplayFiles(order).map((file: any, i: number) => {
+                                const isUploaded = file.status === 'UPLOADED' || file.status === 'COMPLETED' || file.status === 'ACCEPTED';
+                                return (
+                                    <div key={i} className="bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 p-3 flex items-center justify-between group">
+                                        <div className="flex items-center gap-3 overflow-hidden">
+                                            <div className="p-2 bg-white dark:bg-white/10 text-slate-400">
+                                                <DocumentTextIcon className="w-4 h-4" />
+                                            </div>
+                                            <div className="truncate">
+                                                <div className="text-[10px] font-black text-slate-900 dark:text-white uppercase truncate">
+                                                    {file.filename || `${file.kind} (Awaiting Asset)`}
+                                                </div>
+                                                <div className="flex items-center gap-2 text-[8px] text-slate-400 font-bold uppercase tracking-tight">
+                                                    <span>{file.kind}</span>
+                                                    {file.sourceType && <span>• {file.sourceType}</span>}
+                                                    {file.sizeBytes > 0 && <span>• {(file.sizeBytes / 1024 / 1024).toFixed(2)} MB</span>}
+                                                    {file.checksum && <span className="truncate max-w-[100px]"> • {file.checksum}</span>}
+                                                    {file.externalUrl && <span className="truncate max-w-[150px] text-blue-400 lowercase"> • {file.externalUrl}</span>}
+                                                </div>
                                             </div>
                                         </div>
+                                        <div className="flex items-center gap-2">
+                                            <span className={`px-2 py-0.5 text-[8px] font-black uppercase tracking-widest ${
+                                                isUploaded
+                                                    ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300'
+                                                    : 'bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-300'
+                                            }`}>
+                                                {file.status}
+                                            </span>
+                                        </div>
                                     </div>
-                                    <div className="flex items-center gap-2">
-                                        <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 text-[8px] font-black uppercase tracking-widest">
-                                            {file.status}
-                                        </span>
-                                    </div>
-                                </div>
-                            ))
+                                );
+                            })
                         ) : (
                             <div className="bg-red-50 border border-red-100 p-8 text-center space-y-2">
                                 <ExclamationTriangleIcon className="w-6 h-6 mx-auto text-red-400" />
@@ -600,7 +805,7 @@ const OrderDetailDrawer: React.FC<{ id: string, onClose: () => void, onRefresh: 
                     </div>
                     <div className="space-y-4">
                         <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Payment Readiness</h4>
-                        <div className={`p-4 border text-center space-y-2 ${order.payment?.status === 'PAID' ? 'bg-emerald-50 border-emerald-100 text-emerald-600' : 'bg-amber-50 border-amber-100 text-amber-600'}`}>
+                        <div className={`p-4 border text-center space-y-2 ${(order.payment?.status === 'PAID' || order.payment?.status === 'CONFIRMED') ? 'bg-emerald-50 border-emerald-100 text-emerald-600' : 'bg-amber-50 border-amber-100 text-amber-600'}`}>
                             <CreditCardIcon className="w-6 h-6 mx-auto opacity-50" />
                             <div className="text-[10px] font-black uppercase tracking-widest">{order.payment?.status || 'NOT STARTED'}</div>
                         </div>
@@ -652,6 +857,12 @@ const OrderDetailDrawer: React.FC<{ id: string, onClose: () => void, onRefresh: 
                             {/* Payment Management Block */}
                             <div className="border border-slate-200 dark:border-white/10 p-3 space-y-3 bg-slate-50/50 dark:bg-white/5">
                                 <div className="text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">{t('marketplace.paymentGates') || '2. Payment Gates'}</div>
+                                <button
+                                    onClick={handleConfirmWireTransfer}
+                                    className="w-full py-2 bg-amber-600 hover:bg-amber-500 text-white text-[9px] font-black uppercase tracking-widest transition-all cursor-pointer"
+                                >
+                                    Confirm B2B Wire Transfer Receipt
+                                </button>
                                 <div className="grid grid-cols-2 gap-2">
                                     <button 
                                         onClick={handleMarkPaymentReady}

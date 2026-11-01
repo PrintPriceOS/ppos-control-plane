@@ -384,6 +384,7 @@ const start = async () => {
             fastify.use('/api/printhouse/quote-revisions', require('./src/api/routes/orderQuoteRevisionRoutes'));
             fastify.use('/api/marketplace/orders', require('./src/api/routes/marketplaceOrders'));
             fastify.use('/api/marketplace', require('./src/api/routes/marketplacePublic'));
+            fastify.use('/api/public/marketplace', require('./src/api/routes/marketplacePublic'));
             fastify.use('/api/connectors/factory', require('./src/api/routes/factoryConnectorRoutes'));
             fastify.use('/api/public/preflight', require('./src/api/routes/publicPreflight'));
             fastify.use('/api/system', require('./src/api/routes/system'));
@@ -421,6 +422,8 @@ const start = async () => {
             fastify.all('/api/connectors/factory/*', apiNotFoundFallback);
             fastify.all('/api/marketplace', apiNotFoundFallback);
             fastify.all('/api/marketplace/*', apiNotFoundFallback);
+            fastify.all('/api/public/marketplace', apiNotFoundFallback);
+            fastify.all('/api/public/marketplace/*', apiNotFoundFallback);
             fastify.all('/api/public/preflight', apiNotFoundFallback);
             fastify.all('/api/public/preflight/*', apiNotFoundFallback);
             fastify.all('/api/system', apiNotFoundFallback);

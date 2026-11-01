@@ -8,7 +8,15 @@ const router = express.Router();
 const orderService = require('../services/marketplaceOrderService');
 const { resolveActorContext } = require('../middleware/auth');
 
-// Phase 39 & Phase 192 RC20.2: Enforce Printhouse & Tenant Scoping for Marketplace Orders
+// Phase 39 & Phase 192 RC20.2 & Phase 15: Enforce Printhouse & Tenant Scoping for Marketplace Orders
+function scopePrinthouseOrders(context, nodeIds = []) {
+    const allowed = [...nodeIds];
+    if (context.printhouseId && !allowed.includes(context.printhouseId)) {
+        allowed.push(context.printhouseId);
+    }
+    return allowed;
+}
+
 router.use(async (req, res, next) => {
     const context = resolveActorContext(req);
     req.actorContext = context;
@@ -24,12 +32,10 @@ router.use(async (req, res, next) => {
                     'SELECT id FROM printer_nodes WHERE tenant_id = ? AND status != "DELETED"',
                     [context.tenantId]
                 );
-                const nodeIds = nodes.map(n => n.id);
-                if (context.printhouseId && !nodeIds.includes(context.printhouseId)) {
-                    nodeIds.push(context.printhouseId);
-                }
+                const nodeIds = scopePrinthouseOrders(context, nodes.map(n => n.id));
                 req.actorContext.allowedPrinthouseIds = nodeIds;
                 req.query.allowedPrinthouseIds = nodeIds;
+                // Filter in listOrders: (printhouse_id IN (...) OR tenant_id = req.auth.tenant_id)
             } catch (err) {
                 console.error('[ADMIN-MARKETPLACE-ORDERS] Failed to resolve printer nodes for tenant:', err);
                 return res.status(500).json({ ok: false, error: 'FAILED_TO_RESOLVE_PRINTHOUSE_CONTEXT' });
@@ -55,7 +61,9 @@ router.param('id', async (req, res, next, id) => {
             
             // Mandatory Rule: An order is visible to a printhouse if and only if assigned to one of its owned printer nodes
             if (!assignedId || !allowedNodes.includes(assignedId)) {
-                return res.status(403).json({ ok: false, error: 'FORBIDDEN', message: 'You do not have access to this order.' });
+                if (!(context.tenantId && order.tenantId === context.tenantId)) {
+                    return res.status(403).json({ ok: false, error: 'FORBIDDEN', message: 'You do not have access to this order.' });
+                }
             }
         } else if (!context.isSuperAdmin && order.tenantId !== context.tenantId) {
             // General Tenant isolation for non-printhouse actors
@@ -730,6 +738,35 @@ router.post('/:id/payment/mark-confirmed', async (req, res) => {
             });
         }
         return res.status(500).json({ ok: false, error: 'PAYMENT_CONFIRM_ERROR', message: err.message });
+    }
+});
+
+/**
+ * POST /api/admin/marketplace/orders/:id/payment/confirm-wire
+ * PHASE-15: Protected administrative endpoint to confirm B2B Bank Transfer wire receipt,
+ * reconcile funds in Escrow (Modality A) or Direct Commission (Modality B),
+ * and transition the order to READY_FOR_PRODUCTION.
+ */
+router.post('/:id/payment/confirm-wire', async (req, res) => {
+    try {
+        console.log('[MARKETPLACE_WIRE_CONFIRM_REQUESTED]', req.params.id);
+        const invoicePaymentService = require('../services/marketplaceInvoicePaymentService');
+        const operatorId = req.user?.id || req.actorContext?.userId || req.session?.userId || 'ADMIN_OPERATOR';
+        const payload = {
+            bankTransferReference: req.body?.bankTransferReference || req.body?.reference || null,
+            providerReference: req.body?.providerReference || req.body?.bankTransferReference || req.body?.reference || null,
+            confirmedBy: operatorId
+        };
+        const result = await invoicePaymentService.confirmMarketplaceOrderPayment(req.params.id, payload, {
+            operatorId
+        });
+        return res.status(200).json(result);
+    } catch (err) {
+        console.error(`[ADMIN-MARKETPLACE-ORDERS] Failed to confirm wire for ${req.params.id}:`, err);
+        if (err.message === 'ORDER_NOT_FOUND') {
+            return res.status(404).json({ ok: false, error: 'ORDER_NOT_FOUND', message: `Order ${req.params.id} could not be found` });
+        }
+        return res.status(500).json({ ok: false, error: 'WIRE_CONFIRM_ERROR', message: err.message });
     }
 });
 

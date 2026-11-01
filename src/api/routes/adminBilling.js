@@ -423,6 +423,26 @@ async function handleStripeEvent(event) {
         //  1. client_reference_id  (reliable Stripe-native field, set by us)
         //  2. metadata.tenant_id   (legacy / fallback)
         case 'checkout.session.completed': {
+            // PHASE-15: Check if this checkout session belongs to a Marketplace Order
+            const marketplaceOrderId = obj.metadata?.order_id || (obj.mode === 'payment' ? obj.client_reference_id : null);
+            if (marketplaceOrderId) {
+                const invoicePaymentService = require('../services/marketplaceInvoicePaymentService');
+                await invoicePaymentService.confirmMarketplaceOrderPayment(
+                    marketplaceOrderId,
+                    {
+                        stripePaymentIntentId: obj.payment_intent || obj.id,
+                        providerReference: obj.id,
+                        confirmedBy: 'STRIPE_WEBHOOK_CHECKOUT_COMPLETED'
+                    }
+                );
+                console.log('[BILLING][WEBHOOK][MARKETPLACE_ORDER_PAID]', {
+                    orderId: marketplaceOrderId,
+                    sessionId: obj.id,
+                    paymentIntentId: obj.payment_intent
+                });
+                break;
+            }
+
             // Primary: use client_reference_id (set in create-checkout-session)
             // Fallback: metadata.tenant_id for sessions created before this hardening
             const tenantId = obj.client_reference_id || obj.metadata?.tenant_id;
@@ -475,6 +495,26 @@ async function handleStripeEvent(event) {
             }
 
             console.log('[BILLING][WEBHOOK][ACTIVATED]', { tenantId, planType });
+            break;
+        }
+
+        case 'payment_intent.succeeded': {
+            const marketplaceOrderId = obj.metadata?.order_id;
+            if (marketplaceOrderId) {
+                const invoicePaymentService = require('../services/marketplaceInvoicePaymentService');
+                await invoicePaymentService.confirmMarketplaceOrderPayment(
+                    marketplaceOrderId,
+                    {
+                        stripePaymentIntentId: obj.id,
+                        providerReference: obj.id,
+                        confirmedBy: 'STRIPE_WEBHOOK_PAYMENT_INTENT_SUCCEEDED'
+                    }
+                );
+                console.log('[BILLING][WEBHOOK][MARKETPLACE_PAYMENT_INTENT_SUCCEEDED]', {
+                    orderId: marketplaceOrderId,
+                    paymentIntentId: obj.id
+                });
+            }
             break;
         }
 

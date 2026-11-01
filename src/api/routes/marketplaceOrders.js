@@ -6,10 +6,36 @@
 
 const express = require('express');
 const router = express.Router();
+const path = require('path');
+const fs = require('fs');
+const multer = require('multer');
 const marketplaceOrderService = require('../services/marketplaceOrderService');
+const marketplaceOrderFileService = require('../services/marketplaceOrderFileService');
+const invoicePaymentService = require('../services/marketplaceInvoicePaymentService');
 const mysqlClient = require('../services/mysqlClient');
 const { requireAdmin } = require('../middleware/auth');
 const logger = require('../services/logger').child('marketplace-orders-router');
+
+// Configure Multer for production PDF uploads up to 5 GB
+const uploadStorage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        const orderId = (req.params.orderId || 'unknown').replace(/[^a-zA-Z0-9_-]/g, '_');
+        const role = (req.body.role || req.body.kind || 'INTERIOR_PDF').replace(/[^a-zA-Z0-9_-]/g, '_');
+        const dir = path.join(__dirname, '../../../storage/marketplace_orders', orderId, role);
+        fs.mkdirSync(dir, { recursive: true });
+        cb(null, dir);
+    },
+    filename: (req, file, cb) => {
+        cb(null, `${Date.now()}_${path.basename(file.originalname || 'production.pdf')}`);
+    }
+});
+
+const uploadMiddleware = multer({
+    storage: uploadStorage,
+    limits: {
+        fileSize: 5 * 1024 * 1024 * 1024 // 5 GB
+    }
+});
 
 /**
  * Custom middleware: requireMarketplaceOrAdmin
@@ -341,6 +367,96 @@ router.post('/:orderId/readiness/recompute', requireMarketplaceOrAdmin, async (r
     } catch (err) {
         logger.error({ event: 'api_recompute_readiness_failed', orderId, error: err.message });
         return res.status(500).json({ ok: false, error: 'RECOMPUTE_READINESS_FAILED', message: err.message });
+    }
+});
+
+/**
+ * 8. POST /api/marketplace/orders/:orderId/files/upload
+ * PHASE-15: Binary PDF file upload up to 5 GB via Multer.
+ */
+router.post('/:orderId/files/upload', requireMarketplaceOrAdmin, uploadMiddleware.single('file'), async (req, res) => {
+    const { orderId } = req.params;
+    const role = req.body?.role || req.body?.kind || req.query?.role || 'INTERIOR_PDF';
+    const originalName = req.body?.originalName || req.file?.originalname || `${role.toLowerCase()}.pdf`;
+
+    try {
+        const buffer = req.body?.contentBase64
+            ? Buffer.from(req.body.contentBase64, 'base64')
+            : (req.file?.buffer || null);
+
+        const result = await marketplaceOrderFileService.uploadBinaryFile(orderId, {
+            role,
+            file: req.file || null,
+            buffer,
+            originalName,
+            mimeType: req.file?.mimetype || req.body?.mimeType || 'application/pdf',
+            actorId: req.user?.id || 'CUSTOMER'
+        });
+
+        return res.status(200).json(result);
+    } catch (err) {
+        logger.error({ event: 'api_file_upload_failed', orderId, error: err.message });
+        const statusCode = err.statusCode || (err.message === 'ORDER_NOT_FOUND' ? 404 : 500);
+        return res.status(statusCode).json({
+            ok: false,
+            error: err.message,
+            message: err.message
+        });
+    }
+});
+
+/**
+ * 9. POST /api/marketplace/orders/:orderId/files/external-link
+ * PHASE-15: External link ingestion (WeTransfer, Dropbox, Drive, S3) with SSRF validation.
+ */
+router.post('/:orderId/files/external-link', requireMarketplaceOrAdmin, async (req, res) => {
+    const { orderId } = req.params;
+    const { role, kind, externalUrl, url, originalName, sizeBytes, checksumSha256 } = req.body || {};
+
+    try {
+        const result = await marketplaceOrderFileService.registerExternalFileLink(orderId, {
+            role: role || kind || 'INTERIOR_PDF',
+            externalUrl: externalUrl || url,
+            originalName,
+            sizeBytes,
+            checksumSha256,
+            actorId: req.user?.id || 'CUSTOMER'
+        });
+
+        return res.status(200).json(result);
+    } catch (err) {
+        logger.error({ event: 'api_external_link_failed', orderId, error: err.message });
+        const statusCode = err.statusCode || (err.message === 'ORDER_NOT_FOUND' ? 404 : 400);
+        return res.status(statusCode).json({
+            ok: false,
+            error: err.message,
+            message: err.message
+        });
+    }
+});
+
+/**
+ * 10. POST /api/marketplace/orders/:orderId/checkout/session
+ * PHASE-15: Dual Checkout Session Creation (Stripe Card/SEPA or B2B Bank Transfer)
+ * supporting Modality A (Escrow MoR) and Modality B (Direct Commission).
+ */
+router.post('/:orderId/checkout/session', requireMarketplaceOrAdmin, async (req, res) => {
+    const { orderId } = req.params;
+    try {
+        const result = await invoicePaymentService.createMarketplaceOrderCheckoutSession(
+            orderId,
+            req.body || {},
+            { operatorId: req.user?.id || 'CUSTOMER' }
+        );
+        return res.status(200).json(result);
+    } catch (err) {
+        logger.error({ event: 'api_checkout_session_failed', orderId, error: err.message });
+        const statusCode = err.statusCode || (err.message === 'ORDER_NOT_FOUND' ? 404 : 500);
+        return res.status(statusCode).json({
+            ok: false,
+            error: err.message,
+            message: err.message
+        });
     }
 });
 

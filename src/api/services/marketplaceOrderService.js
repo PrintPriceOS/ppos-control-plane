@@ -52,6 +52,9 @@ class MarketplaceOrderService {
             mimeType: f.mime_type || 'application/pdf',
             sizeBytes: Number(f.size_bytes || 0),
             status: f.status || 'PENDING',
+            sourceType: f.source_type || 'DIRECT_UPLOAD',
+            externalUrl: f.external_url || null,
+            ingestionStatus: f.ingestion_status || (f.status === 'UPLOADED' ? 'COMPLETED' : 'PENDING'),
             checksum: f.checksum_sha256 || null,
             storagePath: f.storage_path || null,
             preflightJobId: f.preflight_job_id || null,
@@ -165,12 +168,49 @@ class MarketplaceOrderService {
             riskLevel
         };
 
-        const payment = metadata.payment || {
-            status: orderRow.status === 'PAID' ? 'PAID' : 'NOT_STARTED',
-            method: 'MANUAL',
-            transactionId: metadata.transactionId || null,
-            paidAt: metadata.paidAt || null,
+        const paymentMethod = orderRow.payment_method || metadata.payment?.method || 'BANK_TRANSFER_B2B';
+        const paymentStatus = orderRow.payment_status || metadata.payment?.status || (orderRow.status === 'PAID' ? 'CONFIRMED' : 'PENDING');
+
+        const payment = {
+            ...(metadata.payment || {}),
+            status: paymentStatus,
+            method: paymentMethod,
+            provider: paymentMethod.startsWith('STRIPE') ? 'stripe' : 'bank_transfer',
+            stripeCheckoutSessionId: orderRow.stripe_checkout_session_id || metadata.payment?.stripeCheckoutSessionId || null,
+            stripePaymentIntentId: orderRow.stripe_payment_intent_id || metadata.payment?.stripePaymentIntentId || null,
+            bankTransferReference: orderRow.bank_transfer_reference || metadata.payment?.reference || null,
+            transactionId: orderRow.stripe_payment_intent_id || orderRow.bank_transfer_reference || metadata.transactionId || null,
+            paidAt: metadata.payment?.paidAt || metadata.paidAt || null,
             blockedReason: metadata.paymentBlockedReason || null
+        };
+
+        const subtotalManufacturingEur = Number(orderRow.subtotal_manufacturing_eur || orderRow.estimated_price || selectedOffer.totalPrice || selectedOffer.total_price || 0);
+        const packagingHandlingEur = Number(orderRow.packaging_handling_eur || 0);
+        const shippingFreightEur = Number(orderRow.shipping_freight_eur || 0);
+        const taxRatePct = Number(orderRow.tax_rate_pct ?? 21.0);
+        const netBeforeTax = subtotalManufacturingEur + packagingHandlingEur + shippingFreightEur;
+        const taxAmountEur = Number(orderRow.tax_amount_eur || Math.round(netBeforeTax * (taxRatePct / 100) * 100) / 100);
+        const totalAmountEur = Number(orderRow.total_amount_eur || (netBeforeTax + taxAmountEur) || orderRow.estimated_price || 0);
+
+        const settlementModality = orderRow.settlement_modality || metadata.settlement?.modality || 'MODALITY_A_ESCROW_MOR';
+        const platformFeePct = Number(orderRow.platform_fee_pct ?? 10.0);
+        const platformFeeEur = Number(orderRow.platform_fee_eur || Math.round(subtotalManufacturingEur * (platformFeePct / 100) * 100) / 100);
+        const netPrinthousePayoutEur = Number(
+            orderRow.net_printhouse_payout_eur ||
+            Math.max(0, Math.round((subtotalManufacturingEur + packagingHandlingEur - platformFeeEur) * 100) / 100)
+        );
+        const escrowStatus = orderRow.escrow_status || metadata.settlement?.escrowStatus || 'UNFUNDED';
+
+        const settlement = {
+            modality: settlementModality,
+            modalityLabel: settlementModality === 'MODALITY_B_DIRECT_COMMISSION' ? 'DIRECT COMMISSION' : 'ESCROW MoR',
+            platformFeePct,
+            platformFeeEur,
+            netPrinthousePayoutEur,
+            escrowStatus,
+            subtotalManufacturingEur,
+            packagingHandlingEur,
+            shippingFreightEur
         };
 
         const controlPlane = metadata.controlPlane || {
@@ -193,7 +233,8 @@ class MarketplaceOrderService {
         const order = {
             orderIntentId: orderRow.order_id,
             orderId: orderRow.order_id,
-            publicRef: orderRow.order_id,
+            externalOrderRef: orderRow.external_order_ref || orderRow.order_id,
+            publicRef: orderRow.external_order_ref || orderRow.order_id,
             pricingSessionId: orderRow.pricing_session_id,
             selectedOfferId: orderRow.selected_offer_id,
             customerId: orderRow.customer_id,
@@ -215,18 +256,21 @@ class MarketplaceOrderService {
                 id: selectedOffer.offerId || selectedOffer.id || orderRow.selected_offer_id,
                 printerId: selectedOffer.printhouseId || selectedOffer.printerId || orderRow.printhouse_id,
                 printerName: selectedOffer.printerName || selectedOffer.printhouseName || 'Assigned Printhouse',
-                totalPrice: Number(selectedOffer.totalPrice || selectedOffer.total_price || orderRow.estimated_price || 0),
+                totalPrice: Number(selectedOffer.totalPrice || selectedOffer.total_price || orderRow.estimated_price || totalAmountEur || 0),
                 currency: orderRow.currency || 'EUR',
                 leadTimeDays: selectedOffer.leadTimeDays || 0
             },
             specs: bookSpec,
             totals: {
-                subtotal: Number(orderRow.estimated_price || 0),
-                tax: 0,
-                shipping: 0,
-                total: Number(orderRow.estimated_price || 0),
+                subtotal: subtotalManufacturingEur,
+                packaging: packagingHandlingEur,
+                shipping: shippingFreightEur,
+                taxRatePct,
+                tax: taxAmountEur,
+                total: totalAmountEur,
                 currency: orderRow.currency || 'EUR'
             },
+            settlement,
             productionFiles,
             preflight,
             payment,
@@ -253,7 +297,7 @@ class MarketplaceOrderService {
 
     /**
      * 1. createOrder(input)
-     * Creates a new Marketplace Order.
+     * Creates a new Marketplace Order with Phase 15 financial & settlement breakdown.
      */
     async createOrder(input) {
         logger.info({
@@ -266,30 +310,66 @@ class MarketplaceOrderService {
             hasSessionId: !!input.sessionId
         });
 
-        const orderId = input.orderId || generateId('ord');
+        const orderId = input.orderId || generateId('ORD');
+        const externalOrderRef = input.externalOrderRef || input.order_ref || orderId;
         const status = input.selectedOffer ? 'OFFER_SELECTED' : 'DRAFT';
         const currency = input.currency || 'EUR';
-        const estimatedPrice = input.estimatedPrice || null;
+
+        const offerObj = input.selectedOffer || {};
+        const basePrice = Number(
+            input.subtotalManufacturingEur ??
+            input.estimatedPrice ??
+            offerObj.totalPrice ??
+            offerObj.total_price ??
+            offerObj.suggestedPrice ??
+            0
+        );
+        const packagingHandlingEur = Math.round(Number(input.packagingHandlingEur ?? offerObj.packagingEur ?? 0) * 100) / 100;
+        const shippingFreightEur = Math.round(Number(input.shippingFreightEur ?? offerObj.shippingEur ?? 0) * 100) / 100;
+        const subtotalManufacturingEur = Math.round(basePrice * 100) / 100;
+        const taxRatePct = Number(input.taxRatePct ?? 21.0);
+        const netBeforeTax = subtotalManufacturingEur + packagingHandlingEur + shippingFreightEur;
+        const taxAmountEur = Math.round((input.taxAmountEur ?? (netBeforeTax * (taxRatePct / 100))) * 100) / 100;
+        const totalAmountEur = Math.round((input.totalAmountEur ?? (netBeforeTax + taxAmountEur)) * 100) / 100;
+        const estimatedPrice = subtotalManufacturingEur || totalAmountEur || null;
+
+        const paymentMethod = ['STRIPE_CARD', 'STRIPE_SEPA', 'BANK_TRANSFER_B2B'].includes(input.paymentMethod)
+            ? input.paymentMethod
+            : 'BANK_TRANSFER_B2B';
+        const paymentStatus = input.paymentStatus || 'PENDING';
+        const bankTransferReference = input.bankTransferReference || `PPOS-ORD-${orderId.replace(/[^A-Za-z0-9]/g, '').slice(-8).toUpperCase()}`;
+
+        const settlementModality = input.settlementModality === 'MODALITY_B_DIRECT_COMMISSION'
+            ? 'MODALITY_B_DIRECT_COMMISSION'
+            : 'MODALITY_A_ESCROW_MOR';
+        const platformFeePct = Number(input.platformFeePct ?? 10.0);
+        const platformFeeEur = Math.round((subtotalManufacturingEur * (platformFeePct / 100)) * 100) / 100;
+        const netPrinthousePayoutEur = Math.max(
+            0,
+            Math.round((subtotalManufacturingEur + packagingHandlingEur - platformFeeEur) * 100) / 100
+        );
+        const escrowStatus = input.escrowStatus || 'UNFUNDED';
 
         const customerId = input.customerId || null;
         const sessionId = input.sessionId || null;
-        const tenantId = input.tenantId || null;
-        const printhouseId = input.printhouseId || null;
+        const tenantId = input.tenantId || offerObj.tenantId || null;
+        const printhouseId = input.printhouseId || offerObj.printhouseId || offerObj.printerId || offerObj.houseId || null;
         const pricingSessionId = input.pricingSessionId || null;
-        const selectedOfferId = input.selectedOfferId || null;
+        const selectedOfferId = input.selectedOfferId || offerObj.offerId || offerObj.id || null;
 
         // Prevent client manipulation of legacy or snapshot fields using strict allowlisting
         const allowedInput = {
-            orderId: input.orderId,
-            pricingSessionId: input.pricingSessionId,
-            sessionId: input.sessionId,
-            tenantId: input.tenantId,
-            printhouseId: input.printhouseId,
-            customerId: input.customerId,
-            selectedOfferId: input.selectedOfferId,
+            orderId,
+            externalOrderRef,
+            pricingSessionId,
+            sessionId,
+            tenantId,
+            printhouseId,
+            customerId,
+            selectedOfferId,
             selectedOffer: input.selectedOffer,
-            currency: input.currency,
-            estimatedPrice: input.estimatedPrice,
+            currency,
+            estimatedPrice,
             bookSpec: input.bookSpec,
             customer: input.customer,
             metadata: input.metadata ? { ...input.metadata } : {}
@@ -312,25 +392,69 @@ class MarketplaceOrderService {
         const metadataJson = JSON.stringify(allowedInput.metadata || {});
 
         try {
-            await mysqlClient.query(`
-                INSERT INTO marketplace_orders (
-                    order_id, pricing_session_id, session_id, selected_offer_id, customer_id, tenant_id,
-                    printhouse_id, status, currency, estimated_price, book_spec_json,
-                    selected_offer_json, customer_json, readiness_json, metadata_json,
-                    created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
-            `, [
-                orderId, pricingSessionId, sessionId, selectedOfferId, customerId, tenantId,
-                printhouseId, status, currency, estimatedPrice, bookSpecJson,
-                selectedOfferJson, customerJson, readinessJson, metadataJson
-            ]);
+            // Idempotent check if order already exists
+            const existingRows = await mysqlClient.query(
+                'SELECT order_id FROM marketplace_orders WHERE order_id = ? OR (external_order_ref IS NOT NULL AND external_order_ref = ?) LIMIT 1',
+                [orderId, externalOrderRef]
+            );
+            if (existingRows && existingRows.length > 0) {
+                return await this.getOrder(existingRows[0].order_id);
+            }
+
+            try {
+                await mysqlClient.query(`
+                    INSERT INTO marketplace_orders (
+                        order_id, external_order_ref, pricing_session_id, session_id, selected_offer_id, customer_id, tenant_id,
+                        printhouse_id, status, currency, estimated_price,
+                        subtotal_manufacturing_eur, packaging_handling_eur, shipping_freight_eur,
+                        tax_rate_pct, tax_amount_eur, total_amount_eur,
+                        payment_method, payment_status, bank_transfer_reference,
+                        settlement_modality, platform_fee_pct, platform_fee_eur, net_printhouse_payout_eur, escrow_status,
+                        book_spec_json, selected_offer_json, customer_json, readiness_json, metadata_json,
+                        created_at, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+                `, [
+                    orderId, externalOrderRef, pricingSessionId, sessionId, selectedOfferId, customerId, tenantId,
+                    printhouseId, status, currency, estimatedPrice,
+                    subtotalManufacturingEur, packagingHandlingEur, shippingFreightEur,
+                    taxRatePct, taxAmountEur, totalAmountEur,
+                    paymentMethod, paymentStatus, bankTransferReference,
+                    settlementModality, platformFeePct, platformFeeEur, netPrinthousePayoutEur, escrowStatus,
+                    bookSpecJson, selectedOfferJson, customerJson, readinessJson, metadataJson
+                ]);
+            } catch (colErr) {
+                // Fallback if minimal test schema without session_id or extended columns is used
+                if (colErr.message && colErr.message.includes('Unknown column')) {
+                    await mysqlClient.query(`
+                        INSERT INTO marketplace_orders (
+                            order_id, pricing_session_id, selected_offer_id, customer_id, tenant_id,
+                            printhouse_id, status, currency, estimated_price, book_spec_json,
+                            selected_offer_json, customer_json, readiness_json, metadata_json,
+                            created_at, updated_at
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+                    `, [
+                        orderId, pricingSessionId, selectedOfferId, customerId, tenantId,
+                        printhouseId, status, currency, estimatedPrice, bookSpecJson,
+                        selectedOfferJson, customerJson, readinessJson, metadataJson
+                    ]);
+                } else {
+                    throw colErr;
+                }
+            }
 
             // Append Event log
             await this.appendOrderEvent(orderId, {
                 type: 'ORDER_CREATED',
                 actorType: 'CUSTOMER',
                 actorId: customerId || sessionId || 'ANONYMOUS',
-                payload: { pricingSessionId, selectedOfferId, status }
+                payload: {
+                    pricingSessionId,
+                    selectedOfferId,
+                    status,
+                    settlementModality,
+                    paymentMethod,
+                    totalAmountEur
+                }
             });
 
             // Auto-create slot files
@@ -464,12 +588,19 @@ class MarketplaceOrderService {
         let sql = `SELECT * FROM marketplace_orders WHERE 1=1`;
         const params = [];
 
-        // Phase 192 RC20.2: Enforce strict Printhouse Assignment isolation
+        // Phase 192 RC20.2 & Phase 15: Enforce strict Printhouse Assignment & Tenant isolation
         if (allowedPrinthouseIds !== undefined) {
             if (Array.isArray(allowedPrinthouseIds) && allowedPrinthouseIds.length > 0) {
                 const placeholders = allowedPrinthouseIds.map(() => '?').join(', ');
                 sql += ` AND printhouse_id IN (${placeholders})`;
                 params.push(...allowedPrinthouseIds);
+                if (tenantId) {
+                    sql = sql.replace(
+                        `AND printhouse_id IN (${placeholders})`,
+                        `AND (printhouse_id IN (${placeholders}) OR tenant_id = ?)`
+                    );
+                    params.push(tenantId);
+                }
             } else {
                 // If a printhouse user has 0 printer nodes or empty list, they must see 0 orders (fail-closed)
                 sql += ` AND 1=0`;
@@ -588,6 +719,9 @@ class MarketplaceOrderService {
         if (!order) throw new Error('ORDER_NOT_FOUND');
 
         const { role, originalName, mimeType, sizeBytes, checksumSha256, storagePath, metadata } = input;
+        const sourceType = input.sourceType === 'EXTERNAL_LINK' ? 'EXTERNAL_LINK' : 'DIRECT_UPLOAD';
+        const externalUrl = input.externalUrl || null;
+        const ingestionStatus = input.ingestionStatus || 'COMPLETED';
         if (!role || !originalName) {
             throw new Error('MISSING_REQUIRED_FIELDS');
         }
@@ -605,11 +739,24 @@ class MarketplaceOrderService {
             if (activeFile.status === 'PENDING' || activeFile.status === 'REQUIRED') {
                 // If it is just a pending/required slot, we update it in place
                 fileId = activeFile.file_id;
-                await mysqlClient.query(`
-                    UPDATE marketplace_order_files
-                    SET original_name = ?, mime_type = ?, size_bytes = ?, checksum_sha256 = ?, storage_path = ?, status = 'UPLOADED', uploaded_at = NOW(), updated_at = NOW()
-                    WHERE file_id = ?
-                `, [originalName, mimeType || 'application/pdf', sizeBytes || 0, checksumSha256 || null, storagePath || null, fileId]);
+                try {
+                    await mysqlClient.query(`
+                        UPDATE marketplace_order_files
+                        SET original_name = ?, mime_type = ?, size_bytes = ?, checksum_sha256 = ?, storage_path = ?,
+                            source_type = ?, external_url = ?, ingestion_status = ?, metadata_json = ?,
+                            status = 'UPLOADED', uploaded_at = NOW(), updated_at = NOW()
+                        WHERE file_id = ?
+                    `, [
+                        originalName, mimeType || 'application/pdf', sizeBytes || 0, checksumSha256 || null, storagePath || null,
+                        sourceType, externalUrl, ingestionStatus, metadata ? JSON.stringify(metadata) : null, fileId
+                    ]);
+                } catch (_) {
+                    await mysqlClient.query(`
+                        UPDATE marketplace_order_files
+                        SET original_name = ?, mime_type = ?, size_bytes = ?, checksum_sha256 = ?, storage_path = ?, status = 'UPLOADED', uploaded_at = NOW(), updated_at = NOW()
+                        WHERE file_id = ?
+                    `, [originalName, mimeType || 'application/pdf', sizeBytes || 0, checksumSha256 || null, storagePath || null, fileId]);
+                }
             } else {
                 // If old file exists and is already uploaded/completed, mark it SUPERSEDED and create/increment version
                 fileId = activeFile.file_id;
@@ -622,11 +769,23 @@ class MarketplaceOrderService {
                 // Create new version row
                 const newFileId = generateId('fil');
                 const newVersion = (activeFile.version || 1) + 1;
-                await mysqlClient.query(`
-                    INSERT INTO marketplace_order_files (
-                        file_id, order_id, role, version, original_name, mime_type, size_bytes, checksum_sha256, storage_path, status, uploaded_at, created_at, updated_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'UPLOADED', NOW(), NOW(), NOW())
-                `, [newFileId, orderId, role, newVersion, originalName, mimeType || 'application/pdf', sizeBytes || 0, checksumSha256 || null, storagePath || null]);
+                try {
+                    await mysqlClient.query(`
+                        INSERT INTO marketplace_order_files (
+                            file_id, order_id, role, version, original_name, mime_type, size_bytes, checksum_sha256,
+                            storage_path, source_type, external_url, ingestion_status, metadata_json, status, uploaded_at, created_at, updated_at
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'UPLOADED', NOW(), NOW(), NOW())
+                    `, [
+                        newFileId, orderId, role, newVersion, originalName, mimeType || 'application/pdf', sizeBytes || 0, checksumSha256 || null,
+                        storagePath || null, sourceType, externalUrl, ingestionStatus, metadata ? JSON.stringify(metadata) : null
+                    ]);
+                } catch (_) {
+                    await mysqlClient.query(`
+                        INSERT INTO marketplace_order_files (
+                            file_id, order_id, role, version, original_name, mime_type, size_bytes, checksum_sha256, storage_path, status, uploaded_at, created_at, updated_at
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'UPLOADED', NOW(), NOW(), NOW())
+                    `, [newFileId, orderId, role, newVersion, originalName, mimeType || 'application/pdf', sizeBytes || 0, checksumSha256 || null, storagePath || null]);
+                }
 
                 fileId = newFileId;
 
@@ -639,11 +798,23 @@ class MarketplaceOrderService {
         } else {
             // Slot doesn't exist, create it
             fileId = generateId('fil');
-            await mysqlClient.query(`
-                INSERT INTO marketplace_order_files (
-                    file_id, order_id, role, version, original_name, mime_type, size_bytes, checksum_sha256, storage_path, status, uploaded_at, created_at, updated_at
-                ) VALUES (?, ?, ?, 1, ?, ?, ?, ?, ?, 'UPLOADED', NOW(), NOW(), NOW())
-            `, [fileId, orderId, role, originalName, mimeType || 'application/pdf', sizeBytes || 0, checksumSha256 || null, storagePath || null]);
+            try {
+                await mysqlClient.query(`
+                    INSERT INTO marketplace_order_files (
+                        file_id, order_id, role, version, original_name, mime_type, size_bytes, checksum_sha256,
+                        storage_path, source_type, external_url, ingestion_status, metadata_json, status, uploaded_at, created_at, updated_at
+                    ) VALUES (?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'UPLOADED', NOW(), NOW(), NOW())
+                `, [
+                    fileId, orderId, role, originalName, mimeType || 'application/pdf', sizeBytes || 0, checksumSha256 || null,
+                    storagePath || null, sourceType, externalUrl, ingestionStatus, metadata ? JSON.stringify(metadata) : null
+                ]);
+            } catch (_) {
+                await mysqlClient.query(`
+                    INSERT INTO marketplace_order_files (
+                        file_id, order_id, role, version, original_name, mime_type, size_bytes, checksum_sha256, storage_path, status, uploaded_at, created_at, updated_at
+                    ) VALUES (?, ?, ?, 1, ?, ?, ?, ?, ?, 'UPLOADED', NOW(), NOW(), NOW())
+                `, [fileId, orderId, role, originalName, mimeType || 'application/pdf', sizeBytes || 0, checksumSha256 || null, storagePath || null]);
+            }
         }
 
         // Audit Event

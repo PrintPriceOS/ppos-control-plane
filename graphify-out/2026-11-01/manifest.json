@@ -14574,8 +14574,8 @@
     "semantic_hash": ""
   },
   "src/ui/components/printhouse/setup/PricingPanel.tsx": {
-    "mtime": 1793496950.9587913,
-    "seen": 1793497268.6013877,
+    "mtime": 1793497270.4391718,
+    "seen": 1793497969.96517,
     "ast_hash": "c09a54ae0d679a29ec5bab4f67549162",
     "semantic_hash": ""
   },
@@ -15660,9 +15660,9 @@
     "semantic_hash": ""
   },
   "src/ui/pages/admin/PricingIntelligenceTab.tsx": {
-    "mtime": 1793494446.3534539,
-    "seen": 1793497268.6643853,
-    "ast_hash": "cb0d74c1b839fc602de80fe303141b68",
+    "mtime": 1793497678.02175,
+    "seen": 1793497970.0221632,
+    "ast_hash": "fc3d4f311d252671458897d517e742e1",
     "semantic_hash": ""
   },
   "src/ui/pages/admin/PricingSessionsTab.tsx": {
@@ -30966,9 +30966,9 @@
     "semantic_hash": ""
   },
   "tests/ui_reconciliation_components.test.tsx": {
-    "mtime": 1793493534.7038484,
-    "seen": 1793493841.945295,
-    "ast_hash": "ba7238e6d2091102309454c5478587fd",
+    "mtime": 1793497718.6093915,
+    "seen": 1793497970.2328176,
+    "ast_hash": "8b9f8c1fa6495d9fee97b5173c01e753",
     "semantic_hash": ""
   },
   "services/preflight/preflightEngineService.js": {
@@ -31152,9 +31152,9 @@
     "semantic_hash": ""
   },
   "src/api/routes/pricingRoutes.js": {
-    "mtime": 1793496867.8515658,
-    "seen": 1793497268.2417834,
-    "ast_hash": "0878d6eeb249ecdeb61ddbdb3fcd4bd9",
+    "mtime": 1793497634.041456,
+    "seen": 1793497969.6579878,
+    "ast_hash": "a0fd87911ff5cbb110d46bd4d37456ed",
     "semantic_hash": ""
   },
   "src/api/services/financials/eInvoicingService.js": {
@@ -31164,21 +31164,21 @@
     "semantic_hash": ""
   },
   "src/api/services/pricing/pricingIntelligenceService.js": {
-    "mtime": 1793496866.2778194,
-    "seen": 1793497268.4797835,
-    "ast_hash": "42dbc37ed54e5a4d1e1e1c7c4cadaddc",
+    "mtime": 1793497618.3462586,
+    "seen": 1793497969.8551228,
+    "ast_hash": "3bca39f904dd1d61afe36f8a13513f75",
     "semantic_hash": ""
   },
   "src/ui/components/pricing/EconomicProfilesTable.tsx": {
-    "mtime": 1793494443.4792168,
-    "seen": 1793497268.5873861,
-    "ast_hash": "e5e79373a290a13159deffa47c53fefb",
+    "mtime": 1793497648.9680426,
+    "seen": 1793497969.950168,
+    "ast_hash": "a44b5b48088f2d5c5147fa0d22485fdd",
     "semantic_hash": ""
   },
   "src/ui/components/pricing/LivePriceCalibratorModal.tsx": {
-    "mtime": 1793493631.7839935,
-    "seen": 1793493841.6528156,
-    "ast_hash": "3ab69a6134b299dca25e65ad09e891dc",
+    "mtime": 1793497597.834173,
+    "seen": 1793497969.950168,
+    "ast_hash": "a58875843535eee6c2a07d2afe84c9dc",
     "semantic_hash": ""
   },
   "src/ui/components/pricing/PricingKpiSummaryBar.tsx": {
@@ -31206,9 +31206,9 @@
     "semantic_hash": ""
   },
   "tests/pricingPersistenceSync.test.js": {
-    "mtime": 1793497069.7974782,
-    "seen": 1793497268.9445632,
-    "ast_hash": "f73861ecd7444d7677b9478cb588335c",
+    "mtime": 1793497707.945532,
+    "seen": 1793497970.192818,
+    "ast_hash": "fdaea8120e5fcbf225ec3e10e81360db",
     "semantic_hash": ""
   }
 }

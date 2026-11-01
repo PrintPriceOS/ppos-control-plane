@@ -2449,6 +2449,23 @@ export async function markMarketplaceOrderPaymentBlocked(id: string, reason: str
     });
 }
 
+export async function confirmMarketplaceOrderWirePayment(id: string, payload: { reference?: string; bankTransferReference?: string } = {}) {
+    return adminFetch<{ ok: boolean, orderId?: string, paymentStatus?: string, operationalStatus?: string, escrowStatus?: string }>(
+        `/api/admin/marketplace/orders/${encodeURIComponent(id)}/payment/confirm-wire`,
+        {
+            method: 'POST',
+            body: JSON.stringify(payload)
+        }
+    );
+}
+
+export async function createMarketplaceOrderCheckoutSession(id: string, payload: Record<string, any> = {}) {
+    return adminFetch<any>(`/api/marketplace/orders/${encodeURIComponent(id)}/checkout/session`, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+    });
+}
+
 export async function prepareMarketplaceOrderHandoff(id: string) {
     return adminFetch<any>(`/api/admin/marketplace/orders/${id}/handoff/prepare`, {
         method: 'POST'

@@ -314,6 +314,8 @@ async function requestMarketplacePaymentLink(orderId, options = {}) {
 
     // 4. Resolve provider
     const provider = (
+        options.provider ||
+        orderRow.payment_method ||
         process.env.MARKETPLACE_PAYMENT_PROVIDER ||
         process.env.PAYMENT_PROVIDER ||
         'bank_transfer'
@@ -321,56 +323,92 @@ async function requestMarketplacePaymentLink(orderId, options = {}) {
 
     const requestedAt = new Date().toISOString();
     const requestedBy = options.requestedBy || options.operatorId || options.issuedBy || 'control-plane';
+    const paymentGatewayService = require('./paymentGatewayService');
 
     // 5. Build payment record by provider
     let payment;
 
-    if (provider === 'stripe') {
-        // Stripe env validation
-        const stripeKey = process.env.STRIPE_SECRET_KEY || process.env.MARKETPLACE_STRIPE_SECRET_KEY;
-        if (!stripeKey) {
-            logger.warn({ event: 'MARKETPLACE_PAYMENT_STRIPE_NOT_CONFIGURED', orderId });
-            return {
-                ok: false,
-                error: 'PAYMENT_PROVIDER_NOT_CONFIGURED',
-                orderId,
-                provider: 'stripe',
-                message: 'Stripe integration is not configured. Set STRIPE_SECRET_KEY or MARKETPLACE_STRIPE_SECRET_KEY.'
-            };
-        }
+    if (provider.includes('stripe')) {
+        const stripeSession = await paymentGatewayService.createStripeSession(
+            orderRow,
+            invoice.invoice_number,
+            {
+                paymentMethod: options.paymentMethod || orderRow.payment_method || 'STRIPE_CARD',
+                settlementModality: options.settlementModality || orderRow.settlement_modality || 'MODALITY_A_ESCROW_MOR',
+                stripeAccountId: options.stripeAccountId || null
+            }
+        );
 
-        // Stripe session creation is reserved for Phase 37.2 (requires Budget webhook endpoint).
-        // Return a clear stub rather than a fake URL.
-        return {
-            ok: false,
-            error: 'STRIPE_INTEGRATION_PENDING',
-            orderId,
+        payment = {
+            phase: '15.0',
             provider: 'stripe',
-            message: 'Stripe checkout link generation is reserved for Phase 37.2. Use bank_transfer for Phase 37.1.',
-            phase: '37.1'
+            method: options.paymentMethod || (orderRow.payment_method && orderRow.payment_method.startsWith('STRIPE') ? orderRow.payment_method : 'STRIPE_CARD'),
+            status: 'PAYMENT_PENDING',
+            amount: invoice.amount,
+            currency: invoice.currency,
+            checkoutUrl: stripeSession.checkoutUrl,
+            stripeCheckoutSessionId: stripeSession.sessionId,
+            stripePaymentIntentId: stripeSession.payment_intent_id,
+            settlementModality: stripeSession.settlementModality,
+            escrowStatus: stripeSession.escrowStatus,
+            requestedAt,
+            requestedBy,
+            warnings: progressionAssert.warnings || [],
+            humanReportGates: progressionAssert.humanReportGates || []
         };
-    }
 
-    // Default: bank_transfer
-    const reference = buildPaymentReference();
-    payment = {
-        phase: '37.1',
-        provider: 'bank_transfer',
-        status: 'PAYMENT_PENDING',
-        amount: invoice.amount,
-        currency: invoice.currency,
-        reference,
-        instructions: {
-            iban: process.env.MARKETPLACE_BANK_IBAN || null,
-            bic: process.env.MARKETPLACE_BANK_BIC || null,
-            beneficiary: process.env.MARKETPLACE_BANK_BENEFICIARY || 'PrintPrice Pro',
-            reference
-        },
-        requestedAt,
-        requestedBy,
-        warnings: progressionAssert.warnings || [],
-        humanReportGates: progressionAssert.humanReportGates || []
-    };
+        try {
+            await mysqlClient.query(
+                `UPDATE marketplace_orders
+                 SET payment_method = ?, payment_status = 'PENDING',
+                     stripe_checkout_session_id = ?, stripe_payment_intent_id = ?,
+                     escrow_status = ?, updated_at = NOW()
+                 WHERE order_id = ?`,
+                [
+                    payment.method,
+                    stripeSession.sessionId,
+                    stripeSession.payment_intent_id,
+                    stripeSession.escrowStatus,
+                    orderId
+                ]
+            );
+        } catch (_) {}
+    } else {
+        // Default: bank_transfer
+        const wireInfo = paymentGatewayService.createBankTransferInstructions(
+            orderRow,
+            invoice.invoice_number,
+            {
+                settlementModality: options.settlementModality || orderRow.settlement_modality || 'MODALITY_A_ESCROW_MOR'
+            }
+        );
+        const reference = wireInfo.reference || buildPaymentReference();
+        payment = {
+            phase: '15.0',
+            provider: 'bank_transfer',
+            method: 'BANK_TRANSFER_B2B',
+            status: 'PAYMENT_PENDING',
+            amount: invoice.amount,
+            currency: invoice.currency,
+            reference,
+            settlementModality: wireInfo.settlementModality,
+            instructions: wireInfo.instructions,
+            requestedAt,
+            requestedBy,
+            warnings: progressionAssert.warnings || [],
+            humanReportGates: progressionAssert.humanReportGates || []
+        };
+
+        try {
+            await mysqlClient.query(
+                `UPDATE marketplace_orders
+                 SET payment_method = 'BANK_TRANSFER_B2B', payment_status = 'AWAITING_WIRE',
+                     bank_transfer_reference = ?, escrow_status = ?, updated_at = NOW()
+                 WHERE order_id = ?`,
+                [reference, wireInfo.escrowStatus, orderId]
+            );
+        } catch (_) {}
+    }
 
     // 6. Persist
     const updatedMetadata = { ...metadata, payment };
@@ -378,15 +416,15 @@ async function requestMarketplacePaymentLink(orderId, options = {}) {
 
     // 7. Audit
     await appendEvent(orderId, 'PAYMENT_INSTRUCTIONS_CREATED', {
-        provider: 'bank_transfer',
-        reference,
+        provider: payment.provider,
+        reference: payment.reference || payment.stripeCheckoutSessionId,
         amount: invoice.amount,
         currency: invoice.currency,
         requestedAt,
         requestedBy
     }, requestedBy);
 
-    logger.info({ event: 'MARKETPLACE_PAYMENT_INSTRUCTIONS_CREATED', orderId, reference, provider: 'bank_transfer' });
+    logger.info({ event: 'MARKETPLACE_PAYMENT_INSTRUCTIONS_CREATED', orderId, provider: payment.provider });
 
     return {
         ok: true,
@@ -582,6 +620,318 @@ async function markMarketplacePaymentConfirmed(orderId, payload = {}, options = 
     };
 }
 
+/**
+ * PHASE-15: Creates a dual-mode checkout session (`STRIPE_CARD`, `STRIPE_SEPA`, or `BANK_TRANSFER_B2B`)
+ * and persists the commercial settlement modality (`MODALITY_A_ESCROW_MOR` vs `MODALITY_B_DIRECT_COMMISSION`).
+ */
+async function createMarketplaceOrderCheckoutSession(orderId, payload = {}, options = {}) {
+    const orderRow = await loadOrderRow(orderId);
+    const metadata = safeParseJson(orderRow.metadata_json, {});
+    const paymentGatewayService = require('./paymentGatewayService');
+
+    const paymentMethod = ['STRIPE_CARD', 'STRIPE_SEPA', 'BANK_TRANSFER_B2B'].includes(payload.paymentMethod)
+        ? payload.paymentMethod
+        : (payload.provider === 'stripe' ? 'STRIPE_CARD' : (orderRow.payment_method || 'BANK_TRANSFER_B2B'));
+
+    const settlementModality = payload.settlementModality === 'MODALITY_B_DIRECT_COMMISSION'
+        ? 'MODALITY_B_DIRECT_COMMISSION'
+        : (payload.settlementModality === 'MODALITY_A_ESCROW_MOR'
+            ? 'MODALITY_A_ESCROW_MOR'
+            : (orderRow.settlement_modality || 'MODALITY_A_ESCROW_MOR'));
+
+    const platformFeePct = Number(payload.platformFeePct ?? orderRow.platform_fee_pct ?? 10.0);
+    const subtotalMfgEur = Number(
+        payload.subtotalManufacturingEur ??
+        orderRow.subtotal_manufacturing_eur ??
+        orderRow.estimated_price ??
+        resolveAmountAndCurrency(orderRow).amount ??
+        0
+    );
+    const packagingEur = Number(payload.packagingHandlingEur ?? orderRow.packaging_handling_eur ?? 0);
+    const shippingEur = Number(payload.shippingFreightEur ?? orderRow.shipping_freight_eur ?? 0);
+    const taxRatePct = Number(payload.taxRatePct ?? orderRow.tax_rate_pct ?? 21.0);
+    const netBeforeTax = subtotalMfgEur + packagingEur + shippingEur;
+    const taxAmountEur = Math.round(netBeforeTax * (taxRatePct / 100) * 100) / 100;
+    const totalAmountEur = Math.round((netBeforeTax + taxAmountEur) * 100) / 100;
+    const platformFeeEur = Math.round((subtotalMfgEur * (platformFeePct / 100)) * 100) / 100;
+    const netPrinthousePayoutEur = Math.max(0, Math.round((subtotalMfgEur + packagingEur - platformFeeEur) * 100) / 100);
+
+    const invoiceNumber = metadata.invoice?.invoice_number || buildInvoiceNumber();
+    const nowIso = new Date().toISOString();
+
+    const invoice = metadata.invoice || {
+        phase: '15.0',
+        invoice_number: invoiceNumber,
+        status: 'ISSUED',
+        amount: totalAmountEur,
+        currency: orderRow.currency || 'EUR',
+        issuedAt: nowIso,
+        issuedBy: options.operatorId || 'checkout-engine',
+        source: 'CONTROL_PLANE'
+    };
+
+    let checkoutData;
+    let paymentRecord;
+    let paymentStatus;
+    let escrowStatus;
+
+    if (paymentMethod === 'STRIPE_CARD' || paymentMethod === 'STRIPE_SEPA') {
+        checkoutData = await paymentGatewayService.createStripeSession(
+            {
+                ...orderRow,
+                orderId,
+                subtotal_manufacturing_eur: subtotalMfgEur,
+                total_amount_eur: totalAmountEur,
+                settlement_modality: settlementModality,
+                platform_fee_pct: platformFeePct,
+                platform_fee_eur: platformFeeEur
+            },
+            invoiceNumber,
+            {
+                paymentMethod,
+                settlementModality,
+                stripeAccountId: payload.stripeAccountId || null
+            }
+        );
+
+        paymentStatus = 'PENDING';
+        escrowStatus = settlementModality === 'MODALITY_A_ESCROW_MOR' ? 'ESCROW_FUNDED' : 'DIRECT_SPLIT';
+
+        paymentRecord = {
+            phase: '15.0',
+            provider: 'stripe',
+            method: paymentMethod,
+            status: paymentStatus,
+            amount: totalAmountEur,
+            currency: orderRow.currency || 'EUR',
+            checkoutUrl: checkoutData.checkoutUrl,
+            stripeCheckoutSessionId: checkoutData.sessionId,
+            stripePaymentIntentId: checkoutData.payment_intent_id,
+            settlementModality,
+            escrowStatus,
+            requestedAt: nowIso
+        };
+    } else {
+        checkoutData = paymentGatewayService.createBankTransferInstructions(
+            { ...orderRow, orderId },
+            invoiceNumber,
+            { settlementModality }
+        );
+
+        paymentStatus = 'AWAITING_WIRE';
+        escrowStatus = checkoutData.escrowStatus;
+
+        paymentRecord = {
+            phase: '15.0',
+            provider: 'bank_transfer',
+            method: 'BANK_TRANSFER_B2B',
+            status: paymentStatus,
+            amount: totalAmountEur,
+            currency: orderRow.currency || 'EUR',
+            reference: checkoutData.reference,
+            bankTransferReference: checkoutData.reference,
+            instructions: checkoutData.instructions,
+            settlementModality,
+            escrowStatus,
+            requestedAt: nowIso
+        };
+    }
+
+    const settlementSummary = {
+        modality: settlementModality,
+        platformFeePct,
+        platformFeeEur,
+        netPrinthousePayoutEur,
+        escrowStatus,
+        subtotalManufacturingEur: subtotalMfgEur,
+        packagingHandlingEur: packagingEur,
+        shippingFreightEur: shippingEur,
+        taxRatePct,
+        taxAmountEur,
+        totalAmountEur
+    };
+
+    const updatedMetadata = {
+        ...metadata,
+        invoice,
+        payment: paymentRecord,
+        settlement: settlementSummary
+    };
+
+    try {
+        await mysqlClient.query(
+            `UPDATE marketplace_orders
+             SET subtotal_manufacturing_eur = ?, packaging_handling_eur = ?, shipping_freight_eur = ?,
+                 tax_rate_pct = ?, tax_amount_eur = ?, total_amount_eur = ?,
+                 payment_method = ?, payment_status = ?,
+                 stripe_checkout_session_id = ?, stripe_payment_intent_id = ?, bank_transfer_reference = ?,
+                 settlement_modality = ?, platform_fee_pct = ?, platform_fee_eur = ?,
+                 net_printhouse_payout_eur = ?, escrow_status = ?,
+                 metadata_json = ?, updated_at = NOW()
+             WHERE order_id = ?`,
+            [
+                subtotalMfgEur,
+                packagingEur,
+                shippingEur,
+                taxRatePct,
+                taxAmountEur,
+                totalAmountEur,
+                paymentMethod,
+                paymentStatus,
+                paymentRecord.stripeCheckoutSessionId || null,
+                paymentRecord.stripePaymentIntentId || null,
+                paymentRecord.bankTransferReference || null,
+                settlementModality,
+                platformFeePct,
+                platformFeeEur,
+                netPrinthousePayoutEur,
+                escrowStatus,
+                JSON.stringify(updatedMetadata),
+                orderId
+            ]
+        );
+    } catch (_) {
+        await persistMetadata(orderId, updatedMetadata);
+    }
+
+    await appendEvent(orderId, 'CHECKOUT_SESSION_CREATED', {
+        paymentMethod,
+        settlementModality,
+        totalAmountEur,
+        platformFeeEur,
+        netPrinthousePayoutEur,
+        reference: paymentRecord.bankTransferReference || paymentRecord.stripeCheckoutSessionId
+    }, options.operatorId || 'CUSTOMER');
+
+    return {
+        ok: true,
+        orderId,
+        paymentMethod,
+        paymentStatus,
+        settlementModality,
+        escrowStatus,
+        invoice,
+        payment: paymentRecord,
+        settlement: settlementSummary,
+        checkout: checkoutData
+    };
+}
+
+/**
+ * PHASE-15: Confirms payment via either Stripe Webhook (`checkout.session.completed` / `payment_intent.succeeded`)
+ * or administrative B2B Wire Confirmation (`POST /api/admin/marketplace/orders/:orderId/payment/confirm-wire`).
+ * Transitions `payment_status = 'CONFIRMED'` and `status = 'READY_FOR_PRODUCTION'`, and records
+ * the settlement ledger entry in MySQL (`escrowSettlementService` / `partner_settlement_records`).
+ */
+async function confirmMarketplaceOrderPayment(orderId, payload = {}, options = {}) {
+    const orderRow = await loadOrderRow(orderId);
+    const metadata = safeParseJson(orderRow.metadata_json, {});
+    const confirmedAt = new Date().toISOString();
+    const confirmedBy = payload.confirmedBy || options.operatorId || 'STRIPE_WEBHOOK';
+    const providerReference =
+        payload.providerReference ||
+        payload.stripePaymentIntentId ||
+        payload.bankTransferReference ||
+        orderRow.stripe_payment_intent_id ||
+        orderRow.bank_transfer_reference ||
+        `REF-${randomHex(4)}`;
+
+    const settlementModality = orderRow.settlement_modality || metadata.settlement?.modality || 'MODALITY_A_ESCROW_MOR';
+    const escrowStatus = settlementModality === 'MODALITY_A_ESCROW_MOR'
+        ? 'ESCROW_FUNDED'
+        : 'COMMISSION_SETTLED';
+
+    const existingPayment = metadata.payment || {};
+    const updatedPayment = {
+        ...existingPayment,
+        method: orderRow.payment_method || existingPayment.method || 'BANK_TRANSFER_B2B',
+        status: 'CONFIRMED',
+        paidAt: confirmedAt,
+        confirmedAt,
+        confirmedBy,
+        providerReference
+    };
+
+    const updatedControlPlane = {
+        ...(metadata.controlPlane || {}),
+        acknowledged: true,
+        acknowledgedBy: confirmedBy,
+        acknowledgedAt: confirmedAt,
+        operationalStatus: 'READY_FOR_PRODUCTION'
+    };
+
+    const updatedMetadata = {
+        ...metadata,
+        payment: updatedPayment,
+        controlPlane: updatedControlPlane
+    };
+
+    try {
+        await mysqlClient.query(
+            `UPDATE marketplace_orders
+             SET payment_status = 'CONFIRMED',
+                 escrow_status = ?,
+                 stripe_payment_intent_id = COALESCE(?, stripe_payment_intent_id),
+                 status = 'READY_FOR_PRODUCTION',
+                 metadata_json = ?,
+                 updated_at = NOW()
+             WHERE order_id = ?`,
+            [
+                escrowStatus,
+                payload.stripePaymentIntentId || null,
+                JSON.stringify(updatedMetadata),
+                orderId
+            ]
+        );
+    } catch (_) {
+        await persistMetadataAndStatus(orderId, updatedMetadata, 'READY_FOR_PRODUCTION');
+    }
+
+    // Automatically synchronize with the MySQL commercial settlement & escrow engine
+    let settlementRecord = null;
+    try {
+        const escrowSettlementService = require('./financials/escrowSettlementService');
+        const lockRes = await escrowSettlementService.lockEscrowFundsOnProofApproval(
+            {
+                orderId,
+                tenantId: orderRow.tenant_id || 'default',
+                printhouseId: orderRow.printhouse_id || 'ph-default',
+                grossEscrowEur: Number(orderRow.total_amount_eur || orderRow.estimated_price || existingPayment.amount || 0),
+                manufacturingShareEur: Number(orderRow.subtotal_manufacturing_eur || orderRow.estimated_price || 0),
+                packagingShareEur: Number(orderRow.packaging_handling_eur || 0),
+                freightShareEur: Number(orderRow.shipping_freight_eur || 0),
+                platformFeePct: Number(orderRow.platform_fee_pct ?? 10.0),
+                settlementModality
+            },
+            { tenantId: orderRow.tenant_id || 'default' }
+        );
+        settlementRecord = lockRes.escrow;
+    } catch (escErr) {
+        logger.warn({ event: 'ESCROW_SYNC_WARNING', orderId, error: escErr.message });
+    }
+
+    await appendEvent(orderId, 'PAYMENT_CONFIRMED', {
+        paymentStatus: 'CONFIRMED',
+        operationalStatus: 'READY_FOR_PRODUCTION',
+        escrowStatus,
+        settlementModality,
+        providerReference,
+        confirmedAt,
+        confirmedBy
+    }, confirmedBy);
+
+    return {
+        ok: true,
+        orderId,
+        paymentStatus: 'CONFIRMED',
+        operationalStatus: 'READY_FOR_PRODUCTION',
+        escrowStatus,
+        settlementModality,
+        payment: updatedPayment,
+        settlementRecord
+    };
+}
+
 // ---------------------------------------------------------------------------
 // Module exports
 // ---------------------------------------------------------------------------
@@ -590,5 +940,7 @@ module.exports = {
     generateMarketplaceInvoice,
     requestMarketplacePaymentLink,
     getMarketplaceInvoicePaymentStatus,
-    markMarketplacePaymentConfirmed
+    markMarketplacePaymentConfirmed,
+    createMarketplaceOrderCheckoutSession,
+    confirmMarketplaceOrderPayment
 };
