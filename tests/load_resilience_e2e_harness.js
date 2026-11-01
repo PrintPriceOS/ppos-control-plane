@@ -289,7 +289,7 @@ async function main() {
             );
         }
         return requestRaw(
-            `${BUDGET_BASE_URL}/api/logistics/shipments/SHP-ORD_2026_101/delivery-note.pdf`,
+            `${BUDGET_BASE_URL}/api/logistics/shipments/SHP-ORD_2026_101/delivery-note/pdf`,
             { headers: authHeaders }
         );
     });

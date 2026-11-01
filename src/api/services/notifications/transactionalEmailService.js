@@ -297,7 +297,7 @@ function buildTemplatePayload(templateId, orderInput = {}, options = {}) {
             shipment.sscc18 || telemetry.sscc18 || '(00) 3 8412345 000010492 1'
         );
         const trackingPortalUrl = `${BUDGET_PORTAL_BASE_URL}/portal/tracking/${encodeURIComponent(orderId)}`;
-        const podPdfUrl = `${BUDGET_PORTAL_BASE_URL}/api/logistics/shipments/SHP-${encodeURIComponent(orderId)}/delivery-note.pdf`;
+        const podPdfUrl = `${BUDGET_PORTAL_BASE_URL}/api/logistics/shipments/SHP-${encodeURIComponent(orderId)}/delivery-note/pdf`;
         const subject = `[PrintPrice OS] Palletized Dispatch & Live Telemetry — Order ${orderId} (${carrierName})`;
 
         const bodyHtml = `
