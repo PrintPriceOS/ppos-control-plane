@@ -11,6 +11,7 @@
  *   Selling Price = max(Base Industrial Cost * (1 + Target Margin %), Base Industrial Cost + Min Order Fee)
  */
 import React, { useState, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { EconomicProfileRow } from './EconomicProfilesTable';
 
 export interface PaperCatalogItem {
@@ -93,6 +94,17 @@ export const LivePriceCalibratorModal: React.FC<LivePriceCalibratorModalProps> =
             setMinimumJobFeeEur(Number(initialProfile.minimumJobFeeEur ?? 380));
         }
     }, [initialProfile]);
+
+    useEffect(() => {
+        if (!isOpen || embedded) return;
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') {
+                onClose();
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [isOpen, embedded, onClose]);
 
     const currentProfile = useMemo(() => {
         return profiles.find((p) => p.id === selectedProfileId) || activeProfileDefault;
@@ -599,13 +611,29 @@ export const LivePriceCalibratorModal: React.FC<LivePriceCalibratorModalProps> =
         return content;
     }
 
-    return (
+    const modalNode = (
         <div
             data-testid="live-price-calibrator-modal-backdrop"
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs overflow-y-auto"
+            onClick={(e) => {
+                if (e.target === e.currentTarget) {
+                    onClose();
+                }
+            }}
+            className="fixed inset-0 z-[100] flex items-start sm:items-center justify-center p-4 sm:p-6 bg-black/80 backdrop-blur-xs overflow-y-auto"
         >
-            <div className="w-full max-w-5xl my-8">{content}</div>
+            <div
+                className="w-full max-w-5xl my-auto max-h-[92vh] overflow-y-auto custom-scrollbar"
+                onClick={(e) => e.stopPropagation()}
+            >
+                {content}
+            </div>
         </div>
     );
+
+    if (typeof document !== 'undefined' && document.body) {
+        return createPortal(modalNode, document.body);
+    }
+
+    return modalNode;
 };
 

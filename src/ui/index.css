@@ -217,8 +217,9 @@ textarea:focus-visible,
 
 /* Animations */
 @keyframes slide-fade {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
+  0% { opacity: 0; transform: translateY(8px); }
+  99% { opacity: 1; transform: translateY(0); }
+  100% { opacity: 1; transform: none; }
 }
 
 .animate-slide-fade {

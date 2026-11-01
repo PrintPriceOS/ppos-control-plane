@@ -353,8 +353,21 @@ describe('Dark Industrial Telemetry UI — Canonical Components & Dual-Mode Reco
         const updatedTotal = screen.getByTestId('calibrator-total-selling-price').textContent;
         expect(updatedTotal).not.toEqual(initialTotal);
 
-        // Close calibrator modal and switch to Routing Decisions & Crossover tab
+        // Close calibrator modal via ESC / CLOSE button
         fireEvent.click(screen.getByTestId('close-calibrator-btn'));
+        expect(screen.queryByTestId('live-price-calibrator')).not.toBeInTheDocument();
+
+        // Duplicate a profile and then delete the duplicated profile
+        const duplicateBtn = screen.getByTestId('duplicate-profile-btn-prof-digital-sra3-indigo');
+        fireEvent.click(duplicateBtn);
+        expect(await screen.findByText(/HP Indigo 12000 HD Digital Press \(Copy\)/)).toBeInTheDocument();
+
+        const deleteBtns = screen.getAllByText('DELETE');
+        expect(deleteBtns.length).toBeGreaterThan(0);
+        fireEvent.click(deleteBtns[0]);
+        expect(screen.queryByText(/HP Indigo 12000 HD Digital Press \(Copy\)/)).not.toBeInTheDocument();
+
+        // Switch to Routing Decisions & Crossover tab
         fireEvent.click(screen.getByRole('tab', { name: 'ROUTING DECISIONS' }));
 
         expect(await screen.findByTestId('routing-rules-tab')).toBeInTheDocument();

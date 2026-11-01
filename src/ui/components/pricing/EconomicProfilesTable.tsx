@@ -41,6 +41,7 @@ export interface EconomicProfilesTableProps {
     onEditProfile: (profile: EconomicProfileRow) => void;
     onCalibrateProfile: (profile: EconomicProfileRow) => void;
     onDuplicateProfile: (profile: EconomicProfileRow) => void;
+    onDeleteProfile?: (profile: EconomicProfileRow) => void;
 }
 
 export const EconomicProfilesTable: React.FC<EconomicProfilesTableProps> = ({
@@ -50,7 +51,8 @@ export const EconomicProfilesTable: React.FC<EconomicProfilesTableProps> = ({
     onRefresh,
     onEditProfile,
     onCalibrateProfile,
-    onDuplicateProfile
+    onDuplicateProfile,
+    onDeleteProfile
 }) => {
     return (
         <div data-testid="economic-profiles-table">
@@ -174,6 +176,17 @@ export const EconomicProfilesTable: React.FC<EconomicProfilesTableProps> = ({
                                 >
                                     DUPLICATE
                                 </button>
+                                {onDeleteProfile && (
+                                    <button
+                                        type="button"
+                                        data-testid={`delete-profile-btn-${p.id}`}
+                                        onClick={() => onDeleteProfile(p)}
+                                        className="px-2 py-1 rounded-md bg-red-950/30 hover:bg-[#dc2626] text-red-400 hover:text-white border border-red-900/40 text-[10px] font-black uppercase tracking-wider transition-colors cursor-pointer"
+                                        title="Delete Economic Profile"
+                                    >
+                                        DELETE
+                                    </button>
+                                )}
                             </div>
                         )
                     }

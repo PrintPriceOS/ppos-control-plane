@@ -17,6 +17,7 @@
 const {
     getPricingProfilesAsync,
     savePricingProfileAsync,
+    deletePricingProfileAsync,
     calibrateQuote,
     calculateCrossoverPoint
 } = require('../services/pricing/pricingIntelligenceService');
@@ -87,6 +88,9 @@ function createFallbackRouter() {
         },
         post(path, handler) {
             addRoute('post', path, handler);
+        },
+        delete(path, handler) {
+            addRoute('delete', path, handler);
         }
     };
 }
@@ -129,6 +133,26 @@ function createPricingRouter() {
                 (req.headers && req.headers['x-tenant-id']) ||
                 'tenant-default';
             const result = await savePricingProfileAsync(tenantId, req.body || {});
+            return res.status(200).json(result);
+        } catch (err) {
+            return res.status(err.statusCode || 400).json({
+                ok: false,
+                error: err.message
+            });
+        }
+    });
+
+    // DELETE /api/pricing/profiles/:id
+    router.delete('/profiles/:id', async (req, res) => {
+        try {
+            const tenantId =
+                (req.user && req.user.tenantId) ||
+                (req.query && req.query.tenantId) ||
+                (req.body && req.body.tenantId) ||
+                (req.headers && req.headers['x-tenant-id']) ||
+                'tenant-default';
+            const profileId = req.params && req.params.id;
+            const result = await deletePricingProfileAsync(tenantId, profileId);
             return res.status(200).json(result);
         } catch (err) {
             return res.status(err.statusCode || 400).json({

@@ -6,6 +6,7 @@ const {
     getPricingProfiles,
     getPricingProfilesAsync,
     savePricingProfileAsync,
+    deletePricingProfileAsync,
     syncFromOnboardingRates,
     computeDeterministicRatesChecksum
 } = require('../services/pricing/pricingIntelligenceService');
@@ -168,6 +169,12 @@ function createMockMySqlDb() {
                 }
                 return { affectedRows: node ? 1 : 0 };
             }
+            if (q.startsWith('DELETE FROM printer_pricing_profiles WHERE id = ?')) {
+                const [id] = params;
+                const before = store.printer_pricing_profiles.length;
+                store.printer_pricing_profiles = store.printer_pricing_profiles.filter((p) => p.id !== id);
+                return { affectedRows: before - store.printer_pricing_profiles.length };
+            }
             if (q.startsWith('INSERT INTO printhouse_pricing_revisions')) {
                 const [id, tenant_id, printer_node_id, rates_json, rates_checksum, baseline_rates_checksum, created_by_json] = params;
                 store.printhouse_pricing_revisions.push({
@@ -300,6 +307,40 @@ describe('Phase 14B: Bidirectional MySQL Persistence Bridge (Onboarding <-> /ops
 
         // Ensure tenant-mysql-sync-1 changes never leaked into tenant-clean-no-db-rows
         expect(emptyTenantRes.profiles[0].hourlyRateEur).toBe(265);
+    });
+
+    it('5. Supports profile duplication (allowDuplicate) and deletion (deletePricingProfileAsync) in memory and MySQL', async () => {
+        const mockDb = createMockMySqlDb();
+        await getPricingProfilesAsync('tenant-mysql-sync-1', mockDb);
+
+        const dupRes = await savePricingProfileAsync(
+            'tenant-mysql-sync-1',
+            {
+                id: 'prof-bcn-indigo-copy-9999',
+                printerId: 'mach-bcn-indigo-copy-9999',
+                printerName: 'HP Indigo 15K Digital Press BCN (Copy)',
+                technology: 'DIGITAL_TONER',
+                hourlyRateEur: 110,
+                setupFeeEur: 30,
+                targetMarginPct: 35,
+                minimumJobFeeEur: 90,
+                allowDuplicate: true
+            },
+            mockDb
+        );
+
+        expect(dupRes.ok).toBe(true);
+        expect(getPricingProfiles('tenant-mysql-sync-1').profiles.some((p) => p.id === 'prof-bcn-indigo-copy-9999')).toBe(
+            true
+        );
+
+        const delRes = await deletePricingProfileAsync('tenant-mysql-sync-1', 'prof-bcn-indigo-copy-9999', mockDb);
+        expect(delRes.ok).toBe(true);
+        expect(delRes.deletedId).toBe('prof-bcn-indigo-copy-9999');
+        expect(getPricingProfiles('tenant-mysql-sync-1').profiles.some((p) => p.id === 'prof-bcn-indigo-copy-9999')).toBe(
+            false
+        );
+        expect(mockDb.store.printer_pricing_profiles.some((p) => p.id === 'prof-bcn-indigo-copy-9999')).toBe(false);
     });
 });
 

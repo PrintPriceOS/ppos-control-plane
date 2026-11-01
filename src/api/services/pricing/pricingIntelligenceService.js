@@ -963,7 +963,7 @@ async function savePricingProfileAsync(tenantId = 'tenant-default', profileData 
     await persistProfileToMySQLAsync(
         tenantId,
         syncResult.profile,
-         getTenantState(tenantId).latestRatesJson,
+        getTenantState(tenantId).latestRatesJson,
         syncResult.syncTelemetry.ratesChecksum,
         syncResult.syncTelemetry.revisionId,
         dbClient
@@ -972,6 +972,103 @@ async function savePricingProfileAsync(tenantId = 'tenant-default', profileData 
         ...syncResult,
         syncTelemetry: getTenantState(tenantId).syncTelemetry
     };
+}
+
+/**
+ * Deletes a pricing profile in memory AND removes it from MySQL (`printer_pricing_profiles` +
+ * `printer_nodes.rates_json._workspace_profiles`).
+ */
+function deletePricingProfile(tenantId = 'tenant-default', profileId, dbClient = db) {
+    if (!profileId || typeof profileId !== 'string') {
+        const err = new Error('INVALID_PROFILE_ID: profileId string is required.');
+        err.statusCode = 400;
+        throw err;
+    }
+
+    const state = getTenantState(tenantId);
+    const existingIndex = state.profiles.findIndex((p) => p.id === profileId);
+    const removedProfile = existingIndex >= 0 ? state.profiles[existingIndex] : { id: profileId };
+
+    if (existingIndex >= 0) {
+        state.profiles.splice(existingIndex, 1);
+    }
+
+    // Clean up from latestRatesJson._workspace_profiles if present
+    const nextRates = {
+        ...safeParseJson(state.latestRatesJson, {}),
+        _workspace_profiles: {
+            ...(safeParseJson(state.latestRatesJson, {})._workspace_profiles || {})
+        }
+    };
+
+    for (const key of Object.keys(nextRates._workspace_profiles)) {
+        if (nextRates._workspace_profiles[key] && nextRates._workspace_profiles[key].id === profileId) {
+            delete nextRates._workspace_profiles[key];
+        }
+    }
+
+    state.latestRatesJson = nextRates;
+    const newChecksum = computeDeterministicRatesChecksum(nextRates);
+    const revisionId = `rev_del_${newChecksum.slice(0, 10)}`;
+
+    state.syncTelemetry = {
+        status: 'SYNCED_WITH_WORKSPACE',
+        source: 'WORKSPACE_PROFILE_DELETED',
+        nodeId: removedProfile.nodeId || 'node-primary',
+        ratesChecksum: newChecksum,
+        lastSyncedAt: new Date().toISOString(),
+        revisionId
+    };
+
+    deleteProfileFromMySQLAsync(tenantId, profileId, nextRates, dbClient).catch(() => {});
+
+    return {
+        ok: true,
+        deletedId: profileId,
+        profiles: state.profiles,
+        kpiSummary: computeKpiSummary(state.profiles),
+        syncTelemetry: state.syncTelemetry
+    };
+}
+
+async function deleteProfileFromMySQLAsync(tenantId, profileId, nextRates, dbClient = db) {
+    if (!dbClient || typeof dbClient.query !== 'function') return;
+
+    await dbClient
+        .query('DELETE FROM printer_pricing_profiles WHERE id = ?', [profileId])
+        .catch(() => {});
+
+    const nodes = await dbClient
+        .query(
+            'SELECT id, rates_json FROM printer_nodes WHERE tenant_id = ? AND status != "DELETED" ORDER BY created_at ASC LIMIT 1',
+            [tenantId]
+        )
+        .catch(() => []);
+
+    const targetNode = Array.isArray(nodes) && nodes.length > 0 ? nodes[0] : null;
+    if (targetNode) {
+        const baseRates = safeParseJson(targetNode.rates_json, {});
+        if (baseRates._workspace_profiles && typeof baseRates._workspace_profiles === 'object') {
+            for (const key of Object.keys(baseRates._workspace_profiles)) {
+                if (baseRates._workspace_profiles[key] && baseRates._workspace_profiles[key].id === profileId) {
+                    delete baseRates._workspace_profiles[key];
+                }
+            }
+            await dbClient
+                .query('UPDATE printer_nodes SET rates_json = ? WHERE id = ? AND tenant_id = ?', [
+                    JSON.stringify(baseRates),
+                    targetNode.id,
+                    tenantId
+                ])
+                .catch(() => {});
+        }
+    }
+}
+
+async function deletePricingProfileAsync(tenantId = 'tenant-default', profileId, dbClient = db) {
+    const res = deletePricingProfile(tenantId, profileId, null);
+    await deleteProfileFromMySQLAsync(tenantId, profileId, getTenantState(tenantId).latestRatesJson, dbClient);
+    return res;
 }
 
 /**
@@ -1381,6 +1478,8 @@ module.exports = {
     hydrateTenantFromMySQL,
     savePricingProfile,
     savePricingProfileAsync,
+    deletePricingProfile,
+    deletePricingProfileAsync,
     syncFromOnboardingRates,
     calibrateQuote,
     calculateCrossoverPoint,

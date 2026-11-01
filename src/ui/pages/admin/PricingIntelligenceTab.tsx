@@ -13,6 +13,7 @@
  * Onboarding `Industrial Pricing` share the same state and `/api/pricing/*` engine.
  */
 import React, { useState, useEffect, useMemo } from "react";
+import { createPortal } from "react-dom";
 import { getAuthToken } from "../../lib/authStore";
 import { useTheme } from "../../hooks/useTheme";
 import { useLocale } from "../../i18n";
@@ -490,13 +491,52 @@ export const PricingIntelligenceTab: React.FC<SharedModuleProps> = ({
         setIsCalibratorOpen(true);
     };
 
-    const handleDuplicateProfile = (profile: EconomicProfileRow) => {
+    const handleDuplicateProfile = async (profile: EconomicProfileRow) => {
         const duplicated: EconomicProfileRow = {
             ...profile,
             id: `${profile.id}-copy-${Date.now().toString().slice(-4)}`,
+            printerId: `${profile.printerId || 'mach'}-copy-${Date.now().toString().slice(-4)}`,
             printerName: `${profile.printerName} (Copy)`
         };
         setProfiles((prev) => [duplicated, ...prev]);
+
+        try {
+            const token = getAuthToken();
+            const headers: Record<string, string> = {
+                'Content-Type': 'application/json',
+                'x-user-role': 'PRINTHOUSE_ADMIN'
+            };
+            if (token) headers['Authorization'] = `Bearer ${token}`;
+            await fetch('/api/pricing/profiles', {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({ ...duplicated, allowDuplicate: true })
+            }).catch(() => null);
+        } catch (_) {
+            // Keep optimistic local duplicate in offline/unit-test environments
+        }
+    };
+
+    const handleDeleteProfile = async (profile: EconomicProfileRow) => {
+        setProfiles((prev) => prev.filter((p) => p.id !== profile.id));
+        if (calibratingProfile && calibratingProfile.id === profile.id) {
+            setCalibratingProfile(null);
+            setIsCalibratorOpen(false);
+        }
+
+        try {
+            const token = getAuthToken();
+            const headers: Record<string, string> = {
+                'x-user-role': 'PRINTHOUSE_ADMIN'
+            };
+            if (token) headers['Authorization'] = `Bearer ${token}`;
+            await fetch(`/api/pricing/profiles/${encodeURIComponent(profile.id)}`, {
+                method: 'DELETE',
+                headers
+            }).catch(() => null);
+        } catch (_) {
+            // Keep optimistic local removal in offline/unit-test environments
+        }
     };
 
     return (
@@ -568,6 +608,7 @@ export const PricingIntelligenceTab: React.FC<SharedModuleProps> = ({
                     onEditProfile={handleEditProfile}
                     onCalibrateProfile={handleCalibrateProfile}
                     onDuplicateProfile={handleDuplicateProfile}
+                    onDeleteProfile={handleDeleteProfile}
                 />
             )}
 
@@ -604,15 +645,33 @@ export const PricingIntelligenceTab: React.FC<SharedModuleProps> = ({
             />
 
             {/* 4. Create / Edit Profile Modal */}
-            {isProfileModalOpen && (
-                <div
-                    data-testid="profile-editor-modal"
-                    className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs"
-                >
-                    <div className="rounded-xl p-6 max-w-lg w-full border transition-all bg-white dark:bg-[#14161a] border-slate-200 dark:border-[#1f2228] text-slate-900 dark:text-white">
-                        <h3 className="text-lg font-black uppercase tracking-wider mb-5">
-                            {formData.id ? 'Edit Economic Profile' : 'Create Economic Profile'}
-                        </h3>
+            {isProfileModalOpen && (() => {
+                const profileEditorNode = (
+                    <div
+                        data-testid="profile-editor-modal"
+                        onClick={(e) => {
+                            if (e.target === e.currentTarget) {
+                                setIsProfileModalOpen(false);
+                            }
+                        }}
+                        className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs overflow-y-auto"
+                    >
+                        <div
+                            onClick={(e) => e.stopPropagation()}
+                            className="rounded-xl p-6 max-w-lg w-full my-auto border transition-all bg-white dark:bg-[#14161a] border-slate-200 dark:border-[#1f2228] text-slate-900 dark:text-white shadow-2xl"
+                        >
+                            <div className="flex items-center justify-between mb-5">
+                                <h3 className="text-lg font-black uppercase tracking-wider m-0">
+                                    {formData.id ? 'Edit Economic Profile' : 'Create Economic Profile'}
+                                </h3>
+                                <button
+                                    type="button"
+                                    onClick={() => setIsProfileModalOpen(false)}
+                                    className="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-[#1f2228] text-[10px] font-bold text-slate-400 hover:text-white cursor-pointer"
+                                >
+                                    ESC / CLOSE
+                                </button>
+                            </div>
                         <div className="space-y-4 font-mono text-xs">
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
@@ -739,7 +798,11 @@ export const PricingIntelligenceTab: React.FC<SharedModuleProps> = ({
                         </div>
                     </div>
                 </div>
-            )}
+                );
+                return typeof document !== 'undefined' && document.body
+                    ? createPortal(profileEditorNode, document.body)
+                    : profileEditorNode;
+            })()}
 
             {/* Onboarding Mode Footer CTA */}
             {mode === 'onboarding' && (
