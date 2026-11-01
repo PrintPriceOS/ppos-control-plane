@@ -7470,9 +7470,9 @@
     "semantic_hash": "f59c98983eb0657a28d6d105e8c06fb9"
   },
   "server.js": {
-    "mtime": 1793489924.7932394,
-    "seen": 1793490591.010058,
-    "ast_hash": "92ea08792876012d3bd96ddc261385e6",
+    "mtime": 1793493218.849946,
+    "seen": 1793493841.3153293,
+    "ast_hash": "83eefe4fc34108e1cbe14b7ef0d8a03f",
     "semantic_hash": ""
   },
   "services/FederatedHealthAggregator.js": {
@@ -14574,9 +14574,9 @@
     "semantic_hash": ""
   },
   "src/ui/components/printhouse/setup/PricingPanel.tsx": {
-    "mtime": 1793411530.275877,
-    "seen": 1793449041.9399414,
-    "ast_hash": "f68af48658baa2c2c841ab3fd3ac9c5d",
+    "mtime": 1793493503.8733747,
+    "seen": 1793493841.6658158,
+    "ast_hash": "56809a5b3cfc409ab5f8b8da8b281d8a",
     "semantic_hash": ""
   },
   "src/ui/components/printhouse/setup/PricingPreview.tsx": {
@@ -15492,8 +15492,8 @@
     "semantic_hash": "925aaa4803097d5d7195bd2ec1c49f4e"
   },
   "src/ui/pages/admin/FinancialOpsTab.tsx": {
-    "mtime": 1793489964.8010824,
-    "seen": 1793490591.4079118,
+    "mtime": 1793490712.9193249,
+    "seen": 1793493841.717905,
     "ast_hash": "e444302f3b1760114324ddebad2b66cd",
     "semantic_hash": ""
   },
@@ -15660,9 +15660,9 @@
     "semantic_hash": ""
   },
   "src/ui/pages/admin/PricingIntelligenceTab.tsx": {
-    "mtime": 1793484593.177809,
-    "seen": 1793485067.2165453,
-    "ast_hash": "f152e82a948a7cb66680b8659dde6f23",
+    "mtime": 1793493427.1317081,
+    "seen": 1793493841.7259047,
+    "ast_hash": "cb0d74c1b839fc602de80fe303141b68",
     "semantic_hash": ""
   },
   "src/ui/pages/admin/PricingSessionsTab.tsx": {
@@ -17856,9 +17856,9 @@
     "semantic_hash": ""
   },
   "src/ui/pages/production/ProductionDashboard.tsx": {
-    "mtime": 1793487294.0071669,
-    "seen": 1793487485.7229257,
-    "ast_hash": "9ff86118bc0e4da419b7693b348f434c",
+    "mtime": 1793492108.152581,
+    "seen": 1793493841.8388197,
+    "ast_hash": "f56d36b1697efc4a6c6f85eee108d182",
     "semantic_hash": ""
   },
   "src/ui/pages/production/ProductionPackagesTab.tsx": {
@@ -30966,9 +30966,9 @@
     "semantic_hash": ""
   },
   "tests/ui_reconciliation_components.test.tsx": {
-    "mtime": 1793490328.507403,
-    "seen": 1793490591.629868,
-    "ast_hash": "b69dda86fd335affba8b635174f18a04",
+    "mtime": 1793493534.7038484,
+    "seen": 1793493841.945295,
+    "ast_hash": "ba7238e6d2091102309454c5478587fd",
     "semantic_hash": ""
   },
   "services/preflight/preflightEngineService.js": {
@@ -31008,9 +31008,9 @@
     "semantic_hash": ""
   },
   "src/api/routes/impositionRoutes.js": {
-    "mtime": 1793489863.1993172,
-    "seen": 1793490591.0481937,
-    "ast_hash": "5164ccd46868b9e75d1cabf51d20ee77",
+    "mtime": 1793491384.0356858,
+    "seen": 1793493841.3556912,
+    "ast_hash": "82c21374dfae038f511c354d91f46342",
     "semantic_hash": ""
   },
   "src/api/services/manufacturing/impositionEngineService.js": {
@@ -31020,9 +31020,9 @@
     "semantic_hash": ""
   },
   "src/ui/pages/manufacturing/ManufacturingQueuePage.tsx": {
-    "mtime": 1793490041.0105147,
-    "seen": 1793490591.5058682,
-    "ast_hash": "2785f51b54817c42748c9b394fb218fd",
+    "mtime": 1793491224.2572875,
+    "seen": 1793493841.8129063,
+    "ast_hash": "5d9b9304d198fdc84002a6e66fbbfc2d",
     "semantic_hash": ""
   },
   "tests/impositionEngine.test.js": {
@@ -31086,9 +31086,9 @@
     "semantic_hash": ""
   },
   "src/api/routes/escrowRoutes.js": {
-    "mtime": 1793490382.5013103,
-    "seen": 1793490591.0451941,
-    "ast_hash": "5d21f5924a78872ed0d909181c7fd5a5",
+    "mtime": 1793491883.5746827,
+    "seen": 1793493841.3526924,
+    "ast_hash": "05bb2d0a2a923135b90672598d6ffb29",
     "semantic_hash": ""
   },
   "src/api/routes/predictiveMaintenanceRoutes.js": {
@@ -31110,15 +31110,99 @@
     "semantic_hash": ""
   },
   "src/api/services/manufacturing/jdfConnectorService.js": {
-    "mtime": 1793490230.032499,
-    "seen": 1793490591.2197812,
-    "ast_hash": "17475759a45a7b997bc92fc73bbbee24",
+    "mtime": 1793491387.0302367,
+    "seen": 1793493841.5298803,
+    "ast_hash": "c144970d2b99317dd042717273e895a9",
     "semantic_hash": ""
   },
   "tests/phase12Suite.test.js": {
-    "mtime": 1793490242.3030176,
-    "seen": 1793490591.5888681,
-    "ast_hash": "42cf771bb546e993bd9b73a166018ab6",
+    "mtime": 1793491960.6710565,
+    "seen": 1793493841.90382,
+    "ast_hash": "e0e43daeec06485db913a55bbe42216a",
+    "semantic_hash": ""
+  },
+  "scripts/deploy_atomic_ecosystem_phase13c.sh": {
+    "mtime": 1793492008.4358494,
+    "seen": 1793493840.9760675,
+    "ast_hash": "b97007bf901dfe8863139b2b9a9b66ef",
+    "semantic_hash": ""
+  },
+  "scripts/ecosystem_health_watchdog.sh": {
+    "mtime": 1793492768.4610002,
+    "seen": 1793493840.9780672,
+    "ast_hash": "aa5dbde5f9b78829459f3b23a196225b",
+    "semantic_hash": ""
+  },
+  "scripts/run_phase13_concurrency_benchmark.cjs": {
+    "mtime": 1793492790.115804,
+    "seen": 1793493841.0120842,
+    "ast_hash": "4b9634685fb07b4b1e1e5809aae62f45",
+    "semantic_hash": ""
+  },
+  "services/financials/eInvoicingService.js": {
+    "mtime": 1793492008.6668482,
+    "seen": 1793493841.3153293,
+    "ast_hash": "76ed24d22b7e9f270e1f3440bec15799",
+    "semantic_hash": ""
+  },
+  "services/pricing/pricingIntelligenceService.js": {
+    "mtime": 1793493624.521404,
+    "seen": 1793493841.3173294,
+    "ast_hash": "f6e477c99e2f48f04454fa31b32da07b",
+    "semantic_hash": ""
+  },
+  "src/api/routes/pricingRoutes.js": {
+    "mtime": 1793493624.9790518,
+    "seen": 1793493841.3656914,
+    "ast_hash": "62c1168544c6fbc2df71076340fe4030",
+    "semantic_hash": ""
+  },
+  "src/api/services/financials/eInvoicingService.js": {
+    "mtime": 1793492010.1516397,
+    "seen": 1793493841.5068812,
+    "ast_hash": "ef74a378bd2d4a105476311fd01b7384",
+    "semantic_hash": ""
+  },
+  "src/api/services/pricing/pricingIntelligenceService.js": {
+    "mtime": 1793493628.5933352,
+    "seen": 1793493841.5638845,
+    "ast_hash": "0ad381ce5c1f48ea4b54ffc74e380a28",
+    "semantic_hash": ""
+  },
+  "src/ui/components/pricing/EconomicProfilesTable.tsx": {
+    "mtime": 1793493630.2128198,
+    "seen": 1793493841.6528156,
+    "ast_hash": "e5e79373a290a13159deffa47c53fefb",
+    "semantic_hash": ""
+  },
+  "src/ui/components/pricing/LivePriceCalibratorModal.tsx": {
+    "mtime": 1793493631.7839935,
+    "seen": 1793493841.6528156,
+    "ast_hash": "3ab69a6134b299dca25e65ad09e891dc",
+    "semantic_hash": ""
+  },
+  "src/ui/components/pricing/PricingKpiSummaryBar.tsx": {
+    "mtime": 1793493635.4755132,
+    "seen": 1793493841.6528156,
+    "ast_hash": "49957aedfa29eb824dce06c6cc8c8c5e",
+    "semantic_hash": ""
+  },
+  "src/ui/components/pricing/RoutingRulesTab.tsx": {
+    "mtime": 1793493636.8231063,
+    "seen": 1793493841.6528156,
+    "ast_hash": "0d0e01171697759626b6d87c503f7594",
+    "semantic_hash": ""
+  },
+  "src/ui/components/pricing/index.ts": {
+    "mtime": 1793493637.4043188,
+    "seen": 1793493841.6528156,
+    "ast_hash": "101c9d8b0741cb0edc32d2f61ee3562b",
+    "semantic_hash": ""
+  },
+  "tests/pricingIntelligenceEngine.test.js": {
+    "mtime": 1793493564.2122684,
+    "seen": 1793493841.9058201,
+    "ast_hash": "afe34679123df251bd6c95dc7b474527",
     "semantic_hash": ""
   }
 }

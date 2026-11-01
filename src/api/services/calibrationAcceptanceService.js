@@ -935,6 +935,18 @@ class CalibrationAcceptanceService {
 
             await connection.commit();
 
+            // Phase 14B: Synchronize accepted calibration rates into `/ops/pricing` (`printer_pricing_profiles` + workspace engine)
+            try {
+                const { syncFromOnboardingRates } = require('./pricing/pricingIntelligenceService');
+                await syncFromOnboardingRates(tenantId, resultingRates, {
+                    nodeId: session.printer_node_id,
+                    ratesChecksum: resultingRatesChecksum,
+                    revisionId
+                });
+            } catch (syncErr) {
+                logger.warn('Failed to synchronize calibration acceptance with /ops/pricing (non-fatal):', syncErr.message);
+            }
+
             // Enqueue outgoing webhook and dispatch Slack alert AFTER transaction commits
             try {
                 const outgoingWebhookService = require('./outgoingWebhookService');
@@ -1790,6 +1802,16 @@ class CalibrationAcceptanceService {
             );
 
             await connection.commit();
+
+            // Phase 14B: Synchronize accepted commercial knob rates into `/ops/pricing`
+            try {
+                const { syncFromOnboardingRates } = require('./pricing/pricingIntelligenceService');
+                await syncFromOnboardingRates(tenantId, candidateRates, {
+                    nodeId: printerNodeId,
+                    ratesChecksum: candidateRatesChecksum,
+                    revisionId
+                });
+            } catch (_) {}
 
             return {
                 accepted: true,

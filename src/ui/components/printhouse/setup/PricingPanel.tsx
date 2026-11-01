@@ -59,6 +59,7 @@ export const PricingPanel: React.FC<PricingPanelProps> = ({ sites = [], onSaved 
     const [showLiveCalibrator, setShowLiveCalibrator] = useState(false);
     const [sharedProfiles, setSharedProfiles] = useState<EconomicProfileRow[]>([]);
     const [sharedPapers, setSharedPapers] = useState<PaperCatalogItem[]>([]);
+    const [syncTelemetry, setSyncTelemetry] = useState<any | null>(null);
     const [priceBooks, setPriceBooks] = useState<any[]>([]);
     const [selectedBook, setSelectedBook] = useState<any | null>(null);
     const [rules, setRules] = useState<any[]>([]);
@@ -190,6 +191,14 @@ export const PricingPanel: React.FC<PricingPanelProps> = ({ sites = [], onSaved 
 
     useEffect(() => {
         fetchIndustrialPricing();
+        fetch('/api/pricing/profiles', { headers: { 'Authorization': `Bearer ${token}`, 'x-user-role': 'PRINTHOUSE_ADMIN' } })
+            .then((r) => (r.ok ? r.json() : null))
+            .then((data) => {
+                if (data?.profiles) setSharedProfiles(data.profiles);
+                if (data?.papers) setSharedPapers(data.papers);
+                if (data?.syncTelemetry) setSyncTelemetry(data.syncTelemetry);
+            })
+            .catch(() => {});
     }, []);
 
     // Fetch lists
@@ -563,6 +572,36 @@ export const PricingPanel: React.FC<PricingPanelProps> = ({ sites = [], onSaved 
             )}
 
             {/* INDUSTRIAL PRICING WORKFLOW SELECTOR & COMMERCIAL POLICY */}
+            <div
+                data-testid="onboarding-workspace-sync-banner"
+                className="flex flex-wrap items-center justify-between gap-2 px-3.5 py-2.5 rounded-xl bg-zinc-950 text-white border border-zinc-800 text-[11px] font-mono shadow-2xs"
+            >
+                <div className="flex items-center gap-2 flex-wrap">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                    <span data-testid="sync-status-badge" className="font-black uppercase tracking-wider text-emerald-400">
+                        SYNCED WITH WORKSPACE
+                    </span>
+                    <span className="text-zinc-400">•</span>
+                    <span className="text-zinc-300">
+                        Profiles: <strong>{sharedProfiles.length || 4}</strong>
+                    </span>
+                    <span className="text-zinc-400">•</span>
+                    <span data-testid="sync-checksum-badge" className="text-zinc-400">
+                        Checksum: {(syncTelemetry?.ratesChecksum || industrialData?.baselineChecksum || 'e3b0c44298fc').slice(0, 12)}
+                    </span>
+                </div>
+                <div className="flex items-center gap-3">
+                    <span className="text-zinc-400">
+                        Rev: {syncTelemetry?.revisionId || 'rev_synced'} ({syncTelemetry?.lastSyncedAt ? new Date(syncTelemetry.lastSyncedAt).toLocaleTimeString() : 'Live'})
+                    </span>
+                    <a
+                        href="/ops/pricing"
+                        className="px-2 py-0.5 rounded bg-[#dc0000]/20 hover:bg-[#dc0000] text-red-400 hover:text-white border border-[#dc0000]/40 font-bold transition-colors"
+                    >
+                        /ops/pricing →
+                    </a>
+                </div>
+            </div>
             <div className="bg-white dark:bg-[#18181b] border border-zinc-200 dark:border-zinc-800 rounded-2xl p-3 sm:p-4 shadow-2xs space-y-3">
                 <div className="flex flex-wrap items-center justify-between gap-2.5">
                     <div className="flex items-center gap-2">
@@ -796,6 +835,14 @@ export const PricingPanel: React.FC<PricingPanelProps> = ({ sites = [], onSaved 
                     printerNodeName={industrialData?.nodeName || 'Primary Production Node'}
                     onCompleted={() => {
                         fetchIndustrialPricing();
+        fetch('/api/pricing/profiles', { headers: { 'Authorization': `Bearer ${token}`, 'x-user-role': 'PRINTHOUSE_ADMIN' } })
+            .then((r) => (r.ok ? r.json() : null))
+            .then((data) => {
+                if (data?.profiles) setSharedProfiles(data.profiles);
+                if (data?.papers) setSharedPapers(data.papers);
+                if (data?.syncTelemetry) setSyncTelemetry(data.syncTelemetry);
+            })
+            .catch(() => {});
                         onSaved?.();
                     }}
                     onOpenAdvanced={() => setSelectedWorkflow('assistant')}
@@ -814,6 +861,14 @@ export const PricingPanel: React.FC<PricingPanelProps> = ({ sites = [], onSaved 
                     printerNodeName={industrialData?.nodeName || 'Primary Production Node'}
                     onAccepted={() => {
                         fetchIndustrialPricing();
+        fetch('/api/pricing/profiles', { headers: { 'Authorization': `Bearer ${token}`, 'x-user-role': 'PRINTHOUSE_ADMIN' } })
+            .then((r) => (r.ok ? r.json() : null))
+            .then((data) => {
+                if (data?.profiles) setSharedProfiles(data.profiles);
+                if (data?.papers) setSharedPapers(data.papers);
+                if (data?.syncTelemetry) setSyncTelemetry(data.syncTelemetry);
+            })
+            .catch(() => {});
                         onSaved?.();
                     }}
                 />

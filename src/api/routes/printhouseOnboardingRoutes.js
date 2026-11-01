@@ -344,6 +344,19 @@ router.put('/pricing/industrial', requireAuth, async (req, res) => {
 
         await connection.commit();
 
+        // Phase 14B: Synchronize Onboarding industrial rates into `/ops/pricing` (`printer_pricing_profiles` + workspace engine)
+        try {
+            const { syncFromOnboardingRates } = require('../services/pricing/pricingIntelligenceService');
+            await syncFromOnboardingRates(tenantId, nextRates, {
+                nodeId: targetNodeId,
+                productFamily,
+                ratesChecksum: newRatesChecksum,
+                revisionId
+            });
+        } catch (syncErr) {
+            console.warn('[ONBOARDING->WORKSPACE SYNC] Non-fatal warning:', syncErr.message);
+        }
+
         return res.json({
             ok: true,
             message: 'Industrial pricing configuration updated successfully',

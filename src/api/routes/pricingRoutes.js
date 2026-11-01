@@ -3,7 +3,7 @@
 /**
  * src/api/routes/pricingRoutes.js
  *
- * PrintPrice OS — Phase 14: Pricing Intelligence Engine & Live Calibrator REST API
+ * PrintPrice OS — Phase 14B: Bidirectional MySQL Pricing Intelligence Engine & Live Calibrator REST API
  *
  * Exposes:
  * - GET  /api/pricing/profiles
@@ -15,8 +15,8 @@
  */
 
 const {
-    getPricingProfiles,
-    savePricingProfile,
+    getPricingProfilesAsync,
+    savePricingProfileAsync,
     calibrateQuote,
     calculateCrossoverPoint
 } = require('../services/pricing/pricingIntelligenceService');
@@ -110,7 +110,7 @@ function createPricingRouter() {
                 (req.query && req.query.tenantId) ||
                 (req.headers && req.headers['x-tenant-id']) ||
                 'tenant-default';
-            const data = getPricingProfiles(tenantId);
+            const data = await getPricingProfilesAsync(tenantId);
             return res.status(200).json(data);
         } catch (err) {
             return res.status(err.statusCode || 400).json({
@@ -128,7 +128,7 @@ function createPricingRouter() {
                 (req.body && req.body.tenantId) ||
                 (req.headers && req.headers['x-tenant-id']) ||
                 'tenant-default';
-            const result = savePricingProfile(tenantId, req.body || {});
+            const result = await savePricingProfileAsync(tenantId, req.body || {});
             return res.status(200).json(result);
         } catch (err) {
             return res.status(err.statusCode || 400).json({
@@ -164,6 +164,7 @@ function createPricingRouter() {
                 (req.query && req.query.tenantId) ||
                 (req.headers && req.headers['x-tenant-id']) ||
                 'tenant-default';
+            await getPricingProfilesAsync(tenantId);
             const result = calculateCrossoverPoint(tenantId, req.query || {});
             return res.status(200).json(result);
         } catch (err) {
@@ -182,4 +183,3 @@ defaultRouter.createPricingRouter = createPricingRouter;
 defaultRouter.requireLogisticsControlPlaneAuth = requireLogisticsControlPlaneAuth;
 
 module.exports = defaultRouter;
-
