@@ -18,6 +18,10 @@ const {
     settleEscrowOnSignedPod,
     listEscrowLedger
 } = require('../services/financials/escrowSettlementService');
+const {
+    calculateExecutiveProfitabilitySummary,
+    generateElectronicInvoiceXml
+} = require('../services/financials/eInvoicingService');
 
 function requireLogisticsControlPlaneAuth(req, res, next) {
     const role = (req.user && req.user.role) || (req.headers && req.headers['x-user-role']);
@@ -150,6 +154,48 @@ function createEscrowRouter() {
                 { tenantId }
             );
             return res.status(200).json(result);
+        } catch (err) {
+            return res.status(err.statusCode || 400).json({
+                ok: false,
+                error: err.message
+            });
+        }
+    });
+
+    // GET /api/financials/escrow/profitability
+    router.get('/profitability', async (req, res) => {
+        try {
+            const tenantId =
+                (req.user && req.user.tenantId) ||
+                (req.query && req.query.tenantId) ||
+                (req.headers && req.headers['x-tenant-id']) ||
+                'tenant-default';
+            const summary = calculateExecutiveProfitabilitySummary(tenantId);
+            return res.status(200).json(summary);
+        } catch (err) {
+            return res.status(err.statusCode || 400).json({
+                ok: false,
+                error: err.message
+            });
+        }
+    });
+
+    // GET /api/financials/escrow/:orderId/e-invoice.xml
+    router.get('/:orderId/e-invoice.xml', async (req, res) => {
+        try {
+            const tenantId =
+                (req.user && req.user.tenantId) ||
+                (req.query && req.query.tenantId) ||
+                (req.headers && req.headers['x-tenant-id']) ||
+                'tenant-default';
+            const orderId = req.params && req.params.orderId;
+            const format = (req.query && req.query.format) || 'FACTURAE_3_2_2';
+            const invoice = generateElectronicInvoiceXml({
+                orderId,
+                format,
+                tenantId
+            });
+            return res.status(200).json(invoice);
         } catch (err) {
             return res.status(err.statusCode || 400).json({
                 ok: false,

@@ -19,6 +19,10 @@ import {
     listPredictiveMaintenanceFleet,
     scheduleMaintenanceReset
 } from '../services/machines/predictiveMaintenanceService.js';
+import {
+    calculateExecutiveProfitabilitySummary,
+    generateElectronicInvoiceXml
+} from '../services/financials/eInvoicingService.js';
 
 describe('PrintPrice OS — Phase 12 (Roadmap 2026.5) End-to-End Verification Suite', () => {
     describe('PHASE-12A: Commercial Escrow & Split-Payout Settlement Engine', () => {
@@ -188,6 +192,43 @@ describe('PrintPrice OS — Phase 12 (Roadmap 2026.5) End-to-End Verification Su
             expect(resetRes.machine.maxWearPct).toBe(0.0);
             expect(resetRes.machine.routingBlocked).toBe(false);
             expect(resetRes.machine.routingStatus).toBe('ONLINE_OPTIMAL');
+        });
+    });
+
+    describe('PHASE-13A & 13B: Executive Profitability Engine & EN 16931 Electronic Invoicing (Facturae 3.2.2 / XRechnung 3.0)', () => {
+        it('calculates real-time executive net margin by crossing Escrow split-payouts, closed-loop JMF waste savings, and machine OEE', () => {
+            const prof = calculateExecutiveProfitabilitySummary('tenant-phase12-test');
+            expect(prof.ok).toBe(true);
+            expect(prof.summaryKpis.totalNetMfgRevenueEur).toBeGreaterThan(0);
+            expect(prof.summaryKpis.totalNetIndustrialMarginEur).toBeGreaterThan(0);
+            expect(prof.summaryKpis.totalJmfWasteSavingsEur).toBeGreaterThan(0);
+            expect(prof.orders.length).toBeGreaterThanOrEqual(3);
+        });
+
+        it('generates EN 16931 compliant Facturae 3.2.2 and XRechnung 3.0 UBL 2.1 XML invoices with strictly segregated Mfg / Pack / Freight lines', () => {
+            const facturae = generateElectronicInvoiceXml({
+                orderId: 'PUB-ORD-2026-103',
+                format: 'FACTURAE_3_2_2',
+                tenantId: 'tenant-phase12-test'
+            });
+            expect(facturae.ok).toBe(true);
+            expect(facturae.standard).toBe('FACTURAE_3_2_2');
+            expect(facturae.en16931Compliant).toBe(true);
+            expect(facturae.lineItems.map(l => l.conceptCode)).toContain('MFG_EDITORIAL_PRINT');
+            expect(facturae.lineItems.map(l => l.conceptCode)).toContain('PACK_EPAL_FEFCO');
+            expect(facturae.lineItems.map(l => l.conceptCode)).toContain('FREIGHT_LANDED_DOCK');
+            expect(facturae.lineItems.map(l => l.conceptCode)).toContain('EPAL_PALLET_COMPENSATION');
+            expect(facturae.xml).toContain('<SchemaVersion>3.2.2</SchemaVersion>');
+
+            const xrechnung = generateElectronicInvoiceXml({
+                orderId: 'PUB-ORD-2026-103',
+                format: 'XRECHNUNG_3_0',
+                tenantId: 'tenant-phase12-test'
+            });
+            expect(xrechnung.ok).toBe(true);
+            expect(xrechnung.standard).toBe('XRECHNUNG_3_0');
+            expect(xrechnung.xml).toContain('urn:cen.eu:en16931:2017#compliant#urn:xeinkauf.de:kosit:xrechnung_3.0');
+            expect(xrechnung.xml).toContain('<cbc:ID>MFG_EDITORIAL_PRINT</cbc:ID>');
         });
     });
 });

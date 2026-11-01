@@ -28,6 +28,7 @@ import { ManufacturingQueuePage } from '../src/ui/pages/manufacturing/Manufactur
 import { PublisherHubPage } from '../src/ui/pages/publisher/PublisherHubPage';
 import { FinancialOpsTab } from '../src/ui/pages/admin/FinancialOpsTab';
 import { MachinesPage } from '../src/ui/pages/os/MachinesPage';
+import { ProductionDashboard } from '../src/ui/pages/production/ProductionDashboard';
 import { Sidebar } from '../src/ui/layout/Sidebar';
 import * as adminApi from '../src/ui/lib/adminApi';
 import { setAuthUser } from '../src/ui/lib/authStore';
@@ -304,6 +305,25 @@ describe('Dark Industrial Telemetry UI — Canonical Components & Dual-Mode Reco
         fireEvent.click(resetBtn);
         await screen.findByText(/0\.0% WEAR/i);
         expect(screen.getByTestId('routing-status-MACH-KOMORI-G29-B2')).toHaveTextContent('ROUTING_ENABLED');
+    });
+
+    it('10. Renders PHASE-13A Executive Profitability Dashboard and PHASE-13B EN 16931 Facturae 3.2.2 / XRechnung 3.0 XML Preview', async () => {
+        renderWithProviders(<ProductionDashboard mode="workspace" />, {
+            locale: 'es',
+            route: '/production'
+        });
+
+        expect(screen.getByTestId('executive-profitability-dashboard')).toHaveAttribute('data-mode', 'workspace');
+        expect(screen.getByText('Executive Plant Profitability & JMF Yield')).toBeInTheDocument();
+        expect(screen.getByText('NET MFG REVENUE EUR')).toBeInTheDocument();
+        expect(screen.getByText('REAL NET MARGIN EUR')).toBeInTheDocument();
+        expect(screen.getByText('AVG. INDUSTRIAL MARGIN %')).toBeInTheDocument();
+        expect(screen.getByText('JMF CLOSED-LOOP SAVINGS')).toBeInTheDocument();
+
+        const xrechnungBtn = screen.getByTestId('einvoice-xrechnung-btn-PUB-ORD-2026-103');
+        fireEvent.click(xrechnungBtn);
+        expect(await screen.findByTestId('einvoice-xml-modal')).toBeInTheDocument();
+        expect(screen.getByTestId('einvoice-xml-code')).toHaveTextContent('xrechnung_3.0');
     });
 });
 
