@@ -18,6 +18,17 @@ const crypto = require('crypto');
 const mysqlClient = require('../services/mysqlClient');
 const marketplaceOrderService = require('../services/marketplaceOrderService');
 const { getPublisherOrders, getPublisherTimeline } = require('../services/publisher/publisherHubService');
+const {
+    B2B_ORG_ROLES,
+    B2B_RBAC_PERMISSIONS_MATRIX,
+    listOrganizationMembers,
+    addOrganizationMember,
+    updateOrganizationMemberRole,
+    removeOrganizationMember,
+    resolveB2bActorContext,
+    requireSignOffRights,
+    requireOrgAdminRights
+} = require('../middleware/b2bOrgRbacMiddleware');
 const logger = require('../services/logger').child('customer-portal-router');
 
 // In-memory store with MySQL persistence for B2B Customer Shipping Book & Fiscal Profile
@@ -1430,15 +1441,16 @@ function createCustomerPortalRouter() {
     /**
      * 3c. POST /api/customer/orders/:orderId/soft-proof/approve & /reject
      * Cryptographic 3D Soft-Proof Sign-off (Phase-11C) with SHA-256 signature & Escrow lock.
+     * Enforces B2B RBAC: Only ORG_ADMIN and PRODUCTION_MANAGER may approve for press.
      */
-    router.post('/orders/:orderId/soft-proof/approve', async (req, res) => {
+    router.post('/orders/:orderId/soft-proof/approve', requireSignOffRights, async (req, res) => {
         const orderId = req.params.orderId;
         try {
             const ctx = resolveCustomerContext(req);
             const result = await processCustomerSoftProofDecision(orderId, {
                 decision: 'APPROVED',
                 comments: req.body?.comments || req.body?.notes || '',
-                approvedBy: req.body?.approvedBy || req.body?.email || ctx.email,
+                approvedBy: req.b2bActor?.email || req.body?.approvedBy || req.body?.email || ctx.email,
                 tenantId: ctx.tenantId,
                 geometry: req.body?.geometry || {}
             });
@@ -1774,6 +1786,97 @@ function createCustomerPortalRouter() {
             vatValidation,
             profile: updatedProfile
         });
+    });
+
+    /**
+     * 6. B2B Multi-User Organization & Editorial RBAC Governance Endpoints (Phase 16 - Option 3)
+     * - GET    /api/customer/organization/members
+     * - POST   /api/customer/organization/members              (Requires ORG_ADMIN)
+     * - PUT    /api/customer/organization/members/:memberId/role (Requires ORG_ADMIN)
+     * - DELETE /api/customer/organization/members/:memberId    (Requires ORG_ADMIN)
+     */
+    router.get('/organization/members', async (req, res) => {
+        try {
+            const actor = resolveB2bActorContext(req);
+            const members = await listOrganizationMembers(actor.organizationId);
+            return res.status(200).json({
+                ok: true,
+                organizationId: actor.organizationId,
+                activeActor: actor,
+                rbacMatrix: B2B_RBAC_PERMISSIONS_MATRIX,
+                count: members.length,
+                members
+            });
+        } catch (err) {
+            return res.status(500).json({
+                ok: false,
+                error: 'ORGANIZATION_MEMBERS_LIST_FAILED',
+                message: err.message
+            });
+        }
+    });
+
+    router.post('/organization/members', requireOrgAdminRights, async (req, res) => {
+        try {
+            const actor = resolveB2bActorContext(req);
+            const created = await addOrganizationMember(actor.organizationId, req.body || {});
+            const members = await listOrganizationMembers(actor.organizationId);
+            return res.status(201).json({
+                ok: true,
+                organizationId: actor.organizationId,
+                member: created,
+                members
+            });
+        } catch (err) {
+            return res.status(err.statusCode || 400).json({
+                ok: false,
+                error: err.code || 'ORGANIZATION_MEMBER_CREATE_FAILED',
+                message: err.message
+            });
+        }
+    });
+
+    router.put('/organization/members/:memberId/role', requireOrgAdminRights, async (req, res) => {
+        try {
+            const actor = resolveB2bActorContext(req);
+            const updated = await updateOrganizationMemberRole(
+                actor.organizationId,
+                req.params.memberId,
+                req.body || {}
+            );
+            const members = await listOrganizationMembers(actor.organizationId);
+            return res.status(200).json({
+                ok: true,
+                organizationId: actor.organizationId,
+                member: updated,
+                members
+            });
+        } catch (err) {
+            return res.status(err.statusCode || 400).json({
+                ok: false,
+                error: err.code || 'ORGANIZATION_MEMBER_ROLE_UPDATE_FAILED',
+                message: err.message
+            });
+        }
+    });
+
+    router.delete('/organization/members/:memberId', requireOrgAdminRights, async (req, res) => {
+        try {
+            const actor = resolveB2bActorContext(req);
+            const result = await removeOrganizationMember(actor.organizationId, req.params.memberId);
+            const members = await listOrganizationMembers(actor.organizationId);
+            return res.status(200).json({
+                ...result,
+                organizationId: actor.organizationId,
+                members
+            });
+        } catch (err) {
+            return res.status(err.statusCode || 400).json({
+                ok: false,
+                error: err.code || 'ORGANIZATION_MEMBER_REVOKE_FAILED',
+                message: err.message
+            });
+        }
     });
 
     return router;

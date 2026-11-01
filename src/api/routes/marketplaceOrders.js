@@ -14,6 +14,10 @@ const marketplaceOrderFileService = require('../services/marketplaceOrderFileSer
 const invoicePaymentService = require('../services/marketplaceInvoicePaymentService');
 const mysqlClient = require('../services/mysqlClient');
 const { requireAdmin } = require('../middleware/auth');
+const {
+    requireFinanceRights,
+    requireAssetUploadRights
+} = require('../middleware/b2bOrgRbacMiddleware');
 const logger = require('../services/logger').child('marketplace-orders-router');
 
 // Configure Multer for production PDF uploads up to 5 GB
@@ -375,7 +379,7 @@ router.post('/:orderId/readiness/recompute', requireMarketplaceOrAdmin, async (r
  * 8. POST /api/marketplace/orders/:orderId/files/upload
  * PHASE-15: Binary PDF file upload up to 5 GB via Multer.
  */
-router.post('/:orderId/files/upload', requireMarketplaceOrAdmin, uploadMiddleware.single('file'), async (req, res) => {
+router.post('/:orderId/files/upload', requireMarketplaceOrAdmin, requireAssetUploadRights, uploadMiddleware.single('file'), async (req, res) => {
     const { orderId } = req.params;
     const role = req.body?.role || req.body?.kind || req.query?.role || 'INTERIOR_PDF';
     const originalName = req.body?.originalName || req.file?.originalname || `${role.toLowerCase()}.pdf`;
@@ -391,7 +395,7 @@ router.post('/:orderId/files/upload', requireMarketplaceOrAdmin, uploadMiddlewar
             buffer,
             originalName,
             mimeType: req.file?.mimetype || req.body?.mimeType || 'application/pdf',
-            actorId: req.user?.id || 'CUSTOMER'
+            actorId: req.b2bActor?.memberId || req.user?.id || 'CUSTOMER'
         });
 
         return res.status(200).json(result);
@@ -410,7 +414,7 @@ router.post('/:orderId/files/upload', requireMarketplaceOrAdmin, uploadMiddlewar
  * 9. POST /api/marketplace/orders/:orderId/files/external-link
  * PHASE-15: External link ingestion (WeTransfer, Dropbox, Drive, S3) with SSRF validation.
  */
-router.post('/:orderId/files/external-link', requireMarketplaceOrAdmin, async (req, res) => {
+router.post('/:orderId/files/external-link', requireMarketplaceOrAdmin, requireAssetUploadRights, async (req, res) => {
     const { orderId } = req.params;
     const { role, kind, externalUrl, url, originalName, sizeBytes, checksumSha256 } = req.body || {};
 
@@ -421,7 +425,7 @@ router.post('/:orderId/files/external-link', requireMarketplaceOrAdmin, async (r
             originalName,
             sizeBytes,
             checksumSha256,
-            actorId: req.user?.id || 'CUSTOMER'
+            actorId: req.b2bActor?.memberId || req.user?.id || 'CUSTOMER'
         });
 
         return res.status(200).json(result);
@@ -441,13 +445,13 @@ router.post('/:orderId/files/external-link', requireMarketplaceOrAdmin, async (r
  * PHASE-15: Dual Checkout Session Creation (Stripe Card/SEPA or B2B Bank Transfer)
  * supporting Modality A (Escrow MoR) and Modality B (Direct Commission).
  */
-router.post('/:orderId/checkout/session', requireMarketplaceOrAdmin, async (req, res) => {
+router.post('/:orderId/checkout/session', requireMarketplaceOrAdmin, requireFinanceRights, async (req, res) => {
     const { orderId } = req.params;
     try {
         const result = await invoicePaymentService.createMarketplaceOrderCheckoutSession(
             orderId,
             req.body || {},
-            { operatorId: req.user?.id || 'CUSTOMER' }
+            { operatorId: req.b2bActor?.memberId || req.user?.id || 'CUSTOMER' }
         );
         return res.status(200).json(result);
     } catch (err) {
@@ -465,7 +469,7 @@ router.post('/:orderId/checkout/session', requireMarketplaceOrAdmin, async (req,
  * 11. POST /api/marketplace/orders/:orderId/payment/wire-proof
  * PHASE-15: Uploads B2B Wire Transfer proof document/receipt to expedite verification & release to press.
  */
-router.post('/:orderId/payment/wire-proof', requireMarketplaceOrAdmin, uploadMiddleware.single('file'), async (req, res) => {
+router.post('/:orderId/payment/wire-proof', requireMarketplaceOrAdmin, requireFinanceRights, uploadMiddleware.single('file'), async (req, res) => {
     const { orderId } = req.params;
     try {
         let order = null;
