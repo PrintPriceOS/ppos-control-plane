@@ -301,7 +301,7 @@ async function getOperationalTelemetrySummary(options = {}) {
     } else {
         try {
             const rows = await mysqlClient.query(
-                `SELECT order_id, public_id, status, currency, total_price, book_spec_json, selected_offer_json, readiness_json, metadata_json, created_at, updated_at
+                `SELECT order_id, external_order_ref, status, currency, estimated_price, book_spec_json, selected_offer_json, readiness_json, metadata_json, created_at, updated_at
                  FROM marketplace_orders
                  ORDER BY created_at DESC
                  LIMIT 500`
@@ -427,6 +427,7 @@ async function getOperationalTelemetrySummary(options = {}) {
         const copies = Number(spec.copies || spec.quantity || ord.copies || 500);
         const orderVal = Number(
             ord.total_price ||
+            ord.estimated_price ||
             ord.totalEur ||
             offer.total ||
             offer.totalPrice ||
@@ -476,7 +477,7 @@ async function getOperationalTelemetrySummary(options = {}) {
         if (seenEscrowOrderIds.has(oid)) continue;
         const meta = safeParseJson(ord.metadata_json || ord.metadata, {});
         const offer = safeParseJson(ord.selected_offer_json || ord.totals, {});
-        const val = Number(ord.total_price || offer.total || meta.invoice?.amount || 0);
+        const val = Number(ord.total_price || ord.estimated_price || offer.total || offer.totalPrice || meta.invoice?.amount || 0);
         const escState = String(ord.escrowStatus || meta.escrowStatus || '').toUpperCase();
 
         if (escState === 'UNFUNDED' || String(ord.status || '').toUpperCase() === 'AWAITING_PAYMENT' || String(ord.status || '').toUpperCase() === 'FILES_REQUIRED') {
