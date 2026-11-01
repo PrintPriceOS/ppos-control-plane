@@ -152,9 +152,15 @@ function classifyOrderFunnelStage(order = {}) {
         rawStatus.includes('PLATES') ||
         rawStatus.includes('IMPOSITION') ||
         rawStatus === 'READY_FOR_PRODUCTION' ||
+        rawStatus === 'PROOF_APPROVED' ||
         trackingStage.includes('STAGE_02') ||
         trackingStage.includes('ON_PRESS') ||
-        (readiness.readyForProduction === true && (meta.softProof?.status === 'APPROVED_FOR_PRESS' || order.proofStatus === 'APPROVED_FOR_PRESS'))
+        meta.softProof?.status === 'APPROVED_FOR_PRESS' ||
+        order.proofStatus === 'APPROVED_FOR_PRESS' ||
+        meta.escrowStatus === 'FUNDS_LOCKED_ON_PROOF_APPROVAL' ||
+        meta.escrowStatus === 'IN_MANUFACTURING_HOLD' ||
+        order.escrowStatus === 'FUNDS_LOCKED_ON_PROOF_APPROVAL' ||
+        Boolean(readiness.readyForProduction && meta.softProof?.proofSignatureHash)
     ) {
         return 'STAGE_02_ON_PRESS';
     }
@@ -353,8 +359,8 @@ async function getOperationalTelemetrySummary(options = {}) {
         } catch (_) {}
     }
 
-    // Ensure baseline industrial funnel coverage when database is empty or in clean test environments
-    if (unifiedOrdersMap.size === 0 && !Array.isArray(options.injectedOrders)) {
+    // Ensure canonical publisher reference orders (`PUB-ORD-2026-*`) are included alongside live MySQL orders
+    if (!Array.isArray(options.injectedOrders)) {
         const baselineOrders = [
             {
                 orderId: 'PUB-ORD-2026-101',
@@ -398,7 +404,9 @@ async function getOperationalTelemetrySummary(options = {}) {
             }
         ];
         for (const b of baselineOrders) {
-            unifiedOrdersMap.set(b.orderId, b);
+            if (!unifiedOrdersMap.has(b.orderId)) {
+                unifiedOrdersMap.set(b.orderId, b);
+            }
         }
     }
 
