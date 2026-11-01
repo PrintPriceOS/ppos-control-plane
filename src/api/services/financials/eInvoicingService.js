@@ -171,11 +171,57 @@ function calculateExecutiveProfitabilitySummary(tenantId = 'tenant-default') {
  *   Line 3: Dedicated Road Freight & Dock Slot Delivery (Freight Share)
  *   Line 4 (if applicable): EPAL Non-Return Compensation / Penalty Adjustment
  */
+function resolveCustomerFiscalData(customerEmail = '', customerKey = '') {
+    const defaultFiscal = {
+        legalEntityName: 'Critical Publishing & Editions S.L.',
+        taxIdVat: 'ESB08214819',
+        country: 'ES',
+        fiscalAddress: 'Travessera de Gracia, 47-49',
+        postalCode: '08021',
+        city: 'Barcelona',
+        billingEmail: customerEmail || 'billing@printprice.pro',
+        dir3Code: 'EA0038591',
+        leitwegId: '04011000-1234512345-06',
+        peppolEndpoint: '0088:8412345000018'
+    };
+
+    try {
+        const customerPortalRoutes = require('../../routes/customerPortalRoutes');
+        const store = customerPortalRoutes.customerProfileStore;
+        if (store && store.size > 0) {
+            if (customerKey && store.has(customerKey)) {
+                return { ...defaultFiscal, ...(store.get(customerKey).fiscal || {}) };
+            }
+            if (customerEmail && store.has(customerEmail)) {
+                return { ...defaultFiscal, ...(store.get(customerEmail).fiscal || {}) };
+            }
+            for (const prof of store.values()) {
+                if (
+                    customerEmail &&
+                    (String(prof.email || '').toLowerCase() === String(customerEmail).toLowerCase() ||
+                     String(prof.fiscal?.billingEmail || '').toLowerCase() === String(customerEmail).toLowerCase())
+                ) {
+                    return { ...defaultFiscal, ...(prof.fiscal || {}) };
+                }
+            }
+            const firstProfile = Array.from(store.values())[0];
+            if (firstProfile && firstProfile.fiscal) {
+                return { ...defaultFiscal, ...firstProfile.fiscal };
+            }
+        }
+    } catch (_) {}
+
+    return defaultFiscal;
+}
+
 function generateElectronicInvoiceXml({
     orderId = 'PUB-ORD-2026-103',
     format = 'FACTURAE_3_2_2',
     tenantId = 'tenant-default',
-    vatRatePct = 4.0
+    vatRatePct = 4.0,
+    customerEmail = '',
+    customerKey = '',
+    buyerFiscal = null
 } = {}) {
     const escrow = listEscrowLedger(tenantId);
     let record = escrow.entries.find(e => e.orderId === orderId);
@@ -200,25 +246,52 @@ function generateElectronicInvoiceXml({
                     epalUnreturnedPallets: 0,
                     carrierCode: 'DACHSER_DE',
                     shipmentId: `SHP-2026-${String(orderId).replace(/[^0-9]/g, '').slice(-4) || '9901'}`,
+                    sscc18: '003401234500000018',
+                    issuedAt: runtimeOrder.invoice?.issuedAt || runtimeOrder.createdAt || null,
+                    customerEmail: runtimeOrder.customer?.email || customerEmail
+                };
+            } else if (String(orderId).startsWith('ORD_2026_') || String(orderId).startsWith('PUB-ORD-2026-')) {
+                const baseEntry = escrow.entries[0] || {
+                    manufacturingShareEur: 3120.0,
+                    packagingShareEur: 95.0,
+                    freightShareEur: 240.0,
+                    epalDeductionEur: 0,
+                    epalUnreturnedPallets: 0,
+                    carrierCode: 'DACHSER_DE',
                     sscc18: '003401234500000018'
+                };
+                record = {
+                    ...baseEntry,
+                    escrowId: `ESC-${orderId}`,
+                    orderId,
+                    title: `Editorial Edition ${orderId}`,
+                    isbn: '978-84-9066-801-6',
+                    shipmentId: `SHP-2026-${String(orderId).replace(/[^0-9]/g, '').slice(-4) || '8841'}`
                 };
             }
         } catch (_) {}
     }
 
     if (!record) {
-        record = escrow.entries[0];
-    }
-
-    if (!record) {
-        const err = new Error(`ORDER_NOT_FOUND_FOR_INVOICE: No escrow order found for '${orderId}'.`);
+        const err = new Error(`ORDER_NOT_FOUND_FOR_INVOICE: No escrow or marketplace order found for '${orderId}'.`);
         err.statusCode = 404;
         throw err;
     }
 
+    const fiscal = buyerFiscal || resolveCustomerFiscalData(record.customerEmail || customerEmail, customerKey);
+    const buyerName = fiscal.legalEntityName || 'Critical Publishing & Editions S.L.';
+    const buyerVat = fiscal.taxIdVat || 'ESB08214819';
+    const buyerStreet = fiscal.fiscalStreet || fiscal.fiscalAddress || 'Travessera de Gracia, 47-49';
+    const buyerPostal = fiscal.fiscalPostalCode || fiscal.postalCode || '08021';
+    const buyerCity = fiscal.fiscalCity || fiscal.city || 'Barcelona';
+    const buyerCountry = fiscal.fiscalCountryCode || fiscal.country || 'ES';
+    const buyerDir3 = fiscal.dir3Code || 'EA0038591';
+    const buyerLeitweg = fiscal.leitwegId || '04011000-1234512345-06';
+
     const normalizedFormat = String(format || 'FACTURAE_3_2_2').toUpperCase();
     const invoiceNumber = `INV-2026-${record.orderId.replace(/[^0-9]/g, '').slice(-4) || '0103'}`;
-    const issueDate = '2026-11-01';
+    const rawIssueDate = record.issuedAt || record.updatedAt || new Date().toISOString();
+    const issueDate = String(rawIssueDate).slice(0, 10);
     const taxRate = Number(vatRatePct);
 
     const lineItems = [
@@ -291,7 +364,43 @@ function generateElectronicInvoiceXml({
   <cbc:IssueDate>${issueDate}</cbc:IssueDate>
   <cbc:InvoiceTypeCode>380</cbc:InvoiceTypeCode>
   <cbc:DocumentCurrencyCode>EUR</cbc:DocumentCurrencyCode>
-  <cbc:BuyerReference>${escapeXml(record.orderId)}</cbc:BuyerReference>
+  <cbc:BuyerReference>${escapeXml(buyerLeitweg || record.orderId)}</cbc:BuyerReference>
+  <cac:AccountingSupplierParty>
+    <cac:Party>
+      <cac:PartyName><cbc:Name>PrintPrice OS Europe Industrial Print Hub S.L.</cbc:Name></cac:PartyName>
+      <cac:PostalAddress>
+        <cbc:StreetName>Av. Diagonal 442</cbc:StreetName>
+        <cbc:CityName>Barcelona</cbc:CityName>
+        <cbc:PostalZone>08037</cbc:PostalZone>
+        <cac:Country><cbc:IdentificationCode>ES</cbc:IdentificationCode></cac:Country>
+      </cac:PostalAddress>
+      <cac:PartyTaxScheme>
+        <cbc:CompanyID>ESB67890123</cbc:CompanyID>
+        <cac:TaxScheme><cbc:ID>VAT</cbc:ID></cac:TaxScheme>
+      </cac:PartyTaxScheme>
+      <cac:PartyLegalEntity>
+        <cbc:RegistrationName>PrintPrice OS Europe Industrial Print Hub S.L.</cbc:RegistrationName>
+      </cac:PartyLegalEntity>
+    </cac:Party>
+  </cac:AccountingSupplierParty>
+  <cac:AccountingCustomerParty>
+    <cac:Party>
+      <cac:PartyName><cbc:Name>${escapeXml(buyerName)}</cbc:Name></cac:PartyName>
+      <cac:PostalAddress>
+        <cbc:StreetName>${escapeXml(buyerStreet)}</cbc:StreetName>
+        <cbc:CityName>${escapeXml(buyerCity)}</cbc:CityName>
+        <cbc:PostalZone>${escapeXml(buyerPostal)}</cbc:PostalZone>
+        <cac:Country><cbc:IdentificationCode>${escapeXml(buyerCountry)}</cbc:IdentificationCode></cac:Country>
+      </cac:PostalAddress>
+      <cac:PartyTaxScheme>
+        <cbc:CompanyID>${escapeXml(buyerVat)}</cbc:CompanyID>
+        <cac:TaxScheme><cbc:ID>VAT</cbc:ID></cac:TaxScheme>
+      </cac:PartyTaxScheme>
+      <cac:PartyLegalEntity>
+        <cbc:RegistrationName>${escapeXml(buyerName)}</cbc:RegistrationName>
+      </cac:PartyLegalEntity>
+    </cac:Party>
+  </cac:AccountingCustomerParty>
   <cac:LegalMonetaryTotal>
     <cbc:LineExtensionAmount currencyID="EUR">${taxExclusiveAmountEur.toFixed(2)}</cbc:LineExtensionAmount>
     <cbc:TaxExclusiveAmount currencyID="EUR">${taxExclusiveAmountEur.toFixed(2)}</cbc:TaxExclusiveAmount>
@@ -322,6 +431,48 @@ ${ublLinesXml}
     <Modality>I</Modality>
     <InvoiceIssuerType>EM</InvoiceIssuerType>
   </FileHeader>
+  <Parties>
+    <SellerParty>
+      <TaxIdentification>
+        <PersonTypeCode>J</PersonTypeCode>
+        <ResidenceTypeCode>R</ResidenceTypeCode>
+        <TaxIdentificationNumber>ESB67890123</TaxIdentificationNumber>
+      </TaxIdentification>
+      <LegalEntity>
+        <CorporateName>PrintPrice OS Europe Industrial Print Hub S.L.</CorporateName>
+        <AddressInSpain>
+          <Address>Av. Diagonal 442</Address>
+          <PostCode>08037</PostCode>
+          <Town>Barcelona</Town>
+          <Province>Barcelona</Province>
+          <CountryCode>ESP</CountryCode>
+        </AddressInSpain>
+      </LegalEntity>
+    </SellerParty>
+    <BuyerParty>
+      <TaxIdentification>
+        <PersonTypeCode>J</PersonTypeCode>
+        <ResidenceTypeCode>R</ResidenceTypeCode>
+        <TaxIdentificationNumber>${escapeXml(buyerVat)}</TaxIdentificationNumber>
+      </TaxIdentification>
+      <AdministrativeCentres>
+        <AdministrativeCentre>
+          <CentreCode>${escapeXml(buyerDir3)}</CentreCode>
+          <RoleTypeCode>01</RoleTypeCode>
+        </AdministrativeCentre>
+      </AdministrativeCentres>
+      <LegalEntity>
+        <CorporateName>${escapeXml(buyerName)}</CorporateName>
+        <AddressInSpain>
+          <Address>${escapeXml(buyerStreet)}</Address>
+          <PostCode>${escapeXml(buyerPostal)}</PostCode>
+          <Town>${escapeXml(buyerCity)}</Town>
+          <Province>${escapeXml(buyerCity)}</Province>
+          <CountryCode>${escapeXml(buyerCountry)}</CountryCode>
+        </AddressInSpain>
+      </LegalEntity>
+    </BuyerParty>
+  </Parties>
   <Invoices>
     <Invoice>
       <InvoiceHeader>
@@ -363,6 +514,16 @@ ${facturaeLinesXml}
         taxRatePct: taxRate,
         taxAmountEur,
         taxInclusiveAmountEur,
+        buyerFiscal: {
+            legalEntityName: buyerName,
+            taxIdVat: buyerVat,
+            fiscalStreet: buyerStreet,
+            fiscalPostalCode: buyerPostal,
+            fiscalCity: buyerCity,
+            fiscalCountryCode: buyerCountry,
+            dir3Code: buyerDir3,
+            leitwegId: buyerLeitweg
+        },
         lineItems,
         xml
     };

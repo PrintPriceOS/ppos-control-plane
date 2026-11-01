@@ -484,6 +484,25 @@ router.post('/:orderId/payment/wire-proof', requireMarketplaceOrAdmin, uploadMid
         const notes = req.body?.notes || '';
         const uploadedAt = new Date().toISOString();
 
+        // Persist binary wire proof file to disk if provided via Multer or contentBase64
+        let storagePath = req.file?.path || null;
+        let sizeBytes = Number(req.file?.size || req.body?.sizeBytes || 0);
+        let checksumSha256 = null;
+
+        if (!storagePath && req.body?.contentBase64) {
+            const proofBuffer = Buffer.from(req.body.contentBase64, 'base64');
+            const proofDir = path.join(__dirname, '../../../storage/marketplace_orders', orderId.replace(/[^a-zA-Z0-9_-]/g, '_'), 'WIRE_PROOF');
+            fs.mkdirSync(proofDir, { recursive: true });
+            storagePath = path.join(proofDir, `${Date.now()}_${path.basename(originalName)}`);
+            fs.writeFileSync(storagePath, proofBuffer);
+            sizeBytes = proofBuffer.length;
+            checksumSha256 = require('crypto').createHash('sha256').update(proofBuffer).digest('hex');
+        } else if (storagePath && fs.existsSync(storagePath)) {
+            const fileData = fs.readFileSync(storagePath);
+            sizeBytes = fileData.length;
+            checksumSha256 = require('crypto').createHash('sha256').update(fileData).digest('hex');
+        }
+
         let metadata = {};
         try {
             const rows = await mysqlClient.query('SELECT metadata_json FROM marketplace_orders WHERE order_id = ?', [orderId]);
@@ -499,7 +518,9 @@ router.post('/:orderId/payment/wire-proof', requireMarketplaceOrAdmin, uploadMid
                 reference,
                 ibanOrigin,
                 notes,
-                storagePath: req.file?.path || null,
+                storagePath,
+                sizeBytes,
+                checksumSha256,
                 uploadedAt,
                 uploadedBy: req.user?.id || 'CUSTOMER'
             }

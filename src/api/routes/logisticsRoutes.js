@@ -39,14 +39,38 @@ const {
 } = require('../services/logistics/carrierMilestoneAndEpalService');
 
 function requireLogisticsControlPlaneAuth(req, res, next) {
-    const role = (req.user && req.user.role) || (req.headers && req.headers['x-user-role']);
+    const mktToken = req.headers && req.headers['x-marketplace-token'];
+    const expectedToken = process.env.PPOS_MARKETPLACE_INTAKE_TOKEN || process.env.PPOS_CONTROL_TOKEN;
+    const hasValidMktToken = Boolean(mktToken && expectedToken && mktToken === expectedToken);
+
+    const role =
+        (req.user && req.user.role) ||
+        (req.headers && (req.headers['x-user-role'] || req.headers['x-ppos-role'])) ||
+        (hasValidMktToken ? 'CUSTOMER' : null);
+
     const allowedRoles = new Set([
         'PRINTHOUSE_OPERATOR',
         'PRINTHOUSE_ADMIN',
+        'TENANT_ADMIN',
+        'OPS_ADMIN',
         'ADMIN',
         'SUPER_ADMIN',
-        'OPERATOR'
+        'OPERATOR',
+        'SYSTEM'
     ]);
+
+    const reqPath = String(req.path || req.url || req.originalUrl || '');
+    const isDocumentReadOrLabelRoute =
+        reqPath.includes('/delivery-note/pdf') ||
+        reqPath.includes('/labels/sscc-pdf') ||
+        reqPath.includes('/carrier-protocol/pdf') ||
+        reqPath.includes('/pod-notifications');
+
+    if (isDocumentReadOrLabelRoute) {
+        allowedRoles.add('CUSTOMER');
+        allowedRoles.add('PUBLISHER');
+        allowedRoles.add('AUTHOR');
+    }
 
     if (!role || !allowedRoles.has(String(role).toUpperCase())) {
         return res.status(403).json({
@@ -277,14 +301,14 @@ function createLogisticsRouter(options = {}) {
     router.put('/:id/freight-matrices', handlePutFreightMatrices);
 
     /**
-     * POST /shipments/:id/labels/sscc-pdf (mounted at /api/logistics/shipments/:id/labels/sscc-pdf)
+     * POST & GET /shipments/:id/labels/sscc-pdf (mounted at /api/logistics/shipments/:id/labels/sscc-pdf)
      * Generates GS1-128 SSCC-18 pallet labels in binary PDF buffer (A6 1-page-per-pallet default, or ?format=A4_SHEET_4UP).
      */
-    router.post('/shipments/:id/labels/sscc-pdf', async (req, res) => {
+    const handleSsccLabelsPdf = async (req, res) => {
         try {
             const shipmentId = req.params.id;
             const format = (req.query && req.query.format) || (req.body && req.body.format) || 'A6';
-            const body = req.body || {};
+            const body = { ...(req.query || {}), ...(req.body || {}) };
 
             // Enforce tenant isolation against shipment tenantId if specified
             const authTenantId = req.user && req.user.tenantId;
@@ -320,7 +344,10 @@ function createLogisticsRouter(options = {}) {
                 error: err.message
             });
         }
-    });
+    };
+
+    router.post('/shipments/:id/labels/sscc-pdf', handleSsccLabelsPdf);
+    router.get('/shipments/:id/labels/sscc-pdf', handleSsccLabelsPdf);
 
     /**
      * GET /shipments/:id/delivery-note/pdf (mounted at /api/logistics/shipments/:id/delivery-note/pdf)

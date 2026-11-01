@@ -201,12 +201,32 @@ function createEscrowRouter() {
                 'tenant-default';
             const orderId = req.params && req.params.orderId;
             const format = (req.query && req.query.format) || 'FACTURAE_3_2_2';
+            const customerEmail =
+                (req.headers && req.headers['x-customer-email']) ||
+                (req.query && req.query.email) ||
+                (req.user && req.user.email) ||
+                null;
+            const customerKey = customerEmail
+                ? String(customerEmail).toLowerCase().trim()
+                : null;
             const { syncEscrowLedgerFromMySQL } = require('../services/financials/escrowSettlementService');
             await syncEscrowLedgerFromMySQL(tenantId);
+            let buyerFiscal = null;
+            if (customerKey) {
+                try {
+                    const customerPortalRoutes = require('./customerPortalRoutes');
+                    if (typeof customerPortalRoutes.loadCustomerProfileFromMySQL === 'function') {
+                        buyerFiscal = await customerPortalRoutes.loadCustomerProfileFromMySQL(customerKey, customerEmail);
+                    }
+                } catch (_e) { /* ignore */ }
+            }
             const invoice = generateElectronicInvoiceXml({
                 orderId,
                 format,
-                tenantId
+                tenantId,
+                customerEmail,
+                customerKey,
+                buyerFiscal
             });
             if (req.query && req.query.raw === 'true' && typeof res.setHeader === 'function') {
                 res.setHeader('Content-Type', 'application/xml; charset=utf-8');

@@ -80,7 +80,8 @@ fastify.addHook('onRequest', async (request, reply) => {
             url === '/api/marketplace/orders' ||
             url.startsWith('/api/marketplace/orders/') ||
             url.startsWith('/api/customer/') ||
-            url.startsWith('/api/financials/escrow/');
+            url.startsWith('/api/financials/escrow/') ||
+            url.startsWith('/api/logistics/shipments/');
         if (isMarketplaceOrderPath) {
             const marketplaceHeaderToken = request.headers['x-marketplace-token'];
             const configuredMarketplaceToken = process.env.PPOS_MARKETPLACE_INTAKE_TOKEN;

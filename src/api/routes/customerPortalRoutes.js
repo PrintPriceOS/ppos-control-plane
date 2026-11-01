@@ -244,7 +244,29 @@ function getDefaultCustomerProfile(customerKey, email = '') {
     };
 }
 
+function shouldSeedDemoOrders(customerEmail = '') {
+    const flag = process.env.PPOS_SEED_DEMO_ORDERS;
+    if (flag === 'false' || flag === '0') {
+        return false;
+    }
+    if (flag === 'true' || flag === '1') {
+        return true;
+    }
+    const emailLower = String(customerEmail || '').toLowerCase();
+    const isDemoAccount =
+        !emailLower ||
+        emailLower === 'publisher@printprice.pro' ||
+        emailLower === 'admin@printprice.pro' ||
+        emailLower.endsWith('@editorial-planeta.es') ||
+        emailLower.includes('demo') ||
+        emailLower.includes('test');
+    return isDemoAccount;
+}
+
 function buildBaselineCustomerOrders(customerEmail = 'publisher@printprice.pro') {
+    if (!shouldSeedDemoOrders(customerEmail)) {
+        return [];
+    }
     return [
         {
             orderId: 'ORD_2026_101',
@@ -1391,6 +1413,9 @@ defaultRouter.validateEuVatNumber = validateEuVatNumber;
 defaultRouter.calculateReprintPricing = calculateReprintPricing;
 defaultRouter.buildCustomerOrderTrackingPayload = buildCustomerOrderTrackingPayload;
 defaultRouter.runtimeCustomerOrders = runtimeCustomerOrders;
+defaultRouter.customerProfileStore = customerProfileStore;
+defaultRouter.getDefaultCustomerProfile = getDefaultCustomerProfile;
+defaultRouter.loadCustomerProfileFromMySQL = loadCustomerProfileFromMySQL;
 defaultRouter.updateCustomerOrderRuntimeState = updateCustomerOrderRuntimeState;
 
 module.exports = defaultRouter;

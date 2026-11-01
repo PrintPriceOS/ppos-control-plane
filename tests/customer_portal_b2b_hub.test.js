@@ -217,25 +217,39 @@ describe('B2B Customer Self-Service Hub — End-to-End Transactional Verificatio
     expect(profileData.profile.fiscalProfile.dir3Code).toBe('EA0038291');
     expect(profileData.profile.fiscalProfile.leitwegId).toBe('04011000-1234512345-06');
 
-    // Step 3B: Download Spanish Facturae 3.2.2 XML
+    // Step 3B: Download Spanish Facturae 3.2.2 XML (verify injected BuyerParty fiscal data)
     const facturaeRes = await fetch(
-      `${baseUrl}/api/financials/escrow/ORD_2026_8841/e-invoice.xml?format=FACTURAE_3_2_2&raw=true`,
-      { headers: authHeaders }
+      `${baseUrl}/api/financials/escrow/ORD_2026_101/e-invoice.xml?format=FACTURAE_3_2_2&raw=true`,
+      { headers: { ...authHeaders, 'x-customer-email': 'produccion@editorial-planeta.es' } }
     );
     expect(facturaeRes.status).toBe(200);
     const facturaeXml = await facturaeRes.text();
     expect(facturaeXml).toContain('<fe:Facturae');
     expect(facturaeXml).toContain('<SchemaVersion>3.2.2</SchemaVersion>');
+    expect(facturaeXml).toContain('<BuyerParty>');
+    expect(facturaeXml).toContain('Editorial Planeta S.A.U.');
+    expect(facturaeXml).toContain('ESA08186249');
+    expect(facturaeXml).toContain('EA0038291');
 
-    // Step 3C: Download European XRechnung 3.0 (UBL 2.1) XML
+    // Step 3C: Download European XRechnung 3.0 (UBL 2.1) XML (verify injected AccountingCustomerParty)
     const xrechnungRes = await fetch(
-      `${baseUrl}/api/financials/escrow/ORD_2026_8841/e-invoice.xml?format=XRECHNUNG_3_0&raw=true`,
-      { headers: authHeaders }
+      `${baseUrl}/api/financials/escrow/ORD_2026_101/e-invoice.xml?format=XRECHNUNG_3_0&raw=true`,
+      { headers: { ...authHeaders, 'x-customer-email': 'produccion@editorial-planeta.es' } }
     );
     expect(xrechnungRes.status).toBe(200);
     const xrechnungXml = await xrechnungRes.text();
     expect(xrechnungXml).toContain('<ubl:Invoice');
     expect(xrechnungXml).toContain('xrechnung_3.0');
+    expect(xrechnungXml).toContain('<cac:AccountingCustomerParty>');
+    expect(xrechnungXml).toContain('Editorial Planeta S.A.U.');
+    expect(xrechnungXml).toContain('04011000-1234512345-06');
+
+    // Step 3C-bis: Unknown order returns strict 404 (no silent fallback to ORD-2026-8841)
+    const notFoundInvoiceRes = await fetch(
+      `${baseUrl}/api/financials/escrow/ORD_NON_EXISTENT_999999/e-invoice.xml?format=FACTURAE_3_2_2`,
+      { headers: authHeaders }
+    );
+    expect(notFoundInvoiceRes.status).toBe(404);
 
     // Step 3D: Verify 5-Stage Live Logistics & Signed POD Telemetry
     const trackingRes = await fetch(`${baseUrl}/api/customer/orders/ORD_2026_101/tracking`, {

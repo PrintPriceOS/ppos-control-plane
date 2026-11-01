@@ -89,6 +89,44 @@ class MarketplaceOrderFileService {
         });
 
         const readiness = await marketplaceOrderService.computeReadiness(orderId);
+        let orderStatus = order.status;
+
+        // Check if both required production assets (INTERIOR_PDF and COVER_PDF) are now uploaded/verified
+        const updatedOrder = await marketplaceOrderService.getOrder(orderId);
+        const activeFiles = (updatedOrder?.productionFiles || []).filter(
+            f => f.status !== 'SUPERSEDED' && f.status !== 'PENDING' && f.status !== 'REQUIRED'
+        );
+        const hasInterior = activeFiles.some(f => (f.kind || f.role) === 'INTERIOR_PDF');
+        const hasCover = activeFiles.some(f => (f.kind || f.role) === 'COVER_PDF');
+        const readyForProduction = hasInterior && hasCover;
+
+        if (readyForProduction) {
+            const isPaid =
+                updatedOrder?.payment?.status === 'CONFIRMED' ||
+                updatedOrder?.payment?.status === 'PAID' ||
+                updatedOrder?.payment?.status === 'WIRE_PROOF_UPLOADED' ||
+                updatedOrder?.status === 'PAID';
+            orderStatus = isPaid ? 'IN_PRODUCTION' : 'AWAITING_PAYMENT';
+
+            try {
+                const mysqlClient = require('./mysqlClient');
+                await mysqlClient.query(
+                    'UPDATE marketplace_orders SET status = ?, updated_at = NOW() WHERE order_id = ?',
+                    [orderStatus, orderId]
+                );
+            } catch (_) {}
+
+            try {
+                const customerPortalRoutes = require('../routes/customerPortalRoutes');
+                if (typeof customerPortalRoutes.updateCustomerOrderRuntimeState === 'function') {
+                    customerPortalRoutes.updateCustomerOrderRuntimeState(orderId, {
+                        status: orderStatus,
+                        preflightBypassEligible: true
+                    });
+                }
+            } catch (_) {}
+        }
+
         return {
             ok: true,
             orderId,
@@ -98,8 +136,11 @@ class MarketplaceOrderFileService {
             ingestionStatus: 'COMPLETED',
             sizeBytes,
             checksumSha256,
+            sha256: checksumSha256,
             storagePath: filePath,
             status: 'UPLOADED',
+            orderStatus,
+            readyForProduction,
             readiness
         };
     }
@@ -174,12 +215,51 @@ class MarketplaceOrderFileService {
         });
 
         const readiness = await marketplaceOrderService.computeReadiness(orderId);
+        let orderStatus = 'FILES_REQUIRED';
+
+        const updatedOrder = await marketplaceOrderService.getOrder(orderId);
+        const activeFiles = (updatedOrder?.productionFiles || []).filter(
+            f => f.status !== 'SUPERSEDED' && f.status !== 'PENDING' && f.status !== 'REQUIRED'
+        );
+        const hasInterior = activeFiles.some(f => (f.kind || f.role) === 'INTERIOR_PDF');
+        const hasCover = activeFiles.some(f => (f.kind || f.role) === 'COVER_PDF');
+        const readyForProduction = hasInterior && hasCover;
+
+        if (readyForProduction) {
+            const isPaid =
+                updatedOrder?.payment?.status === 'CONFIRMED' ||
+                updatedOrder?.payment?.status === 'PAID' ||
+                updatedOrder?.payment?.status === 'WIRE_PROOF_UPLOADED' ||
+                updatedOrder?.status === 'PAID';
+            orderStatus = isPaid ? 'IN_PRODUCTION' : 'AWAITING_PAYMENT';
+
+            try {
+                const mysqlClient = require('./mysqlClient');
+                await mysqlClient.query(
+                    'UPDATE marketplace_orders SET status = ?, updated_at = NOW() WHERE order_id = ?',
+                    [orderStatus, orderId]
+                );
+            } catch (_) {}
+
+            try {
+                const customerPortalRoutes = require('../routes/customerPortalRoutes');
+                if (typeof customerPortalRoutes.updateCustomerOrderRuntimeState === 'function') {
+                    customerPortalRoutes.updateCustomerOrderRuntimeState(orderId, {
+                        status: orderStatus,
+                        preflightBypassEligible: true
+                    });
+                }
+            } catch (_) {}
+        }
+
         logger.info({
             event: 'MARKETPLACE_EXTERNAL_LINK_INGESTED',
             orderId,
             fileId: regResult.fileId,
             role: canonicalRole,
-            externalUrl
+            externalUrl,
+            readyForProduction,
+            orderStatus
         });
 
         return {
@@ -191,7 +271,10 @@ class MarketplaceOrderFileService {
             externalUrl,
             ingestionStatus: 'VERIFIED_EXTERNAL_LINK',
             checksumSha256: computedChecksum,
+            sha256: computedChecksum,
             status: 'UPLOADED',
+            orderStatus,
+            readyForProduction,
             readiness
         };
     }
