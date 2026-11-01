@@ -338,6 +338,15 @@ const start = async () => {
             } catch (err) {
                 console.error('[INDUSTRIAL-EVENT-ORCHESTRATION] Startup failed:', err.message);
             }
+
+            // 0.4 Storage Lifecycle & Database Snapshot Scheduler (Phase 16 - Option 2)
+            try {
+                const { startRetentionAndBackupScheduler } = require('./src/api/services/storage/assetRetentionAndBackupService');
+                startRetentionAndBackupScheduler();
+                console.log('[STORAGE-RETENTION-SCHEDULER] Cold archiving and MySQL snapshot scheduler active.');
+            } catch (err) {
+                console.error('[STORAGE-RETENTION-SCHEDULER] Startup failed:', err.message);
+            }
         }
         
         // 1. Register Fastify Static (Product UI - Decoupled Frontend)

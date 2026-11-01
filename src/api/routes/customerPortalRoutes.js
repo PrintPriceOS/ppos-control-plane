@@ -1079,6 +1079,18 @@ function createCustomerPortalRouter() {
             const customPages = Number(req.body?.interiorPages || sourceOrder.specs?.interior_pages || 192);
             const recalculatedTotals = calculateReprintPricing(sourceOrder, requestedCopies);
 
+            // Phase 16 (Option 2): Automatically unpack cold-archived `.tar.gz` assets if source order was archived
+            let coldUnpackResult = null;
+            if (reuseApprovedFiles) {
+                try {
+                    const { unpackArchivedOrder } = require('../services/storage/assetRetentionAndBackupService');
+                    const unpackRes = await unpackArchivedOrder(sourceOrder.orderId || sourceOrderId);
+                    if (unpackRes && unpackRes.restored) {
+                        coldUnpackResult = unpackRes;
+                    }
+                } catch (_) {}
+            }
+
             const suffix = Math.random().toString(36).substring(2, 6).toUpperCase();
             const newOrderId = `ORD_${Date.now()}_${suffix}`;
             const newPublicRef = `ORD-2026-R${Math.floor(1000 + Math.random() * 9000)}`;
@@ -1199,7 +1211,9 @@ function createCustomerPortalRouter() {
                     unitPriceEur: recalculatedTotals.unitPrice,
                     totalPriceEur: recalculatedTotals.total,
                     preflightBypassed: reuseApprovedFiles,
-                    reusedFilesCount: normalizedNewOrder.approvedFiles.length
+                    reusedFilesCount: normalizedNewOrder.approvedFiles.length,
+                    coldStorageRestored: Boolean(coldUnpackResult?.restored),
+                    coldStorageRestoredFilesCount: coldUnpackResult?.restoredFilesCount || 0
                 },
                 orderId: normalizedNewOrder.orderId,
                 publicRef: normalizedNewOrder.publicRef,
@@ -1208,6 +1222,25 @@ function createCustomerPortalRouter() {
         } catch (err) {
             logger.error({ event: 'customer_reorder_failed', sourceOrderId, error: err.message });
             return res.status(500).json({ ok: false, error: 'CUSTOMER_REORDER_FAILED', message: err.message });
+        }
+    });
+
+    /**
+     * 2b. POST /api/customer/orders/:orderId/archive/unpack
+     * On-demand cold storage `.tar.gz` unpack for 1-Click Reorder or legal inspection.
+     */
+    router.post('/orders/:orderId/archive/unpack', async (req, res) => {
+        const orderId = req.params.orderId;
+        try {
+            const { unpackArchivedOrder } = require('../services/storage/assetRetentionAndBackupService');
+            const result = await unpackArchivedOrder(orderId, req.body || {});
+            return res.status(result.ok ? 200 : 404).json(result);
+        } catch (err) {
+            return res.status(500).json({
+                ok: false,
+                error: 'ARCHIVE_UNPACK_FAILED',
+                message: err.message
+            });
         }
     });
 
@@ -1602,6 +1635,51 @@ function createCustomerPortalRouter() {
             return res.status(500).json({
                 ok: false,
                 error: 'CUSTOMER_OPERATIONS_SUMMARY_FAILED',
+                message: err.message
+            });
+        }
+    });
+
+    /**
+     * 3g. Storage Lifecycle & Database Snapshot Endpoints (Phase 16 - Option 2)
+     */
+    router.get('/storage/backup/status', async (req, res) => {
+        try {
+            const { getStorageBackupAndRetentionStatus } = require('../services/storage/assetRetentionAndBackupService');
+            const status = await getStorageBackupAndRetentionStatus();
+            return res.status(200).json(status);
+        } catch (err) {
+            return res.status(500).json({
+                ok: false,
+                error: 'STORAGE_BACKUP_STATUS_FAILED',
+                message: err.message
+            });
+        }
+    });
+
+    router.post('/storage/retention/run', async (req, res) => {
+        try {
+            const { runRetentionCycle } = require('../services/storage/assetRetentionAndBackupService');
+            const result = await runRetentionCycle(req.body || {});
+            return res.status(200).json(result);
+        } catch (err) {
+            return res.status(500).json({
+                ok: false,
+                error: 'STORAGE_RETENTION_RUN_FAILED',
+                message: err.message
+            });
+        }
+    });
+
+    router.post('/storage/backup/run', async (req, res) => {
+        try {
+            const { runDatabaseBackup } = require('../services/storage/assetRetentionAndBackupService');
+            const result = await runDatabaseBackup(req.body || {});
+            return res.status(200).json(result);
+        } catch (err) {
+            return res.status(500).json({
+                ok: false,
+                error: 'DATABASE_BACKUP_RUN_FAILED',
                 message: err.message
             });
         }

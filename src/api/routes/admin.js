@@ -26,19 +26,29 @@ router.get('/test-headers', (req, res) => {
   });
 });
 
-// ── Executive Operational Telemetry Summary (Phase 16 - Option 1) ──────────
+// ── Executive Operational Telemetry & Storage Lifecycle (Phase 16 - Option 1 & Option 2) ──
 const { getOperationalTelemetrySummary } = require('../services/telemetry/operationalTelemetryService');
+const {
+  runRetentionCycle,
+  runDatabaseBackup,
+  getStorageBackupAndRetentionStatus,
+  unpackArchivedOrder
+} = require('../services/storage/assetRetentionAndBackupService');
 
-router.get('/operations/telemetry-summary', async (req, res, next) => {
+function hasTrustedInternalStorageOrTelemetryToken(req) {
   const mktToken = String(req.headers['x-marketplace-token'] || '').trim();
   const expectedMktToken = String(process.env.PPOS_MARKETPLACE_INTAKE_TOKEN || '').trim();
   const serviceToken = String(req.headers['x-service-token'] || '').trim();
   const expectedControlToken = String(process.env.PPOS_CONTROL_TOKEN || '').trim();
 
-  if (
+  return (
     (mktToken && expectedMktToken && mktToken === expectedMktToken) ||
     (serviceToken && expectedControlToken && serviceToken === expectedControlToken)
-  ) {
+  );
+}
+
+router.get('/operations/telemetry-summary', async (req, res, next) => {
+  if (hasTrustedInternalStorageOrTelemetryToken(req)) {
     try {
       const tenantId = req.headers['x-tenant-id'] || req.query.tenantId || 'tenant-default';
       const summary = await getOperationalTelemetrySummary({ tenantId });
@@ -47,6 +57,54 @@ router.get('/operations/telemetry-summary', async (req, res, next) => {
       return res.status(500).json({
         ok: false,
         error: 'OPERATIONAL_TELEMETRY_SUMMARY_FAILED',
+        message: err.message
+      });
+    }
+  }
+  return next();
+});
+
+router.get('/storage/backup/status', async (req, res, next) => {
+  if (hasTrustedInternalStorageOrTelemetryToken(req)) {
+    try {
+      const status = await getStorageBackupAndRetentionStatus();
+      return res.status(200).json(status);
+    } catch (err) {
+      return res.status(500).json({
+        ok: false,
+        error: 'STORAGE_BACKUP_STATUS_FAILED',
+        message: err.message
+      });
+    }
+  }
+  return next();
+});
+
+router.post('/storage/retention/run', async (req, res, next) => {
+  if (hasTrustedInternalStorageOrTelemetryToken(req)) {
+    try {
+      const result = await runRetentionCycle(req.body || {});
+      return res.status(200).json(result);
+    } catch (err) {
+      return res.status(500).json({
+        ok: false,
+        error: 'STORAGE_RETENTION_RUN_FAILED',
+        message: err.message
+      });
+    }
+  }
+  return next();
+});
+
+router.post('/storage/backup/run', async (req, res, next) => {
+  if (hasTrustedInternalStorageOrTelemetryToken(req)) {
+    try {
+      const result = await runDatabaseBackup(req.body || {});
+      return res.status(200).json(result);
+    } catch (err) {
+      return res.status(500).json({
+        ok: false,
+        error: 'DATABASE_BACKUP_RUN_FAILED',
         message: err.message
       });
     }
@@ -1364,7 +1422,7 @@ router.get('/printhouses/:nodeId/publications/latest', async (req, res) => {
     }
 });
 
-// ── Executive Operational Telemetry Summary (Authenticated Admin / System) ──
+// ── Executive Operational Telemetry & Storage Lifecycle (Authenticated Admin / System) ──
 router.get('/operations/telemetry-summary', async (req, res) => {
     try {
         const tenantId = req.user?.tenantId || req.headers['x-tenant-id'] || req.query.tenantId || 'tenant-default';
@@ -1374,6 +1432,58 @@ router.get('/operations/telemetry-summary', async (req, res) => {
         return res.status(500).json({
             ok: false,
             error: 'OPERATIONAL_TELEMETRY_SUMMARY_FAILED',
+            message: err.message
+        });
+    }
+});
+
+router.get('/storage/backup/status', async (req, res) => {
+    try {
+        const status = await getStorageBackupAndRetentionStatus();
+        return res.status(200).json(status);
+    } catch (err) {
+        return res.status(500).json({
+            ok: false,
+            error: 'STORAGE_BACKUP_STATUS_FAILED',
+            message: err.message
+        });
+    }
+});
+
+router.post('/storage/retention/run', async (req, res) => {
+    try {
+        const result = await runRetentionCycle(req.body || {});
+        return res.status(200).json(result);
+    } catch (err) {
+        return res.status(500).json({
+            ok: false,
+            error: 'STORAGE_RETENTION_RUN_FAILED',
+            message: err.message
+        });
+    }
+});
+
+router.post('/storage/backup/run', async (req, res) => {
+    try {
+        const result = await runDatabaseBackup(req.body || {});
+        return res.status(200).json(result);
+    } catch (err) {
+        return res.status(500).json({
+            ok: false,
+            error: 'DATABASE_BACKUP_RUN_FAILED',
+            message: err.message
+        });
+    }
+});
+
+router.post('/storage/retention/unpack/:orderId', async (req, res) => {
+    try {
+        const result = await unpackArchivedOrder(req.params.orderId, req.body || {});
+        return res.status(result.ok ? 200 : 404).json(result);
+    } catch (err) {
+        return res.status(500).json({
+            ok: false,
+            error: 'ARCHIVE_UNPACK_FAILED',
             message: err.message
         });
     }
