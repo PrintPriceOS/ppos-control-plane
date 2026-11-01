@@ -325,5 +325,41 @@ describe('Dark Industrial Telemetry UI — Canonical Components & Dual-Mode Reco
         expect(await screen.findByTestId('einvoice-xml-modal')).toBeInTheDocument();
         expect(screen.getByTestId('einvoice-xml-code')).toHaveTextContent('xrechnung_3.0');
     });
+
+    it('11. Renders PHASE-14 Decoupled Pricing Intelligence Engine (PricingKpiSummaryBar, EconomicProfilesTable, LivePriceCalibratorModal, RoutingRulesTab)', async () => {
+        renderWithProviders(<PricingIntelligenceTab mode="workspace" />, {
+            locale: 'es',
+            route: '/ops/pricing'
+        });
+
+        // Verify KPI bar shows real seeded profiles (> 0)
+        expect(screen.getByTestId('pricing-kpi-summary-bar')).toBeInTheDocument();
+        expect(screen.getByTestId('economic-profiles-table')).toBeInTheDocument();
+        expect(screen.getByText('Heidelberg Speedmaster XL 106-8P')).toBeInTheDocument();
+        expect(screen.getByText('HP Indigo 12000 HD Digital Press')).toBeInTheDocument();
+
+        // Open Live Price Calibrator Modal from the Heidelberg row
+        const calibrateBtn = screen.getByTestId('calibrate-profile-btn-prof-offset-b1-xl106');
+        fireEvent.click(calibrateBtn);
+
+        expect(await screen.findByTestId('live-price-calibrator')).toBeInTheDocument();
+        const initialTotal = screen.getByTestId('calibrator-total-selling-price').textContent;
+
+        // Adjust Target Margin slider from 28% to 45% and verify real-time price recalculation
+        const marginSlider = screen.getByTestId('slider-target-margin');
+        fireEvent.change(marginSlider, { target: { value: '45' } });
+        expect(screen.getByTestId('slider-target-margin-value')).toHaveTextContent('45%');
+
+        const updatedTotal = screen.getByTestId('calibrator-total-selling-price').textContent;
+        expect(updatedTotal).not.toEqual(initialTotal);
+
+        // Close calibrator modal and switch to Routing Decisions & Crossover tab
+        fireEvent.click(screen.getByTestId('close-calibrator-btn'));
+        fireEvent.click(screen.getByRole('tab', { name: 'ROUTING DECISIONS' }));
+
+        expect(await screen.findByTestId('routing-rules-tab')).toBeInTheDocument();
+        expect(screen.getByTestId('crossover-analyzer-card')).toBeInTheDocument();
+        expect(screen.getByTestId('crossover-copies-badge')).toHaveTextContent(/410 copies/);
+    });
 });
 

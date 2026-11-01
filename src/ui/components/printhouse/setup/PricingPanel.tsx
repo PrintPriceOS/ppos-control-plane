@@ -16,6 +16,7 @@ import { QuickCalibrationPanel } from '../pricing/quick-calibration/QuickCalibra
 import { PricingWorkflowSelector, PricingWorkflow } from '../pricing/PricingWorkflowSelector';
 import { SimplifiedOnboardingJourney } from '../onboarding/SimplifiedOnboardingJourney';
 import { SetupDrawer } from './SetupDrawer';
+import { LivePriceCalibratorModal, EconomicProfileRow, PaperCatalogItem } from '../../pricing';
 import { Tag, Plus, Edit, Copy, Trash2, ShieldAlert, BadgeAlert, CheckCircle, CheckCircle2, Calculator, Info, ShieldCheck, HelpCircle, Layers, ChevronDown, ChevronUp, Sparkles, Sliders, ArrowLeft } from 'lucide-react';
 import { useLocale } from '../../../i18n';
 import { ProductFamilyId, FamilyState, FamilyStatus } from '../../../types/printhouseOnboardingTypes';
@@ -55,6 +56,9 @@ export const PricingPanel: React.FC<PricingPanelProps> = ({ sites = [], onSaved 
 
     // ── Downstream Commercial Policies State ──
     const [showCommercialPolicy, setShowCommercialPolicy] = useState(false);
+    const [showLiveCalibrator, setShowLiveCalibrator] = useState(false);
+    const [sharedProfiles, setSharedProfiles] = useState<EconomicProfileRow[]>([]);
+    const [sharedPapers, setSharedPapers] = useState<PaperCatalogItem[]>([]);
     const [priceBooks, setPriceBooks] = useState<any[]>([]);
     const [selectedBook, setSelectedBook] = useState<any | null>(null);
     const [rules, setRules] = useState<any[]>([]);
@@ -576,6 +580,16 @@ export const PricingPanel: React.FC<PricingPanelProps> = ({ sites = [], onSaved 
 
                     {/* Right: Commercial Price Books - Visually distinct commercial action */}
                     <div className="flex items-center gap-2 shrink-0">
+                        <button
+                            id="pricing-live-calibrator-btn"
+                            data-testid="onboarding-open-live-calibrator-btn"
+                            type="button"
+                            onClick={() => setShowLiveCalibrator(true)}
+                            className="px-3 py-1.5 rounded-xl text-xs font-bold border border-[#dc0000]/40 bg-red-50/70 dark:bg-red-950/30 hover:bg-[#dc0000] text-[#dc0000] hover:text-white transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                        >
+                            <Sliders size={13} />
+                            <span>Live Calibrator</span>
+                        </button>
                         <button
                             id="pricing-price-books-btn"
                             type="button"
@@ -1165,6 +1179,25 @@ export const PricingPanel: React.FC<PricingPanelProps> = ({ sites = [], onSaved 
                     isClone={!!cloningBook}
                 />
             )}
+
+            <LivePriceCalibratorModal
+                isOpen={showLiveCalibrator}
+                onClose={() => setShowLiveCalibrator(false)}
+                profiles={sharedProfiles}
+                papers={sharedPapers}
+                onApplyProfileCalibration={async (updatedProfile) => {
+                    await fetch('/api/pricing/profiles', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${token}`,
+                            'x-user-role': 'PRINTHOUSE_ADMIN'
+                        },
+                        body: JSON.stringify(updatedProfile)
+                    }).catch(() => {});
+                    onSaved?.();
+                }}
+            />
 
             {/* MODAL 2: PRICING RULE BUILDER */}
             {showRuleModal && selectedBook && (
