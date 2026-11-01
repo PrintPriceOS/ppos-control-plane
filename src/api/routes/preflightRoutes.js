@@ -13,15 +13,76 @@
  * Protected by `requireLogisticsControlPlaneAuth` (multi-tenant isolation & role enforcement).
  */
 
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
 const {
     PREFLIGHT_STANDARDS,
     MASTER_PAPER_CATALOG,
     GEOMETRY_PROFILES,
     inspectPreflightJob,
     executePreflightAutoFix,
+    purgePreflightJobAsset,
     listTenantPreflightInspections,
     getPreflightInspectionById
 } = require('../services/preflight/preflightEngineService');
+
+const MAX_PREFLIGHT_PDF_BYTES = 2 * 1024 * 1024 * 1024; // 2 GB (2147483648 bytes)
+const PREFLIGHT_TEMP_DIR =
+    process.env.PPOS_PREFLIGHT_TEMP_DIR ||
+    (process.platform === 'win32'
+        ? path.join(os.tmpdir(), 'ppos-preflight-temp')
+        : '/tmp/ppos-preflight-temp');
+
+function createStreamingPreflightUploadMiddleware() {
+    try {
+        const multer = require('multer');
+        const storage = multer.diskStorage({
+            destination: (req, file, cb) => {
+                try {
+                    fs.mkdirSync(PREFLIGHT_TEMP_DIR, { recursive: true });
+                    cb(null, PREFLIGHT_TEMP_DIR);
+                } catch (err) {
+                    cb(err, os.tmpdir());
+                }
+            },
+            filename: (req, file, cb) => {
+                const safeName = path
+                    .basename(file.originalname || 'workshop.pdf')
+                    .replace(/[^a-zA-Z0-9._-]/g, '_');
+                cb(null, `ppos_pf_${Date.now()}_${Math.random().toString(36).slice(2, 8)}_${safeName}`);
+            }
+        });
+        const uploader = multer({
+            storage,
+            limits: {
+                fileSize: MAX_PREFLIGHT_PDF_BYTES
+            }
+        }).single('file');
+
+        return (req, res, next) => {
+            const contentType = String((req.headers && req.headers['content-type']) || '').toLowerCase();
+            if (!contentType.includes('multipart/form-data')) {
+                return next();
+            }
+            uploader(req, res, (err) => {
+                if (err) {
+                    const isSizeLimit = err.code === 'LIMIT_FILE_SIZE' || /too large/i.test(err.message || '');
+                    return res.status(isSizeLimit ? 413 : 400).json({
+                        ok: false,
+                        error: isSizeLimit ? 'PAYLOAD_TOO_LARGE_MAX_2GB' : 'MULTIPART_STREAM_ERROR',
+                        message: err.message
+                    });
+                }
+                next();
+            });
+        };
+    } catch (_) {
+        return (req, res, next) => next();
+    }
+}
+
+const preflightStreamingUpload = createStreamingPreflightUploadMiddleware();
 
 function requireLogisticsControlPlaneAuth(req, res, next) {
     const role = (req.user && req.user.role) || (req.headers && req.headers['x-user-role']) || 'SUPER_ADMIN';
@@ -72,12 +133,12 @@ function createFallbackRouter() {
     const stack = [];
     const middlewares = [];
 
-    const addRoute = (method, path, handler) => {
+    const addRoute = (method, path, ...handlers) => {
         stack.push({
             route: {
                 path,
                 methods: { [method]: true },
-                stack: [{ handle: handler }]
+                stack: handlers.map((h) => ({ handle: h }))
             }
         });
     };
@@ -88,11 +149,14 @@ function createFallbackRouter() {
         use(fn) {
             middlewares.push(fn);
         },
-        get(path, handler) {
-            addRoute('get', path, handler);
+        get(path, ...handlers) {
+            addRoute('get', path, ...handlers);
         },
-        post(path, handler) {
-            addRoute('post', path, handler);
+        post(path, ...handlers) {
+            addRoute('post', path, ...handlers);
+        },
+        delete(path, ...handlers) {
+            addRoute('delete', path, ...handlers);
         }
     };
 }
@@ -172,7 +236,7 @@ function createPreflightRouter() {
     });
 
     // POST /api/preflight/inspect
-    router.post('/inspect', async (req, res) => {
+    router.post('/inspect', preflightStreamingUpload, async (req, res) => {
         try {
             const tenantId =
                 (req.user && req.user.tenantId) ||
@@ -181,23 +245,38 @@ function createPreflightRouter() {
                 'tenant-default';
 
             const payload = { ...(req.body || {}) };
-            if (!payload.pdfBuffer && typeof payload.pdfBase64 === 'string' && payload.pdfBase64.length > 0) {
+            if (req.file) {
+                payload.filePath = req.file.path;
+                payload.storagePath = req.file.path;
+                payload.fileName = payload.fileName || req.file.originalname;
+                payload.sizeBytes = req.file.size;
+            } else if (!payload.pdfBuffer && typeof payload.pdfBase64 === 'string' && payload.pdfBase64.length > 0) {
                 const rawB64 = payload.pdfBase64.replace(/^data:application\/pdf;base64,/i, '');
                 payload.pdfBuffer = Buffer.from(rawB64, 'base64');
             }
 
             let upstreamEngineStatus = null;
-            if (payload.pdfBuffer && Buffer.isBuffer(payload.pdfBuffer) && payload.pdfBuffer.length > 16) {
+            const hasDiskStream = payload.filePath && typeof payload.filePath === 'string' && fs.existsSync(payload.filePath);
+            const hasMemoryBuffer = payload.pdfBuffer && Buffer.isBuffer(payload.pdfBuffer) && payload.pdfBuffer.length > 16;
+
+            if (hasDiskStream || hasMemoryBuffer) {
                 try {
                     const preflightServiceClient = require('../services/preflightServiceClient');
                     const upstreamRes = await preflightServiceClient.createJob({
-                        file: {
-                            originalname: payload.fileName || payload.originalName || `${payload.jobId || 'workshop'}.pdf`,
-                            mimetype: 'application/pdf',
-                            buffer: payload.pdfBuffer
-                        },
+                        file: hasDiskStream
+                            ? {
+                                  originalname: payload.fileName || payload.originalName || `${payload.jobId || 'workshop'}.pdf`,
+                                  mimetype: 'application/pdf',
+                                  path: payload.filePath,
+                                  size: payload.sizeBytes
+                              }
+                            : {
+                                  originalname: payload.fileName || payload.originalName || `${payload.jobId || 'workshop'}.pdf`,
+                                  mimetype: 'application/pdf',
+                                  buffer: payload.pdfBuffer
+                              },
                         tenantId,
-                        strategy: 'ANALYZE_ONLY',
+                        strategy: payload.workflowMode === 'MAGIC_FIX' ? 'AUTO_FIX' : 'ANALYZE_ONLY',
                         policy: payload.policy || 'OFFSET_MODERN_COATED',
                         actorContext: {
                             actorId: (req.user && req.user.id) || 'workshop-operator',
@@ -217,7 +296,7 @@ function createPreflightRouter() {
                 }
             }
 
-            const report = inspectPreflightJob(payload, {
+            let report = inspectPreflightJob(payload, {
                 tenantId,
                 actorId: (req.user && req.user.id) || 'workshop-operator'
             });
@@ -225,7 +304,78 @@ function createPreflightRouter() {
                 report.upstreamEngine = upstreamEngineStatus;
             }
 
+            const shouldAutoFix =
+                String(payload.workflowMode || '').toUpperCase() === 'MAGIC_FIX' ||
+                String(payload.autoFix || '').toLowerCase() === 'true';
+
+            if (shouldAutoFix && report.overallStatus !== 'PASS') {
+                const fixResult = executePreflightAutoFix(
+                    {
+                        jobId: report.jobId,
+                        isbn: report.isbn,
+                        pageCount: report.spineGeometry.pageCount,
+                        paperGrammage: report.substrate.grammageGsm,
+                        paperBulk: report.substrate.bulkCm3PerG,
+                        bindingType: report.spineGeometry.bindingType,
+                        declaredSpineMm: report.spineGeometry.detectedSpineMm,
+                        innerBleedMm: report.bleedGeometry.inner.detectedBleedMm
+                    },
+                    {
+                        tenantId,
+                        actorId: (req.user && req.user.id) || 'workshop-operator'
+                    }
+                );
+                report = getPreflightInspectionById(report.jobId, tenantId) || report;
+                report.autoFixSummary = fixResult;
+            }
+
+            const shouldPurgeAsset =
+                String(req.query && req.query.purgeAsset).toLowerCase() === 'true' ||
+                String(payload.purgeAsset).toLowerCase() === 'true' ||
+                payload.purgeAsset === true;
+
+            if (shouldPurgeAsset) {
+                const purgeOutcome = purgePreflightJobAsset(report.jobId, tenantId);
+                report.assetPurged = true;
+                report.assetStorage = purgeOutcome.inspection
+                    ? purgeOutcome.inspection.assetStorage
+                    : {
+                          ...(report.assetStorage || {}),
+                          storagePath: null,
+                          assetPurged: true,
+                          purgedAt: purgeOutcome.purgedAt,
+                          diskFileRemoved: purgeOutcome.diskFileRemoved,
+                          retentionState: 'METADATA_ONLY_ASSET_PURGED'
+                      };
+            }
+
             return res.status(200).json(report);
+        } catch (err) {
+            return res.status(400).json({
+                ok: false,
+                error: err.message
+            });
+        }
+    });
+
+    // DELETE /api/preflight/jobs/:jobId/asset
+    router.delete('/jobs/:jobId/asset', async (req, res) => {
+        try {
+            const tenantId =
+                (req.user && req.user.tenantId) ||
+                (req.query && req.query.tenantId) ||
+                (req.headers && req.headers['x-tenant-id']) ||
+                'tenant-default';
+            const jobId = req.params && req.params.jobId;
+            if (!jobId) {
+                return res.status(400).json({
+                    ok: false,
+                    error: 'JOB_ID_REQUIRED: jobId parameter is required to purge PDF asset.'
+                });
+            }
+
+            const purgeOutcome = purgePreflightJobAsset(jobId, tenantId);
+            return res.status(200).json(purgeOutcome);
         } catch (err) {
             return res.status(400).json({
                 ok: false,

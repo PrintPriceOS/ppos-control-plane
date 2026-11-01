@@ -230,22 +230,24 @@ class PreflightServiceClient {
    * Create an upstream preflight job natively supporting multipart file payloads and header forwarding
    */
   async createJob({ file, tenantId, strategy, policy, metadata, actorContext, traceId, authHeader }) {
-    if (!file || !file.buffer) {
-      throw new Error('INVALID_FILE_PAYLOAD: File buffer is required');
+    const fs = require('fs');
+    if (!file || (!file.buffer && !file.path)) {
+      throw new Error('INVALID_FILE_PAYLOAD: File buffer or disk stream path is required');
     }
 
     // PDF only enforcement
     const mimeType = file.mimetype || 'application/pdf';
-    if (mimeType !== 'application/pdf') {
+    if (mimeType !== 'application/pdf' && mimeType !== 'application/octet-stream') {
       throw new Error('UNSUPPORTED_MEDIA_TYPE: Only PDF files are permitted for industrial preflight');
     }
 
     // Secure against path traversal
     const safeFilename = (file.originalname || 'document.pdf').replace(/^.*[\\/]/, '').replace(/[^a-zA-Z0-9._-]/g, '_');
 
-    // Max file size enforcement
+    // Max file size enforcement (2 GB default)
     const maxSize = parseInt(process.env.PPOS_MAX_FILE_SIZE_BYTES || '2147483648', 10);
-    if (file.buffer.length > maxSize) {
+    const fileSize = file.size || (file.buffer ? file.buffer.length : 0);
+    if (fileSize > maxSize) {
       throw new Error(`PAYLOAD_TOO_LARGE: File size exceeds maximum industrial limit of ${maxSize} bytes`);
     }
 
@@ -264,7 +266,10 @@ class PreflightServiceClient {
     if (metadata) {
       form.append('metadata', typeof metadata === 'string' ? metadata : JSON.stringify(metadata));
     }
-    form.append('file', file.buffer, {
+    const fileStreamOrBuffer = file.path && fs.existsSync(file.path)
+      ? fs.createReadStream(file.path)
+      : file.buffer;
+    form.append('file', fileStreamOrBuffer, {
       filename: safeFilename,
       contentType: 'application/pdf'
     });

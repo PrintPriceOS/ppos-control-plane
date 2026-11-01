@@ -238,5 +238,95 @@ describe('PHASE-11A — Automated Preflight & Spine Geometry Engine (FIX IT Engi
         expect(fixRes.body.newHealth).toBe('PASS');
         expect(fixRes.body.sanitizedArtifacts.coverPdfSanitizedUrl).toContain('22.1mm.pdf');
     });
+
+    it('5. Supports streaming filePath inspection and immediate disk asset purge (?purgeAsset=true and DELETE /jobs/:jobId/asset)', async () => {
+        const fs = require('fs');
+        const os = require('os');
+        const path = require('path');
+        const router = preflightRoutes.createPreflightRouter();
+
+        const tmpDir = path.join(os.tmpdir(), 'ppos-preflight-test');
+        fs.mkdirSync(tmpDir, { recursive: true });
+        const tmpPdf1 = path.join(tmpDir, 'test_book_2gb_sim_1.pdf');
+        const tmpPdf2 = path.join(tmpDir, 'test_book_2gb_sim_2.pdf');
+        fs.writeFileSync(tmpPdf1, '%PDF-1.6\n1 0 obj << /Type /Page >> endobj\n2 0 obj << /Type /Page >> endobj\n%%EOF');
+        fs.writeFileSync(tmpPdf2, '%PDF-1.6\n1 0 obj << /Type /Page >> endobj\n2 0 obj << /Type /Page >> endobj\n%%EOF');
+
+        // 5.1 Inspect with ?purgeAsset=true automatically unlinks the temporary PDF file after telemetry extraction
+        const purgeOnInspectRes = await invokeRouter(router, {
+            method: 'POST',
+            path: '/inspect',
+            user: { role: 'PRINTHOUSE_ADMIN', tenantId: 'tenant-alpha' },
+            query: { purgeAsset: 'true' },
+            body: {
+                jobId: 'PF-PURGE-AUTO-01',
+                filePath: tmpPdf1,
+                pageCount: 280,
+                paperGrammage: 90,
+                paperBulk: 1.3,
+                bindingType: 'SOFTCOVER_PUR',
+                declaredSpineMm: 18.7
+            }
+        });
+
+        expect(purgeOnInspectRes.statusCode).toBe(200);
+        expect(purgeOnInspectRes.body.assetPurged).toBe(true);
+        expect(purgeOnInspectRes.body.assetStorage.retentionState).toBe('METADATA_ONLY_ASSET_PURGED');
+        expect(fs.existsSync(tmpPdf1)).toBe(false);
+
+        // 5.2 Inspect without auto-purge retains file until DELETE /jobs/:jobId/asset is invoked
+        const retainRes = await invokeRouter(router, {
+            method: 'POST',
+            path: '/inspect',
+            user: { role: 'PRINTHOUSE_ADMIN', tenantId: 'tenant-alpha' },
+            body: {
+                jobId: 'PF-PURGE-MANUAL-02',
+                filePath: tmpPdf2,
+                pageCount: 280,
+                paperGrammage: 90,
+                paperBulk: 1.3,
+                bindingType: 'SOFTCOVER_PUR',
+                declaredSpineMm: 18.7
+            }
+        });
+
+        expect(retainRes.statusCode).toBe(200);
+        expect(fs.existsSync(tmpPdf2)).toBe(true);
+
+        const deleteReq = {
+            method: 'DELETE',
+            url: '/jobs/PF-PURGE-MANUAL-02/asset',
+            path: '/jobs/:jobId/asset',
+            params: { jobId: 'PF-PURGE-MANUAL-02' },
+            user: { role: 'PRINTHOUSE_ADMIN', tenantId: 'tenant-alpha' },
+            headers: {},
+            query: {}
+        };
+        const deleteRes = {
+            statusCode: 200,
+            body: null,
+            status(c) {
+                this.statusCode = c;
+                return this;
+            },
+            json(p) {
+                this.body = p;
+                return this;
+            }
+        };
+
+        const deleteLayer = router.stack.find(
+            (l) => l.route && l.route.path === '/jobs/:jobId/asset' && l.route.methods.delete
+        );
+        expect(deleteLayer).toBeDefined();
+        await deleteLayer.route.stack[deleteLayer.route.stack.length - 1].handle(deleteReq, deleteRes);
+
+        expect(deleteRes.statusCode).toBe(200);
+        expect(deleteRes.body.ok).toBe(true);
+        expect(deleteRes.body.assetPurged).toBe(true);
+        expect(deleteRes.body.diskFileRemoved).toBe(true);
+        expect(deleteRes.body.retentionState).toBe('METADATA_ONLY_ASSET_PURGED');
+        expect(fs.existsSync(tmpPdf2)).toBe(false);
+    });
 });
 

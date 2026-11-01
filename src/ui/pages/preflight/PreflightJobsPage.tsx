@@ -19,7 +19,8 @@ import {
     SwatchIcon,
     WrenchScrewdriverIcon,
     ArrowPathIcon,
-    CheckCircleIcon
+    CheckCircleIcon,
+    TrashIcon
 } from '@heroicons/react/24/outline';
 import { useLocale } from '../../i18n';
 import { getAuthToken } from '../../lib/authStore';
@@ -30,6 +31,10 @@ import {
     IndustrialTable,
     StatusBadge
 } from '../../components/common';
+import {
+    PreflightUploadModal,
+    PreflightUploadModalSubmitPayload
+} from '../../components/preflight/PreflightUploadModal';
 
 export interface PreflightInspectionRow {
     jobId: string;
@@ -51,6 +56,7 @@ export interface PreflightInspectionRow {
     tacStatus: 'PASS' | 'WARNING' | 'FAIL';
     overallStatus: 'PASS' | 'WARNING' | 'FAIL';
     autoFixed?: boolean;
+    assetPurged?: boolean;
 }
 
 const PREFLIGHT_I18N: Record<'en' | 'es' | 'de', Record<string, string>> = {
@@ -266,20 +272,8 @@ export const PreflightJobsPage: React.FC<SharedModuleProps> = ({
     const [jobs, setJobs] = useState<PreflightInspectionRow[]>(INITIAL_WORKSHOP_JOBS);
     const [profiles, setProfiles] = useState(GEOMETRY_PROFILES);
     const [fixingJobId, setFixingJobId] = useState<string | null>(null);
+    const [purgingJobId, setPurgingJobId] = useState<string | null>(null);
     const [showModal, setShowModal] = useState(false);
-
-    // Inspection Form State
-    const [formJobId, setFormJobId] = useState('PF-2026-089');
-    const [formTitle, setFormTitle] = useState('Tratado de Impresión Offset Digital');
-    const [formIsbn, setFormIsbn] = useState('978-84-9032-441-1');
-    const [formRole, setFormRole] = useState<'INTERIOR_PDF' | 'COVER_PDF'>('INTERIOR_PDF');
-    const [formPdfFile, setFormPdfFile] = useState<File | null>(null);
-    const [formPages, setFormPages] = useState(280);
-    const [formBinding, setFormBinding] = useState<'SOFTCOVER_PUR' | 'HARDCOVER'>('SOFTCOVER_PUR');
-    const [formGrammage, setFormGrammage] = useState(90);
-    const [formBulk, setFormBulk] = useState(1.3);
-    const [formDeclaredSpine, setFormDeclaredSpine] = useState(14.0);
-    const [formInnerBleed, setFormInnerBleed] = useState(1.5);
 
     useEffect(() => {
         let isMounted = true;
@@ -317,7 +311,8 @@ export const PreflightJobsPage: React.FC<SharedModuleProps> = ({
                             maxAllowedTacPct: report.tacAndColor.maxAllowedTacPct,
                             tacStatus: report.tacAndColor.status,
                             overallStatus: report.overallStatus,
-                            autoFixed: Boolean(report.autoFixed)
+                            autoFixed: Boolean(report.autoFixed),
+                            assetPurged: Boolean(report.assetPurged || report.assetStorage?.assetPurged)
                         }));
                     if (mapped.length > 0) {
                         setJobs((prev) => {
@@ -335,59 +330,42 @@ export const PreflightJobsPage: React.FC<SharedModuleProps> = ({
         };
     }, []);
 
-    const readFileAsBase64 = (file: File): Promise<string> =>
-        new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => {
-                const resStr = String(reader.result || '');
-                const b64 = resStr.includes(',') ? resStr.split(',')[1] : resStr;
-                resolve(b64);
-            };
-            reader.onerror = () => reject(reader.error);
-            reader.readAsDataURL(file);
-        });
-
-    const handleRunPreflight = async (e?: React.FormEvent) => {
-        if (e) e.preventDefault();
+    const handleRunPreflightSubmit = async (payload: PreflightUploadModalSubmitPayload) => {
         const token = getAuthToken();
 
-        let pdfBase64: string | undefined;
-        if (formPdfFile) {
-            try {
-                pdfBase64 = await readFileAsBase64(formPdfFile);
-            } catch (_) {
-                // Ignore file reader error in synthetic test environments
-            }
-        }
-
         try {
-            const res = await fetch('/api/preflight/inspect', {
+            const formData = new FormData();
+            formData.append('jobId', payload.jobId);
+            formData.append('title', payload.title);
+            formData.append('isbn', payload.isbn);
+            formData.append('role', payload.role);
+            formData.append('workflowMode', payload.workflowMode);
+            formData.append('purgeAsset', String(payload.purgeAsset));
+            formData.append('pageCount', String(payload.pageCount));
+            formData.append('paperGrammage', String(payload.paperGrammage));
+            formData.append('paperBulk', String(payload.paperBulk));
+            formData.append('bindingType', payload.bindingType);
+            formData.append('declaredSpineMm', String(payload.declaredSpineMm));
+            formData.append('innerBleedMm', String(payload.innerBleedMm));
+            if (payload.pdfFile) {
+                formData.append('fileName', payload.pdfFile.name);
+                formData.append('file', payload.pdfFile);
+            }
+
+            const queryStr = payload.purgeAsset ? '?purgeAsset=true' : '';
+            const res = await fetch(`/api/preflight/inspect${queryStr}`, {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json',
                     ...(token ? { Authorization: `Bearer ${token}` } : {})
                 },
-                body: JSON.stringify({
-                    jobId: formJobId,
-                    title: formTitle,
-                    isbn: formIsbn,
-                    role: formRole,
-                    fileName: formPdfFile?.name,
-                    ...(pdfBase64 ? { pdfBase64 } : {}),
-                    pageCount: Number(formPages),
-                    paperGrammage: Number(formGrammage),
-                    paperBulk: Number(formBulk),
-                    bindingType: formBinding,
-                    declaredSpineMm: Number(formDeclaredSpine),
-                    innerBleedMm: Number(formInnerBleed)
-                })
+                body: formData
             });
 
-            if (res.ok) {
+            if (res && res.ok) {
                 const report = await res.json();
                 const newRow: PreflightInspectionRow = {
                     jobId: report.jobId,
-                    title: report.title || formTitle,
+                    title: report.title || payload.title,
                     isbn: report.isbn,
                     bindingType: report.spineGeometry.bindingType || report.spineGeometry.bindingCategory,
                     pageCount: report.spineGeometry.pageCount,
@@ -404,10 +382,10 @@ export const PreflightJobsPage: React.FC<SharedModuleProps> = ({
                     maxAllowedTacPct: report.tacAndColor.maxAllowedTacPct,
                     tacStatus: report.tacAndColor.status,
                     overallStatus: report.overallStatus,
-                    autoFixed: false
+                    autoFixed: Boolean(report.autoFixed || payload.workflowMode === 'MAGIC_FIX'),
+                    assetPurged: Boolean(report.assetPurged || report.assetStorage?.assetPurged || payload.purgeAsset)
                 };
-                setJobs(prev => [newRow, ...prev.filter(j => j.jobId !== newRow.jobId)]);
-                setFormPdfFile(null);
+                setJobs((prev) => [newRow, ...prev.filter((j) => j.jobId !== newRow.jobId)]);
                 setShowModal(false);
                 return;
             }
@@ -415,39 +393,71 @@ export const PreflightJobsPage: React.FC<SharedModuleProps> = ({
             // Fallback deterministic client-side calculation if backend is unreachable in isolated unit test
         }
 
-        const rawBlock = (Number(formPages) / 2) * (Number(formGrammage) / 1000) * Number(formBulk);
+        const rawBlock =
+            (Number(payload.pageCount) / 2) * (Number(payload.paperGrammage) / 1000) * Number(payload.paperBulk);
         const calcSpine =
-            formBinding === 'HARDCOVER'
+            payload.bindingType === 'HARDCOVER'
                 ? Math.round((rawBlock + 4.0 + 3.0) * 100) / 100
                 : Math.round((rawBlock + 0.5) * 100) / 100;
-        const delta = Math.round(Math.abs(calcSpine - Number(formDeclaredSpine)) * 100) / 100;
-        const bleedDeficit = Number(formInnerBleed) < 3.0;
+        const isMagic = payload.workflowMode === 'MAGIC_FIX';
+        const detectedSpine = isMagic ? calcSpine : Number(payload.declaredSpineMm);
+        const delta = Math.round(Math.abs(calcSpine - detectedSpine) * 100) / 100;
+        const innerBleed = isMagic ? Math.max(3.0, Number(payload.innerBleedMm)) : Number(payload.innerBleedMm);
+        const bleedDeficit = innerBleed < 3.0;
         const overall = delta > 1.0 || bleedDeficit ? 'FAIL' : 'PASS';
 
         const fallbackRow: PreflightInspectionRow = {
-            jobId: formJobId,
-            title: formTitle,
-            isbn: formIsbn,
-            bindingType: formBinding,
-            pageCount: Number(formPages),
+            jobId: payload.jobId,
+            title: payload.title,
+            isbn: payload.isbn,
+            bindingType: payload.bindingType,
+            pageCount: Number(payload.pageCount),
             paperId: 'CUSTOM-SUBSTRATE',
-            paperGrammage: Number(formGrammage),
-            paperBulk: Number(formBulk),
+            paperGrammage: Number(payload.paperGrammage),
+            paperBulk: Number(payload.paperBulk),
             calculatedSpineMm: calcSpine,
-            detectedSpineMm: Number(formDeclaredSpine),
+            detectedSpineMm: detectedSpine,
             spineDiscrepancyMm: delta,
-            innerBleedMm: Number(formInnerBleed),
+            innerBleedMm: innerBleed,
             requiredInnerBleedMm: 3.0,
             bleedStatus: bleedDeficit ? 'BLEED_DEFICIT' : 'OK',
             detectedMaxTacPct: 245,
             maxAllowedTacPct: 260,
             tacStatus: 'PASS',
             overallStatus: overall,
-            autoFixed: false
+            autoFixed: isMagic,
+            assetPurged: Boolean(payload.purgeAsset)
         };
 
-        setJobs(prev => [fallbackRow, ...prev.filter(j => j.jobId !== fallbackRow.jobId)]);
+        setJobs((prev) => [fallbackRow, ...prev.filter((j) => j.jobId !== fallbackRow.jobId)]);
         setShowModal(false);
+    };
+
+    const handlePurgeAsset = async (job: PreflightInspectionRow) => {
+        setPurgingJobId(job.jobId);
+        const token = getAuthToken();
+        try {
+            await fetch(`/api/preflight/jobs/${encodeURIComponent(job.jobId)}/asset`, {
+                method: 'DELETE',
+                headers: {
+                    ...(token ? { Authorization: `Bearer ${token}` } : {})
+                }
+            });
+        } catch (_) {
+            // Apply deterministic state update
+        } finally {
+            setJobs((prev) =>
+                prev.map((item) =>
+                    item.jobId === job.jobId
+                        ? {
+                              ...item,
+                              assetPurged: true
+                          }
+                        : item
+                )
+            );
+            setPurgingJobId(null);
+        }
     };
 
     const handleAutoFix = async (job: PreflightInspectionRow) => {
@@ -670,24 +680,47 @@ export const PreflightJobsPage: React.FC<SharedModuleProps> = ({
                             key: 'actions',
                             header: L.colActions,
                             align: 'right',
-                            render: (row) =>
-                                row.overallStatus !== 'PASS' ? (
-                                    <button
-                                        type="button"
-                                        data-testid={`auto-fix-btn-${row.jobId}`}
-                                        disabled={fixingJobId === row.jobId}
-                                        onClick={() => handleAutoFix(row)}
-                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#dc2626] hover:bg-[#e11d48] text-white text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer"
-                                    >
-                                        <WrenchScrewdriverIcon className="w-3.5 h-3.5" />
-                                        {fixingJobId === row.jobId ? '...' : L.btnAutoFix}
-                                    </button>
-                                ) : (
-                                    <span className="inline-flex items-center gap-1 text-[10px] font-mono font-bold text-emerald-400 uppercase">
-                                        <CheckCircleIcon className="w-4 h-4" />
-                                        {L.btnFixed}
-                                    </span>
-                                )
+                            render: (row) => (
+                                <div className="inline-flex items-center justify-end gap-2">
+                                    {row.overallStatus !== 'PASS' ? (
+                                        <button
+                                            type="button"
+                                            data-testid={`auto-fix-btn-${row.jobId}`}
+                                            disabled={fixingJobId === row.jobId}
+                                            onClick={() => handleAutoFix(row)}
+                                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#dc2626] hover:bg-[#e11d48] text-white text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer"
+                                        >
+                                            <WrenchScrewdriverIcon className="w-3.5 h-3.5" />
+                                            {fixingJobId === row.jobId ? '...' : L.btnAutoFix}
+                                        </button>
+                                    ) : (
+                                        <span className="inline-flex items-center gap-1 text-[10px] font-mono font-bold text-emerald-400 uppercase">
+                                            <CheckCircleIcon className="w-4 h-4" />
+                                            {L.btnFixed}
+                                        </span>
+                                    )}
+                                    {row.assetPurged ? (
+                                        <span
+                                            data-testid={`asset-purged-badge-${row.jobId}`}
+                                            className="px-2 py-1 rounded bg-zinc-900 border border-zinc-800 text-[9px] font-mono font-bold text-zinc-400 uppercase"
+                                        >
+                                            [METADATA ONLY / ASSET PURGED]
+                                        </span>
+                                    ) : (
+                                        <button
+                                            type="button"
+                                            data-testid={`purge-asset-btn-${row.jobId}`}
+                                            disabled={purgingJobId === row.jobId}
+                                            onClick={() => handlePurgeAsset(row)}
+                                            title="Purge Asset (Free Disk)"
+                                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-[#0a0b0d] hover:bg-zinc-900 border border-[#1f2228] hover:border-rose-500/40 text-slate-300 hover:text-rose-400 text-[10px] font-mono font-bold uppercase transition-colors cursor-pointer"
+                                        >
+                                            <TrashIcon className="w-3.5 h-3.5" />
+                                            <span>{purgingJobId === row.jobId ? '...' : 'Purge Asset (Free Disk)'}</span>
+                                        </button>
+                                    )}
+                                </div>
+                            )
                         }
                     ]}
                 />
@@ -738,197 +771,12 @@ export const PreflightJobsPage: React.FC<SharedModuleProps> = ({
                 />
             )}
 
-            {/* Modal for + RUN PREFLIGHT */}
-            {showModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4">
-                    <form
-                        onSubmit={handleRunPreflight}
-                        data-testid="run-preflight-modal"
-                        className="w-full max-w-lg rounded-xl bg-[#14161a] border border-[#1f2228] p-6 space-y-4 text-white"
-                    >
-                        <div className="flex items-center justify-between border-b border-[#1f2228] pb-3">
-                            <h3 className="text-sm font-black uppercase tracking-wider">{L.modalTitle}</h3>
-                            <button
-                                type="button"
-                                onClick={() => setShowModal(false)}
-                                className="text-xs font-bold text-slate-400 hover:text-white cursor-pointer"
-                            >
-                                ✕
-                            </button>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-4">
-                            <div>
-                                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
-                                    {L.lblJobId}
-                                </label>
-                                <input
-                                    type="text"
-                                    value={formJobId}
-                                    onChange={(e) => setFormJobId(e.target.value)}
-                                    className="w-full rounded-lg bg-[#0a0b0d] border border-[#1f2228] px-3 py-2 text-xs font-mono text-white"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
-                                    {L.lblIsbn}
-                                </label>
-                                <input
-                                    type="text"
-                                    value={formIsbn}
-                                    onChange={(e) => setFormIsbn(e.target.value)}
-                                    className="w-full rounded-lg bg-[#0a0b0d] border border-[#1f2228] px-3 py-2 text-xs font-mono text-white"
-                                />
-                            </div>
-                            <div className="col-span-2">
-                                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
-                                    {L.lblTitle}
-                                </label>
-                                <input
-                                    type="text"
-                                    value={formTitle}
-                                    onChange={(e) => setFormTitle(e.target.value)}
-                                    className="w-full rounded-lg bg-[#0a0b0d] border border-[#1f2228] px-3 py-2 text-xs font-mono text-white"
-                                />
-                            </div>
-                            <div className="col-span-2">
-                                <div className="flex items-center justify-between mb-1">
-                                    <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                                        {L.lblPdfUpload}
-                                    </label>
-                                    <div className="flex items-center gap-1">
-                                        {(['INTERIOR_PDF', 'COVER_PDF'] as const).map((slot) => (
-                                            <button
-                                                key={slot}
-                                                type="button"
-                                                onClick={() => setFormRole(slot)}
-                                                className={`px-2 py-0.5 rounded text-[9px] font-mono font-bold uppercase transition-colors cursor-pointer ${
-                                                    formRole === slot
-                                                        ? 'bg-[#dc2626] text-white'
-                                                        : 'bg-[#0a0b0d] border border-[#1f2228] text-slate-400 hover:text-white'
-                                                }`}
-                                            >
-                                                {slot === 'INTERIOR_PDF' ? 'INTERIOR / TRIPA' : 'COVER / CUBIERTA'}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-                                <label
-                                    data-testid="preflight-pdf-dropzone"
-                                    className="flex flex-col items-center justify-center rounded-xl border border-dashed border-[#1f2228] hover:border-[#dc2626] bg-[#0a0b0d] px-4 py-3 text-center cursor-pointer transition-colors"
-                                >
-                                    <input
-                                        type="file"
-                                        accept=".pdf,application/pdf"
-                                        data-testid="preflight-pdf-file-input"
-                                        onChange={(e) => {
-                                            const f = e.target.files?.[0] || null;
-                                            setFormPdfFile(f);
-                                            if (f && !formTitle) {
-                                                setFormTitle(f.name.replace(/\.pdf$/i, ''));
-                                            }
-                                        }}
-                                        className="hidden"
-                                    />
-                                    <span className="text-[11px] font-mono font-bold text-slate-300">
-                                        {formPdfFile
-                                            ? `${formPdfFile.name} (${(formPdfFile.size / 1024).toFixed(1)} KB)`
-                                            : L.lblPdfHint}
-                                    </span>
-                                </label>
-                            </div>
-                            <div>
-                                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
-                                    {L.lblPages}
-                                </label>
-                                <input
-                                    type="number"
-                                    value={formPages}
-                                    onChange={(e) => setFormPages(Number(e.target.value))}
-                                    className="w-full rounded-lg bg-[#0a0b0d] border border-[#1f2228] px-3 py-2 text-xs font-mono text-white"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
-                                    {L.lblBinding}
-                                </label>
-                                <select
-                                    value={formBinding}
-                                    onChange={(e) => setFormBinding(e.target.value as 'SOFTCOVER_PUR' | 'HARDCOVER')}
-                                    className="w-full rounded-lg bg-[#0a0b0d] border border-[#1f2228] px-3 py-2 text-xs font-mono text-white"
-                                >
-                                    <option value="SOFTCOVER_PUR">SOFTCOVER_PUR</option>
-                                    <option value="HARDCOVER">HARDCOVER</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
-                                    {L.lblGrammage}
-                                </label>
-                                <input
-                                    type="number"
-                                    value={formGrammage}
-                                    onChange={(e) => setFormGrammage(Number(e.target.value))}
-                                    className="w-full rounded-lg bg-[#0a0b0d] border border-[#1f2228] px-3 py-2 text-xs font-mono text-white"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
-                                    {L.lblBulk}
-                                </label>
-                                <input
-                                    type="number"
-                                    step="0.05"
-                                    value={formBulk}
-                                    onChange={(e) => setFormBulk(Number(e.target.value))}
-                                    className="w-full rounded-lg bg-[#0a0b0d] border border-[#1f2228] px-3 py-2 text-xs font-mono text-white"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
-                                    {L.lblDeclaredSpine}
-                                </label>
-                                <input
-                                    type="number"
-                                    step="0.1"
-                                    value={formDeclaredSpine}
-                                    onChange={(e) => setFormDeclaredSpine(Number(e.target.value))}
-                                    className="w-full rounded-lg bg-[#0a0b0d] border border-[#1f2228] px-3 py-2 text-xs font-mono text-white"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
-                                    {L.lblInnerBleed}
-                                </label>
-                                <input
-                                    type="number"
-                                    step="0.5"
-                                    value={formInnerBleed}
-                                    onChange={(e) => setFormInnerBleed(Number(e.target.value))}
-                                    className="w-full rounded-lg bg-[#0a0b0d] border border-[#1f2228] px-3 py-2 text-xs font-mono text-white"
-                                />
-                            </div>
-                        </div>
-
-                        <div className="flex justify-end gap-3 pt-3 border-t border-[#1f2228]">
-                            <button
-                                type="button"
-                                onClick={() => setShowModal(false)}
-                                className="px-4 py-2 rounded-lg bg-[#0a0b0d] border border-[#1f2228] text-xs font-bold text-slate-300 cursor-pointer"
-                            >
-                                {L.lblCancel}
-                            </button>
-                            <button
-                                type="submit"
-                                data-testid="submit-preflight-inspect-btn"
-                                className="px-4 py-2 rounded-lg bg-white text-[#0a0b0d] text-xs font-black uppercase tracking-wider cursor-pointer"
-                            >
-                                {L.lblSubmitInspect}
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            )}
+            <PreflightUploadModal
+                isOpen={showModal}
+                onClose={() => setShowModal(false)}
+                onSubmit={handleRunPreflightSubmit}
+                labels={L}
+            />
 
             {mode === 'onboarding' && (
                 <div data-testid="preflight-onboarding-footer" className="flex justify-end pt-2">

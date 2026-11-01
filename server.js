@@ -20,7 +20,7 @@ if (process.env.MYSQL_PASSWORD_FILE && fs.existsSync(process.env.MYSQL_PASSWORD_
 
 const mysqlClient = require('./src/api/services/mysqlClient');
 const fastify = require('fastify')({
-    bodyLimit: 64 * 1024 * 1024, // 64 MB body limit for binary base64 asset & wire-proof ingestion
+    bodyLimit: 2 * 1024 * 1024 * 1024, // 2 GB (2147483648 bytes) industrial streaming body limit for illustrated book PDFs
     logger: {
         level: process.env.PPOS_LOG_LEVEL || 'info',
         redact: ['req.headers.authorization', 'req.headers["x-api-key"]'],
@@ -379,6 +379,7 @@ const start = async () => {
             upstream: upstreamPreflightUrl,
             prefix: '/api/preflight/jobs',
             rewritePrefix: '/api/preflight/jobs',
+            httpMethods: ['GET', 'POST', 'PUT', 'PATCH', 'HEAD', 'OPTIONS'],
             http2: false
         });
         await fastify.register(require('@fastify/http-proxy'), {
@@ -497,6 +498,7 @@ const start = async () => {
             fastify.all('/api/preflight/callback', apiNotFoundFallback);
             fastify.all('/api/preflight/inspections', apiNotFoundFallback);
             fastify.all('/api/preflight/inspections/*', apiNotFoundFallback);
+            fastify.delete('/api/preflight/jobs/:jobId/asset', apiNotFoundFallback);
             fastify.all('/api/manufacturing/imposition', apiNotFoundFallback);
             fastify.all('/api/manufacturing/imposition/*', apiNotFoundFallback);
             fastify.all('/api/publisher', apiNotFoundFallback);

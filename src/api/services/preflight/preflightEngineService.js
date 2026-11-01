@@ -37,6 +37,7 @@
  */
 
 const crypto = require('crypto');
+const fs = require('fs');
 
 const PREFLIGHT_STANDARDS = Object.freeze({
     GLUE_ALLOWANCE_MM: 0.5,
@@ -457,9 +458,25 @@ function inspectPdfBufferMetadata(pdfBuffer, options = {}) {
     let hasTrimBox = true;
     let hasBleedBox = true;
 
-    if (pdfBuffer && Buffer.isBuffer(pdfBuffer) && pdfBuffer.length > 16) {
-        const sampleLen = Math.min(pdfBuffer.length, 512 * 1024);
-        const text = pdfBuffer.subarray(0, sampleLen).toString('latin1');
+    let sampleBuf = pdfBuffer;
+    if (!sampleBuf && options.filePath && typeof options.filePath === 'string' && fs.existsSync(options.filePath)) {
+        try {
+            const fd = fs.openSync(options.filePath, 'r');
+            const stat = fs.fstatSync(fd);
+            const readLen = Math.min(stat.size, 512 * 1024);
+            if (readLen > 16) {
+                sampleBuf = Buffer.alloc(readLen);
+                fs.readSync(fd, sampleBuf, 0, readLen, 0);
+            }
+            fs.closeSync(fd);
+        } catch (_) {
+            // Fallback to metadata hints if file descriptor read fails
+        }
+    }
+
+    if (sampleBuf && Buffer.isBuffer(sampleBuf) && sampleBuf.length > 16) {
+        const sampleLen = Math.min(sampleBuf.length, 512 * 1024);
+        const text = sampleBuf.subarray(0, sampleLen).toString('latin1');
 
         const verMatch = text.match(/%PDF-(\d+\.\d+)/);
         if (verMatch) {
@@ -577,6 +594,7 @@ function inspectPreflightJob(payload = {}, actorContext = {}) {
 
     const binaryScan = inspectPdfBufferMetadata(payload.pdfBuffer || null, {
         role,
+        filePath: payload.filePath || payload.storagePath || null,
         expectedPages: pageCount,
         trimWidthMm,
         trimHeightMm,
@@ -735,6 +753,15 @@ function inspectPreflightJob(payload = {}, actorContext = {}) {
             actionsCount: autoFixActions.length,
             actions: autoFixActions
         },
+        workflowMode: String(payload.workflowMode || payload.strategy || 'DIAGNOSTIC').toUpperCase(),
+        assetStorage: {
+            fileName: payload.fileName || payload.originalName || null,
+            sizeBytes: Number(payload.sizeBytes || (payload.pdfBuffer ? payload.pdfBuffer.length : 0)),
+            storagePath: payload.storagePath || payload.filePath || null,
+            assetPurged: Boolean(payload.assetPurged),
+            purgedAt: payload.purgedAt || null,
+            retentionState: payload.assetPurged ? 'METADATA_ONLY_ASSET_PURGED' : (payload.storagePath || payload.filePath ? 'RETAINED_ON_DISK' : 'NO_BINARY_STORED')
+        },
         inspectedAt: new Date().toISOString()
     };
 
@@ -743,6 +770,66 @@ function inspectPreflightJob(payload = {}, actorContext = {}) {
         inspectionLedger.set(`${tenantId}:${orderId}`, report);
     }
     return report;
+}
+
+/**
+ * Purges the temporary or stored heavy PDF binary asset from local disk (`fs.unlinkSync`)
+ * while preserving the immutable 6-axis inspection JSON report, spine delta, and forensic trace.
+ */
+function purgePreflightJobAsset(jobIdOrInspectionId, tenantId = 'tenant-default') {
+    if (!jobIdOrInspectionId) {
+        throw new Error('MISSING_JOB_ID: jobId is required to purge preflight PDF asset.');
+    }
+
+    let inspection = getPreflightInspectionById(jobIdOrInspectionId, tenantId);
+    if (!inspection) {
+        // Check across all tenants if SUPER_ADMIN / system call
+        for (const [, val] of inspectionLedger.entries()) {
+            if (val.jobId === jobIdOrInspectionId || val.inspectionId === jobIdOrInspectionId) {
+                inspection = val;
+                break;
+            }
+        }
+    }
+
+    let diskFileRemoved = false;
+    let targetPath = inspection && inspection.assetStorage ? inspection.assetStorage.storagePath : null;
+
+    if (targetPath && typeof targetPath === 'string') {
+        try {
+            if (fs.existsSync(targetPath)) {
+                fs.unlinkSync(targetPath);
+                diskFileRemoved = true;
+            }
+        } catch (_) {
+            // Ignore unlink error if file was already cleaned by OS tmp reaper
+        }
+    }
+
+    const purgedAt = new Date().toISOString();
+    if (inspection) {
+        inspection.assetPurged = true;
+        inspection.assetStorage = {
+            ...(inspection.assetStorage || {}),
+            storagePath: null,
+            assetPurged: true,
+            purgedAt,
+            diskFileRemoved,
+            retentionState: 'METADATA_ONLY_ASSET_PURGED'
+        };
+        inspectionLedger.set(`${inspection.tenantId || tenantId}:${inspection.jobId}`, inspection);
+    }
+
+    return {
+        ok: true,
+        jobId: inspection ? inspection.jobId : jobIdOrInspectionId,
+        tenantId: inspection ? inspection.tenantId : tenantId,
+        assetPurged: true,
+        diskFileRemoved,
+        retentionState: 'METADATA_ONLY_ASSET_PURGED',
+        purgedAt,
+        inspection: inspection || null
+    };
 }
 
 /**
@@ -896,6 +983,7 @@ module.exports = {
     inspectPdfBufferMetadata,
     inspectPreflightJob,
     executePreflightAutoFix,
+    purgePreflightJobAsset,
     listTenantPreflightInspections,
     getPreflightInspectionById
 };

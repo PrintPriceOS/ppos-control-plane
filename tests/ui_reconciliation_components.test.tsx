@@ -203,12 +203,24 @@ describe('Dark Industrial Telemetry UI — Canonical Components & Dual-Mode Reco
         });
         expect(screen.getAllByText('FIXED & VERIFIED').length).toBeGreaterThanOrEqual(2);
 
-        // Open + RUN PREFLIGHT modal and verify PDF dropzone + submission
+        // Open + RUN PREFLIGHT modal and verify 2-column 2 GB dropzone, MAGIC FIX switcher, and AUTO-PURGE toggle
         fireEvent.click(screen.getByTestId('header-primary-action-btn'));
         expect(screen.getByTestId('run-preflight-modal')).toBeInTheDocument();
         expect(screen.getByTestId('preflight-pdf-dropzone')).toBeInTheDocument();
+        expect(screen.getByText(/DRAG & DROP YOUR PDF HERE OR BROWSE · MAX 2 GB/i)).toBeInTheDocument();
+        expect(screen.getByTestId('workflow-mode-magic-fix')).toBeInTheDocument();
+        expect(screen.getByTestId('workflow-mode-diagnostic')).toBeInTheDocument();
+        expect(screen.getByTestId('auto-purge-checkbox')).toBeChecked();
+        expect(screen.getByTestId('live-spine-calculator-card')).toBeInTheDocument();
         fireEvent.click(screen.getByTestId('submit-preflight-inspect-btn'));
         expect(await screen.findByText('PF-2026-089')).toBeInTheDocument();
+        expect(screen.getByTestId('asset-purged-badge-PF-2026-089')).toHaveTextContent('[METADATA ONLY / ASSET PURGED]');
+
+        // Test manual Purge Asset (Free Disk) button on an existing row
+        const purgeBtn = screen.getByTestId('purge-asset-btn-PF-2026-081');
+        expect(purgeBtn).toHaveTextContent('Purge Asset (Free Disk)');
+        fireEvent.click(purgeBtn);
+        expect(await screen.findByTestId('asset-purged-badge-PF-2026-081')).toHaveTextContent('[METADATA ONLY / ASSET PURGED]');
 
         // Switch to GEOMETRY PROFILES tab
         fireEvent.click(screen.getByRole('tab', { name: 'GEOMETRY PROFILES' }));
