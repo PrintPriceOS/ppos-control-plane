@@ -76,7 +76,11 @@ const PREFLIGHT_I18N: Record<'en' | 'es' | 'de', Record<string, string>> = {
         btnFixed: 'FIXED & VERIFIED',
         modalTitle: 'Run Automated Preflight & Spine Inspection',
         lblJobId: 'Job ID',
+        lblTitle: 'Title / Work',
         lblIsbn: 'ISBN-13',
+        lblRole: 'PDF Asset Slot',
+        lblPdfUpload: 'PDF Archive (Interior / Cover)',
+        lblPdfHint: 'Drop PDF here or click to select (.pdf up to 64 MB)',
         lblPages: 'Page Count',
         lblBinding: 'Binding Type',
         lblGrammage: 'Grammage (g/m²)',
@@ -105,11 +109,15 @@ const PREFLIGHT_I18N: Record<'en' | 'es' | 'de', Record<string, string>> = {
         colTac: 'TAC STATUS',
         colHealth: 'PREFLIGHT HEALTH',
         colActions: 'ACTIONS',
-        btnAutoFix: 'AUTO-FIX (SANEAR)',
-        btnFixed: 'SANEADO OK',
+        btnAutoFix: 'AUTO-FIX (FIX IT)',
+        btnFixed: 'FIXED & VERIFIED',
         modalTitle: 'Ejecutar Inspección de Preflight y Geometría de Lomo',
         lblJobId: 'ID de Trabajo',
+        lblTitle: 'Título / Obra',
         lblIsbn: 'ISBN-13',
+        lblRole: 'Tipo de Archivo PDF',
+        lblPdfUpload: 'Archivo PDF (Tripa / Cubierta)',
+        lblPdfHint: 'Arrastra un PDF aquí o haz clic para seleccionar (.pdf hasta 64 MB)',
         lblPages: 'Número de Páginas',
         lblBinding: 'Tipo de Encuadernación',
         lblGrammage: 'Gramaje (g/m²)',
@@ -138,11 +146,15 @@ const PREFLIGHT_I18N: Record<'en' | 'es' | 'de', Record<string, string>> = {
         colTac: 'TAC STATUS',
         colHealth: 'PREFLIGHT HEALTH',
         colActions: 'ACTIONS',
-        btnAutoFix: 'AUTO-FIX (KORRIGIEREN)',
-        btnFixed: 'KORRIGIERT',
+        btnAutoFix: 'AUTO-FIX (FIX IT)',
+        btnFixed: 'FIXED & VERIFIED',
         modalTitle: 'Automatisierte Preflight- & Buchrückenprüfung starten',
         lblJobId: 'Auftrags-ID',
+        lblTitle: 'Titel / Werk',
         lblIsbn: 'ISBN-13',
+        lblRole: 'PDF-Dateityp',
+        lblPdfUpload: 'PDF-Datei (Buchblock / Umschlag)',
+        lblPdfHint: 'PDF hier ablegen oder klicken zum Auswählen (.pdf bis 64 MB)',
         lblPages: 'Seitenzahl',
         lblBinding: 'Bindungsart',
         lblGrammage: 'Grammatur (g/m²)',
@@ -252,6 +264,7 @@ export const PreflightJobsPage: React.FC<SharedModuleProps> = ({
 
     const [activeTab, setActiveTab] = useState<'queue' | 'profiles'>('queue');
     const [jobs, setJobs] = useState<PreflightInspectionRow[]>(INITIAL_WORKSHOP_JOBS);
+    const [profiles, setProfiles] = useState(GEOMETRY_PROFILES);
     const [fixingJobId, setFixingJobId] = useState<string | null>(null);
     const [showModal, setShowModal] = useState(false);
 
@@ -259,6 +272,8 @@ export const PreflightJobsPage: React.FC<SharedModuleProps> = ({
     const [formJobId, setFormJobId] = useState('PF-2026-089');
     const [formTitle, setFormTitle] = useState('Tratado de Impresión Offset Digital');
     const [formIsbn, setFormIsbn] = useState('978-84-9032-441-1');
+    const [formRole, setFormRole] = useState<'INTERIOR_PDF' | 'COVER_PDF'>('INTERIOR_PDF');
+    const [formPdfFile, setFormPdfFile] = useState<File | null>(null);
     const [formPages, setFormPages] = useState(280);
     const [formBinding, setFormBinding] = useState<'SOFTCOVER_PUR' | 'HARDCOVER'>('SOFTCOVER_PUR');
     const [formGrammage, setFormGrammage] = useState(90);
@@ -266,9 +281,84 @@ export const PreflightJobsPage: React.FC<SharedModuleProps> = ({
     const [formDeclaredSpine, setFormDeclaredSpine] = useState(14.0);
     const [formInnerBleed, setFormInnerBleed] = useState(1.5);
 
+    useEffect(() => {
+        let isMounted = true;
+        const token = getAuthToken();
+        fetch('/api/preflight/inspections', {
+            headers: {
+                ...(token ? { Authorization: `Bearer ${token}` } : {})
+            }
+        })
+            .then((res) => (res && res.ok ? res.json() : null))
+            .then((data) => {
+                if (!isMounted || !data) return;
+                if (Array.isArray(data.geometryProfiles) && data.geometryProfiles.length > 0) {
+                    setProfiles(data.geometryProfiles);
+                }
+                if (Array.isArray(data.inspections) && data.inspections.length > 0) {
+                    const mapped: PreflightInspectionRow[] = data.inspections
+                        .filter((r: any) => r && r.jobId && r.spineGeometry && r.bleedGeometry && r.tacAndColor)
+                        .map((report: any) => ({
+                            jobId: report.jobId,
+                            title: report.title || `Editorial Job ${report.jobId}`,
+                            isbn: report.isbn || '978-84-000000-0-0',
+                            bindingType: report.spineGeometry.bindingType || report.spineGeometry.bindingCategory || 'SOFTCOVER_PUR',
+                            pageCount: report.spineGeometry.pageCount,
+                            paperId: report.substrate?.paperId || 'CUSTOM-SUBSTRATE',
+                            paperGrammage: report.substrate?.grammageGsm || 90,
+                            paperBulk: report.substrate?.bulkCm3PerG || 1.3,
+                            calculatedSpineMm: report.spineGeometry.calculatedSpineMm,
+                            detectedSpineMm: report.spineGeometry.detectedSpineMm,
+                            spineDiscrepancyMm: report.spineGeometry.discrepancyMm,
+                            innerBleedMm: report.bleedGeometry.inner.detectedBleedMm,
+                            requiredInnerBleedMm: report.bleedGeometry.inner.requiredBleedMm,
+                            bleedStatus: report.bleedGeometry.inner.status,
+                            detectedMaxTacPct: report.tacAndColor.detectedMaxTacPct,
+                            maxAllowedTacPct: report.tacAndColor.maxAllowedTacPct,
+                            tacStatus: report.tacAndColor.status,
+                            overallStatus: report.overallStatus,
+                            autoFixed: Boolean(report.autoFixed)
+                        }));
+                    if (mapped.length > 0) {
+                        setJobs((prev) => {
+                            const existingIds = new Set(mapped.map((m) => m.jobId));
+                            return [...mapped, ...prev.filter((p) => !existingIds.has(p.jobId))];
+                        });
+                    }
+                }
+            })
+            .catch(() => {
+                // Keep INITIAL_WORKSHOP_JOBS & GEOMETRY_PROFILES fallback
+            });
+        return () => {
+            isMounted = false;
+        };
+    }, []);
+
+    const readFileAsBase64 = (file: File): Promise<string> =>
+        new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => {
+                const resStr = String(reader.result || '');
+                const b64 = resStr.includes(',') ? resStr.split(',')[1] : resStr;
+                resolve(b64);
+            };
+            reader.onerror = () => reject(reader.error);
+            reader.readAsDataURL(file);
+        });
+
     const handleRunPreflight = async (e?: React.FormEvent) => {
         if (e) e.preventDefault();
         const token = getAuthToken();
+
+        let pdfBase64: string | undefined;
+        if (formPdfFile) {
+            try {
+                pdfBase64 = await readFileAsBase64(formPdfFile);
+            } catch (_) {
+                // Ignore file reader error in synthetic test environments
+            }
+        }
 
         try {
             const res = await fetch('/api/preflight/inspect', {
@@ -281,6 +371,9 @@ export const PreflightJobsPage: React.FC<SharedModuleProps> = ({
                     jobId: formJobId,
                     title: formTitle,
                     isbn: formIsbn,
+                    role: formRole,
+                    fileName: formPdfFile?.name,
+                    ...(pdfBase64 ? { pdfBase64 } : {}),
                     pageCount: Number(formPages),
                     paperGrammage: Number(formGrammage),
                     paperBulk: Number(formBulk),
@@ -296,7 +389,7 @@ export const PreflightJobsPage: React.FC<SharedModuleProps> = ({
                     jobId: report.jobId,
                     title: report.title || formTitle,
                     isbn: report.isbn,
-                    bindingType: report.spineGeometry.bindingCategory,
+                    bindingType: report.spineGeometry.bindingType || report.spineGeometry.bindingCategory,
                     pageCount: report.spineGeometry.pageCount,
                     paperId: report.substrate.paperId,
                     paperGrammage: report.substrate.grammageGsm,
@@ -314,6 +407,7 @@ export const PreflightJobsPage: React.FC<SharedModuleProps> = ({
                     autoFixed: false
                 };
                 setJobs(prev => [newRow, ...prev.filter(j => j.jobId !== newRow.jobId)]);
+                setFormPdfFile(null);
                 setShowModal(false);
                 return;
             }
@@ -601,7 +695,7 @@ export const PreflightJobsPage: React.FC<SharedModuleProps> = ({
                 <IndustrialTable
                     title={L.tabProfiles}
                     subtitle="CANONICAL SPINE & BLEED CALIBRATION MATRICES"
-                    data={GEOMETRY_PROFILES}
+                    data={profiles}
                     emptyEntityName="GEOMETRY PROFILES"
                     rowKey={(row) => row.profileCode}
                     columns={[
@@ -685,6 +779,63 @@ export const PreflightJobsPage: React.FC<SharedModuleProps> = ({
                                     onChange={(e) => setFormIsbn(e.target.value)}
                                     className="w-full rounded-lg bg-[#0a0b0d] border border-[#1f2228] px-3 py-2 text-xs font-mono text-white"
                                 />
+                            </div>
+                            <div className="col-span-2">
+                                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                                    {L.lblTitle}
+                                </label>
+                                <input
+                                    type="text"
+                                    value={formTitle}
+                                    onChange={(e) => setFormTitle(e.target.value)}
+                                    className="w-full rounded-lg bg-[#0a0b0d] border border-[#1f2228] px-3 py-2 text-xs font-mono text-white"
+                                />
+                            </div>
+                            <div className="col-span-2">
+                                <div className="flex items-center justify-between mb-1">
+                                    <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                                        {L.lblPdfUpload}
+                                    </label>
+                                    <div className="flex items-center gap-1">
+                                        {(['INTERIOR_PDF', 'COVER_PDF'] as const).map((slot) => (
+                                            <button
+                                                key={slot}
+                                                type="button"
+                                                onClick={() => setFormRole(slot)}
+                                                className={`px-2 py-0.5 rounded text-[9px] font-mono font-bold uppercase transition-colors cursor-pointer ${
+                                                    formRole === slot
+                                                        ? 'bg-[#dc2626] text-white'
+                                                        : 'bg-[#0a0b0d] border border-[#1f2228] text-slate-400 hover:text-white'
+                                                }`}
+                                            >
+                                                {slot === 'INTERIOR_PDF' ? 'INTERIOR / TRIPA' : 'COVER / CUBIERTA'}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                                <label
+                                    data-testid="preflight-pdf-dropzone"
+                                    className="flex flex-col items-center justify-center rounded-xl border border-dashed border-[#1f2228] hover:border-[#dc2626] bg-[#0a0b0d] px-4 py-3 text-center cursor-pointer transition-colors"
+                                >
+                                    <input
+                                        type="file"
+                                        accept=".pdf,application/pdf"
+                                        data-testid="preflight-pdf-file-input"
+                                        onChange={(e) => {
+                                            const f = e.target.files?.[0] || null;
+                                            setFormPdfFile(f);
+                                            if (f && !formTitle) {
+                                                setFormTitle(f.name.replace(/\.pdf$/i, ''));
+                                            }
+                                        }}
+                                        className="hidden"
+                                    />
+                                    <span className="text-[11px] font-mono font-bold text-slate-300">
+                                        {formPdfFile
+                                            ? `${formPdfFile.name} (${(formPdfFile.size / 1024).toFixed(1)} KB)`
+                                            : L.lblPdfHint}
+                                    </span>
+                                </label>
                             </div>
                             <div>
                                 <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">

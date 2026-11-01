@@ -16,6 +16,7 @@
 const {
     PREFLIGHT_STANDARDS,
     MASTER_PAPER_CATALOG,
+    GEOMETRY_PROFILES,
     inspectPreflightJob,
     executePreflightAutoFix,
     listTenantPreflightInspections,
@@ -122,6 +123,7 @@ function createPreflightRouter() {
                 tenantId,
                 standards: PREFLIGHT_STANDARDS,
                 paperCatalog: MASTER_PAPER_CATALOG,
+                geometryProfiles: GEOMETRY_PROFILES,
                 inspections
             });
         } catch (err) {
@@ -178,10 +180,50 @@ function createPreflightRouter() {
                 (req.headers && req.headers['x-tenant-id']) ||
                 'tenant-default';
 
-            const report = inspectPreflightJob(req.body || {}, {
+            const payload = { ...(req.body || {}) };
+            if (!payload.pdfBuffer && typeof payload.pdfBase64 === 'string' && payload.pdfBase64.length > 0) {
+                const rawB64 = payload.pdfBase64.replace(/^data:application\/pdf;base64,/i, '');
+                payload.pdfBuffer = Buffer.from(rawB64, 'base64');
+            }
+
+            let upstreamEngineStatus = null;
+            if (payload.pdfBuffer && Buffer.isBuffer(payload.pdfBuffer) && payload.pdfBuffer.length > 16) {
+                try {
+                    const preflightServiceClient = require('../services/preflightServiceClient');
+                    const upstreamRes = await preflightServiceClient.createJob({
+                        file: {
+                            originalname: payload.fileName || payload.originalName || `${payload.jobId || 'workshop'}.pdf`,
+                            mimetype: 'application/pdf',
+                            buffer: payload.pdfBuffer
+                        },
+                        tenantId,
+                        strategy: 'ANALYZE_ONLY',
+                        policy: payload.policy || 'OFFSET_MODERN_COATED',
+                        actorContext: {
+                            actorId: (req.user && req.user.id) || 'workshop-operator',
+                            tenantId,
+                            role: (req.user && req.user.role) || 'PRINTHOUSE_ADMIN'
+                        }
+                    });
+                    upstreamEngineStatus = {
+                        dispatched: true,
+                        upstreamJobId: (upstreamRes && (upstreamRes.jobId || upstreamRes.id || (upstreamRes.job && upstreamRes.job.id))) || null
+                    };
+                } catch (upErr) {
+                    upstreamEngineStatus = {
+                        dispatched: false,
+                        fallbackReason: upErr.message
+                    };
+                }
+            }
+
+            const report = inspectPreflightJob(payload, {
                 tenantId,
                 actorId: (req.user && req.user.id) || 'workshop-operator'
             });
+            if (upstreamEngineStatus) {
+                report.upstreamEngine = upstreamEngineStatus;
+            }
 
             return res.status(200).json(report);
         } catch (err) {

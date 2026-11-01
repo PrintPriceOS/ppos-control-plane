@@ -85,6 +85,27 @@ const MASTER_PAPER_CATALOG = Object.freeze({
     }
 });
 
+const GEOMETRY_PROFILES = Object.freeze([
+    {
+        profileCode: 'GEO-PUR-STANDARD',
+        bindingType: 'SOFTCOVER_PUR',
+        formula: '(Pages / 2) × (GSM / 1000) × Bulk + 0.5 mm Glue',
+        innerBleedMm: '3.0 mm',
+        coverBleedMm: '5.0 mm',
+        tacLimit: '260% (Offset) / 300% (Coated)',
+        status: 'ACTIVE'
+    },
+    {
+        profileCode: 'GEO-HARDCOVER-CARTONE',
+        bindingType: 'HARDCOVER',
+        formula: 'Block Spine + (2 × 2.0 mm Board) + 3.0 mm Hinge',
+        innerBleedMm: '3.0 mm',
+        coverBleedMm: '15.0 mm Turn-in Wrap',
+        tacLimit: '300% (ISO Coated v2)',
+        status: 'ACTIVE'
+    }
+]);
+
 // In-memory store of recent preflight inspections and auto-fix orders (scoped by tenantId)
 const inspectionLedger = new Map();
 const autoFixLedger = new Map();
@@ -512,8 +533,8 @@ function inspectPreflightJob(payload = {}, actorContext = {}) {
 
     const substrate = resolveSubstrateProfile({
         paperId: payload.paperId,
-        paperGrammage: payload.paperGrammage || payload.paper_weight_interior || 90,
-        paperBulk: payload.paperBulk || 1.3,
+        paperGrammage: payload.paperGrammage || payload.paper_weight_interior || (!payload.paperId ? 90 : undefined),
+        paperBulk: payload.paperBulk || (!payload.paperId ? 1.3 : undefined),
         paperCoating: payload.paperCoating || payload.paper_type_interior
     });
 
@@ -867,6 +888,7 @@ function getPreflightInspectionById(inspectionOrJobId, tenantId = 'tenant-defaul
 module.exports = {
     PREFLIGHT_STANDARDS,
     MASTER_PAPER_CATALOG,
+    GEOMETRY_PROFILES,
     calculateTheoreticalSpine,
     evaluateBleedGeometry,
     evaluateTacAndColor,

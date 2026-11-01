@@ -303,6 +303,7 @@ export const App: React.FC = () => {
 
                 {/* PREFLIGHT OPERATIONS */}
                 <Route path="/preflight/jobs" element={<PreflightJobsPage />} />
+                <Route path="/printhouse/preflight" element={<PreflightJobsPage />} />
                 <Route path="/preflight/jobs/:jobId" element={<PreflightJobDetailPage />} />
                 <Route path="/preflight/large-documents" element={<PreflightLargeDocumentsPage />} />
                 <Route path="/preflight/artifacts" element={<PreflightArtifactsPage />} />

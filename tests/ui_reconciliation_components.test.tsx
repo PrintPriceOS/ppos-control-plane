@@ -10,7 +10,7 @@
  */
 import React from 'react';
 import '@testing-library/jest-dom';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import { LocaleProvider } from '../src/ui/i18n';
@@ -196,7 +196,24 @@ describe('Dark Industrial Telemetry UI — Canonical Components & Dual-Mode Reco
 
         const autoFixBtn = screen.getByTestId('auto-fix-btn-PF-2026-081');
         expect(autoFixBtn).toBeInTheDocument();
+        expect(autoFixBtn).toHaveTextContent('AUTO-FIX (FIX IT)');
         fireEvent.click(autoFixBtn);
+        await waitFor(() => {
+            expect(screen.queryByTestId('auto-fix-btn-PF-2026-081')).not.toBeInTheDocument();
+        });
+        expect(screen.getAllByText('FIXED & VERIFIED').length).toBeGreaterThanOrEqual(2);
+
+        // Open + RUN PREFLIGHT modal and verify PDF dropzone + submission
+        fireEvent.click(screen.getByTestId('header-primary-action-btn'));
+        expect(screen.getByTestId('run-preflight-modal')).toBeInTheDocument();
+        expect(screen.getByTestId('preflight-pdf-dropzone')).toBeInTheDocument();
+        fireEvent.click(screen.getByTestId('submit-preflight-inspect-btn'));
+        expect(await screen.findByText('PF-2026-089')).toBeInTheDocument();
+
+        // Switch to GEOMETRY PROFILES tab
+        fireEvent.click(screen.getByRole('tab', { name: 'GEOMETRY PROFILES' }));
+        expect(await screen.findByText('GEO-PUR-STANDARD')).toBeInTheDocument();
+        expect(screen.getByText('GEO-HARDCOVER-CARTONE')).toBeInTheDocument();
     });
 
     it('6. Renders PHASE-11B Dynamic Imposition & Production Queue UI with KPIs and signature table', async () => {

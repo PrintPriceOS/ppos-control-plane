@@ -142,6 +142,19 @@ fastify.addHook('onRequest', async (request, reply) => {
             return;
         }
 
+        // 0.1 Support local dev bypass token ONLY when request originates from localhost / 127.0.0.1
+        const isLocalOrigin = request.ip === '127.0.0.1' || request.ip === '::1' || request.hostname === 'localhost' || request.hostname === '127.0.0.1';
+        if (token === 'dev_printhouse_operator_token' && isLocalOrigin && process.env.NODE_ENV !== 'production') {
+            request.user = {
+                id: 'dev-printhouse-operator',
+                role: 'PRINTHOUSE_OPERATOR',
+                tenantId: 'tenant-demo-local',
+                authMode: 'DEV_LOCAL'
+            };
+            request.raw.user = request.user;
+            return;
+        }
+
         try {
             const jwt = require('jsonwebtoken');
             const decoded = jwt.verify(token, jwtSecret, { 
