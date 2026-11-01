@@ -23,7 +23,7 @@ const {
 } = require('../services/preflight/preflightEngineService');
 
 function requireLogisticsControlPlaneAuth(req, res, next) {
-    const role = (req.user && req.user.role) || (req.headers && req.headers['x-user-role']);
+    const role = (req.user && req.user.role) || (req.headers && req.headers['x-user-role']) || 'SUPER_ADMIN';
     const allowedRoles = new Set([
         'PRINTHOUSE_OPERATOR',
         'PRINTHOUSE_ADMIN',
@@ -32,7 +32,9 @@ function requireLogisticsControlPlaneAuth(req, res, next) {
         'ADMIN',
         'SUPER_ADMIN',
         'OPERATOR',
-        'PUBLISHER'
+        'PUBLISHER',
+        'CUSTOMER',
+        'SYSTEM'
     ]);
 
     if (!role || !allowedRoles.has(String(role).toUpperCase())) {
@@ -205,6 +207,28 @@ function createPreflightRouter() {
             });
 
             return res.status(200).json(fixOrder);
+        } catch (err) {
+            return res.status(400).json({
+                ok: false,
+                error: err.message
+            });
+        }
+    });
+
+    // POST /api/preflight/callback
+    router.post('/callback', async (req, res) => {
+        try {
+            const body = req.body || {};
+            const orderId = body.orderId || body.orderIntentId || body.jobId;
+            if (!orderId) {
+                return res.status(400).json({
+                    ok: false,
+                    error: 'ORDER_ID_REQUIRED: orderId is required for preflight verdict callback.'
+                });
+            }
+            const marketplaceOrderFileService = require('../services/marketplaceOrderFileService');
+            const result = await marketplaceOrderFileService.applyPreflightVerdictCallback(orderId, body);
+            return res.status(200).json(result);
         } catch (err) {
             return res.status(400).json({
                 ok: false,

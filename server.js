@@ -83,7 +83,8 @@ fastify.addHook('onRequest', async (request, reply) => {
             url.startsWith('/api/customer/') ||
             url.startsWith('/api/publisher/') ||
             url.startsWith('/api/financials/escrow/') ||
-            url.startsWith('/api/logistics/shipments/');
+            url.startsWith('/api/logistics/shipments/') ||
+            url.startsWith('/api/preflight/');
         if (isMarketplaceOrderPath) {
             const marketplaceHeaderToken = request.headers['x-marketplace-token'];
             const configuredMarketplaceToken = process.env.PPOS_MARKETPLACE_INTAKE_TOKEN;
@@ -346,11 +347,28 @@ const start = async () => {
             wildcard: false 
         });
 
-        // 2. Register Http Proxy (Product API Gateway)
+        // 2. Register Http Proxy (Product API Gateway for upstream preflight worker jobs/policies)
+        // Note: Phase-11A native endpoints (/api/preflight/inspect, /auto-fix, /inspections, /callback)
+        // are handled directly by src/api/routes/preflightRoutes.js via Express below.
+        const upstreamPreflightUrl =
+            process.env.PPOS_PREFLIGHT_SERVICE_URL ||
+            `http://127.0.0.1:${process.env.PPOS_PREFLIGHT_PORT || 8001}`;
         await fastify.register(require('@fastify/http-proxy'), {
-            upstream: `http://localhost:${process.env.PPOS_SERVICE_PORT || 8001}`,
-            prefix: '/api/preflight',
-            rewritePrefix: '/api/preflight',
+            upstream: upstreamPreflightUrl,
+            prefix: '/api/preflight/jobs',
+            rewritePrefix: '/api/preflight/jobs',
+            http2: false
+        });
+        await fastify.register(require('@fastify/http-proxy'), {
+            upstream: upstreamPreflightUrl,
+            prefix: '/api/preflight/policies',
+            rewritePrefix: '/api/preflight/policies',
+            http2: false
+        });
+        await fastify.register(require('@fastify/http-proxy'), {
+            upstream: upstreamPreflightUrl,
+            prefix: '/api/preflight/workers',
+            rewritePrefix: '/api/preflight/workers',
             http2: false
         });
 
@@ -454,6 +472,7 @@ const start = async () => {
             fastify.all('/api/printhouses/*', apiNotFoundFallback);
             fastify.all('/api/preflight/inspect', apiNotFoundFallback);
             fastify.all('/api/preflight/auto-fix', apiNotFoundFallback);
+            fastify.all('/api/preflight/callback', apiNotFoundFallback);
             fastify.all('/api/preflight/inspections', apiNotFoundFallback);
             fastify.all('/api/preflight/inspections/*', apiNotFoundFallback);
             fastify.all('/api/manufacturing/imposition', apiNotFoundFallback);

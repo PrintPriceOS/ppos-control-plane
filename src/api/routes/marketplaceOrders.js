@@ -601,4 +601,67 @@ router.post('/:orderId/payment/webhook', requireMarketplaceOrAdmin, async (req, 
     }
 });
 
+/**
+ * 13. POST /api/marketplace/orders/:orderId/preflight/callback
+ * PHASE-15 / PHASE-11A: Bidirectional Preflight Engine Verdict Callback.
+ * Receives structured pre-press telemetry (CMYK/FOGRA39, DPI, Fonts, TAC %, Bleed +3.0 mm, Spine mm)
+ * and persists it atomically into `marketplace_orders` (`readiness_json`, `metadata_json`) and `marketplace_order_files`.
+ */
+router.post('/:orderId/preflight/callback', requireMarketplaceOrAdmin, async (req, res) => {
+    const { orderId } = req.params;
+    try {
+        const result = await marketplaceOrderFileService.applyPreflightVerdictCallback(orderId, req.body || {});
+        return res.status(200).json(result);
+    } catch (err) {
+        logger.error({ event: 'api_preflight_callback_failed', orderId, error: err.message });
+        const statusCode = err.statusCode || (err.message === 'ORDER_NOT_FOUND' ? 404 : 500);
+        return res.status(statusCode).json({
+            ok: false,
+            error: err.message,
+            message: err.message
+        });
+    }
+});
+
+/**
+ * 14. GET /api/marketplace/orders/:orderId/preflight/report
+ * Returns the full structured Preflight & Spine Geometry report for an order.
+ */
+router.get('/:orderId/preflight/report', requireMarketplaceOrAdmin, async (req, res) => {
+    const { orderId } = req.params;
+    try {
+        const { getPreflightInspectionById, inspectPreflightJob } = require('../services/preflight/preflightEngineService');
+        let report = getPreflightInspectionById(orderId, req.query?.tenantId || 'tenant-default');
+        if (!report) {
+            let order = null;
+            try {
+                order = await marketplaceOrderService.getOrder(orderId);
+            } catch (_) {}
+            const specs = order?.specs || {};
+            report = inspectPreflightJob({
+                jobId: orderId,
+                orderId,
+                title: order?.title || specs.title || `Editorial Job ${orderId}`,
+                isbn: order?.isbn || specs.isbn || '978-84-9066-801-6',
+                pageCount: Number(specs.interior_pages || specs.pages || 240),
+                paperGrammage: Number(specs.paper_weight_interior || 90),
+                paperBulk: 1.3,
+                paperCoating: specs.paper_type_interior || 'UNCOATED',
+                bindingType: specs.binding_method || 'SOFTCOVER_PUR',
+                trimWidthMm: Number(specs.trimWidthMm || 150),
+                trimHeightMm: Number(specs.trimHeightMm || 230),
+                innerBleedMm: 3.0,
+                declaredSpineMm: specs.calculatedSpineMm || null
+            });
+        }
+        return res.status(200).json({
+            ok: true,
+            orderId,
+            preflightReport: report
+        });
+    } catch (err) {
+        return res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
 module.exports = router;

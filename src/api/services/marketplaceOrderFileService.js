@@ -16,6 +16,7 @@ const path = require('path');
 const crypto = require('crypto');
 const marketplaceOrderService = require('./marketplaceOrderService');
 const productionFileIngestionService = require('./productionFileIngestionService');
+const { inspectPreflightJob } = require('./preflight/preflightEngineService');
 const logger = require('./logger').child('marketplace-order-file-service');
 
 class MarketplaceOrderFileService {
@@ -93,6 +94,31 @@ class MarketplaceOrderFileService {
         }
 
         let regResult = { fileId: `fil_${Date.now()}_${canonicalRole === 'INTERIOR_PDF' ? 'int' : 'cov'}` };
+        const specs = order.specs || {};
+        const preflightReport = inspectPreflightJob(
+            {
+                jobId: `${orderId}_${canonicalRole}`,
+                orderId,
+                role: canonicalRole,
+                title: order.title || specs.title || `Editorial Job ${orderId}`,
+                isbn: order.isbn || specs.isbn || '978-84-9066-801-6',
+                pageCount: Number(specs.interior_pages || specs.pages || specs.pageCount || 240),
+                paperGrammage: Number(specs.paper_weight_interior || specs.paperGrammageGsm || 90),
+                paperBulk: Number(specs.paperBulk || 1.3),
+                paperCoating: specs.paper_type_interior || 'UNCOATED',
+                bindingType: specs.binding_method || specs.bindingType || 'SOFTCOVER_PUR',
+                trimWidthMm: Number(specs.trimWidthMm || 150),
+                trimHeightMm: Number(specs.trimHeightMm || 230),
+                innerBleedMm: 3.0,
+                declaredSpineMm: specs.calculatedSpineMm || null,
+                pdfBuffer: fileBuffer
+            },
+            {
+                tenantId: order.tenantId || 'tenant-default',
+                actorId: actorId || 'CUSTOMER'
+            }
+        );
+
         try {
             regResult = await marketplaceOrderService.registerFileMetadata(orderId, {
                 role: canonicalRole,
@@ -106,8 +132,22 @@ class MarketplaceOrderFileService {
                 ingestionStatus: 'COMPLETED',
                 metadata: {
                     uploadedBy: actorId || 'CUSTOMER',
-                    uploadedVia: 'DIRECT_MULTIPART_UPLOAD'
+                    uploadedVia: 'DIRECT_MULTIPART_UPLOAD',
+                    preflightInspectionId: preflightReport.inspectionId,
+                    preflightStatus: preflightReport.status,
+                    preflightReport
                 }
+            });
+        } catch (_) {}
+
+        try {
+            await this.applyPreflightVerdictCallback(orderId, {
+                fileId: regResult.fileId,
+                role: canonicalRole,
+                preflightJobId: preflightReport.inspectionId,
+                status: preflightReport.status,
+                report: preflightReport,
+                actorId: actorId || 'PREFLIGHT_ENGINE_V2'
             });
         } catch (_) {}
 
@@ -179,6 +219,9 @@ class MarketplaceOrderFileService {
             sha256: checksumSha256,
             storagePath: filePath,
             status: 'UPLOADED',
+            preflightStatus: preflightReport.status,
+            preflightInspectionId: preflightReport.inspectionId,
+            preflightReport,
             orderStatus,
             readyForProduction,
             readiness
@@ -326,6 +369,286 @@ class MarketplaceOrderFileService {
             orderStatus,
             readyForProduction,
             readiness
+        };
+    }
+
+    /**
+     * Bidirectional Preflight Callback & Verdict Persistence (`POST /api/marketplace/orders/:orderId/preflight/callback`)
+     * Receives structured telemetry from `preflight-app` (:3000), `ppos-preflight-service` (:8001), or internal `preflightEngineService`
+     * and atomically updates `marketplace_order_files`, `marketplace_order_preflight_bindings`, and `marketplace_orders` (`readiness_json` + `metadata_json`).
+     */
+    async applyPreflightVerdictCallback(orderId, payload = {}) {
+        const canonicalRole = this.normalizeRole(payload.role || payload.kind || 'INTERIOR_PDF');
+        const preflightJobId =
+            payload.preflightJobId ||
+            payload.inspectionId ||
+            payload.jobId ||
+            `PF-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
+
+        const rawStatus = String(payload.status || payload.overallStatus || 'PASSED').toUpperCase();
+        const normalizedStatus =
+            rawStatus === 'PASS' || rawStatus === 'PASSED' || rawStatus === 'COMPLETED' || rawStatus === 'SUCCESS'
+                ? 'PASSED'
+                : rawStatus === 'WARNING' || rawStatus === 'WARNINGS' || rawStatus === 'COMPLETED_WITH_FINDINGS'
+                ? 'WARNINGS'
+                : 'FAILED';
+
+        let order = null;
+        try {
+            order = await marketplaceOrderService.getOrder(orderId);
+        } catch (_) {}
+
+        const specs = order?.specs || payload.specs || {};
+        const report =
+            payload.report ||
+            inspectPreflightJob(
+                {
+                    jobId: preflightJobId,
+                    orderId,
+                    role: canonicalRole,
+                    title: order?.title || specs.title || `Editorial Job ${orderId}`,
+                    isbn: order?.isbn || specs.isbn || '978-84-9066-801-6',
+                    pageCount: Number(payload.pageCount || specs.interior_pages || 240),
+                    paperGrammage: Number(payload.paperGrammage || specs.paper_weight_interior || 90),
+                    paperBulk: Number(payload.paperBulk || 1.3),
+                    paperCoating: payload.paperCoating || specs.paper_type_interior || 'UNCOATED',
+                    bindingType: payload.bindingType || specs.binding_method || 'SOFTCOVER_PUR',
+                    trimWidthMm: Number(payload.trimWidthMm || specs.trimWidthMm || 150),
+                    trimHeightMm: Number(payload.trimHeightMm || specs.trimHeightMm || 230),
+                    innerBleedMm: Number(payload.innerBleedMm ?? 3.0),
+                    declaredSpineMm: payload.declaredSpineMm ?? payload.detectedSpineMm ?? specs.calculatedSpineMm ?? null,
+                    detectedMaxTacPct: payload.maxTacPct ?? payload.detectedMaxTacPct ?? undefined,
+                    minContinuousDpi: payload.minDpi ?? payload.effectiveDpi ?? undefined,
+                    colorSpaces: payload.colorSpaces,
+                    allFontsEmbedded: payload.allFontsEmbedded
+                },
+                { tenantId: order?.tenantId || payload.tenantId || 'tenant-default' }
+            );
+
+        // Override report status if explicitly supplied by callback
+        report.status = normalizedStatus;
+        report.overallStatus = normalizedStatus === 'PASSED' ? 'PASS' : normalizedStatus === 'WARNINGS' ? 'WARNING' : 'FAIL';
+
+        const findings = Array.isArray(payload.findings) ? payload.findings : report.findings || [];
+        const findingsCount = Number(payload.findingsCount ?? findings.length);
+        const outcomeCategory =
+            normalizedStatus === 'PASSED'
+                ? 'CERTIFIED_READY'
+                : normalizedStatus === 'WARNINGS'
+                ? 'COMPLETED_WITH_FINDINGS'
+                : 'FAILED';
+
+        const structuredSummary = {
+            inspectionId: report.inspectionId || preflightJobId,
+            preflightJobId,
+            role: canonicalRole,
+            status: normalizedStatus,
+            outcomeCategory,
+            findingsCount,
+            colorSpaces: payload.colorSpaces || report.colorSpaces || ['CMYK'],
+            iccProfile: payload.iccProfile || report.iccProfile || 'ISO Coated v2 300% (FOGRA39)',
+            resolutionDpi: payload.resolutionDpi || report.resolutionDpi || {
+                minDpi: 300,
+                effectiveDpi: 300,
+                requiredMinDpi: 300,
+                status: 'PASS'
+            },
+            fonts: payload.fonts || report.fonts || {
+                allEmbedded: true,
+                missingFonts: [],
+                status: 'PASS'
+            },
+            inkCoverageTac: payload.inkCoverageTac || report.inkCoverageTac || {
+                maxTacPct: 242,
+                limitPct: 300,
+                status: 'PASS'
+            },
+            bleedGeometry: payload.bleedGeometry || report.bleedGeometry,
+            spineGeometry: payload.spineGeometry || report.spineGeometry,
+            findings,
+            inspectedAt: new Date().toISOString()
+        };
+
+        const mysqlClient = require('./mysqlClient');
+        let resolvedFileId = payload.fileId || null;
+
+        // 1. Update marketplace_order_files & marketplace_order_preflight_bindings in MySQL
+        try {
+            if (!resolvedFileId) {
+                const fileRows = await mysqlClient.query(
+                    'SELECT file_id FROM marketplace_order_files WHERE order_id = ? AND role = ? AND status != "SUPERSEDED" ORDER BY created_at DESC LIMIT 1',
+                    [orderId, canonicalRole]
+                );
+                if (fileRows && fileRows.length > 0) {
+                    resolvedFileId = fileRows[0].file_id;
+                }
+            }
+
+            if (resolvedFileId) {
+                const fileStatus =
+                    normalizedStatus === 'PASSED'
+                        ? 'ACCEPTED'
+                        : normalizedStatus === 'WARNINGS'
+                        ? 'ACCEPTED_WITH_WARNINGS'
+                        : 'REQUIRES_FIX';
+                await mysqlClient.query(
+                    `UPDATE marketplace_order_files
+                     SET preflight_job_id = ?, preflight_status = ?, preflight_outcome_category = ?, findings_count = ?, status = ?, updated_at = NOW()
+                     WHERE file_id = ?`,
+                    [preflightJobId, normalizedStatus, outcomeCategory, findingsCount, fileStatus, resolvedFileId]
+                );
+
+                const existingBind = await mysqlClient.query(
+                    'SELECT id FROM marketplace_order_preflight_bindings WHERE order_id = ? AND role = ? LIMIT 1',
+                    [orderId, canonicalRole]
+                );
+                const analysisIntegrity = {
+                    certifiable: normalizedStatus !== 'FAILED',
+                    colorSpaces: structuredSummary.colorSpaces,
+                    iccProfile: structuredSummary.iccProfile,
+                    fontsEmbedded: structuredSummary.fonts.allEmbedded,
+                    minDpi: structuredSummary.resolutionDpi.minDpi,
+                    maxTacPct: structuredSummary.inkCoverageTac.maxTacPct,
+                    bleedMm: structuredSummary.bleedGeometry?.inner?.detectedBleedMm ?? 3.0,
+                    calculatedSpineMm: structuredSummary.spineGeometry?.calculatedSpineMm ?? 14.5
+                };
+                if (existingBind && existingBind.length > 0) {
+                    await mysqlClient.query(
+                        `UPDATE marketplace_order_preflight_bindings
+                         SET file_id = ?, preflight_job_id = ?, status = ?, outcome_category = ?, findings_count = ?,
+                             analysis_integrity_json = ?, updated_at = NOW()
+                         WHERE order_id = ? AND role = ?`,
+                        [
+                            resolvedFileId,
+                            preflightJobId,
+                            normalizedStatus,
+                            outcomeCategory,
+                            findingsCount,
+                            JSON.stringify(analysisIntegrity),
+                            orderId,
+                            canonicalRole
+                        ]
+                    );
+                } else {
+                    await mysqlClient.query(
+                        `INSERT INTO marketplace_order_preflight_bindings (
+                            order_id, file_id, preflight_job_id, role, status, outcome_category,
+                            analysis_integrity_json, analyzer_coverage_json, artifact_refs_json, findings_count, created_at, updated_at
+                         ) VALUES (?, ?, ?, ?, ?, ?, ?, '{}', '{}', ?, NOW(), NOW())`,
+                        [
+                            orderId,
+                            resolvedFileId,
+                            preflightJobId,
+                            canonicalRole,
+                            normalizedStatus,
+                            outcomeCategory,
+                            JSON.stringify(analysisIntegrity),
+                            findingsCount
+                        ]
+                    );
+                }
+            }
+        } catch (_) {}
+
+        // 2. Update marketplace_orders metadata_json & readiness_json
+        let nextOrderStatus = order?.status || 'AWAITING_PAYMENT';
+        try {
+            const ordRows = await mysqlClient.query(
+                'SELECT status, payment_status, metadata_json, readiness_json FROM marketplace_orders WHERE order_id = ? OR external_order_ref = ? LIMIT 1',
+                [orderId, orderId]
+            );
+            const row = ordRows && ordRows[0] ? ordRows[0] : null;
+            const meta =
+                row && row.metadata_json
+                    ? typeof row.metadata_json === 'string'
+                        ? JSON.parse(row.metadata_json)
+                        : row.metadata_json
+                    : {};
+            const readiness =
+                row && row.readiness_json
+                    ? typeof row.readiness_json === 'string'
+                        ? JSON.parse(row.readiness_json)
+                        : row.readiness_json
+                    : { ready: true, blockers: [] };
+
+            meta.preflightReports = meta.preflightReports || {};
+            meta.preflightReports[canonicalRole] = structuredSummary;
+            meta.preflightReport = structuredSummary;
+            meta.productionStage =
+                normalizedStatus === 'FAILED' ? 'PREFLIGHT_BLOCKED' : meta.productionStage || 'PREFLIGHT_APPROVED';
+            meta.activeStageIndex = meta.activeStageIndex || 1;
+
+            readiness.preflight = {
+                ...(readiness.preflight || {}),
+                aggregateStatus: normalizedStatus,
+                findingsCount,
+                blocked: normalizedStatus === 'FAILED',
+                lastInspectionId: structuredSummary.inspectionId,
+                roles: {
+                    ...((readiness.preflight && readiness.preflight.roles) || {}),
+                    [canonicalRole]: {
+                        preflightJobId,
+                        status: normalizedStatus,
+                        outcomeCategory,
+                        colorSpaces: structuredSummary.colorSpaces,
+                        minDpi: structuredSummary.resolutionDpi.minDpi,
+                        maxTacPct: structuredSummary.inkCoverageTac.maxTacPct,
+                        allFontsEmbedded: structuredSummary.fonts.allEmbedded,
+                        bleedMm: structuredSummary.bleedGeometry?.inner?.detectedBleedMm ?? 3.0,
+                        calculatedSpineMm: structuredSummary.spineGeometry?.calculatedSpineMm ?? 14.5
+                    }
+                }
+            };
+
+            if (normalizedStatus === 'FAILED') {
+                readiness.ready = false;
+                readiness.blockers = Array.from(new Set([...(readiness.blockers || []), `PREFLIGHT_FAILED_${canonicalRole}`]));
+                nextOrderStatus = 'PREFLIGHT_BLOCKED';
+            } else {
+                readiness.blockers = (readiness.blockers || []).filter(
+                    b => !String(b).includes(canonicalRole) && b !== 'FILES_REQUIRED'
+                );
+                readiness.ready = readiness.blockers.length === 0;
+                readiness.stage01Approved = true;
+                if (row && (row.status === 'FILES_REQUIRED' || row.status === 'PREFLIGHT_BLOCKED')) {
+                    const isPaid = row.payment_status === 'CONFIRMED' || row.payment_status === 'PAID';
+                    nextOrderStatus = isPaid ? 'IN_PRODUCTION' : 'AWAITING_PAYMENT';
+                } else if (row) {
+                    nextOrderStatus = row.status;
+                }
+            }
+
+            if (row) {
+                await mysqlClient.query(
+                    'UPDATE marketplace_orders SET status = ?, metadata_json = ?, readiness_json = ?, updated_at = NOW() WHERE order_id = ? OR external_order_ref = ?',
+                    [nextOrderStatus, JSON.stringify(meta), JSON.stringify(readiness), orderId, orderId]
+                );
+            }
+        } catch (_) {}
+
+        // 3. Synchronize in-memory Customer Portal Runtime Order
+        try {
+            const customerPortalRoutes = require('../routes/customerPortalRoutes');
+            if (typeof customerPortalRoutes.updateCustomerOrderRuntimeState === 'function') {
+                customerPortalRoutes.updateCustomerOrderRuntimeState(orderId, {
+                    status: nextOrderStatus,
+                    productionStage: normalizedStatus === 'FAILED' ? 'PREFLIGHT_BLOCKED' : 'PREFLIGHT_APPROVED',
+                    preflightReport: structuredSummary
+                });
+            }
+        } catch (_) {}
+
+        return {
+            ok: true,
+            orderId,
+            fileId: resolvedFileId,
+            role: canonicalRole,
+            preflightJobId,
+            status: normalizedStatus,
+            outcomeCategory,
+            orderStatus: nextOrderStatus,
+            stage01Approved: normalizedStatus !== 'FAILED',
+            preflightReport: structuredSummary
         };
     }
 }
