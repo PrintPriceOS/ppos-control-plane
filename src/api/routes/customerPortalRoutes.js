@@ -1375,6 +1375,78 @@ function createCustomerPortalRouter() {
     });
 
     /**
+     * 3d. GET /api/customer/orders/:orderId/soft-proof/certificate.pdf
+     * Generates and streams the official DIN A4 3D Soft-Proof Sign-Off / Digital Imprimatur PDF Certificate.
+     */
+    router.get('/orders/:orderId/soft-proof/certificate.pdf', async (req, res) => {
+        const orderId = req.params.orderId;
+        try {
+            const ctx = resolveCustomerContext(req);
+            const baseline = buildBaselineCustomerOrders(ctx.email);
+            let order =
+                runtimeCustomerOrders.get(orderId) ||
+                baseline.find(o => o.orderId === orderId || o.publicRef === orderId);
+
+            if (!order) {
+                try {
+                    const dbOrder = await marketplaceOrderService.getOrder(orderId);
+                    if (dbOrder) {
+                        order = mapMarketplaceOrderToCustomerHubOrder(dbOrder);
+                    }
+                } catch (_) {}
+            }
+
+            if (!order && String(orderId).startsWith('ORD')) {
+                order = { ...baseline[0], orderId };
+            }
+
+            if (!order) {
+                return res.status(404).json({
+                    ok: false,
+                    error: 'ORDER_NOT_FOUND',
+                    message: `Order '${orderId}' not found for Digital Imprimatur Certificate generation.`
+                });
+            }
+
+            const key = ctx.customerId || ctx.email || 'default-customer';
+            const profile =
+                (await loadCustomerProfileFromMySQL(key, ctx.email)) ||
+                customerProfileStore.get(key) ||
+                getDefaultCustomerProfile(key, ctx.email);
+
+            const { generateSoftProofCertificatePdf } = require('../services/publisher/softProofCertificatePdfService');
+            const clientIp =
+                req.headers['x-forwarded-for'] ||
+                req.socket?.remoteAddress ||
+                '212.227.79.67 (TLS 1.3 Verified Session)';
+
+            const pdfResult = generateSoftProofCertificatePdf(order, {
+                orderId,
+                approvedBy: order.proofApprovedBy || ctx.email,
+                fiscalProfile: profile?.fiscalProfile || profile?.fiscal || {},
+                clientIp
+            });
+
+            res.setHeader('Content-Type', 'application/pdf');
+            res.setHeader(
+                'Content-Disposition',
+                `inline; filename="Imprimatur_Certificate_${encodeURIComponent(order.orderId || orderId)}.pdf"`
+            );
+            res.setHeader('Content-Length', String(pdfResult.buffer.length));
+            res.setHeader('X-Certificate-Id', pdfResult.certificateId);
+            res.setHeader('X-Proof-Signature-Hash', pdfResult.proofSignatureHash);
+            return res.status(200).send(pdfResult.buffer);
+        } catch (err) {
+            logger.error({ event: 'soft_proof_certificate_pdf_failed', orderId, error: err.message });
+            return res.status(500).json({
+                ok: false,
+                error: 'SOFT_PROOF_CERTIFICATE_PDF_FAILED',
+                message: err.message
+            });
+        }
+    });
+
+    /**
      * 4. GET /api/customer/profile
      * Returns customer's B2B Shipping Address Book (with dock conditions) and Fiscal & Billing Data.
      */

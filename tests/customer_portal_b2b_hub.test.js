@@ -346,5 +346,27 @@ describe('B2B Customer Self-Service Hub — End-to-End Transactional Verificatio
     const publisherSignOffBody = await publisherSignOffRes.json();
     expect(publisherSignOffBody.ok).toBe(true);
     expect(publisherSignOffBody.proofSignatureHash).toMatch(/^SHA256:[a-f0-9]{64}$/);
+
+    // Step 3H: Download DIN A4 3D Soft-Proof Sign-Off / Digital Imprimatur Certificate PDF
+    const certPdfRes = await fetch(
+      `${baseUrl}/api/customer/orders/ORD_2026_103/soft-proof/certificate.pdf`,
+      { headers: authHeaders }
+    );
+    expect(certPdfRes.status).toBe(200);
+    expect(certPdfRes.headers.get('content-type')).toContain('application/pdf');
+    expect(certPdfRes.headers.get('content-disposition')).toContain(
+      'filename="Imprimatur_Certificate_ORD_2026_103.pdf"'
+    );
+    expect(certPdfRes.headers.get('x-certificate-id')).toMatch(/^CERT-SP-\d{4}-[A-F0-9]{8}$/);
+    const certPdfBuf = Buffer.from(await certPdfRes.arrayBuffer());
+    const certPdfText = certPdfBuf.toString('latin1');
+    expect(certPdfText.startsWith('%PDF-1.4')).toBe(true);
+    expect(certPdfText).toContain('DIGITAL IMPRIMATUR & 3D SOFT-PROOF SIGN-OFF CERTIFICATE');
+    expect(certPdfText).toContain('ORD_2026_103');
+    expect(certPdfText).toContain('150 x 230 mm');
+    expect(certPdfText).toContain('16.20 mm');
+    expect(certPdfText).toContain('FUNDS_LOCKED_ON_PROOF_APPROVAL');
+    expect(certPdfText).toContain(softProofBody.proofSignatureHash);
+    expect(certPdfText.trim().endsWith('%%EOF')).toBe(true);
   });
 });

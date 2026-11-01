@@ -275,6 +275,31 @@ function createPublisherRouter() {
     router.post('/orders/:id/proof-decision', handleProofDecision);
     router.post('/proofs/:orderId/sign-off', handleProofDecision);
 
+    // GET /api/publisher/proofs/:orderId/certificate.pdf
+    router.get('/proofs/:orderId/certificate.pdf', async (req, res) => {
+        const orderId = req.params.orderId;
+        try {
+            const { generateSoftProofCertificatePdf } = require('../services/publisher/softProofCertificatePdfService');
+            const customerPortalRoutes = require('./customerPortalRoutes');
+            const order =
+                (customerPortalRoutes.runtimeCustomerOrders && customerPortalRoutes.runtimeCustomerOrders.get(orderId)) ||
+                { orderId };
+            const pdfResult = generateSoftProofCertificatePdf(order, {
+                orderId,
+                approvedBy: (req.user && req.user.email) || req.headers['x-ppos-user-email'] || 'publisher@printprice.pro'
+            });
+            res.setHeader('Content-Type', 'application/pdf');
+            res.setHeader(
+                'Content-Disposition',
+                `inline; filename="Imprimatur_Certificate_${encodeURIComponent(orderId)}.pdf"`
+            );
+            res.setHeader('Content-Length', String(pdfResult.buffer.length));
+            return res.status(200).send(pdfResult.buffer);
+        } catch (err) {
+            return res.status(500).json({ ok: false, error: err.message });
+        }
+    });
+
     // GET /api/publisher/notifications
     router.get('/notifications', async (req, res) => {
         try {
