@@ -26,6 +26,34 @@ router.get('/test-headers', (req, res) => {
   });
 });
 
+// ── Executive Operational Telemetry Summary (Phase 16 - Option 1) ──────────
+const { getOperationalTelemetrySummary } = require('../services/telemetry/operationalTelemetryService');
+
+router.get('/operations/telemetry-summary', async (req, res, next) => {
+  const mktToken = String(req.headers['x-marketplace-token'] || '').trim();
+  const expectedMktToken = String(process.env.PPOS_MARKETPLACE_INTAKE_TOKEN || '').trim();
+  const serviceToken = String(req.headers['x-service-token'] || '').trim();
+  const expectedControlToken = String(process.env.PPOS_CONTROL_TOKEN || '').trim();
+
+  if (
+    (mktToken && expectedMktToken && mktToken === expectedMktToken) ||
+    (serviceToken && expectedControlToken && serviceToken === expectedControlToken)
+  ) {
+    try {
+      const tenantId = req.headers['x-tenant-id'] || req.query.tenantId || 'tenant-default';
+      const summary = await getOperationalTelemetrySummary({ tenantId });
+      return res.status(200).json(summary);
+    } catch (err) {
+      return res.status(500).json({
+        ok: false,
+        error: 'OPERATIONAL_TELEMETRY_SUMMARY_FAILED',
+        message: err.message
+      });
+    }
+  }
+  return next();
+});
+
 router.use(requireAdmin);
 
 // PROTECTED DIAGNOSTICS (Require Auth)
@@ -124,7 +152,7 @@ router.use((req, res, next) => {
       path.startsWith('/financials') ||
       path.startsWith('/pre-production') ||
       path.startsWith('/deployment') ||
-      path.startsWith('/operations') ||
+      (path.startsWith('/operations') && path !== '/operations/telemetry-summary') ||
       path.startsWith('/prelaunch') ||
       path.startsWith('/preproduction') ||
       path.startsWith('/production/pilot-activation') ||
@@ -1333,6 +1361,21 @@ router.get('/printhouses/:nodeId/publications/latest', async (req, res) => {
         res.json({ ok: true, data: pub });
     } catch (err) {
         res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
+// ── Executive Operational Telemetry Summary (Authenticated Admin / System) ──
+router.get('/operations/telemetry-summary', async (req, res) => {
+    try {
+        const tenantId = req.user?.tenantId || req.headers['x-tenant-id'] || req.query.tenantId || 'tenant-default';
+        const summary = await getOperationalTelemetrySummary({ tenantId });
+        return res.status(200).json(summary);
+    } catch (err) {
+        return res.status(500).json({
+            ok: false,
+            error: 'OPERATIONAL_TELEMETRY_SUMMARY_FAILED',
+            message: err.message
+        });
     }
 });
 

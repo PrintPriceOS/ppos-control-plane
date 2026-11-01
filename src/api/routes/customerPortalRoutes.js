@@ -1587,6 +1587,27 @@ function createCustomerPortalRouter() {
     });
 
     /**
+     * 3f. GET /api/customer/operations/summary
+     * Executive real-time operational telemetry summary (Funnel Stage 01..05, Escrow, Pre-Press Health, Storage I/O).
+     */
+    router.get('/operations/summary', async (req, res) => {
+        try {
+            const ctx = resolveCustomerContext(req);
+            const { getOperationalTelemetrySummary } = require('../services/telemetry/operationalTelemetryService');
+            const summary = await getOperationalTelemetrySummary({
+                tenantId: ctx.tenantId || 'tenant-default'
+            });
+            return res.status(200).json(summary);
+        } catch (err) {
+            return res.status(500).json({
+                ok: false,
+                error: 'CUSTOMER_OPERATIONS_SUMMARY_FAILED',
+                message: err.message
+            });
+        }
+    });
+
+    /**
      * 4. GET /api/customer/profile
      * Returns customer's B2B Shipping Address Book (with dock conditions) and Fiscal & Billing Data.
      */
