@@ -80,6 +80,7 @@ fastify.addHook('onRequest', async (request, reply) => {
             url === '/api/marketplace/orders' ||
             url.startsWith('/api/marketplace/orders/') ||
             url.startsWith('/api/customer/') ||
+            url.startsWith('/api/publisher/') ||
             url.startsWith('/api/financials/escrow/') ||
             url.startsWith('/api/logistics/shipments/');
         if (isMarketplaceOrderPath) {

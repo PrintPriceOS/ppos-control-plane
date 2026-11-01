@@ -9,6 +9,7 @@ const express = require('express');
 const customerPortalRoutes = require('../src/api/routes/customerPortalRoutes');
 const marketplaceOrdersRoutes = require('../src/api/routes/marketplaceOrders');
 const escrowRoutes = require('../src/api/routes/escrowRoutes');
+const createPublisherRoutes = require('../src/api/routes/publisherRoutes');
 
 describe('B2B Customer Self-Service Hub — End-to-End Transactional Verification', () => {
   let server;
@@ -27,6 +28,7 @@ describe('B2B Customer Self-Service Hub — End-to-End Transactional Verificatio
     app.use('/api/customer', customerPortalRoutes);
     app.use('/api/marketplace/orders', marketplaceOrdersRoutes);
     app.use('/api/financials/escrow', escrowRoutes);
+    app.use('/api/publisher', createPublisherRoutes);
 
     await new Promise((resolve) => {
       server = app.listen(0, '127.0.0.1', () => {
@@ -294,5 +296,55 @@ describe('B2B Customer Self-Service Hub — End-to-End Transactional Verificatio
     expect(stage5Body.activeStageIndex).toBe(5);
     expect(stage5Body.status).toBe('IN_TRANSIT');
     expect(stage5Body.tracking.carrier.trackingNumber).toBe('DACHSER-EU-991044');
+
+    // Step 3F: 3D Parametric Soft-Proof Cryptographic Sign-Off (SHA-256) & Escrow Lock
+    const softProofRes = await fetch(
+      `${baseUrl}/api/customer/orders/ORD_2026_103/soft-proof/approve`,
+      {
+        method: 'POST',
+        headers: authHeaders,
+        body: JSON.stringify({
+          comments: 'Spine 16.2mm and +3.0mm bleed verified in 3D Soft-Proof.',
+          geometry: {
+            trimWidthMm: 150,
+            trimHeightMm: 230,
+            spineThicknessMm: 16.2,
+            bleedMarginMm: 3.0,
+            hardcoverOverhangMm: 0,
+          },
+          approvedBy: 'produccion@editorial-planeta.es',
+        }),
+      }
+    );
+    expect(softProofRes.status).toBe(200);
+    const softProofBody = await softProofRes.json();
+    expect(softProofBody.ok).toBe(true);
+    expect(softProofBody.proofStatus).toBe('APPROVED_FOR_PRESS');
+    expect(softProofBody.proofSignatureHash).toMatch(/^SHA256:[a-f0-9]{64}$/);
+    expect(softProofBody.escrowStatus).toBe('FUNDS_LOCKED_ON_PROOF_APPROVAL');
+
+    // Step 3G: Publisher Proof Sign-Off endpoint (/api/publisher/proofs/:orderId/sign-off)
+    const publisherSignOffRes = await fetch(
+      `${baseUrl}/api/publisher/proofs/ORD_2026_101/sign-off`,
+      {
+        method: 'POST',
+        headers: authHeaders,
+        body: JSON.stringify({
+          decision: 'APPROVED',
+          comments: 'Publisher sign-off verified.',
+          geometry: {
+            trimWidthMm: 170,
+            trimHeightMm: 240,
+            spineThicknessMm: 22.4,
+            bleedMarginMm: 3.0,
+            hardcoverOverhangMm: 3.0,
+          },
+        }),
+      }
+    );
+    expect(publisherSignOffRes.status).toBe(200);
+    const publisherSignOffBody = await publisherSignOffRes.json();
+    expect(publisherSignOffBody.ok).toBe(true);
+    expect(publisherSignOffBody.proofSignatureHash).toMatch(/^SHA256:[a-f0-9]{64}$/);
   });
 });

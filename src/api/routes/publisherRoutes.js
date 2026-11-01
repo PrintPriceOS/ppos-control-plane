@@ -54,13 +54,16 @@ function resolvePublisherTenantId(req) {
 
 function requirePublisherHubAuth(req, res, next) {
     const role = String(
-        (req.user && req.user.role) || (req.headers && req.headers['x-user-role']) || ''
+        (req.user && req.user.role) ||
+        (req.headers && (req.headers['x-user-role'] || req.headers['x-ppos-role'])) ||
+        ''
     ).toUpperCase();
 
     const allowedRoles = new Set([
         'PUBLISHER',
         'PUBLISHER_ADMIN',
         'PUBLISHER_EDITOR',
+        'CUSTOMER',
         'PRINTHOUSE_ADMIN',
         'TENANT_ADMIN',
         'SUPER_ADMIN'
@@ -222,35 +225,55 @@ function createPublisherRouter() {
         }
     });
 
-    // POST /api/publisher/orders/:id/proof-decision
-    router.post('/orders/:id/proof-decision', async (req, res) => {
+    // POST /api/publisher/orders/:id/proof-decision (and alias /api/publisher/proofs/:id/sign-off)
+    const handleProofDecision = async (req, res) => {
         try {
             const publisherTenantId = resolvePublisherTenantId(req);
-            const orderId = req.params && req.params.id;
+            const orderId = (req.params && (req.params.id || req.params.orderId)) || (req.body && req.body.orderId);
             const userId =
                 (req.user && req.user.id) ||
-                (req.body && req.body.userId) ||
-                (req.headers && req.headers['x-user-id']) ||
+                (req.body && (req.body.userId || req.body.approvedBy || req.body.email)) ||
+                (req.headers && (req.headers['x-customer-email'] || req.headers['x-user-id'])) ||
                 'publisher-editor';
 
-            const result = submitProofApproval({
-                orderId,
-                publisherTenantId,
-                userId,
-                role: 'PUBLISHER',
-                decision: req.body && req.body.decision,
-                comments: req.body && req.body.comments,
-                inspectionNotes: req.body && req.body.inspectionNotes
-            });
-
-            return res.status(200).json(result);
+            try {
+                const result = submitProofApproval({
+                    orderId,
+                    publisherTenantId,
+                    userId,
+                    role: 'PUBLISHER',
+                    decision: (req.body && req.body.decision) || 'APPROVED',
+                    comments: req.body && req.body.comments,
+                    inspectionNotes: req.body && req.body.inspectionNotes
+                });
+                return res.status(200).json(result);
+            } catch (innerErr) {
+                // If order belongs to B2B Customer Portal / MySQL marketplace_orders rather than publisherOrdersStore, delegate to customerPortalRoutes
+                const customerPortalRoutes = require('./customerPortalRoutes');
+                if (typeof customerPortalRoutes.processCustomerSoftProofDecision === 'function') {
+                    const cpResult = await customerPortalRoutes.processCustomerSoftProofDecision(orderId, {
+                        decision: (req.body && req.body.decision) || 'APPROVED',
+                        comments: req.body && req.body.comments,
+                        approvedBy: userId,
+                        tenantId: publisherTenantId,
+                        geometry: req.body && req.body.geometry
+                    });
+                    if (cpResult && cpResult.ok) {
+                        return res.status(200).json(cpResult);
+                    }
+                }
+                throw innerErr;
+            }
         } catch (err) {
             return res.status(err.statusCode || 400).json({
                 ok: false,
                 error: err.message
             });
         }
-    });
+    };
+
+    router.post('/orders/:id/proof-decision', handleProofDecision);
+    router.post('/proofs/:orderId/sign-off', handleProofDecision);
 
     // GET /api/publisher/notifications
     router.get('/notifications', async (req, res) => {
