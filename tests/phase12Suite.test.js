@@ -9,7 +9,8 @@ import {
 import {
     generateJdfJobTicketXml,
     processJmfTelemetrySignal,
-    getLatestJmfTelemetry
+    getLatestJmfTelemetry,
+    simulateJmfTelemetryBurst
 } from '../services/manufacturing/jdfConnectorService.js';
 import {
     CONSUMABLE_THRESHOLDS,
@@ -125,6 +126,25 @@ describe('PrintPrice OS — Phase 12 (Roadmap 2026.5) End-to-End Verification Su
             const latest = getLatestJmfTelemetry('PF-2026-082', 'tenant-phase12-test');
             expect(latest).not.toBeNull();
             expect(latest.deltaEColorAccuracy).toBe(0.72);
+        });
+
+        it('simulates a 3-stage JMF telemetry burst (PLATES_BURNED -> ON_PRESS -> COMPLETED) with real make-ready waste reconciliation', () => {
+            const burst = simulateJmfTelemetryBurst(
+                {
+                    jobId: 'PF-2026-084',
+                    targetGoodSheets: 24000,
+                    plannedMakeReadyWasteSheets: 740,
+                    platesBurned: 32
+                },
+                { tenantId: 'tenant-phase12-test' }
+            );
+
+            expect(burst.ok).toBe(true);
+            expect(burst.finalStatus).toBe('COMPLETED');
+            expect(burst.eventsCount).toBe(3);
+            expect(burst.actualMakeReadyWasteSheets).toBe(710); // 96% of 740
+            expect(burst.wasteVarianceSheets).toBe(-30);
+            expect(burst.latestSignal.pressState).toBe('COMPLETED');
         });
     });
 

@@ -277,6 +277,11 @@ describe('Dark Industrial Telemetry UI — Canonical Components & Dual-Mode Reco
         expect(await screen.findByTestId('jdf-xml-preview-modal')).toBeInTheDocument();
         expect(screen.getByTestId('jdf-xml-code-block')).toHaveTextContent('http://www.cip4.org/JDFSchema_1_1');
 
+        const simJmfBtn = screen.getByTestId('simulate-jmf-btn-PF-2026-084-SIG-01');
+        expect(simJmfBtn).toBeInTheDocument();
+        fireEvent.click(simJmfBtn);
+        expect(await screen.findByTestId('jmf-telemetry-burst-banner')).toBeInTheDocument();
+
         vi.spyOn(adminApi, 'getMachines').mockResolvedValue({
             ok: true,
             total: 1,

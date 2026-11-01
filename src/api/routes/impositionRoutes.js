@@ -22,7 +22,8 @@ const {
 } = require('../services/manufacturing/impositionEngineService');
 const {
     generateJdfJobTicketXml,
-    processJmfTelemetrySignal
+    processJmfTelemetrySignal,
+    simulateJmfTelemetryBurst
 } = require('../services/manufacturing/jdfConnectorService');
 
 function requireLogisticsControlPlaneAuth(req, res, next) {
@@ -208,6 +209,24 @@ function createImpositionRouter() {
                 'tenant-default';
             const result = processJmfTelemetrySignal(req.body || {}, { tenantId });
             return res.status(200).json(result);
+        } catch (err) {
+            return res.status(err.statusCode || 400).json({
+                ok: false,
+                error: err.message
+            });
+        }
+    });
+
+    // POST /api/manufacturing/imposition/jmf/simulate-burst
+    router.post('/jmf/simulate-burst', async (req, res) => {
+        try {
+            const tenantId =
+                (req.user && req.user.tenantId) ||
+                (req.body && req.body.tenantId) ||
+                (req.headers && req.headers['x-tenant-id']) ||
+                'tenant-default';
+            const burst = simulateJmfTelemetryBurst(req.body || {}, { tenantId });
+            return res.status(200).json(burst);
         } catch (err) {
             return res.status(err.statusCode || 400).json({
                 ok: false,

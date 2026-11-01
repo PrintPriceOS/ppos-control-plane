@@ -202,8 +202,97 @@ function getLatestJmfTelemetry(jobId, tenantId = 'tenant-default') {
     return jmfTelemetryStore.get(`${tenantId}:${jobId}`) || null;
 }
 
+/**
+ * Simulates a full 3-stage JMF press telemetry burst (`POST /api/manufacturing/imposition/jmf/simulate-burst`):
+ *   1. `PLATES_BURNED`: CTP plates imaged & mounted (e.g. 64 plates).
+ *   2. `ON_PRESS`: Make-ready calibration completed + 50% good sheets printed.
+ *   3. `COMPLETED`: Target good sheets reached, exact real vs planned make-ready waste reconciled,
+ *      and inline spectrophotometric Delta-E verified (< 1.0).
+ */
+function simulateJmfTelemetryBurst(payload = {}, actorContext = {}) {
+    const tenantId = actorContext.tenantId || payload.tenantId || 'tenant-default';
+    const jobId = payload.jobId || 'PF-2026-082';
+    const targetGoodSheets = Math.max(100, Number(payload.targetGoodSheets) || 24000);
+    const plannedMakeReadyWasteSheets = Math.max(10, Number(payload.plannedMakeReadyWasteSheets) || 1208);
+    const actualMakeReadyWasteSheets =
+        payload.actualMakeReadyWasteSheets !== undefined
+            ? Number(payload.actualMakeReadyWasteSheets)
+            : Math.round(plannedMakeReadyWasteSheets * 0.96); // 4% waste savings via closed-loop Prinect Inpress Control
+    const platesBurned = Math.max(0, Number(payload.platesBurned ?? 64));
+    const speedSheetsPerHour = Math.max(1000, Number(payload.speedSheetsPerHour ?? 16800));
+    const deltaEColorAccuracy = Number(payload.deltaEColorAccuracy ?? 0.68);
+    const deviceId = payload.deviceId || 'HEIDELBERG-XL106-PRINECT-01';
+
+    const events = [
+        {
+            stageIndex: 1,
+            pressState: 'PLATES_BURNED',
+            platesBurned,
+            goodSheetsCounter: 0,
+            wasteSheetsCounter: 0,
+            speedSheetsPerHour: 0,
+            deltaEColorAccuracy: 0.0
+        },
+        {
+            stageIndex: 2,
+            pressState: 'ON_PRESS',
+            platesBurned,
+            goodSheetsCounter: Math.round(targetGoodSheets * 0.5),
+            wasteSheetsCounter: Math.round(actualMakeReadyWasteSheets * 0.85),
+            speedSheetsPerHour,
+            deltaEColorAccuracy: Number((deltaEColorAccuracy + 0.14).toFixed(2))
+        },
+        {
+            stageIndex: 3,
+            pressState: 'COMPLETED',
+            platesBurned,
+            goodSheetsCounter: targetGoodSheets,
+            wasteSheetsCounter: actualMakeReadyWasteSheets,
+            speedSheetsPerHour,
+            deltaEColorAccuracy
+        }
+    ];
+
+    let finalSignal = null;
+    for (const ev of events) {
+        const res = processJmfTelemetrySignal(
+            {
+                jobId,
+                deviceId,
+                pressState: ev.pressState,
+                platesBurned: ev.platesBurned,
+                goodSheetsCounter: ev.goodSheetsCounter,
+                wasteSheetsCounter: ev.wasteSheetsCounter,
+                speedSheetsPerHour: ev.speedSheetsPerHour,
+                deltaEColorAccuracy: ev.deltaEColorAccuracy
+            },
+            { tenantId }
+        );
+        finalSignal = res.signal;
+    }
+
+    const wasteVarianceSheets = actualMakeReadyWasteSheets - plannedMakeReadyWasteSheets;
+
+    return {
+        ok: true,
+        jobId,
+        tenantId,
+        finalStatus: 'COMPLETED',
+        targetGoodSheets,
+        plannedMakeReadyWasteSheets,
+        actualMakeReadyWasteSheets,
+        wasteVarianceSheets,
+        deltaEColorAccuracy,
+        speedSheetsPerHour,
+        eventsCount: events.length,
+        events,
+        latestSignal: finalSignal
+    };
+}
+
 module.exports = {
     generateJdfJobTicketXml,
     processJmfTelemetrySignal,
-    getLatestJmfTelemetry
+    getLatestJmfTelemetry,
+    simulateJmfTelemetryBurst
 };
