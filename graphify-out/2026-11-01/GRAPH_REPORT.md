@@ -1,16 +1,16 @@
 # Graph Report - ppos-control-plane-phase-10-intelligence-layer  (2026-11-01)
 
 ## Corpus Check
-- 4972 files · ~4,556,858 words
+- 4973 files · ~4,561,414 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 36226 nodes · 56181 edges · 2874 communities (2081 shown, 513 thin omitted)
-- Extraction: 96% EXTRACTED · 4% INFERRED · 0% AMBIGUOUS · INFERRED: 2405 edges (avg confidence: 0.85)
+- 36238 nodes · 56238 edges · 2867 communities (2073 shown, 514 thin omitted)
+- Extraction: 96% EXTRACTED · 4% INFERRED · 0% AMBIGUOUS · INFERRED: 2409 edges (avg confidence: 0.85)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `2ba7971d`
+- Built from commit: `83fdde0b`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -21,9 +21,9 @@
 - index-D4kN2rvI.js
 - BackgroundJobMonitor.tsx
 - index-CFO1sqp9.js
-- getAuthToken
+- GuidedPrinthouseJourney.tsx
 - cohortInterventionExecutionPlanActivationTokenRedemptionUnlockEligibilityBuilderService.js
-- i18n.tsx
+- useLocale
 - live-browser.js
 - services/calibrationAcceptanceService.js
 - countryCatalog.js
@@ -39,49 +39,49 @@
 - h3
 - ui_reconciliation_components.test.tsx
 - cohortInterventionExecutionPlanActivationTokenRedemptionUnlockOperatorAttestationBuilderService.js
-- JobDetailDrawer.tsx
-- cohortInterventionExecutionPlanActivationReadinessBuilderService.js
+- PreflightJobDetailPage.tsx
+- cohortInterventionExecutionDispatcherBuilderService.js
 - resolveActorContext
 - printhouseCapabilitiesClient.ts
 - o
 - i
 - Auditoría inicial de `printprice.pro`
-- cohortInterventionExecutionPlanActivationTokenIssuanceBuilderService.js
-- cohortInterventionExecutionReadinessBuilderService.js
+- cohortInterventionExecutionPlanActivationTokenRedemptionFinalApprovalBuilderService.js
+- cohortInterventionExecutionAuthorizationBuilderService.js
 - connectSSE
 - ControlledBetaRuntimeSessionClient
 - cohortInterventionExecutionPlanActivationAuthorizationBuilderService.js
 - modern-screenshot.umd.js
 - cohortInterventionExecutionPlanActivationTokenRedemptionUnlockGovernanceReadinessClosureBuilderService.js
-- calibrationSessionService.js
+- smoke_phase193e_conversational_assistant.js
 - ControlledBetaRuntimeActivityObservation.tsx
-- cohortInterventionExecutionEnvelopeBuilderService.js
+- yf
 - cohortInterventionExecutionPlanActivationTokenRedemptionUnlockComplianceWitnessBuilderService.js
 - cohortInterventionExecutionPlanActivationTokenPreflightBuilderService.js
 - OP-REC-01 — Evaluación Forense y Dictamen de Recuperación de MySQL Staging
-- l3
+- _0
 - cohortInterventionExecutionPlanActivationTokenRedemptionUnlockApprovalBuilderService.js
 - OP-INC-01 — Informe de Auditoría Forense tras Incidente en GATE 2
 - smoke_phase111d_pre_production_runbook_review_workflow.js
 - ProductionMonitoringDashboardPage.tsx
 - smoke_phase109f_end_to_end_compliance_reporting_regression.js
-- authenticatedBetaFetch
+- ControlledBetaInviteAcceptance.tsx
 - smoke_phase110d_go_live_simulation_review_workflow.js
 - smoke_phase112f_end_to_end_final_release_candidate_regression.js
 - migrationService.js
 - smoke_phase108f_end_to_end_data_retention_privacy_regression.js
 - formatters.ts
-- smoke_phase60_post_reupload_lifecycle_regression.js
-- backend_tenant_security.test.js
+- test-phase37-production-unlock.js
+- auditExplorerAdmin.js
 - paper_materials_recovery_03.test.js
-- Je
-- t
+- cohortInterventionExecutionPlanActivationTokenIssuanceBuilderService.js
+- cohortInterventionExecutionPlanActivationTokenRedemptionAuthorizationBuilderService.js
 - orderQuoteRevisionService.js
 - smoke_phase106f_end_to_end_provider_failure_retry_regression.js
 - cohortInterventionExecutionPlanActivationTokenEnvBuilderService.js
 - auditLoggerService.js
 - PrinthouseRegistrationPage.tsx
-- cohortInterventionExecutionAuthorizationBuilderService.js
+- adminControl.js
 - runtimeKillSwitchService.js
 - smoke_phase95f_end_to_end_finops_readiness_regression.js
 - marketplaceOrders.js
@@ -89,14 +89,14 @@
 - el
 - preflightHumanReportSnapshotService.js
 - paper_supplier_offers_and_catalog.test.js
-- cohortInterventionExecutionDispatcherBuilderService.js
-- parseMigrationSql
+- cohortInterventionExecutionPlanActivationTokenRedemptionEnvelopeBuilderService.js
+- bootstrap_canonical_schema.js
 - smoke_phase75f_governance_freeze_production_readiness.js
 - smoke_phase72e_end_to_end_policy_profile_regression.js
 - realityAdmin.js
 - scripts/test_onboarding_connected_suite.js
 - SandboxCommercialPilotService
-- smoke_phase93f_end_to_end_tax_vat_readiness_regression.js
+- industrialProvisioningService.js
 - commercialKnobService.js
 - marketplaceAdmin.js
 - productionDispatchAdmin.js
@@ -113,10 +113,10 @@
 - productionRouteSelectionService.js
 - review_artifacts_onboarding_simplified/test_onboarding_connected_suite.js
 - marketplaceProductionQueueService.js
-- smoke_phase161e_evidence_pack_v161_lineage.js
+- cohortInterventionExecutionPlanActivationTokenRedemptionReadinessBuilderService.js
 - audit_env_variable_completeness.js
 - InternalOrderLifecyclePilotService
-- verify_e2e_workshop_dispatch.js
+- api/services/logistics/deliveryNotePdfService.js
 - test-phase10-controlplane-preflight-alignment.js
 - smoke_phase192d_governed_routing.js
 - printhousePricingRoutes.js
@@ -128,16 +128,16 @@
 - phase39_security_and_integrations.test.js
 - initGlobalBar
 - phase_62f_heavy_pdf_probe_semantics_hardening.md
-- Fs
+- yk
 - showToast
 - Phase 84 Admin Live Ops Command Center Acceptance Pack
 - dev02_controller_correspondence.test.js
 - smoke_phase_39_0_tenant_plan_governance.js
 - Language-Specific Sharp Edges
 - lib/migrationIntegrity.js
-- AutonomousEconomicLoop.js
+- j6
 - run_phase13_concurrency_benchmark.cjs
-- BetaGovernanceWorkspace.tsx
+- ControlledBetaCohortInterventionSimulationReview.tsx
 - industrialDispatchExecutionService.js
 - adminPreflightJobs.js
 - applyEditing
@@ -147,7 +147,7 @@
 - smoke_phase56e_control_plane_artifact_trust_regression.js
 - calibrationReachabilityService.js
 - Phase 195A — Machine-Level Costing Audit Report
-- logistics_integration_preview.test.js
+- smoke_phase164e_evidence_pack_v164_lineage.js
 - paperCaliperReconciliationService.js
 - federationConsensusService.js
 - OP-REC-01 — FASE C: Plan de Ejecución y Validación Aislada (Versión Final Revisada)
@@ -155,7 +155,7 @@
 - quoteEvidenceService.js
 - 2. Auditoría Detallada de Autenticación
 - limitedBetaRuntimeService.js
-- printhouseQuotePreviewService.js
+- calibrationSessionService.js
 - PreflightServiceClient
 - printerSyncService.js
 - RoutingScoreService.js
@@ -166,13 +166,13 @@
 - review_artifacts_onboarding_simplified/calibrationAcceptanceService.js
 - 3. Auditoría de Capacidad e Inteligencia Autónoma (Fases 12–22)
 - OP-REC-01D — Plan de Restauración Definitiva Gobernada de MySQL Staging
-- smoke_autonomous_gating.js
+- AutonomousSimulationLoop.js
 - audit.js
 - AutonomousOptimizationLoop.js
 - cohortInterventionExecutionPlanActivationTokenRedemptionUnlockKillSwitchDryRunBuilderService.js
 - printhouseMachineService.js
 - smoke_phase76f_pilot_seed_readiness.js
-- roundToPrecision
+- spine02_03_engine_and_api.test.js
 - paperProcurementService.js
 - live.md
 - PrelaunchSecurityComplianceHardeningService
@@ -189,8 +189,8 @@
 - api/services/logistics/carrierMilestoneAndEpalService.js
 - federatedDecisionEngine.js
 - ManufacturingEvidenceLedgerService.js
-- aiProviderAdapter.js
-- smoke_phase192b_live_quote_eligibility.js
+- printhouseMachinePricingService.js
+- ControlledBetaCohortActivation.tsx
 - printhouseReadinessService.js
 - smoke_phase74e_end_to_end_audit_bundle_regression.js
 - scripts/src/ui/pages/admin-live-ops/AdminLiveOpsCommandCenterPage.tsx
@@ -206,18 +206,18 @@
 - dependencies
 - Revisión del candidato `ba8d86e` y del runbook de release
 - limitedBetaPreparationGateService.js
-- budget02d01_e2e_real_integration.test.js
-- AutonomousTemporalLoop.js
+- InMemoryTransactionalStorage
+- smoke_autonomous_gating.js
 - TenantPilotReadinessService
-- marketplaceOrderService.js
+- marketplaceOrderFileService.js
 - ControlledBetaExpansionPreparationService
 - engagementEngine.js
-- preflightStorageService.js
+- adminPreflight.js
 - paperImportService.js
 - preProductionOperationalReadinessBoardClient.ts
 - compilerOptions
 - foundingPrinthousePilotGateService.js
-- financialOperationsProductionActivationReviewClient.ts
+- FinancialOperationsProductionActivationReviewPage.tsx
 - LimitedBetaRuntimeService
 - prelaunchSecurityComplianceHardeningClient.ts
 - controlPlaneNotificationService.js
@@ -236,7 +236,7 @@
 - smoke_phase71e_end_to_end_production_handoff_regression.js
 - smoke_phase193d_governed_acceptance.js
 - seed-coverage.js
-- DispatchRecommendationService
+- dispatchRecommendationService.js
 - SubscriptionGuard.tsx
 - PrinthouseCapabilityService
 - ManufacturingDispatchService.js
@@ -251,8 +251,8 @@
 - controlledBetaRuntimeSessionService.js
 - smoke_phase184_runtime_ddl_isolation.js
 - adminBilling.js
-- adminMarketplaceOrders.js
-- test-phase37-dispatch-package.js
+- test-phase36-remediation-loop.js
+- marketplaceOrderService.js
 - mountSvelteComponentVariant
 - industrialDispatchSecurityService.js
 - agentBase.js
@@ -265,9 +265,9 @@
 - Phase 85 Public Marketplace Launch Control Acceptance Pack
 - smoke_phase85f_end_to_end_launch_readiness_regression.js
 - test-intelligence-logic.js
-- routingRecommendationService.js
-- ManufacturingPersistenceService
 - materialsAdmin.js
+- ManufacturingPersistenceService
+- paper_master_database_search.test.js
 - productionDeploymentDryRunClient.ts
 - productionObservabilityIncidentReadinessClient.ts
 - controlledBetaCohortInterventionExecutionPlanActivationTokenRedemptionUnlockComplianceWitnessClient.ts
@@ -280,11 +280,11 @@
 - financialOperationsProductionActivationClient.ts
 - ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenFinalApv.tsx
 - phase192g_end_to_end_golden_path_test.js
-- MachineDetailDrawer.tsx
+- authenticatedBetaFetch
 - ControlledBetaCohortInterventionExecutionPlanActivationTokenRedemptionUnlockFinalReviewClient
 - Phase 192 — Production Readiness & Governed Go-Live
 - adminBetaCommercialization.js
-- ManufacturingPersistenceService.js
+- adminProduction.js
 - foundingPrinthousePilotGateClient.ts
 - ._dbWrite
 - LimitedBetaPreparationGateService
@@ -298,8 +298,8 @@
 - controlledPrinthouseHandoffPackageService.js
 - smoke_phase79e_live_production_monitoring_dashboard_ui.js
 - smoke_phase79a_production_monitoring_schema_sla_model.js
-- AdminDashboard.tsx
-- adminProduction.js
+- NetworkOpsTab.tsx
+- pricingAdmin.js
 - MarketplaceLaunchControlService
 - PreflightContractGateway
 - PreProductionOperationalReadinessBoardService
@@ -309,13 +309,13 @@
 - onboard.md
 - smoke_phase126_1_3_secret_hygiene_acceptance.js
 - controlledBetaCohortActivationService.js
-- smoke_phase192k_rc11_partial_141_recovery.js
+- rk
 - smoke_phase_38_8_production_completion.js
 - smoke_phase77d_pilot_usage_governance.js
 - AutonomousGovernanceLoop.js
 - LiveProductionEnablementService
 - TenantWorkspaceIsolationService
-- rk
+- l6
 - ProductionObservabilityIncidentReadinessService
 - AdminService
 - 2. Evidencia Cruda de Respuestas HTTP (Salida Directa del Servidor)
@@ -323,7 +323,7 @@
 - Revisión del candidato `596ac83` y runbook de release
 - smoke_phase192h_rc8_ledger_state_preservation.js
 - helpSearch.ts
-- IndustrialEventOrchestrationService
+- ManufacturingOrchestrationService.js
 - Phase 194C — Multi-Quantity Calibration Architecture & Design Specification
 - orderPaperDecisionService.js
 - smoke_phase87f_end_to_end_beta_funnel_regression.js
@@ -334,10 +334,10 @@
 - createLiveBrowserDomHelpers
 - smoke_phase_40_production_lifecycle_auditability.js
 - test-phase-1-industrial.js
-- slackNotificationService.js
+- ManufacturingNotificationService
 - Audit: Preflight Operations Module (Control Plane)
 - cohortInterventionSimulationEvidencePackService.js
-- migration_remediation_suite_test.js
+- ControlledBetaCohortInterventionApprovalClient
 - smoke_phase86e_beta_launch_activation.js
 - smoke_phase85d_public_exposure_guard_emergency_stop.js
 - smoke_phase89f_end_to_end_controlled_expansion_regression.js
@@ -392,11 +392,11 @@
 - TokenRedemptionUnlockLegalPolicyHold
 - TokenRedemptionUnlockRiskOfficerCountersign
 - controlledBetaCohortInterventionExecutionPlanActivationTokenStagingClient.ts
-- ControlledBetaCohortInterventionSimulationApproval.tsx
+- tenantPilotClient.ts
 - Phase 82 — Customer Live Order Portal Acceptance Pack
 - Phase 80 — Controlled Live Production Acceptance Pack
 - smoke_phase141b_create_simulation_from_phase140_execution.js
-- dev04b3a_prerequisites_remediation.test.js
+- smoke_phase192l_rc12_tenant_identity_normalization.js
 - Authentication & Session Footguns
 - 2. Detailed Line-by-Line Patch Documentation
 - test-phase36-preflight-bind.js
@@ -425,7 +425,7 @@
 - ControlledBetaCohortInterventionExecutionPlanActivationTokenRedemptionUnlockOperatorAttestationClient
 - ControlledBetaCohortInterventionExecutionPlanActivationTokenRedemptionUnlockPreExecutionFreezeClient
 - ControlledBetaCohortInterventionExecutionPlanActivationTokenRedemptionUnlockSealClient
-- smoke_phase78b_usage_metering_monthly_counters.js
+- usageMeteringService.js
 - PartnerJobDetail.tsx
 - PAPER-MATERIALS-RECOVERY-08 — Protocolo Operativo de Medición Física con Micrómetro (`RECOVERY_08_PHYSICAL_MEASUREMENT_PROTOCOL.md`)
 - smoke_phase193c_inverse_solver.js
@@ -439,7 +439,7 @@
 - 2. Distribution Matrix & Breakdown of the `337` Pending Variants
 - harness.js
 - Cryptographic API Footguns
-- CongestionForecastService.js
+- predictiveAdmin.js
 - sharp-edges/SKILL.md
 - smoke_phase80f_end_to_end_controlled_live_enablement_regression.js
 - smoke_phase87b_funnel_event_tracking_service.js
@@ -447,7 +447,7 @@
 - preflightGovernanceLedgerService.js
 - test-guardrails.js
 - 2. Distribution Matrix & Breakdown of the `337` Pending Variants
-- limitedBetaRuntimeAdmin.js
+- controlledBetaRuntimeActivityReviewClient.ts
 - LimitedBetaRuntime.tsx
 - DEV-04B3A — Registro de Incidencia de Seguridad: Exposición del Redis Compartido (`ppos-redis`)
 - CohortInterventionApprovalWorkflowService
@@ -455,18 +455,18 @@
 - FinancialReconciliationEngine
 - LiveApprovalWorkflowService
 - LiveOrderProductionOpsService
-- slaEvaluationService.js
+- OutgoingWebhookService
 - marketplaceProductionProgressService.js
 - Scenarios
 - PrinthouseMarketplaceReviewService
 - GlobalPolicyRegistry
 - learningLoop.js
-- SessionManager
+- controlledBetaCohortInterventionPreparationClient.ts
 - Scenarios
 - controlledBetaCohortInterventionExecutionPlanActivationTokenIssuanceClient.ts
 - controlledBetaCohortInterventionExecutionPlanActivationTokenPreflightClient.ts
 - DEV-04B.1 — Contrato de Autenticación de API Keys y Criptografía
-- paperCostIntegrationService.js
+- controlledProductionPilotActivationClient.ts
 - auth_middleware.js
 - controlledBetaCohortInterventionExecutionPlanActivationTokenRedemptionLockClient.ts
 - controlledBetaCohortInterventionExecutionPlanActivationTokenRedemptionReadinessClient.ts
@@ -474,7 +474,7 @@
 - limitedBetaPreparationGate.ts
 - smoke_phase193b_calibration_foundation.js
 - createLiveBrowserSessionState
-- getHumanReport
+- smoke_phase59_control_plane_customer_remediation_ux.js
 - Changes
 - Phase 194H — Operational Hardening, Telemetry & Launch Readiness Report
 - Scenarios
@@ -549,8 +549,8 @@
 - Phase 193H — Pricing Hawk-Eye Overview
 - PrintPrice OS — CI-02N: Cierre Formal de Recuperación CI y Dictamen de Aceptación Técnica de PR #3
 - smoke_phase67e_control_plane_transparency_overprint_physical_regression.js
-- countryCatalog.ts
-- dispatchRequest
+- smoke_phase164g_guardrail_redemption_final_approval_passed_not_redeemed_write_scope.js
+- generateMockToken
 - smoke_phase71d_control_plane_printhouse_handoff_package.js
 - smoke_phase75e_end_to_end_recommendation_regression.js
 - animate.md
@@ -589,7 +589,7 @@
 - FinancialReconciliationLedgerService
 - Differential Security Review
 - PartnerCommercialTermsService
-- connectAdmin.js
+- runHttpConnectedHarness
 - PrintPrice OS — Especificación del Flujo de Acceso para Desarrolladores (DEV-03A)
 - C# Sharp Edges
 - UsageMeteringService
@@ -601,7 +601,7 @@
 - PHASE CI-02C — Node.js / Vite ESM Compatibility Recovery
 - Changelog — Phase 23: Industrial Core Hardening + Production Readiness Audit
 - ACEPTACIÓN Y CERTIFICACIÓN DE PARIDAD ECONÓMICA BPE — BUDGET-02C-00R2
-- spine02_03_engine_and_api.test.js
+- spineCalculationService.js
 - PHASE 193F.1 — FRONTEND QUICK CALIBRATION UX & INTEGRATION ARCHITECTURE
 - bpePublicationService.js
 - smoke_phase192c_marketplace_matching.js
@@ -680,12 +680,12 @@
 - 4. Checklist de Intervención y Runbook Ejecutable Paso a Paso
 - 2. Phase 183 Migration Integrity & Official Ledger Execution
 - Phase 124 — Controlled Printhouse Handoff / File Package Pilot
-- smoke_phase93d_tax_vat_review_workflow.js
+- smoke_phase192e_dispatch_telemetry.js
 - PartnerProductionActionService
 - printhouseIntegrationService.js
 - PrinthouseIntegrationService
 - smoke_phase192_1_rc14_operational_readiness_integrity.js
-- execute_recovery12_batch_c1_accreditation.cjs
+- MultiTimelineSimulationService.js
 - 2. Production Audit & Root Cause Analysis
 - INFORME DE RECONCILIACIÓN ARQUITECTÓNICA — BUDGET-02A-R1
 - runtimeActivityReviewDecisionService.js
@@ -719,7 +719,7 @@
 - smoke_phase116a_production_deployment_readiness_schema.js
 - smoke_phase120c_final_preproduction_release_candidate_admin_api_ui.js
 - smoke_phase122_1e_internal_order_lifecycle_evidence_redaction.js
-- execute_recovery12_batch_c4_accreditation.cjs
+- TemporalIntelligenceService.js
 - smoke_phase81a_live_order_schema_lifecycle_status_model.js
 - smoke_phase81c_live_file_preflight_proof_gate_binding.js
 - smoke_phase81d_live_production_queue_handoff_operations.js
@@ -757,7 +757,7 @@
 - Swift Sharp Edges
 - BUDGET-02C-01 — Dictamen de Certificación de Implementación
 - betaPayments.js
-- execute_recovery12_batch_c5_accreditation.cjs
+- quotaEnforcementService.js
 - smoke_phase88c_beta_hardening_action_tracker.js
 - BetaPublicOrderIntakeService
 - 3. Procedimiento de Ejecución en 8 Fases
@@ -785,7 +785,7 @@
 - PartnerJobWorkflowService
 - calibrationRunService.js
 - PrinthouseIntegrationCredentialService
-- productionFileIngestionService.js
+- productionFileValidationService.js
 - SlaEvaluationService
 - PolicyEngine
 - sandboxCommercialPilot.ts
@@ -828,7 +828,7 @@
 - controlledBetaCohortInterventionPreparationAdmin.js
 - controlledBetaCohortInterventionExecutionAdmin.js
 - smoke_phase143f_admin_api_ui_contract.js
-- buildPriceCalibrationAdapter.js
+- deterministicInversePricingSolver.js
 - smoke_phase185g_ledger_legacy_classification.js
 - smoke_phase57b_frontend_artifact_cards_ux.js
 - smoke_phase57c_frontend_file_job_history_artifact_ux.js
@@ -870,7 +870,7 @@
 - Simplify the Design
 - Hardening Dimensions
 - CascadingFailureService.js
-- ActivationHub.tsx
+- slackNotificationService.js
 - cohortInterventionExecutionRollbackService.js
 - CohortInterventionPreparationReviewService
 - cohortInterventionSimulationApprovalAuditService.js
@@ -879,7 +879,7 @@
 - CohortInterventionSimulationApprovalPreparationDecisionService
 - cohortInterventionSimulationApprovalPreparationEvaluatorService.js
 - cohortInterventionSimulationImpactAnalysisService.js
-- smoke_phase193h8b_frontend_country_unification.js
+- ControlledBetaCohortInterventionSimulationExecutionAuthorization.tsx
 - cohortInterventionSimulationReviewEvaluatorService.js
 - 3. Detalle Técnico de las Remediaciones
 - INFORME DE AUDITORÍA — AUTORIDAD ECONÓMICA E IDENTIDAD REAL
@@ -897,7 +897,7 @@
 - FinancialOperationsReleaseGateEvaluatorService
 - FinancialOperationsReleaseRiskService
 - 2.3. SEC-C06 — Seguridad de Tokens Monouso, Prevención de Replay y Compuertas Desacopladas
-- distributedOrchestrationService.js
+- ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenEnv.tsx
 - smoke_phase64e_control_plane_ink_regression.js
 - RealitySimulationService.js
 - MarketplaceLaunchReadinessService
@@ -983,9 +983,9 @@
 - cohortInterventionApprovalEvidencePackService.js
 - cohortInterventionExecutionAuditService.js
 - cohortInterventionExecutionDryRunService.js
-- ProductionMonitoringService
+- commercialPlanService.js
 - DEV-04B.3 — Auditoría de Aislamiento Industrial y Barrera de Despacho (GATE 1)
-- smoke_heavy_pdf_autofix_governance.js
+- smoke_phase193h8c611352_dynamic_signature_parity.js
 - commercialCommitmentAdmin.js
 - smoke_phase100b_production_activation_review_aggregator.js
 - onboardingObservabilityService.js
@@ -1007,7 +1007,7 @@
 - clarify.md
 - Phase 61D Smoke Test Report
 - PlanetaryCoordinationService
-- ConnectService
+- smoke_phase78c_quota_enforcement_api_guard.js
 - BUDGET-02D04F — Informe de Cierre Funcional, Visual y de Seguridad Postdeploy (`Control Plane` & `Budget App`)
 - Scenarios
 - Scenarios
@@ -1019,7 +1019,7 @@
 - Phase 79 — SLA Monitoring Acceptance Pack
 - controlledPrinthouseHandoffPackage.ts
 - foundingPrinthousePilotGate.ts
-- industrialProvisioningService.js
+- system.js
 - smoke_phase193h4_clarification_merge_preservation.js
 - smoke_phase193h8c611368_acceptance_audit_schema_alignment.js
 - smoke_phase193h8c66_atomic_calibration_lifecycle_sequencing.js
@@ -1162,14 +1162,14 @@
 - DeepSpaceExpansionService
 - Phase 125 — Sandbox Commercial / Invoice / Payment Handoff Pilot
 - economicDigitalTwinService.js
-- FederationRegistryService
+- test-phase36-invoice-gate.js
 - Phase 183 — Migration Integrity & Schema Baseline Documentation
 - FinancialOperationsCredentialRedactionGuardrailService
 - FinancialOperationsProviderEventNormalizationService
 - GalacticRiskForecastingService
 - IndustrialCivilizationService
 - IndustrialColonizationService
-- ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenAuth.tsx
+- adminProductionMonitoring.js
 - InfiniteOptimizationService
 - ControlledBetaCohortInterventionSimulationExecutionPlanActivationLock.tsx
 - InterFederationDiplomacyService
@@ -1180,7 +1180,7 @@
 - Registro Operativo de Despliegue Staging OP-02B.2B (Plesk Shared Host)
 - smoke_phase76d_machine_assignment_handoff_integration.js
 - smoke_phase191g_shipping_integrations.js
-- test_http_mysql_connected_harness.js
+- financialOperationsProductionActivationAdmin.js
 - optimizationEngine.js
 - OrbitalManufacturingService
 - Runbook — PPOS Control Plane
@@ -1193,7 +1193,7 @@
 - PrintPrice OS — CI-03E: Acta Definitiva de Aceptación Funcional y Comercial de Guided Onboarding v4
 - 2. Acreditación de Seguridad y Pruebas Ejecutadas
 - PrinthouseWebhookService
-- taxVatReadinessClassifierService.js
+- smoke_phase93f_end_to_end_tax_vat_readiness_regression.js
 - runtimeActivityReviewAggregatorService.js
 - StellarLogisticsService
 - SyntheticIndustrialConsciousnessService
@@ -1331,7 +1331,7 @@
 - cohortInterventionExecutionGuardrailService.js
 - cohortInterventionExecutionOperatorConfirmationService.js
 - 3. Detalle Técnico de las Correcciones
-- ProductionRouteSelectionService
+- CommercialPlanService
 - cohortInterventionSimulationOperatorConfirmationService.js
 - energyOptimizationService.js
 - ManufacturingSignalService
@@ -1396,7 +1396,7 @@
 - smoke_phase141f_simulation_runner_no_operational_mutation.js
 - CONTROL_PLANE_BOOTSTRAP_STATUS
 - smoke_phase142f_admin_api_ui_contract.js
-- sync-preflight-service-to-registry-smoke.js
+- invoiceService.js
 - printhouseMaterialService.js
 - PrintPrice OS — Runbook de Despliegue en Staging (DEV-03R.2)
 - HARDENING_DEPLOYMENT_REVIEW
@@ -1510,7 +1510,7 @@
 - FilterToolbar.tsx
 - IndustrialPanel.tsx
 - PolicyProfilePanel.tsx
-- artifactAdmin.js
+- ArtifactRegistryService
 - financialOperationsComplianceReporting.ts
 - financialOperationsFinalReleaseCandidate.ts
 - financialOperationsGoLiveSimulation.ts
@@ -1834,7 +1834,7 @@
 - Phase 86 Limited Beta Acceptance Pack
 - Phase 92F End-to-End Financial Reconciliation Regression
 - PrintPrice OS — Auditoría Independiente de Remediación (DEV-03R.1)
-- ManufacturingOrchestrationService.js
+- CapacityReservationService.js
 - Adversarial Vulnerability Analysis (Phase 5)
 - Differential Review Methodology
 - Generate Report
@@ -1878,7 +1878,7 @@
 - PHASE CI-02D.1 — Bootstrap Structural Audit Report
 - live-browser-ignores.js
 - Protocolo inicial de QA y Seguridad — PrintPrice Pro
-- cohortInterventionExecutionPlanActivationTokenRedemptionEnvelopeGuardrailService.js
+- smoke_phase163g_guardrail_redemption_envelope_passed_not_redeemed_write_scope.js
 - Manifiesto de Evidencias de Onboarding de Calibración
 - PrintPrice OS — Trazabilidad Criptográfica y Procedencia Git (DEV-03R.2)
 - CohortInterventionExecutionPlanActivationTokenRedemptionReadinessBuilderService
@@ -2041,7 +2041,7 @@
 - backupHmacUtil.js
 - 3. Modificaciones Técnicas en el Código Fuente
 - DEV-04A.3 — Acta de Aceptación Final y Dictamen de Seguridad
-- smoke_phase193h8c61135_forward_pricing_sensitivity.js
+- smoke_phase193h8c681_readiness_contract_alignment.js
 - DEV-04B3A — Dictamen de Preparación y Madurez para GATE 2 (Staging Deployment)
 - ControlledBetaCohortInterventionSimulationExecutionPlanActivationReadiness.tsx
 - 2. Resumen Ejecutivo por Fases de la Misión
@@ -2049,7 +2049,7 @@
 - nodemailer
 - @ppos/pricing-engine
 - cohortInterventionSimulationReviewEvidencePackService.js
-- system.js
+- CohortInterventionExecutionPlanActivationTokenRedemptionFinalApprovalBuilderService
 - PrintPrice OS — Aislamiento y Seguridad de Base de Datos en Staging (OP-DEV-03)
 - 1. Evaluación Consolidada de Requisitos de Preflight
 - 5. Casos numéricos sintéticos para la auditoría
@@ -2061,7 +2061,7 @@
 - 1. Referencia Visual Real (Extraída de Guided Onboarding)
 - BUDGET-02D-01V — Publicación y Certificación Independiente de Integración E2E
 - PrintPrice OS — Registro de Despliegue en Staging (OP-DEV-03D)
-- smoke_phase76a_printhouse_capability_schema.js
+- .evaluateControlledCohortActivationReadiness
 - PrintPrice OS — Resultados de Integración en Vivo con MySQL Staging (OP-DEV-03D)
 - package_dev04a3f_deliverables.py
 - 2. Secuencia Supervisada de 10 Pasos (Criterios GO / NO-GO)
@@ -2089,7 +2089,7 @@
 - DEV-04B.3 — Auditoría de Seguridad de Red y Perímetro Nginx/Plesk (GATE 1)
 - PrintPrice OS — BUDGET-02B-01R2 Final Certification
 - OP-REC-01 — Acta de Recuperación Funcional de MySQL Staging
-- smoke_phase78d_billing_events_overage_policy.js
+- adminTenantBilling.js
 - ControlledBetaCohortInterventionSimulationApprovalPreparation.tsx
 - package_and_verify_v4_zip.py
 - staging_backup_snapshot.sh
@@ -2158,7 +2158,7 @@
 - verify_supplier_registration_ui.py
 - Inventario público inicial de repositorios — PrintPriceOS
 - BUDGET-02D-01R3 — Certificación Final de Remediación de Autoridad, Liquidación y Transacciones
-- FutureOutcomeProjectionService.js
+- GovernedCreditNoteService
 - cohortInterventionExecutionPlanActivationTokenRedemptionUnlockDualControlAuthorizationBuilderService.js
 - upload_and_import.sh
 - smoke_phase69e_end_to_end_visual_diff_regression.js
@@ -2257,7 +2257,7 @@
 - PrintPrice OS — Evaluación de Preparación para Publicación de Documentación (DOC-API-01)
 - 3. Discrepancias entre Consultas en Código y Columnas Reales en Base de Datos
 - PrintPrice OS — Plan de Publicación y Modularización OpenAPI 3.1 (DOC-API-01)
-- PrinthouseProfileBindingService
+- governedInvoiceBuilderService.js
 - SlaRiskService
 - DEV-04B.1 — Modelo de Datos y Esquema Relacional de Credenciales API
 - DEV-04B.1 — Modelo de Amenazas (STRIDE) y Análisis de Seguridad de API
@@ -2284,8 +2284,8 @@
 - DEV-04B3A-FIX — Remediación de Seguridad: Protección del Secreto de Redis
 - smoke_phase134h_invite_acceptance_acceptance_pack.js
 - BUDGET-02D-01R4 — Integridad de la Obligación Económica y Prevención de Replay (TRUST-02 & TRUST-03)
-- smoke_phase136h_runtime_activity_observation_acceptance_pack.js
-- smoke_phase55e_control_plane_standards_real_governance.js
+- ManufacturingOrchestrationService
+- smoke_phase62f_control_plane_heavy_pdf_probe_human_report.js
 - BUDGET-02D-01R5F — Cierre Definitivo del Contrato de Replay e Idempotencia Financiera
 - BUDGET-02D-01R — Gobernanza de Compuertas Financieras y Autorización Industrial
 - 3. Auditoría de Seguridad y Límites de Confianza
@@ -2294,12 +2294,12 @@
 - BUDGET-02D-01 — Consentimiento Forense y Gobernanza de Compuertas Financieras
 - BUDGET-02D-01 — Especificaciones Técnicas Efectivas para Fabricación Industrial
 - BUDGET-02D-03 — Runbook Operativo de Migración de Base de Datos para Preproducción
-- ControlledBetaCohortInterventionSimulationExecutionEnvelope.tsx
+- observabilityService.js
 - ORDEN PAPER-MATERIALS-RECOVERY-06 — Verificación E2E en Vivo: Spine Calculator, BPE y Budget App (Fase 4)
 - RECOVERY-12 (Option A) — P1 Pilot Candidates Audit & Extraction Report
-- smoke_phase75d_control_plane_recommendation_ux.js
+- NotificationBell.tsx
 - 2. Inventario Exacto de Tablas y Migraciones MySQL
-- machineLoadMonitoringService.js
+- MachineLoadMonitoringService
 - BUDGET-02B-00 — Contrato de Seguridad y Autorización Criptográfica (Reconciliación R1)
 - PROPUESTA DE MODELO DE DATOS Y PERSISTENCIA — BUDGET-02C-00
 - DEV-04B.3 — GATE 2: Comparativa y Certificación de Docker Compose
@@ -2312,7 +2312,7 @@
 - PAPER-MATERIALS-RECOVERY-07V — Auditoría Final de Evidencias Individualizadas
 - smoke_phase62e_control_plane_page_marks_regression.js
 - CohortInterventionExecutionDispatcherBuilderService
-- verify-control-plane-schema.js
+- smoke_phase193h8c61134_draft_ready_promotion_integrity.js
 - CohortInterventionExecutionPlanActivationDecisionBuilderService
 - 3. Spine Calculator & BPE Regression Verification
 - 2. Inventario de Sistemas y Componentes
@@ -2330,7 +2330,7 @@
 - DEV-04B3A-FIX — Remediación Crítica: Barrera Industrial Estrictamente Fail-Closed
 - CohortInterventionExecutionPlanActivationHandoffBuilderService
 - PAPER-MATERIALS-RECOVERY-03 — Audit & Remediation of `UNKNOWN · UNCOATED`
-- smoke_phase63e_control_plane_security_interactivity_regression.js
+- phase185_migration_ledger_governance_schema.js
 - MISIÓN BUDGET-02D-04H — UI REFINEMENT & COMPACT MOBILE PROGRESS
 - BUDGET-02D-01R2 — Acta Final de Aceptación y Remediación Integral
 - ACTA DE ACEPTACIÓN FINAL — BUDGET-02B-01
@@ -2369,8 +2369,8 @@
 - DEV-04B.3 GATE 2D — Verificación y Simulación Estática del Runbook de Despliegue
 - MISIÓN BUDGET-02D-04H — UI REFINEMENT & COMPACT MOBILE PROGRESS
 - PreflightPersistenceService
-- MetaCivilizationCoordinationService
-- ParallelCivilizationModelingService
+- smoke_phase57a_control_plane_artifact_ux_contract.js
+- autonomousDispatchService.js
 - BUDGET-02D-01 — Acta Final de Aceptación y Certificación
 - PAPER-MATERIALS-RECOVERY-03R — Final Executive Report, Git Scope Remediation & Selective 943-Row Readiness
 - BUDGET-02D-01 — Certificación de Integración E2E en Motor MySQL 8 Real
@@ -2393,9 +2393,9 @@
 - PAPER-MATERIALS-RECOVERY-11 — Transactional, Concurrency & Security Audit Report
 - PAPER-CALIPER-RECOVERY-02 — Before vs. After Production Audit
 - test-resilience-simulator.js
-- adminPreflight.js
+- smoke_phase78f_end_to_end_usage_billing_regression.js
 - IndustrialPolicyEngineService
-- SLARiskMonitor.js
+- CohortInterventionExecutionPlanActivationAuthorizationBuilderService
 - patch_phase126_1_schema_mysql_compat.js
 - dev04b3a_fix5_bash_runbook_syntax.test.js
 - dev04b3a_fix5_pipeline_errexit_safety.test.js
@@ -2403,7 +2403,7 @@
 - export_and_verify_candidate_image.py
 - staging_candidate_dry_run_audit.js
 - PAPER-CALIPER-RECOVERY-02 — Final Mission Report
-- cohortInterventionExecutionReadinessGuardrailService.js
+- production_telemetry_persistent_replay_test.js
 - 3. Post-Migration Schema & Data Verification
 - PAPER-CALIPER-RECOVERY-02 — Source Audit & Root-Cause Analysis
 - BUDGET-02D-01R — Evidencias de Integración E2E Real y Categorización Transparente
@@ -2428,8 +2428,8 @@
 - 2. Las 6 Guardas de Autoridad de Servidor Verificadas y Reforzadas en Control Plane
 - smoke_phase94d_governed_credit_note_lifecycle.js
 - globalIncidentCoordinator.js
-- http_real_mfa_flow.test.js
-- PricingRuleBuilder.tsx
+- smoke_phase192e_http_routes.js
+- smoke_phase195k_governed_manual_pricing_save.js
 - paperSuppliersRoutes.js
 - BUDGET-02D04G — Informe de Despliegue Productivo Controlado (`https://budget.printprice.pro`)
 - BUDGET-02D04G — Certificación Responsive (`320px–1440px`) y Accesibilidad WCAG (`VIS-01` & `VIS-03`)
@@ -2449,8 +2449,8 @@
 - BUDGET-02D04G — Informe de Despliegue Productivo Controlado (`https://budget.printprice.pro`)
 - BUDGET-02D04G — Certificación Responsive (`320px–1440px`) y Accesibilidad WCAG (`VIS-01` & `VIS-03`)
 - BUDGET-02D04G — Informe de Implementación Visual e Integración de Paper Materials y Quote Revision (`https://budget.printprice.pro`)
-- smoke_phase132a_expansion_preparation_schema.js
-- useLocale
+- smoke_phase94b_governed_invoice_builder.js
+- authStore.ts
 - SPINE-01 — Mapeo de Espesor (`caliper_um` / `bulk`) e Integración con Paper Materials
 - SPINE-02/03 — Informe Final de Implementación, Certificación y Trazabilidad
 - PAPER-CALIPER-RECOVERY-02 — Backup & Rollback Manifest
@@ -2458,11 +2458,11 @@
 - PAPER-CALIPER-RECOVERY-02 — Controlled Production Update Execution Log
 - BUDGET-02D-01R2 — Informe de Seguridad y Gobernanza de Autorizaciones Industriales (SEC-D01 / SEC-D02)
 - BUDGET-02D-03 — Lista de Comprobación Operativa GO / NO-GO para Preproducción
-- smoke_phase65d_control_plane_selective_image_human_report.js
+- test-phase36-marketplace-order-service.js
 - smoke_phase193h8c69_acceptance_db_adapter_integrity.js
 - PAPER-MATERIALS-RECOVERY-04 — Preflight Obligatorio en Producción
 - 2. Catálogo Inicial de Perfiles Livonia (`v2.0.0`)
-- ProductionTimeline.tsx
+- GovernedInvoiceBuilderService
 - 2. Evidencia de API y UI por Familia Representativa (`1.524` Variantes en Vivo)
 - RECOVERY-10 — Phase 1: Production Preflight & Deployment Verification Report
 - FederatedLearningService
@@ -2478,16 +2478,17 @@
 - 1. Tokens Oficiales Extraídos del Ecosistema PrintPrice OS
 - CausalManufacturingService
 - PrintPrice OS — RECOVERY-12: Batch C5 Final Classification Accreditation Report (64 Variants — 100% Completion of 337 Pending Classifications)
-- QuoteService
+- GovernedInvoiceLifecycleService
 - SPINE-03R — Informe de Reconciliación de Historia Git, Aislamiento de PR y Certificación CI
 - SPINE-05 — Runbook de Activación Controlada, Respaldo y Rollback en Producción
 - PrintPrice OS — RECOVERY-12: Batch C5 Final Classification Accreditation Report (64 Variants — 100% Completion of 337 Pending Classifications)
 - GlobalConstitutionService
-- security_settings_tenant_config_isolation_test.js
-- governedOrderRoutingService.js
+- runtime_kill_switch_effectiveness_test.js
+- governedProductionDispatchService.js
 - CohortInterventionExecutionPlanActivationTokenRedemptionUnlockRiskOfficerCountersignAuditService
-- RoutingAgent.js
-- liveProductionClient.ts
+- smoke_phase135h_runtime_session_acceptance_pack.js
+- digitalTwinService.js
+- OmniscientDigitalTwinService
 - PAPER-CALIPER-RECOVERY-02 — Phase 7 Spine Calculator End-to-End Verification
 - smoke_phase94c_invoice_lifecycle_finalization.js
 - recover_paper_calipers_from_ods.cjs
@@ -2516,17 +2517,19 @@
 - SPINE-05 — Plan de Pruebas de Extremo a Extremo (End-to-End Test Plan)
 - SPINE-05 — Dictamen Final de Preparación para Activación en Producción
 - PAPER-MATERIALS-RECOVERY-11 — UI, Trilingual i18n (`DE`/`EN`/`ES`) & Responsive Playwright E2E Report
+- QuantumIndustrialForecastingService
 - requirePrinterLicense.js
 - RECOVERY-09 — Final Executive Report & Deployment Readiness Verdict
 - PAPER-MATERIALS-RECOVERY-05 — Evaluación Final y Plan de Ejecución por Fases
 - 4. End-to-End Remediation Implemented
 - MISIÓN PAPER-MATERIALS-RECOVERY-05V — Reconciliación Determinista de Conflictos de Espesor y Estado Productivo
 - MISIÓN PAPER-MATERIALS-RECOVERY-05V — Plan de Escritura Productiva Gobernada y Separación en 5 Listas Independientes
-- FederationIntelligenceService.js
+- UniversalContinuityService
 - InfiniteRecursionStabilityService
 - MetaRealityCoordinationService
 - OptimizationAgent
-- marketplacePrinthouseProductionService.js
+- LearningAgent
+- RequestTracer
 - IndustrialCognitionService
 - ORDEN PAPER-MATERIALS-RECOVERY-06 — Informe Final de Aplicación Productiva de 234 Variantes Acreditadas
 - IndustrialEthicsService
@@ -2541,10 +2544,10 @@
 - RECOVERY-09 — Phase 5: Governed Integration with Spine Calculator
 - RECOVERY-09 — Phase 4: Paper Supplier Hub UI Implementation Report
 - OmniversalConsciousnessService
-- smoke_phase192e_dispatch_telemetry.js
+- dev04b3a_prerequisites_remediation.test.js
 - OmniversalContinuityService
-- InstanceRegistry
-- smoke_phase145g_guardrail_no_execution_write_scope.js
+- instanceRegistry.js
+- smoke_phase136a_runtime_activity_observation_schema.js
 - RECOVERY-10 — Phase 2: Full Production Backup Manifest & Restorability Verification
 - RECOVERY-10 — Final Executive Report: Governed Production Deployment of Technical Evidence System
 - RECOVERY-10 — Phase 6 (Part 2): Industrial Spine Calculator & Economic BPE Regression Report
@@ -2555,60 +2558,50 @@
 - PostRealitySingularityService
 - PostSingularityGovernanceService
 - industrialHeartbeatService.js
-- server.js
-- smoke_phase146g_guardrail_no_execution_write_scope.js
+- IndustrialProvisioningService
+- controlledBetaOperationalReviewAdmin.js
 - smoke_phase144g_guardrail_write_scope_forbidden_scanner.js
 - PrintPrice OS — RECOVERY-12: Batch C4 Classification Accreditation Report (97 DESIGN Fine Art & Creative Paper Variants)
 - GovernanceDigitalTwinService
+- AutonomousOrchestrator
 - IndustrialMemoryGraphService
 - PrintPrice OS — RECOVERY-12: Batch C4 Classification Accreditation Report (97 DESIGN Fine Art & Creative Paper Variants)
 - TranscendentAwarenessService
-- smoke_phase147g_guardrail_no_op_zero_mutation_write_scope.js
+- cohortInterventionExecutionPlanActivationTokenStagingEvidencePackService.js
 - UniversalEntropyManagementService
 - printhouseMarketplaceReviewService.js
 - smoke_phase166_setup_helper.js
 - RECOVERY-10 — Phase 5: Authenticated API Smoke Tests & Security E2E Report
 - UniversalSingularityTwinService
-- smoke_phase148g_guardrail_dry_run_zero_mutation_write_scope.js
+- security_jobs_queue_isolation_test.js
 - PolicyEvolutionService
 - e6
+- smoke_phase142h_acceptance_pack_real_db.js
 - SelfHealingGovernanceService
+- smoke_phase153h_acceptance_pack_real_db.js
 - smoke_phase180h_acceptance_pack_real_db.js
 - smoke_phase52e_control_plane_color_real_governance.js
 - RecursiveExistenceStabilityService
 - security_machines_materials_isolation_test.js
-- smoke_phase146f_admin_api_ui_contract.js
-- smoke_phase62d_control_plane_page_marks_human_report.js
+- smoke_phase163b_create_token_redemption_envelope_from_phase162_auth.js
+- SLAMonitoringService
 - ecosystem_health_watchdog.sh
-- FederationRecoveryService
 - deploy_atomic_ecosystem_phase13c.sh
 - impositionEngine.test.js
 - CohortInterventionExecutionPlanActivationTokenRedemptionUnlockApprovalBuilderService
 - CSWorkflowService
 - printhouseActivationAdapter.js
-- FIXTURES
+- security_printhouse_dashboard_isolation_test.js
 - CohortInterventionExecutionPlanActivationTokenRedemptionUnlockFinalReviewBuilderService
 - RECOVERY-12 (Batch P1-A) — Formal Accreditation & Catalog Promotion Report
-- CohortInterventionExecutionAuthorizationAuditService
 - RECOVERY-12 (Batch P1-B) — Formal Accreditation & Catalog Promotion Report
 - RECOVERY-12 (Batch P1-A) — Formal Accreditation & Catalog Promotion Report
 - RECOVERY-12 (Batch P1-B) — Formal Accreditation & Catalog Promotion Report
 - CohortInterventionExecutionPlanActivationTokenRedemptionUnlockOperatorAttestationBuilderService
 - CohortInterventionExecutionPlanActivationTokenRedemptionUnlockRiskOfficerCountersignBuilderService
-- CohortInterventionExecutionDispatcherAuditService
-- CohortInterventionExecutionDispatcherEvidencePackService
-- CohortInterventionExecutionEnvelopeEvidencePackService
-- CohortInterventionExecutionReadinessAuditService
 - smoke_phase131a_operational_review_schema.js
-- smoke_phase145f_admin_api_ui_contract.js
-- smoke_phase147f_admin_api_ui_contract.js
-- smoke_phase148f_admin_api_ui_contract.js
 - smoke_phase192_1_rc13_printhouse_readiness.js
-- PrinthousePricingRuleService
 - CohortInterventionSimulationApprovalEvidencePackService
-- smoke_phase143c_preparation_evaluator_rules.js
-- smoke_phase143d_preparation_workflow_governance.js
-- CohortInterventionExecutionEnvelopeAuditService
 
 ## God Nodes (most connected - your core abstractions)
 1. `adminFetch()` - 553 edges
@@ -2637,64 +2630,64 @@
 ## Import Cycles
 - 2-file cycle: `src/api/services/IndustrialEventOrchestrationService.js -> src/api/services/ManufacturingOrchestrationService.js -> src/api/services/IndustrialEventOrchestrationService.js`
 - 2-file cycle: `src/api/services/productionMonitoringService.js -> src/api/services/slaRiskService.js -> src/api/services/productionMonitoringService.js`
-- 3-file cycle: `src/api/services/marketplaceOrderService.js -> src/api/services/preflightReviewApprovalService.js -> src/api/services/preflightHumanReportService.js -> src/api/services/marketplaceOrderService.js`
 - 3-file cycle: `src/api/services/marketplaceOrderService.js -> src/api/services/preflightHumanReportSnapshotService.js -> src/api/services/preflightHumanReportService.js -> src/api/services/marketplaceOrderService.js`
+- 3-file cycle: `src/api/services/marketplaceOrderService.js -> src/api/services/preflightReviewApprovalService.js -> src/api/services/preflightHumanReportService.js -> src/api/services/marketplaceOrderService.js`
 - 4-file cycle: `src/api/services/marketplaceOrderService.js -> src/api/services/preflightReviewApprovalService.js -> src/api/services/preflightHumanReportSnapshotService.js -> src/api/services/preflightHumanReportService.js -> src/api/services/marketplaceOrderService.js`
 
-## Communities (2874 total, 513 thin omitted)
+## Communities (2867 total, 514 thin omitted)
 
 ### Community 0 - "adminFetch"
-Cohesion: 0.02
-Nodes (248): BillingPortalResponse, CheckoutSessionResponse, createBillingPortalSession(), createCheckoutSession(), getSubscriptionStatus(), SubscriptionStatusResponse, MarketplaceIntakeSection(), fetchNotifications() (+240 more)
+Cohesion: 0.01
+Nodes (348): BillingPortalResponse, CheckoutSessionResponse, createBillingPortalSession(), createCheckoutSession(), getSubscriptionStatus(), SubscriptionStatusResponse, createGate(), evaluateGate() (+340 more)
 
 ### Community 1 - "mysqlClient.js"
 Cohesion: 0.01
-Nodes (213): db, db, db, db, db, db, crypto, db (+205 more)
+Nodes (210): db, db, db, db, db, db, crypto, db (+202 more)
 
 ### Community 2 - "admin.js"
 Cohesion: 0.01
-Nodes (199): adminRouter, fs, path, adminRouter, fs, path, adminAssetsRouter, adminBillingRouter (+191 more)
+Nodes (202): adminRouter, fs, path, adminRouter, fs, path, adminAssetsRouter, adminBillingRouter (+194 more)
 
 ### Community 3 - "index-D4kN2rvI.js"
 Cohesion: 0.01
-Nodes (210): D4(), _3(), _6(), $a, aa(), ab, _b(), B2() (+202 more)
+Nodes (226): D4(), _2(), _3(), $4(), A0(), ag, aj(), Ao() (+218 more)
 
 ### Community 4 - "BackgroundJobMonitor.tsx"
-Cohesion: 0.14
-Nodes (21): run(), addBackgroundJob(), BackgroundJobMonitor(), getBackgroundJobs(), MonitoredJob, safeLog(), BackgroundJobProgress(), checkMagicBytes() (+13 more)
+Cohesion: 0.27
+Nodes (10): run(), BackgroundJobMonitor(), getBackgroundJobs(), MonitoredJob, safeLog(), BackgroundJobProgress(), isTerminalPreflightStatus(), normalizeBackgroundJobStatus() (+2 more)
 
 ### Community 5 - "index-CFO1sqp9.js"
 Cohesion: 0.01
-Nodes (246): _2(), _3(), a0(), a2(), a3(), a4, aj(), ap (+238 more)
+Nodes (291): _2(), _3(), a0(), a2(), a4, a5, a6(), ab (+283 more)
 
-### Community 6 - "getAuthToken"
+### Community 6 - "GuidedPrinthouseJourney.tsx"
 Cohesion: 0.04
-Nodes (99): BindingIcon(), BindingIconProps, HardcoverIcon(), SaddleStitchIcon(), SoftcoverIcon(), WireOIcon(), CalculationComparisonView(), CalculationComparisonViewProps (+91 more)
+Nodes (97): EconomicProfileRow, isProfileCompatibleWithFamily(), LivePriceCalibratorModal(), LivePriceCalibratorModalProps, PaperCatalogItem, PRINT_RUN_PRESETS, PRODUCT_FAMILY_OPTIONS, ProductFamilyId (+89 more)
 
 ### Community 7 - "cohortInterventionExecutionPlanActivationTokenRedemptionUnlockEligibilityBuilderService.js"
 Cohesion: 0.05
 Nodes (35): setupFinalizedRedemptionLock(), assert, db, { setupFinalizedRedemptionLock, isProdLike }, assert, db, { setupFinalizedRedemptionLock, isProdLike }, assert (+27 more)
 
-### Community 8 - "i18n.tsx"
-Cohesion: 0.03
-Nodes (76): App(), PricingWorkflow, PricingWorkflowSelector(), PricingWorkflowSelectorProps, CalibrationAcceptanceModal(), CalibrationAcceptanceModalProps, CalibrationCommercialDeclaration(), CalibrationCommercialDeclarationProps (+68 more)
+### Community 8 - "useLocale"
+Cohesion: 0.02
+Nodes (230): cohortInterventionPreparationClient, runtimeActivityReviewClient, AIAuditModal(), extractTextFromGenResponse(), ModelInfo, pickAvailableModel(), Props, BetaWorkspaceShell() (+222 more)
 
 ### Community 9 - "live-browser.js"
 Cohesion: 0.03
 Nodes (150): addManualContextText(), applyGlobalBarLabelState(), applyPlaceholderSizingStyles(), averageRgb01(), bindEditBadgeProxy(), bufferToBase64(), buildCollapsible(), buildColorModels() (+142 more)
 
 ### Community 10 - "services/calibrationAcceptanceService.js"
-Cohesion: 0.04
-Nodes (40): adapter, CalibrationAcceptanceService, extractLeafPaths(), calibrationSessionService, crypto, db, {
+Cohesion: 0.05
+Nodes (36): adapter, CalibrationAcceptanceService, extractLeafPaths(), calibrationSessionService, crypto, db, {
     DEFAULT_ACCEPTANCE_TOLERANCE_ABSOLUTE,
     DEFAULT_ACCEPTANCE_TOLERANCE_PERCENT,
     CANONICAL_ACCEPTABLE_RUN_STATUSES,
     computeGovernanceTolerance
-}, isPlainObject() (+32 more)
+}, isPlainObject() (+28 more)
 
 ### Community 11 - "countryCatalog.js"
 Cohesion: 0.02
-Nodes (94): assertSelectOnly(), classifyCountryValue(), { COUNTRIES, ISO_COUNTRY_CODES_SET, isValidIso2Country, normalizeIso2Country }, FORBIDDEN_SQL_PATTERNS, { getPool }, ISO3_MAP, mysql, NAME_TO_ISO2_MAP (+86 more)
+Nodes (104): assertSelectOnly(), classifyCountryValue(), { COUNTRIES, ISO_COUNTRY_CODES_SET, isValidIso2Country, normalizeIso2Country }, FORBIDDEN_SQL_PATTERNS, { getPool }, ISO3_MAP, mysql, NAME_TO_ISO2_MAP (+96 more)
 
 ### Community 12 - "marketplaceInvoicePaymentService.js"
 Cohesion: 0.15
@@ -2702,19 +2695,19 @@ Nodes (25): runTest(), appendEvent(), assertPaymentEnabled(), buildInvoiceNumber
 
 ### Community 13 - "cohortInterventionExecutionPlanActivationDecisionBuilderService.js"
 Cohesion: 0.02
-Nodes (94): assert, db, assert, db, assert, db, adminRouter, assert (+86 more)
+Nodes (92): assert, db, assert, db, assert, db, adminRouter, assert (+84 more)
 
 ### Community 14 - "auth.js"
-Cohesion: 0.02
-Nodes (115): auditLogger, extractBearerToken(), fail(), isInternalControlToken(), jwt, KNOWN_SUPPLIER_CAPABILITIES, requireAdmin(), ROLE_HIERARCHY (+107 more)
+Cohesion: 0.01
+Nodes (132): limitedBetaRuntimeAdminRouter, limitedBetaRuntimeAdminRouter, auditLogger, extractBearerToken(), fail(), isInternalControlToken(), jwt, KNOWN_SUPPLIER_CAPABILITIES (+124 more)
 
 ### Community 15 - "useAdminQuery"
 Cohesion: 0.02
-Nodes (127): AuditDetailDrawer(), LiveOrder, LiveOrdersFeed(), OrderStatus, Column, DataTable(), DataTableProps, FederationMap() (+119 more)
+Nodes (163): AuditDetailDrawer(), addBackgroundJob(), Column, DataTable(), DataTableProps, ExecutionTimeline(), ExecutionTimelineProps, TimelineEventItem (+155 more)
 
 ### Community 16 - "preflightHumanReportService.js"
-Cohesion: 0.04
-Nodes (42): fs, path, preflightHumanReportService, run(), { buildReviewDecisionUx }, runSmokeTest(), fs, path (+34 more)
+Cohesion: 0.02
+Nodes (84): db, fs, { getHumanReport }, path, runSmokeTest(), uuid, fs, { getHumanReport } (+76 more)
 
 ### Community 17 - "cohortInterventionExecutionPlanActivationTokenRedemptionUnlockEmergencyRollbackAuthorityBuilderService.js"
 Cohesion: 0.04
@@ -2722,75 +2715,75 @@ Nodes (31): assert, db, setupHelper, assert, db, setupHelper, assert, db (+23 mo
 
 ### Community 18 - "i2"
 Cohesion: 0.02
-Nodes (335): i2(), $0(), _1(), A1(), Aa(), ad(), Ae(), af() (+327 more)
+Nodes (333): i2(), $0(), _1(), A1(), Aa(), ad(), Ae(), af() (+325 more)
 
 ### Community 19 - "i2"
 Cohesion: 0.02
-Nodes (316): we(), Ca(), rl(), G(), i2(), $0(), _1(), A1() (+308 more)
+Nodes (297): we(), Ca(), rl(), zE(), i2(), $0(), _1(), A1() (+289 more)
 
 ### Community 20 - "quoteDocumentInterpretationService.js"
 Cohesion: 0.03
-Nodes (60): db, express, interpreter, logger, multer, pdfExtractor, quoteEvidenceService, router (+52 more)
+Nodes (52): db, express, interpreter, logger, multer, pdfExtractor, quoteEvidenceService, router (+44 more)
 
 ### Community 21 - "h3"
-Cohesion: 0.07
-Nodes (6): h3(), k3(), q3, qw(), sb, Ua
+Cohesion: 0.05
+Nodes (8): h3(), k3(), q3, qw(), sb, Ua, v3(), yb()
 
 ### Community 22 - "ui_reconciliation_components.test.tsx"
-Cohesion: 0.05
-Nodes (62): HeaderActionGroup(), HeaderActionGroupProps, HeaderTabOption, IndustrialColumn, IndustrialTable(), IndustrialTableProps, StatusBadge(), ACCENT_MAP (+54 more)
+Cohesion: 0.04
+Nodes (74): HeaderActionGroup(), HeaderActionGroupProps, HeaderTabOption, IndustrialColumn, IndustrialTable(), IndustrialTableProps, StatusBadge(), ACCENT_MAP (+66 more)
 
 ### Community 23 - "cohortInterventionExecutionPlanActivationTokenRedemptionUnlockOperatorAttestationBuilderService.js"
 Cohesion: 0.02
 Nodes (70): setupFinalizedUnlockOperatorAttestation(), setupFinalizedUnlockPreExecutionFreeze(), assert, db, { setupFinalizedUnlockSeal, isProdLike }, assert, db, { setupFinalizedUnlockSeal, isProdLike } (+62 more)
 
-### Community 24 - "JobDetailDrawer.tsx"
-Cohesion: 0.03
-Nodes (76): getArtifactUxForArtifact(), ExecutionTimeline(), ExecutionTimelineProps, TimelineEventItem, GovernanceSnapshot, GovernanceSnapshotViewer(), GovernanceSnapshotViewerProps, JobDetailDrawer() (+68 more)
+### Community 24 - "PreflightJobDetailPage.tsx"
+Cohesion: 0.04
+Nodes (57): getArtifactUxForArtifact(), CustomerRemediationPanel(), CustomerRemediationPanelProps, CustomerRemediationUx, HeavyPdfProbeGovernance, HeavyPdfProbePanel(), HeavyPdfProbePanelProps, HeavyPdfProbeTool (+49 more)
 
-### Community 25 - "cohortInterventionExecutionPlanActivationReadinessBuilderService.js"
+### Community 25 - "cohortInterventionExecutionDispatcherBuilderService.js"
 Cohesion: 0.02
-Nodes (94): assert, db, assert, db, assert, db, assert, db (+86 more)
+Nodes (103): assert, db, assert, db, assert, db, assert, db (+95 more)
 
 ### Community 26 - "resolveActorContext"
 Cohesion: 0.02
 Nodes (86): crypto, db, printhouseActivationService, printhouseSignupService, { requireApprovedPrinthouse, requirePrinthouseSetupAccess }, runSmokeTest(), requireApprovedPrinthouse(), requirePrinthouseScope() (+78 more)
 
 ### Community 27 - "printhouseCapabilitiesClient.ts"
-Cohesion: 0.07
-Nodes (52): createMachine(), createMedia(), createPolicyProfile(), createPrinthouse(), createSlaProfile(), getMachineTemplates(), getPrinthouse(), getReadiness() (+44 more)
+Cohesion: 0.09
+Nodes (45): createMachine(), createMedia(), createPolicyProfile(), createPrinthouse(), createSlaProfile(), getMachineTemplates(), getPrinthouse(), getReadiness() (+37 more)
 
 ### Community 28 - "o"
-Cohesion: 0.03
-Nodes (196): Gs(), zE(), $4(), a2(), de(), fe(), J(), M() (+188 more)
+Cohesion: 0.04
+Nodes (177): Gs(), _6(), $a, a2(), de(), fe(), J(), M() (+169 more)
 
 ### Community 29 - "i"
-Cohesion: 0.03
-Nodes (216): _0(), _4(), _6(), a5, aE(), ag, aN(), at() (+208 more)
+Cohesion: 0.05
+Nodes (179): _0(), _4(), _6(), a3(), aE(), aN(), at(), aw() (+171 more)
 
 ### Community 30 - "Auditoría inicial de `printprice.pro`"
 Cohesion: 0.06
 Nodes (34): 1. Conclusión ejecutiva, 1. Confianza verificable, 2. Identidad de la versión auditada, 2. Recorrido de primer valor, 3. Coherencia de acceso, 3. Evidencia pública de la web, 4. Hallazgos priorizados, 5. Backlog priorizado (+26 more)
 
-### Community 31 - "cohortInterventionExecutionPlanActivationTokenIssuanceBuilderService.js"
-Cohesion: 0.01
-Nodes (114): assert, db, assert, db, assert, db, assert, db (+106 more)
+### Community 31 - "cohortInterventionExecutionPlanActivationTokenRedemptionFinalApprovalBuilderService.js"
+Cohesion: 0.04
+Nodes (31): assert, db, assert, db, assert, db, assert, db (+23 more)
 
-### Community 32 - "cohortInterventionExecutionReadinessBuilderService.js"
-Cohesion: 0.06
-Nodes (33): assert, db, assert, db, assert, db, assert, db (+25 more)
+### Community 32 - "cohortInterventionExecutionAuthorizationBuilderService.js"
+Cohesion: 0.02
+Nodes (141): assert, db, assert, db, assert, db, assert, db (+133 more)
 
 ### Community 33 - "connectSSE"
 Cohesion: 0.09
 Nodes (84): abortSvelteComponentInjection(), applyPlaceholderDimensions(), beginNewLiveConfiguration(), cancelEditing(), cancelEditingToPicking(), cancelInsertConfigure(), captureAndEmit(), cleanup() (+76 more)
 
 ### Community 34 - "ControlledBetaRuntimeSessionClient"
-Cohesion: 0.10
+Cohesion: 0.09
 Nodes (6): ControlledBetaRuntimeSessionClient, runtimeSessionClient, RuntimeSession, RuntimeSessionGate, RuntimeSessionLimits, RuntimeSessionReadiness
 
 ### Community 35 - "cohortInterventionExecutionPlanActivationAuthorizationBuilderService.js"
-Cohesion: 0.03
-Nodes (50): assert, db, assert, db, assert, db, assert, db (+42 more)
+Cohesion: 0.02
+Nodes (86): assert, db, adminRouter, assert, fs, path, assert, db (+78 more)
 
 ### Community 36 - "modern-screenshot.umd.js"
 Cohesion: 0.09
@@ -2800,33 +2793,33 @@ Nodes (53): ae(), be(), Ce(), s(), Ct(), de(), dt(), _e() (+45 more)
 Cohesion: 0.05
 Nodes (26): assert, db, setupHelper, assert, db, setupHelper, assert, db (+18 more)
 
-### Community 38 - "calibrationSessionService.js"
-Cohesion: 0.03
-Nodes (59): adapter, calibrationAcceptanceService, calibrationSessionService, db, ALLOWED_TRANSITIONS, crypto, db, { isValidIso2Country } (+51 more)
+### Community 38 - "smoke_phase193e_conversational_assistant.js"
+Cohesion: 0.15
+Nodes (10): adapterPath, assert, assistant, assistantPath, BASELINE_SNAPSHOT, calibrationSessionService, fs, path (+2 more)
 
 ### Community 39 - "ControlledBetaRuntimeActivityObservation.tsx"
 Cohesion: 0.13
 Nodes (11): ControlledBetaRuntimeActivityObservationClient, runtimeActivityObservationClient, CohortUsageSummary, ParticipantUsageSummary, RuntimeActivityAnomalySignal, RuntimeActivityBlockedAttempt, RuntimeActivityDailyCounter, RuntimeActivityEvent (+3 more)
 
-### Community 40 - "cohortInterventionExecutionEnvelopeBuilderService.js"
-Cohesion: 0.06
-Nodes (31): assert, db, assert, db, assert, db, assert, db (+23 more)
+### Community 40 - "yf"
+Cohesion: 0.05
+Nodes (71): aa(), ab, bk(), cb(), Ck(), Co, constructor(), Cs() (+63 more)
 
 ### Community 41 - "cohortInterventionExecutionPlanActivationTokenRedemptionUnlockComplianceWitnessBuilderService.js"
 Cohesion: 0.04
 Nodes (31): assert, db, { setupFinalizedUnlockFinalHumanAuthorizationSeal, isProdLike }, assert, db, { setupFinalizedUnlockFinalHumanAuthorizationSeal, isProdLike }, assert, db (+23 more)
 
 ### Community 42 - "cohortInterventionExecutionPlanActivationTokenPreflightBuilderService.js"
-Cohesion: 0.02
-Nodes (52): assert, db, assert, db, assert, db, assert, db (+44 more)
+Cohesion: 0.03
+Nodes (34): assert, db, assert, db, assert, db, assert, db (+26 more)
 
 ### Community 43 - "OP-REC-01 — Evaluación Forense y Dictamen de Recuperación de MySQL Staging"
 Cohesion: 0.06
 Nodes (33): 1.1 Inventario de Volúmenes Docker (`docker volume ls`), 1.2 Inventario de Archivos de Respaldo y Volcados SQL en Sistema de Archivos del Host, 1. Inventario Exhaustivo de Volúmenes Docker y Backups en Host, 2.1 Inspección a Nivel del Motor Docker (`docker volume inspect ppos_staging_mysql_data`), 2.2 Inspección en el Sistema de Archivos del Host (`/var/lib/docker/volumes/ppos_staging_mysql_data/_data`), 2.3 Censo de Tablas de Aplicación en `ppos_control_staging/`, 2.4 Metadatos Forenses de `schema_versions.ibd` (`stat`), 2.5 Muestreo de Contenido de Migraciones (Inspección no destructiva con `strings`) (+25 more)
 
-### Community 44 - "l3"
-Cohesion: 0.04
-Nodes (30): bt(), _0, A0(), a3(), a6(), Ao(), at(), Ba (+22 more)
+### Community 44 - "_0"
+Cohesion: 0.08
+Nodes (10): _0, Ba, Dt(), go(), Ju(), kb(), kt(), r6 (+2 more)
 
 ### Community 45 - "cohortInterventionExecutionPlanActivationTokenRedemptionUnlockApprovalBuilderService.js"
 Cohesion: 0.04
@@ -2842,15 +2835,15 @@ Nodes (35): assert(), FinancialOperationsPreProductionRunbookService, fs, path, 
 
 ### Community 48 - "ProductionMonitoringDashboardPage.tsx"
 Cohesion: 0.08
-Nodes (38): acknowledgeIncident(), createIncident(), dismissIncident(), getIncidents(), getMachineLoads(), getProductionTimeline(), getQueueOverview(), getSlaSummary() (+30 more)
+Nodes (36): acknowledgeIncident(), createIncident(), dismissIncident(), getIncidents(), getMachineLoads(), getProductionTimeline(), getQueueOverview(), getSlaSummary() (+28 more)
 
 ### Community 49 - "smoke_phase109f_end_to_end_compliance_reporting_regression.js"
 Cohesion: 0.05
 Nodes (36): assert(), FinancialOperationsComplianceReportDefinitionService, fs, path, ROOT, runSmoke(), assert(), FinancialOperationsComplianceReportDefinitionService (+28 more)
 
-### Community 50 - "authenticatedBetaFetch"
-Cohesion: 0.04
-Nodes (73): authenticatedBetaFetch(), activateControlledCohort(), addActivationParticipant(), bindActivationToCohort(), bindActivationToGate(), bindActivationToTenant(), clearActivationKillSwitch(), createControlledCohortActivation() (+65 more)
+### Community 50 - "ControlledBetaInviteAcceptance.tsx"
+Cohesion: 0.12
+Nodes (10): ControlledBetaInviteAcceptanceClient, inviteAcceptanceClient, ConfirmModalState, AccessPolicy, InviteAcceptanceClaim, InviteAcceptanceGate, InviteAcceptanceReadiness, OnboardingParticipant (+2 more)
 
 ### Community 51 - "smoke_phase110d_go_live_simulation_review_workflow.js"
 Cohesion: 0.05
@@ -2862,42 +2855,42 @@ Nodes (34): assert(), FinancialOperationsFinalReleaseCandidateService, fs, path,
 
 ### Community 53 - "migrationService.js"
 Cohesion: 0.05
-Nodes (62): migrationService, assert(), fs, path, runSmoke(), AUTHORIZED_COMPATIBILITY_VIEWS, handleCompatibilityViewError(), inspectCompatibilityViewStatement() (+54 more)
+Nodes (64): migrationService, assert(), fs, path, runSmoke(), AUTHORIZED_COMPATIBILITY_VIEWS, handleCompatibilityViewError(), inspectCompatibilityViewStatement() (+56 more)
 
 ### Community 54 - "smoke_phase108f_end_to_end_data_retention_privacy_regression.js"
 Cohesion: 0.05
 Nodes (34): assert(), FinancialOperationsDataRetentionPolicyService, fs, path, ROOT, runSmoke(), assert(), FinancialOperationsDataRetentionPolicyService (+26 more)
 
 ### Community 55 - "formatters.ts"
-Cohesion: 0.05
-Nodes (67): acknowledgeMarketplaceOrder(), addNoteToMarketplaceOrder(), assignPrinthouseToMarketplaceOrder(), confirmMarketplaceOrderWirePayment(), getMarketplaceOrderAuditTimeline(), getMarketplaceOrderDetail(), getMarketplaceSessionDetail(), getMarketplaceSessions() (+59 more)
+Cohesion: 0.09
+Nodes (34): deletePreflightArtifact(), getGlobalArtifacts(), getMarketplaceSessionDetail(), getMarketplaceSessions(), getPreflightArtifacts(), listMarketplaceAuditEvents(), selectMarketplaceOffer(), safeArray() (+26 more)
 
-### Community 56 - "smoke_phase60_post_reupload_lifecycle_regression.js"
-Cohesion: 0.07
-Nodes (30): currentJobState, currentOrderState, fs, { getHumanReport }, marketplaceCustomerActionService, marketplaceInvoicePaymentService, marketplaceOrderService, marketplaceProductionQueueService (+22 more)
+### Community 56 - "test-phase37-production-unlock.js"
+Cohesion: 0.12
+Nodes (19): assert, buildMockOrder(), eventLog, invoiceGateService, marketplaceOrderService, mysqlClient, path, queryLog (+11 more)
 
-### Community 57 - "backend_tenant_security.test.js"
-Cohesion: 0.04
-Nodes (46): requireRole(), anomaly, db, express, recovery, { requireRole }, router, twin (+38 more)
+### Community 57 - "auditExplorerAdmin.js"
+Cohesion: 0.29
+Nodes (7): db, express, fetchSourceSafely(), logger, mapAuditRow(), { resolveActorContext }, router
 
 ### Community 58 - "paper_materials_recovery_03.test.js"
-Cohesion: 0.06
-Nodes (53): ACTORS, assert, buildBatchC2Targets(), crypto, db, ensureDoubleSideCoatedEnum(), main(), {
+Cohesion: 0.03
+Nodes (87): ACTORS, assert, buildBatchC1Targets(), crypto, db, ensurePhase1SchemaUpgrade(), main(), {
     PaperEvidenceService,
     loadStaticPendingClassifications337
-} (+45 more)
+} (+79 more)
 
-### Community 59 - "Je"
-Cohesion: 0.07
-Nodes (59): _2(), aj(), Au(), bo(), cj(), n(), dj(), dn() (+51 more)
+### Community 59 - "cohortInterventionExecutionPlanActivationTokenIssuanceBuilderService.js"
+Cohesion: 0.06
+Nodes (22): assert, db, assert, db, assert, db, assert, db (+14 more)
 
-### Community 60 - "t"
-Cohesion: 0.03
-Nodes (67): AIAuditModal(), extractTextFromGenResponse(), ModelInfo, pickAvailableModel(), Props, SupplierOption, SupplierSelect(), SupplierSelectProps (+59 more)
+### Community 60 - "cohortInterventionExecutionPlanActivationTokenRedemptionAuthorizationBuilderService.js"
+Cohesion: 0.06
+Nodes (22): assert, db, assert, db, assert, db, assert, db (+14 more)
 
 ### Community 61 - "orderQuoteRevisionService.js"
 Cohesion: 0.04
-Nodes (59): calculateBusinessHoursExpirationUtc(), canonicalizeObject(), computeSaltedOtpHash(), crypto, deepFreeze(), { executeSpineCalculation }, getMadridOfficialHolidays(), getOfficialHolidaysForJurisdiction() (+51 more)
+Nodes (70): calculateBusinessHoursExpirationUtc(), canonicalizeObject(), computeSaltedOtpHash(), crypto, deepFreeze(), { executeSpineCalculation }, getMadridOfficialHolidays(), getOfficialHolidaysForJurisdiction() (+62 more)
 
 ### Community 62 - "smoke_phase106f_end_to_end_provider_failure_retry_regression.js"
 Cohesion: 0.05
@@ -2905,19 +2898,19 @@ Nodes (33): assert(), FinancialOperationsProviderFailureClassificationService, f
 
 ### Community 63 - "cohortInterventionExecutionPlanActivationTokenEnvBuilderService.js"
 Cohesion: 0.02
-Nodes (95): assert, db, assert, db, assert, db, assert, db (+87 more)
+Nodes (104): assert, db, assert, db, assert, db, assert, db (+96 more)
 
 ### Community 64 - "auditLoggerService.js"
 Cohesion: 0.10
 Nodes (9): auditLogger, db, auditLogger, db, AuditLoggerService, db, logger, axios (+1 more)
 
 ### Community 65 - "PrinthouseRegistrationPage.tsx"
-Cohesion: 0.06
-Nodes (45): AuthButton(), AuthButtonProps, AuthInput(), AuthInputProps, AuthShell(), AuthShellProps, isDarkMode(), MotionBackground() (+37 more)
+Cohesion: 0.05
+Nodes (57): OnboardingChecklist(), OnboardingChecklistProps, OnboardingTask, generateMockOrder(), OrdersRadar(), VerifiedBadgeModal(), VerifiedBadgeModalProps, AuthButton() (+49 more)
 
-### Community 66 - "cohortInterventionExecutionAuthorizationBuilderService.js"
+### Community 66 - "adminControl.js"
 Cohesion: 0.06
-Nodes (33): assert, db, assert, db, assert, db, express, router (+25 more)
+Nodes (23): api, axios, check(), checks, getAuthHeaders(), getAuthToken(), main(), startTime (+15 more)
 
 ### Community 67 - "runtimeKillSwitchService.js"
 Cohesion: 0.05
@@ -2947,13 +2940,13 @@ Nodes (35): db, humanReportSnapshotService, marketplaceOrderService, reviewAppro
 Cohesion: 0.06
 Nodes (27): router, crypto, dispatch(), fs, isDbConfigured, jwt, mysql, mysqlClient (+19 more)
 
-### Community 74 - "cohortInterventionExecutionDispatcherBuilderService.js"
-Cohesion: 0.06
-Nodes (37): assert, db, assert, db, assert, db, express, router (+29 more)
+### Community 74 - "cohortInterventionExecutionPlanActivationTokenRedemptionEnvelopeBuilderService.js"
+Cohesion: 0.07
+Nodes (20): assert, db, assert, db, assert, db, express, router (+12 more)
 
-### Community 75 - "parseMigrationSql"
+### Community 75 - "bootstrap_canonical_schema.js"
 Cohesion: 0.05
-Nodes (43): checkDatabaseEphemeralState(), checkEphemeralIsolation(), FIXTURE_CONTRACT_SPECS, MIGRATION_140_FIXTURE_DDL, mysqlClient, runBootstrap(), verifyOrApplyStructuralFixtures(), bcrypt (+35 more)
+Nodes (36): checkDatabaseEphemeralState(), checkEphemeralIsolation(), FIXTURE_CONTRACT_SPECS, MIGRATION_140_FIXTURE_DDL, mysqlClient, runBootstrap(), verifyOrApplyStructuralFixtures(), bcrypt (+28 more)
 
 ### Community 76 - "smoke_phase75f_governance_freeze_production_readiness.js"
 Cohesion: 0.09
@@ -2965,7 +2958,7 @@ Nodes (31): assert(), { buildProductionHandoffPackage }, { buildProfilePanel }, 
 
 ### Community 78 - "realityAdmin.js"
 Cohesion: 0.04
-Nodes (21): continuity, evolution, express, forecasting, governance, meta, modeling, optimization (+13 more)
+Nodes (20): continuity, evolution, express, forecasting, governance, meta, modeling, optimization (+12 more)
 
 ### Community 79 - "scripts/test_onboarding_connected_suite.js"
 Cohesion: 0.08
@@ -2987,25 +2980,25 @@ Nodes (46): calibrationSessionService, {
 Cohesion: 0.08
 Nodes (24): fs, path, requiredMethods, SandboxCommercialPilotService, sourceFiles, svc, fs, path (+16 more)
 
-### Community 81 - "smoke_phase93f_end_to_end_tax_vat_readiness_regression.js"
-Cohesion: 0.16
-Nodes (11): check(), fs, path, results, ROOT, runRegression(), TaxVatReadinessClassifierService, TaxVatReadinessReviewService (+3 more)
+### Community 81 - "industrialProvisioningService.js"
+Cohesion: 0.06
+Nodes (28): db, fs, path, provisioningService, REQUIRED_COLUMNS, REQUIRED_TABLES, run(), runVirtualValidation() (+20 more)
 
 ### Community 82 - "commercialKnobService.js"
-Cohesion: 0.04
-Nodes (50): adapter, canonicalStringify(), CommercialKnobService, computeRatesChecksum(), crypto, db, deepClone(), getNeutralAdjustments() (+42 more)
+Cohesion: 0.03
+Nodes (65): adapter, canonicalStringify(), CommercialKnobService, computeRatesChecksum(), crypto, db, deepClone(), getNeutralAdjustments() (+57 more)
 
 ### Community 83 - "marketplaceAdmin.js"
 Cohesion: 0.04
 Nodes (27): auction, db, exchange, express, ledger, marketplace, marketplaceService, requireGlobalAdmin (+19 more)
 
 ### Community 84 - "productionDispatchAdmin.js"
-Cohesion: 0.06
-Nodes (33): cascadingService, congestionService, db, economicLoop, economicService, eligibilityService, executionService, express (+25 more)
+Cohesion: 0.03
+Nodes (50): db, riskService, cascadingService, congestionService, db, economicLoop, economicService, eligibilityService (+42 more)
 
 ### Community 85 - "calibrationAssistantService.js"
-Cohesion: 0.04
-Nodes (43): aiAdapter, ALLOWED_COMMERCIAL_FIELDS, ALLOWED_SPEC_FIELDS, CalibrationAssistantService, calibrationSessionService, db, decisionProvider, { isValidIso2Country } (+35 more)
+Cohesion: 0.03
+Nodes (54): axios, logger, aiAdapter, ALLOWED_COMMERCIAL_FIELDS, ALLOWED_SPEC_FIELDS, CalibrationAssistantService, calibrationSessionService, db (+46 more)
 
 ### Community 86 - "FinancialOperationsProductionActivationDryRunService"
 Cohesion: 0.08
@@ -3024,14 +3017,16 @@ Cohesion: 0.05
 Nodes (37): 10. Quote-Derived Initial Values & Ambiguity Resolution, 11. Natur Benchmark Analysis under Commercial Component Model, 12. Offset Minimum Quantity Handling, 13. Onboarding UX Target Flow, 14. Demonstrable Test-Demo Scenario (Natur Benchmark), 15. Audit Summary & Answers to Key Prompt Questions, 16. Benchmark Node Fixtures Breakdown (`node-329a3bc4` — Fährmann Case A), 17. Clarificación de Gobernanza: `VALID_COMMERCIAL_QUOTE` vs Rentabilidad Industrial (+29 more)
 
 ### Community 90 - "api/services/pricing/pricingIntelligenceService.js"
-Cohesion: 0.16
-Nodes (33): createFallbackRouter(), createPricingRouter(), defaultRouter, {
+Cohesion: 0.14
+Nodes (40): createFallbackRouter(), createPricingRouter(), defaultRouter, {
     getPricingProfilesAsync,
+    getTenantMaterialsCatalogAsync,
+    addMaterialToCatalogAsync,
     savePricingProfileAsync,
     deletePricingProfileAsync,
     calibrateQuote,
     calculateCrossoverPoint
-}, requireLogisticsControlPlaneAuth(), buildRatesJsonPatchFromProfile(), calculateCrossoverPoint(), calibrateQuote() (+25 more)
+}, requireLogisticsControlPlaneAuth(), addMaterialToCatalogAsync(), buildRatesJsonPatchFromProfile(), calculateCrossoverPoint() (+32 more)
 
 ### Community 91 - "docs/audits/PHASE_192G_FINAL_GO_NO_GO.md"
 Cohesion: 0.06
@@ -3039,35 +3034,34 @@ Nodes (29): 10. Soak Evidence, 11. Concurrency Evidence, 12. Restart Evidence, 1
 
 ### Community 92 - "paperEvidenceService.js"
 Cohesion: 0.07
-Nodes (44): evaluatePhysicalMicrometerRecord(), readCsvFile(), assert, crypto, fs, mysql, MYSQL_PORT, os (+36 more)
+Nodes (42): assert, crypto, fs, mysql, MYSQL_PORT, os, {
+    PaperEvidenceService,
+    validateAndHashPdfDocument
+}, path (+34 more)
 
 ### Community 93 - "logger.js"
-Cohesion: 0.16
-Nodes (6): evidenceService, logger, LOG_LEVELS, Logger, redact(), SENSITIVE_FIELDS
+Cohesion: 0.07
+Nodes (12): evidenceService, logger, LOG_LEVELS, Logger, redact(), SENSITIVE_FIELDS, auditService, logger (+4 more)
 
 ### Community 94 - "printhouseCapabilityService.js"
 Cohesion: 0.06
-Nodes (32): assert(), db, enableMockDb(), mockDb, printhouseCapabilityService, results, run(), service (+24 more)
+Nodes (32): assert(), db, enableMockDb(), mockDb, results, runSmokeTest(), service, assert() (+24 more)
 
 ### Community 95 - "productionRouteSelectionService.js"
-Cohesion: 0.04
-Nodes (38): computeCanonicalChecksum(), crypto, db, inMemoryProfiles, _isDbFallbackAllowed(), logger, PrinthouseMachinePricingService, telemetry (+30 more)
+Cohesion: 0.06
+Nodes (23): crypto, db, _isDbFallbackAllowed(), logger, mockRuleStore, PrinthouseRouteRuleService, RULE_STATUSES, RULE_TYPES (+15 more)
 
 ### Community 96 - "review_artifacts_onboarding_simplified/test_onboarding_connected_suite.js"
 Cohesion: 0.08
 Nodes (42): assert(), bcrypt, calibrationAcceptanceService, canonicalStringify(), computeCanonicalRatesChecksum(), configuredMysqlPort, createRealUserAndSession(), crypto (+34 more)
 
 ### Community 97 - "marketplaceProductionQueueService.js"
-Cohesion: 0.07
-Nodes (38): assert(), {
-    evaluateProductionQueueEligibility,
-    createProductionQueueEntry,
-    assignProductionMachine
-}, fs, mockState, Module, path, resetMockState(), results (+30 more)
+Cohesion: 0.05
+Nodes (49): currentJobState, currentOrderState, fs, { getHumanReport }, marketplaceCustomerActionService, marketplaceInvoicePaymentService, marketplaceOrderService, marketplaceProductionQueueService (+41 more)
 
-### Community 98 - "smoke_phase161e_evidence_pack_v161_lineage.js"
-Cohesion: 0.07
-Nodes (18): assert, db, assert, db, assert, db, express, router (+10 more)
+### Community 98 - "cohortInterventionExecutionPlanActivationTokenRedemptionReadinessBuilderService.js"
+Cohesion: 0.06
+Nodes (22): assert, db, assert, db, assert, db, assert, db (+14 more)
 
 ### Community 99 - "audit_env_variable_completeness.js"
 Cohesion: 0.07
@@ -3077,24 +3071,24 @@ Nodes (32): applyPatch(), fs, path, UNSAFE_TRUE_FLAGS, classifyVariable(), DATAB
 Cohesion: 0.15
 Nodes (9): crypto, InternalOrderLifecyclePilotService, _isDbFallbackAllowed(), _isTestMode(), LIFECYCLE_STEP_KEYS, REDACTED_FIELDS, RUN_STATUSES, SAFETY_FLAGS_DB (+1 more)
 
-### Community 101 - "verify_e2e_workshop_dispatch.js"
-Cohesion: 0.18
-Nodes (14): {
+### Community 101 - "api/services/logistics/deliveryNotePdfService.js"
+Cohesion: 0.11
+Nodes (33): {
     calculateGs1Mod10CheckDigit,
     validateSscc18
-}, countPdfPageObjects(), crypto, extractHriSsccCodesFromPdf(), findRouteHandler(), fs, invokeAuthenticatedRoute(), logisticsRoutes (+6 more)
+}, countPdfPageObjects(), crypto, extractHriSsccCodesFromPdf(), findRouteHandler(), fs, invokeAuthenticatedRoute(), logisticsRoutes (+25 more)
 
 ### Community 102 - "test-phase10-controlplane-preflight-alignment.js"
-Cohesion: 0.12
-Nodes (14): assert, fallbackResult, fixedArt, gateway, helpers, integrityType, mockPayload, normalized (+6 more)
+Cohesion: 0.07
+Nodes (25): assert(), controlPlaneSchemaService, db, dbQueriesIntercepted, mockUpstreamJobs, preflightServiceClient, runSmokeTests(), syncService (+17 more)
 
 ### Community 103 - "smoke_phase192d_governed_routing.js"
-Cohesion: 0.09
-Nodes (17): activationAdapter, assert, db, discoveryService, eligibilityService, matchingService, mockGrants, mockNodes (+9 more)
+Cohesion: 0.06
+Nodes (29): activationAdapter, assert, db, discoveryService, eligibilityService, matchingService, mockGrants, mockNodes (+21 more)
 
 ### Community 104 - "printhousePricingRoutes.js"
 Cohesion: 0.05
-Nodes (41): assert, cleanFixtures(), db, previewService, priceBookService, readinessService, ruleService, runTests() (+33 more)
+Nodes (42): assert, cleanFixtures(), db, previewService, priceBookService, readinessService, ruleService, runTests() (+34 more)
 
 ### Community 105 - "impeccable/SKILL.md"
 Cohesion: 0.06
@@ -3105,12 +3099,12 @@ Cohesion: 0.07
 Nodes (9): { serviceInstance: service }, { serviceInstance: service }, { serviceInstance: service }, { serviceInstance: service }, { serviceInstance: service }, ControlledBetaRuntimeActivityObservationService, crypto, db (+1 more)
 
 ### Community 107 - "routes/printhouseOnboardingRoutes.js"
-Cohesion: 0.04
-Nodes (44): crypto, fs, http, jwt, mysql, path, port, runHttpConnectedHarness() (+36 more)
+Cohesion: 0.05
+Nodes (35): calibrationAcceptanceService, calibrationAssistantService, calibrationReachabilityService, calibrationRunService, calibrationService, calibrationSessionService, capacityService, commercialKnobService (+27 more)
 
 ### Community 108 - "decisionProvider.js"
-Cohesion: 0.07
-Nodes (21): DecisionProviderOrchestrator, DeterministicDecisionProvider, FORBIDDEN_TASKS, JevDecisionProvider, LLMDecisionProvider, logger, DeterministicDecisionProvider, PRINT_TERMINOLOGY_MAP (+13 more)
+Cohesion: 0.06
+Nodes (23): DecisionProviderOrchestrator, DeterministicDecisionProvider, FORBIDDEN_TASKS, JevDecisionProvider, LLMDecisionProvider, logger, DeterministicDecisionProvider, PRINT_TERMINOLOGY_MAP (+15 more)
 
 ### Community 109 - "acceptance_phase194h_launch_readiness.js"
 Cohesion: 0.06
@@ -3128,9 +3122,9 @@ Nodes (42): agentHasWorkInFlight(), agentStatusText(), applyLiveBarPreference(),
 Cohesion: 0.07
 Nodes (28): 0. Executive Summary, 1. Repos and Execution Order, 2. Core Problem Statement, 3. Definitions, 4. Target Probe Semantic Statuses, 5. Target Probe Categories, 62F-A — Engine Heavy PDF Probe Semantics, 62F-B — Worker Heavy PDF Probe Governance (+20 more)
 
-### Community 113 - "Fs"
-Cohesion: 0.07
-Nodes (5): cb(), Fs, hk(), qk, sb
+### Community 113 - "yk"
+Cohesion: 0.04
+Nodes (14): bg, cb(), dy, Fs, hk(), jk(), qk, rg (+6 more)
 
 ### Community 114 - "showToast"
 Cohesion: 0.08
@@ -3145,25 +3139,25 @@ Cohesion: 0.03
 Nodes (57): CANONICAL_PAPER_CATEGORIES, express, marketplaceService, paperProcurementService, { resolveVariantCaliperProvenance }, router, { v4: uuidv4 }, express (+49 more)
 
 ### Community 117 - "smoke_phase_39_0_tenant_plan_governance.js"
-Cohesion: 0.06
-Nodes (28): adminCode, adminPath, assert, clientApiCode, clientApiFilePath, fs, ingestionCode, ingestionPath (+20 more)
+Cohesion: 0.05
+Nodes (37): adminCode, adminPath, assert, clientApiCode, clientApiFilePath, fs, ingestionCode, ingestionPath (+29 more)
 
 ### Community 118 - "Language-Specific Sharp Edges"
 Cohesion: 0.05
 Nodes (42): Bridge Type Surprises, C#, Coercion Madness, Default Struct Values, Defer in Loops, Dynamic Execution, Eval and Friends, Force Unwrapping (+34 more)
 
 ### Community 119 - "lib/migrationIntegrity.js"
-Cohesion: 0.06
-Nodes (40): args, baselinePath, {
+Cohesion: 0.04
+Nodes (59): args, baselinePath, {
   discoverMigrations,
   calculateFileChecksum,
   classifySqlStatements,
   findPrefixCollisions
-}, fs, isReplace, isWrite, migrationsDir, path (+32 more)
+}, fs, isReplace, isWrite, migrationsDir, path (+51 more)
 
-### Community 120 - "AutonomousEconomicLoop.js"
-Cohesion: 0.08
-Nodes (14): db, riskService, AutonomousEconomicLoop, db, economicService, federationService, logger, riskService (+6 more)
+### Community 120 - "j6"
+Cohesion: 0.11
+Nodes (34): G(), h5, Be(), Bt(), De(), dh(), _e(), ev() (+26 more)
 
 ### Community 121 - "run_phase13_concurrency_benchmark.cjs"
 Cohesion: 0.11
@@ -3172,17 +3166,17 @@ Nodes (34): {
     generateElectronicInvoiceXml
 }, { generateJdfJobTicketXml }, { inspectPreflightJob }, main(), percentile(), { performance }, { planImpositionJob }, runConcurrentWorkload() (+26 more)
 
-### Community 122 - "BetaGovernanceWorkspace.tsx"
-Cohesion: 0.11
-Nodes (25): BetaWorkspaceShell(), BetaWorkspaceShellProps, WorkspaceTab, ReviewAuditLog, ReviewDecision, ReviewEvidence, ReviewFinding, ReviewRecord (+17 more)
+### Community 122 - "ControlledBetaCohortInterventionSimulationReview.tsx"
+Cohesion: 0.35
+Nodes (8): ReviewAuditLog, ReviewDecision, ReviewEvidence, ReviewFinding, ReviewRecord, ReviewSummary, controlledBetaCohortInterventionSimulationReviewClient, STATUS_COLORS
 
 ### Community 123 - "industrialDispatchExecutionService.js"
 Cohesion: 0.15
 Nodes (9): db, executionService, persistence, db, DISPATCH_LIFECYCLE, IndustrialDispatchExecutionService, persistence, scoringService (+1 more)
 
 ### Community 124 - "adminPreflightJobs.js"
-Cohesion: 0.08
-Nodes (16): auditLoggerService, db, express, FormData, gateway, governanceLedgerService, humanReportService, humanReportSnapshotService (+8 more)
+Cohesion: 0.05
+Nodes (37): axios, db, ensureBigFile(), FormData, fs, { getTenantState }, jwt, preflightStatusHelpers (+29 more)
 
 ### Community 125 - "applyEditing"
 Cohesion: 0.10
@@ -3197,8 +3191,8 @@ Cohesion: 0.13
 Nodes (18): assert(), axios, bpePublicationService, canonicalStringify(), child_process, computeRatesChecksum(), configuredMysqlPort, crypto (+10 more)
 
 ### Community 128 - "federationAdmin.js"
-Cohesion: 0.07
-Nodes (25): consensus, db, express, globalIntel, orchestration, recovery, registry, router (+17 more)
+Cohesion: 0.04
+Nodes (37): consensus, db, express, globalIntel, orchestration, recovery, registry, router (+29 more)
 
 ### Community 129 - "smoke_phase56e_control_plane_artifact_trust_regression.js"
 Cohesion: 0.06
@@ -3212,22 +3206,13 @@ Nodes (25): CalibrationEstablishedPathsService, db, adapter, calibrationEstablis
 Cohesion: 0.08
 Nodes (25): 10.1 Empirical Evidence from Natur Case, 10.2 Mathematical Degeneracy Explanation, 10. Natur Underdetermination Analysis, 11. Stakeholder Question — Direct Answer, 12. Onboarding & Revision Governance Gap Audit, 13. Output Architecture Map, 14. Capability Gap Matrix, 15. Stakeholder Data Needed (10 Specific Questions) (+17 more)
 
-### Community 132 - "logistics_integration_preview.test.js"
-Cohesion: 0.11
-Nodes (12): requireLogisticsControlPlaneAuth(), PrinthouseQuotePreviewService, {
-    createLogisticsRouter,
-    requireLogisticsControlPlaneAuth
-}, findRouteLayer(), {
-    generateSsccLabelsPdf,
-    generateDeliveryNotePdf
-}, invokeRouterEndpoint(), require, {
-    createLogisticsRouter,
-    requireLogisticsControlPlaneAuth
-} (+4 more)
+### Community 132 - "smoke_phase164e_evidence_pack_v164_lineage.js"
+Cohesion: 0.07
+Nodes (18): assert, db, assert, db, assert, db, express, router (+10 more)
 
 ### Community 133 - "paperCaliperReconciliationService.js"
 Cohesion: 0.08
-Nodes (32): ARCH_DIR, CV_LIMITS_BY_SUBSTRATE, EMAIL_TEMPLATES_MD_PATH, evaluateManufacturerDatasheetEvidence(), FINAL_ASSESSMENT_MD_PATH, fs, INVENTORY_CSV_PATH, loadAndAuditRecovery08Deliverables() (+24 more)
+Nodes (34): ARCH_DIR, CV_LIMITS_BY_SUBSTRATE, EMAIL_TEMPLATES_MD_PATH, evaluateManufacturerDatasheetEvidence(), evaluatePhysicalMicrometerRecord(), FINAL_ASSESSMENT_MD_PATH, fs, INVENTORY_CSV_PATH (+26 more)
 
 ### Community 134 - "federationConsensusService.js"
 Cohesion: 0.09
@@ -3249,17 +3234,17 @@ Nodes (23): 1. Resumen Ejecutivo de Seguridad, 2.1. Arquitectura Central del Mid
 Cohesion: 0.06
 Nodes (18): LimitedBetaRuntimeService, svc, LimitedBetaRuntimeService, svc, LimitedBetaRuntimeService, svc, LimitedBetaRuntimeService, svc (+10 more)
 
-### Community 140 - "printhouseQuotePreviewService.js"
-Cohesion: 0.05
-Nodes (25): buildPriceAdapter, calibrationSessionService, db, quotePreviewService, NOTE: Missing complex flags (has_mixed_interior, has_endpapers, has_spot_uv), buildPriceAdapter, calibrationAssistantService, calibrationSessionService (+17 more)
+### Community 140 - "calibrationSessionService.js"
+Cohesion: 0.02
+Nodes (83): adapter, calibrationAcceptanceService, calibrationSessionService, db, adapter, liveRates, results, testCases (+75 more)
 
 ### Community 141 - "PreflightServiceClient"
 Cohesion: 0.11
 Nodes (8): logger, MarketplacePreflightService, mysqlClient, preflightServiceClient, axios, jwt, PreflightServiceClient, preflightServiceClient
 
 ### Community 142 - "printerSyncService.js"
-Cohesion: 0.06
-Nodes (21): activationAdapter, crypto, db, PrinterSyncService, assert, db, mockGrants, printerSyncService (+13 more)
+Cohesion: 0.08
+Nodes (15): activationAdapter, crypto, db, PrinterSyncService, assert, db, mockGrants, printerSyncService (+7 more)
 
 ### Community 143 - "RoutingScoreService.js"
 Cohesion: 0.08
@@ -3298,17 +3283,17 @@ Nodes (24): 1. Resumen Ejecutivo (Executive Summary), 2. Mapa Arquitectónico y 
 Cohesion: 0.07
 Nodes (26): 1.1 Identidad, Metadatos y Custodia del Backup de Origen (Fuente B), 1.2 Auditoría y Certificación Exhaustiva del Ledger (177 Registros), 1. Cierre Formal de Evidencias de la Fase C y Protección del Backup, 2. Delimitación Estricta del GO de Restauración y Restricciones Absolutas, 3.1 Autoridad del Directorio Canónico de Staging, 3.2 Protocolo de Verificación de Credenciales (Sin Exposición de Valores), 3.3 Controles de Seguridad de Datadir e Invariantes de Exclusión Mutua, 3. Arquitectura Canónica, Autoridad de Secretos y Seguridad de Datadir (+18 more)
 
-### Community 151 - "smoke_autonomous_gating.js"
+### Community 151 - "AutonomousSimulationLoop.js"
 Cohesion: 0.07
-Nodes (17): economicLoop, optimizationLoop, orchestrator, simulationLoop, status, temporalLoop, twinService, { v4: uuidv4 } (+9 more)
+Nodes (16): projector, { v4: uuidv4 }, twinService, { v4: uuidv4 }, AutonomousSimulationLoop, evaluator, logger, projector (+8 more)
 
 ### Community 152 - "audit.js"
 Cohesion: 0.06
 Nodes (36): adjudicated, batches, bool(), byCategory, byLocation, candidates, CANDIDATES_SCHEMA, CATEGORIES (+28 more)
 
 ### Community 153 - "AutonomousOptimizationLoop.js"
-Cohesion: 0.06
-Nodes (20): db, memoryService, reliabilityService, scoringService, db, reliabilityService, AutonomousOptimizationLoop, congestionService (+12 more)
+Cohesion: 0.04
+Nodes (28): congestionService, db, db, memoryService, reliabilityService, scoringService, db, reliabilityService (+20 more)
 
 ### Community 154 - "cohortInterventionExecutionPlanActivationTokenRedemptionUnlockKillSwitchDryRunBuilderService.js"
 Cohesion: 0.05
@@ -3322,16 +3307,16 @@ Nodes (18): checkProtectedFields(), crypto, db, MACHINE_TEMPLATES, makeMachinePu
 Cohesion: 0.10
 Nodes (21): db, ensurePilotTenant(), introspectTenantsTable(), printhouseCapabilityService, seed(), assert(), bindingService, db (+13 more)
 
-### Community 157 - "roundToPrecision"
-Cohesion: 0.08
-Nodes (41): {
+### Community 157 - "spine02_03_engine_and_api.test.js"
+Cohesion: 0.05
+Nodes (69): {
     BUILTIN_WAREHOUSE_PROFILES,
     TRACKING_INTEGRATION_MODES,
     SLOT_BOOKING_MANAGEMENT_MODES,
     STACKABILITY_HANDLING_MODES,
     calculateOperationalShippingScenarios,
     executeLogisticsCubingCalculation
-}, DEFAULT_CONSUMABLE_RATES, DEFAULT_FREIGHT_MATRICES, evaluateFreightMatrixRow(), extractPostalPrefix(), LogisticsDatabaseService, mapDbRowToWarehouseProfile(), mysqlClient (+33 more)
+}, DEFAULT_CONSUMABLE_RATES, DEFAULT_FREIGHT_MATRICES, evaluateFreightMatrixRow(), extractPostalPrefix(), LogisticsDatabaseService, mapDbRowToWarehouseProfile(), mysqlClient (+61 more)
 
 ### Community 158 - "paperProcurementService.js"
 Cohesion: 0.13
@@ -3366,8 +3351,8 @@ Cohesion: 0.08
 Nodes (23): 10. Fresh Governed C′ Qualification, 11. Corrected C′ Run, 12. Pre-Acceptance Regression Replay, 13. Governed C′ Acceptance, 14. Final Active-Rates Replay, 15. Canonical Baseline, 16. Final Status, 17. Governance Boundary (+15 more)
 
 ### Community 167 - "liveQuoteEligibilityService.js"
-Cohesion: 0.10
-Nodes (15): express, liveQuoteService, router, activationAdapter, crypto, LiveQuoteEligibilityService, moneyUtil, previewService (+7 more)
+Cohesion: 0.06
+Nodes (27): assert, db, liveQuoteService, mockGrants, mockPriceBooks, moneyUtil, previewService, runTests() (+19 more)
 
 ### Community 168 - "smoke_phase72d_control_plane_policy_profile_ux.js"
 Cohesion: 0.12
@@ -3391,44 +3376,28 @@ Nodes (38): express, ingestionService, invoiceService, {
 }, logger, multer, { resolveActorContext }, router (+30 more)
 
 ### Community 170 - "smoke_phase192i_rc9_false_applied_140_repair.js"
-Cohesion: 0.15
-Nodes (19): repairFalseAppliedMigration140(), assert, baseline, baselinePath, {
-  detectFalseAppliedMigration140,
-  repairFalseAppliedMigration140,
-  TARGET_MIGRATION_PATH
-}, fs, getMigrationPath(), ledgerRead (+11 more)
+Cohesion: 0.11
+Nodes (24): detectFalseAppliedMigration140(), fs, logger, migrationIntegrity, path, repairFalseAppliedMigration140(), assert, baseline (+16 more)
 
 ### Community 171 - "api/services/logistics/carrierMilestoneAndEpalService.js"
-Cohesion: 0.08
-Nodes (51): gracefulShutdown(), createFallbackRouter(), createLogisticsRouter(), defaultRouter, {
-    generateSsccLabelsPdf,
-    generateDeliveryNotePdf,
-    generateCarrierProtocolPdf
-}, {
-    ingestCarrierMilestone,
-    listPublisherPodNotifications,
-    runEpalSettlementSweep,
-    startEpalSettlementScheduler,
-    stopEpalSettlementScheduler,
-    getEpalSettlementSchedulerStatus,
-    consolidateOrderLandedCost
-}, { LogisticsDatabaseService }, clearShipmentLedgerForTesting() (+43 more)
+Cohesion: 0.05
+Nodes (56): axios, db, memoryDb, run(), fastify, federationConsensusService, federationRouter, federationSyncService (+48 more)
 
 ### Community 172 - "federatedDecisionEngine.js"
-Cohesion: 0.07
-Nodes (12): FederatedDecisionEngine, ingestor, policyValidator, registry, safety, FederationEngine, registry, FederationPolicyValidator (+4 more)
+Cohesion: 0.09
+Nodes (12): AgentBase, federatedDecisionEngine, RoutingAgent, signalIngestor, FederatedDecisionEngine, ingestor, policyValidator, registry (+4 more)
 
 ### Community 173 - "ManufacturingEvidenceLedgerService.js"
 Cohesion: 0.10
 Nodes (14): AutonomousRerouteService, db, eligibilityService, executionService, logger, { v4: uuidv4 }, db, DispatchExecutionService (+6 more)
 
-### Community 174 - "aiProviderAdapter.js"
-Cohesion: 0.12
-Nodes (9): axios, logger, aiAdapter, LLMDecisionProvider, runTests(), aiProviderAdapter, assert, axios (+1 more)
+### Community 174 - "printhouseMachinePricingService.js"
+Cohesion: 0.08
+Nodes (20): computeCanonicalChecksum(), crypto, db, inMemoryProfiles, _isDbFallbackAllowed(), logger, PrinthouseMachinePricingService, telemetry (+12 more)
 
-### Community 175 - "smoke_phase192b_live_quote_eligibility.js"
-Cohesion: 0.17
-Nodes (12): assert, db, liveQuoteService, mockGrants, mockPriceBooks, moneyUtil, previewService, runTests() (+4 more)
+### Community 175 - "ControlledBetaCohortActivation.tsx"
+Cohesion: 0.19
+Nodes (27): activateControlledCohort(), addActivationParticipant(), bindActivationToCohort(), bindActivationToGate(), bindActivationToTenant(), clearActivationKillSwitch(), createControlledCohortActivation(), defineActivationScope() (+19 more)
 
 ### Community 176 - "printhouseReadinessService.js"
 Cohesion: 0.09
@@ -3451,8 +3420,8 @@ Cohesion: 0.06
 Nodes (26): 1. Tabla de Backup en Base de Datos (`MySQL Control`), 2. Artefactos de Backup en Disco y Hashes SHA-256, 3. Procedimiento de Rollback Inmediato, PAPER-MATERIALS-RECOVERY-07W — Manifiesto de Backup y Rollback Determinista, 1. Resumen de Candidatos Evaluados (38 de `RECOVERY-07V` $\to$ 36 Aplicados, 2 Excluidos), 2. Ejecución de Pasada 1 (`PASS_1_SELECTIVE_36_CALIPER_UPDATE`), 3. Ejecución de Pasada 2 (`PASS_2_IDEMPOTENCY_VERIFICATION`), 4. Verificaciones de Integridad Post-Actualización y Checksums (+18 more)
 
 ### Community 183 - "userMfaService.js"
-Cohesion: 0.21
-Nodes (11): RFC-6238, base32Decode(), base32Encode(), canonicalId(), crypto, db, decryptSecret(), encryptSecret() (+3 more)
+Cohesion: 0.07
+Nodes (28): RFC-6238, axios, bcrypt, crypto, express, getTotpForStep(), http, logger (+20 more)
 
 ### Community 184 - "GATE 2 — Conciliación de Evidencias y Dictamen Final de Preparación de Infraestructura"
 Cohesion: 0.08
@@ -3482,29 +3451,21 @@ Nodes (19): 1. Conclusión, 2. Evidencia observada, 3. Hallazgos P0, 4. Hallazgo
 Cohesion: 0.07
 Nodes (16): LimitedBetaPreparationGateService, LimitedBetaPreparationGateService, svc, LimitedBetaPreparationGateService, svc, LimitedBetaPreparationGateService, svc, LimitedBetaPreparationGateService (+8 more)
 
-### Community 191 - "budget02d01_e2e_real_integration.test.js"
-Cohesion: 0.12
-Nodes (12): crypto, InMemoryTransactionalStorage, manufacturingDispatch, marketplaceDispatchGatingService, mysql, mysqlClient, {
-    OrderQuoteRevisionService,
-    OrderQuoteRevisionError,
-    sha256Canonical
-}, persistence (+4 more)
-
-### Community 192 - "AutonomousTemporalLoop.js"
+### Community 192 - "smoke_autonomous_gating.js"
 Cohesion: 0.06
-Nodes (19): db, governanceService, db, simulationService, AutonomousTemporalLoop, governanceService, logger, riskService (+11 more)
+Nodes (20): economicLoop, optimizationLoop, orchestrator, simulationLoop, status, temporalLoop, db, governanceService (+12 more)
 
-### Community 194 - "marketplaceOrderService.js"
-Cohesion: 0.06
-Nodes (27): db, installMockEngine(), memoryDb, run(), service, setupDiagnostics(), crypto, fs (+19 more)
+### Community 194 - "marketplaceOrderFileService.js"
+Cohesion: 0.07
+Nodes (20): crypto, fs, logger, MarketplaceOrderFileService, marketplaceOrderService, path, productionFileIngestionService, axios (+12 more)
 
 ### Community 196 - "engagementEngine.js"
 Cohesion: 0.13
 Nodes (11): db, notifier, { v4: uuidv4 }, csWorkflowService, db, EngagementEngine, notifier, { v4: uuidv4 } (+3 more)
 
-### Community 197 - "preflightStorageService.js"
-Cohesion: 0.11
-Nodes (10): PreflightQuotaService, TODO: Connect to 'tenants' DB to fetch overrides from metadata_json, storageService, fs, mkdir, path, PreflightStorageService, { promisify } (+2 more)
+### Community 197 - "adminPreflight.js"
+Cohesion: 0.05
+Nodes (31): artifact, auditLogger, express, fs, maxMb, multer, operations, path (+23 more)
 
 ### Community 198 - "paperImportService.js"
 Cohesion: 0.05
@@ -3522,9 +3483,9 @@ Nodes (25): dist, DOM, DOM.Iterable, ES2020, node_modules, src, compilerOptions,
 Cohesion: 0.08
 Nodes (19): FoundingPrinthousePilotGateService, svc, FoundingPrinthousePilotGateService, fs, path, FoundingPrinthousePilotGateService, fs, migSrc (+11 more)
 
-### Community 202 - "financialOperationsProductionActivationReviewClient.ts"
-Cohesion: 0.12
-Nodes (24): createGate(), evaluateGate(), getAudit(), getChecks(), getEvidencePack(), getExportPreview(), getFindings(), getGate() (+16 more)
+### Community 202 - "FinancialOperationsProductionActivationReviewPage.tsx"
+Cohesion: 0.21
+Nodes (14): AuditTimelineProps, FinancialOperationsProductionActivationReviewAuditTimeline(), ChecksPanelProps, FinancialOperationsProductionActivationReviewChecksPanel(), FinancialOperationsProductionActivationReviewFindingsPanel(), FindingsPanelProps, FinancialOperationsProductionActivationReviewGoNoGoPanel(), GoNoGoPanelProps (+6 more)
 
 ### Community 203 - "LimitedBetaRuntimeService"
 Cohesion: 0.20
@@ -3547,8 +3508,8 @@ Cohesion: 0.08
 Nodes (25): jsdom, devDependencies, jsdom, @tailwindcss/vite, @testing-library/jest-dom, @testing-library/react, @testing-library/user-event, @types/leaflet (+17 more)
 
 ### Community 208 - "phase129ControlledBetaFixture.js"
-Cohesion: 0.08
-Nodes (14): crypto, mysql, ControlledBetaCohortActivationService, Phase129ControlledBetaFixture, fs, path, Phase129ControlledBetaFixture, fs (+6 more)
+Cohesion: 0.10
+Nodes (12): crypto, mysql, ControlledBetaCohortActivationService, Phase129ControlledBetaFixture, fs, path, Phase129ControlledBetaFixture, fs (+4 more)
 
 ### Community 209 - "Procedimiento de Reproducibilidad y Verificación Técnica — DEV-02"
 Cohesion: 0.11
@@ -3585,6 +3546,10 @@ Nodes (13): acceptanceService, acceptanceServicePath, adapter, assert, BASELINE_
 ### Community 220 - "seed-coverage.js"
 Cohesion: 0.12
 Nodes (14): allSeeds, { execFileSync }, fs, jsonFiles, mdFiles, os, path, problems (+6 more)
+
+### Community 221 - "dispatchRecommendationService.js"
+Cohesion: 0.06
+Nodes (21): express, provisioningService, recommendationService, { requireAdmin }, router, CapacityScoringService, db, logger (+13 more)
 
 ### Community 222 - "SubscriptionGuard.tsx"
 Cohesion: 0.12
@@ -3623,8 +3588,8 @@ Cohesion: 0.15
 Nodes (21): aggregateReadinessEvidence(), createReleaseCandidate(), evaluateReleaseCandidate(), getFinalEvidencePack(), recordFinding(), resolveFinding(), FinalPreproductionReleaseCandidate(), PHASE_LABELS (+13 more)
 
 ### Community 232 - ".get"
-Cohesion: 0.08
-Nodes (47): af, get(), al(), As(), au(), Bv(), cs(), $d() (+39 more)
+Cohesion: 0.12
+Nodes (33): af, get(), al(), au(), Bv(), cs(), dt(), dv() (+25 more)
 
 ### Community 233 - "controlledBetaRuntimeSessionService.js"
 Cohesion: 0.09
@@ -3638,13 +3603,13 @@ Nodes (19): compatibilityService, dbMock, ddlAllowedPaths, ddlExtractionPending,
 Cohesion: 0.18
 Nodes (11): db, express, getPlanType(), getPlanTypeFromPriceId(), getStripe(), handleStripeEvent(), mapStripeStatus(), PLAN_CATALOG (+3 more)
 
-### Community 236 - "adminMarketplaceOrders.js"
-Cohesion: 0.05
-Nodes (48): adminMarketplaceOrdersRouter, axios, clearMemoryDb(), db, express, installMockEngine(), memoryDb, runTests() (+40 more)
+### Community 236 - "test-phase36-remediation-loop.js"
+Cohesion: 0.07
+Nodes (35): adminMarketplaceOrdersRouter, axios, bindingService, clearMemoryDb(), db, express, installMockEngine(), memoryDb (+27 more)
 
-### Community 237 - "test-phase37-dispatch-package.js"
-Cohesion: 0.12
-Nodes (21): assert, buildMockFiles(), buildMockOrder(), dispatchService, eventLog, marketplaceOrderService, mockFiles, mysqlClient (+13 more)
+### Community 237 - "marketplaceOrderService.js"
+Cohesion: 0.05
+Nodes (39): assert, buildMockFiles(), buildMockOrder(), dispatchService, eventLog, marketplaceOrderService, mockFiles, mysqlClient (+31 more)
 
 ### Community 238 - "mountSvelteComponentVariant"
 Cohesion: 0.11
@@ -3655,12 +3620,12 @@ Cohesion: 0.11
 Nodes (22): assertNotSandboxForDispatch(), assertNotSandboxForDispatchSync(), extractSandboxIndicators(), hasExplicitPersistedCapability(), isPersistedGrantSuspendedOrRevoked(), isSandboxOrder(), logger, mysqlClient (+14 more)
 
 ### Community 240 - "agentBase.js"
-Cohesion: 0.10
-Nodes (7): AgentBase, AgentBase, GuardrailAgent, AgentBase, LearningAgent, AgentBase, RiskAgent
+Cohesion: 0.13
+Nodes (5): AgentBase, AgentBase, GuardrailAgent, AgentBase, RiskAgent
 
 ### Community 241 - "buildRequestContext.js"
-Cohesion: 0.10
-Nodes (14): auditLogger, { loadDeploymentContext }, requestTracer, { verifyJwt }, fs, loadDeploymentContext(), loadJson(), path (+6 more)
+Cohesion: 0.14
+Nodes (12): auditLogger, { loadDeploymentContext }, requestTracer, { verifyJwt }, fs, loadDeploymentContext(), loadJson(), path (+4 more)
 
 ### Community 242 - "factoryConnectorRoutes.js"
 Cohesion: 0.13
@@ -3694,13 +3659,13 @@ Nodes (18): assert(), fs, MarketplaceLaunchControlService, MarketplaceLaunchRead
 Cohesion: 0.11
 Nodes (20): dbHelper, detectorCode, detectors, fs, insightCode, insights, mockDb, path (+12 more)
 
-### Community 250 - "routingRecommendationService.js"
-Cohesion: 0.07
-Nodes (18): crypto, db, DispatchService, TODO: Integrate with Notification Engine (Email, Webhook, etc.), TODO: Alert ops via conflict log or notification, reservationService, crypto, db (+10 more)
+### Community 250 - "materialsAdmin.js"
+Cohesion: 0.05
+Nodes (30): db, express, getScopeContext(), logger, materialService, paperCostIntegrationService, paperProcurementService, { paperThicknessService } (+22 more)
 
-### Community 252 - "materialsAdmin.js"
-Cohesion: 0.08
-Nodes (21): db, express, getScopeContext(), logger, materialService, paperCostIntegrationService, paperProcurementService, { paperThicknessService } (+13 more)
+### Community 252 - "paper_master_database_search.test.js"
+Cohesion: 0.14
+Nodes (12): router, crypto, dispatch(), fs, jwt, materialsAdminRouter, mysql, mysqlClient (+4 more)
 
 ### Community 253 - "productionDeploymentDryRunClient.ts"
 Cohesion: 0.19
@@ -3719,8 +3684,8 @@ Cohesion: 0.24
 Nodes (12): Confirmations, Rule, TokenRedemptionUnlockFinalHumanAuthorizationSeal, client, ControlledBetaCohortInterventionExecutionPlanActivationTokenRedemptionUnlockFinalHumanAuthorizationSealClient, createUnlockFinalHumanAuthorizationSeal(), evaluateUnlockFinalHumanAuthorizationSeal(), finalizeUnlockFinalHumanAuthorizationSeal() (+4 more)
 
 ### Community 257 - "autonomyFinanceAdmin.js"
-Cohesion: 0.06
-Nodes (23): db, express, financialLedgerService, invoiceService, payoutService, router, settlementService, crypto (+15 more)
+Cohesion: 0.07
+Nodes (19): db, express, financialLedgerService, invoiceService, payoutService, router, settlementService, crypto (+11 more)
 
 ### Community 258 - "smoke_phase192_1_rc16_machine_capability_onboarding.js"
 Cohesion: 0.10
@@ -3757,9 +3722,9 @@ Nodes (18): ActivationTokenFinalApvAudit, ActivationTokenFinalApvDetails, Activa
 Cohesion: 0.13
 Nodes (20): activationAdapter, assert, crypto, db, healthService, killSwitchService, main(), mockDispatches (+12 more)
 
-### Community 265 - "MachineDetailDrawer.tsx"
-Cohesion: 0.11
-Nodes (18): FederationNode(), FederationNodeProps, MachineDrawerContext, MachineDrawerContextType, MachineDrawerProvider(), SelectedNodeContext, useMachineDrawer(), MachineDetailDrawer() (+10 more)
+### Community 265 - "authenticatedBetaFetch"
+Cohesion: 0.15
+Nodes (8): authenticatedBetaFetch(), ControlledBetaInviteIssuanceClient, inviteIssuanceClient, InviteIssuanceBatch, InviteIssuanceGate, InviteIssuanceReadiness, InviteIssuanceRecipient, InviteRecord
 
 ### Community 266 - "ControlledBetaCohortInterventionExecutionPlanActivationTokenRedemptionUnlockFinalReviewClient"
 Cohesion: 0.42
@@ -3773,9 +3738,9 @@ Nodes (23): Key Audit Findings, Key Deliverables, Key Deliverables, Key Delivera
 Cohesion: 0.12
 Nodes (16): assert(), BetaPaymentModeService, fs, path, ROOT, runSmoke(), BetaPaymentModeService, BetaPaymentReversalService (+8 more)
 
-### Community 269 - "ManufacturingPersistenceService.js"
-Cohesion: 0.06
-Nodes (22): archiver, auditLogger, crypto, eventService, fs, ManufacturingBundleService, path, persistence (+14 more)
+### Community 269 - "adminProduction.js"
+Cohesion: 0.03
+Nodes (53): validate(), bundleService, dispatchService, eventService, express, machineRegistry, matchingService, nodeService (+45 more)
 
 ### Community 270 - "foundingPrinthousePilotGateClient.ts"
 Cohesion: 0.36
@@ -3786,8 +3751,8 @@ Cohesion: 0.24
 Nodes (5): crypto, ProductionDeploymentDryRunRollbackDrillService, SAFETY_FLAGS, SAFETY_MARKERS, SIMULATED_DEPLOY_STEPS
 
 ### Community 275 - "BillingUsageDashboardPage.tsx"
-Cohesion: 0.04
-Nodes (57): applyManualAdjustment(), assignPlanToTenant(), createOrUpdateCommercialPlan(), getCommercialPlans(), getTenantBillingEvents(), getTenantEntitlement(), getTenantUsage(), updateTenantBillingStatus() (+49 more)
+Cohesion: 0.05
+Nodes (45): applyManualAdjustment(), assignPlanToTenant(), createOrUpdateCommercialPlan(), getCommercialPlans(), getTenantBillingEvents(), getTenantEntitlement(), getTenantUsage(), updateTenantBillingStatus() (+37 more)
 
 ### Community 276 - "MarketplaceLaunchControlPage.tsx"
 Cohesion: 0.15
@@ -3817,13 +3782,17 @@ Nodes (16): assert(), axios, currentActor, db, enableMockDb(), express, fileCont
 Cohesion: 0.14
 Nodes (14): assert(), db, enableMockDb(), fs, incidentService, machineLoadService, mockDb, monitoringService (+6 more)
 
-### Community 283 - "AdminDashboard.tsx"
-Cohesion: 0.04
-Nodes (53): FederatedNodesNetworkPanel(), NetworkCapacityTable(), Props, RegionalStats, NetworkHealthPanel(), Props, Warning, NetworkOverviewCards() (+45 more)
+### Community 283 - "NetworkOpsTab.tsx"
+Cohesion: 0.11
+Nodes (17): NetworkCapacityTable(), Props, RegionalStats, NetworkHealthPanel(), Props, Warning, NetworkOverviewCards(), OverviewStats (+9 more)
 
-### Community 284 - "adminProduction.js"
-Cohesion: 0.03
-Nodes (50): validate(), bundleService, dispatchService, eventService, express, machineRegistry, matchingService, nodeService (+42 more)
+### Community 284 - "pricingAdmin.js"
+Cohesion: 0.04
+Nodes (35): db, economicService, crypto, db, express, logger, mysql, quoteService (+27 more)
+
+### Community 286 - "PreflightContractGateway"
+Cohesion: 0.12
+Nodes (8): adminPreflightJobsRouter, assert(), db, humanReportService, runSmokeTests(), axios, FormData, PreflightContractGateway
 
 ### Community 287 - "PreProductionOperationalReadinessBoardService"
 Cohesion: 0.22
@@ -3851,11 +3820,11 @@ Nodes (12): cp, files, fs, helperPath, path, { redactDatabaseUrl, assertNoSecret
 
 ### Community 293 - "controlledBetaCohortActivationService.js"
 Cohesion: 0.11
-Nodes (11): ControlledBetaCohortActivationService, ControlledBetaCohortActivationService, Phase129ControlledBetaFixture, ControlledBetaCohortActivationService, crypto, FORBIDDEN_FEATURES, _hash(), _isDbFallbackAllowed() (+3 more)
+Nodes (10): ControlledBetaCohortActivationService, ControlledBetaCohortActivationService, Phase129ControlledBetaFixture, ControlledBetaCohortActivationService, Phase129ControlledBetaFixture, ControlledBetaCohortActivationService, crypto, FORBIDDEN_FEATURES (+2 more)
 
-### Community 294 - "smoke_phase192k_rc11_partial_141_recovery.js"
-Cohesion: 0.16
-Nodes (13): assert, baseline, baselinePath, fs, main(), MockDB, path, results (+5 more)
+### Community 294 - "rk"
+Cohesion: 0.18
+Nodes (19): bt(), ak(), ek(), lk(), ln, pg, Qp(), rk() (+11 more)
 
 ### Community 295 - "smoke_phase_38_8_production_completion.js"
 Cohesion: 0.09
@@ -3869,9 +3838,9 @@ Nodes (11): assert(), auditLogger, db, enableMockDb(), mockDb, results, run(), s
 Cohesion: 0.12
 Nodes (10): AutonomousGovernanceLoop, cascadingService, continuityService, db, governanceService, logger, resilienceService, db (+2 more)
 
-### Community 300 - "rk"
-Cohesion: 0.05
-Nodes (34): a6(), ab, Ac(), ak(), componentDidCatch(), dc(), Dt(), ek() (+26 more)
+### Community 300 - "l6"
+Cohesion: 0.18
+Nodes (4): Dt(), l6, _p(), Us
 
 ### Community 301 - "ProductionObservabilityIncidentReadinessService"
 Cohesion: 0.25
@@ -3901,9 +3870,9 @@ Nodes (14): assert, baseline, baselinePath, fs, getMigrationPath(), main(), Mock
 Cohesion: 0.23
 Nodes (14): adminHelpDocs, HelpDoc, HelpDocType, postHelpAnalytics(), fuse, getCategories(), getHelpDocById(), options (+6 more)
 
-### Community 308 - "IndustrialEventOrchestrationService"
-Cohesion: 0.09
-Nodes (8): eventOrchestrator, logger, runTests(), IndustrialEventOrchestrationService, logger, db, IndustrialTelemetryService, logger
+### Community 308 - "ManufacturingOrchestrationService.js"
+Cohesion: 0.11
+Nodes (9): CapacityConflictService, IndustrialEventOrchestrationService, logger, crypto, db, DISPATCH_LIFECYCLE, eventOrchestrator, logger (+1 more)
 
 ### Community 309 - "Phase 194C — Multi-Quantity Calibration Architecture & Design Specification"
 Cohesion: 0.09
@@ -3919,7 +3888,7 @@ Nodes (20): assert(), BetaFunnelAggregationService, BetaFunnelTrackingService, B
 
 ### Community 312 - "industrialDispatchScoringService.js"
 Cohesion: 0.09
-Nodes (13): scoringService, db, temporalService, db, eventOrchestrator, governanceService, IndustrialDispatchScoringService, logger (+5 more)
+Nodes (14): scoringService, capacitySync, db, scoringService, db, eventOrchestrator, governanceService, IndustrialDispatchScoringService (+6 more)
 
 ### Community 313 - "cohortInterventionExecutionPlanActivationTokenIssuanceGuardrailService.js"
 Cohesion: 0.15
@@ -3942,12 +3911,8 @@ Cohesion: 0.15
 Nodes (9): auditLogger, lifecycleAudit, mysqlClient, test(), { v4: uuidv4 }, auditLogger, logger, MarketplaceLifecycleAuditService (+1 more)
 
 ### Community 318 - "test-phase-1-industrial.js"
-Cohesion: 0.17
-Nodes (7): db, scoringService, telemetryService, topologyService, db, FederationTopologyService, logger
-
-### Community 319 - "slackNotificationService.js"
-Cohesion: 0.14
-Nodes (7): ManufacturingNotificationService, axios, db, logger, redactSlackUrl(), SlackNotificationService, { v4: uuidv4 }
+Cohesion: 0.10
+Nodes (10): eventOrchestrator, logger, runTests(), db, scoringService, telemetryService, topologyService, db (+2 more)
 
 ### Community 320 - "Audit: Preflight Operations Module (Control Plane)"
 Cohesion: 0.10
@@ -3957,9 +3922,9 @@ Nodes (19): 1. Architecture Map, 2. File Inventory, 3. Endpoint Inventory, 4. Ga
 Cohesion: 0.12
 Nodes (10): assert, createReviewDraft(), db, assert, createReviewDraft(), db, CohortInterventionSimulationEvidencePackService, crypto (+2 more)
 
-### Community 322 - "migration_remediation_suite_test.js"
-Cohesion: 0.11
-Nodes (19): acquiredLocks, dbMock, { MigrationService }, mockConnection, releasedLocks, MigrationService, assert, db (+11 more)
+### Community 322 - "ControlledBetaCohortInterventionApprovalClient"
+Cohesion: 0.16
+Nodes (5): cohortInterventionApprovalClient, ControlledBetaCohortInterventionApprovalClient, CohortInterventionApproval, CohortInterventionApprovalEvidence, CohortInterventionApprovalStep
 
 ### Community 323 - "smoke_phase86e_beta_launch_activation.js"
 Cohesion: 0.17
@@ -3985,10 +3950,6 @@ Nodes (19): 1.1 Origen Exacto del Flag `SECURITY_ROTATION_PENDING`, 1.2 Inventar
 Cohesion: 0.10
 Nodes (19): 1.1 Origen Exacto del Flag `SECURITY_ROTATION_PENDING`, 1.2 Inventario Completo de Credenciales y Secretos Involucrados (Sin Exponer Valores), 1.3 Evaluación de Impacto por Entorno (`Producción`, `Staging`, `GitHub Actions`), 1. Diagnóstico Exhaustivo de `SECURITY_ROTATION_PENDING`, 2.1 Topología Real de PRs y Cadena de Ancestría Git, 2.2 Estado de Checks de GitHub Actions en `PR #11` y `feat/paper-materials-recovery-11`, 2.3 Compatibilidad de los Cambios de `RECOVERY-12` (P1-A, Migración 175, `PaperEvidenceService` y Batches C1–C5), 2. Auditoría Técnica de `PR #11`, Cadena de Ramas y Compatibilidad con `RECOVERY-12` (+11 more)
 
-### Community 329 - "MaterialAvailabilityService"
-Cohesion: 0.07
-Nodes (22): bottleneckService, db, express, materialService, riskScoringService, router, canonicalJsonStringify(), crypto (+14 more)
-
 ### Community 330 - "2. Inventario de Entidades y Restricciones DDL"
 Cohesion: 0.14
 Nodes (13): 1. Alcance de la Migración, 2.1 `developer_organizations`, 2.2 `developer_accounts`, 2.3 `api_applications`, 2.4 `application_tenant_authorizations` (Puente Multi-Tenant N-a-N), 2.5 `api_credentials` (Almacén Criptográfico de Claves), 2.6 `developer_access_requests`, 2. Inventario de Entidades y Restricciones DDL (+5 more)
@@ -3998,7 +3959,7 @@ Cohesion: 0.24
 Nodes (5): canonicalId(), db, logger, UserSessionService, { v4: uuidv4 }
 
 ### Community 332 - "printhouseIntegrationCredentialService.js"
-Cohesion: 0.11
+Cohesion: 0.13
 Nodes (12): credentialService, express, integrationService, router, webhookService, crypto, db, SECRET_KEY_32 (+4 more)
 
 ### Community 336 - "ContinuityProtectionService.js"
@@ -4026,8 +3987,8 @@ Cohesion: 0.33
 Nodes (8): ActivationTokenRedemptionEnvelopeRecord, ActivationTokenRedemptionEnvelopeRule, RedemptionEnvelopeSignatures, evaluateTokenRedemptionEnvelope(), finalizeTokenRedemptionEnvelope(), getTokenRedemptionEnvelopeDetails(), recordDecision(), ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenRedemptionEnvelope()
 
 ### Community 342 - "pricingReadinessService.js"
-Cohesion: 0.13
-Nodes (6): mysqlClient, pricingReadinessService, GovernedInvoiceBuilderService, mysqlClient, pricingGovernance, PricingReadinessService
+Cohesion: 0.21
+Nodes (5): mysqlClient, pricingReadinessService, mysqlClient, pricingGovernance, PricingReadinessService
 
 ### Community 343 - "smoke_phase102d_provider_contract_sla_review_workflow.js"
 Cohesion: 0.17
@@ -4098,8 +4059,8 @@ Cohesion: 0.17
 Nodes (5): CohortInterventionSimulationReviewDecisionService, crypto, db, serviceInstance, VALID_DECISIONS
 
 ### Community 366 - "routingAdmin.js"
-Cohesion: 0.09
-Nodes (16): auth, db, express, qualityService, recommendationService, requireAdmin, router, routingEngine (+8 more)
+Cohesion: 0.07
+Nodes (19): db, express, { resolveActorContext }, router, topologyService, db, express, qualityService (+11 more)
 
 ### Community 367 - "Operate mode depth (and Read notes)"
 Cohesion: 0.10
@@ -4137,9 +4098,9 @@ Nodes (5): AuditLog, RuleResult, TokenRedemptionUnlockRiskOfficerCountersign, Co
 Cohesion: 0.27
 Nodes (10): ActivationTokenStagingRecord, ActivationTokenStagingResult, ActivationTokenStagingRule, ActivationTokenStagingStatus, StagingSignatures, evaluateTokenStaging(), finalizeTokenStaging(), getTokenStagingDetails() (+2 more)
 
-### Community 377 - "ControlledBetaCohortInterventionSimulationApproval.tsx"
-Cohesion: 0.32
-Nodes (8): ApprovalAuditLog, ApprovalEvidence, ApprovalFinding, ApprovalRecord, ApprovalSummary, controlledBetaCohortInterventionSimulationApprovalClient, ControlledBetaCohortInterventionSimulationApproval(), STATUS_COLORS
+### Community 377 - "tenantPilotClient.ts"
+Cohesion: 0.23
+Nodes (15): blockLiveProductionEnablement(), disablePartnerAccess(), disablePilotAccess(), enablePartnerAccess(), enablePilotAccess(), getTenantPilotReadiness(), listTenantPilots(), requestLiveProductionEnablement() (+7 more)
 
 ### Community 378 - "Phase 82 — Customer Live Order Portal Acceptance Pack"
 Cohesion: 0.10
@@ -4153,9 +4114,9 @@ Nodes (18): 10. Rollback Procedure, 11. Customer-Safe Communication, 12. Operato
 Cohesion: 0.15
 Nodes (7): assert, db, ELIGIBLE_TYPES, CohortInterventionExecutionEvidencePackService, crypto, db, serviceInstance
 
-### Community 381 - "dev04b3a_prerequisites_remediation.test.js"
-Cohesion: 0.17
-Nodes (11): dispatchEligibilityService, fs, governedDispatchService, industrialSecurity, marketplaceDispatchGating, marketplaceOrderService, mysqlClient, os (+3 more)
+### Community 381 - "smoke_phase192l_rc12_tenant_identity_normalization.js"
+Cohesion: 0.16
+Nodes (13): assert, baseline, baselinePath, fs, main(), MockDB, path, results (+5 more)
 
 ### Community 382 - "Authentication & Session Footguns"
 Cohesion: 0.10
@@ -4206,8 +4167,8 @@ Cohesion: 0.15
 Nodes (20): buildSvelteExpressionTextMap(), buildSveltePropValuesFromLiveElement(), buildSveltePropValuesV2(), cloneWithoutElements(), collectTextNodes(), collectVisibleTexts(), cssEscapeIdent(), elementMatchesOriginalMarkup() (+12 more)
 
 ### Community 399 - "smoke_phase79b_sla_evaluation_risk_engine.js"
-Cohesion: 0.15
-Nodes (14): assert(), db, enableMockDb(), evaluationService, fs, mockDb, mockGateway, mockPlanService (+6 more)
+Cohesion: 0.09
+Nodes (21): assert(), db, enableMockDb(), evaluationService, fs, mockDb, mockGateway, mockPlanService (+13 more)
 
 ### Community 400 - "docs/runbooks/PHASE_192G_CONTROLLED_BETA_RUNBOOK.md"
 Cohesion: 0.11
@@ -4249,9 +4210,9 @@ Nodes (4): TokenRedemptionUnlockPreExecutionFreeze, UnlockPreExecutionFreezeRule
 Cohesion: 0.42
 Nodes (4): TokenRedemptionUnlockSeal, UnlockSealRule, ControlledBetaCohortInterventionExecutionPlanActivationTokenRedemptionUnlockSealClient, ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenRedemptionUnlockSeal()
 
-### Community 410 - "smoke_phase78b_usage_metering_monthly_counters.js"
-Cohesion: 0.32
-Nodes (7): assert(), db, enableMockDb(), mockDb, results, runTests(), service
+### Community 410 - "usageMeteringService.js"
+Cohesion: 0.22
+Nodes (9): assert(), db, enableMockDb(), mockDb, results, runTests(), service, db (+1 more)
 
 ### Community 411 - "PartnerJobDetail.tsx"
 Cohesion: 0.19
@@ -4305,9 +4266,9 @@ Nodes (12): CATEGORY_IDS, compile(), fs, MUTATIONS, parallel(), path, RECON_OK, 
 Cohesion: 0.11
 Nodes (18): Algorithm Selection Anti-Patterns, Boolean Confusion, Cipher Mode Parameters, Comparison Footguns, Cryptographic API Footguns, Error Message Differentiation, Hash Algorithm Downgrade, Indistinguishable Byte Arrays (+10 more)
 
-### Community 424 - "CongestionForecastService.js"
-Cohesion: 0.20
-Nodes (5): congestionService, db, CongestionForecastService, db, logger
+### Community 424 - "predictiveAdmin.js"
+Cohesion: 0.12
+Nodes (12): bottleneckService, db, express, materialService, riskScoringService, router, db, logger (+4 more)
 
 ### Community 425 - "sharp-edges/SKILL.md"
 Cohesion: 0.11
@@ -4337,9 +4298,9 @@ Nodes (11): cb, engine, fs, mockActions, mockAudit, mockDb, path, runAll() (+3 m
 Cohesion: 0.10
 Nodes (19): 1. Executive Summary & Production Database Integrity, 2.1 Global Catalog Classification Distribution (`1,524` Total Variants), 2.2 State of Complementary Attributes Across the `337` Pending Variants, 2.3 Breakdown by Functional Group (`G1`–`G6`) and Proposed Target Category, 2.4 Top 30 Commercial Families / Brands Affected (`65` Total Families Across `337` Variants), 2. Distribution Matrix & Breakdown of the `337` Pending Variants, 3.1 Verification of `Control.paper_variant_classification_evidence` (Live MySQL 8 DDL), 3.2 Audit of Current Services & Controllers (`src/api/services/` & `src/api/routes/`) (+11 more)
 
-### Community 432 - "limitedBetaRuntimeAdmin.js"
-Cohesion: 0.12
-Nodes (9): limitedBetaRuntimeAdminRouter, limitedBetaRuntimeAdminRouter, express, LimitedBetaRuntimeService, observabilityService, { requireAdmin }, router, SAFETY_MARKERS (+1 more)
+### Community 432 - "controlledBetaRuntimeActivityReviewClient.ts"
+Cohesion: 0.24
+Nodes (6): ControlledBetaRuntimeActivityReviewClient, RuntimeActivityReview, RuntimeActivityReviewAudit, RuntimeActivityReviewDecision, RuntimeActivityReviewEvidence, RuntimeActivityReviewFinding
 
 ### Community 433 - "LimitedBetaRuntime.tsx"
 Cohesion: 0.19
@@ -4355,11 +4316,7 @@ Nodes (3): CohortInterventionApprovalWorkflowService, db, serviceInstance
 
 ### Community 436 - "authRoutes.js"
 Cohesion: 0.03
-Nodes (63): userService, db, printhouseService, userService, authRateLimiter, bcrypt, crypto, db (+55 more)
-
-### Community 440 - "slaEvaluationService.js"
-Cohesion: 0.22
-Nodes (7): db, logger, productionMonitoringService, queueService, slaRiskService, db, logger
+Nodes (57): userService, db, printhouseService, userService, authRateLimiter, bcrypt, crypto, db (+49 more)
 
 ### Community 441 - "marketplaceProductionProgressService.js"
 Cohesion: 0.16
@@ -4377,9 +4334,9 @@ Nodes (3): GlobalPolicyAuthority, registry, GlobalPolicyRegistry
 Cohesion: 0.19
 Nodes (7): adjuster, memory, ranker, memoryStore, queryOutcomes(), { queryOutcomes }, rankStrategies()
 
-### Community 446 - "SessionManager"
-Cohesion: 0.25
-Nodes (3): AuthGuard(), isAuthenticated(), SessionManager
+### Community 446 - "controlledBetaCohortInterventionPreparationClient.ts"
+Cohesion: 0.24
+Nodes (4): ControlledBetaCohortInterventionPreparationClient, CohortInterventionPreparation, CohortInterventionPreparationEvidence, CohortInterventionPreparationItem
 
 ### Community 447 - "Scenarios"
 Cohesion: 0.11
@@ -4397,9 +4354,9 @@ Nodes (8): ActivationTokenPreflightRecord, ActivationTokenPreflightRule, Preflig
 Cohesion: 0.17
 Nodes (11): 1.1 Estructura del Token, 1. Formato y Entropía de las Credenciales, 2.1 Algoritmo de Creación de Credencial, 2.2 Algoritmo de Verificación en Runtime (Tiempo Constante), 2. Almacenamiento Criptográfico y Algoritmo de Verificación, 3.1 Cabeceras Soportadas, 3.2 Prohibición Estricta de Parámetros Query, 3. Contrato de Transporte HTTP (+3 more)
 
-### Community 451 - "paperCostIntegrationService.js"
-Cohesion: 0.24
-Nodes (5): crypto, db, logger, PaperCostIntegrationService, unwrapRows()
+### Community 451 - "controlledProductionPilotActivationClient.ts"
+Cohesion: 0.38
+Nodes (12): activatePilotTenant(), createPilotRollbackPoint(), createPilotRun(), getPilotAuditTimeline(), getPilotEvidencePack(), getPilotReadiness(), recordPilotFinding(), registerPilotTenant() (+4 more)
 
 ### Community 452 - "auth_middleware.js"
 Cohesion: 0.27
@@ -4429,9 +4386,9 @@ Nodes (11): assert, crypto, fs, migrationPath, path, routesPath, routesSource, s
 Cohesion: 0.22
 Nodes (15): createLiveBrowserSessionState(), clearHandled(), clearScrollY(), clearSession(), isHandled(), loadSession(), markHandled(), nextCheckpointRevision() (+7 more)
 
-### Community 460 - "getHumanReport"
-Cohesion: 0.04
-Nodes (50): db, fs, { getHumanReport }, path, runSmokeTest(), uuid, fs, { getHumanReport } (+42 more)
+### Community 460 - "smoke_phase59_control_plane_customer_remediation_ux.js"
+Cohesion: 0.17
+Nodes (11): fs, { getHumanReport }, marketplaceCustomerActionService, marketplaceOrderService, MOCK_JOB, MOCKED_CUSTOMER_ACTIONS, MOCKED_ORDERS, MOCKED_READINESS (+3 more)
 
 ### Community 461 - "Changes"
 Cohesion: 0.12
@@ -4586,8 +4543,8 @@ Cohesion: 0.17
 Nodes (9): auditService, crypto, db, evidencePackServicePhase137, plannerService, reviewDecisionService, serviceInstance, CohortInterventionPreparationPlannerService (+1 more)
 
 ### Community 504 - "teardown"
-Cohesion: 0.18
-Nodes (14): assert, { FIXTURES, createMockReq, dispatchRequest, setQueryStub, teardown }, router, runTests(), assert, { FIXTURES, generateMockToken, createMockReq, dispatchRequest, setQueryStub, teardown }, jobsRouter, runTests() (+6 more)
+Cohesion: 0.13
+Nodes (23): assert, { FIXTURES, createMockReq, dispatchRequest, setQueryStub, teardown }, router, runTests(), assert, { FIXTURES, generateMockToken, createMockReq, dispatchRequest, setQueryStub, teardown }, preflightRouter, runTests() (+15 more)
 
 ### Community 507 - "MarketplaceDispatchGatingService.js"
 Cohesion: 0.19
@@ -4685,13 +4642,13 @@ Nodes (16): 1. Cronología de Bloqueos y Resoluciones (Hitos CI-02A a CI-02M.6),
 Cohesion: 0.18
 Nodes (10): CONTROL_PLANE_REPORT_PATH, ENGINE_REPORT_PATH, FORBIDDEN_CUSTOMER_PHRASES, FORBIDDEN_SANITATION_TERMS, fs, path, preflightHumanReportService, runSmokeTests() (+2 more)
 
-### Community 536 - "countryCatalog.ts"
-Cohesion: 0.06
-Nodes (48): CountrySelect(), CountrySelectProps, TimezoneSelect(), TimezoneSelectProps, CalibrationClarificationPanel(), CalibrationClarificationPanelProps, Question, CompanyData (+40 more)
+### Community 536 - "smoke_phase164g_guardrail_redemption_final_approval_passed_not_redeemed_write_scope.js"
+Cohesion: 0.15
+Nodes (8): assert, db, ALLOWED_EXCLUSIONS, CohortInterventionExecutionPlanActivationTokenRedemptionFinalApprovalGuardrailService, db, FORBIDDEN_PATTERNS, fs, path
 
-### Community 537 - "dispatchRequest"
-Cohesion: 0.14
-Nodes (18): assert, { FIXTURES, generateMockToken, createMockReq, dispatchRequest, teardown }, pricingRouter, runTests(), assert, dashboardRouter, { FIXTURES, generateMockToken, createMockReq, dispatchRequest, setQueryStub, teardown }, runTests() (+10 more)
+### Community 537 - "generateMockToken"
+Cohesion: 0.16
+Nodes (13): assert, { FIXTURES, generateMockToken, createMockReq, dispatchRequest, teardown }, pricingRouter, runTests(), adminRouter, assert, { FIXTURES, generateMockToken, createMockReq, dispatchRequest, teardown }, adminRouter (+5 more)
 
 ### Community 538 - "smoke_phase71d_control_plane_printhouse_handoff_package.js"
 Cohesion: 0.22
@@ -4798,8 +4755,8 @@ Cohesion: 0.18
 Nodes (8): CohortInterventionPreparationGuardrailService, serviceInstance, auditService, builderService, db, evidencePackService, guardrailService, serviceInstance
 
 ### Community 567 - "cohortInterventionExecutionPlanActivationHandoffBuilderService.js"
-Cohesion: 0.02
-Nodes (88): assert, db, assert, db, assert, db, assert, db (+80 more)
+Cohesion: 0.03
+Nodes (78): assert, db, assert, db, assert, db, assert, db (+70 more)
 
 ### Community 568 - "cohortInterventionExecutionPlanActivationTokenRedemptionReadinessGuardrailService.js"
 Cohesion: 0.15
@@ -4809,9 +4766,9 @@ Nodes (8): assert, db, ALLOWED_EXCLUSIONS, CohortInterventionExecutionPlanActiva
 Cohesion: 0.13
 Nodes (15): Agents, Codebase Size Strategy, Core Principles, Decision Tree, Differential Security Review, Integration, Quality Checklist, Quick Reference (+7 more)
 
-### Community 576 - "connectAdmin.js"
-Cohesion: 0.08
-Nodes (17): express, networkOpsService, { requireAdmin, resolveActorContext }, router, express, networkOpsService, { requireAdmin, resolveActorContext }, router (+9 more)
+### Community 576 - "runHttpConnectedHarness"
+Cohesion: 0.15
+Nodes (9): crypto, fs, http, jwt, mysql, path, port, runHttpConnectedHarness() (+1 more)
 
 ### Community 577 - "PrintPrice OS — Especificación del Flujo de Acceso para Desarrolladores (DEV-03A)"
 Cohesion: 0.14
@@ -4853,11 +4810,11 @@ Nodes (14): Architecture Audit Findings, Build Optimization (`vite.config.ts`), 
 Cohesion: 0.10
 Nodes (19): 1. Resumen Ejecutivo del Cierre R2, 2.1 Planteamiento y Hallazgo Matemático, 2.2 Desglose Aritmético Forense, 2.3 Regla de Precisión Inviolable Certificada, 2. Conciliación Numérica: Resolución de la Discrepancia del Céntimo, 3.1 Especificaciones de Entrada del Experimento, 3.2 Resultados Empíricos Obtenidos en Motor BPE Real, 3.3 Verificación Matemática del Delta (+11 more)
 
-### Community 588 - "spine02_03_engine_and_api.test.js"
-Cohesion: 0.05
-Nodes (56): assert, fs, mysql, MYSQL_PORT, os, {
+### Community 588 - "spineCalculationService.js"
+Cohesion: 0.06
+Nodes (35): assert, fs, mysql, MYSQL_PORT, os, {
     PaperEvidenceService
-}, path, runRealMysqlRecovery11Validation() (+48 more)
+}, path, runRealMysqlRecovery11Validation() (+27 more)
 
 ### Community 589 - "PHASE 193F.1 — FRONTEND QUICK CALIBRATION UX & INTEGRATION ARCHITECTURE"
 Cohesion: 0.13
@@ -4868,8 +4825,8 @@ Cohesion: 0.18
 Nodes (11): axios, BpePublicationService, canonicalStringify(), computeRatesChecksum(), crypto, db, instance, logger (+3 more)
 
 ### Community 591 - "smoke_phase192c_marketplace_matching.js"
-Cohesion: 0.05
-Nodes (30): assert, db, discoveryService, liveQuoteService, matchingService, mockGrants, mockNodes, discoveryService (+22 more)
+Cohesion: 0.07
+Nodes (23): assert, db, discoveryService, liveQuoteService, matchingService, mockGrants, mockNodes, discoveryService (+15 more)
 
 ### Community 592 - "Python Sharp Edges"
 Cohesion: 0.13
@@ -5092,8 +5049,8 @@ Cohesion: 0.06
 Nodes (23): crypto, db, printhouseActivationService, printhouseSignupService, crypto, { renderActivationEmail }, runUnitTests(), EmailDeliveryService (+15 more)
 
 ### Community 650 - "smoke_phase_39_2_tenant_management_console.js"
-Cohesion: 0.07
-Nodes (25): apiCode, appCode, appPath, assert, clientApiPath, drawerCode, drawerPath, fs (+17 more)
+Cohesion: 0.11
+Nodes (16): apiCode, appCode, appPath, assert, clientApiPath, drawerCode, drawerPath, fs (+8 more)
 
 ### Community 651 - "Phase 195B — Machine-Specific Costing & Setup Data Model Report"
 Cohesion: 0.13
@@ -5159,9 +5116,9 @@ Nodes (13): 1. Authorized Release Checkout & Environment Configuration, 2.1 Phas
 Cohesion: 0.14
 Nodes (13): Admin API, Dependencies, File Access Rules, Methods, Migration, Overview, Package Statuses, Phase 124 — Controlled Printhouse Handoff / File Package Pilot (+5 more)
 
-### Community 669 - "smoke_phase93d_tax_vat_review_workflow.js"
-Cohesion: 0.17
-Nodes (10): assert(), fs, path, ROOT, runSmoke(), TaxVatReadinessClassifierService, TaxVatReadinessReviewService, TaxVatReadinessSnapshotService (+2 more)
+### Community 669 - "smoke_phase192e_dispatch_telemetry.js"
+Cohesion: 0.18
+Nodes (9): activationAdapter, assert, db, dispatchEligibilityService, dispatchService, governedRoutingService, mockGrants, mockNodes (+1 more)
 
 ### Community 671 - "printhouseIntegrationService.js"
 Cohesion: 0.20
@@ -5171,12 +5128,9 @@ Nodes (8): ALLOWED_INTEGRATION_TYPES, crypto, db, PROTECTED_FIELDS, assert, db, 
 Cohesion: 0.13
 Nodes (14): checkProtectedFields(), db, getTzOffsetMs(), PrinthouseLeadTimeService, PROTECTED_FIELDS, { v4: uuidv4 }, assert, capacityService (+6 more)
 
-### Community 674 - "execute_recovery12_batch_c1_accreditation.cjs"
-Cohesion: 0.21
-Nodes (11): ACTORS, assert, buildBatchC1Targets(), crypto, db, ensurePhase1SchemaUpgrade(), main(), {
-    PaperEvidenceService,
-    loadStaticPendingClassifications337
-} (+3 more)
+### Community 674 - "MultiTimelineSimulationService.js"
+Cohesion: 0.20
+Nodes (5): db, simulationService, db, logger, MultiTimelineSimulationService
 
 ### Community 675 - "2. Production Audit & Root Cause Analysis"
 Cohesion: 0.12
@@ -5310,12 +5264,9 @@ Nodes (7): adminJs, appTsx, clientPath, fs, pagePath, path, routePath
 Cohesion: 0.22
 Nodes (7): fs, InternalOrderLifecyclePilotService, path, redactedFields, src, svc, svcPath
 
-### Community 713 - "execute_recovery12_batch_c4_accreditation.cjs"
-Cohesion: 0.21
-Nodes (11): ACTORS, assert, buildBatchC4Targets(), classifyFineDesignVariant(), crypto, db, main(), {
-    PaperEvidenceService,
-    loadStaticPendingClassifications337
-} (+3 more)
+### Community 713 - "TemporalIntelligenceService.js"
+Cohesion: 0.20
+Nodes (5): db, temporalService, db, logger, TemporalIntelligenceService
 
 ### Community 714 - "smoke_phase81a_live_order_schema_lifecycle_status_model.js"
 Cohesion: 0.28
@@ -5465,12 +5416,9 @@ Nodes (18): 10. Dictamen Final, 1. Resumen Ejecutivo y Resultados de Certificaci
 Cohesion: 0.22
 Nodes (8): BetaPaymentModeService, BetaPaymentReversalService, BetaPaymentVerificationService, express, paymentModeService, reversalService, router, verificationService
 
-### Community 751 - "execute_recovery12_batch_c5_accreditation.cjs"
-Cohesion: 0.21
-Nodes (11): ACTORS, assert, buildBatchC5Targets(), classifySpecialtyC5B(), crypto, db, main(), {
-    PaperEvidenceService,
-    loadStaticPendingClassifications337
-} (+3 more)
+### Community 751 - "quotaEnforcementService.js"
+Cohesion: 0.25
+Nodes (5): commercialPlanService, db, logger, QuotaEnforcementService, usageMeteringService
 
 ### Community 752 - "smoke_phase88c_beta_hardening_action_tracker.js"
 Cohesion: 0.17
@@ -5489,8 +5437,8 @@ Cohesion: 0.14
 Nodes (13): 1.1 Script Lua Atómico de Ventana Temporal, 1.2 Estructura de Cuotas y Cabeceras RFC, 1. Arquitectura del Limitador Distribuido, 2.1 Mecanismo de Deduplicación, 2.2 Evidencia de la Prueba Unitaria y Multi-Proceso, 2. Guarda de Consumo Único por Solicitud (Anti-Double-Spend), 3.1 Comportamiento por Entorno, 3. Política Fail-Closed en Producción (+5 more)
 
 ### Community 757 - "autonomyAdmin.js"
-Cohesion: 0.03
-Nodes (57): autoReroute, conflictService, db, learningLoop, path, productionOrchestration, slaMonitor, telemetryService (+49 more)
+Cohesion: 0.05
+Nodes (35): autoReroute, conflictService, db, learningLoop, path, productionOrchestration, slaMonitor, telemetryService (+27 more)
 
 ### Community 758 - "Go Sharp Edges"
 Cohesion: 0.15
@@ -5508,10 +5456,6 @@ Nodes (5): db, governanceService, db, IndustrialGovernanceService, logger
 Cohesion: 0.28
 Nodes (4): CohortInterventionSimulationApprovalPreparationEvidencePackService, crypto, db, serviceInstance
 
-### Community 762 - "PreflightArtifactService"
-Cohesion: 0.21
-Nodes (5): fs, path, persistence, PreflightArtifactService, storage
-
 ### Community 763 - "Phase 194E / 194E-R — Multilingual PDF Quote Ingestion & Pricing Assistant Intake"
 Cohesion: 0.14
 Nodes (13): 1. Security Controls & Untrusted Input Boundary, 2.1 Production Extraction Engine (`pdfQuoteExtractionService.js`), 2.2 Language Detection (`quoteLanguageService.js`), 2.3 Terminology Glossary Normalization (`printingTranslationService.js`), 2.4 Generic Contextual Commercial Interpreter (`quoteDocumentInterpretationService.js`), 2. Text Extraction & Multilingual Translation Architecture, 3. Real Document Binary Extraction Results, 4. Operator Corrections & Immutability (+5 more)
@@ -5525,12 +5469,12 @@ Cohesion: 0.09
 Nodes (18): MarketplaceService, crypto, decryptSecretFromRest(), encryptSecretAtRest(), formatIbanGroups(), getMasterEncryptionKey(), logger, maskIban() (+10 more)
 
 ### Community 772 - "paper_supplier_cost_and_documents.test.js"
-Cohesion: 0.12
-Nodes (13): crypto, fs, isDbConfigured, jwt, materialsAdminRouter, mysql, mysqlClient, paperCostIntegrationService (+5 more)
+Cohesion: 0.08
+Nodes (18): crypto, db, logger, PaperCostIntegrationService, unwrapRows(), crypto, fs, isDbConfigured (+10 more)
 
 ### Community 773 - "PrinthousesPage.tsx"
 Cohesion: 0.05
-Nodes (50): CanonicalIndustrialPricingEditorProps, FORM_TABS, FormTab, HISTORICAL_TRANSPORT_SUGGESTIONS, PricingHawkEyePanelProps, BINDING_TS_STEP_MEANS, COMMON_OPERATIONAL_CONFIG, IMPORTANT: These values are UI onboarding guidance only and are never silently… (+42 more)
+Nodes (50): CanonicalIndustrialPricingEditor(), CanonicalIndustrialPricingEditorProps, FORM_TABS, FormTab, getInitialHydratedRates(), HISTORICAL_TRANSPORT_SUGGESTIONS, PricingHawkEyePanelProps, BINDING_TS_STEP_MEANS (+42 more)
 
 ### Community 774 - "machinesAdmin.js"
 Cohesion: 0.27
@@ -5544,9 +5488,9 @@ Nodes (24): assert(), clearMemoryDb(), crypto, customerActionService, db, instal
 Cohesion: 0.03
 Nodes (49): ALL_CANONICAL_PERSISTED_RUN_STATUSES, CANONICAL_ACCEPTABLE_RUN_STATUSES, calibrationEstablishedPathsService, CalibrationRunService, calibrationSessionService, { CANONICAL_ACCEPTABLE_RUN_STATUSES, ALL_CANONICAL_PERSISTED_RUN_STATUSES }, db, logger (+41 more)
 
-### Community 779 - "productionFileIngestionService.js"
-Cohesion: 0.07
-Nodes (19): db, express, ingestionService, router, validationService, axios, crypto, db (+11 more)
+### Community 779 - "productionFileValidationService.js"
+Cohesion: 0.12
+Nodes (12): db, express, ingestionService, router, validationService, crypto, db, fs (+4 more)
 
 ### Community 783 - "sandboxCommercialPilot.ts"
 Cohesion: 0.22
@@ -5708,9 +5652,9 @@ Nodes (6): adminRouter, fs, path, db, express, router
 Cohesion: 0.25
 Nodes (6): adminRouter, assert, fs, path, express, router
 
-### Community 823 - "buildPriceCalibrationAdapter.js"
-Cohesion: 0.02
-Nodes (89): adapter, liveRates, results, testCases, assert, fs, path, applyPatchInMemory() (+81 more)
+### Community 823 - "deterministicInversePricingSolver.js"
+Cohesion: 0.03
+Nodes (57): adapter, calibrationSessionService, { computeGovernanceTolerance }, SOLVER_CONFIG, assert, nonPbFamilies, solver, adapter (+49 more)
 
 ### Community 824 - "smoke_phase185g_ledger_legacy_classification.js"
 Cohesion: 0.25
@@ -5830,12 +5774,12 @@ Nodes (4): CohortInterventionApprovalBuilderService, crypto, db, serviceInstance
 
 ### Community 854 - "preflightOperationsService.js"
 Cohesion: 0.10
-Nodes (23): hydratePreflightArtifacts(), fs, {
+Nodes (18): start(), SchemaNotReadyError, fs, {
   isTerminalDiagnosticStatus,
   mapPhase10Status,
   collectFindings,
   normalizeArtifacts
-}, orchestration, path, persistence, storage, upstream (+15 more)
+}, orchestration, path, persistence, storage (+10 more)
 
 ### Community 855 - "PrintPrice OS — Evaluación de Compatibilidad de la Remediación (DEV-03R)"
 Cohesion: 0.15
@@ -5873,9 +5817,9 @@ Nodes (11): Accessibility Resilience, Assess Hardening Needs, Edge Cases & Bound
 Cohesion: 0.20
 Nodes (5): cascadingService, db, CascadingFailureService, db, logger
 
-### Community 865 - "ActivationHub.tsx"
+### Community 865 - "slackNotificationService.js"
 Cohesion: 0.24
-Nodes (8): OnboardingChecklist(), OnboardingChecklistProps, OnboardingTask, generateMockOrder(), OrdersRadar(), VerifiedBadgeModal(), VerifiedBadgeModalProps, ActivationHub()
+Nodes (6): axios, db, logger, redactSlackUrl(), SlackNotificationService, { v4: uuidv4 }
 
 ### Community 866 - "cohortInterventionExecutionRollbackService.js"
 Cohesion: 0.25
@@ -5905,9 +5849,9 @@ Nodes (4): CohortInterventionSimulationApprovalPreparationEvaluatorService, cryp
 Cohesion: 0.29
 Nodes (4): CohortInterventionSimulationImpactAnalysisService, crypto, db, serviceInstance
 
-### Community 874 - "smoke_phase193h8b_frontend_country_unification.js"
-Cohesion: 0.17
-Nodes (10): assert, companyProfileSrc, countriesData, countrySelectSrc, detailDrawerSrc, { filterCountries }, fs, path (+2 more)
+### Community 874 - "ControlledBetaCohortInterventionSimulationExecutionAuthorization.tsx"
+Cohesion: 0.36
+Nodes (7): AuthAuditLog, AuthEvidence, AuthRecord, AuthRuleCheck, controlledBetaCohortInterventionExecutionAuthorizationClient, ControlledBetaCohortInterventionSimulationExecutionAuthorization(), STATUS_COLORS
 
 ### Community 875 - "cohortInterventionSimulationReviewEvaluatorService.js"
 Cohesion: 0.25
@@ -5929,9 +5873,9 @@ Nodes (11): 0. Governed Invariants & Safety Gates, 1.1 Exact SQL Verification Qu
 Cohesion: 0.11
 Nodes (17): 1. Arquitectura de Seguridad de Tokens y Segundo Factor, 2.1. SEC-C01 — Eliminación del Mock OTP y Factor de Entrega Verificado, 2.2. SEC-C04 — GET de Revisión Estrictamente Seguro e Idempotente, 2.3. SEC-C06 — Seguridad de Tokens Monouso, Prevención de Replay y Compuertas Desacopladas, 2. Validación de Controles Específicos, 3. Matriz de Resultados de Pruebas de Tokens y OTP, 4. Conclusión de Certificación, BUDGET-02C-01R — Validación de Seguridad de Tokens Monouso y Factor OTP (+9 more)
 
-### Community 892 - "distributedOrchestrationService.js"
-Cohesion: 0.14
-Nodes (10): consensus, db, DistributedOrchestrationService, logger, registry, { v4: uuidv4 }, db, logger (+2 more)
+### Community 892 - "ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenEnv.tsx"
+Cohesion: 0.36
+Nodes (7): TokenEnvAuditLog, TokenEnvEvidence, TokenEnvRecord, TokenEnvRuleCheck, controlledBetaCohortInterventionExecutionPlanActivationTokenEnvClient, ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenEnv(), STATUS_COLORS
 
 ### Community 893 - "smoke_phase64e_control_plane_ink_regression.js"
 Cohesion: 0.18
@@ -6002,8 +5946,8 @@ Cohesion: 0.25
 Nodes (5): acceptanceContent, acceptanceServicePath, assert, fs, path
 
 ### Community 914 - "outgoingWebhookService.js"
-Cohesion: 0.08
-Nodes (23): RFC-1112, RFC-1122, RFC-3927, RFC-5771, RFC-6598, axios, BACKOFF_DELAYS_MS, createSsrfSafeLookup() (+15 more)
+Cohesion: 0.11
+Nodes (22): RFC-1112, RFC-1122, RFC-3927, RFC-5771, RFC-6598, axios, BACKOFF_DELAYS_MS, createSsrfSafeLookup() (+14 more)
 
 ### Community 915 - "tmp_debug.js"
 Cohesion: 0.32
@@ -6230,8 +6174,8 @@ Cohesion: 0.15
 Nodes (12): 📖 1. Repository Role, ⚙️ 2. Network Topology and Physical Architecture, 🧬 3. Capacity and Intelligence Auditing (Phases 12–193H), 🔒 4. Security Standards and Multi-Tenant Isolation, 📁 5. Database, Shipping & Quoting Architecture (Phases 191-193H), 🛠️ 6. Initialization and Local Development, 📦 7. Production Deployment (PM2), Critical Deployment Directives (+4 more)
 
 ### Community 972 - "anomalyDetectionService.js"
-Cohesion: 0.08
-Nodes (15): AnomalyDetectionService, db, drift, telemetry, throughput, AnomalyTelemetryService, logger, anomaly (+7 more)
+Cohesion: 0.06
+Nodes (20): AnomalyDetectionService, db, drift, telemetry, throughput, AnomalyTelemetryService, logger, anomaly (+12 more)
 
 ### Community 973 - "Phase 51A: Font Governance Truth & Policy Matrix"
 Cohesion: 0.15
@@ -6257,13 +6201,17 @@ Nodes (4): CohortInterventionExecutionAuditService, crypto, db, serviceInstance
 Cohesion: 0.29
 Nodes (4): CohortInterventionExecutionDryRunService, crypto, db, serviceInstance
 
+### Community 979 - "commercialPlanService.js"
+Cohesion: 0.23
+Nodes (3): db, logger, ProductionMonitoringService
+
 ### Community 980 - "DEV-04B.3 — Auditoría de Aislamiento Industrial y Barrera de Despacho (GATE 1)"
 Cohesion: 0.17
 Nodes (11): 1. Contexto y Riesgo Crítico, 2. Auditoría por Capas de Aislamiento, 3.1 Inspección del Código en `marketplaceOrders.js`, 3.2 Trazabilidad de Llamadas en Rutas Efectivas, 3. Auditoría de Rutas en Código y Análisis de `assertNotSandboxForDispatch()`, 4. Plan de Refuerzo de Código para GATE 2, 5. Conclusión de Aislamiento Industrial, Capa 1: Variables de Entorno del Contenedor Staging (Verificado en Vivo) (+3 more)
 
-### Community 981 - "smoke_heavy_pdf_autofix_governance.js"
-Cohesion: 0.22
-Nodes (9): axios, db, ensureBigFile(), FormData, fs, { getTenantState }, jwt, preflightStatusHelpers (+1 more)
+### Community 981 - "smoke_phase193h8c611352_dynamic_signature_parity.js"
+Cohesion: 0.18
+Nodes (9): adapter, assert, baseSnapshot, bookSpec2000, bpe, fs, path, session (+1 more)
 
 ### Community 982 - "commercialCommitmentAdmin.js"
 Cohesion: 0.05
@@ -6298,8 +6246,8 @@ Cohesion: 0.29
 Nodes (5): ALLOWED_SIMULATION_TYPES, CohortInterventionSimulationGuardrailService, FORBIDDEN_CAPABILITY_KEYWORDS, FORBIDDEN_MUTATION_TABLE_PATTERNS, serviceInstance
 
 ### Community 990 - "smoke_phase79c_production_queue_machine_load_monitor.js"
-Cohesion: 0.18
-Nodes (11): assert(), db, enableMockDb(), machineLoadMonitoringService, mockDb, monitoringService, queueMonitoringService, results (+3 more)
+Cohesion: 0.10
+Nodes (14): assert(), db, enableMockDb(), machineLoadMonitoringService, mockDb, monitoringService, queueMonitoringService, results (+6 more)
 
 ### Community 995 - "3. Fixtures Adversariales y Comportamiento Verificado"
 Cohesion: 0.12
@@ -6321,9 +6269,9 @@ Nodes (10): Actions and navigation, Audit the language, Errors and permissions, 
 Cohesion: 0.15
 Nodes (12): 10. customer public sanitation, 11. readiness / gates, 1. NORMALIZE_OBJECT_STREAMS applied cleanly, 2. NORMALIZE_OBJECT_STREAMS with qpdf warnings, 3. REVOKE_FALSE_CERTIFICATION applied, 4. STRIP_INVALID_PDFX_METADATA applied, 5. STRIP_INVALID_PDFA_METADATA applied, 6. NORMALIZE_STANDARD_METADATA applied (+4 more)
 
-### Community 1003 - "ConnectService"
-Cohesion: 0.22
-Nodes (4): ConnectService, crypto, db, { v4: uuidv4 }
+### Community 1003 - "smoke_phase78c_quota_enforcement_api_guard.js"
+Cohesion: 0.24
+Nodes (9): assert(), db, enableMockDb(), mockDb, plans, results, runTests(), service (+1 more)
 
 ### Community 1004 - "BUDGET-02D04F — Informe de Cierre Funcional, Visual y de Seguridad Postdeploy (`Control Plane` & `Budget App`)"
 Cohesion: 0.11
@@ -6350,8 +6298,8 @@ Cohesion: 0.29
 Nodes (4): crypto, db, RuntimeActivityReviewEvidencePackService, serviceInstance
 
 ### Community 1010 - "controlledPrinthouseHandoffPackageClient.ts"
-Cohesion: 0.09
-Nodes (49): acceptHandoffPackage(), addPackageFileMetadata(), createHandoffPackage(), createScopedFileAccessGrant(), getHandoffAuditTimeline(), getHandoffEvidencePack(), getHandoffPackageReadiness(), recordHandoffFinding() (+41 more)
+Cohesion: 0.36
+Nodes (13): acceptHandoffPackage(), addPackageFileMetadata(), createHandoffPackage(), createScopedFileAccessGrant(), getHandoffAuditTimeline(), getHandoffEvidencePack(), getHandoffPackageReadiness(), recordHandoffFinding() (+5 more)
 
 ### Community 1011 - "smoke_phase113d_production_activation_gate_review_workflow.js"
 Cohesion: 0.24
@@ -6369,9 +6317,9 @@ Nodes (6): ControlledPrinthouseHandoffAccessGrant, ControlledPrinthouseHandoffAu
 Cohesion: 0.29
 Nodes (6): FoundingPrinthousePilotAudit, FoundingPrinthousePilotFinding, FoundingPrinthousePilotOrderLink, FoundingPrinthousePilotParticipant, FoundingPrinthousePilotProgram, FoundingPrinthousePilotSafetyMarkers
 
-### Community 1015 - "industrialProvisioningService.js"
+### Community 1015 - "system.js"
 Cohesion: 0.03
-Nodes (47): db, fs, path, provisioningService, REQUIRED_COLUMNS, REQUIRED_TABLES, run(), runVirtualValidation() (+39 more)
+Nodes (44): connection, getQueue(), { Queue, Job }, queueOperator, queues, connection, Redis, redisConfig (+36 more)
 
 ### Community 1016 - "smoke_phase193h4_clarification_merge_preservation.js"
 Cohesion: 0.29
@@ -6916,13 +6864,17 @@ Nodes (10): API Endpoints, Files, Goal, Phase 125 — Sandbox Commercial / Invoi
 Cohesion: 0.33
 Nodes (3): db, EconomicDigitalTwinService, logger
 
+### Community 1159 - "test-phase36-invoice-gate.js"
+Cohesion: 0.27
+Nodes (9): adminMarketplaceOrdersRouter, axios, clearMemoryDb(), db, express, installMockEngine(), memoryDb, runTests() (+1 more)
+
 ### Community 1160 - "Phase 183 — Migration Integrity & Schema Baseline Documentation"
 Cohesion: 0.18
 Nodes (10): 1. Context and Rationale, 2. Integrity Verification Protocol, 3. Workflow Procedures, 4. Current Findings & Future Separation Plan, Checksum Verification, How to Add a New Migration, How to Handle intentional Checksum Exceptions, Migration Identity (+2 more)
 
-### Community 1166 - "ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenAuth.tsx"
-Cohesion: 0.36
-Nodes (7): TokenAuthAuditLog, TokenAuthEvidence, TokenAuthRecord, TokenAuthRuleCheck, controlledBetaCohortInterventionExecutionPlanActivationTokenAuthClient, ControlledBetaCohortInterventionSimulationExecutionPlanActivationTokenAuth(), STATUS_COLORS
+### Community 1166 - "adminProductionMonitoring.js"
+Cohesion: 0.20
+Nodes (8): express, machineLoadMonitoringService, productionIncidentService, productionMonitoringService, queueMonitoringService, { resolveActorContext }, router, slaEvaluationService
 
 ### Community 1168 - "ControlledBetaCohortInterventionSimulationExecutionPlanActivationLock.tsx"
 Cohesion: 0.36
@@ -6937,16 +6889,16 @@ Cohesion: 0.15
 Nodes (12): 1.1 GET `/live`, 1.2 GET `/ready`, 1. Estado Verificado de Endpoints de Salud y Esquema, 2. Ejecución Real y Estado del Esquema en Base de Datos, 3. Hallazgos Reales de Credenciales y Corrección Persistente, 4.1 Paquete Aprobado en CI (Referencia Original), 4.2 Diferencias Sanitizadas en el `docker-compose.staging.yml` Desplegado, 4. Trazabilidad del Entregable y Diferencias Sanitizadas del Compose (+4 more)
 
 ### Community 1175 - "smoke_phase76d_machine_assignment_handoff_integration.js"
-Cohesion: 0.06
-Nodes (31): assert(), bindingService, db, enableMockDb(), handoffService, mockDb, printhouseCapabilityService, queueService (+23 more)
+Cohesion: 0.08
+Nodes (20): assert(), bindingService, db, enableMockDb(), handoffService, machineCompatibilityService, marketplaceOrderService, mockDb (+12 more)
 
 ### Community 1176 - "smoke_phase191g_shipping_integrations.js"
 Cohesion: 0.20
 Nodes (8): assert, credentialService, db, estimateService, integrationService, memoryTables, shippingService, webhookService
 
-### Community 1177 - "test_http_mysql_connected_harness.js"
+### Community 1177 - "financialOperationsProductionActivationAdmin.js"
 Cohesion: 0.20
-Nodes (10): axios, bcrypt, crypto, express, getTotpForStep(), http, logger, mysql (+2 more)
+Nodes (8): ApprovalService, db, express, GateService, { requireAdmin }, ReviewService, router, safetyMarkers
 
 ### Community 1178 - "optimizationEngine.js"
 Cohesion: 0.53
@@ -6961,8 +6913,8 @@ Cohesion: 0.22
 Nodes (5): evaluator, { v4: uuidv4 }, db, logger, SimulationOutcomeEvaluator
 
 ### Community 1186 - "init_test_db.js"
-Cohesion: 0.12
-Nodes (12): executeSqlFile(), FORBIDDEN_DB_NAMES, fs, init(), mfgSchema, mysqlClient, path, provSchema (+4 more)
+Cohesion: 0.15
+Nodes (9): executeSqlFile(), FORBIDDEN_DB_NAMES, fs, init(), mfgSchema, mysqlClient, path, provSchema (+1 more)
 
 ### Community 1187 - "PrintPrice OS — CI-03E: Acta Definitiva de Aceptación Funcional y Comercial de Guided Onboarding v4"
 Cohesion: 0.15
@@ -6972,9 +6924,9 @@ Nodes (12): 1. Resumen Ejecutivo y Reconciliación de Afirmaciones, 2. Matriz de
 Cohesion: 0.11
 Nodes (17): 1. Declaración de Dictamen y Cierre de Bloqueos, 2.10 Matriz de Estado Histórico frente a Autorización Vigente en MySQL, 2.11 Cobertura de Regresión Consolidada (DEV-04B.3A-FIX6), 2.1 Principio de Autoridad Persistida Inviolable, 2.2 Integración y Desambiguación de los Cinco Callers Industriales, 2.3 Blindaje en RAM y Protección Atómica de Redis Staging, 2.4 Cobertura de Regresión Consolidada, 2.5 Cierre de Overrides de Autorización Industrial (DEV-04B.3A-FIX4) (+9 more)
 
-### Community 1190 - "taxVatReadinessClassifierService.js"
-Cohesion: 0.12
-Nodes (14): assert(), fs, path, ROOT, runSmoke(), TaxVatReadinessClassifierService, assert(), fs (+6 more)
+### Community 1190 - "smoke_phase93f_end_to_end_tax_vat_readiness_regression.js"
+Cohesion: 0.05
+Nodes (35): assert(), fs, path, ROOT, runSmoke(), TaxVatReadinessClassifierService, assert(), fs (+27 more)
 
 ### Community 1191 - "runtimeActivityReviewAggregatorService.js"
 Cohesion: 0.33
@@ -7696,9 +7648,9 @@ Nodes (7): Backend, 🛑 Blockers, CONTROL_PLANE_BOOTSTRAP_STATUS, Frontend (Dev
 Cohesion: 0.50
 Nodes (3): assert, fs, path
 
-### Community 1394 - "sync-preflight-service-to-registry-smoke.js"
-Cohesion: 0.25
-Nodes (8): assert(), controlPlaneSchemaService, db, dbQueriesIntercepted, mockUpstreamJobs, preflightServiceClient, runSmokeTests(), syncService
+### Community 1394 - "invoiceService.js"
+Cohesion: 0.20
+Nodes (5): crypto, db, InvoiceService, logger, paymentGateway
 
 ### Community 1395 - "printhouseMaterialService.js"
 Cohesion: 0.18
@@ -7915,9 +7867,9 @@ Nodes (10): 1. Alcance de la Auditoría Independiente, 2.1 Manifiesto Auditado d
 Cohesion: 0.12
 Nodes (13): crypto, fs, isDbConfigured, jwt, materialsAdminRouter, mysql, mysqlClient, paperOfferService (+5 more)
 
-### Community 1509 - "artifactAdmin.js"
-Cohesion: 0.08
-Nodes (12): artifactRegistry, db, express, { resolveActorContext }, router, ArtifactLifecycleManager, artifactRegistry, db (+4 more)
+### Community 1509 - "ArtifactRegistryService"
+Cohesion: 0.11
+Nodes (7): ArtifactLifecycleManager, artifactRegistry, db, logger, ArtifactRegistryService, db, logger
 
 ### Community 1517 - "Android platform"
 Cohesion: 0.25
@@ -7968,8 +7920,8 @@ Cohesion: 0.29
 Nodes (7): Admin PUT Endpoint, Audit/Logging, C6 — Current Pricing Read/Write Flow, Flow: PrinthouseSetupHub → PricingPanel → CanonicalIndustrialPricingEditor → API → Service → DB, GET Endpoint, PUT Endpoint, Readiness Side Effects
 
 ### Community 1537 - ".get"
-Cohesion: 0.20
-Nodes (21): get(), ar(), Bv(), dt(), fv(), jf(), lu(), Lv() (+13 more)
+Cohesion: 0.16
+Nodes (25): get(), ar(), Bv(), dt(), fv(), Gv(), jf(), lu() (+17 more)
 
 ### Community 1538 - "2. Inventario Detallado de Bloqueantes"
 Cohesion: 0.13
@@ -8088,8 +8040,8 @@ Cohesion: 0.29
 Nodes (6): 1. Goal Description, 2. Validation Status, 3. Strict Guardrails Confirmed, 4. Failover Drill Results, 5. Next Steps, Phase 83 Partner Operations Acceptance Pack
 
 ### Community 1820 - "cohortInterventionExecutionPlanActivationTokenRedemptionAuthorizationGuardrailService.js"
-Cohesion: 0.22
-Nodes (6): ALLOWED_EXCLUSIONS, CohortInterventionExecutionPlanActivationTokenRedemptionAuthorizationGuardrailService, db, FORBIDDEN_PATTERNS, fs, path
+Cohesion: 0.15
+Nodes (8): assert, db, ALLOWED_EXCLUSIONS, CohortInterventionExecutionPlanActivationTokenRedemptionAuthorizationGuardrailService, db, FORBIDDEN_PATTERNS, fs, path
 
 ### Community 1821 - "smoke_phase191f_http_routes.js"
 Cohesion: 0.32
@@ -8907,9 +8859,9 @@ Nodes (3): Failed, Passed, Phase 92F End-to-End Financial Reconciliation Regress
 Cohesion: 0.18
 Nodes (10): 1. Alcance de la Auditoría Independiente, 2.1 Manifiesto Auditado de los 26 Archivos, 2. Verificación de Integridad Criptográfica del Paquete, 3. Inspección del Diff de Código (`git_patch_sec04_sec08.diff`), 4. Auditoría de la Cadena de Middleware en Analytics V2, 5. Auditoría del Blindaje Multitenant en Marketplace Orders, 6. Auditoría del Acceso Administrativo (`SUPER_ADMIN`), 7. Verificación de No Regresión Contractual (+2 more)
 
-### Community 2030 - "ManufacturingOrchestrationService.js"
-Cohesion: 0.08
-Nodes (12): CapacityConflictService, CapacityReservationService, crypto, db, logger, crypto, db, DISPATCH_LIFECYCLE (+4 more)
+### Community 2030 - "CapacityReservationService.js"
+Cohesion: 0.20
+Nodes (4): CapacityReservationService, crypto, db, logger
 
 ### Community 2031 - "Adversarial Vulnerability Analysis (Phase 5)"
 Cohesion: 0.29
@@ -8965,7 +8917,7 @@ Nodes (7): crypto, { execSync }, fs, getFileHash(), os, path, runAuthenticRecons
 
 ### Community 2070 - "api/services/db.js"
 Cohesion: 0.02
-Nodes (68): api, axios, check(), checks, getAuthHeaders(), getAuthToken(), main(), startTime (+60 more)
+Nodes (65): db, express, router, db, express, logger, router, circuitBreaker (+57 more)
 
 ### Community 2071 - "Impeccable Manual Edit Applier"
 Cohesion: 0.29
@@ -8983,9 +8935,9 @@ Nodes (6): globToRegex(), matchesScope(), normalizeIgnoreRule(), normalizeIgnore
 Cohesion: 0.20
 Nodes (6): 1. Conclusión, 4. Límites de las declaraciones, 5. Hallazgos y severidad, 6. Encargo preparado para Antigravity, 7. Estado actual y pendientes, Protocolo inicial de QA y Seguridad — PrintPrice Pro
 
-### Community 2075 - "cohortInterventionExecutionPlanActivationTokenRedemptionEnvelopeGuardrailService.js"
-Cohesion: 0.22
-Nodes (6): ALLOWED_EXCLUSIONS, CohortInterventionExecutionPlanActivationTokenRedemptionEnvelopeGuardrailService, db, FORBIDDEN_PATTERNS, fs, path
+### Community 2075 - "smoke_phase163g_guardrail_redemption_envelope_passed_not_redeemed_write_scope.js"
+Cohesion: 0.15
+Nodes (8): assert, db, ALLOWED_EXCLUSIONS, CohortInterventionExecutionPlanActivationTokenRedemptionEnvelopeGuardrailService, db, FORBIDDEN_PATTERNS, fs, path
 
 ### Community 2076 - "Manifiesto de Evidencias de Onboarding de Calibración"
 Cohesion: 0.33
@@ -9224,8 +9176,8 @@ Cohesion: 0.20
 Nodes (9): 1. Auditoría del Recorrido Actual (`printprice.pro/developers`), 2. Reutilización de Capacidades Existentes vs. Nuevos Requerimientos, 3. Máquina de Estados para "Request API Access" [PROPUESTA DE DISEÑO - NO IMPLEMENTADO], 4. Modelo de Datos y Seguridad de Credenciales [PROPUESTA DEV-02], 5. Prevención de Riesgos de Ejecución en Documentación, Almacenamiento en Base de Datos:, Formato de API Key Propuesto:, PrintPrice OS — API Access & Security Audit (DEV-01B) (+1 more)
 
 ### Community 2222 - "controlledBetaOperationalReviewService.js"
-Cohesion: 0.07
-Nodes (18): ControlledBetaOperationalReviewService, db, fs, path, ControlledBetaOperationalReviewService, db, ControlledBetaOperationalReviewService, db (+10 more)
+Cohesion: 0.08
+Nodes (14): ControlledBetaOperationalReviewService, db, fs, path, ControlledBetaOperationalReviewService, db, ControlledBetaOperationalReviewService, db (+6 more)
 
 ### Community 2223 - "DEV-04B.3 — GATE 2: Modelo de Autoridad de Grants y Revocaciones"
 Cohesion: 0.12
@@ -9303,9 +9255,9 @@ Nodes (13): 1. Resumen Ejecutivo de la Misión, 2. Matriz de Bloqueantes Remedia
 Cohesion: 0.29
 Nodes (6): 1. Declaración de Cumplimiento Normativo, 2. Registro de Riesgos Residuales, 3. Matriz de Entregables Auditables, 4. Restricciones Operativas Mantenidas, 5. Dictamen de Cierre, DEV-04A.3 — Acta de Aceptación Final y Dictamen de Seguridad
 
-### Community 2245 - "smoke_phase193h8c61135_forward_pricing_sensitivity.js"
-Cohesion: 0.22
-Nodes (7): assert, baseSnapshot, bpe, fs, path, productionBookSpec, solver
+### Community 2245 - "smoke_phase193h8c681_readiness_contract_alignment.js"
+Cohesion: 0.20
+Nodes (8): assert, calibrationSessionService, fs, { isValidIso2Country }, path, quickPanelSrc, UI_DIR, wizardSrc
 
 ### Community 2246 - "DEV-04B3A — Dictamen de Preparación y Madurez para GATE 2 (Staging Deployment)"
 Cohesion: 0.20
@@ -9322,10 +9274,6 @@ Nodes (9): 1. Declaración de Dictamen de Salida, 2. Resumen Ejecutivo por Fases
 ### Community 2252 - "cohortInterventionSimulationReviewEvidencePackService.js"
 Cohesion: 0.28
 Nodes (4): CohortInterventionSimulationReviewEvidencePackService, crypto, db, serviceInstance
-
-### Community 2253 - "system.js"
-Cohesion: 0.08
-Nodes (21): connection, getQueue(), { Queue, Job }, queueOperator, queues, connection, Redis, redisConfig (+13 more)
 
 ### Community 2254 - "PrintPrice OS — Aislamiento y Seguridad de Base de Datos en Staging (OP-DEV-03)"
 Cohesion: 0.20
@@ -9367,9 +9315,9 @@ Nodes (15): 1. Cumplimiento de Restricciones Absolutas e Invariantes, 2. Publica
 Cohesion: 0.20
 Nodes (9): 1.1 GATE 1 — Verificación Operativa READ-ONLY, 1.2 GATE 2 — Despliegue Inmutable y Validación en Vivo, 1. Resumen de las Dos Puertas de Control, 2.1 Identificadores de Imagen y Hashes SHA-256, 2. Registro Técnico de la Imagen Docker Inmutable, 3. Estado de los Contenedores tras el Despliegue, 4. Registro de Ejecución de Pruebas de Humo, 5. Dictamen Final (+1 more)
 
-### Community 2267 - "smoke_phase76a_printhouse_capability_schema.js"
-Cohesion: 0.32
-Nodes (7): assert(), db, enableMockDb(), mockDb, results, runSmokeTest(), service
+### Community 2267 - ".evaluateControlledCohortActivationReadiness"
+Cohesion: 0.22
+Nodes (3): _hash(), _isDbFallbackAllowed(), _normalizeBool()
 
 ### Community 2268 - "PrintPrice OS — Resultados de Integración en Vivo con MySQL Staging (OP-DEV-03D)"
 Cohesion: 0.20
@@ -9479,9 +9427,9 @@ Nodes (14): 1. Declaración Formal de Certificación, 2. Matriz Consolidada de S
 Cohesion: 0.13
 Nodes (14): 1.1 Fuente B (Volcado Histórico Aprobado), 1.2 Preservación de Volúmenes en Docker Daemon, 1. Verificación Criptográfica y Preservación de Fuentes Originales, 2. Ingesta Aislada y Exclusión Mutua de Datadir, 3. Auditoría en Sandbox Validador Efímero (Paso 4), 4. Cambio Seguro de Datadir en Docker Compose Canónico (Paso 5), 5.1 Endpoints HTTP de Control Plane Staging, 5.2 Censo Final de Tablas Operativas y Negocio (+6 more)
 
-### Community 2300 - "smoke_phase78d_billing_events_overage_policy.js"
-Cohesion: 0.32
-Nodes (7): assert(), db, enableMockDb(), mockDb, results, runTests(), service
+### Community 2300 - "adminTenantBilling.js"
+Cohesion: 0.11
+Nodes (16): assert(), db, enableMockDb(), mockDb, results, runTests(), service, billingEventService (+8 more)
 
 ### Community 2301 - "ControlledBetaCohortInterventionSimulationApprovalPreparation.tsx"
 Cohesion: 0.32
@@ -9648,8 +9596,8 @@ Cohesion: 0.22
 Nodes (8): 1.1 Jerarquía y Roles Reconocidos, 1. Definición de Políticas de Control de Acceso, 2. Matriz de Autorización por Endpoint, 3.1 Criterio de No-Lectura Previa (Zero Pre-Auth DB Reads), 3.2 Criterio de Denegación por Defecto (Fail-Closed), 3.3 Aislamiento de Supervisión Administrativa, 3. Comprobaciones de Seguridad en Tiempo de Ejecución, PrintPrice OS — Matriz de Autorización Efectiva (DEV-03R)
 
 ### Community 2363 - "test_budget02c01r4v_real_mysql_schema_and_sealing.js"
-Cohesion: 0.15
-Nodes (8): assert, crypto, fs, mysql, MYSQL_PORT, path, pricingSnapshotCanonicalizer, PricingSnapshotCanonicalizer
+Cohesion: 0.11
+Nodes (9): assert, crypto, fs, mysql, MYSQL_PORT, path, pricingSnapshotCanonicalizer, PricingSnapshotCanonicalizer (+1 more)
 
 ### Community 2365 - "test_mapping_display.js"
 Cohesion: 0.50
@@ -9678,10 +9626,6 @@ Nodes (8): Hechos observados y límites, Inventario público inicial de reposito
 ### Community 2387 - "BUDGET-02D-01R3 — Certificación Final de Remediación de Autoridad, Liquidación y Transacciones"
 Cohesion: 0.13
 Nodes (14): 1. Cumplimiento de Restricciones Operativas Absolutas, 2. Matriz de Remediación Integral (BUDGET-02D-01R3), 3. Matriz de Cobertura de Vectores Adversariales Obligatorios, 4.1 Suite de Integración Vitest E2E, 4.2 Suite Completa del Proyecto (Vitest), 4.3 Compilación Limpia de Producción (Vite), 4.4 Integridad de Migraciones de Base de Datos (Phase 183), 4.5 Ejecución Oficial en GitHub Actions CI (Run #40639476337) (+6 more)
-
-### Community 2388 - "FutureOutcomeProjectionService.js"
-Cohesion: 0.20
-Nodes (5): projector, { v4: uuidv4 }, db, FutureOutcomeProjectionService, logger
 
 ### Community 2389 - "cohortInterventionExecutionPlanActivationTokenRedemptionUnlockDualControlAuthorizationBuilderService.js"
 Cohesion: 0.04
@@ -9856,7 +9800,7 @@ Nodes (26): {
 
 ### Community 2435 - "App.tsx"
 Cohesion: 0.03
-Nodes (78): createBetaCohort(), createPreparationGate(), defineRoleBoundary(), getLimitedBetaAuditTimeline(), getLimitedBetaEvidencePack(), getLimitedBetaReadiness(), issueInviteCode(), recordBetaFinding() (+70 more)
+Nodes (82): createRuntimeVerificationRun(), getRuntimeVerificationAuditTimeline(), getRuntimeVerificationEvidencePack(), getRuntimeVerificationReadiness(), verifyAllowlist(), verifyAuditRecovery(), verifyBlockers(), verifyDbReadThrough() (+74 more)
 
 ### Community 2436 - "2. Inventario Consolidado por Dominios y Servicios"
 Cohesion: 0.17
@@ -9999,8 +9943,8 @@ Cohesion: 0.33
 Nodes (5): 1. Modelo de Autorización en Profundidad de 6 Capas, 2. Catálogo de Scopes Granulares de la Plataforma, 3. Matriz Exhaustiva de Endpoints (Contratos DEV-02), 4. Regla Inviolable: Separación de Tokens de Cliente, DEV-04B.1 — Matriz de Autorización por Scopes y Modelo de 6 Capas de Seguridad
 
 ### Community 2478 - "smoke_phase94f_end_to_end_invoice_credit_note_lifecycle.js"
-Cohesion: 0.16
-Nodes (11): check(), fs, GovernedCreditNoteService, GovernedInvoiceBuilderService, GovernedInvoiceLifecycleService, path, results, ROOT (+3 more)
+Cohesion: 0.29
+Nodes (9): check(), fs, GovernedCreditNoteService, GovernedInvoiceBuilderService, GovernedInvoiceLifecycleService, path, results, ROOT (+1 more)
 
 ### Community 2479 - "test-phase38-work-order-execution-integration.js"
 Cohesion: 0.22
@@ -10033,6 +9977,10 @@ Nodes (11): 1.1 Matriz de Rutas y Estado Operativo, 1. Inventario de Endpoints: 
 ### Community 2504 - "PrintPrice OS — Plan de Publicación y Modularización OpenAPI 3.1 (DOC-API-01)"
 Cohesion: 0.17
 Nodes (11): 1. Arquitectura y Principios de Especificación, 2. Desglose Modular por Dominio, 3. Estrategia de Integración en Docusaurus (`docs.printprice.pro`), 4. Pipeline de Validación Automatizada (CI/CD), Criterios de Aceptación del Pipeline, Enfoque de Publicación Recomendado: Páginas Markdown Curadas + Descargas OpenAPI, Módulo 1: `openapi/pricing-marketplace.openapi.yaml`, Módulo 2: `openapi/preflight.openapi.yaml` (+3 more)
+
+### Community 2505 - "governedInvoiceBuilderService.js"
+Cohesion: 0.25
+Nodes (6): crypto, mysqlClient, assert, GovernedInvoiceBuilderService, mysqlClient, runTests()
 
 ### Community 2507 - "DEV-04B.1 — Modelo de Datos y Esquema Relacional de Credenciales API"
 Cohesion: 0.40
@@ -10130,13 +10078,9 @@ Nodes (4): db, fs, path, { spawnSync }
 Cohesion: 0.17
 Nodes (11): 1. Resumen de Hallazgos y Motivación, 2.1 Eliminación Total del Fallback Económico, 2.2 Comparación en Unidades Monetarias Menores (Céntimos), 2.3 Correspondencia Estricta de Parámetros, 2. Remediación TRUST-02: Vinculación Económica Incondicional, 3.1 Identificador Único del Comprobante, 3.2 Protección contra Replay con Referencias Divergentes, 3.3 Rechazo de Comprobante Reutilizado entre Pedidos (Anti-Colisión) (+3 more)
 
-### Community 2532 - "smoke_phase136h_runtime_activity_observation_acceptance_pack.js"
-Cohesion: 0.33
-Nodes (4): db, fs, path, { spawnSync }
-
-### Community 2533 - "smoke_phase55e_control_plane_standards_real_governance.js"
-Cohesion: 0.33
-Nodes (4): fs, path, PreflightHumanReportService, serviceReportsFile
+### Community 2533 - "smoke_phase62f_control_plane_heavy_pdf_probe_human_report.js"
+Cohesion: 0.13
+Nodes (11): fs, path, PreflightHumanReportService, serviceReportsFile, FORBIDDEN_OVERCLAIMS, FORBIDDEN_SANITATION_TERMS, fs, path (+3 more)
 
 ### Community 2534 - "BUDGET-02D-01R5F — Cierre Definitivo del Contrato de Replay e Idempotencia Financiera"
 Cohesion: 0.17
@@ -10170,9 +10114,9 @@ Nodes (9): 1.1 Escenario del Defecto Original, 1.2 Dilema Arquitectónico, 1. El
 Cohesion: 0.17
 Nodes (11): 1. Definición y Topología del Esquema Staging, 2. Estrategia de Población de Datos Sintéticos y Anonimizados, 3.1 Comandos de Ejecución Secuencial, 3. Secuencia Paso a Paso de Aplicación de Migraciones (167 a 171), 4.1 Comprobación Automática de Firmas, 4. Verificación de Integridad y Post-Condiciones del Esquema, 5.1 Secuencia Inversa de Rollback, 5.2 Verificación de Reversión Limpia (+3 more)
 
-### Community 2542 - "ControlledBetaCohortInterventionSimulationExecutionEnvelope.tsx"
-Cohesion: 0.36
-Nodes (7): EnvelopeAuditLog, EnvelopeEvidence, EnvelopeRecord, EnvelopeRuleCheck, controlledBetaCohortInterventionExecutionEnvelopeClient, ControlledBetaCohortInterventionSimulationExecutionEnvelope(), STATUS_COLORS
+### Community 2542 - "observabilityService.js"
+Cohesion: 0.25
+Nodes (4): db, logger, ObservabilityService, os
 
 ### Community 2543 - "ORDEN PAPER-MATERIALS-RECOVERY-06 — Verificación E2E en Vivo: Spine Calculator, BPE y Budget App (Fase 4)"
 Cohesion: 0.25
@@ -10182,17 +10126,13 @@ Nodes (7): 1. Cobertura Real del Catálogo en Producción Tras `RECOVERY-06` (`/
 Cohesion: 0.20
 Nodes (9): 1. Executive Summary & Governance Compliance, 2.1 Primary Deliverable Table — All `25` P1 Book Interior Candidates (`P1_INTERIOR_BOOK_PAPER`), 2.2 Breakdown of Pilot Sub-Batches (`P1-A` vs `P1-B`), 2. P1 Pilot Candidates Table (`DATASHEET_REQUEST_TRACK` Only), 3.1 Excluded `CONFLICT_HOLD` (`CONFLICT_RECONCILIATION_TRACK`) Variants (`5` Total — `0` Included), 3.2 Excluded `PHYSICAL_MICROMETER_TRACK` Variants (`145` Total — `0` Included), 3. Strict Exclusion Audit (`PHYSICAL_MICROMETER_TRACK` & `CONFLICT_HOLD`), 4. Production Database Integrity Verification (`Control.paper_variants`) (+1 more)
 
-### Community 2545 - "smoke_phase75d_control_plane_recommendation_ux.js"
-Cohesion: 0.40
-Nodes (5): adminPreflightJobsRouter, assert(), db, humanReportService, runSmokeTests()
+### Community 2545 - "NotificationBell.tsx"
+Cohesion: 0.33
+Nodes (8): fetchNotifications(), formatRelative(), Notification, NotificationBell(), NotifSeverity, SEVERITY_CONFIG, markAllNotificationsRead(), markNotificationRead()
 
 ### Community 2546 - "2. Inventario Exacto de Tablas y Migraciones MySQL"
 Cohesion: 0.20
 Nodes (9): 1. Los Tres Dominios de Datos de Papel en PrintPrice OS, 2.1 Dominio 1: Catálogo Maestro y Aprovisionamiento B2B de Proveedores, 2.2 Dominio 2: Inventario Físico de Planta y Orquestación MES, 2.3 Dominio 3: Despacho y Registro de Intenciones en Budget App, 2. Inventario Exacto de Tablas y Migraciones MySQL, 3.1 Implementación Real en Runtime, 3.2 Cuadro Comparativo de Significados de Disponibilidad, 3. Reconciliación de Disponibilidad y la Regla de No Inferencia (+1 more)
-
-### Community 2547 - "machineLoadMonitoringService.js"
-Cohesion: 0.14
-Nodes (4): db, logger, MachineLoadMonitoringService, ProductionQueueMonitoringService
 
 ### Community 2548 - "BUDGET-02B-00 — Contrato de Seguridad y Autorización Criptográfica (Reconciliación R1)"
 Cohesion: 0.20
@@ -10234,9 +10174,9 @@ Nodes (9): 1. Resumen Ejecutivo y Segregación Estricta de las 288 Variantes, 2.
 Cohesion: 0.20
 Nodes (9): ENGINE_REPORT_PATH, FORBIDDEN_CUSTOMER_PHRASES, FORBIDDEN_SANITATION_TERMS, fs, path, preflightHumanReportService, runSmokeTests(), SERVICE_REPORT_PATH (+1 more)
 
-### Community 2560 - "verify-control-plane-schema.js"
-Cohesion: 0.33
-Nodes (4): mysql, OPTIONAL_TABLES, REQUIRED_COLUMNS, REQUIRED_TABLES
+### Community 2560 - "smoke_phase193h8c61134_draft_ready_promotion_integrity.js"
+Cohesion: 0.22
+Nodes (7): assert, calibrationSessionService, fs, panelSrc, path, sessionServiceSrc, wizardSrc
 
 ### Community 2562 - "3. Spine Calculator & BPE Regression Verification"
 Cohesion: 0.25
@@ -10298,9 +10238,9 @@ Nodes (8): 1.1 El Mecanismo Vulnerable Previo, 1.2 La Cadena de Explotación Sil
 Cohesion: 0.25
 Nodes (7): 1. Executive Summary of Findings, 2.1. Batch Import Hardcoded Fallback (`src/api/services/paperImportService.js`), 2.2. API Serialization Hardcoded Fallback (`src/api/services/paperProcurementService.js` & `paperOfferService.js`), 2.3. Control Plane UI Concatenation (`src/ui/pages/supplier/SupplierCatalogOffersPage.tsx`), 2. Exact Code Locations of the Bug (Before Fix), 3. Quantified Impact Across the `1,524` Production Variants, PAPER-MATERIALS-RECOVERY-03 — Audit & Remediation of `UNKNOWN · UNCOATED`
 
-### Community 2578 - "smoke_phase63e_control_plane_security_interactivity_regression.js"
-Cohesion: 0.20
-Nodes (9): ENGINE_REPORT_PATH, FORBIDDEN_CUSTOMER_PHRASES, FORBIDDEN_SANITATION_TERMS, fs, path, preflightHumanReportService, runSmokeTests(), SERVICE_REPORT_PATH (+1 more)
+### Community 2578 - "phase185_migration_ledger_governance_schema.js"
+Cohesion: 0.29
+Nodes (6): dbMock, executedQueries, { up }, fs, path, up()
 
 ### Community 2579 - "MISIÓN BUDGET-02D-04H — UI REFINEMENT & COMPACT MOBILE PROGRESS"
 Cohesion: 0.18
@@ -10403,8 +10343,8 @@ Cohesion: 0.18
 Nodes (10): 1. Clasificación y Veredicto Final de la Misión, 2.1 [BUDGET-02D03_INFRASTRUCTURE_INVENTORY.md](file:///c:/Users/KIKE/Downloads/ppos-control-plane-phase-10-intelligence-layer/docs/budget-02d/BUDGET-02D03_INFRASTRUCTURE_INVENTORY.md), 2.2 [BUDGET-02D03_STAGING_ISOLATION_MATRIX.md](file:///c:/Users/KIKE/Downloads/ppos-control-plane-phase-10-intelligence-layer/docs/budget-02d/BUDGET-02D03_STAGING_ISOLATION_MATRIX.md), 2.3 [BUDGET-02D03_DATABASE_MIGRATION_RUNBOOK.md](file:///c:/Users/KIKE/Downloads/ppos-control-plane-phase-10-intelligence-layer/docs/budget-02d/BUDGET-02D03_DATABASE_MIGRATION_RUNBOOK.md), 2.4 [BUDGET-02D03_INTEGRATION_TEST_PLAN.md](file:///c:/Users/KIKE/Downloads/ppos-control-plane-phase-10-intelligence-layer/docs/budget-02d/BUDGET-02D03_INTEGRATION_TEST_PLAN.md), 2.5 [BUDGET-02D03_GO_NO_GO_CHECKLIST.md](file:///c:/Users/KIKE/Downloads/ppos-control-plane-phase-10-intelligence-layer/docs/budget-02d/BUDGET-02D03_GO_NO_GO_CHECKLIST.md), 2. Estructura y Contenido del Paquete de Preflight Generado, 3. Certificación de Restricciones Operativas (+2 more)
 
 ### Community 2608 - "closePool"
-Cohesion: 0.20
-Nodes (9): crypto, fs, mysql, MYSQL_PORT, mysqlClient, orderPaperDecisionService, path, runRealConcurrencyCertification() (+1 more)
+Cohesion: 0.18
+Nodes (10): crypto, fs, mysql, MYSQL_PORT, mysqlClient, orderPaperDecisionService, path, runRealConcurrencyCertification() (+2 more)
 
 ### Community 2609 - "2. Matriz de Casos de Prueba de Integración por Dominio"
 Cohesion: 0.18
@@ -10434,9 +10374,13 @@ Nodes (5): 1. Alcance y Metodología de Validación, 2. Matriz de Paridad y Vali
 Cohesion: 0.18
 Nodes (10): 1. Extracción y Reutilización del Estilo de Control Plane, 2. Nuevo Stepper Móvil Compacto (`CheckoutStepper.tsx`), 3. Optimización del Espacio Vertical en Móvil (`390×844`), 4.1. Barrido de Desbordamiento Horizontal (`overflowPx = scrollWidth - clientWidth`), 4.2. Auditoría Automática de Contraste WCAG AA (`>= 4.5:1`), 4. Verificación Responsive (`320px` a `1440px`) y Contraste WCAG AA, 5. Evidencia Visual Comparativa (Antes / Después), 6. Despliegue Productivo, Checksums SHA-256 y Limpieza (+2 more)
 
-### Community 2616 - "PreflightPersistenceService"
-Cohesion: 0.13
-Nodes (4): db, PreflightPersistenceService, service, { v4: uuidv4 }
+### Community 2617 - "smoke_phase57a_control_plane_artifact_ux_contract.js"
+Cohesion: 0.25
+Nodes (7): fs, { getHumanReport }, outJsonPath, outMdPath, path, runSmokeTests(), scenarios
+
+### Community 2618 - "autonomousDispatchService.js"
+Cohesion: 0.29
+Nodes (5): AutonomousDispatchService, db, logger, productionOrchestration, recommendationService
 
 ### Community 2619 - "BUDGET-02D-01 — Acta Final de Aceptación y Certificación"
 Cohesion: 0.29
@@ -10518,13 +10462,9 @@ Nodes (5): 1. `Control.paper_variants` — Caliper Coverage Before vs. After, 2.
 Cohesion: 0.25
 Nodes (4): db, resilienceSimulator, db, PlanetaryResilienceSimulator
 
-### Community 2641 - "adminPreflight.js"
-Cohesion: 0.03
-Nodes (58): assert(), db, enableMockDb(), mockDb, plans, results, runTests(), service (+50 more)
-
-### Community 2643 - "SLARiskMonitor.js"
-Cohesion: 0.38
-Nodes (3): db, logger, SLARiskMonitor
+### Community 2641 - "smoke_phase78f_end_to_end_usage_billing_regression.js"
+Cohesion: 0.18
+Nodes (13): assert(), billingEventService, commercialPlanService, db, enableMockDb(), fs, mockDb, path (+5 more)
 
 ### Community 2644 - "patch_phase126_1_schema_mysql_compat.js"
 Cohesion: 0.60
@@ -10542,9 +10482,9 @@ Nodes (3): compute_sha256(), main(), scripts/export_and_verify_candidate_image.p
 Cohesion: 0.33
 Nodes (5): 1. Executive Summary, 2. Phase-by-Phase Compliance Matrix, 3. Active Governance & Security States Preserved, Final Verdict, PAPER-CALIPER-RECOVERY-02 — Final Mission Report
 
-### Community 2651 - "cohortInterventionExecutionReadinessGuardrailService.js"
-Cohesion: 0.20
-Nodes (7): CohortInterventionExecutionReadinessGuardrailService, db, FORBIDDEN_EXECUTION_KEYWORDS, fs, path, SCAN_FILES, serviceInstance
+### Community 2651 - "production_telemetry_persistent_replay_test.js"
+Cohesion: 0.25
+Nodes (6): assert, db, dbJobStates, dbTelemetryEvents, mockGrants, printerSyncService
 
 ### Community 2652 - "3. Post-Migration Schema & Data Verification"
 Cohesion: 0.20
@@ -10587,24 +10527,24 @@ Cohesion: 0.20
 Nodes (9): 1. Verificación del Nombre Real de la Tabla Autoritativa de Variantes, 2. Las 6 Guardas de Autoridad de Servidor Verificadas y Reforzadas en Control Plane, Guarda 1 — Resolución obligatoria de `variantId` contra `paper_variants`, Guarda 2 — Obtención de `caliper_um`, procedencia y confianza desde la base de datos, Guarda 3 — Rechazo o degradación de discrepancias entre cliente y base de datos, Guarda 4 — Resolución de perfiles industriales y validación de parámetros de tapa dura, Guarda 5 — Bloqueo de liberación industrial (`verifySnapshotForManufacturingRelease`), Guarda 6 — Tapa dura bajo aprobación técnica y Flexi deshabilitado (+1 more)
 
 ### Community 2687 - "smoke_phase94d_governed_credit_note_lifecycle.js"
-Cohesion: 0.10
-Nodes (20): assert(), fs, GovernedInvoiceBuilderService, path, ROOT, runSmoke(), assert(), fs (+12 more)
+Cohesion: 0.33
+Nodes (8): assert(), fs, GovernedCreditNoteService, GovernedInvoiceBuilderService, GovernedInvoiceLifecycleService, path, ROOT, runSmoke()
 
 ### Community 2688 - "globalIncidentCoordinator.js"
 Cohesion: 0.20
 Nodes (6): authority, GlobalIncidentCoordinator, postureAggregator, rolloutEngine, GlobalPostureAggregator, registry
 
-### Community 2689 - "http_real_mfa_flow.test.js"
-Cohesion: 0.20
-Nodes (7): adminRoutes, authRoutes, db, getTotpForStep(), inMemoryStore, origQuery, userMfaService
+### Community 2689 - "smoke_phase192e_http_routes.js"
+Cohesion: 0.25
+Nodes (6): assert, db, dispatchService, eligibilityService, governedRoutingService, mockGrants
 
-### Community 2690 - "PricingRuleBuilder.tsx"
-Cohesion: 0.33
-Nodes (5): PricingRuleBuilder(), PricingRuleBuilderProps, QuantityTier, QuantityTierEditor(), QuantityTierEditorProps
+### Community 2690 - "smoke_phase195k_governed_manual_pricing_save.js"
+Cohesion: 0.29
+Nodes (6): assert, calibrationSessionService, computeNodeStateChecksum(), crypto, db, runTests()
 
 ### Community 2691 - "paperSuppliersRoutes.js"
-Cohesion: 0.05
-Nodes (27): dbMock, executedQueries, { up }, requireApprovedSupplier(), requireSupplierScope(), db, express, RFC-4180 (+19 more)
+Cohesion: 0.06
+Nodes (21): requireApprovedSupplier(), requireSupplierScope(), db, express, RFC-4180, multer, { paperEvidenceService, PaperEvidenceError, MAX_PDF_SIZE_BYTES }, paperImportService (+13 more)
 
 ### Community 2692 - "BUDGET-02D04G — Informe de Despliegue Productivo Controlado (`https://budget.printprice.pro`)"
 Cohesion: 0.22
@@ -10678,13 +10618,13 @@ Nodes (8): 1.1 Causa Raíz Identificada y Corregida, 1.2 Matriz de Medición Emp
 Cohesion: 0.22
 Nodes (8): 1. Resumen Ejecutivo, 2. Componentes Actualizados en `budget.printprice.pro` (Fases 2, 4 y 5), 3.1 Catálogo Real de Paper Materials (`1,524` Variantes) y Recálculo BPE, 3.2 Flujo Completo de `QuoteRevisionReview.tsx`, 3. Verificación Funcional de Paper Materials + BPE y Quote Revision (Fases 4, 5 y 6), 4. Galería de Evidencias Visuales (Antes / Después), BUDGET-02D04G — Informe de Implementación Visual e Integración de Paper Materials y Quote Revision (`https://budget.printprice.pro`), Logros Clave Certificados en Producción
 
-### Community 2710 - "smoke_phase132a_expansion_preparation_schema.js"
-Cohesion: 0.40
-Nodes (3): db, fs, path
+### Community 2710 - "smoke_phase94b_governed_invoice_builder.js"
+Cohesion: 0.38
+Nodes (6): assert(), fs, GovernedInvoiceBuilderService, path, ROOT, runSmoke()
 
-### Community 2711 - "useLocale"
-Cohesion: 0.05
-Nodes (83): AccessibleModal(), AccessibleModalProps, ActivationGuard(), ActivationGuardProps, PaperSourcingModalProps, ProcurementDocumentModal(), ProcurementDocumentModalProps, PrintPriceLogo() (+75 more)
+### Community 2711 - "authStore.ts"
+Cohesion: 0.04
+Nodes (94): AccessibleModal(), AccessibleModalProps, ActivationGuard(), ActivationGuardProps, AuthGuard(), PaperSourcingModalProps, ProcurementDocumentModal(), ProcurementDocumentModalProps (+86 more)
 
 ### Community 2712 - "SPINE-01 — Mapeo de Espesor (`caliper_um` / `bulk`) e Integración con Paper Materials"
 Cohesion: 0.22
@@ -10714,9 +10654,9 @@ Nodes (7): 1. Resumen Ejecutivo y Causa Raíz, 2.1 Eliminación de Vectores de E
 Cohesion: 0.25
 Nodes (7): 1. Definición del Procedimiento GO / NO-GO, 2. Bloque 1: Integridad de Código y Artefactos de Despliegue, 3. Bloque 2: Integridad de Base de Datos y Migraciones, 4. Bloque 3: Infraestructura, Host y Aislamiento de Red, 5. Bloque 4: Seguridad Operativa, Secretos y Criterios de Parada, 6. Resultado Consolidado de la Evaluación GO / NO-GO, BUDGET-02D-03 — Lista de Comprobación Operativa GO / NO-GO para Preproducción
 
-### Community 2719 - "smoke_phase65d_control_plane_selective_image_human_report.js"
-Cohesion: 0.40
-Nodes (4): fs, path, preflightHumanReportService, runSmokeTests()
+### Community 2719 - "test-phase36-marketplace-order-service.js"
+Cohesion: 0.38
+Nodes (6): db, installMockEngine(), memoryDb, run(), service, setupDiagnostics()
 
 ### Community 2720 - "smoke_phase193h8c69_acceptance_db_adapter_integrity.js"
 Cohesion: 0.25
@@ -10729,10 +10669,6 @@ Nodes (5): 1. Verificación de Inventario y Estado Previo en MySQL `Control`, 2.
 ### Community 2722 - "2. Catálogo Inicial de Perfiles Livonia (`v2.0.0`)"
 Cohesion: 0.25
 Nodes (7): 1. Principio Arquitectónico: Perfiles Industriales Versionados por Imprenta, 2.1 Perfil 1: `livonia-alegro-softcover` (`v2.0.0`), 2.2 Perfil 2: `livonia-colibri-hardcover` (`v2.0.0`), 2.3 Perfil 3: `livonia-colibri-flexi` (`v2.0.0`), 2. Catálogo Inicial de Perfiles Livonia (`v2.0.0`), 3. Esquema JSON de Configuración de Perfil (`SpineBindingProfileSchema`), SPINE-01 — Especificación Técnica de Perfiles de Encuadernación (`Binding Profiles`)
-
-### Community 2723 - "ProductionTimeline.tsx"
-Cohesion: 0.53
-Nodes (5): getActorIcon(), getEventBadgeStyle(), getEventColor(), ProductionEvent, ProductionTimeline()
 
 ### Community 2724 - "2. Evidencia de API y UI por Familia Representativa (`1.524` Variantes en Vivo)"
 Cohesion: 0.33
@@ -10798,25 +10734,29 @@ Nodes (6): 1. Pre-Checks y Respaldo Obligatorio antes de Ejecutar Migraciones (`
 Cohesion: 0.29
 Nodes (6): 1. Certificación de Inmutabilidad de Espesores y Balance Global Final (`Control.paper_variants`), 2. Gobernanza, Segregación de Roles (SoD) y Desactivación de `isSyntheticOtherUncoated`, 3. Registro de Auditoría — Sublote C5-A (`36` Variantes *Olin Colours* 80–170 g/m² — `DESIGN` / `UNCOATED` / `SMOOTH`), 4. Registro de Auditoría — Sublote C5-B (`28` Variantes de Especialidad Real, Sintéticos, Autoadhesivos y Autocopiativo NCR — `OTHER` Acreditado), 5. Cuadro de Cierre Global del Punto 3 (`337 / 337` Variantes Acreditadas — `100,00%`), PrintPrice OS — RECOVERY-12: Batch C5 Final Classification Accreditation Report (64 Variants — 100% Completion of 337 Pending Classifications)
 
-### Community 2744 - "security_settings_tenant_config_isolation_test.js"
-Cohesion: 0.40
-Nodes (4): adminRouter, assert, { FIXTURES, generateMockToken, createMockReq, dispatchRequest, setQueryStub, teardown }, runTests()
-
-### Community 2745 - "governedOrderRoutingService.js"
-Cohesion: 0.09
-Nodes (16): activationAdapter, db, GovernedOrderRoutingService, routingDecisionsLedger, routingEligibilityService, assert, db, dbDispatches (+8 more)
-
-### Community 2747 - "RoutingAgent.js"
+### Community 2744 - "runtime_kill_switch_effectiveness_test.js"
 Cohesion: 0.29
-Nodes (4): AgentBase, federatedDecisionEngine, RoutingAgent, signalIngestor
+Nodes (5): activationAdapter, assert, db, killSwitchService, mockGrants
+
+### Community 2745 - "governedProductionDispatchService.js"
+Cohesion: 0.07
+Nodes (21): dispatchService, eligibilityService, express, router, activationAdapter, db, dispatchEligibilityService, GovernedProductionDispatchService (+13 more)
+
+### Community 2747 - "smoke_phase135h_runtime_session_acceptance_pack.js"
+Cohesion: 0.33
+Nodes (4): db, fs, path, { spawnSync }
+
+### Community 2748 - "digitalTwinService.js"
+Cohesion: 0.33
+Nodes (3): db, DigitalTwinService, logger
 
 ### Community 2750 - "PAPER-CALIPER-RECOVERY-02 — Phase 7 Spine Calculator End-to-End Verification"
 Cohesion: 0.50
 Nodes (3): 1. Summary of Required Phase 7 E2E Scenarios, 2. Raw E2E Verification Evidence (`phase7_spine_e2e_results.json`), PAPER-CALIPER-RECOVERY-02 — Phase 7 Spine Calculator End-to-End Verification
 
 ### Community 2751 - "smoke_phase94c_invoice_lifecycle_finalization.js"
-Cohesion: 0.18
-Nodes (9): assert(), fs, GovernedInvoiceBuilderService, GovernedInvoiceLifecycleService, path, ROOT, runSmoke(), crypto (+1 more)
+Cohesion: 0.27
+Nodes (8): assert(), fs, GovernedInvoiceBuilderService, GovernedInvoiceLifecycleService, path, ROOT, runSmoke(), crypto
 
 ### Community 2754 - "SPINE-06R — F03: Real Browser End-to-End Verification on `https://budget.printprice.pro`"
 Cohesion: 0.33
@@ -10926,17 +10866,9 @@ Nodes (4): 1. Reconciliación Exacta de las 1.524 Variantes en MySQL `Control`, 
 Cohesion: 0.40
 Nodes (4): 1. Segregación Determinista en 5 Listas Independientes, 2. Arquitectura del Script Idempotente y Reversible (`scripts/recover_paper_materials_05v.cjs`), 3. Resultado de la Simulación Dry-Run sobre el Snapshot Productivo (`1.524` Variantes), MISIÓN PAPER-MATERIALS-RECOVERY-05V — Plan de Escritura Productiva Gobernada y Separación en 5 Listas Independientes
 
-### Community 2786 - "FederationIntelligenceService.js"
-Cohesion: 0.33
-Nodes (3): db, FederationIntelligenceService, logger
-
 ### Community 2789 - "OptimizationAgent"
 Cohesion: 0.33
 Nodes (3): AgentBase, engine, OptimizationAgent
-
-### Community 2790 - "marketplacePrinthouseProductionService.js"
-Cohesion: 0.43
-Nodes (6): getProductionDecisionStatus(), logger, marketplaceOrderService, mysqlClient, recordProductionDecision(), safeParseJson()
 
 ### Community 2793 - "ORDEN PAPER-MATERIALS-RECOVERY-06 — Informe Final de Aplicación Productiva de 234 Variantes Acreditadas"
 Cohesion: 0.50
@@ -10970,13 +10902,17 @@ Nodes (3): 1. Five-Tier Epistemic Provenance Model (`classifyCaliperEvidenceTier
 Cohesion: 0.50
 Nodes (3): 1. Functional Capabilities Delivered in Paper Supplier Hub, 2. Design System & Localization (`DE / EN / ES`) Compliance, RECOVERY-09 — Phase 4: Paper Supplier Hub UI Implementation Report
 
-### Community 2806 - "smoke_phase192e_dispatch_telemetry.js"
-Cohesion: 0.05
-Nodes (35): activationAdapter, assert, db, dispatchEligibilityService, dispatchService, governedRoutingService, mockGrants, mockNodes (+27 more)
+### Community 2806 - "dev04b3a_prerequisites_remediation.test.js"
+Cohesion: 0.08
+Nodes (21): activationAdapter, DispatchEligibilityService, governedRoutingService, dispatchEligibilityService, governedDispatchService, industrialSecurity, marketplaceDispatchGating, mysqlClient (+13 more)
 
-### Community 2809 - "smoke_phase145g_guardrail_no_execution_write_scope.js"
-Cohesion: 0.29
-Nodes (6): assert, db, FILES_TO_SCAN, FORBIDDEN_WORDS, fs, path
+### Community 2808 - "instanceRegistry.js"
+Cohesion: 0.12
+Nodes (5): FederationEngine, registry, FederationPolicyValidator, registry, InstanceRegistry
+
+### Community 2809 - "smoke_phase136a_runtime_activity_observation_schema.js"
+Cohesion: 0.40
+Nodes (3): db, fs, path
 
 ### Community 2810 - "RECOVERY-10 — Phase 2: Full Production Backup Manifest & Restorability Verification"
 Cohesion: 0.40
@@ -11007,16 +10943,16 @@ Cohesion: 0.40
 Nodes (4): 1. Four-Stage Epistemic & Governance Separation, 2. Schema & Enum Reuse Audit (Zero Unnecessary Enum / DDL Expansion), 3. RBAC & 3-Way Segregation of Duties (SoD) Matrix, PAPER-MATERIALS-RECOVERY-11 — Architecture, Lifecycle States & Permission Matrix
 
 ### Community 2820 - "industrialHeartbeatService.js"
-Cohesion: 0.07
-Nodes (17): capacitySync, db, scoringService, agentService, express, router, db, IndustrialHeartbeatService (+9 more)
+Cohesion: 0.10
+Nodes (11): agentService, express, router, db, IndustrialHeartbeatService, NODE_STATES, persistence, db (+3 more)
 
-### Community 2821 - "server.js"
-Cohesion: 0.04
-Nodes (36): baseline, baselinePath, compatibilityService, dbMock, fs, path, axios, db (+28 more)
+### Community 2821 - "IndustrialProvisioningService"
+Cohesion: 0.16
+Nodes (7): baseline, baselinePath, compatibilityService, dbMock, fs, path, IndustrialProvisioningService
 
-### Community 2822 - "smoke_phase146g_guardrail_no_execution_write_scope.js"
-Cohesion: 0.29
-Nodes (6): assert, db, FILES_TO_SCAN, FORBIDDEN_WORDS, fs, path
+### Community 2822 - "controlledBetaOperationalReviewAdmin.js"
+Cohesion: 0.50
+Nodes (4): ControlledBetaOperationalReviewService, express, getSvc(), router
 
 ### Community 2823 - "smoke_phase144g_guardrail_write_scope_forbidden_scanner.js"
 Cohesion: 0.29
@@ -11030,9 +10966,9 @@ Nodes (7): 1. Certificación de Inmutabilidad de Espesores y Balance de Clasific
 Cohesion: 0.25
 Nodes (7): 1. Certificación de Inmutabilidad de Espesores y Balance de Clasificación (`Control.paper_variants`), 2. Gobernanza y Segregación de Funciones de 4 Vías (SoD), 3. Registro de Auditoría — Sublote C4-A (`18` Variantes Texturizadas, Marcadas al Fieltro y Verjuradas: `FELT_MARKED`, `LAID`, `TEXTURED`), 4. Registro de Auditoría — Sublote C4-B (`17` Variantes Especiales Perlescentes, Metalizadas y Translúcidas: `SPECIALTY`), 5. Registro de Auditoría — Sublote C4-C (`62` Variantes Creativas Lisas y Coloreadas en Masa: `UNCOATED` / `SMOOTH`), 6. Balance de Clasificaciones Pendientes Restantes (`64` de `337`), PrintPrice OS — RECOVERY-12: Batch C4 Classification Accreditation Report (97 DESIGN Fine Art & Creative Paper Variants)
 
-### Community 2830 - "smoke_phase147g_guardrail_no_op_zero_mutation_write_scope.js"
-Cohesion: 0.29
-Nodes (6): assert, db, FILES_TO_SCAN, FORBIDDEN_WORDS, fs, path
+### Community 2830 - "cohortInterventionExecutionPlanActivationTokenStagingEvidencePackService.js"
+Cohesion: 0.40
+Nodes (3): CohortInterventionExecutionPlanActivationTokenStagingEvidencePackService, crypto, db
 
 ### Community 2832 - "printhouseMarketplaceReviewService.js"
 Cohesion: 0.08
@@ -11046,9 +10982,17 @@ Nodes (66): db, setupFinalizedUnlockComplianceWitness(), setupFinalizedUnlockEme
 Cohesion: 0.50
 Nodes (3): 1. Summary Matrix of Production Authenticated Smoke Checks, 2. Governed Forensic Archiving & Cleanup of Isolated Smoke Records, RECOVERY-10 — Phase 5: Authenticated API Smoke Tests & Security E2E Report
 
-### Community 2836 - "smoke_phase148g_guardrail_dry_run_zero_mutation_write_scope.js"
-Cohesion: 0.29
-Nodes (6): assert, db, FILES_TO_SCAN, FORBIDDEN_WORDS, fs, path
+### Community 2836 - "security_jobs_queue_isolation_test.js"
+Cohesion: 0.40
+Nodes (4): assert, { FIXTURES, generateMockToken, createMockReq, dispatchRequest, setQueryStub, teardown }, jobsRouter, runTests()
+
+### Community 2839 - "smoke_phase142h_acceptance_pack_real_db.js"
+Cohesion: 0.50
+Nodes (3): db, { execSync }, SMOKE_TESTS
+
+### Community 2841 - "smoke_phase153h_acceptance_pack_real_db.js"
+Cohesion: 0.50
+Nodes (3): db, { execSync }, SMOKE_TESTS
 
 ### Community 2842 - "smoke_phase180h_acceptance_pack_real_db.js"
 Cohesion: 0.33
@@ -11062,25 +11006,17 @@ Nodes (5): fs, generateMockScenarios(), humanReportService, path, run()
 Cohesion: 0.33
 Nodes (5): assert, { FIXTURES, generateMockToken, createMockReq, dispatchRequest, setQueryStub, teardown }, machinesRouter, printhouseCapsRouter, runTests()
 
-### Community 2846 - "smoke_phase146f_admin_api_ui_contract.js"
-Cohesion: 0.40
-Nodes (4): adminRouter, assert, fs, path
-
-### Community 2847 - "smoke_phase62d_control_plane_page_marks_human_report.js"
-Cohesion: 0.40
-Nodes (4): fs, path, preflightHumanReportService, runSmokeTests()
-
 ### Community 2854 - "impositionEngine.test.js"
 Cohesion: 0.33
 Nodes (5): createMockReqRes(), impositionEngine, impositionRoutes, invokeRouter(), wrapperEngine
 
 ### Community 2859 - "printhouseActivationAdapter.js"
-Cohesion: 0.07
-Nodes (18): db, killSwitchService, PrinthouseActivationAdapter, SUPPORTED_CAPABILITIES, activationAdapter, assert, db, mockGrants (+10 more)
+Cohesion: 0.09
+Nodes (13): db, killSwitchService, PrinthouseActivationAdapter, SUPPORTED_CAPABILITIES, activationAdapter, assert, db, mockGrants (+5 more)
 
-### Community 2860 - "FIXTURES"
-Cohesion: 0.20
-Nodes (8): adminRouter, assert, { FIXTURES, generateMockToken, createMockReq, dispatchRequest, teardown }, assert, { FIXTURES, generateMockToken, createMockReq, dispatchRequest, setQueryStub, teardown }, printhouseDashboardRouter, runTests(), FIXTURES
+### Community 2860 - "security_printhouse_dashboard_isolation_test.js"
+Cohesion: 0.40
+Nodes (4): assert, { FIXTURES, generateMockToken, createMockReq, dispatchRequest, setQueryStub, teardown }, printhouseDashboardRouter, runTests()
 
 ### Community 2865 - "RECOVERY-12 (Batch P1-A) — Formal Accreditation & Catalog Promotion Report"
 Cohesion: 0.40
@@ -11102,35 +11038,23 @@ Nodes (4): 1. Governance & 4-Stage Transactional Workflow, 2. Completed Transact
 Cohesion: 0.40
 Nodes (3): db, fs, path
 
-### Community 2878 - "smoke_phase145f_admin_api_ui_contract.js"
-Cohesion: 0.40
-Nodes (4): adminRouter, assert, fs, path
-
-### Community 2880 - "smoke_phase147f_admin_api_ui_contract.js"
-Cohesion: 0.40
-Nodes (4): adminRouter, assert, fs, path
-
-### Community 2881 - "smoke_phase148f_admin_api_ui_contract.js"
-Cohesion: 0.40
-Nodes (4): adminRouter, assert, fs, path
-
 ### Community 2882 - "smoke_phase192_1_rc13_printhouse_readiness.js"
 Cohesion: 0.33
 Nodes (6): assert, db, memoryStore, readinessService, resetStore(), runTests()
 
 ## Knowledge Gaps
-- **16156 isolated node(s):** `fs`, `selfTest`, `path`, `SOURCE`, `CATEGORY_IDS` (+16151 more)
-  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 20798 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
-- **513 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **16159 isolated node(s):** `fs`, `selfTest`, `path`, `SOURCE`, `CATEGORY_IDS` (+16154 more)
+  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 20802 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
+- **514 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `PrinthouseSetupHub()` connect `t` to `i18n.tsx`, `App.tsx`, `getAuthToken`, `useLocale`?**
-  _High betweenness centrality (0.011) - this node is a cross-community bridge._
-- **Why does `getAuthToken()` connect `getAuthToken` to `adminFetch`, `PrinthouseRegistrationPage.tsx`, `BackgroundJobMonitor.tsx`, `i18n.tsx`, `ProductionMonitoringDashboardPage.tsx`, `authenticatedBetaFetch`, `ui_reconciliation_components.test.tsx`, `useLocale`, `countryCatalog.ts`, `JobDetailDrawer.tsx`, `AdminDashboard.tsx`, `t`, `SessionManager`?**
-  _High betweenness centrality (0.005) - this node is a cross-community bridge._
-- **Why does `LogisticsDatabaseService` connect `roundToPrecision` to `logistics_integration_preview.test.js`, `api/services/logistics/carrierMilestoneAndEpalService.js`, `printhouseQuotePreviewService.js`?**
+- **Why does `PrinthouseSetupHub()` connect `useLocale` to `App.tsx`?**
+  _High betweenness centrality (0.015) - this node is a cross-community bridge._
+- **Why does `adminFetch()` connect `adminFetch` to `App.tsx`, `BackgroundJobMonitor.tsx`, `PrinthousesPage.tsx`, `financialOperationsProductionActivationClient.ts`, `useLocale`, `foundingPrinthousePilotGateClient.ts`, `useAdminQuery`, `BillingUsageDashboardPage.tsx`, `ui_reconciliation_components.test.tsx`, `authStore.ts`, `PreflightJobDetailPage.tsx`, `printhouseCapabilitiesClient.ts`, `betaObservabilityClient.ts`, `internalOrderLifecyclePilotClient.ts`, `ProductionMonitoringDashboardPage.tsx`, `LimitedBetaRuntime.tsx`, `helpSearch.ts`, `formatters.ts`, `financialOperationsProductionActivationDryRunClient.ts`, `controlledProductionPilotActivationClient.ts`, `preProductionOperationalReadinessBoardClient.ts`, `prelaunchSecurityComplianceHardeningClient.ts`, `productionDeploymentReadinessChecklist.ts`, `SubscriptionGuard.tsx`, `finalPreproductionReleaseCandidate.ts`, `NotificationBell.tsx`, `controlledPrinthouseHandoffPackageClient.ts`, `tenantPilotClient.ts`, `productionDeploymentDryRunClient.ts`, `productionObservabilityIncidentReadinessClient.ts`?**
+  _High betweenness centrality (0.009) - this node is a cross-community bridge._
+- **Why does `LogisticsDatabaseService` connect `spine02_03_engine_and_api.test.js` to `api/services/logistics/carrierMilestoneAndEpalService.js`, `calibrationSessionService.js`?**
   _High betweenness centrality (0.005) - this node is a cross-community bridge._
 - **Are the 25 inferred relationships involving `i2()` (e.g. with `Lv()` and `Pp()`) actually correct?**
   _`i2()` has 25 INFERRED edges - model-reasoned connections that need verification._
@@ -11139,4 +11063,4 @@ _Questions this graph is uniquely positioned to answer:_
 - **Are the 28 inferred relationships involving `i()` (e.g. with `aN()` and `bu()`) actually correct?**
   _`i()` has 28 INFERRED edges - model-reasoned connections that need verification._
 - **What connects `fs`, `selfTest`, `path` to the rest of the system?**
-  _16156 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _16159 weakly-connected nodes found - possible documentation gaps or missing edges._

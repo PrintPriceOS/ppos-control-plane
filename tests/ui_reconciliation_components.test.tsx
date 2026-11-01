@@ -336,8 +336,23 @@ describe('Dark Industrial Telemetry UI — Canonical Components & Dual-Mode Reco
         // Verify KPI bar shows real seeded profiles (> 0)
         expect(screen.getByTestId('pricing-kpi-summary-bar')).toBeInTheDocument();
         expect(screen.getByTestId('economic-profiles-table')).toBeInTheDocument();
+        expect(screen.getByTestId('profiles-family-filter-bar')).toBeInTheDocument();
         expect(screen.getByText('Heidelberg Speedmaster XL 106-8P')).toBeInTheDocument();
         expect(screen.getByText('HP Indigo 12000 HD Digital Press')).toBeInTheDocument();
+
+        // Verify Machine -> Min/Max Formats -> Viable Binding Families columns in EconomicProfilesTable
+        expect(screen.getByTestId('profile-formats-prof-offset-b1-xl106')).toHaveTextContent('280×400 mm');
+        expect(screen.getByTestId('profile-formats-prof-offset-b1-xl106')).toHaveTextContent('1060×750 mm');
+        expect(screen.getByTestId('profile-families-prof-offset-b1-xl106')).toHaveTextContent('HARDCOVER');
+        expect(screen.getByTestId('profile-families-prof-offset-b1-xl106')).toHaveTextContent('SOFTCOVER');
+        expect(screen.getByTestId('profile-families-prof-offset-b1-xl106')).toHaveTextContent('WIRE-O');
+        expect(screen.getByTestId('profile-families-prof-offset-b1-xl106')).toHaveTextContent('SADDLE STITCH');
+
+        // Filter by HARDCOVER and verify Web Rotary (which only supports SOFTCOVER + SADDLE_STITCH) is filtered out
+        fireEvent.click(screen.getByTestId('filter-family-btn-HARDCOVER'));
+        expect(screen.queryByText('Manroland Lithoman IV Web Offset')).not.toBeInTheDocument();
+        fireEvent.click(screen.getByTestId('filter-family-btn-ALL'));
+        expect(screen.getByText('Manroland Lithoman IV Web Offset')).toBeInTheDocument();
 
         // Open Live Price Calibrator Modal from the Heidelberg row
         const calibrateBtn = screen.getByTestId('calibrate-profile-btn-prof-offset-b1-xl106');

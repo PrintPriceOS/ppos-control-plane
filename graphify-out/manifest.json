@@ -15660,9 +15660,9 @@
     "semantic_hash": ""
   },
   "src/ui/pages/admin/PricingIntelligenceTab.tsx": {
-    "mtime": 1793498044.2691443,
-    "seen": 1793501685.5666168,
-    "ast_hash": "fc3d4f311d252671458897d517e742e1",
+    "mtime": 1793531440.454739,
+    "seen": 1793531626.6021028,
+    "ast_hash": "c7ce075d919f3d775d577ab5bec4e046",
     "semantic_hash": ""
   },
   "src/ui/pages/admin/PricingSessionsTab.tsx": {
@@ -30966,9 +30966,9 @@
     "semantic_hash": ""
   },
   "tests/ui_reconciliation_components.test.tsx": {
-    "mtime": 1793530398.2518928,
-    "seen": 1793530638.5825586,
-    "ast_hash": "380e1c10750ce25c57878bbb196ca813",
+    "mtime": 1793531392.3841965,
+    "seen": 1793531626.8011038,
+    "ast_hash": "52e58513fdb1690ea9fd73bf133cf6ed",
     "semantic_hash": ""
   },
   "services/preflight/preflightEngineService.js": {
@@ -31164,15 +31164,15 @@
     "semantic_hash": ""
   },
   "src/api/services/pricing/pricingIntelligenceService.js": {
-    "mtime": 1793530492.1849577,
-    "seen": 1793530638.2215397,
-    "ast_hash": "f9a177643614ebf6105433bd3bf1cf62",
+    "mtime": 1793531439.3862622,
+    "seen": 1793531626.4501035,
+    "ast_hash": "afad53f6ec1410badcc11fb99bb619f9",
     "semantic_hash": ""
   },
   "src/ui/components/pricing/EconomicProfilesTable.tsx": {
-    "mtime": 1793529932.7282476,
-    "seen": 1793530638.3125355,
-    "ast_hash": "e739add10b02a9fad090565877eccb08",
+    "mtime": 1793531439.8752456,
+    "seen": 1793531626.5371037,
+    "ast_hash": "b43bd041893cbc8e99d50ebacbda9627",
     "semantic_hash": ""
   },
   "src/ui/components/pricing/LivePriceCalibratorModal.tsx": {

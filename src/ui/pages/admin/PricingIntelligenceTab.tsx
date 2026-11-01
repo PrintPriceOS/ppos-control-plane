@@ -38,6 +38,11 @@ const SEED_PROFILES: EconomicProfileRow[] = [
         printerName: 'Heidelberg Speedmaster XL 106-8P',
         technology: 'OFFSET_B1',
         technologyLabel: 'Offset B1 (70×100 cm · 16 pp/sig)',
+        supportedFamilies: ['SOFTCOVER', 'HARDCOVER', 'WIRE_O', 'SADDLE_STITCH'],
+        minSheetWidthMm: 280,
+        minSheetHeightMm: 400,
+        maxSheetWidthMm: 1060,
+        maxSheetHeightMm: 750,
         scope: 'GLOBAL',
         hourlyRateEur: 265,
         setupFeeEur: 240,
@@ -54,6 +59,11 @@ const SEED_PROFILES: EconomicProfileRow[] = [
         printerName: 'Komori Lithrone G29 (B2)',
         technology: 'OFFSET_B2',
         technologyLabel: 'Offset B2 (50×70 cm · 8 pp/sig)',
+        supportedFamilies: ['SOFTCOVER', 'HARDCOVER', 'WIRE_O', 'SADDLE_STITCH'],
+        minSheetWidthMm: 210,
+        minSheetHeightMm: 297,
+        maxSheetWidthMm: 750,
+        maxSheetHeightMm: 530,
         scope: 'GLOBAL',
         hourlyRateEur: 185,
         setupFeeEur: 160,
@@ -70,6 +80,11 @@ const SEED_PROFILES: EconomicProfileRow[] = [
         printerName: 'HP Indigo 12000 HD Digital Press',
         technology: 'DIGITAL_TONER',
         technologyLabel: 'Digital SRA3 / B2 (Zero Plate)',
+        supportedFamilies: ['SOFTCOVER', 'HARDCOVER', 'WIRE_O', 'SADDLE_STITCH'],
+        minSheetWidthMm: 148,
+        minSheetHeightMm: 210,
+        maxSheetWidthMm: 750,
+        maxSheetHeightMm: 530,
         scope: 'GLOBAL',
         hourlyRateEur: 95,
         setupFeeEur: 25,
@@ -86,6 +101,11 @@ const SEED_PROFILES: EconomicProfileRow[] = [
         printerName: 'Manroland Lithoman IV Web Offset',
         technology: 'WEB_ROTARY',
         technologyLabel: 'Rotativa Comercial (32 pp/sig)',
+        supportedFamilies: ['SOFTCOVER', 'SADDLE_STITCH'],
+        minSheetWidthMm: 420,
+        minSheetHeightMm: 594,
+        maxSheetWidthMm: 1260,
+        maxSheetHeightMm: 900,
         scope: 'GLOBAL',
         hourlyRateEur: 490,
         setupFeeEur: 680,
@@ -246,6 +266,8 @@ export const PricingIntelligenceTab: React.FC<SharedModuleProps> = ({
     const [isProfileModalOpen, setIsProfileModalOpen] = useState<boolean>(false);
     const [isCalibratorOpen, setIsCalibratorOpen] = useState<boolean>(false);
     const [calibratingProfile, setCalibratingProfile] = useState<EconomicProfileRow | null>(null);
+    const [calibratorInitialFamily, setCalibratorInitialFamily] = useState<'SOFTCOVER' | 'HARDCOVER' | 'WIRE_O' | 'SADDLE_STITCH'>('SOFTCOVER');
+    const [selectedFamilyFilter, setSelectedFamilyFilter] = useState<string>('ALL');
     const [isSaving, setIsSaving] = useState<boolean>(false);
 
     const [formData, setFormData] = useState({
@@ -253,6 +275,11 @@ export const PricingIntelligenceTab: React.FC<SharedModuleProps> = ({
         printerId: printhouseId || 'mach-custom-node',
         printerName: '',
         technology: 'OFFSET_B1',
+        supportedFamilies: ['SOFTCOVER', 'HARDCOVER', 'WIRE_O', 'SADDLE_STITCH'] as string[],
+        minSheetWidthMm: 280,
+        minSheetHeightMm: 400,
+        maxSheetWidthMm: 1060,
+        maxSheetHeightMm: 750,
         hourlyRateEur: 220,
         setupFeeEur: 180,
         plateCostEur: 20,
@@ -399,6 +426,11 @@ export const PricingIntelligenceTab: React.FC<SharedModuleProps> = ({
             printerId: formData.printerId || `mach-${Date.now()}`,
             printerName: formData.printerName || 'Custom Industrial Press',
             technology: formData.technology,
+            supportedFamilies: formData.supportedFamilies,
+            minSheetWidthMm: Number(formData.minSheetWidthMm),
+            minSheetHeightMm: Number(formData.minSheetHeightMm),
+            maxSheetWidthMm: Number(formData.maxSheetWidthMm),
+            maxSheetHeightMm: Number(formData.maxSheetHeightMm),
             scope: 'GLOBAL',
             hourlyRateEur: Number(formData.hourlyRateEur),
             setupFeeEur: Number(formData.setupFeeEur),
@@ -446,6 +478,11 @@ export const PricingIntelligenceTab: React.FC<SharedModuleProps> = ({
                         printerId: String(targetPayload.printerId || 'mach-node'),
                         printerName: String(targetPayload.printerName || 'Industrial Press Node'),
                         technology: String(targetPayload.technology || 'OFFSET_B1'),
+                        supportedFamilies: targetPayload.supportedFamilies || ['SOFTCOVER', 'HARDCOVER', 'WIRE_O', 'SADDLE_STITCH'],
+                        minSheetWidthMm: Number(targetPayload.minSheetWidthMm ?? 148),
+                        minSheetHeightMm: Number(targetPayload.minSheetHeightMm ?? 210),
+                        maxSheetWidthMm: Number(targetPayload.maxSheetWidthMm ?? 750),
+                        maxSheetHeightMm: Number(targetPayload.maxSheetHeightMm ?? 530),
                         scope: 'GLOBAL',
                         hourlyRateEur: Number(targetPayload.hourlyRateEur ?? 220),
                         setupFeeEur: Number(targetPayload.setupFeeEur ?? 180),
@@ -476,6 +513,16 @@ export const PricingIntelligenceTab: React.FC<SharedModuleProps> = ({
             printerId: profile.printerId,
             printerName: profile.printerName,
             technology: profile.technology,
+            supportedFamilies:
+                Array.isArray(profile.supportedFamilies) && profile.supportedFamilies.length > 0
+                    ? profile.supportedFamilies
+                    : profile.technology === 'WEB_ROTARY'
+                      ? ['SOFTCOVER', 'SADDLE_STITCH']
+                      : ['SOFTCOVER', 'HARDCOVER', 'WIRE_O', 'SADDLE_STITCH'],
+            minSheetWidthMm: profile.minSheetWidthMm ?? (profile.technology === 'OFFSET_B1' ? 280 : 148),
+            minSheetHeightMm: profile.minSheetHeightMm ?? (profile.technology === 'OFFSET_B1' ? 400 : 210),
+            maxSheetWidthMm: profile.maxSheetWidthMm ?? (profile.technology === 'OFFSET_B1' ? 1060 : 750),
+            maxSheetHeightMm: profile.maxSheetHeightMm ?? (profile.technology === 'OFFSET_B1' ? 750 : 530),
             hourlyRateEur: profile.hourlyRateEur,
             setupFeeEur: profile.setupFeeEur,
             plateCostEur: profile.plateCostEur ?? 20,
@@ -486,8 +533,11 @@ export const PricingIntelligenceTab: React.FC<SharedModuleProps> = ({
         setIsProfileModalOpen(true);
     };
 
-    const handleCalibrateProfile = (profile: EconomicProfileRow) => {
+    const handleCalibrateProfile = (profile: EconomicProfileRow, initialFamily?: string) => {
         setCalibratingProfile(profile);
+        if (initialFamily) {
+            setCalibratorInitialFamily(initialFamily as any);
+        }
         setIsCalibratorOpen(true);
     };
 
@@ -569,6 +619,11 @@ export const PricingIntelligenceTab: React.FC<SharedModuleProps> = ({
                         printerId: `mach-${Date.now().toString().slice(-4)}`,
                         printerName: '',
                         technology: 'OFFSET_B1',
+                        supportedFamilies: ['SOFTCOVER', 'HARDCOVER', 'WIRE_O', 'SADDLE_STITCH'],
+                        minSheetWidthMm: 280,
+                        minSheetHeightMm: 400,
+                        maxSheetWidthMm: 1060,
+                        maxSheetHeightMm: 750,
                         hourlyRateEur: 220,
                         setupFeeEur: 180,
                         plateCostEur: 20,
@@ -604,6 +659,8 @@ export const PricingIntelligenceTab: React.FC<SharedModuleProps> = ({
                     title={labels.tableTitle}
                     loading={loading}
                     profiles={profiles}
+                    selectedFamilyFilter={selectedFamilyFilter}
+                    onFamilyFilterChange={setSelectedFamilyFilter}
                     onRefresh={fetchPricingEngineData}
                     onEditProfile={handleEditProfile}
                     onCalibrateProfile={handleCalibrateProfile}
@@ -630,6 +687,7 @@ export const PricingIntelligenceTab: React.FC<SharedModuleProps> = ({
                     profiles={profiles}
                     papers={papers}
                     initialProfile={calibratingProfile || profiles[0]}
+                    initialProductFamily={calibratorInitialFamily}
                     onApplyProfileCalibration={handleSaveProfile}
                 />
             )}
@@ -641,6 +699,7 @@ export const PricingIntelligenceTab: React.FC<SharedModuleProps> = ({
                 profiles={profiles}
                 papers={papers}
                 initialProfile={calibratingProfile}
+                initialProductFamily={calibratorInitialFamily}
                 onApplyProfileCalibration={handleSaveProfile}
             />
 
@@ -694,7 +753,21 @@ export const PricingIntelligenceTab: React.FC<SharedModuleProps> = ({
                                     <select
                                         data-testid="profile-select-technology"
                                         value={formData.technology}
-                                        onChange={(e) => setFormData({ ...formData, technology: e.target.value })}
+                                        onChange={(e) => {
+                                            const nextTech = e.target.value;
+                                            setFormData({
+                                                ...formData,
+                                                technology: nextTech,
+                                                supportedFamilies:
+                                                    nextTech === 'WEB_ROTARY'
+                                                        ? ['SOFTCOVER', 'SADDLE_STITCH']
+                                                        : ['SOFTCOVER', 'HARDCOVER', 'WIRE_O', 'SADDLE_STITCH'],
+                                                minSheetWidthMm: nextTech === 'OFFSET_B1' ? 280 : nextTech === 'WEB_ROTARY' ? 420 : 148,
+                                                minSheetHeightMm: nextTech === 'OFFSET_B1' ? 400 : nextTech === 'WEB_ROTARY' ? 594 : 210,
+                                                maxSheetWidthMm: nextTech === 'OFFSET_B1' ? 1060 : nextTech === 'WEB_ROTARY' ? 1260 : 750,
+                                                maxSheetHeightMm: nextTech === 'OFFSET_B1' ? 750 : nextTech === 'WEB_ROTARY' ? 900 : 530
+                                            });
+                                        }}
                                         className="w-full px-3 py-2.5 rounded-lg border font-bold bg-slate-100/50 dark:bg-[#0a0b0d] text-slate-900 dark:text-white border-slate-200 dark:border-[#1f2228]"
                                     >
                                         <option value="OFFSET_B1">OFFSET_B1 (70×100 cm)</option>
@@ -702,6 +775,106 @@ export const PricingIntelligenceTab: React.FC<SharedModuleProps> = ({
                                         <option value="DIGITAL_TONER">DIGITAL_TONER (SRA3 / B2)</option>
                                         <option value="WEB_ROTARY">WEB_ROTARY (Rotativa)</option>
                                     </select>
+                                </div>
+                            </div>
+
+                            {/* 2. Min / Max Sheet Format Bounds (mm) */}
+                            <div className="p-3 rounded-lg bg-slate-50 dark:bg-[#0a0b0d] border border-slate-200 dark:border-[#1f2228] space-y-2">
+                                <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                                    2. FORMATOS MÍN / MÁX ACEPTADOS POR LA MÁQUINA (MM)
+                                </div>
+                                <div className="grid grid-cols-4 gap-2">
+                                    <div>
+                                        <label className="block text-[9px] text-slate-400 mb-0.5">Mín Ancho</label>
+                                        <input
+                                            type="number"
+                                            data-testid="profile-input-min-width"
+                                            value={formData.minSheetWidthMm}
+                                            onChange={(e) =>
+                                                setFormData({ ...formData, minSheetWidthMm: Number(e.target.value) || 0 })
+                                            }
+                                            className="w-full px-2 py-1.5 rounded border font-bold bg-white dark:bg-[#14161a] text-slate-900 dark:text-white border-slate-200 dark:border-[#2a2e37]"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-[9px] text-slate-400 mb-0.5">Mín Alto</label>
+                                        <input
+                                            type="number"
+                                            data-testid="profile-input-min-height"
+                                            value={formData.minSheetHeightMm}
+                                            onChange={(e) =>
+                                                setFormData({ ...formData, minSheetHeightMm: Number(e.target.value) || 0 })
+                                            }
+                                            className="w-full px-2 py-1.5 rounded border font-bold bg-white dark:bg-[#14161a] text-slate-900 dark:text-white border-slate-200 dark:border-[#2a2e37]"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-[9px] text-slate-400 mb-0.5">Máx Ancho</label>
+                                        <input
+                                            type="number"
+                                            data-testid="profile-input-max-width"
+                                            value={formData.maxSheetWidthMm}
+                                            onChange={(e) =>
+                                                setFormData({ ...formData, maxSheetWidthMm: Number(e.target.value) || 0 })
+                                            }
+                                            className="w-full px-2 py-1.5 rounded border font-bold bg-white dark:bg-[#14161a] text-slate-900 dark:text-white border-slate-200 dark:border-[#2a2e37]"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-[9px] text-slate-400 mb-0.5">Máx Alto</label>
+                                        <input
+                                            type="number"
+                                            data-testid="profile-input-max-height"
+                                            value={formData.maxSheetHeightMm}
+                                            onChange={(e) =>
+                                                setFormData({ ...formData, maxSheetHeightMm: Number(e.target.value) || 0 })
+                                            }
+                                            className="w-full px-2 py-1.5 rounded border font-bold bg-white dark:bg-[#14161a] text-slate-900 dark:text-white border-slate-200 dark:border-[#2a2e37]"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* 3. Viable Binding Families */}
+                            <div className="p-3 rounded-lg bg-slate-50 dark:bg-[#0a0b0d] border border-slate-200 dark:border-[#1f2228] space-y-2">
+                                <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                                    3. FAMILIAS DE ENCUADERNACIÓN VIABLES
+                                </div>
+                                <div className="grid grid-cols-2 gap-2">
+                                    {[
+                                        { id: 'HARDCOVER', label: 'Hardcover (Tapa Dura)' },
+                                        { id: 'SOFTCOVER', label: 'Softcover (Rústica PUR)' },
+                                        { id: 'WIRE_O', label: 'Wire-O (Espiral)' },
+                                        { id: 'SADDLE_STITCH', label: 'Saddle Stitch (Grapado)' }
+                                    ].map((fam) => {
+                                        const checked = formData.supportedFamilies.includes(fam.id);
+                                        return (
+                                            <label
+                                                key={fam.id}
+                                                className={`flex items-center gap-2 px-2.5 py-1.5 rounded border cursor-pointer text-[11px] font-bold transition-colors ${
+                                                    checked
+                                                        ? 'bg-[#dc2626]/15 border-[#dc2626] text-white'
+                                                        : 'bg-white dark:bg-[#14161a] border-slate-200 dark:border-[#2a2e37] text-slate-400'
+                                                }`}
+                                            >
+                                                <input
+                                                    type="checkbox"
+                                                    checked={checked}
+                                                    onChange={(e) => {
+                                                        const next = e.target.checked
+                                                            ? [...formData.supportedFamilies, fam.id]
+                                                            : formData.supportedFamilies.filter((f) => f !== fam.id);
+                                                        setFormData({
+                                                            ...formData,
+                                                            supportedFamilies: next.length > 0 ? next : ['SOFTCOVER']
+                                                        });
+                                                    }}
+                                                    className="accent-[#dc2626]"
+                                                />
+                                                <span>{fam.label}</span>
+                                            </label>
+                                        );
+                                    })}
                                 </div>
                             </div>
 
