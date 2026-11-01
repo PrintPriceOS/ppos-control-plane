@@ -16,6 +16,8 @@
 
 const {
     getPricingProfilesAsync,
+    getTenantMaterialsCatalogAsync,
+    addMaterialToCatalogAsync,
     savePricingProfileAsync,
     deletePricingProfileAsync,
     calibrateQuote,
@@ -116,6 +118,42 @@ function createPricingRouter() {
                 'tenant-default';
             const data = await getPricingProfilesAsync(tenantId);
             return res.status(200).json(data);
+        } catch (err) {
+            return res.status(err.statusCode || 400).json({
+                ok: false,
+                error: err.message
+            });
+        }
+    });
+
+    // GET /api/pricing/materials
+    router.get('/materials', async (req, res) => {
+        try {
+            const tenantId =
+                (req.user && req.user.tenantId) ||
+                (req.query && req.query.tenantId) ||
+                (req.headers && req.headers['x-tenant-id']) ||
+                'tenant-default';
+            const data = await getTenantMaterialsCatalogAsync(tenantId);
+            return res.status(200).json(data);
+        } catch (err) {
+            return res.status(err.statusCode || 400).json({
+                ok: false,
+                error: err.message
+            });
+        }
+    });
+
+    // POST /api/pricing/materials
+    router.post('/materials', async (req, res) => {
+        try {
+            const tenantId =
+                (req.user && req.user.tenantId) ||
+                (req.body && req.body.tenantId) ||
+                (req.headers && req.headers['x-tenant-id']) ||
+                'tenant-default';
+            const result = await addMaterialToCatalogAsync(tenantId, req.body || {});
+            return res.status(200).json(result);
         } catch (err) {
             return res.status(err.statusCode || 400).json({
                 ok: false,

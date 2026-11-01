@@ -11952,8 +11952,8 @@
     "semantic_hash": "1615fefe9ddc6467fa9de2c03dd1049f"
   },
   "src/api/services/marketplaceInvoicePaymentService.js": {
-    "mtime": 1793502618.2267108,
-    "seen": 1793503102.1175048,
+    "mtime": 1793527691.8845503,
+    "seen": 1793528737.43861,
     "ast_hash": "f3cceaa24ee477f2ab7cd739175b2099",
     "semantic_hash": ""
   },
@@ -12072,8 +12072,8 @@
     "semantic_hash": "ede2da040445b7da9246509a967c3478"
   },
   "src/api/services/marketplaceService.js": {
-    "mtime": 1793502594.3923686,
-    "seen": 1793503102.1235292,
+    "mtime": 1793527693.252683,
+    "seen": 1793528737.4446096,
     "ast_hash": "d40a539024b24c66b875a6ea0d2129d2",
     "semantic_hash": ""
   },
@@ -12138,8 +12138,8 @@
     "semantic_hash": ""
   },
   "src/api/services/mysqlClient.js": {
-    "mtime": 1793502288.570439,
-    "seen": 1793503102.126637,
+    "mtime": 1793529511.5455754,
+    "seen": 1793530638.19754,
     "ast_hash": "792c6b701f7d604ed039beb234e38d11",
     "semantic_hash": ""
   },
@@ -14574,9 +14574,9 @@
     "semantic_hash": ""
   },
   "src/ui/components/printhouse/setup/PricingPanel.tsx": {
-    "mtime": 1793497270.4391718,
-    "seen": 1793497969.96517,
-    "ast_hash": "c09a54ae0d679a29ec5bab4f67549162",
+    "mtime": 1793530496.9134717,
+    "seen": 1793530638.3255365,
+    "ast_hash": "b173655c80a1a8fcadc943cc1846426f",
     "semantic_hash": ""
   },
   "src/ui/components/printhouse/setup/PricingPreview.tsx": {
@@ -17472,9 +17472,9 @@
     "semantic_hash": ""
   },
   "src/ui/pages/os/GlobalSettingsPage.tsx": {
-    "mtime": 1793502913.133765,
-    "seen": 1793503102.4328861,
-    "ast_hash": "5ee37f8c37a4dacd3cdea18b2eff1580",
+    "mtime": 1793528487.0531716,
+    "seen": 1793528737.748613,
+    "ast_hash": "41a9f7f734e76847a82057d7cd90a4fb",
     "semantic_hash": ""
   },
   "src/ui/pages/os/GovernancePage.tsx": {
@@ -24630,9 +24630,9 @@
     "semantic_hash": ""
   },
   "src/ui/components/printhouse/onboarding/ManualOfferForm.tsx": {
-    "mtime": 1793411530.253875,
-    "seen": 1793449041.9399414,
-    "ast_hash": "9bf0597a0bdba1e8b35e66a73ae9b432",
+    "mtime": 1793530495.9254806,
+    "seen": 1793530638.3155365,
+    "ast_hash": "a91270a8c2b9ec481bd5de41babd5969",
     "semantic_hash": ""
   },
   "src/ui/components/printhouse/onboarding/ProductFamilyCard.tsx": {
@@ -24642,9 +24642,9 @@
     "semantic_hash": ""
   },
   "src/ui/components/printhouse/onboarding/SimplifiedOnboardingJourney.tsx": {
-    "mtime": 1793451481.9802659,
-    "seen": 1793473642.1364913,
-    "ast_hash": "f420b3c4ce452560beeb9859956c0836",
+    "mtime": 1793530496.527392,
+    "seen": 1793530638.3165364,
+    "ast_hash": "c9c6b6828ff5b268499113e64f34ef61",
     "semantic_hash": ""
   },
   "src/ui/components/printhouse/onboarding/VariantSpecTable.tsx": {
@@ -24654,9 +24654,9 @@
     "semantic_hash": ""
   },
   "src/ui/types/printhouseOnboardingTypes.ts": {
-    "mtime": 1793411530.6374042,
-    "seen": 1793449041.9429417,
-    "ast_hash": "24f4fd18e4ae45961c478986a0c18edc",
+    "mtime": 1793530113.44458,
+    "seen": 1793530638.5035355,
+    "ast_hash": "a6673e416deedc2125e0cb1ab2be1f1f",
     "semantic_hash": ""
   },
   "tests/BetaCohortManagement.test.tsx": {
@@ -30966,9 +30966,9 @@
     "semantic_hash": ""
   },
   "tests/ui_reconciliation_components.test.tsx": {
-    "mtime": 1793502857.2167656,
-    "seen": 1793503102.5648284,
-    "ast_hash": "52aaff632dbc9fffaa9e61e005e3f14e",
+    "mtime": 1793530398.2518928,
+    "seen": 1793530638.5825586,
+    "ast_hash": "380e1c10750ce25c57878bbb196ca813",
     "semantic_hash": ""
   },
   "services/preflight/preflightEngineService.js": {
@@ -31152,9 +31152,9 @@
     "semantic_hash": ""
   },
   "src/api/routes/pricingRoutes.js": {
-    "mtime": 1793497634.041456,
-    "seen": 1793497969.6579878,
-    "ast_hash": "a0fd87911ff5cbb110d46bd4d37456ed",
+    "mtime": 1793529906.822974,
+    "seen": 1793530638.019537,
+    "ast_hash": "dfdcad1f7ae234887439231c3d046984",
     "semantic_hash": ""
   },
   "src/api/services/financials/eInvoicingService.js": {
@@ -31164,21 +31164,21 @@
     "semantic_hash": ""
   },
   "src/api/services/pricing/pricingIntelligenceService.js": {
-    "mtime": 1793498040.9113762,
-    "seen": 1793501685.3952098,
-    "ast_hash": "3bca39f904dd1d61afe36f8a13513f75",
+    "mtime": 1793530492.1849577,
+    "seen": 1793530638.2215397,
+    "ast_hash": "f9a177643614ebf6105433bd3bf1cf62",
     "semantic_hash": ""
   },
   "src/ui/components/pricing/EconomicProfilesTable.tsx": {
-    "mtime": 1793498041.046377,
-    "seen": 1793501685.4926155,
-    "ast_hash": "a44b5b48088f2d5c5147fa0d22485fdd",
+    "mtime": 1793529932.7282476,
+    "seen": 1793530638.3125355,
+    "ast_hash": "e739add10b02a9fad090565877eccb08",
     "semantic_hash": ""
   },
   "src/ui/components/pricing/LivePriceCalibratorModal.tsx": {
-    "mtime": 1793498041.6960356,
-    "seen": 1793501685.4926155,
-    "ast_hash": "a58875843535eee6c2a07d2afe84c9dc",
+    "mtime": 1793530494.3442447,
+    "seen": 1793530638.3125355,
+    "ast_hash": "7fd4de126f4ff74fe193970bc8b00711",
     "semantic_hash": ""
   },
   "src/ui/components/pricing/PricingKpiSummaryBar.tsx": {
@@ -31230,15 +31230,21 @@
     "semantic_hash": ""
   },
   "src/api/services/printhousePaymentSettingsService.js": {
-    "mtime": 1793502911.8215396,
-    "seen": 1793503102.192176,
+    "mtime": 1793527861.6079078,
+    "seen": 1793528737.476611,
     "ast_hash": "a7e30f916b83625a2f724f5903882102",
     "semantic_hash": ""
   },
   "tests/printhousePaymentSettings.test.js": {
-    "mtime": 1793502923.518311,
-    "seen": 1793503102.521051,
-    "ast_hash": "df569f39408fe6d23b3f5ab2939eaf9c",
+    "mtime": 1793503179.7118115,
+    "seen": 1793528737.8266132,
+    "ast_hash": "1a9ac1ef65079875cc5df9e58c5fb45e",
+    "semantic_hash": ""
+  },
+  "tests/pricingMaterialsAndMachineBridge.test.js": {
+    "mtime": 1793530497.4130943,
+    "seen": 1793530638.5435543,
+    "ast_hash": "4e4691cf6b057c52bee4a699095d92d2",
     "semantic_hash": ""
   }
 }

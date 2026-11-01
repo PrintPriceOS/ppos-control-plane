@@ -38,6 +38,7 @@ import { getAuthToken } from '../../../lib/authStore';
 import { canonicalizeToEngineBookSpec } from '../../../lib/bookSpecCanonicalizer';
 import { normalizeUiError } from '../../../utils/errorUtils';
 import { FamilyPricingSessionDraft } from '../../../lib/onboardingDraftStore';
+import { PaperCatalogItem, EconomicProfileRow } from '../../pricing';
 
 export interface SimplifiedOnboardingJourneyProps {
     printerNodeId?: string;
@@ -45,6 +46,8 @@ export interface SimplifiedOnboardingJourneyProps {
     initialSpec?: ProgressiveSpecState;
     initialStep?: 1 | 2 | 3 | 4 | 5;
     initialPricingDrafts?: Partial<Record<ProductFamilyId, FamilyPricingSessionDraft>>;
+    materialsCatalog?: PaperCatalogItem[];
+    machinesCatalog?: EconomicProfileRow[];
     onCompleted?: () => void;
     onOpenAdvanced?: () => void;
     onFamiliesStateChange?: (families: Record<ProductFamilyId, FamilyState>, selectedFamilyId: ProductFamilyId) => void;
@@ -81,6 +84,8 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
     printerNodeName = 'Production Node',
     initialSpec,
     initialStep = 1,
+    materialsCatalog = [],
+    machinesCatalog = [],
     onCompleted,
     onOpenAdvanced,
     onFamiliesStateChange,
@@ -1559,6 +1564,8 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
                         <ManualOfferForm
                             familyId={selectedFamilyId}
                             spec={currentOffer}
+                            materialsCatalog={materialsCatalog}
+                            machinesCatalog={machinesCatalog}
                             onChange={(updated) => {
                                 invalidateCalculation();
                                 currentOfferRef.current = updated;

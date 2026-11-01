@@ -1,25 +1,43 @@
 /**
  * src/ui/components/pricing/LivePriceCalibratorModal.tsx
  *
- * PrintPrice OS — Phase 14: Interactive Industrial Price Calibrator
+ * PrintPrice OS — Phase 14C: Unified Product + Machine Industrial Price Calibrator
  *
  * Reusable both as a Modal/Drawer in `/ops/pricing` and as an embedded or modal
  * calibrator in Onboarding (`Industrial Pricing` / `PrinthouseSetupHub.tsx`).
  *
- * Technical Cost Breakdown Formula:
- *   Paper Cost + CTP Plates Cost + Make-Ready Setup Cost + Press Run Time Cost + Finishing Cost = Base Industrial Cost
- *   Selling Price = max(Base Industrial Cost * (1 + Target Margin %), Base Industrial Cost + Min Order Fee)
+ * Unified Hierarchical Model:
+ *   1. Product Family / Binding (`SOFTCOVER`, `HARDCOVER`, `WIRE_O`, `SADDLE_STITCH`)
+ *   2. Compatible Primary Machine / Press Node (`Heidelberg XL 106`, `HP Indigo`, etc.)
+ *   3. Real Substrate / Paper Stock from `materials_catalog` (grouped by category + inline quick-add)
+ *   4. Geometry & Print Run Sliders -> Live Technical Cost Breakdown
  */
 import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { EconomicProfileRow } from './EconomicProfilesTable';
+import { getAuthToken } from '../../lib/authStore';
+
+export type ProductFamilyId = 'SOFTCOVER' | 'HARDCOVER' | 'WIRE_O' | 'SADDLE_STITCH';
 
 export interface PaperCatalogItem {
+    id?: string;
     paperId: string;
     name: string;
+    materialName?: string;
+    material_name?: string;
     grammageGsm: number;
+    gsm?: number;
     bulkFactor: number;
+    bulkMicrons?: number;
+    bulk_microns?: number;
     costPerTonEur: number;
+    costPerKgEur?: number;
+    cost_per_kg_eur?: number;
+    costPerSheetEur?: number;
+    cost_per_sheet_eur?: number;
+    substrateClass?: 'UNCOATED' | 'COATED' | 'BOARD' | string;
+    categoryLabel?: string;
+    sheetFormat?: string;
 }
 
 export interface LivePriceCalibratorModalProps {
@@ -28,14 +46,58 @@ export interface LivePriceCalibratorModalProps {
     profiles: EconomicProfileRow[];
     papers: PaperCatalogItem[];
     initialProfile?: EconomicProfileRow | null;
-    onApplyProfileCalibration?: (updatedProfile: Partial<EconomicProfileRow>) => Promise<void> | void;
+    initialProductFamily?: ProductFamilyId;
+    onApplyProfileCalibration?: (updatedProfile: Partial<EconomicProfileRow> & { productFamily?: ProductFamilyId; paperId?: string }) => Promise<void> | void;
+    onPaperAdded?: (newPaper: PaperCatalogItem) => void;
     embedded?: boolean;
 }
 
+const PRODUCT_FAMILY_OPTIONS: {
+    id: ProductFamilyId;
+    label: string;
+    bindingType: 'PUR' | 'HARDCOVER' | 'WIRE_O' | 'SADDLE';
+    compatibleTechnologies: string[];
+    defaultTrimSize: string;
+    defaultPages: number;
+}[] = [
+    {
+        id: 'SOFTCOVER',
+        label: 'Softcover / Paperback (Rústica PUR)',
+        bindingType: 'PUR',
+        compatibleTechnologies: ['OFFSET_B1', 'OFFSET_B2', 'DIGITAL_TONER', 'WEB_ROTARY'],
+        defaultTrimSize: '150x230',
+        defaultPages: 192
+    },
+    {
+        id: 'HARDCOVER',
+        label: 'Hardcover / Case Bound (Cartoné)',
+        bindingType: 'HARDCOVER',
+        compatibleTechnologies: ['OFFSET_B1', 'OFFSET_B2', 'DIGITAL_TONER'],
+        defaultTrimSize: '150x230',
+        defaultPages: 256
+    },
+    {
+        id: 'WIRE_O',
+        label: 'Wire-O / Twin Loop (Espiral Metálica)',
+        bindingType: 'WIRE_O',
+        compatibleTechnologies: ['DIGITAL_TONER', 'OFFSET_B2', 'OFFSET_B1'],
+        defaultTrimSize: '210x297',
+        defaultPages: 120
+    },
+    {
+        id: 'SADDLE_STITCH',
+        label: 'Saddle Stitch / Stapled (Grapado)',
+        bindingType: 'SADDLE',
+        compatibleTechnologies: ['DIGITAL_TONER', 'OFFSET_B2', 'OFFSET_B1', 'WEB_ROTARY'],
+        defaultTrimSize: '210x297',
+        defaultPages: 48
+    }
+];
+
 const TRIM_SIZES = [
-    { value: '148x210', label: '148×210 mm (A5 Editorial)' },
-    { value: '150x230', label: '150×230 mm (Trade Paperback)' },
-    { value: '210x297', label: '210×297 mm (A4 Catálogo / Manual)' }
+    { value: '148x210', label: '148×210 mm (A5 Editorial)', widthMm: 148, heightMm: 210 },
+    { value: '150x230', label: '150×230 mm (Trade Paperback)', widthMm: 150, heightMm: 230 },
+    { value: '210x297', label: '210×297 mm (A4 Catálogo / Manual)', widthMm: 210, heightMm: 297 }
 ];
 
 const PRINT_RUN_PRESETS = [100, 500, 1000, 5000];
@@ -48,13 +110,24 @@ function round4(n: number): number {
     return Math.round((Number(n) + Number.EPSILON) * 10000) / 10000;
 }
 
+function isProfileCompatibleWithFamily(profile: EconomicProfileRow, familyId: ProductFamilyId): boolean {
+    if (Array.isArray(profile.supportedFamilies) && profile.supportedFamilies.length > 0) {
+        return profile.supportedFamilies.includes(familyId);
+    }
+    const fam = PRODUCT_FAMILY_OPTIONS.find((f) => f.id === familyId);
+    if (!fam) return true;
+    return fam.compatibleTechnologies.includes(profile.technology || 'OFFSET_B1');
+}
+
 export const LivePriceCalibratorModal: React.FC<LivePriceCalibratorModalProps> = ({
     isOpen,
     onClose,
     profiles = [],
     papers = [],
     initialProfile = null,
+    initialProductFamily = 'SOFTCOVER',
     onApplyProfileCalibration,
+    onPaperAdded,
     embedded = false
 }) => {
     const activeProfileDefault = initialProfile || profiles[0] || {
@@ -71,12 +144,31 @@ export const LivePriceCalibratorModal: React.FC<LivePriceCalibratorModalProps> =
         active: true
     };
 
+    const [productFamily, setProductFamily] = useState<ProductFamilyId>(initialProductFamily);
     const [selectedProfileId, setSelectedProfileId] = useState<string>(activeProfileDefault.id);
     const [trimSize, setTrimSize] = useState<string>('150x230');
     const [copies, setCopies] = useState<number>(1000);
     const [pages, setPages] = useState<number>(192);
+    const [catalogPapers, setCatalogPapers] = useState<PaperCatalogItem[]>(papers);
     const [paperId, setPaperId] = useState<string>(papers[1]?.paperId || papers[0]?.paperId || 'paper-ahuesado-90');
-    const [bindingType, setBindingType] = useState<'PUR' | 'HARDCOVER' | 'SADDLE'>('PUR');
+    const [bindingType, setBindingType] = useState<'PUR' | 'HARDCOVER' | 'WIRE_O' | 'SADDLE'>(
+        initialProductFamily === 'HARDCOVER'
+            ? 'HARDCOVER'
+            : initialProductFamily === 'WIRE_O'
+              ? 'WIRE_O'
+              : initialProductFamily === 'SADDLE_STITCH'
+                ? 'SADDLE'
+                : 'PUR'
+    );
+
+    // Quick Add Substrate to `materials_catalog` state
+    const [showAddPaperForm, setShowAddPaperForm] = useState<boolean>(false);
+    const [newPaperName, setNewPaperName] = useState<string>('');
+    const [newPaperGsm, setNewPaperGsm] = useState<number>(100);
+    const [newPaperBulk, setNewPaperBulk] = useState<number>(1.3);
+    const [newPaperCostKg, setNewPaperCostKg] = useState<number>(1.32);
+    const [newPaperClass, setNewPaperClass] = useState<'UNCOATED' | 'COATED' | 'BOARD'>('UNCOATED');
+    const [addingPaper, setAddingPaper] = useState<boolean>(false);
 
     // Interactive Sliders State
     const [hourlyRateEur, setHourlyRateEur] = useState<number>(Number(activeProfileDefault.hourlyRateEur ?? 265));
@@ -84,6 +176,43 @@ export const LivePriceCalibratorModal: React.FC<LivePriceCalibratorModalProps> =
     const [targetMarginPct, setTargetMarginPct] = useState<number>(Number(activeProfileDefault.targetMarginPct ?? 28));
     const [minimumJobFeeEur, setMinimumJobFeeEur] = useState<number>(Number(activeProfileDefault.minimumJobFeeEur ?? 380));
     const [saving, setSaving] = useState<boolean>(false);
+
+    useEffect(() => {
+        if (Array.isArray(papers) && papers.length > 0) {
+            setCatalogPapers(papers);
+            if (!papers.some((p) => p.paperId === paperId)) {
+                setPaperId(papers[1]?.paperId || papers[0]?.paperId);
+            }
+        }
+    }, [papers]);
+
+    // Fetch real substrates from `materials_catalog` (`GET /api/pricing/materials`) when opened
+    useEffect(() => {
+        if (!isOpen && !embedded) return;
+        let cancelled = false;
+        const hydrateRealMaterials = async () => {
+            try {
+                const token = getAuthToken();
+                const headers: Record<string, string> = { 'x-user-role': 'PRINTHOUSE_ADMIN' };
+                if (token) headers['Authorization'] = `Bearer ${token}`;
+                const res = await fetch('/api/pricing/materials', { headers });
+                if (!res || !res.ok || cancelled) return;
+                const data = await res.json();
+                if (!cancelled && Array.isArray(data.materials) && data.materials.length > 0) {
+                    setCatalogPapers(data.materials);
+                    if (!data.materials.some((p: PaperCatalogItem) => p.paperId === paperId)) {
+                        setPaperId(data.materials[0].paperId);
+                    }
+                }
+            } catch (_) {
+                // Keep prop papers fallback in isolated tests
+            }
+        };
+        hydrateRealMaterials();
+        return () => {
+            cancelled = true;
+        };
+    }, [isOpen, embedded]);
 
     useEffect(() => {
         if (initialProfile) {
@@ -94,6 +223,16 @@ export const LivePriceCalibratorModal: React.FC<LivePriceCalibratorModalProps> =
             setMinimumJobFeeEur(Number(initialProfile.minimumJobFeeEur ?? 380));
         }
     }, [initialProfile]);
+
+    useEffect(() => {
+        if (initialProductFamily) {
+            setProductFamily(initialProductFamily);
+            const fam = PRODUCT_FAMILY_OPTIONS.find((f) => f.id === initialProductFamily);
+            if (fam) {
+                setBindingType(fam.bindingType);
+            }
+        }
+    }, [initialProductFamily]);
 
     useEffect(() => {
         if (!isOpen || embedded) return;
@@ -118,20 +257,128 @@ export const LivePriceCalibratorModal: React.FC<LivePriceCalibratorModalProps> =
             setSetupFeeEur(Number(found.setupFeeEur ?? 240));
             setTargetMarginPct(Number(found.targetMarginPct ?? 28));
             setMinimumJobFeeEur(Number(found.minimumJobFeeEur ?? 380));
+            if (!isProfileCompatibleWithFamily(found, productFamily)) {
+                const fallbackFamily = (found.supportedFamilies?.[0] as ProductFamilyId) || 'SOFTCOVER';
+                setProductFamily(fallbackFamily);
+                const famSpec = PRODUCT_FAMILY_OPTIONS.find((f) => f.id === fallbackFamily);
+                if (famSpec) setBindingType(famSpec.bindingType);
+            }
         }
     };
 
+    const handleSelectProductFamily = (nextFamily: ProductFamilyId) => {
+        setProductFamily(nextFamily);
+        const famSpec = PRODUCT_FAMILY_OPTIONS.find((f) => f.id === nextFamily);
+        if (famSpec) {
+            setBindingType(famSpec.bindingType);
+        }
+        // Check if current profile is compatible; if not, suggest best compatible press
+        if (!isProfileCompatibleWithFamily(currentProfile, nextFamily)) {
+            const compatible = profiles.filter((p) => isProfileCompatibleWithFamily(p, nextFamily));
+            if (compatible.length > 0) {
+                const preferred =
+                    nextFamily === 'HARDCOVER'
+                        ? compatible.find((p) => p.technology === 'OFFSET_B1' || p.technology === 'OFFSET_B2') || compatible[0]
+                        : compatible[0];
+                handleSelectProfile(preferred.id);
+            }
+        }
+    };
+
+    const handleCreatePaperInCatalog = async () => {
+        if (!newPaperName.trim()) return;
+        setAddingPaper(true);
+        try {
+            const token = getAuthToken();
+            const headers: Record<string, string> = {
+                'Content-Type': 'application/json',
+                'x-user-role': 'PRINTHOUSE_ADMIN'
+            };
+            if (token) headers['Authorization'] = `Bearer ${token}`;
+
+            const payload = {
+                material_name: newPaperName.trim(),
+                gsm: Number(newPaperGsm || 100),
+                bulkFactor: Number(newPaperBulk || 1.3),
+                cost_per_kg_eur: Number(newPaperCostKg || 1.32),
+                substrate_class: newPaperClass
+            };
+
+            let createdItem: PaperCatalogItem = {
+                paperId: `mat_${Date.now()}`,
+                name: `${payload.material_name} (${payload.gsm} g/m²)`,
+                materialName: payload.material_name,
+                grammageGsm: payload.gsm,
+                gsm: payload.gsm,
+                bulkFactor: payload.bulkFactor,
+                bulkMicrons: Math.round(payload.gsm * payload.bulkFactor),
+                costPerKgEur: payload.cost_per_kg_eur,
+                cost_per_kg_eur: payload.cost_per_kg_eur,
+                costPerTonEur: round2(payload.cost_per_kg_eur * 1000),
+                substrateClass: payload.substrate_class,
+                categoryLabel:
+                    payload.substrate_class === 'BOARD'
+                        ? 'Cartoncillo / Cubierta'
+                        : payload.substrate_class === 'COATED'
+                          ? 'Estucado'
+                          : 'Offset / Ahuesado'
+            };
+
+            const res = await fetch('/api/pricing/materials', {
+                method: 'POST',
+                headers,
+                body: JSON.stringify(payload)
+            }).catch(() => null);
+
+            if (res && res.ok) {
+                const data = await res.json();
+                if (data && data.material) {
+                    createdItem = data.material;
+                }
+            }
+
+            setCatalogPapers((prev) => [createdItem, ...prev.filter((p) => p.paperId !== createdItem.paperId)]);
+            setPaperId(createdItem.paperId);
+            setShowAddPaperForm(false);
+            setNewPaperName('');
+            if (onPaperAdded) onPaperAdded(createdItem);
+        } finally {
+            setAddingPaper(false);
+        }
+    };
+
+    const groupedPapers = useMemo(() => {
+        const uncoated: PaperCatalogItem[] = [];
+        const coated: PaperCatalogItem[] = [];
+        const board: PaperCatalogItem[] = [];
+
+        for (const p of catalogPapers) {
+            const cls = String(p.substrateClass || '').toUpperCase();
+            const lowerName = String(p.name || '').toLowerCase();
+            const gsm = Number(p.grammageGsm || p.gsm || 90);
+            if (cls === 'BOARD' || lowerName.includes('cartulina') || lowerName.includes('folding') || gsm >= 240) {
+                board.push(p);
+            } else if (cls === 'COATED' || lowerName.includes('estucado') || lowerName.includes('silk') || lowerName.includes('coated')) {
+                coated.push(p);
+            } else {
+                uncoated.push(p);
+            }
+        }
+        return { uncoated, coated, board };
+    }, [catalogPapers]);
+
     const currentPaper = useMemo(() => {
         return (
-            papers.find((p) => p.paperId === paperId) || {
+            catalogPapers.find((p) => p.paperId === paperId) || {
                 paperId: 'paper-ahuesado-90',
                 name: 'Ahuesado Editorial Novela 90 g/m² (Vol 1.5)',
                 grammageGsm: 90,
                 bulkFactor: 1.5,
-                costPerTonEur: 1320
+                costPerTonEur: 1320,
+                costPerKgEur: 1.32
             }
         );
-    }, [papers, paperId]);
+    }, [catalogPapers, paperId]);
 
     // Deterministic synchronous calculation matching `pricingIntelligenceService.calibrateQuote`
     const calculation = useMemo(() => {
@@ -149,15 +396,19 @@ export const LivePriceCalibratorModal: React.FC<LivePriceCalibratorModalProps> =
                     : 4;
         const signaturesCount = Math.ceil(Math.max(4, pages) / pagesPerSignature);
 
-        // 1. Paper Cost
+        // 1. Paper Cost (using real `gsm` and `cost_per_kg_eur` from `materials_catalog`)
         const leavesPerCopy = Math.max(4, pages) / 2;
         const netPaperAreaM2 = leavesPerCopy * pageAreaM2 * copies;
         const wasteMultiplier = isDigital ? 1.008 : 1.022;
         const makeReadySheets = isDigital ? 15 : 220;
         const makeReadyAreaM2 = makeReadySheets * signaturesCount * (pageAreaM2 * (pagesPerSignature / 2));
         const grossPaperAreaM2 = netPaperAreaM2 * wasteMultiplier + makeReadyAreaM2;
-        const paperWeightKg = round2((grossPaperAreaM2 * currentPaper.grammageGsm) / 1000);
-        const paperCostEur = round2(paperWeightKg * (currentPaper.costPerTonEur / 1000));
+        const activeGsm = Number(currentPaper.grammageGsm || currentPaper.gsm || 90);
+        const activeCostPerKg = Number(
+            currentPaper.costPerKgEur ?? currentPaper.cost_per_kg_eur ?? Number(currentPaper.costPerTonEur || 1320) / 1000
+        );
+        const paperWeightKg = round2((grossPaperAreaM2 * activeGsm) / 1000);
+        const paperCostEur = round2(paperWeightKg * activeCostPerKg);
 
         // 2. CTP Plates Cost
         const plateUnitEur = isDigital ? 0 : Number(currentProfile.plateCostEur ?? 20);
@@ -175,14 +426,23 @@ export const LivePriceCalibratorModal: React.FC<LivePriceCalibratorModalProps> =
         const clickChargeEur = isDigital ? totalPressSheets * 0.038 : 0;
         const runTimeCostEur = round2(pressRunHours * hourlyRateEur + clickChargeEur);
 
-        // 5. Finishing Cost
-        const bindingSetupEur = bindingType === 'HARDCOVER' ? 180 : bindingType === 'PUR' ? 85 : 45;
+        // 5. Finishing Cost (Product Family & Binding aware)
+        const bindingSetupEur =
+            bindingType === 'HARDCOVER'
+                ? 180
+                : bindingType === 'WIRE_O'
+                  ? 65
+                  : bindingType === 'PUR'
+                    ? 85
+                    : 45;
         const bindingUnitEur =
             bindingType === 'HARDCOVER'
                 ? 1.45 + signaturesCount * 0.04
-                : bindingType === 'PUR'
-                  ? 0.34 + signaturesCount * 0.025
-                  : 0.14;
+                : bindingType === 'WIRE_O'
+                  ? 0.48 + signaturesCount * 0.02
+                  : bindingType === 'PUR'
+                    ? 0.34 + signaturesCount * 0.025
+                    : 0.14;
         const finishingCostEur = round2(bindingSetupEur + copies * bindingUnitEur);
 
         // 6. Base Cost & Selling Price
@@ -198,12 +458,13 @@ export const LivePriceCalibratorModal: React.FC<LivePriceCalibratorModalProps> =
         const unitSellingPriceEur = round4(totalSellingPriceEur / Math.max(1, copies));
         const unitBaseCostEur = round4(baseIndustrialCostEur / Math.max(1, copies));
         const spineWidthMm = round2(
-            ((pages / 2) * currentPaper.grammageGsm * currentPaper.bulkFactor) / 1000 +
-                (bindingType === 'HARDCOVER' ? 3.5 : 0.6)
+            ((pages / 2) * activeGsm * Number(currentPaper.bulkFactor || 1.3)) / 1000 +
+                (bindingType === 'HARDCOVER' ? 3.5 : bindingType === 'WIRE_O' ? 1.8 : 0.6)
         );
 
         return {
             paperWeightKg,
+            activeCostPerKg,
             totalPlates,
             signaturesCount,
             pressRunHours,
@@ -251,6 +512,8 @@ export const LivePriceCalibratorModal: React.FC<LivePriceCalibratorModalProps> =
                 setupFeeEur,
                 targetMarginPct,
                 minimumJobFeeEur,
+                productFamily,
+                paperId: currentPaper.paperId,
                 active: true
             });
             if (!embedded) onClose();
@@ -272,9 +535,12 @@ export const LivePriceCalibratorModal: React.FC<LivePriceCalibratorModalProps> =
                         <h3 className="text-sm font-black uppercase tracking-wider text-slate-900 dark:text-white m-0">
                             Live Industrial Price Calibrator
                         </h3>
+                        <span className="px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/30 text-[10px] font-mono font-bold text-emerald-400">
+                            MATERIALS CATALOG CONNECTED ({catalogPapers.length})
+                        </span>
                     </div>
                     <p className="text-[11px] text-slate-400 m-0 mt-0.5">
-                        Real-time technical cost breakdown (Paper + CTP Plates + Make-Ready + Press Run + Finishing)
+                        Unified Product Family + Machine Node Hierarchy · Real-time technical cost breakdown
                     </p>
                 </div>
                 {!embedded && (
@@ -292,21 +558,21 @@ export const LivePriceCalibratorModal: React.FC<LivePriceCalibratorModalProps> =
             <div className="p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
                 {/* Left Column: Specification & Interactive Sliders (7 cols) */}
                 <div className="lg:col-span-7 space-y-5">
-                    {/* Machine & Paper Selector */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {/* Row 1: Unified Dual Hierarchy (1. Product Family -> 2. Compatible Machine) */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-3.5 rounded-xl bg-slate-50/70 dark:bg-[#0a0b0d]/70 border border-slate-200 dark:border-[#1f2228]">
                         <div>
-                            <label className="block text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1.5">
-                                MACHINE / PRESS NODE
+                            <label className="block text-[10px] font-black uppercase tracking-wider text-[#dc2626] mb-1.5">
+                                1. PRODUCT FAMILY / BINDING
                             </label>
                             <select
-                                data-testid="calibrator-machine-select"
-                                value={selectedProfileId}
-                                onChange={(e) => handleSelectProfile(e.target.value)}
-                                className="w-full px-3 py-2 rounded-lg text-xs font-bold bg-slate-50 dark:bg-[#0a0b0d] border border-slate-200 dark:border-[#1f2228] text-slate-900 dark:text-white"
+                                data-testid="calibrator-family-select"
+                                value={productFamily}
+                                onChange={(e) => handleSelectProductFamily(e.target.value as ProductFamilyId)}
+                                className="w-full px-3 py-2 rounded-lg text-xs font-bold bg-white dark:bg-[#14161a] border border-slate-200 dark:border-[#2a2e37] text-slate-900 dark:text-white"
                             >
-                                {profiles.map((p) => (
-                                    <option key={p.id} value={p.id}>
-                                        {p.printerName} ({p.technology})
+                                {PRODUCT_FAMILY_OPTIONS.map((fam) => (
+                                    <option key={fam.id} value={fam.id}>
+                                        {fam.label}
                                     </option>
                                 ))}
                             </select>
@@ -314,21 +580,155 @@ export const LivePriceCalibratorModal: React.FC<LivePriceCalibratorModalProps> =
 
                         <div>
                             <label className="block text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1.5">
-                                SUBSTRATE / PAPER STOCK
+                                2. PRIMARY MACHINE / PRESS NODE
                             </label>
                             <select
-                                data-testid="calibrator-paper-select"
-                                value={paperId}
-                                onChange={(e) => setPaperId(e.target.value)}
-                                className="w-full px-3 py-2 rounded-lg text-xs font-bold bg-slate-50 dark:bg-[#0a0b0d] border border-slate-200 dark:border-[#1f2228] text-slate-900 dark:text-white"
+                                data-testid="calibrator-machine-select"
+                                value={selectedProfileId}
+                                onChange={(e) => handleSelectProfile(e.target.value)}
+                                className="w-full px-3 py-2 rounded-lg text-xs font-bold bg-white dark:bg-[#14161a] border border-slate-200 dark:border-[#2a2e37] text-slate-900 dark:text-white"
                             >
-                                {papers.map((paper) => (
-                                    <option key={paper.paperId} value={paper.paperId}>
-                                        {paper.name}
-                                    </option>
-                                ))}
+                                {profiles.map((p) => {
+                                    const compatible = isProfileCompatibleWithFamily(p, productFamily);
+                                    return (
+                                        <option key={p.id} value={p.id}>
+                                            {p.printerName} ({p.technology}){compatible ? '' : ' [Incompatible w/ Family]'}
+                                        </option>
+                                    );
+                                })}
                             </select>
                         </div>
+                    </div>
+
+                    {/* Row 2: Real Substrate / Paper Stock from `materials_catalog` */}
+                    <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                            <label className="block text-[10px] font-black uppercase tracking-wider text-slate-400">
+                                3. SUBSTRATE / PAPER STOCK (MYSQL MATERIALS CATALOG)
+                            </label>
+                            <button
+                                type="button"
+                                data-testid="calibrator-add-paper-btn"
+                                onClick={() => setShowAddPaperForm((prev) => !prev)}
+                                className="text-[10px] font-mono font-bold text-[#dc2626] hover:underline cursor-pointer"
+                            >
+                                {showAddPaperForm ? '✕ Cancelar nuevo papel' : '+ Añadir nuevo papel al catálogo'}
+                            </button>
+                        </div>
+
+                        <select
+                            data-testid="calibrator-paper-select"
+                            value={paperId}
+                            onChange={(e) => {
+                                if (e.target.value === '__ADD_NEW_PAPER__') {
+                                    setShowAddPaperForm(true);
+                                    return;
+                                }
+                                setPaperId(e.target.value);
+                            }}
+                            className="w-full px-3 py-2 rounded-lg text-xs font-bold bg-slate-50 dark:bg-[#0a0b0d] border border-slate-200 dark:border-[#1f2228] text-slate-900 dark:text-white"
+                        >
+                            {groupedPapers.uncoated.length > 0 && (
+                                <optgroup label="Offset / Ahuesado (Uncoated)">
+                                    {groupedPapers.uncoated.map((paper) => (
+                                        <option key={paper.paperId} value={paper.paperId}>
+                                            {paper.name} · Vol {paper.bulkFactor} · €{Number(paper.costPerKgEur ?? (paper.costPerTonEur / 1000)).toFixed(2)}/kg
+                                        </option>
+                                    ))}
+                                </optgroup>
+                            )}
+                            {groupedPapers.coated.length > 0 && (
+                                <optgroup label="Estucado (Coated Silk / Matte / Gloss)">
+                                    {groupedPapers.coated.map((paper) => (
+                                        <option key={paper.paperId} value={paper.paperId}>
+                                            {paper.name} · Vol {paper.bulkFactor} · €{Number(paper.costPerKgEur ?? (paper.costPerTonEur / 1000)).toFixed(2)}/kg
+                                        </option>
+                                    ))}
+                                </optgroup>
+                            )}
+                            {groupedPapers.board.length > 0 && (
+                                <optgroup label="Cartoncillo / Cubierta (Board)">
+                                    {groupedPapers.board.map((paper) => (
+                                        <option key={paper.paperId} value={paper.paperId}>
+                                            {paper.name} · Vol {paper.bulkFactor} · €{Number(paper.costPerKgEur ?? (paper.costPerTonEur / 1000)).toFixed(2)}/kg
+                                        </option>
+                                    ))}
+                                </optgroup>
+                            )}
+                            <option value="__ADD_NEW_PAPER__">+ Añadir nuevo papel al catálogo...</option>
+                        </select>
+
+                        {showAddPaperForm && (
+                            <div
+                                data-testid="calibrator-quick-add-paper-form"
+                                className="p-3 rounded-lg bg-slate-100 dark:bg-[#0a0b0d] border border-[#dc2626]/40 grid grid-cols-1 sm:grid-cols-12 gap-2 items-end"
+                            >
+                                <div className="sm:col-span-4">
+                                    <label className="block text-[9px] font-mono uppercase text-slate-400 mb-1">
+                                        Nombre Sustrato
+                                    </label>
+                                    <input
+                                        type="text"
+                                        data-testid="new-paper-name-input"
+                                        placeholder="Ej. Munken Print White"
+                                        value={newPaperName}
+                                        onChange={(e) => setNewPaperName(e.target.value)}
+                                        className="w-full px-2.5 py-1.5 rounded text-xs bg-white dark:bg-[#14161a] border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
+                                    />
+                                </div>
+                                <div className="sm:col-span-2">
+                                    <label className="block text-[9px] font-mono uppercase text-slate-400 mb-1">
+                                        Categoría
+                                    </label>
+                                    <select
+                                        data-testid="new-paper-class-select"
+                                        value={newPaperClass}
+                                        onChange={(e) => setNewPaperClass(e.target.value as any)}
+                                        className="w-full px-2 py-1.5 rounded text-xs bg-white dark:bg-[#14161a] border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
+                                    >
+                                        <option value="UNCOATED">Offset/Ahues.</option>
+                                        <option value="COATED">Estucado</option>
+                                        <option value="BOARD">Cartoncillo</option>
+                                    </select>
+                                </div>
+                                <div className="sm:col-span-2">
+                                    <label className="block text-[9px] font-mono uppercase text-slate-400 mb-1">
+                                        Gramos (g/m²)
+                                    </label>
+                                    <input
+                                        type="number"
+                                        data-testid="new-paper-gsm-input"
+                                        value={newPaperGsm}
+                                        onChange={(e) => setNewPaperGsm(Number(e.target.value))}
+                                        className="w-full px-2 py-1.5 rounded text-xs font-mono bg-white dark:bg-[#14161a] border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
+                                    />
+                                </div>
+                                <div className="sm:col-span-2">
+                                    <label className="block text-[9px] font-mono uppercase text-slate-400 mb-1">
+                                        Coste (€/kg)
+                                    </label>
+                                    <input
+                                        type="number"
+                                        step="0.05"
+                                        data-testid="new-paper-costkg-input"
+                                        value={newPaperCostKg}
+                                        onChange={(e) => setNewPaperCostKg(Number(e.target.value))}
+                                        className="w-full px-2 py-1.5 rounded text-xs font-mono bg-white dark:bg-[#14161a] border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
+                                    />
+                                </div>
+                                <div className="sm:col-span-2">
+                                    <button
+                                        type="button"
+                                        data-testid="save-new-paper-btn"
+                                        disabled={addingPaper || !newPaperName.trim()}
+                                        onClick={handleCreatePaperInCatalog}
+                                        className="w-full py-1.5 px-2 rounded bg-[#dc2626] hover:bg-[#b91c1c] text-white text-[10px] font-black uppercase cursor-pointer disabled:opacity-50"
+                                    >
+                                        {addingPaper ? '...' : 'Guardar'}
+                                    </button>
+                                </div>
+                            </div>
+                        )}
                     </div>
 
                     {/* Trim Size, Pages, Binding & Print Run Presets */}
@@ -374,11 +774,24 @@ export const LivePriceCalibratorModal: React.FC<LivePriceCalibratorModalProps> =
                             <select
                                 data-testid="calibrator-binding-select"
                                 value={bindingType}
-                                onChange={(e) => setBindingType(e.target.value as any)}
+                                onChange={(e) => {
+                                    const nextBind = e.target.value as 'PUR' | 'HARDCOVER' | 'WIRE_O' | 'SADDLE';
+                                    setBindingType(nextBind);
+                                    const mappedFamily: ProductFamilyId =
+                                        nextBind === 'HARDCOVER'
+                                            ? 'HARDCOVER'
+                                            : nextBind === 'WIRE_O'
+                                              ? 'WIRE_O'
+                                              : nextBind === 'SADDLE'
+                                                ? 'SADDLE_STITCH'
+                                                : 'SOFTCOVER';
+                                    setProductFamily(mappedFamily);
+                                }}
                                 className="w-full px-3 py-2 rounded-lg text-xs font-bold bg-slate-50 dark:bg-[#0a0b0d] border border-slate-200 dark:border-[#1f2228] text-slate-900 dark:text-white"
                             >
                                 <option value="PUR">Rústica Fresada PUR</option>
                                 <option value="HARDCOVER">Cartoné / Tapa Dura</option>
+                                <option value="WIRE_O">Wire-O / Espiral Metálica</option>
                                 <option value="SADDLE">Grapado Alambre (2 grapas)</option>
                             </select>
                         </div>

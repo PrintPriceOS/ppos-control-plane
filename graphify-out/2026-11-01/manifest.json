@@ -7470,9 +7470,9 @@
     "semantic_hash": "f59c98983eb0657a28d6d105e8c06fb9"
   },
   "server.js": {
-    "mtime": 1793500782.915536,
-    "seen": 1793501685.1429713,
-    "ast_hash": "ea05e473d93f09a1d31a391e87072c1f",
+    "mtime": 1793502567.5006409,
+    "seen": 1793503101.8989365,
+    "ast_hash": "6ad50a63c0aee9c9caffd0f156d2943d",
     "semantic_hash": ""
   },
   "services/FederatedHealthAggregator.js": {
@@ -11952,9 +11952,9 @@
     "semantic_hash": "1615fefe9ddc6467fa9de2c03dd1049f"
   },
   "src/api/services/marketplaceInvoicePaymentService.js": {
-    "mtime": 1793501634.2088742,
-    "seen": 1793501685.3622093,
-    "ast_hash": "6fbeb4062c6bf731db47cdd4db3308c2",
+    "mtime": 1793527691.8845503,
+    "seen": 1793528737.43861,
+    "ast_hash": "f3cceaa24ee477f2ab7cd739175b2099",
     "semantic_hash": ""
   },
   "src/api/services/marketplaceLaunchControlService.js": {
@@ -12072,9 +12072,9 @@
     "semantic_hash": "ede2da040445b7da9246509a967c3478"
   },
   "src/api/services/marketplaceService.js": {
-    "mtime": 1793501638.1318896,
-    "seen": 1793501685.3672047,
-    "ast_hash": "372145b3b565fbfceab3232bd55cb573",
+    "mtime": 1793527693.252683,
+    "seen": 1793528737.4446096,
+    "ast_hash": "d40a539024b24c66b875a6ea0d2129d2",
     "semantic_hash": ""
   },
   "src/api/services/materialAvailabilityService.js": {
@@ -12138,8 +12138,8 @@
     "semantic_hash": ""
   },
   "src/api/services/mysqlClient.js": {
-    "mtime": 1793498047.3746455,
-    "seen": 1793501685.3702056,
+    "mtime": 1793502288.570439,
+    "seen": 1793503102.126637,
     "ast_hash": "792c6b701f7d604ed039beb234e38d11",
     "semantic_hash": ""
   },
@@ -14748,9 +14748,9 @@
     "semantic_hash": ""
   },
   "src/ui/lib/adminApi.ts": {
-    "mtime": 1793501126.533454,
-    "seen": 1793501685.516615,
-    "ast_hash": "492f0611a78d0352578489f4266801f0",
+    "mtime": 1793502641.0083039,
+    "seen": 1793503102.2981918,
+    "ast_hash": "f9abe12b3fbd438fd9f469d63b49cfd4",
     "semantic_hash": ""
   },
   "src/ui/lib/authStore.ts": {
@@ -17472,9 +17472,9 @@
     "semantic_hash": ""
   },
   "src/ui/pages/os/GlobalSettingsPage.tsx": {
-    "mtime": 1793484593.626866,
-    "seen": 1793485067.3000581,
-    "ast_hash": "f4d63a98837b958e77006b4dc51cf128",
+    "mtime": 1793528487.0531716,
+    "seen": 1793528737.748613,
+    "ast_hash": "41a9f7f734e76847a82057d7cd90a4fb",
     "semantic_hash": ""
   },
   "src/ui/pages/os/GovernancePage.tsx": {
@@ -30966,9 +30966,9 @@
     "semantic_hash": ""
   },
   "tests/ui_reconciliation_components.test.tsx": {
-    "mtime": 1793498044.6831052,
-    "seen": 1793501685.7769425,
-    "ast_hash": "8b9f8c1fa6495d9fee97b5173c01e753",
+    "mtime": 1793528507.6117046,
+    "seen": 1793528737.8636138,
+    "ast_hash": "841a2f391f1d7b5b622080b44d3c6bfb",
     "semantic_hash": ""
   },
   "services/preflight/preflightEngineService.js": {
@@ -31218,9 +31218,27 @@
     "semantic_hash": ""
   },
   "tests/marketplaceCheckoutPipeline.test.js": {
-    "mtime": 1793501614.040573,
-    "seen": 1793501685.7245715,
-    "ast_hash": "737503e8192aa2ce1ba6854e91044c39",
+    "mtime": 1793501817.9914744,
+    "seen": 1793503102.509494,
+    "ast_hash": "624f440bc59e7d59c59cd49f604a1e82",
+    "semantic_hash": ""
+  },
+  "src/api/routes/settingsRoutes.js": {
+    "mtime": 1793502909.768025,
+    "seen": 1793503101.9573436,
+    "ast_hash": "3bcb808f11dd5de8d51426b7662fe35c",
+    "semantic_hash": ""
+  },
+  "src/api/services/printhousePaymentSettingsService.js": {
+    "mtime": 1793527861.6079078,
+    "seen": 1793528737.476611,
+    "ast_hash": "a7e30f916b83625a2f724f5903882102",
+    "semantic_hash": ""
+  },
+  "tests/printhousePaymentSettings.test.js": {
+    "mtime": 1793503179.7118115,
+    "seen": 1793528737.8266132,
+    "ast_hash": "1a9ac1ef65079875cc5df9e58c5fb45e",
     "semantic_hash": ""
   }
 }

@@ -66,6 +66,10 @@ export interface ProgressiveSpecState {
     family: ProductFamilyId;
     product_family?: ProductFamilyId;
     productTitle: string;
+    machineId?: string;
+    machineName?: string;
+    interiorMaterialId?: string;
+    coverMaterialId?: string;
     formatWidthMm?: number;
     formatHeightMm?: number;
     widthMm?: number;

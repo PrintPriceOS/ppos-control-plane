@@ -18,11 +18,13 @@
  * - Distinguishes quantity, paper, finishing, turnaround, and transport options.
  * - Live arithmetic verification with 0.02 EUR rounding tolerance.
  */
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { ProductFamilyId, ProgressiveSpecState, OfferVariantRow } from '../../../types/printhouseOnboardingTypes';
 import { CountrySelect } from '../../common/CountrySelect';
 import { isValidIso2Country } from '../../../lib/countryCatalog';
 import { useLocale } from '../../../i18n';
+import { getAuthToken } from '../../../lib/authStore';
+import { PaperCatalogItem, EconomicProfileRow } from '../../pricing';
 import { 
     Layers, Book, Palette, Scissors, Sparkles, 
     Calculator, Truck, Plus, Trash2, AlertCircle, 
@@ -34,6 +36,8 @@ interface ManualOfferFormProps {
     family?: ProductFamilyId;
     spec?: ProgressiveSpecState;
     initialSpec?: ProgressiveSpecState;
+    materialsCatalog?: PaperCatalogItem[];
+    machinesCatalog?: EconomicProfileRow[];
     onChange?: (updatedSpec: ProgressiveSpecState) => void;
     onSubmit?: () => void;
     onSubmitSpec?: (spec: ProgressiveSpecState) => void;
@@ -45,6 +49,8 @@ export const ManualOfferForm: React.FC<ManualOfferFormProps> = ({
     family,
     spec: propSpec,
     initialSpec,
+    materialsCatalog: propMaterials = [],
+    machinesCatalog: propMachines = [],
     onChange,
     onSubmit,
     onSubmitSpec,
@@ -163,6 +169,138 @@ export const ManualOfferForm: React.FC<ManualOfferFormProps> = ({
         runs: false,
         delivery: false
     });
+
+    const [catalogPapers, setCatalogPapers] = useState<PaperCatalogItem[]>(propMaterials);
+    const [catalogMachines, setCatalogMachines] = useState<EconomicProfileRow[]>(propMachines);
+    const [showNewPaperModal, setShowNewPaperModal] = useState<boolean>(false);
+    const [newPaperName, setNewPaperName] = useState<string>('');
+    const [newPaperGsm, setNewPaperGsm] = useState<number>(100);
+    const [newPaperBulk, setNewPaperBulk] = useState<number>(1.3);
+    const [newPaperCostKg, setNewPaperCostKg] = useState<number>(1.32);
+    const [newPaperClass, setNewPaperClass] = useState<'UNCOATED' | 'COATED' | 'BOARD'>('UNCOATED');
+
+    useEffect(() => {
+        if (propMaterials && propMaterials.length > 0) setCatalogPapers(propMaterials);
+    }, [propMaterials]);
+
+    useEffect(() => {
+        if (propMachines && propMachines.length > 0) setCatalogMachines(propMachines);
+    }, [propMachines]);
+
+    useEffect(() => {
+        if (propMaterials.length > 0 && propMachines.length > 0) return;
+        let cancelled = false;
+        const token = getAuthToken();
+        const headers: Record<string, string> = { 'x-user-role': 'PRINTHOUSE_ADMIN' };
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+        fetch('/api/pricing/profiles', { headers })
+            .then((r) => (r && r.ok ? r.json() : null))
+            .then((data) => {
+                if (cancelled || !data) return;
+                if (Array.isArray(data.papers) && data.papers.length > 0 && propMaterials.length === 0) {
+                    setCatalogPapers(data.papers);
+                }
+                if (Array.isArray(data.profiles) && data.profiles.length > 0 && propMachines.length === 0) {
+                    setCatalogMachines(data.profiles);
+                }
+            })
+            .catch(() => {});
+        return () => {
+            cancelled = true;
+        };
+    }, []);
+
+    const handleSelectInteriorCatalogPaper = (selectedPaperId: string) => {
+        if (selectedPaperId === '__ADD_NEW_PAPER__') {
+            setShowNewPaperModal(true);
+            return;
+        }
+        const found = catalogPapers.find((p) => p.paperId === selectedPaperId);
+        if (!found) return;
+        const labelName = found.materialName || found.material_name || found.name;
+        const gsm = Number(found.grammageGsm || found.gsm || 90);
+        const bulk = Number(found.bulkFactor || 1.3);
+        emitChange({
+            ...spec,
+            interiorMaterialId: found.paperId,
+            interiorPaperType: labelName,
+            interiorPaper: labelName,
+            interiorPaperWeightGsm: gsm,
+            interiorWeightGsm: gsm,
+            interiorPaperVolume: bulk,
+            interiorVolume: bulk
+        });
+    };
+
+    const handleSelectCoverCatalogPaper = (selectedPaperId: string) => {
+        if (selectedPaperId === '__ADD_NEW_PAPER__') {
+            setShowNewPaperModal(true);
+            return;
+        }
+        const found = catalogPapers.find((p) => p.paperId === selectedPaperId);
+        if (!found) return;
+        const labelName = found.materialName || found.material_name || found.name;
+        const gsm = Number(found.grammageGsm || found.gsm || 250);
+        emitChange({
+            ...spec,
+            coverMaterialId: found.paperId,
+            coverPaperType: labelName,
+            coverPaper: labelName,
+            coverPaperWeightGsm: gsm,
+            coverWeightGsm: gsm
+        });
+    };
+
+    const handleQuickAddCatalogPaper = async () => {
+        if (!newPaperName.trim()) return;
+        const token = getAuthToken();
+        const headers: Record<string, string> = {
+            'Content-Type': 'application/json',
+            'x-user-role': 'PRINTHOUSE_ADMIN'
+        };
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+        const payload = {
+            material_name: newPaperName.trim(),
+            gsm: Number(newPaperGsm || 100),
+            bulkFactor: Number(newPaperBulk || 1.3),
+            cost_per_kg_eur: Number(newPaperCostKg || 1.32),
+            substrate_class: newPaperClass
+        };
+        let created: PaperCatalogItem = {
+            paperId: `mat_${Date.now()}`,
+            name: `${payload.material_name} (${payload.gsm} g/m²)`,
+            materialName: payload.material_name,
+            grammageGsm: payload.gsm,
+            bulkFactor: payload.bulkFactor,
+            costPerKgEur: payload.cost_per_kg_eur,
+            costPerTonEur: payload.cost_per_kg_eur * 1000,
+            substrateClass: payload.substrate_class
+        };
+        try {
+            const res = await fetch('/api/pricing/materials', {
+                method: 'POST',
+                headers,
+                body: JSON.stringify(payload)
+            });
+            if (res && res.ok) {
+                const data = await res.json();
+                if (data?.material) created = data.material;
+            }
+        } catch (_) {}
+        setCatalogPapers((prev) => [created, ...prev]);
+        emitChange({
+            ...spec,
+            interiorMaterialId: created.paperId,
+            interiorPaperType: created.materialName || created.name,
+            interiorPaper: created.materialName || created.name,
+            interiorPaperWeightGsm: created.grammageGsm,
+            interiorWeightGsm: created.grammageGsm,
+            interiorPaperVolume: created.bulkFactor,
+            interiorVolume: created.bulkFactor
+        });
+        setShowNewPaperModal(false);
+        setNewPaperName('');
+    };
 
     const toggleSection = (sec: string) => {
         setCollapsedSections(prev => ({ ...prev, [sec]: !prev[sec] }));
@@ -396,7 +534,33 @@ export const ManualOfferForm: React.FC<ManualOfferFormProps> = ({
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-1">
+                            <div className="space-y-1">
+                                <label className="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300">
+                                    Máquina / Prensa Asignada (printhouse_machines)
+                                </label>
+                                <select
+                                    data-testid="manual-offer-machine-select"
+                                    value={spec.machineId || ''}
+                                    onChange={(e) => {
+                                        const mId = e.target.value;
+                                        const foundMach = catalogMachines.find((m) => m.printerId === mId || m.id === mId);
+                                        emitChange({
+                                            ...spec,
+                                            machineId: mId || undefined,
+                                            machineName: foundMach?.printerName || undefined
+                                        });
+                                    }}
+                                    className="w-full px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-white font-medium"
+                                >
+                                    <option value="">Automático según familia ({familyId})</option>
+                                    {catalogMachines.map((mach) => (
+                                        <option key={mach.id} value={mach.printerId || mach.id}>
+                                            {mach.printerName} ({mach.technology})
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
                             <div className="space-y-1">
                                 <label className="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300">
                                     {t('form.currency') || 'Moneda'}
@@ -477,9 +641,35 @@ export const ManualOfferForm: React.FC<ManualOfferFormProps> = ({
                                 />
                             </div>
                             <div className="space-y-1">
-                                <label className="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300">
-                                    {t('form.interiorPaper') || 'Papel de Interior'}
-                                </label>
+                                <div className="flex items-center justify-between">
+                                    <label className="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300">
+                                        {t('form.interiorPaper') || 'Papel de Interior'} (materials_catalog)
+                                    </label>
+                                    <button
+                                        type="button"
+                                        data-testid="manual-offer-add-paper-btn"
+                                        onClick={() => setShowNewPaperModal((prev) => !prev)}
+                                        className="text-[10px] font-bold text-[#dc0000] hover:underline cursor-pointer"
+                                    >
+                                        + Añadir al catálogo
+                                    </button>
+                                </div>
+                                {catalogPapers.length > 0 && (
+                                    <select
+                                        data-testid="manual-offer-interior-paper-select"
+                                        value={spec.interiorMaterialId || ''}
+                                        onChange={(e) => handleSelectInteriorCatalogPaper(e.target.value)}
+                                        className="w-full px-3 py-1.5 mb-1.5 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-white font-medium text-xs"
+                                    >
+                                        <option value="">Seleccionar papel registrado en Materials & Paper...</option>
+                                        {catalogPapers.map((p) => (
+                                            <option key={p.paperId} value={p.paperId}>
+                                                {p.name} · {p.grammageGsm}g · Vol {p.bulkFactor}
+                                            </option>
+                                        ))}
+                                        <option value="__ADD_NEW_PAPER__">+ Añadir nuevo papel al catálogo...</option>
+                                    </select>
+                                )}
                                 <input
                                     type="text"
                                     value={spec.interiorPaperType || ''}
@@ -514,6 +704,75 @@ export const ManualOfferForm: React.FC<ManualOfferFormProps> = ({
                                 />
                             </div>
                         </div>
+
+                        {showNewPaperModal && (
+                            <div
+                                data-testid="manual-offer-quick-add-paper-box"
+                                className="p-3 rounded-xl bg-red-50/50 dark:bg-red-950/20 border border-[#dc0000]/40 grid grid-cols-1 sm:grid-cols-12 gap-2 items-end"
+                            >
+                                <div className="sm:col-span-4">
+                                    <label className="block text-[10px] font-bold text-zinc-600 dark:text-zinc-300 mb-1">
+                                        Nuevo Papel (materials_catalog)
+                                    </label>
+                                    <input
+                                        type="text"
+                                        data-testid="manual-new-paper-name"
+                                        placeholder="Ej. Amber Graphic"
+                                        value={newPaperName}
+                                        onChange={(e) => setNewPaperName(e.target.value)}
+                                        className="w-full px-2.5 py-1.5 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-xs"
+                                    />
+                                </div>
+                                <div className="sm:col-span-2">
+                                    <label className="block text-[10px] font-bold text-zinc-600 dark:text-zinc-300 mb-1">
+                                        Tipo
+                                    </label>
+                                    <select
+                                        value={newPaperClass}
+                                        onChange={(e) => setNewPaperClass(e.target.value as any)}
+                                        className="w-full px-2 py-1.5 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-xs"
+                                    >
+                                        <option value="UNCOATED">Offset/Ahues.</option>
+                                        <option value="COATED">Estucado</option>
+                                        <option value="BOARD">Cartoncillo</option>
+                                    </select>
+                                </div>
+                                <div className="sm:col-span-2">
+                                    <label className="block text-[10px] font-bold text-zinc-600 dark:text-zinc-300 mb-1">
+                                        Gramaje (g/m²)
+                                    </label>
+                                    <input
+                                        type="number"
+                                        data-testid="manual-new-paper-gsm"
+                                        value={newPaperGsm}
+                                        onChange={(e) => setNewPaperGsm(Number(e.target.value))}
+                                        className="w-full px-2 py-1.5 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-xs"
+                                    />
+                                </div>
+                                <div className="sm:col-span-2">
+                                    <label className="block text-[10px] font-bold text-zinc-600 dark:text-zinc-300 mb-1">
+                                        Volumen (Bulk)
+                                    </label>
+                                    <input
+                                        type="number"
+                                        step="0.05"
+                                        value={newPaperBulk}
+                                        onChange={(e) => setNewPaperBulk(Number(e.target.value))}
+                                        className="w-full px-2 py-1.5 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-xs"
+                                    />
+                                </div>
+                                <div className="sm:col-span-2 flex gap-1">
+                                    <button
+                                        type="button"
+                                        data-testid="manual-save-new-paper-btn"
+                                        onClick={handleQuickAddCatalogPaper}
+                                        className="w-full py-1.5 px-2 rounded-lg bg-[#dc0000] hover:bg-red-700 text-white text-xs font-bold cursor-pointer"
+                                    >
+                                        Guardar
+                                    </button>
+                                </div>
+                            </div>
+                        )}
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                             <div className="space-y-1">
@@ -569,8 +828,24 @@ export const ManualOfferForm: React.FC<ManualOfferFormProps> = ({
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                             <div className="space-y-1">
                                 <label className="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300">
-                                    {t('form.coverPaper') || 'Papel de Cubierta / Forro'}
+                                    {t('form.coverPaper') || 'Papel de Cubierta / Forro'} (materials_catalog)
                                 </label>
+                                {catalogPapers.length > 0 && (
+                                    <select
+                                        data-testid="manual-offer-cover-paper-select"
+                                        value={spec.coverMaterialId || ''}
+                                        onChange={(e) => handleSelectCoverCatalogPaper(e.target.value)}
+                                        className="w-full px-3 py-1.5 mb-1.5 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-white font-medium text-xs"
+                                    >
+                                        <option value="">Seleccionar cubierta en Materials & Paper...</option>
+                                        {catalogPapers.map((p) => (
+                                            <option key={p.paperId} value={p.paperId}>
+                                                {p.name} · {p.grammageGsm}g
+                                            </option>
+                                        ))}
+                                        <option value="__ADD_NEW_PAPER__">+ Añadir nuevo papel al catálogo...</option>
+                                    </select>
+                                )}
                                 <input
                                     type="text"
                                     value={spec.coverPaperType || ''}

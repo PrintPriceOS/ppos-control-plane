@@ -833,6 +833,8 @@ export const PricingPanel: React.FC<PricingPanelProps> = ({ sites = [], onSaved 
                 <SimplifiedOnboardingJourney
                     printerNodeId={industrialData?.nodeId}
                     printerNodeName={industrialData?.nodeName || 'Primary Production Node'}
+                    materialsCatalog={sharedPapers}
+                    machinesCatalog={sharedProfiles}
                     onCompleted={() => {
                         fetchIndustrialPricing();
         fetch('/api/pricing/profiles', { headers: { 'Authorization': `Bearer ${token}`, 'x-user-role': 'PRINTHOUSE_ADMIN' } })
@@ -1240,8 +1242,12 @@ export const PricingPanel: React.FC<PricingPanelProps> = ({ sites = [], onSaved 
                 onClose={() => setShowLiveCalibrator(false)}
                 profiles={sharedProfiles}
                 papers={sharedPapers}
+                initialProductFamily={activeFamilyId}
+                onPaperAdded={(newPaper) => {
+                    setSharedPapers((prev) => [newPaper, ...prev.filter((p) => p.paperId !== newPaper.paperId)]);
+                }}
                 onApplyProfileCalibration={async (updatedProfile) => {
-                    await fetch('/api/pricing/profiles', {
+                    const res = await fetch('/api/pricing/profiles', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
@@ -1249,7 +1255,16 @@ export const PricingPanel: React.FC<PricingPanelProps> = ({ sites = [], onSaved 
                             'x-user-role': 'PRINTHOUSE_ADMIN'
                         },
                         body: JSON.stringify(updatedProfile)
-                    }).catch(() => {});
+                    }).catch(() => null);
+                    if (res && res.ok) {
+                        const data = await res.json();
+                        if (data?.profile) {
+                            setSharedProfiles((prev) =>
+                                prev.map((p) => (p.id === data.profile.id ? data.profile : p))
+                            );
+                        }
+                        if (data?.syncTelemetry) setSyncTelemetry(data.syncTelemetry);
+                    }
                     onSaved?.();
                 }}
             />

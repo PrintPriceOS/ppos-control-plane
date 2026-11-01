@@ -22,6 +22,9 @@ export interface EconomicProfileRow {
     printerName: string;
     technology: string;
     technologyLabel?: string;
+    supportedFamilies?: string[];
+    maxSheetWidthMm?: number;
+    maxSheetHeightMm?: number;
     scope: string;
     hourlyRateEur: number;
     setupFeeEur: number;

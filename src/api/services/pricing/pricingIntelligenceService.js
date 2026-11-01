@@ -35,44 +35,201 @@ const DEFAULT_PAPER_CATALOG = [
     {
         paperId: 'paper-offset-80',
         name: 'Offset Blanco Sin Estucar 80 g/m²',
+        materialName: 'Offset Blanco Sin Estucar',
         grammageGsm: 80,
         bulkFactor: 1.25,
+        bulkMicrons: 100,
         costPerTonEur: 1180,
+        costPerKgEur: 1.18,
+        costPerSheetEur: 0.066,
+        substrateClass: 'UNCOATED',
+        categoryLabel: 'Offset / Ahuesado',
         sheetFormat: '70x100'
     },
     {
         paperId: 'paper-ahuesado-90',
         name: 'Ahuesado Editorial Novela 90 g/m² (Vol 1.5)',
+        materialName: 'Ahuesado Editorial Novela',
         grammageGsm: 90,
         bulkFactor: 1.5,
+        bulkMicrons: 135,
         costPerTonEur: 1320,
+        costPerKgEur: 1.32,
+        costPerSheetEur: 0.083,
+        substrateClass: 'UNCOATED',
+        categoryLabel: 'Offset / Ahuesado',
         sheetFormat: '70x100'
     },
     {
         paperId: 'paper-estucado-115',
         name: 'Estucado Mate Arte 115 g/m²',
+        materialName: 'Estucado Mate Arte',
         grammageGsm: 115,
         bulkFactor: 0.95,
+        bulkMicrons: 109,
         costPerTonEur: 1290,
+        costPerKgEur: 1.29,
+        costPerSheetEur: 0.104,
+        substrateClass: 'COATED',
+        categoryLabel: 'Estucado',
         sheetFormat: '70x100'
     },
     {
         paperId: 'paper-estucado-150',
         name: 'Estucado Semimate Catálogo 150 g/m²',
+        materialName: 'Estucado Semimate Catálogo',
         grammageGsm: 150,
         bulkFactor: 0.9,
+        bulkMicrons: 135,
         costPerTonEur: 1340,
+        costPerKgEur: 1.34,
+        costPerSheetEur: 0.141,
+        substrateClass: 'COATED',
+        categoryLabel: 'Estucado',
         sheetFormat: '70x100'
     },
     {
         paperId: 'paper-folding-300',
         name: 'Cartulina Gráfica Cubierta 300 g/m²',
+        materialName: 'Cartulina Gráfica Cubierta',
         grammageGsm: 300,
         bulkFactor: 1.15,
+        bulkMicrons: 345,
         costPerTonEur: 1480,
+        costPerKgEur: 1.48,
+        costPerSheetEur: 0.311,
+        substrateClass: 'BOARD',
+        categoryLabel: 'Cartoncillo / Cubierta',
         sheetFormat: '70x100'
     }
 ];
+
+const PRODUCT_FAMILY_SPECS = {
+    SOFTCOVER: {
+        id: 'SOFTCOVER',
+        label: 'Softcover / Paperback (Rústica PUR)',
+        bindingType: 'PUR',
+        compatibleTechnologies: ['OFFSET_B1', 'OFFSET_B2', 'DIGITAL_TONER', 'WEB_ROTARY'],
+        defaultTrimSize: '150x230',
+        defaultPages: 192
+    },
+    HARDCOVER: {
+        id: 'HARDCOVER',
+        label: 'Hardcover / Case Bound (Cartoné)',
+        bindingType: 'HARDCOVER',
+        compatibleTechnologies: ['OFFSET_B1', 'OFFSET_B2', 'DIGITAL_TONER'],
+        defaultTrimSize: '150x230',
+        defaultPages: 256
+    },
+    WIRE_O: {
+        id: 'WIRE_O',
+        label: 'Wire-O / Twin Loop (Espiral Metálica)',
+        bindingType: 'WIRE_O',
+        compatibleTechnologies: ['DIGITAL_TONER', 'OFFSET_B2', 'OFFSET_B1'],
+        defaultTrimSize: '210x297',
+        defaultPages: 120
+    },
+    SADDLE_STITCH: {
+        id: 'SADDLE_STITCH',
+        label: 'Saddle Stitch / Stapled (Grapado)',
+        bindingType: 'SADDLE',
+        compatibleTechnologies: ['DIGITAL_TONER', 'OFFSET_B2', 'OFFSET_B1', 'WEB_ROTARY'],
+        defaultTrimSize: '210x297',
+        defaultPages: 48
+    }
+};
+
+function inferSupportedFamiliesForTechnology(technology = 'OFFSET_B1', machineRow = {}) {
+    const tech = String(technology || 'OFFSET_B1').toUpperCase();
+    const meta = safeParseJson(machineRow.metadata_json, {});
+    if (Array.isArray(meta.supported_families) && meta.supported_families.length > 0) {
+        return meta.supported_families.map((f) => String(f).toUpperCase());
+    }
+    if (tech === 'WEB_ROTARY') {
+        return ['SOFTCOVER', 'SADDLE_STITCH'];
+    }
+    return ['SOFTCOVER', 'HARDCOVER', 'WIRE_O', 'SADDLE_STITCH'];
+}
+
+function classifyMaterialCategory(materialRow = {}) {
+    const type = String(materialRow.material_type || '').toUpperCase();
+    const subClass = String(materialRow.substrate_class || '').toUpperCase();
+    const finish = String(materialRow.finish_type || '').toUpperCase();
+    const name = String(materialRow.material_name || '').toLowerCase();
+    const gsm = Number(materialRow.gsm || 90);
+
+    if (type === 'BOARD' || subClass.includes('BOARD') || name.includes('cartulina') || name.includes('folding') || name.includes('gc1') || name.includes('gc2') || gsm >= 240) {
+        return { substrateClass: 'BOARD', categoryLabel: 'Cartoncillo / Cubierta' };
+    }
+    if (subClass === 'COATED' || finish.includes('MATTE') || finish.includes('GLOSS') || finish.includes('SILK') || name.includes('estucado') || name.includes('coated') || name.includes('silk') || name.includes('art')) {
+        return { substrateClass: 'COATED', categoryLabel: 'Estucado' };
+    }
+    return { substrateClass: 'UNCOATED', categoryLabel: 'Offset / Ahuesado' };
+}
+
+function normalizeMaterialRowToPaperItem(m = {}) {
+    const meta = safeParseJson(m.metadata_json, {});
+    const gsm = Number(m.gsm || m.paper_gsm || meta.gsm || 90);
+    const { substrateClass, categoryLabel } = classifyMaterialCategory({ ...m, gsm });
+    const bulkFactor = Number(
+        meta.bulk_factor ||
+            meta.bulkFactor ||
+            (m.caliper_um && gsm > 0 ? round2(Number(m.caliper_um) / gsm) : substrateClass === 'UNCOATED' ? 1.3 : substrateClass === 'BOARD' ? 1.15 : 0.95)
+    );
+    const bulkMicrons = Math.round(Number(m.caliper_um || meta.bulk_microns || gsm * bulkFactor));
+    const sheetFormat = String(m.sheet_format || meta.sheet_format || '70x100');
+    const sheetAreaM2 = parseTrimSizeAreaM2(sheetFormat.includes('x') ? `${Number(sheetFormat.split('x')[0]) * 10}x${Number(sheetFormat.split('x')[1]) * 10}` : '700x1000');
+    const singleSheetWeightKg = Math.max(0.005, (sheetAreaM2 * gsm) / 1000);
+
+    let costPerTonEur = Number(meta.cost_per_ton_eur || meta.costPerTonEur || 0);
+    let costPerKgEur = Number(meta.cost_per_kg_eur || meta.costPerKgEur || 0);
+    let costPerSheetEur = Number(m.cost_per_unit || meta.cost_per_sheet_eur || 0);
+
+    if (costPerKgEur > 0 && costPerTonEur <= 0) {
+        costPerTonEur = round2(costPerKgEur * 1000);
+    } else if (costPerTonEur > 0 && costPerKgEur <= 0) {
+        costPerKgEur = round4(costPerTonEur / 1000);
+    } else if (costPerSheetEur > 0 && costPerTonEur <= 0) {
+        // Derive cost per kg from sheet price if reasonable, bounded between €0.85/kg and €3.20/kg
+        const derivedKg = costPerSheetEur / singleSheetWeightKg;
+        costPerKgEur = round4(Math.min(3.2, Math.max(0.85, derivedKg)));
+        costPerTonEur = round2(costPerKgEur * 1000);
+    } else if (costPerTonEur <= 0) {
+        costPerTonEur = substrateClass === 'BOARD' ? 1480 : substrateClass === 'COATED' ? 1310 : 1240;
+        costPerKgEur = round4(costPerTonEur / 1000);
+    }
+
+    if (costPerSheetEur <= 0) {
+        costPerSheetEur = round4(singleSheetWeightKg * costPerKgEur);
+    }
+
+    const rawName = String(m.material_name || m.name || 'Sustrato Industrial').trim();
+    const displayHasGsm = /\b\d+\s*(g|gsm|g\/m)/i.test(rawName);
+    const displayName = displayHasGsm ? rawName : `${rawName} (${gsm} g/m²)`;
+
+    return {
+        id: String(m.id || m.paperId || `mat-${gsm}`),
+        paperId: String(m.id || m.paperId || `mat-${gsm}`),
+        name: displayName,
+        materialName: rawName,
+        material_name: rawName,
+        grammageGsm: gsm,
+        gsm,
+        bulkFactor: round2(bulkFactor),
+        bulkMicrons,
+        bulk_microns: bulkMicrons,
+        costPerTonEur: round2(costPerTonEur),
+        costPerKgEur: round4(costPerKgEur),
+        cost_per_kg_eur: round4(costPerKgEur),
+        costPerSheetEur: round4(costPerSheetEur),
+        cost_per_sheet_eur: round4(costPerSheetEur),
+        substrateClass,
+        categoryLabel,
+        sheetFormat,
+        finishType: String(m.finish_type || m.finish || 'MATTE'),
+        source: 'MYSQL_MATERIALS_CATALOG'
+    };
+}
 
 function computeDeterministicRatesChecksum(ratesObj) {
     function sortObj(obj) {
@@ -107,6 +264,9 @@ function createDefaultProfiles(tenantId) {
             printerName: 'Heidelberg Speedmaster XL 106-8P',
             technology: 'OFFSET_B1',
             technologyLabel: 'Offset B1 (70×100 cm · 16 pp/sig)',
+            supportedFamilies: ['SOFTCOVER', 'HARDCOVER', 'WIRE_O', 'SADDLE_STITCH'],
+            maxSheetWidthMm: 1060,
+            maxSheetHeightMm: 750,
             scope: 'GLOBAL',
             hourlyRateEur: 265,
             setupFeeEur: 240,
@@ -133,6 +293,9 @@ function createDefaultProfiles(tenantId) {
             printerName: 'Komori Lithrone G29 (B2)',
             technology: 'OFFSET_B2',
             technologyLabel: 'Offset B2 (50×70 cm · 8 pp/sig)',
+            supportedFamilies: ['SOFTCOVER', 'HARDCOVER', 'WIRE_O', 'SADDLE_STITCH'],
+            maxSheetWidthMm: 750,
+            maxSheetHeightMm: 530,
             scope: 'GLOBAL',
             hourlyRateEur: 185,
             setupFeeEur: 160,
@@ -159,6 +322,9 @@ function createDefaultProfiles(tenantId) {
             printerName: 'HP Indigo 12000 HD Digital Press',
             technology: 'DIGITAL_TONER',
             technologyLabel: 'Digital SRA3 / B2 (Zero Plate)',
+            supportedFamilies: ['SOFTCOVER', 'HARDCOVER', 'WIRE_O', 'SADDLE_STITCH'],
+            maxSheetWidthMm: 750,
+            maxSheetHeightMm: 530,
             scope: 'GLOBAL',
             hourlyRateEur: 95,
             setupFeeEur: 25,
@@ -185,6 +351,9 @@ function createDefaultProfiles(tenantId) {
             printerName: 'Manroland Lithoman IV Web Offset',
             technology: 'WEB_ROTARY',
             technologyLabel: 'Rotativa Comercial (32 pp/sig)',
+            supportedFamilies: ['SOFTCOVER', 'SADDLE_STITCH'],
+            maxSheetWidthMm: 1260,
+            maxSheetHeightMm: 900,
             scope: 'GLOBAL',
             hourlyRateEur: 490,
             setupFeeEur: 680,
@@ -549,18 +718,12 @@ async function hydrateTenantFromMySQL(tenantId = 'tenant-default', dbClient = db
         // 1. Hydrate Materials / Paper Catalog if tenant has rows in `materials_catalog`
         if (Array.isArray(materials) && materials.length > 0) {
             const mappedPapers = materials
-                .filter((m) => !m.material_type || m.material_type === 'PAPER' || m.material_type === 'BOARD')
-                .map((m) => {
+                .filter((m) => {
                     const meta = safeParseJson(m.metadata_json, {});
-                    return {
-                        paperId: String(m.id),
-                        name: `${m.material_name} (${m.gsm || 90} g/m²)`,
-                        grammageGsm: Number(m.gsm || 90),
-                        bulkFactor: Number(meta.bulk_factor || (m.substrate_class === 'UNCOATED' ? 1.3 : 1.0)),
-                        costPerTonEur: Number(meta.cost_per_ton_eur || 1280),
-                        sheetFormat: String(m.sheet_format || '70x100')
-                    };
-                });
+                    if (meta.archived === true) return false;
+                    return !m.material_type || m.material_type === 'PAPER' || m.material_type === 'BOARD';
+                })
+                .map((m) => normalizeMaterialRowToPaperItem(m));
             if (mappedPapers.length > 0) {
                 state.papers = mappedPapers;
             }
@@ -593,6 +756,9 @@ async function hydrateTenantFromMySQL(tenantId = 'tenant-default', dbClient = db
                     printerName: String(mach.machine_name || mach.model || 'Industrial Press'),
                     technology: tech,
                     technologyLabel: defaultLabels[tech] || tech,
+                    supportedFamilies: inferSupportedFamiliesForTechnology(tech, mach),
+                    maxSheetWidthMm: Number(mach.max_sheet_width_mm || (tech === 'OFFSET_B1' ? 1020 : tech === 'OFFSET_B2' ? 720 : 480)),
+                    maxSheetHeightMm: Number(mach.max_sheet_height_mm || (tech === 'OFFSET_B1' ? 720 : tech === 'OFFSET_B2' ? 520 : 330)),
                     scope: matchingDbProf?.pricing_scope || 'MACHINE',
                     hourlyRateEur: Number(machMeta.hourlyRateEur ?? econ.hourlyRateEur),
                     setupFeeEur: Number(machMeta.setupFeeEur ?? econ.setupFeeEur),
@@ -750,6 +916,7 @@ function getPricingProfiles(tenantId = 'tenant-default') {
         tenantId: String(tenantId || 'tenant-default'),
         profiles: state.profiles,
         papers: state.papers,
+        productFamilies: PRODUCT_FAMILY_SPECS,
         routingHistory: state.routingHistory,
         conflicts: state.conflicts,
         kpiSummary,
@@ -760,6 +927,146 @@ function getPricingProfiles(tenantId = 'tenant-default') {
 async function getPricingProfilesAsync(tenantId = 'tenant-default', dbClient = db) {
     await hydrateTenantFromMySQL(tenantId, dbClient);
     return getPricingProfiles(tenantId);
+}
+
+/**
+ * Returns the tenant's real substrates from `materials_catalog` classified by type
+ * (`Estucado` / `COATED`, `Offset / Ahuesado` / `UNCOATED`, `Cartoncillo / Cubierta` / `BOARD`)
+ * with `id`, `material_name`, `gsm`, `bulk_microns`, `bulkFactor`, `cost_per_kg_eur`, and `cost_per_sheet_eur`.
+ */
+async function getTenantMaterialsCatalogAsync(tenantId = 'tenant-default', dbClient = db) {
+    await hydrateTenantFromMySQL(tenantId, dbClient);
+    const state = getTenantState(tenantId);
+    const materials = state.papers || [];
+    const groupedByCategory = {
+        UNCOATED: materials.filter((p) => (p.substrateClass || 'UNCOATED') === 'UNCOATED'),
+        COATED: materials.filter((p) => p.substrateClass === 'COATED'),
+        BOARD: materials.filter((p) => p.substrateClass === 'BOARD')
+    };
+    return {
+        ok: true,
+        tenantId: String(tenantId || 'tenant-default'),
+        materials,
+        groupedByCategory,
+        productFamilies: PRODUCT_FAMILY_SPECS
+    };
+}
+
+/**
+ * Adds a new substrate directly into the tenant's `materials_catalog` in MySQL and updates
+ * the in-memory paper catalog immediately so both Onboarding and `/ops/pricing` share it.
+ */
+async function addMaterialToCatalogAsync(tenantId = 'tenant-default', payload = {}, dbClient = db) {
+    const rawName = String(payload.material_name || payload.materialName || payload.name || '').trim();
+    if (!rawName) {
+        const err = new Error('INVALID_MATERIAL_NAME: material_name is required.');
+        err.statusCode = 400;
+        throw err;
+    }
+
+    const gsm = Math.max(35, Number(payload.gsm || payload.grammageGsm || 90));
+    const id = String(payload.id || payload.paperId || `mat_${crypto.randomBytes(6).toString('hex')}`);
+    const substrateClassInput = String(payload.substrate_class || payload.substrateClass || '').toUpperCase();
+    const inferredCat = classifyMaterialCategory({
+        material_name: rawName,
+        substrate_class: substrateClassInput,
+        material_type: payload.material_type || (substrateClassInput === 'BOARD' || gsm >= 240 ? 'BOARD' : 'PAPER'),
+        gsm
+    });
+
+    const bulkFactor = Number(
+        payload.bulkFactor ||
+            payload.bulk_factor ||
+            (payload.bulk_microns ? round2(Number(payload.bulk_microns) / gsm) : inferredCat.substrateClass === 'UNCOATED' ? 1.3 : inferredCat.substrateClass === 'BOARD' ? 1.15 : 0.95)
+    );
+    const bulkMicrons = Math.round(Number(payload.bulk_microns || payload.bulkMicrons || gsm * bulkFactor));
+    const costPerKgEur = Number(
+        payload.cost_per_kg_eur ||
+            payload.costPerKgEur ||
+            (payload.costPerTonEur ? Number(payload.costPerTonEur) / 1000 : inferredCat.substrateClass === 'BOARD' ? 1.48 : 1.28)
+    );
+    const costPerTonEur = round2(costPerKgEur * 1000);
+    const sheetFormat = String(payload.sheet_format || payload.sheetFormat || '70x100');
+    const sheetAreaM2 = parseTrimSizeAreaM2(
+        sheetFormat.includes('x') ? `${Number(sheetFormat.split('x')[0]) * 10}x${Number(sheetFormat.split('x')[1]) * 10}` : '700x1000'
+    );
+    const singleSheetWeightKg = Math.max(0.005, (sheetAreaM2 * gsm) / 1000);
+    const costPerSheetEur = round4(
+        Number(payload.cost_per_sheet_eur || payload.costPerSheetEur || singleSheetWeightKg * costPerKgEur)
+    );
+
+    const metadataObj = {
+        bulk_factor: round2(bulkFactor),
+        bulk_microns: bulkMicrons,
+        cost_per_kg_eur: round4(costPerKgEur),
+        cost_per_ton_eur: costPerTonEur,
+        cost_per_sheet_eur: costPerSheetEur,
+        sheet_format: sheetFormat,
+        created_via: payload.source || 'PRICING_CALIBRATOR_QUICK_ADD'
+    };
+
+    const rowObj = {
+        id,
+        tenant_id: String(tenantId || 'tenant-default'),
+        printhouse_id: payload.printhouse_id || 'node-primary',
+        material_name: rawName,
+        material_type: inferredCat.substrateClass === 'BOARD' ? 'BOARD' : 'PAPER',
+        substrate_class: inferredCat.substrateClass,
+        gsm,
+        sheet_format: sheetFormat,
+        finish_type: String(payload.finish_type || (inferredCat.substrateClass === 'COATED' ? 'MATTE' : 'UNCOATED')),
+        cost_per_unit: costPerSheetEur,
+        metadata_json: JSON.stringify(metadataObj)
+    };
+
+    const normalizedPaper = normalizeMaterialRowToPaperItem(rowObj);
+    const state = getTenantState(tenantId);
+    const existingIdx = state.papers.findIndex((p) => p.paperId === normalizedPaper.paperId);
+    if (existingIdx >= 0) {
+        state.papers[existingIdx] = normalizedPaper;
+    } else {
+        state.papers.unshift(normalizedPaper);
+    }
+
+    if (dbClient && typeof dbClient.query === 'function') {
+        try {
+            const nodes = await dbClient
+                .query('SELECT id FROM printer_nodes WHERE tenant_id = ? AND status != "DELETED" ORDER BY created_at ASC LIMIT 1', [tenantId])
+                .catch(() => []);
+            const printhouseId = Array.isArray(nodes) && nodes.length > 0 ? nodes[0].id : rowObj.printhouse_id;
+
+            await dbClient
+                .query(
+                    `INSERT INTO materials_catalog
+                     (id, tenant_id, printhouse_id, material_name, material_type, substrate_class, gsm, sheet_format, finish_type, supplier_name, availability_status, lead_time_days, cost_per_unit, currency, metadata_json)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'IN_STOCK', 2, ?, 'EUR', ?)`,
+                    [
+                        id,
+                        String(tenantId || 'tenant-default'),
+                        printhouseId,
+                        rawName,
+                        rowObj.material_type,
+                        rowObj.substrate_class,
+                        gsm,
+                        sheetFormat,
+                        rowObj.finish_type,
+                        String(payload.supplier_name || 'Catálogo Principal Imprenta'),
+                        costPerSheetEur,
+                        rowObj.metadata_json
+                    ]
+                )
+                .catch(() => {});
+        } catch (_) {
+            // Non-fatal in unit test environments without live MySQL
+        }
+    }
+
+    return {
+        ok: true,
+        tenantId: String(tenantId || 'tenant-default'),
+        material: normalizedPaper,
+        materials: state.papers
+    };
 }
 
 /**
@@ -1083,6 +1390,7 @@ async function syncFromOnboardingRates(tenantId = 'tenant-default', ratesJson = 
 
     const nodeId = String(options.nodeId || options.printerNodeId || 'node-primary');
     const nodeName = String(options.nodeName || 'Primary Production Node');
+    const targetMachineId = options.machineId || options.printerId || null;
     const productFamily = options.productFamily ? String(options.productFamily).toUpperCase() : null;
     const ratesChecksum = options.ratesChecksum || computeDeterministicRatesChecksum(parsedRates);
     const revisionId = options.revisionId || `rev_onb_${ratesChecksum.slice(0, 10)}`;
@@ -1091,39 +1399,47 @@ async function syncFromOnboardingRates(tenantId = 'tenant-default', ratesJson = 
     const b1Econ = extractEconomicParametersFromRatesJson(parsedRates, 'OFFSET_B1');
     const digEcon = extractEconomicParametersFromRatesJson(parsedRates, 'DIGITAL_TONER');
 
-    // Update or insert the primary node profile in the tenant's active profiles
-    const primaryProfileId = `prof-node-${nodeId}`;
+    // Update or insert the target machine profile (if specified) or the primary node profile
+    const primaryProfileId = targetMachineId ? `prof-db-${targetMachineId}` : `prof-node-${nodeId}`;
     const existingIdx = state.profiles.findIndex(
-        (p) => p.id === primaryProfileId || p.nodeId === nodeId || p.id === 'prof-offset-b1-xl106'
+        (p) =>
+            (targetMachineId && (p.printerId === targetMachineId || p.id === targetMachineId)) ||
+            p.id === primaryProfileId ||
+            p.nodeId === nodeId ||
+            p.id === 'prof-offset-b1-xl106'
     );
 
+    const existingProf = existingIdx >= 0 ? state.profiles[existingIdx] : null;
+    const targetTech = existingProf?.technology || (options.technology ? String(options.technology).toUpperCase() : 'OFFSET_B1');
+    const targetEcon = extractEconomicParametersFromRatesJson(parsedRates, targetTech);
+
     const syncedPrimaryProfile = {
-        ...(existingIdx >= 0 ? state.profiles[existingIdx] : {}),
-        id: existingIdx >= 0 ? state.profiles[existingIdx].id : primaryProfileId,
+        ...(existingProf || {}),
+        id: existingProf ? existingProf.id : primaryProfileId,
         tenantId: String(tenantId),
         nodeId,
-        printerId: existingIdx >= 0 ? state.profiles[existingIdx].printerId : nodeId,
+        printerId: targetMachineId || (existingProf ? existingProf.printerId : nodeId),
         printerName:
-            existingIdx >= 0 && state.profiles[existingIdx].source !== 'SEED_FALLBACK'
-                ? state.profiles[existingIdx].printerName
-                : nodeName,
-        technology: 'OFFSET_B1',
+            options.machineName ||
+            (existingProf && existingProf.source !== 'SEED_FALLBACK' ? existingProf.printerName : nodeName),
+        technology: targetTech,
         technologyLabel: productFamily
-            ? `Offset B1 · Calibrated (${productFamily})`
-            : 'Offset B1 · Calibrated Node Rates',
-        scope: 'PRINTER',
-        hourlyRateEur: b1Econ.hourlyRateEur,
-        setupFeeEur: b1Econ.setupFeeEur,
-        plateCostEur: b1Econ.plateCostEur,
-        platesPerForm: 8,
-        pagesPerSignature: 16,
-        speedSheetsPerHour: 14000,
-        makeReadyWasteSheets: 220,
-        runWastePct: 2.2,
-        clickCostEur: 0,
-        targetMarginPct: b1Econ.targetMarginPct,
-        platformMarkupPct: b1Econ.platformMarkupPct,
-        minimumJobFeeEur: b1Econ.minimumJobFeeEur,
+            ? `${targetTech === 'DIGITAL_TONER' ? 'Digital Press' : 'Offset B1'} · Calibrated (${productFamily})`
+            : existingProf?.technologyLabel || 'Offset B1 · Calibrated Node Rates',
+        supportedFamilies: existingProf?.supportedFamilies || inferSupportedFamiliesForTechnology(targetTech),
+        scope: targetMachineId ? 'MACHINE' : 'PRINTER',
+        hourlyRateEur: Number(options.hourlyRateEur ?? targetEcon.hourlyRateEur),
+        setupFeeEur: Number(options.setupFeeEur ?? targetEcon.setupFeeEur),
+        plateCostEur: Number(options.plateCostEur ?? targetEcon.plateCostEur),
+        platesPerForm: targetTech === 'DIGITAL_TONER' ? 0 : 8,
+        pagesPerSignature: targetTech === 'DIGITAL_TONER' ? 4 : targetTech === 'OFFSET_B2' ? 8 : 16,
+        speedSheetsPerHour: targetTech === 'DIGITAL_TONER' ? 3600 : 14000,
+        makeReadyWasteSheets: targetTech === 'DIGITAL_TONER' ? 15 : 220,
+        runWastePct: targetTech === 'DIGITAL_TONER' ? 0.8 : 2.2,
+        clickCostEur: targetTech === 'DIGITAL_TONER' ? 0.038 : 0,
+        targetMarginPct: Number(options.targetMarginPct ?? targetEcon.targetMarginPct),
+        platformMarkupPct: Number(options.platformMarkupPct ?? targetEcon.platformMarkupPct),
+        minimumJobFeeEur: Number(options.minimumJobFeeEur ?? targetEcon.minimumJobFeeEur),
         oeeHealthPct: 95.2,
         active: true,
         status: 'ACTIVE',
@@ -1260,8 +1576,10 @@ function calibrateQuote(tenantId = 'tenant-default', quoteSpec = {}) {
         (pageAreaM2 * (pagesPerSignature / 2));
 
     const grossPaperAreaM2 = netPaperAreaM2 * wasteMultiplier + makeReadyAreaM2;
-    const paperWeightKg = round2((grossPaperAreaM2 * Number(paper.grammageGsm || 90)) / 1000);
-    const costPerKgEur = Number(paper.costPerTonEur || 1250) / 1000;
+    const paperWeightKg = round2((grossPaperAreaM2 * Number(paper.grammageGsm || paper.gsm || 90)) / 1000);
+    const costPerKgEur = Number(
+        paper.costPerKgEur ?? paper.cost_per_kg_eur ?? (Number(paper.costPerTonEur || 1250) / 1000)
+    );
     const paperCostEur = round2(paperWeightKg * costPerKgEur);
 
     // 2. CTP Plates Cost
@@ -1284,14 +1602,34 @@ function calibrateQuote(tenantId = 'tenant-default', quoteSpec = {}) {
             : 0;
     const runTimeCostEur = round2(pressRunHours * hourlyRateEur + clickChargeEur);
 
-    // 5. Finishing Cost
-    const bindingSetupEur = bindingType === 'HARDCOVER' ? 180 : bindingType === 'PUR' ? 85 : 45;
+    // 5. Finishing Cost (Product Family / Binding aware)
+    const productFamily = String(
+        quoteSpec.productFamily ||
+            (bindingType === 'HARDCOVER'
+                ? 'HARDCOVER'
+                : bindingType === 'WIRE_O'
+                  ? 'WIRE_O'
+                  : bindingType === 'SADDLE' || bindingType === 'SADDLE_STITCH'
+                    ? 'SADDLE_STITCH'
+                    : 'SOFTCOVER')
+    ).toUpperCase();
+
+    const bindingSetupEur =
+        productFamily === 'HARDCOVER'
+            ? 180
+            : productFamily === 'WIRE_O'
+              ? 65
+              : productFamily === 'SADDLE_STITCH'
+                ? 45
+                : 85;
     const bindingUnitEur =
-        bindingType === 'HARDCOVER'
+        productFamily === 'HARDCOVER'
             ? 1.45 + signaturesCount * 0.04
-            : bindingType === 'PUR'
-              ? 0.34 + signaturesCount * 0.025
-              : 0.14;
+            : productFamily === 'WIRE_O'
+              ? 0.48 + signaturesCount * 0.02
+              : productFamily === 'SADDLE_STITCH'
+                ? 0.14
+                : 0.34 + signaturesCount * 0.025;
     const finishingCostEur = round2(bindingSetupEur + copies * bindingUnitEur);
 
     // 6. Base Industrial Cost & Target Margin / Minimum Fee Application
@@ -1311,14 +1649,15 @@ function calibrateQuote(tenantId = 'tenant-default', quoteSpec = {}) {
     const unitBaseCostEur = round4(baseIndustrialCostEur / copies);
 
     const spineWidthMm = round2(
-        ((pages / 2) * Number(paper.grammageGsm || 90) * Number(paper.bulkFactor || 1.3)) / 1000 +
-            (bindingType === 'HARDCOVER' ? 3.5 : 0.6)
+        ((pages / 2) * Number(paper.grammageGsm || paper.gsm || 90) * Number(paper.bulkFactor || 1.3)) / 1000 +
+            (productFamily === 'HARDCOVER' ? 3.5 : productFamily === 'WIRE_O' ? 1.8 : 0.6)
     );
 
     return {
         ok: true,
         tenantId: String(tenantId || 'tenant-default'),
         spec: {
+            productFamily,
             trimSize,
             copies,
             pages,
@@ -1326,8 +1665,9 @@ function calibrateQuote(tenantId = 'tenant-default', quoteSpec = {}) {
             spineWidthMm,
             paperId: paper.paperId,
             paperName: paper.name,
-            grammageGsm: paper.grammageGsm,
-            bulkFactor: paper.bulkFactor
+            grammageGsm: paper.grammageGsm || paper.gsm,
+            bulkFactor: paper.bulkFactor,
+            costPerKgEur
         },
         machineProfile: {
             id: baseProfile.id,
@@ -1475,6 +1815,8 @@ function calculateCrossoverPoint(tenantId = 'tenant-default', options = {}) {
 module.exports = {
     getPricingProfiles,
     getPricingProfilesAsync,
+    getTenantMaterialsCatalogAsync,
+    addMaterialToCatalogAsync,
     hydrateTenantFromMySQL,
     savePricingProfile,
     savePricingProfileAsync,
@@ -1485,5 +1827,8 @@ module.exports = {
     calculateCrossoverPoint,
     computeDeterministicRatesChecksum,
     buildRatesJsonPatchFromProfile,
+    normalizeMaterialRowToPaperItem,
+    inferSupportedFamiliesForTechnology,
+    PRODUCT_FAMILY_SPECS,
     DEFAULT_PAPER_CATALOG
 };

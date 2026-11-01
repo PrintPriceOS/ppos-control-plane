@@ -354,6 +354,21 @@ describe('Dark Industrial Telemetry UI — Canonical Components & Dual-Mode Reco
         const updatedTotal = screen.getByTestId('calibrator-total-selling-price').textContent;
         expect(updatedTotal).not.toEqual(initialTotal);
 
+        // Verify Product Family & Machine hierarchy synchronization inside LivePriceCalibratorModal
+        const familySelect = screen.getByTestId('calibrator-family-select') as HTMLSelectElement;
+        expect(familySelect).toBeInTheDocument();
+        fireEvent.change(familySelect, { target: { value: 'HARDCOVER' } });
+        expect((screen.getByTestId('calibrator-binding-select') as HTMLSelectElement).value).toBe('HARDCOVER');
+
+        fireEvent.change(familySelect, { target: { value: 'WIRE_O' } });
+        expect((screen.getByTestId('calibrator-binding-select') as HTMLSelectElement).value).toBe('WIRE_O');
+
+        // Verify quick-add substrate to materials_catalog inline form
+        fireEvent.click(screen.getByTestId('calibrator-add-paper-btn'));
+        expect(screen.getByTestId('calibrator-quick-add-paper-form')).toBeInTheDocument();
+        fireEvent.change(screen.getByTestId('new-paper-name-input'), { target: { value: 'Amber Graphic 100g' } });
+        fireEvent.click(screen.getByTestId('save-new-paper-btn'));
+
         // Close calibrator modal via ESC / CLOSE button
         fireEvent.click(screen.getByTestId('close-calibrator-btn'));
         expect(screen.queryByTestId('live-price-calibrator')).not.toBeInTheDocument();
