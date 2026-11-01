@@ -45,10 +45,14 @@ import {
     KeyIcon,
     DocumentDuplicateIcon,
     TrashIcon,
-    ArrowUpTrayIcon
+    ArrowUpTrayIcon,
+    CreditCardIcon,
+    BanknotesIcon,
+    EyeIcon,
+    EyeSlashIcon
 } from "@heroicons/react/24/outline";
 
-type Section = 'general' | 'notifications' | 'security' | 'integrations' | 'appearance';
+type Section = 'general' | 'payments' | 'notifications' | 'security' | 'integrations' | 'appearance';
 
 const Toggle: React.FC<{ checked: boolean; onChange: () => void; id?: string }> = ({ checked, onChange, id }) => (
     <button
@@ -219,9 +223,147 @@ export const GlobalSettingsPage: React.FC<SharedModuleProps> = ({ mode = 'worksp
     const [slackSaving, setSlackSaving] = useState<boolean>(false);
     const [slackSavedMsg, setSlackSavedMsg] = useState<string | null>(null);
 
+    // ── PHASE-15B: Payouts & Banking (Stripe Connect + SEPA + Settlement Modality) State ──
+    const [stripeAccountId, setStripeAccountId] = useState<string>('');
+    const [stripePublishableKey, setStripePublishableKey] = useState<string>('');
+    const [stripeRestrictedKey, setStripeRestrictedKey] = useState<string>('');
+    const [stripeWebhookSecret, setStripeWebhookSecret] = useState<string>('');
+    const [stripeMode, setStripeMode] = useState<'TEST' | 'LIVE'>('TEST');
+    const [showStripeSecret, setShowStripeSecret] = useState<boolean>(false);
+    const [testingStripeConn, setTestingStripeConn] = useState<boolean>(false);
+    const [stripeConnResult, setStripeConnResult] = useState<{ ok: boolean; status: string; message?: string; stripeAccountId?: string } | null>(null);
+
+    const [bankAccountHolder, setBankAccountHolder] = useState<string>('');
+    const [bankIban, setBankIban] = useState<string>('');
+    const [bankBicSwift, setBankBicSwift] = useState<string>('');
+    const [bankName, setBankName] = useState<string>('');
+
+    const [legalEntityName, setLegalEntityName] = useState<string>('');
+    const [vatTaxId, setVatTaxId] = useState<string>('');
+    const [fiscalAddress, setFiscalAddress] = useState<string>('');
+    const [eInvoiceRoutingCode, setEInvoiceRoutingCode] = useState<string>('');
+    const [defaultSettlementModality, setDefaultSettlementModality] = useState<'MODALITY_A_ESCROW_MOR' | 'MODALITY_B_DIRECT_COMMISSION'>('MODALITY_A_ESCROW_MOR');
+    const [autoPayoutEnabled, setAutoPayoutEnabled] = useState<boolean>(true);
+    const [paymentConfigStatus, setPaymentConfigStatus] = useState<'INCOMPLETE' | 'CONFIGURED' | 'VERIFIED'>('INCOMPLETE');
+    const [savingPaymentSettings, setSavingPaymentSettings] = useState<boolean>(false);
+    const [paymentSettingsMsg, setPaymentSettingsMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
+    const PAYMENT_I18N: Record<Locale, Record<string, string>> = {
+        en: {
+            navTab: 'Payouts & Banking',
+            headerTitle: 'Financial Configuration, Stripe Connectors & Printhouse Banking',
+            headerDesc: 'Configure Stripe Connect credentials, SEPA B2B settlement accounts, tax identity, and commercial payout modality.',
+            statusVerified: 'CONFIGURATION STATUS: VERIFIED & READY FOR MARKETPLACE',
+            statusConfigured: 'CONFIGURATION STATUS: CONFIGURED (PENDING LIVE STRIPE CHECK)',
+            statusIncomplete: 'CONFIGURATION STATUS: INCOMPLETE — DEFAULTING TO ESCROW MoR',
+            block1Title: '1. STRIPE CONNECT & GATEWAY CREDENTIALS',
+            stripeModeLabel: 'Gateway Environment Mode',
+            stripeAccountIdLabel: 'Stripe Connect Account ID',
+            stripePubKeyLabel: 'Publishable Key (pk_test_ / pk_live_)',
+            stripeSecKeyLabel: 'Restricted / Secret Key (AES-256-GCM Encrypted at Rest)',
+            stripeWebhookLabel: 'Webhook Signing Secret (whsec_)',
+            testStripeBtn: 'TEST STRIPE CONNECTION',
+            testingStripeBtn: 'VERIFYING WITH STRIPE...',
+            stripeConnectedBadge: 'CONNECTED (Charges Enabled)',
+            block2Title: '2. BANK SETTLEMENT ACCOUNT (SEPA / B2B WIRE)',
+            holderLabel: 'Legal Account Holder / Beneficiary',
+            ibanLabel: 'IBAN Account Number (ISO 13616 MOD-97)',
+            bicLabel: 'BIC / SWIFT Code',
+            bankNameLabel: 'Financial Institution / Bank Name',
+            ibanValidBadge: 'MOD-97 VALID',
+            ibanInvalidBadge: 'INVALID IBAN CHECKSUM',
+            block3Title: '3. COMMERCIAL SETTLEMENT & TAX PROFILE',
+            modalityLabel: 'Preferred Commercial Settlement Modality',
+            modalityATitle: 'Modality A: PrintPrice Escrow (Merchant of Record)',
+            modalityADesc: 'Centralized collection, secure escrow lock on proof approval, and automated split-payout release upon signed POD.',
+            modalityBTitle: 'Modality B: Direct PrintHouse (Commission Model / Envato)',
+            modalityBDesc: 'Direct customer collection to printhouse account with automated PrintPrice platform fee deduction.',
+            legalEntityLabel: 'Registered Legal Entity Name',
+            vatIdLabel: 'Tax / VAT ID (NIF / CIF / VIES / USt-IdNr)',
+            fiscalAddressLabel: 'Registered Fiscal Address',
+            eInvoiceCodeLabel: 'Electronic Invoicing Routing Code (DIR3 Facturae / Leitweg-ID XRechnung)',
+            savePaymentBtn: 'SAVE PAYMENT SETTINGS',
+            savingPaymentBtn: 'ENCRYPTING & SAVING...'
+        },
+        es: {
+            navTab: 'Pagos y Banca',
+            headerTitle: 'Configuración Financiera, Conectores Stripe y Datos Bancarios de Imprenta',
+            headerDesc: 'Configure credenciales de Stripe Connect, cuenta bancaria SEPA B2B, datos fiscales y modalidad comercial de liquidación.',
+            statusVerified: 'CONFIGURATION STATUS: VERIFIED & READY FOR MARKETPLACE',
+            statusConfigured: 'CONFIGURATION STATUS: CONFIGURED (PENDIENTE VERIFICACIÓN STRIPE)',
+            statusIncomplete: 'CONFIGURATION STATUS: INCOMPLETE — ENRUTAMIENTO ESCROW MoR POR DEFECTO',
+            block1Title: '1. STRIPE CONNECT & GATEWAY CREDENTIALS',
+            stripeModeLabel: 'Entorno de Pasarela Stripe',
+            stripeAccountIdLabel: 'ID de Cuenta Stripe Connect',
+            stripePubKeyLabel: 'Clave Pública (pk_test_ / pk_live_)',
+            stripeSecKeyLabel: 'Clave Secreta / Restringida (Cifrada AES-256-GCM en Reposo)',
+            stripeWebhookLabel: 'Secreto de Webhook (whsec_)',
+            testStripeBtn: 'TEST STRIPE CONNECTION',
+            testingStripeBtn: 'VERIFICANDO CON STRIPE...',
+            stripeConnectedBadge: 'CONNECTED (Charges Enabled)',
+            block2Title: '2. BANK SETTLEMENT ACCOUNT (SEPA / B2B WIRE)',
+            holderLabel: 'Titular Legal de la Cuenta / Beneficiario',
+            ibanLabel: 'Número de Cuenta IBAN (ISO 13616 MOD-97)',
+            bicLabel: 'Código BIC / SWIFT',
+            bankNameLabel: 'Entidad Bancaria',
+            ibanValidBadge: 'MOD-97 VÁLIDO',
+            ibanInvalidBadge: 'CHECKSUM IBAN INVÁLIDO',
+            block3Title: '3. COMMERCIAL SETTLEMENT & TAX PROFILE',
+            modalityLabel: 'Modalidad Comercial de Liquidación Preferida',
+            modalityATitle: 'Modalidad A: PrintPrice Escrow (Merchant of Record)',
+            modalityADesc: 'Cobro centralizado, retención segura en depósito y liberación automática tras albarán POD firmado.',
+            modalityBTitle: 'Modalidad B: Direct PrintHouse (Commission Model / Envato)',
+            modalityBDesc: 'Cobro directo a la imprenta con retención automática de la comisión tecnológica de PrintPrice.',
+            legalEntityLabel: 'Razón Social Legal',
+            vatIdLabel: 'NIF / CIF / VAT ID Comunitario',
+            fiscalAddressLabel: 'Dirección Fiscal Completa',
+            eInvoiceCodeLabel: 'Código de Enrutamiento Facturae / XRechnung (DIR3 / Leitweg-ID)',
+            savePaymentBtn: 'SAVE PAYMENT SETTINGS',
+            savingPaymentBtn: 'CIFRANDO Y GUARDANDO...'
+        },
+        de: {
+            navTab: 'Zahlungen & Bankdaten',
+            headerTitle: 'Finanzkonfiguration, Stripe-Konnektoren & Druckerei-Bankverbindung',
+            headerDesc: 'Konfigurieren Sie Stripe Connect, SEPA-B2B-Bankkonten, Steuerdaten und das Abrechnungsmodell.',
+            statusVerified: 'CONFIGURATION STATUS: VERIFIED & READY FOR MARKETPLACE',
+            statusConfigured: 'CONFIGURATION STATUS: CONFIGURED (STRIPE-PRÜFUNG AUSSTEHEND)',
+            statusIncomplete: 'CONFIGURATION STATUS: INCOMPLETE — STANDARD-ROUTING ÜBER ESCROW MoR',
+            block1Title: '1. STRIPE CONNECT & GATEWAY CREDENTIALS',
+            stripeModeLabel: 'Gateway-Umgebungsmodus',
+            stripeAccountIdLabel: 'Stripe Connect Konto-ID',
+            stripePubKeyLabel: 'Öffentlicher Schlüssel (pk_test_ / pk_live_)',
+            stripeSecKeyLabel: 'Geheimer / Eingeschränkter Schlüssel (AES-256-GCM verschlüsselt)',
+            stripeWebhookLabel: 'Webhook-Signaturgeheimnis (whsec_)',
+            testStripeBtn: 'TEST STRIPE CONNECTION',
+            testingStripeBtn: 'PRÜFUNG LÄUFT...',
+            stripeConnectedBadge: 'CONNECTED (Charges Enabled)',
+            block2Title: '2. BANK SETTLEMENT ACCOUNT (SEPA / B2B WIRE)',
+            holderLabel: 'Kontoinhaber / Begünstigter',
+            ibanLabel: 'IBAN-Kontonummer (ISO 13616 MOD-97)',
+            bicLabel: 'BIC / SWIFT-Code',
+            bankNameLabel: 'Kreditinstitut / Bankname',
+            ibanValidBadge: 'MOD-97 GÜLTIG',
+            ibanInvalidBadge: 'UNGÜLTIGE IBAN-PRÜFSUMME',
+            block3Title: '3. COMMERCIAL SETTLEMENT & TAX PROFILE',
+            modalityLabel: 'Bevorzugtes Abrechnungsmodell',
+            modalityATitle: 'Modalität A: PrintPrice Escrow (Merchant of Record)',
+            modalityADesc: 'Zentraler Zahlungseinzug, sichere Treuhandverwahrung und automatische Freigabe nach signiertem POD.',
+            modalityBTitle: 'Modalität B: Direct PrintHouse (Commission Model / Envato)',
+            modalityBDesc: 'Direktzahlung an die Druckerei mit automatischem Abzug der PrintPrice-Plattformprovision.',
+            legalEntityLabel: 'Offizieller Firmenname',
+            vatIdLabel: 'USt-IdNr. / Steuernummer (VIES)',
+            fiscalAddressLabel: 'Steuerliche Geschäftsadresse',
+            eInvoiceCodeLabel: 'E-Rechnung Leitweg-ID (XRechnung / DIR3)',
+            savePaymentBtn: 'SAVE PAYMENT SETTINGS',
+            savingPaymentBtn: 'VERSCHLÜSSELN & SPEICHERN...'
+        }
+    };
+    const pt = PAYMENT_I18N[locale] || PAYMENT_I18N.en;
+
     // Navigation item definitions with translated labels
     const NAV: { id: Section; label: string; icon: React.ElementType }[] = [
         { id: 'general',       label: t('settings.nav.general'),       icon: Cog6ToothIcon },
+        { id: 'payments',      label: pt.navTab,                       icon: CreditCardIcon },
         { id: 'notifications', label: t('settings.nav.notifications'), icon: BellIcon },
         { id: 'security',      label: t('settings.nav.security'),      icon: ShieldCheckIcon },
         { id: 'integrations',  label: t('settings.nav.integrations'),  icon: ServerIcon },
@@ -284,6 +426,149 @@ export const GlobalSettingsPage: React.FC<SharedModuleProps> = ({ mode = 'worksp
                 }
             })
             .catch(() => {});
+    };
+
+    const loadPaymentSettings = () => {
+        adminFetch<any>('/api/settings/payments')
+            .then(res => {
+                if (res && res.ok && res.settings) {
+                    const s = res.settings;
+                    if (s.stripeAccountId !== undefined) setStripeAccountId(s.stripeAccountId);
+                    if (s.stripePublishableKey !== undefined) setStripePublishableKey(s.stripePublishableKey);
+                    if (s.stripeRestrictedKeyMasked) setStripeRestrictedKey(s.stripeRestrictedKeyMasked);
+                    if (s.stripeWebhookSecretMasked) setStripeWebhookSecret(s.stripeWebhookSecretMasked);
+                    if (s.stripeMode) setStripeMode(s.stripeMode);
+                    if (s.bankAccountHolder !== undefined) setBankAccountHolder(s.bankAccountHolder);
+                    if (s.bankIbanFormatted || s.bankIbanMasked) setBankIban(s.bankIbanFormatted || s.bankIbanMasked);
+                    if (s.bankBicSwift !== undefined) setBankBicSwift(s.bankBicSwift);
+                    if (s.bankName !== undefined) setBankName(s.bankName);
+                    if (s.legalEntityName !== undefined) setLegalEntityName(s.legalEntityName);
+                    if (s.vatTaxId !== undefined) setVatTaxId(s.vatTaxId);
+                    if (s.fiscalAddress !== undefined) setFiscalAddress(s.fiscalAddress);
+                    if (s.eInvoiceRoutingCode !== undefined) setEInvoiceRoutingCode(s.eInvoiceRoutingCode);
+                    if (s.defaultSettlementModality) setDefaultSettlementModality(s.defaultSettlementModality);
+                    if (s.autoPayoutEnabled !== undefined) setAutoPayoutEnabled(Boolean(s.autoPayoutEnabled));
+                    if (s.status) setPaymentConfigStatus(s.status);
+                }
+            })
+            .catch(() => {});
+    };
+
+    const formatIbanLive = (raw: string) => {
+        if (raw.includes('••••')) return raw;
+        const clean = raw.replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, 34);
+        return clean.replace(/(.{4})/g, '$1 ').trim();
+    };
+
+    const checkIbanMod97Client = (ibanInput: string): boolean | null => {
+        if (!ibanInput || ibanInput.includes('••••')) return null;
+        const clean = ibanInput.replace(/\s+/g, '').toUpperCase();
+        if (clean.length < 15) return null;
+        if (!/^[A-Z]{2}[0-9]{2}[A-Z0-9]{11,30}$/.test(clean)) return false;
+        const rearranged = clean.slice(4) + clean.slice(0, 4);
+        let numeric = '';
+        for (let i = 0; i < rearranged.length; i++) {
+            const c = rearranged.charCodeAt(i);
+            numeric += c >= 65 && c <= 90 ? String(c - 55) : rearranged[i];
+        }
+        try {
+            return BigInt(numeric) % 97n === 1n;
+        } catch {
+            return false;
+        }
+    };
+
+    const handleTestStripeConnection = async () => {
+        setTestingStripeConn(true);
+        setStripeConnResult(null);
+        try {
+            const res = await adminFetch<any>('/api/settings/payments/stripe/test-connection', {
+                method: 'POST',
+                body: JSON.stringify({
+                    stripeAccountId,
+                    stripePublishableKey,
+                    stripeRestrictedKey,
+                    stripeMode
+                })
+            });
+            if (res && res.ok && res.status === 'OK') {
+                setStripeConnResult({
+                    ok: true,
+                    status: 'OK',
+                    stripeAccountId: res.stripeAccountId || stripeAccountId
+                });
+                if (paymentConfigStatus !== 'INCOMPLETE') {
+                    setPaymentConfigStatus('VERIFIED');
+                }
+            } else {
+                setStripeConnResult({
+                    ok: false,
+                    status: 'ERROR',
+                    message: res?.message || res?.error || 'Stripe verification failed'
+                });
+            }
+        } catch (err: any) {
+            setStripeConnResult({
+                ok: false,
+                status: 'ERROR',
+                message: err?.message || 'Stripe connection failed'
+            });
+        } finally {
+            setTestingStripeConn(false);
+        }
+    };
+
+    const handleSavePaymentSettings = async () => {
+        setSavingPaymentSettings(true);
+        setPaymentSettingsMsg(null);
+        try {
+            const res = await adminFetch<any>('/api/settings/payments', {
+                method: 'PUT',
+                body: JSON.stringify({
+                    stripeAccountId,
+                    stripePublishableKey,
+                    stripeRestrictedKey,
+                    stripeWebhookSecret,
+                    stripeMode,
+                    bankAccountHolder,
+                    bankIban,
+                    bankBicSwift,
+                    bankName,
+                    legalEntityName,
+                    vatTaxId,
+                    fiscalAddress,
+                    eInvoiceRoutingCode,
+                    defaultSettlementModality,
+                    autoPayoutEnabled
+                })
+            });
+            if (res && res.ok && res.settings) {
+                const s = res.settings;
+                setPaymentConfigStatus(s.status || 'CONFIGURED');
+                if (s.stripeRestrictedKeyMasked) setStripeRestrictedKey(s.stripeRestrictedKeyMasked);
+                if (s.stripeWebhookSecretMasked) setStripeWebhookSecret(s.stripeWebhookSecretMasked);
+                if (s.bankIbanMasked) setBankIban(s.bankIbanMasked);
+                setPaymentSettingsMsg({
+                    ok: true,
+                    text: 'Payment & Banking configuration encrypted and saved to MySQL.'
+                });
+                if (mode === 'onboarding' && onNextStep) {
+                    onNextStep();
+                }
+            } else {
+                setPaymentSettingsMsg({
+                    ok: false,
+                    text: res?.error || 'Validation failed saving payment settings.'
+                });
+            }
+        } catch (err: any) {
+            setPaymentSettingsMsg({
+                ok: false,
+                text: err?.message || 'Error saving payment settings.'
+            });
+        } finally {
+            setSavingPaymentSettings(false);
+        }
     };
 
     // Load initial tenant company profile, notification preferences, and audit log
@@ -357,6 +642,7 @@ export const GlobalSettingsPage: React.FC<SharedModuleProps> = ({ mode = 'worksp
         loadSessions();
         loadWebhooks();
         loadSlack();
+        loadPaymentSettings();
     }, [tenantId, isSuper]);
 
     // Bi-directional subscription to theme, density, and animation stores
@@ -994,6 +1280,378 @@ export const GlobalSettingsPage: React.FC<SharedModuleProps> = ({ mode = 'worksp
                                 </div>
                             )}
                         </>
+                    )}
+
+                    {/* ── PAYOUTS & BANKING (PHASE-15B) ──────────────────── */}
+                    {active === 'payments' && (
+                        <div data-testid="settings-payments-panel" data-mode={mode} className="space-y-6">
+                            <SectionHeader
+                                icon={CreditCardIcon}
+                                title={pt.headerTitle}
+                                description={pt.headerDesc}
+                            />
+
+                            {/* Configuration Telemetry Status Banner */}
+                            <div
+                                data-testid="payment-config-status-banner"
+                                className={`p-3.5 rounded-xl border flex items-center justify-between text-xs font-mono font-bold tracking-wider ${
+                                    paymentConfigStatus === 'VERIFIED'
+                                        ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                                        : paymentConfigStatus === 'CONFIGURED'
+                                        ? 'bg-amber-500/10 border-amber-500/30 text-amber-400'
+                                        : 'bg-zinc-900 border-[#1f2228] text-zinc-400'
+                                }`}
+                            >
+                                <div className="flex items-center gap-2.5">
+                                    <span
+                                        className={`w-2.5 h-2.5 rounded-full ${
+                                            paymentConfigStatus === 'VERIFIED'
+                                                ? 'bg-[#10b981] animate-pulse'
+                                                : paymentConfigStatus === 'CONFIGURED'
+                                                ? 'bg-amber-400'
+                                                : 'bg-[#dc2626]'
+                                        }`}
+                                    />
+                                    <span>
+                                        {paymentConfigStatus === 'VERIFIED'
+                                            ? pt.statusVerified
+                                            : paymentConfigStatus === 'CONFIGURED'
+                                            ? pt.statusConfigured
+                                            : pt.statusIncomplete}
+                                    </span>
+                                </div>
+                                <span className="px-2 py-0.5 rounded bg-[#0a0b0d] border border-[#1f2228] text-[10px] uppercase">
+                                    {defaultSettlementModality === 'MODALITY_B_DIRECT_COMMISSION' ? 'MODALITY B: DIRECT' : 'MODALITY A: ESCROW MoR'}
+                                </span>
+                            </div>
+
+                            {/* BLOCK 1: STRIPE CONNECT & GATEWAY CREDENTIALS */}
+                            <div className="p-5 rounded-xl bg-[#14161a] border border-[#1f2228] space-y-4">
+                                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#1f2228] pb-3">
+                                    <h3 className="text-xs font-black uppercase tracking-widest text-[#dc2626] flex items-center gap-2">
+                                        <CreditCardIcon className="w-4 h-4" />
+                                        <span>{pt.block1Title}</span>
+                                    </h3>
+
+                                    {/* Environment Toggle TEST / LIVE */}
+                                    <div className="flex items-center gap-1 bg-[#0a0b0d] p-1 rounded-lg border border-[#1f2228]">
+                                        <button
+                                            type="button"
+                                            data-testid="stripe-mode-test-btn"
+                                            onClick={() => setStripeMode('TEST')}
+                                            className={`px-3 py-1 rounded text-[10px] font-black uppercase tracking-wider cursor-pointer transition-all ${
+                                                stripeMode === 'TEST'
+                                                    ? 'bg-[#dc2626] text-white'
+                                                    : 'text-zinc-400 hover:text-white'
+                                            }`}
+                                        >
+                                            TEST (Sandbox)
+                                        </button>
+                                        <button
+                                            type="button"
+                                            data-testid="stripe-mode-live-btn"
+                                            onClick={() => setStripeMode('LIVE')}
+                                            className={`px-3 py-1 rounded text-[10px] font-black uppercase tracking-wider cursor-pointer transition-all ${
+                                                stripeMode === 'LIVE'
+                                                    ? 'bg-[#10b981] text-[#0a0b0d]'
+                                                    : 'text-zinc-400 hover:text-white'
+                                            }`}
+                                        >
+                                            LIVE (Production)
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <Field label={pt.stripeAccountIdLabel}>
+                                        <input
+                                            id="settings-stripe-account-id"
+                                            data-testid="input-stripe-account-id"
+                                            value={stripeAccountId}
+                                            onChange={e => setStripeAccountId(e.target.value)}
+                                            placeholder="acct_1P9xYzPrintHouse2026"
+                                            className={`${inputCls} font-mono`}
+                                        />
+                                    </Field>
+                                    <Field label={pt.stripePubKeyLabel}>
+                                        <input
+                                            id="settings-stripe-pub-key"
+                                            data-testid="input-stripe-pub-key"
+                                            value={stripePublishableKey}
+                                            onChange={e => setStripePublishableKey(e.target.value)}
+                                            placeholder={stripeMode === 'LIVE' ? 'pk_live_51P9xYz...' : 'pk_test_51P9xYz...'}
+                                            className={`${inputCls} font-mono`}
+                                        />
+                                    </Field>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <Field label={pt.stripeSecKeyLabel}>
+                                        <div className="relative flex items-center">
+                                            <input
+                                                id="settings-stripe-secret-key"
+                                                data-testid="input-stripe-secret-key"
+                                                type={showStripeSecret ? 'text' : 'password'}
+                                                value={stripeRestrictedKey}
+                                                onChange={e => setStripeRestrictedKey(e.target.value)}
+                                                placeholder={stripeMode === 'LIVE' ? 'rk_live_51P9xYz...' : 'rk_test_51P9xYz...'}
+                                                className={`${inputCls} font-mono pr-10`}
+                                            />
+                                            <button
+                                                type="button"
+                                                data-testid="toggle-stripe-secret-visibility"
+                                                onClick={() => setShowStripeSecret(v => !v)}
+                                                className="absolute right-3 text-zinc-400 hover:text-white cursor-pointer"
+                                                aria-label="Toggle secret key visibility"
+                                            >
+                                                {showStripeSecret ? <EyeSlashIcon className="w-4 h-4" /> : <EyeIcon className="w-4 h-4" />}
+                                            </button>
+                                        </div>
+                                    </Field>
+                                    <Field label={pt.stripeWebhookLabel}>
+                                        <input
+                                            id="settings-stripe-webhook-secret"
+                                            data-testid="input-stripe-webhook-secret"
+                                            type={showStripeSecret ? 'text' : 'password'}
+                                            value={stripeWebhookSecret}
+                                            onChange={e => setStripeWebhookSecret(e.target.value)}
+                                            placeholder="whsec_••••••••••••••••"
+                                            className={`${inputCls} font-mono`}
+                                        />
+                                    </Field>
+                                </div>
+
+                                <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+                                    <button
+                                        type="button"
+                                        id="settings-test-stripe-btn"
+                                        data-testid="btn-test-stripe-connection"
+                                        onClick={handleTestStripeConnection}
+                                        disabled={testingStripeConn}
+                                        className="px-4 py-2 rounded-lg bg-[#0a0b0d] border border-[#1f2228] hover:border-[#dc2626] text-white text-xs font-black uppercase tracking-widest transition-all cursor-pointer flex items-center gap-2"
+                                    >
+                                        <ArrowPathIcon className={`w-4 h-4 ${testingStripeConn ? 'animate-spin text-[#dc2626]' : 'text-zinc-400'}`} />
+                                        <span>{testingStripeConn ? pt.testingStripeBtn : pt.testStripeBtn}</span>
+                                    </button>
+
+                                    {stripeConnResult && (
+                                        <div
+                                            data-testid="stripe-connection-telemetry-badge"
+                                            className={`px-3 py-1.5 rounded-lg border text-xs font-mono font-bold flex items-center gap-2 ${
+                                                stripeConnResult.ok
+                                                    ? 'bg-emerald-500/15 border-emerald-500/30 text-[#10b981]'
+                                                    : 'bg-rose-500/15 border-rose-500/30 text-rose-400'
+                                            }`}
+                                        >
+                                            <span className={`w-2 h-2 rounded-full ${stripeConnResult.ok ? 'bg-[#10b981]' : 'bg-rose-500'}`} />
+                                            <span>
+                                                {stripeConnResult.ok
+                                                    ? `${pt.stripeConnectedBadge} • ${stripeConnResult.stripeAccountId || 'OK'}`
+                                                    : stripeConnResult.message || 'CONNECTION FAILED'}
+                                            </span>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* BLOCK 2: BANK SETTLEMENT ACCOUNT (SEPA / B2B WIRE) */}
+                            <div className="p-5 rounded-xl bg-[#14161a] border border-[#1f2228] space-y-4">
+                                <div className="flex items-center justify-between border-b border-[#1f2228] pb-3">
+                                    <h3 className="text-xs font-black uppercase tracking-widest text-[#dc2626] flex items-center gap-2">
+                                        <BanknotesIcon className="w-4 h-4" />
+                                        <span>{pt.block2Title}</span>
+                                    </h3>
+                                    {(() => {
+                                        const ibanValid = checkIbanMod97Client(bankIban);
+                                        if (ibanValid === null) return null;
+                                        return (
+                                            <span
+                                                data-testid="iban-validation-badge"
+                                                className={`px-2.5 py-0.5 rounded text-[10px] font-mono font-black uppercase tracking-wider border ${
+                                                    ibanValid
+                                                        ? 'bg-emerald-500/15 text-[#10b981] border-emerald-500/30'
+                                                        : 'bg-rose-500/15 text-rose-400 border-rose-500/30'
+                                                }`}
+                                            >
+                                                {ibanValid ? pt.ibanValidBadge : pt.ibanInvalidBadge}
+                                            </span>
+                                        );
+                                    })()}
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <Field label={pt.holderLabel}>
+                                        <input
+                                            id="settings-bank-holder"
+                                            data-testid="input-bank-holder"
+                                            value={bankAccountHolder}
+                                            onChange={e => setBankAccountHolder(e.target.value)}
+                                            placeholder="Gráficas Industriales S.A."
+                                            className={inputCls}
+                                        />
+                                    </Field>
+                                    <Field label={pt.ibanLabel}>
+                                        <input
+                                            id="settings-bank-iban"
+                                            data-testid="input-bank-iban"
+                                            value={bankIban}
+                                            onChange={e => setBankIban(formatIbanLive(e.target.value))}
+                                            placeholder="ES91 2100 0418 4502 0005 1332"
+                                            className={`${inputCls} font-mono`}
+                                        />
+                                    </Field>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <Field label={pt.bicLabel}>
+                                        <input
+                                            id="settings-bank-bic"
+                                            data-testid="input-bank-bic"
+                                            value={bankBicSwift}
+                                            onChange={e => setBankBicSwift(e.target.value.toUpperCase())}
+                                            placeholder="CAIXESBBXXX"
+                                            className={`${inputCls} font-mono uppercase`}
+                                        />
+                                    </Field>
+                                    <Field label={pt.bankNameLabel}>
+                                        <input
+                                            id="settings-bank-name"
+                                            data-testid="input-bank-name"
+                                            value={bankName}
+                                            onChange={e => setBankName(e.target.value)}
+                                            placeholder="CaixaBank / Deutsche Bank AG"
+                                            className={inputCls}
+                                        />
+                                    </Field>
+                                </div>
+                            </div>
+
+                            {/* BLOCK 3: COMMERCIAL SETTLEMENT & TAX PROFILE */}
+                            <div className="p-5 rounded-xl bg-[#14161a] border border-[#1f2228] space-y-4">
+                                <h3 className="text-xs font-black uppercase tracking-widest text-[#dc2626] border-b border-[#1f2228] pb-3 flex items-center gap-2">
+                                    <BuildingOffice2Icon className="w-4 h-4" />
+                                    <span>{pt.block3Title}</span>
+                                </h3>
+
+                                <div className="space-y-2">
+                                    <label className="text-xs font-semibold text-zinc-300">{pt.modalityLabel}</label>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                        <button
+                                            type="button"
+                                            data-testid="select-modality-a-btn"
+                                            onClick={() => setDefaultSettlementModality('MODALITY_A_ESCROW_MOR')}
+                                            className={`p-4 rounded-xl border text-left transition-all cursor-pointer space-y-1.5 ${
+                                                defaultSettlementModality === 'MODALITY_A_ESCROW_MOR'
+                                                    ? 'bg-[#0a0b0d] border-[#10b981] ring-1 ring-[#10b981]'
+                                                    : 'bg-[#0a0b0d]/60 border-[#1f2228] hover:border-zinc-700'
+                                            }`}
+                                        >
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-xs font-black uppercase tracking-wider text-white">
+                                                    {pt.modalityATitle}
+                                                </span>
+                                                <span className="px-2 py-0.5 rounded bg-emerald-500/15 text-[#10b981] text-[9px] font-mono font-bold">
+                                                    ESCROW MoR
+                                                </span>
+                                            </div>
+                                            <p className="text-[11px] text-zinc-400 leading-relaxed">{pt.modalityADesc}</p>
+                                        </button>
+
+                                        <button
+                                            type="button"
+                                            data-testid="select-modality-b-btn"
+                                            onClick={() => setDefaultSettlementModality('MODALITY_B_DIRECT_COMMISSION')}
+                                            className={`p-4 rounded-xl border text-left transition-all cursor-pointer space-y-1.5 ${
+                                                defaultSettlementModality === 'MODALITY_B_DIRECT_COMMISSION'
+                                                    ? 'bg-[#0a0b0d] border-[#dc2626] ring-1 ring-[#dc2626]'
+                                                    : 'bg-[#0a0b0d]/60 border-[#1f2228] hover:border-zinc-700'
+                                            }`}
+                                        >
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-xs font-black uppercase tracking-wider text-white">
+                                                    {pt.modalityBTitle}
+                                                </span>
+                                                <span className="px-2 py-0.5 rounded bg-amber-500/15 text-amber-400 text-[9px] font-mono font-bold">
+                                                    DIRECT SPLIT
+                                                </span>
+                                            </div>
+                                            <p className="text-[11px] text-zinc-400 leading-relaxed">{pt.modalityBDesc}</p>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+                                    <Field label={pt.legalEntityLabel}>
+                                        <input
+                                            id="settings-legal-entity"
+                                            data-testid="input-legal-entity"
+                                            value={legalEntityName}
+                                            onChange={e => setLegalEntityName(e.target.value)}
+                                            placeholder="Gráficas Industriales Europeas S.A."
+                                            className={inputCls}
+                                        />
+                                    </Field>
+                                    <Field label={pt.vatIdLabel}>
+                                        <input
+                                            id="settings-vat-tax-id"
+                                            data-testid="input-vat-tax-id"
+                                            value={vatTaxId}
+                                            onChange={e => setVatTaxId(e.target.value.toUpperCase())}
+                                            placeholder="ESB12345678 / DE123456789"
+                                            className={`${inputCls} font-mono uppercase`}
+                                        />
+                                    </Field>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <Field label={pt.fiscalAddressLabel}>
+                                        <input
+                                            id="settings-fiscal-address"
+                                            data-testid="input-fiscal-address"
+                                            value={fiscalAddress}
+                                            onChange={e => setFiscalAddress(e.target.value)}
+                                            placeholder="Polígono Industrial Zona Franca, Calle 4, 08040 Barcelona"
+                                            className={inputCls}
+                                        />
+                                    </Field>
+                                    <Field label={pt.eInvoiceCodeLabel}>
+                                        <input
+                                            id="settings-einvoice-code"
+                                            data-testid="input-einvoice-code"
+                                            value={eInvoiceRoutingCode}
+                                            onChange={e => setEInvoiceRoutingCode(e.target.value)}
+                                            placeholder="DIR3: L01280796 / Leitweg-ID: 04011000-12345-67"
+                                            className={`${inputCls} font-mono`}
+                                        />
+                                    </Field>
+                                </div>
+
+                                <div className="flex flex-wrap items-center justify-between gap-4 pt-4 border-t border-[#1f2228]">
+                                    <button
+                                        type="button"
+                                        id="settings-save-payments-btn"
+                                        data-testid="btn-save-payment-settings"
+                                        onClick={handleSavePaymentSettings}
+                                        disabled={savingPaymentSettings}
+                                        className="px-6 py-2.5 rounded-xl bg-[#dc2626] hover:bg-red-500 text-white text-xs font-black uppercase tracking-widest transition-all cursor-pointer flex items-center gap-2"
+                                    >
+                                        {savingPaymentSettings ? <ArrowPathIcon className="w-4 h-4 animate-spin" /> : <CheckIcon className="w-4 h-4" />}
+                                        <span>{savingPaymentSettings ? pt.savingPaymentBtn : pt.savePaymentBtn}</span>
+                                    </button>
+
+                                    {paymentSettingsMsg && (
+                                        <span
+                                            data-testid="payment-settings-save-feedback"
+                                            className={`text-xs font-mono font-bold ${
+                                                paymentSettingsMsg.ok ? 'text-[#10b981]' : 'text-rose-400'
+                                            }`}
+                                        >
+                                            {paymentSettingsMsg.text}
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
                     )}
 
                     {/* ── NOTIFICATIONS ──────────────────────────────────── */}

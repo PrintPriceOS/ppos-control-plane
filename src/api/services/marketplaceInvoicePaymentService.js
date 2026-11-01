@@ -633,11 +633,24 @@ async function createMarketplaceOrderCheckoutSession(orderId, payload = {}, opti
         ? payload.paymentMethod
         : (payload.provider === 'stripe' ? 'STRIPE_CARD' : (orderRow.payment_method || 'BANK_TRANSFER_B2B'));
 
+    // PHASE-15B: Load printhouse payment settings to resolve Stripe Connect Account ID, IBAN, and default modality
+    let printhousePaymentSettings = null;
+    try {
+        const printhousePaymentSettingsService = require('./printhousePaymentSettingsService');
+        printhousePaymentSettings = await printhousePaymentSettingsService.getPaymentSettingsByPrinthouseOrTenant(
+            {
+                printhouseId: orderRow.printhouse_id,
+                tenantId: orderRow.tenant_id
+            },
+            { includeRawUnmasked: true }
+        );
+    } catch (_) {}
+
     const settlementModality = payload.settlementModality === 'MODALITY_B_DIRECT_COMMISSION'
         ? 'MODALITY_B_DIRECT_COMMISSION'
         : (payload.settlementModality === 'MODALITY_A_ESCROW_MOR'
             ? 'MODALITY_A_ESCROW_MOR'
-            : (orderRow.settlement_modality || 'MODALITY_A_ESCROW_MOR'));
+            : (orderRow.settlement_modality || printhousePaymentSettings?.defaultSettlementModality || 'MODALITY_A_ESCROW_MOR'));
 
     const platformFeePct = Number(payload.platformFeePct ?? orderRow.platform_fee_pct ?? 10.0);
     const subtotalMfgEur = Number(
@@ -690,7 +703,7 @@ async function createMarketplaceOrderCheckoutSession(orderId, payload = {}, opti
             {
                 paymentMethod,
                 settlementModality,
-                stripeAccountId: payload.stripeAccountId || null
+                stripeAccountId: payload.stripeAccountId || printhousePaymentSettings?.stripeAccountId || null
             }
         );
 
@@ -715,7 +728,12 @@ async function createMarketplaceOrderCheckoutSession(orderId, payload = {}, opti
         checkoutData = paymentGatewayService.createBankTransferInstructions(
             { ...orderRow, orderId },
             invoiceNumber,
-            { settlementModality }
+            {
+                settlementModality,
+                printhouseIban: printhousePaymentSettings?._raw?.bankIban || printhousePaymentSettings?.bankIbanFormatted || null,
+                printhouseBic: printhousePaymentSettings?.bankBicSwift || null,
+                printhouseBeneficiary: printhousePaymentSettings?.bankAccountHolder || printhousePaymentSettings?.legalEntityName || null
+            }
         );
 
         paymentStatus = 'AWAITING_WIRE';

@@ -531,6 +531,30 @@ class MarketplaceService {
             const packagingHandlingEur = Number(extraContext.packagingHandlingEur ?? rawEst.packaging_eur ?? 0);
             const shippingFreightEur = Number(extraContext.shippingFreightEur ?? rawEst.shipping_eur ?? 0);
 
+            // PHASE-15B: Resolve printhouse payment settings (default settlement modality, Stripe Connect status, IBAN readiness)
+            let resolvedModality = extraContext.settlementModality || null;
+            let paymentConfigWarning = null;
+            try {
+                const printhousePaymentSettingsService = require('./printhousePaymentSettingsService');
+                const paymentProfile = await printhousePaymentSettingsService.getPaymentSettingsByPrinthouseOrTenant({
+                    printhouseId,
+                    tenantId
+                });
+                if (!resolvedModality) {
+                    if (
+                        paymentProfile.status === 'INCOMPLETE' ||
+                        (paymentProfile.defaultSettlementModality === 'MODALITY_B_DIRECT_COMMISSION' && !paymentProfile.stripeAccountId)
+                    ) {
+                        resolvedModality = 'MODALITY_A_ESCROW_MOR';
+                        paymentConfigWarning = 'PRINTHOUSE_PAYMENT_PROFILE_INCOMPLETE_ROUTED_TO_ESCROW_MOR';
+                    } else {
+                        resolvedModality = paymentProfile.defaultSettlementModality || 'MODALITY_A_ESCROW_MOR';
+                    }
+                }
+            } catch (_) {
+                resolvedModality = resolvedModality || 'MODALITY_A_ESCROW_MOR';
+            }
+
             const marketplaceOrder = await marketplaceOrderService.createOrder({
                 orderId: String(canonicalOrderId),
                 externalOrderRef: String(canonicalOrderId),
@@ -547,8 +571,9 @@ class MarketplaceService {
                 shippingFreightEur,
                 taxRatePct: extraContext.taxRatePct ?? 21.0,
                 paymentMethod: extraContext.paymentMethod || 'BANK_TRANSFER_B2B',
-                settlementModality: extraContext.settlementModality || 'MODALITY_A_ESCROW_MOR',
+                settlementModality: resolvedModality,
                 platformFeePct: extraContext.platformFeePct ?? 10.0,
+                metadata: paymentConfigWarning ? { paymentConfigWarning } : {},
                 bookSpec: extraContext.bookSpec || orderCtx.specs || orderCtx,
                 customer: extraContext.customer || orderCtx.customer || {
                     name: extraContext.customerName || 'Publisher Checkout',

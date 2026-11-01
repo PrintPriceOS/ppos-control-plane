@@ -2466,6 +2466,28 @@ export async function createMarketplaceOrderCheckoutSession(id: string, payload:
     });
 }
 
+// --- Phase 15B: Printhouse Payment & Banking Settings ---
+export async function getPrinthousePaymentSettings() {
+    return adminFetch<{ ok: boolean; settings?: any }>('/api/settings/payments');
+}
+
+export async function savePrinthousePaymentSettings(payload: Record<string, any>) {
+    return adminFetch<{ ok: boolean; settings?: any; error?: string; code?: string }>('/api/settings/payments', {
+        method: 'PUT',
+        body: JSON.stringify(payload)
+    });
+}
+
+export async function testPrinthouseStripeConnection(payload: Record<string, any>) {
+    return adminFetch<{ ok: boolean; status: string; chargesEnabled?: boolean; payoutsEnabled?: boolean; stripeMode?: string; stripeAccountId?: string; message?: string; code?: string }>(
+        '/api/settings/payments/stripe/test-connection',
+        {
+            method: 'POST',
+            body: JSON.stringify(payload)
+        }
+    );
+}
+
 export async function prepareMarketplaceOrderHandoff(id: string) {
     return adminFetch<any>(`/api/admin/marketplace/orders/${id}/handoff/prepare`, {
         method: 'POST'

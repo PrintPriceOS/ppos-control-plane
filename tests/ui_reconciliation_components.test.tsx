@@ -28,6 +28,7 @@ import { ManufacturingQueuePage } from '../src/ui/pages/manufacturing/Manufactur
 import { PublisherHubPage } from '../src/ui/pages/publisher/PublisherHubPage';
 import { FinancialOpsTab } from '../src/ui/pages/admin/FinancialOpsTab';
 import { MachinesPage } from '../src/ui/pages/os/MachinesPage';
+import { GlobalSettingsPage } from '../src/ui/pages/os/GlobalSettingsPage';
 import { ProductionDashboard } from '../src/ui/pages/production/ProductionDashboard';
 import { Sidebar } from '../src/ui/layout/Sidebar';
 import * as adminApi from '../src/ui/lib/adminApi';
@@ -373,6 +374,69 @@ describe('Dark Industrial Telemetry UI — Canonical Components & Dual-Mode Reco
         expect(await screen.findByTestId('routing-rules-tab')).toBeInTheDocument();
         expect(screen.getByTestId('crossover-analyzer-card')).toBeInTheDocument();
         expect(screen.getByTestId('crossover-copies-badge')).toHaveTextContent(/410 copies/);
+    });
+
+    it('12. Renders PHASE-15B Payouts & Banking tab in GlobalSettingsPage with Stripe Connect, MOD-97 IBAN validation, and Dual Settlement Modality', async () => {
+        vi.spyOn(adminApi, 'adminFetch').mockImplementation(async (url: string) => {
+            if (url.includes('/api/settings/payments/stripe/test-connection')) {
+                return {
+                    ok: true,
+                    status: 'OK',
+                    chargesEnabled: true,
+                    stripeAccountId: 'acct_1P9xYzPrintHouse2026'
+                };
+            }
+            if (url.includes('/api/settings/payments')) {
+                return {
+                    ok: true,
+                    settings: {
+                        stripeAccountId: 'acct_1P9xYzPrintHouse2026',
+                        stripePublishableKey: 'pk_test_51P9xYz',
+                        stripeRestrictedKeyMasked: 'rk_test_••••••••9xYz',
+                        stripeMode: 'TEST',
+                        bankAccountHolder: 'Gráficas Industriales S.A.',
+                        bankIbanFormatted: 'ES91 2100 0418 4502 0005 1332',
+                        bankBicSwift: 'CAIXESBBXXX',
+                        legalEntityName: 'Gráficas Industriales S.A.',
+                        vatTaxId: 'ESA12345678',
+                        fiscalAddress: 'Barcelona Industrial Park',
+                        defaultSettlementModality: 'MODALITY_A_ESCROW_MOR',
+                        status: 'VERIFIED'
+                    }
+                };
+            }
+            return { ok: true, data: [] };
+        });
+
+        renderWithProviders(<GlobalSettingsPage mode="workspace" />, {
+            locale: 'en',
+            route: '/settings'
+        });
+
+        // Switch to Payouts & Banking tab
+        const paymentsNavBtn = document.getElementById('settings-tab-payments');
+        expect(paymentsNavBtn).toBeInTheDocument();
+        fireEvent.click(paymentsNavBtn!);
+
+        expect(await screen.findByTestId('settings-payments-panel')).toBeInTheDocument();
+        expect(screen.getByText('1. STRIPE CONNECT & GATEWAY CREDENTIALS')).toBeInTheDocument();
+        expect(screen.getByText('2. BANK SETTLEMENT ACCOUNT (SEPA / B2B WIRE)')).toBeInTheDocument();
+        expect(screen.getByText('3. COMMERCIAL SETTLEMENT & TAX PROFILE')).toBeInTheDocument();
+
+        // Enter a valid Spanish IBAN and verify live MOD-97 validation badge
+        const ibanInput = screen.getByTestId('input-bank-iban');
+        fireEvent.change(ibanInput, { target: { value: 'ES9121000418450200051332' } });
+        expect(screen.getByTestId('iban-validation-badge')).toHaveTextContent('MOD-97 VALID');
+
+        // Switch settlement modality to Modality B (Direct Commission)
+        fireEvent.click(screen.getByTestId('select-modality-b-btn'));
+        expect(screen.getByTestId('payment-config-status-banner')).toHaveTextContent('MODALITY B: DIRECT');
+
+        // Trigger Stripe Connection Test
+        fireEvent.click(screen.getByTestId('btn-test-stripe-connection'));
+        expect(await screen.findByTestId('stripe-connection-telemetry-badge')).toHaveTextContent(
+            'CONNECTED (Charges Enabled)'
+        );
     });
 });
 
