@@ -20,6 +20,7 @@ if (process.env.MYSQL_PASSWORD_FILE && fs.existsSync(process.env.MYSQL_PASSWORD_
 
 const mysqlClient = require('./src/api/services/mysqlClient');
 const fastify = require('fastify')({
+    bodyLimit: 64 * 1024 * 1024, // 64 MB body limit for binary base64 asset & wire-proof ingestion
     logger: {
         level: process.env.PPOS_LOG_LEVEL || 'info',
         redact: ['req.headers.authorization', 'req.headers["x-api-key"]'],
@@ -373,8 +374,8 @@ const start = async () => {
                 require('express').raw({ type: 'application/json', limit: '2mb' })
             );
 
-            fastify.use(require('express').json());
-            fastify.use(require('express').urlencoded({ extended: true }));
+            fastify.use(require('express').json({ limit: '64mb' }));
+            fastify.use(require('express').urlencoded({ extended: true, limit: '64mb' }));
             
             fastify.use('/api/auth', require('./src/api/routes/authRoutes'));
             fastify.use('/api/admin/financials/activation', require('./src/api/routes/financialOperationsProductionActivationAdmin'));
