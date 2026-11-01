@@ -125,6 +125,16 @@ class MarketplaceOrderFileService {
                     });
                 }
             } catch (_) {}
+
+            try {
+                const { sendTransactionalOrderEmail, TEMPLATE_IDS } = require('./notifications/transactionalEmailService');
+                await sendTransactionalOrderEmail({
+                    templateId: TEMPLATE_IDS.ASSETS_READY_FOR_3D_PROOF,
+                    orderId,
+                    recipientEmail: updatedOrder?.customer?.email || 'produccion@editorial-planeta.es',
+                    order: updatedOrder || { orderId }
+                });
+            } catch (_) {}
         }
 
         return {
@@ -249,6 +259,16 @@ class MarketplaceOrderFileService {
                         preflightBypassEligible: true
                     });
                 }
+            } catch (_) {}
+
+            try {
+                const { sendTransactionalOrderEmail, TEMPLATE_IDS } = require('./notifications/transactionalEmailService');
+                await sendTransactionalOrderEmail({
+                    templateId: TEMPLATE_IDS.ASSETS_READY_FOR_3D_PROOF,
+                    orderId,
+                    recipientEmail: updatedOrder?.customer?.email || 'produccion@editorial-planeta.es',
+                    order: updatedOrder || { orderId }
+                });
             } catch (_) {}
         }
 

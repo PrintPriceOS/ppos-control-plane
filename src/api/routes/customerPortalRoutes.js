@@ -1314,13 +1314,34 @@ function createCustomerPortalRouter() {
             } catch (_) {}
 
             const trackingPayload = buildCustomerOrderTrackingPayload(normalizedUpdated);
+
+            // Auto-dispatch ORDER_SHIPPED_POD_DISPATCH email when transitioning to Stage 05 (IN_TRANSIT / SHIPPED)
+            let dispatchNotification = null;
+            if (nextStep === 5 || nextStatus === 'IN_TRANSIT' || nextStatus === 'DELIVERED') {
+                try {
+                    const { sendTransactionalOrderEmail, TEMPLATE_IDS } = require('../services/notifications/transactionalEmailService');
+                    const emailRes = await sendTransactionalOrderEmail({
+                        templateId: TEMPLATE_IDS.ORDER_SHIPPED_POD_DISPATCH,
+                        orderId: normalizedUpdated.orderId,
+                        recipientEmail: normalizedUpdated.customer?.email || ctx.email,
+                        order: {
+                            ...normalizedUpdated,
+                            telemetry: trackingPayload.telemetry,
+                            shipment: normalizedUpdated.shipment || shipment || {}
+                        }
+                    });
+                    dispatchNotification = emailRes.notification;
+                } catch (_) {}
+            }
+
             return res.status(200).json({
                 ok: true,
                 orderId: normalizedUpdated.orderId,
                 status: nextStatus,
                 productionStage: nextStageKey,
                 activeStageIndex: nextStep,
-                tracking: trackingPayload
+                tracking: trackingPayload,
+                notification: dispatchNotification
             });
         } catch (err) {
             logger.error({ event: 'customer_order_stage_update_failed', orderId, error: err.message });
@@ -1441,6 +1462,80 @@ function createCustomerPortalRouter() {
             return res.status(500).json({
                 ok: false,
                 error: 'SOFT_PROOF_CERTIFICATE_PDF_FAILED',
+                message: err.message
+            });
+        }
+    });
+
+    /**
+     * 3e. GET & POST /api/customer/orders/:orderId/notifications
+     * Audit outbox query and on-demand transactional SMTP dispatch/resend.
+     */
+    router.get('/orders/:orderId/notifications', async (req, res) => {
+        const orderId = req.params.orderId;
+        const { listOrderNotifications } = require('../services/notifications/transactionalEmailService');
+        const notifications = listOrderNotifications(orderId);
+        return res.status(200).json({
+            ok: true,
+            orderId,
+            count: notifications.length,
+            notifications
+        });
+    });
+
+    router.post('/orders/:orderId/notifications/send', async (req, res) => {
+        const orderId = req.params.orderId;
+        try {
+            const ctx = resolveCustomerContext(req);
+            const templateId = String(req.body?.templateId || 'IMPRIMATUR_SIGNED_ESCROW_LOCKED').toUpperCase();
+            const recipientEmail = String(req.body?.recipientEmail || req.body?.email || ctx.email).trim();
+
+            const baseline = buildBaselineCustomerOrders(ctx.email);
+            let order =
+                runtimeCustomerOrders.get(orderId) ||
+                baseline.find(o => o.orderId === orderId || o.publicRef === orderId);
+
+            if (!order) {
+                try {
+                    const dbOrder = await marketplaceOrderService.getOrder(orderId);
+                    if (dbOrder) {
+                        order = mapMarketplaceOrderToCustomerHubOrder(dbOrder);
+                    }
+                } catch (_) {}
+            }
+
+            if (!order && String(orderId).startsWith('ORD')) {
+                order = { ...baseline[0], orderId };
+            }
+
+            if (!order) {
+                return res.status(404).json({
+                    ok: false,
+                    error: 'ORDER_NOT_FOUND',
+                    message: `Order '${orderId}' not found for notification dispatch.`
+                });
+            }
+
+            const { sendTransactionalOrderEmail } = require('../services/notifications/transactionalEmailService');
+            const trackingPayload = buildCustomerOrderTrackingPayload(order);
+            const result = await sendTransactionalOrderEmail({
+                templateId,
+                orderId: order.orderId || orderId,
+                recipientEmail,
+                order: {
+                    ...order,
+                    telemetry: trackingPayload.telemetry
+                },
+                options: {
+                    forceSimulate: Boolean(req.body?.forceSimulate)
+                }
+            });
+
+            return res.status(200).json(result);
+        } catch (err) {
+            return res.status(err.statusCode || 400).json({
+                ok: false,
+                error: err.code || 'NOTIFICATION_DISPATCH_FAILED',
                 message: err.message
             });
         }
@@ -1699,8 +1794,9 @@ async function processCustomerSoftProofDecision(orderId, options = {}) {
         );
     } catch (_) {}
 
-    // Lock Escrow funds on proof approval
+    // Lock Escrow funds on proof approval & auto-dispatch IMPRIMATUR_SIGNED_ESCROW_LOCKED email with PDF attachment
     let escrowRecord = null;
+    let notificationRecord = null;
     if (decision === 'APPROVED') {
         try {
             const { lockEscrowFundsOnProofApproval } = require('../services/financials/escrowSettlementService');
@@ -1718,6 +1814,20 @@ async function processCustomerSoftProofDecision(orderId, options = {}) {
             );
             escrowRecord = escrowRes.escrow;
         } catch (_) {}
+
+        try {
+            const { sendTransactionalOrderEmail, TEMPLATE_IDS } = require('../services/notifications/transactionalEmailService');
+            const emailRes = await sendTransactionalOrderEmail({
+                templateId: TEMPLATE_IDS.IMPRIMATUR_SIGNED_ESCROW_LOCKED,
+                orderId: order.orderId,
+                recipientEmail: approvedBy,
+                order: updatedOrder,
+                options: {
+                    geometry: softProofRecord.geometry
+                }
+            });
+            notificationRecord = emailRes.notification;
+        } catch (_) {}
     }
 
     return {
@@ -1732,6 +1842,7 @@ async function processCustomerSoftProofDecision(orderId, options = {}) {
         escrowStatus: decision === 'APPROVED' ? 'FUNDS_LOCKED_ON_PROOF_APPROVAL' : (order.escrowStatus || 'UNFUNDED'),
         softProof: softProofRecord,
         escrow: escrowRecord,
+        notification: notificationRecord,
         order: updatedOrder
     };
 }
