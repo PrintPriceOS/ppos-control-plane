@@ -22,6 +22,7 @@ const {
     calculateExecutiveProfitabilitySummary,
     generateElectronicInvoiceXml
 } = require('../services/financials/eInvoicingService');
+const { requireFinanceRights } = require('../middleware/b2bOrgRbacMiddleware');
 
 function requireLogisticsControlPlaneAuth(req, res, next) {
     const mktToken = req.headers && req.headers['x-marketplace-token'];
@@ -80,12 +81,12 @@ function requireLogisticsControlPlaneAuth(req, res, next) {
 function createFallbackRouter() {
     const stack = [];
     const middlewares = [];
-    const addRoute = (method, path, handler) => {
+    const addRoute = (method, path, ...handlers) => {
         stack.push({
             route: {
                 path,
                 methods: { [method]: true },
-                stack: [{ handle: handler }]
+                stack: handlers.map(h => ({ handle: h }))
             }
         });
     };
@@ -95,11 +96,11 @@ function createFallbackRouter() {
         use(fn) {
             middlewares.push(fn);
         },
-        get(path, handler) {
-            addRoute('get', path, handler);
+        get(path, ...handlers) {
+            addRoute('get', path, ...handlers);
         },
-        post(path, handler) {
-            addRoute('post', path, handler);
+        post(path, ...handlers) {
+            addRoute('post', path, ...handlers);
         }
     };
 }
@@ -192,7 +193,7 @@ function createEscrowRouter() {
     });
 
     // GET /api/financials/escrow/:orderId/e-invoice.xml
-    router.get('/:orderId/e-invoice.xml', async (req, res) => {
+    router.get('/:orderId/e-invoice.xml', requireFinanceRights, async (req, res) => {
         try {
             const tenantId =
                 (req.user && req.user.tenantId) ||

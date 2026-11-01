@@ -1048,7 +1048,7 @@ function createCustomerPortalRouter() {
      * Clones book technical specifications, re-attaches approved preflight PDFs (skipping redundant preflight
      * when files are unchanged), recalculates live industrial pricing for the new print run, and creates a new order `ORD_...`.
      */
-    router.post('/orders/:orderId/reorder', async (req, res) => {
+    router.post('/orders/:orderId/reorder', requireSignOffRights, async (req, res) => {
         const sourceOrderId = req.params.orderId;
         try {
             const ctx = resolveCustomerContext(req);
