@@ -423,8 +423,16 @@ describe('Dark Industrial Telemetry UI — Canonical Components & Dual-Mode Reco
         expect(screen.getByText('2. BANK SETTLEMENT ACCOUNT (SEPA / B2B WIRE)')).toBeInTheDocument();
         expect(screen.getByText('3. COMMERCIAL SETTLEMENT & TAX PROFILE')).toBeInTheDocument();
 
-        // Enter a valid Spanish IBAN and verify live MOD-97 validation badge
+        // Enter a valid Spanish IBAN and verify live MOD-97 validation badge & canonical h-11 / text-sm styling
         const ibanInput = screen.getByTestId('input-bank-iban');
+        expect(ibanInput.className).toContain('h-11');
+        expect(ibanInput.className).toContain('text-sm');
+        expect(ibanInput.className).toContain('font-mono');
+        expect(screen.getByTestId('input-stripe-account-id').className).toContain('h-11');
+        expect(screen.getByTestId('input-legal-entity').className).toContain('h-11');
+        expect(screen.getByTestId('btn-test-stripe-connection').className).toContain('h-11');
+        expect(screen.getByTestId('btn-save-payment-settings').className).toContain('h-11');
+
         fireEvent.change(ibanInput, { target: { value: 'ES9121000418450200051332' } });
         expect(screen.getByTestId('iban-validation-badge')).toHaveTextContent('MOD-97 VALID');
 

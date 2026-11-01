@@ -1334,12 +1334,12 @@ export const GlobalSettingsPage: React.FC<SharedModuleProps> = ({ mode = 'worksp
                                     </h3>
 
                                     {/* Environment Toggle TEST / LIVE */}
-                                    <div className="flex items-center gap-1 bg-[#0a0b0d] p-1 rounded-lg border border-[#1f2228]">
+                                    <div className="flex items-center gap-1 bg-[#0a0b0d] p-1 h-11 rounded-md border border-zinc-800">
                                         <button
                                             type="button"
                                             data-testid="stripe-mode-test-btn"
                                             onClick={() => setStripeMode('TEST')}
-                                            className={`px-3 py-1 rounded text-[10px] font-black uppercase tracking-wider cursor-pointer transition-all ${
+                                            className={`h-full px-3.5 rounded text-xs font-black uppercase tracking-wider cursor-pointer transition-all ${
                                                 stripeMode === 'TEST'
                                                     ? 'bg-[#dc2626] text-white'
                                                     : 'text-zinc-400 hover:text-white'
@@ -1351,7 +1351,7 @@ export const GlobalSettingsPage: React.FC<SharedModuleProps> = ({ mode = 'worksp
                                             type="button"
                                             data-testid="stripe-mode-live-btn"
                                             onClick={() => setStripeMode('LIVE')}
-                                            className={`px-3 py-1 rounded text-[10px] font-black uppercase tracking-wider cursor-pointer transition-all ${
+                                            className={`h-full px-3.5 rounded text-xs font-black uppercase tracking-wider cursor-pointer transition-all ${
                                                 stripeMode === 'LIVE'
                                                     ? 'bg-[#10b981] text-[#0a0b0d]'
                                                     : 'text-zinc-400 hover:text-white'
@@ -1428,7 +1428,7 @@ export const GlobalSettingsPage: React.FC<SharedModuleProps> = ({ mode = 'worksp
                                         data-testid="btn-test-stripe-connection"
                                         onClick={handleTestStripeConnection}
                                         disabled={testingStripeConn}
-                                        className="px-4 py-2 rounded-lg bg-[#0a0b0d] border border-[#1f2228] hover:border-[#dc2626] text-white text-xs font-black uppercase tracking-widest transition-all cursor-pointer flex items-center gap-2"
+                                        className="h-11 px-4 rounded-md bg-zinc-900/80 border border-zinc-800 hover:border-red-600 text-white text-xs font-black uppercase tracking-widest transition-all cursor-pointer flex items-center gap-2"
                                     >
                                         <ArrowPathIcon className={`w-4 h-4 ${testingStripeConn ? 'animate-spin text-[#dc2626]' : 'text-zinc-400'}`} />
                                         <span>{testingStripeConn ? pt.testingStripeBtn : pt.testStripeBtn}</span>
@@ -1437,7 +1437,7 @@ export const GlobalSettingsPage: React.FC<SharedModuleProps> = ({ mode = 'worksp
                                     {stripeConnResult && (
                                         <div
                                             data-testid="stripe-connection-telemetry-badge"
-                                            className={`px-3 py-1.5 rounded-lg border text-xs font-mono font-bold flex items-center gap-2 ${
+                                            className={`h-11 px-3.5 rounded-md border text-xs font-mono font-bold flex items-center gap-2 ${
                                                 stripeConnResult.ok
                                                     ? 'bg-emerald-500/15 border-emerald-500/30 text-[#10b981]'
                                                     : 'bg-rose-500/15 border-rose-500/30 text-rose-400'
@@ -1534,48 +1534,48 @@ export const GlobalSettingsPage: React.FC<SharedModuleProps> = ({ mode = 'worksp
                                 </h3>
 
                                 <div className="space-y-2">
-                                    <label className="text-xs font-semibold text-zinc-300">{pt.modalityLabel}</label>
+                                    <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-1.5">{pt.modalityLabel}</label>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                         <button
                                             type="button"
                                             data-testid="select-modality-a-btn"
                                             onClick={() => setDefaultSettlementModality('MODALITY_A_ESCROW_MOR')}
-                                            className={`p-4 rounded-xl border text-left transition-all cursor-pointer space-y-1.5 ${
+                                            className={`p-5 rounded-md border text-left transition-all cursor-pointer space-y-2 ${
                                                 defaultSettlementModality === 'MODALITY_A_ESCROW_MOR'
-                                                    ? 'bg-[#0a0b0d] border-[#10b981] ring-1 ring-[#10b981]'
-                                                    : 'bg-[#0a0b0d]/60 border-[#1f2228] hover:border-zinc-700'
+                                                    ? 'bg-zinc-900/80 border-[#10b981] ring-1 ring-[#10b981]'
+                                                    : 'bg-zinc-900/40 border-zinc-800 hover:border-zinc-700'
                                             }`}
                                         >
                                             <div className="flex items-center justify-between">
-                                                <span className="text-xs font-black uppercase tracking-wider text-white">
+                                                <span className="text-sm font-black uppercase tracking-wider text-zinc-100">
                                                     {pt.modalityATitle}
                                                 </span>
-                                                <span className="px-2 py-0.5 rounded bg-emerald-500/15 text-[#10b981] text-[9px] font-mono font-bold">
+                                                <span className="px-2.5 py-1 rounded bg-emerald-500/15 text-[#10b981] text-[10px] font-mono font-bold">
                                                     ESCROW MoR
                                                 </span>
                                             </div>
-                                            <p className="text-[11px] text-zinc-400 leading-relaxed">{pt.modalityADesc}</p>
+                                            <p className="text-xs text-zinc-400 leading-relaxed">{pt.modalityADesc}</p>
                                         </button>
 
                                         <button
                                             type="button"
                                             data-testid="select-modality-b-btn"
                                             onClick={() => setDefaultSettlementModality('MODALITY_B_DIRECT_COMMISSION')}
-                                            className={`p-4 rounded-xl border text-left transition-all cursor-pointer space-y-1.5 ${
+                                            className={`p-5 rounded-md border text-left transition-all cursor-pointer space-y-2 ${
                                                 defaultSettlementModality === 'MODALITY_B_DIRECT_COMMISSION'
-                                                    ? 'bg-[#0a0b0d] border-[#dc2626] ring-1 ring-[#dc2626]'
-                                                    : 'bg-[#0a0b0d]/60 border-[#1f2228] hover:border-zinc-700'
+                                                    ? 'bg-zinc-900/80 border-red-600 ring-1 ring-red-600'
+                                                    : 'bg-zinc-900/40 border-zinc-800 hover:border-zinc-700'
                                             }`}
                                         >
                                             <div className="flex items-center justify-between">
-                                                <span className="text-xs font-black uppercase tracking-wider text-white">
+                                                <span className="text-sm font-black uppercase tracking-wider text-zinc-100">
                                                     {pt.modalityBTitle}
                                                 </span>
-                                                <span className="px-2 py-0.5 rounded bg-amber-500/15 text-amber-400 text-[9px] font-mono font-bold">
+                                                <span className="px-2.5 py-1 rounded bg-amber-500/15 text-amber-400 text-[10px] font-mono font-bold">
                                                     DIRECT SPLIT
                                                 </span>
                                             </div>
-                                            <p className="text-[11px] text-zinc-400 leading-relaxed">{pt.modalityBDesc}</p>
+                                            <p className="text-xs text-zinc-400 leading-relaxed">{pt.modalityBDesc}</p>
                                         </button>
                                     </div>
                                 </div>
@@ -1633,7 +1633,7 @@ export const GlobalSettingsPage: React.FC<SharedModuleProps> = ({ mode = 'worksp
                                         data-testid="btn-save-payment-settings"
                                         onClick={handleSavePaymentSettings}
                                         disabled={savingPaymentSettings}
-                                        className="px-6 py-2.5 rounded-xl bg-[#dc2626] hover:bg-red-500 text-white text-xs font-black uppercase tracking-widest transition-all cursor-pointer flex items-center gap-2"
+                                        className="h-11 px-6 rounded-md bg-[#dc2626] hover:bg-red-500 text-white text-xs font-black uppercase tracking-widest transition-all cursor-pointer flex items-center gap-2"
                                     >
                                         {savingPaymentSettings ? <ArrowPathIcon className="w-4 h-4 animate-spin" /> : <CheckIcon className="w-4 h-4" />}
                                         <span>{savingPaymentSettings ? pt.savingPaymentBtn : pt.savePaymentBtn}</span>
@@ -2009,13 +2009,13 @@ export const GlobalSettingsPage: React.FC<SharedModuleProps> = ({ mode = 'worksp
                                                 value={webhookUrl} 
                                                 onChange={e => setWebhookUrl(e.target.value)} 
                                                 placeholder="https://mfg.yourprinthouse.com/api/ppos/dispatch" 
-                                                className={inputCls} 
+                                                className={`${inputCls} font-mono`} 
                                             />
                                             <button
                                                 id="settings-webhook-save-sub-btn"
                                                 type="button"
                                                 onClick={handleCreateWebhookSubscription}
-                                                className="px-4 py-2 bg-zinc-900 dark:bg-[#dc0000] text-white text-xs font-bold uppercase tracking-wider hover:bg-zinc-800 dark:hover:bg-red-600 shrink-0 cursor-pointer"
+                                                className="h-11 px-4 rounded-md bg-zinc-900 dark:bg-[#dc0000] text-white text-xs font-bold uppercase tracking-wider hover:bg-zinc-800 dark:hover:bg-red-600 shrink-0 cursor-pointer"
                                             >
                                                 Save
                                             </button>
@@ -2026,7 +2026,7 @@ export const GlobalSettingsPage: React.FC<SharedModuleProps> = ({ mode = 'worksp
                                                 type="button"
                                                 onClick={handleTestWebhook}
                                                 disabled={testingWebhook}
-                                                className="px-3 py-1.5 bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs font-bold text-zinc-800 dark:text-zinc-200 hover:border-zinc-400 dark:hover:border-zinc-600 transition-colors cursor-pointer flex items-center gap-1.5"
+                                                className="h-11 px-3.5 rounded-md bg-zinc-100 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 text-xs font-bold text-zinc-800 dark:text-zinc-200 hover:border-zinc-400 dark:hover:border-zinc-600 transition-colors cursor-pointer flex items-center gap-1.5"
                                             >
                                                 {testingWebhook ? (
                                                     <ArrowPathIcon className="w-3.5 h-3.5 animate-spin" />
@@ -2051,14 +2051,14 @@ export const GlobalSettingsPage: React.FC<SharedModuleProps> = ({ mode = 'worksp
                                             <input 
                                                 value={webhookSecret} 
                                                 readOnly 
-                                                className={`${inputCls} font-mono text-xs opacity-80 cursor-not-allowed`} 
+                                                className={`${inputCls} font-mono opacity-80 cursor-not-allowed`} 
                                             />
                                             {webhookSubscriptions.length > 0 && (
                                                 <button
                                                     id="settings-webhook-rotate-btn"
                                                     type="button"
                                                     onClick={() => handleRotateSecret(webhookSubscriptions[0].id)}
-                                                    className="px-3 py-1.5 bg-zinc-100 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-xs font-bold text-zinc-800 dark:text-zinc-200 hover:bg-zinc-200 dark:hover:bg-zinc-700 shrink-0 cursor-pointer"
+                                                    className="h-11 px-3.5 rounded-md bg-zinc-100 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 text-xs font-bold text-zinc-800 dark:text-zinc-200 hover:bg-zinc-200 dark:hover:bg-zinc-700 shrink-0 cursor-pointer"
                                                 >
                                                     {t('settings.integrations.rotateSecretBtn')}
                                                 </button>
@@ -2173,7 +2173,7 @@ export const GlobalSettingsPage: React.FC<SharedModuleProps> = ({ mode = 'worksp
                                                 value={slackWebhook}
                                                 onChange={e => setSlackWebhook(e.target.value)}
                                                 placeholder="https://hooks.slack.com/services/T00/B00/XXXX" 
-                                                className={inputCls} 
+                                                className={`${inputCls} font-mono`} 
                                             />
                                         </Field>
 
@@ -2183,7 +2183,7 @@ export const GlobalSettingsPage: React.FC<SharedModuleProps> = ({ mode = 'worksp
                                                 value={slackChannel}
                                                 onChange={e => setSlackChannel(e.target.value)}
                                                 placeholder="#factory-alerts" 
-                                                className={inputCls} 
+                                                className={`${inputCls} font-mono`} 
                                             />
                                         </Field>
 
@@ -2222,7 +2222,7 @@ export const GlobalSettingsPage: React.FC<SharedModuleProps> = ({ mode = 'worksp
                                                 type="button"
                                                 onClick={handleSaveSlack}
                                                 disabled={slackSaving}
-                                                className="px-4 py-2 bg-zinc-900 dark:bg-[#dc0000] text-white text-xs font-bold uppercase tracking-wider hover:bg-zinc-800 dark:hover:bg-red-600 transition-colors cursor-pointer flex items-center gap-1.5"
+                                                className="h-11 px-4 rounded-md bg-zinc-900 dark:bg-[#dc0000] text-white text-xs font-bold uppercase tracking-wider hover:bg-zinc-800 dark:hover:bg-red-600 transition-colors cursor-pointer flex items-center gap-1.5"
                                             >
                                                 {slackSaving && <ArrowPathIcon className="w-3.5 h-3.5 animate-spin" />}
                                                 <span>Save Slack Config</span>
@@ -2233,7 +2233,7 @@ export const GlobalSettingsPage: React.FC<SharedModuleProps> = ({ mode = 'worksp
                                                 type="button"
                                                 onClick={handleTestSlack}
                                                 disabled={testingSlack}
-                                                className="px-3 py-2 bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-xs font-bold text-zinc-800 dark:text-zinc-200 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors cursor-pointer flex items-center gap-1.5"
+                                                className="h-11 px-3.5 rounded-md bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-xs font-bold text-zinc-800 dark:text-zinc-200 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors cursor-pointer flex items-center gap-1.5"
                                             >
                                                 {testingSlack ? (
                                                     <ArrowPathIcon className="w-3.5 h-3.5 animate-spin" />
@@ -2613,7 +2613,7 @@ export const GlobalSettingsPage: React.FC<SharedModuleProps> = ({ mode = 'worksp
 
 // ─── Visual Components ───────────────────────────────────────────────────────
 
-const inputCls = "settings-input w-full px-3.5 py-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-xs font-medium text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-[#dc0000]/30 focus:border-[#dc0000] transition-colors";
+const inputCls = "settings-input h-11 w-full px-3.5 py-2.5 rounded-md bg-zinc-50 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 text-sm text-zinc-900 dark:text-zinc-100 placeholder-zinc-500 placeholder:text-sm focus:outline-none focus:border-red-600 focus:ring-1 focus:ring-red-600 transition-colors";
 
 const SectionHeader: React.FC<{ icon: React.ElementType; title: string; description: string }> = ({ icon: Icon, title, description }) => (
     <div className="flex items-center gap-3.5 pb-4 border-b border-zinc-100 dark:border-zinc-800">
@@ -2629,7 +2629,7 @@ const SectionHeader: React.FC<{ icon: React.ElementType; title: string; descript
 
 const Field: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => (
     <div className="space-y-1.5">
-        <label className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">{label}</label>
+        <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-1.5">{label}</label>
         {children}
     </div>
 );
