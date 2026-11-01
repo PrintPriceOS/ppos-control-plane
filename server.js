@@ -75,20 +75,29 @@ fastify.addHook('onRequest', async (request, reply) => {
         !url.startsWith('/api/v2/analytics') &&
         !url.startsWith('/api/connectors/factory')
     ) {
-        // Support X-Marketplace-Token for Phase 36.1 Ingest Bypass
-        const isMarketplaceOrderPath = url === '/api/marketplace/orders' || url.startsWith('/api/marketplace/orders/');
+        // Support X-Marketplace-Token for Phase 36.1 & Phase 15B Customer Portal Ingest Bypass
+        const isMarketplaceOrderPath =
+            url === '/api/marketplace/orders' ||
+            url.startsWith('/api/marketplace/orders/') ||
+            url.startsWith('/api/customer/') ||
+            url.startsWith('/api/financials/escrow/');
         if (isMarketplaceOrderPath) {
             const marketplaceHeaderToken = request.headers['x-marketplace-token'];
             const configuredMarketplaceToken = process.env.PPOS_MARKETPLACE_INTAKE_TOKEN;
+            const configuredControlToken = process.env.PPOS_CONTROL_TOKEN;
 
             if (marketplaceHeaderToken) {
-                if (configuredMarketplaceToken && marketplaceHeaderToken === configuredMarketplaceToken) {
+                if (
+                    (configuredMarketplaceToken && marketplaceHeaderToken === configuredMarketplaceToken) ||
+                    (configuredControlToken && marketplaceHeaderToken === configuredControlToken)
+                ) {
                     request.log.info({ event: 'MARKETPLACE_INTAKE_TOKEN_ACCEPTED', path: url });
                     request.user = {
                         id: 'marketplace-token-actor',
                         role: 'SUPER_ADMIN',
                         authMode: 'MARKETPLACE'
                     };
+                    request.raw.user = request.user;
                     return;
                 } else {
                     request.log.warn({ event: 'MARKETPLACE_INTAKE_TOKEN_REJECTED', path: url });
@@ -396,6 +405,7 @@ const start = async () => {
             fastify.use('/api/preflight', require('./src/api/routes/preflightRoutes'));
             fastify.use('/api/manufacturing/imposition', require('./src/api/routes/impositionRoutes'));
             fastify.use('/api/publisher', require('./src/api/routes/publisherRoutes'));
+            fastify.use('/api/customer', require('./src/api/routes/customerPortalRoutes'));
             fastify.use('/api/financials/escrow', require('./src/api/routes/escrowRoutes'));
             fastify.use('/api/machines', require('./src/api/routes/predictiveMaintenanceRoutes'));
             fastify.use('/api/pricing', require('./src/api/routes/pricingRoutes'));
@@ -447,6 +457,8 @@ const start = async () => {
             fastify.all('/api/manufacturing/imposition/*', apiNotFoundFallback);
             fastify.all('/api/publisher', apiNotFoundFallback);
             fastify.all('/api/publisher/*', apiNotFoundFallback);
+            fastify.all('/api/customer', apiNotFoundFallback);
+            fastify.all('/api/customer/*', apiNotFoundFallback);
             fastify.all('/api/financials/escrow', apiNotFoundFallback);
             fastify.all('/api/financials/escrow/*', apiNotFoundFallback);
             fastify.all('/api/machines', apiNotFoundFallback);

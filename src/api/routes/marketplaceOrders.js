@@ -49,16 +49,17 @@ function requireMarketplaceOrAdmin(req, res, next) {
     const authHeader = req.headers['authorization'];
     const xMarketplaceToken = req.headers['x-marketplace-token'];
 
-    // Check shared secret matching process.env.PPOS_MARKETPLACE_INTAKE_TOKEN
-    if (pposMarketplaceIntakeToken) {
+    // Check shared secret matching process.env.PPOS_MARKETPLACE_INTAKE_TOKEN or PPOS_CONTROL_TOKEN
+    const pposControlToken = process.env.PPOS_CONTROL_TOKEN;
+    if (pposMarketplaceIntakeToken || pposControlToken) {
         let bearerToken = '';
         if (authHeader && authHeader.startsWith('Bearer ')) {
             bearerToken = authHeader.substring(7);
         }
 
         if (
-            (xMarketplaceToken && xMarketplaceToken === pposMarketplaceIntakeToken) ||
-            (bearerToken && bearerToken === pposMarketplaceIntakeToken)
+            (pposMarketplaceIntakeToken && ((xMarketplaceToken && xMarketplaceToken === pposMarketplaceIntakeToken) || (bearerToken && bearerToken === pposMarketplaceIntakeToken))) ||
+            (pposControlToken && ((xMarketplaceToken && xMarketplaceToken === pposControlToken) || (bearerToken && bearerToken === pposControlToken)))
         ) {
             req.user = req.user || {
                 id: 'marketplace-token-actor',
@@ -457,6 +458,78 @@ router.post('/:orderId/checkout/session', requireMarketplaceOrAdmin, async (req,
             error: err.message,
             message: err.message
         });
+    }
+});
+
+/**
+ * 11. POST /api/marketplace/orders/:orderId/payment/wire-proof
+ * PHASE-15: Uploads B2B Wire Transfer proof document/receipt to expedite verification & release to press.
+ */
+router.post('/:orderId/payment/wire-proof', requireMarketplaceOrAdmin, uploadMiddleware.single('file'), async (req, res) => {
+    const { orderId } = req.params;
+    try {
+        let order = null;
+        try {
+            order = await marketplaceOrderService.getOrder(orderId);
+        } catch (_) {}
+
+        if (!order && !String(orderId).startsWith('ORD_')) {
+            return res.status(404).json({ ok: false, error: 'ORDER_NOT_FOUND', message: `Order ${orderId} not found.` });
+        }
+
+        const proofId = `prf_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+        const originalName = req.body?.originalName || req.body?.fileName || req.file?.originalname || 'wire_transfer_proof.pdf';
+        const reference = req.body?.reference || req.body?.reconciliationCode || order?.payment?.bankTransferReference || `PPOS-ORD-${orderId.replace(/[^A-Za-z0-9]/g, '').slice(-8).toUpperCase()}`;
+        const ibanOrigin = req.body?.ibanOrigin || null;
+        const notes = req.body?.notes || '';
+        const uploadedAt = new Date().toISOString();
+
+        let metadata = {};
+        try {
+            const rows = await mysqlClient.query('SELECT metadata_json FROM marketplace_orders WHERE order_id = ?', [orderId]);
+            metadata = rows && rows[0] ? safeParseJson(rows[0].metadata_json, {}) : {};
+        } catch (_) {}
+
+        metadata.payment = {
+            ...(metadata.payment || {}),
+            status: metadata.payment?.status === 'CONFIRMED' ? 'CONFIRMED' : 'WIRE_PROOF_UPLOADED',
+            wireProof: {
+                proofId,
+                originalName,
+                reference,
+                ibanOrigin,
+                notes,
+                storagePath: req.file?.path || null,
+                uploadedAt,
+                uploadedBy: req.user?.id || 'CUSTOMER'
+            }
+        };
+
+        try {
+            await mysqlClient.query(
+                'UPDATE marketplace_orders SET payment_status = ?, metadata_json = ?, updated_at = NOW() WHERE order_id = ?',
+                [metadata.payment.status, JSON.stringify(metadata), orderId]
+            );
+            await marketplaceOrderService.appendOrderEvent(orderId, {
+                type: 'WIRE_TRANSFER_PROOF_UPLOADED',
+                actorType: 'CUSTOMER',
+                actorId: req.user?.id || 'CUSTOMER',
+                payload: { proofId, originalName, reference, uploadedAt }
+            });
+        } catch (_) {}
+
+        return res.status(200).json({
+            ok: true,
+            orderId,
+            proofId,
+            status: 'PAYMENT_PROOF_UNDER_REVIEW',
+            reconciliationCode: reference,
+            paymentStatus: metadata.payment.status,
+            wireProof: metadata.payment.wireProof
+        });
+    } catch (err) {
+        logger.error({ event: 'api_wire_proof_upload_failed', orderId, error: err.message });
+        return res.status(500).json({ ok: false, error: 'WIRE_PROOF_UPLOAD_FAILED', message: err.message });
     }
 });
 

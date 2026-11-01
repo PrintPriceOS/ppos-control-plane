@@ -24,7 +24,15 @@ const {
 } = require('../services/financials/eInvoicingService');
 
 function requireLogisticsControlPlaneAuth(req, res, next) {
-    const role = (req.user && req.user.role) || (req.headers && req.headers['x-user-role']);
+    const mktToken = req.headers && req.headers['x-marketplace-token'];
+    const expectedToken = process.env.PPOS_MARKETPLACE_INTAKE_TOKEN || process.env.PPOS_CONTROL_TOKEN;
+    const hasValidMktToken = Boolean(mktToken && expectedToken && mktToken === expectedToken);
+
+    const role =
+        (req.user && req.user.role) ||
+        (req.headers && (req.headers['x-user-role'] || req.headers['x-ppos-role'])) ||
+        (hasValidMktToken ? 'CUSTOMER' : null);
+
     const allowedRoles = new Set([
         'PRINTHOUSE_OPERATOR',
         'PRINTHOUSE_ADMIN',
@@ -33,7 +41,10 @@ function requireLogisticsControlPlaneAuth(req, res, next) {
         'ADMIN',
         'SUPER_ADMIN',
         'OPERATOR',
-        'PUBLISHER'
+        'PUBLISHER',
+        'CUSTOMER',
+        'AUTHOR',
+        'SYSTEM'
     ]);
 
     if (!role || !allowedRoles.has(String(role).toUpperCase())) {
@@ -190,11 +201,18 @@ function createEscrowRouter() {
                 'tenant-default';
             const orderId = req.params && req.params.orderId;
             const format = (req.query && req.query.format) || 'FACTURAE_3_2_2';
+            const { syncEscrowLedgerFromMySQL } = require('../services/financials/escrowSettlementService');
+            await syncEscrowLedgerFromMySQL(tenantId);
             const invoice = generateElectronicInvoiceXml({
                 orderId,
                 format,
                 tenantId
             });
+            if (req.query && req.query.raw === 'true' && typeof res.setHeader === 'function') {
+                res.setHeader('Content-Type', 'application/xml; charset=utf-8');
+                res.setHeader('Content-Disposition', `attachment; filename="${invoice.invoiceNumber}_${invoice.standard}.xml"`);
+                return res.status(200).send(invoice.xml);
+            }
             return res.status(200).json(invoice);
         } catch (err) {
             return res.status(err.statusCode || 400).json({
