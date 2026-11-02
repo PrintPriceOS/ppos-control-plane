@@ -447,6 +447,7 @@ const start = async () => {
             fastify.use('/api/v1/spine', require('./src/api/routes/spineRoutes'));
             fastify.use('/api/logistics', require('./src/api/routes/logisticsRoutes'));
             fastify.use('/api/printhouses', require('./src/api/routes/logisticsRoutes'));
+            fastify.use('/api/printhouses', require('./src/api/routes/printhousesAdmin'));
             fastify.use('/api/preflight', require('./src/api/routes/preflightRoutes'));
             fastify.use('/api/manufacturing/imposition', require('./src/api/routes/impositionRoutes'));
             fastify.use('/api/publisher', require('./src/api/routes/publisherRoutes'));

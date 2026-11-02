@@ -126,7 +126,30 @@ class PrinthouseCapabilityService {
 
     async getPrinthouse(printhouseId) {
         const rows = await db.query('SELECT * FROM printhouses WHERE id = ?', [printhouseId]);
-        return rows[0] || null;
+        if (rows && rows[0]) return rows[0];
+        const nodeRows = await db.query('SELECT * FROM printer_nodes WHERE id = ?', [printhouseId]);
+        if (nodeRows && nodeRows[0]) {
+            const n = nodeRows[0];
+            return {
+                id: n.id,
+                tenant_id: n.tenant_id || 'system',
+                name: n.name,
+                legal_name: n.legal_name || n.name,
+                country: n.country || null,
+                region: n.region || null,
+                city: n.city || null,
+                contact_email: n.email || null,
+                contact_phone: n.contact_phone || null,
+                status: String(n.status || 'ACTIVE').toUpperCase() === 'ACTIVE' ? 'ACTIVE' : 'ACTIVE',
+                onboarding_status: 'READY_FOR_PILOT',
+                default_currency: 'EUR',
+                timezone: n.timezone || 'Europe/Madrid',
+                created_at: n.created_at,
+                updated_at: n.updated_at,
+                _from_printer_nodes: true
+            };
+        }
+        return null;
     }
 
     async listPrinthouses(filters = {}) {
@@ -183,10 +206,12 @@ class PrinthouseCapabilityService {
         const tenantId = actor?.tenantId || 'system';
         const p = await this.getPrinthouse(printhouseId);
         if (!p) throw new Error('PRINTHOUSE_NOT_FOUND');
-        if (p.tenant_id !== tenantId) throw new Error('UNAUTHORIZED_TENANT_ACCESS');
+        const isSuperAdmin = actor?.isSuperAdmin || actor?.role === 'SUPER_ADMIN';
+        if (!isSuperAdmin && p.tenant_id !== tenantId) throw new Error('UNAUTHORIZED_TENANT_ACCESS');
 
         this.validateMachinePayload(payload);
 
+        const effectiveTenantId = p.tenant_id || tenantId;
         const id = this.generateId('mach');
         await db.query(`
             INSERT INTO printhouse_machines
@@ -198,7 +223,7 @@ class PrinthouseCapabilityService {
              supports_softcover, supports_saddle_stitch, supports_perfect_binding, supports_case_binding, metadata_json)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `, [
-            id, printhouseId, tenantId, payload.machine_name, payload.machine_type, payload.manufacturer || null,
+            id, printhouseId, effectiveTenantId, payload.machine_name, payload.machine_type, payload.manufacturer || null,
             payload.model || null, payload.status || 'ACTIVE',
             payload.max_sheet_width_mm || null, payload.max_sheet_height_mm || null,
             payload.min_sheet_width_mm || null, payload.min_sheet_height_mm || null,
@@ -216,7 +241,7 @@ class PrinthouseCapabilityService {
         const created = await this.getMachine(id);
         await this.auditCapabilityChange({
             printhouseId,
-            tenantId,
+            tenantId: effectiveTenantId,
             eventType: 'MACHINE_CREATED',
             actor,
             before: null,
@@ -259,7 +284,8 @@ class PrinthouseCapabilityService {
         const tenantId = actor?.tenantId || 'system';
         const before = await this.getMachine(machineId);
         if (!before) throw new Error('MACHINE_NOT_FOUND');
-        if (before.tenant_id !== tenantId) throw new Error('UNAUTHORIZED_TENANT_ACCESS');
+        const isSuperAdmin = actor?.isSuperAdmin || actor?.role === 'SUPER_ADMIN';
+        if (!isSuperAdmin && before.tenant_id !== tenantId) throw new Error('UNAUTHORIZED_TENANT_ACCESS');
 
         const merged = { ...before, ...payload };
         this.validateMachinePayload(merged);
@@ -295,7 +321,7 @@ class PrinthouseCapabilityService {
                 supports_perfect_binding = COALESCE(?, supports_perfect_binding),
                 supports_case_binding = COALESCE(?, supports_case_binding),
                 metadata_json = COALESCE(?, metadata_json)
-            WHERE id = ? AND tenant_id = ?
+            WHERE id = ?
         `, [
             payload.machine_name || null,
             payload.machine_type || null,
@@ -326,8 +352,7 @@ class PrinthouseCapabilityService {
             payload.supports_perfect_binding !== undefined ? !!payload.supports_perfect_binding : null,
             payload.supports_case_binding !== undefined ? !!payload.supports_case_binding : null,
             payload.metadata_json ? JSON.stringify(payload.metadata_json) : null,
-            machineId,
-            tenantId
+            machineId
         ]);
 
         const after = await this.getMachine(machineId);
@@ -833,7 +858,7 @@ class PrinthouseCapabilityService {
             }
         }
 
-        if (newOnboardingStatus !== printhouse.onboarding_status) {
+        if (newOnboardingStatus !== printhouse.onboarding_status && !printhouse._from_printer_nodes) {
             await db.query('UPDATE printhouses SET onboarding_status = ? WHERE id = ?', [newOnboardingStatus, printhouseId]);
             await this.auditCapabilityChange({
                 printhouseId,

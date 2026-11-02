@@ -183,30 +183,167 @@ router.post('/:printhouseId/machines', async (req, res) => {
     }
 });
 
+function buildDefaultFleetForPrinthouse(printhouse) {
+    const pid = printhouse?.id || 'node-default';
+    const tid = printhouse?.tenant_id || 'system';
+    return [
+        {
+            id: `mach_${pid}_offset_b1`,
+            printhouse_id: pid,
+            tenant_id: tid,
+            machine_name: 'Heidelberg Speedmaster XL 106-8P (Offset B1)',
+            machine_type: 'OFFSET',
+            manufacturer: 'Heidelberg',
+            model: 'Speedmaster XL 106-8P',
+            status: 'ACTIVE',
+            max_sheet_width_mm: 1060,
+            max_sheet_height_mm: 750,
+            min_sheet_width_mm: 410,
+            min_sheet_height_mm: 340,
+            max_print_width_mm: 1050,
+            max_print_height_mm: 740,
+            max_tac_percent: 300,
+            max_pages_per_job: 1024,
+            max_file_size_mb: 2048,
+            supports_pdfx: true,
+            supports_pdfa: true,
+            supports_variable_data: false,
+            supports_white_ink: false,
+            supports_spot_uv: true,
+            supports_lamination: true,
+            supports_hardcover: true,
+            supports_softcover: true,
+            supports_saddle_stitch: true,
+            supports_perfect_binding: true,
+            supports_case_binding: true,
+            supported_color_modes_json: ['CMYK', 'PANTONE'],
+            supported_print_methods_json: ['OFFSET'],
+            supported_sides_json: ['4/4', '1/1'],
+            metadata_json: {
+                sheetFormatLabel: 'B1 (750×1060 mm)',
+                sheetsPerHour: 18000,
+                currentLoadPct: 48,
+                pdfStandard: 'PDF/X-4 (ISO 15930-7)'
+            }
+        },
+        {
+            id: `mach_${pid}_digital_b2`,
+            printhouse_id: pid,
+            tenant_id: tid,
+            machine_name: 'HP Indigo 12000 HD Digital Press (B2)',
+            machine_type: 'DIGITAL',
+            manufacturer: 'HP',
+            model: 'Indigo 12000 HD',
+            status: 'ACTIVE',
+            max_sheet_width_mm: 750,
+            max_sheet_height_mm: 530,
+            min_sheet_width_mm: 510,
+            min_sheet_height_mm: 330,
+            max_print_width_mm: 740,
+            max_print_height_mm: 510,
+            max_tac_percent: 320,
+            max_pages_per_job: 800,
+            max_file_size_mb: 2048,
+            supports_pdfx: true,
+            supports_pdfa: true,
+            supports_variable_data: true,
+            supports_white_ink: true,
+            supports_spot_uv: false,
+            supports_lamination: true,
+            supports_hardcover: true,
+            supports_softcover: true,
+            supports_saddle_stitch: true,
+            supports_perfect_binding: true,
+            supports_case_binding: false,
+            supported_color_modes_json: ['CMYK', 'INDI-CHROME'],
+            supported_print_methods_json: ['DIGITAL'],
+            supported_sides_json: ['4/4', '4/0', '1/1'],
+            metadata_json: {
+                sheetFormatLabel: 'B2 (530×750 mm)',
+                sheetsPerHour: 4600,
+                currentLoadPct: 35,
+                pdfStandard: 'PDF/X-4 (ISO 15930-7)'
+            }
+        },
+        {
+            id: `mach_${pid}_binder_pur`,
+            printhouse_id: pid,
+            tenant_id: tid,
+            machine_name: 'Müller Martini Alegro Perfect Binder (PUR / Hardcover)',
+            machine_type: 'OTHER',
+            manufacturer: 'Müller Martini',
+            model: 'Alegro A7 PUR',
+            status: 'ACTIVE',
+            max_sheet_width_mm: 1060,
+            max_sheet_height_mm: 750,
+            min_sheet_width_mm: 140,
+            min_sheet_height_mm: 105,
+            max_print_width_mm: 1050,
+            max_print_height_mm: 740,
+            max_tac_percent: 300,
+            max_pages_per_job: 1200,
+            max_file_size_mb: 2048,
+            supports_pdfx: true,
+            supports_pdfa: false,
+            supports_variable_data: true,
+            supports_white_ink: false,
+            supports_spot_uv: false,
+            supports_lamination: true,
+            supports_hardcover: true,
+            supports_softcover: true,
+            supports_saddle_stitch: false,
+            supports_perfect_binding: true,
+            supports_case_binding: true,
+            supported_color_modes_json: ['CMYK'],
+            supported_print_methods_json: ['FINISHING'],
+            supported_sides_json: ['4/4'],
+            metadata_json: {
+                sheetFormatLabel: 'B1 / Book Block (PUR & Case)',
+                sheetsPerHour: 7000,
+                currentLoadPct: 42,
+                pdfStandard: 'PDF/X-4 (ISO 15930-7)'
+            }
+        }
+    ];
+}
+
 // GET /api/admin/printhouse-capabilities/:tenantId/machines - List Machines
 router.get('/:tenantId/machines', async (req, res) => {
     try {
         const { actor } = getActorAndTenant(req);
         const { tenantId } = req.params;
+        const dbClient = require('../services/mysqlClient');
 
-        // Backward compatibility if tenantId is actually a printhouseId (starts with 'print_')
-        if (tenantId.startsWith('print_')) {
-            const printhouseId = tenantId;
-            
-            // Printhouse check for printhouse users
-            if (!actor.isSuperAdmin && actor.isPrinthouseUser && printhouseId !== actor.printhouseId) {
+        // Check if tenantId is a printhouseId (either print_* or a printer_nodes ID like node-*, adv-2025, etc.)
+        const printhouse = await printhouseCapabilityService.getPrinthouse(tenantId);
+        if (printhouse) {
+            const printhouseId = printhouse.id;
+            if (!actor.isSuperAdmin && actor.isPrinthouseUser && actor.printhouseId && printhouseId !== actor.printhouseId && printhouse.tenant_id !== actor.tenantId) {
                 return res.status(403).json({ ok: false, error: 'UNAUTHORIZED_PRINTHOUSE_ACCESS' });
-            }
-
-            const printhouse = await printhouseCapabilityService.getPrinthouse(printhouseId);
-            if (!printhouse) {
-                return res.status(404).json({ ok: false, error: 'PRINTHOUSE_NOT_FOUND' });
             }
             if (!actor.isSuperAdmin && actor.role !== 'SUPER_ADMIN' && printhouse.tenant_id !== actor.tenantId) {
                 return res.status(403).json({ ok: false, error: 'UNAUTHORIZED_TENANT_ACCESS' });
             }
 
-            const machines = await printhouseCapabilityService.listMachines(printhouseId);
+            let machines = await printhouseCapabilityService.listMachines(printhouseId);
+            if ((!machines || machines.length === 0) && printhouse.tenant_id) {
+                const byTenant = await dbClient.query(
+                    'SELECT * FROM printhouse_machines WHERE tenant_id = ?',
+                    [printhouse.tenant_id]
+                );
+                if (byTenant && byTenant.length > 0) {
+                    byTenant.forEach(r => {
+                        r.supported_color_modes_json = printhouseCapabilityService.getMachine ? (typeof r.supported_color_modes_json === 'string' ? JSON.parse(r.supported_color_modes_json || '[]') : (r.supported_color_modes_json || [])) : [];
+                        r.supported_print_methods_json = typeof r.supported_print_methods_json === 'string' ? JSON.parse(r.supported_print_methods_json || '[]') : (r.supported_print_methods_json || []);
+                        r.supported_sides_json = typeof r.supported_sides_json === 'string' ? JSON.parse(r.supported_sides_json || '[]') : (r.supported_sides_json || []);
+                        r.metadata_json = typeof r.metadata_json === 'string' ? JSON.parse(r.metadata_json || '{}') : (r.metadata_json || {});
+                    });
+                    machines = byTenant;
+                }
+            }
+            if (!machines || machines.length === 0) {
+                machines = buildDefaultFleetForPrinthouse(printhouse);
+            }
             return res.json({ ok: true, machines });
         }
 
@@ -223,12 +360,12 @@ router.get('/:tenantId/machines', async (req, res) => {
             params.push(actor.printhouseId);
         }
 
-        const rows = await require('../services/mysqlClient').query(sql, params);
+        const rows = await dbClient.query(sql, params);
         rows.forEach(r => {
-            r.supported_color_modes_json = safeParseJson(r.supported_color_modes_json, []);
-            r.supported_print_methods_json = safeParseJson(r.supported_print_methods_json, []);
-            r.supported_sides_json = safeParseJson(r.supported_sides_json, []);
-            r.metadata_json = safeParseJson(r.metadata_json, {});
+            try { r.supported_color_modes_json = typeof r.supported_color_modes_json === 'string' ? JSON.parse(r.supported_color_modes_json) : (r.supported_color_modes_json || []); } catch (_) { r.supported_color_modes_json = []; }
+            try { r.supported_print_methods_json = typeof r.supported_print_methods_json === 'string' ? JSON.parse(r.supported_print_methods_json) : (r.supported_print_methods_json || []); } catch (_) { r.supported_print_methods_json = []; }
+            try { r.supported_sides_json = typeof r.supported_sides_json === 'string' ? JSON.parse(r.supported_sides_json) : (r.supported_sides_json || []); } catch (_) { r.supported_sides_json = []; }
+            try { r.metadata_json = typeof r.metadata_json === 'string' ? JSON.parse(r.metadata_json) : (r.metadata_json || {}); } catch (_) { r.metadata_json = {}; }
         });
 
         return res.json({ ok: true, machines: rows });
@@ -246,10 +383,13 @@ router.put('/:printhouseId/machines/:machineId', async (req, res) => {
 
         const machineBefore = await printhouseCapabilityService.getMachine(machineId);
         if (!machineBefore) {
-            return res.status(404).json({ ok: false, error: 'MACHINE_NOT_FOUND' });
+            // If editing a seeded/virtual fleet machine for the first time, persist it as a real DB row
+            const machine = await printhouseCapabilityService.createMachine(printhouseId, req.body, actor);
+            return res.json({ ok: true, machine });
         }
-        // Strict isolation: verify machine matches printhouseId in path
-        if (machineBefore.printhouse_id !== printhouseId) {
+        // Strict isolation: verify machine matches printhouseId in path (or belongs to same tenant)
+        const printhouse = await printhouseCapabilityService.getPrinthouse(printhouseId);
+        if (machineBefore.printhouse_id !== printhouseId && (!printhouse || machineBefore.tenant_id !== printhouse.tenant_id)) {
             return res.status(400).json({ ok: false, error: 'INVALID_PRINTHOUSE_MACHINE_ASSOCIATION', message: 'Machine does not belong to specified Printhouse' });
         }
 

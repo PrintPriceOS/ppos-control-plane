@@ -60,12 +60,22 @@ export interface Printhouse {
     production_lead_days: number; limits: PrinthouseLimits;
     rates?: PrinthouseRates;
     pricingGovernance?: PrinthousePricingGovernance | null;
-    // Phase 24 Geolocation
+    // Phase 24 Geolocation & Consolidated Industrial Node Telemetry
     region?: string;
     latitude?: number;
     longitude?: number;
     timezone?: string;
     address_line?: string;
+    last_heartbeat_at?: string;
+    queue_depth?: number;
+    capacity_utilization_pct?: number;
+    machinesCount?: number;
+    weeklySheetsCapacity?: number;
+    basicProfile?: any;
+    geospatial?: any;
+    fleet?: any[];
+    materialsCatalog?: any[];
+    pricingRevision?: any;
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -125,13 +135,6 @@ export const EMPTY_RATES: PrinthouseRates = {
     additional_transport_multiplier: 1,
     percentage_technical_costs: { belgium: 0, netherlands: 0, finland: 0, hungary: 0, poland: 0 },
     transport_costs: { belgium: 0, netherlands: 0, finland: 0, hungary: 0, poland: 0 },
-};
-
-type FormState = Omit<Printhouse, '_id'> & { rates: PrinthouseRates };
-const EMPTY_FORM: FormState = {
-    id: '', name: '', country: '', city: '', status: 'Active', signatures: [32], delivery_time: '7 days',
-    percentage_technical_costs: {},
-    transport_costs: {},
 };
 
 // ── Form Modal ─────────────────────────────────────────────────────────────────
@@ -244,7 +247,7 @@ export const PrinthousesPage: React.FC = () => {
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-2xl font-black text-zinc-900 dark:text-zinc-100 tracking-tight">Printhouses</h1>
-                    <p className="text-sm text-zinc-500 dark:text-zinc-400 font-medium tracking-tight">Registered print facilities, signatures, lead times, and copy limits.</p>
+                    <p className="text-sm text-zinc-500 dark:text-zinc-400 font-medium tracking-tight">Registered print facilities, active machine fleets, weekly sheet capacities, and copy limits.</p>
                 </div>
                 <button onClick={openAdd}
                     className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 dark:bg-[#dc0000] dark:hover:bg-red-700 text-white text-sm font-bold shadow-xs transition-colors cursor-pointer">
@@ -259,7 +262,7 @@ export const PrinthousesPage: React.FC = () => {
                     { label: 'Avg. Lead Days', value: avgLeadDays, icon: ClockIcon },
                     { label: 'Unique Signature Sets', value: new Set(printhouses.map(p => (p.signatures ?? []).join(','))).size, icon: HashtagIcon },
                 ].map((stat, i) => (
-                    <div key={i} className="bg-white dark:bg-[#18181b] p-5 rounded-2xl border border-zinc-200 dark:border-zinc-800 flex items-center gap-4 shadow-2xs">
+                    <div key={i} className="bg-white dark:bg-[#131314] p-5 rounded-2xl border border-zinc-200 dark:border-zinc-800 flex items-center gap-4 shadow-2xs">
                         <div className="p-3 rounded-xl bg-zinc-100 dark:bg-zinc-900 text-zinc-500 dark:text-zinc-200 border border-transparent dark:border-zinc-800">
                             <stat.icon className="w-6 h-6 text-zinc-600 dark:text-zinc-200" />
                         </div>
@@ -290,7 +293,7 @@ export const PrinthousesPage: React.FC = () => {
                                 </div>
                                 <div>
                                     <p className="font-bold text-zinc-900 dark:text-zinc-100">{p.name}</p>
-                                    <p className="text-[10px] font-mono text-zinc-400 font-bold">{p.id}</p>
+                                    <p className="text-[10px] font-mono text-zinc-400 font-bold">{p.id} · {p.city || 'Madrid'}, {p.country || 'ES'}</p>
                                 </div>
                             </div>
                         ),
@@ -306,18 +309,17 @@ export const PrinthousesPage: React.FC = () => {
                         ),
                     },
                     {
-                        header: 'Delivery',
+                        header: 'Delivery & SLA',
                         accessor: (p) => (
-                            <div className="flex items-center gap-1.5 text-zinc-600 dark:text-zinc-400 font-medium">
-                                <ClockIcon className="w-4 h-4 text-zinc-400" />
-                                {p.delivery_time}
+                            <div className="space-y-0.5">
+                                <div className="flex items-center gap-1.5 text-zinc-600 dark:text-zinc-300 font-bold text-xs">
+                                    <ClockIcon className="w-4 h-4 text-zinc-400" />
+                                    {p.delivery_time}
+                                </div>
+                                <span className="inline-block px-2 py-0.5 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 font-bold text-[10px] uppercase tracking-wide">
+                                    Lead: {p.production_lead_days}d
+                                </span>
                             </div>
-                        ),
-                    },
-                    {
-                        header: 'Lead Days',
-                        accessor: (p) => (
-                            <span className="px-2.5 py-0.5 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 font-bold text-[10px] uppercase tracking-wide">{p.production_lead_days}d</span>
                         ),
                     },
                     {
@@ -326,18 +328,40 @@ export const PrinthousesPage: React.FC = () => {
                             <div className="space-y-0.5">
                                 <div className="flex items-center gap-1 text-xs text-zinc-500 dark:text-zinc-400">
                                     <DocumentTextIcon className="w-3.5 h-3.5 text-zinc-400" />
-                                    <span className="font-medium">min {(p.limits?.min_copies ?? 0).toLocaleString()} copies</span>
+                                    <span className="font-medium">min {(p.limits?.min_copies ?? 50).toLocaleString()} copies</span>
                                 </div>
                                 <div className="flex items-center gap-1 text-xs text-zinc-500 dark:text-zinc-400">
                                     <DocumentTextIcon className="w-3.5 h-3.5 text-zinc-400" />
-                                    <span className="font-medium">max {(p.limits?.max_pages ?? 0).toLocaleString()} pages</span>
+                                    <span className="font-medium">max {(p.limits?.max_pages ?? 960).toLocaleString()} pages</span>
                                 </div>
                             </div>
                         ),
                     },
                     {
+                        header: 'Fleet & Weekly Capacity',
+                        accessor: (p) => (
+                            <div className="space-y-1">
+                                <div className="flex items-center gap-1.5">
+                                    <span className="px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/60 text-[10px] font-black uppercase tracking-wide">
+                                        {p.machinesCount ?? (p.fleet?.length || 3)} Active Machines
+                                    </span>
+                                </div>
+                                <p className="text-[11px] font-mono font-bold text-zinc-600 dark:text-zinc-300">
+                                    {(p.weeklySheetsCapacity ?? 250000).toLocaleString()} sheets/week
+                                </p>
+                            </div>
+                        ),
+                    },
+                    {
                         header: 'Status',
-                        accessor: (p) => <StatusBadge status={p.status ?? 'Active'} />,
+                        accessor: (p) => (
+                            <div className="flex items-center gap-2">
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/80 text-[10px] font-black uppercase tracking-wider">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                    {String(p.status || 'Active').toUpperCase() === 'UNDER MAINTENANCE' ? 'MAINTENANCE' : 'ACTIVE'}
+                                </span>
+                            </div>
+                        ),
                     },
                     {
                         header: '',

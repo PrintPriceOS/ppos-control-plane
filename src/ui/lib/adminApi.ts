@@ -1514,6 +1514,20 @@ export async function getPrinthouses() {
     return res.printhouses;
 }
 
+export async function getPrinthouseNodeDetail(nodeId: string) {
+    return adminFetch<{ ok: boolean, printhouse: any }>(`/api/admin/printhouses/${encodeURIComponent(nodeId)}`);
+}
+
+export async function publishPrinthouseRatesRevision(nodeId: string, payload: { anchorUpdates?: Record<string, number>, rates?: any } = {}) {
+    return adminFetch<{ ok: boolean, revisionId: string, checksum: string, publishedAt: string, printhouse: any }>(
+        `/api/admin/printhouses/${encodeURIComponent(nodeId)}/publish-revision`,
+        {
+            method: 'POST',
+            body: JSON.stringify(payload)
+        }
+    );
+}
+
 export async function createPrinthouse(data: object) {
     return adminFetch<{ ok: boolean, id: string }>(`/api/admin/printhouses`, {
         method: 'POST',

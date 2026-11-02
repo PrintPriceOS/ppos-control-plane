@@ -148,6 +148,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   });
 
   const isPrinthouseSetupRoute = location.pathname.startsWith('/printhouse/setup');
+  const printhouseNodeMatch = location.pathname.match(/^\/printhouses\/([^/]+)/);
+  const activePrinthouseNodeId = printhouseNodeMatch ? printhouseNodeMatch[1] : null;
   const currentTab = (new URLSearchParams(location.search).get('tab') || 'OVERVIEW').toUpperCase();
 
   const [setupSubmenuOpen, setSetupSubmenuOpen] = useState(true);
@@ -278,8 +280,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {!effectiveCollapsed && setupSubmenuOpen && (
                 <div className="pl-6 space-y-0.5 border-l-2 border-slate-200 dark:border-zinc-800 ml-5 my-1">
                     {PRINTHOUSE_SETUP_SECTIONS.map(sec => {
-                        const isSubActive = isPrinthouseSetupRoute && currentTab === sec.key;
-                        const targetUrl = sec.key === 'OVERVIEW' ? '/printhouse/setup' : `/printhouse/setup?tab=${sec.key}`;
+                        const isSubActive = (isPrinthouseSetupRoute || Boolean(activePrinthouseNodeId)) && currentTab === sec.key;
+                        const targetUrl = activePrinthouseNodeId
+                            ? `/printhouses/${encodeURIComponent(activePrinthouseNodeId)}?tab=${sec.key}`
+                            : (sec.key === 'OVERVIEW' ? '/printhouse/setup' : `/printhouse/setup?tab=${sec.key}`);
                         const SecIcon = sec.icon;
                         const labelText = getSetupSectionLabel(sec.key, sec.label);
 
