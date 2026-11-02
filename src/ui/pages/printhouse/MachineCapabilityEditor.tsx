@@ -4,6 +4,8 @@ import { Machine } from '../../types/printhouseCapabilities';
 import { listMachines, createMachine, updateMachine, deleteMachine, getMachineTemplates } from '../../api/printhouseCapabilitiesClient';
 import { PlusIcon, PencilIcon, TrashIcon, XMarkIcon, BoltIcon, CpuChipIcon } from '@heroicons/react/24/outline';
 import { MachineSpecificationForm } from '../../components/printhouse/MachineSpecificationForm';
+import { MachineBlueprintThumbnail } from '../../components/printhouse/machines/MachineBlueprintThumbnail';
+import { MachineBlueprintModal } from '../../components/printhouse/machines/MachineBlueprintModal';
 
 interface MachineCapabilityEditorProps {
     printhouseId?: string;
@@ -23,6 +25,7 @@ export const MachineCapabilityEditor: React.FC<MachineCapabilityEditorProps> = (
     const [error, setError] = useState<string | null>(null);
     const [editingMachine, setEditingMachine] = useState<Partial<Machine> | null>(null);
     const [isAdding, setIsAdding] = useState(false);
+    const [inspectingBlueprintMachine, setInspectingBlueprintMachine] = useState<any>(null);
 
     const [searchQuery, setSearchQuery] = useState('');
     const [templates, setTemplates] = useState<any[]>([]);
@@ -346,6 +349,12 @@ export const MachineCapabilityEditor: React.FC<MachineCapabilityEditorProps> = (
                                 className="p-5 bg-white dark:bg-[#131314] border border-zinc-200 dark:border-zinc-800 rounded-2xl flex flex-col justify-between hover:border-zinc-300 dark:hover:border-zinc-700 transition-all shadow-2xs"
                             >
                                 <div className="space-y-4">
+                                    {/* Vector Elevation Blueprint Thumbnail Box */}
+                                    <MachineBlueprintThumbnail
+                                        machine={m}
+                                        onInspect={(target) => setInspectingBlueprintMachine(target)}
+                                    />
+
                                     {/* Top Row: Status + Type + Edit/Delete */}
                                     <div className="flex items-start justify-between gap-2">
                                         <div>
@@ -563,6 +572,12 @@ export const MachineCapabilityEditor: React.FC<MachineCapabilityEditorProps> = (
                     </div>
                 </Dialog>
             </Transition>
+
+            <MachineBlueprintModal
+                isOpen={Boolean(inspectingBlueprintMachine)}
+                onClose={() => setInspectingBlueprintMachine(null)}
+                machine={inspectingBlueprintMachine}
+            />
         </div>
     );
 };

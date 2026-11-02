@@ -18,6 +18,8 @@ import { StatusBadge } from '../../components/StatusBadge';
 import { MachineCapabilityEditor } from '../printhouse/MachineCapabilityEditor';
 import { listMachines, deleteMachine } from '../../api/printhouseCapabilitiesClient';
 import { SharedModuleProps, TopSummaryKpiBar, HeaderActionGroup } from '../../components/common';
+import { MachineBlueprintThumbnail } from '../../components/printhouse/machines/MachineBlueprintThumbnail';
+import { MachineBlueprintModal } from '../../components/printhouse/machines/MachineBlueprintModal';
 
 interface Machine {
     id: string;
@@ -81,6 +83,7 @@ export const MachinesPage: React.FC<SharedModuleProps> = ({
     const [printhouses, setPrinthouses] = useState<any[]>([]);
     const [selectedPrinthouseId, setSelectedPrinthouseId] = useState<string>('');
     const [editingMachine, setEditingMachine] = useState<any>(null);
+    const [inspectingBlueprintMachine, setInspectingBlueprintMachine] = useState<any>(null);
 
     // PHASE-12C: Predictive Maintenance & Consumables Lifespan Telemetry
     const [predictiveUnits, setPredictiveUnits] = useState([
@@ -383,12 +386,15 @@ export const MachinesPage: React.FC<SharedModuleProps> = ({
                             const colors = Array.isArray(m.supported_color_modes_json) ? m.supported_color_modes_json : ['CMYK'];
                             return (
                                 <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 rounded-xl bg-zinc-50 dark:bg-zinc-900 flex items-center justify-center flex-shrink-0 border border-zinc-200 dark:border-zinc-800 relative">
-                                        <CpuChipIcon className="w-5 h-5 text-[#dc0000]" />
-                                        {m.profileCompletenessScore < 100 && (
-                                            <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-amber-500 border-2 border-white dark:border-zinc-950 rounded-full" />
-                                        )}
-                                    </div>
+                                    <MachineBlueprintThumbnail
+                                        machine={{
+                                            ...m,
+                                            machineName: primaryName,
+                                            machine_name: primaryName
+                                        }}
+                                        onInspect={(target) => setInspectingBlueprintMachine(target)}
+                                        compact={true}
+                                    />
                                     <div>
                                         <div className="flex items-center gap-2 flex-wrap">
                                             <p className="font-bold text-zinc-900 dark:text-zinc-100 leading-tight">{primaryName}</p>
@@ -675,6 +681,12 @@ export const MachinesPage: React.FC<SharedModuleProps> = ({
                     </div>
                 </div>
             )}
+
+            <MachineBlueprintModal
+                isOpen={Boolean(inspectingBlueprintMachine)}
+                onClose={() => setInspectingBlueprintMachine(null)}
+                machine={inspectingBlueprintMachine}
+            />
         </div>
     );
 };

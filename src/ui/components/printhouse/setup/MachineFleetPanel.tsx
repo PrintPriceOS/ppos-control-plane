@@ -11,6 +11,9 @@ import { Cog, Plus, Edit2, Trash2, CheckCircle, AlertCircle, Zap, RefreshCw, Sli
 import { getAuthToken } from '../../../lib/authStore';
 import { useLocale } from '../../../i18n';
 import { normalizeUiError } from '../../../utils/errorUtils';
+import { MachineBlueprintThumbnail } from '../machines/MachineBlueprintThumbnail';
+import { MachineBlueprintModal } from '../machines/MachineBlueprintModal';
+import { MACHINE_PRESETS_CATALOG } from '../machines/machinePresetsCatalog';
 
 interface MachineData {
     id: string;
@@ -138,6 +141,7 @@ export const MachineFleetPanel: React.FC<{ sites?: SiteOption[]; onSaved?: () =>
     const [loading, setLoading] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
     const [editingMachineId, setEditingMachineId] = useState<string | null>(null);
+    const [inspectingBlueprintMachine, setInspectingBlueprintMachine] = useState<any>(null);
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
     const [form, setForm] = useState<Record<string, any>>({
         machine_name: '',
@@ -585,8 +589,13 @@ export const MachineFleetPanel: React.FC<{ sites?: SiteOption[]; onSaved?: () =>
             {!loading && !isEditing && machines.map(m => (
                 <div
                     key={m.id}
-                    className="bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 rounded-xl p-4 sm:px-5 mb-3 flex items-center justify-between transition-colors"
+                    className="bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 rounded-xl p-4 sm:px-5 mb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-colors"
                 >
+                    <MachineBlueprintThumbnail
+                        machine={m}
+                        onInspect={(target) => setInspectingBlueprintMachine(target)}
+                        compact={true}
+                    />
                     <div className="flex-1 min-w-0 pr-4">
                         <div className="flex items-center gap-2.5 mb-1.5">
                             <span className="font-bold text-sm text-zinc-900 dark:text-white">{m.machine_name}</span>
@@ -659,6 +668,50 @@ export const MachineFleetPanel: React.FC<{ sites?: SiteOption[]; onSaved?: () =>
 
                     {/* Section 1: Identification */}
                     <div className="mb-5">
+                        <div className="mb-3 p-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800">
+                            <label className="block text-[10px] font-bold uppercase tracking-wider text-[#dc0000] dark:text-red-400 mb-1.5">
+                                {t('machines.blueprint.selectPresetLabel')}
+                            </label>
+                            <select
+                                data-testid="setup-preset-catalog-select"
+                                className={`${inputClass} cursor-pointer font-mono text-xs`}
+                                value=""
+                                onChange={(e) => {
+                                    const found = MACHINE_PRESETS_CATALOG.find(p => p.presetId === e.target.value);
+                                    if (!found) return;
+                                    setForm({
+                                        ...form,
+                                        machine_name: `${found.manufacturer} ${found.model}`,
+                                        machine_type: found.technology === 'OFFSET' ? 'OFFSET_PRESS' : found.technology,
+                                        manufacturer: found.manufacturer,
+                                        model: found.model,
+                                        max_sheet_width_mm: found.maxSheetDimensions.widthMm,
+                                        max_sheet_height_mm: found.maxSheetDimensions.heightMm,
+                                        min_sheet_width_mm: found.minSheetDimensions.widthMm,
+                                        min_sheet_height_mm: found.minSheetDimensions.heightMm,
+                                        max_print_width_mm: Math.max(100, found.maxSheetDimensions.widthMm - 10),
+                                        max_print_height_mm: Math.max(100, found.maxSheetDimensions.heightMm - 10),
+                                        nominal_speed_cph: found.nominalSpeedCph,
+                                        make_ready_minutes: found.makeReadyMinutes,
+                                        hourly_cost_eur: found.baseHourlyCostEur,
+                                        max_tac_percent: found.maxTacPercent,
+                                        max_file_size_mb: found.maxFileSizeMb,
+                                        supported_color_modes_json: [...found.supportedColorModes],
+                                        supported_print_methods_json: [...found.supportedPrintMethods],
+                                        supported_sides_json: [...found.supportedSides],
+                                        supports_pdfx: true,
+                                        supports_pdfa: true
+                                    });
+                                }}
+                            >
+                                <option value="">-- {t('machines.blueprint.presetCatalogBadge')} --</option>
+                                {MACHINE_PRESETS_CATALOG.map((preset) => (
+                                    <option key={preset.presetId} value={preset.presetId}>
+                                        [{preset.technology}] {preset.manufacturer} · {preset.model} ({preset.maxSheetDimensions.widthMm}×{preset.maxSheetDimensions.heightMm} mm · {preset.nominalSpeedCph.toLocaleString()} cph)
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
                         <div className="text-xs font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-2.5">
                             {t('setup.machines.section.identification') || '1. Machine Identification'}
                         </div>
@@ -963,6 +1016,12 @@ export const MachineFleetPanel: React.FC<{ sites?: SiteOption[]; onSaved?: () =>
                     </div>
                 </div>
             )}
+
+            <MachineBlueprintModal
+                isOpen={Boolean(inspectingBlueprintMachine)}
+                onClose={() => setInspectingBlueprintMachine(null)}
+                machine={inspectingBlueprintMachine}
+            />
         </div>
     );
 };

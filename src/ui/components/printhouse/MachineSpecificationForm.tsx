@@ -1,6 +1,8 @@
 import React from 'react';
 import { CheckSquare, Square, CheckCircle } from 'lucide-react';
 import { Machine } from '../../types/printhouseCapabilities';
+import { MACHINE_PRESETS_CATALOG } from './machines/machinePresetsCatalog';
+import { resolveMachineSchematic } from './machines/resolveMachineSchematic';
 
 export const CANONICAL_COLOR_MODE_OPTIONS = [
     { value: 'CMYK', label: 'CMYK Standard' },
@@ -109,6 +111,8 @@ export const MachineSpecificationForm: React.FC<MachineSpecificationFormProps> =
     };
 
     const detectedFormat = deriveSheetFormatBadge(machine.max_sheet_width_mm, machine.max_sheet_height_mm);
+    const resolvedPreview = resolveMachineSchematic(machine);
+    const PreviewSchematic = resolvedPreview.Component;
 
     return (
         <form onSubmit={onSubmit} className="p-6 space-y-5 overflow-y-auto flex-1" data-testid="machine-specification-form">
@@ -117,6 +121,67 @@ export const MachineSpecificationForm: React.FC<MachineSpecificationFormProps> =
                     {error}
                 </div>
             )}
+
+            {/* Live Vector Blueprint Preview + 22-Model Preset Selector */}
+            <div className="p-3.5 rounded-xl bg-[#0e0e11] border border-zinc-800 space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                    <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-red-400">
+                        LIVE CAD VECTOR SCHEMATIC · TIER {resolvedPreview.tier} ({resolvedPreview.schematicKey})
+                    </span>
+                    <span className="text-[10px] font-mono text-zinc-400">
+                        {resolvedPreview.sheetFormat} · {resolvedPreview.unitsCount} UNITS
+                    </span>
+                </div>
+                <div className="w-full h-28">
+                    <PreviewSchematic
+                        className="w-full h-full"
+                        theme="dark"
+                        unitsCount={resolvedPreview.unitsCount}
+                        sheetFormat={resolvedPreview.sheetFormat}
+                    />
+                </div>
+                <div>
+                    <select
+                        data-testid="form-preset-catalog-select"
+                        value=""
+                        onChange={(e) => {
+                            const found = MACHINE_PRESETS_CATALOG.find((p) => p.presetId === e.target.value);
+                            if (!found) return;
+                            onChange({
+                                ...machine,
+                                machine_name: `${found.manufacturer} ${found.model}`,
+                                machine_type: found.technology as any,
+                                manufacturer: found.manufacturer,
+                                model: found.model,
+                                max_sheet_width_mm: found.maxSheetDimensions.widthMm,
+                                max_sheet_height_mm: found.maxSheetDimensions.heightMm,
+                                min_sheet_width_mm: found.minSheetDimensions.widthMm,
+                                min_sheet_height_mm: found.minSheetDimensions.heightMm,
+                                max_print_width_mm: Math.max(100, found.maxSheetDimensions.widthMm - 10),
+                                max_print_height_mm: Math.max(100, found.maxSheetDimensions.heightMm - 10),
+                                nominal_speed_cph: found.nominalSpeedCph,
+                                make_ready_minutes: found.makeReadyMinutes,
+                                hourly_cost_eur: found.baseHourlyCostEur,
+                                max_tac_percent: found.maxTacPercent,
+                                max_file_size_mb: found.maxFileSizeMb,
+                                supported_color_modes_json: [...found.supportedColorModes],
+                                supported_print_methods_json: [...found.supportedPrintMethods],
+                                supported_sides_json: [...found.supportedSides],
+                                supports_pdfx: true,
+                                supports_pdfa: true
+                            });
+                        }}
+                        className="w-full px-3 py-1.5 rounded-lg bg-zinc-900 border border-zinc-700 text-xs font-mono text-zinc-200 focus:outline-none focus:border-[#dc0000] cursor-pointer"
+                    >
+                        <option value="">-- Load OEM Preset from European Standards Catalog (22 Models) --</option>
+                        {MACHINE_PRESETS_CATALOG.map((preset) => (
+                            <option key={preset.presetId} value={preset.presetId}>
+                                [{preset.technology}] {preset.manufacturer} · {preset.model} ({preset.maxSheetDimensions.widthMm}×{preset.maxSheetDimensions.heightMm} mm · {preset.nominalSpeedCph.toLocaleString()} cph)
+                            </option>
+                        ))}
+                    </select>
+                </div>
+            </div>
 
             {/* Quick Preset Search */}
             {!machine.id && onSearchQueryChange && (
