@@ -430,6 +430,7 @@ const start = async () => {
             fastify.use('/api/printhouse/onboarding', require('./src/api/routes/printhouseMarketplaceOnboardingRoutes'));
             fastify.use('/api/printhouse/onboarding', require('./src/api/routes/printhouseOnboardingRoutes'));
             fastify.use('/api/printhouse/dashboard', require('./src/api/routes/printhouseDashboard'));
+            fastify.use('/api/printhouse/operations', require('./src/api/routes/printhouseDashboard'));
             fastify.use('/api/printhouse', require('./src/api/routes/printhouseOrders'));
             fastify.use('/api/v2/analytics', require('./src/api/routes/analyticsV2'));
             fastify.use('/api/marketplace/quotes', require('./src/api/routes/printhouseQuoteEligibilityRoutes'));

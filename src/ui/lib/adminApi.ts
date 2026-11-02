@@ -646,6 +646,50 @@ export async function sendPrinthouseB2bOrderMessage(payload: {
     });
 }
 
+export interface OperationalActivityEvent {
+    id: string;
+    orderId?: string | null;
+    printhouseId?: string;
+    domain: 'PREFLIGHT' | 'PRODUCTION' | 'ESCROW' | 'LOGISTICS' | 'COMMUNICATIONS' | 'STORAGE';
+    eventType: string;
+    severity: 'INFO' | 'SUCCESS' | 'WARNING' | 'CRITICAL';
+    title: string;
+    description: string;
+    metadata?: Record<string, any>;
+    actor: string;
+    actorRole?: string;
+    timestamp: string;
+    relativeTime: string;
+}
+
+export async function getPrinthouseOperationalActivityStream(params?: {
+    limit?: number;
+    offset?: number;
+    domain?: string;
+    severity?: string;
+    orderId?: string;
+    since?: string;
+    locale?: string;
+}) {
+    const qs = new URLSearchParams();
+    if (params?.limit) qs.set('limit', String(params.limit));
+    if (params?.offset !== undefined) qs.set('offset', String(params.offset));
+    if (params?.domain) qs.set('domain', params.domain);
+    if (params?.severity) qs.set('severity', params.severity);
+    if (params?.orderId) qs.set('orderId', params.orderId);
+    if (params?.since) qs.set('since', params.since);
+    if (params?.locale) qs.set('locale', params.locale);
+    const queryStr = qs.toString();
+    return adminFetch<{
+        success: boolean;
+        ok?: boolean;
+        total: number;
+        events: OperationalActivityEvent[];
+        queryTimeMs?: number;
+        source?: string;
+    }>(`/api/printhouse/operations/activity-stream${queryStr ? `?${queryStr}` : ''}`);
+}
+
 export async function getGovernanceBlocks() {
     return adminFetch<{ ok: boolean; blocks: GovernanceBlock[] }>('/api/admin/global/blocks');
 }

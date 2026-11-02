@@ -501,12 +501,37 @@ ${facturaeLinesXml}
 </fe:Facturae>`;
     }
 
+    const standardCode = normalizedFormat === 'XRECHNUNG_3_0' ? 'XRECHNUNG_3_0' : 'FACTURAE_3_2_2';
+
+    try {
+        const { recordOperationalEvent } = require('../telemetry/operationalActivityStreamService');
+        recordOperationalEvent({
+            orderId: record.orderId,
+            printhouseId: record.printhouseId || 'node-primary',
+            tenantId,
+            domain: 'ESCROW',
+            eventType: 'E_INVOICE_GENERATED',
+            severity: 'SUCCESS',
+            title: `Factura Electrónica EN 16931 Emitida (${invoiceNumber} · ${standardCode})`,
+            description: `Generado XML estructurado ${standardCode} por €${taxInclusiveAmountEur.toFixed(2)} para '${record.title}'.`,
+            metadata: {
+                invoiceNumber,
+                standard: standardCode,
+                taxInclusiveAmountEur,
+                drawerTarget: 'ESCROW'
+            },
+            actorId: 'EN16931_INVOICE_ENGINE',
+            actorRole: 'FINANCE_APPROVER',
+            actor: 'EN 16931 e-Invoicing Engine'
+        }).catch(() => {});
+    } catch (_) {}
+
     return {
         ok: true,
         invoiceNumber,
         orderId: record.orderId,
         escrowId: record.escrowId,
-        standard: normalizedFormat === 'XRECHNUNG_3_0' ? 'XRECHNUNG_3_0' : 'FACTURAE_3_2_2',
+        standard: standardCode,
         en16931Compliant: true,
         issueDate,
         currency: 'EUR',

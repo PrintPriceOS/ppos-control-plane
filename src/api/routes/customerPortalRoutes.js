@@ -1210,6 +1210,29 @@ function createCustomerPortalRouter() {
             const normalizedNewOrder = normalizeOrderForPortalClient(newOrder);
             runtimeCustomerOrders.set(newOrderId, normalizedNewOrder);
 
+            try {
+                const { recordOperationalEvent } = require('../services/telemetry/operationalActivityStreamService');
+                recordOperationalEvent({
+                    orderId: normalizedNewOrder.orderId,
+                    printhouseId: sourceOrder.printhouseId || 'node-primary',
+                    tenantId: ctx.tenantId || 'tenant-default',
+                    domain: 'COMMUNICATIONS',
+                    eventType: 'REORDER_TRIGGERED',
+                    severity: 'SUCCESS',
+                    title: `Reimpresión 1-Clic Activada (${normalizedNewOrder.orderId})`,
+                    description: `Clonada orden '${sourceOrder.orderId}' por ${requestedCopies} ejemplares (${editionLabel}).`,
+                    metadata: {
+                        sourceOrderId: sourceOrder.orderId,
+                        newOrderId: normalizedNewOrder.orderId,
+                        copies: requestedCopies,
+                        drawerTarget: 'ESCROW'
+                    },
+                    actorId: ctx.email || 'PUBLISHER',
+                    actorRole: 'PUBLISHER',
+                    actor: ctx.email || 'Editorial B2B Hub'
+                }).catch(() => {});
+            } catch (_) {}
+
             return res.status(201).json({
                 ok: true,
                 reorderedFrom: sourceOrder.orderId,
@@ -1381,6 +1404,29 @@ function createCustomerPortalRouter() {
             const normalizedUpdated = normalizeOrderForPortalClient(updatedOrder);
             runtimeCustomerOrders.set(order.orderId, normalizedUpdated);
 
+            try {
+                const { recordOperationalEvent } = require('../services/telemetry/operationalActivityStreamService');
+                recordOperationalEvent({
+                    orderId: normalizedUpdated.orderId,
+                    printhouseId: normalizedUpdated.printhouseId || 'node-primary',
+                    tenantId: ctx.tenantId || 'tenant-default',
+                    domain: 'PRODUCTION',
+                    eventType: `STAGE_TRANSITION_${nextStageKey}`,
+                    severity: 'INFO',
+                    title: `Transición de Etapa en Taller: ${nextStageKey} (${normalizedUpdated.orderId})`,
+                    description: operatorNotes || `Orden movida a etapa ${nextStep}/5 (${nextStageKey}).`,
+                    metadata: {
+                        stage: nextStageKey,
+                        step: nextStep,
+                        status: nextStatus,
+                        drawerTarget: 'FLEET'
+                    },
+                    actorId: ctx.email || 'WORKSHOP_OPERATOR',
+                    actorRole: 'PRINTHOUSE_OPERATOR',
+                    actor: 'Control de Planta MES'
+                }).catch(() => {});
+            } catch (_) {}
+
             // Persist stage transition to MySQL marketplace_orders
             try {
                 const rows = await mysqlClient.query(
@@ -1454,6 +1500,27 @@ function createCustomerPortalRouter() {
                 tenantId: ctx.tenantId,
                 geometry: req.body?.geometry || {}
             });
+            try {
+                const { recordOperationalEvent } = require('../services/telemetry/operationalActivityStreamService');
+                recordOperationalEvent({
+                    orderId,
+                    printhouseId: 'node-primary',
+                    tenantId: ctx.tenantId || 'tenant-default',
+                    domain: 'COMMUNICATIONS',
+                    eventType: 'PROOF_APPROVED',
+                    severity: 'SUCCESS',
+                    title: `Imprimátur 3D Aprobado Criptográficamente (${orderId})`,
+                    description: `Firma digital SHA-256 registrada por ${req.b2bActor?.email || ctx.email}. Orden liberada a máquina.`,
+                    metadata: {
+                        orderId,
+                        signatureHash: result?.proofSignatureHash || null,
+                        drawerTarget: 'B2B'
+                    },
+                    actorId: req.b2bActor?.email || ctx.email || 'PUBLISHER',
+                    actorRole: 'PUBLISHER_SIGN_OFF',
+                    actor: req.b2bActor?.email || ctx.email || 'Editorial B2B'
+                }).catch(() => {});
+            } catch (_) {}
             return res.status(200).json(result);
         } catch (err) {
             return res.status(err.statusCode || 400).json({
@@ -1475,6 +1542,26 @@ function createCustomerPortalRouter() {
                 tenantId: ctx.tenantId,
                 geometry: req.body?.geometry || {}
             });
+            try {
+                const { recordOperationalEvent } = require('../services/telemetry/operationalActivityStreamService');
+                recordOperationalEvent({
+                    orderId,
+                    printhouseId: 'node-primary',
+                    tenantId: ctx.tenantId || 'tenant-default',
+                    domain: 'COMMUNICATIONS',
+                    eventType: 'INCIDENT_RAISED',
+                    severity: 'WARNING',
+                    title: `Revisión Solicitada en Soft-Proof 3D (${orderId})`,
+                    description: req.body?.comments || req.body?.notes || 'Solicitud de ajuste geométrico de lomo/sangrado.',
+                    metadata: {
+                        orderId,
+                        drawerTarget: 'B2B'
+                    },
+                    actorId: ctx.email || 'PUBLISHER',
+                    actorRole: 'PUBLISHER',
+                    actor: ctx.email || 'Editorial B2B'
+                }).catch(() => {});
+            } catch (_) {}
             return res.status(200).json(result);
         } catch (err) {
             return res.status(err.statusCode || 400).json({

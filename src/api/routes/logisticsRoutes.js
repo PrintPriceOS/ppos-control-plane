@@ -326,6 +326,29 @@ function createLogisticsRouter(options = {}) {
                 shipmentData: body
             });
 
+            try {
+                const { recordOperationalEvent } = require('../services/telemetry/operationalActivityStreamService');
+                recordOperationalEvent({
+                    orderId: body.orderId || 'PUB-ORD-2026-105',
+                    printhouseId: (req.user && req.user.printhouseId) || 'node-primary',
+                    tenantId: authTenantId || 'tenant-default',
+                    domain: 'LOGISTICS',
+                    eventType: 'GS1_128_SSCC_PRINTED',
+                    severity: 'SUCCESS',
+                    title: `Etiquetas Térmicas GS1-128 SSCC-18 Generadas (${shipmentId})`,
+                    description: `Emitido documento PDF (${result.format} · ${result.pageCount} págs) para expedición ${shipmentId}.`,
+                    metadata: {
+                        shipmentId,
+                        format: result.format,
+                        pageCount: result.pageCount,
+                        drawerTarget: 'LOGISTICS'
+                    },
+                    actorId: (req.user && req.user.id) || 'DOCK_LOGISTICS',
+                    actorRole: (req.user && req.user.role) || 'PRINTHOUSE_OPERATOR',
+                    actor: 'Terminal Logística GS1-128'
+                }).catch(() => {});
+            } catch (_) {}
+
             if (typeof res.setHeader === 'function') {
                 res.setHeader('Content-Type', 'application/pdf');
                 res.setHeader(
@@ -365,6 +388,28 @@ function createLogisticsRouter(options = {}) {
                 shipmentId,
                 shipmentData
             });
+
+            try {
+                const { recordOperationalEvent } = require('../services/telemetry/operationalActivityStreamService');
+                recordOperationalEvent({
+                    orderId: shipmentData.orderId || 'PUB-ORD-2026-105',
+                    printhouseId: (req.user && req.user.printhouseId) || 'node-primary',
+                    tenantId: (req.user && req.user.tenantId) || 'tenant-default',
+                    domain: 'LOGISTICS',
+                    eventType: 'CMR_DELIVERY_NOTE_GENERATED',
+                    severity: 'INFO',
+                    title: `Albarán de Entrega DIN A4 CMR / POD Emitido (${shipmentId})`,
+                    description: `Generado Lieferschein / Albarán CMR oficial para expedición ${shipmentId}.`,
+                    metadata: {
+                        shipmentId,
+                        pageCount: result.pageCount,
+                        drawerTarget: 'LOGISTICS'
+                    },
+                    actorId: (req.user && req.user.id) || 'DOCK_LOGISTICS',
+                    actorRole: (req.user && req.user.role) || 'PRINTHOUSE_OPERATOR',
+                    actor: 'Terminal Logística Muelle B2B'
+                }).catch(() => {});
+            } catch (_) {}
 
             if (typeof res.setHeader === 'function') {
                 res.setHeader('Content-Type', 'application/pdf');

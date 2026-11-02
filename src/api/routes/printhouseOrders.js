@@ -13,9 +13,39 @@ const dispatchGating = require('../services/MarketplaceDispatchGatingService');
 const db = require('../services/mysqlClient');
 const logger = require('../services/logger').child('printhouse-orders');
 const { resolveActorContext, requirePrinthouseScope } = require('../middleware/auth');
+const { queryOperationalActivityStream } = require('../services/telemetry/operationalActivityStreamService');
 
 // Storage root for production files
 const STORAGE_ROOT = path.join(__dirname, '../../../storage/production_files');
+
+/**
+ * GET /api/printhouse/operations/activity-stream
+ * Queries chronological, immutable operational events from MySQL `operational_events`
+ * indexed by `(printhouse_id, created_at DESC)`.
+ */
+router.get('/operations/activity-stream', requirePrinthouseScope(), async (req, res) => {
+    const context = resolveActorContext(req);
+    try {
+        const result = await queryOperationalActivityStream({
+            printhouseId: context.printhouseId || 'node-primary',
+            tenantId: context.tenantId || 'tenant-default',
+            domain: req.query?.domain || 'ALL',
+            severity: req.query?.severity || 'ALL',
+            orderId: req.query?.orderId || null,
+            since: req.query?.since || null,
+            limit: req.query?.limit || 25,
+            offset: req.query?.offset || 0,
+            locale: req.query?.locale || req.headers?.['accept-language'] || 'es'
+        });
+        return res.status(200).json(result);
+    } catch (err) {
+        return res.status(500).json({
+            success: false,
+            ok: false,
+            error: err.message
+        });
+    }
+});
 
 /**
  * GET /api/printhouse/orders

@@ -602,6 +602,7 @@ router.use('/audit', require('./auditExplorerAdmin')); // Forensic Audit Explore
 router.use('/jobs', require('./jobsAdmin')); // Forensic Jobs Observability Layer
 router.use('/dashboard', require('./adminDashboard')); // Production Mission Control Layer
 router.use('/printhouse/dashboard', require('./printhouseDashboard')); // Dedicated Printhouse Dashboard API
+router.use('/printhouse/operations', require('./printhouseDashboard')); // Printhouse Operational Activity Stream API
 router.use('/observability', require('./adminOnboardingObservability')); // Phase 6: De-mocking Observability
 
 

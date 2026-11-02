@@ -374,6 +374,29 @@ function lockEscrowFundsOnProofApproval(payload = {}, actorContext = {}) {
     escrowLedgerCache.set(`${tenantId}:${orderId}`, record);
     persistSettlementToMySQL(record);
 
+    try {
+        const { recordOperationalEvent } = require('../telemetry/operationalActivityStreamService');
+        recordOperationalEvent({
+            orderId,
+            printhouseId: record.printhouseId || 'node-primary',
+            tenantId,
+            domain: 'ESCROW',
+            eventType: 'FUNDS_LOCKED_ESCROW',
+            severity: 'SUCCESS',
+            title: `Fondos Retenidos en Escrow MoR (€${record.grossEscrowEur.toFixed(2)})`,
+            description: `Bloqueo comercial confirmado para '${record.title}' (Neto Imprenta: €${record.netPrinthousePayoutEur.toFixed(2)}).`,
+            metadata: {
+                escrowId: record.escrowId,
+                grossEscrowEur: record.grossEscrowEur,
+                netPrinthousePayoutEur: record.netPrinthousePayoutEur,
+                drawerTarget: 'ESCROW'
+            },
+            actorId: actorContext.actorId || 'ESCROW_TREASURY',
+            actorRole: 'FINANCE_APPROVER',
+            actor: 'PrintPrice Escrow Treasury MoR'
+        }).catch(() => {});
+    } catch (_) {}
+
     return {
         ok: true,
         escrow: record
@@ -444,6 +467,30 @@ function settleEscrowOnSignedPod(payload = {}, actorContext = {}) {
 
     escrowLedgerCache.set(key, record);
     persistSettlementToMySQL(record);
+
+    try {
+        const { recordOperationalEvent } = require('../telemetry/operationalActivityStreamService');
+        recordOperationalEvent({
+            orderId: record.orderId,
+            printhouseId: record.printhouseId || 'node-primary',
+            tenantId,
+            domain: 'ESCROW',
+            eventType: 'ESCROW_POD_RELEASE',
+            severity: 'SUCCESS',
+            title: `Fondos Escrow Liberados tras POD (€${netPrinthousePayoutEur.toFixed(2)})`,
+            description: `Liquidación Split-Payout ejecutada para '${record.title}' tras recepción de albarán POD firmado.`,
+            metadata: {
+                escrowId: record.escrowId,
+                grossEscrowEur: record.grossEscrowEur,
+                netPrinthousePayoutEur,
+                epalDeductionEur,
+                drawerTarget: 'ESCROW'
+            },
+            actorId: actorContext.actorId || 'ESCROW_POD_SETTLER',
+            actorRole: 'FINANCE_APPROVER',
+            actor: 'Escrow Split-Payout Engine'
+        }).catch(() => {});
+    } catch (_) {}
 
     return {
         ok: true,

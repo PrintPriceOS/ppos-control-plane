@@ -3082,7 +3082,17 @@ export const de = {
   'dashboard.360.colTitleSpec': 'Titel / Spezifikation',
   'dashboard.360.colPressStage': 'Maschine / Phase',
   'dashboard.360.colEscrowInvoice': 'Escrow & E-Rechnung',
-  'dashboard.360.colGrossNet': 'Brutto / Netto (88%)'
+  'dashboard.360.colGrossNet': 'Brutto / Netto (88%)',
+  'dashboard.360.activityStreamTitle': 'Operational Activity Stream',
+  'dashboard.360.activityStreamSubtitle': 'Unveränderliche MySQL-Audit-Chronik · Preflight, Drucksaal, Treuhand MoR & GS1-128 Versand',
+  'dashboard.360.filterPillAll': 'ALLE',
+  'dashboard.360.filterPillPreflight': 'PREFLIGHT',
+  'dashboard.360.filterPillWorkshop': 'DRUCKSAAL',
+  'dashboard.360.filterPillFinance': 'FINANZEN / ESCROW',
+  'dashboard.360.filterPillLogistics': 'LOGISTIK',
+  'dashboard.360.btnRefreshStream': 'AKTUALISIEREN',
+  'dashboard.360.streamPollingBadge': 'LIVE MYSQL · 30s POLLING',
+  'dashboard.360.openOrderDrawerHint': 'Auftrags-Drawer öffnen'
 } as const;
 
 export type TranslationKeys = keyof typeof de;

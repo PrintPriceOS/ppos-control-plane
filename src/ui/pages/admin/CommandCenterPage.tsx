@@ -45,6 +45,7 @@ import { getUserRole, isSupplierUser } from "../../lib/authStore";
 import { safeArray, toDisplayText } from '../../lib/display';
 import { COLORS } from '../../design-system/tokens';
 import { LiveOrdersFeed } from '../../components/dashboard/LiveOrdersFeed';
+import { OperationalActivityStream } from '../../components/dashboard/OperationalActivityStream';
 import {
   StorageLifecycleDrawer,
   LiveMachineAllocationModal,
@@ -866,64 +867,25 @@ export const CommandCenterPage: React.FC = () => {
             />
           </div>
 
-          {/* SCOPED OPERATIONAL ACTIVITY STREAM WITH ELAPSED TIME BADGES */}
+          {/* SCOPED OPERATIONAL ACTIVITY STREAM (MYSQL IMMUTABLE AUDIT TIMELINE) */}
           <div>
-            <TacticalPanel title={t('dashboard.panelOperationalActivity') || 'Operational Activity Stream'} icon={BoltIcon} badge="Immutable" color="slate" status={phActivity.status}>
-              <div data-testid="operational-activity-feed" className="max-h-[180px] overflow-y-auto font-mono text-[10px] space-y-2 custom-scrollbar">
-                {(safeArray(phActivity.data?.data?.events).length > 0
-                  ? safeArray(phActivity.data?.data?.events)
-                  : [
-                      {
-                        id: 'evt-fallback-1',
-                        action: 'PREFLIGHT_AUTO_FIX_CERTIFIED',
-                        message: 'PF-2026-001 · Mirror Bleed (+3.0 mm) + Spine 22.10 mm & GCR TAC 260% certified.',
-                        minutesAgo: 2
-                      },
-                      {
-                        id: 'evt-fallback-2',
-                        action: 'ESCROW_FUNDS_LOCKED',
-                        message: 'PUB-ORD-2026-101 · Escrow €24,850.00 locked on SHA-256 3D Imprimatur sign-off.',
-                        minutesAgo: 15
-                      },
-                      {
-                        id: 'evt-fallback-3',
-                        action: 'GS1_SSCC18_PALLET_LABELS',
-                        message: 'SHP-2026-8801 · Generated 3 × DIN A6 GS1-128 SSCC-18 pallet labels (Zeitfracht Erfurt).',
-                        minutesAgo: 28
-                      },
-                      {
-                        id: 'evt-fallback-4',
-                        action: 'STORAGE_RETENTION_SAFEGUARD',
-                        message: 'Auto-Purge PDF active on streaming intake: 1.8 GB freed in /tmp/ppos-preflight-temp.',
-                        minutesAgo: 45
-                      }
-                    ]
-                ).slice(0, 8).map((log: any, idx: number) => {
-                  const elapsedMin = log.minutesAgo ?? Math.max(2, Math.round((Date.now() - Number(log.timestamp || Date.now() - (idx + 1) * 360000)) / 60000));
-                  return (
-                    <div
-                      key={log.id || idx}
-                      className={`flex items-center justify-between gap-3 p-2.5 rounded-xl border ${COLORS.adaptive.borderSubtle} ${COLORS.adaptive.surfaceMuted}`}
-                    >
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <span className="px-2 py-0.5 rounded bg-emerald-500/15 text-[#10B981] font-black text-[9px] shrink-0">
-                          {log.action || 'SYSTEM_EVENT'}
-                        </span>
-                        <span className={`${COLORS.adaptive.textSecondary} truncate`}>
-                          {log.message || 'Execution trail event logged.'}
-                        </span>
-                      </div>
-                      <span
-                        data-testid={`activity-badge-elapsed-${idx}`}
-                        className="px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-300 border border-zinc-700 text-[9px] font-mono font-bold shrink-0"
-                      >
-                        {t('dashboard.360.timeAgoMin', { min: elapsedMin })}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            </TacticalPanel>
+            <OperationalActivityStream
+              onSelectOrderDrawer={(orderId, domain) => {
+                const dom = String(domain || '').toUpperCase();
+                if (dom === 'ESCROW') {
+                  setSelectedFinancialOrderId(orderId);
+                  setFinancialDrawerOpen(true);
+                } else if (dom === 'LOGISTICS') {
+                  setLogisticsModalOpen(true);
+                } else if (dom === 'COMMUNICATIONS') {
+                  setB2bDrawerOpen(true);
+                } else if (dom === 'STORAGE') {
+                  setStorageDrawerOpen(true);
+                } else {
+                  setFleetModalOpen(true);
+                }
+              }}
+            />
           </div>
         </div>
       ) : (
@@ -1091,25 +1053,25 @@ export const CommandCenterPage: React.FC = () => {
             </div>
           )}
 
-          {/* AUDIT */}
+          {/* AUDIT / OPERATIONAL ACTIVITY STREAM */}
           <div className="lg:col-span-3">
-            <TacticalPanel title={t('dashboard.panelOperationalActivity') || 'Operational Audit Stream'} icon={BoltIcon} badge="Immutable" color="slate" status={audit.status}>
-              <div className="h-[120px] overflow-y-auto font-mono text-[9px] space-y-1.5 custom-scrollbar">
-                {safeArray(audit.data).slice(0, 10).map((log: any) => (
-                  <div key={log.id} className="flex gap-2.5 items-center">
-                    <span className={COLORS.adaptive.textMuted}>[{new Date(log.created_at || Date.now()).toLocaleTimeString()}]</span>
-                    <span className="text-[#10B981] font-bold">{log.action || 'SYSTEM_EVENT'}</span>
-                    <span className={COLORS.adaptive.textSecondary}>{log.entity_id || 'system-cluster'}</span>
-                  </div>
-                ))}
-                {safeArray(audit.data).length === 0 && (
-                  <div className="flex flex-col gap-1.5 justify-center h-full text-center">
-                    <span className={`font-bold ${COLORS.adaptive.textMuted} uppercase tracking-wider`}>{t('dashboard.streamActive') || 'Stream Subscription Active'}</span>
-                    <span className={`text-[8px] ${COLORS.adaptive.textMuted}`}>Listening for transactional microservice trace blocks...</span>
-                  </div>
-                )}
-              </div>
-            </TacticalPanel>
+            <OperationalActivityStream
+              onSelectOrderDrawer={(orderId, domain) => {
+                const dom = String(domain || '').toUpperCase();
+                if (dom === 'ESCROW') {
+                  setSelectedFinancialOrderId(orderId);
+                  setFinancialDrawerOpen(true);
+                } else if (dom === 'LOGISTICS') {
+                  setLogisticsModalOpen(true);
+                } else if (dom === 'COMMUNICATIONS') {
+                  setB2bDrawerOpen(true);
+                } else if (dom === 'STORAGE') {
+                  setStorageDrawerOpen(true);
+                } else {
+                  setFleetModalOpen(true);
+                }
+              }}
+            />
           </div>
 
           {/* DISPATCH & SIMULATION (SYSTEM ADMINS ONLY) */}

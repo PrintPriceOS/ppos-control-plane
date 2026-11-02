@@ -769,6 +769,41 @@ function inspectPreflightJob(payload = {}, actorContext = {}) {
     if (orderId && orderId !== jobId) {
         inspectionLedger.set(`${tenantId}:${orderId}`, report);
     }
+
+    try {
+        const { recordOperationalEvent } = require('../telemetry/operationalActivityStreamService');
+        const sev =
+            overallStatus === 'FAIL'
+                ? 'CRITICAL'
+                : overallStatus === 'WARNING'
+                  ? 'WARNING'
+                  : 'SUCCESS';
+        recordOperationalEvent({
+            orderId: orderId || jobId,
+            printhouseId: actorContext.printhouseId || payload.printhouseId || 'node-primary',
+            tenantId,
+            domain: 'PREFLIGHT',
+            eventType: `PREFLIGHT_${overallStatus}`,
+            severity: sev,
+            title:
+                overallStatus === 'PASS'
+                    ? `Inspección Preflight 6-Ejes Aprobada (${jobId})`
+                    : `Inspección Preflight (${overallStatus}) · ${report.title}`,
+            description: `Lomo calculado: ${spineGeometry.calculatedSpineMm} mm (Δ ${spineGeometry.discrepancyMm} mm) · Sangrado: ${bleedGeometry.inner.detectedBleedMm} mm · TAC máx: ${tacAndColor.detectedMaxTacPct}%.`,
+            metadata: {
+                jobId,
+                calculatedSpineMm: spineGeometry.calculatedSpineMm,
+                discrepancyMm: spineGeometry.discrepancyMm,
+                bleedMm: bleedGeometry.inner.detectedBleedMm,
+                maxTacPct: tacAndColor.detectedMaxTacPct,
+                drawerTarget: 'FLEET'
+            },
+            actorId: actorContext.actorId || 'PREFLIGHT_ENGINE',
+            actorRole: actorContext.role || 'SYSTEM',
+            actor: 'PrintPrice Engine (:8001)'
+        }).catch(() => {});
+    } catch (_) {}
+
     return report;
 }
 
@@ -932,6 +967,30 @@ function executePreflightAutoFix(payload = {}, actorContext = {}) {
 
     inspectionLedger.set(`${tenantId}:${jobId}`, inspection);
     autoFixLedger.set(`${tenantId}:${fixOrderId}`, fixOrder);
+
+    try {
+        const { recordOperationalEvent } = require('../telemetry/operationalActivityStreamService');
+        recordOperationalEvent({
+            orderId: inspection.orderId || jobId,
+            printhouseId: actorContext.printhouseId || payload.printhouseId || 'node-primary',
+            tenantId,
+            domain: 'PREFLIGHT',
+            eventType: 'PREFLIGHT_AUTO_FIX_APPLIED',
+            severity: 'SUCCESS',
+            title: 'Síntesis de Sangre y Lomo Calibrado',
+            description: `Se generó sangrado de ${targetInnerBleedMm.toFixed(1)} mm y lomo recalculado a ${targetSpineMm} mm para '${inspection.title || jobId}'.`,
+            metadata: {
+                jobId,
+                fixOrderId,
+                calculatedSpineMm: targetSpineMm,
+                bleedMm: targetInnerBleedMm,
+                drawerTarget: 'FLEET'
+            },
+            actorId: actorContext.actorId || 'SYSTEM_AUTO_FIX',
+            actorRole: actorContext.role || 'SYSTEM',
+            actor: 'PrintPrice Engine (:8001)'
+        }).catch(() => {});
+    } catch (_) {}
 
     return fixOrder;
 }

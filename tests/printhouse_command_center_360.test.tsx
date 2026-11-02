@@ -141,6 +141,72 @@ vi.mock('../src/ui/lib/adminApi', async (importOriginal) => {
     }),
     sendPrinthouseB2bOrderMessage: vi.fn().mockResolvedValue({
       ok: true
+    }),
+    getPrinthouseOperationalActivityStream: vi.fn().mockResolvedValue({
+      ok: true,
+      total: 5,
+      events: [
+        {
+          id: 'ev-101',
+          orderId: 'PUB-ORD-2026-101',
+          domain: 'PREFLIGHT',
+          eventType: 'AUTO_FIX_APPLIED',
+          severity: 'SUCCESS',
+          title: 'Auto-Fix aplicado en PF-2026-001 (Síntesis de sangre +3mm)',
+          description: 'Lomo ajustado a 22.10 mm, TAC normalizado a 280%.',
+          payload: { spineMm: 22.1, bleedAddedMm: 3, tacNormalizedPct: 280 },
+          actor: { id: 'ppos-preflight-engine', role: 'SYSTEM', label: 'Motor Preflight v2.4' },
+          timestamp: new Date(Date.now() - 2 * 60 * 1000).toISOString()
+        },
+        {
+          id: 'ev-102',
+          orderId: 'PUB-ORD-2026-104',
+          domain: 'ESCROW',
+          eventType: 'FUNDS_LOCKED_ESCROW',
+          severity: 'INFO',
+          title: 'Fondos bloqueados en Escrow (12.400,00 €)',
+          description: 'Imprimátur aprobado por editorial. Retención garantizada hasta firma de POD.',
+          payload: { amountEur: 12400.0, invoiceNumber: 'FE-2026-00104' },
+          actor: { id: 'escrow-engine', role: 'SYSTEM', label: 'Liquidación Fiduciaria' },
+          timestamp: new Date(Date.now() - 15 * 60 * 1000).toISOString()
+        },
+        {
+          id: 'ev-103',
+          orderId: 'PUB-ORD-2026-101',
+          domain: 'PRODUCTION',
+          eventType: 'MACHINE_REASSIGNED',
+          severity: 'INFO',
+          title: 'Asignación en planta: Heidelberg Speedmaster XL 106-8P (Offset B1)',
+          description: 'Pliego B1 (750 × 1060 mm) en impresión activa al 86% de carga.',
+          payload: { machineCode: 'HEIDELBERG-XL106-8P', loadPct: 86 },
+          actor: { id: 'operator-01', role: 'PRINTHOUSE_ADMIN', label: 'Jefe de Taller' },
+          timestamp: new Date(Date.now() - 28 * 60 * 1000).toISOString()
+        },
+        {
+          id: 'ev-104',
+          orderId: 'PUB-ORD-2026-102',
+          domain: 'LOGISTICS',
+          eventType: 'GS1_128_SSCC_PRINTED',
+          severity: 'SUCCESS',
+          title: 'Etiquetas térmicas GS1-128 SSCC generadas (2x EPAL)',
+          description: 'Manifiesto de expedición listo para DHL Freight.',
+          payload: { pallets: 2, carrier: 'DHL Freight Iberia' },
+          actor: { id: 'logistics-dock', role: 'OPERATOR', label: 'Muelle de Expedición' },
+          timestamp: new Date(Date.now() - 42 * 60 * 1000).toISOString()
+        },
+        {
+          id: 'ev-105',
+          orderId: 'PUB-ORD-2026-102',
+          domain: 'PREFLIGHT',
+          eventType: 'CRITICAL_SPINE_MISMATCH',
+          severity: 'CRITICAL',
+          title: 'Desviación crítica de lomo detectada (+2.88 mm)',
+          description: 'Cubierta declarada en 14.00 mm frente a 16.88 mm paramétricos.',
+          payload: { expectedSpineMm: 16.88, actualSpineMm: 14.0, deltaMm: 2.88 },
+          actor: { id: 'ppos-preflight-engine', role: 'SYSTEM', label: 'Motor Preflight v2.4' },
+          timestamp: new Date(Date.now() - 55 * 60 * 1000).toISOString()
+        }
+      ]
     })
   };
 });
@@ -285,5 +351,79 @@ describe('Printhouse Hub 360° Operational Command Center & Interactive Drawers/
       expect(screen.getByTestId('quick-action-attach-delivery-note').textContent).toContain('Lieferschein anhängen');
       expect(screen.getByTestId('quick-action-reject-spine').textContent).toContain('Wegen Rückenbreite ablehnen');
     });
+  });
+
+  it('6. filters Operational Activity Stream by domain pills and opens Order Drawer on Order ID click', async () => {
+    render(
+      <LocaleHarness locale="es">
+        <MemoryRouter>
+          <CommandCenterPage />
+        </MemoryRouter>
+      </LocaleHarness>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('operational-activity-feed')).toBeTruthy();
+      expect(screen.getByTestId('activity-badge-elapsed-0')).toBeTruthy();
+    });
+
+    // Verify domain filter pills exist
+    expect(screen.getByTestId('activity-filter-pill-ALL')).toBeTruthy();
+    expect(screen.getByTestId('activity-filter-pill-PREFLIGHT')).toBeTruthy();
+    expect(screen.getByTestId('activity-filter-pill-PRODUCTION')).toBeTruthy();
+    expect(screen.getByTestId('activity-filter-pill-ESCROW')).toBeTruthy();
+    expect(screen.getByTestId('activity-filter-pill-LOGISTICS')).toBeTruthy();
+
+    // Filter by ESCROW
+    fireEvent.click(screen.getByTestId('activity-filter-pill-ESCROW'));
+    await waitFor(() => {
+      expect(screen.getByText(/Fondos bloqueados en Escrow/i)).toBeTruthy();
+    });
+
+    // Click Order ID badge on an ESCROW event -> opens FinancialEscrowDrawer
+    const orderBadge = screen.getByTestId('activity-order-badge-PUB-ORD-2026-104');
+    fireEvent.click(orderBadge);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('financial-escrow-drawer')).toBeTruthy();
+    });
+  });
+
+  it('7. backend operationalActivityStreamService records immutable events and filters by domain/severity/orderId', async () => {
+    const {
+      recordOperationalEvent,
+      queryOperationalActivityStream
+    } = await import('../src/api/services/telemetry/operationalActivityStreamService.js');
+
+    const recorded = await recordOperationalEvent({
+      orderId: 'PUB-ORD-2026-999',
+      printhouseId: 'node-primary',
+      tenantId: 'tenant-default',
+      domain: 'PREFLIGHT',
+      eventType: 'AUTO_FIX_APPLIED',
+      severity: 'SUCCESS',
+      title: 'Test Auto-Fix Event Recorded',
+      description: 'Sangre +3mm y TAC 280% verificados.',
+      payload: { spineMm: 18.5, bleedAddedMm: 3 },
+      actor: { id: 'test-engine', role: 'SYSTEM', label: 'Motor Preflight Test' }
+    });
+
+    expect(recorded.id).toBeTruthy();
+    expect(recorded.domain).toBe('PREFLIGHT');
+    expect(recorded.severity).toBe('SUCCESS');
+
+    const res = await queryOperationalActivityStream({
+      printhouseId: 'node-primary',
+      tenantId: 'tenant-default',
+      domain: 'PREFLIGHT',
+      orderId: 'PUB-ORD-2026-999',
+      limit: 10,
+      offset: 0
+    });
+
+    expect(res.success).toBe(true);
+    expect(res.total).toBeGreaterThanOrEqual(1);
+    expect(res.events[0].orderId).toBe('PUB-ORD-2026-999');
+    expect(res.events[0].title).toBe('Test Auto-Fix Event Recorded');
   });
 });
