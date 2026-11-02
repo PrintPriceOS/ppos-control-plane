@@ -612,6 +612,40 @@ export async function getPrinthouseDashboardActivity() {
     return adminFetch<{ ok: boolean; data: any; meta: any }>('/api/admin/printhouse/dashboard/activity');
 }
 
+export async function getPrinthouseDashboardTelemetry() {
+    return adminFetch<any>('/api/admin/printhouse/dashboard/telemetry');
+}
+
+export async function purgePrinthouseRetentionAssets(jobId?: string) {
+    return adminFetch<any>('/api/admin/printhouse/dashboard/storage/purge', {
+        method: 'POST',
+        body: JSON.stringify(jobId ? { jobId } : {})
+    });
+}
+
+export async function reassignPrinthouseMachine(payload: {
+    orderId: string;
+    machineCode: string;
+    machineName?: string;
+    notes?: string;
+}) {
+    return adminFetch<any>('/api/admin/printhouse/dashboard/machines/reassign', {
+        method: 'POST',
+        body: JSON.stringify(payload)
+    });
+}
+
+export async function sendPrinthouseB2bOrderMessage(payload: {
+    orderId: string;
+    message: string;
+    alertType?: string;
+}) {
+    return adminFetch<any>('/api/admin/printhouse/dashboard/messages', {
+        method: 'POST',
+        body: JSON.stringify(payload)
+    });
+}
+
 export async function getGovernanceBlocks() {
     return adminFetch<{ ok: boolean; blocks: GovernanceBlock[] }>('/api/admin/global/blocks');
 }
