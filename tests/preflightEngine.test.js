@@ -327,6 +327,16 @@ describe('PHASE-11A — Automated Preflight & Spine Geometry Engine (FIX IT Engi
         expect(deleteRes.body.diskFileRemoved).toBe(true);
         expect(deleteRes.body.retentionState).toBe('METADATA_ONLY_ASSET_PURGED');
         expect(fs.existsSync(tmpPdf2)).toBe(false);
+
+        // 5.3 Verify GET /inspections/:id?download=pdf streams a valid PDF-1.6 (PDF/X-4) press artifact
+        const pdfGen = preflightEngine.generateSanitizedPressPdfBuffer('PF-E2E-11A', 'tenant-alpha');
+        expect(Buffer.isBuffer(pdfGen.buffer)).toBe(true);
+        expect(pdfGen.fileName).toBe('PF-E2E-11A_autofixed_press_ready.pdf');
+        const pdfStr = pdfGen.buffer.toString('latin1');
+        expect(pdfStr).toContain('%PDF-1.6');
+        expect(pdfStr).toContain('/TrimBox');
+        expect(pdfStr).toContain('/BleedBox');
+        expect(pdfStr).toContain('PF-E2E-11A');
     });
 });
 

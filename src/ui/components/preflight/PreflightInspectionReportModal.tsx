@@ -144,6 +144,13 @@ export const PreflightInspectionReportModal: React.FC<PreflightInspectionReportM
         URL.revokeObjectURL(url);
     };
 
+    const handleDownloadFixedPdf = () => {
+        const a = document.createElement('a');
+        a.href = `/api/preflight/inspections/${encodeURIComponent(job.jobId)}?download=pdf`;
+        a.download = `${job.jobId}_autofixed_press_ready.pdf`;
+        a.click();
+    };
+
     const modalNode = (
         <div
             onClick={(e) => {
@@ -194,6 +201,15 @@ export const PreflightInspectionReportModal: React.FC<PreflightInspectionReportM
                     </div>
 
                     <div className="flex items-center gap-2">
+                        <button
+                            type="button"
+                            data-testid="modal-download-fixed-pdf-header-btn"
+                            onClick={handleDownloadFixedPdf}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-950/60 hover:bg-emerald-900/60 border border-emerald-500/40 text-[10px] font-mono font-bold uppercase text-emerald-300 cursor-pointer"
+                        >
+                            <DocumentArrowDownIcon className="w-3.5 h-3.5 text-emerald-400" />
+                            DOWNLOAD FIXED PDF
+                        </button>
                         <button
                             type="button"
                             onClick={handleDownloadJsonReport}
@@ -488,9 +504,20 @@ export const PreflightInspectionReportModal: React.FC<PreflightInspectionReportM
                                             : 'EXECUTE AUTO-FIX (MIRROR BLEED + SPINE)'}
                                     </button>
                                 ) : (
-                                    <div className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-emerald-950/40 border border-emerald-500/40 text-emerald-400 text-xs font-mono font-black uppercase">
-                                        <CheckCircleIcon className="w-4 h-4" />
-                                        FIXED &amp; VERIFIED FOR PRESS
+                                    <div className="space-y-2">
+                                        <div className="w-full flex items-center justify-center gap-2 py-2 px-4 rounded-xl bg-emerald-950/40 border border-emerald-500/40 text-emerald-400 text-xs font-mono font-black uppercase">
+                                            <CheckCircleIcon className="w-4 h-4" />
+                                            FIXED &amp; VERIFIED FOR PRESS
+                                        </div>
+                                        <button
+                                            type="button"
+                                            data-testid="modal-download-fixed-pdf-btn"
+                                            onClick={handleDownloadFixedPdf}
+                                            className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-[#dc0000] hover:bg-[#e11d48] text-white text-xs font-mono font-black uppercase tracking-wider transition-all cursor-pointer"
+                                        >
+                                            <DocumentArrowDownIcon className="w-4 h-4" />
+                                            DOWNLOAD FIXED PDF (PRESS-READY PDF/X-4)
+                                        </button>
                                     </div>
                                 )}
 

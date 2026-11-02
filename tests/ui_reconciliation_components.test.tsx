@@ -228,8 +228,13 @@ describe('Dark Industrial Telemetry UI — Canonical Components & Dual-Mode Reco
         expect(screen.queryByTestId('preflight-inspection-report-modal')).not.toBeInTheDocument();
 
         // Verify clicking VIEW REPORT on an existing row opens the 6-Axis Report Modal for that row
+        expect(screen.getByTestId('download-fixed-pdf-btn-PF-2026-081')).toHaveAttribute(
+            'href',
+            '/api/preflight/inspections/PF-2026-081?download=pdf'
+        );
         fireEvent.click(screen.getByTestId('view-report-btn-PF-2026-081'));
         expect(screen.getByTestId('preflight-inspection-report-modal')).toBeInTheDocument();
+        expect(screen.getByTestId('modal-download-fixed-pdf-btn')).toBeInTheDocument();
         fireEvent.click(screen.getByTestId('close-inspection-report-btn'));
 
         // Test manual Purge Asset (Free Disk) button on an existing row

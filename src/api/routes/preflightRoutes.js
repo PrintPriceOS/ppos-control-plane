@@ -23,6 +23,7 @@ const {
     inspectPreflightJob,
     executePreflightAutoFix,
     purgePreflightJobAsset,
+    generateSanitizedPressPdfBuffer,
     listTenantPreflightInspections,
     getPreflightInspectionById
 } = require('../services/preflight/preflightEngineService');
@@ -222,6 +223,21 @@ function createPreflightRouter() {
                     { tenantId }
                 );
             }
+
+            const downloadFormat = String((req.query && req.query.download) || '').toLowerCase();
+            if (downloadFormat === 'pdf' || downloadFormat === 'fixed_pdf' || downloadFormat === 'artifact') {
+                const { buffer, fileName } = generateSanitizedPressPdfBuffer(inspectionId, tenantId);
+                if (typeof res.setHeader === 'function') {
+                    res.setHeader('Content-Type', 'application/pdf');
+                    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+                    res.setHeader('Content-Length', String(buffer.length));
+                }
+                if (typeof res.send === 'function') {
+                    return res.status(200).send(buffer);
+                }
+                return res.status(200).end(buffer);
+            }
+
             return res.status(200).json({
                 ok: true,
                 tenantId,

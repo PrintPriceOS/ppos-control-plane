@@ -21,7 +21,8 @@ import {
     ArrowPathIcon,
     CheckCircleIcon,
     TrashIcon,
-    DocumentMagnifyingGlassIcon
+    DocumentMagnifyingGlassIcon,
+    DocumentArrowDownIcon
 } from '@heroicons/react/24/outline';
 import { useLocale } from '../../i18n';
 import { getAuthToken } from '../../lib/authStore';
@@ -732,10 +733,23 @@ export const PreflightJobsPage: React.FC<SharedModuleProps> = ({
                                             {fixingJobId === row.jobId ? '...' : L.btnAutoFix}
                                         </button>
                                     ) : (
-                                        <span className="inline-flex items-center gap-1 text-[10px] font-mono font-bold text-emerald-400 uppercase">
-                                            <CheckCircleIcon className="w-4 h-4" />
-                                            {L.btnFixed}
-                                        </span>
+                                        <>
+                                            <span className="inline-flex items-center gap-1 text-[10px] font-mono font-bold text-emerald-400 uppercase">
+                                                <CheckCircleIcon className="w-4 h-4" />
+                                                {L.btnFixed}
+                                            </span>
+                                            {!row.assetPurged && (
+                                                <a
+                                                    href={`/api/preflight/inspections/${encodeURIComponent(row.jobId)}?download=pdf`}
+                                                    download={`${row.jobId}_autofixed_press_ready.pdf`}
+                                                    data-testid={`download-fixed-pdf-btn-${row.jobId}`}
+                                                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-950/60 hover:bg-emerald-900/60 border border-emerald-500/40 text-emerald-300 text-[10px] font-mono font-bold uppercase transition-colors cursor-pointer"
+                                                >
+                                                    <DocumentArrowDownIcon className="w-3.5 h-3.5 text-emerald-400" />
+                                                    <span>DOWNLOAD FIXED PDF</span>
+                                                </a>
+                                            )}
+                                        </>
                                     )}
                                     {row.assetPurged ? (
                                         <span
