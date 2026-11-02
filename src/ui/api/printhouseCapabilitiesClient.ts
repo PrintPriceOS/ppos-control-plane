@@ -56,6 +56,12 @@ export async function updateMachine(printhouseId: string, machineId: string, pay
     });
 }
 
+export async function deleteMachine(printhouseId: string, machineId: string): Promise<{ ok: boolean; status?: string }> {
+    return adminFetch<{ ok: boolean; status?: string }>(`${BASE_URL}/${printhouseId}/machines/${machineId}`, {
+        method: 'DELETE'
+    });
+}
+
 export async function listMedia(printhouseId: string): Promise<{ ok: boolean; media: Media[] }> {
     return adminFetch<{ ok: boolean; media: Media[] }>(`${BASE_URL}/${printhouseId}/media`);
 }

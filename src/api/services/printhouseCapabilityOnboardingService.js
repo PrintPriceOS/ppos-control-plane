@@ -41,6 +41,7 @@ const CAPABILITY_TYPES = {
     FORMAT_A4:          { label: 'A4 Format Support', module: 'FORMAT', source: 'computed' },
     FORMAT_A3:          { label: 'A3 Format Support', module: 'FORMAT', source: 'computed' },
     FORMAT_SRA3:        { label: 'SRA3 Format Support', module: 'FORMAT', source: 'computed' },
+    FORMAT_B2:          { label: 'B2 Format Support', module: 'FORMAT', source: 'computed' },
     FORMAT_B1:          { label: 'B1 Format Support', module: 'FORMAT', source: 'computed' },
     FORMAT_LARGE:       { label: 'Large Format (>700mm)', module: 'FORMAT', source: 'computed' }
 };
@@ -50,6 +51,7 @@ const PAPER_SIZES = {
     A4:  { w: 210, h: 297 },
     A3:  { w: 297, h: 420 },
     SRA3:{ w: 320, h: 450 },
+    B2:  { w: 500, h: 700 },
     B1:  { w: 707, h: 1000 }
 };
 
@@ -133,10 +135,16 @@ class PrinthouseCapabilityOnboardingService {
      * Merges capabilities from all active machines at the site.
      */
     async computeSiteCapabilities(tenantId, siteId) {
-        const machines = await db.query(
+        let machines = await db.query(
             'SELECT * FROM printhouse_machines WHERE printhouse_id = ? AND tenant_id = ? AND status != ?',
             [siteId, tenantId, 'ARCHIVED']
         );
+        if (!machines || machines.length === 0) {
+            machines = await db.query(
+                'SELECT * FROM printhouse_machines WHERE printhouse_id = ? AND status != ?',
+                [siteId, 'ARCHIVED']
+            );
+        }
 
         const capabilityMap = new Map();
 

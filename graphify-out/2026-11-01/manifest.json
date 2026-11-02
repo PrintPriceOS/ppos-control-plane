@@ -7470,9 +7470,9 @@
     "semantic_hash": "f59c98983eb0657a28d6d105e8c06fb9"
   },
   "server.js": {
-    "mtime": 1793502567.5006409,
-    "seen": 1793503101.8989365,
-    "ast_hash": "6ad50a63c0aee9c9caffd0f156d2943d",
+    "mtime": 1793556453.3334384,
+    "seen": 1793556981.7213423,
+    "ast_hash": "8067cc240c8f8e50cf59ab47512d2aac",
     "semantic_hash": ""
   },
   "services/FederatedHealthAggregator.js": {
@@ -7536,15 +7536,15 @@
     "semantic_hash": "194b67be33ce25c729e4aac2b187e3e3"
   },
   "src/api/middleware/v2AuthMiddleware.js": {
-    "mtime": 1793411529.325297,
-    "seen": 1793449041.9309416,
-    "ast_hash": "7aada3e319fb0dcbe92d9b84bb081b16",
+    "mtime": 1793549410.9101999,
+    "seen": 1793550770.4495127,
+    "ast_hash": "2434d09ef5a373216d171b3b26993674",
     "semantic_hash": ""
   },
   "src/api/routes/admin.js": {
-    "mtime": 1793411529.3262973,
-    "seen": 1793449041.9309416,
-    "ast_hash": "287b45d8d5960586d5645969569522c5",
+    "mtime": 1793556384.3859403,
+    "seen": 1793556981.7273407,
+    "ast_hash": "d3475e045af4e39bba402ab28b0a6a52",
     "semantic_hash": ""
   },
   "src/api/routes/adminAssets.js": {
@@ -8382,9 +8382,9 @@
     "semantic_hash": "c7689373cc5d8d72d74d90e0af3fc0c0"
   },
   "src/api/routes/marketplaceOrders.js": {
-    "mtime": 1793500948.0893183,
-    "seen": 1793501685.1902063,
-    "ast_hash": "bd120a193e30389452f6937176502b2e",
+    "mtime": 1793553478.1524086,
+    "seen": 1793554045.4851847,
+    "ast_hash": "a0210f2044fe6b57981417d0d28279fc",
     "semantic_hash": ""
   },
   "src/api/routes/marketplacePublic.js": {
@@ -11952,9 +11952,9 @@
     "semantic_hash": "1615fefe9ddc6467fa9de2c03dd1049f"
   },
   "src/api/services/marketplaceInvoicePaymentService.js": {
-    "mtime": 1793527691.8845503,
-    "seen": 1793528737.43861,
-    "ast_hash": "f3cceaa24ee477f2ab7cd739175b2099",
+    "mtime": 1793546627.759567,
+    "seen": 1793549379.1623948,
+    "ast_hash": "c5ac672a84b3bb56537a236c3c4d6aa0",
     "semantic_hash": ""
   },
   "src/api/services/marketplaceLaunchControlService.js": {
@@ -12138,8 +12138,8 @@
     "semantic_hash": ""
   },
   "src/api/services/mysqlClient.js": {
-    "mtime": 1793529511.5455754,
-    "seen": 1793530638.19754,
+    "mtime": 1793540969.106809,
+    "seen": 1793549379.1713924,
     "ast_hash": "792c6b701f7d604ed039beb234e38d11",
     "semantic_hash": ""
   },
@@ -15660,9 +15660,9 @@
     "semantic_hash": ""
   },
   "src/ui/pages/admin/PricingIntelligenceTab.tsx": {
-    "mtime": 1793498044.2691443,
-    "seen": 1793501685.5666168,
-    "ast_hash": "fc3d4f311d252671458897d517e742e1",
+    "mtime": 1793531440.454739,
+    "seen": 1793531626.6021028,
+    "ast_hash": "c7ce075d919f3d775d577ab5bec4e046",
     "semantic_hash": ""
   },
   "src/ui/pages/admin/PricingSessionsTab.tsx": {
@@ -30834,9 +30834,9 @@
     "semantic_hash": ""
   },
   "src/api/routes/logisticsRoutes.js": {
-    "mtime": 1793483811.501832,
-    "seen": 1793483884.9075267,
-    "ast_hash": "03af39ded889b38d98f45c542cc8838d",
+    "mtime": 1793549412.7005727,
+    "seen": 1793550770.4865127,
+    "ast_hash": "79b9cf1ba89ce2d050d5e83de4131981",
     "semantic_hash": ""
   },
   "tests/logistics_integration_preview.test.js": {
@@ -30966,9 +30966,9 @@
     "semantic_hash": ""
   },
   "tests/ui_reconciliation_components.test.tsx": {
-    "mtime": 1793530398.2518928,
-    "seen": 1793530638.5825586,
-    "ast_hash": "380e1c10750ce25c57878bbb196ca813",
+    "mtime": 1793531392.3841965,
+    "seen": 1793531626.8011038,
+    "ast_hash": "52e58513fdb1690ea9fd73bf133cf6ed",
     "semantic_hash": ""
   },
   "services/preflight/preflightEngineService.js": {
@@ -30978,15 +30978,15 @@
     "semantic_hash": ""
   },
   "src/api/routes/preflightRoutes.js": {
-    "mtime": 1793488489.8625274,
-    "seen": 1793490591.058194,
-    "ast_hash": "e587e9b12f495d86a340708c9a487dba",
+    "mtime": 1793554736.2179923,
+    "seen": 1793555890.574782,
+    "ast_hash": "81c995e3eecf5df9ce3f4f5118dc5f02",
     "semantic_hash": ""
   },
   "src/api/services/preflight/preflightEngineService.js": {
-    "mtime": 1793488490.8200197,
-    "seen": 1793490591.2517939,
-    "ast_hash": "3adc1a7243d30c3a0fc1c514cff01558",
+    "mtime": 1793554738.270779,
+    "seen": 1793555890.7648253,
+    "ast_hash": "02f1159a7d1c456a3d6693d662b77c67",
     "semantic_hash": ""
   },
   "src/ui/pages/os/PreflightJobsPage.tsx": {
@@ -31038,9 +31038,9 @@
     "semantic_hash": ""
   },
   "src/api/routes/publisherRoutes.js": {
-    "mtime": 1793489639.1760914,
-    "seen": 1793490591.0631936,
-    "ast_hash": "f7a4aadbe1bb14b05400963dea3b5799",
+    "mtime": 1793550957.6443973,
+    "seen": 1793554045.4951847,
+    "ast_hash": "a8c2a02c5e328fab89e08b10b8e18780",
     "semantic_hash": ""
   },
   "src/api/services/publisher/publisherHubService.js": {
@@ -31086,9 +31086,9 @@
     "semantic_hash": ""
   },
   "src/api/routes/escrowRoutes.js": {
-    "mtime": 1793491883.5746827,
-    "seen": 1793493841.3526924,
-    "ast_hash": "05bb2d0a2a923135b90672598d6ffb29",
+    "mtime": 1793549411.7875764,
+    "seen": 1793550770.4795127,
+    "ast_hash": "9a9d56c1379c9199cb2b8893e3663867",
     "semantic_hash": ""
   },
   "src/api/routes/predictiveMaintenanceRoutes.js": {
@@ -31098,9 +31098,9 @@
     "semantic_hash": ""
   },
   "src/api/services/financials/escrowSettlementService.js": {
-    "mtime": 1793501633.6502316,
-    "seen": 1793501685.3382046,
-    "ast_hash": "62855dcb1b176fe9a6cda3eb37d9f717",
+    "mtime": 1793547858.1505854,
+    "seen": 1793549379.1383927,
+    "ast_hash": "f5af60d4f1acd69f14c41003e41beffb",
     "semantic_hash": ""
   },
   "src/api/services/machines/predictiveMaintenanceService.js": {
@@ -31158,21 +31158,21 @@
     "semantic_hash": ""
   },
   "src/api/services/financials/eInvoicingService.js": {
-    "mtime": 1793492010.1516397,
-    "seen": 1793493841.5068812,
-    "ast_hash": "ef74a378bd2d4a105476311fd01b7384",
+    "mtime": 1793549415.8435762,
+    "seen": 1793550770.631619,
+    "ast_hash": "e5e5359e9e326462ff875a11253da338",
     "semantic_hash": ""
   },
   "src/api/services/pricing/pricingIntelligenceService.js": {
-    "mtime": 1793530492.1849577,
-    "seen": 1793530638.2215397,
-    "ast_hash": "f9a177643614ebf6105433bd3bf1cf62",
+    "mtime": 1793531439.3862622,
+    "seen": 1793531626.4501035,
+    "ast_hash": "afad53f6ec1410badcc11fb99bb619f9",
     "semantic_hash": ""
   },
   "src/ui/components/pricing/EconomicProfilesTable.tsx": {
-    "mtime": 1793529932.7282476,
-    "seen": 1793530638.3125355,
-    "ast_hash": "e739add10b02a9fad090565877eccb08",
+    "mtime": 1793531439.8752456,
+    "seen": 1793531626.5371037,
+    "ast_hash": "b43bd041893cbc8e99d50ebacbda9627",
     "semantic_hash": ""
   },
   "src/ui/components/pricing/LivePriceCalibratorModal.tsx": {
@@ -31212,9 +31212,9 @@
     "semantic_hash": ""
   },
   "src/api/services/marketplaceOrderFileService.js": {
-    "mtime": 1793501492.5715528,
-    "seen": 1793501685.363206,
-    "ast_hash": "18a4f962723bc016175373a096bdd014",
+    "mtime": 1793554737.5327778,
+    "seen": 1793555890.7376106,
+    "ast_hash": "06ea58f5ad78f5acfad7537627e58458",
     "semantic_hash": ""
   },
   "tests/marketplaceCheckoutPipeline.test.js": {
@@ -31245,6 +31245,72 @@
     "mtime": 1793530497.4130943,
     "seen": 1793530638.5435543,
     "ast_hash": "4e4691cf6b057c52bee4a699095d92d2",
+    "semantic_hash": ""
+  },
+  "src/api/routes/customerPortalRoutes.js": {
+    "mtime": 1793556435.1789362,
+    "seen": 1793556981.7583606,
+    "ast_hash": "58983e87ccc2846bfad3789fb800e15d",
+    "semantic_hash": ""
+  },
+  "tests/customer_portal_b2b_hub.test.js": {
+    "mtime": 1793551017.153539,
+    "seen": 1793554045.9931853,
+    "ast_hash": "00c16d7907f648e3bc84dfd0cee81897",
+    "semantic_hash": ""
+  },
+  "src/api/services/notifications/transactionalEmailService.js": {
+    "mtime": 1793552615.9595623,
+    "seen": 1793554045.6641867,
+    "ast_hash": "06b30b6dfc0d00fc1c109386742e88c3",
+    "semantic_hash": ""
+  },
+  "src/api/services/publisher/softProofCertificatePdfService.js": {
+    "mtime": 1793551135.7209618,
+    "seen": 1793554045.6971846,
+    "ast_hash": "a195e40037d84b74a1e0738f98e9e250",
+    "semantic_hash": ""
+  },
+  "tests/load_resilience_e2e_harness.js": {
+    "mtime": 1793552616.4427943,
+    "seen": 1793554046.005189,
+    "ast_hash": "8d87f86b78f1cbea61c07eb8f9594cbb",
+    "semantic_hash": ""
+  },
+  "tests/preflight_control_plane_parity.test.js": {
+    "mtime": 1793553857.1088622,
+    "seen": 1793554046.0151849,
+    "ast_hash": "518c94340ad47b9366a31d611562578f",
+    "semantic_hash": ""
+  },
+  "tests/transactional_email_notifications.test.js": {
+    "mtime": 1793551774.4703424,
+    "seen": 1793554046.0541854,
+    "ast_hash": "617f51a1ec6ff825cb90791e063ebc0a",
+    "semantic_hash": ""
+  },
+  "src/api/services/telemetry/operationalTelemetryService.js": {
+    "mtime": 1793556034.4077446,
+    "seen": 1793556981.994542,
+    "ast_hash": "5916398a07e0dda8d184f95af980024e",
+    "semantic_hash": ""
+  },
+  "tests/operational_telemetry.test.js": {
+    "mtime": 1793556034.7173738,
+    "seen": 1793556982.2745419,
+    "ast_hash": "1043aae26b30fa4f6fc4f18ca84ccd7d",
+    "semantic_hash": ""
+  },
+  "src/api/services/storage/assetRetentionAndBackupService.js": {
+    "mtime": 1793556815.8416169,
+    "seen": 1793556981.9915414,
+    "ast_hash": "2c25473d80099611116e707fb11dc9c3",
+    "semantic_hash": ""
+  },
+  "tests/asset_retention_and_backup.test.js": {
+    "mtime": 1793556816.7092779,
+    "seen": 1793556982.2555418,
+    "ast_hash": "847e6c44e2c5361bb500a277eb4ec82a",
     "semantic_hash": ""
   }
 }

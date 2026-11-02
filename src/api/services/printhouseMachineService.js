@@ -27,16 +27,17 @@ const PROTECTED_FIELDS = [
 /** Valid machine types */
 const VALID_MACHINE_TYPES = [
     'OFFSET_PRESS', 'DIGITAL_PRESS', 'LARGE_FORMAT', 'BINDER',
-    'FINISHER', 'CUTTER', 'FOLDER', 'LAMINATOR', 'OTHER'
+    'FINISHER', 'CUTTER', 'FOLDER', 'LAMINATOR', 'OTHER',
+    'OFFSET', 'DIGITAL', 'FLEXO', 'SCREEN', 'ROTARY'
 ];
 
 /** Valid machine statuses */
-const VALID_STATUSES = ['ACTIVE', 'MAINTENANCE', 'DECOMMISSIONED', 'ARCHIVED'];
+const VALID_STATUSES = ['ACTIVE', 'MAINTENANCE', 'DECOMMISSIONED', 'ARCHIVED', 'OFFLINE'];
 
 /** Canonical technical capability enums */
-const VALID_COLOR_MODES = ['CMYK', 'CMYK+SPOT', 'CMYK+WHITE', 'RGB', 'GRAYSCALE', 'MONOCHROME', 'SPOT_ONLY'];
-const VALID_PRINT_METHODS = ['SHEETFED_OFFSET', 'DIGITAL_TONER', 'DIGITAL_INKJET', 'WIDE_FORMAT_INKJET', 'WEB_OFFSET', 'FLEXO', 'SCREEN_PRINTING'];
-const VALID_SIDES = ['SIMPLEX', 'DUPLEX'];
+const VALID_COLOR_MODES = ['CMYK', 'CMYK+SPOT', 'CMYK+WHITE', 'RGB', 'GRAYSCALE', 'MONOCHROME', 'SPOT_ONLY', 'PANTONE', 'INDI-CHROME'];
+const VALID_PRINT_METHODS = ['SHEETFED_OFFSET', 'DIGITAL_TONER', 'DIGITAL_INKJET', 'WIDE_FORMAT_INKJET', 'WEB_OFFSET', 'FLEXO', 'SCREEN_PRINTING', 'OFFSET', 'DIGITAL', 'FINISHING'];
+const VALID_SIDES = ['SIMPLEX', 'DUPLEX', '4/4', '4/0', '1/1', '1/0'];
 
 /**
  * Machine templates: pre-populated defaults for common machine types.
@@ -173,6 +174,16 @@ function makeMachinePublic(row) {
     out.supported_print_methods_json = safeParseJson(out.supported_print_methods_json, []);
     out.supported_sides_json = safeParseJson(out.supported_sides_json, []);
     out.metadata_json = safeParseJson(out.metadata_json, {});
+    const meta = out.metadata_json || {};
+    const defaultSpeed = String(out.machine_type || '').includes('OFFSET') ? 18000 : String(out.machine_type || '').includes('DIGITAL') ? 4600 : 7000;
+    const defaultSetup = String(out.machine_type || '').includes('OFFSET') ? 25 : String(out.machine_type || '').includes('DIGITAL') ? 8 : 15;
+    const defaultRate = String(out.machine_type || '').includes('OFFSET') ? 165 : String(out.machine_type || '').includes('DIGITAL') ? 95 : 110;
+    out.nominal_speed_cph = Number(out.nominal_speed_cph ?? meta.nominal_speed_cph ?? meta.sheetsPerHour ?? defaultSpeed);
+    out.make_ready_minutes = Number(out.make_ready_minutes ?? meta.make_ready_minutes ?? meta.setupTimeMin ?? defaultSetup);
+    out.hourly_cost_eur = Number(out.hourly_cost_eur ?? meta.hourly_cost_eur ?? meta.hourlyRateEur ?? defaultRate);
+    out.max_tac_percent = Number(out.max_tac_percent || meta.max_tac_percent || 300);
+    out.max_pages_per_job = Number(out.max_pages_per_job || meta.max_pages_per_job || 1024);
+    out.max_file_size_mb = Number(out.max_file_size_mb || meta.max_file_size_mb || 2048);
     out.supports_pdfx = !!out.supports_pdfx;
     out.supports_pdfa = !!out.supports_pdfa;
     out.supports_variable_data = !!out.supports_variable_data;
@@ -363,17 +374,45 @@ class PrinthouseMachineService {
         return { ...tmpl, ...stripProtectedFields(overrides) };
     }
 
+    enrichMetadata(payload, existingMeta = {}) {
+        const meta = {
+            ...(typeof existingMeta === 'object' && existingMeta ? existingMeta : {}),
+            ...(typeof payload.metadata_json === 'object' && payload.metadata_json ? payload.metadata_json : {})
+        };
+        if (payload.nominal_speed_cph !== undefined && payload.nominal_speed_cph !== '') {
+            meta.nominal_speed_cph = Number(payload.nominal_speed_cph);
+            meta.sheetsPerHour = Number(payload.nominal_speed_cph);
+        } else if (payload.sheetsPerHour !== undefined && payload.sheetsPerHour !== '') {
+            meta.nominal_speed_cph = Number(payload.sheetsPerHour);
+            meta.sheetsPerHour = Number(payload.sheetsPerHour);
+        }
+        if (payload.make_ready_minutes !== undefined && payload.make_ready_minutes !== '') {
+            meta.make_ready_minutes = Number(payload.make_ready_minutes);
+            meta.setupTimeMin = Number(payload.make_ready_minutes);
+        }
+        if (payload.hourly_cost_eur !== undefined && payload.hourly_cost_eur !== '') {
+            meta.hourly_cost_eur = Number(payload.hourly_cost_eur);
+            meta.hourlyRateEur = Number(payload.hourly_cost_eur);
+        }
+        return meta;
+    }
+
     async createMachine(tenantId, siteId, payload, actorContext) {
         checkProtectedFields(payload);
         const node = await this.getPrinterNode(siteId);
         if (!node) throw new Error('SITE_NOT_FOUND');
-        if (node.tenant_id !== tenantId) throw new Error('UNAUTHORIZED_TENANT_ACCESS');
+        const isSuperAdmin = actorContext?.role === 'SUPER_ADMIN' || actorContext?.isSuperAdmin;
+        if (!isSuperAdmin && node.tenant_id && node.tenant_id !== tenantId && node.tenant_id !== 'system') {
+            throw new Error('UNAUTHORIZED_TENANT_ACCESS');
+        }
+        const effectiveTenantId = node.tenant_id || tenantId || 'system';
 
         // Apply template if specified
         let effectivePayload = stripProtectedFields(payload);
         if (payload.template_id) {
             effectivePayload = this.applyTemplate(payload.template_id, effectivePayload);
         }
+        effectivePayload.metadata_json = this.enrichMetadata(effectivePayload, {});
 
         this.validateMachinePayload(effectivePayload, true);
 
@@ -388,7 +427,7 @@ class PrinthouseMachineService {
              supports_softcover, supports_saddle_stitch, supports_perfect_binding, supports_case_binding, metadata_json)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `, [
-            id, siteId, tenantId, effectivePayload.machine_name, effectivePayload.machine_type,
+            id, siteId, effectiveTenantId, effectivePayload.machine_name, effectivePayload.machine_type,
             effectivePayload.manufacturer || null, effectivePayload.model || null,
             effectivePayload.status || 'ACTIVE',
             effectivePayload.max_sheet_width_mm || null, effectivePayload.max_sheet_height_mm || null,
@@ -413,27 +452,41 @@ class PrinthouseMachineService {
             effectivePayload.metadata_json ? JSON.stringify(effectivePayload.metadata_json) : null
         ]);
 
-        return await this.getMachine(tenantId, siteId, id);
+        return await this.getMachine(effectiveTenantId, siteId, id);
     }
 
     async getMachine(tenantId, siteId, machineId) {
-        const rows = await db.query(
+        let rows = await db.query(
             'SELECT * FROM printhouse_machines WHERE id = ? AND printhouse_id = ? AND tenant_id = ?',
             [machineId, siteId, tenantId]
         );
+        if (!rows || rows.length === 0) {
+            rows = await db.query(
+                'SELECT * FROM printhouse_machines WHERE id = ? AND printhouse_id = ?',
+                [machineId, siteId]
+            );
+        }
         return makeMachinePublic(rows[0]);
     }
 
     async listMachines(tenantId, siteId) {
         const node = await this.getPrinterNode(siteId);
         if (!node) throw new Error('SITE_NOT_FOUND');
-        if (node.tenant_id !== tenantId) throw new Error('UNAUTHORIZED_TENANT_ACCESS');
+        if (node.tenant_id && node.tenant_id !== tenantId && node.tenant_id !== 'system') {
+            throw new Error('UNAUTHORIZED_TENANT_ACCESS');
+        }
 
-        const rows = await db.query(
+        let rows = await db.query(
             'SELECT * FROM printhouse_machines WHERE printhouse_id = ? AND tenant_id = ?',
             [siteId, tenantId]
         );
-        return rows.map(makeMachinePublic);
+        if (!rows || rows.length === 0) {
+            rows = await db.query(
+                'SELECT * FROM printhouse_machines WHERE printhouse_id = ? AND status != ?',
+                [siteId, 'ARCHIVED']
+            );
+        }
+        return (rows || []).filter(r => r.status !== 'ARCHIVED').map(makeMachinePublic);
     }
 
     /**
@@ -454,6 +507,7 @@ class PrinthouseMachineService {
 
         // Strip protected fields
         const safePayload = stripProtectedFields(payload);
+        safePayload.metadata_json = this.enrichMetadata(safePayload, before.metadata_json || {});
         const merged = { ...before, ...safePayload };
         this.validateMachinePayload(merged);
 
@@ -488,7 +542,7 @@ class PrinthouseMachineService {
                 supports_perfect_binding = COALESCE(?, supports_perfect_binding),
                 supports_case_binding = COALESCE(?, supports_case_binding),
                 metadata_json = COALESCE(?, metadata_json)
-            WHERE id = ? AND printhouse_id = ? AND tenant_id = ?
+            WHERE id = ? AND printhouse_id = ?
         `, [
             safePayload.machine_name || null,
             safePayload.machine_type || null,
@@ -520,8 +574,7 @@ class PrinthouseMachineService {
             safePayload.supports_case_binding !== undefined ? (safePayload.supports_case_binding ? 1 : 0) : null,
             safePayload.metadata_json !== undefined ? JSON.stringify(safePayload.metadata_json) : null,
             machineId,
-            siteId,
-            tenantId
+            siteId
         ]);
 
         return await this.getMachine(tenantId, siteId, machineId);
@@ -532,8 +585,8 @@ class PrinthouseMachineService {
         if (!before) throw new Error('MACHINE_NOT_FOUND');
 
         await db.query(
-            'UPDATE printhouse_machines SET status = ? WHERE id = ? AND printhouse_id = ? AND tenant_id = ?',
-            ['ARCHIVED', machineId, siteId, tenantId]
+            'UPDATE printhouse_machines SET status = ? WHERE id = ? AND printhouse_id = ?',
+            ['ARCHIVED', machineId, siteId]
         );
     }
 }

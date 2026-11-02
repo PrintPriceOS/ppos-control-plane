@@ -32,10 +32,11 @@ export interface Machine {
     printhouse_id: string;
     tenant_id: string;
     machine_name: string;
-    machine_type: 'OFFSET' | 'DIGITAL' | 'FLEXO' | 'SCREEN' | 'ROTARY' | 'OTHER';
+    name?: string;
+    machine_type: 'OFFSET' | 'DIGITAL' | 'FLEXO' | 'SCREEN' | 'ROTARY' | 'OTHER' | 'OFFSET_PRESS' | 'DIGITAL_PRESS' | 'LARGE_FORMAT' | 'BINDER' | 'FINISHER' | 'CUTTER' | 'FOLDER' | 'LAMINATOR';
     manufacturer?: string;
     model?: string;
-    status: 'ACTIVE' | 'MAINTENANCE' | 'OFFLINE';
+    status: 'ACTIVE' | 'MAINTENANCE' | 'OFFLINE' | 'ARCHIVED' | 'DECOMMISSIONED';
     max_sheet_width_mm?: number;
     max_sheet_height_mm?: number;
     min_sheet_width_mm?: number;
@@ -48,6 +49,9 @@ export interface Machine {
     max_pages_per_job?: number;
     max_file_size_mb?: number;
     max_tac_percent?: number;
+    nominal_speed_cph?: number;
+    make_ready_minutes?: number;
+    hourly_cost_eur?: number;
     supports_pdfx?: boolean;
     supports_pdfa?: boolean;
     supports_variable_data?: boolean;
@@ -59,6 +63,48 @@ export interface Machine {
     supports_saddle_stitch?: boolean;
     supports_perfect_binding?: boolean;
     supports_case_binding?: boolean;
+    sheet_dimensions?: {
+        min_width: number;
+        max_width: number;
+        min_height: number;
+        max_height: number;
+        max_print_width: number;
+        max_print_height: number;
+    };
+    color_modes?: string[];
+    print_methods?: string[];
+    printing_sides?: {
+        simplex: boolean;
+        duplex_perfecting: boolean;
+        raw?: string[];
+    };
+    technical_specs?: {
+        max_tac_percent: number;
+        max_pages_job: number;
+        max_archive_mb: number;
+        nominal_speed_cph: number;
+        make_ready_minutes: number;
+        hourly_cost_eur: number;
+    };
+    features_iso?: {
+        pdfx_compliant: boolean;
+        pdfa_archive: boolean;
+        vdp: boolean;
+        white_ink: boolean;
+        spot_uv: boolean;
+        inline_lamination: boolean;
+        hardcover_case: boolean;
+        softcover: boolean;
+        saddle_stitch: boolean;
+        pur_perfect_binding: boolean;
+        case_binding: boolean;
+    };
+    oee_telemetry?: {
+        status: string;
+        queue_load_percent: number;
+        blanket_wear_percent: number;
+        total_cycles: number;
+    };
     metadata_json?: any;
     created_at?: string;
     updated_at?: string;

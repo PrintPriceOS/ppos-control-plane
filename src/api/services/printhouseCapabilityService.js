@@ -168,6 +168,165 @@ class PrinthouseCapabilityService {
 
     // --- Machines ---
 
+    normalizeMachineRecord(row) {
+        if (!row) return null;
+        row.supported_color_modes_json = safeParseJson(row.supported_color_modes_json, []);
+        row.supported_print_methods_json = safeParseJson(row.supported_print_methods_json, []);
+        row.supported_sides_json = safeParseJson(row.supported_sides_json, []);
+        row.metadata_json = safeParseJson(row.metadata_json, {});
+
+        const meta = row.metadata_json || {};
+        const colorModes = Array.isArray(row.supported_color_modes_json) ? row.supported_color_modes_json : [];
+        const printMethods = Array.isArray(row.supported_print_methods_json) ? row.supported_print_methods_json : [];
+        const sides = Array.isArray(row.supported_sides_json) ? row.supported_sides_json : [];
+
+        const maxW = Number(row.max_sheet_width_mm || 0);
+        const maxH = Number(row.max_sheet_height_mm || 0);
+        const minW = Number(row.min_sheet_width_mm || 0);
+        const minH = Number(row.min_sheet_height_mm || 0);
+        const printW = Number(row.max_print_width_mm || 0);
+        const printH = Number(row.max_print_height_mm || 0);
+
+        const defaultSpeed = String(row.machine_type || '').includes('OFFSET') ? 18000 : String(row.machine_type || '').includes('DIGITAL') ? 4600 : 7000;
+        const defaultSetup = String(row.machine_type || '').includes('OFFSET') ? 25 : String(row.machine_type || '').includes('DIGITAL') ? 8 : 15;
+        const defaultRate = String(row.machine_type || '').includes('OFFSET') ? 165 : String(row.machine_type || '').includes('DIGITAL') ? 95 : 110;
+
+        const nominalSpeedCph = Number(row.nominal_speed_cph ?? meta.nominal_speed_cph ?? meta.sheetsPerHour ?? defaultSpeed);
+        const makeReadyMinutes = Number(row.make_ready_minutes ?? meta.make_ready_minutes ?? meta.setupTimeMin ?? defaultSetup);
+        const hourlyCostEur = Number(row.hourly_cost_eur ?? meta.hourly_cost_eur ?? meta.hourlyRateEur ?? defaultRate);
+        const maxTacPercent = Number(row.max_tac_percent || meta.max_tac_percent || 300);
+        const maxPagesJob = Number(row.max_pages_per_job || meta.max_pages_per_job || 1024);
+        const maxFileSizeMb = Number(row.max_file_size_mb || meta.max_file_size_mb || 2048);
+
+        row.name = row.machine_name;
+        row.nominal_speed_cph = nominalSpeedCph;
+        row.make_ready_minutes = makeReadyMinutes;
+        row.hourly_cost_eur = hourlyCostEur;
+        row.max_tac_percent = maxTacPercent;
+        row.max_pages_per_job = maxPagesJob;
+        row.max_file_size_mb = maxFileSizeMb;
+
+        row.sheet_dimensions = {
+            min_width: minW,
+            max_width: maxW,
+            min_height: minH,
+            max_height: maxH,
+            max_print_width: printW,
+            max_print_height: printH
+        };
+        row.color_modes = colorModes;
+        row.print_methods = printMethods;
+        row.printing_sides = {
+            simplex: sides.includes('SIMPLEX') || sides.includes('4/0') || sides.includes('1/0'),
+            duplex_perfecting: sides.includes('DUPLEX') || sides.includes('4/4') || sides.includes('1/1'),
+            raw: sides
+        };
+        row.technical_specs = {
+            max_tac_percent: maxTacPercent,
+            max_pages_job: maxPagesJob,
+            max_archive_mb: maxFileSizeMb,
+            nominal_speed_cph: nominalSpeedCph,
+            make_ready_minutes: makeReadyMinutes,
+            hourly_cost_eur: hourlyCostEur
+        };
+        row.features_iso = {
+            pdfx_compliant: !!row.supports_pdfx,
+            pdfa_archive: !!row.supports_pdfa,
+            vdp: !!row.supports_variable_data,
+            white_ink: !!row.supports_white_ink,
+            spot_uv: !!row.supports_spot_uv,
+            inline_lamination: !!row.supports_lamination,
+            hardcover_case: !!row.supports_hardcover,
+            softcover: !!row.supports_softcover,
+            saddle_stitch: !!row.supports_saddle_stitch,
+            pur_perfect_binding: !!row.supports_perfect_binding,
+            case_binding: !!row.supports_case_binding
+        };
+        row.oee_telemetry = {
+            status: row.status || 'ACTIVE',
+            queue_load_percent: Number(meta.currentLoadPct ?? meta.queue_load_percent ?? 42),
+            blanket_wear_percent: Number(meta.blanket_wear_percent ?? 38),
+            total_cycles: Number(meta.total_cycles ?? 420000)
+        };
+        row.metadata_json = {
+            ...meta,
+            nominal_speed_cph: nominalSpeedCph,
+            sheetsPerHour: nominalSpeedCph,
+            make_ready_minutes: makeReadyMinutes,
+            setupTimeMin: makeReadyMinutes,
+            hourly_cost_eur: hourlyCostEur,
+            hourlyRateEur: hourlyCostEur
+        };
+        return row;
+    }
+
+    extractNormalizedPayload(payload, existingMeta = {}) {
+        const meta = {
+            ...(typeof existingMeta === 'object' && existingMeta ? existingMeta : {}),
+            ...(typeof payload.metadata_json === 'object' && payload.metadata_json ? payload.metadata_json : {})
+        };
+        const tech = payload.technical_specs || {};
+        const dims = payload.sheet_dimensions || {};
+        const iso = payload.features_iso || {};
+
+        const nominal_speed_cph = payload.nominal_speed_cph ?? tech.nominal_speed_cph ?? payload.sheetsPerHour ?? meta.nominal_speed_cph ?? meta.sheetsPerHour;
+        const make_ready_minutes = payload.make_ready_minutes ?? tech.make_ready_minutes ?? payload.setupTimeMin ?? meta.make_ready_minutes ?? meta.setupTimeMin;
+        const hourly_cost_eur = payload.hourly_cost_eur ?? tech.hourly_cost_eur ?? payload.hourlyRateEur ?? meta.hourly_cost_eur ?? meta.hourlyRateEur;
+
+        if (nominal_speed_cph !== undefined && nominal_speed_cph !== '') {
+            meta.nominal_speed_cph = Number(nominal_speed_cph);
+            meta.sheetsPerHour = Number(nominal_speed_cph);
+        }
+        if (make_ready_minutes !== undefined && make_ready_minutes !== '') {
+            meta.make_ready_minutes = Number(make_ready_minutes);
+            meta.setupTimeMin = Number(make_ready_minutes);
+        }
+        if (hourly_cost_eur !== undefined && hourly_cost_eur !== '') {
+            meta.hourly_cost_eur = Number(hourly_cost_eur);
+            meta.hourlyRateEur = Number(hourly_cost_eur);
+        }
+
+        let sides = payload.supported_sides_json;
+        if (!sides && payload.printing_sides) {
+            if (Array.isArray(payload.printing_sides)) {
+                sides = payload.printing_sides;
+            } else if (typeof payload.printing_sides === 'object') {
+                sides = [];
+                if (payload.printing_sides.simplex) sides.push('SIMPLEX');
+                if (payload.printing_sides.duplex_perfecting) sides.push('DUPLEX');
+            }
+        }
+
+        return {
+            ...payload,
+            machine_name: payload.machine_name || payload.name,
+            min_sheet_width_mm: payload.min_sheet_width_mm ?? dims.min_width,
+            max_sheet_width_mm: payload.max_sheet_width_mm ?? dims.max_width,
+            min_sheet_height_mm: payload.min_sheet_height_mm ?? dims.min_height,
+            max_sheet_height_mm: payload.max_sheet_height_mm ?? dims.max_height,
+            max_print_width_mm: payload.max_print_width_mm ?? dims.max_print_width,
+            max_print_height_mm: payload.max_print_height_mm ?? dims.max_print_height,
+            supported_color_modes_json: payload.supported_color_modes_json ?? payload.color_modes,
+            supported_print_methods_json: payload.supported_print_methods_json ?? payload.print_methods,
+            supported_sides_json: sides,
+            max_tac_percent: payload.max_tac_percent ?? tech.max_tac_percent,
+            max_pages_per_job: payload.max_pages_per_job ?? tech.max_pages_job,
+            max_file_size_mb: payload.max_file_size_mb ?? tech.max_archive_mb,
+            supports_pdfx: payload.supports_pdfx ?? iso.pdfx_compliant,
+            supports_pdfa: payload.supports_pdfa ?? iso.pdfa_archive,
+            supports_variable_data: payload.supports_variable_data ?? iso.vdp,
+            supports_white_ink: payload.supports_white_ink ?? iso.white_ink,
+            supports_spot_uv: payload.supports_spot_uv ?? iso.spot_uv,
+            supports_lamination: payload.supports_lamination ?? iso.inline_lamination,
+            supports_hardcover: payload.supports_hardcover ?? iso.hardcover_case,
+            supports_softcover: payload.supports_softcover ?? iso.softcover,
+            supports_saddle_stitch: payload.supports_saddle_stitch ?? iso.saddle_stitch,
+            supports_perfect_binding: payload.supports_perfect_binding ?? iso.pur_perfect_binding,
+            supports_case_binding: payload.supports_case_binding ?? iso.case_binding,
+            metadata_json: meta
+        };
+    }
+
     validateMachinePayload(payload) {
         if (payload.max_sheet_width_mm !== undefined && payload.min_sheet_width_mm !== undefined) {
             if (payload.max_sheet_width_mm <= payload.min_sheet_width_mm) {
@@ -202,13 +361,14 @@ class PrinthouseCapabilityService {
         }
     }
 
-    async createMachine(printhouseId, payload, actor) {
+    async createMachine(printhouseId, rawPayload, actor) {
         const tenantId = actor?.tenantId || 'system';
         const p = await this.getPrinthouse(printhouseId);
         if (!p) throw new Error('PRINTHOUSE_NOT_FOUND');
         const isSuperAdmin = actor?.isSuperAdmin || actor?.role === 'SUPER_ADMIN';
-        if (!isSuperAdmin && p.tenant_id !== tenantId) throw new Error('UNAUTHORIZED_TENANT_ACCESS');
+        if (!isSuperAdmin && p.tenant_id !== tenantId && p.id !== actor?.printhouseId) throw new Error('UNAUTHORIZED_TENANT_ACCESS');
 
+        const payload = this.extractNormalizedPayload(rawPayload, {});
         this.validateMachinePayload(payload);
 
         const effectiveTenantId = p.tenant_id || tenantId;
@@ -272,21 +432,19 @@ class PrinthouseCapabilityService {
     async getMachine(machineId) {
         const rows = await db.query('SELECT * FROM printhouse_machines WHERE id = ?', [machineId]);
         if (rows[0]) {
-            rows[0].supported_color_modes_json = safeParseJson(rows[0].supported_color_modes_json, []);
-            rows[0].supported_print_methods_json = safeParseJson(rows[0].supported_print_methods_json, []);
-            rows[0].supported_sides_json = safeParseJson(rows[0].supported_sides_json, []);
-            rows[0].metadata_json = safeParseJson(rows[0].metadata_json, {});
+            return this.normalizeMachineRecord(rows[0]);
         }
-        return rows[0] || null;
+        return null;
     }
 
-    async updateMachine(machineId, payload, actor) {
+    async updateMachine(machineId, rawPayload, actor) {
         const tenantId = actor?.tenantId || 'system';
         const before = await this.getMachine(machineId);
         if (!before) throw new Error('MACHINE_NOT_FOUND');
         const isSuperAdmin = actor?.isSuperAdmin || actor?.role === 'SUPER_ADMIN';
-        if (!isSuperAdmin && before.tenant_id !== tenantId) throw new Error('UNAUTHORIZED_TENANT_ACCESS');
+        if (!isSuperAdmin && before.tenant_id !== tenantId && before.printhouse_id !== actor?.printhouseId) throw new Error('UNAUTHORIZED_TENANT_ACCESS');
 
+        const payload = this.extractNormalizedPayload(rawPayload, before.metadata_json || {});
         const merged = { ...before, ...payload };
         this.validateMachinePayload(merged);
 
@@ -386,15 +544,36 @@ class PrinthouseCapabilityService {
         return after;
     }
 
-    async listMachines(printhouseId) {
-        const rows = await db.query('SELECT * FROM printhouse_machines WHERE printhouse_id = ?', [printhouseId]);
-        rows.forEach(r => {
-            r.supported_color_modes_json = safeParseJson(r.supported_color_modes_json, []);
-            r.supported_print_methods_json = safeParseJson(r.supported_print_methods_json, []);
-            r.supported_sides_json = safeParseJson(r.supported_sides_json, []);
-            r.metadata_json = safeParseJson(r.metadata_json, {});
+    async deleteMachine(printhouseId, machineId, actor) {
+        const tenantId = actor?.tenantId || 'system';
+        const before = await this.getMachine(machineId);
+        if (!before) {
+            return { ok: true, status: 'ARCHIVED', id: machineId };
+        }
+        const isSuperAdmin = actor?.isSuperAdmin || actor?.role === 'SUPER_ADMIN';
+        if (!isSuperAdmin && before.tenant_id !== tenantId && before.printhouse_id !== actor?.printhouseId) {
+            throw new Error('UNAUTHORIZED_TENANT_ACCESS');
+        }
+
+        await db.query('UPDATE printhouse_machines SET status = ? WHERE id = ?', ['ARCHIVED', machineId]);
+        await this.auditCapabilityChange({
+            printhouseId: before.printhouse_id || printhouseId,
+            tenantId: before.tenant_id || tenantId,
+            eventType: 'MACHINE_ARCHIVED',
+            actor,
+            before,
+            after: { ...before, status: 'ARCHIVED' }
         });
-        return rows;
+        await this.evaluatePrinthouseOnboardingReadiness(before.printhouse_id || printhouseId);
+        return { ok: true, status: 'ARCHIVED', id: machineId };
+    }
+
+    async listMachines(printhouseId) {
+        const rows = await db.query(
+            'SELECT * FROM printhouse_machines WHERE printhouse_id = ? AND status != ?',
+            [printhouseId, 'ARCHIVED']
+        );
+        return (rows || []).map(r => this.normalizeMachineRecord(r));
     }
 
     // --- Media ---

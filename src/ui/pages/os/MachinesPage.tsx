@@ -7,20 +7,29 @@ import {
     ScaleIcon,
     MagnifyingGlassIcon,
     ArrowPathIcon,
-    ClockIcon,
     MapPinIcon,
-    XMarkIcon
+    XMarkIcon,
+    TrashIcon
 } from "@heroicons/react/24/outline";
 import { DataTable } from '../../components/DataTable';
 import { useAdminQuery } from '../../hooks/useAdminData';
 import { getMachines, getPrinthouses } from '../../lib/adminApi';
 import { StatusBadge } from '../../components/StatusBadge';
 import { MachineCapabilityEditor } from '../printhouse/MachineCapabilityEditor';
-import { listMachines } from '../../api/printhouseCapabilitiesClient';
+import { listMachines, deleteMachine } from '../../api/printhouseCapabilitiesClient';
 import { SharedModuleProps, TopSummaryKpiBar, HeaderActionGroup } from '../../components/common';
 
 interface Machine {
     id: string;
+    machineId?: string;
+    machineName?: string;
+    machine_name?: string;
+    machineType?: string;
+    machine_type?: string;
+    manufacturer?: string;
+    model?: string;
+    printhouseId?: string;
+    printhouse_id?: string;
     companyName: string;
     status: string;
     healthState: string;
@@ -31,6 +40,22 @@ interface Machine {
     country: string;
     region: string;
     needsProfile: boolean;
+    sheetFormatLabel?: string;
+    max_sheet_width_mm?: number;
+    max_sheet_height_mm?: number;
+    min_sheet_width_mm?: number;
+    min_sheet_height_mm?: number;
+    max_print_width_mm?: number;
+    max_print_height_mm?: number;
+    max_tac_percent?: number;
+    max_file_size_mb?: number;
+    max_pages_per_job?: number;
+    nominal_speed_cph?: number;
+    make_ready_minutes?: number;
+    hourly_cost_eur?: number;
+    supported_color_modes_json?: string[];
+    supported_print_methods_json?: string[];
+    supported_sides_json?: string[];
     capacityUtilizationPct: number | null;
     throughput: number | null;
     uptimeScore: number | null;
@@ -142,10 +167,12 @@ export const MachinesPage: React.FC<SharedModuleProps> = ({
     // Filtering logic
     const filteredMachines = useMemo(() => {
         return rawMachines.filter(m => {
+            const mName = m.machineName || m.machine_name || '';
             const matchesSearch = !search || 
-                m.companyName.toLowerCase().includes(search.toLowerCase()) || 
+                (m.companyName || '').toLowerCase().includes(search.toLowerCase()) || 
+                mName.toLowerCase().includes(search.toLowerCase()) ||
                 m.id.toLowerCase().includes(search.toLowerCase()) ||
-                m.locationLabel.toLowerCase().includes(search.toLowerCase());
+                (m.locationLabel || '').toLowerCase().includes(search.toLowerCase());
             
             const matchesStatus = filterStatus === 'ALL' || m.healthState === filterStatus;
             
@@ -154,9 +181,13 @@ export const MachinesPage: React.FC<SharedModuleProps> = ({
     }, [rawMachines, search, filterStatus]);
 
     // Derived stats (Strictly truthful)
-    const activeNodes = rawMachines.filter(m => 
-        m.healthState === 'ONLINE' || m.healthState === 'PROCESSING' || m.healthState === 'HEALTHY'
-    ).length;
+    const activeNodes = useMemo(() => {
+        const activeList = rawMachines.filter(m => 
+            m.healthState === 'ONLINE' || m.healthState === 'PROCESSING' || m.healthState === 'HEALTHY'
+        );
+        const uniqueNodes = new Set(activeList.map(m => m.printhouseId || m.printhouse_id || m.companyName || m.id));
+        return uniqueNodes.size || activeList.length;
+    }, [rawMachines]);
 
     const avgUptime = useMemo(() => {
         const withData = rawMachines.filter(m => m.uptimeScore !== null && m.healthState !== 'OFFLINE');
@@ -169,6 +200,16 @@ export const MachinesPage: React.FC<SharedModuleProps> = ({
         if (!withData.length) return null;
         return Number(withData.reduce((s, m) => s + Number(m.economicEfficiency || 0), 0) / withData.length).toFixed(1);
     }, [rawMachines]);
+
+    const resolveFormatBadge = (m: Machine) => {
+        if (m.sheetFormatLabel) return m.sheetFormatLabel;
+        const maxDim = Math.max(Number(m.max_sheet_width_mm || 0), Number(m.max_sheet_height_mm || 0));
+        const minDim = Math.min(Number(m.max_sheet_width_mm || 0), Number(m.max_sheet_height_mm || 0));
+        if (maxDim >= 1000) return `B1 (${minDim}×${maxDim} mm)`;
+        if (maxDim >= 700) return `B2 (${minDim}×${maxDim} mm)`;
+        if (maxDim > 0) return `SRA3 (${minDim}×${maxDim} mm)`;
+        return 'B1 (750×1060 mm)';
+    };
 
     return (
         <div className="space-y-6" data-testid="machines-workspace" data-mode={mode}>
@@ -300,7 +341,7 @@ export const MachinesPage: React.FC<SharedModuleProps> = ({
                     <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
                     <input 
                         type="text"
-                        placeholder="Search fleet..."
+                        placeholder="Search fleet by machine, node, or city..."
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
                         className="w-full pl-9 pr-4 py-1.5 bg-transparent text-zinc-900 dark:text-zinc-100 text-sm focus:ring-0 border-none outline-none font-medium placeholder:text-zinc-400 dark:placeholder:text-zinc-600"
@@ -335,34 +376,40 @@ export const MachinesPage: React.FC<SharedModuleProps> = ({
                 columns={[
                     {
                         header: 'Machine / Node',
-                        accessor: (m) => (
-                            <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-xl bg-zinc-50 dark:bg-zinc-900 flex items-center justify-center flex-shrink-0 border border-zinc-200 dark:border-zinc-800 relative">
-                                    <CpuChipIcon className="w-5 h-5 text-zinc-400" />
-                                    {m.profileCompletenessScore < 100 && (
-                                        <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-amber-500 border-2 border-white dark:border-zinc-950 rounded-full" />
-                                    )}
-                                </div>
-                                <div>
-                                    <div className="flex items-center gap-2">
-                                        <p className="font-bold text-zinc-900 dark:text-zinc-100 leading-tight">{m.companyName || 'Industrial Node'}</p>
-                                        {m.profileCompletenessScore < 75 && (
-                                            <span className="px-2 py-0.5 rounded-full bg-amber-50 dark:bg-amber-950/40 text-[8px] font-bold text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-900/60 uppercase tracking-wide">
-                                                Needs Profile
-                                            </span>
+                        accessor: (m) => {
+                            const primaryName = m.machineName || m.machine_name || m.companyName || 'Industrial Unit';
+                            const nodeLabel = m.companyName && m.companyName !== primaryName ? m.companyName : (m.printhouseId || m.printhouse_id || m.id);
+                            const formatBadge = resolveFormatBadge(m);
+                            const colors = Array.isArray(m.supported_color_modes_json) ? m.supported_color_modes_json : ['CMYK'];
+                            return (
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-xl bg-zinc-50 dark:bg-zinc-900 flex items-center justify-center flex-shrink-0 border border-zinc-200 dark:border-zinc-800 relative">
+                                        <CpuChipIcon className="w-5 h-5 text-[#dc0000]" />
+                                        {m.profileCompletenessScore < 100 && (
+                                            <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-amber-500 border-2 border-white dark:border-zinc-950 rounded-full" />
                                         )}
                                     </div>
-                                    <div className="flex items-center gap-1.5 mt-0.5">
-                                        <span className="text-[10px] font-mono text-zinc-400 uppercase">{m.id}</span>
-                                        {m.clusterId && (
-                                            <span className="px-1.5 py-0.5 rounded-md bg-zinc-50 dark:bg-zinc-900 text-[9px] font-bold text-zinc-400 uppercase tracking-wide border border-zinc-200 dark:border-zinc-800">
-                                                {m.clusterId}
+                                    <div>
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                            <p className="font-bold text-zinc-900 dark:text-zinc-100 leading-tight">{primaryName}</p>
+                                            <span className="px-2 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-950/40 text-[9px] font-mono font-bold text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60">
+                                                {formatBadge}
                                             </span>
-                                        )}
+                                        </div>
+                                        <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                                            <span className="text-[10px] font-bold text-zinc-500 dark:text-zinc-400">{nodeLabel}</span>
+                                            <span className="text-zinc-300 dark:text-zinc-700">·</span>
+                                            <span className="text-[10px] font-mono text-zinc-400 uppercase">{m.id}</span>
+                                            {colors.slice(0, 2).map((c) => (
+                                                <span key={c} className="px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-900 text-[9px] font-bold text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-800">
+                                                    {c}
+                                                </span>
+                                            ))}
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                        ),
+                            );
+                        },
                         sortKey: 'companyName'
                     },
                     {
@@ -375,11 +422,6 @@ export const MachinesPage: React.FC<SharedModuleProps> = ({
                                         {m.locationLabel}
                                     </span>
                                 </div>
-                                {m.needsProfile && (
-                                    <p className="text-[9px] font-bold text-amber-500 uppercase tracking-wide">
-                                        Complete print node profile
-                                    </p>
-                                )}
                                 {m.region && !m.needsProfile && (
                                     <div className="flex items-center gap-1.5 text-zinc-400">
                                         <MapPinIcon className="w-3 h-3" />
@@ -397,11 +439,6 @@ export const MachinesPage: React.FC<SharedModuleProps> = ({
                                 <div className="w-fit">
                                     <StatusBadge status={m.healthState} />
                                 </div>
-                                {m.healthState === 'OFFLINE' && (
-                                    <div className="px-2 py-0.5 rounded-full bg-zinc-100 dark:bg-zinc-800 text-[8px] font-bold text-zinc-500 uppercase tracking-wide w-fit">
-                                        No live heartbeat
-                                    </div>
-                                )}
                                 <div className="flex items-center gap-1">
                                     <span className="text-[9px] font-bold text-zinc-400 uppercase">Proc:</span>
                                     <span className="text-[9px] font-bold text-zinc-600 dark:text-zinc-400">{m.machineState}</span>
@@ -429,24 +466,18 @@ export const MachinesPage: React.FC<SharedModuleProps> = ({
                                             <div 
                                                 className={`h-full rounded-full transition-all duration-1000 ${
                                                     m.capacityUtilizationPct > 90 ? 'bg-red-500' : 
-                                                    m.capacityUtilizationPct > 70 ? 'bg-amber-500' : 'bg-red-600'
+                                                    m.capacityUtilizationPct > 70 ? 'bg-amber-500' : 'bg-emerald-500'
                                                 }`}
                                                 style={{ width: `${m.capacityUtilizationPct}%` }}
                                             />
                                         )}
                                     </div>
                                 </div>
-                                <div className="flex justify-between items-center">
-                                    <span className="text-[8px] font-bold text-zinc-400 uppercase">Completeness</span>
-                                    <div className="flex items-center gap-1">
-                                        <div className="w-12 h-1.5 bg-zinc-100 dark:bg-zinc-900 rounded-full overflow-hidden">
-                                            <div 
-                                                className={`h-full rounded-full ${m.telemetryCompletenessScore > 75 ? 'bg-emerald-500' : 'bg-amber-500'}`}
-                                                style={{ width: `${m.telemetryCompletenessScore}%` }}
-                                            />
-                                        </div>
-                                        <span className="text-[8px] font-bold text-zinc-500">{m.telemetryCompletenessScore}%</span>
-                                    </div>
+                                <div className="flex justify-between items-center text-[10px] font-mono text-zinc-500">
+                                    <span>Speed:</span>
+                                    <span className="font-bold text-zinc-800 dark:text-zinc-200">
+                                        {(m.nominal_speed_cph || m.throughput || 18000).toLocaleString()} cph
+                                    </span>
                                 </div>
                             </div>
                         ),
@@ -484,7 +515,7 @@ export const MachinesPage: React.FC<SharedModuleProps> = ({
                                 </div>
                                 {m.lastHeartbeatAt && (
                                     <p className="text-[9px] font-medium text-zinc-400">
-                                        Sync: {Math.floor((new Date().getTime() - new Date(m.lastHeartbeatAt).getTime()) / 60000)}m ago
+                                        Sync: {Math.max(0, Math.floor((new Date().getTime() - new Date(m.lastHeartbeatAt).getTime()) / 60000))}m ago
                                     </p>
                                 )}
                             </div>
@@ -494,31 +525,78 @@ export const MachinesPage: React.FC<SharedModuleProps> = ({
                     {
                         header: 'Actions',
                         accessor: (m) => (
-                            <button
-                                onClick={async () => {
-                                    if (!m.printhouseId) {
-                                        alert('Printhouse association not found for this node.');
-                                        return;
-                                    }
-                                    try {
-                                        const res = await listMachines(m.printhouseId);
-                                        if (res.ok && res.machines) {
-                                            const found = res.machines.find((x: any) => x.id === m.id);
-                                            if (found) {
+                            <div className="flex items-center gap-1.5">
+                                <button
+                                    onClick={async () => {
+                                        const targetPhId = m.printhouseId || m.printhouse_id || m.id;
+                                        setSelectedPrinthouseId(targetPhId);
+                                        if (m.machine_name || m.machineName) {
+                                            setEditingMachine({
+                                                ...m,
+                                                machine_name: m.machine_name || m.machineName || m.companyName,
+                                                machine_type: m.machine_type || m.machineType || 'OFFSET',
+                                                printhouse_id: targetPhId
+                                            });
+                                            setIsOnboardOpen(true);
+                                            return;
+                                        }
+                                        try {
+                                            const res = await listMachines(targetPhId);
+                                            if (res.ok && res.machines && res.machines.length > 0) {
+                                                const found = res.machines.find((x: any) => x.id === m.id) || res.machines[0];
                                                 setEditingMachine(found);
                                                 setIsOnboardOpen(true);
                                             } else {
-                                                alert('Machine specifications not found in capabilities registry.');
+                                                setEditingMachine({
+                                                    id: m.id,
+                                                    printhouse_id: targetPhId,
+                                                    machine_name: m.companyName || 'Industrial Press',
+                                                    machine_type: 'OFFSET',
+                                                    status: 'ACTIVE',
+                                                    max_sheet_width_mm: 1060,
+                                                    max_sheet_height_mm: 750,
+                                                    min_sheet_width_mm: 340,
+                                                    min_sheet_height_mm: 340,
+                                                    max_print_width_mm: 1050,
+                                                    max_print_height_mm: 740,
+                                                    max_tac_percent: 300,
+                                                    max_file_size_mb: 2048,
+                                                    nominal_speed_cph: 18000,
+                                                    make_ready_minutes: 25,
+                                                    hourly_cost_eur: 165,
+                                                    supported_color_modes_json: ['CMYK'],
+                                                    supported_print_methods_json: ['SHEETFED_OFFSET'],
+                                                    supported_sides_json: ['SIMPLEX', 'DUPLEX']
+                                                });
+                                                setIsOnboardOpen(true);
                                             }
+                                        } catch (err) {
+                                            console.error(err);
                                         }
-                                    } catch (err) {
-                                        console.error(err);
-                                    }
-                                }}
-                                className="px-2.5 py-1 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-900 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 text-[10px] font-bold uppercase tracking-wider text-zinc-600 dark:text-zinc-400 rounded-lg transition-colors cursor-pointer"
-                            >
-                                Edit Specs
-                            </button>
+                                    }}
+                                    className="px-2.5 py-1 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-900 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 text-[10px] font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300 rounded-lg transition-colors cursor-pointer"
+                                >
+                                    Edit Specs
+                                </button>
+                                {(m.printhouseId || m.printhouse_id) && (
+                                    <button
+                                        onClick={async () => {
+                                            const targetPhId = m.printhouseId || m.printhouse_id || '';
+                                            if (!targetPhId) return;
+                                            try {
+                                                await deleteMachine(targetPhId, m.id);
+                                                q.refetch();
+                                            } catch (err) {
+                                                console.error(err);
+                                            }
+                                        }}
+                                        title="Archive Machine"
+                                        className="p-1.5 bg-zinc-100 hover:bg-red-50 dark:bg-zinc-900 dark:hover:bg-red-950/40 border border-zinc-200 dark:border-zinc-800 text-zinc-500 hover:text-red-600 rounded-lg transition-colors cursor-pointer"
+                                    >
+                                        <TrashIcon className="w-3.5 h-3.5" />
+                                    </button>
+                                )}
+                            </div>
                         )
                     }
                 ]}
@@ -526,7 +604,7 @@ export const MachinesPage: React.FC<SharedModuleProps> = ({
             
             <div className="flex items-center justify-between py-4 border-t border-zinc-200 dark:border-zinc-800">
                 <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">
-                    Showing {filteredMachines.length} of {rawMachines.length} Grid Nodes
+                    Showing {filteredMachines.length} of {rawMachines.length} Grid Units
                 </p>
                 <div className="flex items-center gap-4 text-[10px] font-bold text-zinc-400 uppercase tracking-widest">
                     <div className="flex items-center gap-1.5">
@@ -579,7 +657,7 @@ export const MachinesPage: React.FC<SharedModuleProps> = ({
                             {(selectedPrinthouseId || editingMachine) && (
                                 <div className="border-t border-zinc-200 dark:border-zinc-800 pt-6">
                                     <MachineCapabilityEditor 
-                                        printhouseId={selectedPrinthouseId || editingMachine?.printhouseId} 
+                                        printhouseId={selectedPrinthouseId || editingMachine?.printhouse_id || editingMachine?.printhouseId} 
                                         editingMachine={editingMachine}
                                         onMutationSuccess={() => {
                                             q.refetch();

@@ -7470,9 +7470,9 @@
     "semantic_hash": "f59c98983eb0657a28d6d105e8c06fb9"
   },
   "server.js": {
-    "mtime": 1793502567.5006409,
-    "seen": 1793503101.8989365,
-    "ast_hash": "6ad50a63c0aee9c9caffd0f156d2943d",
+    "mtime": 1793613670.48676,
+    "seen": 1793614578.2499325,
+    "ast_hash": "9258dcab8ff6f280789a2cfa3909384f",
     "semantic_hash": ""
   },
   "services/FederatedHealthAggregator.js": {
@@ -7536,15 +7536,15 @@
     "semantic_hash": "194b67be33ce25c729e4aac2b187e3e3"
   },
   "src/api/middleware/v2AuthMiddleware.js": {
-    "mtime": 1793411529.325297,
-    "seen": 1793449041.9309416,
-    "ast_hash": "7aada3e319fb0dcbe92d9b84bb081b16",
+    "mtime": 1793549410.9101999,
+    "seen": 1793550770.4495127,
+    "ast_hash": "2434d09ef5a373216d171b3b26993674",
     "semantic_hash": ""
   },
   "src/api/routes/admin.js": {
-    "mtime": 1793411529.3262973,
-    "seen": 1793449041.9309416,
-    "ast_hash": "287b45d8d5960586d5645969569522c5",
+    "mtime": 1793586515.2213042,
+    "seen": 1793587112.3883348,
+    "ast_hash": "564f7ed11b2e185515e54f11755fb7e9",
     "semantic_hash": ""
   },
   "src/api/routes/adminAssets.js": {
@@ -8364,10 +8364,10 @@
     "semantic_hash": "4975d2c3353c4ae5c07a3240e3427250"
   },
   "src/api/routes/machinesAdmin.js": {
-    "mtime": 1793411529.393298,
-    "seen": 1793449041.9319417,
-    "ast_hash": "dc80303dfd26ceba7327347bf8746720",
-    "semantic_hash": "dc80303dfd26ceba7327347bf8746720"
+    "mtime": 1793616567.9297776,
+    "seen": 1793616630.0584674,
+    "ast_hash": "b57529679f16f4997ffcb038635d8602",
+    "semantic_hash": ""
   },
   "src/api/routes/marketplaceAdmin.js": {
     "mtime": 1793411529.3942974,
@@ -8382,9 +8382,9 @@
     "semantic_hash": "c7689373cc5d8d72d74d90e0af3fc0c0"
   },
   "src/api/routes/marketplaceOrders.js": {
-    "mtime": 1793500948.0893183,
-    "seen": 1793501685.1902063,
-    "ast_hash": "bd120a193e30389452f6937176502b2e",
+    "mtime": 1793558249.9559524,
+    "seen": 1793558277.347634,
+    "ast_hash": "a5c06c5b71baaa2083546ca41be244ac",
     "semantic_hash": ""
   },
   "src/api/routes/marketplacePublic.js": {
@@ -8502,16 +8502,16 @@
     "semantic_hash": "781c3eabc26df0de1a79324c019b785b"
   },
   "src/api/routes/printhouseCapabilities.js": {
-    "mtime": 1793411529.4072964,
-    "seen": 1793449041.9329417,
-    "ast_hash": "1b8ae43803cd81b2c12dd1a946259edc",
-    "semantic_hash": "1b8ae43803cd81b2c12dd1a946259edc"
+    "mtime": 1793616568.4677446,
+    "seen": 1793616630.0664673,
+    "ast_hash": "ab37b16b8c277e32f65a1ef4b5430b8f",
+    "semantic_hash": ""
   },
   "src/api/routes/printhouseDashboard.js": {
-    "mtime": 1793411529.4072964,
-    "seen": 1793449041.9329417,
-    "ast_hash": "6b3f2a884e6c672b5d7c8adaf56ca9fd",
-    "semantic_hash": "6b3f2a884e6c672b5d7c8adaf56ca9fd"
+    "mtime": 1793612389.3898902,
+    "seen": 1793614578.2999322,
+    "ast_hash": "2f066a50aea4480f03bcf384bb8aceb5",
+    "semantic_hash": ""
   },
   "src/api/routes/printhouseIntegrationRoutes.js": {
     "mtime": 1793411529.4082963,
@@ -8538,9 +8538,9 @@
     "semantic_hash": ""
   },
   "src/api/routes/printhouseOrders.js": {
-    "mtime": 1793411529.4112964,
-    "seen": 1793449041.9329417,
-    "ast_hash": "ec81a0104fedbda706361bf9759de6b2",
+    "mtime": 1793586452.7623968,
+    "seen": 1793587112.4333348,
+    "ast_hash": "516ceefd0dee906f2bbdbacd2b208d80",
     "semantic_hash": ""
   },
   "src/api/routes/printhousePricingRoutes.js": {
@@ -8562,9 +8562,9 @@
     "semantic_hash": ""
   },
   "src/api/routes/printhousesAdmin.js": {
-    "mtime": 1793411529.4132962,
-    "seen": 1793449041.9329417,
-    "ast_hash": "3e05db56d40977c477a3e916ce961021",
+    "mtime": 1793614965.2158642,
+    "seen": 1793616630.068467,
+    "ast_hash": "bad7fa18cb925603c0ecf75742fa305d",
     "semantic_hash": ""
   },
   "src/api/routes/productionDeploymentDryRunAdmin.js": {
@@ -11952,9 +11952,9 @@
     "semantic_hash": "1615fefe9ddc6467fa9de2c03dd1049f"
   },
   "src/api/services/marketplaceInvoicePaymentService.js": {
-    "mtime": 1793527691.8845503,
-    "seen": 1793528737.43861,
-    "ast_hash": "f3cceaa24ee477f2ab7cd739175b2099",
+    "mtime": 1793546627.759567,
+    "seen": 1793549379.1623948,
+    "ast_hash": "c5ac672a84b3bb56537a236c3c4d6aa0",
     "semantic_hash": ""
   },
   "src/api/services/marketplaceLaunchControlService.js": {
@@ -12138,8 +12138,8 @@
     "semantic_hash": ""
   },
   "src/api/services/mysqlClient.js": {
-    "mtime": 1793529511.5455754,
-    "seen": 1793530638.19754,
+    "mtime": 1793540969.106809,
+    "seen": 1793549379.1713924,
     "ast_hash": "792c6b701f7d604ed039beb234e38d11",
     "semantic_hash": ""
   },
@@ -12534,9 +12534,9 @@
     "semantic_hash": "1503701d98cc9fda4e719c28125bcb05"
   },
   "src/api/services/preflightServiceClient.js": {
-    "mtime": 1793411529.7804818,
-    "seen": 1793449041.9379416,
-    "ast_hash": "189f6d993f0fe0cf5c1445eec26134df",
+    "mtime": 1793579283.1583636,
+    "seen": 1793580384.2846408,
+    "ast_hash": "39f5490cfaf2c9eab5c34c4516f086f1",
     "semantic_hash": ""
   },
   "src/api/services/preflightStatusHelpers.js": {
@@ -12618,16 +12618,16 @@
     "semantic_hash": ""
   },
   "src/api/services/printhouseCapabilityOnboardingService.js": {
-    "mtime": 1793411529.787477,
-    "seen": 1793449041.9379416,
-    "ast_hash": "ab8073174ec8a2731ab64121b6443157",
-    "semantic_hash": "ab8073174ec8a2731ab64121b6443157"
+    "mtime": 1793616569.364127,
+    "seen": 1793616630.2677672,
+    "ast_hash": "9a79ea4a94a4d3cfe661c61ab1049282",
+    "semantic_hash": ""
   },
   "src/api/services/printhouseCapabilityService.js": {
-    "mtime": 1793411529.787477,
-    "seen": 1793449041.9379416,
-    "ast_hash": "2d4556b0740d1614c614aac6c4ba310e",
-    "semantic_hash": "2d4556b0740d1614c614aac6c4ba310e"
+    "mtime": 1793616570.7500546,
+    "seen": 1793616630.2677672,
+    "ast_hash": "a74a7b86a7734f3f02c6869272186a60",
+    "semantic_hash": ""
   },
   "src/api/services/printhouseCapacityService.js": {
     "mtime": 1793411529.7884793,
@@ -12666,10 +12666,10 @@
     "semantic_hash": "9c1fa6adac718cf2dfb0489dc6e63c01"
   },
   "src/api/services/printhouseMachineService.js": {
-    "mtime": 1793411529.7914796,
-    "seen": 1793449041.9379416,
-    "ast_hash": "9dc69735c6047a2cd6b4fe9c851c427e",
-    "semantic_hash": "9dc69735c6047a2cd6b4fe9c851c427e"
+    "mtime": 1793616571.3993218,
+    "seen": 1793616630.268767,
+    "ast_hash": "3a33f752aa9ccc0c65b9034e9e784180",
+    "semantic_hash": ""
   },
   "src/api/services/printhouseMarketplaceReviewService.js": {
     "mtime": 1793411529.7914796,
@@ -13608,9 +13608,9 @@
     "semantic_hash": "e04c96deb2e5aa3357398a758b8b4870"
   },
   "src/ui/App.tsx": {
-    "mtime": 1793488494.333675,
-    "seen": 1793490591.302056,
-    "ast_hash": "a8add4e7154cc90e494e607df42a0303",
+    "mtime": 1793576274.6622427,
+    "seen": 1793577661.4235702,
+    "ast_hash": "6910cc4cd65ea791e282a4ca33e9624e",
     "semantic_hash": ""
   },
   "src/ui/api/adminBetaCommercializationClient.ts": {
@@ -13938,10 +13938,10 @@
     "semantic_hash": ""
   },
   "src/ui/api/printhouseCapabilitiesClient.ts": {
-    "mtime": 1793411530.102875,
-    "seen": 1793449041.9399414,
-    "ast_hash": "ab1adf96a4c00f2df90477fe1b87a4e3",
-    "semantic_hash": "ab1adf96a4c00f2df90477fe1b87a4e3"
+    "mtime": 1793615909.9227195,
+    "seen": 1793616630.3307676,
+    "ast_hash": "dc414a8c0e00152074b4cc83822e6271",
+    "semantic_hash": ""
   },
   "src/ui/api/productionDeploymentDryRunClient.ts": {
     "mtime": 1793411530.1208751,
@@ -14292,9 +14292,9 @@
     "semantic_hash": ""
   },
   "src/ui/components/dashboard/LiveOrdersFeed.tsx": {
-    "mtime": 1793411530.1898763,
-    "seen": 1793449041.9399414,
-    "ast_hash": "f4d8eb9286a2e55ba154fa299a6fc26d",
+    "mtime": 1793585900.0141804,
+    "seen": 1793587112.7119727,
+    "ast_hash": "9e173187c471701c48bdb4deb5e74324",
     "semantic_hash": ""
   },
   "src/ui/components/federation/FederationLayer.tsx": {
@@ -14400,9 +14400,9 @@
     "semantic_hash": ""
   },
   "src/ui/components/printhouse/pricing/PricingHawkEyePanel.tsx": {
-    "mtime": 1793411530.2578773,
-    "seen": 1793449041.9399414,
-    "ast_hash": "aaa8ea4b324229411cc4077e11425374",
+    "mtime": 1793614971.0825214,
+    "seen": 1793616630.3617682,
+    "ast_hash": "1388f6df74fffd3d090d66ebfbeb726c",
     "semantic_hash": ""
   },
   "src/ui/components/printhouse/pricing/PricingWorkflowSelector.tsx": {
@@ -14550,9 +14550,9 @@
     "semantic_hash": ""
   },
   "src/ui/components/printhouse/setup/MachineFleetPanel.tsx": {
-    "mtime": 1793411530.2738755,
-    "seen": 1793449041.9399414,
-    "ast_hash": "961e7710fed8483d6e2b1702fb1113ec",
+    "mtime": 1793616573.4473944,
+    "seen": 1793616630.368767,
+    "ast_hash": "bba2a741f9caf00abc26cb7ca8096433",
     "semantic_hash": ""
   },
   "src/ui/components/printhouse/setup/MarketplaceReadinessPanel.tsx": {
@@ -14694,15 +14694,15 @@
     "semantic_hash": "6fc6620fa009162671ca0a6ca8c9fd5b"
   },
   "src/ui/en.ts": {
-    "mtime": 1793411530.2928748,
-    "seen": 1793449041.940942,
-    "ast_hash": "e53b90892835a396c9cc2ec8dc8c0e46",
+    "mtime": 1793612396.5490644,
+    "seen": 1793614578.6009371,
+    "ast_hash": "8aa92879b96e55018139e5ee8a67bc12",
     "semantic_hash": ""
   },
   "src/ui/es.ts": {
-    "mtime": 1793411530.2948842,
-    "seen": 1793449041.940942,
-    "ast_hash": "b6fc848574a6e18325631f15c098358b",
+    "mtime": 1793612397.6743603,
+    "seen": 1793614578.6009371,
+    "ast_hash": "60f62aa0e77656daf38aa528fc2ab280",
     "semantic_hash": ""
   },
   "src/ui/hooks/useAdminData.ts": {
@@ -14736,9 +14736,9 @@
     "semantic_hash": ""
   },
   "src/ui/layout/Sidebar.tsx": {
-    "mtime": 1793484591.4682863,
-    "seen": 1793485067.1725447,
-    "ast_hash": "ac7ea97cb26d68e90de9753929c03e8b",
+    "mtime": 1793614972.2044508,
+    "seen": 1793616630.3787668,
+    "ast_hash": "0aff62a484ba7e4b664e4bd593fd5a99",
     "semantic_hash": ""
   },
   "src/ui/layout/Topbar.tsx": {
@@ -14748,9 +14748,9 @@
     "semantic_hash": ""
   },
   "src/ui/lib/adminApi.ts": {
-    "mtime": 1793502641.0083039,
-    "seen": 1793503102.2981918,
-    "ast_hash": "f9abe12b3fbd438fd9f469d63b49cfd4",
+    "mtime": 1793613681.4910538,
+    "seen": 1793614578.6029365,
+    "ast_hash": "fd39a7511247ced1c0a2443039c0fda0",
     "semantic_hash": ""
   },
   "src/ui/lib/authStore.ts": {
@@ -15462,9 +15462,9 @@
     "semantic_hash": ""
   },
   "src/ui/pages/admin/CommandCenterPage.tsx": {
-    "mtime": 1793411530.3693707,
-    "seen": 1793449041.940942,
-    "ast_hash": "047989f9173d5ed8baa8f078f232351d",
+    "mtime": 1793612399.3778858,
+    "seen": 1793614578.636937,
+    "ast_hash": "639dacfd1a438c0a880d8ef3fca74250",
     "semantic_hash": ""
   },
   "src/ui/pages/admin/CommercialCommitmentsTab.tsx": {
@@ -17490,9 +17490,9 @@
     "semantic_hash": ""
   },
   "src/ui/pages/os/MachinesPage.tsx": {
-    "mtime": 1793490075.0711372,
-    "seen": 1793490591.5108683,
-    "ast_hash": "1c87f46290db3333133d2f7679be5d83",
+    "mtime": 1793616573.9602523,
+    "seen": 1793616630.507931,
+    "ast_hash": "e49545754f3ada7412064ccef228f6d5",
     "semantic_hash": ""
   },
   "src/ui/pages/os/OrdersPage.tsx": {
@@ -17502,15 +17502,15 @@
     "semantic_hash": ""
   },
   "src/ui/pages/os/PrinthouseDetailPage.tsx": {
-    "mtime": 1793411530.562884,
-    "seen": 1793449041.9429417,
-    "ast_hash": "f41ad3eac269cc91103832a892333c5c",
+    "mtime": 1793614976.1138391,
+    "seen": 1793616630.507931,
+    "ast_hash": "cff11d56a989268b44675a0a4dc644df",
     "semantic_hash": ""
   },
   "src/ui/pages/os/PrinthousesPage.tsx": {
-    "mtime": 1793411530.5638833,
-    "seen": 1793449041.9429417,
-    "ast_hash": "ea0d7bd1963f7cb1a0fe65c248ffd336",
+    "mtime": 1793614977.2339735,
+    "seen": 1793616630.507931,
+    "ast_hash": "76143ba95c2a2305065a38eda490f77f",
     "semantic_hash": ""
   },
   "src/ui/pages/os/QueuesWorkersPage.tsx": {
@@ -17652,9 +17652,9 @@
     "semantic_hash": ""
   },
   "src/ui/pages/preflight/PreflightJobsPage.tsx": {
-    "mtime": 1793486676.1704705,
-    "seen": 1793487485.7129257,
-    "ast_hash": "3ecdb38295def186a7f8917bc49acbd5",
+    "mtime": 1793582839.7189841,
+    "seen": 1793584367.6787348,
+    "ast_hash": "e2f166ceb45872fab42295c9bcef4194",
     "semantic_hash": ""
   },
   "src/ui/pages/preflight/PreflightLargeDocumentsPage.tsx": {
@@ -17700,9 +17700,9 @@
     "semantic_hash": ""
   },
   "src/ui/pages/printhouse/MachineCapabilityEditor.tsx": {
-    "mtime": 1793411530.5848823,
-    "seen": 1793449041.9429417,
-    "ast_hash": "fa7fa21d4ebaca4a44a0fea7c9a2479b",
+    "mtime": 1793616574.5523994,
+    "seen": 1793616630.5169315,
+    "ast_hash": "65ce8af994084145d5ec1aaaaa4635e6",
     "semantic_hash": ""
   },
   "src/ui/pages/printhouse/MediaCatalogEditor.tsx": {
@@ -18258,10 +18258,10 @@
     "semantic_hash": ""
   },
   "src/ui/types/printhouseCapabilities.ts": {
-    "mtime": 1793411530.6364038,
-    "seen": 1793449041.9429417,
-    "ast_hash": "a4e45d5f7d272d274227951c2c3bfe2d",
-    "semantic_hash": "a4e45d5f7d272d274227951c2c3bfe2d"
+    "mtime": 1793616575.7358832,
+    "seen": 1793616630.5439305,
+    "ast_hash": "0baad1c9d82093e280759218a61054ca",
+    "semantic_hash": ""
   },
   "src/ui/types/printhousePricing.ts": {
     "mtime": 1793411530.6374042,
@@ -20328,9 +20328,9 @@
     "semantic_hash": ""
   },
   "src/ui/de.ts": {
-    "mtime": 1793411530.286876,
-    "seen": 1793449041.9399414,
-    "ast_hash": "e2f37aae4acc084daa9492ab9916cd7c",
+    "mtime": 1793612394.4383051,
+    "seen": 1793614578.5989368,
+    "ast_hash": "d1a9ec29409270525288aefe69f40258",
     "semantic_hash": ""
   },
   "scripts/test_session_timeout.py": {
@@ -30834,9 +30834,9 @@
     "semantic_hash": ""
   },
   "src/api/routes/logisticsRoutes.js": {
-    "mtime": 1793483811.501832,
-    "seen": 1793483884.9075267,
-    "ast_hash": "03af39ded889b38d98f45c542cc8838d",
+    "mtime": 1793586339.355701,
+    "seen": 1793587112.4243348,
+    "ast_hash": "b376a2b37f33d185d5d95f862c56d62a",
     "semantic_hash": ""
   },
   "tests/logistics_integration_preview.test.js": {
@@ -30936,15 +30936,15 @@
     "semantic_hash": ""
   },
   "src/ui/components/common/IndustrialTable.tsx": {
-    "mtime": 1793484573.2728815,
-    "seen": 1793485067.146545,
-    "ast_hash": "e276f8f99e82688fcd87ccf73cec3aca",
+    "mtime": 1793582090.6782176,
+    "seen": 1793584367.5171945,
+    "ast_hash": "dd6778a3be89c51c2b3af3207c05a912",
     "semantic_hash": ""
   },
   "src/ui/components/common/StatusBadge.tsx": {
-    "mtime": 1793484588.7600684,
-    "seen": 1793485067.146545,
-    "ast_hash": "5cdc1d7cb1e9b4f1ea388124d8ca0f49",
+    "mtime": 1793582091.488057,
+    "seen": 1793584367.5171945,
+    "ast_hash": "a40e15579afe424e7091c0ea7309cab2",
     "semantic_hash": ""
   },
   "src/ui/components/common/TopSummaryKpiBar.tsx": {
@@ -30966,9 +30966,9 @@
     "semantic_hash": ""
   },
   "tests/ui_reconciliation_components.test.tsx": {
-    "mtime": 1793531392.3841965,
-    "seen": 1793531626.8011038,
-    "ast_hash": "52e58513fdb1690ea9fd73bf133cf6ed",
+    "mtime": 1793582690.850852,
+    "seen": 1793584367.7948678,
+    "ast_hash": "89feafb88ab633f2a8a50232c9eb291b",
     "semantic_hash": ""
   },
   "services/preflight/preflightEngineService.js": {
@@ -30978,15 +30978,15 @@
     "semantic_hash": ""
   },
   "src/api/routes/preflightRoutes.js": {
-    "mtime": 1793488489.8625274,
-    "seen": 1793490591.058194,
-    "ast_hash": "e587e9b12f495d86a340708c9a487dba",
+    "mtime": 1793582584.8622358,
+    "seen": 1793584367.2404842,
+    "ast_hash": "bc981b0db62fabc776ec9ab47679b101",
     "semantic_hash": ""
   },
   "src/api/services/preflight/preflightEngineService.js": {
-    "mtime": 1793488490.8200197,
-    "seen": 1793490591.2517939,
-    "ast_hash": "3adc1a7243d30c3a0fc1c514cff01558",
+    "mtime": 1793586285.0086129,
+    "seen": 1793587112.6269748,
+    "ast_hash": "3b785c089e9cfa69bdf4aa683db12a05",
     "semantic_hash": ""
   },
   "src/ui/pages/os/PreflightJobsPage.tsx": {
@@ -30996,9 +30996,9 @@
     "semantic_hash": ""
   },
   "tests/preflightEngine.test.js": {
-    "mtime": 1793486292.4262495,
-    "seen": 1793486474.1439998,
-    "ast_hash": "4db9fec09464bf534182ad7bc0833456",
+    "mtime": 1793582679.4800308,
+    "seen": 1793584367.7508671,
+    "ast_hash": "c1458b22d750f856fa56e454bdf7d198",
     "semantic_hash": ""
   },
   "services/manufacturing/impositionEngineService.js": {
@@ -31038,9 +31038,9 @@
     "semantic_hash": ""
   },
   "src/api/routes/publisherRoutes.js": {
-    "mtime": 1793489639.1760914,
-    "seen": 1793490591.0631936,
-    "ast_hash": "f7a4aadbe1bb14b05400963dea3b5799",
+    "mtime": 1793550957.6443973,
+    "seen": 1793554045.4951847,
+    "ast_hash": "a8c2a02c5e328fab89e08b10b8e18780",
     "semantic_hash": ""
   },
   "src/api/services/publisher/publisherHubService.js": {
@@ -31086,9 +31086,9 @@
     "semantic_hash": ""
   },
   "src/api/routes/escrowRoutes.js": {
-    "mtime": 1793491883.5746827,
-    "seen": 1793493841.3526924,
-    "ast_hash": "05bb2d0a2a923135b90672598d6ffb29",
+    "mtime": 1793561650.682054,
+    "seen": 1793574741.1447022,
+    "ast_hash": "c897168a16fc71687dc9b24d6d43a4eb",
     "semantic_hash": ""
   },
   "src/api/routes/predictiveMaintenanceRoutes.js": {
@@ -31098,9 +31098,9 @@
     "semantic_hash": ""
   },
   "src/api/services/financials/escrowSettlementService.js": {
-    "mtime": 1793501633.6502316,
-    "seen": 1793501685.3382046,
-    "ast_hash": "62855dcb1b176fe9a6cda3eb37d9f717",
+    "mtime": 1793586307.1782832,
+    "seen": 1793587112.5703452,
+    "ast_hash": "4f17e6b460bc54a309c4b06e2e827b27",
     "semantic_hash": ""
   },
   "src/api/services/machines/predictiveMaintenanceService.js": {
@@ -31158,9 +31158,9 @@
     "semantic_hash": ""
   },
   "src/api/services/financials/eInvoicingService.js": {
-    "mtime": 1793492010.1516397,
-    "seen": 1793493841.5068812,
-    "ast_hash": "ef74a378bd2d4a105476311fd01b7384",
+    "mtime": 1793612390.6991668,
+    "seen": 1793614578.4359326,
+    "ast_hash": "fd5769dc0cba662c0a66f1dc9b8e63b6",
     "semantic_hash": ""
   },
   "src/api/services/pricing/pricingIntelligenceService.js": {
@@ -31212,9 +31212,9 @@
     "semantic_hash": ""
   },
   "src/api/services/marketplaceOrderFileService.js": {
-    "mtime": 1793501492.5715528,
-    "seen": 1793501685.363206,
-    "ast_hash": "18a4f962723bc016175373a096bdd014",
+    "mtime": 1793554737.5327778,
+    "seen": 1793555890.7376106,
+    "ast_hash": "06ea58f5ad78f5acfad7537627e58458",
     "semantic_hash": ""
   },
   "tests/marketplaceCheckoutPipeline.test.js": {
@@ -31245,6 +31245,144 @@
     "mtime": 1793530497.4130943,
     "seen": 1793530638.5435543,
     "ast_hash": "4e4691cf6b057c52bee4a699095d92d2",
+    "semantic_hash": ""
+  },
+  "src/api/routes/customerPortalRoutes.js": {
+    "mtime": 1793586386.1690693,
+    "seen": 1793587112.4173343,
+    "ast_hash": "768e27d797b7f9cbc452af599ff44611",
+    "semantic_hash": ""
+  },
+  "tests/customer_portal_b2b_hub.test.js": {
+    "mtime": 1793551017.153539,
+    "seen": 1793554045.9931853,
+    "ast_hash": "00c16d7907f648e3bc84dfd0cee81897",
+    "semantic_hash": ""
+  },
+  "src/api/services/notifications/transactionalEmailService.js": {
+    "mtime": 1793552615.9595623,
+    "seen": 1793554045.6641867,
+    "ast_hash": "06b30b6dfc0d00fc1c109386742e88c3",
+    "semantic_hash": ""
+  },
+  "src/api/services/publisher/softProofCertificatePdfService.js": {
+    "mtime": 1793551135.7209618,
+    "seen": 1793554045.6971846,
+    "ast_hash": "a195e40037d84b74a1e0738f98e9e250",
+    "semantic_hash": ""
+  },
+  "tests/load_resilience_e2e_harness.js": {
+    "mtime": 1793552616.4427943,
+    "seen": 1793554046.005189,
+    "ast_hash": "8d87f86b78f1cbea61c07eb8f9594cbb",
+    "semantic_hash": ""
+  },
+  "tests/preflight_control_plane_parity.test.js": {
+    "mtime": 1793553857.1088622,
+    "seen": 1793554046.0151849,
+    "ast_hash": "518c94340ad47b9366a31d611562578f",
+    "semantic_hash": ""
+  },
+  "tests/transactional_email_notifications.test.js": {
+    "mtime": 1793551774.4703424,
+    "seen": 1793554046.0541854,
+    "ast_hash": "617f51a1ec6ff825cb90791e063ebc0a",
+    "semantic_hash": ""
+  },
+  "src/api/services/telemetry/operationalTelemetryService.js": {
+    "mtime": 1793556034.4077446,
+    "seen": 1793556981.994542,
+    "ast_hash": "5916398a07e0dda8d184f95af980024e",
+    "semantic_hash": ""
+  },
+  "tests/operational_telemetry.test.js": {
+    "mtime": 1793556034.7173738,
+    "seen": 1793556982.2745419,
+    "ast_hash": "1043aae26b30fa4f6fc4f18ca84ccd7d",
+    "semantic_hash": ""
+  },
+  "src/api/services/storage/assetRetentionAndBackupService.js": {
+    "mtime": 1793556815.8416169,
+    "seen": 1793556981.9915414,
+    "ast_hash": "2c25473d80099611116e707fb11dc9c3",
+    "semantic_hash": ""
+  },
+  "tests/asset_retention_and_backup.test.js": {
+    "mtime": 1793556816.7092779,
+    "seen": 1793556982.2555418,
+    "ast_hash": "847e6c44e2c5361bb500a277eb4ec82a",
+    "semantic_hash": ""
+  },
+  "src/api/middleware/b2bOrgRbacMiddleware.js": {
+    "mtime": 1793558248.716072,
+    "seen": 1793558277.308376,
+    "ast_hash": "44d18679d1c33896c8f5de52f22f561b",
+    "semantic_hash": ""
+  },
+  "tests/b2b_multi_user_rbac.test.js": {
+    "mtime": 1793558250.8779233,
+    "seen": 1793558277.833633,
+    "ast_hash": "040011b012e97229128355e765f32227",
+    "semantic_hash": ""
+  },
+  "tests/api_docs_route_parity.test.js": {
+    "mtime": 1793561651.6783295,
+    "seen": 1793574741.6316113,
+    "ast_hash": "1b718fcdd1a2743cf46563bfd1187603",
+    "semantic_hash": ""
+  },
+  "src/ui/components/preflight/PreflightUploadModal.tsx": {
+    "mtime": 1793579742.617798,
+    "seen": 1793580384.3749096,
+    "ast_hash": "a88d7ceef1559cac566b3cad47b4b57b",
+    "semantic_hash": ""
+  },
+  "src/ui/components/preflight/PreflightInspectionReportModal.tsx": {
+    "mtime": 1793582839.2149994,
+    "seen": 1793584367.5211942,
+    "ast_hash": "bde08ea27302061d8f3607d546d6da7a",
+    "semantic_hash": ""
+  },
+  "src/ui/components/dashboard/PrinthouseCommandDrawers.tsx": {
+    "mtime": 1793585901.4571416,
+    "seen": 1793587112.7119727,
+    "ast_hash": "7bacbe2b998c46d628dbf59376808093",
+    "semantic_hash": ""
+  },
+  "tests/printhouse_command_center_360.test.tsx": {
+    "mtime": 1793586800.6247756,
+    "seen": 1793587112.9649727,
+    "ast_hash": "560581aac4c9cd2b8a83ae5e749fde0b",
+    "semantic_hash": ""
+  },
+  "src/api/services/telemetry/operationalActivityStreamService.js": {
+    "mtime": 1793586923.7670107,
+    "seen": 1793587112.6559727,
+    "ast_hash": "c0a8148899889ab75ce0af7c8c010bfe",
+    "semantic_hash": ""
+  },
+  "src/ui/components/dashboard/OperationalActivityStream.tsx": {
+    "mtime": 1793612393.8569589,
+    "seen": 1793614578.575937,
+    "ast_hash": "6bfc8071fdc9489a950444f08114700b",
+    "semantic_hash": ""
+  },
+  "tests/printhouse_node_consolidation.test.tsx": {
+    "mtime": 1793614981.680354,
+    "seen": 1793616630.587934,
+    "ast_hash": "dafb4878716c9544195f7d8ddd444521",
+    "semantic_hash": ""
+  },
+  "src/ui/components/printhouse/MachineSpecificationForm.tsx": {
+    "mtime": 1793616408.207771,
+    "seen": 1793616630.3577676,
+    "ast_hash": "31aecf486b39099ead3a1caf4b85ede8",
+    "semantic_hash": ""
+  },
+  "tests/machinery_fleet_parity.test.tsx": {
+    "mtime": 1793616576.1170104,
+    "seen": 1793616630.5759342,
+    "ast_hash": "74d64683d28ecdfefbb6020d990f798a",
     "semantic_hash": ""
   }
 }

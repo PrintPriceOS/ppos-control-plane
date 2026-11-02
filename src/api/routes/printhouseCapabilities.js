@@ -186,7 +186,7 @@ router.post('/:printhouseId/machines', async (req, res) => {
 function buildDefaultFleetForPrinthouse(printhouse) {
     const pid = printhouse?.id || 'node-default';
     const tid = printhouse?.tenant_id || 'system';
-    return [
+    const raw = [
         {
             id: `mach_${pid}_offset_b1`,
             printhouse_id: pid,
@@ -205,6 +205,9 @@ function buildDefaultFleetForPrinthouse(printhouse) {
             max_tac_percent: 300,
             max_pages_per_job: 1024,
             max_file_size_mb: 2048,
+            nominal_speed_cph: 18000,
+            make_ready_minutes: 25,
+            hourly_cost_eur: 165,
             supports_pdfx: true,
             supports_pdfa: true,
             supports_variable_data: false,
@@ -216,12 +219,15 @@ function buildDefaultFleetForPrinthouse(printhouse) {
             supports_saddle_stitch: true,
             supports_perfect_binding: true,
             supports_case_binding: true,
-            supported_color_modes_json: ['CMYK', 'PANTONE'],
-            supported_print_methods_json: ['OFFSET'],
-            supported_sides_json: ['4/4', '1/1'],
+            supported_color_modes_json: ['CMYK', 'CMYK+SPOT'],
+            supported_print_methods_json: ['SHEETFED_OFFSET'],
+            supported_sides_json: ['SIMPLEX', 'DUPLEX'],
             metadata_json: {
                 sheetFormatLabel: 'B1 (750×1060 mm)',
                 sheetsPerHour: 18000,
+                nominal_speed_cph: 18000,
+                make_ready_minutes: 25,
+                hourly_cost_eur: 165,
                 currentLoadPct: 48,
                 pdfStandard: 'PDF/X-4 (ISO 15930-7)'
             }
@@ -244,6 +250,9 @@ function buildDefaultFleetForPrinthouse(printhouse) {
             max_tac_percent: 320,
             max_pages_per_job: 800,
             max_file_size_mb: 2048,
+            nominal_speed_cph: 4600,
+            make_ready_minutes: 8,
+            hourly_cost_eur: 95,
             supports_pdfx: true,
             supports_pdfa: true,
             supports_variable_data: true,
@@ -255,12 +264,15 @@ function buildDefaultFleetForPrinthouse(printhouse) {
             supports_saddle_stitch: true,
             supports_perfect_binding: true,
             supports_case_binding: false,
-            supported_color_modes_json: ['CMYK', 'INDI-CHROME'],
-            supported_print_methods_json: ['DIGITAL'],
-            supported_sides_json: ['4/4', '4/0', '1/1'],
+            supported_color_modes_json: ['CMYK', 'CMYK+SPOT', 'CMYK+WHITE'],
+            supported_print_methods_json: ['DIGITAL_TONER'],
+            supported_sides_json: ['SIMPLEX', 'DUPLEX'],
             metadata_json: {
                 sheetFormatLabel: 'B2 (530×750 mm)',
                 sheetsPerHour: 4600,
+                nominal_speed_cph: 4600,
+                make_ready_minutes: 8,
+                hourly_cost_eur: 95,
                 currentLoadPct: 35,
                 pdfStandard: 'PDF/X-4 (ISO 15930-7)'
             }
@@ -283,6 +295,9 @@ function buildDefaultFleetForPrinthouse(printhouse) {
             max_tac_percent: 300,
             max_pages_per_job: 1200,
             max_file_size_mb: 2048,
+            nominal_speed_cph: 7000,
+            make_ready_minutes: 15,
+            hourly_cost_eur: 110,
             supports_pdfx: true,
             supports_pdfa: false,
             supports_variable_data: true,
@@ -295,16 +310,20 @@ function buildDefaultFleetForPrinthouse(printhouse) {
             supports_perfect_binding: true,
             supports_case_binding: true,
             supported_color_modes_json: ['CMYK'],
-            supported_print_methods_json: ['FINISHING'],
-            supported_sides_json: ['4/4'],
+            supported_print_methods_json: ['SHEETFED_OFFSET'],
+            supported_sides_json: ['DUPLEX'],
             metadata_json: {
                 sheetFormatLabel: 'B1 / Book Block (PUR & Case)',
                 sheetsPerHour: 7000,
+                nominal_speed_cph: 7000,
+                make_ready_minutes: 15,
+                hourly_cost_eur: 110,
                 currentLoadPct: 42,
                 pdfStandard: 'PDF/X-4 (ISO 15930-7)'
             }
         }
     ];
+    return raw.map(m => printhouseCapabilityService.normalizeMachineRecord ? printhouseCapabilityService.normalizeMachineRecord(m) : m);
 }
 
 // GET /api/admin/printhouse-capabilities/:tenantId/machines - List Machines
@@ -397,6 +416,20 @@ router.put('/:printhouseId/machines/:machineId', async (req, res) => {
         return res.json({ ok: true, machine });
     } catch (err) {
         console.error('[PRINTHOUSE_CAPABILITIES] Error updating machine:', err);
+        const status = err.message === 'UNAUTHORIZED_TENANT_ACCESS' ? 403 : 400;
+        return res.status(status).json({ ok: false, error: err.message });
+    }
+});
+
+// DELETE /api/admin/printhouse-capabilities/:printhouseId/machines/:machineId - Archive / Delete Machine
+router.delete('/:printhouseId/machines/:machineId', async (req, res) => {
+    try {
+        const { actor } = getActorAndTenant(req);
+        const { printhouseId, machineId } = req.params;
+        const result = await printhouseCapabilityService.deleteMachine(printhouseId, machineId, actor);
+        return res.json(result);
+    } catch (err) {
+        console.error('[PRINTHOUSE_CAPABILITIES] Error archiving machine:', err);
         const status = err.message === 'UNAUTHORIZED_TENANT_ACCESS' ? 403 : 400;
         return res.status(status).json({ ok: false, error: err.message });
     }

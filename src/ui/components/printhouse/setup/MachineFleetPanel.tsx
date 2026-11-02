@@ -227,6 +227,12 @@ export const MachineFleetPanel: React.FC<{ sites?: SiteOption[]; onSaved?: () =>
             min_sheet_height_mm: '',
             max_print_width_mm: '',
             max_print_height_mm: '',
+            nominal_speed_cph: 4600,
+            make_ready_minutes: 15,
+            hourly_cost_eur: 95,
+            max_tac_percent: 300,
+            max_pages_per_job: 1024,
+            max_file_size_mb: 2048,
             supported_color_modes_json: [],
             supported_print_methods_json: [],
             supported_sides_json: [],
@@ -254,6 +260,12 @@ export const MachineFleetPanel: React.FC<{ sites?: SiteOption[]; onSaved?: () =>
                     min_sheet_height_mm: tmpl.defaults.min_sheet_height_mm || '',
                     max_print_width_mm: tmpl.defaults.max_print_width_mm || '',
                     max_print_height_mm: tmpl.defaults.max_print_height_mm || '',
+                    nominal_speed_cph: tmpl.defaults.nominal_speed_cph || (String(tmpl.defaults.machine_type || '').includes('OFFSET') ? 18000 : 4600),
+                    make_ready_minutes: tmpl.defaults.make_ready_minutes || (String(tmpl.defaults.machine_type || '').includes('OFFSET') ? 25 : 10),
+                    hourly_cost_eur: tmpl.defaults.hourly_cost_eur || (String(tmpl.defaults.machine_type || '').includes('OFFSET') ? 165 : 95),
+                    max_tac_percent: tmpl.defaults.max_tac_percent || 300,
+                    max_pages_per_job: tmpl.defaults.max_pages_per_job || 1024,
+                    max_file_size_mb: tmpl.defaults.max_file_size_mb || 2048,
                     supported_color_modes_json: Array.isArray(tmpl.defaults.supported_color_modes_json) ? [...tmpl.defaults.supported_color_modes_json] : [],
                     supported_print_methods_json: Array.isArray(tmpl.defaults.supported_print_methods_json) ? [...tmpl.defaults.supported_print_methods_json] : [],
                     supported_sides_json: Array.isArray(tmpl.defaults.supported_sides_json) ? [...tmpl.defaults.supported_sides_json] : [],
@@ -276,8 +288,9 @@ export const MachineFleetPanel: React.FC<{ sites?: SiteOption[]; onSaved?: () =>
         setErrorMsg(null);
     };
 
-    const openEditForm = (machine: MachineData) => {
+    const openEditForm = (machine: MachineData & Record<string, any>) => {
         setEditingMachineId(machine.id);
+        const meta = machine.metadata_json || {};
         setForm({
             machine_name: machine.machine_name || '',
             machine_type: machine.machine_type || 'DIGITAL_PRESS',
@@ -289,6 +302,12 @@ export const MachineFleetPanel: React.FC<{ sites?: SiteOption[]; onSaved?: () =>
             min_sheet_height_mm: machine.min_sheet_height_mm !== undefined && machine.min_sheet_height_mm !== null ? machine.min_sheet_height_mm : '',
             max_print_width_mm: machine.max_print_width_mm !== undefined && machine.max_print_width_mm !== null ? machine.max_print_width_mm : '',
             max_print_height_mm: machine.max_print_height_mm !== undefined && machine.max_print_height_mm !== null ? machine.max_print_height_mm : '',
+            nominal_speed_cph: machine.nominal_speed_cph ?? meta.nominal_speed_cph ?? meta.sheetsPerHour ?? 4600,
+            make_ready_minutes: machine.make_ready_minutes ?? meta.make_ready_minutes ?? meta.setupTimeMin ?? 15,
+            hourly_cost_eur: machine.hourly_cost_eur ?? meta.hourly_cost_eur ?? meta.hourlyRateEur ?? 95,
+            max_tac_percent: machine.max_tac_percent ?? meta.max_tac_percent ?? 300,
+            max_pages_per_job: machine.max_pages_per_job ?? meta.max_pages_per_job ?? 1024,
+            max_file_size_mb: machine.max_file_size_mb ?? meta.max_file_size_mb ?? 2048,
             supported_color_modes_json: Array.isArray(machine.supported_color_modes_json) ? [...machine.supported_color_modes_json] : [],
             supported_print_methods_json: Array.isArray(machine.supported_print_methods_json) ? [...machine.supported_print_methods_json] : [],
             supported_sides_json: Array.isArray(machine.supported_sides_json) ? [...machine.supported_sides_json] : [],
@@ -396,6 +415,20 @@ export const MachineFleetPanel: React.FC<{ sites?: SiteOption[]; onSaved?: () =>
                 min_sheet_height_mm: form.min_sheet_height_mm !== '' && form.min_sheet_height_mm !== null ? Number(form.min_sheet_height_mm) : null,
                 max_print_width_mm: form.max_print_width_mm !== '' && form.max_print_width_mm !== null ? Number(form.max_print_width_mm) : null,
                 max_print_height_mm: form.max_print_height_mm !== '' && form.max_print_height_mm !== null ? Number(form.max_print_height_mm) : null,
+                max_tac_percent: form.max_tac_percent !== '' && form.max_tac_percent !== null && form.max_tac_percent !== undefined ? Number(form.max_tac_percent) : 300,
+                max_pages_per_job: form.max_pages_per_job !== '' && form.max_pages_per_job !== null && form.max_pages_per_job !== undefined ? Number(form.max_pages_per_job) : 1024,
+                max_file_size_mb: form.max_file_size_mb !== '' && form.max_file_size_mb !== null && form.max_file_size_mb !== undefined ? Number(form.max_file_size_mb) : 2048,
+                nominal_speed_cph: form.nominal_speed_cph !== '' && form.nominal_speed_cph !== null && form.nominal_speed_cph !== undefined ? Number(form.nominal_speed_cph) : 4600,
+                make_ready_minutes: form.make_ready_minutes !== '' && form.make_ready_minutes !== null && form.make_ready_minutes !== undefined ? Number(form.make_ready_minutes) : 15,
+                hourly_cost_eur: form.hourly_cost_eur !== '' && form.hourly_cost_eur !== null && form.hourly_cost_eur !== undefined ? Number(form.hourly_cost_eur) : 95,
+                metadata_json: {
+                    nominal_speed_cph: Number(form.nominal_speed_cph || 4600),
+                    sheetsPerHour: Number(form.nominal_speed_cph || 4600),
+                    make_ready_minutes: Number(form.make_ready_minutes || 15),
+                    setupTimeMin: Number(form.make_ready_minutes || 15),
+                    hourly_cost_eur: Number(form.hourly_cost_eur || 95),
+                    hourlyRateEur: Number(form.hourly_cost_eur || 95)
+                },
                 supported_color_modes_json: form.supported_color_modes_json || [],
                 supported_print_methods_json: form.supported_print_methods_json || [],
                 supported_sides_json: form.supported_sides_json || [],
@@ -825,6 +858,68 @@ export const MachineFleetPanel: React.FC<{ sites?: SiteOption[]; onSaved?: () =>
                     <div className="mb-6">
                         <div className="text-xs font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider mb-2.5">
                             {t('setup.machines.section.capabilities') || '5. Technical Capabilities & Features'}
+                        </div>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4">
+                            <div>
+                                <label className={labelClass}>Nominal Speed (cph / sheets/h)</label>
+                                <input
+                                    type="number"
+                                    className={inputClass}
+                                    value={form.nominal_speed_cph ?? 4600}
+                                    onChange={e => setForm({ ...form, nominal_speed_cph: e.target.value })}
+                                    placeholder="e.g. 18000"
+                                />
+                            </div>
+                            <div>
+                                <label className={labelClass}>Make-Ready / Setup (min)</label>
+                                <input
+                                    type="number"
+                                    className={inputClass}
+                                    value={form.make_ready_minutes ?? 15}
+                                    onChange={e => setForm({ ...form, make_ready_minutes: e.target.value })}
+                                    placeholder="e.g. 25"
+                                />
+                            </div>
+                            <div>
+                                <label className={labelClass}>Base Hourly Cost (€/h)</label>
+                                <input
+                                    type="number"
+                                    className={inputClass}
+                                    value={form.hourly_cost_eur ?? 95}
+                                    onChange={e => setForm({ ...form, hourly_cost_eur: e.target.value })}
+                                    placeholder="e.g. 165"
+                                />
+                            </div>
+                            <div>
+                                <label className={labelClass}>Max TAC % (100-400)</label>
+                                <input
+                                    type="number"
+                                    className={inputClass}
+                                    value={form.max_tac_percent ?? 300}
+                                    onChange={e => setForm({ ...form, max_tac_percent: e.target.value })}
+                                    placeholder="e.g. 300"
+                                />
+                            </div>
+                            <div>
+                                <label className={labelClass}>Max Pages / Job</label>
+                                <input
+                                    type="number"
+                                    className={inputClass}
+                                    value={form.max_pages_per_job ?? 1024}
+                                    onChange={e => setForm({ ...form, max_pages_per_job: e.target.value })}
+                                    placeholder="e.g. 1024"
+                                />
+                            </div>
+                            <div>
+                                <label className={labelClass}>Max Archive (MB)</label>
+                                <input
+                                    type="number"
+                                    className={inputClass}
+                                    value={form.max_file_size_mb ?? 2048}
+                                    onChange={e => setForm({ ...form, max_file_size_mb: e.target.value })}
+                                    placeholder="e.g. 2048"
+                                />
+                            </div>
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
                             {CAPABILITY_TOGGLES.map(cap => {
