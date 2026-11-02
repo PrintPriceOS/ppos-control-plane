@@ -14,6 +14,7 @@ import {
 } from './PrinthousesPage';
 import { MachineCapabilityEditor } from '../printhouse/MachineCapabilityEditor';
 import { PricingHawkEyePanel } from '../../components/printhouse/pricing/PricingHawkEyePanel';
+import { MaterialsPaperPage } from '../materials/MaterialsPaperPage';
 
 // ── Display helpers ──────────────────────────────────────────────────────────
 
@@ -516,6 +517,9 @@ function PaperCostsTab({ r, ph }: { r: PrinthouseRates; ph?: Printhouse }) {
 
     return (
         <div className="space-y-6">
+            {/* Interactive Synchronized Substrates & Paper Catalog */}
+            <MaterialsPaperPage printhouseId={ph?.id} embedded={true} />
+
             {/* Homologated Paper & Board Stock Catalog */}
             {catalog.length > 0 && (
                 <div className={card}>

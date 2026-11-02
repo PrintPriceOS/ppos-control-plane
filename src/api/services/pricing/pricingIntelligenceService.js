@@ -28,6 +28,7 @@
 
 const crypto = require('crypto');
 const db = require('../mysqlClient');
+const industrialMaterialsService = require('../materials/industrialMaterialsCatalogService');
 
 const tenantPricingStore = new Map();
 
@@ -1078,10 +1079,49 @@ async function getPricingProfilesAsync(tenantId = 'tenant-default', dbClient = d
  * (`Estucado` / `COATED`, `Offset / Ahuesado` / `UNCOATED`, `Cartoncillo / Cubierta` / `BOARD`)
  * with `id`, `material_name`, `gsm`, `bulk_microns`, `bulkFactor`, `cost_per_kg_eur`, and `cost_per_sheet_eur`.
  */
-async function getTenantMaterialsCatalogAsync(tenantId = 'tenant-default', dbClient = db) {
+async function getTenantMaterialsCatalogAsync(tenantId = 'tenant-default', dbClient = db, queryFilters = {}) {
     await hydrateTenantFromMySQL(tenantId, dbClient);
     const state = getTenantState(tenantId);
-    const materials = state.papers || [];
+    const industrialRes = await industrialMaterialsService.listIndustrialMaterials(
+        queryFilters || {},
+        { tenantId },
+        dbClient
+    );
+
+    // Merge industrial substrates with state.papers so both LivePriceCalibrator and MaterialsPaperPage share a single unified array
+    const byId = new Map();
+    for (const item of industrialRes.materials || []) {
+        byId.set(item.id, {
+            ...item,
+            paperId: item.id,
+            name: `${item.name} (${item.basis_weight_gsm} g/m²)`,
+            materialName: item.name,
+            grammageGsm: item.basis_weight_gsm,
+            gsm: item.basis_weight_gsm,
+            bulkFactor: item.bulk_volume,
+            bulkMicrons: item.caliper_microns,
+            costPerTonEur: item.costPerTonEur,
+            costPerKgEur: item.cost_per_kg_eur,
+            costPerSheetEur: item.cost_per_sheet_eur,
+            substrateClass: item.substrate_class,
+            categoryLabel:
+                item.substrate_class === 'BOARD'
+                    ? 'Cartoncillo / Cubierta'
+                    : item.substrate_class === 'COATED'
+                      ? 'Estucado'
+                      : 'Offset / Ahuesado',
+            sheetFormat: item.sheet_format
+        });
+    }
+    for (const p of state.papers || []) {
+        if (!byId.has(p.paperId)) {
+            byId.set(p.paperId, p);
+        }
+    }
+
+    const materials = Array.from(byId.values());
+    state.papers = materials;
+
     const groupedByCategory = {
         UNCOATED: materials.filter((p) => (p.substrateClass || 'UNCOATED') === 'UNCOATED'),
         COATED: materials.filter((p) => p.substrateClass === 'COATED'),
@@ -1091,6 +1131,8 @@ async function getTenantMaterialsCatalogAsync(tenantId = 'tenant-default', dbCli
         ok: true,
         tenantId: String(tenantId || 'tenant-default'),
         materials,
+        industrialCatalog: industrialRes.materials,
+        kpiSummary: industrialRes.kpiSummary,
         groupedByCategory,
         productFamilies: PRODUCT_FAMILY_SPECS
     };
@@ -1164,12 +1206,46 @@ async function addMaterialToCatalogAsync(tenantId = 'tenant-default', payload = 
     };
 
     const normalizedPaper = normalizeMaterialRowToPaperItem(rowObj);
+    const industrialItem = await industrialMaterialsService.upsertIndustrialMaterial(
+        {
+            ...payload,
+            id,
+            name: rawName,
+            basis_weight_gsm: gsm,
+            bulk_volume: round2(bulkFactor),
+            cost_per_kg_eur: round4(costPerKgEur),
+            cost_per_sheet_eur: costPerSheetEur,
+            tenant_id: String(tenantId || 'tenant-default')
+        },
+        { tenantId },
+        dbClient,
+        false
+    );
+    const enrichedPaper = {
+        ...industrialItem,
+        ...normalizedPaper,
+        id: industrialItem.id,
+        paperId: industrialItem.id,
+        material_type: industrialItem.material_type,
+        category: industrialItem.category,
+        basis_weight_gsm: industrialItem.basis_weight_gsm,
+        bulk_volume: industrialItem.bulk_volume,
+        dimensions_json: industrialItem.dimensions_json,
+        certifications_json: industrialItem.certifications_json,
+        in_stock_kg: industrialItem.in_stock_kg,
+        min_order_kg: industrialItem.min_order_kg,
+        caliper_microns: industrialItem.caliper_microns,
+        spine_per_100pp_mm: industrialItem.spine_per_100pp_mm,
+        spine_200pp_mm: industrialItem.spine_200pp_mm,
+        status: industrialItem.status
+    };
+
     const state = getTenantState(tenantId);
-    const existingIdx = state.papers.findIndex((p) => p.paperId === normalizedPaper.paperId);
+    const existingIdx = state.papers.findIndex((p) => p.paperId === enrichedPaper.paperId);
     if (existingIdx >= 0) {
-        state.papers[existingIdx] = normalizedPaper;
+        state.papers[existingIdx] = enrichedPaper;
     } else {
-        state.papers.unshift(normalizedPaper);
+        state.papers.unshift(enrichedPaper);
     }
 
     if (dbClient && typeof dbClient.query === 'function') {
@@ -1208,7 +1284,7 @@ async function addMaterialToCatalogAsync(tenantId = 'tenant-default', payload = 
     return {
         ok: true,
         tenantId: String(tenantId || 'tenant-default'),
-        material: normalizedPaper,
+        material: enrichedPaper,
         materials: state.papers
     };
 }

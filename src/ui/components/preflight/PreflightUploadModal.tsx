@@ -46,6 +46,23 @@ export interface PreflightUploadModalProps {
     initialJobId?: string;
 }
 
+export interface PreflightSubstrateOption {
+    id: string;
+    name: string;
+    gsm: number;
+    bulk: number;
+    materialType: string;
+}
+
+const DEFAULT_PREFLIGHT_SUBSTRATES: PreflightSubstrateOption[] = [
+    { id: 'MAT-OFFSET-CORAL-90', name: 'Coral Book White 90g (Bulk 1.25)', gsm: 90, bulk: 1.25, materialType: 'SHEETFED_PAPER' },
+    { id: 'MAT-MUNKEN-PRINT-WHITE-90', name: 'Munken Print White 1.5 90g (Bulk 1.50)', gsm: 90, bulk: 1.50, materialType: 'SHEETFED_PAPER' },
+    { id: 'MAT-CORAL-BOOK-IVORY-80', name: 'Coral Book Ivory Ahuesado 80g (Bulk 1.65)', gsm: 80, bulk: 1.65, materialType: 'SHEETFED_PAPER' },
+    { id: 'REEL-CREAM-80-BULK2', name: 'Stora Enso BookCream Reel 80g (Bulk 1.95)', gsm: 80, bulk: 1.95, materialType: 'REEL_PAPER' },
+    { id: 'MAT-SAPPI-MAGNO-SATIN-135', name: 'Magno Satin Estucado Mate 135g (Bulk 0.92)', gsm: 135, bulk: 0.92, materialType: 'SHEETFED_PAPER' },
+    { id: 'BOARD-FEDRIGONI-SYMBOL-300', name: 'Fedrigoni Symbol Card Cubierta 300g (Bulk 1.20)', gsm: 300, bulk: 1.20, materialType: 'BOARD_CARTON' }
+];
+
 export const PreflightUploadModal: React.FC<PreflightUploadModalProps> = ({
     isOpen,
     onClose,
@@ -62,6 +79,8 @@ export const PreflightUploadModal: React.FC<PreflightUploadModalProps> = ({
     const [formPdfFile, setFormPdfFile] = useState<File | null>(null);
     const [formPages, setFormPages] = useState(280);
     const [formBinding, setFormBinding] = useState<'SOFTCOVER_PUR' | 'HARDCOVER'>('SOFTCOVER_PUR');
+    const [substrateOptions, setSubstrateOptions] = useState<PreflightSubstrateOption[]>(DEFAULT_PREFLIGHT_SUBSTRATES);
+    const [selectedSubstrateId, setSelectedSubstrateId] = useState<string>('CUSTOM');
     const [formGrammage, setFormGrammage] = useState(90);
     const [formBulk, setFormBulk] = useState(1.3);
     const [formDeclaredSpine, setFormDeclaredSpine] = useState(14.0);
@@ -69,6 +88,37 @@ export const PreflightUploadModal: React.FC<PreflightUploadModalProps> = ({
     const [isDragging, setIsDragging] = useState(false);
     const [submitting, setSubmitting] = useState(false);
     const [sizeError, setSizeError] = useState<string | null>(null);
+
+    useEffect(() => {
+        if (!isOpen) return;
+        let cancelled = false;
+        fetch('/api/pricing/materials', {
+            headers: { 'x-user-role': 'PRINTHOUSE_ADMIN' }
+        })
+            .then((r) => (r && r.ok ? r.json() : null))
+            .then((data) => {
+                if (cancelled || !data) return;
+                const list = Array.isArray(data.industrialCatalog)
+                    ? data.industrialCatalog
+                    : Array.isArray(data.materials)
+                      ? data.materials
+                      : [];
+                if (list.length > 0) {
+                    const mapped: PreflightSubstrateOption[] = list.map((m: any) => ({
+                        id: String(m.id || m.paperId),
+                        name: `${m.materialName || m.name} · ${m.basis_weight_gsm || m.gsm || 90}g (Bulk ${Number(m.bulk_volume || m.bulkFactor || 1.25).toFixed(2)})`,
+                        gsm: Number(m.basis_weight_gsm || m.gsm || 90),
+                        bulk: Number(m.bulk_volume || m.bulkFactor || 1.25),
+                        materialType: String(m.material_type || 'SHEETFED_PAPER')
+                    }));
+                    setSubstrateOptions(mapped);
+                }
+            })
+            .catch(() => {});
+        return () => {
+            cancelled = true;
+        };
+    }, [isOpen]);
 
     useEffect(() => {
         if (!isOpen) return;
@@ -409,6 +459,32 @@ export const PreflightUploadModal: React.FC<PreflightUploadModalProps> = ({
                                         onChange={(e) => setFormPages(Number(e.target.value))}
                                         className="w-full rounded-lg bg-[#121418] border border-zinc-800 px-3 py-1.5 text-xs font-mono text-white"
                                     />
+                                </div>
+                                <div className="col-span-2">
+                                    <label className="block text-[10px] font-bold uppercase tracking-wider text-emerald-400 mb-1">
+                                        {L.lblCatalogSubstrate || 'Sustrato / Papel del Catálogo (Sincronizado MySQL)'}
+                                    </label>
+                                    <select
+                                        data-testid="preflight-substrate-catalog-select"
+                                        value={selectedSubstrateId}
+                                        onChange={(e) => {
+                                            const val = e.target.value;
+                                            setSelectedSubstrateId(val);
+                                            const found = substrateOptions.find((s) => s.id === val);
+                                            if (found) {
+                                                setFormGrammage(found.gsm);
+                                                setFormBulk(found.bulk);
+                                            }
+                                        }}
+                                        className="w-full rounded-lg bg-[#121418] border border-emerald-500/40 px-3 py-1.5 text-xs font-mono text-white"
+                                    >
+                                        <option value="CUSTOM">— Parámetros Manuales (GSM / Bulk personalizados) —</option>
+                                        {substrateOptions.map((sub) => (
+                                            <option key={sub.id} value={sub.id}>
+                                                {sub.name}
+                                            </option>
+                                        ))}
+                                    </select>
                                 </div>
                                 <div>
                                     <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-400 mb-1">

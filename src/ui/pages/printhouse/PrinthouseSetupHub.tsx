@@ -20,6 +20,7 @@ import { ProductionSitesPanel } from '../../components/printhouse/setup/Producti
 import { MachineFleetPanel } from '../../components/printhouse/setup/MachineFleetPanel';
 import { CapabilitiesPanel } from '../../components/printhouse/setup/CapabilitiesPanel';
 import { MaterialsPanel } from '../../components/printhouse/setup/MaterialsPanel';
+import { MaterialsPaperPage } from '../materials/MaterialsPaperPage';
 import { CapacityPanel } from '../../components/printhouse/setup/CapacityPanel';
 import { LeadTimesPanel } from '../../components/printhouse/setup/LeadTimesPanel';
 import { PricingPanel } from '../../components/printhouse/setup/PricingPanel';
@@ -646,15 +647,12 @@ export const PrinthouseSetupHub: React.FC = () => {
                 )}
 
                 {activeTab === 'MATERIALS' && (
-                    <div className="space-y-4">
-                        <div className="bg-white dark:bg-[#18181b] border border-zinc-200 dark:border-zinc-800 rounded-xl p-4 sm:p-5">
-                            <h2 className="text-xl font-black text-zinc-900 dark:text-white tracking-tight">
-                                {t('setup.section.materials') || 'Materials & Paper'}
-                            </h2>
-                            <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400 mt-1">
-                                {t('setup.section.materialsDesc') || 'Substrate catalog, paper grammages, sheet sizes, and finishing compatibility.'}
-                            </p>
-                        </div>
+                    <div className="space-y-6">
+                        <MaterialsPaperPage
+                            printhouseId={siteOptions[0]?.siteId}
+                            embedded={true}
+                            onSaved={fetchOnboardingData}
+                        />
                         <MaterialsPanel sites={siteOptions} onSaved={fetchOnboardingData} />
                     </div>
                 )}

@@ -49,7 +49,7 @@ export const navigationConfig: NavItem[] = [
     { id: 'manufacturing', label: 'Manufacturing Queue', path: '/manufacturing', icon: 'CpuChipIcon', roles: ['SUPER_ADMIN', 'TENANT_ADMIN', 'PRINTHOUSE_ADMIN', 'PRINTHOUSE_OPERATOR', 'VIEWER'], printhouseOnly: true },
     { id: 'publisher-hub', label: 'Publisher B2B Hub', path: '/publisher/hub', icon: 'BookOpenIcon', roles: ['SUPER_ADMIN', 'TENANT_ADMIN', 'PRINTHOUSE_ADMIN', 'PUBLISHER'] },
     { id: 'machines', label: 'Machines', path: '/machines', icon: 'WrenchScrewdriverIcon', roles: ['SUPER_ADMIN', 'TENANT_ADMIN', 'PRINTHOUSE_ADMIN'], printhouseOnly: true },
-    { id: 'materials', label: 'Materials & Paper', path: '/materials', icon: 'RectangleStackIcon', roles: ['SUPER_ADMIN', 'TENANT_ADMIN', 'PRINTHOUSE_ADMIN'], printhouseOnly: true },
+    { id: 'materials', label: 'Materials & Paper', path: '/materials-paper', icon: 'RectangleStackIcon', roles: ['SUPER_ADMIN', 'TENANT_ADMIN', 'PRINTHOUSE_ADMIN'], printhouseOnly: true },
     { id: 'pricing', label: 'Pricing Profiles', path: '/ops/pricing', icon: 'CurrencyDollarIcon', roles: ['SUPER_ADMIN', 'TENANT_ADMIN', 'PRINTHOUSE_ADMIN'], printhouseOnly: true },
     
     // Intelligence Layer (Super Admin & Ops Admin)

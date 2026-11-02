@@ -10,6 +10,8 @@ const router = express.Router();
 const materialService = require('../services/materialAvailabilityService');
 const { paperThicknessService } = require('../services/paperThicknessService');
 const paperCostIntegrationService = require('../services/paperCostIntegrationService');
+const industrialMaterialsService = require('../services/materials/industrialMaterialsCatalogService');
+const { addMaterialToCatalogAsync } = require('../services/pricing/pricingIntelligenceService');
 const db = require('../services/mysqlClient');
 const logger = require('../services/logger').child('materials-route');
 
@@ -139,6 +141,17 @@ router.get('/', async (req, res) => {
         const rawMaterialsArray = Array.isArray(rows) ? rows : (Array.isArray(rows?.materials) ? rows.materials : []);
         // PAPER-CALIPER-UI-01: read-only thickness from the linked master catalog variant
         const materialsArray = await paperThicknessService.attachThickness(scope.tenantId, rawMaterialsArray);
+
+        // Enrich with industrial mechanics (Sheetfed / Reel dimensions, bulk, spine per 100pp, €/kg, €/pliego)
+        const enrichedMaterials = materialsArray.map((m) =>
+            industrialMaterialsService.normalizeIndustrialMaterialRecord(m)
+        );
+        const industrialCatalog = await industrialMaterialsService.listIndustrialMaterials(
+            req.query || {},
+            scope,
+            db
+        );
+
         const registeredStockUnits = materialsArray.reduce((acc, m) => acc + (Number(m.current_stock_units) || 0), 0);
         const reservedCapacityLocks = materialsArray.reduce((acc, m) => acc + (Number(m.reserved_stock_units) || 0), 0);
         const netAvailablePool = registeredStockUnits - reservedCapacityLocks;
@@ -146,7 +159,9 @@ router.get('/', async (req, res) => {
 
         const payload = {
             ok: true,
-            materials: materialsArray,
+            materials: enrichedMaterials,
+            industrialCatalog: industrialCatalog.materials,
+            kpiSummary: industrialCatalog.kpiSummary,
             summary: {
                 registeredStockUnits,
                 reservedCapacityLocks,
@@ -342,7 +357,19 @@ router.post('/', async (req, res) => {
         const effectiveCenter = scope.printhouseId || targetNodeId || null;
         payload.node_id = effectiveCenter;
         const result = await materialService.createMaterial(payload, scope.tenantId, effectiveCenter);
-        res.json({ ok: true, data: result });
+        const industrialItem = await industrialMaterialsService.upsertIndustrialMaterial(
+            {
+                ...payload,
+                id: result?.id || payload.id,
+                printhouse_id: effectiveCenter || 'GLOBAL_MASTER',
+                tenant_id: scope.tenantId || 'tenant-default'
+            },
+            scope,
+            db,
+            false
+        );
+        await addMaterialToCatalogAsync(scope.tenantId || 'tenant-default', industrialItem, db).catch(() => {});
+        res.json({ ok: true, data: { ...(result || {}), ...industrialItem }, material: industrialItem });
     } catch (err) {
         if (err.statusCode) {
             return res.status(err.statusCode).json({ ok: false, error: err.message, code: err.code || 'FORBIDDEN' });
@@ -352,6 +379,27 @@ router.post('/', async (req, res) => {
         }
         console.error('[MATERIALS-API] Failed to create material:', err);
         res.status(500).json({ ok: false, error: err.message, code: 'MATERIAL_CREATE_ERROR' });
+    }
+});
+
+/**
+ * POST /api/admin/materials/sync-master
+ * Seeds / rehydrates the European Master Industrial Substrates Catalog (Munken, Fedrigoni, Sappi, Lecta, Stora Enso).
+ */
+router.post('/sync-master', async (req, res) => {
+    try {
+        const scope = getScopeContext(req);
+        assertWritePermission(scope);
+        const result = await industrialMaterialsService.syncMasterIndustrialCatalog(scope, db);
+        for (const item of result.materials) {
+            await addMaterialToCatalogAsync(scope.tenantId || 'tenant-default', item, db).catch(() => {});
+        }
+        return res.json(result);
+    } catch (err) {
+        if (err.statusCode) {
+            return res.status(err.statusCode).json({ ok: false, error: err.message, code: err.code || 'FORBIDDEN' });
+        }
+        return res.status(500).json({ ok: false, error: err.message, code: 'SYNC_MASTER_ERROR' });
     }
 });
 
@@ -958,6 +1006,52 @@ router.get('/:id', async (req, res) => {
         }
         console.error(`[MATERIALS-API] Failed to fetch unit [${req.params.id}]:`, err);
         res.status(500).json({ ok: false, error: err.message, code: 'MATERIAL_DETAIL_ERROR' });
+    }
+});
+
+/**
+ * PUT /api/admin/materials/:id
+ * Updates substrate price (€/kg), bulk (cm³/g), dimensions, certifications, or stock/status;
+ * persists in MySQL, updates Pricing Intelligence / Preflight BPE cache, and emits `MATERIAL_PRICE_UPDATED` in `operational_events`.
+ */
+router.put('/:id', async (req, res) => {
+    try {
+        const scope = getScopeContext(req);
+        assertWritePermission(scope);
+        const updated = await industrialMaterialsService.upsertIndustrialMaterial(
+            {
+                ...(req.body || {}),
+                id: req.params.id
+            },
+            scope,
+            db,
+            true
+        );
+        await addMaterialToCatalogAsync(scope.tenantId || 'tenant-default', updated, db).catch(() => {});
+        return res.json({ ok: true, data: updated, material: updated });
+    } catch (err) {
+        if (err.statusCode) {
+            return res.status(err.statusCode).json({ ok: false, error: err.message, code: err.code || 'UPDATE_ERROR' });
+        }
+        return res.status(500).json({ ok: false, error: err.message, code: 'MATERIAL_UPDATE_ERROR' });
+    }
+});
+
+/**
+ * DELETE /api/admin/materials/:id
+ * Soft-deletes / archives a substrate (`status = 'DISCONTINUED'`) without breaking active pricing profiles or orders.
+ */
+router.delete('/:id', async (req, res) => {
+    try {
+        const scope = getScopeContext(req);
+        assertWritePermission(scope);
+        const archived = await industrialMaterialsService.archiveIndustrialMaterial(req.params.id, scope, db);
+        return res.json(archived);
+    } catch (err) {
+        if (err.statusCode) {
+            return res.status(err.statusCode).json({ ok: false, error: err.message, code: err.code || 'ARCHIVE_ERROR' });
+        }
+        return res.status(500).json({ ok: false, error: err.message, code: 'MATERIAL_ARCHIVE_ERROR' });
     }
 });
 

@@ -47,6 +47,7 @@ import { TelemetryTab } from './pages/admin/TelemetryTab';
 import { ForensicsTab } from './pages/admin/ForensicsTab';
 import { IndustrialOpsPage } from './pages/admin/IndustrialOpsPage';
 import { MaterialsPage } from './pages/admin/MaterialsPage';
+import { MaterialsPaperPage } from './pages/materials/MaterialsPaperPage';
 import { AuditExplorerPage } from './pages/admin/AuditExplorerPage';
 
 import { PreflightJobsPage } from './pages/preflight/PreflightJobsPage';
@@ -367,7 +368,9 @@ export const App: React.FC = () => {
                 <Route path="/ops/pricing" element={<PricingIntelligenceTab />} />
                 <Route path="/pricing" element={<PricingIntelligenceTab />} />
                 <Route path="/machines" element={<MachinesPage />} />
-                <Route path="/materials" element={<div className="p-8"><MaterialsPage /></div>} />
+                <Route path="/materials-paper" element={<div className="p-8"><MaterialsPaperPage /></div>} />
+                <Route path="/materials" element={<div className="p-8"><MaterialsPaperPage /></div>} />
+                <Route path="/materials/warehouse" element={<div className="p-8"><MaterialsPage /></div>} />
                 <Route path="/ops/financials" element={<FinancialOpsTab />} />
                 <Route path="/ops/success" element={<SuccessWorkspace />} />
                 <Route path="/admin/help" element={<AdminHelpPage />} />

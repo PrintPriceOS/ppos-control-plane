@@ -24,6 +24,8 @@ const {
     calculateCrossoverPoint
 } = require('../services/pricing/pricingIntelligenceService');
 
+const industrialMaterialsService = require('../services/materials/industrialMaterialsCatalogService');
+
 const {
     calculateRoutingDecisions,
     forceManualRoutingDecisionAsync,
@@ -151,7 +153,7 @@ function createPricingRouter() {
                 (req.query && req.query.tenantId) ||
                 (req.headers && req.headers['x-tenant-id']) ||
                 'tenant-default';
-            const data = await getTenantMaterialsCatalogAsync(tenantId);
+            const data = await getTenantMaterialsCatalogAsync(tenantId, undefined, req.query || {});
             return res.status(200).json(data);
         } catch (err) {
             return res.status(err.statusCode || 400).json({
@@ -171,6 +173,69 @@ function createPricingRouter() {
                 'tenant-default';
             const result = await addMaterialToCatalogAsync(tenantId, req.body || {});
             return res.status(200).json(result);
+        } catch (err) {
+            return res.status(err.statusCode || 400).json({
+                ok: false,
+                error: err.message
+            });
+        }
+    });
+
+    // PUT /api/pricing/materials/:id
+    router.put('/materials/:id', async (req, res) => {
+        try {
+            const tenantId =
+                (req.user && req.user.tenantId) ||
+                (req.body && req.body.tenantId) ||
+                (req.headers && req.headers['x-tenant-id']) ||
+                'tenant-default';
+            const updated = await industrialMaterialsService.upsertIndustrialMaterial(
+                { ...(req.body || {}), id: req.params.id },
+                { tenantId },
+                undefined,
+                true
+            );
+            const result = await addMaterialToCatalogAsync(tenantId, updated);
+            return res.status(200).json({ ok: true, material: updated, materials: result.materials });
+        } catch (err) {
+            return res.status(err.statusCode || 400).json({
+                ok: false,
+                error: err.message
+            });
+        }
+    });
+
+    // DELETE /api/pricing/materials/:id
+    router.delete('/materials/:id', async (req, res) => {
+        try {
+            const tenantId =
+                (req.user && req.user.tenantId) ||
+                (req.query && req.query.tenantId) ||
+                (req.headers && req.headers['x-tenant-id']) ||
+                'tenant-default';
+            const archived = await industrialMaterialsService.archiveIndustrialMaterial(req.params.id, { tenantId });
+            return res.status(200).json(archived);
+        } catch (err) {
+            return res.status(err.statusCode || 400).json({
+                ok: false,
+                error: err.message
+            });
+        }
+    });
+
+    // POST /api/pricing/materials/sync-master
+    router.post('/materials/sync-master', async (req, res) => {
+        try {
+            const tenantId =
+                (req.user && req.user.tenantId) ||
+                (req.body && req.body.tenantId) ||
+                (req.headers && req.headers['x-tenant-id']) ||
+                'tenant-default';
+            const synced = await industrialMaterialsService.syncMasterIndustrialCatalog({ tenantId });
+            for (const item of synced.materials) {
+                await addMaterialToCatalogAsync(tenantId, item).catch(() => {});
+            }
+            return res.status(200).json(synced);
         } catch (err) {
             return res.status(err.statusCode || 400).json({
                 ok: false,
