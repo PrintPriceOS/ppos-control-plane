@@ -20,7 +20,8 @@ import {
     WrenchScrewdriverIcon,
     ArrowPathIcon,
     CheckCircleIcon,
-    TrashIcon
+    TrashIcon,
+    DocumentMagnifyingGlassIcon
 } from '@heroicons/react/24/outline';
 import { useLocale } from '../../i18n';
 import { getAuthToken } from '../../lib/authStore';
@@ -35,6 +36,7 @@ import {
     PreflightUploadModal,
     PreflightUploadModalSubmitPayload
 } from '../../components/preflight/PreflightUploadModal';
+import { PreflightInspectionReportModal } from '../../components/preflight/PreflightInspectionReportModal';
 
 export interface PreflightInspectionRow {
     jobId: string;
@@ -57,6 +59,12 @@ export interface PreflightInspectionRow {
     overallStatus: 'PASS' | 'WARNING' | 'FAIL';
     autoFixed?: boolean;
     assetPurged?: boolean;
+    iccProfile?: string;
+    minDpi?: number;
+    allFontsEmbedded?: boolean;
+    trimWidthMm?: number;
+    trimHeightMm?: number;
+    findings?: Array<{ code: string; severity: 'CRITICAL' | 'WARNING' | 'PASS'; message: string }>;
 }
 
 const PREFLIGHT_I18N: Record<'en' | 'es' | 'de', Record<string, string>> = {
@@ -274,6 +282,9 @@ export const PreflightJobsPage: React.FC<SharedModuleProps> = ({
     const [fixingJobId, setFixingJobId] = useState<string | null>(null);
     const [purgingJobId, setPurgingJobId] = useState<string | null>(null);
     const [showModal, setShowModal] = useState(false);
+    const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
+
+    const selectedJob = jobs.find((j) => j.jobId === selectedJobId) || null;
 
     useEffect(() => {
         let isMounted = true;
@@ -312,7 +323,13 @@ export const PreflightJobsPage: React.FC<SharedModuleProps> = ({
                             tacStatus: report.tacAndColor.status,
                             overallStatus: report.overallStatus,
                             autoFixed: Boolean(report.autoFixed),
-                            assetPurged: Boolean(report.assetPurged || report.assetStorage?.assetPurged)
+                            assetPurged: Boolean(report.assetPurged || report.assetStorage?.assetPurged),
+                            iccProfile: report.tacAndColor?.iccProfile,
+                            minDpi: report.resolutionAndFonts?.minImageDpi,
+                            allFontsEmbedded: report.resolutionAndFonts?.allFontsEmbedded,
+                            trimWidthMm: report.bleedGeometry?.trimWidthMm,
+                            trimHeightMm: report.bleedGeometry?.trimHeightMm,
+                            findings: Array.isArray(report.findings) ? report.findings : undefined
                         }));
                     if (mapped.length > 0) {
                         setJobs((prev) => {
@@ -383,10 +400,17 @@ export const PreflightJobsPage: React.FC<SharedModuleProps> = ({
                     tacStatus: report.tacAndColor.status,
                     overallStatus: report.overallStatus,
                     autoFixed: Boolean(report.autoFixed || payload.workflowMode === 'MAGIC_FIX'),
-                    assetPurged: Boolean(report.assetPurged || report.assetStorage?.assetPurged || payload.purgeAsset)
+                    assetPurged: Boolean(report.assetPurged || report.assetStorage?.assetPurged || payload.purgeAsset),
+                    iccProfile: report.tacAndColor?.iccProfile,
+                    minDpi: report.resolutionAndFonts?.minImageDpi,
+                    allFontsEmbedded: report.resolutionAndFonts?.allFontsEmbedded,
+                    trimWidthMm: report.bleedGeometry?.trimWidthMm,
+                    trimHeightMm: report.bleedGeometry?.trimHeightMm,
+                    findings: Array.isArray(report.findings) ? report.findings : undefined
                 };
                 setJobs((prev) => [newRow, ...prev.filter((j) => j.jobId !== newRow.jobId)]);
                 setShowModal(false);
+                setSelectedJobId(newRow.jobId);
                 return;
             }
         } catch (_) {
@@ -431,6 +455,7 @@ export const PreflightJobsPage: React.FC<SharedModuleProps> = ({
 
         setJobs((prev) => [fallbackRow, ...prev.filter((j) => j.jobId !== fallbackRow.jobId)]);
         setShowModal(false);
+        setSelectedJobId(fallbackRow.jobId);
     };
 
     const handlePurgeAsset = async (job: PreflightInspectionRow) => {
@@ -574,10 +599,11 @@ export const PreflightJobsPage: React.FC<SharedModuleProps> = ({
             {activeTab === 'queue' ? (
                 <IndustrialTable
                     title={L.tabQueue}
-                    subtitle={`${jobs.length} PDF ARCHIVES ANALYZED`}
+                    subtitle={`${jobs.length} PDF ARCHIVES ANALYZED · CLICK ANY ROW TO OPEN 6-AXIS REPORT`}
                     data={jobs}
                     emptyEntityName="PREFLIGHT JOBS"
                     rowKey={(row) => row.jobId}
+                    onRowClick={(row) => setSelectedJobId(row.jobId)}
                     columns={[
                         {
                             key: 'jobId',
@@ -681,7 +707,19 @@ export const PreflightJobsPage: React.FC<SharedModuleProps> = ({
                             header: L.colActions,
                             align: 'right',
                             render: (row) => (
-                                <div className="inline-flex items-center justify-end gap-2">
+                                <div
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="inline-flex items-center justify-end gap-2"
+                                >
+                                    <button
+                                        type="button"
+                                        data-testid={`view-report-btn-${row.jobId}`}
+                                        onClick={() => setSelectedJobId(row.jobId)}
+                                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-[#0a0b0d] hover:bg-zinc-900 border border-[#1f2228] hover:border-zinc-600 text-slate-200 hover:text-white text-[10px] font-mono font-bold uppercase transition-colors cursor-pointer"
+                                    >
+                                        <DocumentMagnifyingGlassIcon className="w-3.5 h-3.5 text-[#dc2626]" />
+                                        <span>VIEW REPORT</span>
+                                    </button>
                                     {row.overallStatus !== 'PASS' ? (
                                         <button
                                             type="button"
@@ -776,6 +814,15 @@ export const PreflightJobsPage: React.FC<SharedModuleProps> = ({
                 onClose={() => setShowModal(false)}
                 onSubmit={handleRunPreflightSubmit}
                 labels={L}
+            />
+
+            <PreflightInspectionReportModal
+                job={selectedJob}
+                onClose={() => setSelectedJobId(null)}
+                onAutoFix={handleAutoFix}
+                onPurgeAsset={handlePurgeAsset}
+                fixingJobId={fixingJobId}
+                purgingJobId={purgingJobId}
             />
 
             {mode === 'onboarding' && (

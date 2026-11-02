@@ -10,21 +10,23 @@ export type { BadgeStatus };
 
 export interface StatusBadgeProps extends BaseProps {
     showDot?: boolean;
+    label?: string;
 }
 
-export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, className = '', showDot = true }) => {
+export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, label, className = '', showDot = true }) => {
     const norm = String(status || '').toUpperCase();
+    const displayText = label || status;
 
     let dotColor = 'bg-slate-400';
     let pillStyle = 'bg-[#14161a] border-[#1f2228] text-slate-300';
 
-    if (norm === 'ACTIVE' || norm === 'HEALTHY' || norm === 'ONLINE' || norm === 'COMPLETED' || norm === 'COMPLETE' || norm === 'SYNCED') {
+    if (norm === 'ACTIVE' || norm === 'HEALTHY' || norm === 'ONLINE' || norm === 'COMPLETED' || norm === 'COMPLETE' || norm === 'SYNCED' || norm === 'PASS' || norm === 'OK') {
         dotColor = 'bg-[#10b981]';
         pillStyle = 'bg-emerald-950/40 border-emerald-500/30 text-[#10b981]';
     } else if (norm === 'QUEUED' || norm === 'IN_PROGRESS' || norm === 'WARNING' || norm === 'DEGRADED' || norm === 'PROCESSING' || norm === 'UNDER MAINTENANCE') {
         dotColor = 'bg-[#f59e0b]';
         pillStyle = 'bg-amber-950/40 border-amber-500/30 text-[#f59e0b]';
-    } else if (norm === 'OFFLINE' || norm === 'FAILED' || norm === 'ERROR' || norm === 'REJECTED') {
+    } else if (norm === 'OFFLINE' || norm === 'FAILED' || norm === 'FAIL' || norm === 'ERROR' || norm === 'REJECTED' || norm === 'BLEED_DEFICIT') {
         dotColor = 'bg-[#dc2626]';
         pillStyle = 'bg-red-950/40 border-red-500/30 text-red-400';
     } else if (norm === 'INFO' || norm === 'RUNNING') {
@@ -43,7 +45,7 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, className = ''
             className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border text-[10px] font-black uppercase tracking-widest transition-colors ${pillStyle} ${className}`}
         >
             {showDot && <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${dotColor}`} />}
-            <span>{status}</span>
+            <span>{displayText}</span>
         </span>
     );
 };

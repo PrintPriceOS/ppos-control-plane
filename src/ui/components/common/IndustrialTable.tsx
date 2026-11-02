@@ -22,8 +22,10 @@ export interface IndustrialColumn<T> {
 
 export interface IndustrialTableProps<T> {
     title?: string;
+    subtitle?: string;
     columns: IndustrialColumn<T>[];
     data: T[];
+    rowKey?: (row: T, index: number) => string | number;
     loading?: boolean;
     onRefresh?: () => void;
     onRowClick?: (row: T) => void;
@@ -36,8 +38,10 @@ export interface IndustrialTableProps<T> {
 
 export function IndustrialTable<T extends Record<string, any>>({
     title,
+    subtitle,
     columns,
     data,
+    rowKey,
     loading = false,
     onRefresh,
     onRowClick,
@@ -64,15 +68,20 @@ export function IndustrialTable<T extends Record<string, any>>({
             data-testid="industrial-table"
             className="rounded-xl bg-white dark:bg-[#14161a] border border-slate-200 dark:border-[#1f2228] overflow-hidden transition-all shadow-2xs"
         >
-            {(title || onRefresh || headerRight) && (
+            {(title || subtitle || onRefresh || headerRight) && (
                 <div className="px-6 py-4 border-b border-slate-200 dark:border-[#1f2228] flex items-center justify-between bg-slate-50/50 dark:bg-[#0f1013]/60">
-                    {title ? (
-                        <h3 className="font-black text-xs uppercase tracking-widest text-slate-900 dark:text-white m-0">
-                            {title}
-                        </h3>
-                    ) : (
-                        <span />
-                    )}
+                    <div>
+                        {title ? (
+                            <h3 className="font-black text-xs uppercase tracking-widest text-slate-900 dark:text-white m-0">
+                                {title}
+                            </h3>
+                        ) : null}
+                        {subtitle ? (
+                            <p className="text-[10px] font-mono text-slate-400 uppercase tracking-wider mt-0.5 m-0">
+                                {subtitle}
+                            </p>
+                        ) : null}
+                    </div>
                     <div className="flex items-center gap-3">
                         {headerRight}
                         {onRefresh && (
@@ -111,7 +120,7 @@ export function IndustrialTable<T extends Record<string, any>>({
                     <tbody className="divide-y divide-slate-100 dark:divide-[#1f2228]">
                         {visibleRows.map((row, idx) => (
                             <tr
-                                key={row.id || row._id || idx}
+                                key={rowKey ? rowKey(row, idx) : row.id || row._id || idx}
                                 onClick={() => onRowClick?.(row)}
                                 className={`transition-colors hover:bg-slate-50 dark:hover:bg-[#181b20] ${
                                     onRowClick ? 'cursor-pointer' : ''

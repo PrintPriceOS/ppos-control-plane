@@ -213,8 +213,24 @@ describe('Dark Industrial Telemetry UI — Canonical Components & Dual-Mode Reco
         expect(screen.getByTestId('auto-purge-checkbox')).toBeChecked();
         expect(screen.getByTestId('live-spine-calculator-card')).toBeInTheDocument();
         fireEvent.click(screen.getByTestId('submit-preflight-inspect-btn'));
-        expect(await screen.findByText('PF-2026-089')).toBeInTheDocument();
+        expect(await screen.findAllByText('PF-2026-089')).not.toHaveLength(0);
         expect(screen.getByTestId('asset-purged-badge-PF-2026-089')).toHaveTextContent('[METADATA ONLY / ASSET PURGED]');
+
+        // Verify the 6-Axis Preflight Report Modal automatically opened after submitting + RUN PREFLIGHT
+        expect(screen.getByTestId('preflight-inspection-report-modal')).toBeInTheDocument();
+        expect(screen.getByText('01 — COLOR SPACE')).toBeInTheDocument();
+        expect(screen.getByText('02 — RESOLUTION')).toBeInTheDocument();
+        expect(screen.getByText('03 — INK DENSITY')).toBeInTheDocument();
+        expect(screen.getByText('04 — TYPOGRAPHY')).toBeInTheDocument();
+        expect(screen.getByText('05 — PERIMETRAL BLEED')).toBeInTheDocument();
+        expect(screen.getByText('06 — BOOK GEOMETRY')).toBeInTheDocument();
+        fireEvent.click(screen.getByTestId('close-inspection-report-btn'));
+        expect(screen.queryByTestId('preflight-inspection-report-modal')).not.toBeInTheDocument();
+
+        // Verify clicking VIEW REPORT on an existing row opens the 6-Axis Report Modal for that row
+        fireEvent.click(screen.getByTestId('view-report-btn-PF-2026-081'));
+        expect(screen.getByTestId('preflight-inspection-report-modal')).toBeInTheDocument();
+        fireEvent.click(screen.getByTestId('close-inspection-report-btn'));
 
         // Test manual Purge Asset (Free Disk) button on an existing row
         const purgeBtn = screen.getByTestId('purge-asset-btn-PF-2026-081');
@@ -253,7 +269,7 @@ describe('Dark Industrial Telemetry UI — Canonical Components & Dual-Mode Reco
         expect(screen.getByTestId('publisher-hub-workspace')).toHaveAttribute('data-mode', 'workspace');
         expect(screen.getByText('Publisher Operations Hub')).toBeInTheDocument();
         expect(screen.getByText('ACTIVE TITLES')).toBeInTheDocument();
-        expect(screen.getByText('AWAITING APPROVAL')).toBeInTheDocument();
+        expect(screen.getAllByText('AWAITING APPROVAL').length).toBeGreaterThanOrEqual(1);
         expect(screen.getByText('COPIES IN PRESS')).toBeInTheDocument();
         expect(screen.getByText('ON-TIME DELIVERY %')).toBeInTheDocument();
 
