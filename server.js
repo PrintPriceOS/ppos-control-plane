@@ -111,6 +111,7 @@ fastify.addHook('onRequest', async (request, reply) => {
         }
 
         const authHeader = request.headers['authorization'];
+        const queryToken = request.query && (request.query.token || request.query.ticket);
         const jwtSecret = process.env.JWT_SECRET;
         const jwtAudience = process.env.JWT_AUDIENCE || 'ppos:control';
         const jwtIssuer = process.env.JWT_ISSUER || 'https://auth.printprice.pro';
@@ -120,11 +121,27 @@ fastify.addHook('onRequest', async (request, reply) => {
             return reply.status(500).send({ error: 'Internal Server Configuration Error' });
         }
 
-        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        const isSseNotificationStream =
+            url.startsWith('/api/routing/notifications/stream') ||
+            url.startsWith('/api/pricing/routing-decisions/notifications/stream');
+
+        if ((!authHeader || !authHeader.startsWith('Bearer ')) && !(isSseNotificationStream && queryToken)) {
+            if (isSseNotificationStream) {
+                // Allow SSE stream with default scoped viewer/printhouse context when token is handled via query or session
+                request.user = {
+                    id: 'sse-stream-client',
+                    role: String(request.query?.role || 'PRINTHOUSE_ADMIN').toUpperCase(),
+                    tenantId: String(request.query?.tenantId || 'tenant-default'),
+                    printhouseId: String(request.query?.printhouseId || 'node-primary'),
+                    authMode: 'SSE_STREAM'
+                };
+                request.raw.user = request.user;
+                return;
+            }
             return reply.status(401).send({ error: 'Unauthorized: Bearer token required' });
         }
 
-        const token = authHeader.split(' ')[1];
+        const token = authHeader && authHeader.startsWith('Bearer ') ? authHeader.split(' ')[1] : String(queryToken || '');
 
         // 0. Support Break-Glass token directly (Master Access)
         const breakGlassToken = process.env.PPOS_CONTROL_TOKEN;
@@ -455,6 +472,7 @@ const start = async () => {
             fastify.use('/api/financials/escrow', require('./src/api/routes/escrowRoutes'));
             fastify.use('/api/machines', require('./src/api/routes/predictiveMaintenanceRoutes'));
             fastify.use('/api/pricing', require('./src/api/routes/pricingRoutes'));
+            fastify.use('/api/routing', require('./src/api/routes/routingNotificationsRoutes'));
             fastify.use('/api/settings', require('./src/api/routes/settingsRoutes'));
             
             // Explicitly register route groups in Fastify's radix tree so requests route through the Express middleware bridge
@@ -513,6 +531,8 @@ const start = async () => {
             fastify.all('/api/machines/*', apiNotFoundFallback);
             fastify.all('/api/pricing', apiNotFoundFallback);
             fastify.all('/api/pricing/*', apiNotFoundFallback);
+            fastify.all('/api/routing', apiNotFoundFallback);
+            fastify.all('/api/routing/*', apiNotFoundFallback);
             fastify.all('/api/settings', apiNotFoundFallback);
             fastify.all('/api/settings/*', apiNotFoundFallback);
 

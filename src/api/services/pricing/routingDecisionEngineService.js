@@ -32,6 +32,11 @@ const {
     getPricingProfilesAsync,
     calibrateQuote
 } = require('./pricingIntelligenceService');
+const {
+    evaluateAndEmitRoutingDecisionEvents,
+    emitRoutingNotification,
+    ROUTING_EVENT_TYPES
+} = require('./routingNotificationService');
 
 const routingStateStore = new Map();
 
@@ -219,6 +224,8 @@ function createDefaultGovernanceRules(tenantId = 'tenant-default') {
         crossBorderPenaltyFactor: 1.18,
         maxRadiusKm: 2500,
         slaToleranceDays: 7,
+        enablePushAlarms: true,
+        autoWebhookToAssignedPrinthouse: true,
         weights: {
             cost: 0.4,
             freight: 0.3,
@@ -393,6 +400,14 @@ async function saveRoutingGovernanceRulesAsync(tenantId = 'tenant-default', payl
         ),
         maxRadiusKm: Math.max(100, Number(payload.maxRadiusKm ?? state.rules.maxRadiusKm ?? 2500)),
         slaToleranceDays: Math.max(1, Number(payload.slaToleranceDays ?? state.rules.slaToleranceDays ?? 7)),
+        enablePushAlarms:
+            payload.enablePushAlarms !== undefined
+                ? Boolean(payload.enablePushAlarms)
+                : Boolean(state.rules.enablePushAlarms ?? true),
+        autoWebhookToAssignedPrinthouse:
+            payload.autoWebhookToAssignedPrinthouse !== undefined
+                ? Boolean(payload.autoWebhookToAssignedPrinthouse)
+                : Boolean(state.rules.autoWebhookToAssignedPrinthouse ?? true),
         weights: payload.weights && typeof payload.weights === 'object'
             ? {
                   cost: Number(payload.weights.cost ?? presetWeights.cost),
@@ -764,12 +779,13 @@ async function calculateRoutingDecisions(tenantId = 'tenant-default', orderSpec 
     });
 
     // Record simulated dispatch in recent automated routing events if requested
+    const generatedOrderId = orderSpec.orderId || `PUB-ORD-2026-${Math.floor(8900 + Math.random() * 900)}`;
     if (winner && options.recordEvent !== false) {
         const simEvent = {
             id: `rt-sim-${Date.now().toString().slice(-5)}`,
             tenantId: String(tenantId || 'tenant-default'),
-            orderId: orderSpec.orderId || `PUB-ORD-2026-${Math.floor(8900 + Math.random() * 900)}`,
-            job_id: orderSpec.orderId || `PUB-ORD-2026-SIM`,
+            orderId: generatedOrderId,
+            job_id: generatedOrderId,
             job_name: `${copies.toLocaleString()} ej · ${trimSize} mm · ${pages} pp (${productFamily})`,
             productSpec: `${copies.toLocaleString()} copias · ${trimSize} mm · ${pages} pp · ${productFamily}`,
             destination: `${destination.city}, ${destination.country} (${winner.distanceKm} km)`,
@@ -780,7 +796,7 @@ async function calculateRoutingDecisions(tenantId = 'tenant-default', orderSpec 
                     : dispatchPolicy === 'LOCAL_LOW_CARBON'
                       ? 'Low Carbon / Local'
                       : 'Cost Optimal',
-            status: 'OPTIMAL_SIMULATED',
+            status: options.forcedManual ? 'FORCED_MANUAL' : 'OPTIMAL_SIMULATED',
             finalScore: winner.finalScore,
             industrialCostEur: winner.industrialCostEur,
             freightCostEur: winner.freightCostEur,
@@ -802,16 +818,21 @@ async function calculateRoutingDecisions(tenantId = 'tenant-default', orderSpec 
         state.events = [simEvent, ...state.events.slice(0, 14)];
     }
 
-    return {
+    const baseResult = {
         ok: true,
         tenantId: String(tenantId || 'tenant-default'),
         policyApplied: {
             dispatchPolicy,
             maxQueueCongestionPct,
             crossBorderPenaltyFactor,
+            enablePushAlarms: Boolean(options.enablePushAlarms ?? activeRules.enablePushAlarms ?? true),
+            autoWebhookToAssignedPrinthouse: Boolean(
+                options.autoWebhookToAssignedPrinthouse ?? activeRules.autoWebhookToAssignedPrinthouse ?? true
+            ),
             weights
         },
         orderSpec: {
+            orderId: generatedOrderId,
             copies,
             pages,
             trimSize,
@@ -822,6 +843,131 @@ async function calculateRoutingDecisions(tenantId = 'tenant-default', orderSpec 
         },
         optimalNode: rankedCandidates.find((c) => c.compatible) || null,
         candidates: rankedCandidates,
+        recentEvents: state.events
+    };
+
+    // Emit real-time notifications, SSE frames, operational_events & signed webhooks (< 500ms)
+    let notificationsResult = { emitted: [], primaryNotification: null };
+    if (options.emitNotifications !== false) {
+        notificationsResult = await evaluateAndEmitRoutingDecisionEvents(baseResult, {
+            orderId: generatedOrderId,
+            forcedManual: Boolean(options.forcedManual),
+            previousWinnerName: options.previousWinnerName,
+            enablePushAlarms: baseResult.policyApplied.enablePushAlarms,
+            autoWebhookToAssignedPrinthouse: baseResult.policyApplied.autoWebhookToAssignedPrinthouse,
+            webhookTargets: options.webhookTargets,
+            webhookOptions: options.webhookOptions,
+            dbClient
+        });
+    }
+
+    return {
+        ...baseResult,
+        notifications: notificationsResult.emitted.map((e) => e.notification),
+        primaryNotification: notificationsResult.primaryNotification,
+        notificationPipeline: notificationsResult
+    };
+}
+
+/**
+ * Forces a manual operator override (`ROUTING_FORCED_MANUAL`) onto a specific candidate profileId.
+ */
+async function forceManualRoutingDecisionAsync(
+    tenantId = 'tenant-default',
+    payload = {},
+    options = {},
+    dbClient = db
+) {
+    const state = getRoutingTenantState(tenantId);
+    const orderId = String(payload.orderId || `PUB-ORD-2026-${Math.floor(8900 + Math.random() * 900)}`).trim();
+    const targetCandidate = payload.candidate || {};
+    const previousWinnerName = payload.previousWinnerName || 'Top-1 Algorítmico';
+
+    const winner = {
+        profileId: targetCandidate.profileId || 'prof-manual',
+        printerId: targetCandidate.printerId || targetCandidate.profileId || 'mach-manual',
+        printerName: targetCandidate.printerName || 'Prensa Asignada Manualmente',
+        nodeId: targetCandidate.nodeId || 'node-primary',
+        nodeName: targetCandidate.nodeName || 'Printhouse Hub',
+        technology: targetCandidate.technology || 'OFFSET_B1',
+        distanceKm: Number(targetCandidate.distanceKm || 150),
+        isCrossBorder: Boolean(targetCandidate.isCrossBorder),
+        industrialCostEur: Number(targetCandidate.industrialCostEur || 1200),
+        freightCostEur: Number(targetCandidate.freightCostEur || 85),
+        totalLandedCostEur: Number(targetCandidate.totalLandedCostEur || 1285),
+        totalLeadTimeDays: Number(targetCandidate.totalLeadTimeDays || 4),
+        queueLoadPct: Number(targetCandidate.queueLoadPct || 52),
+        finalScore: Number(targetCandidate.finalScore || 88.5),
+        targetMarginPct: Number(targetCandidate.targetMarginPct || 28),
+        estimatedMarginEur: Number(targetCandidate.estimatedMarginEur || 320)
+    };
+
+    const manualAuditRow = {
+        id: `rt-man-${Date.now().toString().slice(-5)}`,
+        tenantId: String(tenantId || 'tenant-default'),
+        orderId,
+        job_id: orderId,
+        job_name: payload.productSpec || `Asignación Manual Operador (${winner.printerName})`,
+        productSpec: payload.productSpec || `Desvío Manual · ${winner.nodeName} · ${winner.printerName}`,
+        destination: payload.destination || targetCandidate.destinationLabel || 'Madrid, ES',
+        assignedPrinthouse: `${winner.nodeName} · ${winner.printerName}`,
+        decisionDriver: 'Manual Override',
+        status: 'FORCED_MANUAL',
+        finalScore: winner.finalScore,
+        industrialCostEur: winner.industrialCostEur,
+        freightCostEur: winner.freightCostEur,
+        totalLandedEur: winner.totalLandedCostEur,
+        leadTimeDays: winner.totalLeadTimeDays,
+        queueLoadPct: winner.queueLoadPct,
+        created_at: new Date().toISOString(),
+        final_decision_json: {
+            printer_id: winner.printerId,
+            printer_name: winner.printerName,
+            node_name: winner.nodeName,
+            technology: winner.technology,
+            final_routing_score: winner.finalScore,
+            margin_pct: winner.targetMarginPct,
+            estimated_margin: winner.estimatedMarginEur,
+            selected_reason: `ROUTING_FORCED_MANUAL: Operador anuló '${previousWinnerName}' y asignó manualmente ${winner.nodeName} · ${winner.printerName} (Landed €${winner.totalLandedCostEur.toFixed(2)}).`
+        }
+    };
+
+    state.events = [manualAuditRow, ...state.events.slice(0, 14)];
+
+    const emittedEvt = await emitRoutingNotification(
+        ROUTING_EVENT_TYPES.ROUTING_FORCED_MANUAL,
+        {
+            tenantId,
+            printhouseId: winner.nodeId,
+            orderId,
+            winner,
+            previousWinnerName,
+            orderSpec: payload.orderSpec || {
+                copies: payload.copies || 1000,
+                pages: payload.pages || 240,
+                trimSize: payload.trimSize || '148x210',
+                productFamily: payload.productFamily || 'SOFTCOVER',
+                destination: payload.destination || 'Madrid, ES'
+            },
+            actorId: options.actorId || 'PRINTHOUSE_ADMIN',
+            actorRole: options.actorRole || 'PRINTHOUSE_ADMIN',
+            actor: options.actor || 'Operador de Despacho Manual'
+        },
+        {
+            enablePushAlarms: state.rules.enablePushAlarms !== false,
+            autoWebhookToAssignedPrinthouse: state.rules.autoWebhookToAssignedPrinthouse !== false,
+            ...options,
+            dbClient
+        }
+    );
+
+    return {
+        ok: true,
+        tenantId: String(tenantId || 'tenant-default'),
+        orderId,
+        forcedNode: winner,
+        event: manualAuditRow,
+        notification: emittedEvt.notification,
         recentEvents: state.events
     };
 }
@@ -837,6 +983,7 @@ async function getRoutingDecisionsHistoryAsync(tenantId = 'tenant-default') {
 
 module.exports = {
     calculateRoutingDecisions,
+    forceManualRoutingDecisionAsync,
     getRoutingGovernanceRulesAsync,
     saveRoutingGovernanceRulesAsync,
     getRoutingDecisionsHistoryAsync,
@@ -844,3 +991,4 @@ module.exports = {
     DESTINATION_COORDINATES,
     POLICY_PRESETS
 };
+

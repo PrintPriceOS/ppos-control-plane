@@ -26,10 +26,17 @@ const {
 
 const {
     calculateRoutingDecisions,
+    forceManualRoutingDecisionAsync,
     getRoutingGovernanceRulesAsync,
     saveRoutingGovernanceRulesAsync,
     getRoutingDecisionsHistoryAsync
 } = require('../services/pricing/routingDecisionEngineService');
+
+const {
+    registerSseSubscriber,
+    listRecentRoutingNotifications,
+    emitRoutingNotification
+} = require('../services/pricing/routingNotificationService');
 
 function requireLogisticsControlPlaneAuth(req, res, next) {
     const role = (req.user && req.user.role) || (req.headers && req.headers['x-user-role']);
@@ -333,6 +340,84 @@ function createPricingRouter() {
                 (req.headers && req.headers['x-tenant-id']) ||
                 'tenant-default';
             const result = await getRoutingDecisionsHistoryAsync(tenantId);
+            return res.status(200).json(result);
+        } catch (err) {
+            return res.status(err.statusCode || 400).json({
+                ok: false,
+                error: err.message
+            });
+        }
+    });
+
+    // POST /api/pricing/routing-decisions/force-manual
+    router.post('/routing-decisions/force-manual', async (req, res) => {
+        try {
+            const tenantId =
+                (req.user && req.user.tenantId) ||
+                (req.body && req.body.tenantId) ||
+                (req.headers && req.headers['x-tenant-id']) ||
+                'tenant-default';
+            const result = await forceManualRoutingDecisionAsync(tenantId, req.body || {});
+            return res.status(200).json(result);
+        } catch (err) {
+            return res.status(err.statusCode || 400).json({
+                ok: false,
+                error: err.message
+            });
+        }
+    });
+
+    // GET /api/pricing/routing-decisions/notifications/stream (or /api/routing/notifications/stream)
+    router.get('/routing-decisions/notifications/stream', (req, res) => {
+        registerSseSubscriber(req, res, {
+            tenantId:
+                (req.user && req.user.tenantId) ||
+                (req.query && req.query.tenantId) ||
+                (req.headers && req.headers['x-tenant-id']) ||
+                'tenant-default',
+            printhouseId:
+                (req.user && req.user.printhouseId) ||
+                (req.query && req.query.printhouseId) ||
+                (req.headers && req.headers['x-printhouse-id']) ||
+                'node-primary',
+            role:
+                (req.user && req.user.role) ||
+                (req.query && req.query.role) ||
+                (req.headers && req.headers['x-user-role']) ||
+                'PRINTHOUSE_ADMIN'
+        });
+    });
+
+    // GET /api/pricing/routing-decisions/notifications
+    router.get('/routing-decisions/notifications', (req, res) => {
+        const tenantId =
+            (req.user && req.user.tenantId) ||
+            (req.query && req.query.tenantId) ||
+            (req.headers && req.headers['x-tenant-id']) ||
+            'tenant-default';
+        const limit = Number((req.query && req.query.limit) || 20);
+        const list = listRecentRoutingNotifications(tenantId, limit);
+        return res.status(200).json({
+            ok: true,
+            tenantId,
+            notifications: list
+        });
+    });
+
+    // POST /api/pricing/routing-decisions/notifications/emit (manual/test trigger)
+    router.post('/routing-decisions/notifications/emit', async (req, res) => {
+        try {
+            const tenantId =
+                (req.user && req.user.tenantId) ||
+                (req.body && req.body.tenantId) ||
+                (req.headers && req.headers['x-tenant-id']) ||
+                'tenant-default';
+            const scenario = (req.body && req.body.scenarioType) || 'ROUTING_ASSIGNED_OPTIMAL';
+            const result = await emitRoutingNotification(
+                scenario,
+                { ...(req.body || {}), tenantId },
+                (req.body && req.body.options) || {}
+            );
             return res.status(200).json(result);
         } catch (err) {
             return res.status(err.statusCode || 400).json({

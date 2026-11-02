@@ -181,14 +181,32 @@ export const OperationalActivityStream: React.FC<OperationalActivityStreamProps>
           locale
         });
         if (res && Array.isArray(res.events) && res.events.length > 0) {
-          setEvents(res.events);
+          setEvents(prev => {
+            const liveOnly = prev.filter(p => String(p.id).startsWith('RT-') || String(p.eventType).startsWith('ROUTING_'));
+            const byId = new Map<string, OperationalActivityEvent>();
+            for (const item of [...liveOnly, ...res.events]) {
+              if (item && item.id && !byId.has(item.id)) {
+                byId.set(item.id, item);
+              }
+            }
+            return Array.from(byId.values()).slice(0, 25);
+          });
           setTotalCount(res.total || res.events.length);
         } else {
           const filtered =
             domainToFetch === 'ALL'
               ? FALLBACK_EVENTS
               : FALLBACK_EVENTS.filter(e => e.domain === domainToFetch);
-          setEvents(filtered);
+          setEvents(prev => {
+            const liveOnly = prev.filter(p => String(p.id).startsWith('RT-') || String(p.eventType).startsWith('ROUTING_'));
+            const byId = new Map<string, OperationalActivityEvent>();
+            for (const item of [...liveOnly, ...filtered]) {
+              if (item && item.id && !byId.has(item.id)) {
+                byId.set(item.id, item);
+              }
+            }
+            return Array.from(byId.values()).slice(0, 25);
+          });
           setTotalCount(filtered.length);
         }
       } catch {
@@ -196,7 +214,16 @@ export const OperationalActivityStream: React.FC<OperationalActivityStreamProps>
           domainToFetch === 'ALL'
             ? FALLBACK_EVENTS
             : FALLBACK_EVENTS.filter(e => e.domain === domainToFetch);
-        setEvents(filtered);
+        setEvents(prev => {
+          const liveOnly = prev.filter(p => String(p.id).startsWith('RT-') || String(p.eventType).startsWith('ROUTING_'));
+          const byId = new Map<string, OperationalActivityEvent>();
+          for (const item of [...liveOnly, ...filtered]) {
+            if (item && item.id && !byId.has(item.id)) {
+              byId.set(item.id, item);
+            }
+          }
+          return Array.from(byId.values()).slice(0, 25);
+        });
         setTotalCount(filtered.length);
       } finally {
         setLoading(false);
@@ -212,6 +239,42 @@ export const OperationalActivityStream: React.FC<OperationalActivityStreamProps>
     }, 30000);
     return () => clearInterval(interval);
   }, [activeDomain, fetchStream]);
+
+  // Real-time SSE / Window Event Listener (< 50ms instant insertion at node 0 without waiting 30s)
+  useEffect(() => {
+    const handleLiveRoutingNotification = (ev: Event) => {
+      const customEv = ev as CustomEvent<any>;
+      const payload = customEv.detail;
+      if (!payload || !payload.id) return;
+
+      const domain = String(payload.domain || 'PRODUCTION').toUpperCase();
+      if (activeDomain !== 'ALL' && activeDomain !== domain) {
+        return;
+      }
+
+      const liveEvent: OperationalActivityEvent = {
+        id: payload.id,
+        orderId: payload.orderId || payload.metadata?.orderId || 'PUB-ORD-2026',
+        domain,
+        eventType: payload.eventType || 'ROUTING_ASSIGNED_OPTIMAL',
+        severity: (payload.severity || 'SUCCESS') as any,
+        title: payload.title,
+        description: payload.description || payload.message || '',
+        metadata: payload.metadata || {},
+        actor: payload.actor || 'Algorithmic Routing Engine (5-Axis)',
+        timestamp: payload.timestamp || new Date().toISOString(),
+        relativeTime: locale === 'de' ? 'Gerade eben' : locale === 'en' ? 'Just now' : 'Hace 1s'
+      };
+
+      setEvents(prev => [liveEvent, ...prev.filter(x => x.id !== liveEvent.id)].slice(0, 25));
+      setTotalCount(prev => prev + 1);
+    };
+
+    window.addEventListener('ppos:routing-notification', handleLiveRoutingNotification as EventListener);
+    return () => {
+      window.removeEventListener('ppos:routing-notification', handleLiveRoutingNotification as EventListener);
+    };
+  }, [activeDomain, locale]);
 
   const filterPills: { id: ActivityFilterDomain; label: string; testId: string; altTestId: string }[] = [
     { id: 'ALL', label: t('dashboard.360.filterPillAll'), testId: 'pill-filter-all', altTestId: 'activity-filter-pill-ALL' },

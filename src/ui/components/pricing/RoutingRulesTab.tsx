@@ -496,8 +496,11 @@ export const RoutingRulesTab: React.FC<RoutingRulesTabProps> = ({
     const [dispatchPolicy, setDispatchPolicy] = useState<DispatchPolicyId>('BALANCED_HYBRID');
     const [maxQueueCongestionPct, setMaxQueueCongestionPct] = useState<number>(85);
     const [crossBorderPenaltyFactor, setCrossBorderPenaltyFactor] = useState<number>(1.18);
+    const [enablePushAlarms, setEnablePushAlarms] = useState<boolean>(true);
+    const [autoWebhookToAssignedPrinthouse, setAutoWebhookToAssignedPrinthouse] = useState<boolean>(true);
     const [savingRules, setSavingRules] = useState<boolean>(false);
     const [rulesSavedBanner, setRulesSavedBanner] = useState<string | null>(null);
+    const [liveToastNotification, setLiveToastNotification] = useState<any | null>(null);
 
     // 2. Live Routing Simulator Specification State
     const [simCopies, setSimCopies] = useState<number>(1000);
@@ -515,6 +518,37 @@ export const RoutingRulesTab: React.FC<RoutingRulesTabProps> = ({
             setAuditEvents(routingHistory);
         }
     }, [routingHistory]);
+
+    // Listen for live SSE routing notifications & "Ver Decisión" drawer triggers from NotificationBell
+    useEffect(() => {
+        const handleRoutingNotif = (ev: Event) => {
+            const customEv = ev as CustomEvent<any>;
+            const payload = customEv.detail;
+            if (!payload) return;
+            setLiveToastNotification(payload);
+        };
+
+        const handleOpenDrawer = (ev: Event) => {
+            const customEv = ev as CustomEvent<any>;
+            const detail = customEv.detail;
+            if (!detail) return;
+            setInspectingEvent({
+                id: detail.notificationId,
+                orderId: detail.orderId,
+                job_id: detail.orderId,
+                final_decision_json: {
+                    selected_reason: `${detail.title} — ${detail.description}`
+                }
+            });
+        };
+
+        window.addEventListener('ppos:routing-notification', handleRoutingNotif as EventListener);
+        window.addEventListener('ppos:open-routing-decision-drawer', handleOpenDrawer as EventListener);
+        return () => {
+            window.removeEventListener('ppos:routing-notification', handleRoutingNotif as EventListener);
+            window.removeEventListener('ppos:open-routing-decision-drawer', handleOpenDrawer as EventListener);
+        };
+    }, []);
 
     // Hydrate governance rules from `/api/pricing/routing-decisions/rules` on mount
     useEffect(() => {
@@ -534,6 +568,12 @@ export const RoutingRulesTab: React.FC<RoutingRulesTabProps> = ({
                     }
                     if (data.rules.crossBorderPenaltyFactor !== undefined) {
                         setCrossBorderPenaltyFactor(Number(data.rules.crossBorderPenaltyFactor));
+                    }
+                    if (data.rules.enablePushAlarms !== undefined) {
+                        setEnablePushAlarms(Boolean(data.rules.enablePushAlarms));
+                    }
+                    if (data.rules.autoWebhookToAssignedPrinthouse !== undefined) {
+                        setAutoWebhookToAssignedPrinthouse(Boolean(data.rules.autoWebhookToAssignedPrinthouse));
                     }
                 }
             } catch (_) {
@@ -601,6 +641,8 @@ export const RoutingRulesTab: React.FC<RoutingRulesTabProps> = ({
                     dispatchPolicy,
                     maxQueueCongestionPct,
                     crossBorderPenaltyFactor,
+                    enablePushAlarms,
+                    autoWebhookToAssignedPrinthouse,
                     weights: policyObj.weights
                 })
             }).catch(() => null);
@@ -654,7 +696,11 @@ export const RoutingRulesTab: React.FC<RoutingRulesTabProps> = ({
                     destination: simDestination,
                     dispatchPolicy,
                     maxQueueCongestionPct,
-                    crossBorderPenaltyFactor
+                    crossBorderPenaltyFactor,
+                    options: {
+                        enablePushAlarms,
+                        autoWebhookToAssignedPrinthouse
+                    }
                 })
             }).catch(() => null);
 
@@ -666,14 +712,24 @@ export const RoutingRulesTab: React.FC<RoutingRulesTabProps> = ({
                 if (Array.isArray(json?.recentEvents) && json.recentEvents.length > 0) {
                     setAuditEvents(json.recentEvents);
                 }
+                if (json?.primaryNotification) {
+                    setLiveToastNotification(json.primaryNotification);
+                    if (enablePushAlarms) {
+                        window.dispatchEvent(
+                            new CustomEvent('ppos:routing-notification', { detail: json.primaryNotification })
+                        );
+                    }
+                }
             } else {
                 const winner = localRanked.find((c) => c.compatible);
+                const destObj = DESTINATIONS.find((d) => d.code === simDestination) || DESTINATIONS[0];
+                const orderId = `PUB-ORD-2026-${Math.floor(8900 + Math.random() * 900)}`;
+
                 if (winner) {
-                    const destObj = DESTINATIONS.find((d) => d.code === simDestination) || DESTINATIONS[0];
                     const newEvt = {
                         id: `rt-sim-${Date.now().toString().slice(-4)}`,
-                        orderId: `PUB-ORD-2026-${Math.floor(8900 + Math.random() * 900)}`,
-                        job_id: `PUB-ORD-2026-SIM`,
+                        orderId,
+                        job_id: orderId,
                         job_name: `${simCopies.toLocaleString()} ej · ${simTrimSize} mm · ${simPages} pp (${simFamily})`,
                         productSpec: `${simCopies.toLocaleString()} copias · ${simTrimSize} mm · ${simPages} pp · ${simFamily}`,
                         destination: `${destObj.city}, ${destObj.country} (${winner.distanceKm} km)`,
@@ -690,10 +746,120 @@ export const RoutingRulesTab: React.FC<RoutingRulesTabProps> = ({
                         }
                     };
                     setAuditEvents((prev) => [newEvt, ...prev]);
+
+                    const localNotif = {
+                        id: `RT-NOTIF-${Date.now()}`,
+                        orderId,
+                        domain: 'PRODUCTION',
+                        eventType: 'ROUTING_ASSIGNED_OPTIMAL',
+                        severity: 'SUCCESS',
+                        title: `Ruta Óptima Adjudicada (${winner.finalScore.toFixed(1)}/100): ${winner.nodeName} · ${winner.printerName}`,
+                        description: `Orden ${orderId} asignada a ${winner.nodeName} (${winner.printerName}) con Landed Cost €${winner.totalLandedCostEur.toFixed(2)}.`,
+                        timestamp: new Date().toISOString(),
+                        metadata: {
+                            orderId,
+                            winnerNodeName: winner.nodeName,
+                            assignedMachineName: winner.printerName,
+                            landedCostEur: winner.totalLandedCostEur
+                        }
+                    };
+                    setLiveToastNotification(localNotif);
+                    if (enablePushAlarms) {
+                        window.dispatchEvent(new CustomEvent('ppos:routing-notification', { detail: localNotif }));
+                    }
+                } else {
+                    const critNotif = {
+                        id: `RT-NOTIF-CRIT-${Date.now()}`,
+                        orderId,
+                        domain: 'PRODUCTION',
+                        eventType: 'ROUTING_NO_ELIGIBLE_CANDIDATE',
+                        severity: 'CRITICAL',
+                        title: `ALERTA CRÍTICA: Orden ${orderId} Bloqueada Sin Taller Elegible`,
+                        description: `Ninguna máquina activa soporta las dimensiones (${simTrimSize} mm · ${simFamily}) o el bloqueo de cola (${maxQueueCongestionPct}%).`,
+                        timestamp: new Date().toISOString(),
+                        metadata: { orderId }
+                    };
+                    setLiveToastNotification(critNotif);
+                    if (enablePushAlarms) {
+                        window.dispatchEvent(new CustomEvent('ppos:routing-notification', { detail: critNotif }));
+                    }
                 }
             }
         } finally {
             setSimulating(false);
+        }
+    };
+
+    const handleForceManualRoute = async (candidate: RoutingCandidateEvaluation) => {
+        const orderId = `PUB-ORD-2026-${Math.floor(8900 + Math.random() * 900)}`;
+        const previousWinnerName = optimalCandidate
+            ? `${optimalCandidate.nodeName} · ${optimalCandidate.printerName}`
+            : 'Top-1 Algorítmico';
+
+        const destObj = DESTINATIONS.find((d) => d.code === simDestination) || DESTINATIONS[0];
+        const manualEvt = {
+            id: `rt-man-${Date.now().toString().slice(-4)}`,
+            orderId,
+            job_id: orderId,
+            job_name: `${simCopies.toLocaleString()} ej · ${simTrimSize} mm · ${simPages} pp (${simFamily})`,
+            productSpec: `Desvío Manual · ${candidate.nodeName} · ${candidate.printerName}`,
+            destination: `${destObj.city}, ${destObj.country} (${candidate.distanceKm} km)`,
+            assignedPrinthouse: `${candidate.nodeName} · ${candidate.printerName}`,
+            decisionDriver: 'Manual Override',
+            status: 'FORCED_MANUAL',
+            finalScore: candidate.finalScore,
+            created_at: new Date().toISOString(),
+            final_decision_json: {
+                printer_name: `${candidate.nodeName} · ${candidate.printerName}`,
+                final_routing_score: candidate.finalScore,
+                margin_pct: candidate.targetMarginPct,
+                estimated_margin: candidate.estimatedMarginEur,
+                selected_reason: `ROUTING_FORCED_MANUAL: Operador anuló ${previousWinnerName} y asignó manualmente ${candidate.nodeName} · ${candidate.printerName} (Landed €${candidate.totalLandedCostEur.toFixed(2)}).`
+            }
+        };
+        setAuditEvents((prev) => [manualEvt, ...prev]);
+
+        const manualNotif = {
+            id: `RT-NOTIF-MAN-${Date.now()}`,
+            orderId,
+            domain: 'PRODUCTION',
+            eventType: 'ROUTING_FORCED_MANUAL',
+            severity: 'INFO',
+            title: `Desvío Manual de Operador: ${orderId} ➔ ${candidate.nodeName}`,
+            description: `Asignación forzada a ${candidate.nodeName} · ${candidate.printerName} (Landed €${candidate.totalLandedCostEur.toFixed(2)}).`,
+            timestamp: new Date().toISOString(),
+            metadata: {
+                orderId,
+                winnerNodeName: candidate.nodeName,
+                assignedMachineName: candidate.printerName,
+                landedCostEur: candidate.totalLandedCostEur
+            }
+        };
+        setLiveToastNotification(manualNotif);
+        if (enablePushAlarms) {
+            window.dispatchEvent(new CustomEvent('ppos:routing-notification', { detail: manualNotif }));
+        }
+
+        try {
+            const token = getAuthToken();
+            const headers: Record<string, string> = {
+                'Content-Type': 'application/json',
+                'x-user-role': 'PRINTHOUSE_ADMIN'
+            };
+            if (token) headers['Authorization'] = `Bearer ${token}`;
+            await fetch('/api/pricing/routing-decisions/force-manual', {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({
+                    orderId,
+                    candidate,
+                    previousWinnerName,
+                    productSpec: manualEvt.job_name,
+                    destination: manualEvt.destination
+                })
+            }).catch(() => null);
+        } catch {
+            // Non-fatal in offline tests
         }
     };
 
@@ -834,7 +1000,100 @@ export const RoutingRulesTab: React.FC<RoutingRulesTabProps> = ({
                         </div>
                     </div>
                 </div>
+
+                {/* Operator Real-Time Notification & Outgoing Webhook Quick Switches */}
+                <div className="pt-3 border-t border-slate-200 dark:border-[#1f2228] flex flex-wrap items-center justify-between gap-4">
+                    <div className="flex flex-wrap items-center gap-6">
+                        <label
+                            data-testid="toggle-push-alarms-label"
+                            className="flex items-center gap-2 text-xs font-mono font-bold text-slate-700 dark:text-slate-200 cursor-pointer select-none"
+                        >
+                            <input
+                                type="checkbox"
+                                data-testid="toggle-realtime-push-alarms"
+                                checked={enablePushAlarms}
+                                onChange={(e) => setEnablePushAlarms(e.target.checked)}
+                                className="w-4 h-4 accent-[#dc2626] rounded cursor-pointer"
+                            />
+                            <span>Real-time Push Alarms (Notify on Saturation &amp; Hard Gates)</span>
+                        </label>
+
+                        <label
+                            data-testid="toggle-auto-webhook-label"
+                            className="flex items-center gap-2 text-xs font-mono font-bold text-slate-700 dark:text-slate-200 cursor-pointer select-none"
+                        >
+                            <input
+                                type="checkbox"
+                                data-testid="toggle-auto-webhook-printhouse"
+                                checked={autoWebhookToAssignedPrinthouse}
+                                onChange={(e) => setAutoWebhookToAssignedPrinthouse(e.target.checked)}
+                                className="w-4 h-4 accent-[#10b981] rounded cursor-pointer"
+                            />
+                            <span>Auto-Webhook to Assigned Printhouse (HMAC-SHA256)</span>
+                        </label>
+                    </div>
+
+                    <div className="text-[10px] font-mono text-slate-400">
+                        SSE Channel: <span className="text-[#10b981] font-bold">/api/routing/notifications/stream</span>
+                    </div>
+                </div>
             </div>
+
+            {/* Instant Real-Time Routing Toast / Banner */}
+            {liveToastNotification && (
+                <div
+                    data-testid="routing-live-toast-banner"
+                    className={`p-4 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-all ${
+                        String(liveToastNotification.severity).toUpperCase() === 'CRITICAL'
+                            ? 'bg-rose-950/60 border-[#dc0000] text-rose-100'
+                            : String(liveToastNotification.severity).toUpperCase() === 'WARNING'
+                              ? 'bg-amber-950/60 border-amber-500 text-amber-100'
+                              : String(liveToastNotification.severity).toUpperCase() === 'INFO'
+                                ? 'bg-blue-950/60 border-blue-500 text-blue-100'
+                                : 'bg-emerald-950/60 border-[#10b981] text-emerald-100'
+                    }`}
+                >
+                    <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                            <span className="px-2 py-0.5 rounded bg-black/40 border border-white/20 text-[10px] font-mono font-black uppercase">
+                                {liveToastNotification.eventType || 'ROUTING_ASSIGNED_OPTIMAL'} ·{' '}
+                                {liveToastNotification.severity || 'SUCCESS'}
+                            </span>
+                            <span className="font-mono text-[11px] font-black">
+                                {liveToastNotification.orderId || 'PUB-ORD-2026'}
+                            </span>
+                            <span className="font-bold text-xs">{liveToastNotification.title}</span>
+                        </div>
+                        <p className="text-xs opacity-90 m-0">{liveToastNotification.description}</p>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                        <button
+                            type="button"
+                            data-testid="toast-inspect-decision-btn"
+                            onClick={() =>
+                                setInspectingEvent({
+                                    orderId: liveToastNotification.orderId,
+                                    job_id: liveToastNotification.orderId,
+                                    final_decision_json: {
+                                        selected_reason: `${liveToastNotification.title} — ${liveToastNotification.description}`
+                                    }
+                                })
+                            }
+                            className="px-3 py-1.5 rounded-lg bg-black/50 hover:bg-black/80 border border-white/20 text-[10px] font-mono font-bold uppercase cursor-pointer"
+                        >
+                            Ver Decisión
+                        </button>
+                        <button
+                            type="button"
+                            data-testid="toast-dismiss-btn"
+                            onClick={() => setLiveToastNotification(null)}
+                            className="px-2.5 py-1.5 rounded-lg bg-black/30 hover:bg-black/60 text-[10px] font-mono uppercase cursor-pointer"
+                        >
+                            ✕
+                        </button>
+                    </div>
+                </div>
+            )}
 
             {/* 2. Live Algorithmic Routing Simulator */}
             <div
@@ -1139,17 +1398,29 @@ export const RoutingRulesTab: React.FC<RoutingRulesTabProps> = ({
                                             </span>
                                         </td>
                                         <td className="py-2.5 px-3 text-right font-mono text-[11px]">
-                                            <span
-                                                className={
-                                                    isWinner
-                                                        ? 'text-[#10b981] font-bold'
-                                                        : !cand.compatible
-                                                          ? 'text-rose-400 font-bold'
-                                                          : 'text-amber-400'
-                                                }
-                                            >
-                                                {cand.rejectionReason}
-                                            </span>
+                                            <div className="flex items-center justify-end gap-2">
+                                                <span
+                                                    className={
+                                                        isWinner
+                                                            ? 'text-[#10b981] font-bold'
+                                                            : !cand.compatible
+                                                              ? 'text-rose-400 font-bold'
+                                                              : 'text-amber-400'
+                                                    }
+                                                >
+                                                    {cand.rejectionReason}
+                                                </span>
+                                                {!isWinner && cand.compatible && (
+                                                    <button
+                                                        type="button"
+                                                        data-testid={`force-manual-route-btn-${cand.profileId}`}
+                                                        onClick={() => handleForceManualRoute(cand)}
+                                                        className="px-2 py-0.5 rounded bg-slate-800 hover:bg-[#dc2626] text-slate-200 hover:text-white border border-slate-700 text-[9px] font-mono font-black uppercase transition-colors cursor-pointer shrink-0"
+                                                    >
+                                                        Forzar Ruta
+                                                    </button>
+                                                )}
+                                            </div>
                                         </td>
                                     </tr>
                                 );
