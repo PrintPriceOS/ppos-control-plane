@@ -24,6 +24,13 @@ const {
     calculateCrossoverPoint
 } = require('../services/pricing/pricingIntelligenceService');
 
+const {
+    calculateRoutingDecisions,
+    getRoutingGovernanceRulesAsync,
+    saveRoutingGovernanceRulesAsync,
+    getRoutingDecisionsHistoryAsync
+} = require('../services/pricing/routingDecisionEngineService');
+
 function requireLogisticsControlPlaneAuth(req, res, next) {
     const role = (req.user && req.user.role) || (req.headers && req.headers['x-user-role']);
     const allowedRoles = new Set([
@@ -90,6 +97,9 @@ function createFallbackRouter() {
         },
         post(path, handler) {
             addRoute('post', path, handler);
+        },
+        put(path, handler) {
+            addRoute('put', path, handler);
         },
         delete(path, handler) {
             addRoute('delete', path, handler);
@@ -251,6 +261,78 @@ function createPricingRouter() {
                 'tenant-default';
             await getPricingProfilesAsync(tenantId);
             const result = calculateCrossoverPoint(tenantId, req.query || {});
+            return res.status(200).json(result);
+        } catch (err) {
+            return res.status(err.statusCode || 400).json({
+                ok: false,
+                error: err.message
+            });
+        }
+    });
+
+    // GET /api/pricing/routing-decisions/rules
+    router.get('/routing-decisions/rules', async (req, res) => {
+        try {
+            const tenantId =
+                (req.user && req.user.tenantId) ||
+                (req.query && req.query.tenantId) ||
+                (req.headers && req.headers['x-tenant-id']) ||
+                'tenant-default';
+            const result = await getRoutingGovernanceRulesAsync(tenantId);
+            return res.status(200).json(result);
+        } catch (err) {
+            return res.status(err.statusCode || 400).json({
+                ok: false,
+                error: err.message
+            });
+        }
+    });
+
+    // PUT /api/pricing/routing-decisions/rules
+    router.put('/routing-decisions/rules', async (req, res) => {
+        try {
+            const tenantId =
+                (req.user && req.user.tenantId) ||
+                (req.body && req.body.tenantId) ||
+                (req.headers && req.headers['x-tenant-id']) ||
+                'tenant-default';
+            const result = await saveRoutingGovernanceRulesAsync(tenantId, req.body || {});
+            return res.status(200).json(result);
+        } catch (err) {
+            return res.status(err.statusCode || 400).json({
+                ok: false,
+                error: err.message
+            });
+        }
+    });
+
+    // POST /api/pricing/routing-decisions/simulate
+    router.post('/routing-decisions/simulate', async (req, res) => {
+        try {
+            const tenantId =
+                (req.user && req.user.tenantId) ||
+                (req.body && req.body.tenantId) ||
+                (req.headers && req.headers['x-tenant-id']) ||
+                'tenant-default';
+            const result = await calculateRoutingDecisions(tenantId, req.body || {}, req.body?.options || {});
+            return res.status(200).json(result);
+        } catch (err) {
+            return res.status(err.statusCode || 400).json({
+                ok: false,
+                error: err.message
+            });
+        }
+    });
+
+    // GET /api/pricing/routing-decisions/history
+    router.get('/routing-decisions/history', async (req, res) => {
+        try {
+            const tenantId =
+                (req.user && req.user.tenantId) ||
+                (req.query && req.query.tenantId) ||
+                (req.headers && req.headers['x-tenant-id']) ||
+                'tenant-default';
+            const result = await getRoutingDecisionsHistoryAsync(tenantId);
             return res.status(200).json(result);
         } catch (err) {
             return res.status(err.statusCode || 400).json({

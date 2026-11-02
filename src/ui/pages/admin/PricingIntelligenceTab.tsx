@@ -679,6 +679,7 @@ export const PricingIntelligenceTab: React.FC<SharedModuleProps> = ({
             {view === 'routing' && (
                 <RoutingRulesTab
                     loading={loading}
+                    profiles={profiles}
                     crossover={crossover}
                     routingHistory={routingHistory}
                     conflicts={conflicts}
