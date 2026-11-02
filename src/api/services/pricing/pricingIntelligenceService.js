@@ -1406,11 +1406,10 @@ async function persistProfileToMySQLAsync(
             await dbClient
                 .query(
                     `UPDATE printhouse_machines
-                     SET machine_name = ?, hourly_rate_eur = ?, min_sheet_width_mm = ?, min_sheet_height_mm = ?, max_sheet_width_mm = ?, max_sheet_height_mm = ?, metadata_json = ?
+                     SET machine_name = ?, min_sheet_width_mm = ?, min_sheet_height_mm = ?, max_sheet_width_mm = ?, max_sheet_height_mm = ?, metadata_json = ?
                      WHERE id = ?`,
                     [
                         normalized.printerName,
-                        normalized.hourlyRateEur,
                         normalized.minSheetWidthMm,
                         normalized.minSheetHeightMm,
                         normalized.maxSheetWidthMm,
