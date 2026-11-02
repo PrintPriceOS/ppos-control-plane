@@ -15,6 +15,7 @@ import {
 import { MachineCapabilityEditor } from '../printhouse/MachineCapabilityEditor';
 import { PricingHawkEyePanel } from '../../components/printhouse/pricing/PricingHawkEyePanel';
 import { MaterialsPaperPage } from '../materials/MaterialsPaperPage';
+import { useLocale } from '../../i18n';
 
 // ── Display helpers ──────────────────────────────────────────────────────────
 
@@ -683,6 +684,7 @@ const SETUP_TAB_TO_DETAIL_TAB: Record<string, DetailTab> = {
 
 export const PrinthouseDetailPage: React.FC = () => {
     const { id } = useParams<{ id: string }>();
+    const { t } = useLocale();
     const location = useLocation();
     const navigate = useNavigate();
     const [searchParams, setSearchParams] = useSearchParams();
@@ -751,7 +753,7 @@ export const PrinthouseDetailPage: React.FC = () => {
                             <h1 className="text-2xl font-black text-zinc-900 dark:text-zinc-100 tracking-tight truncate">{ph.name}</h1>
                             <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 text-[10px] font-black uppercase tracking-wider">
                                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                                ACTIVE NODE
+                                {t('printhouses.detail.activeNodeBadge')}
                             </span>
                         </div>
                         <p className="text-xs text-zinc-400 font-mono mt-0.5">
@@ -763,7 +765,7 @@ export const PrinthouseDetailPage: React.FC = () => {
                     <button onClick={() => setEditOpen(true)}
                         className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-zinc-900 dark:bg-[#dc0000] text-white text-xs font-bold uppercase tracking-wider hover:bg-zinc-800 dark:hover:bg-red-700 transition-colors flex-shrink-0 cursor-pointer">
                         <PencilSquareIcon className="w-4 h-4" />
-                        Edit Node & Rates
+                        {t('printhouses.detail.btnEditNodeRates')}
                     </button>
                 </div>
             </div>
@@ -771,10 +773,10 @@ export const PrinthouseDetailPage: React.FC = () => {
             {/* Summary KPI Cards */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 {[
-                    { label: 'Delivery SLA', value: ph.delivery_time || '5-7 days', icon: ClockIcon },
-                    { label: 'Lead Days', value: `${ph.production_lead_days || 5}d`, icon: ClockIcon },
-                    { label: 'Min Copies / Max Pages', value: `${(ph.limits?.min_copies ?? 50).toLocaleString()} / ${(ph.limits?.max_pages ?? 960).toLocaleString()}p`, icon: DocumentTextIcon },
-                    { label: 'Active Fleet / Weekly Cap', value: `${ph.machinesCount ?? 3} units · ${((ph.weeklySheetsCapacity ?? 250000) / 1000).toFixed(0)}k sheets`, icon: HashtagIcon },
+                    { label: t('printhouses.detail.kpiDeliverySla'), value: ph.delivery_time || '5-7 days', icon: ClockIcon },
+                    { label: t('printhouses.detail.kpiLeadDays'), value: `${ph.production_lead_days || 5}d`, icon: ClockIcon },
+                    { label: t('printhouses.detail.kpiMinCopiesMaxPages'), value: `${(ph.limits?.min_copies ?? 50).toLocaleString()} / ${(ph.limits?.max_pages ?? 960).toLocaleString()}p`, icon: DocumentTextIcon },
+                    { label: t('printhouses.detail.kpiActiveFleetCap'), value: `${ph.machinesCount ?? 3} units · ${((ph.weeklySheetsCapacity ?? 250000) / 1000).toFixed(0)}k sheets`, icon: HashtagIcon },
                 ].map((s, i) => (
                     <div key={i} className="bg-white dark:bg-[#131314] border border-zinc-200 dark:border-zinc-800 rounded-2xl p-4 flex items-center gap-3 shadow-2xs">
                         <div className="p-2.5 rounded-xl bg-zinc-100 dark:bg-zinc-900 text-zinc-500 dark:text-zinc-300">

@@ -20,6 +20,7 @@ import { listMachines, deleteMachine } from '../../api/printhouseCapabilitiesCli
 import { SharedModuleProps, TopSummaryKpiBar, HeaderActionGroup } from '../../components/common';
 import { MachineBlueprintThumbnail } from '../../components/printhouse/machines/MachineBlueprintThumbnail';
 import { MachineBlueprintModal } from '../../components/printhouse/machines/MachineBlueprintModal';
+import { useLocale } from '../../i18n';
 
 interface Machine {
     id: string;
@@ -76,6 +77,7 @@ export const MachinesPage: React.FC<SharedModuleProps> = ({
     onNextStep,
     onPrevStep
 }) => {
+    const { t } = useLocale();
     const [search, setSearch] = useState('');
     const [filterStatus, setFilterStatus] = useState<string>('ALL');
     
@@ -217,10 +219,10 @@ export const MachinesPage: React.FC<SharedModuleProps> = ({
     return (
         <div className="space-y-6" data-testid="machines-workspace" data-mode={mode}>
             <HeaderActionGroup
-                title="Industrial Machines"
-                subtitle="Machinery fleet, maximum sheet format, throughput speed and live connection state."
+                title={t('machines.workspace.title')}
+                subtitle={t('machines.workspace.subtitle')}
                 mode={mode}
-                primaryActionLabel="ONBOARD FLEET UNIT"
+                primaryActionLabel={t('machines.workspace.btnOnboardUnit')}
                 onPrimaryAction={() => {
                     setEditingMachine(null);
                     setSelectedPrinthouseId('');
@@ -239,10 +241,10 @@ export const MachinesPage: React.FC<SharedModuleProps> = ({
 
             <TopSummaryKpiBar
                 items={[
-                    { id: 'total-fleet', label: 'TOTAL FLEET', value: rawMachines.length, icon: CpuChipIcon, accent: 'blue' },
-                    { id: 'active-nodes', label: 'ACTIVE NODES', value: activeNodes, icon: SignalIcon, accent: 'emerald' },
-                    { id: 'avg-uptime', label: 'AVG. UPTIME', value: avgUptime ? `${avgUptime}%` : 'N/A', icon: BoltIcon, accent: 'amber' },
-                    { id: 'grid-efficiency', label: 'GRID EFFICIENCY', value: avgEfficiency ? `${avgEfficiency}%` : 'N/A', icon: ScaleIcon, accent: 'rose' }
+                    { id: 'total-fleet', label: t('machines.workspace.kpiTotalFleet'), value: rawMachines.length, icon: CpuChipIcon, accent: 'blue' },
+                    { id: 'active-nodes', label: t('machines.workspace.kpiActiveNodes'), value: activeNodes, icon: SignalIcon, accent: 'emerald' },
+                    { id: 'avg-uptime', label: t('machines.workspace.kpiAvgUptime'), value: avgUptime ? `${avgUptime}%` : 'N/A', icon: BoltIcon, accent: 'amber' },
+                    { id: 'grid-efficiency', label: t('machines.workspace.kpiGridEfficiency'), value: avgEfficiency ? `${avgEfficiency}%` : 'N/A', icon: ScaleIcon, accent: 'rose' }
                 ]}
             />
 
@@ -254,14 +256,14 @@ export const MachinesPage: React.FC<SharedModuleProps> = ({
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#1f2228] pb-3">
                     <div>
                         <h3 className="text-xs font-black uppercase tracking-wider text-white">
-                            Predictive Press Maintenance & OEE Lifespan Engine (PHASE-12C)
+                            {t('machines.workspace.predictiveTitle')}
                         </h3>
                         <p className="text-[11px] text-slate-400">
-                            Automated consumable cycle tracking (Offset Blankets 1.2M · 3-Knife Trimmer 150k · Digital PIP 450k) and ≥95% preventive routing lock
+                            {t('machines.workspace.predictiveSubtitle')}
                         </p>
                     </div>
                     <span className="px-3 py-1 rounded-full bg-[#0a0b0d] border border-[#1f2228] text-[10px] font-mono font-bold text-emerald-400">
-                        AVG. PLANT OEE: {(predictiveUnits.reduce((a, b) => a + b.oeePct, 0) / predictiveUnits.length).toFixed(1)}%
+                        {t('machines.workspace.avgPlantOee')}: {(predictiveUnits.reduce((a, b) => a + b.oeePct, 0) / predictiveUnits.length).toFixed(1)}%
                     </span>
                 </div>
 
@@ -344,7 +346,7 @@ export const MachinesPage: React.FC<SharedModuleProps> = ({
                     <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
                     <input 
                         type="text"
-                        placeholder="Search fleet by machine, node, or city..."
+                        placeholder={t('machines.workspace.searchPlaceholder')}
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
                         className="w-full pl-9 pr-4 py-1.5 bg-transparent text-zinc-900 dark:text-zinc-100 text-sm focus:ring-0 border-none outline-none font-medium placeholder:text-zinc-400 dark:placeholder:text-zinc-600"
@@ -378,7 +380,7 @@ export const MachinesPage: React.FC<SharedModuleProps> = ({
                 data={filteredMachines}
                 columns={[
                     {
-                        header: 'Machine / Node',
+                        header: t('machines.workspace.colMachineNode'),
                         accessor: (m) => {
                             const primaryName = m.machineName || m.machine_name || m.companyName || 'Industrial Unit';
                             const nodeLabel = m.companyName && m.companyName !== primaryName ? m.companyName : (m.printhouseId || m.printhouse_id || m.id);
@@ -419,7 +421,7 @@ export const MachinesPage: React.FC<SharedModuleProps> = ({
                         sortKey: 'companyName'
                     },
                     {
-                        header: 'Geolocation',
+                        header: t('machines.workspace.colGeolocation'),
                         accessor: (m) => (
                             <div className="space-y-1">
                                 <div className="flex items-center gap-1.5 text-zinc-600 dark:text-zinc-300">
@@ -439,7 +441,7 @@ export const MachinesPage: React.FC<SharedModuleProps> = ({
                         sortKey: 'locationLabel'
                     },
                     {
-                        header: 'Grid Health',
+                        header: t('machines.workspace.colGridHealth'),
                         accessor: (m) => (
                             <div className="flex flex-col gap-1.5">
                                 <div className="w-fit">
@@ -457,7 +459,7 @@ export const MachinesPage: React.FC<SharedModuleProps> = ({
                         sortKey: 'healthState'
                     },
                     {
-                        header: 'Industrial Stats',
+                        header: t('machines.workspace.colIndustrialStats'),
                         accessor: (m) => (
                             <div className="space-y-2 w-36">
                                 <div>
@@ -490,7 +492,7 @@ export const MachinesPage: React.FC<SharedModuleProps> = ({
                         sortKey: 'capacityUtilizationPct'
                     },
                     {
-                        header: 'Performance',
+                        header: t('machines.workspace.colPerformance'),
                         accessor: (m) => (
                             <div className="flex items-center gap-4">
                                 <div className="text-center">
@@ -510,7 +512,7 @@ export const MachinesPage: React.FC<SharedModuleProps> = ({
                         sortKey: 'uptimeScore'
                     },
                     {
-                        header: 'Telemetry Integrity',
+                        header: t('machines.workspace.colTelemetryIntegrity'),
                         accessor: (m) => (
                             <div className="space-y-1">
                                 <div className="flex items-center gap-1.5">
@@ -529,7 +531,7 @@ export const MachinesPage: React.FC<SharedModuleProps> = ({
                         sortKey: 'lastHeartbeatAt'
                     },
                     {
-                        header: 'Actions',
+                        header: t('machines.workspace.colActions'),
                         accessor: (m) => (
                             <div className="flex items-center gap-1.5">
                                 <button
@@ -582,7 +584,7 @@ export const MachinesPage: React.FC<SharedModuleProps> = ({
                                     }}
                                     className="px-2.5 py-1 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-900 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 text-[10px] font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300 rounded-lg transition-colors cursor-pointer"
                                 >
-                                    Edit Specs
+                                    {t('machines.workspace.btnEditSpecs')}
                                 </button>
                                 {(m.printhouseId || m.printhouse_id) && (
                                     <button
@@ -610,7 +612,7 @@ export const MachinesPage: React.FC<SharedModuleProps> = ({
             
             <div className="flex items-center justify-between py-4 border-t border-zinc-200 dark:border-zinc-800">
                 <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">
-                    Showing {filteredMachines.length} of {rawMachines.length} Grid Units
+                    {t('machines.workspace.showingUnits', { shown: filteredMachines.length, total: rawMachines.length })}
                 </p>
                 <div className="flex items-center gap-4 text-[10px] font-bold text-zinc-400 uppercase tracking-widest">
                     <div className="flex items-center gap-1.5">

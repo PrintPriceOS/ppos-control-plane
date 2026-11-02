@@ -42,6 +42,7 @@ import {
     ScaleIcon
 } from '@heroicons/react/24/outline';
 import { getAuthToken } from '../../lib/authStore';
+import { useLocale } from '../../i18n';
 import {
     MaterialSpecificationDrawer,
     IndustrialSubstrateRecord,
@@ -275,12 +276,12 @@ const DEFAULT_FALLBACK_SUBSTRATES: IndustrialSubstrateRecord[] = [
     }
 ];
 
-const FILTER_TABS: { id: MaterialsFilterTab; label: string }[] = [
-    { id: 'ALL', label: 'TODOS LOS MATERIALES' },
-    { id: 'SHEETFED_PAPER', label: 'PLIEGOS (SHEETFED)' },
-    { id: 'REEL_PAPER', label: 'BOBINAS (REELS)' },
-    { id: 'BOARD_AND_ENDPAPERS', label: 'CARTONES Y GUARDAS' },
-    { id: 'LAMINATION_FOIL', label: 'LAMINADOS / PELÍCULAS' }
+const FILTER_TABS: { id: MaterialsFilterTab; labelKey: string }[] = [
+    { id: 'ALL', labelKey: 'materials.catalog.tabAll' },
+    { id: 'SHEETFED_PAPER', labelKey: 'materials.catalog.tabSheetfed' },
+    { id: 'REEL_PAPER', labelKey: 'materials.catalog.tabReel' },
+    { id: 'BOARD_AND_ENDPAPERS', labelKey: 'materials.catalog.tabBoardEndpapers' },
+    { id: 'LAMINATION_FOIL', labelKey: 'materials.catalog.tabLamination' }
 ];
 
 function normalizeFrontendMaterial(raw: any): IndustrialSubstrateRecord {
@@ -343,6 +344,7 @@ export const MaterialsPaperPage: React.FC<MaterialsPaperPageProps> = ({
     onSaved
 }) => {
     const navigate = useNavigate();
+    const { t } = useLocale();
 
     const [materials, setMaterials] = useState<IndustrialSubstrateRecord[]>(DEFAULT_FALLBACK_SUBSTRATES);
     const [activeFilterTab, setActiveFilterTab] = useState<MaterialsFilterTab>('ALL');
@@ -551,28 +553,28 @@ export const MaterialsPaperPage: React.FC<MaterialsPaperPageProps> = ({
     const formatTypeBadge = (type: IndustrialMaterialType) => {
         switch (type) {
             case 'SHEETFED_PAPER':
-                return { label: 'PLIEGO (SHEETFED)', color: 'bg-sky-500/10 text-sky-500 border-sky-500/30' };
+                return { label: t('materials.catalog.typeSheetfed'), color: 'bg-sky-500/10 text-sky-500 border-sky-500/30' };
             case 'REEL_PAPER':
-                return { label: 'BOBINA (WEB REEL)', color: 'bg-purple-500/10 text-purple-400 border-purple-500/30' };
+                return { label: t('materials.catalog.typeReel'), color: 'bg-purple-500/10 text-purple-400 border-purple-500/30' };
             case 'BOARD_CARTON':
-                return { label: 'CARTÓN / CUBIERTA', color: 'bg-amber-500/10 text-amber-500 border-amber-500/30' };
+                return { label: t('materials.catalog.typeBoard'), color: 'bg-amber-500/10 text-amber-500 border-amber-500/30' };
             case 'ENDPAPERS':
-                return { label: 'GUARDAS (ENDPAPERS)', color: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/30' };
+                return { label: t('materials.catalog.typeEndpapers'), color: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/30' };
             case 'LAMINATION_FOIL':
-                return { label: 'PELÍCULA / LAMINADO', color: 'bg-pink-500/10 text-pink-400 border-pink-500/30' };
+                return { label: t('materials.catalog.typeLamination'), color: 'bg-pink-500/10 text-pink-400 border-pink-500/30' };
         }
     };
 
     const formatDimensionsText = (item: IndustrialSubstrateRecord) => {
         const d = item.dimensions_json || {};
         if (item.material_type === 'REEL_PAPER' || item.material_type === 'LAMINATION_FOIL') {
-            return `Ancho ${d.web_width_mm || 840} mm · Ø${d.max_diameter_mm || 1200} mm · Cono ${d.core_diameter_mm || 76} mm`;
+            return `${d.web_width_mm || 840} mm · Ø${d.max_diameter_mm || 1200} mm · Ø${d.core_diameter_mm || 76} mm`;
         }
         const w = d.width_mm || 700;
         const h = d.height_mm || 1000;
         const grain = d.grain_direction || 'LG';
-        const std = w === 700 && h === 1000 ? 'B1' : w === 500 && h === 700 ? 'B2' : w === 320 && h === 450 ? 'SRA3' : 'Pliego';
-        return `${std} · ${w}×${h} mm (${grain === 'LG' ? 'Fibra Larga LG' : 'Fibra Corta SG'})`;
+        const std = w === 700 && h === 1000 ? 'B1' : w === 500 && h === 700 ? 'B2' : w === 320 && h === 450 ? 'SRA3' : 'Sheet';
+        return `${std} · ${w}×${h} mm (${grain === 'LG' ? t('materials.catalog.grainLong') : t('materials.catalog.grainShort')})`;
     };
 
     return (
@@ -586,14 +588,14 @@ export const MaterialsPaperPage: React.FC<MaterialsPaperPageProps> = ({
                     <div>
                         <div className="flex items-center gap-2.5 flex-wrap">
                             <h1 className="text-xl font-black uppercase tracking-tight text-zinc-900 dark:text-white m-0">
-                                Materials &amp; Paper — Industrial Substrates Catalog
+                                {t('materials.catalog.title')}
                             </h1>
                             <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-[10px] font-mono font-bold text-emerald-500 uppercase">
-                                MYSQL &amp; BPE LIVE SYNC
+                                {t('materials.catalog.badgeSync')}
                             </span>
                         </div>
                         <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 mb-0">
-                            Gestión relacional homologada de Pliegos Cortados (Sheetfed B1/B2/SRA3), Bobinas Continuas (Web Reels), Cartones, Guardas y Películas con cálculo instantáneo de mano (cm³/g), calibre (µm) y coste por pliego.
+                            {t('materials.catalog.subtitle')}
                         </p>
                     </div>
                 </div>
@@ -607,7 +609,7 @@ export const MaterialsPaperPage: React.FC<MaterialsPaperPageProps> = ({
                         className="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs font-bold text-zinc-700 dark:text-zinc-200 hover:border-zinc-400 dark:hover:border-zinc-700 transition-colors cursor-pointer"
                     >
                         <ArrowPathIcon className={`w-4 h-4 ${syncingMaster ? 'animate-spin text-[#dc0000]' : ''}`} />
-                        SYNC MASTER CATALOG
+                        {t('materials.catalog.btnRefresh')}
                     </button>
 
                     <button
@@ -617,7 +619,7 @@ export const MaterialsPaperPage: React.FC<MaterialsPaperPageProps> = ({
                         className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#dc0000] hover:bg-red-700 text-white text-xs font-black uppercase tracking-wider shadow-sm transition-all cursor-pointer"
                     >
                         <PlusIcon className="w-4 h-4" />
-                        + NUEVO SUSTRATO / PAPEL
+                        {t('materials.catalog.btnNewSubstrate')}
                     </button>
                 </div>
             </div>
@@ -653,13 +655,13 @@ export const MaterialsPaperPage: React.FC<MaterialsPaperPageProps> = ({
                 >
                     <div>
                         <p className="text-[10px] font-mono font-bold uppercase tracking-widest text-zinc-400">
-                            TOTAL SUBSTRATES
+                            {t('materials.catalog.kpiTotalSubstrates')}
                         </p>
                         <p className="text-2xl font-mono font-black text-zinc-900 dark:text-white mt-1">
                             {kpis.totalSubstrates}
                         </p>
                         <p className="text-[11px] text-zinc-500 mt-0.5">
-                            Sustratos activos en catálogo MySQL
+                            {t('materials.catalog.kpiTotalSubstratesSub')}
                         </p>
                     </div>
                     <div className="w-10 h-10 rounded-xl bg-zinc-100 dark:bg-zinc-900 flex items-center justify-center text-[#dc0000]">
@@ -673,13 +675,13 @@ export const MaterialsPaperPage: React.FC<MaterialsPaperPageProps> = ({
                 >
                     <div>
                         <p className="text-[10px] font-mono font-bold uppercase tracking-widest text-sky-500">
-                            SHEETFED STOCKS
+                            {t('materials.catalog.kpiSheetfedStocks')}
                         </p>
                         <p className="text-2xl font-mono font-black text-zinc-900 dark:text-white mt-1">
                             {kpis.sheetfedCount}
                         </p>
                         <p className="text-[11px] text-zinc-500 mt-0.5">
-                            Pliegos homologados (B1, B2, SRA3)
+                            {t('materials.catalog.kpiSheetfedStocksSub')}
                         </p>
                     </div>
                     <div className="w-10 h-10 rounded-xl bg-sky-500/10 flex items-center justify-center text-sky-500">
@@ -693,13 +695,13 @@ export const MaterialsPaperPage: React.FC<MaterialsPaperPageProps> = ({
                 >
                     <div>
                         <p className="text-[10px] font-mono font-bold uppercase tracking-widest text-purple-400">
-                            REEL INVENTORY
+                            {t('materials.catalog.kpiReelInventory')}
                         </p>
                         <p className="text-2xl font-mono font-black text-zinc-900 dark:text-white mt-1">
                             {kpis.reelCount} <span className="text-xs font-normal text-zinc-400">({kpis.totalReelTonnes} t)</span>
                         </p>
                         <p className="text-[11px] text-zinc-500 mt-0.5">
-                            Bobinas continuas (Web Offset / Inkjet)
+                            {t('materials.catalog.kpiReelInventorySub')}
                         </p>
                     </div>
                     <div className="w-10 h-10 rounded-xl bg-purple-500/10 flex items-center justify-center text-purple-400">
@@ -713,13 +715,13 @@ export const MaterialsPaperPage: React.FC<MaterialsPaperPageProps> = ({
                 >
                     <div>
                         <p className="text-[10px] font-mono font-bold uppercase tracking-widest text-amber-500">
-                            AVG. PAPER COST
+                            {t('materials.catalog.kpiAvgPaperCost')}
                         </p>
                         <p className="text-2xl font-mono font-black text-zinc-900 dark:text-white mt-1">
                             €{kpis.avgCostKg}<span className="text-xs font-normal text-zinc-400">/kg</span>
                         </p>
                         <p className="text-[11px] text-zinc-500 mt-0.5">
-                            Media ponderada celulosa activa
+                            {t('materials.catalog.kpiAvgPaperCostSub')}
                         </p>
                     </div>
                     <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-500">
@@ -745,7 +747,7 @@ export const MaterialsPaperPage: React.FC<MaterialsPaperPageProps> = ({
                                         : 'bg-zinc-100 dark:bg-zinc-900 text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'
                                 }`}
                             >
-                                {tab.label}
+                                {t(tab.labelKey)}
                             </button>
                         );
                     })}
@@ -758,7 +760,7 @@ export const MaterialsPaperPage: React.FC<MaterialsPaperPageProps> = ({
                         data-testid="materials-search-input"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        placeholder="Buscar por papel, molino, GSM, código..."
+                        placeholder={t('materials.catalog.searchPlaceholder')}
                         className="w-full pl-9 pr-3 py-2 rounded-xl bg-zinc-50 dark:bg-[#0B0C0E] border border-zinc-200 dark:border-zinc-800 text-xs font-medium text-zinc-900 dark:text-white"
                     />
                 </div>
@@ -770,13 +772,13 @@ export const MaterialsPaperPage: React.FC<MaterialsPaperPageProps> = ({
                     <table data-testid="industrial-substrates-table" className="w-full text-left border-collapse">
                         <thead>
                             <tr className="bg-zinc-50 dark:bg-[#0B0C0E] border-b border-zinc-200 dark:border-zinc-800 text-[10px] font-mono font-black uppercase tracking-wider text-zinc-400">
-                                <th className="py-3.5 px-4">1. MATERIAL / FABRICANTE</th>
-                                <th className="py-3.5 px-4">2. TIPO &amp; FORMATO GEOMÉTRICO</th>
-                                <th className="py-3.5 px-4">3. GRAMAJE &amp; MANO (BULK)</th>
-                                <th className="py-3.5 px-4">4. CERTIFICACIONES</th>
-                                <th className="py-3.5 px-4 text-right">5. COSTE (€/KG &amp; PLIEGO)</th>
-                                <th className="py-3.5 px-4 text-right">6. STOCK &amp; ESTADO</th>
-                                <th className="py-3.5 px-4 text-right">7. ACCIONES</th>
+                                <th className="py-3.5 px-4">1. {t('materials.catalog.colMaterial')}</th>
+                                <th className="py-3.5 px-4">2. {t('materials.catalog.colDimensionsGrain')}</th>
+                                <th className="py-3.5 px-4">3. {t('materials.catalog.colGsmBulk')}</th>
+                                <th className="py-3.5 px-4">4. {t('materials.catalog.colStockCerts')}</th>
+                                <th className="py-3.5 px-4 text-right">5. {t('materials.catalog.colTariffCost')}</th>
+                                <th className="py-3.5 px-4 text-right">6. STOCK</th>
+                                <th className="py-3.5 px-4 text-right">7. {t('materials.catalog.colActions')}</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800/80 text-xs">
@@ -960,3 +962,4 @@ export const MaterialsPaperPage: React.FC<MaterialsPaperPageProps> = ({
 };
 
 export default MaterialsPaperPage;
+

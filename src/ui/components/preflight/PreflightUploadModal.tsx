@@ -13,6 +13,7 @@
  */
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
+import { useLocale } from '../../i18n';
 import {
     SparklesIcon,
     DocumentArrowUpIcon,
@@ -70,8 +71,15 @@ export const PreflightUploadModal: React.FC<PreflightUploadModalProps> = ({
     labels: L,
     initialJobId = 'PF-2026-089'
 }) => {
+    const { locale } = useLocale();
     const [formJobId, setFormJobId] = useState(initialJobId);
-    const [formTitle, setFormTitle] = useState('Tratado de Impresión Offset Digital');
+    const [formTitle, setFormTitle] = useState(
+        locale === 'de'
+            ? 'Handbuch für industriellen Offset- und Digitaldruck'
+            : locale === 'es'
+              ? 'Tratado de Impresión Offset Digital'
+              : 'Treatise on Industrial Offset & Digital Printing'
+    );
     const [formIsbn, setFormIsbn] = useState('978-84-9032-441-1');
     const [formRole, setFormRole] = useState<'INTERIOR_PDF' | 'COVER_PDF'>('INTERIOR_PDF');
     const [workflowMode, setWorkflowMode] = useState<'MAGIC_FIX' | 'DIAGNOSTIC'>('MAGIC_FIX');
@@ -259,7 +267,17 @@ export const PreflightUploadModal: React.FC<PreflightUploadModalProps> = ({
                                         >
                                             <div className="flex items-center justify-between w-full">
                                                 <span className="text-xs font-black uppercase tracking-wider">
-                                                    {slot === 'INTERIOR_PDF' ? 'INTERIOR / TRIPA' : 'COVER / CUBIERTA'}
+                                                    {slot === 'INTERIOR_PDF'
+                                                        ? locale === 'de'
+                                                            ? 'INNENTEIL / BUCHBLOCK'
+                                                            : locale === 'es'
+                                                              ? 'INTERIOR / TRIPA'
+                                                              : 'INTERIOR / BOOK BLOCK'
+                                                        : locale === 'de'
+                                                          ? 'UMSCHLAG / COVER'
+                                                          : locale === 'es'
+                                                            ? 'COVER / CUBIERTA'
+                                                            : 'COVER / SPREAD'}
                                                 </span>
                                                 <span
                                                     className={`w-2 h-2 rounded-full ${
@@ -462,7 +480,12 @@ export const PreflightUploadModal: React.FC<PreflightUploadModalProps> = ({
                                 </div>
                                 <div className="col-span-2">
                                     <label className="block text-[10px] font-bold uppercase tracking-wider text-emerald-400 mb-1">
-                                        {L.lblCatalogSubstrate || 'Sustrato / Papel del Catálogo (Sincronizado MySQL)'}
+                                        {L.lblCatalogSubstrate ||
+                                            (locale === 'de'
+                                                ? 'Substrat / Papier aus Katalog (MySQL-synchronisiert)'
+                                                : locale === 'es'
+                                                  ? 'Sustrato / Papel del Catálogo (Sincronizado MySQL)'
+                                                  : 'Catalog Substrate / Paper (MySQL Synced)')}
                                     </label>
                                     <select
                                         data-testid="preflight-substrate-catalog-select"
@@ -478,7 +501,13 @@ export const PreflightUploadModal: React.FC<PreflightUploadModalProps> = ({
                                         }}
                                         className="w-full rounded-lg bg-[#121418] border border-emerald-500/40 px-3 py-1.5 text-xs font-mono text-white"
                                     >
-                                        <option value="CUSTOM">— Parámetros Manuales (GSM / Bulk personalizados) —</option>
+                                        <option value="CUSTOM">
+                                            {locale === 'de'
+                                                ? '— Manuelle Parameter (Benutzerdefiniertes GSM / Volumen) —'
+                                                : locale === 'es'
+                                                  ? '— Parámetros Manuales (GSM / Bulk personalizados) —'
+                                                  : '— Custom Manual Parameters (Custom GSM / Bulk) —'}
+                                        </option>
                                         {substrateOptions.map((sub) => (
                                             <option key={sub.id} value={sub.id}>
                                                 {sub.name}

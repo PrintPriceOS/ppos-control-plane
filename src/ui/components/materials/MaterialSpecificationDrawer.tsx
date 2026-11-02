@@ -23,6 +23,7 @@ import {
     BookOpenIcon,
     CurrencyEuroIcon
 } from '@heroicons/react/24/outline';
+import { useLocale } from '../../i18n';
 
 export type IndustrialMaterialType =
     | 'SHEETFED_PAPER'
@@ -169,6 +170,7 @@ export const MaterialSpecificationDrawer: React.FC<MaterialSpecificationDrawerPr
     initialMaterial = null,
     onSave
 }) => {
+    const { locale } = useLocale();
     const isEdit = Boolean(initialMaterial && initialMaterial.id);
 
     const [idCode, setIdCode] = useState<string>('');
@@ -393,10 +395,24 @@ export const MaterialSpecificationDrawer: React.FC<MaterialSpecificationDrawerPr
                         </div>
                         <div>
                             <h3 className="text-sm font-black uppercase tracking-wider text-zinc-900 dark:text-white m-0">
-                                {isEdit ? 'Editar Especificación Técnica de Sustrato' : 'Alta de Nuevo Sustrato Industrial'}
+                                {isEdit
+                                    ? locale === 'de'
+                                        ? 'Technische Substratspezifikation bearbeiten'
+                                        : locale === 'en'
+                                          ? 'Edit Industrial Substrate Specification'
+                                          : 'Editar Especificación Técnica de Sustrato'
+                                    : locale === 'de'
+                                      ? 'Neues Industrielles Substrat Registrieren'
+                                      : locale === 'en'
+                                        ? 'Onboard New Industrial Substrate'
+                                        : 'Alta de Nuevo Sustrato Industrial'}
                             </h3>
                             <p className="text-[10px] font-mono text-zinc-500 dark:text-zinc-400 uppercase tracking-widest m-0 mt-0.5">
-                                MYSQL PRINTHOUSE_MATERIALS · SINCRONIZADO CON LIVE CALIBRATOR &amp; BPE SPINE ENGINE
+                                {locale === 'de'
+                                    ? 'MYSQL PRINTHOUSE_MATERIALS · SYNCHRONISIERT MIT LIVE CALIBRATOR & BPE SPINE ENGINE'
+                                    : locale === 'en'
+                                      ? 'MYSQL PRINTHOUSE_MATERIALS · SYNCHRONIZED WITH LIVE CALIBRATOR & BPE SPINE ENGINE'
+                                      : 'MYSQL PRINTHOUSE_MATERIALS · SINCRONIZADO CON LIVE CALIBRATOR & BPE SPINE ENGINE'}
                             </p>
                         </div>
                     </div>
@@ -875,7 +891,7 @@ export const MaterialSpecificationDrawer: React.FC<MaterialSpecificationDrawerPr
                         onClick={onClose}
                         className="px-4 py-2 rounded-xl border border-zinc-200 dark:border-zinc-800 text-xs font-bold text-zinc-500 hover:text-zinc-900 dark:hover:text-white cursor-pointer"
                     >
-                        Cancelar
+                        {locale === 'de' ? 'Abbrechen' : locale === 'en' ? 'Cancel' : 'Cancelar'}
                     </button>
                     <button
                         type="submit"
@@ -885,10 +901,22 @@ export const MaterialSpecificationDrawer: React.FC<MaterialSpecificationDrawerPr
                     >
                         <SparklesIcon className="w-4 h-4" />
                         {saving
-                            ? 'Sincronizando MySQL & BPE...'
+                            ? locale === 'de'
+                                ? 'Synchronisiere MySQL & BPE...'
+                                : locale === 'en'
+                                  ? 'Syncing MySQL & BPE...'
+                                  : 'Sincronizando MySQL & BPE...'
                             : isEdit
-                              ? 'Guardar Cambios y Recalibrar BPE'
-                              : 'Registrar Sustrato en Catálogo'}
+                              ? locale === 'de'
+                                  ? 'Änderungen speichern & BPE kalibrieren'
+                                  : locale === 'en'
+                                    ? 'Save Changes & Recalibrate BPE'
+                                    : 'Guardar Cambios y Recalibrar BPE'
+                              : locale === 'de'
+                                ? 'Substrat im Katalog registrieren'
+                                : locale === 'en'
+                                  ? 'Register Substrate in Catalog'
+                                  : 'Registrar Sustrato en Catálogo'}
                     </button>
                 </div>
             </form>
@@ -902,3 +930,4 @@ export const MaterialSpecificationDrawer: React.FC<MaterialSpecificationDrawerPr
 };
 
 export default MaterialSpecificationDrawer;
+

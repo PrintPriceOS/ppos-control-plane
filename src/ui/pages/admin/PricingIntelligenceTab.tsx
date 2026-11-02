@@ -235,27 +235,47 @@ export const PricingIntelligenceTab: React.FC<SharedModuleProps> = ({
         {
             id: 'rt-decision-901',
             job_id: 'JOB-2026-8841',
-            job_name: 'Catálogo Industrial Primavera (1.500 ej · 128 pp)',
+            job_name:
+                locale === 'de'
+                    ? 'Industriekatalog Frühjahr (1.500 Ex. · 128 S.)'
+                    : locale === 'es'
+                      ? 'Catálogo Industrial Primavera (1.500 ej · 128 pp)'
+                      : 'Spring Industrial Catalog (1,500 copies · 128 pp)',
             created_at: '2026-06-01T09:15:00.000Z',
             final_decision_json: {
                 printer_name: 'Heidelberg Speedmaster XL 106-8P',
                 final_routing_score: 94,
                 margin_pct: 28,
                 estimated_margin: 814.4,
-                selected_reason: 'Tirada (1.500 ej.) superior al umbral de cruce Digital/Offset (410 ej.).'
+                selected_reason:
+                    locale === 'de'
+                        ? 'Auflage (1.500 Ex.) liegt über dem Digital/Offset-Crossover-Schwellenwert (410 Ex.).'
+                        : locale === 'es'
+                          ? 'Tirada (1.500 ej.) superior al umbral de cruce Digital/Offset (410 ej.).'
+                          : 'Print run (1,500 copies) exceeds the Digital/Offset crossover threshold (410 copies).'
             }
         },
         {
             id: 'rt-decision-902',
             job_id: 'JOB-2026-8842',
-            job_name: 'Manual Técnico Serie Corta (200 ej · 96 pp)',
+            job_name:
+                locale === 'de'
+                    ? 'Technisches Handbuch Kleinauflage (200 Ex. · 96 S.)'
+                    : locale === 'es'
+                      ? 'Manual Técnico Serie Corta (200 ej · 96 pp)'
+                      : 'Short-Run Technical Manual (200 copies · 96 pp)',
             created_at: '2026-06-01T09:42:00.000Z',
             final_decision_json: {
                 printer_name: 'HP Indigo 12000 HD Digital Press',
                 final_routing_score: 97,
                 margin_pct: 35,
                 estimated_margin: 248.9,
-                selected_reason: 'Tirada corta (200 ej.) inferior al punto de cruce (410 ej.). Cero planchas CTP.'
+                selected_reason:
+                    locale === 'de'
+                        ? 'Kleinauflage (200 Ex.) unterhalb des Crossover-Punkts (410 Ex.). Keine CTP-Platten.'
+                        : locale === 'es'
+                          ? 'Tirada corta (200 ej.) inferior al punto de cruce (410 ej.). Cero planchas CTP.'
+                          : 'Short run (200 copies) below crossover point (410 copies). Zero CTP plates.'
             }
         }
     ]);

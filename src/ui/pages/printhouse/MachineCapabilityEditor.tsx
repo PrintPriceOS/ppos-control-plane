@@ -6,6 +6,7 @@ import { PlusIcon, PencilIcon, TrashIcon, XMarkIcon, BoltIcon, CpuChipIcon } fro
 import { MachineSpecificationForm } from '../../components/printhouse/MachineSpecificationForm';
 import { MachineBlueprintThumbnail } from '../../components/printhouse/machines/MachineBlueprintThumbnail';
 import { MachineBlueprintModal } from '../../components/printhouse/machines/MachineBlueprintModal';
+import { useLocale } from '../../i18n';
 
 interface MachineCapabilityEditorProps {
     printhouseId?: string;
@@ -20,6 +21,7 @@ export const MachineCapabilityEditor: React.FC<MachineCapabilityEditorProps> = (
     editingMachine: propEditingMachine,
     onCancelEdit
 }) => {
+    const { t } = useLocale();
     const [machines, setMachines] = useState<Machine[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -308,15 +310,16 @@ export const MachineCapabilityEditor: React.FC<MachineCapabilityEditorProps> = (
                     </div>
                     <div>
                         <h3 className="text-sm font-black text-zinc-900 dark:text-zinc-100 uppercase tracking-wider">
-                            Active Machine Fleet ({machines.length})
+                            {t('machines.workspace.activeFleetHeader', { count: machines.length })}
                         </h3>
                         <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                            Homologated offset presses, digital HD units, and PUR/Hardcover binding lines synchronized with Preflight & BPE.
+                            {t('machines.workspace.activeFleetSubtitle')}
                         </p>
                     </div>
                 </div>
                 <button 
                     onClick={handleNew}
+                    data-testid="btn-add-machine-fleet"
                     className="px-4 py-2.5 rounded-xl bg-[#dc0000] hover:bg-red-700 text-white text-xs font-bold uppercase tracking-wider flex items-center gap-2 transition-colors cursor-pointer shrink-0 shadow-xs"
                 >
                     <PlusIcon className="w-4 h-4" /> + ADD MACHINE
@@ -399,19 +402,19 @@ export const MachineCapabilityEditor: React.FC<MachineCapabilityEditorProps> = (
                                     {/* Technical Specs Grid */}
                                     <div className="grid grid-cols-2 gap-2.5 p-3 rounded-xl bg-zinc-50 dark:bg-zinc-900/70 border border-zinc-200/70 dark:border-zinc-800/80 text-xs">
                                         <div>
-                                            <span className="block text-[9px] font-bold uppercase tracking-wider text-zinc-400">Formato Pliego</span>
+                                            <span className="block text-[9px] font-bold uppercase tracking-wider text-zinc-400">{t('machines.workspace.specSheetFormat')}</span>
                                             <span className="font-mono font-bold text-zinc-900 dark:text-zinc-100 text-[11px]">{sheetBadge}</span>
                                         </div>
                                         <div>
-                                            <span className="block text-[9px] font-bold uppercase tracking-wider text-zinc-400">Velocidad Nominal</span>
+                                            <span className="block text-[9px] font-bold uppercase tracking-wider text-zinc-400">{t('machines.workspace.specNominalSpeed')}</span>
                                             <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400 text-[11px]">{speedLabel}</span>
                                         </div>
                                         <div>
-                                            <span className="block text-[9px] font-bold uppercase tracking-wider text-zinc-400">TAC / Ingesta</span>
+                                            <span className="block text-[9px] font-bold uppercase tracking-wider text-zinc-400">{t('machines.workspace.specTacIngest')}</span>
                                             <span className="font-mono font-bold text-zinc-900 dark:text-zinc-100 text-[11px]">{m.max_tac_percent || 300}% · {m.max_file_size_mb || 2048} MB</span>
                                         </div>
                                         <div>
-                                            <span className="block text-[9px] font-bold uppercase tracking-wider text-zinc-400">Coste / Puesta a Punto</span>
+                                            <span className="block text-[9px] font-bold uppercase tracking-wider text-zinc-400">{t('machines.workspace.specCostMakeReady')}</span>
                                             <span className="font-mono font-bold text-zinc-900 dark:text-zinc-100 text-[11px]">{rateLabel}</span>
                                         </div>
                                     </div>
@@ -419,7 +422,7 @@ export const MachineCapabilityEditor: React.FC<MachineCapabilityEditorProps> = (
                                     {/* Real-Time Load Bar */}
                                     <div>
                                         <div className="flex items-center justify-between text-[10px] font-bold mb-1">
-                                            <span className="text-zinc-400 uppercase tracking-wider">Carga Actual de Cola</span>
+                                            <span className="text-zinc-400 uppercase tracking-wider">{t('machines.workspace.currentQueueLoad')}</span>
                                             <span className="font-mono text-zinc-800 dark:text-zinc-200">{loadPct}%</span>
                                         </div>
                                         <div className="w-full h-1.5 rounded-full bg-zinc-100 dark:bg-zinc-800 overflow-hidden">
@@ -473,7 +476,7 @@ export const MachineCapabilityEditor: React.FC<MachineCapabilityEditorProps> = (
                                         onClick={() => handleEdit(m)}
                                         className="px-3 py-1 rounded-lg border border-zinc-200 dark:border-zinc-800 text-[10px] font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 flex items-center gap-1 cursor-pointer"
                                     >
-                                        <PencilIcon className="w-3 h-3" /> Configure
+                                        <PencilIcon className="w-3 h-3" /> {t('machines.workspace.btnConfigure')}
                                     </button>
                                 </div>
                             </div>
@@ -523,10 +526,10 @@ export const MachineCapabilityEditor: React.FC<MachineCapabilityEditorProps> = (
                                             <BoltIcon className="w-5 h-5 text-[#dc0000]" />
                                             <div>
                                                 <h4 className="text-sm font-black text-zinc-900 dark:text-zinc-100 uppercase tracking-wider">
-                                                    {editingMachine?.id ? 'Edit Machine Specifications' : 'Onboard New Production Machine'}
+                                                    {editingMachine?.id ? t('machines.workspace.modalEditTitle') : t('machines.workspace.modalOnboardTitle')}
                                                 </h4>
                                                 <p className="text-[11px] text-zinc-500">
-                                                    Configure sheet constraints, color modes, print methods, throughput speed, TAC ink limits, and PDF/X-4 capabilities.
+                                                    {t('machines.workspace.modalSubtitle')}
                                                 </p>
                                             </div>
                                         </div>

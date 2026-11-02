@@ -74,12 +74,6 @@ export const LocaleProvider: React.FC<{ children: ReactNode; initialLocale?: Loc
   );
 };
 
-export const useLocale = () => {
-  const context = useContext(LocaleContext);
-  if (!context) throw new Error('useLocale must be used within a LocaleProvider');
-  return context;
-};
-
 // Global legacy t support for extracted code
 export const t = (key: string, params?: Record<string, any>): string => {
   const currentLoc = getStoredLocale();
@@ -91,4 +85,17 @@ export const t = (key: string, params?: Record<string, any>): string => {
     });
   }
   return template;
+};
+
+export const useLocale = (): LocaleContextType => {
+  const context = useContext(LocaleContext);
+  if (!context) {
+    const fallbackLocale = getStoredLocale();
+    return {
+      locale: fallbackLocale,
+      setLocale: () => {},
+      t: (key: string, params?: Record<string, any>) => t(key, params)
+    };
+  }
+  return context;
 };

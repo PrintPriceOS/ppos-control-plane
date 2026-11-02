@@ -106,10 +106,46 @@ const FALLBACK_PRODUCTION_ORDERS: LiveOrder[] = [
     }
 ];
 
+function localizeDemoProductName(order: LiveOrder, locale: string): string {
+    const id = String(order.id || '');
+    const map: Record<string, { en: string; de: string; es: string }> = {
+        'PUB-ORD-2026-101': {
+            en: 'European Industrial Architecture Atlas (3rd Ed.) · 1,500 copies',
+            de: 'Atlas der Europäischen Industriearchitektur (3. Aufl.) · 1.500 Ex.',
+            es: 'Atlas de Arquitectura Industrial Europea (3ª Ed.) · 1,500 uds'
+        },
+        'PUB-ORD-2026-102': {
+            en: 'Chronicles of Swiss Typographic Design · 1,000 copies',
+            de: 'Chroniken des Schweizer Typografie-Designs · 1.000 Ex.',
+            es: 'Crónicas del Diseño Tipográfico Suizo · 1,000 uds'
+        },
+        'PUB-ORD-2026-103': {
+            en: 'Frankfurt Book Fair 2026 Technical Catalog · 800 copies',
+            de: 'Technischer Katalog Frankfurter Buchmesse 2026 · 800 Ex.',
+            es: 'Catálogo Técnico Feria del Libro de Frankfurt 2026 · 800 uds'
+        },
+        'PUB-ORD-2026-104': {
+            en: 'Applied Photonic Engineering Manual · 1,200 copies',
+            de: 'Handbuch für Angewandte Photonik-Ingenieurtechnik · 1.200 Ex.',
+            es: 'Manual de Ingeniería Fotónica Aplicada · 1,200 uds'
+        },
+        'PUB-ORD-2026-105': {
+            en: 'Bauhaus & Ulm Monograph 1919-1968 · 2,000 copies',
+            de: 'Monografie Bauhaus & Ulm 1919-1968 · 2.000 Ex.',
+            es: 'Monografía Bauhaus & Ulm 1919-1968 · 2,000 uds'
+        }
+    };
+    const entry = map[id];
+    if (entry) {
+        return locale === 'de' ? entry.de : locale === 'es' ? entry.es : entry.en;
+    }
+    return order.productName || (locale === 'de' ? 'Zugewiesener Fertigungsauftrag' : locale === 'es' ? 'Orden de Producción Asignada' : 'Assigned Production Order');
+}
+
 export const LiveOrdersFeed: React.FC<{
     onSelectOrder?: (orderId?: string) => void;
 }> = ({ onSelectOrder }) => {
-    const { t } = useLocale();
+    const { t, locale } = useLocale();
     const isDark = typeof document !== 'undefined' && document.documentElement.classList.contains('dark');
     const [orders, setOrders] = useState<LiveOrder[]>(FALLBACK_PRODUCTION_ORDERS);
     const [revenue, setRevenue] = useState<number>(64210.00);
@@ -180,7 +216,7 @@ export const LiveOrdersFeed: React.FC<{
                     </h2>
                     <p style={{ fontSize: '13px', fontFamily: 'monospace', color: isDark ? '#10b981' : '#059669', fontWeight: 700, marginTop: '4px' }}>
                         {loading
-                            ? 'Hydrating orders...'
+                            ? t('orders.demo.hydratingOrders')
                             : t('dashboard.360.expectedRevenueSubtitle', {
                                 gross: revenue.toLocaleString('en-US', { minimumFractionDigits: 2 }),
                                 net: (revenue * 0.88).toLocaleString('en-US', { minimumFractionDigits: 2 })
@@ -253,7 +289,7 @@ export const LiveOrdersFeed: React.FC<{
                 textTransform: 'uppercase',
                 letterSpacing: '0.05em'
             }}>
-                <div>Order ID</div>
+                <div>{t('orders.demo.orderIdLabel')}</div>
                 <div>{t('dashboard.360.colTitleSpec')}</div>
                 <div>{t('dashboard.360.colPressStage')}</div>
                 <div>{t('dashboard.360.colEscrowInvoice')}</div>
@@ -295,7 +331,7 @@ export const LiveOrdersFeed: React.FC<{
                             <div style={{ fontWeight: 700, fontFamily: 'monospace' }}>{order.id}</div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingRight: '12px' }}>
                                 <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                    {order.productName || 'Assigned Production Order'}
+                                    {localizeDemoProductName(order, locale)}
                                 </span>
                                 {order.isUrgent && (
                                     <span style={{ 
@@ -306,7 +342,7 @@ export const LiveOrdersFeed: React.FC<{
                                         borderRadius: '4px',
                                         fontWeight: 700,
                                         fontFamily: 'monospace'
-                                    }}>URGENT</span>
+                                    }}>{t('orders.demo.urgentBadge')}</span>
                                 )}
                             </div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontFamily: 'monospace' }}>

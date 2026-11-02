@@ -49,6 +49,115 @@ async function downloadAuthenticatedFile(url: string, defaultFilename: string) {
   }
 }
 
+function localizeDrawerOrderTitle(orderOrJobId: string, fallbackTitle: string, locale: string): string {
+  const id = String(orderOrJobId || '');
+  const map: Record<string, { en: string; de: string; es: string }> = {
+    'PF-2026-001': {
+      en: 'The Shadow of the Wind — Special Collectors Edition',
+      de: 'Der Schatten des Windes — Sonderausgabe',
+      es: 'La Sombra del Viento — Edición Especial'
+    },
+    'PF-2026-002': {
+      en: 'European Industrial Architecture Atlas (3rd Ed.)',
+      de: 'Atlas der Europäischen Industriearchitektur (3. Aufl.)',
+      es: 'Atlas de Arquitectura Industrial Europea (3ª Ed.)'
+    },
+    'PF-2026-003': {
+      en: 'Contemporary Swiss Typography Manual',
+      de: 'Handbuch Zeitgenössische Schweizer Typografie',
+      es: 'Manual de Tipografía Suiza Contemporánea'
+    },
+    'PUB-ORD-2026-101': {
+      en: 'European Industrial Architecture Atlas (3rd Ed.)',
+      de: 'Atlas der Europäischen Industriearchitektur (3. Aufl.)',
+      es: 'Atlas de Arquitectura Industrial Europea (3ª Ed.)'
+    },
+    'PUB-ORD-2026-102': {
+      en: 'Chronicles of Swiss Typographic Design',
+      de: 'Chroniken des Schweizer Typografie-Designs',
+      es: 'Crónicas del Diseño Tipográfico Suizo'
+    },
+    'PUB-ORD-2026-103': {
+      en: 'Frankfurt Book Fair 2026 Technical Catalog',
+      de: 'Technischer Katalog Frankfurter Buchmesse 2026',
+      es: 'Catálogo Técnico Feria del Libro de Frankfurt 2026'
+    },
+    'PUB-ORD-2026-104': {
+      en: 'Applied Photonic Engineering Manual',
+      de: 'Handbuch für Angewandte Photonik-Ingenieurtechnik',
+      es: 'Manual de Ingeniería Fotónica Aplicada'
+    },
+    'PUB-ORD-2026-105': {
+      en: 'Bauhaus & Ulm Monograph 1919-1968',
+      de: 'Monografie Bauhaus & Ulm 1919-1968',
+      es: 'Monografía Bauhaus & Ulm 1919-1968'
+    }
+  };
+  const found = map[id];
+  if (found) {
+    return locale === 'de' ? found.de : locale === 'es' ? found.es : found.en;
+  }
+  return fallbackTitle;
+}
+
+function localizeAllocatedSignatures(machineCodeOrId: string, fallbackSpec: string, locale: string): string {
+  const key = String(machineCodeOrId || '').toUpperCase();
+  if (key.includes('XL106')) {
+    return locale === 'de'
+      ? '20 × 16 S. Falzbögen (CMYK + Dispersionslack)'
+      : locale === 'es'
+        ? '20 × 16pp Signaturas (CMYK + Barniz)'
+        : '20 × 16pp Signatures (CMYK + Aqueous Coating)';
+  }
+  if (key.includes('INDIGO')) {
+    return locale === 'de'
+      ? 'Kleinauflage + Umschläge C1S 300 g/m²'
+      : locale === 'es'
+        ? 'Tirada Corta + Cubiertas C1S 300g'
+        : 'Short-Run Block + Covers C1S 300 gsm';
+  }
+  if (key.includes('KOMORI') || key.includes('G29')) {
+    return locale === 'de'
+      ? 'Umschlag + Vorsatzpapier Pantone 485C'
+      : locale === 'es'
+        ? 'Cubierta + Guardas Pantone 485C'
+        : 'Cover Spread + Endpapers Pantone 485C';
+  }
+  if (key.includes('ALEGRO') || key.includes('MULLER')) {
+    return locale === 'de'
+      ? 'PUR-Rückenfräsung + Symmetrische Rillung 7,5 mm'
+      : locale === 'es'
+        ? 'Fresado PUR + Hendido Simétrico 7.5 mm'
+        : 'PUR Spine Milling + Symmetric Scoring 7.5 mm';
+  }
+  return fallbackSpec;
+}
+
+function localizeB2bMessageText(msgId: string, fallbackText: string, locale: string): string {
+  const map: Record<string, { en: string; de: string; es: string }> = {
+    'm-104-1': {
+      en: 'Detected interior bleed deficit (1.5 mm vs 3.0 mm) and spine deviation (+2.10 mm). Automatic Mirror Bleed +3.0 mm synthesis and parametric spine recalibration (16.88 mm) applied.',
+      de: 'Beschnittdefizit im Innenteil (1,5 mm statt 3,0 mm) und Rückenabweichung (+2,10 mm) erkannt. Automatische Spiegelbeschnitt-Synthese (+3,0 mm) und parametrische Rückenneukalibrierung (16,88 mm) angewendet.',
+      es: 'Detectado déficit de sangrado interior (1.5 mm vs 3.0 mm) y desviación de lomo (+2.10 mm). Síntesis automática Mirror Bleed +3.0 mm y recalibrado paramétrico (16.88 mm) aplicados.'
+    },
+    'm-104-2': {
+      en: 'Can we download the auto-repaired PDF with the recalibrated 16.88 mm spine before releasing the Escrow hold?',
+      de: 'Können wir das reparierte PDF mit der neuen Rückenbreite von 16,88 mm vor der Freigabe der Escrow-Sperre herunterladen?',
+      es: '¿Podemos descargar el PDF reparado con el nuevo lomo de 16.88 mm antes de liberar el bloqueo Escrow?'
+    },
+    'm-101-1': {
+      en: 'We have validated the 3D Soft-Proof and signed the SHA-256 Imprimatur. Please confirm press entry on Heidelberg XL 106.',
+      de: 'Wir haben den 3D-Softproof geprüft und das SHA-256-Imprimatur unterzeichnet. Bitte Druckbeginn auf der Heidelberg XL 106 bestätigen.',
+      es: 'Hemos validado el 3D Soft-Proof y firmado el Imprimatur SHA-256. Confirmad entrada en máquina Heidelberg XL 106.'
+    }
+  };
+  const entry = map[msgId];
+  if (entry) {
+    return locale === 'de' ? entry.de : locale === 'es' ? entry.es : entry.en;
+  }
+  return fallbackText;
+}
+
 /* ============================================================================
  * 1. STORAGE LIFECYCLE & QUOTA MANAGER DRAWER
  * ========================================================================== */
@@ -58,7 +167,7 @@ export const StorageLifecycleDrawer: React.FC<{
   storageData: any;
   onPurgeCompleted: () => void;
 }> = ({ open, onClose, storageData, onPurgeCompleted }) => {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
   const [purging, setPurging] = useState(false);
   const [purgeBanner, setPurgeBanner] = useState<string | null>(null);
   const [purgedJobsLocal, setPurgedJobsLocal] = useState<Record<string, boolean>>({});
@@ -266,7 +375,7 @@ export const StorageLifecycleDrawer: React.FC<{
                         </span>
                       )}
                     </div>
-                    <p className="text-xs font-bold text-zinc-200">{job.title}</p>
+                    <p className="text-xs font-bold text-zinc-200">{localizeDrawerOrderTitle(job.jobId, job.title, locale)}</p>
                     <div className="flex flex-wrap gap-4 text-[10px] font-mono text-zinc-400 pt-1">
                       <span>{t('dashboard.360.interiorSlotLabel')}: {isPurged ? '0 MB' : `${job.interiorSizeMb} MB`}</span>
                       <span>{t('dashboard.360.coverSlotLabel')}: {isPurged ? '0 MB' : `${job.coverSizeMb} MB`}</span>
@@ -358,7 +467,7 @@ export const LiveMachineAllocationModal: React.FC<{
   orders: any[];
   onReassigned: () => void;
 }> = ({ open, onClose, fleetData, orders, onReassigned }) => {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
   const [selectedOrder, setSelectedOrder] = useState<string>('PUB-ORD-2026-101');
   const [selectedMachine, setSelectedMachine] = useState<string>('HEIDELBERG-XL106-8P');
   const [reassigning, setReassigning] = useState(false);
@@ -532,10 +641,10 @@ export const LiveMachineAllocationModal: React.FC<{
                       <span className="text-zinc-400">ETA: {m.etaMinutes || 35} min</span>
                     </div>
                     <p className="text-xs font-bold text-zinc-200 truncate">
-                      {m.activeTitle || 'Offset Run'}
+                      {localizeDrawerOrderTitle(m.activeOrderId || 'PUB-ORD-2026-101', m.activeTitle || 'Offset Run', locale)}
                     </p>
                     <p className="text-[10px] font-mono text-zinc-400">
-                      {m.allocatedSignatures || '16pp Signatures CMYK ISO Coated v2'}
+                      {localizeAllocatedSignatures(m.code || m.id, m.allocatedSignatures || '16pp Signatures CMYK ISO Coated v2', locale)}
                     </p>
                   </div>
                 </div>
@@ -606,7 +715,7 @@ export const LiveMachineAllocationModal: React.FC<{
                 >
                   {ALLOCATABLE_ORDERS.map(ord => (
                     <option key={ord.id} value={ord.id}>
-                      {ord.id} — {ord.title} ({ord.copies.toLocaleString()} copies · {ord.sheetFormat} · {ord.binding})
+                      {ord.id} — {localizeDrawerOrderTitle(ord.id, ord.title, locale)} ({ord.copies.toLocaleString()} · {ord.sheetFormat} · {ord.binding})
                     </option>
                   ))}
                   {(orders || []).map((o: any) => (
@@ -662,7 +771,7 @@ export const FinancialEscrowDrawer: React.FC<{
   financialData: any;
   selectedOrderId?: string | null;
 }> = ({ open, onClose, financialData, selectedOrderId }) => {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
   const [escrowFilter, setEscrowFilter] = useState<'ALL' | 'LOCKED' | 'RELEASED'>('ALL');
 
   if (!open || typeof document === 'undefined') return null;
@@ -841,7 +950,7 @@ export const FinancialEscrowDrawer: React.FC<{
                       <span className="text-xs font-mono font-black text-white">{item.orderId}</span>
                       <span className="text-[10px] font-mono text-zinc-400">· {item.invoiceNumber}</span>
                     </div>
-                    <h3 className="text-sm font-bold text-zinc-100 mt-0.5">{item.title}</h3>
+                    <h3 className="text-sm font-bold text-zinc-100 mt-0.5">{localizeDrawerOrderTitle(item.orderId, item.title, locale)}</h3>
                     <p className="text-[11px] text-zinc-400">{item.publisherName} · {item.paymentRail}</p>
                   </div>
                   <span
@@ -930,7 +1039,7 @@ export const LogisticsPalletModal: React.FC<{
   onClose: () => void;
   logisticsData: any;
 }> = ({ open, onClose, logisticsData }) => {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
 
   if (!open || typeof document === 'undefined') return null;
 
@@ -1026,7 +1135,7 @@ export const LogisticsPalletModal: React.FC<{
                       {shp.warehouseCode}
                     </span>
                   </div>
-                  <h3 className="text-sm font-bold text-white mt-1">{shp.title}</h3>
+                  <h3 className="text-sm font-bold text-white mt-1">{localizeDrawerOrderTitle(shp.orderId, shp.title, locale)}</h3>
                   <p className="text-xs text-zinc-400">
                     {shp.warehouseName} · {shp.carrierName}
                   </p>
@@ -1118,7 +1227,7 @@ export const B2bIncidentBridgeDrawer: React.FC<{
   b2bData: any;
   onMessageSent: () => void;
 }> = ({ open, onClose, b2bData, onMessageSent }) => {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
   const [selectedOrderId, setSelectedOrderId] = useState<string>('PUB-ORD-2026-104');
   const [replyText, setReplyText] = useState<string>('');
   const [sending, setSending] = useState(false);
@@ -1274,7 +1383,7 @@ export const B2bIncidentBridgeDrawer: React.FC<{
             <div className="p-4 rounded-2xl bg-[#131314] border border-zinc-800 flex flex-wrap items-center justify-between gap-2">
               <div>
                 <span className="text-[10px] font-mono text-zinc-400">{activeThread.publisherContact}</span>
-                <h3 className="text-xs font-black text-white">{activeThread.title}</h3>
+                <h3 className="text-xs font-black text-white">{localizeDrawerOrderTitle(activeThread.orderId, activeThread.title, locale)}</h3>
               </div>
               <span className="px-2.5 py-1 rounded-full text-[9px] font-mono font-bold uppercase bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
                 {activeThread.imprimaturStatus}
@@ -1301,7 +1410,7 @@ export const B2bIncidentBridgeDrawer: React.FC<{
                     <span className="font-bold text-zinc-200">{m.senderName}</span>
                     <span>{new Date(m.timestamp).toLocaleTimeString()}</span>
                   </div>
-                  <p className="text-xs text-zinc-100 leading-relaxed">{m.text}</p>
+                  <p className="text-xs text-zinc-100 leading-relaxed">{localizeB2bMessageText(m.id, m.text, locale)}</p>
                 </div>
               );
             })}

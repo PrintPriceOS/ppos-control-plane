@@ -3,6 +3,7 @@ import { CheckSquare, Square, CheckCircle } from 'lucide-react';
 import { Machine } from '../../types/printhouseCapabilities';
 import { MACHINE_PRESETS_CATALOG } from './machines/machinePresetsCatalog';
 import { resolveMachineSchematic } from './machines/resolveMachineSchematic';
+import { useLocale } from '../../i18n';
 
 export const CANONICAL_COLOR_MODE_OPTIONS = [
     { value: 'CMYK', label: 'CMYK Standard' },
@@ -87,6 +88,7 @@ export const MachineSpecificationForm: React.FC<MachineSpecificationFormProps> =
     onShowSuggestionsChange,
     onSelectTemplate
 }) => {
+    const { t } = useLocale();
     const colorModes: string[] = Array.isArray(machine.supported_color_modes_json)
         ? machine.supported_color_modes_json
         : [];
@@ -173,7 +175,7 @@ export const MachineSpecificationForm: React.FC<MachineSpecificationFormProps> =
                         }}
                         className="w-full px-3 py-1.5 rounded-lg bg-zinc-900 border border-zinc-700 text-xs font-mono text-zinc-200 focus:outline-none focus:border-[#dc0000] cursor-pointer"
                     >
-                        <option value="">-- Load OEM Preset from European Standards Catalog (22 Models) --</option>
+                        <option value="">-- {t('machines.blueprint.selectPresetLabel')} --</option>
                         {MACHINE_PRESETS_CATALOG.map((preset) => (
                             <option key={preset.presetId} value={preset.presetId}>
                                 [{preset.technology}] {preset.manufacturer} · {preset.model} ({preset.maxSheetDimensions.widthMm}×{preset.maxSheetDimensions.heightMm} mm · {preset.nominalSpeedCph.toLocaleString()} cph)

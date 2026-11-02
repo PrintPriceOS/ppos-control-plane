@@ -113,6 +113,147 @@ const FALLBACK_EVENTS: OperationalActivityEvent[] = [
   }
 ];
 
+function localizeFallbackEvent(ev: OperationalActivityEvent, locale: string): OperationalActivityEvent {
+  const id = String(ev.id || '');
+  const translationsById: Record<string, {
+    en: { title: string; description: string; actor?: string; relativeTime: string };
+    de: { title: string; description: string; actor?: string; relativeTime: string };
+    es: { title: string; description: string; actor?: string; relativeTime: string };
+  }> = {
+    'EVT-2026-8845': {
+      en: {
+        title: 'Mirror Bleed Synthesis (+3.0 mm) & Calibrated Spine',
+        description: "Generated 3.0 mm mirror bleed and recalculated spine to 16.88 mm for 'Applied Photonic Engineering Manual' (PDF/X-4).",
+        actor: 'PrintPrice Engine (:8001)',
+        relativeTime: '2m ago'
+      },
+      de: {
+        title: 'Spiegelbeschnitt-Synthese (+3,0 mm) & Kalibrierter Buchrücken',
+        description: "3,0 mm Spiegelbeschnitt erzeugt und Rückenbreite auf 16,88 mm für 'Handbuch für Angewandte Photonik-Ingenieurtechnik' (PDF/X-4) neu berechnet.",
+        actor: 'PrintPrice Engine (:8001)',
+        relativeTime: 'vor 2 Min.'
+      },
+      es: {
+        title: 'Síntesis de Sangre (+3.0 mm) y Lomo Calibrado',
+        description: "Se generó sangrado espejo de 3.0 mm y lomo recalculado a 16.88 mm para 'Manual de Ingeniería Fotónica Aplicada' (PDF/X-4).",
+        actor: 'PrintPrice Engine (:8001)',
+        relativeTime: 'Hace 2m'
+      }
+    },
+    'EVT-2026-8843': {
+      en: {
+        title: 'Funds Custodied in Escrow MoR (€24,850.00)',
+        description: 'Commercial escrow hold verified via SEPA B2B Wire Escrow (88% Printhouse Split: €21,868.00 net guaranteed).',
+        actor: 'PrintPrice Escrow Treasury MoR',
+        relativeTime: '15m ago'
+      },
+      de: {
+        title: 'Treuhandgelder im Escrow MoR gesichert (€24.850,00)',
+        description: 'Kaufmännische Treuhandsperre über SEPA B2B Wire Escrow bestätigt (88% Druckerei-Split: €21.868,00 netto garantiert).',
+        actor: 'PrintPrice Escrow Treasury MoR',
+        relativeTime: 'vor 15 Min.'
+      },
+      es: {
+        title: 'Fondos Custodiados en Escrow MoR (€24,850.00)',
+        description: 'Retención comercial verificada vía SEPA B2B Wire Escrow (Split 88% Imprenta: €21,868.00 netos garantizados).',
+        actor: 'PrintPrice Escrow Treasury MoR',
+        relativeTime: 'Hace 15m'
+      }
+    },
+    'EVT-2026-8842': {
+      en: {
+        title: 'Pressroom Transition: IN_PREFLIGHT → PRINTING (Offset B1)',
+        description: 'Allocated 1,500-copy run (20 signatures × 16pp CMYK ISO Coated v2) to Heidelberg Speedmaster XL 106-8P press.',
+        actor: 'CTP Pressroom Lead (Heidelberg Prinect)',
+        relativeTime: '22m ago'
+      },
+      de: {
+        title: 'Drucksaal-Übergang: IN_PREFLIGHT → PRINTING (Offset B1)',
+        description: 'Auflage von 1.500 Exemplaren (20 Falzbögen × 16 S. CMYK ISO Coated v2) an Heidelberg Speedmaster XL 106-8P zugewiesen.',
+        actor: 'CTP-Drucksaalleitung (Heidelberg Prinect)',
+        relativeTime: 'vor 22 Min.'
+      },
+      es: {
+        title: 'Transición de Taller: IN_PREFLIGHT → PRINTING (Offset B1)',
+        description: 'Asignada tirada de 1,500 ejemplares (20 signaturas × 16pp CMYK ISO Coated v2) a prensa Heidelberg Speedmaster XL 106-8P.',
+        actor: 'Jefe de Taller CTP (Heidelberg Prinect)',
+        relativeTime: 'Hace 22m'
+      }
+    },
+    'EVT-2026-8841': {
+      en: {
+        title: 'EPAL Palletization & GS1-128 SSCC-18 Thermal Labels Issued',
+        description: '3 EPAL Euro-pallets (72 FEFCO 0201 cartons · 1,485 kg) labeled with SSCC range 003401234500000018–0032 bound for Zeitfracht Erfurt (DE).',
+        actor: 'B2B Loading Bay Terminal',
+        relativeTime: '28m ago'
+      },
+      de: {
+        title: 'EPAL-Palettierung & GS1-128 SSCC-18 Thermoetiketten erstellt',
+        description: '3 EPAL-Europaletten (72 FEFCO 0201 Kartons · 1.485 kg) mit SSCC-Bereich 003401234500000018–0032 nach Zeitfracht Erfurt (DE) etikettiert.',
+        actor: 'B2B-Verladeterminal',
+        relativeTime: 'vor 28 Min.'
+      },
+      es: {
+        title: 'Paletización EPAL y Etiquetas Térmicas GS1-128 SSCC-18 Emitidas',
+        description: '3 palets europeos EPAL (72 cajas FEFCO 0201 · 1,485 kg) etiquetados con rango SSCC 003401234500000018–0032 hacia Zeitfracht Erfurt (DE).',
+        actor: 'Terminal Logística Muelle B2B',
+        relativeTime: 'Hace 28m'
+      }
+    },
+    'EVT-2026-8840': {
+      en: {
+        title: 'PUR Perfect Binding Line Load Alert (92% Capacity)',
+        description: "Müller Martini Alegro PUR line operating at 92% queue load with 'Chronicles of Swiss Typographic Design'.",
+        actor: 'MES JMF Telemetry Sensor',
+        relativeTime: '36m ago'
+      },
+      de: {
+        title: 'Auslastungswarnung PUR-Klebebindelinie (92% Kapazität)',
+        description: "Müller Martini Alegro PUR-Linie arbeitet bei 92% Auslastung mit 'Chroniken des Schweizer Typografie-Designs'.",
+        actor: 'MES JMF Telemetry Sensor',
+        relativeTime: 'vor 36 Min.'
+      },
+      es: {
+        title: 'Alerta de Carga en Tren de Encuadernación PUR (92% Capacidad)',
+        description: "Línea Müller Martini Alegro PUR operando al 92% de carga con 'Crónicas del Diseño Tipográfico Suizo'.",
+        actor: 'MES JMF Telemetry Sensor',
+        relativeTime: 'Hace 36m'
+      }
+    },
+    'EVT-2026-8839': {
+      en: {
+        title: 'Geometric Spine Deviation Detected (Δ +2.88 mm)',
+        description: 'Cover PDF declared 14.00 mm spine vs 16.88 mm physical bulk calculated for 288 pages on 90 gsm paper (Bulk 1.3).',
+        actor: 'Preflight 6-Axis Inspector',
+        relativeTime: '44m ago'
+      },
+      de: {
+        title: 'Geometrische Rückenbreiten-Abweichung erkannt (Δ +2,88 mm)',
+        description: 'Umschlag-PDF deklarierte 14,00 mm Rückenbreite gegenüber 16,88 mm berechnetem Buchblock für 288 Seiten auf 90 g/m² Papier (Volumen 1,3).',
+        actor: 'Preflight 6-Axis Inspector',
+        relativeTime: 'vor 44 Min.'
+      },
+      es: {
+        title: 'Desviación Geométrica de Lomo Detectada (Δ +2.88 mm)',
+        description: 'El PDF de cubierta declaraba 14.00 mm frente a los 16.88 mm físicos calculados para 288 págs en papel 90g (Volumen 1.3).',
+        actor: 'Preflight 6-Axis Inspector',
+        relativeTime: 'Hace 44m'
+      }
+    }
+  };
+
+  const entry = translationsById[id];
+  if (!entry) return ev;
+  const loc = locale === 'de' ? entry.de : locale === 'es' ? entry.es : entry.en;
+  return {
+    ...ev,
+    title: loc.title,
+    description: loc.description,
+    actor: loc.actor || ev.actor,
+    relativeTime: loc.relativeTime
+  };
+}
+
 function getSeverityStyles(severity: string) {
   switch (String(severity).toUpperCase()) {
     case 'SUCCESS':
@@ -350,7 +491,8 @@ export const OperationalActivityStream: React.FC<OperationalActivityStreamProps>
         className="p-6 max-h-[380px] overflow-y-auto custom-scrollbar"
       >
         <div className="relative pl-6 border-l-2 border-zinc-800 space-y-3">
-          {events.map((ev, idx) => {
+          {events.map((rawEv, idx) => {
+            const ev = localizeFallbackEvent(rawEv, locale);
             const sevStyles = getSeverityStyles(ev.severity);
             const DomainIcon = getDomainIcon(ev.domain);
             const relBadge =

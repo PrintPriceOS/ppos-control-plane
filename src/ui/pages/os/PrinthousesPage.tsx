@@ -11,6 +11,7 @@ import { useAdminQuery } from '../../hooks/useAdminData';
 import { getPrinthouses, createPrinthouse, updatePrinthouse, deletePrinthouse } from '../../lib/adminApi';
 import { CanonicalIndustrialPricingEditor } from '../../components/printhouse/pricing/CanonicalIndustrialPricingEditor';
 import { PrinthousePricingGovernance } from '../../types/printhousePricing';
+import { useLocale } from '../../i18n';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 export interface PrinthouseLimits { min_copies: number; max_pages: number; }
@@ -217,6 +218,7 @@ export const PrinthouseFormModal: React.FC<FormModalProps> = ({ isOpen, onClose,
 // ── List Page ─────────────────────────────────────────────────────────────────
 export const PrinthousesPage: React.FC = () => {
     const navigate = useNavigate();
+    const { t } = useLocale();
     const q = useAdminQuery<Printhouse[]>('printhouses', getPrinthouses);
 
     const [modalOpen, setModalOpen] = useState(false);
@@ -246,21 +248,21 @@ export const PrinthousesPage: React.FC = () => {
         <div className="space-y-6">
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-2xl font-black text-zinc-900 dark:text-zinc-100 tracking-tight">Printhouses</h1>
-                    <p className="text-sm text-zinc-500 dark:text-zinc-400 font-medium tracking-tight">Registered print facilities, active machine fleets, weekly sheet capacities, and copy limits.</p>
+                    <h1 className="text-2xl font-black text-zinc-900 dark:text-zinc-100 tracking-tight">{t('printhouses.page.title')}</h1>
+                    <p className="text-sm text-zinc-500 dark:text-zinc-400 font-medium tracking-tight">{t('printhouses.page.subtitle')}</p>
                 </div>
                 <button onClick={openAdd}
                     className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 dark:bg-[#dc0000] dark:hover:bg-red-700 text-white text-sm font-bold shadow-xs transition-colors cursor-pointer">
                     <PlusIcon className="w-4 h-4" />
-                    Add Printhouse
+                    {t('printhouses.page.btnAdd')}
                 </button>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                 {[
-                    { label: 'Total Printhouses', value: printhouses.length, icon: PrinterIcon },
-                    { label: 'Avg. Lead Days', value: avgLeadDays, icon: ClockIcon },
-                    { label: 'Unique Signature Sets', value: new Set(printhouses.map(p => (p.signatures ?? []).join(','))).size, icon: HashtagIcon },
+                    { label: t('printhouses.page.kpiTotal'), value: printhouses.length, icon: PrinterIcon },
+                    { label: t('printhouses.page.kpiAvgLead'), value: avgLeadDays, icon: ClockIcon },
+                    { label: t('printhouses.page.kpiUniqueSigs'), value: new Set(printhouses.map(p => (p.signatures ?? []).join(','))).size, icon: HashtagIcon },
                 ].map((stat, i) => (
                     <div key={i} className="bg-white dark:bg-[#131314] p-5 rounded-2xl border border-zinc-200 dark:border-zinc-800 flex items-center gap-4 shadow-2xs">
                         <div className="p-3 rounded-xl bg-zinc-100 dark:bg-zinc-900 text-zinc-500 dark:text-zinc-200 border border-transparent dark:border-zinc-800">
@@ -285,7 +287,7 @@ export const PrinthousesPage: React.FC = () => {
                 data={printhouses}
                 columns={[
                     {
-                        header: 'Printhouse',
+                        header: t('printhouses.page.colPrinthouse'),
                         accessor: (p) => (
                             <div className="flex items-center gap-2">
                                 <div className="w-8 h-8 rounded-xl bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 flex items-center justify-center flex-shrink-0">
@@ -299,7 +301,7 @@ export const PrinthousesPage: React.FC = () => {
                         ),
                     },
                     {
-                        header: 'Signatures',
+                        header: t('printhouses.page.colSignatures'),
                         accessor: (p) => (
                             <div className="flex items-center gap-1.5 flex-wrap">
                                 {(p.signatures ?? []).map(s => (
@@ -309,7 +311,7 @@ export const PrinthousesPage: React.FC = () => {
                         ),
                     },
                     {
-                        header: 'Delivery & SLA',
+                        header: t('printhouses.page.colDeliverySla'),
                         accessor: (p) => (
                             <div className="space-y-0.5">
                                 <div className="flex items-center gap-1.5 text-zinc-600 dark:text-zinc-300 font-bold text-xs">
@@ -323,7 +325,7 @@ export const PrinthousesPage: React.FC = () => {
                         ),
                     },
                     {
-                        header: 'Limits',
+                        header: t('printhouses.page.colLimits'),
                         accessor: (p) => (
                             <div className="space-y-0.5">
                                 <div className="flex items-center gap-1 text-xs text-zinc-500 dark:text-zinc-400">
@@ -338,22 +340,22 @@ export const PrinthousesPage: React.FC = () => {
                         ),
                     },
                     {
-                        header: 'Fleet & Weekly Capacity',
+                        header: t('printhouses.page.colFleetCapacity'),
                         accessor: (p) => (
                             <div className="space-y-1">
                                 <div className="flex items-center gap-1.5">
                                     <span className="px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/60 text-[10px] font-black uppercase tracking-wide">
-                                        {p.machinesCount ?? (p.fleet?.length || 3)} Active Machines
+                                        {t('printhouses.page.activeMachinesCount', { count: p.machinesCount ?? (p.fleet?.length || 3) })}
                                     </span>
                                 </div>
                                 <p className="text-[11px] font-mono font-bold text-zinc-600 dark:text-zinc-300">
-                                    {(p.weeklySheetsCapacity ?? 250000).toLocaleString()} sheets/week
+                                    {t('printhouses.page.sheetsPerWeek', { sheets: (p.weeklySheetsCapacity ?? 250000).toLocaleString() })}
                                 </p>
                             </div>
                         ),
                     },
                     {
-                        header: 'Status',
+                        header: t('printhouses.page.colStatus'),
                         accessor: (p) => (
                             <div className="flex items-center gap-2">
                                 <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/80 text-[10px] font-black uppercase tracking-wider">
