@@ -176,10 +176,15 @@ export const LiveOrdersFeed: React.FC<{
                     style={{ cursor: onSelectOrder ? 'pointer' : 'default' }}
                 >
                     <h2 style={{ fontSize: '16px', fontWeight: 800, color: isDark ? '#fff' : '#0f172a', display: 'flex', alignItems: 'center', gap: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                        <Zap size={18} color="#dc0000" /> {t('dashboard.orders.expectedRevenue') || 'Expected Printhouse Revenue & Escrow Ledger'}
+                        <Zap size={18} color="#dc0000" /> {t('dashboard.orders.expectedRevenue') || 'Expected Printhouse Revenue'}
                     </h2>
                     <p style={{ fontSize: '13px', fontFamily: 'monospace', color: isDark ? '#10b981' : '#059669', fontWeight: 700, marginTop: '4px' }}>
-                        {loading ? 'Hydrating orders...' : `Expected Gross Revenue: €${revenue.toLocaleString('en-US', { minimumFractionDigits: 2 })} · Net Printhouse (88%): €${(revenue * 0.88).toLocaleString('en-US', { minimumFractionDigits: 2 })} · Click any order for Facturae/XRechnung XML`}
+                        {loading
+                            ? 'Hydrating orders...'
+                            : t('dashboard.360.expectedRevenueSubtitle', {
+                                gross: revenue.toLocaleString('en-US', { minimumFractionDigits: 2 }),
+                                net: (revenue * 0.88).toLocaleString('en-US', { minimumFractionDigits: 2 })
+                            })}
                     </p>
                 </div>
                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
@@ -202,7 +207,7 @@ export const LiveOrdersFeed: React.FC<{
                                 gap: '6px'
                             }}
                         >
-                            <FileCode2 size={14} color="#dc0000" /> EN 16931 XML / ESCROW SETTLEMENTS
+                            <FileCode2 size={14} color="#dc0000" /> {t('dashboard.360.btnOpenEscrowLedger')}
                         </button>
                     )}
                     {(['ALL', 'HIGH_PROFIT', 'URGENT'] as const).map(f => (
@@ -249,10 +254,10 @@ export const LiveOrdersFeed: React.FC<{
                 letterSpacing: '0.05em'
             }}>
                 <div>Order ID</div>
-                <div>Title / Production Spec</div>
-                <div>Press / Stage</div>
-                <div>Escrow &amp; E-Invoice</div>
-                <div style={{ textAlign: 'right' }}>Gross / Net (88%)</div>
+                <div>{t('dashboard.360.colTitleSpec')}</div>
+                <div>{t('dashboard.360.colPressStage')}</div>
+                <div>{t('dashboard.360.colEscrowInvoice')}</div>
+                <div style={{ textAlign: 'right' }}>{t('dashboard.360.colGrossNet')}</div>
             </div>
 
             {/* Table Body with Animations */}

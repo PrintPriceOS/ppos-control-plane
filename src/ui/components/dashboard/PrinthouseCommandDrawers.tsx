@@ -13,7 +13,6 @@ import {
   ExclamationTriangleIcon,
   ArrowsRightLeftIcon,
   DocumentTextIcon,
-  ShieldCheckIcon,
   PaperAirplaneIcon,
   QrCodeIcon
 } from '@heroicons/react/24/outline';
@@ -23,6 +22,7 @@ import {
   sendPrinthouseB2bOrderMessage
 } from '../../lib/adminApi';
 import { getAuthToken } from '../../lib/authStore';
+import { useLocale } from '../../i18n';
 
 async function downloadAuthenticatedFile(url: string, defaultFilename: string) {
   try {
@@ -58,6 +58,7 @@ export const StorageLifecycleDrawer: React.FC<{
   storageData: any;
   onPurgeCompleted: () => void;
 }> = ({ open, onClose, storageData, onPurgeCompleted }) => {
+  const { t } = useLocale();
   const [purging, setPurging] = useState(false);
   const [purgeBanner, setPurgeBanner] = useState<string | null>(null);
   const [purgedJobsLocal, setPurgedJobsLocal] = useState<Record<string, boolean>>({});
@@ -111,11 +112,11 @@ export const StorageLifecycleDrawer: React.FC<{
       setPurgedJobsLocal(map);
       setPurgeBanner(
         res?.message ||
-          `Purga completada: liberados ${res?.reclaimedMb || 2018.4} MB en /tmp y /storage. Metadatos forenses JSON e hashes SHA-256 conservados.`
+          `${t('dashboard.360.diskFreed')}: ${res?.reclaimedMb || 2018.4} MB (/tmp & /storage). ${t('dashboard.360.shaRetained')}.`
       );
       onPurgeCompleted();
-    } catch (e: any) {
-      setPurgeBanner('Activos PDF temporales purgados. Reportes forenses JSON conservados en base de datos.');
+    } catch (_) {
+      setPurgeBanner(`${t('dashboard.360.diskFreed')} · ${t('dashboard.360.shaRetained')}`);
     } finally {
       setPurging(false);
     }
@@ -126,7 +127,7 @@ export const StorageLifecycleDrawer: React.FC<{
     try {
       await purgePrinthouseRetentionAssets(jobId);
       setPurgedJobsLocal(prev => ({ ...prev, [jobId]: true }));
-      setPurgeBanner(`Archivo PDF de ${jobId} eliminado del disco. Reporte técnico de 6 ejes conservado.`);
+      setPurgeBanner(`${jobId}: ${t('dashboard.360.diskFreed')} (${t('dashboard.360.shaRetained')})`);
       onPurgeCompleted();
     } finally {
       setPurging(false);
@@ -152,14 +153,14 @@ export const StorageLifecycleDrawer: React.FC<{
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-sm font-black uppercase tracking-wider text-white">
-                  Storage Lifecycle &amp; Quota Manager
+                  {t('dashboard.360.storageDrawerTitle')}
                 </h2>
                 <span className="px-2 py-0.5 text-[9px] font-mono font-bold uppercase rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                  QUOTA ACTIVE
+                  {t('dashboard.360.quotaActiveBadge')}
                 </span>
               </div>
               <p className="text-[11px] font-mono text-zinc-400 mt-0.5">
-                /tmp/ppos-preflight-temp &amp; /storage/marketplace_orders · Max 2 GB/PDF Stream
+                {t('dashboard.360.storageDrawerSubtitle')}
               </p>
             </div>
           </div>
@@ -178,14 +179,14 @@ export const StorageLifecycleDrawer: React.FC<{
             <div className="flex items-end justify-between">
               <div>
                 <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-zinc-400">
-                  PRINTHOUSE NVMe STORAGE QUOTA
+                  {t('dashboard.360.nvmeQuotaLabel')}
                 </span>
                 <div className="text-2xl font-black text-white mt-1 font-mono">
                   {Object.keys(purgedJobsLocal).length > 2 ? '16.4' : usedGb} GB{' '}
-                  <span className="text-sm font-normal text-zinc-400">/ {quotaGb} GB Assigned</span>
+                  <span className="text-sm font-normal text-zinc-400">/ {quotaGb} GB {t('dashboard.360.assignedLabel')}</span>
                 </div>
               </div>
-              <span className="text-lg font-mono font-black text-[#10b981]">{usagePct}% USED</span>
+              <span className="text-lg font-mono font-black text-[#10b981]">{usagePct}% {t('dashboard.360.usedLabel')}</span>
             </div>
 
             <div className="h-2.5 bg-zinc-900 rounded-full overflow-hidden border border-zinc-800">
@@ -197,30 +198,30 @@ export const StorageLifecycleDrawer: React.FC<{
 
             <div className="grid grid-cols-3 gap-3 pt-2">
               <div className="p-3 rounded-xl bg-zinc-900/80 border border-zinc-800/80">
-                <span className="text-[9px] font-mono uppercase text-zinc-400 block">INTERIOR BLOCKS</span>
+                <span className="text-[9px] font-mono uppercase text-zinc-400 block">{t('dashboard.360.interiorBlocks')}</span>
                 <span className="text-sm font-mono font-black text-white">
                   {storageData?.bySlot?.INTERIOR_PDF?.sizeGb ?? 16.8} GB
                 </span>
                 <span className="text-[9px] font-mono text-zinc-500 block">
-                  {storageData?.bySlot?.INTERIOR_PDF?.count ?? 8} Heavy PDFs
+                  {storageData?.bySlot?.INTERIOR_PDF?.count ?? 8} {t('dashboard.360.heavyPdfs')}
                 </span>
               </div>
               <div className="p-3 rounded-xl bg-zinc-900/80 border border-zinc-800/80">
-                <span className="text-[9px] font-mono uppercase text-zinc-400 block">COVER SPREADS</span>
+                <span className="text-[9px] font-mono uppercase text-zinc-400 block">{t('dashboard.360.coverSpreads')}</span>
                 <span className="text-sm font-mono font-black text-white">
                   {storageData?.bySlot?.COVER_PDF?.sizeGb ?? 1.4} GB
                 </span>
                 <span className="text-[9px] font-mono text-zinc-500 block">
-                  {storageData?.bySlot?.COVER_PDF?.count ?? 8} Spreads + Spine
+                  {storageData?.bySlot?.COVER_PDF?.count ?? 8} {t('dashboard.360.spreadsAndSpine')}
                 </span>
               </div>
               <div className="p-3 rounded-xl bg-zinc-900/80 border border-zinc-800/80">
-                <span className="text-[9px] font-mono uppercase text-zinc-400 block">RECLAIMED DISK</span>
+                <span className="text-[9px] font-mono uppercase text-zinc-400 block">{t('dashboard.360.reclaimedDisk')}</span>
                 <span className="text-sm font-mono font-black text-[#10b981]">
                   {storageData?.reclaimedGb ?? 6.8} GB
                 </span>
                 <span className="text-[9px] font-mono text-zinc-500 block">
-                  {storageData?.purgedArtifactsCount ?? 6} Purged PDFs
+                  {storageData?.purgedArtifactsCount ?? 6} {t('dashboard.360.purgedPdfs')}
                 </span>
               </div>
             </div>
@@ -237,9 +238,9 @@ export const StorageLifecycleDrawer: React.FC<{
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <h3 className="text-xs font-black uppercase tracking-wider text-zinc-300">
-                Desglose por Trabajo (Interior / Tripa vs Cubierta)
+                {t('dashboard.360.jobBreakdownTitle')}
               </h3>
-              <span className="text-[10px] font-mono text-zinc-400">SHA-256 &amp; JSON Report Retained</span>
+              <span className="text-[10px] font-mono text-zinc-400">{t('dashboard.360.shaRetained')}</span>
             </div>
 
             {jobs.map(job => {
@@ -257,18 +258,18 @@ export const StorageLifecycleDrawer: React.FC<{
                       </span>
                       {isPurged ? (
                         <span className="px-2 py-0.5 text-[9px] font-mono font-bold uppercase rounded bg-zinc-800 text-zinc-400 border border-zinc-700">
-                          METADATA ONLY / ASSET PURGED
+                          {t('dashboard.360.metadataOnlyBadge')}
                         </span>
                       ) : (
                         <span className="px-2 py-0.5 text-[9px] font-mono font-bold uppercase rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                          HOT DISK ({job.totalSizeMb} MB)
+                          {t('dashboard.360.hotDiskBadge')} ({job.totalSizeMb} MB)
                         </span>
                       )}
                     </div>
                     <p className="text-xs font-bold text-zinc-200">{job.title}</p>
                     <div className="flex flex-wrap gap-4 text-[10px] font-mono text-zinc-400 pt-1">
-                      <span>Interior (Tripa): {isPurged ? '0 MB (Purged)' : `${job.interiorSizeMb} MB`}</span>
-                      <span>Cubierta (Cover): {isPurged ? '0 MB (Purged)' : `${job.coverSizeMb} MB`}</span>
+                      <span>{t('dashboard.360.interiorSlotLabel')}: {isPurged ? '0 MB' : `${job.interiorSizeMb} MB`}</span>
+                      <span>{t('dashboard.360.coverSlotLabel')}: {isPurged ? '0 MB' : `${job.coverSizeMb} MB`}</span>
                       <span>ISBN: {job.isbn}</span>
                     </div>
                   </div>
@@ -276,7 +277,7 @@ export const StorageLifecycleDrawer: React.FC<{
                   <div>
                     {isPurged ? (
                       <span className="text-[10px] font-mono text-zinc-500 uppercase px-3 py-1.5 rounded-lg border border-zinc-800 bg-zinc-900/50">
-                        Disco Liberado
+                        {t('dashboard.360.diskFreed')}
                       </span>
                     ) : (
                       <button
@@ -285,7 +286,7 @@ export const StorageLifecycleDrawer: React.FC<{
                         className="px-3 py-2 rounded-xl bg-zinc-900 hover:bg-[#dc0000]/20 border border-zinc-700 hover:border-[#dc0000] text-[10px] font-mono font-bold uppercase text-zinc-200 hover:text-white transition-all flex items-center gap-1.5 cursor-pointer"
                       >
                         <TrashIcon className="w-3.5 h-3.5 text-[#dc0000]" />
-                        Purge PDF
+                        {t('dashboard.360.btnPurgePdf')}
                       </button>
                     )}
                   </div>
@@ -298,7 +299,7 @@ export const StorageLifecycleDrawer: React.FC<{
         {/* Footer Quick Action */}
         <div className="px-6 py-4 bg-[#131314] border-t border-zinc-800 flex items-center justify-between gap-4">
           <div className="text-[10px] font-mono text-zinc-400">
-            Política activa: Conserva reportes forenses de 6 ejes y libera binarios PDF pesados.
+            {t('dashboard.360.storageFooterNote')}
           </div>
           <button
             data-testid="btn-purge-retention-assets"
@@ -307,7 +308,7 @@ export const StorageLifecycleDrawer: React.FC<{
             className="px-5 py-2.5 rounded-xl bg-[#dc0000] hover:bg-[#b80000] text-white text-xs font-black uppercase tracking-wider flex items-center gap-2 shadow-lg cursor-pointer transition-all"
           >
             <TrashIcon className="w-4 h-4" />
-            {purging ? 'PURGING ASSETS...' : 'PURGE RETENTION ASSETS'}
+            {purging ? t('dashboard.360.purgingAssets') : t('dashboard.360.btnPurgeRetentionAssets')}
           </button>
         </div>
       </div>
@@ -319,6 +320,37 @@ export const StorageLifecycleDrawer: React.FC<{
 /* ============================================================================
  * 2. LIVE MACHINE ALLOCATION & PRESS QUEUE MODAL
  * ========================================================================== */
+const ALLOCATABLE_ORDERS = [
+  {
+    id: 'PUB-ORD-2026-101',
+    title: 'Atlas de Arquitectura Industrial Europea (3ª Ed.)',
+    copies: 1500,
+    sheetFormat: 'B1 (750 × 1060 mm)',
+    binding: 'HARDCOVER'
+  },
+  {
+    id: 'PUB-ORD-2026-102',
+    title: 'Crónicas del Diseño Tipográfico Suizo',
+    copies: 1000,
+    sheetFormat: 'B2 (530 × 750 mm)',
+    binding: 'SOFTCOVER_PUR'
+  },
+  {
+    id: 'PUB-ORD-2026-104',
+    title: 'Manual de Ingeniería Fotónica Aplicada',
+    copies: 1200,
+    sheetFormat: 'B2 (530 × 750 mm)',
+    binding: 'SOFTCOVER_PUR'
+  },
+  {
+    id: 'PUB-ORD-2026-105',
+    title: 'Monografía Bauhaus & Ulm 1919-1968',
+    copies: 2000,
+    sheetFormat: 'B1 (750 × 1060 mm)',
+    binding: 'HARDCOVER'
+  }
+];
+
 export const LiveMachineAllocationModal: React.FC<{
   open: boolean;
   onClose: () => void;
@@ -326,6 +358,7 @@ export const LiveMachineAllocationModal: React.FC<{
   orders: any[];
   onReassigned: () => void;
 }> = ({ open, onClose, fleetData, orders, onReassigned }) => {
+  const { t } = useLocale();
   const [selectedOrder, setSelectedOrder] = useState<string>('PUB-ORD-2026-101');
   const [selectedMachine, setSelectedMachine] = useState<string>('HEIDELBERG-XL106-8P');
   const [reassigning, setReassigning] = useState(false);
@@ -399,6 +432,9 @@ export const LiveMachineAllocationModal: React.FC<{
         }
       ];
 
+  const activeOrderSpec =
+    ALLOCATABLE_ORDERS.find(o => o.id === selectedOrder) || ALLOCATABLE_ORDERS[0];
+
   const handleReassign = async () => {
     setReassigning(true);
     try {
@@ -408,10 +444,10 @@ export const LiveMachineAllocationModal: React.FC<{
         machineCode: selectedMachine,
         machineName: targetMachine?.name || selectedMachine
       });
-      setFeedback(`Orden ${selectedOrder} reasignada en tiempo real a ${targetMachine?.name || selectedMachine}.`);
+      setFeedback(`${selectedOrder} → ${targetMachine?.name || selectedMachine}`);
       onReassigned();
     } catch (_) {
-      setFeedback(`Orden ${selectedOrder} vinculada a prensa ${selectedMachine}.`);
+      setFeedback(`${selectedOrder} → ${selectedMachine}`);
     } finally {
       setReassigning(false);
     }
@@ -435,10 +471,10 @@ export const LiveMachineAllocationModal: React.FC<{
             </div>
             <div>
               <h2 className="text-sm font-black uppercase tracking-wider text-white">
-                Live Machine Allocation &amp; Press Telemetry
+                {t('dashboard.360.fleetModalTitle')}
               </h2>
               <p className="text-[11px] font-mono text-zinc-400">
-                Offset B1/B2 · Digital Inkjet/LEP · Encuadernación PUR &amp; Cuellos de Botella en Tiempo Real
+                {t('dashboard.360.fleetModalSubtitle')}
               </p>
             </div>
           </div>
@@ -457,7 +493,7 @@ export const LiveMachineAllocationModal: React.FC<{
             <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between text-xs font-mono text-amber-300">
               <div className="flex items-center gap-2.5">
                 <ExclamationTriangleIcon className="w-5 h-5 text-amber-400 shrink-0" />
-                <span>CUELLO DE BOTELLA DETECTADO: {fleetData.bottleneckAlert}</span>
+                <span>{t('dashboard.360.bottleneckDetected')}: {fleetData.bottleneckAlert}</span>
               </div>
               <span className="px-2 py-0.5 rounded bg-amber-500/20 text-[10px] font-bold">92% LOAD</span>
             </div>
@@ -492,14 +528,14 @@ export const LiveMachineAllocationModal: React.FC<{
                   {/* Active Job on Press */}
                   <div className="p-3 rounded-xl bg-zinc-900/90 border border-zinc-800/80 space-y-1">
                     <div className="flex items-center justify-between text-[10px] font-mono">
-                      <span className="text-[#dc0000] font-bold">ORDEN ACTIVA: {m.activeOrderId || 'PUB-ORD-2026-101'}</span>
+                      <span className="text-[#dc0000] font-bold">{t('dashboard.360.activeOrderLabel')}: {m.activeOrderId || 'PUB-ORD-2026-101'}</span>
                       <span className="text-zinc-400">ETA: {m.etaMinutes || 35} min</span>
                     </div>
                     <p className="text-xs font-bold text-zinc-200 truncate">
-                      {m.activeTitle || 'Tirada Offset Industrial en Curso'}
+                      {m.activeTitle || 'Offset Run'}
                     </p>
                     <p className="text-[10px] font-mono text-zinc-400">
-                      {m.allocatedSignatures || 'Pliegos 16pp CMYK ISO Coated v2'}
+                      {m.allocatedSignatures || '16pp Signatures CMYK ISO Coated v2'}
                     </p>
                   </div>
                 </div>
@@ -507,7 +543,7 @@ export const LiveMachineAllocationModal: React.FC<{
                 {/* Load & OEE Bar */}
                 <div className="space-y-1.5 pt-2">
                   <div className="flex justify-between text-[10px] font-mono">
-                    <span className="text-zinc-400">CARGA DE MÁQUINA: {m.loadPct ?? 80}%</span>
+                    <span className="text-zinc-400">{t('dashboard.360.machineLoadLabel')}: {m.loadPct ?? 80}%</span>
                     <span className="text-emerald-400 font-bold">OEE: {m.oeePct ?? 92}%</span>
                   </div>
                   <div className="h-2 bg-zinc-900 rounded-full overflow-hidden border border-zinc-800">
@@ -523,13 +559,31 @@ export const LiveMachineAllocationModal: React.FC<{
             ))}
           </div>
 
-          {/* Interactive Reassignment Controls */}
+          {/* Interactive Reassignment Controls (Wider Order Selector + Sheet Format & Binding Badges) */}
           <div className="p-5 rounded-2xl bg-[#131314] border border-zinc-800 space-y-4">
-            <div className="flex items-center gap-2">
-              <ArrowsRightLeftIcon className="w-4 h-4 text-[#dc0000]" />
-              <h3 className="text-xs font-black uppercase tracking-wider text-white">
-                Reasignación Dinámica de Orden a Máquina / Prensa
-              </h3>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <ArrowsRightLeftIcon className="w-4 h-4 text-[#dc0000]" />
+                <h3 className="text-xs font-black uppercase tracking-wider text-white">
+                  {t('dashboard.360.reassignSectionTitle')}
+                </h3>
+              </div>
+
+              {/* Sheet Format (B1/B2) & Binding Badges for Selected Order */}
+              <div className="flex items-center gap-2">
+                <span
+                  data-testid="badge-order-sheet-format"
+                  className="px-2.5 py-1 rounded-lg bg-[#dc0000]/15 border border-[#dc0000]/30 text-[10px] font-mono font-bold text-white"
+                >
+                  {activeOrderSpec.sheetFormat}
+                </span>
+                <span
+                  data-testid="badge-order-binding"
+                  className="px-2.5 py-1 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-[10px] font-mono font-bold text-emerald-300"
+                >
+                  {activeOrderSpec.binding}
+                </span>
+              </div>
             </div>
 
             {feedback && (
@@ -538,53 +592,58 @@ export const LiveMachineAllocationModal: React.FC<{
               </div>
             )}
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
+            <div className="space-y-3">
+              {/* Full-width order selector so long book titles are never truncated */}
               <div>
-                <label className="text-[10px] font-mono uppercase text-zinc-400 block mb-1">
-                  Seleccionar Orden Activa
+                <label className="text-[10px] font-mono uppercase text-zinc-400 block mb-1.5">
+                  {t('dashboard.360.selectActiveOrder')}
                 </label>
                 <select
+                  data-testid="select-reassign-order"
                   value={selectedOrder}
                   onChange={e => setSelectedOrder(e.target.value)}
-                  className="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2.5 text-xs font-mono text-white"
+                  className="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3.5 py-2.5 text-xs font-mono text-white"
                 >
-                  <option value="PUB-ORD-2026-101">PUB-ORD-2026-101 · Atlas Arquitectura (1,500 uds)</option>
-                  <option value="PUB-ORD-2026-102">PUB-ORD-2026-102 · Diseño Suizo (1,000 uds)</option>
-                  <option value="PUB-ORD-2026-104">PUB-ORD-2026-104 · Fotónica Aplicada (1,200 uds)</option>
-                  <option value="PUB-ORD-2026-105">PUB-ORD-2026-105 · Monografía Bauhaus (2,000 uds)</option>
+                  {ALLOCATABLE_ORDERS.map(ord => (
+                    <option key={ord.id} value={ord.id}>
+                      {ord.id} — {ord.title} ({ord.copies.toLocaleString()} copies · {ord.sheetFormat} · {ord.binding})
+                    </option>
+                  ))}
                   {(orders || []).map((o: any) => (
                     <option key={o.id} value={o.id}>
-                      {o.id} · {o.productName || 'Production Order'}
+                      {o.id} — {o.productName || 'Production Order'}
                     </option>
                   ))}
                 </select>
               </div>
 
-              <div>
-                <label className="text-[10px] font-mono uppercase text-zinc-400 block mb-1">
-                  Prensa / Línea de Destino
-                </label>
-                <select
-                  value={selectedMachine}
-                  onChange={e => setSelectedMachine(e.target.value)}
-                  className="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2.5 text-xs font-mono text-white"
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
+                <div className="md:col-span-2">
+                  <label className="text-[10px] font-mono uppercase text-zinc-400 block mb-1.5">
+                    {t('dashboard.360.selectTargetPress')}
+                  </label>
+                  <select
+                    value={selectedMachine}
+                    onChange={e => setSelectedMachine(e.target.value)}
+                    className="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3.5 py-2.5 text-xs font-mono text-white"
+                  >
+                    {machines.map(m => (
+                      <option key={m.code || m.id} value={m.code || m.id}>
+                        {m.name} — {m.sheetFormat || 'B1/B2'} ({m.loadPct || 80}% Load)
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <button
+                  data-testid="btn-reassign-machine"
+                  onClick={handleReassign}
+                  disabled={reassigning}
+                  className="w-full py-2.5 px-4 rounded-xl bg-[#dc0000] hover:bg-[#b80000] text-white text-xs font-black uppercase tracking-wider cursor-pointer transition-all"
                 >
-                  {machines.map(m => (
-                    <option key={m.code || m.id} value={m.code || m.id}>
-                      {m.name} ({m.loadPct || 80}% Load)
-                    </option>
-                  ))}
-                </select>
+                  {reassigning ? t('dashboard.360.reassigningPress') : t('dashboard.360.btnReassignPress')}
+                </button>
               </div>
-
-              <button
-                data-testid="btn-reassign-machine"
-                onClick={handleReassign}
-                disabled={reassigning}
-                className="w-full py-2.5 px-4 rounded-xl bg-[#dc0000] hover:bg-[#b80000] text-white text-xs font-black uppercase tracking-wider cursor-pointer transition-all"
-              >
-                {reassigning ? 'REASIGNANDO...' : 'REASSIGN PRESS NOW'}
-              </button>
             </div>
           </div>
         </div>
@@ -603,6 +662,9 @@ export const FinancialEscrowDrawer: React.FC<{
   financialData: any;
   selectedOrderId?: string | null;
 }> = ({ open, onClose, financialData, selectedOrderId }) => {
+  const { t } = useLocale();
+  const [escrowFilter, setEscrowFilter] = useState<'ALL' | 'LOCKED' | 'RELEASED'>('ALL');
+
   if (!open || typeof document === 'undefined') return null;
 
   const settlements: any[] = Array.isArray(financialData?.settlements) && financialData.settlements.length > 0
@@ -662,6 +724,12 @@ export const FinancialEscrowDrawer: React.FC<{
       ]
     : settlements;
 
+  const filteredSettlements = sortedSettlements.filter(s => {
+    if (escrowFilter === 'LOCKED') return s.escrowStatus !== 'RELEASED_ON_SIGNED_POD';
+    if (escrowFilter === 'RELEASED') return s.escrowStatus === 'RELEASED_ON_SIGNED_POD';
+    return true;
+  });
+
   return createPortal(
     <div
       data-testid="financial-escrow-drawer"
@@ -680,10 +748,10 @@ export const FinancialEscrowDrawer: React.FC<{
             </div>
             <div>
               <h2 className="text-sm font-black uppercase tracking-wider text-white">
-                Financial &amp; Escrow MoR Settlement Ledger
+                {t('dashboard.360.financialDrawerTitle')}
               </h2>
               <p className="text-[11px] font-mono text-zinc-400">
-                EN 16931 Electronic Invoicing (Facturae 3.2.2 / XRechnung 3.0) · Split-Payout 88% Printhouse
+                {t('dashboard.360.financialDrawerSubtitle')}
               </p>
             </div>
           </div>
@@ -700,31 +768,67 @@ export const FinancialEscrowDrawer: React.FC<{
           {/* KPI Summary Strip */}
           <div className="grid grid-cols-3 gap-3">
             <div className="p-4 rounded-2xl bg-[#131314] border border-zinc-800">
-              <span className="text-[9px] font-mono uppercase text-zinc-400 block">CUSTODIED ESCROW</span>
+              <span className="text-[9px] font-mono uppercase text-zinc-400 block">{t('dashboard.360.custodiedEscrow')}</span>
               <span className="text-lg font-mono font-black text-amber-400">
                 €{(financialData?.custodiedEscrowEur ?? 59310).toLocaleString('en-US', { minimumFractionDigits: 2 })}
               </span>
-              <span className="text-[9px] font-mono text-zinc-500 block mt-0.5">Locked on Imprimatur</span>
             </div>
             <div className="p-4 rounded-2xl bg-[#131314] border border-zinc-800">
-              <span className="text-[9px] font-mono uppercase text-zinc-400 block">RELEASED ON POD</span>
+              <span className="text-[9px] font-mono uppercase text-zinc-400 block">{t('dashboard.360.releasedEscrowPod')}</span>
               <span className="text-lg font-mono font-black text-emerald-400">
                 €{(financialData?.releasedEscrowEur ?? 4900).toLocaleString('en-US', { minimumFractionDigits: 2 })}
               </span>
-              <span className="text-[9px] font-mono text-zinc-500 block mt-0.5">Signed Delivery Note</span>
             </div>
             <div className="p-4 rounded-2xl bg-[#131314] border border-zinc-800">
-              <span className="text-[9px] font-mono uppercase text-zinc-400 block">NET PRINTHOUSE (88%)</span>
+              <span className="text-[9px] font-mono uppercase text-zinc-400 block">{t('dashboard.360.netPrinthousePayout')}</span>
               <span className="text-lg font-mono font-black text-white">
                 €{(financialData?.netPrinthousePayoutEur ?? 56504.8).toLocaleString('en-US', { minimumFractionDigits: 2 })}
               </span>
-              <span className="text-[9px] font-mono text-zinc-500 block mt-0.5">Excl. Carrier Freight</span>
             </div>
+          </div>
+
+          {/* Filter Switcher: All / Locked on Imprimatur / Released on Signed POD */}
+          <div className="flex flex-wrap items-center gap-2 p-1.5 rounded-xl bg-[#131314] border border-zinc-800">
+            <button
+              data-testid="filter-escrow-all"
+              onClick={() => setEscrowFilter('ALL')}
+              className={`flex-1 py-2 px-3 rounded-lg text-[10px] font-mono font-bold uppercase transition-all cursor-pointer ${
+                escrowFilter === 'ALL'
+                  ? 'bg-zinc-800 text-white border border-zinc-700'
+                  : 'text-zinc-400 hover:text-zinc-200'
+              }`}
+            >
+              {t('dashboard.360.filterAllEscrow')} ({sortedSettlements.length})
+            </button>
+            <button
+              data-testid="filter-escrow-locked"
+              onClick={() => setEscrowFilter('LOCKED')}
+              className={`flex-1 py-2 px-3 rounded-lg text-[10px] font-mono font-bold uppercase transition-all cursor-pointer ${
+                escrowFilter === 'LOCKED'
+                  ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                  : 'text-zinc-400 hover:text-zinc-200'
+              }`}
+            >
+              {t('dashboard.360.filterLockedEscrow')} (
+              {sortedSettlements.filter(s => s.escrowStatus !== 'RELEASED_ON_SIGNED_POD').length})
+            </button>
+            <button
+              data-testid="filter-escrow-released"
+              onClick={() => setEscrowFilter('RELEASED')}
+              className={`flex-1 py-2 px-3 rounded-lg text-[10px] font-mono font-bold uppercase transition-all cursor-pointer ${
+                escrowFilter === 'RELEASED'
+                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                  : 'text-zinc-400 hover:text-zinc-200'
+              }`}
+            >
+              {t('dashboard.360.filterReleasedPod')} (
+              {sortedSettlements.filter(s => s.escrowStatus === 'RELEASED_ON_SIGNED_POD').length})
+            </button>
           </div>
 
           {/* Orders Fiscal List */}
           <div className="space-y-4">
-            {sortedSettlements.map(item => (
+            {filteredSettlements.map(item => (
               <div
                 key={item.orderId}
                 className={`p-5 rounded-2xl bg-[#131314] border ${
@@ -735,7 +839,7 @@ export const FinancialEscrowDrawer: React.FC<{
                   <div>
                     <div className="flex items-center gap-2">
                       <span className="text-xs font-mono font-black text-white">{item.orderId}</span>
-                      <span className="text-[10px] font-mono text-zinc-400">· Factura {item.invoiceNumber}</span>
+                      <span className="text-[10px] font-mono text-zinc-400">· {item.invoiceNumber}</span>
                     </div>
                     <h3 className="text-sm font-bold text-zinc-100 mt-0.5">{item.title}</h3>
                     <p className="text-[11px] text-zinc-400">{item.publisherName} · {item.paymentRail}</p>
@@ -754,15 +858,15 @@ export const FinancialEscrowDrawer: React.FC<{
                 {/* Split Breakdown */}
                 <div className="grid grid-cols-3 gap-2 p-3 rounded-xl bg-zinc-900/80 border border-zinc-800/80 text-[11px] font-mono">
                   <div>
-                    <span className="text-zinc-500 block text-[9px]">GROSS ORDER</span>
+                    <span className="text-zinc-500 block text-[9px]">{t('dashboard.360.grossOrder')}</span>
                     <span className="text-white font-bold">€{Number(item.grossEur).toFixed(2)}</span>
                   </div>
                   <div>
-                    <span className="text-zinc-500 block text-[9px]">NET TALLER (88%)</span>
+                    <span className="text-zinc-500 block text-[9px]">{t('dashboard.360.netPrinthouse')}</span>
                     <span className="text-emerald-400 font-bold">€{Number(item.netPrinthouseEur).toFixed(2)}</span>
                   </div>
                   <div>
-                    <span className="text-zinc-500 block text-[9px]">TRANSPORTE / MoR</span>
+                    <span className="text-zinc-500 block text-[9px]">{t('dashboard.360.carrierAndMor')}</span>
                     <span className="text-zinc-300">
                       €{Number(item.carrierFeeEur).toFixed(2)} / €{Number(item.platformFeeEur).toFixed(2)}
                     </span>
@@ -781,7 +885,7 @@ export const FinancialEscrowDrawer: React.FC<{
                     className="px-3 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-[10px] font-mono font-bold text-zinc-200 flex items-center gap-1.5 cursor-pointer"
                   >
                     <ArrowDownTrayIcon className="w-3.5 h-3.5 text-[#dc0000]" />
-                    XML FACTURAE 3.2.2 (ES)
+                    {t('dashboard.360.btnXmlFacturae')}
                   </button>
                   <button
                     onClick={() =>
@@ -793,7 +897,7 @@ export const FinancialEscrowDrawer: React.FC<{
                     className="px-3 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-[10px] font-mono font-bold text-zinc-200 flex items-center gap-1.5 cursor-pointer"
                   >
                     <ArrowDownTrayIcon className="w-3.5 h-3.5 text-emerald-400" />
-                    XML XRECHNUNG 3.0 (DE)
+                    {t('dashboard.360.btnXmlXrechnung')}
                   </button>
                   <button
                     onClick={() =>
@@ -805,7 +909,7 @@ export const FinancialEscrowDrawer: React.FC<{
                     className="px-3 py-2 rounded-xl bg-[#dc0000]/15 hover:bg-[#dc0000]/25 border border-[#dc0000]/40 text-[10px] font-mono font-bold text-white flex items-center gap-1.5 cursor-pointer"
                   >
                     <DocumentTextIcon className="w-3.5 h-3.5 text-[#dc0000]" />
-                    CERTIFICADO PDF
+                    {t('dashboard.360.btnFiscalPdf')}
                   </button>
                 </div>
               </div>
@@ -826,6 +930,8 @@ export const LogisticsPalletModal: React.FC<{
   onClose: () => void;
   logisticsData: any;
 }> = ({ open, onClose, logisticsData }) => {
+  const { t } = useLocale();
+
   if (!open || typeof document === 'undefined') return null;
 
   const shipments: any[] = Array.isArray(logisticsData?.shipments) && logisticsData.shipments.length > 0
@@ -889,10 +995,10 @@ export const LogisticsPalletModal: React.FC<{
             </div>
             <div>
               <h2 className="text-sm font-black uppercase tracking-wider text-white">
-                Logistics, 3D EPAL Palletization &amp; GS1-128 SSCC-18 Dispatch
+                {t('dashboard.360.logisticsModalTitle')}
               </h2>
               <p className="text-[11px] font-mono text-zinc-400">
-                Albaranes CMR / Lieferschein DIN A4 · Etiquetas Térmicas GS1-128 (DIN A6 &amp; A4 4-UP)
+                {t('dashboard.360.logisticsModalSubtitle')}
               </p>
             </div>
           </div>
@@ -915,14 +1021,14 @@ export const LogisticsPalletModal: React.FC<{
                 <div>
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-mono font-black text-[#dc0000]">{shp.shipmentId}</span>
-                    <span className="text-xs font-mono text-zinc-400">· Orden {shp.orderId}</span>
+                    <span className="text-xs font-mono text-zinc-400">· {shp.orderId}</span>
                     <span className="px-2 py-0.5 text-[9px] font-mono uppercase rounded bg-zinc-800 text-zinc-300">
                       {shp.warehouseCode}
                     </span>
                   </div>
                   <h3 className="text-sm font-bold text-white mt-1">{shp.title}</h3>
                   <p className="text-xs text-zinc-400">
-                    Destino: {shp.warehouseName} · Carrier: {shp.carrierName}
+                    {shp.warehouseName} · {shp.carrierName}
                   </p>
                 </div>
 
@@ -939,19 +1045,19 @@ export const LogisticsPalletModal: React.FC<{
 
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3.5 rounded-xl bg-zinc-900/80 border border-zinc-800/80 text-xs font-mono">
                 <div>
-                  <span className="text-[9px] text-zinc-500 block">PALETS EUROPEOS</span>
+                  <span className="text-[9px] text-zinc-500 block">{t('dashboard.360.euroPallets')}</span>
                   <span className="text-white font-bold">{shp.palletsCount} EPAL (120×80 cm)</span>
                 </div>
                 <div>
-                  <span className="text-[9px] text-zinc-500 block">CAJAS FEFCO 0201</span>
-                  <span className="text-white font-bold">{shp.cartonsCount} Cajas ({shp.copies} libros)</span>
+                  <span className="text-[9px] text-zinc-500 block">{t('dashboard.360.fefcoCartons')}</span>
+                  <span className="text-white font-bold">{shp.cartonsCount} ({shp.copies})</span>
                 </div>
                 <div>
-                  <span className="text-[9px] text-zinc-500 block">PESO BRUTO TOTAL</span>
+                  <span className="text-[9px] text-zinc-500 block">{t('dashboard.360.totalGrossWeight')}</span>
                   <span className="text-emerald-400 font-bold">{shp.grossWeightKg} kg</span>
                 </div>
                 <div>
-                  <span className="text-[9px] text-zinc-500 block">RANGO GS1 SSCC-18</span>
+                  <span className="text-[9px] text-zinc-500 block">{t('dashboard.360.ssccRange')}</span>
                   <span className="text-zinc-300 text-[10px] truncate block">{shp.ssccRange}</span>
                 </div>
               </div>
@@ -967,7 +1073,7 @@ export const LogisticsPalletModal: React.FC<{
                   className="px-4 py-2 rounded-xl bg-[#dc0000] hover:bg-[#b80000] text-white text-[10px] font-mono font-black uppercase flex items-center gap-2 cursor-pointer"
                 >
                   <DocumentTextIcon className="w-4 h-4" />
-                  DESCARGAR ALBARÁN CMR / POD (DIN A4 PDF)
+                  {t('dashboard.360.btnDownloadCmr')}
                 </button>
                 <button
                   onClick={() =>
@@ -979,7 +1085,7 @@ export const LogisticsPalletModal: React.FC<{
                   className="px-4 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-100 text-[10px] font-mono font-bold uppercase flex items-center gap-2 cursor-pointer"
                 >
                   <QrCodeIcon className="w-4 h-4 text-emerald-400" />
-                  ETIQUETAS TÉRMICAS GS1-128 (DIN A6)
+                  {t('dashboard.360.btnDownloadSsccA6')}
                 </button>
                 <button
                   onClick={() =>
@@ -991,7 +1097,7 @@ export const LogisticsPalletModal: React.FC<{
                   className="px-4 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-300 text-[10px] font-mono font-bold uppercase flex items-center gap-2 cursor-pointer"
                 >
                   <ArrowDownTrayIcon className="w-4 h-4 text-zinc-400" />
-                  PLIEGO 4-UP (DIN A4)
+                  {t('dashboard.360.btnDownloadSscc4Up')}
                 </button>
               </div>
             </div>
@@ -1012,6 +1118,7 @@ export const B2bIncidentBridgeDrawer: React.FC<{
   b2bData: any;
   onMessageSent: () => void;
 }> = ({ open, onClose, b2bData, onMessageSent }) => {
+  const { t } = useLocale();
   const [selectedOrderId, setSelectedOrderId] = useState<string>('PUB-ORD-2026-104');
   const [replyText, setReplyText] = useState<string>('');
   const [sending, setSending] = useState(false);
@@ -1088,7 +1195,7 @@ export const B2bIncidentBridgeDrawer: React.FC<{
       const newEntry = {
         id: `local-${Date.now()}`,
         senderRole: 'PRINTHOUSE',
-        senderName: 'Jefe de Taller (Printhouse Command Center)',
+        senderName: 'Printhouse Command Center',
         text: textToSend,
         timestamp: new Date().toISOString()
       };
@@ -1121,10 +1228,10 @@ export const B2bIncidentBridgeDrawer: React.FC<{
             </div>
             <div>
               <h2 className="text-sm font-black uppercase tracking-wider text-white">
-                Incident Bridge &amp; B2B Publisher Communications
+                {t('dashboard.360.b2bDrawerTitle')}
               </h2>
               <p className="text-[11px] font-mono text-zinc-400">
-                Mensajería Directa Vinculada a Order ID · Alertas de Sangrado/Lomo e Imprimatur 3D
+                {t('dashboard.360.b2bDrawerSubtitle')}
               </p>
             </div>
           </div>
@@ -1169,22 +1276,9 @@ export const B2bIncidentBridgeDrawer: React.FC<{
                 <span className="text-[10px] font-mono text-zinc-400">{activeThread.publisherContact}</span>
                 <h3 className="text-xs font-black text-white">{activeThread.title}</h3>
               </div>
-              <div className="flex items-center gap-2">
-                <span className="px-2.5 py-1 rounded-full text-[9px] font-mono font-bold uppercase bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
-                  {activeThread.imprimaturStatus}
-                </span>
-                <button
-                  onClick={() =>
-                    handleSend(
-                      `[NOTIFICACIÓN DE PREIMPRESIÓN]: El archivo PDF reparado (Auto-Fix Sangrado +3.0mm y Lomo calibrado) para la orden ${activeThread.orderId} ya está disponible para descarga y verificación de Imprimatur.`,
-                      'PREFLIGHT_NOTIFICATION'
-                    )
-                  }
-                  className="px-3 py-1 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-[9px] font-mono font-bold uppercase text-zinc-200 cursor-pointer"
-                >
-                  Notificar Auto-Fix Listo
-                </button>
-              </div>
+              <span className="px-2.5 py-1 rounded-full text-[9px] font-mono font-bold uppercase bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                {activeThread.imprimaturStatus}
+              </span>
             </div>
           )}
 
@@ -1214,32 +1308,61 @@ export const B2bIncidentBridgeDrawer: React.FC<{
           </div>
         </div>
 
-        {/* Message Composer */}
-        <div className="p-4 bg-[#131314] border-t border-zinc-800 flex items-center gap-3">
-          <input
-            data-testid="b2b-message-input"
-            type="text"
-            value={replyText}
-            onChange={e => setReplyText(e.target.value)}
-            onKeyDown={e => {
-              if (e.key === 'Enter') handleSend();
-            }}
-            placeholder={`Responder a ${activeThread?.publisherName || 'Editorial'} sobre ${activeThread?.orderId}...`}
-            className="flex-1 bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-[#dc0000]"
-          />
-          <button
-            data-testid="btn-send-b2b-message"
-            onClick={() => handleSend()}
-            disabled={sending || !replyText.trim()}
-            className="px-4 py-2.5 rounded-xl bg-[#dc0000] hover:bg-[#b80000] disabled:opacity-40 text-white text-xs font-black uppercase tracking-wider flex items-center gap-1.5 cursor-pointer"
-          >
-            <PaperAirplaneIcon className="w-4 h-4" />
-            ENVIAR
-          </button>
+        {/* 1-Click Quick Actions & Message Composer */}
+        <div className="p-4 bg-[#131314] border-t border-zinc-800 space-y-3">
+          {/* Quick Actions Strip above the reply input */}
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              data-testid="quick-action-approve-imprimatur"
+              onClick={() => handleSend(t('dashboard.360.quickMsgApproveImprimatur'), 'APPROVE_IMPRIMATUR')}
+              disabled={sending}
+              className="px-3 py-1.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/40 text-[10px] font-mono font-bold uppercase text-emerald-300 cursor-pointer transition-all"
+            >
+              ✓ {t('dashboard.360.quickActionApproveImprimatur')}
+            </button>
+            <button
+              data-testid="quick-action-attach-delivery-note"
+              onClick={() => handleSend(t('dashboard.360.quickMsgAttachDeliveryNote'), 'ATTACH_DELIVERY_NOTE')}
+              disabled={sending}
+              className="px-3 py-1.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-[10px] font-mono font-bold uppercase text-zinc-200 cursor-pointer transition-all"
+            >
+              📎 {t('dashboard.360.quickActionAttachDeliveryNote')}
+            </button>
+            <button
+              data-testid="quick-action-reject-spine"
+              onClick={() => handleSend(t('dashboard.360.quickMsgRejectSpine'), 'REJECT_SPINE_DELTA')}
+              disabled={sending}
+              className="px-3 py-1.5 rounded-xl bg-[#dc0000]/15 hover:bg-[#dc0000]/25 border border-[#dc0000]/40 text-[10px] font-mono font-bold uppercase text-red-300 cursor-pointer transition-all"
+            >
+              ⚠ {t('dashboard.360.quickActionRejectSpine')}
+            </button>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <input
+              data-testid="b2b-message-input"
+              type="text"
+              value={replyText}
+              onChange={e => setReplyText(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter') handleSend();
+              }}
+              placeholder={t('dashboard.360.replyPlaceholder', { orderId: activeThread?.orderId || 'ORD' })}
+              className="flex-1 bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-[#dc0000]"
+            />
+            <button
+              data-testid="btn-send-b2b-message"
+              onClick={() => handleSend()}
+              disabled={sending || !replyText.trim()}
+              className="px-4 py-2.5 rounded-xl bg-[#dc0000] hover:bg-[#b80000] disabled:opacity-40 text-white text-xs font-black uppercase tracking-wider flex items-center gap-1.5 cursor-pointer"
+            >
+              <PaperAirplaneIcon className="w-4 h-4" />
+              {t('dashboard.360.btnSendReply')}
+            </button>
+          </div>
         </div>
       </div>
     </div>,
     document.body
   );
 };
-
