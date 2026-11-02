@@ -11,7 +11,8 @@
  *   switcher, book parameters (Job ID, ISBN-13, Title, Binding, Pages, GSM, Bulk, Bleed),
  *   and real-time parametric spine calculation preview.
  */
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import {
     SparklesIcon,
     DocumentArrowUpIcon,
@@ -68,6 +69,17 @@ export const PreflightUploadModal: React.FC<PreflightUploadModalProps> = ({
     const [isDragging, setIsDragging] = useState(false);
     const [submitting, setSubmitting] = useState(false);
     const [sizeError, setSizeError] = useState<string | null>(null);
+
+    useEffect(() => {
+        if (!isOpen) return;
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') {
+                onClose();
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [isOpen, onClose]);
 
     if (!isOpen) return null;
 
@@ -129,15 +141,20 @@ export const PreflightUploadModal: React.FC<PreflightUploadModalProps> = ({
         }
     };
 
-    return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 overflow-y-auto">
+    const modalContent = (
+        <div
+            onClick={(e) => {
+                if (e.target === e.currentTarget) onClose();
+            }}
+            className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 sm:p-6 overflow-y-auto"
+        >
             <form
                 onSubmit={handleFormSubmit}
                 data-testid="run-preflight-modal"
-                className="w-full max-w-5xl rounded-2xl bg-[#121418] border border-zinc-800 shadow-2xl overflow-hidden text-white"
+                className="w-full max-w-5xl max-h-[90vh] flex flex-col rounded-2xl bg-[#121418] border border-zinc-800 shadow-2xl overflow-hidden text-white my-auto"
             >
                 {/* Header */}
-                <div className="flex items-center justify-between border-b border-zinc-800 bg-[#0B0C0E] px-6 py-4">
+                <div className="shrink-0 flex items-center justify-between border-b border-zinc-800 bg-[#0B0C0E] px-6 py-4">
                     <div className="flex items-center gap-3">
                         <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-[#dc0000]/15 border border-[#dc0000]/40 text-[#dc0000]">
                             <WrenchScrewdriverIcon className="w-4 h-4" />
@@ -154,6 +171,7 @@ export const PreflightUploadModal: React.FC<PreflightUploadModalProps> = ({
                     <button
                         type="button"
                         onClick={onClose}
+                        aria-label="Close modal"
                         className="px-2.5 py-1 rounded-lg bg-zinc-900 border border-zinc-800 text-xs font-bold text-zinc-400 hover:text-white cursor-pointer"
                     >
                         ✕
@@ -161,7 +179,7 @@ export const PreflightUploadModal: React.FC<PreflightUploadModalProps> = ({
                 </div>
 
                 {/* Two-Column Body: 60% Left (Dropzone & Purge Policy) | 40% Right (Workflow & Specs) */}
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 p-6">
+                <div className="flex-1 overflow-y-auto custom-scrollbar grid grid-cols-1 lg:grid-cols-12 gap-6 p-6">
                     {/* LEFT COLUMN (60% -> 7 cols on 12-col grid) */}
                     <div className="lg:col-span-7 flex flex-col justify-between space-y-4">
                         {/* Slot Selector: INTERIOR / TRIPA vs COVER / CUBIERTA */}
@@ -472,7 +490,7 @@ export const PreflightUploadModal: React.FC<PreflightUploadModalProps> = ({
                 </div>
 
                 {/* Footer Actions */}
-                <div className="flex items-center justify-between border-t border-zinc-800 bg-[#0B0C0E] px-6 py-4">
+                <div className="shrink-0 flex items-center justify-between border-t border-zinc-800 bg-[#0B0C0E] px-6 py-4">
                     <div className="flex items-center gap-2 text-[11px] font-mono text-zinc-400">
                         <ShieldCheckIcon className="w-4 h-4 text-emerald-400" />
                         <span>
@@ -503,6 +521,12 @@ export const PreflightUploadModal: React.FC<PreflightUploadModalProps> = ({
             </form>
         </div>
     );
+
+    if (typeof document !== 'undefined' && document.body) {
+        return createPortal(modalContent, document.body);
+    }
+    return modalContent;
 };
 
 export default PreflightUploadModal;
+
