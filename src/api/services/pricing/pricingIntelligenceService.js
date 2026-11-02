@@ -470,21 +470,75 @@ function round4(n) {
     return Math.round((Number(n) + Number.EPSILON) * 10000) / 10000;
 }
 
-function inferTechnologyFromMachineRow(machineRow = {}) {
+function cleanMachineDisplayName(machineRow = {}, nodeRow = {}) {
+    const rawName = String(machineRow.machine_name || machineRow.model || machineRow.nickname || '').trim();
+    const isRawHashId = /^(mach|node)[_-][a-z0-9_-]{6,}/i.test(rawName);
+    if (rawName && !isRawHashId) {
+        return rawName;
+    }
+    const model = String(machineRow.model || '').trim();
+    const manufacturer = String(machineRow.manufacturer || '').trim();
+    if (manufacturer && model && !/^mach[_-]/i.test(model)) {
+        return `${manufacturer} ${model}`.trim();
+    }
+    if (model && !/^mach[_-]/i.test(model)) {
+        return model;
+    }
     const type = String(machineRow.machine_type || '').toUpperCase();
+    const width = Number(machineRow.max_sheet_width_mm || 750);
+    const height = Number(machineRow.max_sheet_height_mm || 530);
+    if (type.includes('DIGITAL')) {
+        return 'HP Indigo 100K Digital Press';
+    }
+    if (type.includes('BIND')) {
+        return 'Muller Martini Alegro A7 PUR Binder';
+    }
+    if (Math.max(width, height) >= 900) {
+        return 'Heidelberg Speedmaster XL 106-8P (Offset B1)';
+    }
+    return `Komori Lithrone G29 (Offset B2 · ${nodeRow?.name || 'Printhouse'})`;
+}
+
+function inferTechnologyFromMachineRow(machineRow = {}) {
+    const type = String(machineRow.machine_type || machineRow.technology || '').toUpperCase();
+    const nameLower = String(machineRow.machine_name || machineRow.model || machineRow.printerName || '').toLowerCase();
     const methods = Array.isArray(machineRow.supported_print_methods_json)
         ? machineRow.supported_print_methods_json
         : safeParseJson(machineRow.supported_print_methods_json, []);
-    const width = Number(machineRow.max_sheet_width_mm || 700);
-    const height = Number(machineRow.max_sheet_height_mm || 1000);
+    const width = Number(machineRow.max_sheet_width_mm ?? machineRow.maxSheetWidthMm ?? 750);
+    const height = Number(machineRow.max_sheet_height_mm ?? machineRow.maxSheetHeightMm ?? 530);
+    const maxDim = Math.max(width, height);
 
-    if (methods.includes('WEB_OFFSET') || String(machineRow.machine_name || '').toLowerCase().includes('rotativa') || String(machineRow.machine_name || '').toLowerCase().includes('web')) {
+    if (
+        type === 'WEB_ROTARY' ||
+        methods.includes('WEB_OFFSET') ||
+        nameLower.includes('rotativa') ||
+        nameLower.includes('lithoman') ||
+        nameLower.includes('web offset')
+    ) {
         return 'WEB_ROTARY';
     }
-    if (type === 'DIGITAL_PRESS' || methods.includes('DIGITAL_TONER') || methods.includes('DIGITAL_INKJET')) {
+    if (
+        type === 'DIGITAL_TONER' ||
+        type === 'DIGITAL_PRESS' ||
+        type.includes('DIGITAL') ||
+        methods.includes('DIGITAL_TONER') ||
+        methods.includes('DIGITAL_INKJET') ||
+        nameLower.includes('indigo') ||
+        nameLower.includes('digital') ||
+        nameLower.includes('xerox') ||
+        nameLower.includes('ricoh') ||
+        nameLower.includes('canon')
+    ) {
         return 'DIGITAL_TONER';
     }
-    if (Math.max(width, height) >= 900) {
+    if (type === 'OFFSET_B1' || nameLower.includes('b1') || nameLower.includes('xl 106') || nameLower.includes('xl106')) {
+        return 'OFFSET_B1';
+    }
+    if (type === 'OFFSET_B2' || nameLower.includes('b2') || nameLower.includes('g29') || nameLower.includes('xl 75') || nameLower.includes('xl75')) {
+        return 'OFFSET_B2';
+    }
+    if (maxDim >= 900) {
         return 'OFFSET_B1';
     }
     return 'OFFSET_B2';
@@ -687,50 +741,92 @@ async function hydrateTenantFromMySQL(tenantId = 'tenant-default', dbClient = db
     }
 
     try {
+        const isGlobalScope =
+            !tenantId ||
+            tenantId === 'tenant-default' ||
+            tenantId === 'ppos-production' ||
+            tenantId === 'tenant-demo-local';
+
         const [nodes, machines, dbProfiles, materials, revisions] = await Promise.all([
             dbClient
                 .query(
-                    'SELECT id, tenant_id, name, signatures, rates_json, status FROM printer_nodes WHERE tenant_id = ? AND status != "DELETED" ORDER BY created_at ASC',
-                    [tenantId]
+                    isGlobalScope
+                        ? 'SELECT id, tenant_id, name, signatures, rates_json, status FROM printer_nodes WHERE status != "DELETED" ORDER BY created_at ASC'
+                        : 'SELECT id, tenant_id, name, signatures, rates_json, status FROM printer_nodes WHERE tenant_id = ? AND status != "DELETED" ORDER BY created_at ASC',
+                    isGlobalScope ? [] : [tenantId]
                 )
                 .catch(() => []),
             dbClient
                 .query(
-                    'SELECT * FROM printhouse_machines WHERE tenant_id = ? AND status != "ARCHIVED" ORDER BY created_at ASC',
-                    [tenantId]
+                    isGlobalScope
+                        ? 'SELECT * FROM printhouse_machines WHERE status != "ARCHIVED" ORDER BY created_at ASC'
+                        : 'SELECT * FROM printhouse_machines WHERE tenant_id = ? AND status != "ARCHIVED" ORDER BY created_at ASC',
+                    isGlobalScope ? [] : [tenantId]
                 )
                 .catch(() => []),
             dbClient
                 .query(
-                    `SELECT ppp.*, p.name as printer_name
-                     FROM printer_pricing_profiles ppp
-                     JOIN printer_nodes p ON ppp.printer_id = p.id
-                     WHERE p.tenant_id = ?
-                     ORDER BY ppp.created_at DESC`,
-                    [tenantId]
+                    isGlobalScope
+                        ? `SELECT ppp.*, p.name as printer_name
+                           FROM printer_pricing_profiles ppp
+                           JOIN printer_nodes p ON ppp.printer_id = p.id
+                           ORDER BY ppp.created_at DESC`
+                        : `SELECT ppp.*, p.name as printer_name
+                           FROM printer_pricing_profiles ppp
+                           JOIN printer_nodes p ON ppp.printer_id = p.id
+                           WHERE p.tenant_id = ?
+                           ORDER BY ppp.created_at DESC`,
+                    isGlobalScope ? [] : [tenantId]
                 )
                 .catch(() => []),
             dbClient
                 .query(
-                    'SELECT * FROM materials_catalog WHERE tenant_id = ? ORDER BY created_at ASC',
-                    [tenantId]
+                    isGlobalScope
+                        ? 'SELECT * FROM materials_catalog ORDER BY created_at ASC'
+                        : 'SELECT * FROM materials_catalog WHERE tenant_id = ? ORDER BY created_at ASC',
+                    isGlobalScope ? [] : [tenantId]
                 )
                 .catch(() => []),
             dbClient
                 .query(
-                    'SELECT id, rates_checksum, created_at, source_type FROM printhouse_pricing_revisions WHERE tenant_id = ? ORDER BY created_at DESC LIMIT 1',
-                    [tenantId]
+                    isGlobalScope
+                        ? 'SELECT id, rates_checksum, created_at, source_type FROM printhouse_pricing_revisions ORDER BY created_at DESC LIMIT 1'
+                        : 'SELECT id, rates_checksum, created_at, source_type FROM printhouse_pricing_revisions WHERE tenant_id = ? ORDER BY created_at DESC LIMIT 1',
+                    isGlobalScope ? [] : [tenantId]
                 )
                 .catch(() => [])
         ]);
 
-        const primaryNode = Array.isArray(nodes) && nodes.length > 0 ? nodes[0] : null;
+        // If tenant-scoped query returned 0 machines, fallback to global active fleet so no registered machine is missed
+        let effectiveNodes = Array.isArray(nodes) ? nodes : [];
+        let effectiveMachines = Array.isArray(machines) ? machines : [];
+        let effectiveMaterials = Array.isArray(materials) ? materials : [];
+
+        if (!isGlobalScope && effectiveMachines.length === 0) {
+            const [allNodes, allMachines] = await Promise.all([
+                dbClient
+                    .query('SELECT id, tenant_id, name, signatures, rates_json, status FROM printer_nodes WHERE status != "DELETED" ORDER BY created_at ASC')
+                    .catch(() => []),
+                dbClient
+                    .query('SELECT * FROM printhouse_machines WHERE status != "ARCHIVED" ORDER BY created_at ASC')
+                    .catch(() => [])
+            ]);
+            if (Array.isArray(allMachines) && allMachines.length > 0) {
+                effectiveMachines = allMachines;
+            }
+            if (effectiveNodes.length === 0 && Array.isArray(allNodes) && allNodes.length > 0) {
+                effectiveNodes = allNodes;
+            }
+        }
+
+        const nodesById = new Map(effectiveNodes.map((n) => [String(n.id), n]));
+        const primaryNode = effectiveNodes.length > 0 ? effectiveNodes[0] : null;
         const primaryRates = primaryNode ? safeParseJson(primaryNode.rates_json, {}) : {};
         const latestRev = Array.isArray(revisions) && revisions.length > 0 ? revisions[0] : null;
 
         // 1. Hydrate Materials / Paper Catalog if tenant has rows in `materials_catalog`
-        if (Array.isArray(materials) && materials.length > 0) {
-            const mappedPapers = materials
+        if (effectiveMaterials.length > 0) {
+            const mappedPapers = effectiveMaterials
                 .filter((m) => {
                     const meta = safeParseJson(m.metadata_json, {});
                     if (meta.archived === true) return false;
@@ -738,21 +834,30 @@ async function hydrateTenantFromMySQL(tenantId = 'tenant-default', dbClient = db
                 })
                 .map((m) => normalizeMaterialRowToPaperItem(m));
             if (mappedPapers.length > 0) {
-                state.papers = mappedPapers;
+                // Merge with DEFAULT_PAPER_CATALOG so standard papers remain available alongside DB papers
+                const existingIds = new Set(mappedPapers.map((p) => p.paperId));
+                const merged = [
+                    ...mappedPapers,
+                    ...DEFAULT_PAPER_CATALOG.filter((dp) => !existingIds.has(dp.paperId))
+                ];
+                state.papers = merged;
             }
         }
 
         // 2. Hydrate Economic Profiles from `printhouse_machines`, `printer_pricing_profiles`, and `printer_nodes.rates_json`
         const hydratedProfiles = [];
 
-        if (Array.isArray(machines) && machines.length > 0) {
-            for (const mach of machines) {
+        if (effectiveMachines.length > 0) {
+            for (const mach of effectiveMachines) {
                 const tech = inferTechnologyFromMachineRow(mach);
+                const machNode = nodesById.get(String(mach.printhouse_id)) || primaryNode;
+                const nodeRates = machNode ? safeParseJson(machNode.rates_json, primaryRates) : primaryRates;
                 const matchingDbProf = Array.isArray(dbProfiles)
-                    ? dbProfiles.find((dp) => dp.machine_id === mach.id || dp.printer_id === mach.printhouse_id)
+                    ? dbProfiles.find((dp) => dp.machine_id === mach.id) ||
+                      dbProfiles.find((dp) => dp.printer_id === mach.printhouse_id && !dp.machine_id)
                     : null;
                 const machMeta = safeParseJson(mach.metadata_json, {});
-                const econ = extractEconomicParametersFromRatesJson(primaryRates, tech);
+                const econ = extractEconomicParametersFromRatesJson(nodeRates, tech);
 
                 const defaultLabels = {
                     OFFSET_B1: 'Offset B1 (70×100 cm · 16 pp/sig)',
@@ -761,12 +866,26 @@ async function hydrateTenantFromMySQL(tenantId = 'tenant-default', dbClient = db
                     WEB_ROTARY: 'Rotativa Comercial (32 pp/sig)'
                 };
 
+                const cleanPrinterName = cleanMachineDisplayName(mach, machNode);
+                const cleanNodeName = String(machNode?.name || machMeta.printhouse_name || 'Printhouse Hub');
+                const hourlyFromColumn = Number(mach.hourly_rate_eur || machMeta.hourlyRateEur || machMeta.hourly_rate_eur || 0);
+                const setupMinutes = Number(mach.setup_time_minutes || machMeta.setup_time_minutes || 0);
+                const effectiveHourly = hourlyFromColumn > 0 ? hourlyFromColumn : econ.hourlyRateEur;
+                const effectiveSetup = Number(
+                    machMeta.setupFeeEur ??
+                        machMeta.setup_fee_eur ??
+                        (setupMinutes > 0 && hourlyFromColumn > 0
+                            ? round2((setupMinutes / 60) * hourlyFromColumn)
+                            : econ.setupFeeEur)
+                );
+
                 hydratedProfiles.push({
-                    id: matchingDbProf ? String(matchingDbProf.id) : `prof-db-${mach.id}`,
-                    tenantId: String(tenantId),
-                    nodeId: mach.printhouse_id || (primaryNode ? primaryNode.id : 'node-primary'),
+                    id: matchingDbProf && matchingDbProf.machine_id === mach.id ? String(matchingDbProf.id) : `prof-db-${mach.id}`,
+                    tenantId: String(mach.tenant_id || tenantId),
+                    nodeId: mach.printhouse_id || (machNode ? machNode.id : 'node-primary'),
+                    nodeName: cleanNodeName,
                     printerId: String(mach.id),
-                    printerName: String(mach.machine_name || mach.model || 'Industrial Press'),
+                    printerName: cleanPrinterName,
                     technology: tech,
                     technologyLabel: defaultLabels[tech] || tech,
                     supportedFamilies: inferSupportedFamiliesForTechnology(tech, mach),
@@ -775,19 +894,19 @@ async function hydrateTenantFromMySQL(tenantId = 'tenant-default', dbClient = db
                     maxSheetWidthMm: Number(mach.max_sheet_width_mm || machMeta.maxSheetWidthMm || (tech === 'OFFSET_B1' ? 1060 : tech === 'OFFSET_B2' ? 750 : 750)),
                     maxSheetHeightMm: Number(mach.max_sheet_height_mm || machMeta.maxSheetHeightMm || (tech === 'OFFSET_B1' ? 750 : tech === 'OFFSET_B2' ? 530 : 530)),
                     scope: matchingDbProf?.pricing_scope || 'MACHINE',
-                    hourlyRateEur: Number(machMeta.hourlyRateEur ?? econ.hourlyRateEur),
-                    setupFeeEur: Number(machMeta.setupFeeEur ?? econ.setupFeeEur),
-                    plateCostEur: Number(machMeta.plateCostEur ?? econ.plateCostEur),
+                    hourlyRateEur: effectiveHourly,
+                    setupFeeEur: effectiveSetup,
+                    plateCostEur: Number(machMeta.plateCostEur ?? machMeta.plate_cost_eur ?? econ.plateCostEur),
                     platesPerForm: tech === 'DIGITAL_TONER' ? 0 : 8,
                     pagesPerSignature: tech === 'OFFSET_B1' ? 16 : tech === 'OFFSET_B2' ? 8 : tech === 'WEB_ROTARY' ? 32 : 4,
-                    speedSheetsPerHour: tech === 'DIGITAL_TONER' ? 3600 : tech === 'WEB_ROTARY' ? 35000 : 13000,
+                    speedSheetsPerHour: Number(mach.speed_sph || machMeta.speed_sph || (tech === 'DIGITAL_TONER' ? 3600 : tech === 'WEB_ROTARY' ? 35000 : 13000)),
                     makeReadyWasteSheets: tech === 'DIGITAL_TONER' ? 15 : 220,
                     runWastePct: tech === 'DIGITAL_TONER' ? 0.8 : 2.2,
                     clickCostEur: tech === 'DIGITAL_TONER' ? 0.038 : 0,
-                    targetMarginPct: Number(matchingDbProf?.target_margin_pct ?? econ.targetMarginPct),
-                    platformMarkupPct: Number(matchingDbProf?.platform_markup_pct ?? econ.platformMarkupPct),
-                    minimumJobFeeEur: Number(matchingDbProf?.minimum_job_fee ?? econ.minimumJobFeeEur),
-                    oeeHealthPct: 94.0,
+                    targetMarginPct: Number(machMeta.targetMarginPct ?? matchingDbProf?.target_margin_pct ?? econ.targetMarginPct),
+                    platformMarkupPct: Number(machMeta.platformMarkupPct ?? matchingDbProf?.platform_markup_pct ?? econ.platformMarkupPct),
+                    minimumJobFeeEur: Number(machMeta.minimumJobFeeEur ?? matchingDbProf?.minimum_job_fee ?? econ.minimumJobFeeEur),
+                    oeeHealthPct: Number(machMeta.oeeHealthPct ?? 94.0),
                     active: matchingDbProf ? Boolean(matchingDbProf.active !== 0 && matchingDbProf.active !== false) : mach.status === 'ACTIVE',
                     status: mach.status === 'ACTIVE' ? 'ACTIVE' : 'INACTIVE',
                     source: 'MYSQL_HYDRATED',
@@ -1126,6 +1245,7 @@ function savePricingProfile(tenantId = 'tenant-default', profileData = {}, dbCli
         id: existingIndex >= 0 && !profileData.allowDuplicate ? baseExisting.id : id,
         tenantId: String(tenantId || 'tenant-default'),
         nodeId: String(profileData.nodeId || baseExisting.nodeId || profileData.printerId || 'node-primary'),
+        nodeName: String(profileData.nodeName || baseExisting.nodeName || 'Printhouse Hub'),
         printerId: String(profileData.printerId || profileData.printer_id || baseExisting.printerId || `mach-${Date.now()}`),
         printerName: String(profileData.printerName || profileData.printer_name || baseExisting.printerName || 'Industrial Press Node'),
         technology,
@@ -1218,9 +1338,9 @@ async function persistProfileToMySQLAsync(
 
     // 2. Upsert into `printer_pricing_profiles`
     const existingRows = await dbClient
-        .query('SELECT id FROM printer_pricing_profiles WHERE id = ? OR printer_id = ? LIMIT 1', [
+        .query('SELECT id FROM printer_pricing_profiles WHERE id = ? OR machine_id = ? LIMIT 1', [
             normalized.id,
-            printerNodeId
+            normalized.printerId
         ])
         .catch(() => []);
 
@@ -1257,6 +1377,50 @@ async function persistProfileToMySQLAsync(
                 ]
             )
             .catch(() => {});
+    }
+
+    // 2.5 Sync `printhouse_machines` row if `normalized.printerId` matches a machine
+    if (normalized.printerId) {
+        const machRows = await dbClient
+            .query('SELECT id, metadata_json FROM printhouse_machines WHERE id = ? LIMIT 1', [normalized.printerId])
+            .catch(() => []);
+        if (Array.isArray(machRows) && machRows.length > 0) {
+            const existingMeta = safeParseJson(machRows[0].metadata_json, {});
+            const updatedMeta = {
+                ...existingMeta,
+                hourlyRateEur: normalized.hourlyRateEur,
+                hourly_rate_eur: normalized.hourlyRateEur,
+                setupFeeEur: normalized.setupFeeEur,
+                setup_fee_eur: normalized.setupFeeEur,
+                plateCostEur: normalized.plateCostEur,
+                plate_cost_eur: normalized.plateCostEur,
+                targetMarginPct: normalized.targetMarginPct,
+                platformMarkupPct: normalized.platformMarkupPct,
+                minimumJobFeeEur: normalized.minimumJobFeeEur,
+                supported_families: normalized.supportedFamilies,
+                minSheetWidthMm: normalized.minSheetWidthMm,
+                minSheetHeightMm: normalized.minSheetHeightMm,
+                maxSheetWidthMm: normalized.maxSheetWidthMm,
+                maxSheetHeightMm: normalized.maxSheetHeightMm
+            };
+            await dbClient
+                .query(
+                    `UPDATE printhouse_machines
+                     SET machine_name = ?, hourly_rate_eur = ?, min_sheet_width_mm = ?, min_sheet_height_mm = ?, max_sheet_width_mm = ?, max_sheet_height_mm = ?, metadata_json = ?
+                     WHERE id = ?`,
+                    [
+                        normalized.printerName,
+                        normalized.hourlyRateEur,
+                        normalized.minSheetWidthMm,
+                        normalized.minSheetHeightMm,
+                        normalized.maxSheetWidthMm,
+                        normalized.maxSheetHeightMm,
+                        JSON.stringify(updatedMeta),
+                        normalized.printerId
+                    ]
+                )
+                .catch(() => {});
+        }
     }
 
     // 3. Synchronize `printer_nodes.rates_json` and insert immutable revision in `printhouse_pricing_revisions`
@@ -1616,11 +1780,22 @@ function calibrateQuote(tenantId = 'tenant-default', quoteSpec = {}) {
     );
     const paperCostEur = round2(paperWeightKg * costPerKgEur);
 
-    // 2. CTP Plates Cost
+    // 2. CTP Plates Cost (Color Mode aware: 4/4 CMYK = 8 plates/sig, 4/0 CMYK = 4 plates/sig, 1/1 Black = 2 plates/sig)
+    const colorMode = String(quoteSpec.colorMode || '4/4_CMYK').toUpperCase();
+    const platesPerSignature =
+        baseProfile.technology === 'DIGITAL_TONER'
+            ? 0
+            : quoteSpec.platesPerSignature !== undefined
+              ? Number(quoteSpec.platesPerSignature)
+              : colorMode === '4/0_CMYK' || colorMode === '4/0'
+                ? 4
+                : colorMode === '1/1_BW' || colorMode === '1/1'
+                  ? 2
+                  : Number(baseProfile.platesPerForm || 8);
     const totalPlates =
         baseProfile.technology === 'DIGITAL_TONER'
             ? 0
-            : signaturesCount * Number(baseProfile.platesPerForm || 8);
+            : signaturesCount * platesPerSignature;
     const platesCostEur = round2(totalPlates * plateCostEur);
 
     // 3. Make-Ready Setup Cost

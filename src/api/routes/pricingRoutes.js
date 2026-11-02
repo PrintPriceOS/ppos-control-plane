@@ -180,6 +180,29 @@ function createPricingRouter() {
         }
     });
 
+    // POST /api/pricing/profiles/:id/save-rates
+    router.post('/profiles/:id/save-rates', async (req, res) => {
+        try {
+            const tenantId =
+                (req.user && req.user.tenantId) ||
+                (req.body && req.body.tenantId) ||
+                (req.headers && req.headers['x-tenant-id']) ||
+                'tenant-default';
+            const profileId = req.params && req.params.id;
+            const payload = {
+                ...(req.body || {}),
+                id: profileId || (req.body && req.body.id)
+            };
+            const result = await savePricingProfileAsync(tenantId, payload);
+            return res.status(200).json(result);
+        } catch (err) {
+            return res.status(err.statusCode || 400).json({
+                ok: false,
+                error: err.message
+            });
+        }
+    });
+
     // DELETE /api/pricing/profiles/:id
     router.delete('/profiles/:id', async (req, res) => {
         try {

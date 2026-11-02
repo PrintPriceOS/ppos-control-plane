@@ -160,6 +160,7 @@ export const LivePriceCalibratorModal: React.FC<LivePriceCalibratorModalProps> =
                 ? 'SADDLE'
                 : 'PUR'
     );
+    const [colorMode, setColorMode] = useState<'4/4_CMYK' | '4/0_CMYK' | '1/1_BW'>('4/4_CMYK');
 
     // Quick Add Substrate to `materials_catalog` state
     const [showAddPaperForm, setShowAddPaperForm] = useState<boolean>(false);
@@ -410,9 +411,16 @@ export const LivePriceCalibratorModal: React.FC<LivePriceCalibratorModalProps> =
         const paperWeightKg = round2((grossPaperAreaM2 * activeGsm) / 1000);
         const paperCostEur = round2(paperWeightKg * activeCostPerKg);
 
-        // 2. CTP Plates Cost
+        // 2. CTP Plates Cost (Color Mode aware: 4/4 CMYK = 8 pl/sig, 4/0 CMYK = 4 pl/sig, 1/1 Black = 2 pl/sig)
         const plateUnitEur = isDigital ? 0 : Number(currentProfile.plateCostEur ?? 20);
-        const totalPlates = isDigital ? 0 : signaturesCount * 8;
+        const platesPerSig = isDigital
+            ? 0
+            : colorMode === '4/0_CMYK'
+              ? 4
+              : colorMode === '1/1_BW'
+                ? 2
+                : 8;
+        const totalPlates = isDigital ? 0 : signaturesCount * platesPerSig;
         const platesCostEur = round2(totalPlates * plateUnitEur);
 
         // 3. Make-Ready Setup Cost
@@ -466,6 +474,7 @@ export const LivePriceCalibratorModal: React.FC<LivePriceCalibratorModalProps> =
             paperWeightKg,
             activeCostPerKg,
             totalPlates,
+            platesPerSig,
             signaturesCount,
             pressRunHours,
             paperCostEur,
@@ -488,6 +497,7 @@ export const LivePriceCalibratorModal: React.FC<LivePriceCalibratorModalProps> =
         currentProfile,
         currentPaper,
         bindingType,
+        colorMode,
         hourlyRateEur,
         setupFeeEur,
         targetMarginPct,
@@ -731,8 +741,8 @@ export const LivePriceCalibratorModal: React.FC<LivePriceCalibratorModalProps> =
                         )}
                     </div>
 
-                    {/* Trim Size, Pages, Binding & Print Run Presets */}
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    {/* Trim Size, Pages, Color/Plates & Binding Presets */}
+                    <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
                         <div>
                             <label className="block text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1.5">
                                 TRIM SIZE (MM)
@@ -765,6 +775,22 @@ export const LivePriceCalibratorModal: React.FC<LivePriceCalibratorModalProps> =
                                 onChange={(e) => setPages(Math.max(8, Number(e.target.value)))}
                                 className="w-full px-3 py-2 rounded-lg text-xs font-mono font-bold bg-slate-50 dark:bg-[#0a0b0d] border border-slate-200 dark:border-[#1f2228] text-slate-900 dark:text-white"
                             />
+                        </div>
+
+                        <div>
+                            <label className="block text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1.5">
+                                INKS / CTP PLATES
+                            </label>
+                            <select
+                                data-testid="calibrator-colormode-select"
+                                value={colorMode}
+                                onChange={(e) => setColorMode(e.target.value as '4/4_CMYK' | '4/0_CMYK' | '1/1_BW')}
+                                className="w-full px-3 py-2 rounded-lg text-xs font-mono font-bold bg-slate-50 dark:bg-[#0a0b0d] border border-slate-200 dark:border-[#1f2228] text-slate-900 dark:text-white"
+                            >
+                                <option value="4/4_CMYK">4/4 CMYK (8 pl/sig)</option>
+                                <option value="4/0_CMYK">4/0 CMYK (4 pl/sig)</option>
+                                <option value="1/1_BW">1/1 B&W (2 pl/sig)</option>
+                            </select>
                         </div>
 
                         <div>

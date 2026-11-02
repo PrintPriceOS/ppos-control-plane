@@ -25,6 +25,8 @@ import {
     PricingKpiSummaryBar,
     EconomicProfilesTable,
     EconomicProfileRow,
+    classifyProfileTechnology,
+    cleanDisplayMachineName,
     LivePriceCalibratorModal,
     PaperCatalogItem,
     RoutingRulesTab,
@@ -354,7 +356,12 @@ export const PricingIntelligenceTab: React.FC<SharedModuleProps> = ({
             if (profRes && profRes.ok) {
                 const profJson = await profRes.json();
                 if (Array.isArray(profJson.profiles) && profJson.profiles.length > 0) {
-                    setProfiles(profJson.profiles);
+                    const normalizedProfiles = profJson.profiles.map((p: any) => ({
+                        ...p,
+                        printerName: cleanDisplayMachineName(p),
+                        technology: classifyProfileTechnology(p)
+                    }));
+                    setProfiles(normalizedProfiles);
                 }
                 if (Array.isArray(profJson.papers) && profJson.papers.length > 0) {
                     setPapers(profJson.papers);
@@ -412,10 +419,10 @@ export const PricingIntelligenceTab: React.FC<SharedModuleProps> = ({
             avgHourlyRateEur: avgHourly,
             economicHealthPct: 93.4,
             technologyBreakdown: {
-                OFFSET_B1: activeList.filter((p) => p.technology === 'OFFSET_B1').length,
-                OFFSET_B2: activeList.filter((p) => p.technology === 'OFFSET_B2').length,
-                DIGITAL_TONER: activeList.filter((p) => p.technology === 'DIGITAL_TONER').length,
-                WEB_ROTARY: activeList.filter((p) => p.technology === 'WEB_ROTARY').length
+                OFFSET_B1: activeList.filter((p) => classifyProfileTechnology(p) === 'OFFSET_B1').length,
+                OFFSET_B2: activeList.filter((p) => classifyProfileTechnology(p) === 'OFFSET_B2').length,
+                DIGITAL_TONER: activeList.filter((p) => classifyProfileTechnology(p) === 'DIGITAL_TONER').length,
+                WEB_ROTARY: activeList.filter((p) => classifyProfileTechnology(p) === 'WEB_ROTARY').length
             }
         };
     }, [profiles]);

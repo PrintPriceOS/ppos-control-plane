@@ -13,6 +13,8 @@ export interface EconomicProfileRow {
     id: string;
     printerId: string;
     printerName: string;
+    nodeId?: string;
+    nodeName?: string;
     technology: string;
     technologyLabel?: string;
     supportedFamilies?: string[];
@@ -29,6 +31,59 @@ export interface EconomicProfileRow {
     minimumJobFeeEur: number;
     active: boolean;
     status?: string;
+}
+
+export function classifyProfileTechnology(p: Partial<EconomicProfileRow> & Record<string, any>): string {
+    const rawTech = String(p.technology || p.machine_type || '').toUpperCase();
+    const nameLower = String(p.printerName || p.printer_name || p.machine_name || '').toLowerCase();
+    const maxW = Number(p.maxSheetWidthMm ?? p.max_sheet_width_mm ?? 750);
+    const maxH = Number(p.maxSheetHeightMm ?? p.max_sheet_height_mm ?? 530);
+    const maxDim = Math.max(maxW, maxH);
+
+    if (
+        rawTech === 'WEB_ROTARY' ||
+        rawTech.includes('ROTARY') ||
+        rawTech.includes('WEB') ||
+        nameLower.includes('rotativa') ||
+        nameLower.includes('lithoman') ||
+        nameLower.includes('web offset')
+    ) {
+        return 'WEB_ROTARY';
+    }
+    if (
+        rawTech === 'DIGITAL_TONER' ||
+        rawTech === 'DIGITAL_PRESS' ||
+        rawTech.includes('DIGITAL') ||
+        nameLower.includes('indigo') ||
+        nameLower.includes('digital') ||
+        nameLower.includes('xerox') ||
+        nameLower.includes('ricoh')
+    ) {
+        return 'DIGITAL_TONER';
+    }
+    if (rawTech === 'OFFSET_B1' || nameLower.includes('b1') || nameLower.includes('xl 106') || nameLower.includes('xl106')) {
+        return 'OFFSET_B1';
+    }
+    if (rawTech === 'OFFSET_B2' || nameLower.includes('b2') || nameLower.includes('g29') || nameLower.includes('xl 75') || nameLower.includes('xl75')) {
+        return 'OFFSET_B2';
+    }
+    if (maxDim >= 900) {
+        return 'OFFSET_B1';
+    }
+    return 'OFFSET_B2';
+}
+
+export function cleanDisplayMachineName(p: Partial<EconomicProfileRow> & Record<string, any>): string {
+    const raw = String(p.printerName || p.printer_name || p.machine_name || '').trim();
+    const isRawHash = /^(mach|node)[_-][a-z0-9_-]{6,}/i.test(raw);
+    if (raw && !isRawHash) {
+        return raw;
+    }
+    const tech = classifyProfileTechnology(p);
+    if (tech === 'DIGITAL_TONER') return 'HP Indigo 100K Digital Press';
+    if (tech === 'WEB_ROTARY') return 'Manroland Lithoman IV Web Offset';
+    if (tech === 'OFFSET_B1') return 'Heidelberg Speedmaster XL 106-8P';
+    return 'Komori Lithrone G29 (B2)';
 }
 
 export interface EconomicProfilesTableProps {
@@ -159,21 +214,31 @@ export const EconomicProfilesTable: React.FC<EconomicProfilesTableProps> = ({
                     {
                         key: 'printer',
                         header: '1. MÁQUINA / PRENSA',
-                        render: (p: any) => (
-                            <div>
-                                <div className="font-bold text-slate-900 dark:text-white">
-                                    {p.printerName || p.printer_name || 'N/A'}
+                        render: (p: any) => {
+                            const displayName = cleanDisplayMachineName(p);
+                            const classifiedTech = classifyProfileTechnology(p);
+                            const nodeLabel =
+                                p.nodeName ||
+                                p.printhouse_name ||
+                                (p.printerId && !/^mach[_-][a-f0-9]{10,}/i.test(String(p.printerId))
+                                    ? String(p.printerId)
+                                    : 'Printhouse Hub');
+                            return (
+                                <div>
+                                    <div className="font-bold text-slate-900 dark:text-white">
+                                        {displayName}
+                                    </div>
+                                    <div className="flex items-center gap-1.5 mt-0.5">
+                                        <span className="px-1.5 py-0.2 rounded bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-[9px] font-mono font-black uppercase text-slate-700 dark:text-slate-300">
+                                            {classifiedTech}
+                                        </span>
+                                        <span className="text-[10px] font-mono text-slate-400">
+                                            {nodeLabel}
+                                        </span>
+                                    </div>
                                 </div>
-                                <div className="flex items-center gap-1.5 mt-0.5">
-                                    <span className="px-1.5 py-0.2 rounded bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-[9px] font-mono font-black uppercase text-slate-700 dark:text-slate-300">
-                                        {p.technology || p.pricing_scope || 'OFFSET_B1'}
-                                    </span>
-                                    <span className="text-[10px] font-mono text-slate-400">
-                                        {p.printerId || p.printer_id || p.id}
-                                    </span>
-                                </div>
-                            </div>
-                        )
+                            );
+                        }
                     },
                     {
                         key: 'formats',
