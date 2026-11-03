@@ -3373,7 +3373,16 @@ export const de = {
   'setup.integrations.placeholderName': 'z. B. Heidelberg Prinect Webhook-Brücke',
   'setup.integrations.placeholderUrl': 'https://api.ihredruckerei.de/v1/webhooks',
   'setup.integrations.topicsCountBadge': '{count} Themen aktiv',
-  'nav.developers': 'Entwickler API-Hub'
+  'nav.developers': 'Entwickler API-Hub',
+  'developers.billing.activateBtn': 'Production Scale aktivieren (49 €/Monat + Nutzung)',
+  'developers.billing.managePortalBtn': 'Abonnement & Rechnungen verwalten ↗',
+  'developers.billing.checkoutSuccessToast': 'Production Scale aktiviert! Ihr Mandant ist jetzt für produktive pp_live_*-Schlüssel und Stripe Metered Billing freigeschaltet.',
+  'developers.billing.spendCapTitle': 'Monatliches Ausgabenlimit (Spend Cap Governance)',
+  'developers.billing.spendCapDesc': 'Definieren Sie eine monatliche Kostenobergrenze (49 € Basis + nutzungsbasierte Abrechnung) inklusive automatischer E-Mail-Warnung.',
+  'developers.billing.spendCapLabel': 'Monatliche Kostenobergrenze (€ EUR)',
+  'developers.billing.alertEmailLabel': 'E-Mail für Ausgabenwarnungen',
+  'developers.billing.saveSpendCapBtn': 'Ausgabenlimit speichern',
+  'developers.billing.spendCapSavedToast': 'Monatliches Ausgabenlimit und Benachrichtigungs-E-Mail erfolgreich aktualisiert.'
 } as const;
 
 export type TranslationKeys = keyof typeof de;

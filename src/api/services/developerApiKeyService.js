@@ -116,10 +116,24 @@ class DeveloperApiKeyService {
             }
         } catch (_) {}
 
+        // Check Stripe Billing Subscription table / store
+        try {
+            const stripeBillingService = require('./stripeBillingService');
+            const sub = await stripeBillingService.getBillingSubscription(tenantId);
+            if (sub && (sub.billingTier === 'PRODUCTION_SCALE' || sub.billingTier === 'ENTERPRISE_TENANT') && sub.status === 'ACTIVE') {
+                return {
+                    eligible: true,
+                    tier: sub.billingTier,
+                    stripeCustomerId: sub.stripeCustomerId,
+                    stripeSubscriptionId: sub.stripeSubscriptionId
+                };
+            }
+        } catch (_) {}
+
         // Check in-memory fallback
         for (const rec of fallbackMemoryKeys.values()) {
             if (rec.tenantId === tenantId && (rec.billingTier === 'PRODUCTION_SCALE' || rec.billingTier === 'ENTERPRISE_TENANT')) {
-                return { eligible: true, tier: rec.billingTier };
+                return { eligible: true, tier: rec.billingTier, stripeCustomerId: rec.stripeCustomerId };
             }
         }
 
@@ -148,6 +162,7 @@ class DeveloperApiKeyService {
         let billingTier = 'SANDBOX_FREE';
         let rateLimitPerMinute = TIER_DEFINITIONS.SANDBOX_FREE.rateLimitPerMinute;
         let monthlyQuota = TIER_DEFINITIONS.SANDBOX_FREE.monthlyQuota;
+        let resolvedStripeCustomerId = payload.stripeCustomerId || null;
 
         if (requestedType === 'LIVE') {
             const eligibility = await this.checkLiveKeyEligibility(tenantId, actor);
@@ -158,6 +173,7 @@ class DeveloperApiKeyService {
                 throw err;
             }
             billingTier = eligibility.eligible ? eligibility.tier : 'PRODUCTION_SCALE';
+            resolvedStripeCustomerId = resolvedStripeCustomerId || eligibility.stripeCustomerId || null;
             const tierDef = TIER_DEFINITIONS[billingTier] || TIER_DEFINITIONS.PRODUCTION_SCALE;
             rateLimitPerMinute = tierDef.rateLimitPerMinute;
             monthlyQuota = tierDef.monthlyQuota;
@@ -181,7 +197,7 @@ class DeveloperApiKeyService {
             monthlyQuota,
             usageCurrentMonth: 0,
             billingTier,
-            stripeCustomerId: payload.stripeCustomerId || null,
+            stripeCustomerId: resolvedStripeCustomerId,
             status: 'ACTIVE',
             lastUsedAt: null,
             createdAt: now,
@@ -442,7 +458,7 @@ class DeveloperApiKeyService {
         try {
             const rows = await db.query(
                 `SELECT id, tenant_id, user_id, key_name, key_type, key_prefix, hashed_key, scopes_json,
-                        rate_limit_per_minute, monthly_quota, usage_current_month, billing_tier, status
+                        rate_limit_per_minute, monthly_quota, usage_current_month, billing_tier, stripe_customer_id, status
                  FROM developer_api_keys
                  WHERE hashed_key = ? LIMIT 1`,
                 [incomingHash]
@@ -462,6 +478,7 @@ class DeveloperApiKeyService {
                     monthlyQuota: Number(row.monthly_quota || 1000),
                     usageCurrentMonth: Number(row.usage_current_month || 0),
                     billingTier: row.billing_tier || 'SANDBOX_FREE',
+                    stripeCustomerId: row.stripe_customer_id || null,
                     status: row.status
                 };
             }
@@ -509,14 +526,16 @@ class DeveloperApiKeyService {
         };
     }
 
-    async incrementKeyUsage(keyId, tenantId, endpoint = '/api/v1', method = 'POST', statusCode = 200, durationMs = 14) {
+    async incrementKeyUsage(keyId, tenantId, endpoint = '/api/v1', method = 'POST', statusCode = 200, durationMs = 14, idempotencyKey = null) {
         const mem = fallbackMemoryKeys.get(keyId);
         if (mem) {
             mem.usageCurrentMonth = (mem.usageCurrentMonth || 0) + 1;
             mem.lastUsedAt = new Date().toISOString();
         }
 
-        const billableUnits = endpoint.includes('preflight') ? 0.10 : endpoint.includes('pricing') ? 0.005 : 0.0;
+        const isPreflight = endpoint.includes('/api/preflight') || endpoint.includes('preflight');
+        const isPricing = endpoint.includes('/api/pricing') || endpoint.includes('pricing');
+        const billableUnits = isPreflight ? 0.10 : isPricing ? 0.005 : 0.0;
 
         fallbackUsageLogs.unshift({
             id: `ulog_${crypto.randomUUID()}`,
@@ -542,13 +561,175 @@ class DeveloperApiKeyService {
                 [`ulog_${crypto.randomUUID()}`, keyId, tenantId, endpoint, method, statusCode, durationMs, billableUnits]
             );
         } catch (_) {}
+
+        // Phase 199B: If key is LIVE on PRODUCTION_SCALE and HTTP 200 on Preflight or Pricing, report metered event to Stripe
+        if (statusCode === 200 && (isPreflight || isPricing)) {
+            let keyRecord = mem;
+            if (!keyRecord) {
+                try {
+                    const rows = await db.query(
+                        'SELECT id, tenant_id, key_type, billing_tier, stripe_customer_id FROM developer_api_keys WHERE id = ? LIMIT 1',
+                        [keyId]
+                    );
+                    const row = Array.isArray(rows) ? (Array.isArray(rows[0]) ? rows[0][0] : rows[0]) : null;
+                    if (row) {
+                        keyRecord = {
+                            id: row.id,
+                            tenantId: row.tenant_id,
+                            keyType: row.key_type,
+                            billingTier: row.billing_tier,
+                            stripeCustomerId: row.stripe_customer_id
+                        };
+                    }
+                } catch (_) {}
+            }
+
+            if (keyRecord && keyRecord.keyType === 'LIVE' && keyRecord.billingTier === 'PRODUCTION_SCALE') {
+                const eventName = isPreflight ? 'preflight_2gb_inspection' : 'bpe_pricing_quote';
+                try {
+                    const stripeBillingService = require('./stripeBillingService');
+                    await stripeBillingService.reportMeterUsage({
+                        customerId: keyRecord.stripeCustomerId || null,
+                        tenantId: keyRecord.tenantId || tenantId,
+                        apiKeyId: keyRecord.id || keyId,
+                        eventName,
+                        quantity: 1,
+                        idempotencyKey
+                    });
+                } catch (_) {}
+            }
+        }
+    }
+
+    /**
+     * Log an API call and report Stripe Metered Usage if applicable (pp_live_* on PRODUCTION_SCALE).
+     */
+    async logApiCall({
+        keyRecord = null,
+        keyId = null,
+        tenantId = null,
+        endpoint = '/api/v1',
+        method = 'POST',
+        statusCode = 200,
+        durationMs = 14,
+        idempotencyKey = null
+    } = {}) {
+        const resolvedKeyId = keyRecord?.id || keyId;
+        const resolvedTenantId = keyRecord?.tenantId || tenantId;
+        if (!resolvedKeyId || !resolvedTenantId) return null;
+
+        await this.incrementKeyUsage(
+            resolvedKeyId,
+            resolvedTenantId,
+            endpoint,
+            method,
+            statusCode,
+            durationMs,
+            idempotencyKey
+        );
+
+        const isPreflight = endpoint.includes('/api/preflight') || endpoint.includes('preflight');
+        const isPricing = endpoint.includes('/api/pricing') || endpoint.includes('pricing');
+        return {
+            ok: true,
+            keyId: resolvedKeyId,
+            tenantId: resolvedTenantId,
+            endpoint,
+            statusCode,
+            meteredEvent: statusCode === 200
+                ? (isPreflight ? 'preflight_2gb_inspection' : isPricing ? 'bpe_pricing_quote' : null)
+                : null
+        };
+    }
+
+    /**
+     * Reset monthly usage counters for all keys belonging to a tenant upon `invoice.payment_succeeded`.
+     */
+    async resetMonthlyUsageCounters(tenantId) {
+        if (!tenantId) return { ok: false };
+
+        try {
+            await db.query(
+                'UPDATE developer_api_keys SET usage_current_month = 0 WHERE tenant_id = ?',
+                [tenantId]
+            );
+        } catch (_) {}
+
+        for (const rec of fallbackMemoryKeys.values()) {
+            if (rec.tenantId === tenantId) {
+                rec.usageCurrentMonth = 0;
+                rec.updatedAt = new Date().toISOString();
+            }
+        }
+
+        return { ok: true, tenantId, resetAt: new Date().toISOString() };
+    }
+
+    /**
+     * Suspend LIVE keys and downgrade tenant billing tier to SANDBOX_FREE
+     * upon `invoice.payment_failed` or `customer.subscription.deleted`.
+     */
+    async handleSubscriptionDowngradeOrSuspension(tenantId, reason = 'customer.subscription.deleted') {
+        if (!tenantId) return { ok: false };
+
+        const sandboxDef = TIER_DEFINITIONS.SANDBOX_FREE;
+
+        try {
+            await db.query(
+                `UPDATE developer_api_keys
+                 SET status = CASE WHEN key_type = 'LIVE' THEN 'SUSPENDED' ELSE status END,
+                     billing_tier = 'SANDBOX_FREE',
+                     rate_limit_per_minute = ?,
+                     monthly_quota = ?
+                 WHERE tenant_id = ? AND status = 'ACTIVE'`,
+                [sandboxDef.rateLimitPerMinute, sandboxDef.monthlyQuota, tenantId]
+            );
+        } catch (_) {}
+
+        for (const rec of fallbackMemoryKeys.values()) {
+            if (rec.tenantId === tenantId && rec.status === 'ACTIVE') {
+                if (rec.keyType === 'LIVE') {
+                    rec.status = 'SUSPENDED';
+                }
+                rec.billingTier = 'SANDBOX_FREE';
+                rec.rateLimitPerMinute = sandboxDef.rateLimitPerMinute;
+                rec.monthlyQuota = sandboxDef.monthlyQuota;
+                rec.updatedAt = new Date().toISOString();
+            }
+        }
+
+        await auditLogger.log({
+            type: 'DEVELOPER_SUBSCRIPTION_DOWNGRADED',
+            tenantId,
+            userId: 'stripe-webhook',
+            status: 'WARNING',
+            metadata: { reason, targetTier: 'SANDBOX_FREE', liveKeysSuspended: true }
+        }).catch(() => {});
+
+        return { ok: true, tenantId, billingTier: 'SANDBOX_FREE', reason };
     }
 
     async getUsageTelemetry(tenantId) {
         const keys = await this.listApiKeys(tenantId);
+        let subscription = null;
+        let meterEvents = [];
+
+        try {
+            const stripeBillingService = require('./stripeBillingService');
+            subscription = await stripeBillingService.getBillingSubscription(tenantId);
+            meterEvents = await stripeBillingService.getMeterEventsForTenant(tenantId);
+        } catch (_) {}
+
         const totalCallsMonth = keys.reduce((acc, k) => acc + (k.usageCurrentMonth || 0), 0);
-        const activeQuota = keys.reduce((acc, k) => Math.max(acc, k.monthlyQuota || 1000), 1000);
-        const activeTier = keys.find(k => k.status === 'ACTIVE')?.billingTier || 'SANDBOX_FREE';
+        const activeTierFromKey = keys.find(k => k.status === 'ACTIVE')?.billingTier;
+        const activeTier = (subscription?.status === 'ACTIVE' && subscription?.billingTier === 'PRODUCTION_SCALE')
+            ? 'PRODUCTION_SCALE'
+            : (activeTierFromKey || subscription?.billingTier || 'SANDBOX_FREE');
+        const tierDetails = TIER_DEFINITIONS[activeTier] || TIER_DEFINITIONS.SANDBOX_FREE;
+        const activeQuota = Math.max(
+            tierDetails.monthlyQuota,
+            keys.reduce((acc, k) => Math.max(acc, k.monthlyQuota || 1000), 1000)
+        );
 
         let recentLogs = [];
         try {
@@ -576,12 +757,14 @@ class DeveloperApiKeyService {
             recentLogs = fallbackUsageLogs.filter(l => l.tenantId === tenantId).slice(0, 25);
         }
 
-        const accruedCostEur = recentLogs.reduce((acc, l) => acc + Number(l.billableUnits || 0), 0);
+        const logsCostEur = recentLogs.reduce((acc, l) => acc + Number(l.billableUnits || 0), 0);
+        const meterCostEur = meterEvents.reduce((acc, m) => acc + Number(m.totalCostEur || 0), 0);
+        const accruedCostEur = Math.max(logsCostEur, meterCostEur);
 
         return {
             tenantId,
             activeTier,
-            tierDetails: TIER_DEFINITIONS[activeTier] || TIER_DEFINITIONS.SANDBOX_FREE,
+            tierDetails,
             totalCallsMonth,
             monthlyQuota: activeQuota,
             utilizationPct: Math.min(100, Number(((totalCallsMonth / activeQuota) * 100).toFixed(2))),
@@ -592,6 +775,16 @@ class DeveloperApiKeyService {
                 ? Number(((recentLogs.filter(r => r.statusCode < 400).length / recentLogs.length) * 100).toFixed(1))
                 : 100.0,
             accruedMeteredEur: Number(accruedCostEur.toFixed(3)),
+            subscription: subscription || {
+                tenantId,
+                billingTier: activeTier,
+                status: 'ACTIVE',
+                stripeCustomerId: null,
+                stripeSubscriptionId: null,
+                monthlySpendCapEur: 150.00,
+                alertEmail: null
+            },
+            meterEvents: meterEvents.slice(0, 25),
             recentLogs,
             availableScopes: ALLOWED_SCOPES,
             tiersCatalog: TIER_DEFINITIONS
@@ -601,6 +794,10 @@ class DeveloperApiKeyService {
     _clearFallbackStore() {
         fallbackMemoryKeys.clear();
         fallbackUsageLogs.length = 0;
+        try {
+            const stripeBillingService = require('./stripeBillingService');
+            stripeBillingService._clearFallbackStores();
+        } catch (_) {}
     }
 }
 

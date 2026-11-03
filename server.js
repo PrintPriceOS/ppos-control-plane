@@ -63,6 +63,7 @@ fastify.addHook('onRequest', async (request, reply) => {
 
     // 2. API BYPASS
     if (url.startsWith('/api/auth')) return;
+    if (url.startsWith('/api/billing/stripe/webhook')) return;
     if (url.includes('/api/v2/analytics/public')) return;
     if (url.startsWith('/api/public/preflight')) return;
     if (url.includes('/quote-revisions/review/')) return;
@@ -161,9 +162,11 @@ fastify.addHook('onRequest', async (request, reply) => {
                 apiKeyId: keyRecord.id,
                 keyType: keyRecord.keyType,
                 billingTier: keyRecord.billingTier,
+                stripeCustomerId: keyRecord.stripeCustomerId || null,
                 authMode: 'API_KEY'
             };
             request.raw.user = request.user;
+            request._developerApiKeyRecord = keyRecord;
             return;
         }
 
@@ -493,10 +496,15 @@ const start = async () => {
                 '/api/admin/billing/webhook',
                 require('express').raw({ type: 'application/json', limit: '2mb' })
             );
+            fastify.use(
+                '/api/billing/stripe/webhook',
+                require('express').raw({ type: 'application/json', limit: '2mb' })
+            );
 
             fastify.use(require('express').json({ limit: '64mb' }));
             fastify.use(require('express').urlencoded({ extended: true, limit: '64mb' }));
             
+            fastify.use('/api/billing/stripe', require('./src/api/routes/stripeBillingRoutes'));
             fastify.use('/api/auth', require('./src/api/routes/authRoutes'));
             fastify.use('/api/admin/financials/activation', require('./src/api/routes/financialOperationsProductionActivationAdmin'));
             fastify.use('/api/admin/printhouse-reviews', require('./src/api/routes/printhouseAdminReviewRoutes'));
@@ -601,6 +609,8 @@ const start = async () => {
             fastify.all('/api/settings/*', apiNotFoundFallback);
             fastify.all('/api/developer', apiNotFoundFallback);
             fastify.all('/api/developer/*', apiNotFoundFallback);
+            fastify.all('/api/billing/stripe', apiNotFoundFallback);
+            fastify.all('/api/billing/stripe/*', apiNotFoundFallback);
 
             fastify.log.info('[ROUTES][ADMIN][REGISTERED] route=/api/admin/* mounted successfully via Express bridge');
             console.log('[ROUTES][ADMIN][REGISTERED] route=/api/admin/* mounted successfully via Express bridge');
@@ -620,6 +630,20 @@ const start = async () => {
                         reply.statusCode,
                         reply.getResponseTime()
                     );
+                    if (request._developerApiKeyRecord && reply.statusCode === 200) {
+                        const reqUrl = String(request.url || '');
+                        if (reqUrl.startsWith('/api/preflight') || reqUrl.startsWith('/api/pricing')) {
+                            const developerApiKeyService = require('./src/api/services/developerApiKeyService');
+                            developerApiKeyService.logApiCall({
+                                keyRecord: request._developerApiKeyRecord,
+                                endpoint: reqUrl,
+                                method: request.method,
+                                statusCode: reply.statusCode,
+                                durationMs: Math.round(reply.getResponseTime() || 14),
+                                idempotencyKey: request.headers['idempotency-key'] || request.headers['x-idempotency-key'] || null
+                            }).catch(() => {});
+                        }
+                    }
                 } catch (err) {
                     // Fail silently for observability
                 }

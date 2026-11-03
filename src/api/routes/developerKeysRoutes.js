@@ -7,6 +7,7 @@
 const express = require('express');
 const router = express.Router({ mergeParams: true });
 const developerApiKeyService = require('../services/developerApiKeyService');
+const stripeBillingService = require('../services/stripeBillingService');
 const { authenticateApiKey } = require('../middleware/authenticateApiKey');
 
 function resolveTenantAndUser(req) {
@@ -25,13 +26,117 @@ function resolveTenantAndUser(req) {
         req.user?.role ||
         req.headers?.['x-user-role'] ||
         'DEVELOPER_SANDBOX';
+    const email =
+        req.user?.email ||
+        req.headers?.['x-user-email'] ||
+        req.body?.userEmail ||
+        null;
 
     return {
         tenantId: String(tenantId),
         userId: String(userId),
-        actor: { id: String(userId), role: String(role).toUpperCase(), tenantId: String(tenantId) }
+        userEmail: email ? String(email) : null,
+        actor: { id: String(userId), role: String(role).toUpperCase(), tenantId: String(tenantId), email }
     };
 }
+
+// POST /api/developer/billing/create-checkout-session (and /api/developer/keys/billing/create-checkout-session)
+async function handleCreateCheckoutSession(req, res) {
+    try {
+        const { tenantId, userId, userEmail } = resolveTenantAndUser(req);
+        const { returnUrl, monthlySpendCapEur, idempotencyKey } = req.body || {};
+        const session = await stripeBillingService.createCheckoutSession({
+            tenantId,
+            userId,
+            userEmail: req.body?.userEmail || userEmail,
+            returnUrl: returnUrl || 'https://control.printprice.pro/developers',
+            monthlySpendCapEur: monthlySpendCapEur ?? 150.00,
+            idempotencyKey: idempotencyKey || req.headers?.['idempotency-key'] || null
+        });
+        res.status(200).json({
+            ok: true,
+            success: true,
+            session,
+            sessionId: session.sessionId,
+            url: session.url,
+            data: session
+        });
+    } catch (err) {
+        res.status(err.statusCode || 500).json({ ok: false, error: err.message });
+    }
+}
+
+// POST /api/developer/billing/verify-session
+async function handleVerifyCheckoutSession(req, res) {
+    try {
+        const { tenantId } = resolveTenantAndUser(req);
+        const sessionId = req.body?.sessionId || req.query?.session_id;
+        const subscription = await stripeBillingService.verifyCheckoutSessionOnReturn({
+            tenantId,
+            sessionId
+        });
+        res.status(200).json({
+            ok: true,
+            success: true,
+            subscription,
+            data: subscription
+        });
+    } catch (err) {
+        res.status(err.statusCode || 500).json({ ok: false, error: err.message });
+    }
+}
+
+// POST /api/developer/billing/customer-portal
+async function handleCustomerPortalSession(req, res) {
+    try {
+        const { tenantId } = resolveTenantAndUser(req);
+        const { customerId, returnUrl } = req.body || {};
+        const portal = await stripeBillingService.createCustomerPortalSession({
+            tenantId,
+            customerId: customerId || null,
+            returnUrl: returnUrl || 'https://control.printprice.pro/developers'
+        });
+        res.status(200).json({
+            ok: true,
+            success: true,
+            portal,
+            url: portal.url,
+            data: portal
+        });
+    } catch (err) {
+        res.status(err.statusCode || 500).json({ ok: false, error: err.message });
+    }
+}
+
+// POST /api/developer/billing/spend-cap
+async function handleUpdateSpendCap(req, res) {
+    try {
+        const { tenantId, userEmail } = resolveTenantAndUser(req);
+        const { monthlySpendCapEur, alertEmail } = req.body || {};
+        const subscription = await stripeBillingService.updateSpendCap({
+            tenantId,
+            monthlySpendCapEur,
+            alertEmail: alertEmail !== undefined ? alertEmail : userEmail
+        });
+        res.status(200).json({
+            ok: true,
+            success: true,
+            subscription,
+            data: subscription
+        });
+    } catch (err) {
+        res.status(err.statusCode || 500).json({ ok: false, error: err.message });
+    }
+}
+
+router.post('/billing/create-checkout-session', handleCreateCheckoutSession);
+router.post('/create-checkout-session', handleCreateCheckoutSession);
+router.post('/billing/verify-session', handleVerifyCheckoutSession);
+router.post('/verify-session', handleVerifyCheckoutSession);
+router.post('/billing/customer-portal', handleCustomerPortalSession);
+router.post('/customer-portal', handleCustomerPortalSession);
+router.post('/billing/spend-cap', handleUpdateSpendCap);
+router.post('/spend-cap', handleUpdateSpendCap);
 
 // GET /api/developer/keys — List all API keys + telemetry summary for tenant
 router.get('/', async (req, res) => {

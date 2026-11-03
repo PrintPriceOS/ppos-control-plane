@@ -116,8 +116,31 @@ function authenticateApiKey(requiredScope = null) {
             apiKeyId: keyRecord.id,
             keyType: keyRecord.keyType,
             billingTier: keyRecord.billingTier,
+            stripeCustomerId: keyRecord.stripeCustomerId || null,
             authMode: 'API_KEY'
         };
+
+        // Phase 199B: Hook into response completion to report metered usage on HTTP 200 for Preflight & Pricing
+        const startTimeMs = Date.now();
+        const requestPath = req.originalUrl || req.url || '/api/v1';
+        const requestMethod = req.method || 'POST';
+        const idempotencyHeader = req.headers?.['idempotency-key'] || req.headers?.['x-idempotency-key'] || null;
+
+        if (res && typeof res.on === 'function') {
+            res.on('finish', () => {
+                const status = res.statusCode || 200;
+                if (status === 200 && (requestPath.includes('/api/preflight') || requestPath.includes('/api/pricing'))) {
+                    developerApiKeyService.logApiCall({
+                        keyRecord,
+                        endpoint: requestPath,
+                        method: requestMethod,
+                        statusCode: status,
+                        durationMs: Math.max(1, Date.now() - startTimeMs),
+                        idempotencyKey: idempotencyHeader
+                    }).catch(() => {});
+                }
+            });
+        }
 
         if (typeof next === 'function') {
             return next();

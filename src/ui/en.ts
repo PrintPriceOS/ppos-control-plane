@@ -3373,7 +3373,16 @@ export const en = {
   'setup.integrations.placeholderName': 'e.g. Heidelberg Prinect Webhook Bridge',
   'setup.integrations.placeholderUrl': 'https://api.yourprinthouse.com/v1/webhooks',
   'setup.integrations.topicsCountBadge': '{count} topics active',
-  'nav.developers': 'Developer API Hub'
+  'nav.developers': 'Developer API Hub',
+  'developers.billing.activateBtn': 'Activate Production Scale (€49/mo + Metered)',
+  'developers.billing.managePortalBtn': 'Manage Subscription & Invoices ↗',
+  'developers.billing.checkoutSuccessToast': 'Production Scale Activated! Your tenant is now unlocked for high-throughput pp_live_* keys and Stripe Metered Billing.',
+  'developers.billing.spendCapTitle': 'Monthly Spend Cap Governance',
+  'developers.billing.spendCapDesc': 'Set a monthly metered spend ceiling (€49 base + metered consumption) with automated warning email notifications.',
+  'developers.billing.spendCapLabel': 'Monthly Spend Ceiling (€ EUR)',
+  'developers.billing.alertEmailLabel': 'Spend Warning Notification Email',
+  'developers.billing.saveSpendCapBtn': 'Save Spend Cap',
+  'developers.billing.spendCapSavedToast': 'Monthly spend cap and alert notification email updated.'
 } as const;
 
 export type TranslationKeys = keyof typeof en;

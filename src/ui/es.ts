@@ -3373,7 +3373,16 @@ export const es = {
   'setup.integrations.placeholderName': 'ej. Puente Webhook Heidelberg Prinect',
   'setup.integrations.placeholderUrl': 'https://api.suimprenta.es/v1/webhooks',
   'setup.integrations.topicsCountBadge': '{count} tópicos activos',
-  'nav.developers': 'Developer API Hub'
+  'nav.developers': 'Developer API Hub',
+  'developers.billing.activateBtn': 'Activar Production Scale (49 €/mes + Uso Medido)',
+  'developers.billing.managePortalBtn': 'Gestionar Suscripción y Facturas ↗',
+  'developers.billing.checkoutSuccessToast': '¡Plan Production Scale activado! Tu cuenta ya puede generar llaves pp_live_* de alto rendimiento con facturación medida en Stripe.',
+  'developers.billing.spendCapTitle': 'Gobernanza de Límite de Gasto Mensual (Spend Cap)',
+  'developers.billing.spendCapDesc': 'Configura un techo máximo de gasto mensual (49 € base + consumo medido) con alertas preventivas por correo electrónico.',
+  'developers.billing.spendCapLabel': 'Techo de Gasto Mensual (€ EUR)',
+  'developers.billing.alertEmailLabel': 'Email para Alertas de Consumo',
+  'developers.billing.saveSpendCapBtn': 'Guardar Límite de Gasto',
+  'developers.billing.spendCapSavedToast': 'Límite de gasto mensual y correo de alertas actualizados correctamente.'
 } as const;
 
 export type TranslationKeys = keyof typeof es;

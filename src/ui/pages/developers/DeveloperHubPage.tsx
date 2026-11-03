@@ -80,6 +80,15 @@ interface TelemetrySummary {
     avgLatencyMs: number;
     successRatePct: number;
     accruedMeteredEur: number;
+    subscription?: {
+        tenantId: string;
+        billingTier: string;
+        status: string;
+        stripeCustomerId: string | null;
+        stripeSubscriptionId: string | null;
+        monthlySpendCapEur: number;
+        alertEmail: string | null;
+    };
     recentLogs: UsageLogEntry[];
     availableScopes: string[];
 }
@@ -136,8 +145,16 @@ const DEVELOPER_HUB_I18N = {
         paywallBadge: 'PRODUCTION GATEWAY UNLOCK',
         paywallTitle: 'Unlock Production Live API Keys (pp_live_*)',
         paywallDesc: 'External B2B platforms and SaaS integrators can unlock immediate Production throughput by activating the Production Scale Metered Plan. Verified Printhouse & Publisher Partner Tenants receive Live keys automatically at zero base fee.',
-        labelStripeCustomer: 'Billing Reference / Stripe Payment Method Token (Optional in Demo)',
+        labelStripeCustomer: 'Billing Notification Email (for VAT Invoices & Spend Alerts)',
         btnActivateProduction: 'Activate Production Scale (€49/mo + Metered)',
+        btnManagePortal: 'Manage Subscription & Invoices ↗',
+        checkoutSuccessToast: 'Production Scale Activated! Your tenant is now unlocked for high-throughput pp_live_* keys and Stripe Metered Billing.',
+        spendCapTitle: 'Monthly Spend Cap Governance',
+        spendCapDesc: 'Configure your monthly metered spend ceiling (€49.00 base + metered consumption) with automated warning email notifications.',
+        spendCapLabel: 'Monthly Spend Ceiling (€ EUR)',
+        alertEmailLabel: 'Spend Warning Notification Email',
+        saveSpendCapBtn: 'Save Spend Cap',
+        spendCapSavedToast: 'Monthly spend cap and notification email saved.',
         pingSuccess: '200 OK · Handshake Verified',
         scopeDesc: {
             'pricing:read': 'Calculate dynamic BPE offset/digital quotes & Q* crossovers',
@@ -200,8 +217,16 @@ const DEVELOPER_HUB_I18N = {
         paywallBadge: 'DESBLOQUEO DE PRODUCCIÓN',
         paywallTitle: 'Desbloquear Llaves Live de Producción (pp_live_*)',
         paywallDesc: 'Los desarrolladores externos y plataformas SaaS B2B pueden desbloquear el entorno Live activando el plan Production Scale. Las Imprentas y Editoriales verificadas del ecosistema obtienen llaves Live automáticamente sin cuota base.',
-        labelStripeCustomer: 'Referencia de Facturación / Método Stripe (Opcional en Demo)',
+        labelStripeCustomer: 'Email de Facturación (para Facturas IVA y Alertas de Consumo)',
         btnActivateProduction: 'Activar Production Scale (49 €/mes + Uso Medido)',
+        btnManagePortal: 'Gestionar Suscripción y Facturas ↗',
+        checkoutSuccessToast: '¡Plan Production Scale activado! Tu cuenta ya puede generar llaves pp_live_* de alto rendimiento con facturación medida en Stripe.',
+        spendCapTitle: 'Gobernanza de Límite de Gasto Mensual (Spend Cap)',
+        spendCapDesc: 'Configura un techo máximo de gasto mensual (49,00 € base + consumo medido) con alertas preventivas por correo electrónico.',
+        spendCapLabel: 'Techo de Gasto Mensual (€ EUR)',
+        alertEmailLabel: 'Email para Alertas de Consumo',
+        saveSpendCapBtn: 'Guardar Límite de Gasto',
+        spendCapSavedToast: 'Límite de gasto mensual y correo de alertas actualizados correctamente.',
         pingSuccess: '200 OK · Handshake Verificado',
         scopeDesc: {
             'pricing:read': 'Cálculo instantáneo de presupuestos BPE offset/digital y curva Q*',
@@ -264,8 +289,16 @@ const DEVELOPER_HUB_I18N = {
         paywallBadge: 'PRODUKTIONS-FREISCHALTUNG',
         paywallTitle: 'Produktive Live-API-Schlüssel freischalten (pp_live_*)',
         paywallDesc: 'Externe B2B-Plattformen und SaaS-Integratoren können den Live-Durchsatz durch Aktivierung des Production Scale Tarifs freischalten. Verifizierte Druckerei- und Verlagspartner erhalten Live-Keys automatisch ohne Grundgebühr.',
-        labelStripeCustomer: 'Abrechnungsreferenz / Stripe-Zahlungsmittel-Token (Optional in Demo)',
+        labelStripeCustomer: 'Abrechnungs-E-Mail (für USt.-Rechnungen & Ausgabenwarnungen)',
         btnActivateProduction: 'Production Scale aktivieren (49 €/Monat + Nutzung)',
+        btnManagePortal: 'Abonnement & Rechnungen verwalten ↗',
+        checkoutSuccessToast: 'Production Scale aktiviert! Ihr Mandant ist jetzt für produktive pp_live_*-Schlüssel und Stripe Metered Billing freigeschaltet.',
+        spendCapTitle: 'Monatliches Ausgabenlimit (Spend Cap Governance)',
+        spendCapDesc: 'Definieren Sie eine monatliche Kostenobergrenze (49,00 € Basis + nutzungsbasierte Abrechnung) inklusive automatischer E-Mail-Warnung.',
+        spendCapLabel: 'Monatliche Kostenobergrenze (€ EUR)',
+        alertEmailLabel: 'E-Mail für Ausgabenwarnungen',
+        saveSpendCapBtn: 'Ausgabenlimit speichern',
+        spendCapSavedToast: 'Monatliches Ausgabenlimit und Benachrichtigungs-E-Mail erfolgreich aktualisiert.',
         pingSuccess: '200 OK · Handshake verifiziert',
         scopeDesc: {
             'pricing:read': 'Dynamische BPE Offset-/Digital-Kalkulation & Q*-Crossover berechnen',
@@ -301,14 +334,19 @@ export const DeveloperHubPage: React.FC = () => {
     const [revealedKeyData, setRevealedKeyData] = useState<{ rawKey: string; keyName: string; keyType: string; scopes: string[] } | null>(null);
     const [copiedSecret, setCopiedSecret] = useState<boolean>(false);
 
-    // Paywall / Billing Upgrade modal
+    // Paywall / Billing Upgrade modal & Spend Cap Governance
     const [showPaywallModal, setShowPaywallModal] = useState<boolean>(false);
-    const [stripeRefInput, setStripeRefInput] = useState<string>('pm_card_visa_enterprise_verified');
+    const [stripeRefInput, setStripeRefInput] = useState<string>('billing@company.com');
     const [upgradingBilling, setUpgradingBilling] = useState<boolean>(false);
+    const [openingPortal, setOpeningPortal] = useState<boolean>(false);
+    const [monthlySpendCapEur, setMonthlySpendCapEur] = useState<number>(150);
+    const [spendAlertEmail, setSpendAlertEmail] = useState<string>('');
+    const [savingSpendCap, setSavingSpendCap] = useState<boolean>(false);
 
     // Ping & banner feedback
     const [pingResultByKey, setPingResultByKey] = useState<Record<string, { ok: boolean; text: string }>>({});
     const [errorBanner, setErrorBanner] = useState<string | null>(null);
+    const [successToast, setSuccessToast] = useState<string | null>(null);
 
     const fetchHubData = useCallback(async () => {
         setLoading(true);
@@ -325,7 +363,14 @@ export const DeveloperHubPage: React.FC = () => {
             const json = await res.json();
             if (json.ok && json.data) {
                 setKeys(json.data.keys || []);
-                setTelemetry(json.data.telemetry || null);
+                const telem: TelemetrySummary | null = json.data.telemetry || null;
+                setTelemetry(telem);
+                if (telem?.subscription?.monthlySpendCapEur) {
+                    setMonthlySpendCapEur(Number(telem.subscription.monthlySpendCapEur));
+                }
+                if (telem?.subscription?.alertEmail) {
+                    setSpendAlertEmail(telem.subscription.alertEmail);
+                }
             }
         } catch (err: any) {
             setErrorBanner(err.message || 'Could not load Developer Hub data');
@@ -337,6 +382,36 @@ export const DeveloperHubPage: React.FC = () => {
     useEffect(() => {
         fetchHubData();
     }, [fetchHubData]);
+
+    // Phase 199B: Reconcile Stripe Checkout return_url (?session_id=...&status=success)
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        const params = new URLSearchParams(window.location.search);
+        const sessionId = params.get('session_id');
+        const status = params.get('status');
+
+        if (sessionId && status === 'success') {
+            (async () => {
+                try {
+                    const res = await fetch('/api/developer/billing/verify-session', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            ...buildAuthHeaders()
+                        },
+                        body: JSON.stringify({ sessionId })
+                    });
+                    if (res.ok) {
+                        setSuccessToast(copy.checkoutSuccessToast);
+                        await fetchHubData();
+                    }
+                } catch (_) {}
+                // Clean query params without full reload
+                const cleanUrl = window.location.pathname;
+                window.history.replaceState({}, document.title, cleanUrl);
+            })();
+        }
+    }, [copy.checkoutSuccessToast, fetchHubData]);
 
     const handleToggleScope = (scope: string) => {
         setSelectedScopes(prev =>
@@ -450,27 +525,94 @@ export const DeveloperHubPage: React.FC = () => {
         setUpgradingBilling(true);
         setErrorBanner(null);
         try {
-            const res = await fetch('/api/developer/keys/upgrade-billing', {
+            const returnUrl = typeof window !== 'undefined'
+                ? `${window.location.origin}/developers`
+                : 'https://control.printprice.pro/developers';
+
+            const res = await fetch('/api/developer/billing/create-checkout-session', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     ...buildAuthHeaders()
                 },
                 body: JSON.stringify({
-                    planTier: 'PRODUCTION_SCALE',
-                    stripeCustomerId: stripeRefInput.trim() || 'cus_ppos_live_verified'
+                    userEmail: stripeRefInput.trim() || 'billing@company.com',
+                    returnUrl,
+                    monthlySpendCapEur
                 })
             });
             const json = await res.json();
             if (!res.ok || !json.ok) {
-                throw new Error(json?.error?.message || 'Billing upgrade failed');
+                throw new Error(json?.error?.message || json?.error || 'Stripe Checkout session creation failed');
             }
             setShowPaywallModal(false);
+            if (json.url && typeof window !== 'undefined') {
+                window.location.href = json.url;
+                return;
+            }
             await fetchHubData();
         } catch (err: any) {
             setErrorBanner(err.message);
         } finally {
             setUpgradingBilling(false);
+        }
+    };
+
+    const handleOpenCustomerPortal = async () => {
+        setOpeningPortal(true);
+        setErrorBanner(null);
+        try {
+            const returnUrl = typeof window !== 'undefined'
+                ? `${window.location.origin}/developers`
+                : 'https://control.printprice.pro/developers';
+
+            const res = await fetch('/api/developer/billing/customer-portal', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...buildAuthHeaders()
+                },
+                body: JSON.stringify({ returnUrl })
+            });
+            const json = await res.json();
+            if (!res.ok || !json.ok) {
+                throw new Error(json?.error || 'Could not open Stripe Customer Portal');
+            }
+            if (json.url && typeof window !== 'undefined') {
+                window.open(json.url, '_blank', 'noopener,noreferrer');
+            }
+        } catch (err: any) {
+            setErrorBanner(err.message);
+        } finally {
+            setOpeningPortal(false);
+        }
+    };
+
+    const handleSaveSpendCap = async () => {
+        setSavingSpendCap(true);
+        setErrorBanner(null);
+        try {
+            const res = await fetch('/api/developer/billing/spend-cap', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...buildAuthHeaders()
+                },
+                body: JSON.stringify({
+                    monthlySpendCapEur: Number(monthlySpendCapEur || 150),
+                    alertEmail: spendAlertEmail.trim() || null
+                })
+            });
+            const json = await res.json();
+            if (!res.ok || !json.ok) {
+                throw new Error(json?.error || 'Failed to save spend cap');
+            }
+            setSuccessToast(copy.spendCapSavedToast);
+            await fetchHubData();
+        } catch (err: any) {
+            setErrorBanner(err.message);
+        } finally {
+            setSavingSpendCap(false);
         }
     };
 
@@ -536,6 +678,18 @@ export const DeveloperHubPage: React.FC = () => {
                         </button>
                     )}
 
+                    {activeTierCode === 'PRODUCTION_SCALE' && (
+                        <button
+                            type="button"
+                            onClick={handleOpenCustomerPortal}
+                            disabled={openingPortal}
+                            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg border border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 text-xs font-bold hover:bg-emerald-500/20 transition-colors cursor-pointer"
+                        >
+                            <CreditCardIcon className="w-4 h-4" />
+                            <span>{copy.btnManagePortal}</span>
+                        </button>
+                    )}
+
                     <button
                         type="button"
                         onClick={() => handleCreateKey(true)}
@@ -556,6 +710,18 @@ export const DeveloperHubPage: React.FC = () => {
                     </button>
                 </div>
             </div>
+
+            {successToast && (
+                <div className="p-4 rounded-xl border border-emerald-500/40 bg-emerald-950/20 text-emerald-400 flex items-center justify-between text-xs font-medium">
+                    <div className="flex items-center gap-2">
+                        <CheckCircleIcon className="w-4 h-4 shrink-0" />
+                        <span>{successToast}</span>
+                    </div>
+                    <button onClick={() => setSuccessToast(null)} className="text-emerald-300 hover:text-white">
+                        <XMarkIcon className="w-4 h-4" />
+                    </button>
+                </div>
+            )}
 
             {errorBanner && (
                 <div className="p-4 rounded-xl border border-red-500/40 bg-red-950/20 text-red-400 flex items-center justify-between text-xs font-medium">
@@ -863,80 +1029,161 @@ export const DeveloperHubPage: React.FC = () => {
 
             {/* TAB 3: TIERS & METERED BILLING */}
             {activeTab === 'BILLING' && (
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    {/* Tier 1: Sandbox Free */}
-                    <div className="p-6 rounded-xl border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/60 flex flex-col justify-between space-y-6">
-                        <div className="space-y-3">
-                            <span className="px-2.5 py-1 rounded text-[10px] font-mono font-bold bg-sky-500/15 text-sky-400 border border-sky-500/30">
-                                LEVEL 1 · SANDBOX_FREE
-                            </span>
-                            <h3 className="text-xl font-black text-slate-900 dark:text-white">Developer Sandbox</h3>
-                            <div className="text-2xl font-black font-mono text-slate-900 dark:text-white">
-                                €0 <span className="text-xs font-normal text-zinc-500">/ month · No card required</span>
-                            </div>
-                            <ul className="space-y-2 text-xs text-slate-600 dark:text-zinc-400 pt-2">
-                                <li>✓ Instant <code className="font-mono text-sky-400">pp_test_*</code> credentials</li>
-                                <li>✓ 60 requests / minute sliding window</li>
-                                <li>✓ 1,000 free API calls / month</li>
-                                <li>✓ PDF Preflight up to 50 MB (watermarked output)</li>
-                                <li>✓ Mock order dispatch & webhook inspector</li>
-                            </ul>
-                        </div>
-                        <div className="pt-4 border-t border-slate-200 dark:border-zinc-800 text-xs font-mono text-emerald-500 font-bold">
-                            ✓ Included by default for all accounts
-                        </div>
-                    </div>
-
-                    {/* Tier 2: Production Scale */}
-                    <div className="p-6 rounded-xl border-2 border-[#dc0000] bg-gradient-to-b from-red-950/15 via-white to-white dark:from-red-950/20 dark:via-zinc-900 dark:to-zinc-950 flex flex-col justify-between space-y-6 shadow-lg">
-                        <div className="space-y-3">
-                            <div className="flex items-center justify-between">
-                                <span className="px-2.5 py-1 rounded text-[10px] font-mono font-bold bg-red-500/20 text-red-400 border border-red-500/40">
-                                    LEVEL 2 · PRODUCTION_SCALE
+                <div className="space-y-6">
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        {/* Tier 1: Sandbox Free */}
+                        <div className="p-6 rounded-xl border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/60 flex flex-col justify-between space-y-6">
+                            <div className="space-y-3">
+                                <span className="px-2.5 py-1 rounded text-[10px] font-mono font-bold bg-sky-500/15 text-sky-400 border border-sky-500/30">
+                                    LEVEL 1 · SANDBOX_FREE
                                 </span>
-                                <span className="text-[10px] font-mono font-bold text-red-500 uppercase">MOST POPULAR B2B</span>
+                                <h3 className="text-xl font-black text-slate-900 dark:text-white">Developer Sandbox</h3>
+                                <div className="text-2xl font-black font-mono text-slate-900 dark:text-white">
+                                    €0 <span className="text-xs font-normal text-zinc-500">/ month · No card required</span>
+                                </div>
+                                <ul className="space-y-2 text-xs text-slate-600 dark:text-zinc-400 pt-2">
+                                    <li>✓ Instant <code className="font-mono text-sky-400">pp_test_*</code> credentials</li>
+                                    <li>✓ 60 requests / minute sliding window</li>
+                                    <li>✓ 1,000 free API calls / month</li>
+                                    <li>✓ PDF Preflight up to 50 MB (watermarked output)</li>
+                                    <li>✓ Mock order dispatch & webhook inspector</li>
+                                </ul>
                             </div>
-                            <h3 className="text-xl font-black text-slate-900 dark:text-white">Production Scale (Metered)</h3>
-                            <div className="text-2xl font-black font-mono text-slate-900 dark:text-white">
-                                €49 <span className="text-xs font-normal text-zinc-500">/ month + metered usage</span>
+                            <div className="pt-4 border-t border-slate-200 dark:border-zinc-800 text-xs font-mono text-emerald-500 font-bold">
+                                ✓ Included by default for all accounts
                             </div>
-                            <ul className="space-y-2 text-xs text-slate-600 dark:text-zinc-300 pt-2">
-                                <li>✓ Unlocks <code className="font-mono text-red-400">pp_live_*</code> Production keys</li>
-                                <li>✓ 600 requests / minute · 100,000 calls/mo</li>
-                                <li>✓ 2 GB PDF/X-4 streaming + unwatermarked self-healing</li>
-                                <li>✓ €0.10 / preflight PDF · €0.005 / BPE pricing call</li>
-                                <li>✓ Live multi-plant order routing & HMAC webhooks</li>
-                            </ul>
                         </div>
-                        <button
-                            type="button"
-                            onClick={() => setShowPaywallModal(true)}
-                            className="w-full py-2.5 px-4 rounded-lg bg-[#dc0000] hover:bg-red-700 text-white text-xs font-bold transition-colors cursor-pointer"
-                        >
-                            {activeTierCode === 'PRODUCTION_SCALE' ? '✓ Active Plan' : copy.btnActivateProduction}
-                        </button>
+
+                        {/* Tier 2: Production Scale */}
+                        <div className="p-6 rounded-xl border-2 border-[#dc0000] bg-gradient-to-b from-red-950/15 via-white to-white dark:from-red-950/20 dark:via-zinc-900 dark:to-zinc-950 flex flex-col justify-between space-y-6 shadow-lg">
+                            <div className="space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <span className="px-2.5 py-1 rounded text-[10px] font-mono font-bold bg-red-500/20 text-red-400 border border-red-500/40">
+                                        LEVEL 2 · PRODUCTION_SCALE
+                                    </span>
+                                    <span className="text-[10px] font-mono font-bold text-red-500 uppercase">MOST POPULAR B2B</span>
+                                </div>
+                                <h3 className="text-xl font-black text-slate-900 dark:text-white">Production Scale (Metered)</h3>
+                                <div className="text-2xl font-black font-mono text-slate-900 dark:text-white">
+                                    €49 <span className="text-xs font-normal text-zinc-500">/ month + metered usage</span>
+                                </div>
+                                <ul className="space-y-2 text-xs text-slate-600 dark:text-zinc-300 pt-2">
+                                    <li>✓ Unlocks <code className="font-mono text-red-400">pp_live_*</code> Production keys</li>
+                                    <li>✓ 600 requests / minute · 100,000 calls/mo</li>
+                                    <li>✓ 2 GB PDF/X-4 streaming + unwatermarked self-healing</li>
+                                    <li>✓ €0.10 / preflight PDF · €0.005 / BPE pricing call</li>
+                                    <li>✓ Live multi-plant order routing & HMAC webhooks</li>
+                                </ul>
+                            </div>
+                            <div className="space-y-2">
+                                {activeTierCode === 'PRODUCTION_SCALE' ? (
+                                    <button
+                                        type="button"
+                                        onClick={handleOpenCustomerPortal}
+                                        disabled={openingPortal}
+                                        className="w-full py-2.5 px-4 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-colors cursor-pointer"
+                                    >
+                                        {openingPortal ? '...' : copy.btnManagePortal}
+                                    </button>
+                                ) : (
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowPaywallModal(true)}
+                                        className="w-full py-2.5 px-4 rounded-lg bg-[#dc0000] hover:bg-red-700 text-white text-xs font-bold transition-colors cursor-pointer"
+                                    >
+                                        {copy.btnActivateProduction}
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Tier 3: Enterprise Partner Tenant */}
+                        <div className="p-6 rounded-xl border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/60 flex flex-col justify-between space-y-6">
+                            <div className="space-y-3">
+                                <span className="px-2.5 py-1 rounded text-[10px] font-mono font-bold bg-purple-500/15 text-purple-400 border border-purple-500/30">
+                                    LEVEL 3 · ENTERPRISE_TENANT
+                                </span>
+                                <h3 className="text-xl font-black text-slate-900 dark:text-white">Verified Printhouse / Publisher</h3>
+                                <div className="text-2xl font-black font-mono text-slate-900 dark:text-white">
+                                    Included <span className="text-xs font-normal text-zinc-500">with Partner Node Membership</span>
+                                </div>
+                                <ul className="space-y-2 text-xs text-slate-600 dark:text-zinc-400 pt-2">
+                                    <li>✓ Immediate <code className="font-mono text-purple-400">pp_live_*</code> keys for ERP/MIS</li>
+                                    <li>✓ 1,200 requests / minute burst capacity</li>
+                                    <li>✓ 1,000,000 monthly API calls included</li>
+                                    <li>✓ Direct CIP4 JDF 1.7 / JMF press telemetry bridge</li>
+                                    <li>✓ EN 16931 automated escrow settlement</li>
+                                </ul>
+                            </div>
+                            <div className="pt-4 border-t border-slate-200 dark:border-zinc-800 text-xs font-mono text-purple-400 font-bold">
+                                Role: {userRole || 'TENANT_MEMBER'}
+                            </div>
+                        </div>
                     </div>
 
-                    {/* Tier 3: Enterprise Partner Tenant */}
-                    <div className="p-6 rounded-xl border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/60 flex flex-col justify-between space-y-6">
-                        <div className="space-y-3">
-                            <span className="px-2.5 py-1 rounded text-[10px] font-mono font-bold bg-purple-500/15 text-purple-400 border border-purple-500/30">
-                                LEVEL 3 · ENTERPRISE_TENANT
-                            </span>
-                            <h3 className="text-xl font-black text-slate-900 dark:text-white">Verified Printhouse / Publisher</h3>
-                            <div className="text-2xl font-black font-mono text-slate-900 dark:text-white">
-                                Included <span className="text-xs font-normal text-zinc-500">with Partner Node Membership</span>
+                    {/* Spend Cap Governance Card */}
+                    <div className="p-6 rounded-xl border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/70 space-y-4">
+                        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+                            <div>
+                                <h3 className="text-base font-black text-slate-900 dark:text-white">{copy.spendCapTitle}</h3>
+                                <p className="text-xs text-slate-500 dark:text-zinc-400 mt-0.5">{copy.spendCapDesc}</p>
                             </div>
-                            <ul className="space-y-2 text-xs text-slate-600 dark:text-zinc-400 pt-2">
-                                <li>✓ Immediate <code className="font-mono text-purple-400">pp_live_*</code> keys for ERP/MIS</li>
-                                <li>✓ 1,200 requests / minute burst capacity</li>
-                                <li>✓ 1,000,000 monthly API calls included</li>
-                                <li>✓ Direct CIP4 JDF 1.7 / JMF press telemetry bridge</li>
-                                <li>✓ EN 16931 automated escrow settlement</li>
-                            </ul>
+                            <div className="flex items-center gap-2">
+                                {[150, 300, 500, 1000].map(preset => (
+                                    <button
+                                        key={preset}
+                                        type="button"
+                                        onClick={() => setMonthlySpendCapEur(preset)}
+                                        className={`px-2.5 py-1 rounded text-xs font-mono font-bold border transition-colors cursor-pointer ${
+                                            monthlySpendCapEur === preset
+                                                ? 'border-[#dc0000] bg-red-500/15 text-red-400'
+                                                : 'border-slate-200 dark:border-zinc-700 text-slate-600 dark:text-zinc-400'
+                                        }`}
+                                    >
+                                        €{preset}
+                                    </button>
+                                ))}
+                            </div>
                         </div>
-                        <div className="pt-4 border-t border-slate-200 dark:border-zinc-800 text-xs font-mono text-purple-400 font-bold">
-                            Role: {userRole || 'TENANT_MEMBER'}
+
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                            <div>
+                                <label className="block text-[11px] font-mono uppercase text-zinc-400 mb-1">
+                                    {copy.spendCapLabel}
+                                </label>
+                                <input
+                                    type="number"
+                                    min={49}
+                                    step={10}
+                                    value={monthlySpendCapEur}
+                                    onChange={e => setMonthlySpendCapEur(Math.max(49, Number(e.target.value || 49)))}
+                                    className="w-full px-3.5 py-2 rounded-lg border border-slate-300 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-950 font-mono text-sm text-slate-900 dark:text-white"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-[11px] font-mono uppercase text-zinc-400 mb-1">
+                                    {copy.alertEmailLabel}
+                                </label>
+                                <input
+                                    type="email"
+                                    value={spendAlertEmail}
+                                    onChange={e => setSpendAlertEmail(e.target.value)}
+                                    placeholder="devops-alerts@yourcompany.com"
+                                    className="w-full px-3.5 py-2 rounded-lg border border-slate-300 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-950 font-mono text-sm text-slate-900 dark:text-white"
+                                />
+                            </div>
+
+                            <div>
+                                <button
+                                    type="button"
+                                    onClick={handleSaveSpendCap}
+                                    disabled={savingSpendCap}
+                                    className="w-full py-2 px-4 rounded-lg bg-[#dc0000] hover:bg-red-700 text-white text-xs font-bold transition-colors cursor-pointer"
+                                >
+                                    {savingSpendCap ? '...' : copy.saveSpendCapBtn}
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>

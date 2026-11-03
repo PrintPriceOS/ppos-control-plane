@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-11-03T00:33:56.918Z",
+  "generatedAt": "2026-11-03T01:16:49.717Z",
   "hashAlgorithm": "sha256",
   "contentNormalization": "utf8-lf-v1",
   "approvedPrefixCollisions": {
@@ -2429,9 +2429,22 @@
     {
       "path": "migrations/178_phase199a_developer_api_keys_and_metered_billing.sql",
       "prefix": "178",
-      "canonicalSha256": "69aa863dbc1432c8c1711483094b07af3783572ab0d388af76e111f550ee9487",
+      "canonicalSha256": "2034ca4c0f9c424ba0d1fa258c86dfa732c1a9f0c98425cc093a6b0ee84ff17c",
       "contentNormalization": "utf8-lf-v1",
-      "sizeBytes": 1770,
+      "sizeBytes": 1771,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/179_phase199b_stripe_metered_billing_and_spend_caps.sql",
+      "prefix": "179",
+      "canonicalSha256": "192d43e53c2ccbe6557f661ff2835a940bef449e92ddd0f11724d8360d928d69",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 1833,
       "containsDdl": true,
       "containsDml": true,
       "containsTransaction": false,
