@@ -148,4 +148,80 @@ describe('Phase 199A: Self-Service Developer Hub & Metered API Gateway', () => {
         expect(statusRevoked).toBe(403);
         expect(jsonBody.error.message).toMatch(/REVOKED/);
     });
+
+    it('Phase 199D: provisions developer webhooks with whsec_* secret, blocks SSRF, rotates secret, dispatches HMAC-SHA256 signed events, and replays deliveries with tenant isolation', async () => {
+        // 1. SSRF rejection for loopback/private IPs
+        await expect(
+            developerApiKeyService.saveWebhookEndpoint('tenant-wh-01', {
+                endpointUrl: 'http://127.0.0.1:8080/internal-hook',
+                events: ['preflight.certified']
+            })
+        ).rejects.toThrow(/SSRF_BLOCKED_HOST|SSRF/i);
+
+        await expect(
+            developerApiKeyService.saveWebhookEndpoint('tenant-wh-01', {
+                endpointUrl: 'http://169.254.169.254/latest/meta-data',
+                events: ['preflight.certified']
+            })
+        ).rejects.toThrow(/SSRF_BLOCKED_HOST|SSRF/i);
+
+        // 2. Save valid HTTPS webhook endpoint and receive one-time whsec_* secret
+        const createdSub = await developerApiKeyService.saveWebhookEndpoint(
+            'tenant-wh-01',
+            {
+                url: 'https://hooks.erp-publisher.com/v1/printprice',
+                description: 'Production ERP Bridge',
+                events: ['preflight.certified', 'order.status_changed', 'einvoice.issued']
+            },
+            { id: 'user-wh-01', email: 'devops@erp-publisher.com' }
+        );
+
+        expect(createdSub.url).toBe('https://hooks.erp-publisher.com/v1/printprice');
+        expect(createdSub.oneTimeSigningSecret).toMatch(/^whsec_[0-9a-f]{48}$/);
+        expect(createdSub.secretPrefix).toContain(createdSub.oneTimeSigningSecret.slice(0, 12));
+        expect(createdSub.events).toContain('preflight.certified');
+
+        // 3. Rotate signing secret atomically
+        const rotated = await developerApiKeyService.rotateWebhookEndpointSecret(
+            'tenant-wh-01',
+            createdSub.id,
+            { id: 'user-wh-01' }
+        );
+        expect(rotated.oneTimeSigningSecret).toMatch(/^whsec_[0-9a-f]{48}$/);
+        expect(rotated.oneTimeSigningSecret).not.toBe(createdSub.oneTimeSigningSecret);
+
+        // 4. Dispatch HMAC-SHA256 signed test event
+        const dispatchRes = await developerApiKeyService.dispatchTestWebhookEvent(
+            'tenant-wh-01',
+            {
+                eventType: 'preflight.certified',
+                targetUrl: 'https://hooks.erp-publisher.com/v1/printprice'
+            },
+            { id: 'user-wh-01' }
+        );
+
+        expect(dispatchRes.delivery.eventType).toBe('preflight.certified');
+        expect(dispatchRes.signedHeaders['X-PPOS-Signature']).toMatch(/^sha256=[0-9a-f]{64}$/);
+        expect(dispatchRes.delivery.status).toBe('DELIVERED');
+        expect(dispatchRes.delivery.statusCode).toBe(200);
+
+        // 5. List deliveries and replay with tenant isolation
+        const deliveries = await developerApiKeyService.listWebhookDeliveriesForTenant('tenant-wh-01');
+        expect(deliveries.length).toBeGreaterThanOrEqual(1);
+        expect(deliveries[0].id).toBe(dispatchRes.delivery.id);
+
+        // Cross-tenant replay should fail with 403
+        await expect(
+            developerApiKeyService.replayWebhookDeliveryForTenant('tenant-other-99', dispatchRes.delivery.id)
+        ).rejects.toThrow(/FORBIDDEN|cannot replay/i);
+
+        // Valid tenant replay succeeds
+        const replayed = await developerApiKeyService.replayWebhookDeliveryForTenant(
+            'tenant-wh-01',
+            dispatchRes.delivery.id,
+            { id: 'user-wh-01' }
+        );
+        expect(replayed.status).toBe('DELIVERED');
+        expect(replayed.attemptCount).toBeGreaterThanOrEqual(2);
+    });
 });

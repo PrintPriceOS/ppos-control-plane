@@ -3382,7 +3382,17 @@ export const es = {
   'developers.billing.spendCapLabel': 'Techo de Gasto Mensual (€ EUR)',
   'developers.billing.alertEmailLabel': 'Email para Alertas de Consumo',
   'developers.billing.saveSpendCapBtn': 'Guardar Límite de Gasto',
-  'developers.billing.spendCapSavedToast': 'Límite de gasto mensual y correo de alertas actualizados correctamente.'
+  'developers.billing.spendCapSavedToast': 'Límite de gasto mensual y correo de alertas actualizados correctamente.',
+  'developers.webhooks.tab': 'WEBHOOKS Y BITÁCORA DE EVENTOS',
+  'developers.webhooks.title': 'Suscripciones de Webhooks Salientes y Firma HMAC-SHA256',
+  'developers.webhooks.subtitle': 'Reciba callbacks HTTP POST firmados en tiempo real (X-PPOS-Signature) ante inspecciones preflight, enrutamiento de 5 ejes, tiradas en prensa o liberaciones escrow.',
+  'developers.webhooks.endpointLabel': 'URL del Endpoint HTTPS Destino',
+  'developers.webhooks.secretLabel': 'Secreto de Firma (HMAC-SHA256)',
+  'developers.webhooks.rotateSecretBtn': 'Rotar Secreto',
+  'developers.webhooks.saveBtn': 'Guardar Suscripción Webhook',
+  'developers.webhooks.sendTestBtn': 'Enviar Evento de Prueba ▶',
+  'developers.webhooks.deliveriesTitle': 'Entregas Recientes y Replay Forense (webhook_deliveries)',
+  'developers.webhooks.replayBtn': 'Reenviar'
 } as const;
 
 export type TranslationKeys = keyof typeof es;

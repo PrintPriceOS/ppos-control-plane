@@ -287,5 +287,110 @@ router.delete('/:keyId', async (req, res) => {
     }
 });
 
+// =========================================================================
+// Phase 199D: Developer Webhook Subscriptions, Signing Secret Rotation & Delivery Forensics
+// =========================================================================
+
+// GET /api/developer/webhooks (and /api/developer/keys/webhooks) — List endpoints & recent deliveries
+async function handleListWebhooks(req, res) {
+    try {
+        const { tenantId } = resolveTenantAndUser(req);
+        const [endpoints, deliveries] = await Promise.all([
+            developerApiKeyService.listWebhookEndpoints(tenantId),
+            developerApiKeyService.listWebhookDeliveriesForTenant(tenantId)
+        ]);
+        res.json({
+            ok: true,
+            success: true,
+            tenantId,
+            endpoints,
+            deliveries,
+            data: { endpoints, deliveries }
+        });
+    } catch (err) {
+        res.status(err.statusCode || 500).json({ ok: false, error: err.message });
+    }
+}
+
+// POST /api/developer/webhooks — Create or update a webhook endpoint subscription
+async function handleSaveWebhook(req, res) {
+    try {
+        const { tenantId, actor } = resolveTenantAndUser(req);
+        const endpoint = await developerApiKeyService.saveWebhookEndpoint(tenantId, req.body || {}, actor);
+        res.status(200).json({
+            ok: true,
+            success: true,
+            endpoint,
+            data: endpoint
+        });
+    } catch (err) {
+        const statusCode = err.message?.includes('SSRF_SECURITY_VIOLATION') ? 400 : (err.statusCode || 500);
+        res.status(statusCode).json({ ok: false, error: err.message });
+    }
+}
+
+// POST /api/developer/webhooks/:subscriptionId/rotate-secret — Atomically rotate whsec_* signing secret
+async function handleRotateWebhookSecret(req, res) {
+    try {
+        const { tenantId, actor } = resolveTenantAndUser(req);
+        const rotated = await developerApiKeyService.rotateWebhookEndpointSecret(
+            tenantId,
+            req.params.subscriptionId,
+            actor
+        );
+        res.status(200).json({
+            ok: true,
+            success: true,
+            webhook: rotated,
+            data: rotated
+        });
+    } catch (err) {
+        res.status(err.statusCode || 500).json({ ok: false, error: err.message });
+    }
+}
+
+// POST /api/developer/webhooks/test-event — Dispatch live HMAC-SHA256 signed test event
+async function handleTestWebhookEvent(req, res) {
+    try {
+        const { tenantId, actor } = resolveTenantAndUser(req);
+        const result = await developerApiKeyService.dispatchTestWebhookEvent(tenantId, req.body || {}, actor);
+        res.status(200).json({
+            ok: true,
+            success: true,
+            ...result,
+            data: result
+        });
+    } catch (err) {
+        const statusCode = err.message?.includes('SSRF_SECURITY_VIOLATION') ? 400 : (err.statusCode || 500);
+        res.status(statusCode).json({ ok: false, error: err.message });
+    }
+}
+
+// POST /api/developer/webhooks/deliveries/:deliveryId/replay — Manual forensic replay
+async function handleReplayWebhookDelivery(req, res) {
+    try {
+        const { tenantId, actor } = resolveTenantAndUser(req);
+        const replayed = await developerApiKeyService.replayWebhookDeliveryForTenant(
+            tenantId,
+            req.params.deliveryId,
+            actor
+        );
+        res.status(200).json({
+            ok: true,
+            success: true,
+            ...replayed,
+            data: replayed
+        });
+    } catch (err) {
+        res.status(err.statusCode || 500).json({ ok: false, error: err.message });
+    }
+}
+
+router.get('/webhooks', handleListWebhooks);
+router.post('/webhooks', handleSaveWebhook);
+router.post('/webhooks/test-event', handleTestWebhookEvent);
+router.post('/webhooks/:subscriptionId/rotate-secret', handleRotateWebhookSecret);
+router.post('/webhooks/deliveries/:deliveryId/replay', handleReplayWebhookDelivery);
+
 module.exports = router;
 

@@ -3382,7 +3382,17 @@ export const de = {
   'developers.billing.spendCapLabel': 'Monatliche Kostenobergrenze (€ EUR)',
   'developers.billing.alertEmailLabel': 'E-Mail für Ausgabenwarnungen',
   'developers.billing.saveSpendCapBtn': 'Ausgabenlimit speichern',
-  'developers.billing.spendCapSavedToast': 'Monatliches Ausgabenlimit und Benachrichtigungs-E-Mail erfolgreich aktualisiert.'
+  'developers.billing.spendCapSavedToast': 'Monatliches Ausgabenlimit und Benachrichtigungs-E-Mail erfolgreich aktualisiert.',
+  'developers.webhooks.tab': 'WEBHOOKS & EREIGNISPROTOKOLLE',
+  'developers.webhooks.title': 'Ausgehende Webhook-Abonnements & HMAC-SHA256-Signierung',
+  'developers.webhooks.subtitle': 'Empfangen Sie signierte Echtzeit-HTTP-POST-Callbacks (X-PPOS-Signature) bei Preflight-Prüfungen, 5-Achsen-Routing, Druckläufen oder Treuhandfreigaben.',
+  'developers.webhooks.endpointLabel': 'Ziel-HTTPS-Endpunkt-URL',
+  'developers.webhooks.secretLabel': 'Signaturgeheimnis (HMAC-SHA256)',
+  'developers.webhooks.rotateSecretBtn': 'Geheimnis rotieren',
+  'developers.webhooks.saveBtn': 'Webhook-Abonnement speichern',
+  'developers.webhooks.sendTestBtn': 'Testereignis senden ▶',
+  'developers.webhooks.deliveriesTitle': 'Letzte Webhook-Zustellungen & Forensisches Replay (webhook_deliveries)',
+  'developers.webhooks.replayBtn': 'Erneut senden'
 } as const;
 
 export type TranslationKeys = keyof typeof de;
