@@ -716,6 +716,22 @@ export const CommandCenterPage: React.FC = () => {
       {isPrinthouseUser ? (
         /* HUMAN-CENTRIC INDUSTRIAL COCKPIT — PRINTHOUSE HUB 360° COMMAND CENTER */
         <div className="space-y-6">
+          {/* Telemetry Classification Notice */}
+          <div className="flex items-center justify-between px-1">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+              <span className="text-xs font-mono font-bold tracking-wider text-amber-500 uppercase">
+                Telemetry Channel
+              </span>
+            </div>
+            <span
+              data-testid="telemetry-sample-indicator"
+              className="inline-flex items-center px-2.5 py-0.5 rounded text-[10px] font-mono font-bold uppercase tracking-wider bg-amber-500/10 text-amber-500 dark:text-amber-400 border border-amber-500/30"
+            >
+              [DEMO / STAGING SAMPLE]
+            </span>
+          </div>
+
           {/* 1. TOP HERO STATS ROW (4 LARGE CARDS) */}
           <div
             data-testid="hub-hero-stats-grid"

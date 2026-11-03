@@ -31,4 +31,3 @@ CREATE TABLE IF NOT EXISTS developer_stripe_meter_events (
     INDEX idx_dev_meter_tenant_created (tenant_id, created_at),
     INDEX idx_dev_meter_customer (stripe_customer_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
