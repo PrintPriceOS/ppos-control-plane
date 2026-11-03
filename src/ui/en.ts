@@ -3035,6 +3035,8 @@ export const en = {
   'dashboard.360.diskFreed': 'Disk Freed',
   'dashboard.360.btnPurgePdf': 'Purge PDF',
   'dashboard.360.storageFooterNote': 'Active policy: Retains 6-axis forensic JSON reports and unlinks heavy PDF binaries.',
+  'dashboard.360.storageEmptyTitle': 'No Heavy PDF Assets Stored',
+  'dashboard.360.storageEmptyDesc': 'No heavy PDF assets currently stored. Preflight uploads and production order files will appear here.',
   'dashboard.360.btnPurgeRetentionAssets': 'PURGE RETENTION ASSETS',
   'dashboard.360.purgingAssets': 'PURGING ASSETS...',
   'dashboard.360.fleetModalTitle': 'Live Machine Allocation & Press Telemetry',

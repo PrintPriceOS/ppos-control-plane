@@ -168,49 +168,61 @@ export const StorageLifecycleDrawer: React.FC<{
   onPurgeCompleted: () => void;
 }> = ({ open, onClose, storageData, onPurgeCompleted }) => {
   const { t, locale } = useLocale();
+  const isDemo = isDemoTenant();
   const [purging, setPurging] = useState(false);
   const [purgeBanner, setPurgeBanner] = useState<string | null>(null);
   const [purgedJobsLocal, setPurgedJobsLocal] = useState<Record<string, boolean>>({});
 
   if (!open || typeof document === 'undefined') return null;
 
-  const usedGb = storageData?.usedGb ?? 18.4;
+  const usedGb = storageData?.usedGb ?? (isDemo ? 18.4 : 0.0);
   const quotaGb = storageData?.quotaGb ?? 100;
-  const usagePct = storageData?.usagePct ?? 18.4;
-  const jobs: any[] = Array.isArray(storageData?.jobsBreakdown) && storageData.jobsBreakdown.length > 0
+  const usagePct = storageData?.usagePct ?? (isDemo ? 18.4 : 0.0);
+  const rawJobs: any[] = Array.isArray(storageData?.jobsBreakdown)
     ? storageData.jobsBreakdown
-    : [
-        {
-          jobId: 'PF-2026-001',
-          title: 'Der Schatten des Windes — Edición Especial',
-          isbn: '978-84-08-14658-2',
-          bindingType: 'SOFTCOVER_PUR',
-          interiorSizeMb: 640.5,
-          coverSizeMb: 48.2,
-          totalSizeMb: 688.7,
-          assetPurged: false
-        },
-        {
-          jobId: 'PF-2026-002',
-          title: 'Atlas de Arquitectura Industrial Europea',
-          isbn: '978-3-8365-9102-7',
-          bindingType: 'HARDCOVER',
-          interiorSizeMb: 812.0,
-          coverSizeMb: 64.5,
-          totalSizeMb: 876.5,
-          assetPurged: false
-        },
-        {
-          jobId: 'PF-2026-003',
-          title: 'Manual de Tipografía Suiza Contemporánea',
-          isbn: '978-84-123456-7-8',
-          bindingType: 'SOFTCOVER_PUR',
-          interiorSizeMb: 420.8,
-          coverSizeMb: 32.4,
-          totalSizeMb: 453.2,
-          assetPurged: false
-        }
-      ];
+    : (isDemo
+      ? [
+          {
+            jobId: 'PF-2026-001',
+            title: 'Der Schatten des Windes — Edición Especial',
+            isbn: '978-84-08-14658-2',
+            bindingType: 'SOFTCOVER_PUR',
+            interiorSizeMb: 640.5,
+            coverSizeMb: 48.2,
+            totalSizeMb: 688.7,
+            assetPurged: false
+          },
+          {
+            jobId: 'PF-2026-002',
+            title: 'Atlas de Arquitectura Industrial Europea',
+            isbn: '978-3-8365-9102-7',
+            bindingType: 'HARDCOVER',
+            interiorSizeMb: 812.0,
+            coverSizeMb: 64.5,
+            totalSizeMb: 876.5,
+            assetPurged: false
+          },
+          {
+            jobId: 'PF-2026-003',
+            title: 'Manual de Tipografía Suiza Contemporánea',
+            isbn: '978-84-123456-7-8',
+            bindingType: 'SOFTCOVER_PUR',
+            interiorSizeMb: 420.8,
+            coverSizeMb: 32.4,
+            totalSizeMb: 453.2,
+            assetPurged: false
+          }
+        ]
+      : []);
+
+  const jobs = rawJobs;
+  const unpurgedCount = jobs.filter(j => !j.assetPurged && !purgedJobsLocal[j.jobId]).length;
+  const interiorSizeGb = storageData?.bySlot?.INTERIOR_PDF?.sizeGb ?? (isDemo ? 16.8 : 0.0);
+  const interiorCount = storageData?.bySlot?.INTERIOR_PDF?.count ?? (isDemo ? 8 : 0);
+  const coverSizeGb = storageData?.bySlot?.COVER_PDF?.sizeGb ?? (isDemo ? 1.4 : 0.0);
+  const coverCount = storageData?.bySlot?.COVER_PDF?.count ?? (isDemo ? 8 : 0);
+  const reclaimedGb = storageData?.reclaimedGb ?? (isDemo ? 6.8 : 0.0);
+  const purgedArtifactsCount = storageData?.purgedArtifactsCount ?? (isDemo ? 6 : 0);
 
   const handleBulkPurge = async () => {
     setPurging(true);
@@ -309,28 +321,28 @@ export const StorageLifecycleDrawer: React.FC<{
               <div className="p-3 rounded-xl bg-zinc-900/80 border border-zinc-800/80">
                 <span className="text-[9px] font-mono uppercase text-zinc-400 block">{t('dashboard.360.interiorBlocks')}</span>
                 <span className="text-sm font-mono font-black text-white">
-                  {storageData?.bySlot?.INTERIOR_PDF?.sizeGb ?? 16.8} GB
+                  {interiorSizeGb} GB
                 </span>
                 <span className="text-[9px] font-mono text-zinc-500 block">
-                  {storageData?.bySlot?.INTERIOR_PDF?.count ?? 8} {t('dashboard.360.heavyPdfs')}
+                  {interiorCount} {t('dashboard.360.heavyPdfs')}
                 </span>
               </div>
               <div className="p-3 rounded-xl bg-zinc-900/80 border border-zinc-800/80">
                 <span className="text-[9px] font-mono uppercase text-zinc-400 block">{t('dashboard.360.coverSpreads')}</span>
                 <span className="text-sm font-mono font-black text-white">
-                  {storageData?.bySlot?.COVER_PDF?.sizeGb ?? 1.4} GB
+                  {coverSizeGb} GB
                 </span>
                 <span className="text-[9px] font-mono text-zinc-500 block">
-                  {storageData?.bySlot?.COVER_PDF?.count ?? 8} {t('dashboard.360.spreadsAndSpine')}
+                  {coverCount} {t('dashboard.360.spreadsAndSpine')}
                 </span>
               </div>
               <div className="p-3 rounded-xl bg-zinc-900/80 border border-zinc-800/80">
                 <span className="text-[9px] font-mono uppercase text-zinc-400 block">{t('dashboard.360.reclaimedDisk')}</span>
                 <span className="text-sm font-mono font-black text-[#10b981]">
-                  {storageData?.reclaimedGb ?? 6.8} GB
+                  {reclaimedGb} GB
                 </span>
                 <span className="text-[9px] font-mono text-zinc-500 block">
-                  {storageData?.purgedArtifactsCount ?? 6} {t('dashboard.360.purgedPdfs')}
+                  {purgedArtifactsCount} {t('dashboard.360.purgedPdfs')}
                 </span>
               </div>
             </div>
@@ -352,56 +364,75 @@ export const StorageLifecycleDrawer: React.FC<{
               <span className="text-[10px] font-mono text-zinc-400">{t('dashboard.360.shaRetained')}</span>
             </div>
 
-            {jobs.map(job => {
-              const isPurged = job.assetPurged || purgedJobsLocal[job.jobId];
-              return (
-                <div
-                  key={job.jobId}
-                  className="p-4 rounded-2xl bg-[#131314] border border-zinc-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4"
-                >
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-mono font-black text-white">{job.jobId}</span>
-                      <span className="px-2 py-0.5 text-[9px] font-mono uppercase rounded bg-zinc-800 text-zinc-300">
-                        {job.bindingType || 'SOFTCOVER_PUR'}
-                      </span>
+            {jobs.length === 0 ? (
+              <div
+                data-testid="storage-empty-state"
+                className="p-8 rounded-2xl bg-[#131314] border border-dashed border-zinc-800 flex flex-col items-center justify-center text-center space-y-3"
+              >
+                <div className="w-12 h-12 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center">
+                  <ServerIcon className="w-6 h-6 text-zinc-500" />
+                </div>
+                <div className="space-y-1">
+                  <h4 className="text-xs font-mono font-bold uppercase tracking-wider text-zinc-300">
+                    {t('dashboard.360.storageEmptyTitle')}
+                  </h4>
+                  <p className="text-[11px] font-mono text-zinc-400 max-w-md">
+                    {t('dashboard.360.storageEmptyDesc')}
+                  </p>
+                </div>
+              </div>
+            ) : (
+              jobs.map(job => {
+                const isPurged = job.assetPurged || purgedJobsLocal[job.jobId];
+                return (
+                  <div
+                    key={job.jobId}
+                    className="p-4 rounded-2xl bg-[#131314] border border-zinc-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+                  >
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-mono font-black text-white">{job.jobId}</span>
+                        <span className="px-2 py-0.5 text-[9px] font-mono uppercase rounded bg-zinc-800 text-zinc-300">
+                          {job.bindingType || 'SOFTCOVER_PUR'}
+                        </span>
+                        {isPurged ? (
+                          <span className="px-2 py-0.5 text-[9px] font-mono font-bold uppercase rounded bg-zinc-800 text-zinc-400 border border-zinc-700">
+                            {t('dashboard.360.metadataOnlyBadge')}
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 text-[9px] font-mono font-bold uppercase rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                            {t('dashboard.360.hotDiskBadge')} ({job.totalSizeMb} MB)
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs font-bold text-zinc-200">{localizeDrawerOrderTitle(job.jobId, job.title, locale)}</p>
+                      <div className="flex flex-wrap gap-4 text-[10px] font-mono text-zinc-400 pt-1">
+                        <span>{t('dashboard.360.interiorSlotLabel')}: {isPurged ? '0 MB' : `${job.interiorSizeMb} MB`}</span>
+                        <span>{t('dashboard.360.coverSlotLabel')}: {isPurged ? '0 MB' : `${job.coverSizeMb} MB`}</span>
+                        <span>ISBN: {job.isbn}</span>
+                      </div>
+                    </div>
+
+                    <div>
                       {isPurged ? (
-                        <span className="px-2 py-0.5 text-[9px] font-mono font-bold uppercase rounded bg-zinc-800 text-zinc-400 border border-zinc-700">
-                          {t('dashboard.360.metadataOnlyBadge')}
+                        <span className="text-[10px] font-mono text-zinc-500 uppercase px-3 py-1.5 rounded-lg border border-zinc-800 bg-zinc-900/50">
+                          {t('dashboard.360.diskFreed')}
                         </span>
                       ) : (
-                        <span className="px-2 py-0.5 text-[9px] font-mono font-bold uppercase rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                          {t('dashboard.360.hotDiskBadge')} ({job.totalSizeMb} MB)
-                        </span>
+                        <button
+                          onClick={() => handleSingleJobPurge(job.jobId)}
+                          disabled={purging}
+                          className="px-3 py-2 rounded-xl bg-zinc-900 hover:bg-[#dc0000]/20 border border-zinc-700 hover:border-[#dc0000] text-[10px] font-mono font-bold uppercase text-zinc-200 hover:text-white transition-all flex items-center gap-1.5 cursor-pointer"
+                        >
+                          <TrashIcon className="w-3.5 h-3.5 text-[#dc0000]" />
+                          {t('dashboard.360.btnPurgePdf')}
+                        </button>
                       )}
                     </div>
-                    <p className="text-xs font-bold text-zinc-200">{localizeDrawerOrderTitle(job.jobId, job.title, locale)}</p>
-                    <div className="flex flex-wrap gap-4 text-[10px] font-mono text-zinc-400 pt-1">
-                      <span>{t('dashboard.360.interiorSlotLabel')}: {isPurged ? '0 MB' : `${job.interiorSizeMb} MB`}</span>
-                      <span>{t('dashboard.360.coverSlotLabel')}: {isPurged ? '0 MB' : `${job.coverSizeMb} MB`}</span>
-                      <span>ISBN: {job.isbn}</span>
-                    </div>
                   </div>
-
-                  <div>
-                    {isPurged ? (
-                      <span className="text-[10px] font-mono text-zinc-500 uppercase px-3 py-1.5 rounded-lg border border-zinc-800 bg-zinc-900/50">
-                        {t('dashboard.360.diskFreed')}
-                      </span>
-                    ) : (
-                      <button
-                        onClick={() => handleSingleJobPurge(job.jobId)}
-                        disabled={purging}
-                        className="px-3 py-2 rounded-xl bg-zinc-900 hover:bg-[#dc0000]/20 border border-zinc-700 hover:border-[#dc0000] text-[10px] font-mono font-bold uppercase text-zinc-200 hover:text-white transition-all flex items-center gap-1.5 cursor-pointer"
-                      >
-                        <TrashIcon className="w-3.5 h-3.5 text-[#dc0000]" />
-                        {t('dashboard.360.btnPurgePdf')}
-                      </button>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
+                );
+              })
+            )}
           </div>
         </div>
 
@@ -413,8 +444,8 @@ export const StorageLifecycleDrawer: React.FC<{
           <button
             data-testid="btn-purge-retention-assets"
             onClick={handleBulkPurge}
-            disabled={purging}
-            className="px-5 py-2.5 rounded-xl bg-[#dc0000] hover:bg-[#b80000] text-white text-xs font-black uppercase tracking-wider flex items-center gap-2 shadow-lg cursor-pointer transition-all"
+            disabled={purging || (jobs.length > 0 && unpurgedCount === 0) || (jobs.length === 0 && reclaimedGb === 0 && usedGb === 0)}
+            className="px-5 py-2.5 rounded-xl bg-[#dc0000] hover:bg-[#b80000] disabled:bg-zinc-800 disabled:text-zinc-600 disabled:cursor-not-allowed text-white text-xs font-black uppercase tracking-wider flex items-center gap-2 shadow-lg cursor-pointer transition-all"
           >
             <TrashIcon className="w-4 h-4" />
             {purging ? t('dashboard.360.purgingAssets') : t('dashboard.360.btnPurgeRetentionAssets')}

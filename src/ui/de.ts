@@ -3035,6 +3035,8 @@ export const de = {
   'dashboard.360.diskFreed': 'Speicher Freigegeben',
   'dashboard.360.btnPurgePdf': 'PDF Bereinigen',
   'dashboard.360.storageFooterNote': 'Aktive Richtlinie: Bewahrt 6-Achsen-JSON-Berichte und löscht schwere PDF-Binärdateien.',
+  'dashboard.360.storageEmptyTitle': 'Keine schweren PDF-Dateien gespeichert',
+  'dashboard.360.storageEmptyDesc': 'Derzeit sind keine schweren PDF-Dateien gespeichert. Preflight-Uploads und Produktionsauftragsdateien werden hier angezeigt.',
   'dashboard.360.btnPurgeRetentionAssets': 'RETENTIONS-ASSETS BEREINIGEN',
   'dashboard.360.purgingAssets': 'BEREINIGUNG LÄUFT...',
   'dashboard.360.fleetModalTitle': 'Live-Maschinenbelegung & Druckmaschinen-Telemetrie',

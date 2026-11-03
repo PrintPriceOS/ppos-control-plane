@@ -762,6 +762,7 @@ function inspectPreflightJob(payload = {}, actorContext = {}) {
             purgedAt: payload.purgedAt || null,
             retentionState: payload.assetPurged ? 'METADATA_ONLY_ASSET_PURGED' : (payload.storagePath || payload.filePath ? 'RETAINED_ON_DISK' : 'NO_BINARY_STORED')
         },
+        assetPurged: Boolean(payload.assetPurged),
         inspectedAt: new Date().toISOString()
     };
 
@@ -1137,6 +1138,7 @@ module.exports = {
     inspectPreflightJob,
     executePreflightAutoFix,
     purgePreflightJobAsset,
+    purgePreflightInspectionAsset: purgePreflightJobAsset,
     generateSanitizedPressPdfBuffer,
     listTenantPreflightInspections,
     getPreflightInspectionById

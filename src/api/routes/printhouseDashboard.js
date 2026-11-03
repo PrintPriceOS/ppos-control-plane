@@ -15,6 +15,11 @@ const {
     runRetentionCycle
 } = require('../services/storage/assetRetentionAndBackupService');
 const {
+    getTenantStorageQuota,
+    purgeJobPdfBinary,
+    batchPurgeRetentionAssets
+} = require('../services/storage/storageLifecycleService');
+const {
     listTenantPreflightInspections,
     purgePreflightInspectionAsset
 } = require('../services/preflight/preflightEngineService');
@@ -912,9 +917,10 @@ router.get('/telemetry', async (req, res) => {
     const printhouseId = context.printhouseId || 'node-primary';
 
     try {
-        const [opSummary, backupStatus] = await Promise.all([
+        const [opSummary, backupStatus, storageQuota] = await Promise.all([
             getOperationalTelemetrySummary({ tenantId }),
-            getStorageBackupAndRetentionStatus().catch(() => null)
+            getStorageBackupAndRetentionStatus().catch(() => null),
+            getTenantStorageQuota(tenantId).catch(() => null)
         ]);
 
         const isDemo = isDemoTenant(tenantId);
@@ -992,7 +998,7 @@ router.get('/telemetry', async (req, res) => {
                 printhouseId,
                 role: context.role
             },
-            storage: {
+            storage: storageQuota || {
                 status: isDemo ? 'ACTIVE' : 'IDLE',
                 usedBytes: Math.round(activeHotGb * 1024 * 1024 * 1024),
                 usedGb: activeHotGb,
@@ -1154,78 +1160,12 @@ router.post('/storage/purge', async (req, res) => {
 
     try {
         if (jobId) {
-            const single = purgePreflightInspectionAsset(jobId, tenantId);
-            try {
-                await recordOperationalEvent({
-                    orderId: jobId,
-                    printhouseId: context.printhouseId || 'node-primary',
-                    tenantId,
-                    domain: 'STORAGE',
-                    eventType: 'STORAGE_ASSET_PURGED',
-                    severity: 'INFO',
-                    title: `Activo PDF Purgado de Disco (${jobId})`,
-                    description: `Liberados 688.7 MB conservando reporte forense de 6 ejes y hash SHA-256.`,
-                    metadata: {
-                        jobId,
-                        reclaimedMb: 688.7,
-                        drawerTarget: 'STORAGE'
-                    },
-                    actorId: context.userId || 'PRINTHOUSE_ADMIN',
-                    actorRole: context.role || 'PRINTHOUSE_ADMIN',
-                    actor: 'Storage Lifecycle Manager'
-                });
-            } catch (_) {}
-            return res.status(200).json({
-                ok: true,
-                mode: 'SINGLE_JOB_PURGE',
-                jobId,
-                purgedCount: 1,
-                reclaimedMb: 688.7,
-                inspection: single.inspection
-            });
+            const outcome = await purgeJobPdfBinary(jobId, tenantId, context);
+            return res.status(200).json(outcome);
         }
 
-        const inspections = listTenantPreflightInspections(tenantId);
-        let purgedCount = 0;
-        for (const insp of inspections) {
-            if (!insp.assetPurged) {
-                purgePreflightInspectionAsset(insp.jobId || insp.id, tenantId);
-                purgedCount++;
-            }
-        }
-
-        const cycle = await runRetentionCycle().catch(() => null);
-        const totalReclaimedMb = Number(((Math.max(purgedCount, 3) * 612.4) + (cycle?.reclaimedBytes || 0) / (1024 * 1024)).toFixed(1));
-
-        try {
-            await recordOperationalEvent({
-                orderId: 'PUB-ORD-2026-104',
-                printhouseId: context.printhouseId || 'node-primary',
-                tenantId,
-                domain: 'STORAGE',
-                eventType: 'STORAGE_RETENTION_PURGE_EXECUTED',
-                severity: 'SUCCESS',
-                title: `Purga de Retención Ejecutada (${Math.max(purgedCount, 3)} PDFs · ${totalReclaimedMb} MB Liberados)`,
-                description: 'Activos PDF pesados eliminados del disco local. Reportes forenses de 6 ejes y metadatos SHA-256 conservados.',
-                metadata: {
-                    purgedCount: Math.max(purgedCount, 3),
-                    reclaimedMb: totalReclaimedMb,
-                    drawerTarget: 'STORAGE'
-                },
-                actorId: context.userId || 'PRINTHOUSE_ADMIN',
-                actorRole: context.role || 'PRINTHOUSE_ADMIN',
-                actor: 'Storage Lifecycle Manager'
-            });
-        } catch (_) {}
-
-        return res.status(200).json({
-            ok: true,
-            mode: 'BULK_RETENTION_PURGE',
-            executedAt: new Date().toISOString(),
-            purgedCount: Math.max(purgedCount, 3),
-            reclaimedMb: totalReclaimedMb,
-            message: 'Activos PDF pesados eliminados del disco local. Reportes forenses de 6 ejes y metadatos SHA-256 conservados.'
-        });
+        const batchOutcome = await batchPurgeRetentionAssets(tenantId, context);
+        return res.status(200).json(batchOutcome);
     } catch (err) {
         return res.status(500).json({ ok: false, error: err.message });
     }

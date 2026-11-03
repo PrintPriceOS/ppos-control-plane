@@ -3035,6 +3035,8 @@ export const es = {
   'dashboard.360.diskFreed': 'Disco Liberado',
   'dashboard.360.btnPurgePdf': 'Purgar PDF',
   'dashboard.360.storageFooterNote': 'Política activa: Conserva reportes forenses de 6 ejes y libera binarios PDF pesados.',
+  'dashboard.360.storageEmptyTitle': 'Sin Activos PDF Pesados Almacenados',
+  'dashboard.360.storageEmptyDesc': 'No hay activos PDF pesados almacenados actualmente. Las subidas de preflight y los archivos de órdenes de producción aparecerán aquí.',
   'dashboard.360.btnPurgeRetentionAssets': 'PURGAR ACTIVOS DE RETENCIÓN',
   'dashboard.360.purgingAssets': 'PURGANDO ACTIVOS...',
   'dashboard.360.fleetModalTitle': 'Asignación de Máquinas en Vivo y Telemetría de Prensas',

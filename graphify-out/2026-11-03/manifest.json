@@ -14292,9 +14292,9 @@
     "semantic_hash": ""
   },
   "src/ui/components/dashboard/LiveOrdersFeed.tsx": {
-    "mtime": 1793629498.6638415,
-    "seen": 1793637715.6838477,
-    "ast_hash": "3745a19ccd3e952cbc34df0f6b954fad",
+    "mtime": 1793675138.8570826,
+    "seen": 1793675592.391222,
+    "ast_hash": "b1b4b17be4e80f08a4603f9986ffe9d4",
     "semantic_hash": ""
   },
   "src/ui/components/federation/FederationLayer.tsx": {
@@ -14694,15 +14694,15 @@
     "semantic_hash": "6fc6620fa009162671ca0a6ca8c9fd5b"
   },
   "src/ui/en.ts": {
-    "mtime": 1793674519.4007237,
-    "seen": 1793674593.1375983,
-    "ast_hash": "74046e4811c051bd993ab2533b27095b",
+    "mtime": 1793675078.2972796,
+    "seen": 1793675592.4222229,
+    "ast_hash": "3b95b7008b861018c7fa4fd37928bc22",
     "semantic_hash": ""
   },
   "src/ui/es.ts": {
-    "mtime": 1793674521.2057838,
-    "seen": 1793674593.1375983,
-    "ast_hash": "ed54acb32c2b66ab0fb0c60194449142",
+    "mtime": 1793675079.5543382,
+    "seen": 1793675592.4222229,
+    "ast_hash": "090303635818d8d842647289dade70ce",
     "semantic_hash": ""
   },
   "src/ui/hooks/useAdminData.ts": {
@@ -15462,9 +15462,9 @@
     "semantic_hash": ""
   },
   "src/ui/pages/admin/CommandCenterPage.tsx": {
-    "mtime": 1793612399.3778858,
-    "seen": 1793614578.636937,
-    "ast_hash": "639dacfd1a438c0a880d8ef3fca74250",
+    "mtime": 1793675243.3464055,
+    "seen": 1793675592.4572299,
+    "ast_hash": "0671175868b038f44108467f1bb70e96",
     "semantic_hash": ""
   },
   "src/ui/pages/admin/CommercialCommitmentsTab.tsx": {
@@ -20328,9 +20328,9 @@
     "semantic_hash": ""
   },
   "src/ui/de.ts": {
-    "mtime": 1793674518.8553686,
-    "seen": 1793674593.135599,
-    "ast_hash": "f282a8861d191d26421fff6563980f58",
+    "mtime": 1793675081.3445053,
+    "seen": 1793675592.4202218,
+    "ast_hash": "7328e2ae7b2330a5399c6504e0a699f4",
     "semantic_hash": ""
   },
   "scripts/test_session_timeout.py": {
