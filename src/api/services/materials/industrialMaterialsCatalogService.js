@@ -666,6 +666,191 @@ function normalizeIndustrialMaterialRecord(raw = {}) {
     };
 }
 
+/**
+ * Validates physical and mechanical compatibility between a printing/finishing machine
+ * and a target paper substrate or material.
+ *
+ * Rules:
+ * 1. REEL_PAPER / LAMINATION_FOIL:
+ *    - Machine must support continuous web/rotary or wide format printing.
+ *    - Web width must fit within machine web clearance / max print width.
+ * 2. SHEETFED_PAPER / BOARD_CARTON / ENDPAPERS:
+ *    - Sheet width and height must be within machine limits [min_sheet_mm .. max_sheet_mm].
+ *    - Grammage (GSM) must be supported by the machine type (e.g. Offset vs Digital vs Large Format).
+ */
+function validateMachineSubstrateCompatibility(machine = {}, substrate = {}) {
+    const reasons = [];
+    const warnings = [];
+
+    const matType = normalizeIndustrialMaterialType(substrate.material_type || substrate.materialType, substrate);
+    const isReel = matType === 'REEL_PAPER' || matType === 'LAMINATION_FOIL';
+    const dims = normalizeDimensionsJson(matType, substrate.dimensions_json || substrate.dimensions || substrate);
+    const gsm = Number(substrate.basis_weight_gsm || substrate.gsm || substrate.paper_gsm || 90);
+    const caliperUm = Number(substrate.caliper_microns || substrate.caliper_um || (gsm * Number(substrate.bulk_volume || substrate.bulkFactor || 1.25)));
+
+    const machineType = String(machine.machine_type || machine.machineType || 'OFFSET_PRESS').toUpperCase();
+    const printMethods = Array.isArray(machine.supported_print_methods_json)
+        ? machine.supported_print_methods_json
+        : safeParseJson(machine.supported_print_methods_json, []);
+
+    // 1. Reel Substrates (Rotary / Web Feed)
+    if (isReel) {
+        const isRotaryOrWeb =
+            machineType.includes('ROT') ||
+            machineType === 'LARGE_FORMAT' ||
+            printMethods.includes('WEB_OFFSET') ||
+            printMethods.includes('WIDE_FORMAT_INKJET');
+
+        if (!isRotaryOrWeb) {
+            reasons.push(`INCOMPATIBLE_MACHINE_FEED: Machine type ${machineType} does not support continuous web reels (requires ROTARY or WEB_OFFSET feeder).`);
+        }
+
+        const maxWebWidth = Number(machine.max_print_width_mm || machine.max_sheet_width_mm || 1000);
+        const webWidth = Number(dims.web_width_mm || 840);
+
+        if (webWidth > maxWebWidth) {
+            reasons.push(`INCOMPATIBLE_WEB_WIDTH: Substrate reel width (${webWidth} mm) exceeds maximum machine web clearance (${maxWebWidth} mm).`);
+        }
+    } else {
+        // 2. Sheetfed Substrates (Cut Sheets)
+        if (machineType.includes('ROT') && !printMethods.includes('SHEETFED_OFFSET')) {
+            reasons.push(`INCOMPATIBLE_FEED_TYPE: Rotary machine cannot feed cut sheets directly without inline sheeter.`);
+        }
+
+        const w = Number(dims.width_mm || 700);
+        const h = Number(dims.height_mm || 1000);
+        const minDim = Math.min(w, h);
+        const maxDim = Math.max(w, h);
+
+        const machineMaxWidth = Number(machine.max_sheet_width_mm || 720);
+        const machineMaxHeight = Number(machine.max_sheet_height_mm || 1020);
+        const machineMinDim = Math.min(machineMaxWidth, machineMaxHeight);
+        const machineMaxDim = Math.max(machineMaxWidth, machineMaxHeight);
+
+        if (minDim > machineMinDim || maxDim > machineMaxDim) {
+            reasons.push(`SHEET_EXCEEDS_FEEDER_BOUNDS: Sheet dimensions ${w}×${h} mm exceed machine maximum feeder capacity ${machineMaxWidth}×${machineMaxHeight} mm.`);
+        }
+
+        const machineMinWidth = Number(machine.min_sheet_width_mm || 210);
+        const machineMinHeight = Number(machine.min_sheet_height_mm || 297);
+        const machineFeederMinDim = Math.min(machineMinWidth, machineMinHeight);
+
+        if (minDim < machineFeederMinDim) {
+            reasons.push(`SHEET_BELOW_MINIMUM_FEEDER: Sheet dimensions ${w}×${h} mm are smaller than machine minimum gripper boundary (${machineMinWidth}×${machineMinHeight} mm).`);
+        }
+
+        // Grammage / Board Caliper checks
+        if (machineType === 'DIGITAL_PRESS' && gsm > 400) {
+            reasons.push(`EXCESSIVE_GRAMMAGE_FOR_DIGITAL: Grammage ${gsm} g/m² exceeds maximum standard digital press toner/fuser limit (400 g/m²).`);
+        } else if (machineType === 'OFFSET_PRESS' && gsm > 600) {
+            reasons.push(`EXCESSIVE_GRAMMAGE_FOR_OFFSET: Grammage ${gsm} g/m² exceeds standard sheetfed offset cylinder clearance (max 600 g/m²).`);
+        } else if (gsm < 45 && machineType === 'OFFSET_PRESS') {
+            warnings.push(`LOW_GRAMMAGE_AIR_ASSIST_REQUIRED: Lightweight paper (${gsm} g/m²) requires calibrated suction heads and slow feeder speed.`);
+        }
+    }
+
+    return {
+        compatible: reasons.length === 0,
+        reasons,
+        warnings,
+        caliperMicrons: Math.round(caliperUm),
+        substrateType: matType,
+        isReel,
+        evaluatedAt: new Date().toISOString()
+    };
+}
+
+/**
+ * Synchronizes an industrial material record with MySQL `paper_products` and `paper_variants`
+ * relational schema, maintaining SHA-256 fingerprint, caliper, and bulk factor.
+ */
+async function syncMaterialToPaperVariants(materialRecord = {}, dbClient = db) {
+    if (!dbClient || typeof dbClient.query !== 'function') return null;
+
+    const productId = `PROD-${crypto.createHash('md5').update(String(materialRecord.name || '').trim().toLowerCase()).digest('hex').substring(0, 16)}`;
+    const category =
+        materialRecord.material_type === 'BOARD_CARTON'
+            ? 'CARTON'
+            : materialRecord.category === 'COATED_GLOSS' || materialRecord.category === 'COATED_MATTE'
+              ? 'COATED'
+              : 'OFFSET';
+
+    // 1. Upsert paper_products
+    await dbClient.query(
+        `INSERT INTO paper_products
+         (id, name, brand, manufacturer, category, finish_summary, description, metadata_json)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE
+            name = VALUES(name),
+            brand = VALUES(brand),
+            manufacturer = VALUES(manufacturer),
+            category = VALUES(category),
+            finish_summary = VALUES(finish_summary),
+            updated_at = CURRENT_TIMESTAMP`,
+        [
+            productId,
+            materialRecord.name,
+            materialRecord.manufacturer,
+            materialRecord.manufacturer,
+            category,
+            materialRecord.finish_type || 'UNCOATED',
+            `${materialRecord.name} - Calibrado PPOS Control Plane`,
+            JSON.stringify(materialRecord.metadata || {})
+        ]
+    ).catch(() => {});
+
+    // 2. Compute deterministic variant fingerprint
+    const isReel = materialRecord.material_type === 'REEL_PAPER' || materialRecord.material_type === 'LAMINATION_FOIL';
+    const dims = materialRecord.dimensions_json || {};
+    const widthMm = isReel ? Number(dims.web_width_mm || 840) : Number(dims.width_mm || 700);
+    const heightMm = isReel ? 1000 : Number(dims.height_mm || 1000);
+    const gsm = Number(materialRecord.basis_weight_gsm || materialRecord.gsm || 90);
+    const bulk = Number(materialRecord.bulk_volume || materialRecord.bulkFactor || 1.25);
+    const caliperUm = Number(materialRecord.caliper_microns || Math.round(gsm * bulk));
+    const grain = dims.grain_direction === 'SG' ? 'SHORT_GRAIN' : 'LONG_GRAIN';
+
+    const fpString = `${(materialRecord.name || '').toLowerCase().trim()}|${gsm}|${widthMm}x${heightMm}|${materialRecord.finish_type || 'UNCOATED'}|${caliperUm}|${grain}`;
+    const fingerprint = crypto.createHash('sha256').update(fpString).digest('hex').substring(0, 32);
+    const variantId = `VAR-${fingerprint.substring(0, 16)}`;
+
+    // 3. Upsert paper_variants
+    await dbClient.query(
+        `INSERT INTO paper_variants
+         (id, product_id, gsm, caliper_um, caliper_mm, bulk_factor, width_mm, height_mm, is_reel, finish, grain_direction, fingerprint, metadata_json)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE
+            caliper_um = VALUES(caliper_um),
+            caliper_mm = VALUES(caliper_mm),
+            bulk_factor = VALUES(bulk_factor),
+            is_reel = VALUES(is_reel),
+            metadata_json = VALUES(metadata_json),
+            updated_at = CURRENT_TIMESTAMP`,
+        [
+            variantId,
+            productId,
+            gsm,
+            caliperUm,
+            caliperUm / 1000,
+            bulk,
+            widthMm,
+            heightMm,
+            isReel ? 1 : 0,
+            materialRecord.finish_type || 'UNCOATED',
+            grain,
+            fingerprint,
+            JSON.stringify(materialRecord.metadata || {})
+        ]
+    ).catch(() => {});
+
+    return {
+        productId,
+        variantId,
+        fingerprint,
+        caliperUm,
+        bulkFactor: bulk
+    };
+}
+
 function initRuntimeCatalog() {
     if (runtimeIndustrialMaterials.size > 0) return;
     for (const item of EUROPEAN_MASTER_SUBSTRATES) {
@@ -984,6 +1169,9 @@ async function upsertIndustrialMaterial(payload = {}, scope = {}, dbClient = db,
                     ]
                 )
                 .catch(() => {});
+
+            // Synchronize relational paper catalog: paper_products & paper_variants
+            await syncMaterialToPaperVariants(normalized, dbClient).catch(() => {});
         } catch (_) {
             // Non-fatal in isolated test environments
         }
@@ -1110,5 +1298,8 @@ module.exports = {
     listIndustrialMaterials,
     upsertIndustrialMaterial,
     archiveIndustrialMaterial,
-    syncMasterIndustrialCatalog
+    syncMasterIndustrialCatalog,
+    validateMachineSubstrateCompatibility,
+    syncMaterialToPaperVariants
 };
+

@@ -579,3 +579,4 @@ module.exports = {
     normalizeSoftProofCertificatePayload,
     generateSoftProofCertificatePdf
 };
+

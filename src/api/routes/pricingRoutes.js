@@ -244,6 +244,26 @@ function createPricingRouter() {
         }
     });
 
+    // POST /api/pricing/materials/validate-compatibility
+    router.post('/materials/validate-compatibility', async (req, res) => {
+        try {
+            const { machine, substrate } = req.body || {};
+            if (!machine || !substrate) {
+                return res.status(400).json({
+                    ok: false,
+                    error: 'MISSING_PAYLOAD: machine and substrate objects are both required.'
+                });
+            }
+            const validation = industrialMaterialsService.validateMachineSubstrateCompatibility(machine, substrate);
+            return res.status(200).json({ ok: true, ...validation });
+        } catch (err) {
+            return res.status(500).json({
+                ok: false,
+                error: err.message
+            });
+        }
+    });
+
     // POST /api/pricing/profiles
     router.post('/profiles', async (req, res) => {
         try {

@@ -170,7 +170,7 @@ export const MaterialSpecificationDrawer: React.FC<MaterialSpecificationDrawerPr
     initialMaterial = null,
     onSave
 }) => {
-    const { locale } = useLocale();
+    const { locale, t } = useLocale();
     const isEdit = Boolean(initialMaterial && initialMaterial.id);
 
     const [idCode, setIdCode] = useState<string>('');
@@ -395,24 +395,10 @@ export const MaterialSpecificationDrawer: React.FC<MaterialSpecificationDrawerPr
                         </div>
                         <div>
                             <h3 className="text-sm font-black uppercase tracking-wider text-zinc-900 dark:text-white m-0">
-                                {isEdit
-                                    ? locale === 'de'
-                                        ? 'Technische Substratspezifikation bearbeiten'
-                                        : locale === 'en'
-                                          ? 'Edit Industrial Substrate Specification'
-                                          : 'Editar Especificación Técnica de Sustrato'
-                                    : locale === 'de'
-                                      ? 'Neues Industrielles Substrat Registrieren'
-                                      : locale === 'en'
-                                        ? 'Onboard New Industrial Substrate'
-                                        : 'Alta de Nuevo Sustrato Industrial'}
+                                {isEdit ? t('materials.drawer.titleEdit') : t('materials.drawer.titleNew')}
                             </h3>
                             <p className="text-[10px] font-mono text-zinc-500 dark:text-zinc-400 uppercase tracking-widest m-0 mt-0.5">
-                                {locale === 'de'
-                                    ? 'MYSQL PRINTHOUSE_MATERIALS · SYNCHRONISIERT MIT LIVE CALIBRATOR & BPE SPINE ENGINE'
-                                    : locale === 'en'
-                                      ? 'MYSQL PRINTHOUSE_MATERIALS · SYNCHRONIZED WITH LIVE CALIBRATOR & BPE SPINE ENGINE'
-                                      : 'MYSQL PRINTHOUSE_MATERIALS · SINCRONIZADO CON LIVE CALIBRATOR & BPE SPINE ENGINE'}
+                                {t('materials.drawer.badgeSync')}
                             </p>
                         </div>
                     </div>
@@ -437,7 +423,7 @@ export const MaterialSpecificationDrawer: React.FC<MaterialSpecificationDrawerPr
                     {/* 1. Selector Visual de Tipo de Material (Pliego vs Bobina vs Cartón/Guarda/Laminado) */}
                     <div>
                         <label className="block text-[10px] font-mono font-black uppercase tracking-widest text-zinc-500 dark:text-zinc-400 mb-2">
-                            01 // ARQUITECTURA FÍSICA DEL SUSTRATO (PLIEGO CORTADO VS. BOBINA CONTINUA)
+                            {t('materials.drawer.sec01Title')}
                         </label>
                         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
                             {MATERIAL_TYPE_OPTIONS.map((opt) => {
@@ -477,7 +463,7 @@ export const MaterialSpecificationDrawer: React.FC<MaterialSpecificationDrawerPr
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div className="sm:col-span-2">
                             <label className="block text-[10px] font-black uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-1">
-                                Nombre Comercial del Papel / Sustrato *
+                                {t('materials.drawer.nameLabel')}
                             </label>
                             <input
                                 type="text"
@@ -485,28 +471,28 @@ export const MaterialSpecificationDrawer: React.FC<MaterialSpecificationDrawerPr
                                 data-testid="material-drawer-name-input"
                                 value={name}
                                 onChange={(e) => setName(e.target.value)}
-                                placeholder="Ej. Munken Print White 1.5 / Coral Book Ivory / Stora Enso Reel"
+                                placeholder={t('materials.drawer.namePlaceholder')}
                                 className="w-full px-3.5 py-2 rounded-xl bg-zinc-50 dark:bg-[#0B0C0E] border border-zinc-200 dark:border-zinc-800 text-sm font-bold text-zinc-900 dark:text-white"
                             />
                         </div>
 
                         <div>
                             <label className="block text-[10px] font-black uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-1">
-                                Fabricante / Molino Papelero
+                                {t('materials.drawer.millLabel')}
                             </label>
                             <input
                                 type="text"
                                 data-testid="material-drawer-manufacturer-input"
                                 value={manufacturer}
                                 onChange={(e) => setManufacturer(e.target.value)}
-                                placeholder="Arctic Paper, Fedrigoni, Sappi, Lecta..."
+                                placeholder={t('materials.drawer.millPlaceholder')}
                                 className="w-full px-3.5 py-2 rounded-xl bg-zinc-50 dark:bg-[#0B0C0E] border border-zinc-200 dark:border-zinc-800 text-xs font-bold text-zinc-900 dark:text-white"
                             />
                         </div>
 
                         <div>
                             <label className="block text-[10px] font-black uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-1">
-                                Categoría de Superficie
+                                {t('materials.drawer.categoryLabel')}
                             </label>
                             <select
                                 data-testid="material-drawer-category-select"
@@ -527,7 +513,7 @@ export const MaterialSpecificationDrawer: React.FC<MaterialSpecificationDrawerPr
                     <div className="p-4 rounded-2xl bg-zinc-50 dark:bg-[#0B0C0E] border border-zinc-200 dark:border-zinc-800 space-y-4">
                         <div className="flex items-center justify-between flex-wrap gap-2">
                             <span className="text-[10px] font-mono font-black uppercase tracking-widest text-[#dc0000]">
-                                02 // {isReelMode ? 'GEOMETRÍA DE BOBINA CONTINUA (WEB REEL)' : 'DIMENSIONES DE PLIEGO Y SENTIDO DE FIBRA'}
+                                {isReelMode ? t('materials.drawer.sec02Reel') : t('materials.drawer.sec02Sheet')}
                             </span>
                             <div className="flex flex-wrap gap-1.5">
                                 {!isReelMode
@@ -566,7 +552,7 @@ export const MaterialSpecificationDrawer: React.FC<MaterialSpecificationDrawerPr
                             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                                 <div>
                                     <label className="block text-[10px] font-bold uppercase text-zinc-400 mb-1">
-                                        Ancho Pliego (mm)
+                                        {t('materials.drawer.widthSheetLabel')}
                                     </label>
                                     <input
                                         type="number"
@@ -580,7 +566,7 @@ export const MaterialSpecificationDrawer: React.FC<MaterialSpecificationDrawerPr
                                 </div>
                                 <div>
                                     <label className="block text-[10px] font-bold uppercase text-zinc-400 mb-1">
-                                        Alto Pliego (mm)
+                                        {t('materials.drawer.heightSheetLabel')}
                                     </label>
                                     <input
                                         type="number"
@@ -594,7 +580,7 @@ export const MaterialSpecificationDrawer: React.FC<MaterialSpecificationDrawerPr
                                 </div>
                                 <div>
                                     <label className="block text-[10px] font-bold uppercase text-zinc-400 mb-1">
-                                        Sentido de Fibra (Grain)
+                                        {t('materials.drawer.grainLabel')}
                                     </label>
                                     <select
                                         data-testid="material-drawer-grain-select"
@@ -602,8 +588,8 @@ export const MaterialSpecificationDrawer: React.FC<MaterialSpecificationDrawerPr
                                         onChange={(e) => setGrainDirection(e.target.value as 'LG' | 'SG')}
                                         className="w-full px-3 py-2 rounded-xl bg-white dark:bg-[#14161a] border border-zinc-200 dark:border-zinc-800 text-xs font-mono font-bold"
                                     >
-                                        <option value="LG">LG — Fibra Larga (Long Grain)</option>
-                                        <option value="SG">SG — Fibra Corta (Short Grain)</option>
+                                        <option value="LG">LG — {t('materials.catalog.grainLong')}</option>
+                                        <option value="SG">SG — {t('materials.catalog.grainShort')}</option>
                                     </select>
                                 </div>
                             </div>
@@ -611,7 +597,7 @@ export const MaterialSpecificationDrawer: React.FC<MaterialSpecificationDrawerPr
                             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                                 <div>
                                     <label className="block text-[10px] font-bold uppercase text-zinc-400 mb-1">
-                                        Ancho de Banda (web_width_mm)
+                                        {t('materials.drawer.webWidthLabel')}
                                     </label>
                                     <input
                                         type="number"
@@ -625,7 +611,7 @@ export const MaterialSpecificationDrawer: React.FC<MaterialSpecificationDrawerPr
                                 </div>
                                 <div>
                                     <label className="block text-[10px] font-bold uppercase text-zinc-400 mb-1">
-                                        Diámetro Máx. Bobina (mm)
+                                        {t('materials.drawer.maxDiameterLabel')}
                                     </label>
                                     <input
                                         type="number"
@@ -639,7 +625,7 @@ export const MaterialSpecificationDrawer: React.FC<MaterialSpecificationDrawerPr
                                 </div>
                                 <div>
                                     <label className="block text-[10px] font-bold uppercase text-zinc-400 mb-1">
-                                        Mandril / Cono (core_diameter)
+                                        {t('materials.drawer.coreDiameterLabel')}
                                     </label>
                                     <select
                                         data-testid="material-drawer-core-select"
@@ -647,8 +633,8 @@ export const MaterialSpecificationDrawer: React.FC<MaterialSpecificationDrawerPr
                                         onChange={(e) => setCoreDiameterMm(Number(e.target.value) === 152 ? 152 : 76)}
                                         className="w-full px-3 py-2 rounded-xl bg-white dark:bg-[#14161a] border border-zinc-200 dark:border-zinc-800 text-xs font-mono font-bold"
                                     >
-                                        <option value={76}>76 mm (3&quot; Estándar Rotativa)</option>
-                                        <option value={152}>152 mm (6&quot; Alta Velocidad)</option>
+                                        <option value={76}>{t('materials.drawer.core76')}</option>
+                                        <option value={152}>{t('materials.drawer.core152')}</option>
                                     </select>
                                 </div>
                             </div>
@@ -660,17 +646,17 @@ export const MaterialSpecificationDrawer: React.FC<MaterialSpecificationDrawerPr
                         <div className="flex items-center justify-between">
                             <span className="text-[10px] font-mono font-black uppercase tracking-widest text-emerald-500 flex items-center gap-1.5">
                                 <BookOpenIcon className="w-4 h-4" />
-                                03 // GRAMAJE (GSM), MANO ESPECÍFICA (BULK) Y CÁLCULO DE LOMO
+                                {t('materials.drawer.sec03Title')}
                             </span>
                             <span className="text-[10px] font-mono font-bold text-zinc-400">
-                                Calibre: {liveMetrics.caliperMicrons} µm
+                                {t('materials.drawer.caliperPrefix')}: {liveMetrics.caliperMicrons} µm
                             </span>
                         </div>
 
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                             <div>
                                 <label className="block text-[10px] font-bold uppercase text-zinc-400 mb-1">
-                                    Gramaje Base (g/m²) *
+                                    {t('materials.drawer.gsmLabel')}
                                 </label>
                                 <input
                                     type="number"
@@ -686,10 +672,10 @@ export const MaterialSpecificationDrawer: React.FC<MaterialSpecificationDrawerPr
                             <div className="sm:col-span-2">
                                 <div className="flex items-center justify-between mb-1">
                                     <label className="text-[10px] font-bold uppercase text-zinc-400">
-                                        Mano / Volumen Específico (Bulk cm³/g)
+                                        {t('materials.drawer.bulkLabel')}
                                     </label>
                                     <span className="text-xs font-mono font-black text-emerald-500">
-                                        {bulkVolume.toFixed(2)} cm³/g ({liveMetrics.caliperMicrons} µm/hoja)
+                                        {bulkVolume.toFixed(2)} cm³/g ({liveMetrics.caliperMicrons} {t('materials.drawer.perLeaf')})
                                     </span>
                                 </div>
                                 <div className="flex items-center gap-3">
@@ -724,7 +710,7 @@ export const MaterialSpecificationDrawer: React.FC<MaterialSpecificationDrawerPr
                         >
                             <div>
                                 <div className="text-[9px] font-mono uppercase text-zinc-400">
-                                    LOMO BASE (100 PÁGS)
+                                    {t('materials.drawer.spineBase100pp')}
                                 </div>
                                 <div className="text-sm font-mono font-black text-zinc-900 dark:text-white mt-0.5">
                                     {liveMetrics.spinePer100PagesMm.toFixed(2)} mm
@@ -732,7 +718,7 @@ export const MaterialSpecificationDrawer: React.FC<MaterialSpecificationDrawerPr
                             </div>
                             <div className="border-x border-zinc-200 dark:border-zinc-800 px-2">
                                 <div className="text-[9px] font-mono font-bold uppercase text-emerald-500">
-                                    LIBRO ESTÁNDAR (200 PÁGS)
+                                    {t('materials.drawer.spineStandard200pp')}
                                 </div>
                                 <div
                                     data-testid="drawer-spine-200pp-value"
@@ -743,7 +729,7 @@ export const MaterialSpecificationDrawer: React.FC<MaterialSpecificationDrawerPr
                             </div>
                             <div>
                                 <div className="text-[9px] font-mono uppercase text-zinc-400">
-                                    NOVELA (320 PÁGS)
+                                    {t('materials.drawer.spineNovel320pp')}
                                 </div>
                                 <div className="text-sm font-mono font-black text-zinc-900 dark:text-white mt-0.5">
                                     {liveMetrics.spine320PagesMm.toFixed(2)} mm
@@ -757,17 +743,17 @@ export const MaterialSpecificationDrawer: React.FC<MaterialSpecificationDrawerPr
                         <div className="flex items-center justify-between">
                             <span className="text-[10px] font-mono font-black uppercase tracking-widest text-amber-500 flex items-center gap-1.5">
                                 <CurrencyEuroIcon className="w-4 h-4" />
-                                04 // TARIFA INDUSTRIAL (€/KG) Y CALCULADORA INSTANTÁNEA DE PLIEGO
+                                {t('materials.drawer.sec04Title')}
                             </span>
                             <span className="text-[10px] font-mono text-zinc-400">
-                                €{(costPerKgEur * 1000).toFixed(0)} / Tonelada
+                                {t('materials.drawer.perTonne', { val: (costPerKgEur * 1000).toFixed(0) })}
                             </span>
                         </div>
 
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                             <div>
                                 <label className="block text-[10px] font-bold uppercase text-zinc-400 mb-1">
-                                    Coste por Kilo (€/kg) *
+                                    {t('materials.drawer.costKgLabel')}
                                 </label>
                                 <input
                                     type="number"
@@ -782,7 +768,7 @@ export const MaterialSpecificationDrawer: React.FC<MaterialSpecificationDrawerPr
                             </div>
                             <div>
                                 <label className="block text-[10px] font-bold uppercase text-zinc-400 mb-1">
-                                    Stock Disponible (kg)
+                                    {t('materials.drawer.stockKgLabel')}
                                 </label>
                                 <input
                                     type="number"
@@ -796,7 +782,7 @@ export const MaterialSpecificationDrawer: React.FC<MaterialSpecificationDrawerPr
                             </div>
                             <div>
                                 <label className="block text-[10px] font-bold uppercase text-zinc-400 mb-1">
-                                    Pedido Mínimo / Alerta (kg)
+                                    {t('materials.drawer.minOrderKgLabel')}
                                 </label>
                                 <input
                                     type="number"
@@ -817,7 +803,7 @@ export const MaterialSpecificationDrawer: React.FC<MaterialSpecificationDrawerPr
                             <div>
                                 <div className="text-[9px] font-mono uppercase text-zinc-400 flex items-center justify-center gap-1">
                                     <ScaleIcon className="w-3 h-3" />
-                                    {isReelMode ? 'PESO POR M² LINEAL' : 'PESO DE 1 PLIEGO'}
+                                    {isReelMode ? t('materials.drawer.weightLinearM2') : t('materials.drawer.weightSheet')}
                                 </div>
                                 <div
                                     data-testid="drawer-sheet-weight-g"
@@ -828,7 +814,7 @@ export const MaterialSpecificationDrawer: React.FC<MaterialSpecificationDrawerPr
                             </div>
                             <div className="border-x border-zinc-200 dark:border-zinc-800 px-2">
                                 <div className="text-[9px] font-mono font-bold uppercase text-amber-500">
-                                    {isReelMode ? 'COSTE METRO LINEAL' : 'COSTE EXACTO / PLIEGO'}
+                                    {isReelMode ? t('materials.drawer.costLinearMeter') : t('materials.drawer.costExactSheet')}
                                 </div>
                                 <div
                                     data-testid="drawer-cost-per-sheet-eur"
@@ -839,7 +825,7 @@ export const MaterialSpecificationDrawer: React.FC<MaterialSpecificationDrawerPr
                             </div>
                             <div>
                                 <div className="text-[9px] font-mono uppercase text-zinc-400">
-                                    COSTE 1.000 PLIEGOS
+                                    {t('materials.drawer.cost1000Sheets')}
                                 </div>
                                 <div className="text-sm font-mono font-black text-zinc-900 dark:text-white mt-0.5">
                                     €{liveMetrics.costPer1000SheetsEur.toFixed(2)}
@@ -851,7 +837,7 @@ export const MaterialSpecificationDrawer: React.FC<MaterialSpecificationDrawerPr
                     {/* 6. Certificaciones Medioambientales y Estado */}
                     <div className="space-y-3">
                         <label className="block text-[10px] font-mono font-black uppercase tracking-widest text-zinc-500 dark:text-zinc-400">
-                            05 // CERTIFICACIONES MEDIOAMBIENTALES Y CADENA DE CUSTODIA
+                            {t('materials.drawer.sec05Title')}
                         </label>
                         <div className="grid grid-cols-2 gap-2.5">
                             {CERTIFICATION_OPTIONS.map((cert) => {
@@ -891,7 +877,7 @@ export const MaterialSpecificationDrawer: React.FC<MaterialSpecificationDrawerPr
                         onClick={onClose}
                         className="px-4 py-2 rounded-xl border border-zinc-200 dark:border-zinc-800 text-xs font-bold text-zinc-500 hover:text-zinc-900 dark:hover:text-white cursor-pointer"
                     >
-                        {locale === 'de' ? 'Abbrechen' : locale === 'en' ? 'Cancel' : 'Cancelar'}
+                        {t('materials.drawer.btnCancel')}
                     </button>
                     <button
                         type="submit"
@@ -901,22 +887,10 @@ export const MaterialSpecificationDrawer: React.FC<MaterialSpecificationDrawerPr
                     >
                         <SparklesIcon className="w-4 h-4" />
                         {saving
-                            ? locale === 'de'
-                                ? 'Synchronisiere MySQL & BPE...'
-                                : locale === 'en'
-                                  ? 'Syncing MySQL & BPE...'
-                                  : 'Sincronizando MySQL & BPE...'
+                            ? t('materials.drawer.btnSaving')
                             : isEdit
-                              ? locale === 'de'
-                                  ? 'Änderungen speichern & BPE kalibrieren'
-                                  : locale === 'en'
-                                    ? 'Save Changes & Recalibrate BPE'
-                                    : 'Guardar Cambios y Recalibrar BPE'
-                              : locale === 'de'
-                                ? 'Substrat im Katalog registrieren'
-                                : locale === 'en'
-                                  ? 'Register Substrate in Catalog'
-                                  : 'Registrar Sustrato en Catálogo'}
+                              ? t('materials.drawer.btnSaveEdit')
+                              : t('materials.drawer.btnSaveNew')}
                     </button>
                 </div>
             </form>

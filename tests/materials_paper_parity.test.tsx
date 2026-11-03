@@ -262,4 +262,108 @@ describe('Phase 15 — Materials & Paper Industrial Substrates Parity Suite', ()
         expect(calibratorPaperSelect).toBeDefined();
         expect(calibratorPaperSelect.innerHTML).toContain('Munken Print White 1.5');
     });
+
+    it('6. validates mechanical & physical compatibility (Machine ↔ Substrate) across Offset, Digital, and Rotary', () => {
+        const offsetPress = {
+            machine_type: 'OFFSET_PRESS',
+            max_sheet_width_mm: 720,
+            max_sheet_height_mm: 1020,
+            min_sheet_width_mm: 210,
+            min_sheet_height_mm: 297,
+            supported_print_methods_json: ['SHEETFED_OFFSET']
+        };
+
+        const digitalPress = {
+            machine_type: 'DIGITAL_PRESS',
+            max_sheet_width_mm: 330,
+            max_sheet_height_mm: 488,
+            min_sheet_width_mm: 100,
+            min_sheet_height_mm: 148,
+            supported_print_methods_json: ['DIGITAL_TONER']
+        };
+
+        const rotaryPress = {
+            machine_type: 'ROTARY',
+            max_print_width_mm: 850,
+            supported_print_methods_json: ['WEB_OFFSET']
+        };
+
+        // Case A: B1 Sheetfed (700x1000) fits Heidelberg/Komori B1 Offset Press
+        const fitB1 = industrialMaterialsService.validateMachineSubstrateCompatibility(offsetPress, {
+            name: 'Munken Print White B1',
+            material_type: 'SHEETFED_PAPER',
+            basis_weight_gsm: 90,
+            bulk_volume: 1.5,
+            dimensions_json: { width_mm: 700, height_mm: 1000 }
+        });
+        expect(fitB1.compatible).toBe(true);
+        expect(fitB1.reasons).toHaveLength(0);
+        expect(fitB1.caliperMicrons).toBe(135);
+
+        // Case B: B1 Sheetfed (700x1000) FAILS on HP Indigo / Canon Digital Press (feeder max 330x488)
+        const rejectDigitalB1 = industrialMaterialsService.validateMachineSubstrateCompatibility(digitalPress, {
+            name: 'Munken Print White B1',
+            material_type: 'SHEETFED_PAPER',
+            basis_weight_gsm: 90,
+            dimensions_json: { width_mm: 700, height_mm: 1000 }
+        });
+        expect(rejectDigitalB1.compatible).toBe(false);
+        expect(rejectDigitalB1.reasons[0]).toContain('SHEET_EXCEEDS_FEEDER_BOUNDS');
+
+        // Case C: Continuous Web Reel (960mm width) FAILS on 850mm Rotary Press
+        const rejectWideReel = industrialMaterialsService.validateMachineSubstrateCompatibility(rotaryPress, {
+            name: 'Stora Enso Wide Web Reel',
+            material_type: 'REEL_PAPER',
+            basis_weight_gsm: 80,
+            dimensions_json: { web_width_mm: 960 }
+        });
+        expect(rejectWideReel.compatible).toBe(false);
+        expect(rejectWideReel.reasons[0]).toContain('INCOMPATIBLE_WEB_WIDTH');
+
+        // Case D: Cut sheet on Rotary press without sheeter FAILS
+        const rejectSheetOnRotary = industrialMaterialsService.validateMachineSubstrateCompatibility(rotaryPress, {
+            name: 'Coral Book Cut Sheet',
+            material_type: 'SHEETFED_PAPER',
+            dimensions_json: { width_mm: 700, height_mm: 1000 }
+        });
+        expect(rejectSheetOnRotary.compatible).toBe(false);
+        expect(rejectSheetOnRotary.reasons[0]).toContain('INCOMPATIBLE_FEED_TYPE');
+    });
+
+    it('7. synchronizes master materials with relational paper_variants maintaining SHA-256 fingerprint & caliper', async () => {
+        const mockDb = {
+            queries: [] as any[],
+            query: async (sql: string, params: any[]) => {
+                mockDb.queries.push({ sql, params });
+                return [{ affectedRows: 1, insertId: 1 }];
+            }
+        };
+
+        const syncResult = await industrialMaterialsService.syncMaterialToPaperVariants(
+            {
+                name: 'Arctic Volume White Silk 150',
+                manufacturer: 'Arctic Paper',
+                material_type: 'SHEETFED_PAPER',
+                category: 'COATED_MATTE',
+                basis_weight_gsm: 150,
+                bulk_volume: 1.10,
+                caliper_microns: 165,
+                dimensions_json: { width_mm: 700, height_mm: 1000, grain_direction: 'LG' },
+                finish_type: 'MATTE'
+            },
+            mockDb
+        );
+
+        expect(syncResult).not.toBeNull();
+        expect(syncResult.productId).toContain('PROD-');
+        expect(syncResult.variantId).toContain('VAR-');
+        expect(syncResult.caliperUm).toBe(165);
+        expect(syncResult.bulkFactor).toBe(1.10);
+        expect(syncResult.fingerprint).toHaveLength(32);
+
+        // Verify SQL queries were dispatched for both paper_products and paper_variants
+        expect(mockDb.queries).toHaveLength(2);
+        expect(mockDb.queries[0].sql).toContain('INSERT INTO paper_products');
+        expect(mockDb.queries[1].sql).toContain('INSERT INTO paper_variants');
+    });
 });

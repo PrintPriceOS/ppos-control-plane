@@ -173,3 +173,4 @@ describe('Transactional SMTP Email Engine & Outbox Governance (Option A)', () =>
     expect(templatesSent).toContain('ASSETS_READY_FOR_3D_PROOF');
   });
 });
+

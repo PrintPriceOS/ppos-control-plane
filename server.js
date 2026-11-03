@@ -111,6 +111,7 @@ fastify.addHook('onRequest', async (request, reply) => {
         }
 
         const authHeader = request.headers['authorization'];
+        const xApiKeyHeader = request.headers['x-api-key'];
         const queryToken = request.query && (request.query.token || request.query.ticket);
         const jwtSecret = process.env.JWT_SECRET;
         const jwtAudience = process.env.JWT_AUDIENCE || 'ppos:control';
@@ -121,9 +122,58 @@ fastify.addHook('onRequest', async (request, reply) => {
             return reply.status(500).send({ error: 'Internal Server Configuration Error' });
         }
 
+        // Phase 199A: Support Self-Service Developer API Keys (`pp_test_...` / `pp_live_...`) via Authorization Bearer or X-API-Key
+        const rawBearerCandidate = authHeader && authHeader.startsWith('Bearer ') ? authHeader.split(' ')[1].trim() : null;
+        const candidateDeveloperKey = (xApiKeyHeader && /^pp_(test|live)_/i.test(String(xApiKeyHeader).trim()))
+            ? String(xApiKeyHeader).trim()
+            : (rawBearerCandidate && /^pp_(test|live)_/i.test(rawBearerCandidate) ? rawBearerCandidate : null);
+
+        if (candidateDeveloperKey) {
+            const developerApiKeyService = require('./src/api/services/developerApiKeyService');
+            const { checkSlidingWindowRateLimit } = require('./src/api/middleware/authenticateApiKey');
+
+            const verification = await developerApiKeyService.verifyRawApiKey(candidateDeveloperKey);
+            if (!verification.valid) {
+                return reply.status(verification.statusCode || 401).send({
+                    ok: false,
+                    error: verification.error
+                });
+            }
+
+            const { keyRecord } = verification;
+            const rl = checkSlidingWindowRateLimit(keyRecord.id, keyRecord.rateLimitPerMinute || 60);
+            reply.header('X-RateLimit-Limit', String(rl.limit));
+            reply.header('X-RateLimit-Remaining', String(rl.remaining));
+
+            if (!rl.allowed) {
+                reply.header('Retry-After', String(rl.retryAfterSec));
+                return reply.status(429).send({
+                    ok: false,
+                    error: `Rate limit of ${rl.limit} req/min exceeded. Retry after ${rl.retryAfterSec}s.`
+                });
+            }
+
+            request.user = {
+                id: keyRecord.userId,
+                tenantId: keyRecord.tenantId,
+                role: keyRecord.keyType === 'LIVE' ? 'TENANT_ADMIN' : 'DEVELOPER_SANDBOX',
+                scopes: keyRecord.scopes,
+                apiKeyId: keyRecord.id,
+                keyType: keyRecord.keyType,
+                billingTier: keyRecord.billingTier,
+                authMode: 'API_KEY'
+            };
+            request.raw.user = request.user;
+            return;
+        }
+
         const isSseNotificationStream =
             url.startsWith('/api/routing/notifications/stream') ||
             url.startsWith('/api/pricing/routing-decisions/notifications/stream');
+
+        const isSelfServiceDeveloperHub =
+            url.startsWith('/api/developer/keys') ||
+            url.startsWith('/api/developer');
 
         if ((!authHeader || !authHeader.startsWith('Bearer ')) && !(isSseNotificationStream && queryToken)) {
             if (isSseNotificationStream) {
@@ -134,6 +184,18 @@ fastify.addHook('onRequest', async (request, reply) => {
                     tenantId: String(request.query?.tenantId || 'tenant-default'),
                     printhouseId: String(request.query?.printhouseId || 'node-primary'),
                     authMode: 'SSE_STREAM'
+                };
+                request.raw.user = request.user;
+                return;
+            }
+            if (isSelfServiceDeveloperHub) {
+                // Allow instant Self-Service Developer Sandbox provisioning when visiting /developers without prior JWT
+                const guestSandboxTenant = String(request.headers['x-sandbox-tenant'] || 'tenant-dev-sandbox');
+                request.user = {
+                    id: 'sandbox-developer',
+                    role: 'DEVELOPER_SANDBOX',
+                    tenantId: guestSandboxTenant,
+                    authMode: 'SANDBOX_SELF_SERVICE'
                 };
                 request.raw.user = request.user;
                 return;
@@ -474,6 +536,8 @@ const start = async () => {
             fastify.use('/api/pricing', require('./src/api/routes/pricingRoutes'));
             fastify.use('/api/routing', require('./src/api/routes/routingNotificationsRoutes'));
             fastify.use('/api/settings', require('./src/api/routes/settingsRoutes'));
+            fastify.use('/api/developer/keys', require('./src/api/routes/developerKeysRoutes'));
+            fastify.use('/api/developer', require('./src/api/routes/developerKeysRoutes'));
             
             // Explicitly register route groups in Fastify's radix tree so requests route through the Express middleware bridge
             const apiNotFoundFallback = (request, reply) => {
@@ -535,6 +599,8 @@ const start = async () => {
             fastify.all('/api/routing/*', apiNotFoundFallback);
             fastify.all('/api/settings', apiNotFoundFallback);
             fastify.all('/api/settings/*', apiNotFoundFallback);
+            fastify.all('/api/developer', apiNotFoundFallback);
+            fastify.all('/api/developer/*', apiNotFoundFallback);
 
             fastify.log.info('[ROUTES][ADMIN][REGISTERED] route=/api/admin/* mounted successfully via Express bridge');
             console.log('[ROUTES][ADMIN][REGISTERED] route=/api/admin/* mounted successfully via Express bridge');

@@ -90,3 +90,4 @@ router.patch('/notifications/:id/read', (req, res) => {
 });
 
 module.exports = router;
+

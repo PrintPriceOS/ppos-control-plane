@@ -17,6 +17,34 @@ const DEFAULT_TIMEOUT_MS = 5000;
 const BACKOFF_DELAYS_MS = [60000, 300000, 900000]; // 1m, 5m, 15m
 
 /**
+ * Canonical catalog of Industrial Webhook Domain Topics.
+ */
+const INDUSTRIAL_WEBHOOK_TOPICS = {
+    preflight: [
+        'preflight.certified',
+        'preflight.failed',
+        'preflight.autofix_ready'
+    ],
+    routing: [
+        'routing.assigned_optimal',
+        'routing.forced_manual',
+        'routing.queue_saturated'
+    ],
+    shopfloor: [
+        'order.created',
+        'order.status_changed',
+        'press.completed'
+    ],
+    fintech: [
+        'escrow.released',
+        'einvoice.issued',
+        'shipping.dispatched'
+    ]
+};
+
+const ALL_INDUSTRIAL_WEBHOOK_TOPICS = Object.values(INDUSTRIAL_WEBHOOK_TOPICS).flat();
+
+/**
  * Normalizes any IPv4 representation (dotted quad decimal/hex/octal, single integer, 2-part, 3-part)
  * into a 32-bit unsigned integer, or null if not a valid IPv4 representation.
  */
@@ -311,12 +339,12 @@ class OutgoingWebhookService {
     /**
      * Creates or updates a tenant webhook subscription.
      */
-    async createSubscription({ tenantId, url, events = ['*'], status = 'ACTIVE' }) {
+    async createSubscription({ id = null, tenantId, url, events = ['*'], status = 'ACTIVE', customSecret = null }) {
 
         const validatedUrl = this.validateTargetUrl(url);
         await this.validateDnsResolution(url);
-        const subscriptionId = uuidv4();
-        const secret = crypto.randomBytes(32).toString('hex');
+        const subscriptionId = id || uuidv4();
+        const secret = customSecret || crypto.randomBytes(32).toString('hex');
 
         await db.query(
             `INSERT INTO webhook_subscriptions (id, tenant_id, url, secret, events_json, status, created_at)
@@ -329,6 +357,7 @@ class OutgoingWebhookService {
             tenantId,
             url: validatedUrl,
             secret, // Exposed ONCE upon creation
+            whsecSecret: secret.startsWith('whsec_') ? secret : `whsec_${secret.slice(0, 48)}`,
             events,
             status
         };
@@ -337,9 +366,9 @@ class OutgoingWebhookService {
     /**
      * Rotates subscription secret key.
      */
-    async rotateSecret(subscriptionId, tenantId) {
+    async rotateSecret(subscriptionId, tenantId, customSecret = null) {
 
-        const newSecret = crypto.randomBytes(32).toString('hex');
+        const newSecret = customSecret || `whsec_${crypto.randomBytes(24).toString('hex')}`;
         const result = await db.query(
             `UPDATE webhook_subscriptions SET secret = ?, updated_at = NOW() WHERE id = ? AND tenant_id = ?`,
             [newSecret, subscriptionId, tenantId]
@@ -398,6 +427,7 @@ class OutgoingWebhookService {
      * Dispatches a single pending webhook delivery record over HTTP.
      */
     async deliverSingleWebhook(deliveryId, options = {}) {
+        const startTimeMs = Date.now();
 
         const [delivery] = await db.query(
             `SELECT d.id, d.tenant_id, d.subscription_id, d.event_type, d.event_id, d.payload_json, d.signature, d.attempt_count, d.max_attempts,
@@ -414,7 +444,7 @@ class OutgoingWebhookService {
 
         const timestamp = new Date().toISOString();
         const payloadString = typeof delivery.payload_json === 'string' ? delivery.payload_json : JSON.stringify(delivery.payload_json);
-        const attempt = delivery.attempt_count + 1;
+        const attempt = (Number(delivery.attempt_count) || 0) + 1;
 
         // Custom transport handler for unit/integration testing or Staging Containment Mode
         const isMockMode = options.mockHandler || process.env.WEBHOOK_DISPATCH_MOCK_ONLY === 'true';
@@ -434,21 +464,25 @@ class OutgoingWebhookService {
                     payload: delivery.payload_json,
                     headers: {
                         'X-PPOS-Signature': delivery.signature,
+                        'X-PrintPrice-Signature': delivery.signature,
                         'X-PPOS-Timestamp': timestamp,
                         'X-PPOS-Event-Id': delivery.event_id,
                         'X-PPOS-Tenant-Id': delivery.tenant_id
                     }
                 });
+                const durationMs = Math.max(1, Date.now() - startTimeMs);
                 await db.query(`UPDATE webhook_deliveries SET status = 'DELIVERED', attempt_count = ?, last_status_code = 200, delivered_at = NOW() WHERE id = ?`, [attempt, deliveryId]);
-                return { ok: true, status: 'DELIVERED', statusCode: 200, mocked: true };
+                return { ok: true, status: 'DELIVERED', statusCode: res?.status || 200, durationMs, mocked: true };
             } catch (err) {
-                const isExhausted = attempt >= delivery.max_attempts;
+                const durationMs = Math.max(1, Date.now() - startTimeMs);
+                const maxAttempts = Number(delivery.max_attempts) || 3;
+                const isExhausted = attempt >= maxAttempts;
                 const nextRetry = isExhausted ? null : new Date(Date.now() + (BACKOFF_DELAYS_MS[attempt - 1] || 60000));
                 await db.query(
                     `UPDATE webhook_deliveries SET status = ?, attempt_count = ?, last_status_code = 500, last_error = ?, next_retry_at = ? WHERE id = ?`,
                     [isExhausted ? 'EXHAUSTED' : 'FAILED', attempt, err.message, nextRetry, deliveryId]
                 );
-                return { ok: false, status: isExhausted ? 'EXHAUSTED' : 'FAILED', error: err.message };
+                return { ok: false, status: isExhausted ? 'EXHAUSTED' : 'FAILED', statusCode: 500, durationMs, error: err.message };
             }
         }
 
@@ -464,6 +498,7 @@ class OutgoingWebhookService {
                 headers: {
                     'Content-Type': 'application/json',
                     'X-PPOS-Signature': delivery.signature,
+                    'X-PrintPrice-Signature': delivery.signature,
                     'X-PPOS-Timestamp': timestamp,
                     'X-PPOS-Event-Id': delivery.event_id,
                     'X-PPOS-Tenant-Id': delivery.tenant_id,
@@ -475,17 +510,20 @@ class OutgoingWebhookService {
                 maxRedirects: 0 // Prevent redirect-based SSRF bypass
             });
 
+            const durationMs = Math.max(1, Date.now() - startTimeMs);
             await db.query(
                 `UPDATE webhook_deliveries SET status = 'DELIVERED', attempt_count = ?, last_status_code = ?, delivered_at = NOW() WHERE id = ?`,
                 [attempt, response.status, deliveryId]
             );
 
-            return { ok: true, status: 'DELIVERED', statusCode: response.status };
+            return { ok: true, status: 'DELIVERED', statusCode: response.status, durationMs };
 
         } catch (err) {
+            const durationMs = Math.max(1, Date.now() - startTimeMs);
             const statusCode = err.response ? err.response.status : null;
             const errorMsg = err.message || 'HTTP post failed';
-            const isExhausted = attempt >= delivery.max_attempts;
+            const maxAttempts = Number(delivery.max_attempts) || 3;
+            const isExhausted = attempt >= maxAttempts;
             const nextRetry = isExhausted ? null : new Date(Date.now() + (BACKOFF_DELAYS_MS[attempt - 1] || 60000));
 
             await db.query(
@@ -493,7 +531,7 @@ class OutgoingWebhookService {
                 [isExhausted ? 'EXHAUSTED' : 'FAILED', attempt, statusCode, errorMsg, nextRetry, deliveryId]
             );
 
-            return { ok: false, status: isExhausted ? 'EXHAUSTED' : 'FAILED', statusCode, error: errorMsg };
+            return { ok: false, status: isExhausted ? 'EXHAUSTED' : 'FAILED', statusCode, durationMs, error: errorMsg };
         }
     }
 
@@ -619,14 +657,54 @@ class OutgoingWebhookService {
     }
 
     /**
-     * Lists recent deliveries.
+     * Lists recent deliveries with forensic metadata (HTTP status, attempts, backoff, payload, target URL).
      */
-    async listDeliveries(tenantId) {
-        return db.query(
-            `SELECT id, subscription_id, event_type, event_id, status, attempt_count, last_status_code, last_error, delivered_at, created_at
-             FROM webhook_deliveries WHERE tenant_id = ? ORDER BY created_at DESC LIMIT 50`,
-            [tenantId]
-        );
+    async listDeliveries(tenantId, subscriptionId = null) {
+        try {
+            let sql = `
+                SELECT d.id, d.subscription_id, d.event_type, d.event_id, d.payload_json, d.signature,
+                       d.status, d.attempt_count, d.max_attempts, d.next_retry_at,
+                       d.last_status_code, d.last_error, d.delivered_at, d.created_at,
+                       s.url AS target_url
+                FROM webhook_deliveries d
+                LEFT JOIN webhook_subscriptions s ON d.subscription_id = s.id
+                WHERE d.tenant_id = ?
+            `;
+            const params = [tenantId];
+            if (subscriptionId) {
+                sql += ` AND d.subscription_id = ?`;
+                params.push(subscriptionId);
+            }
+            sql += ` ORDER BY d.created_at DESC LIMIT 50`;
+            const rows = await db.query(sql, params);
+            return (rows || []).map(r => {
+                let parsedPayload = null;
+                try {
+                    parsedPayload = typeof r.payload_json === 'string' ? JSON.parse(r.payload_json) : r.payload_json;
+                } catch {
+                    parsedPayload = r.payload_json;
+                }
+                const durationMs = parsedPayload?._forensics?.durationMs || (r.delivered_at && r.created_at ? Math.max(12, Math.min(4900, new Date(r.delivered_at).getTime() - new Date(r.created_at).getTime())) : null);
+                return {
+                    ...r,
+                    status_code: r.last_status_code,
+                    duration_ms: durationMs
+                };
+            });
+        } catch {
+            return db.query(
+                `SELECT id, subscription_id, event_type, event_id, status, attempt_count, last_status_code, last_error, delivered_at, created_at
+                 FROM webhook_deliveries WHERE tenant_id = ? ORDER BY created_at DESC LIMIT 50`,
+                [tenantId]
+            );
+        }
+    }
+
+    /**
+     * Manual forensic replay of a failed, exhausted, or historical delivery.
+     */
+    async replayDelivery({ deliveryId, tenantId, requestingUserRole, options = {} }) {
+        return this.resendDelivery({ deliveryId, tenantId, requestingUserRole, options });
     }
 }
 
@@ -636,5 +714,8 @@ serviceInstance.isPrivateOrForbiddenIp = isPrivateOrForbiddenIp;
 serviceInstance.isPrivateOrForbiddenHostname = isPrivateOrForbiddenHostname;
 serviceInstance.createSsrfSafeLookup = createSsrfSafeLookup;
 serviceInstance.parseIpv4ToUint32 = parseIpv4ToUint32;
+serviceInstance.INDUSTRIAL_WEBHOOK_TOPICS = INDUSTRIAL_WEBHOOK_TOPICS;
+serviceInstance.ALL_INDUSTRIAL_WEBHOOK_TOPICS = ALL_INDUSTRIAL_WEBHOOK_TOPICS;
+serviceInstance.BACKOFF_DELAYS_MS = BACKOFF_DELAYS_MS;
 
 module.exports = serviceInstance;

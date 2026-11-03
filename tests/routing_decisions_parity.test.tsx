@@ -150,3 +150,4 @@ describe('Routing Decisions Engine — Multi-Variable Scoring, Hard Gates & Simu
         expect(screen.getByTestId('optimal-winner-name')).toHaveTextContent(/Indigo/i);
     });
 });
+

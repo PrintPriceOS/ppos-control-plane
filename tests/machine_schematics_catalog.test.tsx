@@ -211,3 +211,4 @@ describe('Industrial Vector Blueprint SVG Engine & Machine Preset Catalog', () =
     }
   });
 });
+

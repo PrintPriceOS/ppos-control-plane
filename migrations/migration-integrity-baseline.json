@@ -1,9 +1,17 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-10-29T11:20:10.174Z",
+  "generatedAt": "2026-11-03T00:33:56.918Z",
   "hashAlgorithm": "sha256",
   "contentNormalization": "utf8-lf-v1",
   "approvedPrefixCollisions": {
+    "172": [
+      "migrations/172_phase15_marketplace_checkout_dual_settlement.sql",
+      "migrations/172_phase197a_paper_caliper_and_livonia_reference.sql"
+    ],
+    "173": [
+      "migrations/173_phase15b_printhouse_payment_settings.sql",
+      "migrations/173_phase197b_spine_binding_profiles_and_snapshots.sql"
+    ],
     "013": [
       "migrations/013_paywall_tenant_subscriptions.sql",
       "migrations/013_phase39_0_tenant_plan_governance.sql"
@@ -1852,7 +1860,7 @@
       "prefix": "137",
       "canonicalSha256": "8b2d93a7807a899e82160d7b8a794d01d41732825f7bc440ac50cb37305235cf",
       "contentNormalization": "utf8-lf-v1",
-      "sizeBytes": 1497,
+      "sizeBytes": 1469,
       "containsDdl": true,
       "containsDml": true,
       "containsTransaction": false,
@@ -1865,7 +1873,7 @@
       "prefix": "138",
       "canonicalSha256": "f05627a83b03a96338f31fca1faa0c13067612cc48c4cb8ac125637d9b9d3203",
       "contentNormalization": "utf8-lf-v1",
-      "sizeBytes": 1979,
+      "sizeBytes": 1948,
       "containsDdl": true,
       "containsDml": true,
       "containsTransaction": false,
@@ -2311,6 +2319,22 @@
       ]
     },
     {
+      "path": "migrations/172_phase15_marketplace_checkout_dual_settlement.sql",
+      "prefix": "172",
+      "canonicalSha256": "37c58d93c90f7928a9e29b00f7cf42dd040af9ad6d7dbfa199cd9c53e8d81014",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 5416,
+      "containsDdl": true,
+      "containsDml": false,
+      "containsTransaction": false,
+      "statementTypes": [
+        "ALTER_TABLE",
+        "CREATE_INDEX",
+        "CREATE_PROCEDURE",
+        "DROP_PROCEDURE"
+      ]
+    },
+    {
       "path": "migrations/172_phase197a_paper_caliper_and_livonia_reference.sql",
       "prefix": "172",
       "canonicalSha256": "96f083c4f4e263bcc4d1616ac10a76d6dbe4e2eff04bc1d0eac04453a56daa5c",
@@ -2322,6 +2346,19 @@
       "statementTypes": [
         "CREATE_TABLE",
         "ALTER_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/173_phase15b_printhouse_payment_settings.sql",
+      "prefix": "173",
+      "canonicalSha256": "1fe3fa9427ed679c569cf48660523ec6ed16909056bf14b195775c9fbd3cf6b5",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 1627,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
       ]
     },
     {
@@ -2387,6 +2424,19 @@
       "containsTransaction": false,
       "statementTypes": [
         "ALTER_TABLE"
+      ]
+    },
+    {
+      "path": "migrations/178_phase199a_developer_api_keys_and_metered_billing.sql",
+      "prefix": "178",
+      "canonicalSha256": "69aa863dbc1432c8c1711483094b07af3783572ab0d388af76e111f550ee9487",
+      "contentNormalization": "utf8-lf-v1",
+      "sizeBytes": 1770,
+      "containsDdl": true,
+      "containsDml": true,
+      "containsTransaction": false,
+      "statementTypes": [
+        "CREATE_TABLE"
       ]
     }
   ]

@@ -403,6 +403,27 @@ router.post('/sync-master', async (req, res) => {
     }
 });
 
+/**
+ * POST /api/admin/materials/validate-compatibility
+ * Evaluates mechanical and physical compatibility between a press/finisher and a substrate.
+ */
+router.post('/validate-compatibility', async (req, res) => {
+    try {
+        const { machine, substrate } = req.body || {};
+        if (!machine || !substrate) {
+            return res.status(400).json({
+                ok: false,
+                error: 'MISSING_PAYLOAD: machine and substrate objects are both required.',
+                code: 'INVALID_PAYLOAD'
+            });
+        }
+        const validation = industrialMaterialsService.validateMachineSubstrateCompatibility(machine, substrate);
+        return res.json({ ok: true, ...validation });
+    } catch (err) {
+        return res.status(500).json({ ok: false, error: err.message, code: 'VALIDATE_COMPATIBILITY_ERROR' });
+    }
+});
+
 const paperProcurementService = require('../services/paperProcurementService');
 
 /**

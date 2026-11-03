@@ -1322,16 +1322,30 @@ router.post('/webhooks/subscriptions/:id/rotate-secret', requireRole('TENANT_ADM
     }
 });
 
+router.get('/webhooks/topics', async (_req, res) => {
+    try {
+        res.json({
+            ok: true,
+            data: {
+                domains: outgoingWebhookService.INDUSTRIAL_WEBHOOK_TOPICS,
+                allTopics: outgoingWebhookService.ALL_INDUSTRIAL_WEBHOOK_TOPICS
+            }
+        });
+    } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
 router.get('/webhooks/deliveries', async (req, res) => {
     try {
-        const deliveries = await outgoingWebhookService.listDeliveries(req.user.tenantId);
+        const deliveries = await outgoingWebhookService.listDeliveries(req.user.tenantId, req.query.subscriptionId || null);
         res.json({ ok: true, data: deliveries });
     } catch (err) {
         res.status(500).json({ ok: false, error: err.message });
     }
 });
 
-router.post('/webhooks/deliveries/:id/resend', requireRole('TENANT_ADMIN'), async (req, res) => {
+const handleAdminWebhookReplay = async (req, res) => {
     try {
         const result = await outgoingWebhookService.resendDelivery({
             deliveryId: req.params.id,
@@ -1343,10 +1357,16 @@ router.post('/webhooks/deliveries/:id/resend', requireRole('TENANT_ADMIN'), asyn
         const status = err.statusCode || (err.message.includes('not found') ? 404 : (err.message.includes('Forbidden') || err.message.includes('not authorized') ? 403 : 500));
         res.status(status).json({ ok: false, error: err.message });
     }
-});
+};
 
-router.post('/webhooks/test', requireRole('TENANT_ADMIN'), async (req, res) => {
+router.post('/webhooks/deliveries/:id/resend', requireRole('TENANT_ADMIN'), handleAdminWebhookReplay);
+router.post('/webhooks/deliveries/:id/replay', requireRole('TENANT_ADMIN'), handleAdminWebhookReplay);
+
+const handleAdminWebhookTestPing = async (req, res) => {
     try {
+        if (req.body?.targetUrl) {
+            outgoingWebhookService.validateTargetUrl(req.body.targetUrl);
+        }
         const result = await outgoingWebhookService.enqueueWebhookEvent({
             tenantId: req.user.tenantId,
             eventType: 'test.ping',
@@ -1354,9 +1374,13 @@ router.post('/webhooks/test', requireRole('TENANT_ADMIN'), async (req, res) => {
         });
         res.json({ ok: true, data: result });
     } catch (err) {
-        res.status(500).json({ ok: false, error: err.message });
+        const status = err.message?.includes('SSRF') || err.message?.includes('Forbidden webhook target') ? 400 : 500;
+        res.status(status).json({ ok: false, error: err.message });
     }
-});
+};
+
+router.post('/webhooks/test', requireRole('TENANT_ADMIN'), handleAdminWebhookTestPing);
+router.post('/webhooks/test-ping', requireRole('TENANT_ADMIN'), handleAdminWebhookTestPing);
 
 // ── Slack Alerts Endpoints (Goal D) ───────────────────────────────────────
 const slackNotificationService = require('../services/slackNotificationService');

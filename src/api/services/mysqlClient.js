@@ -15,7 +15,7 @@ function getPool() {
             if (fs.existsSync(process.env.MYSQL_PASSWORD_FILE)) {
                 password = fs.readFileSync(process.env.MYSQL_PASSWORD_FILE, 'utf8').trim();
             }
-        } catch (e) {}
+        } catch (e) { }
     }
 
     const config = {
@@ -46,7 +46,7 @@ function getPool() {
             config.password = decodeURIComponent(dbUrl.password);
             config.database = dbUrl.pathname.replace(/^\//, '');
             usedUrl = true;
-            
+
             logger.info({
                 event: 'config_parsed_from_url',
                 message: 'MySQL configuration parsed from DATABASE_URL',
@@ -72,7 +72,7 @@ function getPool() {
         logger.error({
             event: 'pool_error',
             message: 'MySQL Pool Error',
-            metadata: { 
+            metadata: {
                 code: err.code,
                 host: config.host,
                 database: config.database,
@@ -85,7 +85,7 @@ function getPool() {
     logger.info({
         event: 'pool_created',
         message: 'MySQL Connection pool initialized',
-        metadata: { 
+        metadata: {
             host: config.host || 'NOT_SET',
             database: config.database || 'NOT_SET',
             user: config.user || 'NOT_SET',
@@ -98,7 +98,7 @@ function getPool() {
 
 async function query(sql, params = []) {
     const isConfigured = process.env.MYSQL_HOST || process.env.DATABASE_URL;
-    
+
     if (!isConfigured) {
         const error = new Error('MySQL is UNCONFIGURED. Ensure MYSQL_HOST or DATABASE_URL is set in .env');
         error.code = 'DB_UNCONFIGURED';
@@ -122,7 +122,7 @@ async function query(sql, params = []) {
 
 async function getConnection() {
     const isConfigured = process.env.MYSQL_HOST || process.env.DATABASE_URL;
-    
+
     if (!isConfigured) {
         const error = new Error('MySQL is UNCONFIGURED. Ensure MYSQL_HOST or DATABASE_URL is set in .env');
         error.code = 'DB_UNCONFIGURED';

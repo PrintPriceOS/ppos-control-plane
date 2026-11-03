@@ -66,6 +66,7 @@ export const navigationConfig: NavItem[] = [
     { id: 'beta-governance', label: 'Beta Governance', path: '/admin/beta/governance', icon: 'ShieldCheckIcon', roles: ['SUPER_ADMIN', 'OPS_ADMIN'] },
     
     // System / Admin
+    { id: 'developers', label: 'Developer API Hub', path: '/developers', icon: 'CommandLineIcon', roles: ['SUPER_ADMIN', 'OPS_ADMIN', 'TENANT_ADMIN', 'PRINTHOUSE_ADMIN', 'PUBLISHER', 'VIEWER'] },
     { id: 'tenants', label: 'Tenant Management', path: '/tenants', icon: 'BuildingOfficeIcon', roles: ['SUPER_ADMIN', 'OPS_ADMIN'] },
     { id: 'audit', label: 'Audit Logs', path: '/audit', icon: 'ClipboardDocumentListIcon', roles: ['SUPER_ADMIN', 'OPS_ADMIN', 'TENANT_ADMIN'] },
     { id: 'settings', label: 'Settings', path: '/settings', icon: 'Cog6ToothIcon', roles: ['SUPER_ADMIN', 'TENANT_ADMIN', 'PRINTHOUSE_ADMIN'] },
