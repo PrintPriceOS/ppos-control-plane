@@ -646,6 +646,31 @@ export async function sendPrinthouseB2bOrderMessage(payload: {
     });
 }
 
+export async function getB2bThreads() {
+    return adminFetch<{ ok: boolean; data: any[]; threads: any[]; totalCount: number }>('/api/b2b/threads');
+}
+
+export async function getB2bThreadMessages(orderId: string) {
+    return adminFetch<{ ok: boolean; orderId: string; data: any[]; messages: any[]; totalCount: number }>(`/api/b2b/threads/${encodeURIComponent(orderId)}/messages`);
+}
+
+export async function postB2bThreadMessage(orderId: string, payload: {
+    message: string;
+    senderType?: string;
+    senderName?: string;
+    actionTrigger?: string;
+    attachments?: any[];
+}) {
+    return adminFetch<{ ok: boolean; data: any; message: any }>(`/api/b2b/threads/${encodeURIComponent(orderId)}/messages`, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+    });
+}
+
+export async function getEscrowSummary() {
+    return adminFetch<{ ok: boolean; data: any; ledger: any }>('/api/financials/escrow/summary');
+}
+
 export interface OperationalActivityEvent {
     id: string;
     orderId?: string | null;

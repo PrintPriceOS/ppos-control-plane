@@ -712,7 +712,7 @@ export const CommandCenterPage: React.FC = () => {
           >
             <ChatBubbleLeftRightIcon className="w-4 h-4" />
             <span>
-              {t('dashboard.360.quickB2b')} ({phTelemetry.data?.b2bCommunications?.unreadMessagesCount ?? 3})
+              {t('dashboard.360.quickB2b')} ({phTelemetry.data?.b2bCommunications?.unreadMessagesCount ?? (isDemo ? 3 : 0)})
             </span>
           </button>
         </div>
@@ -1017,7 +1017,7 @@ export const CommandCenterPage: React.FC = () => {
                       </div>
                       <div className="text-xl sm:text-2xl font-extrabold text-zinc-900 dark:text-[#f4f4f5] tabular-nums">
                         €
-                        {(phTelemetry.data?.financials?.custodiedEscrowEur ?? 59310).toLocaleString(
+                        {(phTelemetry.data?.financials?.custodiedEscrowEur ?? (isDemo ? 59310 : 0)).toLocaleString(
                           'en-US',
                           { minimumFractionDigits: 0 }
                         )}
@@ -1044,7 +1044,7 @@ export const CommandCenterPage: React.FC = () => {
                       </div>
                       <div className="text-xl sm:text-2xl font-extrabold text-zinc-900 dark:text-[#f4f4f5] tabular-nums">
                         €
-                        {(phTelemetry.data?.financials?.releasedEscrowEur ?? 4900).toLocaleString(
+                        {(phTelemetry.data?.financials?.releasedEscrowEur ?? (isDemo ? 4900 : 0)).toLocaleString(
                           'en-US',
                           { minimumFractionDigits: 0 }
                         )}
@@ -1072,7 +1072,7 @@ export const CommandCenterPage: React.FC = () => {
                       <div className="text-xl sm:text-2xl font-extrabold text-[#10b981] tabular-nums">
                         €
                         {(
-                          phTelemetry.data?.financials?.netPrinthousePayoutEur ?? 56504
+                          phTelemetry.data?.financials?.netPrinthousePayoutEur ?? (isDemo ? 56504 : 0)
                         ).toLocaleString('en-US', { maximumFractionDigits: 0 })}
                       </div>
                     </div>
@@ -1131,7 +1131,7 @@ export const CommandCenterPage: React.FC = () => {
                   </div>
                   <p className="text-xs text-zinc-600 dark:text-zinc-300 mt-1.5 pl-5">
                     {t('dashboard.hub.statusNormalDetail', {
-                      unread: phTelemetry.data?.b2bCommunications?.unreadMessagesCount ?? 3,
+                      unread: phTelemetry.data?.b2bCommunications?.unreadMessagesCount ?? (isDemo ? 3 : 0),
                     })}
                   </p>
                 </div>
@@ -1185,7 +1185,7 @@ export const CommandCenterPage: React.FC = () => {
                   className="py-2.5 px-3 rounded-xl bg-zinc-100 dark:bg-[#18181c] hover:bg-zinc-200 dark:hover:bg-[#27272a] text-zinc-800 dark:text-zinc-200 border border-zinc-200 dark:border-[#27272a] text-xs font-bold transition-colors cursor-pointer"
                 >
                   {t('dashboard.hub.btnOpenB2bChannel', {
-                    count: phTelemetry.data?.b2bCommunications?.unreadMessagesCount ?? 3,
+                    count: phTelemetry.data?.b2bCommunications?.unreadMessagesCount ?? (isDemo ? 3 : 0),
                   })}
                 </button>
               </div>

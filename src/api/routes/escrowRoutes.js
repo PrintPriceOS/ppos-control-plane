@@ -134,6 +134,36 @@ function createEscrowRouter() {
         }
     });
 
+    // GET /api/financials/escrow/summary
+    router.get('/summary', async (req, res) => {
+        try {
+            const tenantId =
+                (req.user && req.user.tenantId) ||
+                (req.query && req.query.tenantId) ||
+                (req.headers && req.headers['x-tenant-id']) ||
+                'tenant-default';
+            const ledger = listEscrowLedger(tenantId);
+            return res.status(200).json({
+                ok: true,
+                tenantId,
+                data: {
+                    currency: 'EUR',
+                    custodiedEscrowEur: ledger.escrowLockedEur || 0,
+                    releasedEscrowEur: ledger.releasedToPrinthousesEur || 0,
+                    netPrinthousePayoutEur: ledger.netPrinthousePayoutEur || 0,
+                    pendingPodCount: ledger.pendingPodCount || 0,
+                    totalSettlements: (ledger.entries || []).length
+                },
+                ledger
+            });
+        } catch (err) {
+            return res.status(err.statusCode || 400).json({
+                ok: false,
+                error: err.message
+            });
+        }
+    });
+
     // POST /api/financials/escrow/lock
     router.post('/lock', async (req, res) => {
         try {

@@ -21,7 +21,7 @@ import {
   reassignPrinthouseMachine,
   sendPrinthouseB2bOrderMessage
 } from '../../lib/adminApi';
-import { getAuthToken } from '../../lib/authStore';
+import { getAuthToken, isDemoTenant } from '../../lib/authStore';
 import { useLocale } from '../../i18n';
 
 async function downloadAuthenticatedFile(url: string, defaultFilename: string) {
@@ -776,9 +776,10 @@ export const FinancialEscrowDrawer: React.FC<{
 
   if (!open || typeof document === 'undefined') return null;
 
+  const isDemo = isDemoTenant();
   const settlements: any[] = Array.isArray(financialData?.settlements) && financialData.settlements.length > 0
     ? financialData.settlements
-    : [
+    : (isDemo ? [
         {
           orderId: 'PUB-ORD-2026-101',
           title: 'Atlas de Arquitectura Industrial Europea (3ª Ed.)',
@@ -824,7 +825,7 @@ export const FinancialEscrowDrawer: React.FC<{
           xrechnungXmlUrl: '/api/financials/escrow/PUB-ORD-2026-103/e-invoice.xml?format=XRECHNUNG_3_0&raw=true',
           certificatePdfUrl: '/api/customer/orders/PUB-ORD-2026-103/soft-proof/certificate.pdf'
         }
-      ];
+      ] : []);
 
   const sortedSettlements = selectedOrderId
     ? [
@@ -937,7 +938,22 @@ export const FinancialEscrowDrawer: React.FC<{
 
           {/* Orders Fiscal List */}
           <div className="space-y-4">
-            {filteredSettlements.map(item => (
+            {filteredSettlements.length === 0 ? (
+              <div data-testid="escrow-empty-state" className="p-8 rounded-2xl bg-[#131314] border border-zinc-800 text-center space-y-3">
+                <div className="w-12 h-12 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center mx-auto text-zinc-500">
+                  <CurrencyEuroIcon className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-zinc-200">
+                    {t('dashboard.360.escrowEmptyTitle')}
+                  </h3>
+                  <p className="text-xs text-zinc-400 max-w-md mx-auto mt-1 leading-relaxed">
+                    {t('dashboard.360.escrowEmptyDesc')}
+                  </p>
+                </div>
+              </div>
+            ) : (
+              filteredSettlements.map(item => (
               <div
                 key={item.orderId}
                 className={`p-5 rounded-2xl bg-[#131314] border ${
@@ -1022,7 +1038,8 @@ export const FinancialEscrowDrawer: React.FC<{
                   </button>
                 </div>
               </div>
-            ))}
+            ))
+            )}
           </div>
         </div>
       </div>
@@ -1235,9 +1252,10 @@ export const B2bIncidentBridgeDrawer: React.FC<{
 
   if (!open || typeof document === 'undefined') return null;
 
+  const isDemo = isDemoTenant();
   const threads: any[] = Array.isArray(b2bData?.threads) && b2bData.threads.length > 0
     ? b2bData.threads
-    : [
+    : (isDemo ? [
         {
           threadId: 'MSG-TH-104',
           orderId: 'PUB-ORD-2026-104',
@@ -1283,7 +1301,7 @@ export const B2bIncidentBridgeDrawer: React.FC<{
             }
           ]
         }
-      ];
+      ] : []);
 
   const activeThread = threads.find(t => t.orderId === selectedOrderId) || threads[0];
   const combinedMessages = [
@@ -1353,71 +1371,92 @@ export const B2bIncidentBridgeDrawer: React.FC<{
         </div>
 
         {/* Thread Selector Tabs */}
-        <div className="px-6 py-3 bg-[#131314]/60 border-b border-zinc-800 flex gap-2 overflow-x-auto">
-          {threads.map(th => (
-            <button
-              key={th.orderId}
-              onClick={() => setSelectedOrderId(th.orderId)}
-              className={`px-3 py-2 rounded-xl text-left border transition-all shrink-0 cursor-pointer ${
-                activeThread?.orderId === th.orderId
-                  ? 'bg-[#dc0000]/15 border-[#dc0000] text-white'
-                  : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-zinc-200'
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] font-mono font-black">{th.orderId}</span>
-                {th.unreadCount > 0 && (
-                  <span className="px-1.5 py-0.2 text-[9px] font-mono font-bold rounded-full bg-[#dc0000] text-white">
-                    {th.unreadCount}
-                  </span>
-                )}
-              </div>
-              <div className="text-[10px] truncate max-w-[160px] mt-0.5">{th.publisherName}</div>
-            </button>
-          ))}
-        </div>
-
-        {/* Active Thread Messages */}
-        <div className="p-6 overflow-y-auto flex-1 space-y-4 custom-scrollbar">
-          {activeThread && (
-            <div className="p-4 rounded-2xl bg-[#131314] border border-zinc-800 flex flex-wrap items-center justify-between gap-2">
-              <div>
-                <span className="text-[10px] font-mono text-zinc-400">{activeThread.publisherContact}</span>
-                <h3 className="text-xs font-black text-white">{localizeDrawerOrderTitle(activeThread.orderId, activeThread.title, locale)}</h3>
-              </div>
-              <span className="px-2.5 py-1 rounded-full text-[9px] font-mono font-bold uppercase bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
-                {activeThread.imprimaturStatus}
-              </span>
-            </div>
-          )}
-
-          <div className="space-y-3">
-            {combinedMessages.map((m: any) => {
-              const isPrinthouse = m.senderRole === 'PRINTHOUSE';
-              const isSystem = m.senderRole === 'SYSTEM_PREFLIGHT';
-              return (
-                <div
-                  key={m.id}
-                  className={`p-4 rounded-2xl border ${
-                    isPrinthouse
-                      ? 'bg-[#dc0000]/10 border-[#dc0000]/30 ml-8'
-                      : isSystem
-                        ? 'bg-amber-500/10 border-amber-500/30'
-                        : 'bg-[#131314] border-zinc-800 mr-8'
-                  }`}
-                >
-                  <div className="flex items-center justify-between text-[10px] font-mono text-zinc-400 mb-1">
-                    <span className="font-bold text-zinc-200">{m.senderName}</span>
-                    <span>{new Date(m.timestamp).toLocaleTimeString()}</span>
-                  </div>
-                  <p className="text-xs text-zinc-100 leading-relaxed">{localizeB2bMessageText(m.id, m.text, locale)}</p>
+        {threads.length > 0 && (
+          <div className="px-6 py-3 bg-[#131314]/60 border-b border-zinc-800 flex gap-2 overflow-x-auto">
+            {threads.map(th => (
+              <button
+                key={th.orderId}
+                onClick={() => setSelectedOrderId(th.orderId)}
+                className={`px-3 py-2 rounded-xl text-left border transition-all shrink-0 cursor-pointer ${
+                  activeThread?.orderId === th.orderId
+                    ? 'bg-[#dc0000]/15 border-[#dc0000] text-white'
+                    : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-zinc-200'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-mono font-black">{th.orderId}</span>
+                  {th.unreadCount > 0 && (
+                    <span className="px-1.5 py-0.2 text-[9px] font-mono font-bold rounded-full bg-[#dc0000] text-white">
+                      {th.unreadCount}
+                    </span>
+                  )}
                 </div>
-              );
-            })}
+                <div className="text-[10px] truncate max-w-[160px] mt-0.5">{th.publisherName}</div>
+              </button>
+            ))}
           </div>
+        )}
+
+        {/* Active Thread Messages / Empty State */}
+        <div className="p-6 overflow-y-auto flex-1 space-y-4 custom-scrollbar">
+          {threads.length === 0 ? (
+            <div data-testid="b2b-threads-empty-state" className="p-10 rounded-2xl bg-[#131314] border border-zinc-800 text-center space-y-4 my-auto">
+              <div className="w-14 h-14 rounded-2xl bg-[#dc0000]/10 border border-[#dc0000]/30 flex items-center justify-center mx-auto text-[#dc0000]">
+                <ChatBubbleLeftRightIcon className="w-7 h-7" />
+              </div>
+              <div className="space-y-1.5">
+                <h3 className="text-sm font-bold text-zinc-200 uppercase tracking-wide">
+                  {t('dashboard.360.b2bDrawerEmptyTitle')}
+                </h3>
+                <p className="text-xs text-zinc-400 max-w-md mx-auto leading-relaxed">
+                  {t('dashboard.360.b2bDrawerEmptyDesc')}
+                </p>
+              </div>
+            </div>
+          ) : (
+            <>
+              {activeThread && (
+                <div className="p-4 rounded-2xl bg-[#131314] border border-zinc-800 flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <span className="text-[10px] font-mono text-zinc-400">{activeThread.publisherContact}</span>
+                    <h3 className="text-xs font-black text-white">{localizeDrawerOrderTitle(activeThread.orderId, activeThread.title, locale)}</h3>
+                  </div>
+                  <span className="px-2.5 py-1 rounded-full text-[9px] font-mono font-bold uppercase bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                    {activeThread.imprimaturStatus}
+                  </span>
+                </div>
+              )}
+
+              <div className="space-y-3">
+                {combinedMessages.map((m: any) => {
+                  const isPrinthouse = m.senderRole === 'PRINTHOUSE';
+                  const isSystem = m.senderRole === 'SYSTEM_PREFLIGHT';
+                  return (
+                    <div
+                      key={m.id}
+                      className={`p-4 rounded-2xl border ${
+                        isPrinthouse
+                          ? 'bg-[#dc0000]/10 border-[#dc0000]/30 ml-8'
+                          : isSystem
+                            ? 'bg-amber-500/10 border-amber-500/30'
+                            : 'bg-[#131314] border-zinc-800 mr-8'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between text-[10px] font-mono text-zinc-400 mb-1">
+                        <span className="font-bold text-zinc-200">{m.senderName}</span>
+                        <span>{new Date(m.timestamp).toLocaleTimeString()}</span>
+                      </div>
+                      <p className="text-xs text-zinc-100 leading-relaxed">{localizeB2bMessageText(m.id, m.text, locale)}</p>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
         </div>
 
         {/* 1-Click Quick Actions & Message Composer */}
+        {threads.length > 0 && (
         <div className="p-4 bg-[#131314] border-t border-zinc-800 space-y-3">
           {/* Quick Actions Strip above the reply input */}
           <div className="flex flex-wrap items-center gap-2">
@@ -1470,6 +1509,7 @@ export const B2bIncidentBridgeDrawer: React.FC<{
             </button>
           </div>
         </div>
+        )}
       </div>
     </div>,
     document.body

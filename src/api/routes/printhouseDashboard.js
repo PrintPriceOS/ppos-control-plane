@@ -18,7 +18,11 @@ const {
     listTenantPreflightInspections,
     purgePreflightInspectionAsset
 } = require('../services/preflight/preflightEngineService');
-const { listEscrowLedger } = require('../services/financials/escrowSettlementService');
+const {
+    listTenantThreads,
+    getOrderMessages,
+    postOrderMessage
+} = require('../services/b2bCommunicationsService');
 const { generateElectronicInvoiceXml } = require('../services/financials/eInvoicingService');
 const {
     recordOperationalEvent,
@@ -949,7 +953,8 @@ router.get('/telemetry', async (req, res) => {
         }
 
         const shipments = isDemo ? getCanonicalShipments(tenantId) : [];
-        const b2bThreads = isDemo ? getCanonicalB2bThreads(printhouseId) : [];
+        const liveThreads = await listTenantThreads(tenantId);
+        const b2bThreads = liveThreads.length > 0 ? liveThreads : (isDemo ? getCanonicalB2bThreads(printhouseId) : []);
 
         // Build per-job storage breakdown (Interior vs Cover)
         const storageJobsBreakdown = inspections.map((insp, idx) => {
@@ -1252,6 +1257,17 @@ router.post('/messages', async (req, res) => {
     };
     existing.push(newMsg);
     runtimeB2bOrderMessages.set(String(orderId), existing);
+
+    // Also persist through b2bCommunicationsService for bidirectional synchronization
+    try {
+        await postOrderMessage(context.tenantId || 'tenant-default', String(orderId), {
+            senderType: 'PRINTHOUSE_OPERATOR',
+            senderName: `Operador de Planta (${context.printhouseId || 'Printhouse Hub'})`,
+            messageBody: String(message).trim(),
+            actionTrigger: alertType || null,
+            printhouseId: context.printhouseId || 'node-primary'
+        });
+    } catch (_) {}
 
     try {
         const sev =
