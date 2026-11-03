@@ -637,237 +637,553 @@ export const CommandCenterPage: React.FC = () => {
   return (
     <div className="space-y-6 italic-text-off">
       {/* Header */}
-      <div className={`flex flex-wrap items-center justify-between gap-4 border-b ${COLORS.adaptive.borderSubtle} pb-4`}>
+      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-zinc-200 dark:border-[#27272a] pb-5">
         <div>
-          <h1 id="dashboard-main-title" className={`text-2xl font-black ${COLORS.adaptive.textPrimary} tracking-tight`}>
-            {isPrinthouseUser 
-              ? (t('dashboard.360.titlePrinthouse') || t('dashboard.titlePrinthouse')) 
-              : (t('dashboard.titleControlPlane') || 'Control Plane')}
+          <h1
+            id="dashboard-main-title"
+            className="text-3xl sm:text-4xl font-extrabold text-zinc-900 dark:text-[#f4f4f5] tracking-tight"
+          >
+            {isPrinthouseUser
+              ? t('dashboard.hub.heroTitle')
+              : t('dashboard.titleControlPlane') || 'Control Plane'}
           </h1>
-          <p className="text-sm font-medium text-slate-500 dark:text-zinc-400 mt-1">
-            {isPrinthouseUser 
-              ? (t('dashboard.360.subtitlePrinthouse') || t('dashboard.subtitlePrinthouse')) 
-              : (t('dashboard.subtitleControlPlane') || 'Operational Intelligence & Mission Control')}
+          <p className="text-sm sm:text-base font-medium text-zinc-600 dark:text-[#a1a1aa] mt-1.5 max-w-3xl">
+            {isPrinthouseUser
+              ? t('dashboard.hub.heroSubtitle')
+              : t('dashboard.subtitleControlPlane') || 'Operational Intelligence & Mission Control'}
           </p>
         </div>
 
         {/* Quick 360° Action Strip */}
         <div className="flex flex-wrap items-center gap-2">
           <button
+            type="button"
             data-testid="quick-btn-storage-drawer"
             onClick={() => setStorageDrawerOpen(true)}
-            className="px-3 py-1.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-[10px] font-mono font-bold uppercase text-zinc-200 flex items-center gap-1.5 cursor-pointer"
+            className="px-3.5 py-2 rounded-xl bg-zinc-100 dark:bg-[#0e0e11] hover:bg-zinc-200 dark:hover:bg-[#18181c] border border-zinc-200 dark:border-[#27272a] text-xs font-bold text-zinc-800 dark:text-zinc-200 flex items-center gap-2 transition-colors cursor-pointer"
           >
-            <ServerIcon className="w-3.5 h-3.5 text-[#10b981]" />
-            {t('dashboard.360.quickStorage')} ({usedStorageGb} GB / 100 GB)
+            <ServerIcon className="w-4 h-4 text-[#10b981]" />
+            <span>
+              {t('dashboard.360.quickStorage')} ({usedStorageGb} GB / 100 GB)
+            </span>
           </button>
           <button
+            type="button"
             data-testid="quick-btn-fleet-modal"
             onClick={() => setFleetModalOpen(true)}
-            className="px-3 py-1.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-[10px] font-mono font-bold uppercase text-zinc-200 flex items-center gap-1.5 cursor-pointer"
+            className="px-3.5 py-2 rounded-xl bg-zinc-100 dark:bg-[#0e0e11] hover:bg-zinc-200 dark:hover:bg-[#18181c] border border-zinc-200 dark:border-[#27272a] text-xs font-bold text-zinc-800 dark:text-zinc-200 flex items-center gap-2 transition-colors cursor-pointer"
           >
-            <CpuChipIcon className="w-3.5 h-3.5 text-[#dc0000]" />
-            {t('dashboard.360.quickFleet')} ({fleetList.length})
+            <CpuChipIcon className="w-4 h-4 text-[#ef4444]" />
+            <span>
+              {t('dashboard.360.quickFleet')} ({fleetList.length})
+            </span>
           </button>
           <button
+            type="button"
             data-testid="quick-btn-escrow-drawer"
             onClick={() => {
               setSelectedFinancialOrderId(null);
               setFinancialDrawerOpen(true);
             }}
-            className="px-3 py-1.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-[10px] font-mono font-bold uppercase text-zinc-200 flex items-center gap-1.5 cursor-pointer"
+            className="px-3.5 py-2 rounded-xl bg-zinc-100 dark:bg-[#0e0e11] hover:bg-zinc-200 dark:hover:bg-[#18181c] border border-zinc-200 dark:border-[#27272a] text-xs font-bold text-zinc-800 dark:text-zinc-200 flex items-center gap-2 transition-colors cursor-pointer"
           >
-            <CurrencyEuroIcon className="w-3.5 h-3.5 text-emerald-400" />
-            {t('dashboard.360.quickEscrow')}
+            <CurrencyEuroIcon className="w-4 h-4 text-[#10b981]" />
+            <span>{t('dashboard.360.quickEscrow')}</span>
           </button>
           <button
+            type="button"
             data-testid="quick-btn-logistics-modal"
             onClick={() => setLogisticsModalOpen(true)}
-            className="px-3 py-1.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-[10px] font-mono font-bold uppercase text-zinc-200 flex items-center gap-1.5 cursor-pointer"
+            className="px-3.5 py-2 rounded-xl bg-zinc-100 dark:bg-[#0e0e11] hover:bg-zinc-200 dark:hover:bg-[#18181c] border border-zinc-200 dark:border-[#27272a] text-xs font-bold text-zinc-800 dark:text-zinc-200 flex items-center gap-2 transition-colors cursor-pointer"
           >
-            <TruckIcon className="w-3.5 h-3.5 text-amber-400" />
-            {t('dashboard.360.quickLogistics')}
+            <TruckIcon className="w-4 h-4 text-amber-400" />
+            <span>{t('dashboard.360.quickLogistics')}</span>
           </button>
           <button
+            type="button"
             data-testid="quick-btn-b2b-drawer"
             onClick={() => setB2bDrawerOpen(true)}
-            className="px-3 py-1.5 rounded-xl bg-[#dc0000]/15 hover:bg-[#dc0000]/25 border border-[#dc0000]/40 text-[10px] font-mono font-bold uppercase text-white flex items-center gap-1.5 cursor-pointer"
+            className="px-3.5 py-2 rounded-xl bg-[#ef4444]/15 hover:bg-[#ef4444] border border-[#ef4444]/40 text-xs font-bold text-[#ef4444] hover:text-white flex items-center gap-2 transition-colors cursor-pointer"
           >
-            <ChatBubbleLeftRightIcon className="w-3.5 h-3.5 text-[#dc0000]" />
-            {t('dashboard.360.quickB2b')} ({phTelemetry.data?.b2bCommunications?.unreadMessagesCount ?? 3})
+            <ChatBubbleLeftRightIcon className="w-4 h-4" />
+            <span>
+              {t('dashboard.360.quickB2b')} ({phTelemetry.data?.b2bCommunications?.unreadMessagesCount ?? 3})
+            </span>
           </button>
         </div>
       </div>
 
       {isPrinthouseUser ? (
-        /* PRINTHOUSE 360° OPERATIONAL COMMAND CENTER (BALANCED 3-COLUMN GRID) */
+        /* HUMAN-CENTRIC INDUSTRIAL COCKPIT — PRINTHOUSE HUB 360° COMMAND CENTER */
         <div className="space-y-6">
-          {/* UPPER 6-CARD BALANCED 3-COLUMN TELEMETRY MATRIX */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
-            {/* ROW 1, COL 1: PREFLIGHT QUEUE */}
-            <TacticalPanel
-              testId="card-preflight-queue"
-              className="min-h-[215px]"
-              onClick={() => setFleetModalOpen(true)}
-              title={t('dashboard.panelPreflight') || 'Preflight'}
-              icon={Square3Stack3DIcon}
-              badge={t('dashboard.360.badgeClickAllocate')}
-              color="emerald"
-              status={phSummary.status}
-            >
-              <div className="space-y-5 flex flex-col justify-between h-full">
-                <div className="grid grid-cols-2 gap-3">
-                  <TelemetryItem label={t('dashboard.activeJobs') || 'Active Jobs'} value={activeJobs} status="stable" />
-                  <TelemetryItem label={t('dashboard.failedToday') || 'Failed (Today)'} value={phSummary.data?.data?.failedJobsToday || 0} status="stable" />
-                </div>
-                <StatBar label={t('dashboard.360.firstPassAutoFix')} value={phSummary.data?.data?.completedJobsToday ? Math.min(100, (phSummary.data.data.completedJobsToday / 5) * 100) : 84} color="emerald" />
-              </div>
-            </TacticalPanel>
-
-            {/* ROW 1, COL 2: INCIDENT BRIDGE & B2B COMMS */}
-            <IncidentBridge
-              auditData={null}
-              isPrinthouse={true}
-              printhouseIncidents={phIncidents.data?.data?.incidents}
-              onOpenDrawer={() => setB2bDrawerOpen(true)}
-            />
-
-            {/* ROW 1, COL 3: STORAGE LIFECYCLE & QUOTA */}
-            <TacticalPanel
-              testId="card-storage-utilized"
-              className="min-h-[215px]"
-              onClick={() => setStorageDrawerOpen(true)}
-              title={t('dashboard.360.panelStorageQuota')}
-              icon={ServerIcon}
-              badge={t('dashboard.360.badgeManagePurge')}
-              color="emerald"
-            >
-              <div className="space-y-2.5 flex flex-col justify-between h-full">
-                <div className={`flex justify-between items-center p-2.5 rounded-xl border ${COLORS.adaptive.borderSubtle} ${COLORS.adaptive.surfaceMuted}`}>
-                  <span className={`text-[9px] font-bold ${COLORS.adaptive.textPrimary} uppercase`}>{t('dashboard.storageUtilized') || 'Storage Utilized'}</span>
-                  <span data-testid="metric-storage-utilized" className="text-[10px] font-mono font-black text-[#10B981]">
-                    {usedStorageGb} GB / 100 GB (18.4%)
-                  </span>
-                </div>
-                <div className={`flex justify-between items-center p-2.5 rounded-xl border ${COLORS.adaptive.borderSubtle} ${COLORS.adaptive.surfaceMuted}`}>
-                  <span className={`text-[9px] font-bold ${COLORS.adaptive.textPrimary} uppercase`}>{t('dashboard.activeArtifacts') || 'Active Artifacts'}</span>
-                  <span data-testid="metric-active-artifacts" className="text-[10px] font-mono font-black text-[#10B981]">
-                    {activeArtifactsCount} Hot PDFs · {purgedArtifactsCount} {t('dashboard.360.purged')}
-                  </span>
-                </div>
-                <div className="pt-1">
-                  <StatBar label={t('dashboard.360.nvmeQuotaUsage')} value={18.4} color="emerald" />
-                </div>
-              </div>
-            </TacticalPanel>
-
-            {/* ROW 2, COL 1: PRINTING FLEET */}
-            <TacticalPanel
-              testId="card-fleet-machines"
-              className="min-h-[215px]"
-              onClick={() => setFleetModalOpen(true)}
-              title={t('dashboard.panelFleet') || 'Fleet'}
-              icon={CpuChipIcon}
-              badge={t('dashboard.360.badgeInteractiveReassign')}
-              color="primary"
-              status={phMachines.status}
-            >
-              <div className="space-y-2">
-                {fleetList.slice(0, 3).map((w: any) => (
-                  <div key={w?.id || w?.code || Math.random()} className={`p-2 rounded-xl ${COLORS.adaptive.surfaceMuted} border ${COLORS.adaptive.borderSubtle} flex items-center justify-between`}>
-                    <div className="min-w-0 pr-2">
-                      <span className={`text-[9px] font-mono font-bold ${COLORS.adaptive.textPrimary} block truncate`}>{toDisplayText(w?.name || w?.id)}</span>
-                      {w?.activeOrderId && (
-                        <span className="text-[8px] font-mono text-zinc-400 block">Run: {w.activeOrderId} ({w.loadPct || 82}% Load)</span>
-                      )}
-                    </div>
-                    <span className={`text-[8px] font-black ${w?.status === 'active' || w?.status === 'ACTIVE' ? 'text-[#10B981]' : COLORS.adaptive.textMuted} uppercase shrink-0`}>
-                      {formatOperationalStatus(w?.status || 'ACTIVE', t)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </TacticalPanel>
-
-            {/* ROW 2, COL 2: LOGISTICS, EPAL PALLETS & POD */}
-            <TacticalPanel
-              testId="card-logistics-pallets"
-              className="min-h-[215px]"
-              onClick={() => setLogisticsModalOpen(true)}
-              title={t('dashboard.360.panelLogistics')}
-              icon={TruckIcon}
-              badge={t('dashboard.360.badgeGs1Sscc')}
-              color="amber"
-            >
-              <div className="space-y-2.5 flex flex-col justify-between h-full">
-                <div className={`flex justify-between items-center p-2.5 rounded-xl border ${COLORS.adaptive.borderSubtle} ${COLORS.adaptive.surfaceMuted}`}>
-                  <span className={`text-[9px] font-bold ${COLORS.adaptive.textPrimary} uppercase`}>{t('dashboard.360.scheduledShipments')}</span>
-                  <span className="text-[10px] font-mono font-black text-white">
-                    {phTelemetry.data?.logistics?.scheduledShipmentsCount ?? 3}
-                  </span>
-                </div>
-                <div className={`flex justify-between items-center p-2.5 rounded-xl border ${COLORS.adaptive.borderSubtle} ${COLORS.adaptive.surfaceMuted}`}>
-                  <span className={`text-[9px] font-bold ${COLORS.adaptive.textPrimary} uppercase`}>{t('dashboard.360.epalAndLabels')}</span>
-                  <span className="text-[10px] font-mono font-black text-[#10B981]">
-                    {phTelemetry.data?.logistics?.totalEpalPallets ?? 6} EPAL · {phTelemetry.data?.logistics?.ssccLabelsGeneratedCount ?? 12} SSCC
-                  </span>
-                </div>
-                <div className={`flex justify-between items-center p-2.5 rounded-xl border ${COLORS.adaptive.borderSubtle} ${COLORS.adaptive.surfaceMuted}`}>
-                  <span className={`text-[9px] font-bold ${COLORS.adaptive.textPrimary} uppercase`}>{t('dashboard.360.cmrDeliveryNotes')}</span>
-                  <span className="text-[9px] font-mono font-black text-[#dc0000] uppercase">
-                    {t('dashboard.360.downloadPdfArrow')}
-                  </span>
-                </div>
-              </div>
-            </TacticalPanel>
-
-            {/* ROW 2, COL 3: ESCROW MoR & EN 16931 BILLING */}
-            <TacticalPanel
-              testId="card-escrow-financials"
-              className="min-h-[215px]"
+          {/* 1. TOP HERO STATS ROW (4 LARGE CARDS) */}
+          <div
+            data-testid="hub-hero-stats-grid"
+            className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5"
+          >
+            {/* Card 1: Net Monthly Revenue */}
+            <div
+              data-testid="hero-card-net-revenue"
               onClick={() => {
                 setSelectedFinancialOrderId(null);
                 setFinancialDrawerOpen(true);
               }}
-              title={t('dashboard.360.panelEscrowBilling')}
-              icon={CurrencyEuroIcon}
-              badge={t('dashboard.360.badgeFacturaeXrechnung')}
-              color="primary"
+              className="bg-white dark:bg-[#0e0e11] border border-zinc-200 dark:border-[#27272a] hover:border-[#10b981] rounded-2xl p-6 flex flex-col justify-between transition-all cursor-pointer shadow-sm"
             >
-              <div className="space-y-2.5 flex flex-col justify-between h-full">
-                <div className={`flex justify-between items-center p-2.5 rounded-xl border ${COLORS.adaptive.borderSubtle} ${COLORS.adaptive.surfaceMuted}`}>
-                  <span className={`text-[9px] font-bold ${COLORS.adaptive.textPrimary} uppercase`}>{t('dashboard.360.custodiedEscrow')}</span>
-                  <span className="text-[10px] font-mono font-black text-amber-400">
-                    €{(phTelemetry.data?.financials?.custodiedEscrowEur ?? 59310).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+              <div>
+                <div className="flex items-center justify-between gap-2 mb-3">
+                  <span className="text-xs font-bold uppercase tracking-wider text-zinc-500 dark:text-[#a1a1aa]">
+                    {t('dashboard.hub.kpiRevenueTitle')}
+                  </span>
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-[#10b981]/15 text-[#10b981] border border-[#10b981]/30">
+                    {t('dashboard.hub.kpiRevenueBadge')}
                   </span>
                 </div>
-                <div className={`flex justify-between items-center p-2.5 rounded-xl border ${COLORS.adaptive.borderSubtle} ${COLORS.adaptive.surfaceMuted}`}>
-                  <span className={`text-[9px] font-bold ${COLORS.adaptive.textPrimary} uppercase`}>{t('dashboard.360.releasedEscrowPod')}</span>
-                  <span className="text-[10px] font-mono font-black text-emerald-400">
-                    €{(phTelemetry.data?.financials?.releasedEscrowEur ?? 4900).toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                  </span>
-                </div>
-                <div className={`flex justify-between items-center p-2.5 rounded-xl border ${COLORS.adaptive.borderSubtle} ${COLORS.adaptive.surfaceMuted}`}>
-                  <span className={`text-[9px] font-bold ${COLORS.adaptive.textPrimary} uppercase`}>{t('dashboard.360.netPrinthousePayout')}</span>
-                  <span className="text-[10px] font-mono font-black text-[#10B981]">
-                    €{(phTelemetry.data?.financials?.netPrinthousePayoutEur ?? 56504.80).toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                  </span>
+                <div className="text-3xl sm:text-4xl font-extrabold text-zinc-900 dark:text-[#f4f4f5] tabular-nums tracking-tight">
+                  €
+                  {(phTelemetry.data?.financials?.netPrinthousePayoutEur ?? 56504.8).toLocaleString(
+                    'en-US',
+                    { minimumFractionDigits: 2 }
+                  )}
                 </div>
               </div>
-            </TacticalPanel>
+              <p className="mt-4 pt-3 border-t border-zinc-100 dark:border-[#1f1f24] text-xs sm:text-sm font-medium text-zinc-600 dark:text-[#a1a1aa]">
+                {t('dashboard.hub.kpiRevenueSubtitle', {
+                  cleared: (phTelemetry.data?.financials?.releasedEscrowEur ?? 4900).toLocaleString(
+                    'en-US'
+                  ),
+                })}
+              </p>
+            </div>
+
+            {/* Card 2: Plant Fleet Utilization */}
+            <div
+              data-testid="hero-card-fleet-oee"
+              onClick={() => setFleetModalOpen(true)}
+              className="bg-white dark:bg-[#0e0e11] border border-zinc-200 dark:border-[#27272a] hover:border-[#ef4444] rounded-2xl p-6 flex flex-col justify-between transition-all cursor-pointer shadow-sm"
+            >
+              <div>
+                <div className="flex items-center justify-between gap-2 mb-3">
+                  <span className="text-xs font-bold uppercase tracking-wider text-zinc-500 dark:text-[#a1a1aa]">
+                    {t('dashboard.hub.kpiFleetTitle')}
+                  </span>
+                  <CpuChipIcon className="w-5 h-5 text-[#ef4444]" />
+                </div>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-3xl sm:text-4xl font-extrabold text-zinc-900 dark:text-[#f4f4f5] tabular-nums tracking-tight">
+                    86%
+                  </span>
+                  <span className="text-lg font-extrabold text-[#10b981]">
+                    {t('dashboard.hub.kpiFleetUnit')}
+                  </span>
+                </div>
+                {/* Full-width dynamic progress bar */}
+                <div className="mt-3 w-full h-2.5 bg-zinc-200 dark:bg-[#1f1f24] rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-gradient-to-r from-[#10b981] to-[#ef4444] rounded-full transition-all duration-700"
+                    style={{ width: '86%' }}
+                  />
+                </div>
+              </div>
+              <p className="mt-4 pt-3 border-t border-zinc-100 dark:border-[#1f1f24] text-xs sm:text-sm font-medium text-zinc-600 dark:text-[#a1a1aa]">
+                {t('dashboard.hub.kpiFleetSubtitle', { active: 3, total: 3 })}
+              </p>
+            </div>
+
+            {/* Card 3: Preflight First-Pass Health */}
+            <div
+              data-testid="card-preflight-queue"
+              onClick={() => setFleetModalOpen(true)}
+              className="bg-white dark:bg-[#0e0e11] border border-zinc-200 dark:border-[#27272a] hover:border-[#10b981] rounded-2xl p-6 flex flex-col justify-between transition-all cursor-pointer shadow-sm"
+            >
+              <div>
+                <div className="flex items-center justify-between gap-2 mb-3">
+                  <span className="text-xs font-bold uppercase tracking-wider text-zinc-500 dark:text-[#a1a1aa]">
+                    {t('dashboard.hub.kpiPreflightTitle')}
+                  </span>
+                  <Square3Stack3DIcon className="w-5 h-5 text-[#10b981]" />
+                </div>
+                <div className="text-3xl sm:text-4xl font-extrabold text-zinc-900 dark:text-[#f4f4f5] tabular-nums tracking-tight">
+                  84.2%
+                </div>
+                {/* Dual-color progress segment (84% auto-fixed / 16% operator review) */}
+                <div className="mt-3 space-y-1.5">
+                  <div className="w-full h-2.5 bg-zinc-200 dark:bg-[#1f1f24] rounded-full overflow-hidden flex">
+                    <div
+                      className="h-full bg-[#10b981]"
+                      style={{ width: '84.2%' }}
+                      title={t('dashboard.hub.kpiPreflightAutoFixed')}
+                    />
+                    <div
+                      className="h-full bg-amber-400"
+                      style={{ width: '15.8%' }}
+                      title={t('dashboard.hub.kpiPreflightReview')}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between text-[11px] font-semibold">
+                    <span className="text-[#10b981]">{t('dashboard.hub.kpiPreflightAutoFixed')}</span>
+                    <span className="text-amber-500 dark:text-amber-400">
+                      {t('dashboard.hub.kpiPreflightReview')}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <p className="mt-3 pt-3 border-t border-zinc-100 dark:border-[#1f1f24] text-xs sm:text-sm font-medium text-zinc-600 dark:text-[#a1a1aa]">
+                {t('dashboard.hub.kpiPreflightSubtitle', {
+                  jobs: activeJobs,
+                  errors: phSummary.data?.data?.failedJobsToday || 0,
+                })}
+              </p>
+            </div>
+
+            {/* Card 4: Active Logistics in Transit */}
+            <div
+              data-testid="card-logistics-pallets"
+              onClick={() => setLogisticsModalOpen(true)}
+              className="bg-white dark:bg-[#0e0e11] border border-zinc-200 dark:border-[#27272a] hover:border-amber-400 rounded-2xl p-6 flex flex-col justify-between transition-all cursor-pointer shadow-sm"
+            >
+              <div>
+                <div className="flex items-center justify-between gap-2 mb-3">
+                  <span className="text-xs font-bold uppercase tracking-wider text-zinc-500 dark:text-[#a1a1aa]">
+                    {t('dashboard.hub.kpiLogisticsTitle')}
+                  </span>
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30">
+                    {t('dashboard.hub.kpiLogisticsBadge', {
+                      shipments: phTelemetry.data?.logistics?.scheduledShipmentsCount ?? 3,
+                    })}
+                  </span>
+                </div>
+                <div className="text-3xl sm:text-4xl font-extrabold text-zinc-900 dark:text-[#f4f4f5] tabular-nums tracking-tight">
+                  {t('dashboard.hub.kpiLogisticsValue', {
+                    pallets: phTelemetry.data?.logistics?.totalEpalPallets ?? 6,
+                  })}
+                </div>
+              </div>
+              <p className="mt-4 pt-3 border-t border-zinc-100 dark:border-[#1f1f24] text-xs sm:text-sm font-medium text-zinc-600 dark:text-[#a1a1aa]">
+                {t('dashboard.hub.kpiLogisticsSubtitle', {
+                  sscc: phTelemetry.data?.logistics?.ssccLabelsGeneratedCount ?? 12,
+                })}
+              </p>
+            </div>
           </div>
 
-          {/* LIVE REVENUE FEED */}
+          {/* 2. MAIN VISUAL TELEMETRY GRID (3 HIGH-IMPACT PANELS) */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
+            {/* Panel 1: Press Fleet Live Occupancy & Job Progress */}
+            <div
+              data-testid="card-fleet-machines"
+              className="bg-white dark:bg-[#0e0e11] border border-zinc-200 dark:border-[#27272a] rounded-2xl p-6 flex flex-col justify-between shadow-sm"
+            >
+              <div>
+                <div className="flex items-start justify-between gap-3 mb-5 pb-4 border-b border-zinc-200 dark:border-[#27272a]">
+                  <div>
+                    <h2 className="text-base sm:text-lg font-extrabold text-zinc-900 dark:text-[#f4f4f5] tracking-tight">
+                      {t('dashboard.hub.panelFleetTitle')}
+                    </h2>
+                    <p className="text-xs text-zinc-500 dark:text-[#a1a1aa] mt-0.5">
+                      {t('dashboard.hub.panelFleetSubtitle')}
+                    </p>
+                  </div>
+                  <span className="px-2.5 py-1 rounded-lg bg-[#ef4444]/10 text-[#ef4444] border border-[#ef4444]/30 text-xs font-bold shrink-0">
+                    3 / 3 Online
+                  </span>
+                </div>
+
+                <div className="space-y-4">
+                  {[
+                    {
+                      id: 'heidelberg-xl106',
+                      name: 'Heidelberg Speedmaster XL 106-8P',
+                      jobLabel: t('dashboard.hub.pressJobAtlas'),
+                      pct: 80,
+                      etaMin: 24,
+                      accent: 'bg-[#10b981]',
+                    },
+                    {
+                      id: 'hp-indigo-12000',
+                      name: 'HP Indigo 12000 HD Digital Press',
+                      jobLabel: t('dashboard.hub.pressJobPhotonic'),
+                      pct: 74,
+                      etaMin: 19,
+                      accent: 'bg-blue-500',
+                    },
+                    {
+                      id: 'komori-g29',
+                      name: 'Komori Lithrone G29 (Offset 5C)',
+                      jobLabel: t('dashboard.hub.pressJobBauhaus'),
+                      pct: 48,
+                      etaMin: 42,
+                      accent: 'bg-[#ef4444]',
+                    },
+                  ].map((press) => (
+                    <div
+                      key={press.id}
+                      className="p-3.5 rounded-xl bg-zinc-50 dark:bg-[#141418] border border-zinc-200 dark:border-[#27272a] space-y-2.5"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="w-2.5 h-2.5 rounded-full bg-[#10b981] shrink-0" />
+                          <span className="text-sm font-bold text-zinc-900 dark:text-[#f4f4f5] truncate">
+                            {press.name}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className="text-xs font-mono font-semibold text-zinc-500 dark:text-[#a1a1aa]">
+                            {t('dashboard.hub.pressEtaMin', { min: press.etaMin })}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setFleetModalOpen(true)}
+                            className="px-2.5 py-1 rounded-lg bg-zinc-200/80 dark:bg-[#1f1f24] hover:bg-[#ef4444] text-zinc-800 dark:text-zinc-200 hover:text-white text-xs font-bold transition-colors cursor-pointer"
+                          >
+                            {t('dashboard.hub.btnReassignPress')}
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="text-xs font-medium text-zinc-600 dark:text-[#a1a1aa]">
+                        {press.jobLabel}
+                      </div>
+
+                      <div className="w-full h-2 bg-zinc-200 dark:bg-[#27272a] rounded-full overflow-hidden">
+                        <div
+                          className={`h-full ${press.accent} rounded-full transition-all duration-700`}
+                          style={{ width: `${press.pct}%` }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Panel 2: Financial Escrow Pipeline (Cash Flow Horizon) */}
+            <div
+              data-testid="card-escrow-financials"
+              className="bg-white dark:bg-[#0e0e11] border border-zinc-200 dark:border-[#27272a] rounded-2xl p-6 flex flex-col justify-between shadow-sm"
+            >
+              <div>
+                <div className="flex items-start justify-between gap-3 mb-5 pb-4 border-b border-zinc-200 dark:border-[#27272a]">
+                  <div>
+                    <h2 className="text-base sm:text-lg font-extrabold text-zinc-900 dark:text-[#f4f4f5] tracking-tight">
+                      {t('dashboard.hub.panelEscrowTitle')}
+                    </h2>
+                    <p className="text-xs text-zinc-500 dark:text-[#a1a1aa] mt-0.5">
+                      {t('dashboard.hub.panelEscrowSubtitle')}
+                    </p>
+                  </div>
+                  <CurrencyEuroIcon className="w-6 h-6 text-[#10b981] shrink-0" />
+                </div>
+
+                {/* Connected 3-Stage Visual Pipeline */}
+                <div className="space-y-3">
+                  {/* Stage 1 */}
+                  <div
+                    onClick={() => {
+                      setSelectedFinancialOrderId(null);
+                      setFinancialDrawerOpen(true);
+                    }}
+                    className="p-4 rounded-xl bg-zinc-50 dark:bg-[#141418] border border-zinc-200 dark:border-[#27272a] hover:border-amber-400 transition-colors cursor-pointer"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div>
+                        <div className="text-xs font-bold uppercase tracking-wider text-amber-500 dark:text-amber-400">
+                          {t('dashboard.hub.escrowStage1Label')}
+                        </div>
+                        <div className="text-xs text-zinc-500 dark:text-[#a1a1aa] mt-0.5">
+                          {t('dashboard.hub.escrowStage1Desc')}
+                        </div>
+                      </div>
+                      <div className="text-xl sm:text-2xl font-extrabold text-zinc-900 dark:text-[#f4f4f5] tabular-nums">
+                        €
+                        {(phTelemetry.data?.financials?.custodiedEscrowEur ?? 59310).toLocaleString(
+                          'en-US',
+                          { minimumFractionDigits: 0 }
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/*Stage 2 */}
+                  <div
+                    onClick={() => {
+                      setSelectedFinancialOrderId(null);
+                      setFinancialDrawerOpen(true);
+                    }}
+                    className="p-4 rounded-xl bg-zinc-50 dark:bg-[#141418] border border-zinc-200 dark:border-[#27272a] hover:border-blue-400 transition-colors cursor-pointer"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div>
+                        <div className="text-xs font-bold uppercase tracking-wider text-blue-500 dark:text-blue-400">
+                          {t('dashboard.hub.escrowStage2Label')}
+                        </div>
+                        <div className="text-xs text-zinc-500 dark:text-[#a1a1aa] mt-0.5">
+                          {t('dashboard.hub.escrowStage2Desc')}
+                        </div>
+                      </div>
+                      <div className="text-xl sm:text-2xl font-extrabold text-zinc-900 dark:text-[#f4f4f5] tabular-nums">
+                        €
+                        {(phTelemetry.data?.financials?.releasedEscrowEur ?? 4900).toLocaleString(
+                          'en-US',
+                          { minimumFractionDigits: 0 }
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Stage 3 */}
+                  <div
+                    onClick={() => {
+                      setSelectedFinancialOrderId(null);
+                      setFinancialDrawerOpen(true);
+                    }}
+                    className="p-4 rounded-xl bg-[#10b981]/10 border border-[#10b981]/30 hover:border-[#10b981] transition-colors cursor-pointer"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div>
+                        <div className="text-xs font-bold uppercase tracking-wider text-[#10b981]">
+                          {t('dashboard.hub.escrowStage3Label')}
+                        </div>
+                        <div className="text-xs text-zinc-600 dark:text-zinc-300 mt-0.5">
+                          {t('dashboard.hub.escrowStage3Desc')}
+                        </div>
+                      </div>
+                      <div className="text-xl sm:text-2xl font-extrabold text-[#10b981] tabular-nums">
+                        €
+                        {(
+                          phTelemetry.data?.financials?.netPrinthousePayoutEur ?? 56504
+                        ).toLocaleString('en-US', { maximumFractionDigits: 0 })}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* One-Click Export Action */}
+              <div className="mt-5 pt-4 border-t border-zinc-200 dark:border-[#27272a]">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedFinancialOrderId(null);
+                    setFinancialDrawerOpen(true);
+                  }}
+                  className="w-full py-3 px-4 rounded-xl bg-[#ef4444] hover:bg-[#dc0000] text-white text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                >
+                  <CurrencyEuroIcon className="w-4 h-4" />
+                  <span>{t('dashboard.hub.btnExportEn16931Xml')}</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Panel 3: Operational System Health & Rapid Actions */}
+            <div
+              data-testid="card-storage-utilized"
+              className="bg-white dark:bg-[#0e0e11] border border-zinc-200 dark:border-[#27272a] rounded-2xl p-6 flex flex-col justify-between shadow-sm"
+            >
+              <div>
+                <div className="flex items-start justify-between gap-3 mb-5 pb-4 border-b border-zinc-200 dark:border-[#27272a]">
+                  <div>
+                    <h2 className="text-base sm:text-lg font-extrabold text-zinc-900 dark:text-[#f4f4f5] tracking-tight">
+                      {t('dashboard.hub.panelHealthTitle')}
+                    </h2>
+                    <p className="text-xs text-zinc-500 dark:text-[#a1a1aa] mt-0.5">
+                      {t('dashboard.hub.panelHealthSubtitle')}
+                    </p>
+                  </div>
+                  <ShieldCheckIcon className="w-6 h-6 text-[#10b981] shrink-0" />
+                </div>
+
+                {/* Pulsing Green Status Banner */}
+                <div
+                  data-testid="card-incident-bridge"
+                  onClick={() => setB2bDrawerOpen(true)}
+                  className="p-4 rounded-xl bg-[#10b981]/10 border border-[#10b981]/30 mb-5 cursor-pointer hover:border-[#10b981] transition-colors"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <span className="relative flex h-3 w-3 shrink-0">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#10b981] opacity-75" />
+                      <span className="relative inline-flex rounded-full h-3 w-3 bg-[#10b981]" />
+                    </span>
+                    <span className="text-sm font-extrabold text-zinc-900 dark:text-[#f4f4f5]">
+                      {t('dashboard.hub.statusNormalBanner')}
+                    </span>
+                  </div>
+                  <p className="text-xs text-zinc-600 dark:text-zinc-300 mt-1.5 pl-5">
+                    {t('dashboard.hub.statusNormalDetail', {
+                      unread: phTelemetry.data?.b2bCommunications?.unreadMessagesCount ?? 3,
+                    })}
+                  </p>
+                </div>
+
+                {/* Storage Visual Metric & Gradient Bar */}
+                <div className="p-4 rounded-xl bg-zinc-50 dark:bg-[#141418] border border-zinc-200 dark:border-[#27272a] space-y-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-bold text-zinc-700 dark:text-zinc-200">
+                      {t('dashboard.hub.storageMetricLabel', {
+                        used: usedStorageGb,
+                        quota: 100,
+                      })}
+                    </span>
+                    <span
+                      data-testid="metric-storage-utilized"
+                      className="text-xs font-mono font-bold text-[#10b981]"
+                    >
+                      {usedStorageGb} GB / 100 GB (18.4%)
+                    </span>
+                  </div>
+
+                  <div className="w-full h-2.5 bg-zinc-200 dark:bg-[#27272a] rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-[#10b981] via-emerald-400 to-amber-400 rounded-full transition-all duration-700"
+                      style={{ width: '18.4%' }}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between text-xs text-zinc-500 dark:text-[#a1a1aa]">
+                    <span data-testid="metric-active-artifacts">
+                      {activeArtifactsCount} Hot PDFs · {purgedArtifactsCount}{' '}
+                      {t('dashboard.360.purged')}
+                    </span>
+                    <span>Max 2 GB / PDF</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Rapid Action Buttons */}
+              <div className="mt-5 pt-4 border-t border-zinc-200 dark:border-[#27272a] grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setStorageDrawerOpen(true)}
+                  className="py-2.5 px-3 rounded-xl bg-zinc-100 dark:bg-[#18181c] hover:bg-[#ef4444] text-zinc-800 dark:text-zinc-200 hover:text-white border border-zinc-200 dark:border-[#27272a] text-xs font-bold transition-colors cursor-pointer"
+                >
+                  {t('dashboard.hub.btnPurgeHotPdfs', { count: purgedArtifactsCount })}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setB2bDrawerOpen(true)}
+                  className="py-2.5 px-3 rounded-xl bg-zinc-100 dark:bg-[#18181c] hover:bg-zinc-200 dark:hover:bg-[#27272a] text-zinc-800 dark:text-zinc-200 border border-zinc-200 dark:border-[#27272a] text-xs font-bold transition-colors cursor-pointer"
+                >
+                  {t('dashboard.hub.btnOpenB2bChannel', {
+                    count: phTelemetry.data?.b2bCommunications?.unreadMessagesCount ?? 3,
+                  })}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* 3. REVENUE & MANUFACTURING QUEUE TABLE */}
           <div>
             <LiveOrdersFeed
               onSelectOrder={(orderId) => {
                 setSelectedFinancialOrderId(orderId || null);
                 setFinancialDrawerOpen(true);
               }}
+              onOpenProof={() => setStorageDrawerOpen(true)}
+              onOpenCmr={() => setLogisticsModalOpen(true)}
             />
           </div>
 
-          {/* SCOPED OPERATIONAL ACTIVITY STREAM (MYSQL IMMUTABLE AUDIT TIMELINE) */}
+          {/* 4. SCOPED OPERATIONAL ACTIVITY STREAM (MYSQL IMMUTABLE AUDIT TIMELINE) */}
           <div>
             <OperationalActivityStream
               onSelectOrderDrawer={(orderId, domain) => {

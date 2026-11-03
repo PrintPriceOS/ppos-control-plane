@@ -9517,7 +9517,7 @@
       "file_type": "code",
       "norm_label": "liveorder",
       "source_file": "src/ui/components/dashboard/LiveOrdersFeed.tsx",
-      "source_location": "L9"
+      "source_location": "L24"
     },
     {
       "id": "src_ui_components_dashboard_liveordersfeed_orderstatus",
@@ -9530,7 +9530,7 @@
       "file_type": "code",
       "norm_label": "orderstatus",
       "source_file": "src/ui/components/dashboard/LiveOrdersFeed.tsx",
-      "source_location": "L7"
+      "source_location": "L16"
     },
     {
       "id": "src_api_services_machineloadmonitoringservice_machineloadmonitoringservice",
@@ -14665,7 +14665,7 @@
       "file_type": "code",
       "norm_label": "translationkeys",
       "source_file": "src/ui/de.ts",
-      "source_location": "L3494"
+      "source_location": "L3542"
     },
     {
       "id": "src_ui_en_translationkeys",
@@ -14678,7 +14678,7 @@
       "file_type": "code",
       "norm_label": "translationkeys",
       "source_file": "src/ui/en.ts",
-      "source_location": "L3494"
+      "source_location": "L3542"
     },
     {
       "id": "src_ui_es_translationkeys",
@@ -14691,7 +14691,7 @@
       "file_type": "code",
       "norm_label": "translationkeys",
       "source_file": "src/ui/es.ts",
-      "source_location": "L3494"
+      "source_location": "L3542"
     },
     {
       "id": "src_ui_i18n_locale",
@@ -83920,7 +83920,7 @@
       "file_type": "code",
       "norm_label": "liveordersfeed()",
       "source_file": "src/ui/components/dashboard/LiveOrdersFeed.tsx",
-      "source_location": "L145"
+      "source_location": "L167"
     },
     {
       "id": "src_ui_components_dashboard_liveordersfeed_localizedemoproductname",
@@ -83932,7 +83932,7 @@
       "file_type": "code",
       "norm_label": "localizedemoproductname()",
       "source_file": "src/ui/components/dashboard/LiveOrdersFeed.tsx",
-      "source_location": "L109"
+      "source_location": "L124"
     },
     {
       "id": "src_ui_lib_adminapi_getprinthousedashboardorders",
@@ -304846,7 +304846,7 @@
       "file_type": "code",
       "norm_label": "fallback_production_orders",
       "source_file": "src/ui/components/dashboard/LiveOrdersFeed.tsx",
-      "source_location": "L26"
+      "source_location": "L41"
     },
     {
       "id": "docs_architecture_paper_materials_recovery_unknown_uncoated_audit",
@@ -564931,7 +564931,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/ui/components/dashboard/LiveOrdersFeed.tsx",
-      "source_location": "L148",
+      "source_location": "L172",
       "weight": 1.0
     },
     {
@@ -564943,7 +564943,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/ui/components/dashboard/LiveOrdersFeed.tsx",
-      "source_location": "L157",
+      "source_location": "L180",
       "weight": 1.0
     },
     {
@@ -564955,7 +564955,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/ui/components/dashboard/LiveOrdersFeed.tsx",
-      "source_location": "L215",
+      "source_location": "L236",
       "weight": 1.0
     },
     {
@@ -564967,7 +564967,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/ui/components/dashboard/LiveOrdersFeed.tsx",
-      "source_location": "L334",
+      "source_location": "L337",
       "weight": 1.0
     },
     {
@@ -575016,6 +575016,30 @@
     },
     {
       "source": "src_ui_pages_admin_commandcenterpage_commandcenterpage",
+      "target": "src_ui_pages_admin_commandcenterpage_formatoperationalstatus",
+      "relation": "calls",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "context": "call",
+      "source_file": "src/ui/pages/admin/CommandCenterPage.tsx",
+      "source_location": "L1235",
+      "weight": 1.0
+    },
+    {
+      "source": "src_ui_pages_admin_commandcenterpage_commandcenterpage",
+      "target": "src_ui_lib_display_todisplaytext",
+      "relation": "calls",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "context": "call",
+      "source_file": "src/ui/pages/admin/CommandCenterPage.tsx",
+      "source_location": "L1242",
+      "weight": 1.0
+    },
+    {
+      "source": "src_ui_pages_admin_commandcenterpage_commandcenterpage",
       "target": "src_ui_i18n_uselocale",
       "relation": "calls",
       "_origin": "ast",
@@ -575119,31 +575143,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/ui/pages/admin/CommandCenterPage.tsx",
-      "source_location": "L644",
-      "weight": 1.0
-    },
-    {
-      "source": "src_ui_pages_admin_commandcenterpage_commandcenterpage",
-      "target": "src_ui_lib_display_todisplaytext",
-      "relation": "calls",
-      "_origin": "ast",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "context": "call",
-      "source_file": "src/ui/pages/admin/CommandCenterPage.tsx",
-      "source_location": "L779",
-      "weight": 1.0
-    },
-    {
-      "source": "src_ui_pages_admin_commandcenterpage_commandcenterpage",
-      "target": "src_ui_pages_admin_commandcenterpage_formatoperationalstatus",
-      "relation": "calls",
-      "_origin": "ast",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "context": "call",
-      "source_file": "src/ui/pages/admin/CommandCenterPage.tsx",
-      "source_location": "L785",
+      "source_location": "L647",
       "weight": 1.0
     },
     {
@@ -610737,7 +610737,7 @@
       "confidence_score": 1.0,
       "context": "import",
       "source_file": "src/ui/components/dashboard/LiveOrdersFeed.tsx",
-      "source_location": "L4",
+      "source_location": "L13",
       "weight": 1.0
     },
     {
@@ -610749,7 +610749,7 @@
       "confidence_score": 1.0,
       "context": "import",
       "source_file": "src/ui/components/dashboard/LiveOrdersFeed.tsx",
-      "source_location": "L5",
+      "source_location": "L14",
       "weight": 1.0
     },
     {
@@ -697239,7 +697239,7 @@
       "confidence_score": 1.0,
       "context": "import",
       "source_file": "src/ui/components/dashboard/LiveOrdersFeed.tsx",
-      "source_location": "L4",
+      "source_location": "L13",
       "weight": 1.0
     },
     {
@@ -697251,7 +697251,7 @@
       "confidence_score": 1.0,
       "context": "import",
       "source_file": "src/ui/components/dashboard/LiveOrdersFeed.tsx",
-      "source_location": "L5",
+      "source_location": "L14",
       "weight": 1.0
     },
     {
@@ -967106,29 +967106,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/ui/components/dashboard/LiveOrdersFeed.tsx",
-      "source_location": "L109",
-      "weight": 1.0
-    },
-    {
-      "source": "src_ui_components_dashboard_liveordersfeed",
-      "target": "src_ui_components_dashboard_liveordersfeed_liveordersfeed",
-      "relation": "contains",
-      "_origin": "ast",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "source_file": "src/ui/components/dashboard/LiveOrdersFeed.tsx",
-      "source_location": "L145",
-      "weight": 1.0
-    },
-    {
-      "source": "src_ui_components_dashboard_liveordersfeed",
-      "target": "src_ui_components_dashboard_liveordersfeed_fallback_production_orders",
-      "relation": "contains",
-      "_origin": "ast",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "source_file": "src/ui/components/dashboard/LiveOrdersFeed.tsx",
-      "source_location": "L26",
+      "source_location": "L124",
       "weight": 1.0
     },
     {
@@ -967139,7 +967117,18 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/ui/components/dashboard/LiveOrdersFeed.tsx",
-      "source_location": "L7",
+      "source_location": "L16",
+      "weight": 1.0
+    },
+    {
+      "source": "src_ui_components_dashboard_liveordersfeed",
+      "target": "src_ui_components_dashboard_liveordersfeed_liveordersfeed",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/ui/components/dashboard/LiveOrdersFeed.tsx",
+      "source_location": "L167",
       "weight": 1.0
     },
     {
@@ -967150,7 +967139,18 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/ui/components/dashboard/LiveOrdersFeed.tsx",
-      "source_location": "L9",
+      "source_location": "L24",
+      "weight": 1.0
+    },
+    {
+      "source": "src_ui_components_dashboard_liveordersfeed",
+      "target": "src_ui_components_dashboard_liveordersfeed_fallback_production_orders",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/ui/components/dashboard/LiveOrdersFeed.tsx",
+      "source_location": "L41",
       "weight": 1.0
     },
     {
@@ -972441,7 +972441,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/ui/de.ts",
-      "source_location": "L3494",
+      "source_location": "L3542",
       "weight": 1.0
     },
     {
@@ -972529,7 +972529,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/ui/en.ts",
-      "source_location": "L3494",
+      "source_location": "L3542",
       "weight": 1.0
     },
     {
@@ -972551,7 +972551,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/ui/es.ts",
-      "source_location": "L3494",
+      "source_location": "L3542",
       "weight": 1.0
     },
     {
@@ -1096732,5 +1096732,5 @@
     }
   ],
   "hyperedges": [],
-  "built_at_commit": "7f2d1fe000e37f54b86e80b6e159b47082f70a69"
+  "built_at_commit": "3c5ffd1882dd35258e5cb1f89de8e26572a808da"
 }
