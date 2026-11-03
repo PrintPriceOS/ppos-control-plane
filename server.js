@@ -87,6 +87,7 @@ fastify.addHook('onRequest', async (request, reply) => {
     if (url.startsWith('/api/billing/stripe/webhook')) return;
     if (url.includes('/api/v2/analytics/public')) return;
     if (url.startsWith('/api/public/preflight')) return;
+    if (url === '/api/preflight/capabilities' || url.startsWith('/api/preflight/capabilities?')) return;
     if (url.includes('/quote-revisions/review/')) return;
 
     // 3. PROTECTED ROUTES
@@ -95,6 +96,8 @@ fastify.addHook('onRequest', async (request, reply) => {
         !url.startsWith('/api/admin') &&
         !url.startsWith('/api/auth') &&
         !url.startsWith('/api/public/preflight') &&
+        url !== '/api/preflight/capabilities' &&
+        !url.startsWith('/api/preflight/capabilities?') &&
         !url.startsWith('/api/v2/analytics') &&
         !url.startsWith('/api/connectors/factory')
     ) {
@@ -606,6 +609,7 @@ const start = async () => {
             fastify.all('/api/logistics/*', apiNotFoundFallback);
             fastify.all('/api/printhouses', apiNotFoundFallback);
             fastify.all('/api/printhouses/*', apiNotFoundFallback);
+            fastify.all('/api/preflight/capabilities', apiNotFoundFallback);
             fastify.all('/api/preflight/inspect', apiNotFoundFallback);
             fastify.all('/api/preflight/auto-fix', apiNotFoundFallback);
             fastify.all('/api/preflight/callback', apiNotFoundFallback);

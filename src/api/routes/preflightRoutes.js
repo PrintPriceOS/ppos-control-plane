@@ -172,6 +172,32 @@ function createPreflightRouter() {
         router = createFallbackRouter();
     }
 
+    // GET /api/preflight/capabilities (Public Discovery Endpoint per OpenAPI contract)
+    router.get('/capabilities', (req, res) => {
+        return res.status(200).json({
+            ok: true,
+            standards: PREFLIGHT_STANDARDS,
+            supportedRules: [
+                'GEOMETRY_TRIMBOX_VALIDATION',
+                'BLEED_3MM_ENFORCEMENT',
+                'IMAGE_RESOLUTION_300DPI',
+                'COLOR_CMYK_ONLY',
+                'FONTS_EMBEDDED_CHECK'
+            ],
+            availableFixes: [
+                'NORMALIZE_PAGE_BOXES',
+                'GENERATE_SYNTHETIC_BLEED',
+                'RGB_TO_FOGRA39_CONVERSION'
+            ],
+            geometryPolicies: [
+                'ISO_216_A_SERIES',
+                'STANDARD_BOOK_SIZES'
+            ],
+            geometryProfiles: GEOMETRY_PROFILES,
+            maxUploadSizeBytes: MAX_PREFLIGHT_PDF_BYTES
+        });
+    });
+
     router.use(requireLogisticsControlPlaneAuth);
 
     // GET /api/preflight/inspections
