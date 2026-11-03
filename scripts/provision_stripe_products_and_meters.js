@@ -404,3 +404,4 @@ module.exports = {
     CANONICAL_PRODUCT,
     CANONICAL_PRICES
 };
+
