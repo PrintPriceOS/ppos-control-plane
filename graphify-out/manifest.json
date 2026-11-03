@@ -14694,15 +14694,15 @@
     "semantic_hash": "6fc6620fa009162671ca0a6ca8c9fd5b"
   },
   "src/ui/en.ts": {
-    "mtime": 1793671894.7165935,
-    "seen": 1793672075.5605805,
-    "ast_hash": "fa79f186f29819449c126ae87d3c84bf",
+    "mtime": 1793674519.4007237,
+    "seen": 1793674593.1375983,
+    "ast_hash": "74046e4811c051bd993ab2533b27095b",
     "semantic_hash": ""
   },
   "src/ui/es.ts": {
-    "mtime": 1793671897.248833,
-    "seen": 1793672075.5605805,
-    "ast_hash": "9dce61f1c00ae4af2ba2aa56725bf896",
+    "mtime": 1793674521.2057838,
+    "seen": 1793674593.1375983,
+    "ast_hash": "ed54acb32c2b66ab0fb0c60194449142",
     "semantic_hash": ""
   },
   "src/ui/hooks/useAdminData.ts": {
@@ -15246,10 +15246,10 @@
     "semantic_hash": "b89d809753674b8bb4ea19c54ead8ccc"
   },
   "src/ui/lib/helpSearch.ts": {
-    "mtime": 1777486677.9306903,
-    "seen": 1791003542.6545813,
-    "ast_hash": "5d492cf9e44758f643505f91a8450201",
-    "semantic_hash": "5d492cf9e44758f643505f91a8450201"
+    "mtime": 1793674522.34405,
+    "seen": 1793674593.1655986,
+    "ast_hash": "0f36e22694b4b890b9cb7837131af000",
+    "semantic_hash": ""
   },
   "src/ui/lib/jobMonitorHelpers.js": {
     "mtime": 1793411530.3472304,
@@ -15330,22 +15330,22 @@
     "semantic_hash": ""
   },
   "src/ui/pages/admin-help/AdminHelpArticle.tsx": {
-    "mtime": 1793411530.3572297,
-    "seen": 1793449041.940942,
-    "ast_hash": "01e095ba70e0bc87b137bf43b842b2ea",
-    "semantic_hash": "01e095ba70e0bc87b137bf43b842b2ea"
+    "mtime": 1793674523.0573108,
+    "seen": 1793674593.1705987,
+    "ast_hash": "23472a828ea20cf89f7eb1ddda8d0e5a",
+    "semantic_hash": ""
   },
   "src/ui/pages/admin-help/AdminHelpCenter.tsx": {
-    "mtime": 1793411530.3582304,
-    "seen": 1793449041.940942,
-    "ast_hash": "fbd4419394e41d5a887cdc9faccb5419",
-    "semantic_hash": "fbd4419394e41d5a887cdc9faccb5419"
+    "mtime": 1793674527.270152,
+    "seen": 1793674593.1705987,
+    "ast_hash": "1743dffe8bdab59a9f1969e93c79ec6d",
+    "semantic_hash": ""
   },
   "src/ui/pages/admin-help/AdminHelpPage.tsx": {
-    "mtime": 1793411530.3592308,
-    "seen": 1793449041.940942,
-    "ast_hash": "239b938cb24c7092b926e3a8ff4a87b2",
-    "semantic_hash": "239b938cb24c7092b926e3a8ff4a87b2"
+    "mtime": 1793674528.8178108,
+    "seen": 1793674593.1705987,
+    "ast_hash": "84f235bf5224257d725f086052a7495b",
+    "semantic_hash": ""
   },
   "src/ui/pages/admin-live-ops/AdminLiveOpsCommandCenterPage.tsx": {
     "mtime": 1793411530.3592308,
@@ -20328,9 +20328,9 @@
     "semantic_hash": ""
   },
   "src/ui/de.ts": {
-    "mtime": 1793671893.992561,
-    "seen": 1793672075.5585806,
-    "ast_hash": "bc789a838aa29290500f26027779d8ec",
+    "mtime": 1793674518.8553686,
+    "seen": 1793674593.135599,
+    "ast_hash": "f282a8861d191d26421fff6563980f58",
     "semantic_hash": ""
   },
   "scripts/test_session_timeout.py": {
@@ -31821,6 +31821,30 @@
     "mtime": 1793669438.0064442,
     "seen": 1793671108.766532,
     "ast_hash": "9256c4b673e616dba6494fe1c13fc2cd",
+    "semantic_hash": ""
+  },
+  "scripts/test_developer_ecosystem_e2e.py": {
+    "mtime": 1793673388.684492,
+    "seen": 1793674592.6086268,
+    "ast_hash": "2dd8548c3499d3fd5fb3bfd6126e0647",
+    "semantic_hash": ""
+  },
+  "src/ui/data/helpRegistry.ts": {
+    "mtime": 1793674292.248134,
+    "seen": 1793674593.135599,
+    "ast_hash": "39e3f0a0511ce3b1e4904dca6dbaa84b",
+    "semantic_hash": ""
+  },
+  "tests/AdminHelpConsole.test.tsx": {
+    "mtime": 1793674316.9231677,
+    "seen": 1793674593.3186,
+    "ast_hash": "6b7c60cb2374072b41219a4108e5c385",
+    "semantic_hash": ""
+  },
+  "tests/phase199e_full_developer_ecosystem_e2e.test.js": {
+    "mtime": 1793673389.448154,
+    "seen": 1793674593.3545976,
+    "ast_hash": "da0c6bee2e58fc5f0fb0135e55e00d1d",
     "semantic_hash": ""
   }
 }

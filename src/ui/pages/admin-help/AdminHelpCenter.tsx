@@ -1,189 +1,447 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { searchHelpDocs, getCategories } from '../../lib/helpSearch';
-import { adminHelpDocs, HelpDoc } from '../../data/adminKnowledgeBase';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
-    MagnifyingGlassIcon,
-    BookOpenIcon,
-    ChartBarIcon,
-    CommandLineIcon,
-    ExclamationTriangleIcon,
-    BeakerIcon,
-    ArrowLeftIcon
-} from '@heroicons/react/24/outline';
+  HELP_ARTICLES,
+  HELP_CATEGORIES,
+  HelpArticle,
+  HelpCategoryId,
+  HelpArticleType,
+} from '../../data/helpRegistry';
+import { useLocale } from '../../i18n';
 import { postHelpAnalytics } from '../../lib/adminApi';
+import {
+  MagnifyingGlassIcon,
+  XMarkIcon,
+  ArrowLeftIcon,
+  ArrowTopRightOnSquareIcon,
+  ArrowRightIcon,
+  BookOpenIcon,
+  WrenchScrewdriverIcon,
+  CodeBracketSquareIcon,
+  ChartBarSquareIcon,
+  CpuChipIcon,
+  SparklesIcon,
+  BanknotesIcon,
+  DocumentCheckIcon,
+} from '@heroicons/react/24/outline';
 
-const getIconForType = (type: string) => {
-    switch (type) {
-        case 'metric': return <ChartBarIcon className="w-5 h-5 text-blue-500" />;
-        case 'error': return <ExclamationTriangleIcon className="w-5 h-5 text-red-500" />;
-        case 'control': return <CommandLineIcon className="w-5 h-5 text-blue-500" />;
-        case 'runbook': return <BookOpenIcon className="w-5 h-5 text-purple-500" />;
-        default: return <BeakerIcon className="w-5 h-5 text-slate-500" />;
-    }
+const getTypeBadgeStyle = (type: HelpArticleType): string => {
+  switch (type) {
+    case 'GUIDE':
+      return 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30';
+    case 'RUNBOOK':
+      return 'bg-red-500/15 text-red-600 dark:text-red-400 border-red-500/40';
+    case 'API_SPEC':
+      return 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30';
+    case 'METRIC':
+      return 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30';
+  }
+};
+
+const getTypeIcon = (type: HelpArticleType) => {
+  switch (type) {
+    case 'GUIDE':
+      return <BookOpenIcon className="w-3.5 h-3.5" />;
+    case 'RUNBOOK':
+      return <WrenchScrewdriverIcon className="w-3.5 h-3.5" />;
+    case 'API_SPEC':
+      return <CodeBracketSquareIcon className="w-3.5 h-3.5" />;
+    case 'METRIC':
+      return <ChartBarSquareIcon className="w-3.5 h-3.5" />;
+  }
+};
+
+const getCategoryIcon = (category: HelpCategoryId) => {
+  switch (category) {
+    case 'preflight':
+      return <DocumentCheckIcon className="w-4 h-4" />;
+    case 'pricing':
+      return <SparklesIcon className="w-4 h-4" />;
+    case 'machinery':
+      return <CpuChipIcon className="w-4 h-4" />;
+    case 'integrations':
+      return <CodeBracketSquareIcon className="w-4 h-4" />;
+    case 'fintech':
+      return <BanknotesIcon className="w-4 h-4" />;
+    case 'runbooks':
+      return <WrenchScrewdriverIcon className="w-4 h-4" />;
+  }
 };
 
 export const AdminHelpCenter: React.FC = () => {
-    useEffect(() => {
-        console.log('HelpCenter: Component mounted at', window.location.pathname);
-    }, []);
+  const { t } = useLocale();
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialQuery = searchParams.get('q') || '';
+  const initialCat = (searchParams.get('cat') as HelpCategoryId | null) || null;
 
-    const [searchQuery, setSearchQuery] = useState('');
-    const [selectedCategory, setSelectedCategory] = useState<string>('All');
-    const [results, setResults] = useState<HelpDoc[]>([]);
-    const searchInputRef = useRef<HTMLInputElement>(null);
+  const [query, setQuery] = useState(initialQuery);
+  const [selectedCategory, setSelectedCategory] = useState<HelpCategoryId | null>(
+    initialCat && HELP_CATEGORIES.some((c) => c.id === initialCat) ? initialCat : null
+  );
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
-    const categories = ['All', ...getCategories()];
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (
+        e.key === '/' &&
+        document.activeElement?.tagName !== 'INPUT' &&
+        document.activeElement?.tagName !== 'TEXTAREA'
+      ) {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
-    useEffect(() => {
-        // Initial data sync
-        setResults(adminHelpDocs);
-        console.log('HelpCenter: Data initialized:', adminHelpDocs.length);
-    }, []);
+  // Debounced analytics for search
+  useEffect(() => {
+    if (!query || query.trim().length < 2) return;
+    const timer = setTimeout(() => {
+      postHelpAnalytics({ eventType: 'search', query: query.trim() });
+    }, 800);
+    return () => clearTimeout(timer);
+  }, [query]);
 
-    useEffect(() => {
-        const handleKeyDown = (e: KeyboardEvent) => {
-            if (e.key === '/' && document.activeElement !== searchInputRef.current) {
-                e.preventDefault();
-                searchInputRef.current?.focus();
-            }
-        };
-        window.addEventListener('keydown', handleKeyDown);
-        return () => window.removeEventListener('keydown', handleKeyDown);
-    }, []);
+  const filteredArticles = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return HELP_ARTICLES.filter((article) => {
+      if (selectedCategory && article.category !== selectedCategory) {
+        return false;
+      }
+      if (!q) return true;
 
-    useEffect(() => {
-        let filtered = adminHelpDocs;
-        if (searchQuery.trim()) {
-            filtered = searchHelpDocs(searchQuery);
-        }
-        if (selectedCategory && selectedCategory !== 'All') {
-            filtered = filtered.filter(doc => doc.category === selectedCategory);
-        }
-        setResults(filtered);
-    }, [searchQuery, selectedCategory]);
+      const translatedTitle = t(article.titleKey).toLowerCase();
+      const translatedSummary = t(article.summaryKey).toLowerCase();
+      const categoryLabel = t(`helpConsole.categories.${article.category}`).toLowerCase();
+      const tagMatch = article.tags.some((tag) => tag.toLowerCase().includes(q));
+      const formulaMatch = article.formulaSpec ? article.formulaSpec.toLowerCase().includes(q) : false;
 
-    return (
-        <div className="flex flex-col md:flex-row bg-slate-50 min-h-screen w-full">
-            {/* Sidebar */}
-            <div className="w-full md:w-64 bg-white border-r border-slate-200 shrink-0 p-6">
-                <div className="flex items-center gap-2 mb-8">
-                    <div className="w-8 h-8 bg-blue-600 rounded-none flex items-center justify-center">
-                        <BookOpenIcon className="w-5 h-5 text-white" />
-                    </div>
-                    <span className="font-bold text-slate-900 tracking-tight">Help Console</span>
-                </div>
+      return (
+        translatedTitle.includes(q) ||
+        translatedSummary.includes(q) ||
+        categoryLabel.includes(q) ||
+        article.id.toLowerCase().includes(q) ||
+        article.type.toLowerCase().includes(q) ||
+        tagMatch ||
+        formulaMatch
+      );
+    });
+  }, [query, selectedCategory, t]);
 
-                <nav className="space-y-1">
-                    <a
-                        href="/admin"
-                        className="flex items-center gap-2 px-3 py-2 text-sm text-blue-600 hover:bg-blue-50 rounded-none mb-6 font-medium transition-colors"
-                    >
-                        <ArrowLeftIcon className="w-4 h-4" />
-                        Back to Dashboard
-                    </a>
+  const handleOpenArticle = (id: string) => {
+    postHelpAnalytics({
+      eventType: 'view',
+      docId: id,
+      query: query.trim() ? query.trim() : undefined,
+    });
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.set('doc', id);
+    setSearchParams(nextParams);
+  };
 
-                    <div className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 px-3">Categories</div>
-                    {categories.map(cat => (
-                        <button
-                            key={cat}
-                            onClick={() => setSelectedCategory(cat)}
-                            className={`w-full text-left px-3 py-2 rounded-none text-sm transition-colors ${selectedCategory === cat
-                                ? 'bg-blue-50 text-blue-700 font-medium'
-                                : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-                                }`}
-                        >
-                            {cat}
-                        </button>
-                    ))}
-                </nav>
+  const handleSelectCategory = (catId: HelpCategoryId | null) => {
+    setSelectedCategory(catId);
+    const nextParams = new URLSearchParams(searchParams);
+    if (catId) {
+      nextParams.set('cat', catId);
+    } else {
+      nextParams.delete('cat');
+    }
+    setSearchParams(nextParams, { replace: true });
+  };
+
+  const handleTagClick = (e: React.MouseEvent, tag: string) => {
+    e.stopPropagation();
+    setQuery(tag);
+    searchInputRef.current?.focus();
+  };
+
+  return (
+    <div
+      data-testid="admin-help-console"
+      className="min-h-screen bg-[#f8fafc] dark:bg-[#09090b] text-slate-900 dark:text-[#f4f4f5] pb-20 transition-colors"
+    >
+      {/* Tactical HUD Top Header */}
+      <div className="bg-white dark:bg-[#0e0e11] border-b border-slate-200 dark:border-[#27272a]">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="flex flex-wrap items-center justify-between gap-4 mb-5">
+            <button
+              type="button"
+              onClick={() => navigate('/admin')}
+              className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-[#a1a1aa] hover:text-[#dc0000] dark:hover:text-[#ef4444] transition-colors cursor-pointer"
+            >
+              <ArrowLeftIcon className="w-4 h-4" />
+              {t('helpConsole.backToCockpit')}
+            </button>
+
+            <div className="flex items-center gap-2">
+              <a
+                href="https://docs.printprice.pro/docs/api/overview"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold uppercase tracking-wider bg-slate-100 dark:bg-[#141418] text-slate-700 dark:text-[#e4e4e7] border border-slate-300 dark:border-[#27272a] hover:border-[#dc0000] dark:hover:border-[#dc0000] hover:text-[#dc0000] dark:hover:text-[#ef4444] transition-colors"
+              >
+                <span>OpenAPI 3.1 Portal</span>
+                <ArrowTopRightOnSquareIcon className="w-3.5 h-3.5" />
+              </a>
+              <button
+                type="button"
+                onClick={() => navigate('/developers')}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold uppercase tracking-wider bg-[#dc0000] hover:bg-[#b90000] text-white border border-[#dc0000] transition-colors cursor-pointer"
+              >
+                <span>{t('nav.developers')}</span>
+                <ArrowRightIcon className="w-3.5 h-3.5" />
+              </button>
             </div>
+          </div>
 
-            {/* Main Content Area */}
-            <div className="flex-1 p-6 md:p-10 max-w-7xl">
-                <div className="mb-8">
-                    <h1 className="text-3xl font-extrabold text-slate-900 leading-tight">Help & Documentation</h1>
-                </div>
+          <h1
+            data-testid="help-console-title"
+            className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-[#f4f4f5] tracking-tight"
+          >
+            {t('helpConsole.title')}
+          </h1>
+          <p className="mt-2 text-sm sm:text-base text-slate-600 dark:text-[#a1a1aa] max-w-4xl leading-relaxed">
+            {t('helpConsole.subtitle')}
+          </p>
 
-                {/* Search Bar */}
-                <div className="relative mb-10 group max-w-2xl">
-                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                        <MagnifyingGlassIcon className="h-5 w-5 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
-                    </div>
-                    <input
-                        ref={searchInputRef}
-                        type="text"
-                        className="block w-full pl-11 pr-14 py-4 border-slate-200 rounded-none leading-5 bg-white shadow-sm hover:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm transition-all"
-                        placeholder="Type to search (e.g. 'roi', 'cmyk', 'error 502')..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                    />
-                    <div className="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none">
-                        <kbd className="inline-flex items-center border border-slate-200 rounded-none px-2 text-sm font-sans font-medium text-slate-400">
-                            /
-                        </kbd>
-                    </div>
-                </div>
-
-                {/* Results List */}
-                <div className="space-y-6">
-                    <div className="flex items-center justify-between">
-                        <div className="text-sm font-semibold text-slate-900 bg-slate-100 px-3 py-1 rounded-none border border-slate-200">
-                            {results.length} article{results.length !== 1 ? 's' : ''} found in {selectedCategory}
-                        </div>
-                        {results.length > 0 && (
-                            <div className="text-[10px] font-bold text-blue-500 uppercase tracking-widest bg-blue-50 px-2.5 py-1 rounded-none border border-blue-100">
-                                Verified Documentation
-                            </div>
-                        )}
-                    </div>
-
-                    {results.length === 0 ? (
-                        <div className="text-center py-20 bg-white rounded-none border border-dashed border-slate-300 shadow-sm transition-all">
-                            <MagnifyingGlassIcon className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-                            <h3 className="text-xl font-bold text-slate-900">No matching guides found</h3>
-                            <p className="text-slate-500 mt-2 max-w-sm mx-auto">Try common terms like "metrics", "audit", or "fix" to see available help articles.</p>
-                            <button
-                                onClick={() => { setSearchQuery(''); setSelectedCategory('All'); }}
-                                className="mt-6 text-blue-600 font-bold hover:underline"
-                            >
-                                Reset all filters
-                            </button>
-                        </div>
-                    ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6 pb-20">
-                            {results.map((doc) => (
-                                <a
-                                    key={doc.id}
-                                    href={`/admin/help?doc=${doc.id}`}
-                                    onClick={() => postHelpAnalytics({ event_type: 'search_result_clicked', article_id: doc.id, search_query: searchQuery.trim() })}
-                                    className="block bg-white border border-slate-200 rounded-none p-6 hover:border-blue-400 hover:shadow-xl transition-all group relative overflow-hidden"
-                                >
-                                    <div className="flex items-center gap-3 mb-4">
-                                        <div className="bg-slate-50 p-2.5 rounded-none border border-slate-100 group-hover:border-blue-100 group-hover:bg-blue-50 transition-colors">
-                                            {getIconForType(doc.type)}
-                                        </div>
-                                        <div className="flex flex-col">
-                                            <span className="text-[10px] uppercase tracking-widest font-extrabold text-blue-500 leading-none mb-1.5">{doc.category}</span>
-                                            <h3 className="text-lg font-bold text-slate-900 group-hover:text-blue-600 transition-colors leading-tight">{doc.title}</h3>
-                                        </div>
-                                    </div>
-                                    <p className="text-sm text-slate-600 line-clamp-3 leading-relaxed">
-                                        {doc.summary}
-                                    </p>
-                                    <div className="mt-6 flex flex-wrap gap-2">
-                                        {doc.keywords.slice(0, 4).map(k => (
-                                            <span key={k} className="bg-slate-50 text-slate-500 text-[11px] px-2.5 py-1 rounded-none border border-slate-100 font-bold group-hover:bg-white group-hover:border-blue-100 transition-colors">#{k}</span>
-                                        ))}
-                                    </div>
-                                    <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-all transform translate-x-2 group-hover:translate-x-0">
-                                        <ArrowLeftIcon className="w-5 h-5 text-blue-400 rotate-180" />
-                                    </div>
-                                </a>
-                            ))}
-                        </div>
-                    )}
-                </div>
+          {/* Instant Search Bar with '/' Shortcut */}
+          <div className="mt-6 max-w-3xl relative">
+            <div className="relative flex items-center">
+              <MagnifyingGlassIcon className="w-5 h-5 text-slate-400 dark:text-[#71717a] absolute left-4 pointer-events-none" />
+              <input
+                ref={searchInputRef}
+                data-testid="help-console-search-input"
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder={t('helpConsole.searchPlaceholder')}
+                className="w-full pl-12 pr-14 py-3.5 bg-slate-50 dark:bg-[#131316] border border-slate-300 dark:border-[#27272a] text-slate-900 dark:text-[#f4f4f5] placeholder-slate-400 dark:placeholder-[#71717a] text-sm font-medium focus:outline-none focus:border-[#dc0000] dark:focus:border-[#ef4444] focus:ring-1 focus:ring-[#dc0000] transition-all"
+              />
+              {query ? (
+                <button
+                  type="button"
+                  onClick={() => setQuery('')}
+                  aria-label="Clear search"
+                  className="absolute right-3.5 p-1 text-slate-400 hover:text-slate-700 dark:text-[#a1a1aa] dark:hover:text-white cursor-pointer"
+                >
+                  <XMarkIcon className="w-5 h-5" />
+                </button>
+              ) : (
+                <kbd className="hidden sm:inline-flex items-center justify-center px-2 py-0.5 text-[11px] font-mono font-bold text-slate-500 dark:text-[#a1a1aa] bg-slate-200/70 dark:bg-[#1f1f24] border border-slate-300 dark:border-[#27272a] absolute right-3.5 pointer-events-none">
+                  /
+                </kbd>
+              )}
             </div>
+          </div>
         </div>
-    );
+      </div>
+
+      {/* Main Content Area: Sidebar + Cards Grid */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-8">
+        <div className="flex flex-col lg:flex-row gap-8">
+          {/* Left Domain Taxonomy Sidebar */}
+          <aside className="w-full lg:w-72 flex-shrink-0">
+            <div className="sticky top-6 bg-white dark:bg-[#0e0e11] border border-slate-200 dark:border-[#27272a] p-3">
+              <nav aria-label="Operational Knowledge Domains" className="space-y-1">
+                <button
+                  type="button"
+                  data-testid="help-cat-all"
+                  onClick={() => handleSelectCategory(null)}
+                  className={`w-full flex items-center justify-between px-3.5 py-2.5 text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer border ${
+                    selectedCategory === null
+                      ? 'bg-[#dc0000]/10 dark:bg-[#dc0000]/15 text-[#dc0000] dark:text-[#ef4444] border-[#dc0000]/40'
+                      : 'bg-transparent text-slate-600 dark:text-[#a1a1aa] border-transparent hover:bg-slate-100 dark:hover:bg-[#16161a] hover:text-slate-900 dark:hover:text-[#f4f4f5]'
+                  }`}
+                >
+                  <span className="truncate">{t('helpConsole.allCategories')}</span>
+                  <span
+                    className={`ml-2 px-2 py-0.5 text-[11px] font-mono ${
+                      selectedCategory === null
+                        ? 'bg-[#dc0000] text-white'
+                        : 'bg-slate-100 dark:bg-[#18181c] text-slate-600 dark:text-[#a1a1aa]'
+                    }`}
+                  >
+                    {HELP_ARTICLES.length}
+                  </span>
+                </button>
+
+                {HELP_CATEGORIES.map((cat) => {
+                  const isActive = selectedCategory === cat.id;
+                  return (
+                    <button
+                      key={cat.id}
+                      type="button"
+                      data-testid={`help-cat-${cat.id}`}
+                      onClick={() => handleSelectCategory(cat.id)}
+                      className={`w-full flex items-center justify-between px-3.5 py-2.5 text-xs font-bold tracking-wide transition-colors cursor-pointer border ${
+                        isActive
+                          ? 'bg-[#dc0000]/10 dark:bg-[#dc0000]/15 text-[#dc0000] dark:text-[#ef4444] border-[#dc0000]/40'
+                          : 'bg-transparent text-slate-600 dark:text-[#a1a1aa] border-transparent hover:bg-slate-100 dark:hover:bg-[#16161a] hover:text-slate-900 dark:hover:text-[#f4f4f5]'
+                      }`}
+                    >
+                      <span className="flex items-center gap-2.5 text-left truncate">
+                        <span className={isActive ? 'text-[#dc0000] dark:text-[#ef4444]' : 'text-slate-400 dark:text-[#71717a]'}>
+                          {getCategoryIcon(cat.id)}
+                        </span>
+                        <span className="truncate">{t(cat.labelKey)}</span>
+                      </span>
+                      <span
+                        className={`ml-2 px-2 py-0.5 text-[11px] font-mono ${
+                          isActive
+                            ? 'bg-[#dc0000] text-white'
+                            : 'bg-slate-100 dark:bg-[#18181c] text-slate-600 dark:text-[#a1a1aa]'
+                        }`}
+                      >
+                        {cat.count}
+                      </span>
+                    </button>
+                  );
+                })}
+              </nav>
+            </div>
+          </aside>
+
+          {/* Right Cards Grid */}
+          <div className="flex-1 min-w-0">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-200 dark:border-[#27272a]">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 bg-[#dc0000]" />
+                <span
+                  data-testid="help-articles-count"
+                  className="text-xs font-mono font-bold uppercase tracking-wider text-slate-600 dark:text-[#a1a1aa]"
+                >
+                  {t('helpConsole.articlesFound', { count: filteredArticles.length })}
+                </span>
+              </div>
+              {(query || selectedCategory) && (
+                <button
+                  type="button"
+                  data-testid="help-reset-filters"
+                  onClick={() => {
+                    setQuery('');
+                    handleSelectCategory(null);
+                  }}
+                  className="text-xs font-bold text-[#dc0000] dark:text-[#ef4444] hover:underline cursor-pointer"
+                >
+                  {t('helpConsole.resetFilters')}
+                </button>
+              )}
+            </div>
+
+            {filteredArticles.length === 0 ? (
+              <div className="bg-white dark:bg-[#0e0e11] border border-slate-200 dark:border-[#27272a] p-12 text-center">
+                <MagnifyingGlassIcon className="w-10 h-10 text-slate-400 dark:text-[#71717a] mx-auto mb-3" />
+                <h3 className="text-base font-bold text-slate-900 dark:text-[#f4f4f5]">
+                  {t('helpConsole.noResultsTitle')}
+                </h3>
+                <p className="text-sm text-slate-500 dark:text-[#a1a1aa] mt-1 max-w-md mx-auto">
+                  {t('helpConsole.noResultsHint')}
+                </p>
+              </div>
+            ) : (
+              <div
+                data-testid="help-articles-grid"
+                className="grid grid-cols-1 md:grid-cols-2 gap-4"
+              >
+                {filteredArticles.map((article: HelpArticle) => (
+                  <article
+                    key={article.id}
+                    data-testid={`help-card-${article.id}`}
+                    onClick={() => handleOpenArticle(article.id)}
+                    className="bg-white dark:bg-[#0e0e11] border border-slate-200 dark:border-[#27272a] hover:border-[#dc0000] dark:hover:border-[#ef4444] p-5 flex flex-col justify-between transition-colors cursor-pointer group"
+                  >
+                    <div>
+                      {/* Card Top Meta Row: Type Badge + Category Pill */}
+                      <div className="flex items-center justify-between gap-2 mb-3">
+                        <span
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 text-[11px] font-mono font-bold uppercase tracking-wider border ${getTypeBadgeStyle(
+                            article.type
+                          )}`}
+                        >
+                          {getTypeIcon(article.type)}
+                          {t(`helpConsole.types.${article.type}`)}
+                        </span>
+                        <span className="text-[11px] font-mono font-semibold text-slate-500 dark:text-[#a1a1aa] truncate">
+                          {t(`helpConsole.categories.${article.category}`)}
+                        </span>
+                      </div>
+
+                      {/* Headline */}
+                      <h2 className="text-base font-bold text-slate-900 dark:text-[#f4f4f5] group-hover:text-[#dc0000] dark:group-hover:text-[#ef4444] transition-colors leading-snug mb-2">
+                        {t(article.titleKey)}
+                      </h2>
+
+                      {/* 2-Sentence Operational Summary */}
+                      <p className="text-xs sm:text-sm text-slate-600 dark:text-[#a1a1aa] leading-relaxed mb-4">
+                        {t(article.summaryKey)}
+                      </p>
+
+                      {/* Canonical Formula / Spec Strip */}
+                      {article.formulaSpec && (
+                        <div className="mb-4 px-3 py-2 bg-slate-100 dark:bg-[#141418] border border-slate-200 dark:border-[#27272a] font-mono text-[11px] text-slate-700 dark:text-[#e4e4e7] overflow-x-auto">
+                          {article.formulaSpec}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="pt-3 border-t border-slate-100 dark:border-[#1f1f24] space-y-3">
+                      {/* Interactive Tag Pills */}
+                      <div className="flex flex-wrap gap-1.5">
+                        {article.tags.map((tag) => (
+                          <button
+                            key={tag}
+                            type="button"
+                            onClick={(e) => handleTagClick(e, tag)}
+                            className="text-[11px] font-mono px-2 py-0.5 bg-slate-100 dark:bg-[#16161b] text-slate-600 dark:text-[#a1a1aa] border border-slate-200 dark:border-[#27272a] hover:border-[#dc0000] dark:hover:border-[#ef4444] hover:text-[#dc0000] dark:hover:text-[#ef4444] transition-colors cursor-pointer"
+                          >
+                            {tag}
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* Contextual Deep Action Buttons */}
+                      <div className="flex items-center justify-between gap-2 pt-1">
+                        {article.jumpToRoute ? (
+                          <button
+                            type="button"
+                            data-testid={`help-jump-${article.id}`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigate(article.jumpToRoute!);
+                            }}
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-bold bg-[#dc0000]/10 dark:bg-[#dc0000]/15 text-[#dc0000] dark:text-[#ef4444] border border-[#dc0000]/30 hover:bg-[#dc0000] hover:text-white dark:hover:bg-[#dc0000] dark:hover:text-white transition-colors cursor-pointer"
+                          >
+                            <span>{t('helpConsole.openSectionBtn')}</span>
+                          </button>
+                        ) : (
+                          <span />
+                        )}
+
+                        {article.docsUrl && (
+                          <a
+                            href={article.docsUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            data-testid={`help-docs-${article.id}`}
+                            onClick={(e) => e.stopPropagation()}
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-bold bg-slate-100 dark:bg-[#16161b] text-slate-700 dark:text-[#e4e4e7] border border-slate-300 dark:border-[#27272a] hover:border-[#dc0000] dark:hover:border-[#ef4444] hover:text-[#dc0000] dark:hover:text-[#ef4444] transition-colors"
+                          >
+                            <span>{t('helpConsole.docsReferenceBtn')}</span>
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 };

@@ -1,27 +1,17 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { AdminHelpCenter } from './AdminHelpCenter';
 import { AdminHelpArticle } from './AdminHelpArticle';
 
 /**
  * AdminHelpPage Dispatcher
- * 
- * Switches between the Help Center (Search) and the specific Help Article 
- * based on the presence of the 'doc' query parameter.
+ *
+ * Switches between the Help Center (Search & Domain Taxonomy) and the specific
+ * Help Article / Runbook based on the presence of the 'doc' query parameter.
  */
 export const AdminHelpPage: React.FC = () => {
-    const [hasDoc, setHasDoc] = useState(false);
+  const [searchParams] = useSearchParams();
+  const docId = searchParams.get('doc') || (typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('doc') : null);
 
-    useEffect(() => {
-        const checkParams = () => {
-            const params = new URLSearchParams(window.location.search);
-            setHasDoc(params.has('doc'));
-        };
-
-        checkParams();
-        // Basic listener for popstate to handle local navigation without reload
-        window.addEventListener('popstate', checkParams);
-        return () => window.removeEventListener('popstate', checkParams);
-    }, []);
-
-    return hasDoc ? <AdminHelpArticle /> : <AdminHelpCenter />;
+  return docId ? <AdminHelpArticle docId={docId} /> : <AdminHelpCenter />;
 };

@@ -27,9 +27,28 @@ export const getCategories = (): string[] => {
 };
 
 export const getErrorArticleLink = (errorCode: string): string => {
-    if (!errorCode || typeof errorCode !== 'string') return '/admin/help?doc=error-generic';
+    if (!errorCode || typeof errorCode !== 'string') return '/admin/help?doc=rb-pdf-2gb-timeout-recovery';
 
     const normalized = errorCode.toUpperCase().trim();
+    if (normalized.includes('SPEND_CAP') || normalized.includes('402')) {
+        return '/admin/help?doc=rb-resolve-402-spend-cap-paused';
+    }
+    if (normalized.includes('WEBHOOK') || normalized.includes('SIGNATURE')) {
+        return '/admin/help?doc=rb-webhook-exponential-backoff';
+    }
+    if (normalized.includes('BLEED') || normalized.includes('TRIM')) {
+        return '/admin/help?doc=pf-bleedbox-synthesis';
+    }
+    if (normalized.includes('SPINE') || normalized.includes('CALIPER')) {
+        return '/admin/help?doc=pf-spine-caliper-math';
+    }
+    if (normalized.includes('TIMEOUT') || normalized.includes('GHOSTSCRIPT')) {
+        return '/admin/help?doc=rb-pdf-2gb-timeout-recovery';
+    }
+    if (normalized.includes('SATURAT') || normalized.includes('ROUTING')) {
+        return '/admin/help?doc=rb-plant-saturation-reroute';
+    }
+
     const candidateId = `error-${normalized.toLowerCase().replace(/_/g, '-')}`;
 
     if (adminHelpDocs.some(doc => doc.id === candidateId)) {

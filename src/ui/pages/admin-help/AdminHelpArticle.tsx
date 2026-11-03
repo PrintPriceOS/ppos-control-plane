@@ -1,262 +1,300 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
+import {
+  HELP_ARTICLES,
+  getHelpArticleById,
+  HelpArticle,
+  HelpArticleType,
+} from '../../data/helpRegistry';
 import { getHelpDocById } from '../../lib/helpSearch';
-import { HelpDoc } from '../../data/adminKnowledgeBase';
-import { BookOpenIcon, ChartBarIcon, CommandLineIcon, ExclamationTriangleIcon, BeakerIcon, ArrowTopRightOnSquareIcon } from '@heroicons/react/24/outline';
+import { useLocale } from '../../i18n';
 import { postHelpAnalytics } from '../../lib/adminApi';
+import {
+  ArrowLeftIcon,
+  CheckCircleIcon,
+  ExclamationTriangleIcon,
+  XCircleIcon,
+  ArrowTopRightOnSquareIcon,
+  BookOpenIcon,
+  WrenchScrewdriverIcon,
+  CodeBracketSquareIcon,
+  ChartBarSquareIcon,
+} from '@heroicons/react/24/outline';
 
-const getIconForType = (type: string) => {
-    switch (type) {
-        case 'metric': return <ChartBarIcon className="w-5 h-5 text-blue-500" />;
-        case 'error': return <ExclamationTriangleIcon className="w-5 h-5 text-red-500" />;
-        case 'control': return <CommandLineIcon className="w-5 h-5 text-blue-500" />;
-        case 'runbook': return <BookOpenIcon className="w-5 h-5 text-purple-500" />;
-        default: return <BeakerIcon className="w-5 h-5 text-slate-500" />;
-    }
+const getTypeBadgeStyle = (type: HelpArticleType): string => {
+  switch (type) {
+    case 'GUIDE':
+      return 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30';
+    case 'RUNBOOK':
+      return 'bg-red-500/15 text-red-600 dark:text-red-400 border-red-500/40';
+    case 'API_SPEC':
+      return 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30';
+    case 'METRIC':
+      return 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30';
+  }
 };
 
-export const AdminHelpArticle: React.FC = () => {
-    const [doc, setDoc] = useState<HelpDoc | null>(null);
-    const [loading, setLoading] = useState(true);
+const getTypeIcon = (type: HelpArticleType) => {
+  switch (type) {
+    case 'GUIDE':
+      return <BookOpenIcon className="w-3.5 h-3.5" />;
+    case 'RUNBOOK':
+      return <WrenchScrewdriverIcon className="w-3.5 h-3.5" />;
+    case 'API_SPEC':
+      return <CodeBracketSquareIcon className="w-3.5 h-3.5" />;
+    case 'METRIC':
+      return <ChartBarSquareIcon className="w-3.5 h-3.5" />;
+  }
+};
 
-    useEffect(() => {
-        const params = new URLSearchParams(window.location.search);
-        const docId = params.get('doc');
-        if (docId) {
-            setDoc(getHelpDocById(docId) || null);
-            postHelpAnalytics({ event_type: 'article_viewed', article_id: docId }).catch(console.error);
-        }
-        setLoading(false);
-    }, []);
+interface Props {
+  docId: string;
+}
 
-    if (loading) return <div className="p-8 text-center text-slate-500">Loading...</div>;
+export const AdminHelpArticle: React.FC<Props> = ({ docId }) => {
+  const { t } = useLocale();
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
 
-    if (!doc) {
-        return (
-            <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6 text-center">
-                <div className="bg-white p-8 rounded-none border border-slate-200 shadow-sm max-w-md">
-                    <BookOpenIcon className="w-12 h-12 text-slate-400 mx-auto mb-4" />
-                    <h2 className="text-xl font-bold text-slate-900 mb-2">Document not found</h2>
-                    <p className="text-slate-600 mb-6">The knowledge base article you are looking for does not exist or has been removed.</p>
-                    <a href="/admin/help" className="inline-block bg-blue-600 text-white px-5 py-2.5 rounded-none font-medium hover:bg-blue-700 transition">
-                        Back to Help Center
-                    </a>
-                </div>
-            </div>
-        );
+  const article = getHelpArticleById(docId);
+  const legacyDoc = !article ? getHelpDocById(docId) : undefined;
+
+  useEffect(() => {
+    try {
+      window.scrollTo?.(0, 0);
+    } catch {
+      // Ignore in non-browser/jsdom test environments
     }
+    if (article) {
+      postHelpAnalytics({ eventType: 'view', docId: article.id });
+    } else if (legacyDoc) {
+      postHelpAnalytics({ eventType: 'view', docId: legacyDoc.id });
+    } else {
+      postHelpAnalytics({ eventType: 'fallback_error', docId, errorCode: docId });
+    }
+  }, [docId, article, legacyDoc]);
+
+  const handleBackToIndex = () => {
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete('doc');
+    setSearchParams(nextParams);
+  };
+
+  if (article) {
+    const relatedArticles = HELP_ARTICLES.filter(
+      (a) => a.category === article.category && a.id !== article.id
+    ).slice(0, 4);
 
     return (
-        <div className="min-h-screen bg-slate-50 text-slate-800 font-sans">
-            {/* Header */}
-            <header className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between sticky top-0 z-10">
-                <div className="flex items-center gap-3">
-                    <a href="/admin" className="text-blue-600 font-bold hover:text-blue-800 transition-colors flex items-center gap-1.5 text-sm">
-                        <span>← Back to Dashboard</span>
-                    </a>
-                    <div className="h-6 w-px bg-slate-300 mx-1" />
-                    <a href="/admin/help" className="text-slate-500 hover:text-slate-900 transition-colors flex items-center gap-1 text-sm">
-                        <span>Search</span>
-                    </a>
-                    <div className="h-6 w-px bg-slate-300 mx-1" />
-                    <nav className="text-sm font-medium flex items-center gap-2">
-                        <span className="text-slate-400 hidden md:inline">{doc.category}</span>
-                        <span className="text-slate-300 hidden md:inline">/</span>
-                        <span className="text-slate-900 truncate max-w-[150px] md:max-w-md">{doc.title}</span>
-                    </nav>
-                </div>
-                {doc.dashboardPath && (
-                    <a
-                        href={doc.dashboardPath}
-                        className="text-sm border border-slate-200 bg-white hover:bg-slate-50 shadow-sm px-4 py-2 rounded-none text-slate-700 font-medium flex items-center gap-2 transition"
-                    >
-                        <span>Open in Cockpit</span>
-                        <ArrowTopRightOnSquareIcon className="w-4 h-4" />
-                    </a>
-                )}
-            </header>
+      <div
+        data-testid={`help-article-view-${article.id}`}
+        className="min-h-screen bg-[#f8fafc] dark:bg-[#09090b] text-slate-900 dark:text-[#f4f4f5] pb-20 transition-colors"
+      >
+        {/* Top Bar */}
+        <div className="bg-white dark:bg-[#0e0e11] border-b border-slate-200 dark:border-[#27272a]">
+          <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-5 flex flex-wrap items-center justify-between gap-4">
+            <button
+              type="button"
+              data-testid="help-article-back-btn"
+              onClick={handleBackToIndex}
+              className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-[#a1a1aa] hover:text-[#dc0000] dark:hover:text-[#ef4444] transition-colors cursor-pointer"
+            >
+              <ArrowLeftIcon className="w-4 h-4" />
+              {t('helpConsole.backToIndex')}
+            </button>
 
-            <div className="max-w-4xl mx-auto px-6 py-10">
-
-                {/* Fallback Banner */}
-                {doc.id === 'error-generic' && new URLSearchParams(window.location.search).get('doc') !== 'error-generic' && (
-                    <div className="mb-6 bg-amber-50 border border-amber-200 p-4 rounded-none flex gap-3 text-amber-800 items-start shadow-sm animate-slide-fade">
-                        <ExclamationTriangleIcon className="w-5 h-5 shrink-0 mt-0.5 text-amber-500" />
-                        <div>
-                            <h4 className="font-bold text-sm uppercase tracking-widest mb-1">Specific documentation not found</h4>
-                            <p className="text-sm">We couldn't find a dedicated guide for exactly <code className="bg-amber-100 px-1 rounded-none font-bold">{new URLSearchParams(window.location.search).get('doc')?.replace('error-', '')}</code>. Displaying the generic troubleshooting steps instead.</p>
-                        </div>
-                    </div>
-                )}
-
-                {/* Article Hero */}
-                <div className="mb-10">
-                    <div className="flex items-center gap-3 mb-4">
-                        <div className="bg-white border border-slate-200 p-2 rounded-none shadow-sm">
-                            {getIconForType(doc.type)}
-                        </div>
-                        <div className="uppercase tracking-wider text-sm font-bold text-slate-500">
-                            {doc.type} Document
-                        </div>
-                    </div>
-                    <h1 className="text-3xl md:text-4xl font-extrabold text-slate-900 mb-4">{doc.title}</h1>
-                    <p className="text-xl text-slate-600 leading-relaxed border-l-4 border-slate-300 pl-4 py-1">
-                        {doc.summary}
-                    </p>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-
-                    {/* Main Content */}
-                    <div className="md:col-span-2 space-y-8">
-
-                        {/* dynamic Body rendered safely */}
-                        <div className="bg-white border border-slate-200 rounded-none p-6 md:p-8 shadow-sm">
-                            <h2 className="text-lg font-bold text-slate-900 mb-4 border-b border-slate-100 pb-3">What are we looking at?</h2>
-                            <div
-                                className="prose prose-slate prose-blue max-w-none prose-headings:font-bold prose-headings:text-slate-900 prose-p:text-slate-700 prose-li:text-slate-700 prose-a:text-blue-600"
-                                dangerouslySetInnerHTML={{
-                                    __html: doc.body
-                                        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-                                        .replace(/\*(.*?)\*/g, '<em>$1</em>')
-                                        .replace(/\n/g, '<br/>')
-                                        .replace(/- (.*?)(?=<br\/>|$)/g, '<li class="ml-4 list-disc">$1</li>')
-                                        .replace(/`([^`]+)`/g, '<code class="bg-slate-100 text-slate-800 px-1 py-0.5 rounded-none text-sm">$1</code>')
-                                }}
-                            />
-                        </div>
-
-                    </div>
-
-                    {/* Right Rail */}
-                    <div className="space-y-6">
-
-                        {/* Take Action / Related Actions */}
-                        {doc.relatedActions && doc.relatedActions.length > 0 && (
-                            <div className="bg-blue-600 rounded-none p-6 shadow-sm border border-blue-500 text-white">
-                                <h3 className="text-sm font-bold uppercase tracking-wider mb-4 flex items-center gap-2">
-                                    <CommandLineIcon className="w-4 h-4 text-blue-200" />
-                                    Take Action
-                                </h3>
-                                <div className="space-y-2.5">
-                                    {doc.relatedActions.map((action, i) => (
-                                        <a
-                                            key={i}
-                                            href={action.url}
-                                            className="block w-full text-left bg-blue-700/50 hover:bg-blue-800 border border-blue-500 rounded-none px-4 py-3 text-sm font-medium transition-colors shadow-sm group"
-                                        >
-                                            <div className="flex justify-between items-center">
-                                                <span>{action.label}</span>
-                                                <ArrowTopRightOnSquareIcon className="w-4 h-4 opacity-50 group-hover:opacity-100 transition-opacity" />
-                                            </div>
-                                        </a>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Applies To */}
-                        {doc.appliesTo && doc.appliesTo.length > 0 && (
-                            <div className="bg-slate-900 border border-slate-700 rounded-none p-6 shadow-sm">
-                                <h3 className="text-sm font-bold text-white uppercase tracking-wider mb-3">Applies To</h3>
-                                <div className="flex flex-wrap gap-2">
-                                    {doc.appliesTo.map(role => (
-                                        <span key={role} className="bg-slate-800 text-slate-300 border border-slate-700 text-xs px-2.5 py-1 rounded-none font-medium">
-                                            {role}
-                                        </span>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Thresholds / Status Card */}
-                        {(doc.normal || doc.warning || doc.critical) && (
-                            <div className="bg-white border border-slate-200 rounded-none p-6 shadow-sm">
-                                <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-4">Metric Thresholds</h3>
-                                <ul className="space-y-3">
-                                    {doc.normal && (
-                                        <li className="flex justify-between items-center text-sm">
-                                            <span className="text-slate-500">Normal</span>
-                                            <span className="font-mono bg-green-50 text-green-700 font-bold px-2 py-1 rounded-none">{doc.normal}</span>
-                                        </li>
-                                    )}
-                                    {doc.warning && (
-                                        <li className="flex justify-between items-center text-sm">
-                                            <span className="text-slate-500">Warning</span>
-                                            <span className="font-mono bg-amber-50 text-amber-700 font-bold px-2 py-1 rounded-none">{doc.warning}</span>
-                                        </li>
-                                    )}
-                                    {doc.critical && (
-                                        <li className="flex justify-between items-center text-sm">
-                                            <span className="text-slate-500">Critical</span>
-                                            <span className="font-mono bg-red-50 text-red-700 font-bold px-2 py-1 rounded-none">{doc.critical}</span>
-                                        </li>
-                                    )}
-                                </ul>
-                            </div>
-                        )}
-
-                        {/* Action Card */}
-                        {doc.action && doc.action.length > 0 && (
-                            <div className="bg-white border border-slate-200 rounded-none p-6 shadow-sm border-l-4 border-l-blue-500">
-                                <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-4 flex items-center gap-2">
-                                    <CommandLineIcon className="w-4 h-4 text-blue-500" />
-                                    Recommended Actions
-                                </h3>
-                                <ul className="space-y-2">
-                                    {doc.action.map((act, i) => (
-                                        <li key={i} className="flex gap-2 text-sm text-slate-700">
-                                            <span className="text-blue-500 font-bold">•</span>
-                                            <span>{act}</span>
-                                        </li>
-                                    ))}
-                                </ul>
-                            </div>
-                        )}
-
-                        {/* Meta Card */}
-                        <div className="bg-slate-100 rounded-none p-5 text-xs text-slate-500">
-                            <div className="mb-2"><strong>ID:</strong> `{doc.id}`</div>
-                            {doc.lastUpdated && <div><strong>Last updated:</strong> {doc.lastUpdated}</div>}
-
-                            {doc.relatedIds && doc.relatedIds.length > 0 && (
-                                <div className="mt-4 pt-4 border-t border-slate-200">
-                                    <strong className="block mb-2 text-slate-700">Related Articles:</strong>
-                                    <div className="space-y-2">
-                                        {doc.relatedIds.map(rid => (
-                                            <a key={rid} href={`/admin/help?doc=${rid}`} className="block text-blue-600 hover:underline truncate">
-                                                {rid}
-                                            </a>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Feedback Loop */}
-                        <div className="bg-white border border-slate-200 rounded-none p-6 shadow-sm text-center">
-                            <h3 className="text-sm font-bold text-slate-900 mb-3">Was this article helpful?</h3>
-                            <div className="flex justify-center gap-3 mb-4">
-                                <button
-                                    onClick={() => postHelpAnalytics({ event_type: 'helpful_yes', article_id: doc.id })}
-                                    className="px-4 py-2 border border-slate-200 rounded-none text-sm font-medium text-slate-600 hover:bg-slate-50 hover:text-green-600 hover:border-green-200 transition-colors">
-                                    👍 Yes
-                                </button>
-                                <button
-                                    onClick={() => postHelpAnalytics({ event_type: 'helpful_no', article_id: doc.id })}
-                                    className="px-4 py-2 border border-slate-200 rounded-none text-sm font-medium text-slate-600 hover:bg-slate-50 hover:text-red-600 hover:border-red-200 transition-colors">
-                                    👎 No
-                                </button>
-                            </div>
-                            <button
-                                onClick={() => postHelpAnalytics({ event_type: 'improvement_suggested', article_id: doc.id })}
-                                className="text-xs text-blue-600 hover:underline">
-                                Suggest an improvement →
-                            </button>
-                        </div>
-
-                    </div>
-                </div>
+            <div className="flex items-center gap-2">
+              {article.jumpToRoute && (
+                <button
+                  type="button"
+                  onClick={() => navigate(article.jumpToRoute!)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold bg-[#dc0000] hover:bg-[#b90000] text-white border border-[#dc0000] transition-colors cursor-pointer"
+                >
+                  <span>{t('helpConsole.openSectionBtn')}</span>
+                </button>
+              )}
+              {article.docsUrl && (
+                <a
+                  href={article.docsUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold bg-slate-100 dark:bg-[#16161b] text-slate-700 dark:text-[#e4e4e7] border border-slate-300 dark:border-[#27272a] hover:border-[#dc0000] dark:hover:border-[#ef4444] transition-colors"
+                >
+                  <span>{t('helpConsole.docsReferenceBtn')}</span>
+                  <ArrowTopRightOnSquareIcon className="w-3.5 h-3.5" />
+                </a>
+              )}
             </div>
-        </div >
+          </div>
+        </div>
+
+        {/* Main Article Container */}
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 mt-8">
+          <div className="bg-white dark:bg-[#0e0e11] border border-slate-200 dark:border-[#27272a] p-6 sm:p-10">
+            {/* Badges */}
+            <div className="flex flex-wrap items-center gap-2.5 mb-4">
+              <span
+                className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 text-xs font-mono font-bold uppercase tracking-wider border ${getTypeBadgeStyle(
+                  article.type
+                )}`}
+              >
+                {getTypeIcon(article.type)}
+                {t(`helpConsole.types.${article.type}`)}
+              </span>
+              <span className="px-2.5 py-0.5 text-xs font-mono font-bold bg-slate-100 dark:bg-[#16161b] text-slate-600 dark:text-[#a1a1aa] border border-slate-200 dark:border-[#27272a]">
+                {t(`helpConsole.categories.${article.category}`)}
+              </span>
+              <span className="px-2.5 py-0.5 text-xs font-mono text-slate-500 dark:text-[#71717a]">
+                ID: {article.id}
+              </span>
+            </div>
+
+            {/* Title */}
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-[#f4f4f5] tracking-tight mb-4">
+              {t(article.titleKey)}
+            </h1>
+
+            {/* Summary */}
+            <p className="text-base sm:text-lg text-slate-600 dark:text-[#a1a1aa] leading-relaxed mb-8 pb-6 border-b border-slate-200 dark:border-[#27272a]">
+              {t(article.summaryKey)}
+            </p>
+
+            {/* Canonical Formula / Specification Box */}
+            {article.formulaSpec && (
+              <div className="mb-8">
+                <div className="text-xs font-mono font-bold uppercase tracking-wider text-slate-500 dark:text-[#a1a1aa] mb-2">
+                  {t('helpConsole.formulaLabel')}
+                </div>
+                <div className="p-4 bg-slate-100 dark:bg-[#141418] border border-slate-300 dark:border-[#27272a] font-mono text-xs sm:text-sm text-slate-900 dark:text-[#f4f4f5] overflow-x-auto">
+                  {article.formulaSpec}
+                </div>
+              </div>
+            )}
+
+            {/* Operating Thresholds Telemetry Grid */}
+            {(article.normalRange || article.warningThreshold || article.criticalThreshold) && (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+                {article.normalRange && (
+                  <div className="p-4 bg-emerald-500/5 dark:bg-emerald-500/10 border border-emerald-500/30">
+                    <div className="flex items-center gap-1.5 text-emerald-700 dark:text-emerald-400 font-mono font-bold text-xs uppercase tracking-wider mb-1.5">
+                      <CheckCircleIcon className="w-4 h-4" />
+                      {t('helpConsole.normalRangeLabel')}
+                    </div>
+                    <div className="text-sm font-mono font-semibold text-slate-900 dark:text-[#f4f4f5]">
+                      {article.normalRange}
+                    </div>
+                  </div>
+                )}
+                {article.warningThreshold && (
+                  <div className="p-4 bg-amber-500/5 dark:bg-amber-500/10 border border-amber-500/30">
+                    <div className="flex items-center gap-1.5 text-amber-700 dark:text-amber-400 font-mono font-bold text-xs uppercase tracking-wider mb-1.5">
+                      <ExclamationTriangleIcon className="w-4 h-4" />
+                      {t('helpConsole.warningThresholdLabel')}
+                    </div>
+                    <div className="text-sm font-mono font-semibold text-slate-900 dark:text-[#f4f4f5]">
+                      {article.warningThreshold}
+                    </div>
+                  </div>
+                )}
+                {article.criticalThreshold && (
+                  <div className="p-4 bg-red-500/5 dark:bg-red-500/10 border border-red-500/30">
+                    <div className="flex items-center gap-1.5 text-red-700 dark:text-red-400 font-mono font-bold text-xs uppercase tracking-wider mb-1.5">
+                      <XCircleIcon className="w-4 h-4" />
+                      {t('helpConsole.criticalThresholdLabel')}
+                    </div>
+                    <div className="text-sm font-mono font-semibold text-slate-900 dark:text-[#f4f4f5]">
+                      {article.criticalThreshold}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Tags */}
+            <div className="flex flex-wrap gap-2 pt-4 border-t border-slate-200 dark:border-[#27272a]">
+              {article.tags.map((tag) => (
+                <button
+                  key={tag}
+                  type="button"
+                  onClick={() => {
+                    const nextParams = new URLSearchParams();
+                    nextParams.set('q', tag);
+                    setSearchParams(nextParams);
+                  }}
+                  className="text-xs font-mono px-2.5 py-1 bg-slate-100 dark:bg-[#16161b] text-slate-600 dark:text-[#a1a1aa] border border-slate-200 dark:border-[#27272a] hover:border-[#dc0000] dark:hover:border-[#ef4444] hover:text-[#dc0000] dark:hover:text-[#ef4444] transition-colors cursor-pointer"
+                >
+                  {tag}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Related Modules in Domain */}
+          {relatedArticles.length > 0 && (
+            <div className="mt-8">
+              <h2 className="text-sm font-mono font-bold uppercase tracking-wider text-slate-600 dark:text-[#a1a1aa] mb-4">
+                {t('helpConsole.relatedArticlesTitle')}
+              </h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {relatedArticles.map((rel: HelpArticle) => (
+                  <div
+                    key={rel.id}
+                    onClick={() => {
+                      const nextParams = new URLSearchParams(searchParams);
+                      nextParams.set('doc', rel.id);
+                      setSearchParams(nextParams);
+                    }}
+                    className="p-4 bg-white dark:bg-[#0e0e11] border border-slate-200 dark:border-[#27272a] hover:border-[#dc0000] dark:hover:border-[#ef4444] transition-colors cursor-pointer"
+                  >
+                    <div className="text-[11px] font-mono font-bold text-[#dc0000] dark:text-[#ef4444] uppercase mb-1">
+                      {t(`helpConsole.types.${rel.type}`)}
+                    </div>
+                    <div className="text-sm font-bold text-slate-900 dark:text-[#f4f4f5] mb-1">
+                      {t(rel.titleKey)}
+                    </div>
+                    <p className="text-xs text-slate-500 dark:text-[#a1a1aa] line-clamp-2">
+                      {t(rel.summaryKey)}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
     );
+  }
+
+  // Fallback for legacy error links (e.g. /admin/help?doc=error-*)
+  return (
+    <div className="min-h-screen bg-[#f8fafc] dark:bg-[#09090b] text-slate-900 dark:text-[#f4f4f5] pb-20">
+      <div className="bg-white dark:bg-[#0e0e11] border-b border-slate-200 dark:border-[#27272a]">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <button
+            type="button"
+            onClick={handleBackToIndex}
+            className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-[#a1a1aa] hover:text-[#dc0000] dark:hover:text-[#ef4444] cursor-pointer"
+          >
+            <ArrowLeftIcon className="w-4 h-4" />
+            {t('helpConsole.backToIndex')}
+          </button>
+        </div>
+      </div>
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 mt-8">
+        <div className="bg-white dark:bg-[#0e0e11] border border-slate-200 dark:border-[#27272a] p-8">
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-[#f4f4f5] mb-2">
+            {legacyDoc ? legacyDoc.title : docId}
+          </h1>
+          <p className="text-sm text-slate-600 dark:text-[#a1a1aa] mb-6">
+            {legacyDoc ? legacyDoc.summary : t('helpConsole.noResultsHint')}
+          </p>
+          {legacyDoc?.body && (
+            <div className="text-sm text-slate-700 dark:text-[#e4e4e7] whitespace-pre-line font-mono bg-slate-100 dark:bg-[#141418] p-4 border border-slate-200 dark:border-[#27272a]">
+              {legacyDoc.body.trim()}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 };
