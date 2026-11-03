@@ -408,6 +408,9 @@ const verifySiteAccess = async (req, res, next) => {
 
 router.use(requireAuth);
 
+// In-memory tenant onboarding status map (ONBOARDING_PENDING -> ACTIVE_OPERATION)
+const tenantLifecycleStatus = new Map();
+
 // ──── 0. Root Readiness & Onboarding State Aggregation Endpoint ───────────────
 router.get('/', async (req, res) => {
     try {
@@ -422,9 +425,13 @@ router.get('/', async (req, res) => {
             onboardingService.getProductionSites(tenantId).catch(() => ([]))
         ]);
 
+        const currentStatus = tenantLifecycleStatus.get(tenantId) || 'ONBOARDING_PENDING';
+
         res.json({
             ok: true,
             data: {
+                tenantId,
+                status: currentStatus,
                 company,
                 sites,
                 readiness
@@ -433,6 +440,25 @@ router.get('/', async (req, res) => {
     } catch (err) {
         console.error('[ONBOARDING][ROOT-READINESS-ERROR]', err);
         res.status(500).json({ ok: false, error: err.message || 'Failed to compute printhouse readiness' });
+    }
+});
+
+// POST /api/printhouse/onboarding/complete — Finalizes onboarding, transitions to ACTIVE_OPERATION
+router.post('/complete', async (req, res) => {
+    try {
+        const tenantId = req.user.tenantId;
+        if (!tenantId) {
+            return res.status(400).json({ ok: false, error: 'Tenant context required' });
+        }
+        tenantLifecycleStatus.set(tenantId, 'ACTIVE_OPERATION');
+        return res.status(200).json({
+            ok: true,
+            tenantId,
+            status: 'ACTIVE_OPERATION',
+            message: 'Onboarding completed successfully. Workspace unlocked for active operations.'
+        });
+    } catch (err) {
+        return res.status(500).json({ ok: false, error: err.message });
     }
 });
 

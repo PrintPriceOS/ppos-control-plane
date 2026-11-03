@@ -163,6 +163,9 @@ function createFallbackRouter() {
     };
 }
 
+// In-memory tenant preflight quality profile registry
+const tenantPreflightProfiles = new Map();
+
 function createPreflightRouter() {
     let router;
     try {
@@ -174,8 +177,18 @@ function createPreflightRouter() {
 
     // GET /api/preflight/capabilities (Public Discovery Endpoint per OpenAPI contract)
     router.get('/capabilities', (req, res) => {
+        const tenantId = req.query?.tenantId || (req.user && req.user.tenantId) || 'tenant-default';
+        const tenantProfile = tenantPreflightProfiles.get(tenantId);
+
         return res.status(200).json({
             ok: true,
+            tenantId,
+            qualityProfile: tenantProfile || {
+                standard: 'ISO_12647_2_FOGRA39',
+                minBleedMm: 3.0,
+                minDpi: 300,
+                colorMode: 'CMYK_ONLY'
+            },
             standards: PREFLIGHT_STANDARDS,
             supportedRules: [
                 'GEOMETRY_TRIMBOX_VALIDATION',
@@ -195,6 +208,39 @@ function createPreflightRouter() {
             ],
             geometryProfiles: GEOMETRY_PROFILES,
             maxUploadSizeBytes: MAX_PREFLIGHT_PDF_BYTES
+        });
+    });
+
+    // POST /api/preflight/profile (Tenant Quality Profile Configuration — Onboarding Phase 4)
+    router.post('/profile', (req, res) => {
+        const tenantId = (req.user && req.user.tenantId) || req.body?.tenantId || 'tenant-default';
+        const profile = {
+            standard: req.body?.standard || 'ISO_12647_2_FOGRA39',
+            minBleedMm: req.body?.minBleedMm !== undefined ? Number(req.body.minBleedMm) : 3.0,
+            minDpi: req.body?.minDpi !== undefined ? Number(req.body.minDpi) : 300,
+            colorMode: req.body?.colorMode || 'CMYK_ONLY',
+            updatedAt: new Date().toISOString()
+        };
+        tenantPreflightProfiles.set(tenantId, profile);
+        return res.status(200).json({
+            ok: true,
+            tenantId,
+            profile
+        });
+    });
+
+    router.get('/profile', (req, res) => {
+        const tenantId = (req.user && req.user.tenantId) || req.query?.tenantId || 'tenant-default';
+        const profile = tenantPreflightProfiles.get(tenantId) || {
+            standard: 'ISO_12647_2_FOGRA39',
+            minBleedMm: 3.0,
+            minDpi: 300,
+            colorMode: 'CMYK_ONLY'
+        };
+        return res.status(200).json({
+            ok: true,
+            tenantId,
+            profile
         });
     });
 

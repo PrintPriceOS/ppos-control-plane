@@ -12,6 +12,8 @@ import {
 } from 'lucide-react';
 import { getPrinthouseDashboardOrders } from '../../lib/adminApi';
 import { useLocale } from '../../i18n';
+import { getUserTenantId, isDemoTenant } from '../../lib/authStore';
+import { Link } from 'react-router-dom';
 
 type OrderStatus =
   | 'PENDING_ROUTING'
@@ -170,20 +172,32 @@ export const LiveOrdersFeed: React.FC<{
   onOpenCmr?: (orderId: string) => void;
 }> = ({ onSelectOrder, onOpenProof, onOpenCmr }) => {
   const { t, locale } = useLocale();
-  const [orders, setOrders] = useState<LiveOrder[]>(FALLBACK_PRODUCTION_ORDERS);
-  const [revenue, setRevenue] = useState<number>(64210.0);
+  const isDemo = isDemoTenant(getUserTenantId());
+  const [orders, setOrders] = useState<LiveOrder[]>(isDemo ? FALLBACK_PRODUCTION_ORDERS : []);
+  const [revenue, setRevenue] = useState<number>(isDemo ? 64210.0 : 0.0);
   const [filter, setFilter] = useState<'ALL' | 'HIGH_PROFIT' | 'URGENT'>('ALL');
   const [loading, setLoading] = useState<boolean>(true);
 
   const fetchOrders = async () => {
     try {
       const res = await getPrinthouseDashboardOrders();
-      if (res && res.ok && res.data && Array.isArray(res.data.orders) && res.data.orders.length > 0) {
-        setOrders(res.data.orders);
-        setRevenue(res.data.expectedRevenueEUR || 64210.0);
+      if (res && res.ok && res.data) {
+        if (Array.isArray(res.data.orders) && res.data.orders.length > 0) {
+          setOrders(res.data.orders);
+          setRevenue(res.data.expectedRevenueEUR || 0);
+        } else if (isDemo) {
+          setOrders(FALLBACK_PRODUCTION_ORDERS);
+          setRevenue(64210.0);
+        } else {
+          setOrders([]);
+          setRevenue(0.0);
+        }
       }
     } catch (e) {
-      // Fallback orders stay active
+      if (!isDemo) {
+        setOrders([]);
+        setRevenue(0.0);
+      }
     } finally {
       setLoading(false);
     }
@@ -408,8 +422,25 @@ export const LiveOrdersFeed: React.FC<{
       </div>
 
       {filteredOrders.length === 0 && (
-        <div className="py-10 text-center text-sm text-zinc-500 dark:text-[#a1a1aa]">
-          {t('dashboard.orders.noOrders') || 'No orders matching the current filter.'}
+        <div
+          data-testid="orders-empty-state"
+          className="py-12 px-4 text-center rounded-xl bg-zinc-50 dark:bg-[#141418] border border-dashed border-zinc-200 dark:border-[#27272a] my-4 space-y-2"
+        >
+          <Package className="w-8 h-8 text-zinc-400 mx-auto" />
+          <p className="text-sm font-semibold text-zinc-900 dark:text-[#f4f4f5]">
+            No inbound or production orders. Your pipeline is empty.
+          </p>
+          <p className="text-xs text-zinc-500 dark:text-[#a1a1aa] max-w-sm mx-auto">
+            Once orders are routed from the marketplace or submitted via API, they will appear in this real-time production feed.
+          </p>
+          <div className="pt-2">
+            <Link
+              to="/onboarding"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#ef4444] hover:bg-[#dc0000] text-white text-xs font-bold transition-colors"
+            >
+              Verify Onboarding Profile →
+            </Link>
+          </div>
         </div>
       )}
     </div>

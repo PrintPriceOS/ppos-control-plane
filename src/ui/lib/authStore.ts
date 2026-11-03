@@ -124,6 +124,11 @@ export function getUserTenantId(): string {
     return getAuthUser()?.tenantId || '';
 }
 
+export function isDemoTenant(tenantId?: string): boolean {
+    const tid = String(tenantId !== undefined ? tenantId : getUserTenantId()).trim().toLowerCase();
+    return tid.startsWith('tenant-demo') || tid === 'demo' || tid === 'tenant-staging-sample';
+}
+
 export function getUserPrinthouseId(): string {
     return getAuthUser()?.printhouseId || '';
 }

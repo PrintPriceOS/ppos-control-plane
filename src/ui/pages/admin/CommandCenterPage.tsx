@@ -38,10 +38,10 @@ import {
   getPrinthouseDashboardActivity,
   getPrinthouseDashboardTelemetry
 } from "../../lib/adminApi";
-import { Navigate } from 'react-router-dom';
+import { Navigate, Link } from 'react-router-dom';
 import { FederationMap } from '../../components/federation/FederationMap';
 import { useAdminQuery } from "../../hooks/useAdminData";
-import { getUserRole, isSupplierUser } from "../../lib/authStore";
+import { getUserRole, isSupplierUser, getUserTenantId, isDemoTenant } from "../../lib/authStore";
 import { safeArray, toDisplayText } from '../../lib/display';
 import { COLORS } from '../../design-system/tokens';
 import { LiveOrdersFeed } from '../../components/dashboard/LiveOrdersFeed';
@@ -591,8 +591,11 @@ export const CommandCenterPage: React.FC = () => {
     } catch (e: any) { alert(e.message); }
   };
 
+  const currentTenantId = getUserTenantId();
+  const isDemo = isDemoTenant(currentTenantId);
+
   const activeJobs = isPrinthouseUser
-    ? (phSummary.data?.data?.activeJobs || phTelemetry.data?.fleetAndQueue?.activeJobsInQueue || 4)
+    ? (phSummary.data?.data?.activeJobs ?? phTelemetry.data?.fleetAndQueue?.activeJobsInQueue ?? (isDemo ? 4 : 0))
     : (industrial.data?.queue?.queues?.[0]?.counts?.active || 4);
   const waitingJobs = isPrinthouseUser
     ? 0
@@ -615,24 +618,26 @@ export const CommandCenterPage: React.FC = () => {
 
   const usedStorageGb = phSummary.data?.data?.storage?.sizeBytes
     ? ((phSummary.data.data.storage.sizeBytes) / (1024 ** 3)).toFixed(1)
-    : (phTelemetry.data?.storage?.usedGb ?? '18.4');
+    : (phTelemetry.data?.storage?.usedGb ?? (isDemo ? '18.4' : '0.0'));
   const activeArtifactsCount = phSummary.data?.data?.storage?.artifactsCount
     ?? phTelemetry.data?.storage?.activeArtifactsCount
-    ?? 14;
+    ?? (isDemo ? 14 : 0);
   const purgedArtifactsCount = phSummary.data?.data?.storage?.purgedCount
     ?? phTelemetry.data?.storage?.purgedArtifactsCount
-    ?? 6;
+    ?? (isDemo ? 6 : 0);
 
   const fleetList = safeArray(phMachines.data?.data?.machines).length > 0
     ? safeArray(phMachines.data?.data?.machines)
     : safeArray(phTelemetry.data?.fleetAndQueue?.machines).length > 0
       ? safeArray(phTelemetry.data?.fleetAndQueue?.machines)
-      : [
-          { id: 'xl106', name: 'Heidelberg Speedmaster XL 106-8P (Offset B1)', status: 'ACTIVE', loadPct: 86 },
-          { id: 'indigo12k', name: 'HP Indigo 12000 HD Digital Press (B2)', status: 'ACTIVE', loadPct: 74 },
-          { id: 'komorig29', name: 'Komori Lithrone G29 (Offset 5C)', status: 'ACTIVE', loadPct: 48 },
-          { id: 'alegro', name: 'Müller Martini Alegro PUR Binder', status: 'ACTIVE', loadPct: 92 }
-        ];
+      : isDemo
+        ? [
+            { id: 'xl106', name: 'Heidelberg Speedmaster XL 106-8P (Offset B1)', status: 'ACTIVE', loadPct: 86 },
+            { id: 'indigo12k', name: 'HP Indigo 12000 HD Digital Press (B2)', status: 'ACTIVE', loadPct: 74 },
+            { id: 'komorig29', name: 'Komori Lithrone G29 (Offset 5C)', status: 'ACTIVE', loadPct: 48 },
+            { id: 'alegro', name: 'Müller Martini Alegro PUR Binder', status: 'ACTIVE', loadPct: 92 }
+          ]
+        : [];
 
   return (
     <div className="space-y-6 italic-text-off">
@@ -724,12 +729,14 @@ export const CommandCenterPage: React.FC = () => {
                 Telemetry Channel
               </span>
             </div>
-            <span
-              data-testid="telemetry-sample-indicator"
-              className="inline-flex items-center px-2.5 py-0.5 rounded text-[10px] font-mono font-bold uppercase tracking-wider bg-amber-500/10 text-amber-500 dark:text-amber-400 border border-amber-500/30"
-            >
-              [DEMO / STAGING SAMPLE]
-            </span>
+            {isDemo && (
+              <span
+                data-testid="telemetry-sample-indicator"
+                className="inline-flex items-center px-2.5 py-0.5 rounded text-[10px] font-mono font-bold uppercase tracking-wider bg-amber-500/10 text-amber-500 dark:text-amber-400 border border-amber-500/30"
+              >
+                [DEMO / STAGING SAMPLE]
+              </span>
+            )}
           </div>
 
           {/* 1. TOP HERO STATS ROW (4 LARGE CARDS) */}
@@ -757,7 +764,7 @@ export const CommandCenterPage: React.FC = () => {
                 </div>
                 <div className="text-3xl sm:text-4xl font-extrabold text-zinc-900 dark:text-[#f4f4f5] tabular-nums tracking-tight">
                   €
-                  {(phTelemetry.data?.financials?.netPrinthousePayoutEur ?? 56504.8).toLocaleString(
+                  {(phTelemetry.data?.financials?.netPrinthousePayoutEur ?? (isDemo ? 56504.8 : 0)).toLocaleString(
                     'en-US',
                     { minimumFractionDigits: 2 }
                   )}
@@ -765,7 +772,7 @@ export const CommandCenterPage: React.FC = () => {
               </div>
               <p className="mt-4 pt-3 border-t border-zinc-100 dark:border-[#1f1f24] text-xs sm:text-sm font-medium text-zinc-600 dark:text-[#a1a1aa]">
                 {t('dashboard.hub.kpiRevenueSubtitle', {
-                  cleared: (phTelemetry.data?.financials?.releasedEscrowEur ?? 4900).toLocaleString(
+                  cleared: (phTelemetry.data?.financials?.releasedEscrowEur ?? (isDemo ? 4900 : 0)).toLocaleString(
                     'en-US'
                   ),
                 })}
@@ -787,7 +794,7 @@ export const CommandCenterPage: React.FC = () => {
                 </div>
                 <div className="flex items-baseline gap-2">
                   <span className="text-3xl sm:text-4xl font-extrabold text-zinc-900 dark:text-[#f4f4f5] tabular-nums tracking-tight">
-                    86%
+                    {phTelemetry.data?.fleetAndQueue?.avgOeePct ?? (isDemo ? 86 : 0)}%
                   </span>
                   <span className="text-lg font-extrabold text-[#10b981]">
                     {t('dashboard.hub.kpiFleetUnit')}
@@ -797,12 +804,15 @@ export const CommandCenterPage: React.FC = () => {
                 <div className="mt-3 w-full h-2.5 bg-zinc-200 dark:bg-[#1f1f24] rounded-full overflow-hidden">
                   <div
                     className="h-full bg-gradient-to-r from-[#10b981] to-[#ef4444] rounded-full transition-all duration-700"
-                    style={{ width: '86%' }}
+                    style={{ width: `${phTelemetry.data?.fleetAndQueue?.avgOeePct ?? (isDemo ? 86 : 0)}%` }}
                   />
                 </div>
               </div>
               <p className="mt-4 pt-3 border-t border-zinc-100 dark:border-[#1f1f24] text-xs sm:text-sm font-medium text-zinc-600 dark:text-[#a1a1aa]">
-                {t('dashboard.hub.kpiFleetSubtitle', { active: 3, total: 3 })}
+                {t('dashboard.hub.kpiFleetSubtitle', {
+                  active: fleetList.filter((m: any) => m.status === 'ACTIVE' || m.status === 'active').length,
+                  total: fleetList.length
+                })}
               </p>
             </div>
 
@@ -820,19 +830,19 @@ export const CommandCenterPage: React.FC = () => {
                   <Square3Stack3DIcon className="w-5 h-5 text-[#10b981]" />
                 </div>
                 <div className="text-3xl sm:text-4xl font-extrabold text-zinc-900 dark:text-[#f4f4f5] tabular-nums tracking-tight">
-                  84.2%
+                  {isDemo ? '84.2%' : (activeJobs > 0 ? '100%' : '0.0%')}
                 </div>
-                {/* Dual-color progress segment (84% auto-fixed / 16% operator review) */}
+                {/* Dual-color progress segment */}
                 <div className="mt-3 space-y-1.5">
                   <div className="w-full h-2.5 bg-zinc-200 dark:bg-[#1f1f24] rounded-full overflow-hidden flex">
                     <div
                       className="h-full bg-[#10b981]"
-                      style={{ width: '84.2%' }}
+                      style={{ width: isDemo ? '84.2%' : (activeJobs > 0 ? '100%' : '0%') }}
                       title={t('dashboard.hub.kpiPreflightAutoFixed')}
                     />
                     <div
                       className="h-full bg-amber-400"
-                      style={{ width: '15.8%' }}
+                      style={{ width: isDemo ? '15.8%' : '0%' }}
                       title={t('dashboard.hub.kpiPreflightReview')}
                     />
                   </div>
@@ -865,19 +875,19 @@ export const CommandCenterPage: React.FC = () => {
                   </span>
                   <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30">
                     {t('dashboard.hub.kpiLogisticsBadge', {
-                      shipments: phTelemetry.data?.logistics?.scheduledShipmentsCount ?? 3,
+                      shipments: phTelemetry.data?.logistics?.scheduledShipmentsCount ?? (isDemo ? 3 : 0),
                     })}
                   </span>
                 </div>
                 <div className="text-3xl sm:text-4xl font-extrabold text-zinc-900 dark:text-[#f4f4f5] tabular-nums tracking-tight">
                   {t('dashboard.hub.kpiLogisticsValue', {
-                    pallets: phTelemetry.data?.logistics?.totalEpalPallets ?? 6,
+                    pallets: phTelemetry.data?.logistics?.totalEpalPallets ?? (isDemo ? 6 : 0),
                   })}
                 </div>
               </div>
               <p className="mt-4 pt-3 border-t border-zinc-100 dark:border-[#1f1f24] text-xs sm:text-sm font-medium text-zinc-600 dark:text-[#a1a1aa]">
                 {t('dashboard.hub.kpiLogisticsSubtitle', {
-                  sscc: phTelemetry.data?.logistics?.ssccLabelsGeneratedCount ?? 12,
+                  sscc: phTelemetry.data?.logistics?.ssccLabelsGeneratedCount ?? (isDemo ? 12 : 0),
                 })}
               </p>
             </div>
@@ -901,75 +911,70 @@ export const CommandCenterPage: React.FC = () => {
                     </p>
                   </div>
                   <span className="px-2.5 py-1 rounded-lg bg-[#ef4444]/10 text-[#ef4444] border border-[#ef4444]/30 text-xs font-bold shrink-0">
-                    3 / 3 Online
+                    {fleetList.length > 0
+                      ? `${fleetList.filter((m: any) => m.status === 'ACTIVE' || m.status === 'active').length} / ${fleetList.length} Online`
+                      : '0 Machines'}
                   </span>
                 </div>
 
-                <div className="space-y-4">
-                  {[
-                    {
-                      id: 'heidelberg-xl106',
-                      name: 'Heidelberg Speedmaster XL 106-8P',
-                      jobLabel: t('dashboard.hub.pressJobAtlas'),
-                      pct: 80,
-                      etaMin: 24,
-                      accent: 'bg-[#10b981]',
-                    },
-                    {
-                      id: 'hp-indigo-12000',
-                      name: 'HP Indigo 12000 HD Digital Press',
-                      jobLabel: t('dashboard.hub.pressJobPhotonic'),
-                      pct: 74,
-                      etaMin: 19,
-                      accent: 'bg-blue-500',
-                    },
-                    {
-                      id: 'komori-g29',
-                      name: 'Komori Lithrone G29 (Offset 5C)',
-                      jobLabel: t('dashboard.hub.pressJobBauhaus'),
-                      pct: 48,
-                      etaMin: 42,
-                      accent: 'bg-[#ef4444]',
-                    },
-                  ].map((press) => (
-                    <div
-                      key={press.id}
-                      className="p-3.5 rounded-xl bg-zinc-50 dark:bg-[#141418] border border-zinc-200 dark:border-[#27272a] space-y-2.5"
+                {fleetList.length === 0 ? (
+                  <div
+                    data-testid="fleet-empty-state"
+                    className="p-6 text-center rounded-xl bg-zinc-50 dark:bg-[#141418] border border-dashed border-zinc-200 dark:border-[#27272a] space-y-3"
+                  >
+                    <CpuChipIcon className="w-8 h-8 text-zinc-400 mx-auto" />
+                    <p className="text-xs text-zinc-600 dark:text-[#a1a1aa] font-medium max-w-xs mx-auto">
+                      No presses or finishing equipment configured yet.
+                    </p>
+                    <Link
+                      to="/onboarding"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#ef4444] hover:bg-[#dc0000] text-white text-xs font-bold transition-colors"
                     >
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <span className="w-2.5 h-2.5 rounded-full bg-[#10b981] shrink-0" />
-                          <span className="text-sm font-bold text-zinc-900 dark:text-[#f4f4f5] truncate">
-                            {press.name}
-                          </span>
+                      [Add Machine via Onboarding]
+                    </Link>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {fleetList.map((press: any) => (
+                      <div
+                        key={press.id || press.code}
+                        className="p-3.5 rounded-xl bg-zinc-50 dark:bg-[#141418] border border-zinc-200 dark:border-[#27272a] space-y-2.5"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="w-2.5 h-2.5 rounded-full bg-[#10b981] shrink-0" />
+                            <span className="text-sm font-bold text-zinc-900 dark:text-[#f4f4f5] truncate">
+                              {press.name}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <span className="text-xs font-mono font-semibold text-zinc-500 dark:text-[#a1a1aa]">
+                              {press.etaMin !== undefined ? t('dashboard.hub.pressEtaMin', { min: press.etaMin }) : 'Standby'}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setFleetModalOpen(true)}
+                              className="px-2.5 py-1 rounded-lg bg-zinc-200/80 dark:bg-[#1f1f24] hover:bg-[#ef4444] text-zinc-800 dark:text-zinc-200 hover:text-white text-xs font-bold transition-colors cursor-pointer"
+                            >
+                              {t('dashboard.hub.btnReassignPress')}
+                            </button>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-2 shrink-0">
-                          <span className="text-xs font-mono font-semibold text-zinc-500 dark:text-[#a1a1aa]">
-                            {t('dashboard.hub.pressEtaMin', { min: press.etaMin })}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => setFleetModalOpen(true)}
-                            className="px-2.5 py-1 rounded-lg bg-zinc-200/80 dark:bg-[#1f1f24] hover:bg-[#ef4444] text-zinc-800 dark:text-zinc-200 hover:text-white text-xs font-bold transition-colors cursor-pointer"
-                          >
-                            {t('dashboard.hub.btnReassignPress')}
-                          </button>
+
+                        <div className="text-xs font-medium text-zinc-600 dark:text-[#a1a1aa]">
+                          {press.jobLabel || press.activeTitle || 'Available for production dispatch'}
+                        </div>
+
+                        <div className="w-full h-2 bg-zinc-200 dark:bg-[#27272a] rounded-full overflow-hidden">
+                          <div
+                            className={`h-full ${press.accent || 'bg-[#10b981]'} rounded-full transition-all duration-700`}
+                            style={{ width: `${press.pct || press.loadPct || 0}%` }}
+                          />
                         </div>
                       </div>
-
-                      <div className="text-xs font-medium text-zinc-600 dark:text-[#a1a1aa]">
-                        {press.jobLabel}
-                      </div>
-
-                      <div className="w-full h-2 bg-zinc-200 dark:bg-[#27272a] rounded-full overflow-hidden">
-                        <div
-                          className={`h-full ${press.accent} rounded-full transition-all duration-700`}
-                          style={{ width: `${press.pct}%` }}
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -1322,10 +1327,16 @@ export const CommandCenterPage: React.FC = () => {
               status={routing.status}
             >
               <div className="space-y-4">
-                <TelemetryItem label={t('dashboard.avgMargin') || 'Expected Revenue'} value="€64,210.00" status="stable" />
+                <TelemetryItem
+                  label={t('dashboard.avgMargin') || 'Expected Revenue'}
+                  value={isDemo ? '€64,210.00' : '€0.00'}
+                  status="stable"
+                />
                 <div className={`flex justify-between border-t ${COLORS.adaptive.borderSubtle} pt-3`}>
                   <span className={`text-[9px] font-bold ${COLORS.adaptive.textMuted} uppercase`}>Net Printhouse (88%)</span>
-                  <span className="text-sm font-black text-[#10B981]">€56,504.80</span>
+                  <span className="text-sm font-black text-[#10B981]">
+                    {isDemo ? '€56,504.80' : '€0.00'}
+                  </span>
                 </div>
               </div>
             </TacticalPanel>

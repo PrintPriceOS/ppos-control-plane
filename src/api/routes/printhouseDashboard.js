@@ -35,6 +35,11 @@ const runtimeB2bOrderMessages = new Map(); // orderId -> Array<message>
 
 const DEFAULT_PRINTHOUSE_QUOTA_BYTES = 100 * 1024 * 1024 * 1024; // 100 GB industrial quota
 
+function isDemoTenant(tenantId) {
+    const tid = String(tenantId || '').trim().toLowerCase();
+    return tid.startsWith('tenant-demo') || tid === 'tenant-default' || tid === 'demo';
+}
+
 function getCanonicalFleetMachines(printhouseId = 'node-primary') {
     return [
         {
@@ -356,9 +361,9 @@ router.get('/summary', async (req, res) => {
                 summary.storage.usagePct = Number(((summary.storage.sizeBytes / DEFAULT_PRINTHOUSE_QUOTA_BYTES) * 100).toFixed(2));
                 summary.storage.status = 'ACTIVE';
             } else {
-                // Hydrate from live preflightEngineService & operationalTelemetryService if not in stubbed empty unit test
+                // Hydrate from live preflightEngineService & operationalTelemetryService only for demo tenants
                 const isMockedTestUser = String(context.userId || '').startsWith('user-ph-') || String(context.userId || '').startsWith('user-printhouse-');
-                if (!isMockedTestUser) {
+                if (!isMockedTestUser && isDemoTenant(context.tenantId)) {
                     const inspections = listTenantPreflightInspections(context.tenantId || 'tenant-default');
                     const retainedInspections = inspections.filter(i => !i.assetPurged);
                     const purgedInspections = inspections.filter(i => i.assetPurged);
@@ -454,9 +459,9 @@ router.get('/orders', async (req, res) => {
             });
         });
 
-        // If DB returned 0 orders and we are in live Printhouse Hub (not a mocked unit test user), hydrate from canonical Escrow & Plant orders
+        // If DB returned 0 orders, only hydrate canonical sample orders for designated demo tenants
         const isMockedTestUser = String(context.userId || '').startsWith('user-ph-') || String(context.userId || '').startsWith('user-printhouse-');
-        if (ordersList.length === 0 && !isMockedTestUser) {
+        if (ordersList.length === 0 && !isMockedTestUser && isDemoTenant(context.tenantId)) {
             const liveProductionOrders = [
                 {
                     id: 'PUB-ORD-2026-101',
@@ -604,7 +609,7 @@ router.get('/machines', async (req, res) => {
         }));
 
         const isMockedTestUser = String(context.userId || '').startsWith('user-ph-') || String(context.userId || '').startsWith('user-printhouse-');
-        if (machines.length === 0 && !isMockedTestUser) {
+        if (machines.length === 0 && !isMockedTestUser && isDemoTenant(context.tenantId)) {
             machines = getCanonicalFleetMachines(context.printhouseId || 'node-primary');
         }
 
@@ -700,7 +705,7 @@ router.get('/queue', async (req, res) => {
         }));
 
         const isMockedTestUser = String(context.userId || '').startsWith('user-ph-') || String(context.userId || '').startsWith('user-printhouse-');
-        if (dispatches.length === 0 && !isMockedTestUser) {
+        if (dispatches.length === 0 && !isMockedTestUser && isDemoTenant(context.tenantId)) {
             const inspections = listTenantPreflightInspections(context.tenantId || 'tenant-default');
             dispatches = inspections.map(insp => ({
                 id: insp.jobId || insp.id,
@@ -773,7 +778,7 @@ router.get('/incidents', async (req, res) => {
         });
 
         const isMockedTestUser = String(context.userId || '').startsWith('user-ph-') || String(context.userId || '').startsWith('user-printhouse-');
-        if (incidents.length === 0 && !isMockedTestUser) {
+        if (incidents.length === 0 && !isMockedTestUser && isDemoTenant(context.tenantId)) {
             incidents.push(
                 {
                     id: 'INC-2026-01',
@@ -840,7 +845,7 @@ router.get('/activity', async (req, res) => {
         }));
 
         const isMockedTestUser = String(context.userId || '').startsWith('user-ph-') || String(context.userId || '').startsWith('user-printhouse-');
-        if (events.length === 0 && !isMockedTestUser) {
+        if (events.length === 0 && !isMockedTestUser && isDemoTenant(context.tenantId)) {
             events = [
                 {
                     id: 'evt-live-1',
@@ -908,19 +913,43 @@ router.get('/telemetry', async (req, res) => {
             getStorageBackupAndRetentionStatus().catch(() => null)
         ]);
 
+        const isDemo = isDemoTenant(tenantId);
         const inspections = listTenantPreflightInspections(tenantId);
-        const fleetMachines = getCanonicalFleetMachines(printhouseId).map(m => {
-            // Apply any runtime order reassignments
-            for (const [ordId, machCode] of runtimeMachineReassignments.entries()) {
-                if (m.code === machCode) {
-                    return { ...m, activeOrderId: ordId };
-                }
+        
+        // Fleet machines: real DB machines or empty, only fallback if isDemo
+        let fleetMachines = [];
+        try {
+            const [rows] = await db.query(
+                'SELECT id, name, status, region, heartbeat_at FROM printer_machines WHERE tenant_id = ? AND printhouse_id = ?',
+                [tenantId, printhouseId]
+            );
+            if (Array.isArray(rows) && rows.length > 0) {
+                fleetMachines = rows.map(r => ({
+                    id: r.id,
+                    code: r.id,
+                    name: r.name,
+                    status: r.status,
+                    operationalState: r.status === 'active' ? 'IDLE' : 'MAINTENANCE',
+                    loadPct: 0,
+                    oeePct: 0,
+                    speedSph: 10000
+                }));
             }
-            return m;
-        });
+        } catch (_) {}
 
-        const shipments = getCanonicalShipments(tenantId);
-        const b2bThreads = getCanonicalB2bThreads(printhouseId);
+        if (fleetMachines.length === 0 && isDemo) {
+            fleetMachines = getCanonicalFleetMachines(printhouseId).map(m => {
+                for (const [ordId, machCode] of runtimeMachineReassignments.entries()) {
+                    if (m.code === machCode) {
+                        return { ...m, activeOrderId: ordId };
+                    }
+                }
+                return m;
+            });
+        }
+
+        const shipments = isDemo ? getCanonicalShipments(tenantId) : [];
+        const b2bThreads = isDemo ? getCanonicalB2bThreads(printhouseId) : [];
 
         // Build per-job storage breakdown (Interior vs Cover)
         const storageJobsBreakdown = inspections.map((insp, idx) => {
@@ -944,11 +973,11 @@ router.get('/telemetry', async (req, res) => {
             };
         });
 
-        const activeHotGb = 18.4;
+        const activeHotGb = isDemo ? 18.4 : 0.0;
         const quotaGb = 100.0;
-        const reclaimedGb = Number(
+        const reclaimedGb = isDemo ? Number(
             ((backupStatus?.retentionMetrics?.totalReclaimedMb || 6960) / 1024).toFixed(2)
-        );
+        ) : 0.0;
 
         return res.status(200).json({
             ok: true,
@@ -959,34 +988,38 @@ router.get('/telemetry', async (req, res) => {
                 role: context.role
             },
             storage: {
-                status: 'ACTIVE',
+                status: isDemo ? 'ACTIVE' : 'IDLE',
                 usedBytes: Math.round(activeHotGb * 1024 * 1024 * 1024),
                 usedGb: activeHotGb,
                 quotaBytes: DEFAULT_PRINTHOUSE_QUOTA_BYTES,
                 quotaGb,
-                usagePct: 18.4,
-                activeArtifactsCount: Math.max(inspections.filter(i => !i.assetPurged).length * 2, 12),
-                purgedArtifactsCount: Math.max(inspections.filter(i => i.assetPurged).length, 6),
+                usagePct: isDemo ? 18.4 : 0.0,
+                activeArtifactsCount: isDemo ? Math.max(inspections.filter(i => !i.assetPurged).length * 2, 12) : 0,
+                purgedArtifactsCount: isDemo ? Math.max(inspections.filter(i => i.assetPurged).length, 6) : 0,
                 reclaimedGb,
-                coldArchivesCount: backupStatus?.retentionMetrics?.archivedOrdersCount || 3,
-                dbSnapshotsCount: backupStatus?.backupMetrics?.availableSnapshotsCount || 5,
-                bySlot: {
+                coldArchivesCount: isDemo ? (backupStatus?.retentionMetrics?.archivedOrdersCount || 3) : 0,
+                dbSnapshotsCount: isDemo ? (backupStatus?.backupMetrics?.availableSnapshotsCount || 5) : 0,
+                bySlot: isDemo ? {
                     INTERIOR_PDF: { count: 8, sizeGb: 16.8 },
                     COVER_PDF: { count: 8, sizeGb: 1.4 },
                     WIRE_PROOF: { count: 5, sizeGb: 0.2 }
+                } : {
+                    INTERIOR_PDF: { count: 0, sizeGb: 0 },
+                    COVER_PDF: { count: 0, sizeGb: 0 },
+                    WIRE_PROOF: { count: 0, sizeGb: 0 }
                 },
                 jobsBreakdown: storageJobsBreakdown
             },
             fleetAndQueue: {
                 activeJobsInQueue: inspections.length,
                 printingNowCount: fleetMachines.filter(m => m.operationalState === 'PRINTING' || m.operationalState === 'BINDING').length,
-                avgFleetLoadPct: Math.round(fleetMachines.reduce((a, b) => a + b.loadPct, 0) / fleetMachines.length),
-                avgOeePct: Number((fleetMachines.reduce((a, b) => a + b.oeePct, 0) / fleetMachines.length).toFixed(1)),
-                bottleneckAlert: 'Línea PUR Müller Martini Alegro al 92% de carga (curado de adhesivo)',
-                funnelStages: opSummary.funnel?.stages || [],
+                avgFleetLoadPct: fleetMachines.length > 0 ? Math.round(fleetMachines.reduce((a, b) => a + (b.loadPct || 0), 0) / fleetMachines.length) : 0,
+                avgOeePct: fleetMachines.length > 0 ? Number((fleetMachines.reduce((a, b) => a + (b.oeePct || 0), 0) / fleetMachines.length).toFixed(1)) : 0,
+                bottleneckAlert: isDemo ? 'Línea PUR Müller Martini Alegro al 92% de carga (curado de adhesivo)' : null,
+                funnelStages: isDemo ? (opSummary.funnel?.stages || []) : [],
                 machines: fleetMachines
             },
-            financials: {
+            financials: isDemo ? {
                 currency: 'EUR',
                 expectedRevenueEur: 64210.00,
                 custodiedEscrowEur: Math.max(opSummary.escrow?.totalCustodiedEur || 0, 59310.00),
@@ -1072,6 +1105,16 @@ router.get('/telemetry', async (req, res) => {
                         certificatePdfUrl: '/api/customer/orders/PUB-ORD-2026-103/soft-proof/certificate.pdf'
                     }
                 ]
+            } : {
+                currency: 'EUR',
+                expectedRevenueEur: 0.00,
+                custodiedEscrowEur: 0.00,
+                releasedEscrowEur: 0.00,
+                netPrinthousePayoutEur: 0.00,
+                platformFeeMorEur: 0.00,
+                carrierLogisticsFeeEur: 0.00,
+                en16931Compliance: 'FACTURAE_3.2.2 & XRECHNUNG_3.0_ACTIVE',
+                settlements: []
             },
             logistics: {
                 scheduledShipmentsCount: shipments.length,
@@ -1085,8 +1128,8 @@ router.get('/telemetry', async (req, res) => {
             b2bCommunications: {
                 unreadMessagesCount: b2bThreads.reduce((a, t) => a + t.unreadCount, 0),
                 pendingImprimaturCount: b2bThreads.filter(t => t.imprimaturStatus !== 'APPROVED_FOR_PRESS').length,
-                preflightAlertsCount: opSummary.prepressHealth?.warningsCount || 2,
-                incidentMatrix: opSummary.prepressHealth?.incidentMatrix || [],
+                preflightAlertsCount: isDemo ? (opSummary.prepressHealth?.warningsCount || 2) : 0,
+                incidentMatrix: isDemo ? (opSummary.prepressHealth?.incidentMatrix || []) : [],
                 threads: b2bThreads
             }
         });

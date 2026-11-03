@@ -79,6 +79,46 @@ function createPredictiveMaintenanceRouter() {
 
     router.use(requireLogisticsControlPlaneAuth);
 
+    // GET /api/machines — Lists tenant machines (for Hub 360° & Machines panel)
+    router.get('/', async (req, res) => {
+        try {
+            const tenantId =
+                (req.user && req.user.tenantId) ||
+                (req.query && req.query.tenantId) ||
+                (req.headers && req.headers['x-tenant-id']) ||
+                'tenant-default';
+            const printhouseId = (req.user && req.user.printhouseId) || 'node-primary';
+
+            // Query DB printer_machines or fall back to empty list for clean slate
+            let machines = [];
+            try {
+                const db = require('../services/mysqlClient');
+                const rows = await db.query(
+                    'SELECT id, name, status, region, heartbeat_at FROM printer_machines WHERE tenant_id = ?',
+                    [tenantId]
+                );
+                if (Array.isArray(rows) && rows.length > 0) {
+                    machines = rows.map(r => ({
+                        id: r.id,
+                        code: r.id,
+                        name: r.name,
+                        status: r.status,
+                        operationalState: r.status === 'active' ? 'IDLE' : 'MAINTENANCE'
+                    }));
+                }
+            } catch (_) {}
+
+            return res.status(200).json({
+                ok: true,
+                tenantId,
+                data: machines,
+                machines
+            });
+        } catch (err) {
+            return res.status(500).json({ ok: false, error: err.message });
+        }
+    });
+
     // GET /api/machines/predictive-maintenance
     router.get('/predictive-maintenance', async (req, res) => {
         try {
