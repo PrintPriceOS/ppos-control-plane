@@ -97,7 +97,8 @@ function requireLogisticsControlPlaneAuth(req, res, next) {
         'OPERATOR',
         'PUBLISHER',
         'CUSTOMER',
-        'SYSTEM'
+        'SYSTEM',
+        'DEVELOPER_SANDBOX'
     ]);
 
     if (!role || !allowedRoles.has(String(role).toUpperCase())) {

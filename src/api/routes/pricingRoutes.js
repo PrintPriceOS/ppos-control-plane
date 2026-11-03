@@ -50,7 +50,8 @@ function requireLogisticsControlPlaneAuth(req, res, next) {
         'ADMIN',
         'SUPER_ADMIN',
         'OPERATOR',
-        'PUBLISHER'
+        'PUBLISHER',
+        'DEVELOPER_SANDBOX'
     ]);
 
     if (!role || !allowedRoles.has(String(role).toUpperCase())) {
@@ -335,6 +336,68 @@ function createPricingRouter() {
                 'tenant-default';
             const result = calibrateQuote(tenantId, req.body || {});
             return res.status(200).json(result);
+        } catch (err) {
+            return res.status(err.statusCode || 400).json({
+                ok: false,
+                error: err.message
+            });
+        }
+    });
+
+    // POST /api/pricing/book-estimate — Phase 199C Interactive Developer Console & BPE Real-Time Calculator
+    router.post('/book-estimate', async (req, res) => {
+        try {
+            const tenantId =
+                (req.user && req.user.tenantId) ||
+                (req.body && req.body.tenantId) ||
+                (req.headers && req.headers['x-tenant-id']) ||
+                'tenant-default';
+
+            const body = req.body || {};
+            const copies = Math.max(1, Number(body.printRunCopies || body.copies || 1000));
+            const pageCount = Math.max(4, Number(body.pageCount || body.interior_pages || 240));
+            const trimWidthMm = Number(body.trimWidthMm || 148);
+            const trimHeightMm = Number(body.trimHeightMm || 210);
+            const interiorPaperGsm = Number(body.interiorPaperGsm || 90);
+            const bindingType = String(body.bindingType || body.binding_method || 'SOFTCOVER_PUR');
+
+            const calibrated = calibrateQuote(tenantId, {
+                ...body,
+                copies,
+                pageCount,
+                trimWidthMm,
+                trimHeightMm,
+                interiorPaperGsm,
+                bindingType
+            });
+
+            const crossover = calculateCrossoverPoint(tenantId, {
+                pageCount,
+                trimWidthMm,
+                trimHeightMm,
+                interiorPaperGsm
+            });
+
+            return res.status(200).json({
+                ok: true,
+                success: true,
+                tenantId,
+                engine: 'PPOS_5AXIS_BPE_V2',
+                input: {
+                    trimWidthMm,
+                    trimHeightMm,
+                    pageCount,
+                    printRunCopies: copies,
+                    interiorPaperGsm,
+                    bindingType
+                },
+                estimate: calibrated.calibration || calibrated,
+                crossover: {
+                    qStarCopies: crossover?.crossoverQuantity || 750,
+                    recommendedTechnology: copies >= (crossover?.crossoverQuantity || 750) ? 'SHEETFED_OFFSET' : 'HIGH_SPEED_INKJET_DIGITAL'
+                },
+                timestamp: new Date().toISOString()
+            });
         } catch (err) {
             return res.status(err.statusCode || 400).json({
                 ok: false,

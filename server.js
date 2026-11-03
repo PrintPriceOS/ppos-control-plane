@@ -57,6 +57,27 @@ const {
 fastify.addHook('onRequest', async (request, reply) => {
     const url = request.url;
 
+    // Phase 199C: Allow Cross-Origin API Playground requests from docs.printprice.pro & printprice.pro
+    const origin = request.headers['origin'];
+    const allowedCorsOrigins = new Set([
+        'https://docs.printprice.pro',
+        'https://printprice.pro',
+        'https://control.printprice.pro',
+        'http://localhost:3000',
+        'http://localhost:5173',
+        'http://127.0.0.1:3000'
+    ]);
+    if (origin && (allowedCorsOrigins.has(origin) || origin.endsWith('.printprice.pro'))) {
+        reply.header('Access-Control-Allow-Origin', origin);
+        reply.header('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+        reply.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-API-Key, X-Tenant-Id, X-Sandbox-Tenant, Idempotency-Key, X-Trace-Id');
+        reply.header('Access-Control-Expose-Headers', 'X-RateLimit-Limit, X-RateLimit-Remaining, Retry-After');
+        reply.header('Access-Control-Allow-Credentials', 'true');
+    }
+    if (request.method === 'OPTIONS') {
+        return reply.status(204).send();
+    }
+
     // 1. PUBLIC ROUTES
     if (url.startsWith('/health')) return;
     if (url === '/' || url === '/index.html' || url.startsWith('/assets/') || url.includes('favicon')) return;

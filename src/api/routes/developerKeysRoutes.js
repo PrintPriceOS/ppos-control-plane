@@ -219,14 +219,14 @@ router.post('/upgrade-billing', async (req, res) => {
     }
 });
 
-// POST /api/developer/keys/verify-ping — Sandbox/Live self-test endpoint protected by authenticateApiKey
-router.post('/verify-ping', authenticateApiKey('pricing:read'), async (req, res) => {
+// POST or GET /api/developer/keys/verify-ping & /api/developer/keys/test-ping — Sandbox/Live self-test endpoint protected by authenticateApiKey
+async function handleVerifyPing(req, res) {
     try {
         await developerApiKeyService.incrementKeyUsage(
             req.apiKey.id,
             req.apiKey.tenantId,
-            '/api/developer/keys/verify-ping',
-            'POST',
+            req.originalUrl || '/api/developer/keys/test-ping',
+            req.method || 'GET',
             200,
             11
         );
@@ -238,12 +238,23 @@ router.post('/verify-ping', authenticateApiKey('pricing:read'), async (req, res)
             keyType: req.apiKey.keyType,
             tenantId: req.apiKey.tenantId,
             scopes: req.apiKey.scopes,
-            billingTier: req.apiKey.billingTier
+            billingTier: req.apiKey.billingTier,
+            rateLimitPerMinute: req.apiKey.rateLimitPerMinute,
+            monthlyQuota: req.apiKey.monthlyQuota,
+            usageCurrentMonth: req.apiKey.usageCurrentMonth,
+            timestamp: new Date().toISOString()
         });
     } catch (err) {
         res.status(500).json({ ok: false, error: err.message });
     }
-});
+}
+
+router.post('/verify-ping', authenticateApiKey('pricing:read'), handleVerifyPing);
+router.get('/verify-ping', authenticateApiKey('pricing:read'), handleVerifyPing);
+router.get('/test-ping', authenticateApiKey('pricing:read'), handleVerifyPing);
+router.post('/test-ping', authenticateApiKey('pricing:read'), handleVerifyPing);
+router.get('/keys/test-ping', authenticateApiKey('pricing:read'), handleVerifyPing);
+router.post('/keys/test-ping', authenticateApiKey('pricing:read'), handleVerifyPing);
 
 // POST /api/developer/keys/:keyId/rotate — Atomically rotate an API key
 router.post('/:keyId/rotate', async (req, res) => {
