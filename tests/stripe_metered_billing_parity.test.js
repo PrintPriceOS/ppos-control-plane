@@ -315,5 +315,84 @@ describe('Phase 199B — Stripe Hybrid Flat-Rate (€49/mo) + Metered Billing Pa
         const verifyTestAfter = await developerApiKeyService.verifyRawApiKey(testKey.rawKey);
         expect(verifyTestAfter.valid).toBe(true);
     });
+
+    it('6. Enforces Spend Cap Governance: dispatches 80% warning email, auto-pauses pp_live_* keys at 100% spend cap, and resumes upon cap increase', async () => {
+        const tenantId = 'tenant-spend-cap-gov-06';
+
+        // 1. Activate Production Scale with a €50.00 monthly spend ceiling (€49.00 base + €1.00 metered margin)
+        await stripeBillingService.processWebhookEvent({
+            id: 'evt_spendcap_start_06',
+            type: 'checkout.session.completed',
+            data: {
+                object: {
+                    client_reference_id: tenantId,
+                    customer: 'cus_spendcap_06',
+                    subscription: 'sub_spendcap_06',
+                    metadata: {
+                        tenantId,
+                        billingTier: 'PRODUCTION_SCALE',
+                        monthlySpendCapEur: '50.00',
+                        userEmail: 'finops@b2bprint.io'
+                    }
+                }
+            }
+        });
+
+        const liveKey = await developerApiKeyService.createApiKey(
+            tenantId,
+            'user-06',
+            { keyName: 'FinOps Governed Live Key', keyType: 'LIVE' }
+        );
+
+        // At €49.00 base / €50.00 cap = 98% (>= 80% threshold)
+        // Reporting 1 preflight inspection (€0.10) brings total to €49.10 / €50.00 (98.2%) -> triggers 80% warning email
+        await stripeBillingService.reportMeterUsage({
+            customerId: 'cus_spendcap_06',
+            tenantId,
+            apiKeyId: liveKey.id,
+            eventName: 'preflight_2gb_inspection',
+            quantity: 1,
+            idempotencyKey: 'idem_gov_warn_80'
+        });
+
+        let alertState = stripeBillingService.getSpendCapAlertState(tenantId);
+        expect(alertState.warned80At).not.toBeNull();
+        expect(alertState.paused100At).toBeNull();
+        expect(alertState.emailsDispatched.some(e => e.thresholdPct === 80)).toBe(true);
+
+        // Key is still active at 98.2%
+        const checkAt98 = await developerApiKeyService.verifyRawApiKey(liveKey.rawKey);
+        expect(checkAt98.valid).toBe(true);
+
+        // Reporting 9 more preflight inspections (€0.90) brings total to €50.00 / €50.00 (100%) -> triggers 100% auto-pause!
+        await stripeBillingService.reportMeterUsage({
+            customerId: 'cus_spendcap_06',
+            tenantId,
+            apiKeyId: liveKey.id,
+            eventName: 'preflight_2gb_inspection',
+            quantity: 9,
+            idempotencyKey: 'idem_gov_pause_100'
+        });
+
+        alertState = stripeBillingService.getSpendCapAlertState(tenantId);
+        expect(alertState.paused100At).not.toBeNull();
+        expect(alertState.emailsDispatched.some(e => e.thresholdPct === 100)).toBe(true);
+
+        // Verify LIVE key is now auto-paused with HTTP 402 Spend Cap message
+        const checkAt100 = await developerApiKeyService.verifyRawApiKey(liveKey.rawKey);
+        expect(checkAt100.valid).toBe(false);
+        expect(checkAt100.statusCode).toBe(402);
+        expect(checkAt100.error).toContain('Monthly Spend Cap (100%) reached');
+
+        // Raising the monthly spend cap to €150.00 automatically un-pauses the LIVE key
+        await stripeBillingService.updateSpendCap({
+            tenantId,
+            monthlySpendCapEur: 150.00,
+            alertEmail: 'finops@b2bprint.io'
+        });
+
+        const checkAfterCapRaise = await developerApiKeyService.verifyRawApiKey(liveKey.rawKey);
+        expect(checkAfterCapRaise.valid).toBe(true);
+    });
 });
 

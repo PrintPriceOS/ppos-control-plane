@@ -53,6 +53,7 @@ const subscriptionStore = globalThis.__PPOS_STRIPE_SUBSCRIPTIONS__ || (globalThi
 const meterEventsStore = globalThis.__PPOS_STRIPE_METER_EVENTS__ || (globalThis.__PPOS_STRIPE_METER_EVENTS__ = new Map());
 const processedWebhookEvents = globalThis.__PPOS_STRIPE_WEBHOOK_IDS__ || (globalThis.__PPOS_STRIPE_WEBHOOK_IDS__ = new Set());
 const checkoutSessionsStore = globalThis.__PPOS_STRIPE_CHECKOUT_SESSIONS__ || (globalThis.__PPOS_STRIPE_CHECKOUT_SESSIONS__ = new Map());
+const spendCapAlertsStore = globalThis.__PPOS_STRIPE_SPEND_CAP_ALERTS__ || (globalThis.__PPOS_STRIPE_SPEND_CAP_ALERTS__ = new Map());
 
 class StripeBillingService {
     static get METERED_EVENT_CATALOG() {
@@ -396,6 +397,11 @@ class StripeBillingService {
             );
         } catch (_) {}
 
+        // Phase 199C: Evaluate Spend Cap Governance (80% warning & 100% auto-pause) after recording meter usage
+        if (tenantId) {
+            await this.evaluateSpendCapGovernance(tenantId).catch(() => {});
+        }
+
         return eventRecord;
     }
 
@@ -674,12 +680,21 @@ class StripeBillingService {
         const updated = await this._upsertSubscriptionRecord({
             tenantId,
             billingTier: existing?.billingTier || 'SANDBOX_FREE',
-            status: existing?.status || 'ACTIVE',
+            status: existing?.status === 'SUSPENDED' ? 'ACTIVE' : (existing?.status || 'ACTIVE'),
             stripeCustomerId: existing?.stripeCustomerId || null,
             stripeSubscriptionId: existing?.stripeSubscriptionId || null,
             monthlySpendCapEur: cap,
             alertEmail: alertEmail !== null ? alertEmail : (existing?.alertEmail || null)
         });
+
+        // Re-evaluate governance (un-pauses LIVE keys if new cap is above accrued spend)
+        const govState = await this.evaluateSpendCapGovernance(tenantId).catch(() => null);
+        if (govState && !govState.autoPaused) {
+            try {
+                const developerApiKeyService = require('./developerApiKeyService');
+                await developerApiKeyService.resumeSpendCapPausedKeys(tenantId);
+            } catch (_) {}
+        }
 
         await auditLogger.log({
             type: 'DEVELOPER_SPEND_CAP_UPDATED',
@@ -690,6 +705,184 @@ class StripeBillingService {
         }).catch(() => {});
 
         return updated;
+    }
+
+    /**
+     * Phase 199C: Evaluate tenant monthly spend (Base €49 + Accrued Metered Usage)
+     * against `monthlySpendCapEur`:
+     *  - At >= 80%: Dispatches a transactional warning email (once per cycle).
+     *  - At >= 100%: Dispatches a critical alert email and auto-pauses billable `pp_live_*` keys.
+     */
+    async evaluateSpendCapGovernance(tenantId) {
+        if (!tenantId) return null;
+
+        const sub = await this.getBillingSubscription(tenantId);
+        if (!sub || sub.billingTier !== 'PRODUCTION_SCALE') {
+            return { tenantId, enforced: false, reason: 'NOT_ON_PRODUCTION_SCALE' };
+        }
+
+        const monthlySpendCapEur = Math.max(49, Number(sub.monthlySpendCapEur || 150));
+        const meterEvents = await this.getMeterEventsForTenant(tenantId);
+        const accruedMeteredEur = Number(
+            meterEvents.reduce((sum, ev) => sum + Number(ev.totalCostEur || 0), 0).toFixed(4)
+        );
+        const baseCommitEur = BASE_SUBSCRIPTION_PLAN.monthlyBaseEur; // €49.00
+        const accruedTotalEur = Number((baseCommitEur + accruedMeteredEur).toFixed(4));
+        const utilizationPct = Number(((accruedTotalEur / monthlySpendCapEur) * 100).toFixed(2));
+
+        const alertState = spendCapAlertsStore.get(tenantId) || {
+            warned80At: null,
+            paused100At: null,
+            lastThresholdTriggered: 0,
+            emailsDispatched: []
+        };
+
+        const emailDeliveryService = require('./emailDeliveryService');
+        const developerApiKeyService = require('./developerApiKeyService');
+
+        // 1. Check 100% Critical Spend Cap -> Auto-Pause billable LIVE keys
+        if (utilizationPct >= 100) {
+            if (!alertState.paused100At) {
+                alertState.paused100At = new Date().toISOString();
+                alertState.lastThresholdTriggered = 100;
+
+                const emailRes = await emailDeliveryService.sendSpendCapAlertEmail({
+                    to: sub.alertEmail || 'billing-alerts@printprice.pro',
+                    tenantId,
+                    thresholdPct: 100,
+                    accruedTotalEur,
+                    accruedMeteredEur,
+                    monthlySpendCapEur,
+                    autoPaused: true
+                }).catch(() => ({ ok: false }));
+
+                alertState.emailsDispatched.push({
+                    thresholdPct: 100,
+                    sentAt: alertState.paused100At,
+                    recipient: sub.alertEmail || 'billing-alerts@printprice.pro',
+                    accruedTotalEur,
+                    monthlySpendCapEur,
+                    emailResult: emailRes
+                });
+
+                await developerApiKeyService.pauseLiveKeysForSpendCap(tenantId, {
+                    accruedTotalEur,
+                    monthlySpendCapEur
+                });
+
+                await auditLogger.log({
+                    type: 'DEVELOPER_SPEND_CAP_100_AUTO_PAUSED',
+                    tenantId,
+                    userId: 'spend-cap-governor',
+                    status: 'WARNING',
+                    metadata: {
+                        accruedTotalEur,
+                        accruedMeteredEur,
+                        monthlySpendCapEur,
+                        utilizationPct
+                    }
+                }).catch(() => {});
+            }
+
+            spendCapAlertsStore.set(tenantId, alertState);
+            return {
+                tenantId,
+                enforced: true,
+                autoPaused: true,
+                thresholdTriggered: 100,
+                baseCommitEur,
+                accruedMeteredEur,
+                accruedTotalEur,
+                monthlySpendCapEur,
+                utilizationPct,
+                alertState
+            };
+        }
+
+        // 2. Check 80% Preventive Warning Threshold
+        if (utilizationPct >= 80) {
+            // If previously paused at 100% and cap was increased so now between 80% and 99.9%, clear pause
+            alertState.paused100At = null;
+
+            if (!alertState.warned80At) {
+                alertState.warned80At = new Date().toISOString();
+                alertState.lastThresholdTriggered = 80;
+
+                const emailRes = await emailDeliveryService.sendSpendCapAlertEmail({
+                    to: sub.alertEmail || 'billing-alerts@printprice.pro',
+                    tenantId,
+                    thresholdPct: 80,
+                    accruedTotalEur,
+                    accruedMeteredEur,
+                    monthlySpendCapEur,
+                    autoPaused: false
+                }).catch(() => ({ ok: false }));
+
+                alertState.emailsDispatched.push({
+                    thresholdPct: 80,
+                    sentAt: alertState.warned80At,
+                    recipient: sub.alertEmail || 'billing-alerts@printprice.pro',
+                    accruedTotalEur,
+                    monthlySpendCapEur,
+                    emailResult: emailRes
+                });
+
+                await auditLogger.log({
+                    type: 'DEVELOPER_SPEND_CAP_80_WARNING',
+                    tenantId,
+                    userId: 'spend-cap-governor',
+                    status: 'INFO',
+                    metadata: {
+                        accruedTotalEur,
+                        accruedMeteredEur,
+                        monthlySpendCapEur,
+                        utilizationPct
+                    }
+                }).catch(() => {});
+            }
+
+            spendCapAlertsStore.set(tenantId, alertState);
+            return {
+                tenantId,
+                enforced: true,
+                autoPaused: false,
+                thresholdTriggered: 80,
+                baseCommitEur,
+                accruedMeteredEur,
+                accruedTotalEur,
+                monthlySpendCapEur,
+                utilizationPct,
+                alertState
+            };
+        }
+
+        // Below 80%: clear cycle alert markers if cap was raised
+        alertState.warned80At = null;
+        alertState.paused100At = null;
+        alertState.lastThresholdTriggered = 0;
+        spendCapAlertsStore.set(tenantId, alertState);
+
+        return {
+            tenantId,
+            enforced: true,
+            autoPaused: false,
+            thresholdTriggered: 0,
+            baseCommitEur,
+            accruedMeteredEur,
+            accruedTotalEur,
+            monthlySpendCapEur,
+            utilizationPct,
+            alertState
+        };
+    }
+
+    getSpendCapAlertState(tenantId) {
+        return spendCapAlertsStore.get(tenantId) || {
+            warned80At: null,
+            paused100At: null,
+            lastThresholdTriggered: 0,
+            emailsDispatched: []
+        };
     }
 
     async getBillingSubscription(tenantId) {
@@ -838,6 +1031,7 @@ class StripeBillingService {
         meterEventsStore.clear();
         processedWebhookEvents.clear();
         checkoutSessionsStore.clear();
+        spendCapAlertsStore.clear();
     }
 }
 

@@ -498,6 +498,13 @@ class DeveloperApiKeyService {
         }
 
         if (keyRecord.status !== 'ACTIVE') {
+            if (keyRecord.pauseReason === 'SPEND_CAP_REACHED') {
+                return {
+                    valid: false,
+                    statusCode: 402,
+                    error: 'Monthly Spend Cap (100%) reached. Billable API calls are auto-paused to prevent overage charges. Increase your Monthly Spend Ceiling in the Developer Hub.'
+                };
+            }
             return { valid: false, statusCode: 403, error: `API key is ${keyRecord.status}` };
         }
 
@@ -709,6 +716,64 @@ class DeveloperApiKeyService {
         return { ok: true, tenantId, billingTier: 'SANDBOX_FREE', reason };
     }
 
+    /**
+     * Phase 199C: Auto-pause LIVE keys when a tenant reaches 100% of their `monthly_spend_cap_eur`.
+     */
+    async pauseLiveKeysForSpendCap(tenantId, { accruedTotalEur = 0, monthlySpendCapEur = 150 } = {}) {
+        if (!tenantId) return { ok: false };
+
+        try {
+            await db.query(
+                `UPDATE developer_api_keys
+                 SET status = 'SUSPENDED'
+                 WHERE tenant_id = ? AND key_type = 'LIVE' AND status = 'ACTIVE'`,
+                [tenantId]
+            );
+        } catch (_) {}
+
+        for (const rec of fallbackMemoryKeys.values()) {
+            if (rec.tenantId === tenantId && rec.keyType === 'LIVE' && rec.status === 'ACTIVE') {
+                rec.status = 'SUSPENDED';
+                rec.pauseReason = 'SPEND_CAP_REACHED';
+                rec.updatedAt = new Date().toISOString();
+            }
+        }
+
+        return {
+            ok: true,
+            tenantId,
+            autoPaused: true,
+            accruedTotalEur,
+            monthlySpendCapEur
+        };
+    }
+
+    /**
+     * Phase 199C: Resume LIVE keys paused due to Spend Cap after the tenant increases their `monthly_spend_cap_eur`.
+     */
+    async resumeSpendCapPausedKeys(tenantId) {
+        if (!tenantId) return { ok: false };
+
+        try {
+            await db.query(
+                `UPDATE developer_api_keys
+                 SET status = 'ACTIVE'
+                 WHERE tenant_id = ? AND key_type = 'LIVE' AND status = 'SUSPENDED'`,
+                [tenantId]
+            );
+        } catch (_) {}
+
+        for (const rec of fallbackMemoryKeys.values()) {
+            if (rec.tenantId === tenantId && rec.keyType === 'LIVE' && rec.status === 'SUSPENDED' && rec.pauseReason === 'SPEND_CAP_REACHED') {
+                rec.status = 'ACTIVE';
+                rec.pauseReason = null;
+                rec.updatedAt = new Date().toISOString();
+            }
+        }
+
+        return { ok: true, tenantId, resumed: true };
+    }
+
     async getUsageTelemetry(tenantId) {
         const keys = await this.listApiKeys(tenantId);
         let subscription = null;
@@ -761,6 +826,27 @@ class DeveloperApiKeyService {
         const meterCostEur = meterEvents.reduce((acc, m) => acc + Number(m.totalCostEur || 0), 0);
         const accruedCostEur = Math.max(logsCostEur, meterCostEur);
 
+        let spendCapGovernance = null;
+        try {
+            const stripeBillingService = require('./stripeBillingService');
+            const capEur = Math.max(49, Number(subscription?.monthlySpendCapEur || 150));
+            const baseEur = activeTier === 'PRODUCTION_SCALE' ? 49.00 : 0.00;
+            const totalCycleEur = Number((baseEur + accruedCostEur).toFixed(3));
+            const capPct = Number(((totalCycleEur / capEur) * 100).toFixed(2));
+            const alertState = stripeBillingService.getSpendCapAlertState(tenantId);
+            spendCapGovernance = {
+                monthlySpendCapEur: capEur,
+                baseCommitEur: baseEur,
+                accruedMeteredEur: Number(accruedCostEur.toFixed(3)),
+                totalCycleEur,
+                utilizationPct: Math.min(100, capPct),
+                rawUtilizationPct: capPct,
+                warned80At: alertState.warned80At,
+                paused100At: alertState.paused100At,
+                autoPaused: Boolean(alertState.paused100At)
+            };
+        } catch (_) {}
+
         return {
             tenantId,
             activeTier,
@@ -775,6 +861,7 @@ class DeveloperApiKeyService {
                 ? Number(((recentLogs.filter(r => r.statusCode < 400).length / recentLogs.length) * 100).toFixed(1))
                 : 100.0,
             accruedMeteredEur: Number(accruedCostEur.toFixed(3)),
+            spendCapGovernance,
             subscription: subscription || {
                 tenantId,
                 billingTier: activeTier,

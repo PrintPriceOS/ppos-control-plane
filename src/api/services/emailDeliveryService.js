@@ -253,6 +253,89 @@ class EmailDeliveryService {
         err.code = 'EMAIL_PROVIDER_UNSUPPORTED';
         throw err;
     }
+
+    /**
+     * Phase 199C: Dispatch Transactional Spend Cap Warning (80%) or Auto-Pause (100%) Email.
+     */
+    async sendSpendCapAlertEmail({
+        to,
+        tenantId,
+        thresholdPct = 80,
+        accruedTotalEur = 0,
+        accruedMeteredEur = 0,
+        monthlySpendCapEur = 150,
+        autoPaused = false
+    }, overrides = {}) {
+        const provider = (overrides.EMAIL_PROVIDER || process.env.EMAIL_PROVIDER || 'DEV_LOGGER').toUpperCase();
+        const from = overrides.EMAIL_FROM || process.env.EMAIL_FROM || 'billing-alerts@printprice.pro';
+        const recipient = to || 'billing-alerts@printprice.pro';
+        const redactedTo = this._redactEmail(recipient);
+
+        const isCritical = thresholdPct >= 100 || autoPaused;
+        const subject = isCritical
+            ? `[PrintPrice OS CRITICAL] 100% Spend Cap Reached (€${Number(accruedTotalEur).toFixed(2)} / €${Number(monthlySpendCapEur).toFixed(2)}) — Billable API Calls Paused`
+            : `[PrintPrice OS WARNING] 80% Monthly Spend Cap Alert (€${Number(accruedTotalEur).toFixed(2)} / €${Number(monthlySpendCapEur).toFixed(2)})`;
+
+        const text = [
+            `PrintPrice OS — Developer API Gateway Spend Cap Governance`,
+            `------------------------------------------------------------`,
+            `Tenant ID: ${tenantId}`,
+            `Threshold Triggered: ${thresholdPct}%`,
+            `Monthly Spend Ceiling: €${Number(monthlySpendCapEur).toFixed(2)} EUR`,
+            `Current Cycle Total (€49.00 Base + €${Number(accruedMeteredEur).toFixed(2)} Metered): €${Number(accruedTotalEur).toFixed(2)} EUR`,
+            `Status: ${isCritical ? 'AUTO-PAUSED (Live billable API calls paused until spend cap is raised or next billing cycle)' : 'ACTIVE (Approaching monthly spend ceiling)'}`,
+            ``,
+            `Manage your spend cap or billing settings in the Developer Hub:`,
+            `https://control.printprice.pro/developers`
+        ].join('\n');
+
+        const html = `<div style="font-family:monospace,sans-serif;padding:20px;background:#09090b;color:#f4f4f5;border:1px solid ${isCritical ? '#dc0000' : '#f59e0b'};border-radius:12px;">
+            <h2 style="color:${isCritical ? '#ef4444' : '#fbbf24'};margin-top:0;">${subject}</h2>
+            <p>Tenant: <strong>${tenantId}</strong></p>
+            <ul>
+                <li><strong>Monthly Spend Cap:</strong> €${Number(monthlySpendCapEur).toFixed(2)} EUR</li>
+                <li><strong>Current Cycle Total:</strong> €${Number(accruedTotalEur).toFixed(2)} EUR (€49.00 Base + €${Number(accruedMeteredEur).toFixed(2)} Metered)</li>
+                <li><strong>Action Taken:</strong> ${isCritical ? 'Billable pp_live_* calls paused automatically to prevent overage charges.' : 'Preventive 80% warning notification.'}</li>
+            </ul>
+            <p><a href="https://control.printprice.pro/developers" style="color:#ef4444;font-weight:bold;">Increase Spend Cap in Developer Hub →</a></p>
+        </div>`;
+
+        if (provider === 'DEV_LOGGER') {
+            console.log(`[SPEND-CAP-EMAIL-DEV] Dispatched ${thresholdPct}% spend alert to ${redactedTo} for tenant ${tenantId} (€${Number(accruedTotalEur).toFixed(2)} / €${Number(monthlySpendCapEur).toFixed(2)})`);
+            return {
+                ok: true,
+                provider: 'DEV_LOGGER',
+                thresholdPct,
+                autoPaused: Boolean(isCritical),
+                subject,
+                messageId: `spendcap-msg-${Date.now()}`
+            };
+        }
+
+        if (provider === 'SMTP') {
+            try {
+                const transporter = this.getTransporter(overrides);
+                const info = await transporter.sendMail({ from, to: recipient, subject, text, html });
+                return {
+                    ok: true,
+                    provider: 'SMTP',
+                    thresholdPct,
+                    autoPaused: Boolean(isCritical),
+                    subject,
+                    messageId: info.messageId
+                };
+            } catch (err) {
+                return {
+                    ok: false,
+                    provider: 'SMTP',
+                    thresholdPct,
+                    error: this._sanitizeErrorMessage(err.message)
+                };
+            }
+        }
+
+        return { ok: true, provider, thresholdPct, subject };
+    }
 }
 
 module.exports = new EmailDeliveryService();
