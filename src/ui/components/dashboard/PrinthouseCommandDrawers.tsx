@@ -808,8 +808,9 @@ export const FinancialEscrowDrawer: React.FC<{
   if (!open || typeof document === 'undefined') return null;
 
   const isDemo = isDemoTenant();
-  const settlements: any[] = Array.isArray(financialData?.settlements) && financialData.settlements.length > 0
-    ? financialData.settlements
+  const rawSettlements = Array.isArray(financialData?.settlements) ? financialData.settlements : null;
+  const settlements: any[] = rawSettlements !== null
+    ? rawSettlements
     : (isDemo ? [
         {
           orderId: 'PUB-ORD-2026-101',
@@ -871,6 +872,23 @@ export const FinancialEscrowDrawer: React.FC<{
     return true;
   });
 
+  // Dynamically derive escrow totals from settlements or API payload (default 0 on clean accounts)
+  const custodiedLocked = settlements.length > 0
+    ? settlements
+        .filter(s => s.escrowStatus !== 'RELEASED_ON_SIGNED_POD' && s.escrowStatus !== 'RELEASED')
+        .reduce((acc, s) => acc + (Number(s.grossEur ?? s.amountEur) || 0), 0)
+    : (Number(financialData?.custodiedEscrowEur) || 0);
+
+  const releasedPod = settlements.length > 0
+    ? settlements
+        .filter(s => s.escrowStatus === 'RELEASED_ON_SIGNED_POD' || s.escrowStatus === 'RELEASED')
+        .reduce((acc, s) => acc + (Number(s.grossEur ?? s.amountEur) || 0), 0)
+    : (Number(financialData?.releasedEscrowEur) || 0);
+
+  const netPayout = settlements.length > 0
+    ? settlements.reduce((acc, s) => acc + (Number(s.netPrinthouseEur ?? s.netEur ?? ((s.grossEur ?? s.amountEur ?? 0) * 0.88)) || 0), 0)
+    : (Number(financialData?.netPrinthousePayoutEur) || 0);
+
   return createPortal(
     <div
       data-testid="financial-escrow-drawer"
@@ -911,19 +929,19 @@ export const FinancialEscrowDrawer: React.FC<{
             <div className="p-4 rounded-2xl bg-[#131314] border border-zinc-800">
               <span className="text-[9px] font-mono uppercase text-zinc-400 block">{t('dashboard.360.custodiedEscrow')}</span>
               <span className="text-lg font-mono font-black text-amber-400">
-                €{(financialData?.custodiedEscrowEur ?? 59310).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                €{custodiedLocked.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
             </div>
             <div className="p-4 rounded-2xl bg-[#131314] border border-zinc-800">
               <span className="text-[9px] font-mono uppercase text-zinc-400 block">{t('dashboard.360.releasedEscrowPod')}</span>
               <span className="text-lg font-mono font-black text-emerald-400">
-                €{(financialData?.releasedEscrowEur ?? 4900).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                €{releasedPod.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
             </div>
             <div className="p-4 rounded-2xl bg-[#131314] border border-zinc-800">
               <span className="text-[9px] font-mono uppercase text-zinc-400 block">{t('dashboard.360.netPrinthousePayout')}</span>
               <span className="text-lg font-mono font-black text-white">
-                €{(financialData?.netPrinthousePayoutEur ?? 56504.8).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                €{netPayout.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
             </div>
           </div>

@@ -426,4 +426,23 @@ describe('Printhouse Hub 360° Operational Command Center & Interactive Drawers/
     expect(res.events[0].orderId).toBe('PUB-ORD-2026-999');
     expect(res.events[0].title).toBe('Test Auto-Fix Event Recorded');
   });
+
+  it('8. renders FinancialEscrowDrawer with exact €0.00 KPIs when supplied with empty records', async () => {
+    render(
+      <LocaleHarness locale="es">
+        <FinancialEscrowDrawer
+          open={true}
+          onClose={() => {}}
+          financialData={{ settlements: [], custodiedEscrowEur: 0, releasedEscrowEur: 0, netPrinthousePayoutEur: 0 }}
+        />
+      </LocaleHarness>
+    );
+
+    expect(screen.getByTestId('financial-escrow-drawer')).toBeTruthy();
+    expect(screen.getAllByText('€0.00').length).toBeGreaterThanOrEqual(3);
+    expect(screen.getByTestId('escrow-empty-state')).toBeTruthy();
+    expect(screen.queryByText(/59,310/)).toBeNull();
+    expect(screen.queryByText(/56,504/)).toBeNull();
+    expect(screen.queryByText(/4,900/)).toBeNull();
+  });
 });
