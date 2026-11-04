@@ -73,6 +73,11 @@ class MarketplaceDispatchGatingService {
 
         const canonicalRef = order.order_ref || order.order_id || order.id;
 
+        // Gate 0a: Demand-driven paywall — unlicensed printhouse cannot dispatch/execute
+        if (order.dispatch_lock_reason === 'AWAITING_PRINTHOUSE_LICENSE') {
+            throw new Error('DISPATCH_BLOCKED: AWAITING_PRINTHOUSE_LICENSE — activate the Annual Operating License to unlock this order.');
+        }
+
         // Gate 0: Block dispatch if an unresolved quote revision is pending (BLK-03)
         let pendingRevs = [];
         try {

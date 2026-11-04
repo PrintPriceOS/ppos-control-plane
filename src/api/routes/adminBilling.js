@@ -443,6 +443,15 @@ async function handleStripeEvent(event) {
                 break;
             }
 
+            if (obj.metadata?.kind === 'PRINTHOUSE_LICENSE') {
+                const result = await require('../services/printhouseLicenseService').activateLicense({
+                    printhouseId: obj.metadata.printhouse_id || obj.client_reference_id,
+                    stripeCustomerId: obj.customer || null
+                });
+                console.log('[BILLING][WEBHOOK][PRINTHOUSE_LICENSE_ACTIVATED]', result);
+                break;
+            }
+
             // Primary: use client_reference_id (set in create-checkout-session)
             // Fallback: metadata.tenant_id for sessions created before this hardening
             const tenantId = obj.client_reference_id || obj.metadata?.tenant_id;

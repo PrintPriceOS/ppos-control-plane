@@ -8,6 +8,7 @@ import { short } from "../../lib/formatters";
 import { safeArray } from "../../lib/display";
 import { useLocale } from "../../i18n";
 import { SharedModuleProps } from "../../components/common";
+import { UnlicensedRevenueBanner } from "../../components/printhouse/UnlicensedRevenueBanner";
 
 export const JobsPage: React.FC<SharedModuleProps> = ({ mode = 'workspace' }) => {
   const { t } = useLocale();
@@ -73,6 +74,8 @@ export const JobsPage: React.FC<SharedModuleProps> = ({ mode = 'workspace' }) =>
           </span>
         </div>
       </div>
+
+      <UnlicensedRevenueBanner />
 
       {/* Compressed Operational Toolbar */}
       <div className="p-3 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xs flex items-center gap-3 font-mono text-xs">

@@ -529,6 +529,7 @@ const start = async () => {
             fastify.use(require('express').urlencoded({ extended: true, limit: '64mb' }));
             
             fastify.use('/api/billing/stripe', require('./src/api/routes/stripeBillingRoutes'));
+            fastify.use('/api/billing/printhouse', require('./src/api/routes/printhouseLicenseRoutes'));
             fastify.use('/api/auth', require('./src/api/routes/authRoutes'));
             fastify.use('/api/admin/financials/activation', require('./src/api/routes/financialOperationsProductionActivationAdmin'));
             fastify.use('/api/admin/printhouse-reviews', require('./src/api/routes/printhouseAdminReviewRoutes'));

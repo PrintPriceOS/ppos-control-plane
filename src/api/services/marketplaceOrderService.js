@@ -279,6 +279,7 @@ class MarketplaceOrderService {
             readiness: readinessData.ready ? 'READY' : 'BLOCKED',
             blockers: readinessData.blockers || [],
             readinessFull: readinessData,
+            dispatchLockReason: orderRow.dispatch_lock_reason || 'NONE',
 
             // Phase 38.8 additions
             productionCompletedAt: orderRow.production_completed_at || null,
@@ -391,6 +392,23 @@ class MarketplaceOrderService {
         const readinessJson = JSON.stringify({ ready: false, blockers: ['FILES_REQUIRED'] });
         const metadataJson = JSON.stringify(allowedInput.metadata || {});
 
+        // Demand-driven gatekeeping check: verify printhouse subscription status
+        let dispatchLockReason = 'NONE';
+        if (printhouseId) {
+            try {
+                const phRows = await mysqlClient.query(
+                    'SELECT subscription_status FROM printhouses WHERE id = ? OR tenant_id = ? LIMIT 1',
+                    [printhouseId, printhouseId]
+                );
+                if (phRows && phRows.length > 0) {
+                    const isLicensed = phRows[0].subscription_status === 'ACTIVE';
+                    dispatchLockReason = isLicensed ? 'NONE' : 'AWAITING_PRINTHOUSE_LICENSE';
+                }
+            } catch (phErr) {
+                logger.warn({ event: 'printhouse_license_check_degraded', printhouseId, error: phErr.message });
+            }
+        }
+
         try {
             // Idempotent check if order already exists
             const existingRows = await mysqlClient.query(
@@ -411,8 +429,9 @@ class MarketplaceOrderService {
                         payment_method, payment_status, bank_transfer_reference,
                         settlement_modality, platform_fee_pct, platform_fee_eur, net_printhouse_payout_eur, escrow_status,
                         book_spec_json, selected_offer_json, customer_json, readiness_json, metadata_json,
+                        dispatch_lock_reason,
                         created_at, updated_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
                 `, [
                     orderId, externalOrderRef, pricingSessionId, sessionId, selectedOfferId, customerId, tenantId,
                     printhouseId, status, currency, estimatedPrice,
@@ -420,7 +439,8 @@ class MarketplaceOrderService {
                     taxRatePct, taxAmountEur, totalAmountEur,
                     paymentMethod, paymentStatus, bankTransferReference,
                     settlementModality, platformFeePct, platformFeeEur, netPrinthousePayoutEur, escrowStatus,
-                    bookSpecJson, selectedOfferJson, customerJson, readinessJson, metadataJson
+                    bookSpecJson, selectedOfferJson, customerJson, readinessJson, metadataJson,
+                    dispatchLockReason
                 ]);
             } catch (colErr) {
                 // Fallback if minimal test schema without session_id or extended columns is used
@@ -430,12 +450,14 @@ class MarketplaceOrderService {
                             order_id, pricing_session_id, selected_offer_id, customer_id, tenant_id,
                             printhouse_id, status, currency, estimated_price, book_spec_json,
                             selected_offer_json, customer_json, readiness_json, metadata_json,
+                            dispatch_lock_reason,
                             created_at, updated_at
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
                     `, [
                         orderId, pricingSessionId, selectedOfferId, customerId, tenantId,
                         printhouseId, status, currency, estimatedPrice, bookSpecJson,
-                        selectedOfferJson, customerJson, readinessJson, metadataJson
+                        selectedOfferJson, customerJson, readinessJson, metadataJson,
+                        dispatchLockReason
                     ]);
                 } else {
                     throw colErr;

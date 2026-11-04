@@ -520,6 +520,17 @@ class StripeBillingService {
 
         switch (event.type) {
             case 'checkout.session.completed': {
+                if (obj.metadata?.kind === 'PRINTHOUSE_LICENSE') {
+                    const phId = obj.metadata.printhouse_id || obj.client_reference_id;
+                    const licenseResult = await require('./printhouseLicenseService').activateLicense({
+                        printhouseId: phId,
+                        stripeCustomerId: obj.customer || null,
+                        stripeSubscriptionId: null
+                    });
+                    processedWebhookEvents.add(event.id);
+                    return { ok: true, eventId: event.id, eventType: event.type, printhouseId: phId, ...licenseResult };
+                }
+
                 const tenantId = obj.metadata?.tenantId || obj.metadata?.tenant_id || obj.client_reference_id;
                 const customerId = obj.customer || `cus_ppos_${crypto.randomBytes(6).toString('hex')}`;
                 const subscriptionId = obj.subscription || `sub_ppos_${crypto.randomBytes(6).toString('hex')}`;

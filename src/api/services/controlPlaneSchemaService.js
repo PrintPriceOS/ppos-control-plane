@@ -1436,6 +1436,15 @@ class ControlPlaneSchemaService {
         await this.ensureColumn('marketplace_orders', 'session_id', 'VARCHAR(128) NULL');
         await this.ensureIndex('marketplace_orders', 'idx_session', 'session_id');
         await this.ensureColumn('marketplace_orders', 'readiness_json', 'JSON NULL');
+        await this.ensureColumn('marketplace_orders', 'dispatch_lock_reason', "ENUM('NONE', 'AWAITING_PRINTHOUSE_LICENSE', 'AWAITING_PREFLIGHT') NOT NULL DEFAULT 'NONE'");
+
+        // Demand-driven printhouse paywall columns
+        await this.ensureColumn('printhouses', 'subscription_status', "ENUM('INACTIVE', 'ACTIVE', 'PAST_DUE', 'CANCELED') NOT NULL DEFAULT 'INACTIVE'");
+        await this.ensureColumn('printhouses', 'stripe_customer_id', 'VARCHAR(255) NULL');
+        await this.ensureColumn('printhouses', 'stripe_subscription_id', 'VARCHAR(255) NULL');
+        await this.ensureColumn('printhouses', 'subscription_expires_at', 'DATETIME NULL');
+        await this.ensureColumn('printhouses', 'tax_country_code', "CHAR(2) NOT NULL DEFAULT 'LV'");
+        await this.ensureColumn('printhouses', 'vat_number', 'VARCHAR(64) NULL');
 
         await this.ensureColumn('marketplace_order_files', 'artifact_refs_json', 'JSON NULL');
         await this.ensureColumn('marketplace_order_files', 'preflight_outcome_category', 'VARCHAR(64) NULL');
