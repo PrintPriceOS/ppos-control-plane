@@ -1324,7 +1324,18 @@ async function syncMasterIndustrialCatalog(scope = {}, dbClient = db) {
             }
 
             const gsm = Number(row.gsm || 90);
-            const bulk = Number(row.bulk_factor || 1.25);
+            let rawBulk = Number(row.bulk_factor || 0);
+            if (!Number.isFinite(rawBulk) || rawBulk < 0.5) {
+                if (row.caliper_um && row.gsm && Number(row.gsm) > 0) {
+                    const derived = Number((Number(row.caliper_um) / Number(row.gsm)).toFixed(2));
+                    rawBulk = derived >= 0.5 && derived <= 3.5 ? derived : 1.0;
+                } else {
+                    rawBulk = 1.0;
+                }
+            } else if (rawBulk > 3.5) {
+                rawBulk = 3.5;
+            }
+            const bulk = Number(rawBulk.toFixed(2));
             const widthMm = Number(row.width_mm || 700);
             const heightMm = Number(row.height_mm || 1000);
             const grain = String(row.grain_direction || '').toUpperCase().includes('SHORT') || row.grain_direction === 'SG' ? 'SG' : 'LG';
