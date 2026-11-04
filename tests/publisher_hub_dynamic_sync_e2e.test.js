@@ -27,7 +27,21 @@ describe('Publisher Hub — Dynamic Order Sync & Clean-Slate Zero-State', () => 
         expect(result.summaryKpis.onTimeDeliveryPct).toBeNull();
     });
 
-    it('2. Retains seeded baseline mock orders only for authorized demo tenants', async () => {
+    it('2. Asserts PUB-ORD-2026-101, PUB-ORD-2026-102, and PUB-ORD-2026-103 do NOT appear for clean tenants', async () => {
+        const realPublisherTenantId = 'ph-d65e4e8b';
+        const result = await getPublisherOrders({
+            publisherTenantId: realPublisherTenantId,
+            role: 'PUBLISHER'
+        });
+
+        expect(result.ok).toBe(true);
+        const orderIds = result.orders.map(o => o.orderId);
+        expect(orderIds).not.toContain('PUB-ORD-2026-101');
+        expect(orderIds).not.toContain('PUB-ORD-2026-102');
+        expect(orderIds).not.toContain('PUB-ORD-2026-103');
+    });
+
+    it('3. Retains seeded baseline mock orders only for authorized demo tenants', async () => {
         const demoTenantId = 'tenant-demo-agency';
         const result = await getPublisherOrders({
             publisherTenantId: demoTenantId,
@@ -40,7 +54,7 @@ describe('Publisher Hub — Dynamic Order Sync & Clean-Slate Zero-State', () => 
         expect(result.summaryKpis.copiesInPress).toBeGreaterThan(0);
     });
 
-    it('3. Dynamically synchronizes orders from marketplaceOrderService into getPublisherOrders', async () => {
+    it('4. Dynamically synchronizes orders from marketplaceOrderService into getPublisherOrders', async () => {
         const dynamicTenantId = 'tenant-sync-test-99';
         const dynamicEmail = 'publisher99@printprice.pro';
 
@@ -97,7 +111,39 @@ describe('Publisher Hub — Dynamic Order Sync & Clean-Slate Zero-State', () => 
         listOrdersSpy.mockRestore();
     });
 
-    it('4. Enforces strict cross-tenant isolation and blocks cross-tenant access to dynamic orders', async () => {
+    it('5. Asserts the 6-stage manufacturing timeline references the selected order ID and never contains 003401234500000018', async () => {
+        const dynamicTenantId = 'tenant-timeline-test-77';
+        const dynamicOrderId = 'ORD_TIMELINE_GENUINE_77';
+
+        createPublisherOrder(
+            {
+                orderId: dynamicOrderId,
+                title: 'Genuine Production Run Edition',
+                isbn: '978-0-999-88877-6',
+                pageCount: 200,
+                paperGrammageGsm: 90,
+                bindingType: 'SOFTCOVER_PUR'
+            },
+            { publisherTenantId: dynamicTenantId, role: 'PUBLISHER' }
+        );
+
+        const timeline = await getPublisherTimeline({
+            orderId: dynamicOrderId,
+            publisherTenantId: dynamicTenantId,
+            role: 'PUBLISHER'
+        });
+
+        expect(timeline.ok).toBe(true);
+        expect(timeline.orderId).toBe(dynamicOrderId);
+        expect(timeline.milestones).toHaveLength(6);
+        expect(timeline.milestones[0].code).toBe('PREFLIGHT_VALIDATED');
+        expect(timeline.milestones[5].code).toBe('DISPATCHED_AND_DELIVERED');
+        // Must not contain hardcoded mock SSCC
+        expect(timeline.logisticsTracking.sscc18).not.toBe('003401234500000018');
+        expect(timeline.logisticsTracking.sscc18).not.toBe('040481234500000010');
+    });
+
+    it('6. Enforces strict cross-tenant isolation and blocks cross-tenant access to dynamic orders', async () => {
         const tenantA = 'tenant-sync-corp-a';
         const tenantB = 'tenant-sync-corp-b';
 

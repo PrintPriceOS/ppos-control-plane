@@ -11,7 +11,10 @@ import {
     ExclamationTriangleIcon,
     XMarkIcon,
     ArrowRightIcon,
-    PlusIcon
+    PlusIcon,
+    MagnifyingGlassIcon,
+    ArchiveBoxIcon,
+    TrashIcon
 } from '@heroicons/react/24/outline';
 import { useLocale } from '../../i18n';
 import {
@@ -53,6 +56,21 @@ export interface PublisherEditionRow {
     fscCertificateCode: string;
     estimatedDeliveryDate: string;
     onTimeGuaranteed: boolean;
+    dispatchPackage?: {
+        sscc?: string;
+    };
+    tracking?: {
+        sscc?: string;
+    };
+    documents?: {
+        deliveryNotePdfUrl?: string;
+        preflightReportUrl?: string;
+        fscCertificateUrl?: string;
+    };
+    files?: Array<{
+        kind?: string;
+        url?: string;
+    }>;
 }
 
 const TIMELINE_STEPS = [
@@ -103,7 +121,7 @@ const TIMELINE_STEPS = [
 const PUBLISHER_HUB_I18N = {
     en: {
         title: 'Publisher Operations Hub',
-        subtitle: 'B2B Editorial Self-Service Console · 3D Parametric Soft-Proofing, Live Press Telemetry & Signed POD Archive',
+        subtitle: 'B2B Editorial Self-Service · Parametric 3D Soft-Proofing, Live Press Telemetry & Signed POD Delivery Notes',
         tabActive: 'ACTIVE EDITIONS',
         tabArchive: 'ARCHIVE & PODs',
         ctaSubmitTitle: 'SUBMIT NEW TITLE',
@@ -133,7 +151,13 @@ const PUBLISHER_HUB_I18N = {
         lblBulk: 'Paper Bulk (cm³/g)',
         lblCreate: 'Submit Title & Generate 3D Proof',
         lblCancel: 'Cancel',
-        saveContinue: 'Save & Continue'
+        saveContinue: 'Save & Continue',
+        emptyStateTitle: 'No Active Publisher Editions Found',
+        emptyStateDescription: 'No active publisher editions found. Orders created in Budget portal will automatically sync here.',
+        searchPlaceholder: 'Search by title, order ID, or ISBN...',
+        btnArchiveDismiss: 'Archive / Dismiss',
+        pendingGeneration: 'Pending Generation',
+        emptyPlaceholderDeck: 'Select an edition from the list to launch 3D soft-proofing and view live production telemetry.'
     },
     es: {
         title: 'Publisher Operations Hub',
@@ -167,7 +191,13 @@ const PUBLISHER_HUB_I18N = {
         lblBulk: 'Volumen / Mano (cm³/g)',
         lblCreate: 'Registrar Título y Generar Prueba 3D',
         lblCancel: 'Cancelar',
-        saveContinue: 'Guardar y Continuar'
+        saveContinue: 'Guardar y Continuar',
+        emptyStateTitle: 'No Hay Ediciones Editoriales Activas',
+        emptyStateDescription: 'No active publisher editions found. Orders created in Budget portal will automatically sync here.',
+        searchPlaceholder: 'Buscar por título, ID de pedido o ISBN...',
+        btnArchiveDismiss: 'Archivar / Descartar',
+        pendingGeneration: 'Generación Pendiente',
+        emptyPlaceholderDeck: 'Selecciona una edición de la lista para iniciar la prueba 3D y consultar la telemetría en planta.'
     },
     de: {
         title: 'Publisher Operations Hub',
@@ -201,7 +231,13 @@ const PUBLISHER_HUB_I18N = {
         lblBulk: 'Spezifisches Volumen (cm³/g)',
         lblCreate: 'Titel einreichen & 3D-Proof erstellen',
         lblCancel: 'Abbrechen',
-        saveContinue: 'Speichern & Weiter'
+        saveContinue: 'Speichern & Weiter',
+        emptyStateTitle: 'Keine aktiven Verlagsausgaben gefunden',
+        emptyStateDescription: 'No active publisher editions found. Orders created in Budget portal will automatically sync here.',
+        searchPlaceholder: 'Nach Titel, Bestell-ID oder ISBN suchen...',
+        btnArchiveDismiss: 'Archivieren / Verwerfen',
+        pendingGeneration: 'Generierung ausstehend',
+        emptyPlaceholderDeck: 'Wählen Sie eine Ausgabe aus der Liste aus, um das 3D-Softproofing zu starten und Live-Telemetriedaten anzuzeigen.'
     }
 };
 
@@ -308,11 +344,14 @@ export const PublisherHubPage: React.FC<SharedModuleProps> = ({
 
     const [activeTab, setActiveTab] = useState<'active' | 'archive'>('active');
     const isDemo = isDemoTenant();
+
+    // TASK 1: Initialize editions state as empty array [] for real authenticated tenants
     const [editions, setEditions] = useState<PublisherEditionRow[]>(isDemo ? INITIAL_PUBLISHER_EDITIONS : []);
     const [selectedOrder, setSelectedOrder] = useState<PublisherEditionRow | null>(
         isDemo ? INITIAL_PUBLISHER_EDITIONS[0] : null
     );
     const [loading, setLoading] = useState<boolean>(!isDemo);
+    const [searchQuery, setSearchQuery] = useState<string>('');
     const [showSubmitModal, setShowSubmitModal] = useState<boolean>(false);
     const [downloadFeedback, setDownloadFeedback] = useState<string | null>(null);
 
@@ -403,24 +442,35 @@ export const PublisherHubPage: React.FC<SharedModuleProps> = ({
             prev.map(item =>
                 item.orderId === orderId
                     ? {
-                          ...item,
-                          proofStatus: nextProofStatus,
-                          currentStage: nextStage,
-                          currentStageIndex: nextStageIndex
-                      }
+                        ...item,
+                        proofStatus: nextProofStatus,
+                        currentStage: nextStage,
+                        currentStageIndex: nextStageIndex
+                    }
                     : item
             )
         );
         setSelectedOrder(prev =>
             prev && prev.orderId === orderId
                 ? {
-                      ...prev,
-                      proofStatus: nextProofStatus,
-                      currentStage: nextStage,
-                      currentStageIndex: nextStageIndex
-                  }
+                    ...prev,
+                    proofStatus: nextProofStatus,
+                    currentStage: nextStage,
+                    currentStageIndex: nextStageIndex
+                }
                 : prev
         );
+    };
+
+    const handleArchiveOrDismiss = (orderId: string, e?: React.MouseEvent) => {
+        if (e) e.stopPropagation();
+        setEditions(prev => {
+            const filtered = prev.filter(o => o.orderId !== orderId);
+            if (selectedOrder && selectedOrder.orderId === orderId) {
+                setSelectedOrder(filtered.length > 0 ? filtered[0] : null);
+            }
+            return filtered;
+        });
     };
 
     const handleCreateTitle = (e: React.FormEvent) => {
@@ -431,9 +481,10 @@ export const PublisherHubPage: React.FC<SharedModuleProps> = ({
                 ? Math.round((innerBlockMm + 2 * 2.5 + 1.2) * 100) / 100
                 : Math.round((innerBlockMm + 0.5) * 100) / 100;
 
+        const newOrderId = `PUB-ORD-2026-${Math.floor(104 + editions.length)}`;
         const createdOrder: PublisherEditionRow = {
-            orderId: `PUB-ORD-2026-${Math.floor(104 + editions.length)}`,
-            publisherTenantId: 'tenant-publisher-penguin',
+            orderId: newOrderId,
+            publisherTenantId: getUserTenantId() || 'tenant-publisher-penguin',
             isbn: newIsbn,
             title: newTitle,
             edition: '1st Edition (2026)',
@@ -457,7 +508,7 @@ export const PublisherHubPage: React.FC<SharedModuleProps> = ({
             proofStatus: 'AWAITING_APPROVAL',
             preflightInspectionId: `PF-2026-${Math.floor(104 + editions.length)}`,
             shipmentId: `SHP-2026-${Math.floor(9910 + editions.length)}`,
-            sscc18: '003401234500000049',
+            sscc18: `00340123${String(newOrderId).replace(/\D/g, '').padEnd(10, '0').slice(0, 10)}`,
             fscCertificateCode: 'FSC-C128904-2026',
             estimatedDeliveryDate: '2026-11-20',
             onTimeGuaranteed: true
@@ -468,7 +519,7 @@ export const PublisherHubPage: React.FC<SharedModuleProps> = ({
         setShowSubmitModal(false);
     };
 
-    // KPI aggregations
+    // TASK 1: Clean zero values when editions.length === 0
     const activeTitlesCount = editions.filter(
         e => e.currentStage !== 'DISPATCHED_AND_DELIVERED'
     ).length;
@@ -481,15 +532,49 @@ export const PublisherHubPage: React.FC<SharedModuleProps> = ({
     const onTimeDeliveryPct =
         editions.length > 0
             ? (
-                  (editions.filter(e => e.onTimeGuaranteed).length / editions.length) *
-                  100
-              ).toFixed(1)
+                (editions.filter(e => e.onTimeGuaranteed).length / editions.length) *
+                100
+            ).toFixed(1)
             : '0.0';
 
-    const visibleEditions =
+    const tabFilteredEditions =
         activeTab === 'archive'
             ? editions.filter(e => e.currentStage === 'DISPATCHED_AND_DELIVERED')
             : editions;
+
+    const visibleEditions = tabFilteredEditions.filter(e => {
+        if (!searchQuery.trim()) return true;
+        const q = searchQuery.toLowerCase();
+        return (
+            e.title.toLowerCase().includes(q) ||
+            e.orderId.toLowerCase().includes(q) ||
+            e.isbn.toLowerCase().includes(q)
+        );
+    });
+
+    // Resolve Dynamic SSCC Identifier
+    const resolveDynamicSscc = (order: PublisherEditionRow): string => {
+        if (order.dispatchPackage?.sscc) return order.dispatchPackage.sscc;
+        if (order.tracking?.sscc) return order.tracking.sscc;
+        if (order.sscc18 && !order.sscc18.startsWith('003401234500000018') && !order.sscc18.startsWith('040481234500000010')) {
+            return order.sscc18;
+        }
+        return 'SSCC: PENDING ALLOCATION';
+    };
+
+    // Document links resolution helper
+    const hasDeliveryNote = Boolean(
+        selectedOrder?.documents?.deliveryNotePdfUrl ||
+        selectedOrder?.shipmentId
+    );
+    const hasPreflightReport = Boolean(
+        selectedOrder?.documents?.preflightReportUrl ||
+        selectedOrder?.preflightInspectionId
+    );
+    const hasFscCert = Boolean(
+        selectedOrder?.documents?.fscCertificateUrl ||
+        selectedOrder?.fscCertificateCode
+    );
 
     return (
         <div
@@ -561,10 +646,10 @@ export const PublisherHubPage: React.FC<SharedModuleProps> = ({
                         </div>
                         <div>
                             <div className="text-sm font-bold text-white tracking-wide">
-                                Zero Active Editions Configured
+                                {L.emptyStateTitle}
                             </div>
                             <div className="text-xs text-slate-400 mt-0.5">
-                                No active editions found for this tenant. Configure a new book in the Budget portal to launch preflight and 3D proofing.
+                                {L.emptyStateDescription}
                             </div>
                         </div>
                     </div>
@@ -581,264 +666,341 @@ export const PublisherHubPage: React.FC<SharedModuleProps> = ({
                 </div>
             )}
 
-            <IndustrialTable
-                title={activeTab === 'active' ? L.tabActive : L.tabArchive}
-                subtitle="EDITORIAL B2B ORDERS ·COMMERCIAL PURCHASE PRICE ONLY (INTERNAL PRINTHOUSE COSTS HIDDEN)"
-                data={visibleEditions}
-                emptyEntityName="PUBLISHER EDITIONS"
-                rowKey={row => row.orderId}
-                columns={[
-                    {
-                        key: 'titleIsbn',
-                        header: L.colTitleIsbn,
-                        render: row => (
-                            <div>
-                                <div className="font-mono font-black text-white">{row.orderId}</div>
-                                <div className="text-xs font-bold text-slate-200 max-w-[260px] truncate">
-                                    {row.title}
-                                </div>
-                                <div className="text-[10px] font-mono text-slate-400">
-                                    ISBN: {row.isbn} · {row.printRunCopies.toLocaleString()} copies · €
-                                    {row.agreedPurchasePriceEur.toLocaleString()}
-                                </div>
-                            </div>
-                        )
-                    },
-                    {
-                        key: 'bindingSpecs',
-                        header: L.colBindingSpecs,
-                        render: row => (
-                            <div>
-                                <span className="px-2 py-0.5 rounded bg-[#0a0b0d] border border-[#1f2228] font-mono text-[10px] font-black text-white">
-                                    {row.bindingType.replace(/_/g, ' ')}
+            {/* TASK 2: Responsive Master-Detail (Split-View) Layout */}
+            {editions.length > 0 ? (
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                    {/* Left Column: Edition Cards List (lg:col-span-5) */}
+                    <div className="lg:col-span-5 space-y-4">
+                        <div className="p-4 rounded-xl bg-[#14161a] border border-[#1f2228] space-y-3">
+                            <div className="flex items-center justify-between">
+                                <h2 className="text-xs font-mono font-black uppercase tracking-wider text-slate-300 m-0">
+                                    {activeTab === 'active' ? L.tabActive : L.tabArchive} ({visibleEditions.length})
+                                </h2>
+                                <span className="text-[11px] font-mono text-slate-500">
+                                    B2B COMMERCIAL VIEW
                                 </span>
-                                <div className="text-[10px] font-mono text-slate-400 mt-1">
-                                    {row.trimWidthMm}×{row.trimHeightMm} mm · {row.pageCount} pp ·{' '}
-                                    {row.paperGrammageGsm}g/m²
-                                </div>
                             </div>
-                        )
-                    },
-                    {
-                        key: 'spine',
-                        header: L.colSpine,
-                        render: row => (
-                            <div className="font-mono">
-                                <span className="text-xs font-black text-[#10b981]">
-                                    {row.calculatedSpineMm.toFixed(2)} mm
-                                </span>
-                                <div className="text-[10px] text-slate-400">
-                                    Bleed +{row.bleedMarginMm.toFixed(1)} mm
-                                </div>
-                            </div>
-                        )
-                    },
-                    {
-                        key: 'stage',
-                        header: L.colCurrentStage,
-                        render: row => (
-                            <div className="font-mono text-xs">
-                                <span className="text-white font-bold">
-                                    {row.currentStage.replace(/_/g, ' ')}
-                                </span>
-                                <div className="text-[10px] text-slate-400">
-                                    Stage {row.currentStageIndex}/6 · ETA {row.estimatedDeliveryDate}
-                                </div>
-                            </div>
-                        )
-                    },
-                    {
-                        key: 'proofStatus',
-                        header: L.colProofStatus,
-                        render: row => (
-                            <StatusBadge
-                                status={
-                                    row.proofStatus === 'APPROVED_FOR_PRESS'
-                                        ? 'HEALTHY'
-                                        : row.proofStatus === 'CORRECTION_REQUESTED'
-                                        ? 'WARNING'
-                                        : 'QUEUED'
-                                }
-                                label={row.proofStatus.replace(/_/g, ' ')}
-                            />
-                        )
-                    },
-                    {
-                        key: 'actions',
-                        header: L.colActions,
-                        align: 'right',
-                        render: row => (
-                            <button
-                                type="button"
-                                data-testid={`inspect-3d-btn-${row.orderId}`}
-                                onClick={() => setSelectedOrder(row)}
-                                className="px-3 py-1.5 rounded-lg bg-[#dc2626] hover:bg-red-500 text-white font-mono text-[11px] font-black uppercase tracking-wider inline-flex items-center gap-1.5 transition-all cursor-pointer"
-                            >
-                                <CubeIcon className="w-3.5 h-3.5" />
-                                <span>{L.btnOpen3D}</span>
-                            </button>
-                        )
-                    }
-                ]}
-            />
 
-            {/* Integrated 3D Soft-Proofing Viewer + 6-Stage Real-Time Telemetry + Document Center */}
-            {selectedOrder && (
-                <div
-                    data-testid="publisher-active-inspection-panel"
-                    className="space-y-6 pt-2"
-                >
-                    <SoftProofingViewer3D
-                        book={{
-                            orderId: selectedOrder.orderId,
-                            isbn: selectedOrder.isbn,
-                            title: selectedOrder.title,
-                            trimWidthMm: selectedOrder.trimWidthMm,
-                            trimHeightMm: selectedOrder.trimHeightMm,
-                            spineThicknessMm: selectedOrder.calculatedSpineMm,
-                            bleedMarginMm: selectedOrder.bleedMarginMm,
-                            hardcoverOverhangMm: selectedOrder.hardcoverOverhangMm,
-                            bindingType: selectedOrder.bindingType,
-                            surfaceFinish: selectedOrder.surfaceFinish,
-                            paperSpecification: selectedOrder.paperSpecification,
-                            proofStatus: selectedOrder.proofStatus
-                        }}
-                        locale={lang}
-                        onApproveForPress={({ orderId, comments }) =>
-                            handleProofDecision(orderId, 'APPROVED', comments)
-                        }
-                        onRequestCorrection={({ orderId, comments }) =>
-                            handleProofDecision(orderId, 'REJECTED', comments)
-                        }
-                    />
-
-                    {/* 6-Stage Manufacturing Telemetry Timeline */}
-                    <div
-                        data-testid="publisher-manufacturing-timeline"
-                        className="p-5 rounded-xl bg-[#14161a] border border-[#1f2228] space-y-4"
-                    >
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                            <h3 className="font-mono text-xs font-black uppercase tracking-wider text-slate-300 m-0">
-                                {L.timelineHeading} · {selectedOrder.orderId}
-                            </h3>
-                            <span className="font-mono text-[11px] text-slate-400">
-                                SSCC-18: {selectedOrder.sscc18}
-                            </span>
+                            {/* Search input */}
+                            <div className="relative">
+                                <MagnifyingGlassIcon className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" />
+                                <input
+                                    type="text"
+                                    value={searchQuery}
+                                    onChange={e => setSearchQuery(e.target.value)}
+                                    placeholder={L.searchPlaceholder}
+                                    className="w-full pl-9 pr-3 py-1.5 rounded-lg bg-[#0a0b0d] border border-[#2a2e39] text-xs font-mono text-white placeholder-slate-500 focus:outline-none focus:border-[#dc2626]"
+                                />
+                            </div>
                         </div>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
-                            {TIMELINE_STEPS.map(milestone => {
-                                const isCompleted =
-                                    milestone.step < selectedOrder.currentStageIndex ||
-                                    (milestone.step === 6 &&
-                                        selectedOrder.currentStage === 'DISPATCHED_AND_DELIVERED');
-                                const isCurrent =
-                                    milestone.step === selectedOrder.currentStageIndex &&
-                                    selectedOrder.currentStage !== 'DISPATCHED_AND_DELIVERED';
-
-                                return (
-                                    <div
-                                        key={milestone.code}
-                                        data-testid={`timeline-step-${milestone.code}`}
-                                        className={`p-3 rounded-lg border font-mono transition-all ${
-                                            isCompleted
-                                                ? 'bg-emerald-500/10 border-emerald-500/30 text-white'
-                                                : isCurrent
-                                                ? 'bg-[#dc2626]/15 border-[#dc2626] text-white'
-                                                : 'bg-[#0a0b0d] border-[#1f2228] text-slate-500'
-                                        }`}
-                                    >
-                                        <div className="flex items-center justify-between text-[10px]">
-                                            <span className="font-black">{milestone.phase}</span>
-                                            {isCompleted ? (
-                                                <CheckCircleIcon className="w-4 h-4 text-[#10b981]" />
-                                            ) : isCurrent ? (
-                                                <ExclamationTriangleIcon className="w-4 h-4 text-[#dc2626]" />
-                                            ) : (
-                                                <span>#{milestone.step}</span>
-                                            )}
-                                        </div>
-                                        <div className="text-[11px] font-black mt-1.5 break-all">
-                                            {milestone.label}
-                                        </div>
-                                        <div className="text-[10px] text-slate-400 mt-0.5">
-                                            {milestone.subtitle}
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    </div>
-
-                    {/* Self-Service Editorial Document Center */}
-                    <div
-                        data-testid="publisher-document-center"
-                        className="p-5 rounded-xl bg-[#14161a] border border-[#1f2228] flex flex-col sm:flex-row sm:items-center justify-between gap-4"
-                    >
-                        <div>
-                            <h3 className="font-mono text-xs font-black uppercase tracking-wider text-slate-300 m-0">
-                                {L.docCenterHeading}
-                            </h3>
-                            <p className="text-xs font-mono text-slate-400 mt-1 m-0">
-                                Shipment {selectedOrder.shipmentId} · Preflight{' '}
-                                {selectedOrder.preflightInspectionId} · {selectedOrder.fscCertificateCode}
-                            </p>
-                            {downloadFeedback && (
-                                <div className="text-[11px] font-mono text-[#10b981] mt-1">
-                                    {downloadFeedback}
+                        {/* Scrollable Editions List */}
+                        <div
+                            data-testid="publisher-editions-list"
+                            className="max-h-[calc(100vh-280px)] overflow-y-auto pr-1 space-y-3"
+                        >
+                            {visibleEditions.length === 0 ? (
+                                <div className="p-6 rounded-xl bg-[#14161a] border border-[#1f2228] text-center text-xs font-mono text-slate-400">
+                                    No editions matching query.
                                 </div>
+                            ) : (
+                                visibleEditions.map(row => {
+                                    const isSelected = selectedOrder?.orderId === row.orderId;
+                                    return (
+                                        <div
+                                            key={row.orderId}
+                                            data-testid={`edition-card-${row.orderId}`}
+                                            onClick={() => setSelectedOrder(row)}
+                                            className={`p-4 rounded-xl border transition-all cursor-pointer relative ${isSelected
+                                                    ? 'bg-[#181b20] border-[#dc2626] shadow-lg shadow-red-950/20'
+                                                    : 'bg-[#14161a] border-[#1f2228] hover:border-[#2f3542]'
+                                                }`}
+                                        >
+                                            <div className="flex items-start justify-between gap-2">
+                                                <div className="space-y-1 flex-1 min-w-0">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="font-mono font-black text-xs text-white">
+                                                            {row.orderId}
+                                                        </span>
+                                                        <span className="px-1.5 py-0.5 rounded bg-[#0a0b0d] border border-[#2a2e39] font-mono text-[9px] font-bold text-slate-300">
+                                                            {row.bindingType.replace(/_/g, ' ')}
+                                                        </span>
+                                                    </div>
+                                                    <div className="text-xs font-bold text-slate-200 truncate">
+                                                        {row.title}
+                                                    </div>
+                                                    <div className="text-[10px] font-mono text-slate-400">
+                                                        ISBN: {row.isbn} · {row.printRunCopies.toLocaleString()} copies · €{row.agreedPurchasePriceEur.toLocaleString()}
+                                                    </div>
+                                                </div>
+
+                                                <div className="flex flex-col items-end gap-1.5 shrink-0">
+                                                    <StatusBadge
+                                                        status={
+                                                            row.proofStatus === 'APPROVED_FOR_PRESS'
+                                                                ? 'HEALTHY'
+                                                                : row.proofStatus === 'CORRECTION_REQUESTED'
+                                                                    ? 'WARNING'
+                                                                    : 'QUEUED'
+                                                        }
+                                                        label={row.proofStatus.replace(/_/g, ' ')}
+                                                    />
+                                                    <span className="text-[10px] font-mono font-bold text-[#10b981]">
+                                                        Spine: {row.calculatedSpineMm.toFixed(2)} mm
+                                                    </span>
+                                                </div>
+                                            </div>
+
+                                            <div className="mt-3 pt-2.5 border-t border-[#1f2228] flex items-center justify-between text-[10px] font-mono text-slate-400">
+                                                <div className="truncate">
+                                                    Stage {row.currentStageIndex}/6 · {row.currentStage.replace(/_/g, ' ')}
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <button
+                                                        type="button"
+                                                        data-testid={`inspect-3d-btn-${row.orderId}`}
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setSelectedOrder(row);
+                                                        }}
+                                                        className="px-2 py-1 rounded bg-[#dc2626] hover:bg-red-500 text-white font-mono text-[10px] font-black uppercase tracking-wider inline-flex items-center gap-1 transition-all"
+                                                    >
+                                                        <CubeIcon className="w-3 h-3" />
+                                                        <span>{L.btnOpen3D}</span>
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        data-testid={`dismiss-btn-${row.orderId}`}
+                                                        onClick={(e) => handleArchiveOrDismiss(row.orderId, e)}
+                                                        title={L.btnArchiveDismiss}
+                                                        className="p-1 rounded hover:bg-red-500/10 text-slate-500 hover:text-red-400 border border-transparent hover:border-red-500/30 transition-all cursor-pointer"
+                                                    >
+                                                        <TrashIcon className="w-3.5 h-3.5" />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                })
                             )}
                         </div>
+                    </div>
 
-                        <div className="flex flex-wrap items-center gap-2.5">
-                            <a
-                                href={`/api/logistics/shipments/${selectedOrder.shipmentId}/delivery-note/pdf`}
-                                data-testid="download-signed-pod-btn"
-                                onClick={e => {
-                                    e.preventDefault();
-                                    setDownloadFeedback(
-                                        `READY: /api/logistics/shipments/${selectedOrder.shipmentId}/delivery-note/pdf`
-                                    );
-                                }}
-                                className="px-3 py-2 rounded-lg bg-[#0a0b0d] hover:bg-[#181b20] border border-[#1f2228] text-xs font-mono font-bold text-white inline-flex items-center gap-1.5 no-underline"
+                    {/* Right Column: Sticky Inspection Deck (lg:col-span-7) */}
+                    <div className="lg:col-span-7">
+                        {selectedOrder ? (
+                            <div
+                                data-testid="publisher-active-inspection-panel"
+                                className="sticky top-6 space-y-4"
                             >
-                                <DocumentArrowDownIcon className="w-4 h-4 text-[#dc2626]" />
-                                <span>{L.btnPodPdf}</span>
-                            </a>
+                                {/* Top Bar: Selected Edition Summary */}
+                                <div className="p-4 rounded-xl bg-[#14161a] border border-[#1f2228] flex flex-wrap items-center justify-between gap-3">
+                                    <div className="min-w-0">
+                                        <div className="flex items-center gap-2">
+                                            <span className="font-mono text-sm font-black text-white">
+                                                {selectedOrder.orderId}
+                                            </span>
+                                            <span className="text-xs text-slate-400">·</span>
+                                            <span className="text-xs font-mono text-slate-300 truncate">
+                                                {selectedOrder.title}
+                                            </span>
+                                        </div>
+                                        <div className="text-[10px] font-mono text-slate-400 mt-0.5">
+                                            ISBN: {selectedOrder.isbn} · {selectedOrder.trimWidthMm}×{selectedOrder.trimHeightMm} mm · {selectedOrder.pageCount} pp · {selectedOrder.paperGrammageGsm}g/m²
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <div className="px-2.5 py-1 rounded-lg bg-[#0a0b0d] border border-[#2a2e39] font-mono text-xs">
+                                            <span className="text-slate-400 text-[10px] uppercase block">Caliper Spine</span>
+                                            <span className="font-black text-[#10b981]">
+                                                {selectedOrder.calculatedSpineMm.toFixed(2)} mm
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
 
-                            <a
-                                href={`/api/preflight/inspections/${selectedOrder.preflightInspectionId}`}
-                                data-testid="download-preflight-report-btn"
-                                onClick={e => {
-                                    e.preventDefault();
-                                    setDownloadFeedback(
-                                        `READY: /api/preflight/inspections/${selectedOrder.preflightInspectionId}`
-                                    );
-                                }}
-                                className="px-3 py-2 rounded-lg bg-[#0a0b0d] hover:bg-[#181b20] border border-[#1f2228] text-xs font-mono font-bold text-white inline-flex items-center gap-1.5 no-underline"
-                            >
-                                <DocumentArrowDownIcon className="w-4 h-4 text-[#3b82f6]" />
-                                <span>{L.btnPreflightReport}</span>
-                            </a>
+                                {/* Parametric 3D Soft-Proofing Canvas */}
+                                <SoftProofingViewer3D
+                                    book={{
+                                        orderId: selectedOrder.orderId,
+                                        isbn: selectedOrder.isbn,
+                                        title: selectedOrder.title,
+                                        trimWidthMm: selectedOrder.trimWidthMm,
+                                        trimHeightMm: selectedOrder.trimHeightMm,
+                                        spineThicknessMm: selectedOrder.calculatedSpineMm,
+                                        bleedMarginMm: selectedOrder.bleedMarginMm,
+                                        hardcoverOverhangMm: selectedOrder.hardcoverOverhangMm,
+                                        bindingType: selectedOrder.bindingType,
+                                        surfaceFinish: selectedOrder.surfaceFinish,
+                                        paperSpecification: selectedOrder.paperSpecification,
+                                        proofStatus: selectedOrder.proofStatus
+                                    }}
+                                    locale={lang}
+                                    onApproveForPress={({ orderId, comments }) =>
+                                        handleProofDecision(orderId, 'APPROVED', comments)
+                                    }
+                                    onRequestCorrection={({ orderId, comments }) =>
+                                        handleProofDecision(orderId, 'REJECTED', comments)
+                                    }
+                                />
 
-                            <a
-                                href={`/api/publisher/orders/${selectedOrder.orderId}/certificates/fsc-pefc`}
-                                data-testid="download-fsc-cert-btn"
-                                onClick={e => {
-                                    e.preventDefault();
-                                    setDownloadFeedback(
-                                        `READY: /api/publisher/orders/${selectedOrder.orderId}/certificates/fsc-pefc (${selectedOrder.fscCertificateCode})`
-                                    );
-                                }}
-                                className="px-3 py-2 rounded-lg bg-[#0a0b0d] hover:bg-[#181b20] border border-[#1f2228] text-xs font-mono font-bold text-white inline-flex items-center gap-1.5 no-underline"
-                            >
-                                <ShieldCheckIcon className="w-4 h-4 text-[#10b981]" />
-                                <span>{L.btnFscCert}</span>
-                            </a>
-                        </div>
+                                {/* TASK 3: Dynamic 6-Stage Manufacturing Telemetry Timeline */}
+                                <div
+                                    data-testid="publisher-manufacturing-timeline"
+                                    className="p-4 rounded-xl bg-[#14161a] border border-[#1f2228] space-y-3"
+                                >
+                                    <div className="flex flex-wrap items-center justify-between gap-2">
+                                        <h3 className="font-mono text-xs font-black uppercase tracking-wider text-slate-300 m-0">
+                                            {L.timelineHeading} · {selectedOrder.orderId}
+                                        </h3>
+                                        <span className="font-mono text-[11px] text-slate-400">
+                                            {resolveDynamicSscc(selectedOrder)}
+                                        </span>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+                                        {TIMELINE_STEPS.map(milestone => {
+                                            const isCompleted =
+                                                milestone.step < selectedOrder.currentStageIndex ||
+                                                (milestone.step === 6 &&
+                                                    selectedOrder.currentStage === 'DISPATCHED_AND_DELIVERED');
+                                            const isCurrent =
+                                                milestone.step === selectedOrder.currentStageIndex &&
+                                                selectedOrder.currentStage !== 'DISPATCHED_AND_DELIVERED';
+
+                                            return (
+                                                <div
+                                                    key={milestone.code}
+                                                    data-testid={`timeline-step-${milestone.code}`}
+                                                    className={`p-2.5 rounded-lg border font-mono transition-all ${isCompleted
+                                                            ? 'bg-emerald-500/10 border-emerald-500/30 text-white'
+                                                            : isCurrent
+                                                                ? 'bg-[#dc2626]/15 border-[#dc2626] text-white'
+                                                                : 'bg-[#0a0b0d] border-[#1f2228] text-slate-500'
+                                                        }`}
+                                                >
+                                                    <div className="flex items-center justify-between text-[9px]">
+                                                        <span className="font-black">{milestone.phase}</span>
+                                                        {isCompleted ? (
+                                                            <CheckCircleIcon className="w-3.5 h-3.5 text-[#10b981]" />
+                                                        ) : isCurrent ? (
+                                                            <ExclamationTriangleIcon className="w-3.5 h-3.5 text-[#dc2626]" />
+                                                        ) : (
+                                                            <span>#{milestone.step}</span>
+                                                        )}
+                                                    </div>
+                                                    <div className="text-[10px] font-black mt-1 break-all">
+                                                        {milestone.label}
+                                                    </div>
+                                                    <div className="text-[9px] text-slate-400 mt-0.5">
+                                                        {milestone.subtitle}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+
+                                {/* TASK 3: Self-Service Editorial Document Center */}
+                                <div
+                                    data-testid="publisher-document-center"
+                                    className="p-4 rounded-xl bg-[#14161a] border border-[#1f2228] flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                                >
+                                    <div>
+                                        <h3 className="font-mono text-xs font-black uppercase tracking-wider text-slate-300 m-0">
+                                            {L.docCenterHeading}
+                                        </h3>
+                                        <p className="text-[11px] font-mono text-slate-400 mt-0.5 m-0">
+                                            Shipment {selectedOrder.shipmentId || 'N/A'} · Preflight{' '}
+                                            {selectedOrder.preflightInspectionId || 'N/A'} · {selectedOrder.fscCertificateCode || 'N/A'}
+                                        </p>
+                                        {downloadFeedback && (
+                                            <div className="text-[10px] font-mono text-[#10b981] mt-1">
+                                                {downloadFeedback}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        {hasDeliveryNote ? (
+                                            <a
+                                                href={`/api/logistics/shipments/${selectedOrder.shipmentId}/delivery-note/pdf`}
+                                                data-testid="download-signed-pod-btn"
+                                                onClick={e => {
+                                                    e.preventDefault();
+                                                    setDownloadFeedback(
+                                                        `READY: /api/logistics/shipments/${selectedOrder.shipmentId}/delivery-note/pdf`
+                                                    );
+                                                }}
+                                                className="px-2.5 py-1.5 rounded-lg bg-[#0a0b0d] hover:bg-[#181b20] border border-[#1f2228] text-[11px] font-mono font-bold text-white inline-flex items-center gap-1.5 no-underline"
+                                            >
+                                                <DocumentArrowDownIcon className="w-3.5 h-3.5 text-[#dc2626]" />
+                                                <span>{L.btnPodPdf}</span>
+                                            </a>
+                                        ) : (
+                                            <span className="px-2.5 py-1.5 rounded-lg bg-[#0a0b0d] border border-[#1f2228] text-[10px] font-mono text-slate-500 inline-flex items-center gap-1 cursor-not-allowed">
+                                                <DocumentArrowDownIcon className="w-3.5 h-3.5 text-slate-600" />
+                                                <span>{L.pendingGeneration}</span>
+                                            </span>
+                                        )}
+
+                                        {hasPreflightReport ? (
+                                            <a
+                                                href={`/api/preflight/inspections/${selectedOrder.preflightInspectionId}`}
+                                                data-testid="download-preflight-report-btn"
+                                                onClick={e => {
+                                                    e.preventDefault();
+                                                    setDownloadFeedback(
+                                                        `READY: /api/preflight/inspections/${selectedOrder.preflightInspectionId}`
+                                                    );
+                                                }}
+                                                className="px-2.5 py-1.5 rounded-lg bg-[#0a0b0d] hover:bg-[#181b20] border border-[#1f2228] text-[11px] font-mono font-bold text-white inline-flex items-center gap-1.5 no-underline"
+                                            >
+                                                <DocumentArrowDownIcon className="w-3.5 h-3.5 text-[#3b82f6]" />
+                                                <span>{L.btnPreflightReport}</span>
+                                            </a>
+                                        ) : (
+                                            <span className="px-2.5 py-1.5 rounded-lg bg-[#0a0b0d] border border-[#1f2228] text-[10px] font-mono text-slate-500 inline-flex items-center gap-1 cursor-not-allowed">
+                                                <DocumentArrowDownIcon className="w-3.5 h-3.5 text-slate-600" />
+                                                <span>{L.pendingGeneration}</span>
+                                            </span>
+                                        )}
+
+                                        {hasFscCert ? (
+                                            <a
+                                                href={`/api/publisher/orders/${selectedOrder.orderId}/certificates/fsc-pefc`}
+                                                data-testid="download-fsc-cert-btn"
+                                                onClick={e => {
+                                                    e.preventDefault();
+                                                    setDownloadFeedback(
+                                                        `READY: /api/publisher/orders/${selectedOrder.orderId}/certificates/fsc-pefc (${selectedOrder.fscCertificateCode})`
+                                                    );
+                                                }}
+                                                className="px-2.5 py-1.5 rounded-lg bg-[#0a0b0d] hover:bg-[#181b20] border border-[#1f2228] text-[11px] font-mono font-bold text-white inline-flex items-center gap-1.5 no-underline"
+                                            >
+                                                <ShieldCheckIcon className="w-3.5 h-3.5 text-[#10b981]" />
+                                                <span>{L.btnFscCert}</span>
+                                            </a>
+                                        ) : (
+                                            <span className="px-2.5 py-1.5 rounded-lg bg-[#0a0b0d] border border-[#1f2228] text-[10px] font-mono text-slate-500 inline-flex items-center gap-1 cursor-not-allowed">
+                                                <ShieldCheckIcon className="w-3.5 h-3.5 text-slate-600" />
+                                                <span>{L.pendingGeneration}</span>
+                                            </span>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="p-8 rounded-xl bg-[#14161a] border border-[#1f2228] text-center space-y-2">
+                                <CubeIcon className="w-8 h-8 text-slate-600 mx-auto" />
+                                <div className="text-xs font-mono text-slate-400">
+                                    {L.emptyPlaceholderDeck}
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
-            )}
+            ) : null}
 
             {/* Modal for + SUBMIT NEW TITLE */}
             {showSubmitModal && (
@@ -849,103 +1011,129 @@ export const PublisherHubPage: React.FC<SharedModuleProps> = ({
                         className="w-full max-w-lg rounded-xl bg-[#14161a] border border-[#1f2228] p-6 space-y-4 text-white"
                     >
                         <div className="flex items-center justify-between border-b border-[#1f2228] pb-3">
-                            <h3 className="font-mono text-sm font-black uppercase tracking-wider m-0">
+                            <h3 className="text-sm font-mono font-black uppercase text-white m-0">
                                 {L.submitModalTitle}
                             </h3>
                             <button
                                 type="button"
                                 onClick={() => setShowSubmitModal(false)}
-                                className="text-slate-400 hover:text-white cursor-pointer"
+                                className="text-slate-400 hover:text-white"
                             >
                                 <XMarkIcon className="w-5 h-5" />
                             </button>
                         </div>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs font-mono">
-                            <label className="space-y-1 sm:col-span-2">
-                                <span className="text-slate-400">{L.lblTitle}</span>
+                        <div className="space-y-3 font-mono text-xs">
+                            <div>
+                                <label className="block text-slate-400 text-[11px] mb-1">
+                                    {L.lblTitle}
+                                </label>
                                 <input
                                     type="text"
+                                    required
                                     value={newTitle}
                                     onChange={e => setNewTitle(e.target.value)}
-                                    className="w-full px-3 py-2 rounded bg-[#0a0b0d] border border-[#1f2228] text-white"
+                                    className="w-full px-3 py-2 rounded-lg bg-[#0a0b0d] border border-[#2a2e39] text-white focus:outline-none focus:border-[#dc2626]"
                                 />
-                            </label>
-                            <label className="space-y-1">
-                                <span className="text-slate-400">{L.lblIsbn}</span>
-                                <input
-                                    type="text"
-                                    value={newIsbn}
-                                    onChange={e => setNewIsbn(e.target.value)}
-                                    className="w-full px-3 py-2 rounded bg-[#0a0b0d] border border-[#1f2228] text-white"
-                                />
-                            </label>
-                            <label className="space-y-1">
-                                <span className="text-slate-400">{L.lblCopies}</span>
-                                <input
-                                    type="number"
-                                    value={newCopies}
-                                    onChange={e => setNewCopies(Number(e.target.value))}
-                                    className="w-full px-3 py-2 rounded bg-[#0a0b0d] border border-[#1f2228] text-white"
-                                />
-                            </label>
-                            <label className="space-y-1">
-                                <span className="text-slate-400">{L.lblPages}</span>
-                                <input
-                                    type="number"
-                                    step={4}
-                                    value={newPages}
-                                    onChange={e => setNewPages(Number(e.target.value))}
-                                    className="w-full px-3 py-2 rounded bg-[#0a0b0d] border border-[#1f2228] text-white"
-                                />
-                            </label>
-                            <label className="space-y-1">
-                                <span className="text-slate-400">{L.lblBinding}</span>
-                                <select
-                                    value={newBinding}
-                                    onChange={e =>
-                                        setNewBinding(
-                                            e.target.value as 'SOFTCOVER_PUR' | 'HARDCOVER_SEWN'
-                                        )
-                                    }
-                                    className="w-full px-3 py-2 rounded bg-[#0a0b0d] border border-[#1f2228] text-white"
-                                >
-                                    <option value="SOFTCOVER_PUR">SOFTCOVER PUR</option>
-                                    <option value="HARDCOVER_SEWN">HARDCOVER SEWN (Cartoné)</option>
-                                </select>
-                            </label>
-                            <label className="space-y-1">
-                                <span className="text-slate-400">{L.lblGrammage}</span>
-                                <input
-                                    type="number"
-                                    value={newGrammage}
-                                    onChange={e => setNewGrammage(Number(e.target.value))}
-                                    className="w-full px-3 py-2 rounded bg-[#0a0b0d] border border-[#1f2228] text-white"
-                                />
-                            </label>
-                            <label className="space-y-1">
-                                <span className="text-slate-400">{L.lblBulk}</span>
-                                <input
-                                    type="number"
-                                    step={0.05}
-                                    value={newBulk}
-                                    onChange={e => setNewBulk(Number(e.target.value))}
-                                    className="w-full px-3 py-2 rounded bg-[#0a0b0d] border border-[#1f2228] text-white"
-                                />
-                            </label>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="block text-slate-400 text-[11px] mb-1">
+                                        {L.lblIsbn}
+                                    </label>
+                                    <input
+                                        type="text"
+                                        required
+                                        value={newIsbn}
+                                        onChange={e => setNewIsbn(e.target.value)}
+                                        className="w-full px-3 py-2 rounded-lg bg-[#0a0b0d] border border-[#2a2e39] text-white focus:outline-none focus:border-[#dc2626]"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-slate-400 text-[11px] mb-1">
+                                        {L.lblCopies}
+                                    </label>
+                                    <input
+                                        type="number"
+                                        min="100"
+                                        step="100"
+                                        value={newCopies}
+                                        onChange={e => setNewCopies(Number(e.target.value))}
+                                        className="w-full px-3 py-2 rounded-lg bg-[#0a0b0d] border border-[#2a2e39] text-white focus:outline-none focus:border-[#dc2626]"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="block text-slate-400 text-[11px] mb-1">
+                                        {L.lblPages}
+                                    </label>
+                                    <input
+                                        type="number"
+                                        min="16"
+                                        step="4"
+                                        value={newPages}
+                                        onChange={e => setNewPages(Number(e.target.value))}
+                                        className="w-full px-3 py-2 rounded-lg bg-[#0a0b0d] border border-[#2a2e39] text-white focus:outline-none focus:border-[#dc2626]"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-slate-400 text-[11px] mb-1">
+                                        {L.lblBinding}
+                                    </label>
+                                    <select
+                                        value={newBinding}
+                                        onChange={e =>
+                                            setNewBinding(e.target.value as 'SOFTCOVER_PUR' | 'HARDCOVER_SEWN')
+                                        }
+                                        className="w-full px-3 py-2 rounded-lg bg-[#0a0b0d] border border-[#2a2e39] text-white focus:outline-none focus:border-[#dc2626]"
+                                    >
+                                        <option value="SOFTCOVER_PUR">SOFTCOVER PUR</option>
+                                        <option value="HARDCOVER_SEWN">HARDCOVER SEWN</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="block text-slate-400 text-[11px] mb-1">
+                                        {L.lblGrammage}
+                                    </label>
+                                    <input
+                                        type="number"
+                                        value={newGrammage}
+                                        onChange={e => setNewGrammage(Number(e.target.value))}
+                                        className="w-full px-3 py-2 rounded-lg bg-[#0a0b0d] border border-[#2a2e39] text-white focus:outline-none focus:border-[#dc2626]"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-slate-400 text-[11px] mb-1">
+                                        {L.lblBulk}
+                                    </label>
+                                    <input
+                                        type="number"
+                                        step="0.05"
+                                        value={newBulk}
+                                        onChange={e => setNewBulk(Number(e.target.value))}
+                                        className="w-full px-3 py-2 rounded-lg bg-[#0a0b0d] border border-[#2a2e39] text-white focus:outline-none focus:border-[#dc2626]"
+                                    />
+                                </div>
+                            </div>
                         </div>
 
-                        <div className="flex justify-end gap-2 pt-3 border-t border-[#1f2228]">
+                        <div className="flex items-center justify-end gap-3 pt-3 border-t border-[#1f2228]">
                             <button
                                 type="button"
                                 onClick={() => setShowSubmitModal(false)}
-                                className="px-4 py-2 rounded-lg bg-[#0a0b0d] border border-[#1f2228] text-xs font-mono font-bold text-slate-300 cursor-pointer"
+                                className="px-4 py-2 rounded-lg bg-transparent hover:bg-white/5 text-slate-300 font-mono text-xs"
                             >
                                 {L.lblCancel}
                             </button>
                             <button
                                 type="submit"
-                                className="px-4 py-2 rounded-lg bg-[#dc2626] text-xs font-mono font-black uppercase text-white cursor-pointer"
+                                className="px-4 py-2 rounded-lg bg-[#dc2626] hover:bg-red-500 text-white font-mono text-xs font-black uppercase tracking-wider"
                             >
                                 {L.lblCreate}
                             </button>
@@ -953,7 +1141,6 @@ export const PublisherHubPage: React.FC<SharedModuleProps> = ({
                     </form>
                 </div>
             )}
-
             {/* Dual-Mode Onboarding Footer */}
             {mode === 'onboarding' && onNextStep && (
                 <div className="flex justify-end pt-4 border-t border-[#1f2228]">
@@ -972,4 +1159,3 @@ export const PublisherHubPage: React.FC<SharedModuleProps> = ({
     );
 };
 export default PublisherHubPage;
-

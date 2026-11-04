@@ -743,9 +743,6 @@ function getPublisherOrderDetail({
             publisherTenantId,
             order: sanitizeOrderForRole(order, role)
         };
-        payload.then = function(onFulfilled) {
-            return Promise.resolve(payload).then(onFulfilled);
-        };
         return payload;
     }
 
@@ -764,10 +761,6 @@ function getPublisherOrderDetail({
     })();
 
     if (syncError) {
-        // If caller didn't await and expected synchronous throw if not found
-        // Return promise that also behaves like syncError if inspected synchronously
-        promise.then = promise.then.bind(promise);
-        // But if someone checks sync properties, throw
         throw syncError;
     }
 
@@ -842,11 +835,7 @@ function getPublisherTimeline({
     }
 
     if (order) {
-        const payload = buildTimelinePayload(order, publisherTenantId, role);
-        payload.then = function(onFulfilled) {
-            return Promise.resolve(payload).then(onFulfilled);
-        };
-        return payload;
+        return buildTimelinePayload(order, publisherTenantId, role);
     }
 
     if (syncError && (syncError.statusCode === 403 || syncError.code === 'FORBIDDEN_CROSS_TENANT_ACCESS')) {
