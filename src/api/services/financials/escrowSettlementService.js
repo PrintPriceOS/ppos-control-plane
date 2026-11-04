@@ -130,6 +130,10 @@ function buildBaselineEscrowEntries(tenantId = 'tenant-default') {
 }
 
 function ensureEscrowTenantSeeded(tenantId = 'tenant-default') {
+    // Strictly prohibit falling back to baseline escrow entries unless tenant ID explicitly matches demo
+    const isDemo = String(tenantId).trim().toLowerCase().startsWith('tenant-demo') || tenantId === 'demo';
+    if (!isDemo) return;
+
     let hasEntries = false;
     for (const key of escrowLedgerCache.keys()) {
         if (key.startsWith(`${tenantId}:`)) {
@@ -232,9 +236,9 @@ async function syncEscrowLedgerFromMySQL(tenantId = 'tenant-default') {
     try {
         const orderRows = await mysqlClient.query(
             `SELECT * FROM marketplace_orders
-             WHERE (tenant_id = ? OR ? = 'tenant-default')
+             WHERE tenant_id = ?
              ORDER BY created_at DESC LIMIT 50`,
-            [tenantId, tenantId]
+            [tenantId]
         );
         for (const row of orderRows || []) {
             const key = `${tenantId}:${row.order_id}`;

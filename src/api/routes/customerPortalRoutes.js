@@ -176,17 +176,17 @@ function getDefaultCustomerProfile(customerKey, email = '') {
     return {
         customerKey,
         fiscal: {
-            legalEntityName: 'Penguin Random House Editorial Group S.A.U.',
-            taxIdVat: 'ESB08214819',
-            viesValidated: true,
-            country: 'ES',
-            fiscalAddress: 'Travessera de Gracia, 47-49',
-            postalCode: '08021',
-            city: 'Barcelona',
-            billingEmail: email || 'billing@penguinrandomhouse.es',
-            dir3Code: 'EA0038591',
-            leitwegId: '04011000-1234512345-06',
-            peppolEndpoint: '0088:8412345000018',
+            legalEntityName: '',
+            taxIdVat: '',
+            viesValidated: false,
+            country: '',
+            fiscalAddress: '',
+            postalCode: '',
+            city: '',
+            billingEmail: email || '',
+            dir3Code: null,
+            leitwegId: null,
+            peppolEndpoint: null,
             preferredEInvoiceFormat: 'FACTURAE_3_2_2'
         },
         addresses: [
@@ -257,21 +257,11 @@ function getDefaultCustomerProfile(customerKey, email = '') {
 
 function shouldSeedDemoOrders(customerEmail = '') {
     const flag = process.env.PPOS_SEED_DEMO_ORDERS;
-    if (flag === 'false' || flag === '0') {
-        return false;
-    }
     if (flag === 'true' || flag === '1') {
-        return true;
+        const emailLower = String(customerEmail || '').toLowerCase();
+        return emailLower.startsWith('demo') || emailLower.includes('demo');
     }
-    const emailLower = String(customerEmail || '').toLowerCase();
-    const isDemoAccount =
-        !emailLower ||
-        emailLower === 'publisher@printprice.pro' ||
-        emailLower === 'admin@printprice.pro' ||
-        emailLower.endsWith('@editorial-planeta.es') ||
-        emailLower.includes('demo') ||
-        emailLower.includes('test');
-    return isDemoAccount;
+    return false;
 }
 
 function buildBaselineCustomerOrders(customerEmail = 'publisher@printprice.pro') {
@@ -558,7 +548,7 @@ function resolveCustomerContext(req) {
         req.body?.email ||
         user.email ||
         req.headers['x-customer-email'] ||
-        'publisher@printprice.pro';
+        null;
 
     const sessionId =
         req.query?.sessionId ||
@@ -575,11 +565,20 @@ function resolveCustomerContext(req) {
         req.headers['x-tenant-id'] ||
         'tenant-default';
 
+    const organizationId =
+        req.headers['x-b2b-org-id'] ||
+        req.query?.organizationId ||
+        req.body?.organizationId ||
+        user.organizationId ||
+        user.organization_id ||
+        null;
+
     return {
         customerId: customerId ? String(customerId) : null,
-        email: String(email).toLowerCase(),
+        email: email ? String(email).toLowerCase() : null,
         sessionId: sessionId ? String(sessionId) : null,
-        tenantId: String(tenantId)
+        tenantId: String(tenantId),
+        organizationId: organizationId ? String(organizationId) : null
     };
 }
 
@@ -1011,16 +1010,24 @@ function createCustomerPortalRouter() {
                 orderMap.set(id, normalizeOrderForPortalClient(runtimeOrder));
             }
 
-            // Also hydrate any matching orders from MySQL marketplace_orders
+            // Hydrate strictly matching orders from MySQL marketplace_orders
             try {
-                const dbResult = await marketplaceOrderService.listOrders({
-                    search: ctx.customerId || (ctx.email !== 'publisher@printprice.pro' ? ctx.email : undefined),
-                    isSuperAdmin: true,
-                    limit: 30
-                });
-                for (const dbOrd of dbResult.orders || []) {
-                    const mapped = mapMarketplaceOrderToCustomerHubOrder(dbOrd);
-                    orderMap.set(mapped.orderId, normalizeOrderForPortalClient(mapped));
+                if (ctx.email || ctx.organizationId || ctx.customerId) {
+                    const dbResult = await marketplaceOrderService.listOrders({
+                        customerEmail: ctx.email || undefined,
+                        organizationId: ctx.organizationId || undefined,
+                        search: (!ctx.email && !ctx.organizationId && ctx.customerId) ? ctx.customerId : undefined,
+                        limit: 50
+                    });
+                    for (const dbOrd of dbResult.orders || []) {
+                        // Strict filter: omit load test synthetic orders from user views unless explicitly a test user
+                        const title = dbOrd.specs?.title || dbOrd.specs?.edition || '';
+                        if (title.includes('Load Test') && !ctx.email?.includes('load-test')) {
+                            continue;
+                        }
+                        const mapped = mapMarketplaceOrderToCustomerHubOrder(dbOrd);
+                        orderMap.set(mapped.orderId, normalizeOrderForPortalClient(mapped));
+                    }
                 }
             } catch (_) {
                 // Non-fatal fallback if DB is unreachable in isolated unit test
@@ -1290,8 +1297,7 @@ function createCustomerPortalRouter() {
             const normalizedRef = String(orderId).replace(/_/g, '-');
             let order =
                 runtimeCustomerOrders.get(orderId) ||
-                baseline.find(o => o.orderId === orderId || o.publicRef === orderId || o.publicRef === normalizedRef) ||
-                (String(orderId).startsWith('ORD_') ? { ...baseline[0], orderId } : null);
+                baseline.find(o => o.orderId === orderId || o.publicRef === orderId || o.publicRef === normalizedRef);
 
             if (!order) {
                 try {
@@ -1727,7 +1733,9 @@ function createCustomerPortalRouter() {
             const ctx = resolveCustomerContext(req);
             const { getOperationalTelemetrySummary } = require('../services/telemetry/operationalTelemetryService');
             const summary = await getOperationalTelemetrySummary({
-                tenantId: ctx.tenantId || 'tenant-default'
+                tenantId: ctx.tenantId || 'tenant-default',
+                customerEmail: ctx.email || undefined,
+                organizationId: ctx.organizationId || undefined
             });
             return res.status(200).json(summary);
         } catch (err) {
@@ -1801,10 +1809,83 @@ function createCustomerPortalRouter() {
         if (!customerProfileStore.has(key)) {
             customerProfileStore.set(key, getDefaultCustomerProfile(key, ctx.email));
         }
+        const profile = customerProfileStore.get(key);
+        const hasFiscal = Boolean(profile?.fiscal?.legalEntityName?.trim() && profile?.fiscal?.taxIdVat?.trim());
+        const fiscalStatus = hasFiscal ? (profile.fiscal.viesValidated ? 'VIES_VALIDATED' : 'VIES_PENDING') : 'PENDING_COMPLETION';
         return res.status(200).json({
             ok: true,
-            profile: customerProfileStore.get(key)
+            status: fiscalStatus,
+            profile: {
+                ...profile,
+                fiscalStatus
+            }
         });
+    });
+
+    /**
+     * 4b. GET /api/customer/orders/:orderId/proforma.pdf
+     * Generates and streams the official high-end DIN A4 Vector Proforma Invoice & Wire Instructions.
+     */
+    router.get('/orders/:orderId/proforma.pdf', async (req, res) => {
+        const orderId = req.params.orderId;
+        try {
+            const ctx = resolveCustomerContext(req);
+            const baseline = buildBaselineCustomerOrders(ctx.email);
+            let order =
+                runtimeCustomerOrders.get(orderId) ||
+                baseline.find(o => o.orderId === orderId || o.publicRef === orderId);
+
+            if (!order) {
+                try {
+                    const dbOrder = await marketplaceOrderService.getOrder(orderId);
+                    if (dbOrder) {
+                        order = mapMarketplaceOrderToCustomerHubOrder(dbOrder);
+                    }
+                } catch (_) {}
+            }
+
+            if (!order && String(orderId).startsWith('ORD')) {
+                order = { ...baseline[0], orderId };
+            }
+
+            if (!order) {
+                return res.status(404).json({
+                    ok: false,
+                    error: 'ORDER_NOT_FOUND',
+                    message: `Order '${orderId}' not found for proforma invoice generation.`
+                });
+            }
+
+            const key = ctx.customerId || ctx.email || 'default-customer';
+            const profile =
+                (await loadCustomerProfileFromMySQL(key, ctx.email)) ||
+                customerProfileStore.get(key) ||
+                getDefaultCustomerProfile(key, ctx.email);
+
+            const { generateProformaInvoicePdf } = require('../services/publisher/proformaInvoicePdfService');
+            const result = generateProformaInvoicePdf(order, {
+                orderId,
+                fiscalProfile: profile?.fiscalProfile || profile?.fiscal || {},
+                customerEmail: ctx.email
+            });
+
+            res.setHeader('Content-Type', 'application/pdf');
+            res.setHeader(
+                'Content-Disposition',
+                `inline; filename="Proforma_${encodeURIComponent(order.orderId || orderId)}.pdf"`
+            );
+            res.setHeader('Content-Length', String(result.buffer.length));
+            res.setHeader('X-Invoice-Number', result.invoiceNumber);
+            res.setHeader('X-Gross-Amount', String(result.grossAmount));
+            return res.status(200).send(result.buffer);
+        } catch (err) {
+            logger.error({ event: 'proforma_invoice_pdf_failed', orderId, error: err.message });
+            return res.status(500).json({
+                ok: false,
+                error: 'PROFORMA_INVOICE_PDF_FAILED',
+                message: err.message
+            });
+        }
     });
 
     /**
@@ -1885,7 +1966,8 @@ function createCustomerPortalRouter() {
     router.get('/organization/members', async (req, res) => {
         try {
             const actor = resolveB2bActorContext(req);
-            const members = await listOrganizationMembers(actor.organizationId);
+            const includeSuspended = req.query?.includeSuspended === "true";
+            const members = await listOrganizationMembers(actor.organizationId, { includeSuspended });
             return res.status(200).json({
                 ok: true,
                 organizationId: actor.organizationId,

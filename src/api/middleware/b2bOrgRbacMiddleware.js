@@ -98,53 +98,9 @@ const organizationMembersStore = new Map(); // organizationId -> Map(memberId ->
 let membersTableInitialized = false;
 
 function buildDefaultOrgMembers(organizationId = 'org-publisher-default') {
-    const nowIso = '2026-10-15T09:00:00.000Z';
-    return [
-        {
-            memberId: 'MEM_2026_0001',
-            organizationId,
-            email: 'publisher@printprice.pro',
-            fullName: 'Elena Vance (Editorial Director)',
-            role: B2B_ORG_ROLES.ORG_ADMIN,
-            status: B2B_MEMBER_STATUSES.ACTIVE,
-            department: 'Executive & Editorial Board',
-            createdAt: nowIso,
-            updatedAt: nowIso
-        },
-        {
-            memberId: 'MEM_2026_0002',
-            organizationId,
-            email: 'production@printprice.pro',
-            fullName: 'Marcus Weber (Head of Industrial Production)',
-            role: B2B_ORG_ROLES.PRODUCTION_MANAGER,
-            status: B2B_MEMBER_STATUSES.ACTIVE,
-            department: 'Pre-Press & Plant Operations',
-            createdAt: nowIso,
-            updatedAt: nowIso
-        },
-        {
-            memberId: 'MEM_2026_0003',
-            organizationId,
-            email: 'finance@printprice.pro',
-            fullName: 'Sofía Mendoza (B2B Treasury & Controller)',
-            role: B2B_ORG_ROLES.FINANCE_APPROVER,
-            status: B2B_MEMBER_STATUSES.ACTIVE,
-            department: 'Finance & EN 16931 Billing',
-            createdAt: nowIso,
-            updatedAt: nowIso
-        },
-        {
-            memberId: 'MEM_2026_0004',
-            organizationId,
-            email: 'designer@printprice.pro',
-            fullName: 'Lucas Meyer (Senior Book Designer)',
-            role: B2B_ORG_ROLES.PREPRESS_DESIGNER,
-            status: B2B_MEMBER_STATUSES.ACTIVE,
-            department: 'Editorial Design & Layout Studio',
-            createdAt: nowIso,
-            updatedAt: nowIso
-        }
-    ];
+    // Zero mock policy: clean slate organizations have no synthetic team members.
+    // Colleagues must be explicitly invited via POST /api/customer/organization/members.
+    return [];
 }
 
 function ensureOrgSeededInMemory(organizationId = 'org-publisher-default') {
@@ -240,9 +196,11 @@ async function syncOrgMembersWithMySQL(organizationId = 'org-publisher-default')
 /**
  * Lists all members in a B2B Organization.
  */
-async function listOrganizationMembers(organizationId = 'org-publisher-default') {
+async function listOrganizationMembers(organizationId = 'org-publisher-default', options = {}) {
     const members = await syncOrgMembersWithMySQL(organizationId);
-    return members.map(m => ({
+    const includeSuspended = options.includeSuspended === true || String(options.includeSuspended).toLowerCase() === 'true';
+    const filtered = includeSuspended ? members : members.filter(m => m.status === 'ACTIVE' || m.status === 'INVITED');
+    return filtered.map(m => ({
         ...m,
         permissions: B2B_RBAC_PERMISSIONS_MATRIX[m.role] || B2B_RBAC_PERMISSIONS_MATRIX.PREPRESS_DESIGNER
     }));

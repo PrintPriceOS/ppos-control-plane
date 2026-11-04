@@ -580,6 +580,8 @@ class MarketplaceOrderService {
             tenantId,
             printhouseId,
             allowedPrinthouseIds,
+            customerEmail,
+            organizationId,
             search,
             limit = 50,
             offset = 0
@@ -587,6 +589,18 @@ class MarketplaceOrderService {
 
         let sql = `SELECT * FROM marketplace_orders WHERE 1=1`;
         const params = [];
+
+        // Strict customer and organization filtering
+        if (customerEmail && organizationId) {
+            sql += ` AND (customer_email = ? OR organization_id = ? OR JSON_UNQUOTE(JSON_EXTRACT(customer_json, '$.email')) = ?)`;
+            params.push(customerEmail, organizationId, customerEmail);
+        } else if (customerEmail) {
+            sql += ` AND (customer_email = ? OR JSON_UNQUOTE(JSON_EXTRACT(customer_json, '$.email')) = ?)`;
+            params.push(customerEmail, customerEmail);
+        } else if (organizationId) {
+            sql += ` AND organization_id = ?`;
+            params.push(organizationId);
+        }
 
         // Phase 192 RC20.2 & Phase 15: Enforce strict Printhouse Assignment & Tenant isolation
         if (allowedPrinthouseIds !== undefined) {

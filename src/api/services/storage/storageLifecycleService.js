@@ -34,10 +34,90 @@ const MARKETPLACE_STORAGE_DIR =
     process.env.PPOS_MARKETPLACE_FILES_DIR ||
     path.join(REPO_ROOT, 'storage', 'marketplace_orders');
 
+const IMMUNE_ORDER_STATUSES = new Set([
+    'AWAITING_CUSTOMER_APPROVAL',
+    'PROOFING',
+    'INCIDENT_OPEN',
+    'PENDING_IMPRIMATUR'
+]);
+
+const PURGEABLE_ORDER_STATUSES = new Set([
+    'DELIVERED',
+    'COMPLETED',
+    'CANCELLED',
+    'REJECTED',
+    'POD_SIGNED',
+    'SETTLED'
+]);
+
 function isDemoTenantId(tenantId) {
     if (!tenantId) return false;
     const t = String(tenantId).trim().toLowerCase();
     return t === 'tenant-demo' || t.startsWith('tenant-demo-');
+}
+
+/**
+ * Calculates whether a file timestamp has elapsed past European business-day window,
+ * strictly pausing or excluding Saturday 00:00 to Sunday 23:59 UTC.
+ *
+ * @param {string|Date|number} fileTimestamp - Upload or modification date
+ * @param {object} [options]
+ * @param {Date} [options.now] - Current date/time reference (defaults to new Date())
+ * @param {number} [options.businessHoursLimit] - Default threshold in business hours (default: 36h)
+ * @returns {object} { isExpired: boolean, elapsedBusinessHours: number, businessHoursLimit: number, wasPausedOverWeekend: boolean }
+ */
+function isWeekendSafeWindow(fileTimestamp, options = {}) {
+    if (!fileTimestamp) {
+        return { isExpired: false, elapsedBusinessHours: 0, businessHoursLimit: 36, wasPausedOverWeekend: false };
+    }
+
+    const fileTime = new Date(fileTimestamp).getTime();
+    if (isNaN(fileTime)) {
+        return { isExpired: false, elapsedBusinessHours: 0, businessHoursLimit: 36, wasPausedOverWeekend: false };
+    }
+
+    const now = options.now ? new Date(options.now) : new Date();
+    const nowTime = now.getTime();
+
+    if (nowTime <= fileTime) {
+        return { isExpired: false, elapsedBusinessHours: 0, businessHoursLimit: options.businessHoursLimit || 36, wasPausedOverWeekend: false };
+    }
+
+    // Step in 1-hour increments or compute total business milliseconds
+    // Weekend definition: Saturday 00:00:00 UTC (day 6) to Sunday 23:59:59 UTC (day 0)
+    let businessMs = 0;
+    let weekendMs = 0;
+    const stepMs = 60 * 60 * 1000; // 1 hour step
+
+    let cursor = fileTime;
+    while (cursor < nowTime) {
+        const nextCursor = Math.min(cursor + stepMs, nowTime);
+        const segment = nextCursor - cursor;
+        const d = new Date(cursor);
+        const day = d.getUTCDay(); // 0 = Sun, 6 = Sat
+
+        if (day === 0 || day === 6) {
+            weekendMs += segment;
+        } else {
+            businessMs += segment;
+        }
+        cursor = nextCursor;
+    }
+
+    const elapsedBusinessHours = Number((businessMs / (1000 * 60 * 60)).toFixed(2));
+    const dayOfWeek = now.getUTCDay(); // 1 = Monday
+    // Monday dynamic extension: requires at least 72h total window (4,320 min)
+    const businessHoursLimit = options.businessHoursLimit || (dayOfWeek === 1 ? 48 : 36);
+
+    const isExpired = elapsedBusinessHours >= businessHoursLimit;
+
+    return {
+        isExpired,
+        elapsedBusinessHours,
+        businessHoursLimit,
+        wasPausedOverWeekend: weekendMs > 0,
+        weekendHoursPaused: Number((weekendMs / (1000 * 60 * 60)).toFixed(2))
+    };
 }
 
 /**
@@ -294,6 +374,9 @@ async function purgeJobPdfBinary(jobId, tenantId = 'tenant-default', actorContex
         ? Number((bytesReclaimed / (1024 * 1024)).toFixed(1))
         : 688.7;
 
+    const currentStatus = String(inspection.overallStatus || inspection.status || '').toUpperCase();
+    const isUnapproved = IMMUNE_ORDER_STATUSES.has(currentStatus);
+
     try {
         await recordOperationalEvent({
             orderId: jobId,
@@ -301,14 +384,15 @@ async function purgeJobPdfBinary(jobId, tenantId = 'tenant-default', actorContex
             tenantId,
             domain: 'STORAGE',
             eventType: 'STORAGE_ASSET_PURGED',
-            severity: 'INFO',
+            severity: isUnapproved ? 'WARNING' : 'INFO',
             title: `Activo PDF Purgado de Disco (${jobId})`,
-            description: `Liberados ${reclaimedMb} MB conservando reporte forense de 6 ejes y hash SHA-256.`,
+            description: `Liberados ${reclaimedMb} MB conservando reporte forense de 6 ejes y hash SHA-256.${isUnapproved ? ' AVISO: El archivo fue purgado manualmente estando en revisión/imprimátur.' : ''}`,
             metadata: {
                 jobId,
                 reclaimedMb,
                 diskFileRemoved,
-                drawerTarget: 'STORAGE'
+                drawerTarget: 'STORAGE',
+                forcedUnapprovedPurge: isUnapproved
             },
             actorId: actorContext.userId || 'PRINTHOUSE_ADMIN',
             actorRole: actorContext.role || 'PRINTHOUSE_ADMIN',
@@ -323,26 +407,50 @@ async function purgeJobPdfBinary(jobId, tenantId = 'tenant-default', actorContex
         purgedCount: 1,
         diskFileRemoved,
         reclaimedMb,
+        warning: isUnapproved ? 'JOB_UNAPPROVED_MANUAL_PURGE_EXECUTED: Asset purged while in active approval state.' : null,
         inspection: outcome.inspection || outcome
     };
 }
 
 /**
- * Bulk purges all eligible retention PDF assets for tenant.
+ * Bulk purges all eligible retention PDF assets for tenant with European Business-Day & Status Awareness.
+ * Skips immune review states: AWAITING_CUSTOMER_APPROVAL, PROOFING, INCIDENT_OPEN, PENDING_IMPRIMATUR.
+ * Skips files that have not exceeded the weekend-adjusted European business-day window.
  */
-async function batchPurgeRetentionAssets(tenantId = 'tenant-default', actorContext = {}) {
+async function batchPurgeRetentionAssets(tenantId = 'tenant-default', actorContext = {}, options = {}) {
     const inspections = listTenantPreflightInspections(tenantId);
     let purgedCount = 0;
+    let skippedImmuneCount = 0;
+    let skippedWeekendWindowCount = 0;
     let totalBytesReclaimed = 0;
+
+    const now = options.now ? new Date(options.now) : new Date();
 
     for (const insp of inspections) {
         const jId = insp.jobId || insp.id;
-        if (!insp.assetPurged) {
-            const res = await purgeJobPdfBinary(jId, tenantId, actorContext);
-            if (res.ok) {
-                purgedCount++;
-                totalBytesReclaimed += (res.reclaimedMb * 1024 * 1024);
+        if (insp.assetPurged) continue;
+
+        // 1. Invariant: Order / Inspection Status Immunity Check
+        const rawStatus = String(insp.status || insp.overallStatus || '').toUpperCase().trim();
+        if (IMMUNE_ORDER_STATUSES.has(rawStatus)) {
+            skippedImmuneCount++;
+            continue;
+        }
+
+        // 2. Invariant: European Business-Day Window Check
+        const fileTimestamp = insp.inspectedAt || insp.assetStorage?.uploadedAt || insp.createdAt || null;
+        if (fileTimestamp) {
+            const windowEval = isWeekendSafeWindow(fileTimestamp, { now, businessHoursLimit: options.businessHoursLimit });
+            if (!windowEval.isExpired && !options.forceExpireAll) {
+                skippedWeekendWindowCount++;
+                continue;
             }
+        }
+
+        const res = await purgeJobPdfBinary(jId, tenantId, actorContext);
+        if (res.ok) {
+            purgedCount++;
+            totalBytesReclaimed += (res.reclaimedMb * 1024 * 1024);
         }
     }
 
@@ -362,9 +470,11 @@ async function batchPurgeRetentionAssets(tenantId = 'tenant-default', actorConte
             eventType: 'STORAGE_RETENTION_PURGE_EXECUTED',
             severity: 'SUCCESS',
             title: `Purga de Retención Ejecutada (${purgedCount} PDFs · ${totalReclaimedMb} MB Liberados)`,
-            description: 'Activos PDF pesados eliminados del disco local. Reportes forenses de 6 ejes y metadatos SHA-256 conservados.',
+            description: `Activos PDF pesados eliminados del disco local. Omitidos por inmunidad de estado: ${skippedImmuneCount}, protegidos por ventana comercial europea: ${skippedWeekendWindowCount}.`,
             metadata: {
                 purgedCount,
+                skippedImmuneCount,
+                skippedWeekendWindowCount,
                 reclaimedMb: totalReclaimedMb,
                 drawerTarget: 'STORAGE'
             },
@@ -377,8 +487,10 @@ async function batchPurgeRetentionAssets(tenantId = 'tenant-default', actorConte
     return {
         ok: true,
         mode: 'BULK_RETENTION_PURGE',
-        executedAt: new Date().toISOString(),
+        executedAt: now.toISOString(),
         purgedCount,
+        skippedImmuneCount,
+        skippedWeekendWindowCount,
         reclaimedMb: totalReclaimedMb,
         message: 'Activos PDF pesados eliminados del disco local. Reportes forenses de 6 ejes y metadatos SHA-256 conservados.'
     };
@@ -388,6 +500,9 @@ module.exports = {
     getTenantStorageQuota,
     purgeJobPdfBinary,
     batchPurgeRetentionAssets,
+    isWeekendSafeWindow,
+    IMMUNE_ORDER_STATUSES,
+    PURGEABLE_ORDER_STATUSES,
     PREFLIGHT_TEMP_DIR,
     MARKETPLACE_STORAGE_DIR
 };

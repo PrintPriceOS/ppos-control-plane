@@ -43,35 +43,35 @@ const CANONICAL_FUNNEL_STAGES = Object.freeze([
         stageNumber: 1,
         shortLabel: 'Stage 01: Preflight',
         label: 'Stage 01: Preflight & 3D Imprimatur',
-        description: 'Ingesta PDF/X-4, validación de lomo/sangrado y firma criptográfica SHA-256.'
+        description: 'PDF/X-4 intake, spine & bleed verification, and SHA-256 cryptographic sign-off.'
     },
     {
         stageCode: 'STAGE_02_ON_PRESS',
         stageNumber: 2,
         shortLabel: 'Stage 02: On Press',
         label: 'Stage 02: CTP & Offset/Digital Press',
-        description: 'Filmación de planchas CTP, imposición de pliegos y tirada en máquina con control ΔE.'
+        description: 'CTP plate imaging, signature imposition, and press run with automated ΔE colorimetry.'
     },
     {
         stageCode: 'STAGE_03_BINDING',
         stageNumber: 3,
         shortLabel: 'Stage 03: Binding',
-        label: 'Stage 03: Plegado & Encuadernación PUR/Cartoné',
-        description: 'Alzado de signaturas, fresado PUR o cosido hilo, colocación de tapas y guillotinado trilateral.'
+        label: 'Stage 03: Folding & Binding (PUR / Hardcover)',
+        description: 'Signature gathering, PUR milling or thread sewing, casing-in, and 3-knife trimming.'
     },
     {
         stageCode: 'STAGE_04_PALLETIZATION',
         stageNumber: 4,
         shortLabel: 'Stage 04: Palletization',
-        label: 'Stage 04: Encajado FEFCO & Paletizado EPAL',
-        description: 'Retractilado, encajado FEFCO 0201, paletizado europeo EPAL y etiquetado GS1-128 (SSCC-18).'
+        label: 'Stage 04: FEFCO Packaging & EPAL Palletization',
+        description: 'Shrink wrapping, FEFCO 0201 boxing, EPAL Euro-pallet stacking, and GS1-128 (SSCC-18) labeling.'
     },
     {
         stageCode: 'STAGE_05_DELIVERED_POD',
         stageNumber: 5,
         shortLabel: 'Stage 05: Delivered & POD',
-        label: 'Stage 05: Expedición & POD Firmado',
-        description: 'Tránsito logístico B2B, descarga en muelle editorial, firma de albarán CMR/POD y liberación Escrow.'
+        label: 'Stage 05: Dispatch & Signed POD',
+        description: 'B2B freight transit, publisher dock unloading, signed CMR/POD capture, and Escrow release.'
     }
 ]);
 
@@ -306,12 +306,31 @@ async function getOperationalTelemetrySummary(options = {}) {
         dbOrders = options.injectedOrders;
     } else {
         try {
-            const rows = await mysqlClient.query(
-                `SELECT order_id, external_order_ref, status, currency, estimated_price, book_spec_json, selected_offer_json, readiness_json, metadata_json, created_at, updated_at
-                 FROM marketplace_orders
-                 ORDER BY created_at DESC
-                 LIMIT 500`
-            );
+            let sql = `SELECT order_id, external_order_ref, status, currency, estimated_price, book_spec_json, selected_offer_json, readiness_json, metadata_json, created_at, updated_at
+                 FROM marketplace_orders WHERE 1=1`;
+            const params = [];
+
+            if (options.customerEmail && options.organizationId) {
+                sql += ` AND (customer_email = ? OR organization_id = ? OR JSON_UNQUOTE(JSON_EXTRACT(customer_json, '$.email')) = ?)`;
+                params.push(options.customerEmail, options.organizationId, options.customerEmail);
+            } else if (options.customerEmail) {
+                sql += ` AND (customer_email = ? OR JSON_UNQUOTE(JSON_EXTRACT(customer_json, '$.email')) = ?)`;
+                params.push(options.customerEmail, options.customerEmail);
+            } else if (options.organizationId) {
+                sql += ` AND organization_id = ?`;
+                params.push(options.organizationId);
+            } else if (tenantId && tenantId !== 'tenant-default' && tenantId !== 'all') {
+                sql += ` AND tenant_id = ?`;
+                params.push(tenantId);
+            }
+
+            // Exclude synthetic load test orders from telemetry unless requested
+            if (!options.includeLoadTest) {
+                sql += ` AND (JSON_UNQUOTE(JSON_EXTRACT(book_spec_json, '$.title')) NOT LIKE '%Load Test%' OR book_spec_json IS NULL)`;
+            }
+
+            sql += ` ORDER BY created_at DESC LIMIT 500`;
+            const rows = await mysqlClient.query(sql, params);
             if (Array.isArray(rows)) {
                 dbOrders = rows;
             }
@@ -320,25 +339,7 @@ async function getOperationalTelemetrySummary(options = {}) {
         }
     }
 
-    if (Array.isArray(options.injectedFiles)) {
-        dbFiles = options.injectedFiles;
-    } else {
-        try {
-            const fileRows = await mysqlClient.query(
-                `SELECT file_id, order_id, role, original_name, size_bytes, status, preflight_status, preflight_outcome_category, findings_count, metadata_json, created_at
-                 FROM marketplace_order_files
-                 ORDER BY created_at DESC
-                 LIMIT 1000`
-            );
-            if (Array.isArray(fileRows)) {
-                dbFiles = fileRows;
-            }
-        } catch (err) {
-            logger.debug('MySQL marketplace_order_files query skipped or offline in telemetry summary', { error: err.message });
-        }
-    }
-
-    // Merge runtime customer portal orders if present and not already in dbOrders
+    // Merge runtime customer portal orders if present and matching tenant/user criteria
     const unifiedOrdersMap = new Map();
     for (const row of dbOrders) {
         const id = row.order_id || row.orderId;
@@ -351,6 +352,9 @@ async function getOperationalTelemetrySummary(options = {}) {
             const customerPortalRoutes = require('../../routes/customerPortalRoutes');
             if (customerPortalRoutes.runtimeCustomerOrders instanceof Map) {
                 for (const [id, rtOrd] of customerPortalRoutes.runtimeCustomerOrders.entries()) {
+                    if (options.customerEmail && rtOrd.customer?.email !== options.customerEmail) {
+                        continue;
+                    }
                     if (!unifiedOrdersMap.has(id)) {
                         unifiedOrdersMap.set(id, rtOrd);
                     }
@@ -359,8 +363,36 @@ async function getOperationalTelemetrySummary(options = {}) {
         } catch (_) {}
     }
 
-    // Ensure canonical publisher reference orders (`PUB-ORD-2026-*`) are included alongside live MySQL orders
-    if (!Array.isArray(options.injectedOrders)) {
+    const orderIdSet = new Set(Array.from(unifiedOrdersMap.keys()));
+
+    if (Array.isArray(options.injectedFiles)) {
+        dbFiles = options.injectedFiles;
+    } else {
+        try {
+            if (orderIdSet.size > 0) {
+                const placeholders = Array.from(orderIdSet).map(() => '?').join(',');
+                const fileRows = await mysqlClient.query(
+                    `SELECT file_id, order_id, role, original_name, size_bytes, status, preflight_status, preflight_outcome_category, findings_count, metadata_json, created_at
+                     FROM marketplace_order_files
+                     WHERE order_id IN (${placeholders})
+                     ORDER BY created_at DESC
+                     LIMIT 1000`,
+                    Array.from(orderIdSet)
+                );
+                if (Array.isArray(fileRows)) {
+                    dbFiles = fileRows;
+                }
+            } else {
+                dbFiles = [];
+            }
+        } catch (err) {
+            logger.debug('MySQL marketplace_order_files query skipped or offline in telemetry summary', { error: err.message });
+        }
+    }
+
+    // Only include canonical publisher reference orders for demo publisher sessions
+    const isDemo = options.customerEmail?.includes('demo') || (options.isDemoAccount && !options.customerEmail);
+    if (!Array.isArray(options.injectedOrders) && isDemo) {
         const baselineOrders = [
             {
                 orderId: 'PUB-ORD-2026-101',
@@ -582,8 +614,8 @@ async function getOperationalTelemetrySummary(options = {}) {
                 directPassCount += 1;
             }
         }
-    } else {
-        // Deterministic baseline telemetry when no runtime inspections have been uploaded yet
+    } else if (isDemo) {
+        // Deterministic baseline telemetry when demo account is active and no inspections yet
         totalFilesEvaluated = 24;
         directPassCount = 19;
         warningsCount = 4;
@@ -593,17 +625,22 @@ async function getOperationalTelemetrySummary(options = {}) {
         incidentCounts.BLEED_DEFICIT = 2;
         incidentCounts.UNEMBEDDED_FONTS = 0;
         incidentCounts.SPINE_MISMATCH = 1;
+    } else {
+        totalFilesEvaluated = 0;
+        directPassCount = 0;
+        warningsCount = 0;
+        failedCount = 0;
     }
 
     const firstPassSuccessRatioPct =
         totalFilesEvaluated > 0
             ? round2((directPassCount / totalFilesEvaluated) * 100)
-            : 100;
+            : 0.0;
 
     const incidentMatrix = [
         {
             code: 'BLEED_DEFICIT',
-            label: 'Sangrado Perimetral Insuficiente (< 3.0 mm)',
+            label: 'Insufficient Perimeter Bleed (< 3.0 mm)',
             standardRef: 'ISO 12647-2 / Mirror Bleed',
             severity: 'WARNING',
             count: incidentCounts.BLEED_DEFICIT,
@@ -611,7 +648,7 @@ async function getOperationalTelemetrySummary(options = {}) {
         },
         {
             code: 'TAC_EXCEEDED',
-            label: 'Cobertura Total de Tinta Excedida (TAC > 300%)',
+            label: 'Total Area Coverage Exceeded (TAC > 300%)',
             standardRef: 'FOGRA39 / ISO Coated v2',
             severity: 'WARNING',
             count: incidentCounts.TAC_EXCEEDED,
@@ -619,7 +656,7 @@ async function getOperationalTelemetrySummary(options = {}) {
         },
         {
             code: 'SPINE_MISMATCH',
-            label: 'Desviación Geométrica de Lomo (|Δ| > 1.0 mm)',
+            label: 'Spine Geometry Discrepancy (|Δ| > 1.0 mm)',
             standardRef: 'PHASE-11A Parametric Spine',
             severity: 'CRITICAL',
             count: incidentCounts.SPINE_MISMATCH,
@@ -627,7 +664,7 @@ async function getOperationalTelemetrySummary(options = {}) {
         },
         {
             code: 'LOW_DPI',
-            label: 'Resolución de Imagen Continua Baja (< 300 DPI)',
+            label: 'Low Raster Image Resolution (< 300 DPI)',
             standardRef: 'PDF/X-4 Effective DPI',
             severity: 'WARNING',
             count: incidentCounts.LOW_DPI,
@@ -635,7 +672,7 @@ async function getOperationalTelemetrySummary(options = {}) {
         },
         {
             code: 'UNEMBEDDED_FONTS',
-            label: 'Tipografías sin Incrustar en Diccionario PDF',
+            label: 'Unembedded Fonts in PDF Dictionary',
             standardRef: 'ISO 15930-7 (PDF/X-4)',
             severity: 'CRITICAL',
             count: incidentCounts.UNEMBEDDED_FONTS,
@@ -643,57 +680,53 @@ async function getOperationalTelemetrySummary(options = {}) {
         }
     ];
 
-    // ── 5. Compute Storage & I/O Telemetry ───────────────────────────────────
-    const diskScan = scanStorageDirectory(storageRoot);
-
-    // Combine physical disk scan with DB metadata for files whose bytes are tracked in MySQL
+    // ── 5. Compute Storage & I/O Telemetry Scoped to Tenant/Orders ─────────────
+    let totalStorageBytes = 0;
     const roleBreakdown = {
-        INTERIOR_PDF: {
-            count: diskScan.byRole.INTERIOR_PDF.count,
-            bytes: diskScan.byRole.INTERIOR_PDF.bytes
-        },
-        COVER_PDF: {
-            count: diskScan.byRole.COVER_PDF.count,
-            bytes: diskScan.byRole.COVER_PDF.bytes
-        },
-        WIRE_PROOF: {
-            count: diskScan.byRole.WIRE_PROOF.count,
-            bytes: diskScan.byRole.WIRE_PROOF.bytes
+        INTERIOR_PDF: { count: 0, bytes: 0, megabytes: 0 },
+        COVER_PDF: { count: 0, bytes: 0, megabytes: 0 },
+        WIRE_PROOF: { count: 0, bytes: 0, megabytes: 0 }
+    };
+
+    if (orderIdSet.size > 0) {
+        // Only scan storage directories belonging to the tenant's orders
+        for (const oid of orderIdSet) {
+            const orderDiskScan = scanStorageDirectory(path.join(storageRoot, oid));
+            for (const roleKey of ['INTERIOR_PDF', 'COVER_PDF', 'WIRE_PROOF']) {
+                roleBreakdown[roleKey].count += orderDiskScan.byRole[roleKey].count;
+                roleBreakdown[roleKey].bytes += orderDiskScan.byRole[roleKey].bytes;
+            }
         }
-    };
 
-    // If DB has more files than physical scan (e.g. external links or synthetic records), merge counts
-    let dbTotalBytes = 0;
-    const dbByRole = {
-        INTERIOR_PDF: { count: 0, bytes: 0 },
-        COVER_PDF: { count: 0, bytes: 0 },
-        WIRE_PROOF: { count: 0, bytes: 0 }
-    };
-
-    for (const f of dbFiles) {
-        const r = String(f.role || 'INTERIOR_PDF').toUpperCase();
-        const roleKey = r.includes('COVER')
-            ? 'COVER_PDF'
-            : r.includes('WIRE') || r.includes('PAYMENT')
-              ? 'WIRE_PROOF'
-              : 'INTERIOR_PDF';
-        const sz = Number(f.size_bytes || f.sizeBytes || 0);
-        dbByRole[roleKey].count += 1;
-        dbByRole[roleKey].bytes += sz;
-        dbTotalBytes += sz;
+        // Merge with DB metadata for files belonging to the tenant's orders
+        for (const f of dbFiles) {
+            const r = String(f.role || 'INTERIOR_PDF').toUpperCase();
+            const roleKey = r.includes('COVER')
+                ? 'COVER_PDF'
+                : r.includes('WIRE') || r.includes('PAYMENT')
+                  ? 'WIRE_PROOF'
+                  : 'INTERIOR_PDF';
+            const sz = Number(f.size_bytes || f.sizeBytes || 0);
+            // If disk had 0 bytes, use DB tracked size
+            if (roleBreakdown[roleKey].count === 0) {
+                roleBreakdown[roleKey].count += 1;
+                roleBreakdown[roleKey].bytes += sz;
+            }
+        }
+    } else if (isDemo) {
+        // Demo fallback disk scan
+        const diskScan = scanStorageDirectory(storageRoot);
+        for (const roleKey of ['INTERIOR_PDF', 'COVER_PDF', 'WIRE_PROOF']) {
+            roleBreakdown[roleKey].count = diskScan.byRole[roleKey].count;
+            roleBreakdown[roleKey].bytes = diskScan.byRole[roleKey].bytes;
+        }
     }
 
     for (const roleKey of ['INTERIOR_PDF', 'COVER_PDF', 'WIRE_PROOF']) {
-        roleBreakdown[roleKey].count = Math.max(roleBreakdown[roleKey].count, dbByRole[roleKey].count);
-        roleBreakdown[roleKey].bytes = Math.max(roleBreakdown[roleKey].bytes, dbByRole[roleKey].bytes);
         roleBreakdown[roleKey].megabytes = round2(roleBreakdown[roleKey].bytes / (1024 * 1024));
+        totalStorageBytes += roleBreakdown[roleKey].bytes;
     }
 
-    const totalStorageBytes = Math.max(
-        diskScan.totalBytes,
-        dbTotalBytes,
-        roleBreakdown.INTERIOR_PDF.bytes + roleBreakdown.COVER_PDF.bytes + roleBreakdown.WIRE_PROOF.bytes
-    );
     const totalAssetsCount =
         roleBreakdown.INTERIOR_PDF.count + roleBreakdown.COVER_PDF.count + roleBreakdown.WIRE_PROOF.count;
 
@@ -752,10 +785,10 @@ async function getOperationalTelemetrySummary(options = {}) {
             incidentMatrix
         },
         storageIo: {
-            storageRoot: diskScan.scannedPath,
-            storageDirExists: diskScan.exists,
-            physicalDiskFilesCount: diskScan.filesCount,
-            physicalDiskBytes: diskScan.totalBytes,
+            storageRoot,
+            storageDirExists: fs.existsSync(storageRoot),
+            physicalDiskFilesCount: totalAssetsCount,
+            physicalDiskBytes: totalStorageBytes,
             totalBytes: totalStorageBytes,
             totalMb: totalStorageMb,
             totalGb: totalStorageGb,

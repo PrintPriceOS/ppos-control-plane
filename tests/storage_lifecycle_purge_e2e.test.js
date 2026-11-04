@@ -11,7 +11,8 @@ const require = createRequire(import.meta.url);
 const {
     getTenantStorageQuota,
     purgeJobPdfBinary,
-    batchPurgeRetentionAssets
+    batchPurgeRetentionAssets,
+    isWeekendSafeWindow
 } = require('../src/api/services/storage/storageLifecycleService');
 const {
     inspectPreflightJob,
@@ -119,18 +120,24 @@ describe('Storage Lifecycle & Physical Purge Engine E2E', () => {
         fs.writeFileSync(file1, Buffer.alloc(1024 * 1024, 0x42));
         fs.writeFileSync(file2, Buffer.alloc(2048 * 1024, 0x43));
 
-        inspectPreflightJob({
+        // Files created 5 days ago to exceed business-day window
+        const pastDate = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString();
+
+        const r1 = inspectPreflightJob({
             jobId: 'PF-BATCH-001',
             tenantId,
             filePath: file1,
             title: 'Book A'
         });
-        inspectPreflightJob({
+        r1.inspectedAt = pastDate;
+
+        const r2 = inspectPreflightJob({
             jobId: 'PF-BATCH-002',
             tenantId,
             filePath: file2,
             title: 'Book B'
         });
+        r2.inspectedAt = pastDate;
 
         expect(fs.existsSync(file1)).toBe(true);
         expect(fs.existsSync(file2)).toBe(true);
@@ -171,5 +178,69 @@ describe('Storage Lifecycle & Physical Purge Engine E2E', () => {
         const inspectionA = getPreflightInspectionById('PF-ISO-A', tenantA);
         expect(inspectionA.assetPurged).toBe(false);
         expect(fs.existsSync(fileA)).toBe(true);
+    });
+
+    it('6. prevents batch purge of files with status AWAITING_CUSTOMER_APPROVAL regardless of file age', async () => {
+        const tenantId = 'tenant-immune-' + Date.now();
+        const immuneFile = path.join(testTempDir, 'immune_preflight_proof.pdf');
+        fs.writeFileSync(immuneFile, Buffer.alloc(1024 * 1024, 0x47));
+
+        // File created/inspected 10 days ago (well beyond retention threshold)
+        const pastDate = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString();
+
+        const report = inspectPreflightJob({
+            jobId: 'PF-IMMUNE-01',
+            tenantId,
+            filePath: immuneFile,
+            title: 'Pending Proof Approval Catalog'
+        });
+        report.overallStatus = 'AWAITING_CUSTOMER_APPROVAL';
+        report.status = 'AWAITING_CUSTOMER_APPROVAL';
+        report.inspectedAt = pastDate;
+
+        expect(fs.existsSync(immuneFile)).toBe(true);
+
+        // Run batch purge with forceExpireAll to verify status immunity supercedes age
+        const batchRes = await batchPurgeRetentionAssets(tenantId, {}, { forceExpireAll: true });
+
+        expect(batchRes.ok).toBe(true);
+        expect(batchRes.purgedCount).toBe(0);
+        expect(batchRes.skippedImmuneCount).toBe(1);
+
+        // File must physically remain on disk
+        expect(fs.existsSync(immuneFile)).toBe(true);
+
+        const checkInspection = getPreflightInspectionById('PF-IMMUNE-01', tenantId);
+        expect(checkInspection.assetPurged).toBe(false);
+
+        // However, individual manual purge by operator remains permitted with a warning
+        const manualPurge = await purgeJobPdfBinary('PF-IMMUNE-01', tenantId);
+        expect(manualPurge.ok).toBe(true);
+        expect(manualPurge.warning).toContain('JOB_UNAPPROVED_MANUAL_PURGE_EXECUTED');
+        expect(fs.existsSync(immuneFile)).toBe(false);
+    });
+
+    it('7. calculates European business-day retention window without expiring Friday afternoon uploads on Monday morning', async () => {
+        // Simulation: File uploaded Friday at 16:00 UTC (2026-11-06T16:00:00Z)
+        const fridayUpload = new Date('2026-11-06T16:00:00Z');
+
+        // Check 1: Monday morning 09:00 UTC (2026-11-09T09:00:00Z)
+        // Wall clock elapsed: 65 hours.
+        // European business hours elapsed: Friday 16:00->24:00 (8h) + Monday 00:00->09:00 (9h) = 17 business hours.
+        const mondayMorning = new Date('2026-11-09T09:00:00Z');
+        const evalMonday = isWeekendSafeWindow(fridayUpload, { now: mondayMorning });
+
+        expect(evalMonday.wasPausedOverWeekend).toBe(true);
+        expect(evalMonday.weekendHoursPaused).toBe(48); // Entire Sat + Sun paused
+        expect(evalMonday.elapsedBusinessHours).toBe(17);
+        expect(evalMonday.isExpired).toBe(false); // Friday upload MUST NOT expire Monday morning
+
+        // Check 2: Wednesday morning 17:00 UTC (2026-11-11T17:00:00Z)
+        // Elapsed business hours: 8 (Fri) + 24 (Mon) + 24 (Tue) + 17 (Wed) = 73 hours.
+        const wednesdayAfternoon = new Date('2026-11-11T17:00:00Z');
+        const evalWed = isWeekendSafeWindow(fridayUpload, { now: wednesdayAfternoon });
+
+        expect(evalWed.isExpired).toBe(true);
+        expect(evalWed.elapsedBusinessHours).toBeGreaterThanOrEqual(48);
     });
 });
