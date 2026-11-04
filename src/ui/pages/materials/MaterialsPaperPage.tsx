@@ -371,6 +371,7 @@ export const MaterialsPaperPage: React.FC<MaterialsPaperPageProps> = ({
     // Bulk CSV Rate Card Modal state
     const [isCsvModalOpen, setIsCsvModalOpen] = useState<boolean>(false);
     const [csvText, setCsvText] = useState<string>('');
+    const [csvFileName, setCsvFileName] = useState<string>('');
     const [isImportingCsv, setIsImportingCsv] = useState<boolean>(false);
 
     const buildHeaders = (): Record<string, string> => {
@@ -1079,9 +1080,13 @@ export const MaterialsPaperPage: React.FC<MaterialsPaperPageProps> = ({
                 <div
                     role="dialog"
                     aria-modal="true"
-                    className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in"
+                    data-testid="bulk-master-catalog-modal"
+                    onClick={(e) => {
+                        if (e.target === e.currentTarget) setIsBulkMasterModalOpen(false);
+                    }}
+                    className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fade-in"
                 >
-                    <div className="bg-[#18191c] border border-zinc-800 rounded-2xl max-w-4xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+                    <div className="bg-[#18191c] border border-zinc-800 rounded-2xl max-w-4xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden m-auto">
                         {/* Header */}
                         <div className="p-5 border-b border-zinc-800 flex items-center justify-between">
                             <div>
@@ -1287,26 +1292,32 @@ export const MaterialsPaperPage: React.FC<MaterialsPaperPageProps> = ({
                 <div
                     role="dialog"
                     aria-modal="true"
-                    className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in"
+                    data-testid="rate-card-csv-modal"
+                    onClick={(e) => {
+                        if (e.target === e.currentTarget) setIsCsvModalOpen(false);
+                    }}
+                    className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fade-in"
                 >
-                    <div className="bg-[#18191c] border border-zinc-800 rounded-2xl max-w-2xl w-full flex flex-col shadow-2xl overflow-hidden">
+                    <div className="bg-white dark:bg-[#18191c] border border-zinc-200 dark:border-zinc-800 rounded-2xl max-w-2xl w-full flex flex-col shadow-2xl overflow-hidden m-auto">
                         {/* Header */}
-                        <div className="p-5 border-b border-zinc-800 flex items-center justify-between">
+                        <div className="p-5 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between bg-zinc-50 dark:bg-[#121316]">
                             <div>
                                 <div className="flex items-center gap-2">
-                                    <ArrowUpTrayIcon className="w-5 h-5 text-emerald-400" />
-                                    <h2 className="text-base font-black text-white uppercase tracking-wider">
+                                    <div className="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-500">
+                                        <ArrowUpTrayIcon className="w-4 h-4" />
+                                    </div>
+                                    <h2 className="text-sm font-black text-zinc-900 dark:text-white uppercase tracking-wider">
                                         {t('materials.bulk.csvModalTitle')}
                                     </h2>
                                 </div>
-                                <p className="text-xs text-zinc-400 mt-1">
+                                <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
                                     {t('materials.bulk.csvModalSubtitle')}
                                 </p>
                             </div>
                             <button
                                 type="button"
                                 onClick={() => setIsCsvModalOpen(false)}
-                                className="p-2 text-zinc-400 hover:text-white rounded-lg hover:bg-zinc-800 transition-colors cursor-pointer"
+                                className="p-2 text-zinc-400 hover:text-zinc-700 dark:hover:text-white rounded-lg hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
                             >
                                 <XMarkIcon className="w-5 h-5" />
                             </button>
@@ -1315,30 +1326,41 @@ export const MaterialsPaperPage: React.FC<MaterialsPaperPageProps> = ({
                         {/* Body */}
                         <div className="p-5 space-y-4">
                             <div>
-                                <label className="block text-xs font-bold text-zinc-300 mb-1.5">
-                                    Upload CSV File (.csv):
+                                <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5">
+                                    {t('materials.bulk.csvUploadLabel')}
                                 </label>
-                                <input
-                                    type="file"
-                                    accept=".csv"
-                                    data-testid="rate-card-file-input"
-                                    onChange={(e) => {
-                                        const file = e.target.files?.[0];
-                                        if (file) {
-                                            const reader = new FileReader();
-                                            reader.onload = (ev) => {
-                                                setCsvText(String(ev.target?.result || ''));
-                                            };
-                                            reader.readAsText(file);
-                                        }
-                                    }}
-                                    className="w-full text-xs text-zinc-400 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-zinc-800 file:text-zinc-200 hover:file:bg-zinc-700 cursor-pointer"
-                                />
+                                
+                                <div className="flex items-center gap-3">
+                                    <label className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 border border-zinc-300 dark:border-zinc-700 text-xs font-bold text-zinc-800 dark:text-zinc-200 cursor-pointer transition-colors shadow-sm">
+                                        <ArrowUpTrayIcon className="w-3.5 h-3.5 text-emerald-500" />
+                                        <span>{t('materials.bulk.csvChooseFile')}</span>
+                                        <input
+                                            type="file"
+                                            accept=".csv"
+                                            data-testid="rate-card-file-input"
+                                            className="hidden"
+                                            onChange={(e) => {
+                                                const file = e.target.files?.[0];
+                                                if (file) {
+                                                    setCsvFileName(file.name);
+                                                    const reader = new FileReader();
+                                                    reader.onload = (ev) => {
+                                                        setCsvText(String(ev.target?.result || ''));
+                                                    };
+                                                    reader.readAsText(file);
+                                                }
+                                            }}
+                                        />
+                                    </label>
+                                    <span className="text-xs text-zinc-500 dark:text-zinc-400 font-mono truncate max-w-xs">
+                                        {csvFileName || t('materials.bulk.csvNoFileChosen')}
+                                    </span>
+                                </div>
                             </div>
 
                             <div>
-                                <label className="block text-xs font-bold text-zinc-300 mb-1.5">
-                                    Or Paste Rate Card Lines:
+                                <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5">
+                                    {t('materials.bulk.csvPasteLabel')}
                                 </label>
                                 <textarea
                                     rows={8}
@@ -1346,17 +1368,17 @@ export const MaterialsPaperPage: React.FC<MaterialsPaperPageProps> = ({
                                     data-testid="rate-card-csv-textarea"
                                     onChange={(e) => setCsvText(e.target.value)}
                                     placeholder={t('materials.bulk.csvPastePlaceholder')}
-                                    className="w-full p-3 bg-zinc-950 border border-zinc-800 rounded-xl text-xs font-mono text-zinc-200 focus:outline-none focus:border-emerald-500"
+                                    className="w-full p-3 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl text-xs font-mono text-zinc-900 dark:text-zinc-200 focus:outline-none focus:border-emerald-500 shadow-inner"
                                 />
                             </div>
                         </div>
 
                         {/* Footer */}
-                        <div className="p-4 border-t border-zinc-800 bg-zinc-950 flex items-center justify-end gap-3">
+                        <div className="p-4 border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 flex items-center justify-end gap-3">
                             <button
                                 type="button"
                                 onClick={() => setIsCsvModalOpen(false)}
-                                className="px-4 py-2 rounded-xl text-xs font-bold text-zinc-400 hover:text-white cursor-pointer"
+                                className="px-4 py-2 rounded-xl text-xs font-bold text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white cursor-pointer"
                             >
                                 {t('common.cancel') || 'Cancel'}
                             </button>
@@ -1365,7 +1387,7 @@ export const MaterialsPaperPage: React.FC<MaterialsPaperPageProps> = ({
                                 data-testid="submit-rate-card-csv-btn"
                                 disabled={!csvText.trim() || isImportingCsv}
                                 onClick={handleImportCsv}
-                                className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-black uppercase tracking-wider transition-colors cursor-pointer flex items-center gap-2"
+                                className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-black uppercase tracking-wider transition-colors cursor-pointer flex items-center gap-2 shadow-sm"
                             >
                                 {isImportingCsv ? (
                                     <>
