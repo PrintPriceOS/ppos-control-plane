@@ -1398,6 +1398,270 @@ async function syncMasterIndustrialCatalog(scope = {}, dbClient = db) {
     };
 }
 
+function deriveMillBrand(productName, rawManufacturer) {
+    const raw = String(rawManufacturer || '').trim();
+    if (raw && raw !== 'European Certified Mill' && raw !== 'NULL' && raw.length > 2) {
+        return raw;
+    }
+    const name = String(productName || '').toLowerCase();
+    if (name.includes('munken') || name.includes('arctic')) return 'Arctic Paper';
+    if (name.includes('coral') || name.includes('garda') || name.includes('torras') || name.includes('lecta')) return 'Lecta / Torraspapel';
+    if (name.includes('magno') || name.includes('sappi') || name.includes('algro')) return 'Sappi Europe';
+    if (name.includes('fedrigoni') || name.includes('symbol') || name.includes('sirio') || name.includes('freelife') || name.includes('woodstock') || name.includes('burano')) return 'Fedrigoni Group';
+    if (name.includes('stora') || name.includes('enso') || name.includes('bookcream') || name.includes('performa')) return 'Stora Enso';
+    if (name.includes('upm') || name.includes('profi')) return 'UPM Communication Papers';
+    if (name.includes('metsa') || name.includes('metsä') || name.includes('carta') || name.includes('alaska')) return 'Metsä Board';
+    if (name.includes('olin') || name.includes('rives') || name.includes('conqueror') || name.includes('antalis')) return 'Antalis / Arjowiggins';
+    if (name.includes('invercote') || name.includes('iggesund') || name.includes('holmen')) return 'Holmen Iggesund';
+    if (name.includes('derprosa') || name.includes('taghleef')) return 'Taghleef / Derprosa';
+    if (name.includes('eska') || name.includes('kappaboard')) return 'Eska Graphic Board';
+    if (name.includes('geltex')) return 'Guarro Casas / Fedrigoni';
+    return raw || 'European Certified Mill';
+}
+
+/**
+ * Bulk activates selected paper variants or sets rate card into tenant catalog.
+ */
+async function bulkActivateMasterVariants({ variantIds = [], ratePerKgEur = 1.34, scope = {}, dbClient = db }) {
+    await ensurePrinthouseMaterialsSchema(dbClient);
+    const tenantId = scope.tenantId || 'tenant-default';
+    const printhouseId = scope.printhouseId || 'GLOBAL_MASTER';
+    const targetRate = Number(ratePerKgEur) > 0 ? Number(ratePerKgEur) : 1.34;
+
+    let rowsToActivate = [];
+    if (dbClient && typeof dbClient.query === 'function' && process.env.PPOS_CI_EPHEMERAL_FIXTURES !== 'true') {
+        try {
+            let query = `
+                SELECT 
+                    v.id as variant_id,
+                    p.name as product_name,
+                    p.brand,
+                    p.manufacturer,
+                    p.category as raw_category,
+                    v.gsm,
+                    v.caliper_um,
+                    v.bulk_factor,
+                    v.width_mm,
+                    v.height_mm,
+                    v.is_reel,
+                    v.finish,
+                    v.grain_direction
+                FROM paper_variants v
+                JOIN paper_products p ON p.id = v.product_id
+            `;
+            const params = [];
+            if (Array.isArray(variantIds) && variantIds.length > 0) {
+                const placeholders = variantIds.map(() => '?').join(',');
+                query += ` WHERE v.id IN (${placeholders}) OR CONCAT('MAT-', v.id) IN (${placeholders})`;
+                params.push(...variantIds, ...variantIds);
+            }
+            const res = await dbClient.query(query, params).catch(() => []);
+            const unwrap = (r) => (Array.isArray(r) ? (Array.isArray(r[0]) ? r[0] : r) : []);
+            rowsToActivate = unwrap(res);
+        } catch (_) {
+            rowsToActivate = [];
+        }
+    }
+
+    // Fallback if DB query returned nothing or unit test environment
+    if (rowsToActivate.length === 0) {
+        for (const [id, item] of runtimeIndustrialMaterials.entries()) {
+            if (!variantIds.length || variantIds.includes(id) || variantIds.includes(id.replace(/^MAT-/, ''))) {
+                rowsToActivate.push({
+                    variant_id: id.replace(/^MAT-/, ''),
+                    product_name: item.name,
+                    manufacturer: item.manufacturer,
+                    raw_category: item.category,
+                    gsm: item.basis_weight_gsm,
+                    bulk_factor: item.bulk_volume,
+                    width_mm: item.dimensions_json?.width_mm || 700,
+                    height_mm: item.dimensions_json?.height_mm || 1000,
+                    is_reel: item.material_type === 'REEL_PAPER',
+                    finish: item.finish_type || 'MATTE',
+                    grain_direction: item.dimensions_json?.grain_direction || 'LG'
+                });
+            }
+        }
+    }
+
+    const activated = [];
+    for (const row of rowsToActivate) {
+        const isReel = Boolean(row.is_reel);
+        const rawCat = String(row.raw_category || '').toUpperCase();
+        let materialType = 'SHEETFED_PAPER';
+        if (isReel) materialType = 'REEL_PAPER';
+        else if (rawCat === 'CARTON') materialType = 'BOARD_CARTON';
+        else if (rawCat === 'DESIGN' || String(row.product_name).toLowerCase().includes('guarda')) materialType = 'ENDPAPERS';
+
+        let category = 'OFFSET_UNCOATED';
+        if (rawCat === 'COATED') {
+            const fin = String(row.finish || '').toUpperCase();
+            category = fin.includes('GLOSS') ? 'COATED_GLOSS' : 'COATED_MATTE';
+        } else if (rawCat === 'CARTON') {
+            category = 'SPECIALTY';
+        } else if (Number(row.bulk_factor || 1.0) >= 1.4) {
+            category = 'BULKY_CREAM';
+        }
+
+        const gsm = Number(row.gsm || 90);
+        let rawBulk = Number(row.bulk_factor || 0);
+        if (!Number.isFinite(rawBulk) || rawBulk < 0.5) {
+            if (row.caliper_um && row.gsm && Number(row.gsm) > 0) {
+                const derived = Number((Number(row.caliper_um) / Number(row.gsm)).toFixed(2));
+                rawBulk = derived >= 0.5 && derived <= 3.5 ? derived : 1.0;
+            } else {
+                rawBulk = 1.0;
+            }
+        } else if (rawBulk > 3.5) {
+            rawBulk = 3.5;
+        }
+        const bulk = Number(rawBulk.toFixed(2));
+        const widthMm = Number(row.width_mm || 700);
+        const heightMm = Number(row.height_mm || 1000);
+        const grain = String(row.grain_direction || '').toUpperCase().includes('SHORT') || row.grain_direction === 'SG' ? 'SG' : 'LG';
+        const brand = deriveMillBrand(row.product_name, row.manufacturer || row.brand);
+
+        const item = {
+            id: `MAT-${row.variant_id}`,
+            printhouse_id: printhouseId,
+            tenant_id: tenantId,
+            name: row.product_name,
+            manufacturer: brand,
+            material_type: materialType,
+            category,
+            basis_weight_gsm: gsm,
+            bulk_volume: bulk,
+            dimensions_json: isReel
+                ? {
+                      web_width_mm: widthMm,
+                      max_diameter_mm: 1200,
+                      core_diameter_mm: 76,
+                      format_label: `Bobina ${widthMm} mm · Ø1200 mm`
+                  }
+                : {
+                      width_mm: widthMm,
+                      height_mm: heightMm,
+                      grain_direction: grain,
+                      format_label: `${widthMm === 700 && heightMm === 1000 ? 'B1' : widthMm === 500 && heightMm === 700 ? 'B2' : 'Pliego'} (${widthMm}×${heightMm} mm · ${grain})`
+                  },
+            cost_per_kg_eur: targetRate,
+            certifications_json: ['FSC_MIX'],
+            in_stock_kg: 5000.00,
+            min_order_kg: 500.00,
+            status: 'ACTIVE'
+        };
+
+        const upserted = await upsertIndustrialMaterial(item, { tenantId, printhouseId }, dbClient, false);
+        activated.push(upserted);
+    }
+
+    return {
+        ok: true,
+        activatedCount: activated.length,
+        materials: activated,
+        kpiSummary: computeIndustrialCatalogKpis(Array.from(runtimeIndustrialMaterials.values()))
+    };
+}
+
+/**
+ * Parses and imports CSV rate cards into printhouse active substrates.
+ * Headers: brand_or_name, grammage, format, price_eur_kg
+ */
+async function importPaperRateCardCsv({ csvText = '', scope = {}, dbClient = db }) {
+    if (!csvText || typeof csvText !== 'string') {
+        throw new Error('CSV content is required.');
+    }
+
+    const lines = csvText.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    if (lines.length < 2) {
+        throw new Error('CSV must contain a header row and at least one data row.');
+    }
+
+    const header = lines[0].toLowerCase().split(',').map(h => h.trim().replace(/^["']|["']$/g, ''));
+    const brandIdx = header.findIndex(h => h.includes('brand') || h.includes('name') || h.includes('papel') || h.includes('molino') || h.includes('material'));
+    const gsmIdx = header.findIndex(h => h.includes('grammage') || h.includes('gsm') || h.includes('gramaje'));
+    const formatIdx = header.findIndex(h => h.includes('format') || h.includes('formato') || h.includes('dimension'));
+    const priceIdx = header.findIndex(h => h.includes('price') || h.includes('cost') || h.includes('precio') || h.includes('eur') || h.includes('kg'));
+
+    const itemsToProcess = [];
+    for (let i = 1; i < lines.length; i++) {
+        const cols = lines[i].split(',').map(c => c.trim().replace(/^["']|["']$/g, ''));
+        if (cols.length === 0 || !cols[0]) continue;
+        const brandOrName = brandIdx >= 0 ? cols[brandIdx] : cols[0];
+        const gsm = gsmIdx >= 0 ? Number(cols[gsmIdx]) || 90 : 90;
+        const formatStr = formatIdx >= 0 ? cols[formatIdx] : '';
+        const priceEurKg = priceIdx >= 0 ? Number(cols[priceIdx].replace(',', '.')) || 1.34 : 1.34;
+
+        itemsToProcess.push({
+            brandOrName,
+            gsm,
+            formatStr,
+            priceEurKg
+        });
+    }
+
+    const tenantId = scope.tenantId || 'tenant-default';
+    const printhouseId = scope.printhouseId || 'GLOBAL_MASTER';
+    const updated = [];
+
+    const allMaterials = await listIndustrialMaterials({}, { tenantId, printhouseId }, dbClient);
+    for (const entry of itemsToProcess) {
+        const queryTerm = entry.brandOrName.toLowerCase();
+        const matches = allMaterials.materials.filter(m => {
+            const nameMatch = m.name.toLowerCase().includes(queryTerm) || m.manufacturer.toLowerCase().includes(queryTerm);
+            const gsmMatch = Math.abs(m.basis_weight_gsm - entry.gsm) <= 5;
+            return nameMatch && gsmMatch;
+        });
+
+        if (matches.length > 0) {
+            for (const match of matches) {
+                const upserted = await upsertIndustrialMaterial(
+                    {
+                        ...match,
+                        cost_per_kg_eur: entry.priceEurKg
+                    },
+                    { tenantId, printhouseId },
+                    dbClient,
+                    false
+                );
+                updated.push(upserted);
+            }
+        } else {
+            const bespoke = {
+                id: `MAT-BESPOKE-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+                printhouse_id: printhouseId,
+                tenant_id: tenantId,
+                name: entry.brandOrName,
+                manufacturer: deriveMillBrand(entry.brandOrName, ''),
+                material_type: 'SHEETFED_PAPER',
+                category: entry.gsm > 150 ? 'COATED_MATTE' : 'OFFSET_UNCOATED',
+                basis_weight_gsm: entry.gsm,
+                bulk_volume: 1.25,
+                dimensions_json: {
+                    width_mm: 700,
+                    height_mm: 1000,
+                    grain_direction: 'LG',
+                    format_label: entry.formatStr || 'B1 (700×1000 mm · LG)'
+                },
+                cost_per_kg_eur: entry.priceEurKg,
+                certifications_json: ['FSC_MIX'],
+                in_stock_kg: 5000.00,
+                min_order_kg: 500.00,
+                status: 'ACTIVE'
+            };
+            const upserted = await upsertIndustrialMaterial(bespoke, { tenantId, printhouseId }, dbClient, false);
+            updated.push(upserted);
+        }
+    }
+
+    return {
+        ok: true,
+        importedCount: updated.length,
+        materials: updated,
+        kpiSummary: computeIndustrialCatalogKpis(Array.from(runtimeIndustrialMaterials.values()))
+    };
+}
+
 module.exports = {
     EUROPEAN_MASTER_SUBSTRATES,
     VALID_INDUSTRIAL_MATERIAL_TYPES,
@@ -1411,6 +1675,9 @@ module.exports = {
     upsertIndustrialMaterial,
     archiveIndustrialMaterial,
     syncMasterIndustrialCatalog,
+    bulkActivateMasterVariants,
+    importPaperRateCardCsv,
+    deriveMillBrand,
     validateMachineSubstrateCompatibility,
     syncMaterialToPaperVariants
 };

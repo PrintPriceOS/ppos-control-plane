@@ -404,6 +404,56 @@ router.post('/sync-master', async (req, res) => {
 });
 
 /**
+ * POST /api/admin/materials/bulk-activate
+ * Bulk activates selected paper variants or applies a global €/kg rate.
+ */
+router.post('/bulk-activate', async (req, res) => {
+    try {
+        const scope = getScopeContext(req);
+        assertWritePermission(scope);
+        const { variantIds, ratePerKgEur } = req.body || {};
+        const result = await industrialMaterialsService.bulkActivateMasterVariants({
+            variantIds: Array.isArray(variantIds) ? variantIds : [],
+            ratePerKgEur: Number(ratePerKgEur) || 1.34,
+            scope,
+            dbClient: db
+        });
+        return res.json(result);
+    } catch (err) {
+        if (err.statusCode) {
+            return res.status(err.statusCode).json({ ok: false, error: err.message, code: err.code || 'FORBIDDEN' });
+        }
+        return res.status(500).json({ ok: false, error: err.message, code: 'BULK_ACTIVATE_ERROR' });
+    }
+});
+
+/**
+ * POST /api/admin/materials/import-rate-card-csv
+ * Imports rate card CSV/Excel text and reconciles against paper variants.
+ */
+router.post('/import-rate-card-csv', async (req, res) => {
+    try {
+        const scope = getScopeContext(req);
+        assertWritePermission(scope);
+        const { csvText } = req.body || {};
+        if (!csvText) {
+            return res.status(400).json({ ok: false, error: 'CSV_TEXT_REQUIRED' });
+        }
+        const result = await industrialMaterialsService.importPaperRateCardCsv({
+            csvText,
+            scope,
+            dbClient: db
+        });
+        return res.json(result);
+    } catch (err) {
+        if (err.statusCode) {
+            return res.status(err.statusCode).json({ ok: false, error: err.message, code: err.code || 'FORBIDDEN' });
+        }
+        return res.status(500).json({ ok: false, error: err.message, code: 'CSV_IMPORT_ERROR' });
+    }
+});
+
+/**
  * POST /api/admin/materials/validate-compatibility
  * Evaluates mechanical and physical compatibility between a press/finisher and a substrate.
  */

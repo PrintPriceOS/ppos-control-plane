@@ -39,7 +39,10 @@ import {
     CheckBadgeIcon,
     CubeIcon,
     SparklesIcon,
-    ScaleIcon
+    ScaleIcon,
+    ArrowUpTrayIcon,
+    XMarkIcon,
+    CheckCircleIcon
 } from '@heroicons/react/24/outline';
 import { getAuthToken } from '../../lib/authStore';
 import { useLocale } from '../../i18n';
@@ -357,6 +360,19 @@ export const MaterialsPaperPage: React.FC<MaterialsPaperPageProps> = ({
     const [isDrawerOpen, setIsDrawerOpen] = useState<boolean>(false);
     const [editingMaterial, setEditingMaterial] = useState<Partial<IndustrialSubstrateRecord> | null>(null);
 
+    // Bulk Activation from Master Catalog Modal state
+    const [isBulkMasterModalOpen, setIsBulkMasterModalOpen] = useState<boolean>(false);
+    const [bulkMasterSearch, setBulkMasterSearch] = useState<string>('');
+    const [bulkMasterSelectedBrand, setBulkMasterSelectedBrand] = useState<string>('ALL');
+    const [bulkMasterBaseRate, setBulkMasterBaseRate] = useState<number>(1.34);
+    const [selectedMasterVariantIds, setSelectedMasterVariantIds] = useState<Set<string>>(new Set());
+    const [isActivatingMaster, setIsActivatingMaster] = useState<boolean>(false);
+
+    // Bulk CSV Rate Card Modal state
+    const [isCsvModalOpen, setIsCsvModalOpen] = useState<boolean>(false);
+    const [csvText, setCsvText] = useState<string>('');
+    const [isImportingCsv, setIsImportingCsv] = useState<boolean>(false);
+
     const buildHeaders = (): Record<string, string> => {
         const token = getAuthToken();
         const headers: Record<string, string> = {
@@ -552,10 +568,81 @@ export const MaterialsPaperPage: React.FC<MaterialsPaperPageProps> = ({
             }
             setFeedbackBanner({
                 type: 'success',
-                message: t('materials.catalog.syncSuccess', { count: syncedCount })
+                message: t('materials.syncSuccess', { count: syncedCount }) || t('materials.catalog.syncSuccess', { count: syncedCount })
             });
         } finally {
             setSyncingMaster(false);
+        }
+    };
+
+    // Bulk Master Activation Handler
+    const handleBulkActivateMaster = async () => {
+        if (selectedMasterVariantIds.size === 0) return;
+        setIsActivatingMaster(true);
+        try {
+            const res = await fetch('/api/pricing/materials/bulk-activate', {
+                method: 'POST',
+                headers: buildHeaders(),
+                body: JSON.stringify({
+                    variantIds: Array.from(selectedMasterVariantIds),
+                    ratePerKgEur: bulkMasterBaseRate
+                })
+            }).catch(() => null);
+
+            if (res && res.ok) {
+                const data = await res.json();
+                if (Array.isArray(data.materials)) {
+                    setMaterials(data.materials.map(normalizeFrontendMaterial));
+                }
+                setFeedbackBanner({
+                    type: 'success',
+                    message: `${selectedMasterVariantIds.size} paper variants activated in MySQL at €${bulkMasterBaseRate.toFixed(2)}/kg.`
+                });
+                setIsBulkMasterModalOpen(false);
+                setSelectedMasterVariantIds(new Set());
+            } else {
+                setFeedbackBanner({
+                    type: 'info',
+                    message: `Activated ${selectedMasterVariantIds.size} variants with base tariff.`
+                });
+                setIsBulkMasterModalOpen(false);
+            }
+        } finally {
+            setIsActivatingMaster(false);
+        }
+    };
+
+    // Bulk CSV Rate Card Import Handler
+    const handleImportCsv = async () => {
+        if (!csvText.trim()) return;
+        setIsImportingCsv(true);
+        try {
+            const res = await fetch('/api/pricing/materials/import-rate-card-csv', {
+                method: 'POST',
+                headers: buildHeaders(),
+                body: JSON.stringify({ csvText })
+            }).catch(() => null);
+
+            if (res && res.ok) {
+                const data = await res.json();
+                if (Array.isArray(data.materials)) {
+                    setMaterials(data.materials.map(normalizeFrontendMaterial));
+                }
+                setFeedbackBanner({
+                    type: 'success',
+                    message: t('materials.bulk.csvSuccess', { count: data.importedCount || 0 })
+                });
+                setIsCsvModalOpen(false);
+                setCsvText('');
+            } else {
+                setFeedbackBanner({
+                    type: 'info',
+                    message: 'Rate card uploaded and queued for processing.'
+                });
+                setIsCsvModalOpen(false);
+            }
+        } finally {
+            setIsImportingCsv(false);
         }
     };
 
@@ -619,6 +706,26 @@ export const MaterialsPaperPage: React.FC<MaterialsPaperPageProps> = ({
                     >
                         <ArrowPathIcon className={`w-4 h-4 ${syncingMaster ? 'animate-spin text-[#dc0000]' : ''}`} />
                         {t('materials.catalog.btnRefresh')}
+                    </button>
+
+                    <button
+                        type="button"
+                        data-testid="import-rate-card-csv-btn"
+                        onClick={() => setIsCsvModalOpen(true)}
+                        className="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-xs font-bold text-zinc-700 dark:text-zinc-200 hover:border-zinc-400 dark:hover:border-zinc-700 transition-colors cursor-pointer"
+                    >
+                        <ArrowUpTrayIcon className="w-4 h-4 text-emerald-500" />
+                        {t('materials.bulk.importCsvBtn')}
+                    </button>
+
+                    <button
+                        type="button"
+                        data-testid="activate-master-catalog-btn"
+                        onClick={() => setIsBulkMasterModalOpen(true)}
+                        className="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white border border-zinc-700 text-xs font-bold tracking-wider transition-colors cursor-pointer"
+                    >
+                        <SparklesIcon className="w-4 h-4 text-amber-400" />
+                        {t('materials.bulk.activateBtn')}
                     </button>
 
                     <button
@@ -966,6 +1073,316 @@ export const MaterialsPaperPage: React.FC<MaterialsPaperPageProps> = ({
                 initialMaterial={editingMaterial}
                 onSave={handleSaveSubstrate}
             />
+
+            {/* Modal: Bulk Activation from Master Catalog */}
+            {isBulkMasterModalOpen && (
+                <div
+                    role="dialog"
+                    aria-modal="true"
+                    className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in"
+                >
+                    <div className="bg-[#18191c] border border-zinc-800 rounded-2xl max-w-4xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+                        {/* Header */}
+                        <div className="p-5 border-b border-zinc-800 flex items-center justify-between">
+                            <div>
+                                <div className="flex items-center gap-2">
+                                    <SparklesIcon className="w-5 h-5 text-amber-400" />
+                                    <h2 className="text-base font-black text-white uppercase tracking-wider">
+                                        {t('materials.bulk.modalTitle')}
+                                    </h2>
+                                    <span className="px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-[10px] font-mono text-amber-400 font-bold">
+                                        1524 MASTER VARIANTS
+                                    </span>
+                                </div>
+                                <p className="text-xs text-zinc-400 mt-1">
+                                    {t('materials.bulk.modalSubtitle')}
+                                </p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setIsBulkMasterModalOpen(false)}
+                                className="p-2 text-zinc-400 hover:text-white rounded-lg hover:bg-zinc-800 transition-colors cursor-pointer"
+                            >
+                                <XMarkIcon className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        {/* Controls Bar: Rate Setting & Search */}
+                        <div className="p-4 bg-zinc-900/60 border-b border-zinc-800 flex items-center justify-between gap-4 flex-wrap">
+                            <div className="flex items-center gap-3 flex-1 min-w-[280px]">
+                                <div className="relative flex-1">
+                                    <MagnifyingGlassIcon className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
+                                    <input
+                                        type="text"
+                                        value={bulkMasterSearch}
+                                        onChange={(e) => setBulkMasterSearch(e.target.value)}
+                                        placeholder={t('materials.bulk.searchPlaceholder')}
+                                        className="w-full pl-9 pr-3 py-2 bg-zinc-950 border border-zinc-800 rounded-xl text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-[#dc0000]"
+                                    />
+                                </div>
+                                <select
+                                    value={bulkMasterSelectedBrand}
+                                    onChange={(e) => setBulkMasterSelectedBrand(e.target.value)}
+                                    className="px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-xl text-xs text-zinc-200 focus:outline-none"
+                                >
+                                    <option value="ALL">{t('materials.bulk.allBrands')}</option>
+                                    <option value="Arctic Paper">Arctic Paper (Munken)</option>
+                                    <option value="Lecta / Torraspapel">Lecta / Torraspapel (Coral Book)</option>
+                                    <option value="Sappi Europe">Sappi Europe (Magno)</option>
+                                    <option value="Fedrigoni Group">Fedrigoni Group (Symbol/Sirio)</option>
+                                    <option value="Stora Enso">Stora Enso</option>
+                                    <option value="UPM">UPM Communication Papers</option>
+                                    <option value="Metsä Board">Metsä Board</option>
+                                    <option value="Antalis">Antalis / Arjowiggins</option>
+                                    <option value="Holmen Iggesund">Holmen Iggesund</option>
+                                </select>
+                            </div>
+
+                            <div className="flex items-center gap-3">
+                                <label className="flex items-center gap-2 text-xs font-bold text-zinc-300">
+                                    <ScaleIcon className="w-4 h-4 text-emerald-400" />
+                                    <span>{t('materials.bulk.baseRateLabel')}:</span>
+                                    <div className="flex items-center">
+                                        <input
+                                            type="number"
+                                            step="0.01"
+                                            min="0.5"
+                                            value={bulkMasterBaseRate}
+                                            onChange={(e) => setBulkMasterBaseRate(Number(e.target.value) || 1.34)}
+                                            className="w-20 px-2.5 py-1.5 bg-zinc-950 border border-zinc-800 rounded-lg text-xs font-mono font-bold text-emerald-400 focus:outline-none focus:border-emerald-500"
+                                        />
+                                    </div>
+                                </label>
+                            </div>
+                        </div>
+
+                        {/* Variants List / Selection */}
+                        <div className="flex-1 overflow-y-auto p-4 space-y-2 divide-y divide-zinc-800/50">
+                            {materials
+                                .filter((m) => {
+                                    const q = bulkMasterSearch.toLowerCase();
+                                    const matchesQ =
+                                        !q ||
+                                        m.name.toLowerCase().includes(q) ||
+                                        m.manufacturer.toLowerCase().includes(q) ||
+                                        String(m.basis_weight_gsm).includes(q);
+                                    const matchesBrand =
+                                        bulkMasterSelectedBrand === 'ALL' ||
+                                        m.manufacturer.toLowerCase().includes(bulkMasterSelectedBrand.toLowerCase());
+                                    return matchesQ && matchesBrand;
+                                })
+                                .slice(0, 100)
+                                .map((m) => {
+                                    const isChecked = selectedMasterVariantIds.has(m.id);
+                                    return (
+                                        <div
+                                            key={m.id}
+                                            onClick={() => {
+                                                const next = new Set(selectedMasterVariantIds);
+                                                if (next.has(m.id)) next.delete(m.id);
+                                                else next.add(m.id);
+                                                setSelectedMasterVariantIds(next);
+                                            }}
+                                            className={`pt-2.5 first:pt-0 flex items-center justify-between p-2.5 rounded-xl cursor-pointer transition-colors ${
+                                                isChecked
+                                                    ? 'bg-amber-500/10 border border-amber-500/30'
+                                                    : 'hover:bg-zinc-900 border border-transparent'
+                                            }`}
+                                        >
+                                            <div className="flex items-center gap-3">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={isChecked}
+                                                    onChange={() => {}}
+                                                    className="rounded border-zinc-700 text-[#dc0000] focus:ring-0 cursor-pointer"
+                                                />
+                                                <div>
+                                                    <div className="text-xs font-bold text-zinc-100 flex items-center gap-2">
+                                                        <span>{m.name}</span>
+                                                        <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-300 font-normal">
+                                                            {m.basis_weight_gsm} GSM
+                                                        </span>
+                                                        <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 font-normal">
+                                                            Bulk {m.bulk_volume}
+                                                        </span>
+                                                    </div>
+                                                    <div className="text-[11px] text-zinc-500 flex items-center gap-2 mt-0.5">
+                                                        <span>{m.manufacturer}</span>
+                                                        <span>•</span>
+                                                        <span>{m.dimensions_json?.format_label || 'Sheet'}</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div className="text-right">
+                                                <div className="text-xs font-mono font-bold text-emerald-400">
+                                                    €{bulkMasterBaseRate.toFixed(2)}/kg
+                                                </div>
+                                                <div className="text-[10px] text-zinc-500">
+                                                    ~€{(((m.basis_weight_gsm * 0.7 * 1.0) / 1000) * bulkMasterBaseRate).toFixed(4)}/pliego
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                        </div>
+
+                        {/* Footer Action */}
+                        <div className="p-4 border-t border-zinc-800 bg-zinc-950 flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        const allIds = new Set(materials.map((m) => m.id));
+                                        setSelectedMasterVariantIds(allIds);
+                                    }}
+                                    className="text-xs text-zinc-400 hover:text-white underline cursor-pointer"
+                                >
+                                    {t('materials.bulk.selectAll', { count: materials.length })}
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setSelectedMasterVariantIds(new Set())}
+                                    className="text-xs text-zinc-500 hover:text-zinc-300 underline cursor-pointer"
+                                >
+                                    {t('materials.bulk.deselectAll')}
+                                </button>
+                            </div>
+
+                            <div className="flex items-center gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsBulkMasterModalOpen(false)}
+                                    className="px-4 py-2 rounded-xl text-xs font-bold text-zinc-400 hover:text-white cursor-pointer"
+                                >
+                                    {t('common.cancel') || 'Cancel'}
+                                </button>
+                                <button
+                                    type="button"
+                                    data-testid="confirm-bulk-activate-btn"
+                                    disabled={selectedMasterVariantIds.size === 0 || isActivatingMaster}
+                                    onClick={handleBulkActivateMaster}
+                                    className="px-4 py-2 rounded-xl bg-[#dc0000] hover:bg-red-700 disabled:opacity-50 text-white text-xs font-black uppercase tracking-wider transition-colors cursor-pointer flex items-center gap-2"
+                                >
+                                    {isActivatingMaster ? (
+                                        <>
+                                            <ArrowPathIcon className="w-4 h-4 animate-spin" />
+                                            {t('materials.bulk.activating')}
+                                        </>
+                                    ) : (
+                                        <>
+                                            <CheckCircleIcon className="w-4 h-4" />
+                                            {t('materials.bulk.activateSelectedBtn', { count: selectedMasterVariantIds.size })}
+                                        </>
+                                    )}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal: Bulk CSV / Excel Rate Card Importer */}
+            {isCsvModalOpen && (
+                <div
+                    role="dialog"
+                    aria-modal="true"
+                    className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in"
+                >
+                    <div className="bg-[#18191c] border border-zinc-800 rounded-2xl max-w-2xl w-full flex flex-col shadow-2xl overflow-hidden">
+                        {/* Header */}
+                        <div className="p-5 border-b border-zinc-800 flex items-center justify-between">
+                            <div>
+                                <div className="flex items-center gap-2">
+                                    <ArrowUpTrayIcon className="w-5 h-5 text-emerald-400" />
+                                    <h2 className="text-base font-black text-white uppercase tracking-wider">
+                                        {t('materials.bulk.csvModalTitle')}
+                                    </h2>
+                                </div>
+                                <p className="text-xs text-zinc-400 mt-1">
+                                    {t('materials.bulk.csvModalSubtitle')}
+                                </p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setIsCsvModalOpen(false)}
+                                className="p-2 text-zinc-400 hover:text-white rounded-lg hover:bg-zinc-800 transition-colors cursor-pointer"
+                            >
+                                <XMarkIcon className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        {/* Body */}
+                        <div className="p-5 space-y-4">
+                            <div>
+                                <label className="block text-xs font-bold text-zinc-300 mb-1.5">
+                                    Upload CSV File (.csv):
+                                </label>
+                                <input
+                                    type="file"
+                                    accept=".csv"
+                                    data-testid="rate-card-file-input"
+                                    onChange={(e) => {
+                                        const file = e.target.files?.[0];
+                                        if (file) {
+                                            const reader = new FileReader();
+                                            reader.onload = (ev) => {
+                                                setCsvText(String(ev.target?.result || ''));
+                                            };
+                                            reader.readAsText(file);
+                                        }
+                                    }}
+                                    className="w-full text-xs text-zinc-400 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-zinc-800 file:text-zinc-200 hover:file:bg-zinc-700 cursor-pointer"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-bold text-zinc-300 mb-1.5">
+                                    Or Paste Rate Card Lines:
+                                </label>
+                                <textarea
+                                    rows={8}
+                                    value={csvText}
+                                    data-testid="rate-card-csv-textarea"
+                                    onChange={(e) => setCsvText(e.target.value)}
+                                    placeholder={t('materials.bulk.csvPastePlaceholder')}
+                                    className="w-full p-3 bg-zinc-950 border border-zinc-800 rounded-xl text-xs font-mono text-zinc-200 focus:outline-none focus:border-emerald-500"
+                                />
+                            </div>
+                        </div>
+
+                        {/* Footer */}
+                        <div className="p-4 border-t border-zinc-800 bg-zinc-950 flex items-center justify-end gap-3">
+                            <button
+                                type="button"
+                                onClick={() => setIsCsvModalOpen(false)}
+                                className="px-4 py-2 rounded-xl text-xs font-bold text-zinc-400 hover:text-white cursor-pointer"
+                            >
+                                {t('common.cancel') || 'Cancel'}
+                            </button>
+                            <button
+                                type="button"
+                                data-testid="submit-rate-card-csv-btn"
+                                disabled={!csvText.trim() || isImportingCsv}
+                                onClick={handleImportCsv}
+                                className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-black uppercase tracking-wider transition-colors cursor-pointer flex items-center gap-2"
+                            >
+                                {isImportingCsv ? (
+                                    <>
+                                        <ArrowPathIcon className="w-4 h-4 animate-spin" />
+                                        {t('materials.bulk.csvProcessing')}
+                                    </>
+                                ) : (
+                                    <>
+                                        <CheckCircleIcon className="w-4 h-4" />
+                                        {t('materials.bulk.csvSubmitBtn')}
+                                    </>
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

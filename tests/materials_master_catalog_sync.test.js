@@ -103,4 +103,83 @@ describe('European Master Paper Catalog Sync & i18n Suite', () => {
         expect(formattedEs).toContain('1524');
         expect(formattedDe).toContain('1524');
     });
+
+    it('4. verifies bulk activation of master variants applies specified €/kg rate', async () => {
+        const mockDb = {
+            query: vi.fn().mockImplementation((sql) => {
+                if (sql.includes('SELECT') && sql.includes('paper_variants')) {
+                    return Promise.resolve([
+                        [
+                            {
+                                variant_id: 'v-test-1',
+                                product_name: 'Munken Print White 1.5 90g',
+                                brand: 'Arctic Paper',
+                                manufacturer: 'Arctic Paper',
+                                raw_category: 'OFFSET',
+                                gsm: 90,
+                                caliper_um: 135,
+                                bulk_factor: 1.50,
+                                width_mm: 700,
+                                height_mm: 1000,
+                                is_reel: 0,
+                                finish: 'UNCOATED',
+                                grain_direction: 'LG'
+                            },
+                            {
+                                variant_id: 'v-test-2',
+                                product_name: 'Coral Book White 1.25 80g',
+                                brand: 'Lecta / Torraspapel',
+                                manufacturer: 'Lecta / Torraspapel',
+                                raw_category: 'OFFSET',
+                                gsm: 80,
+                                caliper_um: 100,
+                                bulk_factor: 1.25,
+                                width_mm: 700,
+                                height_mm: 1000,
+                                is_reel: 0,
+                                finish: 'UNCOATED',
+                                grain_direction: 'LG'
+                            }
+                        ]
+                    ]);
+                }
+                return Promise.resolve([{ affectedRows: 1 }]);
+            })
+        };
+
+        const result = await industrialMaterialsService.bulkActivateMasterVariants({
+            variantIds: ['v-test-1', 'v-test-2'],
+            ratePerKgEur: 1.45,
+            scope: { tenantId: 'tenant-test', printhouseId: 'ph-test' },
+            dbClient: mockDb
+        });
+
+        expect(result.ok).toBe(true);
+        expect(result.activatedCount).toBe(2);
+        expect(result.materials[0].cost_per_kg_eur).toBe(1.45);
+        expect(result.materials[0].manufacturer).toBe('Arctic Paper');
+        expect(result.materials[1].manufacturer).toBe('Lecta / Torraspapel');
+    });
+
+    it('5. verifies bulk CSV rate card parser matches variants and updates cost', async () => {
+        const csvContent = `brand_or_name,grammage,format,price_eur_kg
+Munken Print,90,70x100,1.52
+Coral Book,80,70x100,1.38`;
+
+        const mockDb = {
+            query: vi.fn().mockResolvedValue([{ affectedRows: 1 }])
+        };
+
+        const result = await industrialMaterialsService.importPaperRateCardCsv({
+            csvText: csvContent,
+            scope: { tenantId: 'tenant-test', printhouseId: 'ph-test' },
+            dbClient: mockDb
+        });
+
+        expect(result.ok).toBe(true);
+        expect(result.importedCount).toBeGreaterThanOrEqual(2);
+        const munken = result.materials.find(m => m.name.includes('Munken'));
+        expect(munken).toBeDefined();
+        expect(munken.cost_per_kg_eur).toBe(1.52);
+    });
 });

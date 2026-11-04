@@ -245,6 +245,70 @@ function createPricingRouter() {
         }
     });
 
+    // POST /api/pricing/materials/bulk-activate
+    router.post('/materials/bulk-activate', async (req, res) => {
+        try {
+            const tenantId =
+                (req.user && req.user.tenantId) ||
+                (req.body && req.body.tenantId) ||
+                (req.headers && req.headers['x-tenant-id']) ||
+                'tenant-default';
+            const printhouseId =
+                (req.user && req.user.printhouseId) ||
+                (req.body && req.body.printhouseId) ||
+                (req.headers && req.headers['x-printhouse-id']) ||
+                'GLOBAL_MASTER';
+            const { variantIds, ratePerKgEur } = req.body || {};
+            const result = await industrialMaterialsService.bulkActivateMasterVariants({
+                variantIds: Array.isArray(variantIds) ? variantIds : [],
+                ratePerKgEur: Number(ratePerKgEur) || 1.34,
+                scope: { tenantId, printhouseId }
+            });
+            for (const item of result.materials) {
+                await addMaterialToCatalogAsync(tenantId, item).catch(() => {});
+            }
+            return res.status(200).json(result);
+        } catch (err) {
+            return res.status(err.statusCode || 400).json({
+                ok: false,
+                error: err.message
+            });
+        }
+    });
+
+    // POST /api/pricing/materials/import-rate-card-csv
+    router.post('/materials/import-rate-card-csv', async (req, res) => {
+        try {
+            const tenantId =
+                (req.user && req.user.tenantId) ||
+                (req.body && req.body.tenantId) ||
+                (req.headers && req.headers['x-tenant-id']) ||
+                'tenant-default';
+            const printhouseId =
+                (req.user && req.user.printhouseId) ||
+                (req.body && req.body.printhouseId) ||
+                (req.headers && req.headers['x-printhouse-id']) ||
+                'GLOBAL_MASTER';
+            const { csvText } = req.body || {};
+            if (!csvText) {
+                return res.status(400).json({ ok: false, error: 'CSV_TEXT_REQUIRED' });
+            }
+            const result = await industrialMaterialsService.importPaperRateCardCsv({
+                csvText,
+                scope: { tenantId, printhouseId }
+            });
+            for (const item of result.materials) {
+                await addMaterialToCatalogAsync(tenantId, item).catch(() => {});
+            }
+            return res.status(200).json(result);
+        } catch (err) {
+            return res.status(err.statusCode || 400).json({
+                ok: false,
+                error: err.message
+            });
+        }
+    });
+
     // POST /api/pricing/materials/validate-compatibility
     router.post('/materials/validate-compatibility', async (req, res) => {
         try {
