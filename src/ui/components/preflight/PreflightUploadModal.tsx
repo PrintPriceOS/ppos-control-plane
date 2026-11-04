@@ -14,13 +14,15 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useLocale } from '../../i18n';
+import { isDemoTenant } from '../../lib/authStore';
 import {
     SparklesIcon,
     DocumentArrowUpIcon,
     TrashIcon,
     ShieldCheckIcon,
     WrenchScrewdriverIcon,
-    MagnifyingGlassCircleIcon
+    MagnifyingGlassCircleIcon,
+    LockClosedIcon
 } from '@heroicons/react/24/outline';
 
 export interface PreflightUploadModalSubmitPayload {
@@ -69,33 +71,48 @@ export const PreflightUploadModal: React.FC<PreflightUploadModalProps> = ({
     onClose,
     onSubmit,
     labels: L,
-    initialJobId = 'PF-2026-089'
+    initialJobId
 }) => {
     const { locale } = useLocale();
-    const [formJobId, setFormJobId] = useState(initialJobId);
-    const [formTitle, setFormTitle] = useState(
-        locale === 'de'
-            ? 'Handbuch für industriellen Offset- und Digitaldruck'
-            : locale === 'es'
-              ? 'Tratado de Impresión Offset Digital'
-              : 'Treatise on Industrial Offset & Digital Printing'
+
+    // STRICT IMMUTABLE SYSTEM-GENERATED JOB ID:
+    // Format: PF-YYYY-XXXX (authoritative unique ID, locked from manual editing)
+    const isDemo = isDemoTenant();
+    const [formJobId, setFormJobId] = useState<string>(() =>
+        initialJobId || (isDemo ? 'PF-2026-089' : `PF-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`)
     );
-    const [formIsbn, setFormIsbn] = useState('978-84-9032-441-1');
+
+    // CLEAN SLATE INITIAL STATE: No hardcoded demo values for production preflight
+    const [formTitle, setFormTitle] = useState<string>('');
+    const [formIsbn, setFormIsbn] = useState<string>('');
     const [formRole, setFormRole] = useState<'INTERIOR_PDF' | 'COVER_PDF'>('INTERIOR_PDF');
     const [workflowMode, setWorkflowMode] = useState<'MAGIC_FIX' | 'DIAGNOSTIC'>('MAGIC_FIX');
     const [autoPurgeAsset, setAutoPurgeAsset] = useState<boolean>(true);
     const [formPdfFile, setFormPdfFile] = useState<File | null>(null);
-    const [formPages, setFormPages] = useState(280);
+    const [formPages, setFormPages] = useState<number | ''>('');
     const [formBinding, setFormBinding] = useState<'SOFTCOVER_PUR' | 'HARDCOVER'>('SOFTCOVER_PUR');
     const [substrateOptions, setSubstrateOptions] = useState<PreflightSubstrateOption[]>(DEFAULT_PREFLIGHT_SUBSTRATES);
     const [selectedSubstrateId, setSelectedSubstrateId] = useState<string>('CUSTOM');
-    const [formGrammage, setFormGrammage] = useState(90);
-    const [formBulk, setFormBulk] = useState(1.3);
-    const [formDeclaredSpine, setFormDeclaredSpine] = useState(14.0);
-    const [formInnerBleed, setFormInnerBleed] = useState(1.5);
+    const [formGrammage, setFormGrammage] = useState<number | ''>('');
+    const [formBulk, setFormBulk] = useState<number | ''>('');
+    const [formDeclaredSpine, setFormDeclaredSpine] = useState<number | ''>('');
+    const [formInnerBleed, setFormInnerBleed] = useState<number | ''>('');
     const [isDragging, setIsDragging] = useState(false);
     const [submitting, setSubmitting] = useState(false);
     const [sizeError, setSizeError] = useState<string | null>(null);
+
+    // Refresh system-generated Job ID when modal opens if none was explicitly passed
+    useEffect(() => {
+        if (isOpen) {
+            if (initialJobId) {
+                setFormJobId(initialJobId);
+            } else if (!isDemo) {
+                setFormJobId(`PF-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`);
+            } else {
+                setFormJobId('PF-2026-089');
+            }
+        }
+    }, [isOpen, initialJobId, isDemo]);
 
     useEffect(() => {
         if (!isOpen) return;
@@ -143,14 +160,29 @@ export const PreflightUploadModal: React.FC<PreflightUploadModalProps> = ({
 
     const MAX_BYTES = 2 * 1024 * 1024 * 1024; // 2 GB
 
-    // Real-time dynamic parametric spine calculation
-    const rawBlockMm = (Number(formPages || 0) / 2) * (Number(formGrammage || 0) / 1000) * Number(formBulk || 0);
-    const calculatedSpineMm =
-        formBinding === 'HARDCOVER'
+    // Real-time dynamic parametric spine calculation:
+    // Only evaluate the calculated parametric spine and PDF DELTA (Δ) once the user has input real values
+    // or when a certified paper substrate is selected.
+    const hasCalibratedInput =
+        Boolean(formPages && Number(formPages) > 0) &&
+        Boolean(formGrammage && Number(formGrammage) > 0) &&
+        Boolean(formBulk && Number(formBulk) > 0);
+
+    const rawBlockMm = hasCalibratedInput
+        ? (Number(formPages) / 2) * (Number(formGrammage) / 1000) * Number(formBulk)
+        : 0;
+    const calculatedSpineMm = hasCalibratedInput
+        ? formBinding === 'HARDCOVER'
             ? Math.round((rawBlockMm + 4.0 + 3.0) * 100) / 100
-            : Math.round((rawBlockMm + 0.5) * 100) / 100;
-    const spineDeltaMm = Math.round(Math.abs(calculatedSpineMm - Number(formDeclaredSpine || 0)) * 100) / 100;
-    const isSpineMismatch = spineDeltaMm > 1.0;
+            : Math.round((rawBlockMm + 0.5) * 100) / 100
+        : null;
+
+    const hasDeclaredSpine = Boolean(formDeclaredSpine !== '' && !isNaN(Number(formDeclaredSpine)));
+    const spineDeltaMm =
+        calculatedSpineMm !== null && hasDeclaredSpine
+            ? Math.round(Math.abs(calculatedSpineMm - Number(formDeclaredSpine)) * 100) / 100
+            : null;
+    const isSpineMismatch = spineDeltaMm !== null && spineDeltaMm > 1.0;
 
     const formatFileSize = (bytes: number): string => {
         if (bytes >= 1024 * 1024 * 1024) {
@@ -162,15 +194,35 @@ export const PreflightUploadModal: React.FC<PreflightUploadModalProps> = ({
         return `${(bytes / 1024).toFixed(1)} KB`;
     };
 
-    const handleFileSelect = (file: File | null) => {
+    const handleFileSelect = async (file: File | null) => {
         setSizeError(null);
         if (file && file.size > MAX_BYTES) {
             setSizeError('PAYLOAD_TOO_LARGE: Maximum file size is 2 GB (2048 MB).');
             return;
         }
         setFormPdfFile(file);
-        if (file && (!formTitle || formTitle === 'Tratado de Impresión Offset Digital')) {
-            setFormTitle(file.name.replace(/\.pdf$/i, ''));
+        if (file) {
+            if (!formTitle) {
+                // Populate title cleanly from file name
+                const cleanName = file.name.replace(/\.pdf$/i, '').replace(/[-_]/g, ' ');
+                setFormTitle(cleanName);
+            }
+
+            // Client-side quick binary metadata extraction (page count hint)
+            try {
+                const sampleSlice = await file.slice(0, Math.min(file.size, 512 * 1024)).arrayBuffer();
+                const text = new TextDecoder('latin1').decode(sampleSlice);
+                const pageMatches = text.match(/\/Type\s*\/Page\b(?!s)/g);
+                if (pageMatches && pageMatches.length > 0) {
+                    if (formRole === 'COVER_PDF') {
+                        setFormPages(pageMatches.length);
+                    } else if (pageMatches.length >= 2) {
+                        setFormPages(pageMatches.length);
+                    }
+                }
+            } catch (_) {
+                // Metadata extraction hint failed silently
+            }
         }
     };
 
@@ -181,18 +233,18 @@ export const PreflightUploadModal: React.FC<PreflightUploadModalProps> = ({
         try {
             await onSubmit({
                 jobId: formJobId,
-                title: formTitle,
-                isbn: formIsbn,
+                title: formTitle || 'Untitled Book Project',
+                isbn: formIsbn || '978-0-0000-0000-0',
                 role: formRole,
                 workflowMode,
                 purgeAsset: autoPurgeAsset,
                 pdfFile: formPdfFile,
-                pageCount: Number(formPages),
+                pageCount: Number(formPages || 0),
                 bindingType: formBinding,
-                paperGrammage: Number(formGrammage),
-                paperBulk: Number(formBulk),
-                declaredSpineMm: Number(formDeclaredSpine),
-                innerBleedMm: Number(formInnerBleed)
+                paperGrammage: Number(formGrammage || 0),
+                paperBulk: Number(formBulk || 0),
+                declaredSpineMm: Number(formDeclaredSpine || 0),
+                innerBleedMm: Number(formInnerBleed || 0)
             });
         } finally {
             setSubmitting(false);
@@ -420,15 +472,27 @@ export const PreflightUploadModal: React.FC<PreflightUploadModalProps> = ({
                             {/* Book Spec Fields */}
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
-                                    <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-400 mb-1">
-                                        {L.lblJobId || 'Job ID'}
+                                    <label className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-zinc-400 mb-1">
+                                        <span>{L.lblJobId || 'Job ID'}</span>
+                                        <span className="inline-flex items-center gap-1 text-[9px] font-mono text-zinc-400 font-normal">
+                                            <LockClosedIcon className="w-2.5 h-2.5 text-zinc-400" />
+                                            LOCKED
+                                        </span>
                                     </label>
-                                    <input
-                                        type="text"
-                                        value={formJobId}
-                                        onChange={(e) => setFormJobId(e.target.value)}
-                                        className="w-full rounded-lg bg-[#121418] border border-zinc-800 px-3 py-1.5 text-xs font-mono text-white"
-                                    />
+                                    <div className="relative">
+                                        <input
+                                            type="text"
+                                            value={formJobId}
+                                            readOnly
+                                            disabled
+                                            tabIndex={-1}
+                                            data-testid="preflight-job-id-input"
+                                            className="w-full rounded-lg bg-zinc-950/80 border border-zinc-800 px-3 py-1.5 text-xs font-mono font-bold text-zinc-300 cursor-not-allowed select-none opacity-85"
+                                        />
+                                        <div className="absolute inset-y-0 right-0 pr-2.5 flex items-center pointer-events-none text-zinc-400">
+                                            <LockClosedIcon className="w-3.5 h-3.5" />
+                                        </div>
+                                    </div>
                                 </div>
                                 <div>
                                     <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-400 mb-1">
@@ -437,8 +501,9 @@ export const PreflightUploadModal: React.FC<PreflightUploadModalProps> = ({
                                     <input
                                         type="text"
                                         value={formIsbn}
+                                        placeholder="e.g. 978-X-XXXX-XXXX-X"
                                         onChange={(e) => setFormIsbn(e.target.value)}
-                                        className="w-full rounded-lg bg-[#121418] border border-zinc-800 px-3 py-1.5 text-xs font-mono text-white"
+                                        className="w-full rounded-lg bg-[#121418] border border-zinc-800 px-3 py-1.5 text-xs font-mono text-white placeholder:text-zinc-600 focus:border-zinc-600 focus:outline-none"
                                     />
                                 </div>
                                 <div className="col-span-2">
@@ -448,8 +513,9 @@ export const PreflightUploadModal: React.FC<PreflightUploadModalProps> = ({
                                     <input
                                         type="text"
                                         value={formTitle}
+                                        placeholder="e.g. The Industrial Book Design Manual"
                                         onChange={(e) => setFormTitle(e.target.value)}
-                                        className="w-full rounded-lg bg-[#121418] border border-zinc-800 px-3 py-1.5 text-xs font-mono text-white"
+                                        className="w-full rounded-lg bg-[#121418] border border-zinc-800 px-3 py-1.5 text-xs font-mono text-white placeholder:text-zinc-600 focus:border-zinc-600 focus:outline-none"
                                     />
                                 </div>
                                 <div>
@@ -474,8 +540,9 @@ export const PreflightUploadModal: React.FC<PreflightUploadModalProps> = ({
                                     <input
                                         type="number"
                                         value={formPages}
-                                        onChange={(e) => setFormPages(Number(e.target.value))}
-                                        className="w-full rounded-lg bg-[#121418] border border-zinc-800 px-3 py-1.5 text-xs font-mono text-white"
+                                        placeholder="e.g. 192"
+                                        onChange={(e) => setFormPages(e.target.value === '' ? '' : Number(e.target.value))}
+                                        className="w-full rounded-lg bg-[#121418] border border-zinc-800 px-3 py-1.5 text-xs font-mono text-white placeholder:text-zinc-600 focus:border-zinc-600 focus:outline-none"
                                     />
                                 </div>
                                 <div className="col-span-2">
@@ -497,6 +564,8 @@ export const PreflightUploadModal: React.FC<PreflightUploadModalProps> = ({
                                             if (found) {
                                                 setFormGrammage(found.gsm);
                                                 setFormBulk(found.bulk);
+                                                // If page count is not yet defined, initialize to standard book block 280pp
+                                                setFormPages((prev) => (prev !== '' && Number(prev) > 0 ? prev : 280));
                                             }
                                         }}
                                         className="w-full rounded-lg bg-[#121418] border border-emerald-500/40 px-3 py-1.5 text-xs font-mono text-white"
@@ -522,8 +591,9 @@ export const PreflightUploadModal: React.FC<PreflightUploadModalProps> = ({
                                     <input
                                         type="number"
                                         value={formGrammage}
-                                        onChange={(e) => setFormGrammage(Number(e.target.value))}
-                                        className="w-full rounded-lg bg-[#121418] border border-zinc-800 px-3 py-1.5 text-xs font-mono text-white"
+                                        placeholder="e.g. 100 gsm"
+                                        onChange={(e) => setFormGrammage(e.target.value === '' ? '' : Number(e.target.value))}
+                                        className="w-full rounded-lg bg-[#121418] border border-zinc-800 px-3 py-1.5 text-xs font-mono text-white placeholder:text-zinc-600 focus:border-zinc-600 focus:outline-none"
                                     />
                                 </div>
                                 <div>
@@ -534,8 +604,9 @@ export const PreflightUploadModal: React.FC<PreflightUploadModalProps> = ({
                                         type="number"
                                         step="0.05"
                                         value={formBulk}
-                                        onChange={(e) => setFormBulk(Number(e.target.value))}
-                                        className="w-full rounded-lg bg-[#121418] border border-zinc-800 px-3 py-1.5 text-xs font-mono text-white"
+                                        placeholder="e.g. 1.20"
+                                        onChange={(e) => setFormBulk(e.target.value === '' ? '' : Number(e.target.value))}
+                                        className="w-full rounded-lg bg-[#121418] border border-zinc-800 px-3 py-1.5 text-xs font-mono text-white placeholder:text-zinc-600 focus:border-zinc-600 focus:outline-none"
                                     />
                                 </div>
                                 <div>
@@ -546,8 +617,9 @@ export const PreflightUploadModal: React.FC<PreflightUploadModalProps> = ({
                                         type="number"
                                         step="0.1"
                                         value={formDeclaredSpine}
-                                        onChange={(e) => setFormDeclaredSpine(Number(e.target.value))}
-                                        className="w-full rounded-lg bg-[#121418] border border-zinc-800 px-3 py-1.5 text-xs font-mono text-white"
+                                        placeholder="e.g. 12.5 mm"
+                                        onChange={(e) => setFormDeclaredSpine(e.target.value === '' ? '' : Number(e.target.value))}
+                                        className="w-full rounded-lg bg-[#121418] border border-zinc-800 px-3 py-1.5 text-xs font-mono text-white placeholder:text-zinc-600 focus:border-zinc-600 focus:outline-none"
                                     />
                                 </div>
                                 <div>
@@ -558,8 +630,9 @@ export const PreflightUploadModal: React.FC<PreflightUploadModalProps> = ({
                                         type="number"
                                         step="0.5"
                                         value={formInnerBleed}
-                                        onChange={(e) => setFormInnerBleed(Number(e.target.value))}
-                                        className="w-full rounded-lg bg-[#121418] border border-zinc-800 px-3 py-1.5 text-xs font-mono text-white"
+                                        placeholder="e.g. 3.0 mm"
+                                        onChange={(e) => setFormInnerBleed(e.target.value === '' ? '' : Number(e.target.value))}
+                                        className="w-full rounded-lg bg-[#121418] border border-zinc-800 px-3 py-1.5 text-xs font-mono text-white placeholder:text-zinc-600 focus:border-zinc-600 focus:outline-none"
                                     />
                                 </div>
                             </div>
@@ -575,7 +648,7 @@ export const PreflightUploadModal: React.FC<PreflightUploadModalProps> = ({
                                     CALCULATED PARAMETRIC SPINE
                                 </div>
                                 <div className="text-base font-mono font-black text-white mt-0.5">
-                                    {calculatedSpineMm.toFixed(2)} mm
+                                    {calculatedSpineMm !== null ? `${calculatedSpineMm.toFixed(2)} mm` : '-- mm'}
                                 </div>
                             </div>
                             <div className="text-right font-mono">
@@ -584,10 +657,16 @@ export const PreflightUploadModal: React.FC<PreflightUploadModalProps> = ({
                                 </div>
                                 <div
                                     className={`text-xs font-bold mt-0.5 ${
-                                        isSpineMismatch ? 'text-rose-400' : 'text-emerald-400'
+                                        spineDeltaMm === null
+                                            ? 'text-zinc-400'
+                                            : isSpineMismatch
+                                              ? 'text-rose-400'
+                                              : 'text-emerald-400'
                                     }`}
                                 >
-                                    {spineDeltaMm.toFixed(2)} mm {isSpineMismatch ? '(MISMATCH)' : '(OK)'}
+                                    {spineDeltaMm !== null
+                                        ? `${spineDeltaMm.toFixed(2)} mm ${isSpineMismatch ? '(MISMATCH)' : '(OK)'}`
+                                        : 'Awaiting Input'}
                                 </div>
                             </div>
                         </div>
