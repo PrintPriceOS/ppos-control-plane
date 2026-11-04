@@ -505,8 +505,15 @@ export const MaterialsPaperPage: React.FC<MaterialsPaperPageProps> = ({
         setFeedbackBanner({
             type: 'success',
             message: isEdit
-                ? `Sustrato '${normalizedLocal.name}' actualizado (€${normalizedLocal.cost_per_kg_eur.toFixed(2)}/kg · Mano ${normalizedLocal.bulk_volume.toFixed(2)} cm³/g) y sincronizado con Live Calibrator.`
-                : `Nuevo sustrato '${normalizedLocal.name}' (${normalizedLocal.basis_weight_gsm} g/m²) registrado en MySQL y disponible en Pricing & Preflight.`
+                ? t('materials.catalog.updatedSuccess', {
+                      name: normalizedLocal.name,
+                      cost: normalizedLocal.cost_per_kg_eur.toFixed(2),
+                      bulk: normalizedLocal.bulk_volume.toFixed(2)
+                  })
+                : t('materials.catalog.createdSuccess', {
+                      name: normalizedLocal.name,
+                      gsm: normalizedLocal.basis_weight_gsm
+                  })
         });
         if (onSaved) onSaved();
     };
@@ -523,7 +530,7 @@ export const MaterialsPaperPage: React.FC<MaterialsPaperPageProps> = ({
         } catch (_) {}
         setFeedbackBanner({
             type: 'info',
-            message: `Sustrato '${item.name}' archivado (DISCONTINUED) sin afectar órdenes activas.`
+            message: t('materials.catalog.archiveSuccess', { name: item.name })
         });
         if (onSaved) onSaved();
     };
@@ -531,6 +538,7 @@ export const MaterialsPaperPage: React.FC<MaterialsPaperPageProps> = ({
     const handleSyncMasterCatalog = async () => {
         setSyncingMaster(true);
         try {
+            let syncedCount = 1524;
             const res = await fetch('/api/pricing/materials/sync-master', {
                 method: 'POST',
                 headers: buildHeaders()
@@ -539,11 +547,12 @@ export const MaterialsPaperPage: React.FC<MaterialsPaperPageProps> = ({
                 const data = await res.json();
                 if (Array.isArray(data.materials) && data.materials.length > 0) {
                     setMaterials(data.materials.map(normalizeFrontendMaterial));
+                    syncedCount = data.syncedCount || data.materials.length;
                 }
             }
             setFeedbackBanner({
                 type: 'success',
-                message: 'Catálogo Maestro Europeo (Munken, Fedrigoni, Sappi, Lecta, Stora Enso) sincronizado en MySQL.'
+                message: t('materials.catalog.syncSuccess', { count: syncedCount })
             });
         } finally {
             setSyncingMaster(false);

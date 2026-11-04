@@ -3187,6 +3187,10 @@ export const de = {
   'materials.catalog.grainShort': 'BREITBAHN (SG)',
   'materials.catalog.btnEdit': 'Bearbeiten',
   'materials.catalog.emptyFiltered': 'Keine industriellen Bedruckstoffe für den gewählten Filter gefunden.',
+  'materials.catalog.syncSuccess': 'Europäischer Papier-Hauptkatalog ({count} technische Varianten von Munken, Fedrigoni, Sappi, Lecta, Stora Enso) erfolgreich mit MySQL synchronisiert.',
+  'materials.catalog.createdSuccess': 'Neues Substrat \'{name}\' ({gsm} g/m²) in MySQL registriert und für Kalkulation & Preflight verfügbar.',
+  'materials.catalog.updatedSuccess': 'Substrat \'{name}\' aktualisiert (€{cost}/kg · Volumen {bulk} cm³/g) und mit Live Calibrator synchronisiert.',
+  'materials.catalog.archiveSuccess': 'Substrat \'{name}\' archiviert (DISCONTINUED) ohne aktive Aufträge zu beeinträchtigen.',
 
   // Material Specification Drawer & Mechanical Calculations
   'materials.drawer.titleEdit': 'Technische Substratspezifikation bearbeiten',

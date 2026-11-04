@@ -3187,6 +3187,10 @@ export const es = {
   'materials.catalog.grainShort': 'FIBRA CORTA (SG)',
   'materials.catalog.btnEdit': 'Editar',
   'materials.catalog.emptyFiltered': 'No se encontraron sustratos industriales con el filtro seleccionado.',
+  'materials.catalog.syncSuccess': 'Catálogo Maestro Europeo ({count} variantes técnicas de Munken, Fedrigoni, Sappi, Lecta, Stora Enso) sincronizado con éxito en MySQL.',
+  'materials.catalog.createdSuccess': 'Nuevo sustrato \'{name}\' ({gsm} g/m²) registrado en MySQL y disponible en Pricing & Preflight.',
+  'materials.catalog.updatedSuccess': 'Sustrato \'{name}\' actualizado (€{cost}/kg · Mano {bulk} cm³/g) y sincronizado con Live Calibrator.',
+  'materials.catalog.archiveSuccess': 'Sustrato \'{name}\' archivado (DISCONTINUED) sin afectar órdenes activas.',
 
   // Material Specification Drawer & Mechanical Calculations
   'materials.drawer.titleEdit': 'Editar Especificación Técnica de Sustrato',

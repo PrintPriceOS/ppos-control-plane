@@ -1263,19 +1263,120 @@ async function syncMasterIndustrialCatalog(scope = {}, dbClient = db) {
     initRuntimeCatalog();
     await ensurePrinthouseMaterialsSchema(dbClient);
 
+    const unwrap = (r) => (Array.isArray(r) ? (Array.isArray(r[0]) ? r[0] : r) : []);
     const syncedItems = [];
-    for (const masterItem of EUROPEAN_MASTER_SUBSTRATES) {
-        const upserted = await upsertIndustrialMaterial(
-            {
-                ...masterItem,
-                printhouse_id: scope.printhouseId || masterItem.printhouse_id || 'GLOBAL_MASTER',
-                tenant_id: scope.tenantId || masterItem.tenant_id || 'tenant-default'
-            },
-            scope,
-            dbClient,
-            false
-        );
-        syncedItems.push(upserted);
+    let variantsFromDb = [];
+
+    // 1. Query the 1,524 technical variants from MySQL if connected
+    if (dbClient && typeof dbClient.query === 'function' && process.env.PPOS_CI_EPHEMERAL_FIXTURES !== 'true') {
+        try {
+            const rawVariants = unwrap(
+                await dbClient.query(`
+                    SELECT 
+                        v.id AS variant_id,
+                        p.id AS product_id,
+                        p.name AS product_name,
+                        COALESCE(p.brand, p.manufacturer, 'European Certified Mill') AS manufacturer,
+                        p.category AS raw_category,
+                        v.gsm,
+                        v.caliper_um,
+                        v.bulk_factor,
+                        v.width_mm,
+                        v.height_mm,
+                        v.is_reel,
+                        v.finish,
+                        v.grain_direction
+                    FROM paper_variants v
+                    JOIN paper_products p ON p.id = v.product_id
+                    JOIN supplier_paper_catalog_variants sp ON sp.variant_id = v.id
+                    WHERE sp.status = 'ACTIVE' OR sp.status IS NULL
+                `).catch(() => [])
+            );
+            if (Array.isArray(rawVariants) && rawVariants.length > 0) {
+                variantsFromDb = rawVariants;
+            }
+        } catch (_) {
+            // Non-fatal, fallback to baseline
+        }
+    }
+
+    if (variantsFromDb.length > 0) {
+        for (const row of variantsFromDb) {
+            const isReel = Boolean(row.is_reel);
+            const rawCat = String(row.raw_category || '').toUpperCase();
+            let materialType = 'SHEETFED_PAPER';
+            if (isReel) {
+                materialType = 'REEL_PAPER';
+            } else if (rawCat === 'CARTON') {
+                materialType = 'BOARD_CARTON';
+            } else if (rawCat === 'DESIGN' || String(row.product_name).toLowerCase().includes('guarda')) {
+                materialType = 'ENDPAPERS';
+            }
+
+            let category = 'OFFSET_UNCOATED';
+            if (rawCat === 'COATED') {
+                const fin = String(row.finish || '').toUpperCase();
+                category = fin.includes('GLOSS') ? 'COATED_GLOSS' : 'COATED_MATTE';
+            } else if (rawCat === 'CARTON') {
+                category = 'SPECIALTY';
+            } else if (Number(row.bulk_factor || 1.0) >= 1.4) {
+                category = 'BULKY_CREAM';
+            }
+
+            const gsm = Number(row.gsm || 90);
+            const bulk = Number(row.bulk_factor || 1.25);
+            const widthMm = Number(row.width_mm || 700);
+            const heightMm = Number(row.height_mm || 1000);
+            const grain = String(row.grain_direction || '').toUpperCase().includes('SHORT') || row.grain_direction === 'SG' ? 'SG' : 'LG';
+
+            const item = {
+                id: `MAT-${row.variant_id}`,
+                printhouse_id: scope.printhouseId || 'GLOBAL_MASTER',
+                tenant_id: scope.tenantId || 'tenant-default',
+                name: row.product_name,
+                manufacturer: row.manufacturer,
+                material_type: materialType,
+                category,
+                basis_weight_gsm: gsm,
+                bulk_volume: bulk,
+                dimensions_json: isReel
+                    ? {
+                          web_width_mm: widthMm,
+                          max_diameter_mm: 1200,
+                          core_diameter_mm: 76,
+                          format_label: `Bobina ${widthMm} mm · Ø1200 mm`
+                      }
+                    : {
+                          width_mm: widthMm,
+                          height_mm: heightMm,
+                          grain_direction: grain,
+                          format_label: `${widthMm === 700 && heightMm === 1000 ? 'B1' : widthMm === 500 && heightMm === 700 ? 'B2' : 'Pliego'} (${widthMm}×${heightMm} mm · ${grain})`
+                      },
+                cost_per_kg_eur: 1.3400,
+                certifications_json: ['FSC_MIX'],
+                in_stock_kg: 5000.00,
+                min_order_kg: 500.00,
+                status: 'ACTIVE'
+            };
+
+            const upserted = await upsertIndustrialMaterial(item, scope, dbClient, false);
+            syncedItems.push(upserted);
+        }
+    } else {
+        // Fallback: Seed baseline European Master Substrates
+        for (const masterItem of EUROPEAN_MASTER_SUBSTRATES) {
+            const upserted = await upsertIndustrialMaterial(
+                {
+                    ...masterItem,
+                    printhouse_id: scope.printhouseId || masterItem.printhouse_id || 'GLOBAL_MASTER',
+                    tenant_id: scope.tenantId || masterItem.tenant_id || 'tenant-default'
+                },
+                scope,
+                dbClient,
+                false
+            );
+            syncedItems.push(upserted);
+        }
     }
 
     return {

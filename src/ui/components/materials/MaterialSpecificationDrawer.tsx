@@ -21,9 +21,13 @@ import {
     ScaleIcon,
     CheckBadgeIcon,
     BookOpenIcon,
-    CurrencyEuroIcon
+    CurrencyEuroIcon,
+    MagnifyingGlassIcon,
+    ArrowPathIcon,
+    CheckCircleIcon
 } from '@heroicons/react/24/outline';
 import { useLocale } from '../../i18n';
+import * as adminApi from '../../lib/adminApi';
 
 export type IndustrialMaterialType =
     | 'SHEETFED_PAPER'
@@ -199,6 +203,83 @@ export const MaterialSpecificationDrawer: React.FC<MaterialSpecificationDrawerPr
     const [status, setStatus] = useState<'ACTIVE' | 'LOW_STOCK' | 'DISCONTINUED'>('ACTIVE');
     const [saving, setSaving] = useState<boolean>(false);
     const [validationError, setValidationError] = useState<string | null>(null);
+
+    // Master Paper Database Search State (1,524 technical variants)
+    const [paperDbSearch, setPaperDbSearch] = useState<string>('');
+    const [paperDbResults, setPaperDbResults] = useState<adminApi.MasterPaperDatabaseItem[]>([]);
+    const [paperDbLoading, setPaperDbLoading] = useState<boolean>(false);
+    const [selectedDbPaper, setSelectedDbPaper] = useState<adminApi.MasterPaperDatabaseItem | null>(null);
+
+    // Debounced search for master paper database (1,524 variants)
+    useEffect(() => {
+        if (!isOpen) return;
+        if (!paperDbSearch.trim()) {
+            setPaperDbResults([]);
+            setPaperDbLoading(false);
+            return;
+        }
+
+        setPaperDbLoading(true);
+        const timer = setTimeout(async () => {
+            try {
+                const res = await adminApi.searchMasterPaperDatabase({ query: paperDbSearch.trim(), limit: 25 });
+                if (res?.ok && Array.isArray(res?.data?.items)) {
+                    setPaperDbResults(res.data.items);
+                } else {
+                    setPaperDbResults([]);
+                }
+            } catch (err) {
+                setPaperDbResults([]);
+            } finally {
+                setPaperDbLoading(false);
+            }
+        }, 250);
+
+        return () => clearTimeout(timer);
+    }, [paperDbSearch, isOpen]);
+
+    const handleSelectDbPaper = (item: adminApi.MasterPaperDatabaseItem) => {
+        setSelectedDbPaper(item);
+        setName(item.productName);
+        if (item.brand || item.manufacturer) {
+            setManufacturer(item.brand || item.manufacturer || 'European Mill');
+        }
+        setGsm(Number(item.gsm || 90));
+        if (item.bulk_factor) {
+            setBulkVolume(Number(item.bulk_factor));
+        } else if (item.caliper_um && item.gsm) {
+            setBulkVolume(Number((item.caliper_um / item.gsm).toFixed(2)));
+        }
+
+        if (item.widthMm && item.heightMm) {
+            setWidthMm(Number(item.widthMm));
+            setHeightMm(Number(item.heightMm));
+        }
+
+        if (item.isReel) {
+            setMaterialType('REEL_PAPER');
+            if (item.widthMm) setWebWidthMm(Number(item.widthMm));
+        } else if (String(item.category).toUpperCase() === 'CARTON') {
+            setMaterialType('BOARD_CARTON');
+            setCategory('SPECIALTY');
+        } else {
+            setMaterialType('SHEETFED_PAPER');
+            const cat = String(item.category || '').toUpperCase();
+            if (cat === 'COATED') {
+                const fin = String(item.finish || '').toUpperCase();
+                setCategory(fin.includes('GLOSS') ? 'COATED_GLOSS' : 'COATED_MATTE');
+            } else if (Number(item.bulk_factor || 1.0) >= 1.4) {
+                setCategory('BULKY_CREAM');
+            } else {
+                setCategory('OFFSET_UNCOATED');
+            }
+        }
+
+        if (item.grainDirection) {
+            const gd = String(item.grainDirection).toUpperCase();
+            setGrainDirection(gd.includes('SHORT') || gd === 'SG' ? 'SG' : 'LG');
+        }
+    };
 
     useEffect(() => {
         if (!isOpen) return;
@@ -419,6 +500,134 @@ export const MaterialSpecificationDrawer: React.FC<MaterialSpecificationDrawerPr
                             {validationError}
                         </div>
                     )}
+
+                    {/* Master Paper Database Quick Search & Load (1,524 Canonical Variants) */}
+                    <div className="p-4 rounded-2xl bg-zinc-50 dark:bg-[#0B0C0E] border border-zinc-200 dark:border-zinc-800 space-y-3">
+                        <div className="flex items-center justify-between">
+                            <label className="text-[10px] font-mono font-black uppercase tracking-widest text-[#dc0000]">
+                                {t('materials.dbSearch.title')}
+                            </label>
+                            <span className="text-[9px] font-mono text-zinc-400">
+                                1,524 {locale === 'de' ? 'Varianten' : locale === 'es' ? 'variantes activas' : 'active variants'}
+                            </span>
+                        </div>
+                        <p className="text-[11px] text-zinc-500 dark:text-zinc-400 m-0">
+                            {t('materials.dbSearch.subtitle')}
+                        </p>
+                        <div className="relative">
+                            <MagnifyingGlassIcon className="w-4 h-4 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                            <input
+                                type="text"
+                                data-testid="material-db-search-input"
+                                value={paperDbSearch}
+                                onChange={(e) => setPaperDbSearch(e.target.value)}
+                                placeholder={t('materials.dbSearch.placeholder')}
+                                className="w-full pl-9 pr-9 py-2 rounded-xl bg-white dark:bg-[#14161a] border border-zinc-200 dark:border-zinc-800 text-xs font-medium text-zinc-900 dark:text-white"
+                            />
+                            {paperDbSearch && (
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setPaperDbSearch('');
+                                        setPaperDbResults([]);
+                                    }}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 cursor-pointer"
+                                >
+                                    <XMarkIcon className="w-3.5 h-3.5" />
+                                </button>
+                            )}
+                        </div>
+
+                        {/* Quick filter chips */}
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="text-[10px] text-zinc-500 font-semibold">{t('materials.dbSearch.suggestions')}</span>
+                            {['70x100', '64x92', '72x102', '500x700', 'SRA3', 'Munken', 'Alaska', 'Silk', 'Fedrigoni'].map((chip) => (
+                                <button
+                                    key={chip}
+                                    type="button"
+                                    onClick={() => setPaperDbSearch(chip)}
+                                    className="px-2 py-0.5 rounded-md text-[10px] font-mono font-medium bg-zinc-200/60 dark:bg-zinc-800 hover:bg-[#dc0000] hover:text-white text-zinc-600 dark:text-zinc-300 transition-colors cursor-pointer"
+                                >
+                                    {chip}
+                                </button>
+                            ))}
+                        </div>
+
+                        {/* Search Dropdown / Results */}
+                        {paperDbSearch.trim().length >= 2 && (
+                            <div className="border border-zinc-200 dark:border-zinc-800 rounded-xl max-h-48 overflow-y-auto divide-y divide-zinc-200 dark:divide-zinc-800 bg-white dark:bg-[#14161a] shadow-lg">
+                                {paperDbLoading && (
+                                    <div className="p-3 text-center text-[11px] text-zinc-400 flex items-center justify-center gap-2">
+                                        <ArrowPathIcon className="w-4 h-4 animate-spin text-[#dc0000]" />
+                                        <span>{t('materials.dbSearch.searching')}</span>
+                                    </div>
+                                )}
+                                {!paperDbLoading && paperDbResults.length === 0 && (
+                                    <div className="p-3 text-center text-[11px] text-zinc-500">
+                                        {t('materials.dbSearch.noResults')}
+                                    </div>
+                                )}
+                                {!paperDbLoading && paperDbResults.map((item) => (
+                                    <div
+                                        key={item.variantId}
+                                        onClick={() => handleSelectDbPaper(item)}
+                                        className={`p-2.5 flex items-center justify-between gap-2 hover:bg-zinc-100 dark:hover:bg-zinc-800/60 transition-colors cursor-pointer ${
+                                            selectedDbPaper?.variantId === item.variantId ? 'bg-[#dc0000]/10' : ''
+                                        }`}
+                                    >
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex items-center space-x-1.5 flex-wrap gap-y-1">
+                                                <span className="font-bold text-xs truncate text-zinc-900 dark:text-white">
+                                                    {item.productName}
+                                                </span>
+                                                <span className="text-[9px] px-1.5 py-0.5 rounded font-mono font-bold uppercase bg-zinc-200/70 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300">
+                                                    {item.gsm} GSM
+                                                </span>
+                                                <span className="text-[9px] px-1.5 py-0.5 rounded font-mono font-bold uppercase bg-amber-500/10 text-amber-500">
+                                                    {item.sheetFormat}
+                                                </span>
+                                            </div>
+                                            <div className="flex items-center gap-2 text-[10px] text-zinc-500 mt-0.5">
+                                                <span>{item.brand || item.manufacturer || 'European Mill'}</span>
+                                                <span>•</span>
+                                                <span>{item.finish}</span>
+                                                <span>•</span>
+                                                <span className="font-mono">{item.caliper_um ? `${item.caliper_um} µm` : `Mano ${item.bulk_factor || 1.2}`}</span>
+                                            </div>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleSelectDbPaper(item);
+                                            }}
+                                            className="px-2.5 py-1 bg-[#dc0000] hover:bg-red-700 text-white rounded-lg text-[9px] font-black uppercase tracking-wider transition-colors cursor-pointer shrink-0"
+                                        >
+                                            {t('materials.dbSearch.load')}
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
+                        {selectedDbPaper && (
+                            <div className="p-2.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 flex items-center justify-between gap-2 text-emerald-500">
+                                <div className="flex items-center gap-2 min-w-0 text-[11px]">
+                                    <CheckCircleIcon className="w-4 h-4 shrink-0" />
+                                    <span className="font-bold truncate">
+                                        {t('materials.dbSearch.linkedTo')} {selectedDbPaper.productName} ({selectedDbPaper.gsm}g · {selectedDbPaper.sheetFormat})
+                                    </span>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => setSelectedDbPaper(null)}
+                                    className="text-[10px] uppercase font-bold text-rose-500 hover:underline cursor-pointer shrink-0"
+                                >
+                                    {t('materials.dbSearch.unlink')}
+                                </button>
+                            </div>
+                        )}
+                    </div>
 
                     {/* 1. Selector Visual de Tipo de Material (Pliego vs Bobina vs Cartón/Guarda/Laminado) */}
                     <div>

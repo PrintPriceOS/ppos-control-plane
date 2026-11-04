@@ -3187,6 +3187,10 @@ export const en = {
   'materials.catalog.grainShort': 'SHORT GRAIN (SG)',
   'materials.catalog.btnEdit': 'Edit',
   'materials.catalog.emptyFiltered': 'No industrial substrates match the selected filter.',
+  'materials.catalog.syncSuccess': 'European Master Paper Catalog ({count} technical variants from Munken, Fedrigoni, Sappi, Lecta, Stora Enso) synchronized successfully with MySQL.',
+  'materials.catalog.createdSuccess': 'New substrate \'{name}\' ({gsm} g/m²) registered in MySQL and available in Pricing & Preflight.',
+  'materials.catalog.updatedSuccess': 'Substrate \'{name}\' updated (€{cost}/kg · Bulk {bulk} cm³/g) and synchronized with Live Calibrator.',
+  'materials.catalog.archiveSuccess': 'Substrate \'{name}\' archived (DISCONTINUED) without impacting active orders.',
 
   // Material Specification Drawer & Mechanical Calculations
   'materials.drawer.titleEdit': 'Edit Industrial Substrate Specification',
