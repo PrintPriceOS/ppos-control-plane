@@ -104,7 +104,7 @@ export const ProductionDashboard: React.FC<SharedModuleProps> = (props) => {
     const isDemo = isDemoTenant();
     const [viewMode, setViewMode] = useState<'profitability' | 'queue'>('profitability');
     const [rows, setRows] = useState<ExecutiveProfitabilityRow[]>(isDemo ? INITIAL_PROFITABILITY_ROWS : []);
-    const [loading, setLoading] = useState<boolean>(!isDemo);
+    const [loading, setLoading] = useState<boolean>(true);
     const [invoicePreview, setInvoicePreview] = useState<{
         orderId: string;
         standard: 'FACTURAE_3_2_2' | 'XRECHNUNG_3_0';
@@ -147,10 +147,17 @@ export const ProductionDashboard: React.FC<SharedModuleProps> = (props) => {
                         // Enforce clean zero-slate for real tenant
                         setRows([]);
                     }
+                } else if (!isDemo) {
+                    setRows([]);
                 }
             })
             .catch(() => {
-                if (isMounted) setLoading(false);
+                if (isMounted) {
+                    setLoading(false);
+                    if (!isDemo) {
+                        setRows([]);
+                    }
+                }
             });
 
         return () => {

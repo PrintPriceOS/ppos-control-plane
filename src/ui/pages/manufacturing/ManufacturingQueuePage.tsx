@@ -198,7 +198,7 @@ export const ManufacturingQueuePage: React.FC<SharedModuleProps> = ({
     const [activeTab, setActiveTab] = useState<'dispatcher' | 'live_queue'>('dispatcher');
     const isDemo = isDemoTenant();
     const [rows, setRows] = useState<ImpositionSignatureRow[]>(isDemo ? INITIAL_SIGNATURE_QUEUE : []);
-    const [loading, setLoading] = useState<boolean>(!isDemo);
+    const [loading, setLoading] = useState<boolean>(true);
     const [showComposeModal, setShowComposeModal] = useState(false);
     const [jdfPreviewModal, setJdfPreviewModal] = useState<{ jobId: string; xml: string } | null>(null);
     const [jmfSimBanner, setJmfSimBanner] = useState<{
@@ -252,10 +252,17 @@ export const ManufacturingQueuePage: React.FC<SharedModuleProps> = ({
                         // Enforce clean-slate empty state [] for non-demo
                         setRows([]);
                     }
+                } else if (!isDemo) {
+                    setRows([]);
                 }
             })
             .catch(() => {
-                if (isMounted) setLoading(false);
+                if (isMounted) {
+                    setLoading(false);
+                    if (!isDemo) {
+                        setRows([]);
+                    }
+                }
             });
 
         return () => {

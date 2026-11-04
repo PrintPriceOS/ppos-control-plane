@@ -280,7 +280,7 @@ export const PreflightJobsPage: React.FC<SharedModuleProps> = ({
     const [activeTab, setActiveTab] = useState<'queue' | 'profiles'>('queue');
     const isDemo = isDemoTenant();
     const [jobs, setJobs] = useState<PreflightInspectionRow[]>(isDemo ? INITIAL_WORKSHOP_JOBS : []);
-    const [loading, setLoading] = useState<boolean>(!isDemo);
+    const [loading, setLoading] = useState<boolean>(true);
     const [profiles, setProfiles] = useState(GEOMETRY_PROFILES);
     const [fixingJobId, setFixingJobId] = useState<string | null>(null);
     const [purgingJobId, setPurgingJobId] = useState<string | null>(null);
@@ -345,10 +345,17 @@ export const PreflightJobsPage: React.FC<SharedModuleProps> = ({
                         // Real tenant with zero inspections: enforce clean-slate []
                         setJobs([]);
                     }
+                } else if (!isDemo) {
+                    setJobs([]);
                 }
             })
             .catch(() => {
-                if (isMounted) setLoading(false);
+                if (isMounted) {
+                    setLoading(false);
+                    if (!isDemo) {
+                        setJobs([]);
+                    }
+                }
             });
         return () => {
             isMounted = false;
