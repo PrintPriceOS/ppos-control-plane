@@ -151,9 +151,19 @@ function createPublisherRouter() {
                 (req.user && req.user.role) ||
                 (req.headers && req.headers['x-user-role']) ||
                 'PUBLISHER';
+            const customerEmail =
+                (req.user && req.user.email) ||
+                (req.headers && req.headers['x-customer-email']) ||
+                null;
+            const organizationId =
+                (req.user && req.user.organizationId) ||
+                (req.headers && req.headers['x-organization-id']) ||
+                null;
 
-            const payload = getPublisherOrders({
+            const payload = await getPublisherOrders({
                 publisherTenantId,
+                customerEmail,
+                organizationId,
                 role: 'PUBLISHER' // Always enforce publisher sanitization on B2B Hub endpoints
             });
             payload.viewerRole = String(role).toUpperCase();
@@ -192,9 +202,20 @@ function createPublisherRouter() {
         try {
             const publisherTenantId = resolvePublisherTenantId(req);
             const orderId = req.params && req.params.id;
-            const detail = getPublisherOrderDetail({
+            const customerEmail =
+                (req.user && req.user.email) ||
+                (req.headers && req.headers['x-customer-email']) ||
+                null;
+            const organizationId =
+                (req.user && req.user.organizationId) ||
+                (req.headers && req.headers['x-organization-id']) ||
+                null;
+
+            const detail = await getPublisherOrderDetail({
                 orderId,
                 publisherTenantId,
+                customerEmail,
+                organizationId,
                 role: 'PUBLISHER'
             });
             return res.status(200).json(detail);
@@ -211,9 +232,20 @@ function createPublisherRouter() {
         try {
             const publisherTenantId = resolvePublisherTenantId(req);
             const orderId = req.params && req.params.id;
-            const telemetry = getPublisherTimeline({
+            const customerEmail =
+                (req.user && req.user.email) ||
+                (req.headers && req.headers['x-customer-email']) ||
+                null;
+            const organizationId =
+                (req.user && req.user.organizationId) ||
+                (req.headers && req.headers['x-organization-id']) ||
+                null;
+
+            const telemetry = await getPublisherTimeline({
                 orderId,
                 publisherTenantId,
+                customerEmail,
+                organizationId,
                 role: 'PUBLISHER'
             });
             return res.status(200).json(telemetry);

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     BookOpenIcon,
     ClockIcon,
@@ -10,7 +10,8 @@ import {
     CheckCircleIcon,
     ExclamationTriangleIcon,
     XMarkIcon,
-    ArrowRightIcon
+    ArrowRightIcon,
+    PlusIcon
 } from '@heroicons/react/24/outline';
 import { useLocale } from '../../i18n';
 import {
@@ -21,6 +22,7 @@ import {
     SharedModuleProps
 } from '../../components/common';
 import { SoftProofingViewer3D } from '../../components/publisher/SoftProofingViewer3D';
+import { getAuthToken, getUserTenantId, isDemoTenant } from '../../lib/authStore';
 
 export interface PublisherEditionRow {
     orderId: string;
@@ -305,12 +307,55 @@ export const PublisherHubPage: React.FC<SharedModuleProps> = ({
     const L = PUBLISHER_HUB_I18N[lang];
 
     const [activeTab, setActiveTab] = useState<'active' | 'archive'>('active');
-    const [editions, setEditions] = useState<PublisherEditionRow[]>(INITIAL_PUBLISHER_EDITIONS);
+    const isDemo = isDemoTenant();
+    const [editions, setEditions] = useState<PublisherEditionRow[]>(isDemo ? INITIAL_PUBLISHER_EDITIONS : []);
     const [selectedOrder, setSelectedOrder] = useState<PublisherEditionRow | null>(
-        INITIAL_PUBLISHER_EDITIONS[0]
+        isDemo ? INITIAL_PUBLISHER_EDITIONS[0] : null
     );
+    const [loading, setLoading] = useState<boolean>(!isDemo);
     const [showSubmitModal, setShowSubmitModal] = useState<boolean>(false);
     const [downloadFeedback, setDownloadFeedback] = useState<string | null>(null);
+
+    // Dynamic data loading from GET /api/publisher/orders
+    useEffect(() => {
+        let mounted = true;
+        const fetchOrders = async () => {
+            try {
+                const token = getAuthToken();
+                const headers: Record<string, string> = {
+                    'Content-Type': 'application/json'
+                };
+                if (token) {
+                    headers['Authorization'] = `Bearer ${token}`;
+                }
+                const res = await fetch('/api/publisher/orders', { headers });
+                if (res.ok) {
+                    const data = await res.json();
+                    if (mounted && data.ok && Array.isArray(data.orders)) {
+                        setEditions(data.orders);
+                        if (data.orders.length > 0) {
+                            setSelectedOrder(prev => {
+                                if (!prev) return data.orders[0];
+                                const match = data.orders.find((o: PublisherEditionRow) => o.orderId === prev.orderId);
+                                return match || data.orders[0];
+                            });
+                        } else {
+                            setSelectedOrder(null);
+                        }
+                    }
+                }
+            } catch (_) {
+                // Fall back gracefully to existing state in offline / test environments
+            } finally {
+                if (mounted) setLoading(false);
+            }
+        };
+
+        fetchOrders();
+        return () => {
+            mounted = false;
+        };
+    }, []);
 
     // Form state for "+ SUBMIT NEW TITLE"
     const [newTitle, setNewTitle] = useState('Manual de Tipografía Editorial Contemporánea');
@@ -439,7 +484,7 @@ export const PublisherHubPage: React.FC<SharedModuleProps> = ({
                   (editions.filter(e => e.onTimeGuaranteed).length / editions.length) *
                   100
               ).toFixed(1)
-            : '100.0';
+            : '0.0';
 
     const visibleEditions =
         activeTab === 'archive'
@@ -503,6 +548,38 @@ export const PublisherHubPage: React.FC<SharedModuleProps> = ({
                     }
                 ]}
             />
+
+            {/* Clean-Slate Zero State Alert Banner */}
+            {!loading && editions.length === 0 && (
+                <div
+                    data-testid="publisher-clean-slate-banner"
+                    className="p-6 rounded-xl bg-[#14161a] border border-[#262930] flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-xl"
+                >
+                    <div className="flex items-center gap-3.5">
+                        <div className="w-10 h-10 rounded-lg bg-[#1a1d24] border border-[#2a2e39] flex items-center justify-center shrink-0 text-slate-400">
+                            <BookOpenIcon className="w-5 h-5" />
+                        </div>
+                        <div>
+                            <div className="text-sm font-bold text-white tracking-wide">
+                                Zero Active Editions Configured
+                            </div>
+                            <div className="text-xs text-slate-400 mt-0.5">
+                                No active editions found for this tenant. Configure a new book in the Budget portal to launch preflight and 3D proofing.
+                            </div>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-2.5 w-full md:w-auto">
+                        <button
+                            type="button"
+                            onClick={() => setShowSubmitModal(true)}
+                            className="w-full md:w-auto px-4 py-2 rounded-lg bg-[#dc2626] hover:bg-red-500 text-white font-mono text-xs font-black uppercase tracking-wider inline-flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md"
+                        >
+                            <PlusIcon className="w-4 h-4" />
+                            <span>{L.ctaSubmitTitle}</span>
+                        </button>
+                    </div>
+                </div>
+            )}
 
             <IndustrialTable
                 title={activeTab === 'active' ? L.tabActive : L.tabArchive}
