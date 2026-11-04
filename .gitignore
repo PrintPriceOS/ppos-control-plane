@@ -10,3 +10,5 @@ scratch/
 *.sql.gz
 review_artifacts*/
 
+
+storage/
