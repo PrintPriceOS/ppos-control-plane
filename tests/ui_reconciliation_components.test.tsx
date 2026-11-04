@@ -261,8 +261,20 @@ describe('Dark Industrial Telemetry UI — Canonical Components & Dual-Mode Reco
         expect(screen.getByText('PLATE CONSUMPTION')).toBeInTheDocument();
         expect(screen.getByText('AVG. PAPER EFFICIENCY %')).toBeInTheDocument();
         expect(screen.getByText('TOTAL SETUP WASTE')).toBeInTheDocument();
-        expect(screen.getByTestId('header-primary-action-btn')).toHaveTextContent('COMPOSE SIGNATURES');
+        const composeBtn = screen.getByTestId('header-primary-action-btn');
+        expect(composeBtn).toHaveTextContent('COMPOSE SIGNATURES');
         expect(screen.getAllByText(/978-3-8365-9102-7/).length).toBeGreaterThan(0);
+
+        // Open Compose Signatures Modal & verify locked Job ID and clean slate validation
+        fireEvent.click(composeBtn);
+        expect(screen.getByTestId('compose-signatures-modal')).toBeInTheDocument();
+
+        const submitBtn = screen.getByTestId('submit-compose-signatures-btn');
+        expect(submitBtn).toBeDisabled();
+
+        const jobIdInput = screen.getByDisplayValue(/^SIG-\d{4}-\d{4}$/);
+        expect(jobIdInput).toBeDisabled();
+        expect(jobIdInput).toHaveAttribute('readonly');
     });
 
     it('7. Renders PHASE-11C Publisher Operations Hub UI with 3D Soft-Proofing Viewer, 6-stage timeline, and APPROVE FOR PRESS', async () => {

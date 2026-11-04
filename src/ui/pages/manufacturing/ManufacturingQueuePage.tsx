@@ -18,7 +18,8 @@ import {
     CpuChipIcon,
     ChartBarIcon,
     FireIcon,
-    PlayIcon
+    PlayIcon,
+    LockClosedIcon
 } from '@heroicons/react/24/outline';
 import { useLocale } from '../../i18n';
 import { getAuthToken, isDemoTenant } from '../../lib/authStore';
@@ -367,18 +368,43 @@ export const ManufacturingQueuePage: React.FC<SharedModuleProps> = ({
     };
 
     // Compose Form State
-    const [formJobId, setFormJobId] = useState('PF-2026-095');
-    const [formTitle, setFormTitle] = useState('Compendio de Ingeniería Gráfica (240 pp)');
-    const [formIsbn, setFormIsbn] = useState('978-84-9104-882-4');
-    const [formPages, setFormPages] = useState(240);
-    const [formCopies, setFormCopies] = useState(2000);
+    const generateSystemJobId = () => `SIG-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
+    const [formJobId, setFormJobId] = useState(generateSystemJobId);
+    const [formTitle, setFormTitle] = useState('');
+    const [formIsbn, setFormIsbn] = useState('');
+    const [formPages, setFormPages] = useState<number | ''>('');
+    const [formCopies, setFormCopies] = useState<number | ''>('');
     const [formFormat, setFormFormat] = useState<'B1' | 'B2' | 'SRA3'>('B1');
     const [formBinding, setFormBinding] = useState<'SOFTCOVER_PUR' | 'SADDLE_STITCH' | 'HARDCOVER'>('SOFTCOVER_PUR');
-    const [formGrammage, setFormGrammage] = useState(90);
-    const [formBulk, setFormBulk] = useState(1.3);
+    const [formGrammage, setFormGrammage] = useState<number | ''>('');
+    const [formBulk, setFormBulk] = useState<number | ''>('');
+
+    const openComposeModal = () => {
+        setFormJobId(generateSystemJobId());
+        setFormTitle('');
+        setFormIsbn('');
+        setFormPages('');
+        setFormCopies('');
+        setFormFormat('B1');
+        setFormBinding('SOFTCOVER_PUR');
+        setFormGrammage('');
+        setFormBulk('');
+        setShowComposeModal(true);
+    };
+
+    // Form validation: pages must be positive multiple of 4, copies > 0
+    const parsedPages = Number(formPages);
+    const parsedCopies = Number(formCopies);
+    const isFormValid =
+        Number.isInteger(parsedPages) &&
+        parsedPages > 0 &&
+        parsedPages % 4 === 0 &&
+        Number.isInteger(parsedCopies) &&
+        parsedCopies > 0;
 
     const handleComposeSignatures = async (e?: React.FormEvent) => {
         if (e) e.preventDefault();
+        if (!isFormValid) return;
         const token = getAuthToken();
 
         try {
@@ -497,7 +523,7 @@ export const ManufacturingQueuePage: React.FC<SharedModuleProps> = ({
                 activeTabId={activeTab}
                 onTabChange={(id) => setActiveTab(id as 'dispatcher' | 'live_queue')}
                 primaryActionLabel={L.ctaCompose}
-                onPrimaryAction={() => setShowComposeModal(true)}
+                onPrimaryAction={openComposeModal}
             />
 
             <TopSummaryKpiBar
@@ -731,14 +757,17 @@ export const ManufacturingQueuePage: React.FC<SharedModuleProps> = ({
 
                         <div className="grid grid-cols-2 gap-4">
                             <div>
-                                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                                <label className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                                    <LockClosedIcon className="w-3 h-3 text-slate-500" />
                                     {L.lblJobId}
+                                    <span className="text-[9px] font-mono text-emerald-400/80 lowercase">(system locked)</span>
                                 </label>
                                 <input
                                     type="text"
                                     value={formJobId}
-                                    onChange={(e) => setFormJobId(e.target.value)}
-                                    className="w-full rounded-lg bg-[#0a0b0d] border border-[#1f2228] px-3 py-2 text-xs font-mono text-white"
+                                    readOnly
+                                    disabled
+                                    className="w-full rounded-lg bg-[#0a0b0d]/70 border border-[#1f2228] px-3 py-2 text-xs font-mono text-slate-400 cursor-not-allowed select-none opacity-80"
                                 />
                             </div>
                             <div>
@@ -749,7 +778,8 @@ export const ManufacturingQueuePage: React.FC<SharedModuleProps> = ({
                                     type="text"
                                     value={formIsbn}
                                     onChange={(e) => setFormIsbn(e.target.value)}
-                                    className="w-full rounded-lg bg-[#0a0b0d] border border-[#1f2228] px-3 py-2 text-xs font-mono text-white"
+                                    placeholder="e.g., 978-X-XXXX-XXXX-X"
+                                    className="w-full rounded-lg bg-[#0a0b0d] border border-[#1f2228] px-3 py-2 text-xs font-mono text-white placeholder:text-slate-600 focus:outline-none focus:border-red-500"
                                 />
                             </div>
                             <div>
@@ -759,9 +789,14 @@ export const ManufacturingQueuePage: React.FC<SharedModuleProps> = ({
                                 <input
                                     type="number"
                                     step="4"
+                                    min="4"
                                     value={formPages}
-                                    onChange={(e) => setFormPages(Number(e.target.value))}
-                                    className="w-full rounded-lg bg-[#0a0b0d] border border-[#1f2228] px-3 py-2 text-xs font-mono text-white"
+                                    onChange={(e) => {
+                                        const v = e.target.value;
+                                        setFormPages(v === '' ? '' : Number(v));
+                                    }}
+                                    placeholder="e.g., 192 (mult. of 4)"
+                                    className="w-full rounded-lg bg-[#0a0b0d] border border-[#1f2228] px-3 py-2 text-xs font-mono text-white placeholder:text-slate-600 focus:outline-none focus:border-red-500"
                                 />
                             </div>
                             <div>
@@ -770,9 +805,14 @@ export const ManufacturingQueuePage: React.FC<SharedModuleProps> = ({
                                 </label>
                                 <input
                                     type="number"
+                                    min="1"
                                     value={formCopies}
-                                    onChange={(e) => setFormCopies(Number(e.target.value))}
-                                    className="w-full rounded-lg bg-[#0a0b0d] border border-[#1f2228] px-3 py-2 text-xs font-mono text-white"
+                                    onChange={(e) => {
+                                        const v = e.target.value;
+                                        setFormCopies(v === '' ? '' : Number(v));
+                                    }}
+                                    placeholder="e.g., 1000"
+                                    className="w-full rounded-lg bg-[#0a0b0d] border border-[#1f2228] px-3 py-2 text-xs font-mono text-white placeholder:text-slate-600 focus:outline-none focus:border-red-500"
                                 />
                             </div>
                             <div>
@@ -782,7 +822,7 @@ export const ManufacturingQueuePage: React.FC<SharedModuleProps> = ({
                                 <select
                                     value={formFormat}
                                     onChange={(e) => setFormFormat(e.target.value as 'B1' | 'B2' | 'SRA3')}
-                                    className="w-full rounded-lg bg-[#0a0b0d] border border-[#1f2228] px-3 py-2 text-xs font-mono text-white"
+                                    className="w-full rounded-lg bg-[#0a0b0d] border border-[#1f2228] px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-red-500"
                                 >
                                     <option value="B1">B1 (720×1020 mm · 32pp)</option>
                                     <option value="B2">B2 (520×720 mm · 16pp)</option>
@@ -800,7 +840,7 @@ export const ManufacturingQueuePage: React.FC<SharedModuleProps> = ({
                                             e.target.value as 'SOFTCOVER_PUR' | 'SADDLE_STITCH' | 'HARDCOVER'
                                         )
                                     }
-                                    className="w-full rounded-lg bg-[#0a0b0d] border border-[#1f2228] px-3 py-2 text-xs font-mono text-white"
+                                    className="w-full rounded-lg bg-[#0a0b0d] border border-[#1f2228] px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-red-500"
                                 >
                                     <option value="SOFTCOVER_PUR">SOFTCOVER_PUR</option>
                                     <option value="SADDLE_STITCH">SADDLE_STITCH (Grapa / Creep)</option>
@@ -813,9 +853,14 @@ export const ManufacturingQueuePage: React.FC<SharedModuleProps> = ({
                                 </label>
                                 <input
                                     type="number"
+                                    min="1"
                                     value={formGrammage}
-                                    onChange={(e) => setFormGrammage(Number(e.target.value))}
-                                    className="w-full rounded-lg bg-[#0a0b0d] border border-[#1f2228] px-3 py-2 text-xs font-mono text-white"
+                                    onChange={(e) => {
+                                        const v = e.target.value;
+                                        setFormGrammage(v === '' ? '' : Number(v));
+                                    }}
+                                    placeholder="e.g., 100"
+                                    className="w-full rounded-lg bg-[#0a0b0d] border border-[#1f2228] px-3 py-2 text-xs font-mono text-white placeholder:text-slate-600 focus:outline-none focus:border-red-500"
                                 />
                             </div>
                             <div>
@@ -825,9 +870,14 @@ export const ManufacturingQueuePage: React.FC<SharedModuleProps> = ({
                                 <input
                                     type="number"
                                     step="0.05"
+                                    min="0.1"
                                     value={formBulk}
-                                    onChange={(e) => setFormBulk(Number(e.target.value))}
-                                    className="w-full rounded-lg bg-[#0a0b0d] border border-[#1f2228] px-3 py-2 text-xs font-mono text-white"
+                                    onChange={(e) => {
+                                        const v = e.target.value;
+                                        setFormBulk(v === '' ? '' : Number(v));
+                                    }}
+                                    placeholder="e.g., 1.20"
+                                    className="w-full rounded-lg bg-[#0a0b0d] border border-[#1f2228] px-3 py-2 text-xs font-mono text-white placeholder:text-slate-600 focus:outline-none focus:border-red-500"
                                 />
                             </div>
                         </div>
@@ -836,14 +886,19 @@ export const ManufacturingQueuePage: React.FC<SharedModuleProps> = ({
                             <button
                                 type="button"
                                 onClick={() => setShowComposeModal(false)}
-                                className="px-4 py-2 rounded-lg bg-[#0a0b0d] border border-[#1f2228] text-xs font-bold text-slate-300 cursor-pointer"
+                                className="px-4 py-2 rounded-lg bg-[#0a0b0d] border border-[#1f2228] text-xs font-bold text-slate-300 hover:text-white cursor-pointer"
                             >
                                 {L.lblCancel}
                             </button>
                             <button
                                 type="submit"
+                                disabled={!isFormValid}
                                 data-testid="submit-compose-signatures-btn"
-                                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-white text-[#0a0b0d] text-xs font-black uppercase tracking-wider cursor-pointer"
+                                className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-black uppercase tracking-wider transition-opacity ${
+                                    isFormValid
+                                        ? 'bg-white text-[#0a0b0d] hover:bg-slate-200 cursor-pointer shadow-lg'
+                                        : 'bg-zinc-800 text-zinc-500 cursor-not-allowed opacity-60'
+                                }`}
                             >
                                 <PlayIcon className="w-3.5 h-3.5" />
                                 {L.lblSubmit}
