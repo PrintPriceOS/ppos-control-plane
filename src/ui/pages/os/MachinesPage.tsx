@@ -21,6 +21,43 @@ import { SharedModuleProps, TopSummaryKpiBar, HeaderActionGroup } from '../../co
 import { MachineBlueprintThumbnail } from '../../components/printhouse/machines/MachineBlueprintThumbnail';
 import { MachineBlueprintModal } from '../../components/printhouse/machines/MachineBlueprintModal';
 import { useLocale } from '../../i18n';
+import { getAuthToken, isDemoTenant } from '../../lib/authStore';
+
+const INITIAL_PREDICTIVE_UNITS = [
+    {
+        machineId: 'MACH-HEIDELBERG-XL106-B1',
+        machineName: 'Heidelberg Speedmaster XL 106 (B1 720×1020 mm)',
+        oeePct: 86.4,
+        routingBlocked: false,
+        routingStatus: 'ROUTING_ENABLED' as 'ROUTING_ENABLED' | 'ROUTING_BLOCKED_MAINTENANCE_REQUIRED',
+        consumableLabel: 'Offset Rubber Blankets (1.2M nominal)',
+        accumulatedCycles: 744000,
+        nominalMaxCycles: 1200000,
+        wearPct: 62.0
+    },
+    {
+        machineId: 'MACH-KOMORI-G29-B2',
+        machineName: 'Komori Lithrone G29 + Muller Martini Trimmer (B2 520×720 mm)',
+        oeePct: 75.8,
+        routingBlocked: true,
+        routingStatus: 'ROUTING_BLOCKED_MAINTENANCE_REQUIRED' as 'ROUTING_ENABLED' | 'ROUTING_BLOCKED_MAINTENANCE_REQUIRED',
+        consumableLabel: '3-Knife Trimmer Blades (150k cuts nominal)',
+        accumulatedCycles: 144000,
+        nominalMaxCycles: 150000,
+        wearPct: 96.0
+    },
+    {
+        machineId: 'MACH-INDIGO-12000-SRA3',
+        machineName: 'HP Indigo 12000 Digital Press (SRA3 320×450 mm)',
+        oeePct: 88.2,
+        routingBlocked: false,
+        routingStatus: 'ROUTING_ENABLED' as 'ROUTING_ENABLED' | 'ROUTING_BLOCKED_MAINTENANCE_REQUIRED',
+        consumableLabel: 'Digital Imaging Blanket / PIP (450k nominal)',
+        accumulatedCycles: 198000,
+        nominalMaxCycles: 450000,
+        wearPct: 44.0
+    }
+];
 
 interface Machine {
     id: string;
@@ -88,47 +125,60 @@ export const MachinesPage: React.FC<SharedModuleProps> = ({
     const [inspectingBlueprintMachine, setInspectingBlueprintMachine] = useState<any>(null);
 
     // PHASE-12C: Predictive Maintenance & Consumables Lifespan Telemetry
-    const [predictiveUnits, setPredictiveUnits] = useState([
-        {
-            machineId: 'MACH-HEIDELBERG-XL106-B1',
-            machineName: 'Heidelberg Speedmaster XL 106 (B1 720×1020 mm)',
-            oeePct: 86.4,
-            routingBlocked: false,
-            routingStatus: 'ROUTING_ENABLED' as 'ROUTING_ENABLED' | 'ROUTING_BLOCKED_MAINTENANCE_REQUIRED',
-            consumableLabel: 'Offset Rubber Blankets (1.2M nominal)',
-            accumulatedCycles: 744000,
-            nominalMaxCycles: 1200000,
-            wearPct: 62.0
-        },
-        {
-            machineId: 'MACH-KOMORI-G29-B2',
-            machineName: 'Komori Lithrone G29 + Muller Martini Trimmer (B2 520×720 mm)',
-            oeePct: 75.8,
-            routingBlocked: true,
-            routingStatus: 'ROUTING_BLOCKED_MAINTENANCE_REQUIRED' as 'ROUTING_ENABLED' | 'ROUTING_BLOCKED_MAINTENANCE_REQUIRED',
-            consumableLabel: '3-Knife Trimmer Blades (150k cuts nominal)',
-            accumulatedCycles: 144000,
-            nominalMaxCycles: 150000,
-            wearPct: 96.0
-        },
-        {
-            machineId: 'MACH-INDIGO-12000-SRA3',
-            machineName: 'HP Indigo 12000 Digital Press (SRA3 320×450 mm)',
-            oeePct: 88.2,
-            routingBlocked: false,
-            routingStatus: 'ROUTING_ENABLED' as 'ROUTING_ENABLED' | 'ROUTING_BLOCKED_MAINTENANCE_REQUIRED',
-            consumableLabel: 'Digital Imaging Blanket / PIP (450k nominal)',
-            accumulatedCycles: 198000,
-            nominalMaxCycles: 450000,
-            wearPct: 44.0
-        }
-    ]);
+    const isDemo = isDemoTenant();
+    const [predictiveUnits, setPredictiveUnits] = useState(isDemo ? INITIAL_PREDICTIVE_UNITS : []);
+
+    useEffect(() => {
+        let isMounted = true;
+        const token = getAuthToken();
+        fetch('/api/machines/predictive-maintenance', {
+            headers: {
+                ...(token ? { Authorization: `Bearer ${token}` } : {})
+            }
+        })
+            .then(res => (res && res.ok ? res.json() : null))
+            .then(data => {
+                if (!isMounted) return;
+                if (data && Array.isArray(data.machines)) {
+                    if (data.machines.length > 0) {
+                        setPredictiveUnits(data.machines.map((m: any) => ({
+                            machineId: m.machineId,
+                            machineName: m.name || m.machineName,
+                            oeePct: m.oee?.oeePct ?? 80.0,
+                            routingBlocked: Boolean(m.routingBlocked),
+                            routingStatus: m.routingStatus || (m.routingBlocked ? 'ROUTING_BLOCKED_MAINTENANCE_REQUIRED' : 'ROUTING_ENABLED'),
+                            consumableLabel: m.consumables?.[0]?.name || 'Consumables',
+                            accumulatedCycles: m.consumables?.[0]?.currentCycles ?? 0,
+                            nominalMaxCycles: m.consumables?.[0]?.maxLifespanCycles ?? 1000000,
+                            wearPct: m.maxWearPct ?? (m.consumables?.[0]?.wearPct ?? 0)
+                        })));
+                    } else if (!isDemo) {
+                        setPredictiveUnits([]);
+                    }
+                } else if (!isDemo) {
+                    setPredictiveUnits([]);
+                }
+            })
+            .catch(() => {
+                if (isMounted && !isDemo) {
+                    setPredictiveUnits([]);
+                }
+            });
+
+        return () => {
+            isMounted = false;
+        };
+    }, [isDemo]);
 
     const handleResetConsumables = async (machineId: string) => {
+        const token = getAuthToken();
         try {
             await fetch(`/api/machines/${machineId}/maintenance-reset`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(token ? { Authorization: `Bearer ${token}` } : {})
+                },
                 body: JSON.stringify({ workOrderId: `WO-MAINT-${Date.now()}` })
             });
         } catch (_) {
@@ -263,70 +313,84 @@ export const MachinesPage: React.FC<SharedModuleProps> = ({
                         </p>
                     </div>
                     <span className="px-3 py-1 rounded-full bg-[#0a0b0d] border border-[#1f2228] text-[10px] font-mono font-bold text-emerald-400">
-                        {t('machines.workspace.avgPlantOee')}: {(predictiveUnits.reduce((a, b) => a + b.oeePct, 0) / predictiveUnits.length).toFixed(1)}%
+                        {t('machines.workspace.avgPlantOee')}: {predictiveUnits.length > 0 ? `${(predictiveUnits.reduce((a, b) => a + b.oeePct, 0) / predictiveUnits.length).toFixed(1)}%` : 'N/A'}
                     </span>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    {predictiveUnits.map((unit) => (
-                        <div
-                            key={unit.machineId}
-                            data-testid={`predictive-unit-${unit.machineId}`}
-                            className="rounded-lg bg-[#0a0b0d] border border-[#1f2228] p-4 space-y-3"
-                        >
-                            <div className="flex items-start justify-between gap-2">
-                                <div>
-                                    <div className="font-mono text-xs font-black text-white">{unit.machineId}</div>
-                                    <div className="text-[11px] font-bold text-slate-300">{unit.machineName}</div>
-                                </div>
-                                <span
-                                    data-testid={`routing-status-${unit.machineId}`}
-                                    className={`px-2 py-0.5 rounded-full text-[9px] font-mono font-bold uppercase ${
-                                        unit.routingBlocked
-                                            ? 'bg-rose-500/15 text-rose-400 border border-rose-500/30'
-                                            : 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
-                                    }`}
-                                >
-                                    {unit.routingStatus}
-                                </span>
-                            </div>
-
-                            <div className="space-y-1">
-                                <div className="flex justify-between text-[10px] font-mono text-slate-400">
-                                    <span>{unit.consumableLabel}</span>
-                                    <span className={unit.wearPct >= 95 ? 'text-rose-400 font-black' : 'text-emerald-400 font-bold'}>
-                                        {unit.wearPct.toFixed(1)}% WEAR
-                                    </span>
-                                </div>
-                                <div className="h-1.5 w-full rounded-full bg-[#14161a] overflow-hidden">
-                                    <div
-                                        className={`h-full rounded-full ${
-                                            unit.wearPct >= 95 ? 'bg-rose-500' : unit.wearPct >= 80 ? 'bg-amber-400' : 'bg-emerald-500'
-                                        }`}
-                                        style={{ width: `${Math.min(100, unit.wearPct)}%` }}
-                                    />
-                                </div>
-                                <div className="flex justify-between items-center text-[10px] font-mono text-slate-400 pt-1">
-                                    <span>
-                                        {unit.accumulatedCycles.toLocaleString()} / {unit.nominalMaxCycles.toLocaleString()} cycles
-                                    </span>
-                                    <span>OEE: {unit.oeePct.toFixed(1)}%</span>
-                                </div>
-                            </div>
-
-                            {unit.routingBlocked && (
-                                <button
-                                    type="button"
-                                    onClick={() => handleResetConsumables(unit.machineId)}
-                                    data-testid={`reset-maintenance-btn-${unit.machineId}`}
-                                    className="w-full py-1.5 px-3 rounded-lg bg-[#dc2626] hover:bg-[#e11d48] text-white text-[10px] font-mono font-black uppercase tracking-wider cursor-pointer"
-                                >
-                                    RESET CONSUMABLES & UNLOCK ROUTING
-                                </button>
-                            )}
+                {predictiveUnits.length === 0 ? (
+                    <div
+                        data-testid="predictive-clean-slate-banner"
+                        className="p-5 rounded-lg bg-[#0a0b0d] border border-[#1f2228] text-center space-y-2"
+                    >
+                        <div className="font-mono text-xs font-bold text-slate-300">
+                            No industrial machinery registered in maintenance telemetry.
                         </div>
-                    ))}
-                </div>
+                        <div className="text-[11px] text-slate-500 max-w-xl mx-auto">
+                            Onboard a press unit or connect shopfloor IoT nodes to track consumable wear and OEE.
+                        </div>
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        {predictiveUnits.map((unit) => (
+                            <div
+                                key={unit.machineId}
+                                data-testid={`predictive-unit-${unit.machineId}`}
+                                className="rounded-lg bg-[#0a0b0d] border border-[#1f2228] p-4 space-y-3"
+                            >
+                                <div className="flex items-start justify-between gap-2">
+                                    <div>
+                                        <div className="font-mono text-xs font-black text-white">{unit.machineId}</div>
+                                        <div className="text-[11px] font-bold text-slate-300">{unit.machineName}</div>
+                                    </div>
+                                    <span
+                                        data-testid={`routing-status-${unit.machineId}`}
+                                        className={`px-2 py-0.5 rounded-full text-[9px] font-mono font-bold uppercase ${
+                                            unit.routingBlocked
+                                                ? 'bg-rose-500/15 text-rose-400 border border-rose-500/30'
+                                                : 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                                        }`}
+                                    >
+                                        {unit.routingStatus}
+                                    </span>
+                                </div>
+
+                                <div className="space-y-1">
+                                    <div className="flex justify-between text-[10px] font-mono text-slate-400">
+                                        <span>{unit.consumableLabel}</span>
+                                        <span className={unit.wearPct >= 95 ? 'text-rose-400 font-black' : 'text-emerald-400 font-bold'}>
+                                            {unit.wearPct.toFixed(1)}% WEAR
+                                        </span>
+                                    </div>
+                                    <div className="h-1.5 w-full rounded-full bg-[#14161a] overflow-hidden">
+                                        <div
+                                            className={`h-full rounded-full ${
+                                                unit.wearPct >= 95 ? 'bg-rose-500' : unit.wearPct >= 80 ? 'bg-amber-400' : 'bg-emerald-500'
+                                            }`}
+                                            style={{ width: `${Math.min(100, unit.wearPct)}%` }}
+                                        />
+                                    </div>
+                                    <div className="flex justify-between items-center text-[10px] font-mono text-slate-400 pt-1">
+                                        <span>
+                                            {unit.accumulatedCycles.toLocaleString()} / {unit.nominalMaxCycles.toLocaleString()} cycles
+                                        </span>
+                                        <span>OEE: {unit.oeePct.toFixed(1)}%</span>
+                                    </div>
+                                </div>
+
+                                {unit.routingBlocked && (
+                                    <button
+                                        type="button"
+                                        onClick={() => handleResetConsumables(unit.machineId)}
+                                        data-testid={`reset-maintenance-btn-${unit.machineId}`}
+                                        className="w-full py-1.5 px-3 rounded-lg bg-[#dc2626] hover:bg-[#e11d48] text-white text-[10px] font-mono font-black uppercase tracking-wider cursor-pointer"
+                                    >
+                                        RESET CONSUMABLES & UNLOCK ROUTING
+                                    </button>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                )}
             </div>
 
             {mode === 'onboarding' && (

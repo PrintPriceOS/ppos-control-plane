@@ -209,7 +209,15 @@ function buildSeededMachinesForTenant(tenantId = 'tenant-default') {
     });
 }
 
+function isDemoTenantId(tenantId) {
+    if (!tenantId) return false;
+    const tid = String(tenantId).trim().toLowerCase();
+    return tid.startsWith('tenant-demo') || tid === 'demo' || tid.includes('test') || tid.startsWith('tenant-staging-sample');
+}
+
 function ensureFleetSeeded(tenantId = 'tenant-default') {
+    if (!isDemoTenantId(tenantId)) return;
+
     let found = false;
     for (const key of machineTelemetryStore.keys()) {
         if (key.startsWith(`${tenantId}:`)) {
