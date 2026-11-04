@@ -16,6 +16,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { EconomicProfileRow } from './EconomicProfilesTable';
 import { getAuthToken } from '../../lib/authStore';
+import { useLocale } from '../../i18n';
 
 export type ProductFamilyId = 'SOFTCOVER' | 'HARDCOVER' | 'WIRE_O' | 'SADDLE_STITCH';
 
@@ -54,7 +55,7 @@ export interface LivePriceCalibratorModalProps {
 
 const PRODUCT_FAMILY_OPTIONS: {
     id: ProductFamilyId;
-    label: string;
+    labelKey: string;
     bindingType: 'PUR' | 'HARDCOVER' | 'WIRE_O' | 'SADDLE';
     compatibleTechnologies: string[];
     defaultTrimSize: string;
@@ -62,7 +63,7 @@ const PRODUCT_FAMILY_OPTIONS: {
 }[] = [
     {
         id: 'SOFTCOVER',
-        label: 'Softcover / Paperback (Rústica PUR)',
+        labelKey: 'calibrator.familySoftcover',
         bindingType: 'PUR',
         compatibleTechnologies: ['OFFSET_B1', 'OFFSET_B2', 'DIGITAL_TONER', 'WEB_ROTARY'],
         defaultTrimSize: '150x230',
@@ -70,7 +71,7 @@ const PRODUCT_FAMILY_OPTIONS: {
     },
     {
         id: 'HARDCOVER',
-        label: 'Hardcover / Case Bound (Cartoné)',
+        labelKey: 'calibrator.familyHardcover',
         bindingType: 'HARDCOVER',
         compatibleTechnologies: ['OFFSET_B1', 'OFFSET_B2', 'DIGITAL_TONER'],
         defaultTrimSize: '150x230',
@@ -78,7 +79,7 @@ const PRODUCT_FAMILY_OPTIONS: {
     },
     {
         id: 'WIRE_O',
-        label: 'Wire-O / Twin Loop (Espiral Metálica)',
+        labelKey: 'calibrator.familyWireO',
         bindingType: 'WIRE_O',
         compatibleTechnologies: ['DIGITAL_TONER', 'OFFSET_B2', 'OFFSET_B1'],
         defaultTrimSize: '210x297',
@@ -86,7 +87,7 @@ const PRODUCT_FAMILY_OPTIONS: {
     },
     {
         id: 'SADDLE_STITCH',
-        label: 'Saddle Stitch / Stapled (Grapado)',
+        labelKey: 'calibrator.familySaddle',
         bindingType: 'SADDLE',
         compatibleTechnologies: ['DIGITAL_TONER', 'OFFSET_B2', 'OFFSET_B1', 'WEB_ROTARY'],
         defaultTrimSize: '210x297',
@@ -94,10 +95,10 @@ const PRODUCT_FAMILY_OPTIONS: {
     }
 ];
 
-const TRIM_SIZES = [
-    { value: '148x210', label: '148×210 mm (A5 Editorial)', widthMm: 148, heightMm: 210 },
-    { value: '150x230', label: '150×230 mm (Trade Paperback)', widthMm: 150, heightMm: 230 },
-    { value: '210x297', label: '210×297 mm (A4 Catálogo / Manual)', widthMm: 210, heightMm: 297 }
+const TRIM_SIZES: { value: string; labelKey: string; widthMm: number; heightMm: number }[] = [
+    { value: '148x210', labelKey: 'calibrator.trimA5', widthMm: 148, heightMm: 210 },
+    { value: '150x230', labelKey: 'calibrator.trimTrade', widthMm: 150, heightMm: 230 },
+    { value: '210x297', labelKey: 'calibrator.trimA4', widthMm: 210, heightMm: 297 }
 ];
 
 const PRINT_RUN_PRESETS = [100, 500, 1000, 5000];
@@ -130,6 +131,7 @@ export const LivePriceCalibratorModal: React.FC<LivePriceCalibratorModalProps> =
     onPaperAdded,
     embedded = false
 }) => {
+    const { t } = useLocale();
     const activeProfileDefault = initialProfile || profiles[0] || {
         id: 'prof-offset-b1-xl106',
         printerId: 'mach-heidelberg-xl106',
@@ -582,7 +584,7 @@ export const LivePriceCalibratorModal: React.FC<LivePriceCalibratorModalProps> =
                             >
                                 {PRODUCT_FAMILY_OPTIONS.map((fam) => (
                                     <option key={fam.id} value={fam.id}>
-                                        {fam.label}
+                                        {t(fam.labelKey)}
                                     </option>
                                 ))}
                             </select>
@@ -622,7 +624,7 @@ export const LivePriceCalibratorModal: React.FC<LivePriceCalibratorModalProps> =
                                 onClick={() => setShowAddPaperForm((prev) => !prev)}
                                 className="text-[10px] font-mono font-bold text-[#dc2626] hover:underline cursor-pointer"
                             >
-                                {showAddPaperForm ? '✕ Cancelar nuevo papel' : '+ Añadir nuevo papel al catálogo'}
+                                {showAddPaperForm ? t('calibrator.cancelNewPaper') : t('calibrator.addNewPaper')}
                             </button>
                         </div>
 
@@ -639,7 +641,7 @@ export const LivePriceCalibratorModal: React.FC<LivePriceCalibratorModalProps> =
                             className="w-full px-3 py-2 rounded-lg text-xs font-bold bg-slate-50 dark:bg-[#0a0b0d] border border-slate-200 dark:border-[#1f2228] text-slate-900 dark:text-white"
                         >
                             {groupedPapers.uncoated.length > 0 && (
-                                <optgroup label="Offset / Ahuesado (Uncoated)">
+                                <optgroup label={t('calibrator.optUncoated')}>
                                     {groupedPapers.uncoated.map((paper) => (
                                         <option key={paper.paperId} value={paper.paperId}>
                                             {paper.name} · Vol {paper.bulkFactor} · €{Number(paper.costPerKgEur ?? (paper.costPerTonEur / 1000)).toFixed(2)}/kg
@@ -648,7 +650,7 @@ export const LivePriceCalibratorModal: React.FC<LivePriceCalibratorModalProps> =
                                 </optgroup>
                             )}
                             {groupedPapers.coated.length > 0 && (
-                                <optgroup label="Estucado (Coated Silk / Matte / Gloss)">
+                                <optgroup label={t('calibrator.optCoated')}>
                                     {groupedPapers.coated.map((paper) => (
                                         <option key={paper.paperId} value={paper.paperId}>
                                             {paper.name} · Vol {paper.bulkFactor} · €{Number(paper.costPerKgEur ?? (paper.costPerTonEur / 1000)).toFixed(2)}/kg
@@ -657,7 +659,7 @@ export const LivePriceCalibratorModal: React.FC<LivePriceCalibratorModalProps> =
                                 </optgroup>
                             )}
                             {groupedPapers.board.length > 0 && (
-                                <optgroup label="Cartoncillo / Cubierta (Board)">
+                                <optgroup label={t('calibrator.optBoard')}>
                                     {groupedPapers.board.map((paper) => (
                                         <option key={paper.paperId} value={paper.paperId}>
                                             {paper.name} · Vol {paper.bulkFactor} · €{Number(paper.costPerKgEur ?? (paper.costPerTonEur / 1000)).toFixed(2)}/kg
@@ -665,7 +667,7 @@ export const LivePriceCalibratorModal: React.FC<LivePriceCalibratorModalProps> =
                                     ))}
                                 </optgroup>
                             )}
-                            <option value="__ADD_NEW_PAPER__">+ Añadir nuevo papel al catálogo...</option>
+                            <option value="__ADD_NEW_PAPER__">{t('calibrator.addNewPaperOpt')}</option>
                         </select>
 
                         {showAddPaperForm && (
@@ -675,7 +677,7 @@ export const LivePriceCalibratorModal: React.FC<LivePriceCalibratorModalProps> =
                             >
                                 <div className="sm:col-span-4">
                                     <label className="block text-[9px] font-mono uppercase text-slate-400 mb-1">
-                                        Nombre Sustrato
+                                        {t('calibrator.lblSubstrateName')}
                                     </label>
                                     <input
                                         type="text"
@@ -688,7 +690,7 @@ export const LivePriceCalibratorModal: React.FC<LivePriceCalibratorModalProps> =
                                 </div>
                                 <div className="sm:col-span-2">
                                     <label className="block text-[9px] font-mono uppercase text-slate-400 mb-1">
-                                        Categoría
+                                        {t('calibrator.lblCategory')}
                                     </label>
                                     <select
                                         data-testid="new-paper-class-select"
@@ -696,14 +698,14 @@ export const LivePriceCalibratorModal: React.FC<LivePriceCalibratorModalProps> =
                                         onChange={(e) => setNewPaperClass(e.target.value as any)}
                                         className="w-full px-2 py-1.5 rounded text-xs bg-white dark:bg-[#14161a] border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
                                     >
-                                        <option value="UNCOATED">Offset/Ahues.</option>
-                                        <option value="COATED">Estucado</option>
-                                        <option value="BOARD">Cartoncillo</option>
+                                        <option value="UNCOATED">{t('calibrator.optUncoated')}</option>
+                                        <option value="COATED">{t('calibrator.optCoated')}</option>
+                                        <option value="BOARD">{t('calibrator.optBoard')}</option>
                                     </select>
                                 </div>
                                 <div className="sm:col-span-2">
                                     <label className="block text-[9px] font-mono uppercase text-slate-400 mb-1">
-                                        Gramos (g/m²)
+                                        {t('calibrator.lblGsm')}
                                     </label>
                                     <input
                                         type="number"
@@ -715,7 +717,7 @@ export const LivePriceCalibratorModal: React.FC<LivePriceCalibratorModalProps> =
                                 </div>
                                 <div className="sm:col-span-2">
                                     <label className="block text-[9px] font-mono uppercase text-slate-400 mb-1">
-                                        Coste (€/kg)
+                                        {t('calibrator.lblCostKg')}
                                     </label>
                                     <input
                                         type="number"
@@ -734,7 +736,7 @@ export const LivePriceCalibratorModal: React.FC<LivePriceCalibratorModalProps> =
                                         onClick={handleCreatePaperInCatalog}
                                         className="w-full py-1.5 px-2 rounded bg-[#dc2626] hover:bg-[#b91c1c] text-white text-[10px] font-black uppercase cursor-pointer disabled:opacity-50"
                                     >
-                                        {addingPaper ? '...' : 'Guardar'}
+                                        {addingPaper ? '...' : t('calibrator.btnSavePaper')}
                                     </button>
                                 </div>
                             </div>
@@ -755,7 +757,7 @@ export const LivePriceCalibratorModal: React.FC<LivePriceCalibratorModalProps> =
                             >
                                 {TRIM_SIZES.map((ts) => (
                                     <option key={ts.value} value={ts.value}>
-                                        {ts.label}
+                                        {t(ts.labelKey)}
                                     </option>
                                 ))}
                             </select>
@@ -815,10 +817,10 @@ export const LivePriceCalibratorModal: React.FC<LivePriceCalibratorModalProps> =
                                 }}
                                 className="w-full px-3 py-2 rounded-lg text-xs font-bold bg-slate-50 dark:bg-[#0a0b0d] border border-slate-200 dark:border-[#1f2228] text-slate-900 dark:text-white"
                             >
-                                <option value="PUR">Rústica Fresada PUR</option>
-                                <option value="HARDCOVER">Cartoné / Tapa Dura</option>
-                                <option value="WIRE_O">Wire-O / Espiral Metálica</option>
-                                <option value="SADDLE">Grapado Alambre (2 grapas)</option>
+                                <option value="PUR">{t('calibrator.bindPur')}</option>
+                                <option value="HARDCOVER">{t('calibrator.bindHardcover')}</option>
+                                <option value="WIRE_O">{t('calibrator.bindWireO')}</option>
+                                <option value="SADDLE">{t('calibrator.bindSaddle')}</option>
                             </select>
                         </div>
                     </div>
@@ -1038,7 +1040,7 @@ export const LivePriceCalibratorModal: React.FC<LivePriceCalibratorModalProps> =
                             onClick={handleCommitCalibration}
                             className="w-full py-2.5 px-4 rounded-lg bg-[#dc2626] hover:bg-[#e11d48] text-white text-xs font-black uppercase tracking-wider transition-colors cursor-pointer"
                         >
-                            {saving ? 'SAVING CALIBRATION...' : 'SAVE CALIBRATED RATES TO PROFILE'}
+                            {saving ? t('calibrator.saving') : t('calibrator.saveBtn')}
                         </button>
                     </div>
                 </div>

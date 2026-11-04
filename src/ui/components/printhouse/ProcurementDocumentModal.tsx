@@ -231,7 +231,7 @@ export const ProcurementDocumentModal: React.FC<ProcurementDocumentModalProps> =
                             /* Printable IFrame View */
                             <div className="relative w-full rounded-xl overflow-hidden border border-zinc-200 dark:border-zinc-700 bg-white shadow-inner">
                                 <div className="bg-zinc-100 dark:bg-zinc-800 px-3 py-1.5 border-b border-zinc-200 dark:border-zinc-700 flex items-center justify-between text-[11px] text-zinc-500">
-                                    <span>Vista previa de impresión A4 (800 × 1130 px simulado)</span>
+                                    {t('procurement.document.printPreviewSim')}
                                     <span>{docData.documentTitle}</span>
                                 </div>
                                 <iframe
@@ -255,11 +255,11 @@ export const ProcurementDocumentModal: React.FC<ProcurementDocumentModalProps> =
                                             {docData.buyer?.name}
                                         </div>
                                         <div className="text-xs text-zinc-500 space-y-1">
-                                            <div><strong>Centro:</strong> {docData.buyer?.deliverySiteName}</div>
-                                            <div><strong>Dirección:</strong> {docData.buyer?.deliveryAddress}</div>
+                                            <div><strong>{t('procurement.document.lblSite')}</strong> {docData.buyer?.deliverySiteName}</div>
+                                            <div><strong>{t('procurement.document.lblAddress')}</strong> {docData.buyer?.deliveryAddress}</div>
                                             {docData.buyer?.buyerNotes && (
                                                 <div className="text-amber-600 dark:text-amber-400">
-                                                    <strong>Notas:</strong> {docData.buyer.buyerNotes}
+                                                    <strong>{t('procurement.document.lblNotes')}</strong> {docData.buyer.buyerNotes}
                                                 </div>
                                             )}
                                         </div>
@@ -275,9 +275,9 @@ export const ProcurementDocumentModal: React.FC<ProcurementDocumentModalProps> =
                                             {docData.supplier?.companyName}
                                         </div>
                                         <div className="text-xs text-zinc-500 space-y-1">
-                                            <div><strong>SKU Proveedor:</strong> {docData.supplier?.supplierSku}</div>
-                                            <div><strong>Pedido:</strong> {docData.orderNumber} ({docData.orderType})</div>
-                                            <div><strong>Emisión:</strong> {docData.issueDate}</div>
+                                            <div><strong>{t('procurement.document.lblSupplierSku')}</strong> {docData.supplier?.supplierSku}</div>
+                                            <div><strong>{t('procurement.document.lblOrder')}</strong> {docData.orderNumber} ({docData.orderType})</div>
+                                            <div><strong>{t('procurement.document.lblIssueDate')}</strong> {docData.issueDate}</div>
                                         </div>
                                     </div>
                                 </div>
@@ -288,7 +288,7 @@ export const ProcurementDocumentModal: React.FC<ProcurementDocumentModalProps> =
                                         <thead className="bg-zinc-100 dark:bg-zinc-800/80 text-zinc-600 dark:text-zinc-400 text-left">
                                             <tr>
                                                 <th className="py-2.5 px-4 font-bold">{t('procurement.document.materialSpec')}</th>
-                                                <th className="py-2.5 px-4 font-bold">Gramaje / Formato</th>
+                                                <th className="py-2.5 px-4 font-bold">{t('procurement.document.gsmFormat')}</th>
                                                 <th className="py-2.5 px-4 font-bold">{t('procurement.document.orderedQuantity')}</th>
                                                 <th className="py-2.5 px-4 font-bold">{t('procurement.document.totalSheets')}</th>
                                                 {docType === 'packing_slip' ? (

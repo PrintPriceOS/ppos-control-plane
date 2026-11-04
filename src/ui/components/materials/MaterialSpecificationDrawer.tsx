@@ -92,48 +92,48 @@ export interface MaterialSpecificationDrawerProps {
 
 const MATERIAL_TYPE_OPTIONS: {
     id: IndustrialMaterialType;
-    label: string;
-    sublabel: string;
+    labelKey: string;
+    sublabelKey: string;
     isReel: boolean;
 }[] = [
     {
         id: 'SHEETFED_PAPER',
-        label: 'Pliego (Sheetfed)',
-        sublabel: 'B1 70×100 · B2 50×70 · SRA3',
+        labelKey: 'materials.drawer.typeSheet',
+        sublabelKey: 'materials.drawer.subSheet',
         isReel: false
     },
     {
         id: 'REEL_PAPER',
-        label: 'Bobina (Web Reel)',
-        sublabel: 'Rotativa Offset · Inkjet Continua',
+        labelKey: 'materials.drawer.typeReel',
+        sublabelKey: 'materials.drawer.subReel',
         isReel: true
     },
     {
         id: 'BOARD_CARTON',
-        label: 'Cartón / Cubierta',
-        sublabel: 'Folding GC1/GC2 · Cartón Gris',
+        labelKey: 'materials.drawer.typeBoard',
+        sublabelKey: 'materials.drawer.subBoard',
         isReel: false
     },
     {
         id: 'ENDPAPERS',
-        label: 'Guardas (Endpapers)',
-        sublabel: 'Papel Guarda Cartoné 120-160g',
+        labelKey: 'materials.drawer.typeEndpapers',
+        sublabelKey: 'materials.drawer.subEndpapers',
         isReel: false
     },
     {
         id: 'LAMINATION_FOIL',
-        label: 'Laminado / Película',
-        sublabel: 'BOPP Mate · Brillo · Soft-Touch',
+        labelKey: 'materials.drawer.typeLamination',
+        sublabelKey: 'materials.drawer.subLamination',
         isReel: true
     }
 ];
 
-const CATEGORY_OPTIONS: { id: IndustrialSubstrateCategory; label: string }[] = [
-    { id: 'OFFSET_UNCOATED', label: 'Offset Blanco Sin Estucar (Uncoated)' },
-    { id: 'BULKY_CREAM', label: 'Edición / Novela Ahuesado Alta Mano (Bulky Cream)' },
-    { id: 'COATED_MATTE', label: 'Estucado Mate / Semimate Seda (Coated Matte)' },
-    { id: 'COATED_GLOSS', label: 'Estucado Arte Brillante (Coated Gloss)' },
-    { id: 'SPECIALTY', label: 'Especialidad / Verjurado / Película Técnica' }
+const CATEGORY_OPTIONS: { id: IndustrialSubstrateCategory; labelKey: string }[] = [
+    { id: 'OFFSET_UNCOATED', labelKey: 'materials.drawer.catOffset' },
+    { id: 'BULKY_CREAM', labelKey: 'materials.drawer.catBulky' },
+    { id: 'COATED_MATTE', labelKey: 'materials.drawer.catCoatedMatte' },
+    { id: 'COATED_GLOSS', labelKey: 'materials.drawer.catCoatedGloss' },
+    { id: 'SPECIALTY', labelKey: 'materials.drawer.catSpecialty' }
 ];
 
 const CERTIFICATION_OPTIONS: { id: EnvironmentalCertification; label: string; desc: string }[] = [
@@ -311,11 +311,11 @@ export const MaterialSpecificationDrawer: React.FC<MaterialSpecificationDrawerPr
         setValidationError(null);
 
         if (!name.trim()) {
-            setValidationError('El nombre comercial del papel o sustrato es obligatorio.');
+            setValidationError(t('materials.drawer.errNameRequired'));
             return;
         }
         if (gsm < 15 || gsm > 2500) {
-            setValidationError('El gramaje (GSM) debe estar comprendido entre 15 y 2500 g/m².');
+            setValidationError(t('materials.drawer.errGsmRange'));
             return;
         }
 
@@ -368,7 +368,7 @@ export const MaterialSpecificationDrawer: React.FC<MaterialSpecificationDrawerPr
             );
             onClose();
         } catch (err: any) {
-            setValidationError(err?.message || 'Error al guardar la especificación del sustrato.');
+            setValidationError(err?.message || t('materials.drawer.errSaveFailed'));
         } finally {
             setSaving(false);
         }
@@ -442,7 +442,7 @@ export const MaterialSpecificationDrawer: React.FC<MaterialSpecificationDrawerPr
                                     >
                                         <div className="flex items-center justify-between">
                                             <span className="text-xs font-black uppercase tracking-tight">
-                                                {opt.label}
+                                                {t(opt.labelKey)}
                                             </span>
                                             <span
                                                 className={`w-2 h-2 rounded-full ${
@@ -451,7 +451,7 @@ export const MaterialSpecificationDrawer: React.FC<MaterialSpecificationDrawerPr
                                             />
                                         </div>
                                         <span className="block text-[10px] font-mono text-zinc-400 mt-1">
-                                            {opt.sublabel}
+                                            {t(opt.sublabelKey)}
                                         </span>
                                     </button>
                                 );
@@ -502,7 +502,7 @@ export const MaterialSpecificationDrawer: React.FC<MaterialSpecificationDrawerPr
                             >
                                 {CATEGORY_OPTIONS.map((c) => (
                                     <option key={c.id} value={c.id}>
-                                        {c.label}
+                                        {t(c.labelKey)}
                                     </option>
                                 ))}
                             </select>

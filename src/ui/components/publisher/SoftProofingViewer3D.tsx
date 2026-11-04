@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useLocale } from '../../i18n';
 import {
     CubeIcon,
     ArrowsPointingOutIcon,
@@ -46,7 +47,9 @@ const VIEWER_I18N = {
         requestCorrectionCta: 'REQUEST CORRECTION',
         commentsPlaceholder: 'Add pre-press sign-off notes or specify bleed/spine adjustments...',
         approvedBanner: 'DIGITALLY SIGNED & APPROVED FOR CTP PLATESETTER',
-        correctionBanner: 'CORRECTION REQUESTED — PREFLIGHT HOLD'
+        correctionBanner: 'CORRECTION REQUESTED — PREFLIGHT HOLD',
+        hardcoverBadge: 'HARDCOVER · 3MM OVERHANG',
+        softcoverBadge: 'SOFTCOVER PUR'
     },
     es: {
         viewerBadge: 'MOTOR PARAMÉTRICO 3D DE SOFT-PROOFING · PHASE-11C',
@@ -62,7 +65,9 @@ const VIEWER_I18N = {
         requestCorrectionCta: 'REQUEST CORRECTION',
         commentsPlaceholder: 'Añadir notas de aprobación o especificar correcciones de sangrado/lomo...',
         approvedBanner: 'FIRMADO DIGITALMENTE Y APROBADO PARA PLANCHAS CTP',
-        correctionBanner: 'CORRECCIÓN SOLICITADA — RETENIDO EN PREFLIGHT'
+        correctionBanner: 'CORRECCIÓN SOLICITADA — RETENIDO EN PREFLIGHT',
+        hardcoverBadge: 'CARTONÉ · CEJA 3MM',
+        softcoverBadge: 'RÚSTICA PUR'
     },
     de: {
         viewerBadge: 'PARAMETRISCHE 3D-SOFTPROOF-ENGINE · PHASE-11C',
@@ -78,17 +83,21 @@ const VIEWER_I18N = {
         requestCorrectionCta: 'REQUEST CORRECTION',
         commentsPlaceholder: 'Freigabekommentar oder Korrekturhinweise zu Beschnitt/Rücken eingeben...',
         approvedBanner: 'DIGITAL SIGNIERT & FÜR CTP-DRUCKFREIGABE BESTÄTIGT',
-        correctionBanner: 'KORREKTUR ANGEFORDERT — PREFLIGHT-STOPP'
+        correctionBanner: 'KORREKTUR ANGEFORDERT — PREFLIGHT-STOPP',
+        hardcoverBadge: 'HARDCOVER · 3MM STEHKANTE',
+        softcoverBadge: 'SOFTCOVER PUR'
     }
 };
 
 export const SoftProofingViewer3D: React.FC<SoftProofingViewer3DProps> = ({
     book,
-    locale = 'en',
+    locale: explicitLocale,
     onApproveForPress,
     onRequestCorrection
 }) => {
-    const lang = (locale === 'es' || locale === 'de' ? locale : 'en') as 'en' | 'es' | 'de';
+    const { locale: contextLocale } = useLocale();
+    const effectiveLocale = explicitLocale || contextLocale || 'en';
+    const lang = (effectiveLocale === 'es' || effectiveLocale === 'de' ? effectiveLocale : 'en') as 'en' | 'es' | 'de';
     const L = VIEWER_I18N[lang];
 
     const [rotationY, setRotationY] = useState<number>(-28);
@@ -306,7 +315,7 @@ export const SoftProofingViewer3D: React.FC<SoftProofingViewer3DProps> = ({
 
                                 <div className="pl-3 pt-2">
                                     <span className="px-1.5 py-0.5 rounded bg-[#dc2626]/20 border border-[#dc2626]/40 font-mono text-[8px] font-black text-[#dc2626] uppercase">
-                                        {isHardcover ? 'CARTONÉ · CEJA 3MM' : 'RÚSTICA PUR'}
+                                        {isHardcover ? L.hardcoverBadge : L.softcoverBadge}
                                     </span>
                                     <h4 className="font-black text-xs text-white mt-2 leading-snug line-clamp-3">
                                         {book.title}
