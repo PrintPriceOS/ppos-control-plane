@@ -12,7 +12,7 @@
  * B2: 520x720 mm, SRA3: 320x450 mm), computing signature fold decomposition, creep compensation,
  * make-ready waste, and dispatching CTP plates & sheets into the Manufacturing Queue.
  */
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     Square3Stack3DIcon,
     CpuChipIcon,
@@ -21,7 +21,7 @@ import {
     PlayIcon
 } from '@heroicons/react/24/outline';
 import { useLocale } from '../../i18n';
-import { getAuthToken } from '../../lib/authStore';
+import { getAuthToken, isDemoTenant } from '../../lib/authStore';
 import {
     SharedModuleProps,
     HeaderActionGroup,
@@ -196,7 +196,9 @@ export const ManufacturingQueuePage: React.FC<SharedModuleProps> = ({
     const L = IMPOSITION_I18N[lang];
 
     const [activeTab, setActiveTab] = useState<'dispatcher' | 'live_queue'>('dispatcher');
-    const [rows, setRows] = useState<ImpositionSignatureRow[]>(INITIAL_SIGNATURE_QUEUE);
+    const isDemo = isDemoTenant();
+    const [rows, setRows] = useState<ImpositionSignatureRow[]>(isDemo ? INITIAL_SIGNATURE_QUEUE : []);
+    const [loading, setLoading] = useState<boolean>(!isDemo);
     const [showComposeModal, setShowComposeModal] = useState(false);
     const [jdfPreviewModal, setJdfPreviewModal] = useState<{ jobId: string; xml: string } | null>(null);
     const [jmfSimBanner, setJmfSimBanner] = useState<{
@@ -208,6 +210,58 @@ export const ManufacturingQueuePage: React.FC<SharedModuleProps> = ({
         deltaEColorAccuracy: number;
         speedSheetsPerHour: number;
     } | null>(null);
+
+    useEffect(() => {
+        let isMounted = true;
+        const token = getAuthToken();
+        fetch('/api/manufacturing/imposition/queue', {
+            headers: {
+                ...(token ? { Authorization: `Bearer ${token}` } : {})
+            }
+        })
+            .then((res) => (res && res.ok ? res.json() : null))
+            .then((data) => {
+                if (!isMounted) return;
+                setLoading(false);
+                if (data && Array.isArray(data.dispatches)) {
+                    if (data.dispatches.length > 0) {
+                        const flattenedRows: ImpositionSignatureRow[] = [];
+                        data.dispatches.forEach((dispatch: any) => {
+                            if (Array.isArray(dispatch.queuedSignatures)) {
+                                dispatch.queuedSignatures.forEach((sig: any) => {
+                                    flattenedRows.push({
+                                        queueEntryId: sig.queueEntryId || `${dispatch.jobId}-SIG-${sig.signatureNumber}`,
+                                        jobId: dispatch.jobId || sig.jobId,
+                                        title: dispatch.title || sig.title || `Job ${dispatch.jobId}`,
+                                        isbn: dispatch.isbn || sig.isbn || '—',
+                                        signatureLabel: sig.signatureLabel || `SIG #${sig.signatureNumber}`,
+                                        impositionScheme: sig.impositionScheme || 'Standard Imposition',
+                                        foldPattern: sig.foldPattern || 'Standard Fold',
+                                        platesRequired: Number(sig.platesRequired || 0),
+                                        paperEfficiencyPct: Number(sig.paperEfficiencyPct || 75),
+                                        creepOffsetMm: Number(sig.creepOffsetMm || 0),
+                                        makeReadyWasteSheets: Number(sig.makeReadyWasteSheets || 0),
+                                        targetPress: sig.targetPress || dispatch.targetPress || 'Industrial Press',
+                                        status: sig.status || 'QUEUED_FOR_PLATESETTER'
+                                    });
+                                });
+                            }
+                        });
+                        setRows(flattenedRows);
+                    } else if (!isDemo) {
+                        // Enforce clean-slate empty state [] for non-demo
+                        setRows([]);
+                    }
+                }
+            })
+            .catch(() => {
+                if (isMounted) setLoading(false);
+            });
+
+        return () => {
+            isMounted = false;
+        };
+    }, [isDemo]);
 
     const handleSimulateJmfBurst = async (row: ImpositionSignatureRow) => {
         const token = getAuthToken();
@@ -505,7 +559,9 @@ export const ManufacturingQueuePage: React.FC<SharedModuleProps> = ({
                 title={activeTab === 'dispatcher' ? L.tabDispatcher : L.tabLiveQueue}
                 subtitle={`${rows.length} SIGNATURE RUNS & CTP PLATES SCHEDULED`}
                 data={rows}
+                loading={loading}
                 emptyEntityName="IMPOSITION SIGNATURES"
+                emptyMessage="NO ACTIVE IMPOSITION SIGNATURES FOUND · COMPOSE SIGNATURES OR DISPATCH FROM PREFLIGHT TO POPULATE QUEUE"
                 rowKey={(row) => row.queueEntryId}
                 columns={[
                     {

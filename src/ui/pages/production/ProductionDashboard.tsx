@@ -9,7 +9,7 @@
  *   - PHASE-12C Machine OEE (%) & Predictive Maintenance health
  *   - PHASE-13B EN 16931 Electronic Invoicing (Facturae 3.2.2 / XRechnung 3.0 XML)
  */
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     CurrencyEuroIcon,
     ChartBarIcon,
@@ -17,6 +17,7 @@ import {
     CpuChipIcon,
     DocumentTextIcon
 } from '@heroicons/react/24/outline';
+import { getAuthToken, isDemoTenant } from '../../lib/authStore';
 import {
     SharedModuleProps,
     HeaderActionGroup,
@@ -100,13 +101,62 @@ const INITIAL_PROFITABILITY_ROWS: ExecutiveProfitabilityRow[] = [
 
 export const ProductionDashboard: React.FC<SharedModuleProps> = (props) => {
     const { mode = 'workspace' } = props;
+    const isDemo = isDemoTenant();
     const [viewMode, setViewMode] = useState<'profitability' | 'queue'>('profitability');
-    const [rows] = useState<ExecutiveProfitabilityRow[]>(INITIAL_PROFITABILITY_ROWS);
+    const [rows, setRows] = useState<ExecutiveProfitabilityRow[]>(isDemo ? INITIAL_PROFITABILITY_ROWS : []);
+    const [loading, setLoading] = useState<boolean>(!isDemo);
     const [invoicePreview, setInvoicePreview] = useState<{
         orderId: string;
         standard: 'FACTURAE_3_2_2' | 'XRECHNUNG_3_0';
         xml: string;
     } | null>(null);
+
+    useEffect(() => {
+        let isMounted = true;
+        const token = getAuthToken();
+        fetch('/api/financials/escrow/profitability', {
+            headers: {
+                ...(token ? { Authorization: `Bearer ${token}` } : {})
+            }
+        })
+            .then((res) => (res && res.ok ? res.json() : null))
+            .then((data) => {
+                if (!isMounted) return;
+                setLoading(false);
+                if (data && Array.isArray(data.orders)) {
+                    if (data.orders.length > 0) {
+                        const mapped: ExecutiveProfitabilityRow[] = data.orders.map((o: any) => ({
+                            orderId: o.orderId,
+                            jobId: o.jobId || `JOB-${o.orderId}`,
+                            isbn: o.isbn || '978-84-000000-0-0',
+                            title: o.title || `Order ${o.orderId}`,
+                            machineName: o.machineName || 'Industrial Press',
+                            machineOeePct: Number(o.machineOeePct || 85.0),
+                            manufacturingShareEur: Number(o.manufacturingShareEur || 0),
+                            epalCompensationEur: Number(o.epalCompensationEur || 0),
+                            plannedWasteSheets: Number(o.plannedWasteSheets || 0),
+                            actualWasteSheets: Number(o.actualWasteSheets || 0),
+                            jmfWasteSavingsEur: Number(o.jmfWasteSavingsEur || 0),
+                            realDirectMfgCostEur: Number(o.realDirectMfgCostEur || 0),
+                            netIndustrialMarginEur: Number(o.netIndustrialMarginEur || 0),
+                            netIndustrialMarginPct: Number(o.netIndustrialMarginPct || 0),
+                            escrowStatus: o.escrowStatus || 'PENDING'
+                        }));
+                        setRows(mapped);
+                    } else if (!isDemo) {
+                        // Enforce clean zero-slate for real tenant
+                        setRows([]);
+                    }
+                }
+            })
+            .catch(() => {
+                if (isMounted) setLoading(false);
+            });
+
+        return () => {
+            isMounted = false;
+        };
+    }, [isDemo]);
 
     const handlePreviewEInvoice = (
         row: ExecutiveProfitabilityRow,
@@ -202,7 +252,9 @@ export const ProductionDashboard: React.FC<SharedModuleProps> = (props) => {
                         title="REAL-TIME ORDER PROFITABILITY & EN 16931 E-INVOICING LEDGER"
                         subtitle={`${rows.length} ORDERS RECONCILED ACROSS ESCROW, JMF PRESS WASTE & OEE`}
                         data={rows}
+                        loading={loading}
                         emptyEntityName="PROFITABILITY LEDGER ENTRIES"
+                        emptyMessage="NO ACTIVE ORDER PROFITABILITY ENTRIES FOUND · ESCROW ORDERS AND CLOSED-LOOP JMF RUNS WILL RECONCILE HERE"
                         rowKey={(r) => r.orderId}
                         columns={[
                             {

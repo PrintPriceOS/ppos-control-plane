@@ -25,7 +25,7 @@ import {
     DocumentArrowDownIcon
 } from '@heroicons/react/24/outline';
 import { useLocale } from '../../i18n';
-import { getAuthToken } from '../../lib/authStore';
+import { getAuthToken, isDemoTenant } from '../../lib/authStore';
 import {
     SharedModuleProps,
     HeaderActionGroup,
@@ -278,7 +278,9 @@ export const PreflightJobsPage: React.FC<SharedModuleProps> = ({
     const L = PREFLIGHT_I18N[lang];
 
     const [activeTab, setActiveTab] = useState<'queue' | 'profiles'>('queue');
-    const [jobs, setJobs] = useState<PreflightInspectionRow[]>(INITIAL_WORKSHOP_JOBS);
+    const isDemo = isDemoTenant();
+    const [jobs, setJobs] = useState<PreflightInspectionRow[]>(isDemo ? INITIAL_WORKSHOP_JOBS : []);
+    const [loading, setLoading] = useState<boolean>(!isDemo);
     const [profiles, setProfiles] = useState(GEOMETRY_PROFILES);
     const [fixingJobId, setFixingJobId] = useState<string | null>(null);
     const [purgingJobId, setPurgingJobId] = useState<string | null>(null);
@@ -297,11 +299,13 @@ export const PreflightJobsPage: React.FC<SharedModuleProps> = ({
         })
             .then((res) => (res && res.ok ? res.json() : null))
             .then((data) => {
-                if (!isMounted || !data) return;
+                if (!isMounted) return;
+                setLoading(false);
+                if (!data) return;
                 if (Array.isArray(data.geometryProfiles) && data.geometryProfiles.length > 0) {
                     setProfiles(data.geometryProfiles);
                 }
-                if (Array.isArray(data.inspections) && data.inspections.length > 0) {
+                if (Array.isArray(data.inspections)) {
                     const mapped: PreflightInspectionRow[] = data.inspections
                         .filter((r: any) => r && r.jobId && r.spineGeometry && r.bleedGeometry && r.tacAndColor)
                         .map((report: any) => ({
@@ -337,16 +341,19 @@ export const PreflightJobsPage: React.FC<SharedModuleProps> = ({
                             const existingIds = new Set(mapped.map((m) => m.jobId));
                             return [...mapped, ...prev.filter((p) => !existingIds.has(p.jobId))];
                         });
+                    } else if (!isDemo) {
+                        // Real tenant with zero inspections: enforce clean-slate []
+                        setJobs([]);
                     }
                 }
             })
             .catch(() => {
-                // Keep INITIAL_WORKSHOP_JOBS & GEOMETRY_PROFILES fallback
+                if (isMounted) setLoading(false);
             });
         return () => {
             isMounted = false;
         };
-    }, []);
+    }, [isDemo]);
 
     const handleRunPreflightSubmit = async (payload: PreflightUploadModalSubmitPayload) => {
         const token = getAuthToken();
@@ -542,7 +549,7 @@ export const PreflightJobsPage: React.FC<SharedModuleProps> = ({
     const autoFixRatio =
         totalInspected > 0
             ? Math.round((jobs.filter(j => j.autoFixed || j.overallStatus === 'PASS').length / totalInspected) * 100)
-            : 100;
+            : 0;
 
     return (
         <div
@@ -602,7 +609,9 @@ export const PreflightJobsPage: React.FC<SharedModuleProps> = ({
                     title={L.tabQueue}
                     subtitle={`${jobs.length} PDF ARCHIVES ANALYZED · CLICK ANY ROW TO OPEN 6-AXIS REPORT`}
                     data={jobs}
+                    loading={loading}
                     emptyEntityName="PREFLIGHT JOBS"
+                    emptyMessage="NO ACTIVE PREFLIGHT INSPECTIONS FOUND · USE '+ RUN PREFLIGHT' TO INSPECT OR FIX ASSETS"
                     rowKey={(row) => row.jobId}
                     onRowClick={(row) => setSelectedJobId(row.jobId)}
                     columns={[
