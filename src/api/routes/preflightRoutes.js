@@ -30,6 +30,8 @@ const {
     getPreflightInspectionById
 } = require('../services/preflight/preflightEngineService');
 
+const { preflightIngestRateLimiter } = require('../middleware/rateLimiter');
+
 const MAX_PREFLIGHT_PDF_BYTES = 2 * 1024 * 1024 * 1024; // 2 GB (2147483648 bytes)
 const PREFLIGHT_TEMP_DIR =
     process.env.PPOS_PREFLIGHT_TEMP_DIR ||
@@ -327,7 +329,7 @@ function createPreflightRouter() {
     });
 
     // POST /api/preflight/inspect
-    router.post('/inspect', preflightStreamingUpload, async (req, res) => {
+    router.post('/inspect', preflightIngestRateLimiter, preflightStreamingUpload, async (req, res) => {
         try {
             const tenantId =
                 (req.user && req.user.tenantId) ||
@@ -486,7 +488,7 @@ function createPreflightRouter() {
     });
 
     // POST /api/preflight/ingest (Asynchronous 2GB PDF Ingestion returning HTTP 202 Accepted)
-    router.post('/ingest', preflightStreamingUpload, async (req, res) => {
+    router.post('/ingest', preflightIngestRateLimiter, preflightStreamingUpload, async (req, res) => {
         try {
             const tenantId =
                 (req.user && req.user.tenantId) ||

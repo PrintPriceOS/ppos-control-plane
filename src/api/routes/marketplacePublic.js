@@ -8,12 +8,15 @@ const express = require('express');
 const router = express.Router();
 const marketplaceService = require('../services/marketplaceService');
 const { v4: uuidv4 } = require('uuid');
+const { bpePricingRateLimiter, createRequestTimeoutGuard } = require('../middleware/rateLimiter');
+
+const bpeTimeoutGuard15s = createRequestTimeoutGuard(15000);
 
 /**
  * POST /api/marketplace/offers
  * Standard contract for requesting marketplace offers.
  */
-router.post('/offers', async (req, res) => {
+router.post('/offers', bpePricingRateLimiter, bpeTimeoutGuard15s, async (req, res) => {
     const traceId = req.headers['x-trace-id'] || `trace_${uuidv4()}`;
     const startTime = Date.now();
 
@@ -192,7 +195,7 @@ const CANONICAL_PAPER_CATEGORIES = [
  * Public commercial paper catalog for Budget and Marketplace clients.
  * Sanitized: wholesale prices, internal supplier margins, and credentials are strictly excluded.
  */
-router.get('/paper-catalog', async (req, res) => {
+router.get('/paper-catalog', bpePricingRateLimiter, async (req, res) => {
     const traceId = req.headers['x-trace-id'] || `trace_${uuidv4()}`;
     const startTime = Date.now();
 
@@ -316,5 +319,62 @@ router.post('/sessions/:sessionId/select', async (req, res) => {
         });
     }
 });
+
+const { calibrateQuote, calculateCrossoverPoint } = require('../services/pricing/pricingIntelligenceService');
+
+/**
+ * GET /api/budget/paper/search (aliased on /api/marketplace)
+ */
+router.get('/paper/search', bpePricingRateLimiter, async (req, res) => {
+    req.url = '/paper-catalog';
+    const result = await paperProcurementService.searchMasterPaperDatabase('ppos-production', req.query || {});
+    return res.status(200).json({
+        ok: true,
+        total: result.total,
+        items: result.items || []
+    });
+});
+
+/**
+ * POST /api/budget/quote & POST /api/budget/calculate
+ * Synchronous BPE quote endpoints protected by 60/600 sliding-window rate limiter & 15s timeout guard.
+ */
+const handleBudgetQuote = async (req, res) => {
+    try {
+        if (req.body && req.body.__simulateHangMs) {
+            await new Promise((r) => setTimeout(r, Number(req.body.__simulateHangMs)));
+        }
+        if (req.timedOut) return;
+        const tenantId = (req.user && req.user.tenantId) || 'tenant-default';
+        const body = req.body || {};
+        const copies = Math.max(1, Number(body.copies || body.printRunCopies || 1000));
+        const pageCount = Math.max(4, Number(body.interior_pages || body.pageCount || 240));
+        const calibrated = calibrateQuote(tenantId, {
+            ...body,
+            copies,
+            pageCount
+        });
+        const crossover = calculateCrossoverPoint(tenantId, {
+            pageCount,
+            trimWidthMm: Number(body.trimWidthMm || 148),
+            trimHeightMm: Number(body.trimHeightMm || 210),
+            interiorPaperGsm: Number(body.interiorPaperGsm || body.paper_weight_interior || 90)
+        });
+        return res.status(200).json({
+            ok: true,
+            success: true,
+            tenantId,
+            estimate: calibrated.calibration || calibrated,
+            crossover
+        });
+    } catch (err) {
+        return res.status(err.statusCode || 400).json({
+            ok: false,
+            error: err.message
+        });
+    }
+};
+router.post('/quote', bpePricingRateLimiter, bpeTimeoutGuard15s, handleBudgetQuote);
+router.post('/calculate', bpePricingRateLimiter, bpeTimeoutGuard15s, handleBudgetQuote);
 
 module.exports = router;

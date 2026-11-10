@@ -19,7 +19,9 @@ if (process.env.MYSQL_PASSWORD_FILE && fs.existsSync(process.env.MYSQL_PASSWORD_
 }
 
 const mysqlClient = require('./src/api/services/mysqlClient');
+const { applySecurityHeadersAndCors } = require('./src/api/middleware/rateLimiter');
 const fastify = require('fastify')({
+    trustProxy: true, // Respect X-Forwarded-For from Plesk/Nginx reverse proxy for accurate IP rate-limiting
     bodyLimit: 2 * 1024 * 1024 * 1024, // 2 GB (2147483648 bytes) industrial streaming body limit for illustrated book PDFs
     logger: {
         level: process.env.PPOS_LOG_LEVEL || 'info',
@@ -57,23 +59,8 @@ const {
 fastify.addHook('onRequest', async (request, reply) => {
     const url = request.url;
 
-    // Phase 199C: Allow Cross-Origin API Playground requests from docs.printprice.pro & printprice.pro
-    const origin = request.headers['origin'];
-    const allowedCorsOrigins = new Set([
-        'https://docs.printprice.pro',
-        'https://printprice.pro',
-        'https://control.printprice.pro',
-        'http://localhost:3000',
-        'http://localhost:5173',
-        'http://127.0.0.1:3000'
-    ]);
-    if (origin && (allowedCorsOrigins.has(origin) || origin.endsWith('.printprice.pro'))) {
-        reply.header('Access-Control-Allow-Origin', origin);
-        reply.header('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
-        reply.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-API-Key, X-Tenant-Id, X-Sandbox-Tenant, Idempotency-Key, X-Trace-Id');
-        reply.header('Access-Control-Expose-Headers', 'X-RateLimit-Limit, X-RateLimit-Remaining, Retry-After');
-        reply.header('Access-Control-Allow-Credentials', 'true');
-    }
+    // Phase 199C & Security Hardening: Enforce Helmet defensive headers & strict CORS origin allowlist
+    applySecurityHeadersAndCors(request, reply);
     if (request.method === 'OPTIONS') {
         return reply.status(204).send();
     }
@@ -166,7 +153,10 @@ fastify.addHook('onRequest', async (request, reply) => {
             }
 
             const { keyRecord } = verification;
-            const rl = checkSlidingWindowRateLimit(keyRecord.id, keyRecord.rateLimitPerMinute || 60);
+            const rl = checkSlidingWindowRateLimit(keyRecord.id, keyRecord.rateLimitPerMinute || 600);
+            reply.header('RateLimit-Limit', String(rl.limit));
+            reply.header('RateLimit-Remaining', String(rl.remaining));
+            reply.header('RateLimit-Reset', String(rl.retryAfterSec || 60));
             reply.header('X-RateLimit-Limit', String(rl.limit));
             reply.header('X-RateLimit-Remaining', String(rl.remaining));
 
@@ -174,7 +164,8 @@ fastify.addHook('onRequest', async (request, reply) => {
                 reply.header('Retry-After', String(rl.retryAfterSec));
                 return reply.status(429).send({
                     ok: false,
-                    error: `Rate limit of ${rl.limit} req/min exceeded. Retry after ${rl.retryAfterSec}s.`
+                    error: 'RATE_LIMIT_EXCEEDED',
+                    message: `Too many requests. Please retry in ${rl.retryAfterSec}s.`
                 });
             }
 
@@ -552,6 +543,7 @@ const start = async () => {
             fastify.use('/api/marketplace/orders', require('./src/api/routes/marketplaceOrders'));
             fastify.use('/api/marketplace', require('./src/api/routes/marketplacePublic'));
             fastify.use('/api/public/marketplace', require('./src/api/routes/marketplacePublic'));
+            fastify.use('/api/budget', require('./src/api/routes/marketplacePublic'));
             fastify.use('/api/connectors/factory', require('./src/api/routes/factoryConnectorRoutes'));
             fastify.use('/api/public/preflight', require('./src/api/routes/publicPreflight'));
             fastify.use('/api/system', require('./src/api/routes/system'));
@@ -602,6 +594,8 @@ const start = async () => {
             fastify.all('/api/marketplace/*', apiNotFoundFallback);
             fastify.all('/api/public/marketplace', apiNotFoundFallback);
             fastify.all('/api/public/marketplace/*', apiNotFoundFallback);
+            fastify.all('/api/budget', apiNotFoundFallback);
+            fastify.all('/api/budget/*', apiNotFoundFallback);
             fastify.all('/api/public/preflight', apiNotFoundFallback);
             fastify.all('/api/public/preflight/*', apiNotFoundFallback);
             fastify.all('/api/system', apiNotFoundFallback);

@@ -40,6 +40,13 @@ const {
     emitRoutingNotification
 } = require('../services/pricing/routingNotificationService');
 
+const {
+    bpePricingRateLimiter,
+    createRequestTimeoutGuard
+} = require('../middleware/rateLimiter');
+
+const bpeTimeoutGuard15s = createRequestTimeoutGuard(15000);
+
 function requireLogisticsControlPlaneAuth(req, res, next) {
     const role = (req.user && req.user.role) || (req.headers && req.headers['x-user-role']);
     const allowedRoles = new Set([
@@ -87,12 +94,12 @@ function requireLogisticsControlPlaneAuth(req, res, next) {
 function createFallbackRouter() {
     const stack = [];
     const middlewares = [];
-    const addRoute = (method, path, handler) => {
+    const addRoute = (method, path, ...handlers) => {
         stack.push({
             route: {
                 path,
                 methods: { [method]: true },
-                stack: [{ handle: handler }]
+                stack: handlers.map((h) => ({ handle: h }))
             }
         });
     };
@@ -102,17 +109,17 @@ function createFallbackRouter() {
         use(fn) {
             middlewares.push(fn);
         },
-        get(path, handler) {
-            addRoute('get', path, handler);
+        get(path, ...handlers) {
+            addRoute('get', path, ...handlers);
         },
-        post(path, handler) {
-            addRoute('post', path, handler);
+        post(path, ...handlers) {
+            addRoute('post', path, ...handlers);
         },
-        put(path, handler) {
-            addRoute('put', path, handler);
+        put(path, ...handlers) {
+            addRoute('put', path, ...handlers);
         },
-        delete(path, handler) {
-            addRoute('delete', path, handler);
+        delete(path, ...handlers) {
+            addRoute('delete', path, ...handlers);
         }
     };
 }
@@ -393,14 +400,18 @@ function createPricingRouter() {
         }
     });
 
-    // POST /api/pricing/calibrate
-    router.post('/calibrate', async (req, res) => {
+    // POST /api/pricing/calibrate (and alias POST /api/pricing/calculate)
+    const handleCalibrateOrCalculate = async (req, res) => {
         try {
             const tenantId =
                 (req.user && req.user.tenantId) ||
                 (req.body && req.body.tenantId) ||
                 (req.headers && req.headers['x-tenant-id']) ||
                 'tenant-default';
+            if (req.body && req.body.__simulateHangMs) {
+                await new Promise((r) => setTimeout(r, Number(req.body.__simulateHangMs)));
+            }
+            if (req.timedOut) return;
             const result = calibrateQuote(tenantId, req.body || {});
             return res.status(200).json(result);
         } catch (err) {
@@ -409,10 +420,12 @@ function createPricingRouter() {
                 error: err.message
             });
         }
-    });
+    };
+    router.post('/calibrate', bpePricingRateLimiter, bpeTimeoutGuard15s, handleCalibrateOrCalculate);
+    router.post('/calculate', bpePricingRateLimiter, bpeTimeoutGuard15s, handleCalibrateOrCalculate);
 
     // POST /api/pricing/book-estimate — Phase 199C Interactive Developer Console & BPE Real-Time Calculator
-    router.post('/book-estimate', async (req, res) => {
+    router.post('/book-estimate', bpePricingRateLimiter, bpeTimeoutGuard15s, async (req, res) => {
         try {
             const tenantId =
                 (req.user && req.user.tenantId) ||
