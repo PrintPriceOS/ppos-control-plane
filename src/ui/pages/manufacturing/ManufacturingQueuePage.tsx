@@ -8,9 +8,10 @@
  * supporting Dual-Mode ('onboarding' | 'workspace' via SharedModuleProps) and full trilingual
  * localization (ES, EN, DE).
  *
- * Connects PHASE-11A validated PDF geometries with machine sheet formats (B1: 720x1020 mm,
- * B2: 520x720 mm, SRA3: 320x450 mm), computing signature fold decomposition, creep compensation,
- * make-ready waste, and dispatching CTP plates & sheets into the Manufacturing Queue.
+ * Connects PHASE-11A validated PDF geometries and the 1,524 Master Substrate Catalog (`caliper_um`)
+ * with machine sheet formats (B1: 720x1020 mm, B2: 520x720 mm, SRA3: 320x450 mm), computing
+ * 16pp vs 32pp signature fold decomposition, caliper-based creep compensation, accumulated
+ * block thickness, preventive folding warnings, and CIP4 JDF/JMF descriptors.
  */
 import React, { useState, useEffect } from 'react';
 import {
@@ -19,7 +20,8 @@ import {
     ChartBarIcon,
     FireIcon,
     PlayIcon,
-    LockClosedIcon
+    LockClosedIcon,
+    ExclamationTriangleIcon
 } from '@heroicons/react/24/outline';
 import { useLocale } from '../../i18n';
 import { getAuthToken, isDemoTenant } from '../../lib/authStore';
@@ -39,9 +41,15 @@ export interface ImpositionSignatureRow {
     signatureLabel: string;
     impositionScheme: string;
     foldPattern: string;
+    workMode?: string;
+    grainDirection?: string;
+    caliperUm?: number;
+    accumulatedBlockThicknessMm?: number;
     platesRequired: number;
     paperEfficiencyPct: number;
     creepOffsetMm: number;
+    exceedsFoldingTolerance?: boolean;
+    foldingToleranceWarning?: string | null;
     makeReadyWasteSheets: number;
     targetPress: string;
     status: 'QUEUED_FOR_PLATESETTER' | 'PLATES_BURNED' | 'ON_PRESS' | 'COMPLETED';
@@ -50,7 +58,7 @@ export interface ImpositionSignatureRow {
 const IMPOSITION_I18N: Record<'en' | 'es' | 'de', Record<string, string>> = {
     en: {
         title: 'Dynamic Imposition & Production Queue',
-        subtitle: 'Automated signature folding decomposition, creep compensation, CTP plate calculation and press routing',
+        subtitle: 'Automated signature folding decomposition, caliper-driven creep compensation, CTP plate calculation and press routing',
         tabDispatcher: 'IMPOSITION DISPATCHER',
         tabLiveQueue: 'LIVE QUEUE',
         ctaCompose: 'COMPOSE SIGNATURES',
@@ -61,7 +69,7 @@ const IMPOSITION_I18N: Record<'en' | 'es' | 'de', Record<string, string>> = {
         colJobIsbn: 'JOB / ISBN',
         colSignature: 'SIGNATURE #',
         colScheme: 'IMPOSITION SCHEME',
-        colCreep: 'CREEP OFFSET',
+        colCreep: 'BLOCK & CREEP OFFSET',
         colWaste: 'MAKE-READY WASTE',
         colPress: 'TARGET PRESS',
         colStatus: 'STATUS',
@@ -73,14 +81,17 @@ const IMPOSITION_I18N: Record<'en' | 'es' | 'de', Record<string, string>> = {
         lblFormat: 'Machine Sheet Format',
         lblBinding: 'Binding Mode',
         lblGrammage: 'Grammage (g/m²)',
+        lblCaliperUm: 'Caliper (µm · Master Catalog)',
         lblBulk: 'Paper Bulk (cm³/g)',
+        lblGrain: 'Grain Direction (LG / SG)',
         lblSubmit: 'Calculate & Dispatch Signatures',
         lblCancel: 'Cancel',
-        saveContinue: 'Save & Continue'
+        saveContinue: 'Save & Continue',
+        warnFoldingBadge: 'CREEP TOLERANCE EXCEEDED'
     },
     es: {
         title: 'Dynamic Imposition & Production Queue',
-        subtitle: 'Trazado automático de signaturas, compensación de arrastre (creep), cálculo de planchas CTP y enrutamiento a máquina',
+        subtitle: 'Trazado automático de signaturas, compensación de arrastre (creep) por calibre (µm), cálculo de planchas CTP y enrutamiento a máquina',
         tabDispatcher: 'IMPOSITION DISPATCHER',
         tabLiveQueue: 'LIVE QUEUE',
         ctaCompose: 'COMPOSE SIGNATURES',
@@ -91,7 +102,7 @@ const IMPOSITION_I18N: Record<'en' | 'es' | 'de', Record<string, string>> = {
         colJobIsbn: 'JOB / ISBN',
         colSignature: 'SIGNATURE #',
         colScheme: 'IMPOSITION SCHEME',
-        colCreep: 'CREEP OFFSET',
+        colCreep: 'BLOCK & CREEP OFFSET',
         colWaste: 'MAKE-READY WASTE',
         colPress: 'TARGET PRESS',
         colStatus: 'STATUS',
@@ -103,14 +114,17 @@ const IMPOSITION_I18N: Record<'en' | 'es' | 'de', Record<string, string>> = {
         lblFormat: 'Formato de Pliego de Máquina',
         lblBinding: 'Tipo de Encuadernación',
         lblGrammage: 'Gramaje (g/m²)',
+        lblCaliperUm: 'Calibre Real (µm · Catálogo Maestro)',
         lblBulk: 'Volumen Específico / Mano (cm³/g)',
+        lblGrain: 'Sentido de Fibra (LG / SG)',
         lblSubmit: 'Calcular y Despachar Pliegos',
         lblCancel: 'Cancelar',
-        saveContinue: 'Guardar y Continuar'
+        saveContinue: 'Guardar y Continuar',
+        warnFoldingBadge: 'TOLERANCIA PLEGADO EXCEDIDA'
     },
     de: {
         title: 'Dynamic Imposition & Production Queue',
-        subtitle: 'Automatische Falzbogen-Ausschießplanung, Bundzuwachs-Ausgleich (Creep), CTP-Plattenberechnung und Druckmaschinen-Routing',
+        subtitle: 'Automatische Falzbogen-Ausschießplanung, kaliberbasierter Bundzuwachs-Ausgleich (Creep), CTP-Plattenberechnung und Druckmaschinen-Routing',
         tabDispatcher: 'IMPOSITION DISPATCHER',
         tabLiveQueue: 'LIVE QUEUE',
         ctaCompose: 'COMPOSE SIGNATURES',
@@ -121,7 +135,7 @@ const IMPOSITION_I18N: Record<'en' | 'es' | 'de', Record<string, string>> = {
         colJobIsbn: 'JOB / ISBN',
         colSignature: 'SIGNATURE #',
         colScheme: 'IMPOSITION SCHEME',
-        colCreep: 'CREEP OFFSET',
+        colCreep: 'BLOCK & CREEP OFFSET',
         colWaste: 'MAKE-READY WASTE',
         colPress: 'TARGET PRESS',
         colStatus: 'STATUS',
@@ -133,10 +147,13 @@ const IMPOSITION_I18N: Record<'en' | 'es' | 'de', Record<string, string>> = {
         lblFormat: 'Maschinen-Bogenformat',
         lblBinding: 'Bindungsart',
         lblGrammage: 'Grammatur (g/m²)',
+        lblCaliperUm: 'Bogenstärke (µm · Stammkatalog)',
         lblBulk: 'Spezifisches Volumen (cm³/g)',
+        lblGrain: 'Laufrichtung (LG / SG)',
         lblSubmit: 'Berechnen & Einreihen',
         lblCancel: 'Abbrechen',
-        saveContinue: 'Speichern & Weiter'
+        saveContinue: 'Speichern & Weiter',
+        warnFoldingBadge: 'FALZTOLERANZ ÜBERSCHRITTEN'
     }
 };
 
@@ -147,11 +164,17 @@ const INITIAL_SIGNATURE_QUEUE: ImpositionSignatureRow[] = [
         title: 'Atlas de Arquitectura Industrial Europea (240pp: 7×32pp + 1×16pp)',
         isbn: '978-3-8365-9102-7',
         signatureLabel: 'SIG #1..7 (7×32pp)',
-        impositionScheme: '32pp B1 (16pp/side · 720×1020 mm)',
-        foldPattern: '4-Fold Cross (French Fold 32pp)',
+        impositionScheme: '32pp B1 (16pp/side · Sheetwise · 720×1020 mm)',
+        foldPattern: '4-Fold Cross (French Fold 32pp · LG)',
+        workMode: 'SHEETWISE_FRONT_BACK',
+        grainDirection: 'LG',
+        caliperUm: 117,
+        accumulatedBlockThicknessMm: 14.04,
         platesRequired: 56,
         paperEfficiencyPct: 75.2,
         creepOffsetMm: 0.0,
+        exceedsFoldingTolerance: false,
+        foldingToleranceWarning: null,
         makeReadyWasteSheets: 1208,
         targetPress: 'Heidelberg Speedmaster XL 106 (B1 720×1020 mm)',
         status: 'ON_PRESS'
@@ -162,11 +185,17 @@ const INITIAL_SIGNATURE_QUEUE: ImpositionSignatureRow[] = [
         title: 'Atlas de Arquitectura Industrial Europea (240pp: 7×32pp + 1×16pp)',
         isbn: '978-3-8365-9102-7',
         signatureLabel: 'SIG #8 (1×16pp)',
-        impositionScheme: '16pp B2 (8pp/side · 520×720 mm)',
-        foldPattern: '3-Fold Cross (16pp Standard)',
+        impositionScheme: '16pp B2 (8pp/side · Sheetwise · 520×720 mm)',
+        foldPattern: '3-Fold Cross (16pp Standard · LG)',
+        workMode: 'SHEETWISE_FRONT_BACK',
+        grainDirection: 'LG',
+        caliperUm: 117,
+        accumulatedBlockThicknessMm: 14.04,
         platesRequired: 8,
         paperEfficiencyPct: 73.7,
         creepOffsetMm: 0.0,
+        exceedsFoldingTolerance: false,
+        foldingToleranceWarning: null,
         makeReadyWasteSheets: 173,
         targetPress: 'Komori Lithrone G29 (B2 520×720 mm)',
         status: 'PLATES_BURNED'
@@ -177,11 +206,17 @@ const INITIAL_SIGNATURE_QUEUE: ImpositionSignatureRow[] = [
         title: 'Catálogo Técnico Feria de Frankfurt (64pp Caballete)',
         isbn: '978-3-9573-0412-9',
         signatureLabel: 'SIG #1..4 (4×16pp)',
-        impositionScheme: '16pp B1 (8pp/side · 720×1020 mm)',
-        foldPattern: '3-Fold Saddle Stitch (Caballete)',
+        impositionScheme: '16pp B1 (8pp/side · Work-and-Turn · 720×1020 mm)',
+        foldPattern: '3-Fold Saddle Stitch (Caballete · LG)',
+        workMode: 'WORK_AND_TURN',
+        grainDirection: 'LG',
+        caliperUm: 117,
+        accumulatedBlockThicknessMm: 3.74,
         platesRequired: 32,
         paperEfficiencyPct: 74.1,
         creepOffsetMm: 7.02,
+        exceedsFoldingTolerance: true,
+        foldingToleranceWarning: 'PREVENTIVE_FOLDING_WARNING: Accumulated block thickness (3.74 mm) and max creep (+7.02 mm at 117 µm) exceed uncompensated folding tolerance (1.50 mm). Progressive inward margin shingling is mandatory.',
         makeReadyWasteSheets: 740,
         targetPress: 'Heidelberg Speedmaster XL 106 (B1 720×1020 mm)',
         status: 'QUEUED_FOR_PLATESETTER'
@@ -238,9 +273,15 @@ export const ManufacturingQueuePage: React.FC<SharedModuleProps> = ({
                                         signatureLabel: sig.signatureLabel || `SIG #${sig.signatureNumber}`,
                                         impositionScheme: sig.impositionScheme || 'Standard Imposition',
                                         foldPattern: sig.foldPattern || 'Standard Fold',
+                                        workMode: sig.workMode,
+                                        grainDirection: sig.grainDirection,
+                                        caliperUm: Number(sig.caliperUm || dispatch.caliperUm || 0) || undefined,
+                                        accumulatedBlockThicknessMm: Number(sig.accumulatedBlockThicknessMm || dispatch.accumulatedBlockThicknessMm || 0) || undefined,
                                         platesRequired: Number(sig.platesRequired || 0),
                                         paperEfficiencyPct: Number(sig.paperEfficiencyPct || 75),
                                         creepOffsetMm: Number(sig.creepOffsetMm || 0),
+                                        exceedsFoldingTolerance: Boolean(sig.exceedsFoldingTolerance ?? dispatch.exceedsFoldingTolerance),
+                                        foldingToleranceWarning: sig.foldingToleranceWarning || dispatch.foldingToleranceWarning || null,
                                         makeReadyWasteSheets: Number(sig.makeReadyWasteSheets || 0),
                                         targetPress: sig.targetPress || dispatch.targetPress || 'Industrial Press',
                                         status: sig.status || 'QUEUED_FOR_PLATESETTER'
@@ -250,7 +291,6 @@ export const ManufacturingQueuePage: React.FC<SharedModuleProps> = ({
                         });
                         setRows(flattenedRows);
                     } else if (!isDemo) {
-                        // Enforce clean-slate empty state [] for non-demo
                         setRows([]);
                     }
                 } else if (!isDemo) {
@@ -354,12 +394,18 @@ export const ManufacturingQueuePage: React.FC<SharedModuleProps> = ({
             `<?xml version="1.0" encoding="UTF-8"?>`,
             `<JDF xmlns="http://www.cip4.org/JDFSchema_1_1" Version="1.7" ID="JDF-${row.jobId}" JobID="${row.jobId}" Status="Ready" Type="Combined" Types="LayoutPreparation Imposition Interpreting Rendering DigitalPrinting Folding Stitching Trimming CoverApplication" DescriptiveName="${row.title}">`,
             `  <ResourcePool>`,
-            `    <LayoutPreparationParams ID="LPP-${row.jobId}" Class="Parameter" Status="Available" Sides="TwoSidedFlipY" NumberUp="16 2" PresentationDirection="FoldCatalog" />`,
-            `    <StrippingParams ID="SP-${row.jobId}" Class="Parameter" Status="Available" SectionList="32" WorkStyle="WorkAndTurn">`,
+            `    <Device ID="DEV-01" Class="Implementation" Status="Available" DeviceID="HEIDELBERG-XL106-PRINECT-01" DeviceClass="Press" FriendlyName="${row.targetPress}" />`,
+            `    <LayoutPreparationParams ID="LPP-${row.jobId}" Class="Parameter" Status="Available" Sides="TwoSidedFlipY" NumberUp="16 2" PresentationDirection="FoldCatalog">`,
+            `      <SheetLayout SheetFormat="B1" UsableWidthMm="1004" UsableHeightMm="702" GripperMarginMm="12.0" GrainDirection="${row.grainDirection || 'LG'}" />`,
+            `      <MarksList RegistrationMarks="true" CutMarks="true" FoldMarks="true" CollationMarks="true" ColorControlStrip="true" />`,
+            `      <CreepCompensation Enabled="${row.creepOffsetMm > 0}" CaliperUm="${row.caliperUm || 117}" AccumulatedBlockThicknessMm="${(row.accumulatedBlockThicknessMm || 14.04).toFixed(2)}" MaxInnerCreepMm="${row.creepOffsetMm.toFixed(2)}" />`,
+            `    </LayoutPreparationParams>`,
+            `    <FoldingIntent ID="FI-${row.jobId}" Class="Intent" Status="Available" FoldCatalog="F32-7" FoldPattern="${row.foldPattern}" CaliperUm="${row.caliperUm || 117}" />`,
+            `    <StrippingParams ID="SP-${row.jobId}" Class="Parameter" Status="Available" SectionList="32" WorkStyle="${row.workMode || 'WorkAndTurn'}">`,
             `      <StripCellParams BleedFace="3.0" BleedSpine="0.0" TrimSize="210 297" CreepOffsetMm="${row.creepOffsetMm.toFixed(2)}" />`,
             `    </StrippingParams>`,
             `    <ColorantControl ID="CC-${row.jobId}" Class="Parameter" Status="Available" ProcessColorModel="DeviceCMYK" ICCProfile="ISO Coated v2 (FOGRA39)" MaxTotalAreaCoveragePct="300" />`,
-            `    <CoverApplicationParams ID="CAP-${row.jobId}" Class="Parameter" Status="Available" SpineThicknessMm="14.54" GlueType="PUR" />`,
+            `    <CoverApplicationParams ID="CAP-${row.jobId}" Class="Parameter" Status="Available" SpineThicknessMm="${(row.accumulatedBlockThicknessMm || 14.54).toFixed(2)}" GlueType="PUR" />`,
             `    <Component ID="COMP-${row.jobId}" Class="Quantity" Status="Available" ComponentType="Sheet" MakeReadyWasteSheets="${row.makeReadyWasteSheets}" TargetPress="${row.targetPress}" />`,
             `  </ResourcePool>`,
             `</JDF>`
@@ -375,9 +421,11 @@ export const ManufacturingQueuePage: React.FC<SharedModuleProps> = ({
     const [formPages, setFormPages] = useState<number | ''>('');
     const [formCopies, setFormCopies] = useState<number | ''>('');
     const [formFormat, setFormFormat] = useState<'B1' | 'B2' | 'SRA3'>('B1');
-    const [formBinding, setFormBinding] = useState<'SOFTCOVER_PUR' | 'SADDLE_STITCH' | 'HARDCOVER'>('SOFTCOVER_PUR');
+    const [formBinding, setFormBinding] = useState<'SOFTCOVER_PUR' | 'SADDLE_STITCH' | 'HARDCOVER_SEWN'>('SOFTCOVER_PUR');
     const [formGrammage, setFormGrammage] = useState<number | ''>('');
+    const [formCaliperUm, setFormCaliperUm] = useState<number | ''>('');
     const [formBulk, setFormBulk] = useState<number | ''>('');
+    const [formGrain, setFormGrain] = useState<'LONG_GRAIN' | 'SHORT_GRAIN'>('LONG_GRAIN');
 
     const openComposeModal = () => {
         setFormJobId(generateSystemJobId());
@@ -388,7 +436,9 @@ export const ManufacturingQueuePage: React.FC<SharedModuleProps> = ({
         setFormFormat('B1');
         setFormBinding('SOFTCOVER_PUR');
         setFormGrammage('');
+        setFormCaliperUm('');
         setFormBulk('');
+        setFormGrain('LONG_GRAIN');
         setShowComposeModal(true);
     };
 
@@ -422,8 +472,10 @@ export const ManufacturingQueuePage: React.FC<SharedModuleProps> = ({
                     copies: Number(formCopies),
                     sheetFormat: formFormat,
                     bindingType: formBinding,
-                    paperGrammage: Number(formGrammage),
-                    paperBulk: Number(formBulk)
+                    paperGrammage: Number(formGrammage) || 90,
+                    caliperUm: formCaliperUm !== '' ? Number(formCaliperUm) : undefined,
+                    paperBulk: formBulk !== '' ? Number(formBulk) : undefined,
+                    grainDirection: formGrain
                 })
             });
 
@@ -439,11 +491,19 @@ export const ManufacturingQueuePage: React.FC<SharedModuleProps> = ({
                         dispatch.queuedSignatures?.[0]?.impositionScheme || `32pp ${formFormat}`,
                     foldPattern:
                         dispatch.queuedSignatures?.[0]?.foldPattern || '4-Fold Cross',
+                    workMode: dispatch.queuedSignatures?.[0]?.workMode,
+                    grainDirection: dispatch.queuedSignatures?.[0]?.grainDirection,
+                    caliperUm: dispatch.caliperUm,
+                    accumulatedBlockThicknessMm: dispatch.accumulatedBlockThicknessMm,
                     platesRequired: dispatch.totalPlatesDispatched,
                     paperEfficiencyPct: dispatch.avgPaperEfficiencyPct,
                     creepOffsetMm:
+                        dispatch.maxCreepOffsetMm ??
                         dispatch.queuedSignatures?.[dispatch.queuedSignatures.length - 1]
-                            ?.creepOffsetMm || 0,
+                            ?.creepOffsetMm ??
+                        0,
+                    exceedsFoldingTolerance: dispatch.exceedsFoldingTolerance,
+                    foldingToleranceWarning: dispatch.foldingToleranceWarning || null,
                     makeReadyWasteSheets: dispatch.totalMakeReadyWasteSheets,
                     targetPress: dispatch.targetPress,
                     status: 'QUEUED_FOR_PLATESETTER'
@@ -456,21 +516,30 @@ export const ManufacturingQueuePage: React.FC<SharedModuleProps> = ({
             // Deterministic fallback in unit test environments
         }
 
-        const sig32 = Math.floor(Number(formPages) / 32);
-        const remAfter32 = Number(formPages) % 32;
-        const sig16 = Math.floor(remAfter32 / 16);
-        const totalSigs = Math.max(1, sig32 + sig16);
-        const breakdown = `${sig32 > 0 ? `${sig32}×32pp` : ''}${sig16 > 0 ? ` + ${sig16}×16pp` : ''}`;
+        const effectiveGsm = Number(formGrammage) || 90;
+        const effectiveBulk = Number(formBulk) || 1.3;
+        const effectiveCaliperUm =
+            formCaliperUm !== '' && Number(formCaliperUm) > 0
+                ? Number(formCaliperUm)
+                : Math.round(effectiveGsm * effectiveBulk);
+        const maxSigSize = formFormat === 'B1' && effectiveCaliperUm <= 125 ? 32 : formFormat === 'SRA3' ? 8 : 16;
+        const sigPrimary = Math.floor(Number(formPages) / maxSigSize);
+        const remAfterPrimary = Number(formPages) % maxSigSize;
+        const sigSecondary = remAfterPrimary > 0 ? Math.ceil(remAfterPrimary / 16) : 0;
+        const totalSigs = Math.max(1, sigPrimary + sigSecondary);
+        const breakdown = `${sigPrimary > 0 ? `${sigPrimary}×${maxSigSize}pp` : ''}${sigSecondary > 0 ? ` + ${sigSecondary}×16pp` : ''}`;
         const plates = formFormat === 'SRA3' ? 0 : totalSigs * 8;
         const waste =
             formFormat === 'SRA3'
                 ? 10 + Math.ceil((totalSigs * Number(formCopies)) * 0.005)
                 : totalSigs * 150 + Math.ceil((totalSigs * Number(formCopies)) * 0.015);
-        const sheetThickness = 4 * (Number(formGrammage) / 1000) * Number(formBulk);
+        const sheetThickness = 4 * (effectiveCaliperUm / 1000);
+        const blockThicknessMm = Math.round((Number(formPages) / 2) * (effectiveCaliperUm / 1000) * 100) / 100;
         const creepMm =
             formBinding === 'SADDLE_STITCH'
                 ? Math.round((Number(formPages) / 4 - 1) * sheetThickness * 100) / 100
                 : 0;
+        const exceedsTolerance = formBinding === 'SADDLE_STITCH' && (creepMm > 1.5 || blockThicknessMm > 4.5);
 
         const fallbackRow: ImpositionSignatureRow = {
             queueEntryId: `${formJobId}-SIG-01`,
@@ -478,11 +547,17 @@ export const ManufacturingQueuePage: React.FC<SharedModuleProps> = ({
             title: `${formTitle} (${breakdown})`,
             isbn: formIsbn,
             signatureLabel: `SIG #1..${totalSigs} (${breakdown})`,
-            impositionScheme: formFormat === 'B1' ? '32pp B1 (16pp/side)' : formFormat === 'B2' ? '16pp B2 (8pp/side)' : '8pp SRA3 (4pp/side)',
-            foldPattern: '4-Fold Cross (French Fold)',
+            impositionScheme: `${maxSigSize}pp ${formFormat} (${maxSigSize / 2}pp/side · Sheetwise)`,
+            foldPattern: maxSigSize === 32 ? '4-Fold Cross (French Fold)' : '3-Fold Cross (16pp Standard)',
+            caliperUm: effectiveCaliperUm,
+            accumulatedBlockThicknessMm: blockThicknessMm,
             platesRequired: plates,
             paperEfficiencyPct: 74.8,
             creepOffsetMm: creepMm,
+            exceedsFoldingTolerance: exceedsTolerance,
+            foldingToleranceWarning: exceedsTolerance
+                ? `PREVENTIVE_FOLDING_WARNING: Block (${blockThicknessMm.toFixed(2)} mm) & creep (+${creepMm.toFixed(2)} mm) exceed tolerance.`
+                : null,
             makeReadyWasteSheets: waste,
             targetPress:
                 formFormat === 'B1'
@@ -505,6 +580,7 @@ export const ManufacturingQueuePage: React.FC<SharedModuleProps> = ({
             ? (rows.reduce((acc, r) => acc + r.paperEfficiencyPct, 0) / rows.length).toFixed(1)
             : '0.0';
     const totalSetupWaste = rows.reduce((acc, r) => acc + r.makeReadyWasteSheets, 0);
+    const rowsExceedingTolerance = rows.filter(r => r.exceedsFoldingTolerance || r.creepOffsetMm > 1.5);
 
     return (
         <div
@@ -558,6 +634,25 @@ export const ManufacturingQueuePage: React.FC<SharedModuleProps> = ({
                     }
                 ]}
             />
+
+            {/* Preventive Folding & Creep Tolerance Alert Banner */}
+            {rowsExceedingTolerance.length > 0 && (
+                <div
+                    data-testid="preventive-folding-tolerance-alert"
+                    className="rounded-xl bg-[#14161a] border border-amber-500/40 p-4 flex items-start gap-3"
+                >
+                    <ExclamationTriangleIcon className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+                    <div className="space-y-1 text-xs font-mono">
+                        <div className="font-black uppercase tracking-wider text-amber-400">
+                            {L.warnFoldingBadge} · {rowsExceedingTolerance.length} ACTIVE SIGNATURE RUN(S)
+                        </div>
+                        <p className="text-slate-300 leading-relaxed">
+                            {rowsExceedingTolerance[0].foldingToleranceWarning ||
+                                `Accumulated block thickness (${(rowsExceedingTolerance[0].accumulatedBlockThicknessMm || 3.74).toFixed(2)} mm) and max creep (+${rowsExceedingTolerance[0].creepOffsetMm.toFixed(2)} mm) exceed uncompensated folding tolerance (1.50 mm). Automatic progressive inward margin shingling is active in JDF 1.7 output.`}
+                        </p>
+                    </div>
+                </div>
+            )}
 
             {jmfSimBanner && (
                 <div
@@ -640,13 +735,26 @@ export const ManufacturingQueuePage: React.FC<SharedModuleProps> = ({
                         key: 'creep',
                         header: L.colCreep,
                         render: (row) => (
-                            <span
-                                className={`font-mono text-xs font-bold ${
-                                    row.creepOffsetMm > 0 ? 'text-amber-400' : 'text-slate-400'
-                                }`}
-                            >
-                                {row.creepOffsetMm > 0 ? `+${row.creepOffsetMm.toFixed(2)} mm` : '0.00 mm (PUR/Hard)'}
-                            </span>
+                            <div className="space-y-0.5">
+                                <span
+                                    className={`font-mono text-xs font-bold block ${
+                                        row.creepOffsetMm > 0 ? 'text-amber-400' : 'text-slate-400'
+                                    }`}
+                                >
+                                    {row.creepOffsetMm > 0 ? `+${row.creepOffsetMm.toFixed(2)} mm` : '0.00 mm (PUR/Hard)'}
+                                </span>
+                                {row.accumulatedBlockThicknessMm !== undefined && (
+                                    <span className="text-[10px] font-mono text-slate-400 block">
+                                        Block: {row.accumulatedBlockThicknessMm.toFixed(2)} mm
+                                        {row.caliperUm ? ` · ${row.caliperUm} µm` : ''}
+                                    </span>
+                                )}
+                                {row.exceedsFoldingTolerance && (
+                                    <span className="inline-block px-1.5 py-0.5 rounded bg-amber-500/15 border border-amber-500/40 text-[9px] font-mono font-black text-amber-400 uppercase">
+                                        {L.warnFoldingBadge}
+                                    </span>
+                                )}
+                            </div>
                         )
                     },
                     {
@@ -824,7 +932,7 @@ export const ManufacturingQueuePage: React.FC<SharedModuleProps> = ({
                                     onChange={(e) => setFormFormat(e.target.value as 'B1' | 'B2' | 'SRA3')}
                                     className="w-full rounded-lg bg-[#0a0b0d] border border-[#1f2228] px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-red-500"
                                 >
-                                    <option value="B1">B1 (720×1020 mm · 32pp)</option>
+                                    <option value="B1">B1 (720×1020 mm · 32pp/16pp)</option>
                                     <option value="B2">B2 (520×720 mm · 16pp)</option>
                                     <option value="SRA3">SRA3 (320×450 mm · 8pp Digital)</option>
                                 </select>
@@ -837,14 +945,14 @@ export const ManufacturingQueuePage: React.FC<SharedModuleProps> = ({
                                     value={formBinding}
                                     onChange={(e) =>
                                         setFormBinding(
-                                            e.target.value as 'SOFTCOVER_PUR' | 'SADDLE_STITCH' | 'HARDCOVER'
+                                            e.target.value as 'SOFTCOVER_PUR' | 'SADDLE_STITCH' | 'HARDCOVER_SEWN'
                                         )
                                     }
                                     className="w-full rounded-lg bg-[#0a0b0d] border border-[#1f2228] px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-red-500"
                                 >
                                     <option value="SOFTCOVER_PUR">SOFTCOVER_PUR</option>
                                     <option value="SADDLE_STITCH">SADDLE_STITCH (Grapa / Creep)</option>
-                                    <option value="HARDCOVER">HARDCOVER</option>
+                                    <option value="HARDCOVER_SEWN">HARDCOVER_SEWN (Cosido Hilo)</option>
                                 </select>
                             </div>
                             <div>
@@ -865,6 +973,23 @@ export const ManufacturingQueuePage: React.FC<SharedModuleProps> = ({
                             </div>
                             <div>
                                 <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                                    {L.lblCaliperUm}
+                                </label>
+                                <input
+                                    type="number"
+                                    min="30"
+                                    max="600"
+                                    value={formCaliperUm}
+                                    onChange={(e) => {
+                                        const v = e.target.value;
+                                        setFormCaliperUm(v === '' ? '' : Number(v));
+                                    }}
+                                    placeholder="e.g., 113 (µm)"
+                                    className="w-full rounded-lg bg-[#0a0b0d] border border-[#1f2228] px-3 py-2 text-xs font-mono text-white placeholder:text-slate-600 focus:outline-none focus:border-red-500"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
                                     {L.lblBulk}
                                 </label>
                                 <input
@@ -879,6 +1004,19 @@ export const ManufacturingQueuePage: React.FC<SharedModuleProps> = ({
                                     placeholder="e.g., 1.20"
                                     className="w-full rounded-lg bg-[#0a0b0d] border border-[#1f2228] px-3 py-2 text-xs font-mono text-white placeholder:text-slate-600 focus:outline-none focus:border-red-500"
                                 />
+                            </div>
+                            <div>
+                                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                                    {L.lblGrain}
+                                </label>
+                                <select
+                                    value={formGrain}
+                                    onChange={(e) => setFormGrain(e.target.value as 'LONG_GRAIN' | 'SHORT_GRAIN')}
+                                    className="w-full rounded-lg bg-[#0a0b0d] border border-[#1f2228] px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-red-500"
+                                >
+                                    <option value="LONG_GRAIN">LONG_GRAIN (LG · Fibra Larga)</option>
+                                    <option value="SHORT_GRAIN">SHORT_GRAIN (SG · Fibra Corta)</option>
+                                </select>
                             </div>
                         </div>
 
@@ -923,4 +1061,3 @@ export const ManufacturingQueuePage: React.FC<SharedModuleProps> = ({
     );
 };
 export default ManufacturingQueuePage;
-

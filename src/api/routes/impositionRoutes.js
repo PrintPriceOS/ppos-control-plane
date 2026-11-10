@@ -16,6 +16,7 @@
 const {
     IMPOSITION_STANDARDS,
     MACHINE_SHEET_FORMATS,
+    resolveMasterCatalogVariant,
     planImpositionJob,
     dispatchImpositionJob,
     listDispatchedImpositionQueue
@@ -133,6 +134,30 @@ function createImpositionRouter() {
         }
     });
 
+    // Helper to enrich payload with master catalog substrate attributes when variantId is supplied
+    async function enrichPayloadWithCatalogVariant(rawPayload = {}) {
+        const payload = { ...rawPayload };
+        const varId = payload.variantId || payload.variant_id;
+        if (varId) {
+            const dbVariant = await resolveMasterCatalogVariant(varId);
+            if (dbVariant) {
+                if (!payload.caliperUm && !payload.caliper_um && dbVariant.caliper_um) {
+                    payload.caliperUm = Number(dbVariant.caliper_um);
+                }
+                if (!payload.paperGrammage && !payload.gsm && dbVariant.gsm) {
+                    payload.paperGrammage = Number(dbVariant.gsm);
+                }
+                if (!payload.paperBulk && !payload.bulkFactor && dbVariant.bulk_factor) {
+                    payload.paperBulk = Number(dbVariant.bulk_factor);
+                }
+                if (!payload.grainDirection && !payload.grain_direction && dbVariant.grain_direction) {
+                    payload.grainDirection = dbVariant.grain_direction;
+                }
+            }
+        }
+        return payload;
+    }
+
     // POST /api/manufacturing/imposition/plan
     router.post('/plan', async (req, res) => {
         try {
@@ -142,7 +167,8 @@ function createImpositionRouter() {
                 (req.headers && req.headers['x-tenant-id']) ||
                 'tenant-default';
 
-            const plan = planImpositionJob(req.body || {}, {
+            const enrichedBody = await enrichPayloadWithCatalogVariant(req.body || {});
+            const plan = planImpositionJob(enrichedBody, {
                 tenantId,
                 actorId: (req.user && req.user.id) || 'workshop-operator'
             });
@@ -165,7 +191,8 @@ function createImpositionRouter() {
                 (req.headers && req.headers['x-tenant-id']) ||
                 'tenant-default';
 
-            const dispatchRecord = dispatchImpositionJob(req.body || {}, {
+            const enrichedBody = await enrichPayloadWithCatalogVariant(req.body || {});
+            const dispatchRecord = dispatchImpositionJob(enrichedBody, {
                 tenantId,
                 actorId: (req.user && req.user.id) || 'workshop-operator'
             });
@@ -183,10 +210,11 @@ function createImpositionRouter() {
     router.get('/:jobId/jdf-ticket.xml', async (req, res) => {
         try {
             const jobId = req.params && req.params.jobId;
-            const ticket = generateJdfJobTicketXml({
+            const enrichedQuery = await enrichPayloadWithCatalogVariant({
                 ...(req.query || {}),
                 jobId
             });
+            const ticket = generateJdfJobTicketXml(enrichedQuery);
             if (typeof res.setHeader === 'function') {
                 res.setHeader('Content-Type', 'application/vnd.cip4-jdf+xml; charset=utf-8');
             }

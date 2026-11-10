@@ -6,19 +6,26 @@
  * PrintPrice OS — Phase 12B: CIP4 JDF 1.7 Job Ticket Generator & JMF Press Telemetry Bridge
  *
  * Responsibilities:
- * 1. Generates standards-compliant CIP4 JDF 1.7 XML job tickets (`generateJdfJobTicketXml`)
+ * 1. Generates standards-compliant CIP4 JDF 1.7 / JMF XML job tickets (`generateJdfJobTicketXml`)
  *    ready to feed Heidelberg Prinect, Kodak Prinergy, and HP Indigo Production Pro RIPs/CTPs.
- * 2. Embeds PHASE-11A physical geometry (`CoverApplicationParams` spine width in mm,
+ * 2. Includes mandatory CIP4 descriptors:
+ *    - `<Device>` (`DeviceID`, `DeviceClass="Press"`, `FolderDeviceID`)
+ *    - `<SheetLayout>` (`SheetFormat`, `UsableWidthMm`, `UsableHeightMm`, `GripperMarginMm`, `GrainDirection`)
+ *    - `<MarksList>` (`CutMarks`, `RegistrationMarks`, `ColorControlStrip`, `CollationMarks`, `FoldMarks`)
+ *    - `<FoldingIntent>` (`FoldCatalog`, `MaxSignaturePages`, `GrainAlignment`, `CaliperUm`)
+ * 3. Embeds PHASE-11A physical geometry (`CoverApplicationParams` spine width in mm,
  *    `InterpretingParams` & `ColorantControl` ISO Coated v2 / FOGRA39 TAC limits) and
  *    PHASE-11B imposition layout (`LayoutPreparationParams`, `StrippingParams` signature breakdown
- *    32/16/8/4 pp, B1/B2/SRA3 sheet dimensions, and progressive Saddle-Stitch creep offset).
- * 3. Processes incoming JMF (`Job Messaging Format`) telemetry signals (`processJmfTelemetrySignal`)
+ *    32/16/8/4 pp, B1/B2/SRA3 sheet dimensions, and progressive caliper-driven creep offset).
+ * 4. Processes incoming JMF (`Job Messaging Format`) telemetry signals (`processJmfTelemetrySignal`)
  *    updating live good-sheet counters, make-ready waste, and CTP plate burn states.
  */
 
 const crypto = require('crypto');
 const { calculateTheoreticalSpine } = require('../preflight/preflightEngineService');
 const {
+    MACHINE_SHEET_FORMATS,
+    resolveSubstrateCaliperSpec,
     calculateSignaturesLayout,
     calculateCreepOffset,
     estimateMakeReadyWaste
@@ -36,21 +43,33 @@ function escapeXml(str) {
 }
 
 /**
- * Generates a complete CIP4 JDF 1.7 XML Job Ticket (`GET /api/manufacturing/imposition/:jobId/jdf-ticket.xml`)
+ * Generates a complete CIP4 JDF 1.7 / JMF XML Job Ticket (`GET /api/manufacturing/imposition/:jobId/jdf-ticket.xml`)
  */
 function generateJdfJobTicketXml(payload = {}) {
     const jobId = payload.jobId || 'PF-2026-082';
     const isbn = payload.isbn || '978-3-8365-9102-7';
     const title = payload.title || 'Atlas de Arquitectura Industrial Europea';
-    const totalPages = Number(payload.totalPages) || 240;
-    const printRunCopies = Number(payload.printRunCopies) || 3000;
+    const totalPages = Number(payload.totalPages || payload.pageCount) || 240;
+    const printRunCopies = Number(payload.printRunCopies || payload.copies) || 3000;
     const trimWidthMm = Number(payload.trimWidthMm) || 150;
     const trimHeightMm = Number(payload.trimHeightMm) || 230;
     const bleedMarginMm = Number(payload.bleedMarginMm) || 3.0;
-    const paperGrammage = Number(payload.paperGrammage) || 90;
-    const paperBulk = Number(payload.paperBulk) || 1.3;
+    const variantId = payload.variantId || payload.variant_id || null;
+    const grainDirection = payload.grainDirection || payload.grain_direction || 'LONG_GRAIN';
+
+    const substrate = resolveSubstrateCaliperSpec({
+        caliperUm: payload.caliperUm ?? payload.caliper_um,
+        paperGrammage: payload.paperGrammage ?? payload.gsm ?? 90,
+        paperBulk: payload.paperBulk ?? payload.bulkFactor ?? payload.bulk_volume
+    });
+
+    const paperGrammage = substrate.grammageGsm;
+    const paperBulk = substrate.paperBulk;
+    const caliperUm = substrate.caliperUm;
     const bindingType = payload.bindingType || 'SOFTCOVER_PUR';
-    const machineFormatCode = payload.machineFormatCode || 'B1';
+    const machineFormatCode = String(payload.machineFormatCode || payload.sheetFormat || 'B1').toUpperCase();
+    const machineSpec = MACHINE_SHEET_FORMATS[machineFormatCode] || MACHINE_SHEET_FORMATS.B1;
+    const deviceId = payload.deviceId || machineSpec.deviceId || 'HEIDELBERG-XL106-PRINECT-01';
     const targetRipSystem = payload.targetRipSystem || 'HEIDELBERG_PRINECT_2026';
 
     const spine = calculateTheoreticalSpine({
@@ -62,20 +81,23 @@ function generateJdfJobTicketXml(payload = {}) {
 
     const layout = calculateSignaturesLayout({
         pageCount: totalPages,
-        totalPages,
         trimWidthMm,
         trimHeightMm,
-        bleedMarginMm,
         sheetFormat: machineFormatCode,
-        machineFormatCode
+        grainDirection,
+        caliperUm,
+        paperGrammage,
+        paperBulk
     });
 
     const creep = calculateCreepOffset({
         pageCount: totalPages,
-        totalPages,
+        caliperUm,
         paperGrammage,
         paperBulk,
-        bindingType
+        bindingType,
+        foldCompressionFactor: payload.foldCompressionFactor,
+        signaturePages: layout.maxSignaturePagesSupported
     });
 
     const waste = estimateMakeReadyWaste({
@@ -105,11 +127,14 @@ function generateJdfJobTicketXml(payload = {}) {
             const sheetOffset =
                 creep.sheetOffsets?.find(s => s.sheetNumber === sig.signatureNumber)
                     ?.progressiveOffsetMm ?? 0;
-            return `      <BinderySignature ID="SIG_${sig.signatureNumber}" SignatureType="FoldGrid" NumberUp="${sig.signaturePages / 2}" FoldCatalog="${escapeXml(sig.foldPattern)}">
-        <SignatureCell PageRange="${pageStart}-${pageEnd}" CreepOffsetMm="${sheetOffset}" PlatesCMYK="${sig.platesRequired}" />
+            return `      <BinderySignature ID="SIG_${sig.signatureNumber}" SignatureType="FoldGrid" NumberUp="${sig.signaturePages / 2}" FoldCatalog="${escapeXml(sig.foldCatalogCode || sig.foldPattern)}" WorkStyle="${escapeXml(sig.workMode)}">
+        <SignatureCell PageRange="${pageStart}-${pageEnd}" CreepOffsetMm="${sheetOffset}" PlatesCMYK="${sig.platesRequired}" GrainDirection="${escapeXml(sig.grainDirection)}" />
       </BinderySignature>`;
         })
         .join('\n');
+
+    const primaryFoldCatalog = layout.signatures[0]?.foldCatalogCode || 'F32-7';
+    const primaryFoldPattern = layout.signatures[0]?.foldPattern || '4-Fold Cross (French Fold 32pp)';
 
     const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <JDF xmlns="http://www.cip4.org/JDFSchema_1_1"
@@ -125,10 +150,14 @@ function generateJdfJobTicketXml(payload = {}) {
     <Created AgentName="PrintPriceOS Control Plane Phase-12B" AgentVersion="2026.5" TimeStamp="${new Date().toISOString()}" TargetRIP="${escapeXml(targetRipSystem)}" />
   </AuditPool>
   <ResourcePool>
+    <Device ID="DEV_01" Class="Implementation" Status="Available" DeviceID="${escapeXml(deviceId)}" DeviceClass="Press" FriendlyName="${escapeXml(layout.machineName)}" FolderDeviceID="${escapeXml(layout.folderDeviceId || 'STAHL-KH82-FOLDER-01')}" />
     <LayoutPreparationParams ID="LPP_01" Class="Parameter" Status="Available" NumberUp="${layout.maxSignaturePagesSupported / 2}" PresentationDirection="FoldCatalog" BindingEdge="Left">
       <ExternalImpositionTemplate FileSpec="urn:printprice:imposition:${escapeXml(jobId)}:${escapeXml(layout.breakdownSummary)}" />
-      <CreepCompensation Enabled="${creep.creepActive}" BindingType="${escapeXml(bindingType)}" SheetThicknessMm="${creep.sheetThicknessMm}" MaxInnerCreepMm="${creep.maxCreepOffsetMm}" />
+      <SheetLayout SheetFormat="${escapeXml(layout.sheetFormat)}" SheetWidthMm="${layout.sheetDimensionsMm.widthMm}" SheetHeightMm="${layout.sheetDimensionsMm.heightMm}" UsableWidthMm="${layout.printableAreaMm.widthMm}" UsableHeightMm="${layout.printableAreaMm.heightMm}" GripperMarginMm="${layout.workshopMarks.gripperEdgeMm}" ColorBarMm="${layout.workshopMarks.colorBarMm}" GrainDirection="${escapeXml(layout.grainDirection)}" GrainAlignment="${escapeXml(layout.grainAlignmentStatus)}" />
+      <MarksList RegistrationMarks="true" CutMarks="true" FoldMarks="true" CollationMarks="true" ColorControlStrip="true" BleedMm="${layout.workshopMarks.bleedPerPageMm}" GutterMm="${layout.workshopMarks.gutterMm}" />
+      <CreepCompensation Enabled="${creep.creepActive}" BindingType="${escapeXml(bindingType)}" CaliperUm="${caliperUm}" CaliperSource="${escapeXml(substrate.caliperSource)}" LeafDisplacementMm="${creep.leafDisplacementMm}" SheetThicknessMm="${creep.sheetThicknessMm}" AccumulatedBlockThicknessMm="${creep.accumulatedBlockThicknessMm}" MaxInnerCreepMm="${creep.maxCreepOffsetMm}" ExceedsFoldingTolerance="${creep.exceedsFoldingTolerance}" />
     </LayoutPreparationParams>
+    <FoldingIntent ID="FI_01" Class="Intent" Status="Available" FoldCatalog="${escapeXml(primaryFoldCatalog)}" FoldPattern="${escapeXml(primaryFoldPattern)}" MaxSignaturePages="${layout.maxSignaturePagesSupported}" GeometricMaxPages="${layout.geometricMaxSignaturePages}" GrainDirection="${escapeXml(layout.grainDirection)}" CaliperUm="${caliperUm}" VariantID="${escapeXml(variantId || 'MASTER_CATALOG')}" />
     <StrippingParams ID="STP_01" Class="Parameter" Status="Available" SheetFormat="${escapeXml(layout.sheetFormat)}" SheetWidthMm="${layout.sheetDimensionsMm.widthMm}" SheetHeightMm="${layout.sheetDimensionsMm.heightMm}" GripperMarginMm="${layout.workshopMarks.gripperEdgeMm}" ColorBarMm="${layout.workshopMarks.colorBarMm}">
 ${strippingNodesXml}
     </StrippingParams>
@@ -138,7 +167,9 @@ ${strippingNodesXml}
     <Component ID="COMP_FINAL" Class="Quantity" Status="Unavailable" ComponentType="FinalProduct" Amount="${printRunCopies}" MakeReadyWasteSheets="${waste.totalWasteSheets}" GrossPressSheets="${waste.grossSheetsRequired}" />
   </ResourcePool>
   <ResourceLinkPool>
+    <DeviceLink rRef="DEV_01" Usage="Input" />
     <LayoutPreparationParamsLink rRef="LPP_01" Usage="Input" />
+    <FoldingIntentLink rRef="FI_01" Usage="Input" />
     <StrippingParamsLink rRef="STP_01" Usage="Input" />
     <InterpretingParamsLink rRef="INT_01" Usage="Input" />
     <ColorantControlLink rRef="COL_01" Usage="Input" />
@@ -153,11 +184,16 @@ ${strippingNodesXml}
         isbn,
         title,
         jdfVersion: '1.7',
+        deviceId,
         targetRipSystem,
+        caliperUm,
+        accumulatedBlockThicknessMm: creep.accumulatedBlockThicknessMm,
         signatureBreakdownLabel: layout.breakdownSummary,
+        maxSignaturePagesSupported: layout.maxSignaturePagesSupported,
         totalPlatesRequired: layout.totalPlatesRequired,
         calculatedSpineMm: spine.calculatedSpineMm,
         maxCreepOffsetMm: creep.maxCreepOffsetMm,
+        exceedsFoldingTolerance: creep.exceedsFoldingTolerance,
         makeReadyWasteSheets: waste.totalWasteSheets,
         xml
     };
@@ -203,11 +239,7 @@ function getLatestJmfTelemetry(jobId, tenantId = 'tenant-default') {
 }
 
 /**
- * Simulates a full 3-stage JMF press telemetry burst (`POST /api/manufacturing/imposition/jmf/simulate-burst`):
- *   1. `PLATES_BURNED`: CTP plates imaged & mounted (e.g. 64 plates).
- *   2. `ON_PRESS`: Make-ready calibration completed + 50% good sheets printed.
- *   3. `COMPLETED`: Target good sheets reached, exact real vs planned make-ready waste reconciled,
- *      and inline spectrophotometric Delta-E verified (< 1.0).
+ * Simulates a full 3-stage JMF press telemetry burst (`POST /api/manufacturing/imposition/jmf/simulate-burst`)
  */
 function simulateJmfTelemetryBurst(payload = {}, actorContext = {}) {
     const tenantId = actorContext.tenantId || payload.tenantId || 'tenant-default';
@@ -217,7 +249,7 @@ function simulateJmfTelemetryBurst(payload = {}, actorContext = {}) {
     const actualMakeReadyWasteSheets =
         payload.actualMakeReadyWasteSheets !== undefined
             ? Number(payload.actualMakeReadyWasteSheets)
-            : Math.round(plannedMakeReadyWasteSheets * 0.96); // 4% waste savings via closed-loop Prinect Inpress Control
+            : Math.round(plannedMakeReadyWasteSheets * 0.96);
     const platesBurned = Math.max(0, Number(payload.platesBurned ?? 64));
     const speedSheetsPerHour = Math.max(1000, Number(payload.speedSheetsPerHour ?? 16800));
     const deltaEColorAccuracy = Number(payload.deltaEColorAccuracy ?? 0.68);
