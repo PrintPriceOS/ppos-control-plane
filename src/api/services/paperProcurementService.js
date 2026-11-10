@@ -304,7 +304,7 @@ class PaperProcurementService {
      */
     async searchMasterPaperDatabase(buyerTenantId, query = {}) {
         const rawQuery = (query.query || query.q || '').trim();
-        const limit = Math.min(Math.max(1, parseInt(query.limit, 10) || 30), 100);
+        const limit = Math.min(Math.max(1, parseInt(query.limit, 10) || 4000), 5000);
         const offset = Math.max(0, parseInt(query.offset, 10) || 0);
 
         // If raw query is non-empty but under 2 characters and no category/finish filter is specified, return empty
