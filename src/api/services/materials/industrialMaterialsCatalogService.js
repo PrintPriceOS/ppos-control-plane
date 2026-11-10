@@ -1339,13 +1339,14 @@ async function syncMasterIndustrialCatalog(scope = {}, dbClient = db) {
             const widthMm = Number(row.width_mm || 700);
             const heightMm = Number(row.height_mm || 1000);
             const grain = String(row.grain_direction || '').toUpperCase().includes('SHORT') || row.grain_direction === 'SG' ? 'SG' : 'LG';
+            const brand = deriveMillBrand(row.product_name, row.manufacturer);
 
             const item = {
                 id: `MAT-${row.variant_id}`,
                 printhouse_id: scope.printhouseId || 'GLOBAL_MASTER',
                 tenant_id: scope.tenantId || 'tenant-default',
                 name: row.product_name,
-                manufacturer: row.manufacturer,
+                manufacturer: brand,
                 material_type: materialType,
                 category,
                 basis_weight_gsm: gsm,

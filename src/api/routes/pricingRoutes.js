@@ -224,8 +224,8 @@ function createPricingRouter() {
         }
     });
 
-    // POST /api/pricing/materials/sync-master
-    router.post('/materials/sync-master', async (req, res) => {
+    // POST /api/pricing/materials/sync-master (also aliased at /refresh and /sync-mysql)
+    const handlePricingSyncMaster = async (req, res) => {
         try {
             const tenantId =
                 (req.user && req.user.tenantId) ||
@@ -243,7 +243,10 @@ function createPricingRouter() {
                 error: err.message
             });
         }
-    });
+    };
+    router.post('/materials/sync-master', handlePricingSyncMaster);
+    router.post('/materials/refresh', handlePricingSyncMaster);
+    router.post('/materials/sync-mysql', handlePricingSyncMaster);
 
     // POST /api/pricing/materials/bulk-activate
     router.post('/materials/bulk-activate', async (req, res) => {

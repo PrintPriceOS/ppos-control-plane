@@ -3192,7 +3192,7 @@ export const en = {
   'materials.catalog.btnEdit': 'Edit',
   'materials.catalog.emptyFiltered': 'No industrial substrates match the selected filter.',
   'materials.catalog.syncSuccess': 'European Master Paper Catalog ({count} technical variants from Munken, Fedrigoni, Sappi, Lecta, Stora Enso) synchronized successfully with MySQL.',
-  'materials.syncSuccess': 'European Master Paper Catalog ({count} technical variants) synchronized successfully with MySQL.',
+  'materials.syncSuccess': 'European Master Paper Catalog ({count} technical variants from Munken, Fedrigoni, Sappi, Lecta, Stora Enso) synchronized successfully with MySQL.',
   'materials.bulk.activateBtn': '+ Activate From Master Catalog',
   'materials.bulk.importCsvBtn': 'Import Rate Card (CSV)',
   'materials.bulk.modalTitle': 'Master European Paper Catalog (1,524 Variants)',

@@ -383,10 +383,10 @@ router.post('/', async (req, res) => {
 });
 
 /**
- * POST /api/admin/materials/sync-master
- * Seeds / rehydrates the European Master Industrial Substrates Catalog (Munken, Fedrigoni, Sappi, Lecta, Stora Enso).
+ * POST /api/admin/materials/sync-master (also aliased at /refresh and /sync-mysql)
+ * Seeds / rehydrates the European Master Industrial Substrates Catalog (1,524 active variants from Munken, Fedrigoni, Sappi, Lecta, Stora Enso).
  */
-router.post('/sync-master', async (req, res) => {
+const handleSyncMasterCatalog = async (req, res) => {
     try {
         const scope = getScopeContext(req);
         assertWritePermission(scope);
@@ -401,7 +401,11 @@ router.post('/sync-master', async (req, res) => {
         }
         return res.status(500).json({ ok: false, error: err.message, code: 'SYNC_MASTER_ERROR' });
     }
-});
+};
+
+router.post('/sync-master', handleSyncMasterCatalog);
+router.post('/refresh', handleSyncMasterCatalog);
+router.post('/sync-mysql', handleSyncMasterCatalog);
 
 /**
  * POST /api/admin/materials/bulk-activate

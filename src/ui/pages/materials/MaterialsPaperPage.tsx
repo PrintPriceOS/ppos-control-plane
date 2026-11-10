@@ -759,7 +759,7 @@ export const MaterialsPaperPage: React.FC<MaterialsPaperPageProps> = ({
                         onClick={() => setFeedbackBanner(null)}
                         className="text-[10px] font-mono underline ml-4 cursor-pointer"
                     >
-                        CERRAR
+                        {t('close') || 'CLOSE'}
                     </button>
                 </div>
             )}
@@ -1057,8 +1057,8 @@ export const MaterialsPaperPage: React.FC<MaterialsPaperPageProps> = ({
                                 <tr>
                                     <td colSpan={7} className="py-10 text-center text-xs text-zinc-400 font-mono">
                                         {loading
-                                            ? 'Cargando catálogo industrial desde MySQL...'
-                                            : 'No se encontraron sustratos para el filtro seleccionado.'}
+                                            ? `${t('common.loading') || 'Loading'}...`
+                                            : t('materials.catalog.emptyFiltered')}
                                     </td>
                                 </tr>
                             )}
@@ -1224,7 +1224,7 @@ export const MaterialsPaperPage: React.FC<MaterialsPaperPageProps> = ({
                                                     €{bulkMasterBaseRate.toFixed(2)}/kg
                                                 </div>
                                                 <div className="text-[10px] text-zinc-500">
-                                                    ~€{(((m.basis_weight_gsm * 0.7 * 1.0) / 1000) * bulkMasterBaseRate).toFixed(4)}/pliego
+                                                    ~€{((((m.dimensions_json?.width_mm || 700) / 1000) * ((m.dimensions_json?.height_mm || 1000) / 1000) * m.basis_weight_gsm / 1000) * bulkMasterBaseRate).toFixed(4)}/sheet
                                                 </div>
                                             </div>
                                         </div>

@@ -534,6 +534,7 @@ const start = async () => {
             fastify.use('/api/admin/financials/activation', require('./src/api/routes/financialOperationsProductionActivationAdmin'));
             fastify.use('/api/admin/printhouse-reviews', require('./src/api/routes/printhouseAdminReviewRoutes'));
             fastify.use('/api/admin/materials', require('./src/api/routes/materialsAdmin'));
+            fastify.use('/api/materials', require('./src/api/routes/materialsAdmin'));
             fastify.use('/api/admin', require('./src/api/routes/admin'));
             fastify.use('/api/printhouse/onboarding/shipping', require('./src/api/routes/printhouseShippingRoutes'));
             fastify.use('/api/printhouse/onboarding/integrations', require('./src/api/routes/printhouseIntegrationRoutes'));
@@ -584,6 +585,8 @@ const start = async () => {
             fastify.all('/api/auth/*', apiNotFoundFallback);
             fastify.all('/api/admin/materials', apiNotFoundFallback);
             fastify.all('/api/admin/materials/*', apiNotFoundFallback);
+            fastify.all('/api/materials', apiNotFoundFallback);
+            fastify.all('/api/materials/*', apiNotFoundFallback);
             fastify.all('/api/admin', apiNotFoundFallback);
             fastify.all('/api/admin/*', apiNotFoundFallback);
             fastify.all('/api/admin/financials/activation', apiNotFoundFallback);

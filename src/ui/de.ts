@@ -3192,7 +3192,7 @@ export const de = {
   'materials.catalog.btnEdit': 'Bearbeiten',
   'materials.catalog.emptyFiltered': 'Keine industriellen Bedruckstoffe für den gewählten Filter gefunden.',
   'materials.catalog.syncSuccess': 'Europäischer Papier-Hauptkatalog ({count} technische Varianten von Munken, Fedrigoni, Sappi, Lecta, Stora Enso) erfolgreich mit MySQL synchronisiert.',
-  'materials.syncSuccess': 'Europäischer Papier-Hauptkatalog ({count} technische Varianten) erfolgreich mit MySQL synchronisiert.',
+  'materials.syncSuccess': 'Europäischer Papier-Hauptkatalog ({count} technische Varianten von Munken, Fedrigoni, Sappi, Lecta, Stora Enso) erfolgreich mit MySQL synchronisiert.',
   'materials.bulk.activateBtn': '+ Aus Hauptkatalog aktivieren',
   'materials.bulk.importCsvBtn': 'Preistabelle importieren (CSV)',
   'materials.bulk.modalTitle': 'Europäischer Papier-Hauptkatalog (1.524 Varianten)',
