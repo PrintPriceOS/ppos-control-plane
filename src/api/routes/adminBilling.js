@@ -423,6 +423,16 @@ async function handleStripeEvent(event) {
         //  1. client_reference_id  (reliable Stripe-native field, set by us)
         //  2. metadata.tenant_id   (legacy / fallback)
         case 'checkout.session.completed': {
+            if (obj.metadata?.kind === 'PRINTHOUSE_LICENSE') {
+                const result = await require('../services/printhouseLicenseService').activateLicense({
+                    printhouseId: obj.metadata.printhouse_id || obj.client_reference_id,
+                    stripeCustomerId: obj.customer || null,
+                    stripeSubscriptionId: obj.subscription || null
+                });
+                console.log('[BILLING][WEBHOOK][PRINTHOUSE_LICENSE_ACTIVATED]', result);
+                break;
+            }
+
             // PHASE-15: Check if this checkout session belongs to a Marketplace Order
             const marketplaceOrderId = obj.metadata?.order_id || (obj.mode === 'payment' ? obj.client_reference_id : null);
             if (marketplaceOrderId) {
@@ -440,15 +450,6 @@ async function handleStripeEvent(event) {
                     sessionId: obj.id,
                     paymentIntentId: obj.payment_intent
                 });
-                break;
-            }
-
-            if (obj.metadata?.kind === 'PRINTHOUSE_LICENSE') {
-                const result = await require('../services/printhouseLicenseService').activateLicense({
-                    printhouseId: obj.metadata.printhouse_id || obj.client_reference_id,
-                    stripeCustomerId: obj.customer || null
-                });
-                console.log('[BILLING][WEBHOOK][PRINTHOUSE_LICENSE_ACTIVATED]', result);
                 break;
             }
 

@@ -88,8 +88,8 @@ async function activateLicense({ printhouseId, stripeCustomerId = null, stripeSu
         const [unlocked] = await conn.query(
             `UPDATE marketplace_orders
                 SET dispatch_lock_reason = 'NONE', updated_at = NOW()
-              WHERE printhouse_id = ? AND dispatch_lock_reason = 'AWAITING_PRINTHOUSE_LICENSE'`,
-            [printhouseId]
+              WHERE (printhouse_id = ? OR tenant_id = ?) AND dispatch_lock_reason = 'AWAITING_PRINTHOUSE_LICENSE'`,
+            [printhouseId, printhouseId]
         );
         await conn.commit();
         return { printhouseActivated: upd.affectedRows > 0, ordersUnlocked: unlocked.affectedRows };
@@ -103,16 +103,16 @@ async function activateLicense({ printhouseId, stripeCustomerId = null, stripeSu
 
 async function getLockedSummary(tenantId) {
     const rows = await mysqlClient.query(
-        `SELECT COUNT(*) AS cnt, COALESCE(SUM(mo.total_amount_eur), 0) AS total
+        `SELECT COUNT(DISTINCT mo.order_id) AS cnt, COALESCE(SUM(COALESCE(mo.total_amount_eur, mo.estimated_price, 0)), 0) AS total
            FROM marketplace_orders mo
-           JOIN printhouses p ON p.id = mo.printhouse_id
+           JOIN printhouses p ON (p.id = mo.printhouse_id OR p.tenant_id = mo.printhouse_id OR p.tenant_id = mo.tenant_id)
           WHERE p.tenant_id = ? AND mo.dispatch_lock_reason = 'AWAITING_PRINTHOUSE_LICENSE'`,
         [tenantId]
     );
     const lockedRows = await mysqlClient.query(
-        `SELECT mo.id, mo.order_code, mo.status, mo.total_amount_eur, mo.currency, mo.created_at
+        `SELECT mo.order_id AS id, COALESCE(mo.external_order_ref, mo.order_id) AS order_code, mo.status, COALESCE(mo.total_amount_eur, mo.estimated_price, 0) AS total_amount_eur, mo.currency, mo.created_at
            FROM marketplace_orders mo
-           JOIN printhouses p ON p.id = mo.printhouse_id
+           JOIN printhouses p ON (p.id = mo.printhouse_id OR p.tenant_id = mo.printhouse_id OR p.tenant_id = mo.tenant_id)
           WHERE p.tenant_id = ? AND mo.dispatch_lock_reason = 'AWAITING_PRINTHOUSE_LICENSE'
           ORDER BY mo.created_at DESC
           LIMIT 50`,
