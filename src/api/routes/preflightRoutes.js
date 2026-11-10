@@ -21,6 +21,8 @@ const {
     MASTER_PAPER_CATALOG,
     GEOMETRY_PROFILES,
     inspectPreflightJob,
+    ingestAsyncPreflightJob,
+    getAsyncPreflightJobStatus,
     executePreflightAutoFix,
     purgePreflightJobAsset,
     generateSanitizedPressPdfBuffer,
@@ -334,6 +336,7 @@ function createPreflightRouter() {
                 'tenant-default';
 
             const payload = { ...(req.body || {}) };
+            const contentLengthBytes = Number((req.headers && req.headers['content-length']) || 0);
             if (req.file) {
                 payload.filePath = req.file.path;
                 payload.storagePath = req.file.path;
@@ -342,6 +345,41 @@ function createPreflightRouter() {
             } else if (!payload.pdfBuffer && typeof payload.pdfBase64 === 'string' && payload.pdfBase64.length > 0) {
                 const rawB64 = payload.pdfBase64.replace(/^data:application\/pdf;base64,/i, '');
                 payload.pdfBuffer = Buffer.from(rawB64, 'base64');
+            }
+
+            const effectivePayloadBytes = Number(
+                payload.fileSizeBytes ??
+                payload.sizeBytes ??
+                contentLengthBytes ??
+                (payload.pdfBuffer ? payload.pdfBuffer.length : 0)
+            );
+            if (effectivePayloadBytes > MAX_PREFLIGHT_PDF_BYTES) {
+                return res.status(413).json({
+                    ok: false,
+                    error: 'PAYLOAD_TOO_LARGE_MAX_2GB',
+                    maxAllowedBytes: MAX_PREFLIGHT_PDF_BYTES,
+                    receivedBytes: effectivePayloadBytes,
+                    message: `File payload (${effectivePayloadBytes} bytes) exceeds strict 2 GB ceiling (${MAX_PREFLIGHT_PDF_BYTES} bytes).`
+                });
+            }
+
+            const isAsyncMode =
+                String((req.query && req.query.async) || '').toLowerCase() === 'true' ||
+                String(payload.async || '').toLowerCase() === 'true' ||
+                payload.async === true;
+
+            if (isAsyncMode) {
+                const asyncAck = ingestAsyncPreflightJob(
+                    {
+                        ...payload,
+                        fileSizeBytes: effectivePayloadBytes
+                    },
+                    {
+                        tenantId,
+                        actorId: (req.user && req.user.id) || 'workshop-operator'
+                    }
+                );
+                return res.status(202).json(asyncAck);
             }
 
             let upstreamEngineStatus = null;
@@ -439,6 +477,80 @@ function createPreflightRouter() {
             }
 
             return res.status(200).json(report);
+        } catch (err) {
+            return res.status(400).json({
+                ok: false,
+                error: err.message
+            });
+        }
+    });
+
+    // POST /api/preflight/ingest (Asynchronous 2GB PDF Ingestion returning HTTP 202 Accepted)
+    router.post('/ingest', preflightStreamingUpload, async (req, res) => {
+        try {
+            const tenantId =
+                (req.user && req.user.tenantId) ||
+                (req.body && req.body.tenantId) ||
+                (req.headers && req.headers['x-tenant-id']) ||
+                'tenant-default';
+
+            const payload = { ...(req.body || {}) };
+            const contentLengthBytes = Number((req.headers && req.headers['content-length']) || 0);
+            if (req.file) {
+                payload.filePath = req.file.path;
+                payload.storagePath = req.file.path;
+                payload.fileName = payload.fileName || req.file.originalname;
+                payload.sizeBytes = req.file.size;
+            } else if (!payload.pdfBuffer && typeof payload.pdfBase64 === 'string' && payload.pdfBase64.length > 0) {
+                const rawB64 = payload.pdfBase64.replace(/^data:application\/pdf;base64,/i, '');
+                payload.pdfBuffer = Buffer.from(rawB64, 'base64');
+            }
+
+            const effectivePayloadBytes = Number(
+                payload.fileSizeBytes ??
+                payload.sizeBytes ??
+                contentLengthBytes ??
+                (payload.pdfBuffer ? payload.pdfBuffer.length : 0)
+            );
+
+            const asyncAck = ingestAsyncPreflightJob(
+                {
+                    ...payload,
+                    fileSizeBytes: effectivePayloadBytes
+                },
+                {
+                    tenantId,
+                    actorId: (req.user && req.user.id) || 'workshop-operator'
+                }
+            );
+            return res.status(202).json(asyncAck);
+        } catch (err) {
+            const status = err.statusCode || (err.code === 'PAYLOAD_TOO_LARGE_MAX_2GB' ? 413 : 400);
+            return res.status(status).json({
+                ok: false,
+                error: err.code || err.message,
+                message: err.message
+            });
+        }
+    });
+
+    // GET /api/preflight/ingest/:id (Retrieve Asynchronous Diagnostic Job / Evidence State)
+    router.get('/ingest/:id', async (req, res) => {
+        try {
+            const tenantId =
+                (req.user && req.user.tenantId) ||
+                (req.query && req.query.tenantId) ||
+                (req.headers && req.headers['x-tenant-id']) ||
+                'tenant-default';
+            const id = req.params && req.params.id;
+            const record = getAsyncPreflightJobStatus(id, tenantId);
+            if (!record) {
+                return res.status(404).json({
+                    ok: false,
+                    error: 'DIAGNOSTIC_JOB_NOT_FOUND'
+                });
+            }
+            return res.status(200).json(record);
         } catch (err) {
             return res.status(400).json({
                 ok: false,

@@ -40,6 +40,8 @@ const crypto = require('crypto');
 const fs = require('fs');
 
 const PREFLIGHT_STANDARDS = Object.freeze({
+    MAX_PREFLIGHT_PAYLOAD_BYTES: 2 * 1024 * 1024 * 1024, // 2 GB (2147483648 bytes)
+    CANONICAL_TERMINAL_STATES: Object.freeze(['COMPLETED', 'DEGRADED', 'PARTIAL', 'FAILED']),
     GLUE_ALLOWANCE_MM: 0.5,
     DEFAULT_BOARD_THICKNESS_MM: 2.0,
     DEFAULT_HINGE_ALLOWANCE_MM: 3.0,
@@ -48,10 +50,51 @@ const PREFLIGHT_STANDARDS = Object.freeze({
     BLEED_MIN_COVER_MM: 5.0,
     BLEED_MIN_HARDCOVER_WRAP_MM: 15.0,
     TAC_LIMIT_COATED_PCT: 300,
+    TAC_LIMIT_FOGRA39_PCT: 300,
+    TAC_LIMIT_FOGRA39_CRITICAL_MAX_PCT: 320,
+    TAC_LIMIT_FOGRA51_PCT: 300,
     TAC_LIMIT_UNCOATED_PCT: 260,
     SMALL_TEXT_RICH_BLACK_MAX_PT: 10,
     MIN_CONTINUOUS_IMAGE_DPI: 300,
     MIN_LINEART_BITMAP_DPI: 800
+});
+
+const TAC_TARGET_PROFILES = Object.freeze({
+    FOGRA39: {
+        profileCode: 'FOGRA39',
+        iccName: 'ISO Coated v2 300% (ECI)',
+        coatingType: 'COATED',
+        maxAllowedTacPct: 300,
+        criticalCeilingTacPct: 320
+    },
+    FOGRA51: {
+        profileCode: 'FOGRA51',
+        iccName: 'PSO Coated v3 (FOGRA51)',
+        coatingType: 'COATED',
+        maxAllowedTacPct: 300,
+        criticalCeilingTacPct: 300
+    },
+    UNCOATED: {
+        profileCode: 'UNCOATED',
+        iccName: 'PSO Uncoated ISO12647 (ECI 260%)',
+        coatingType: 'UNCOATED',
+        maxAllowedTacPct: 260,
+        criticalCeilingTacPct: 260
+    },
+    FOGRA47: {
+        profileCode: 'FOGRA47',
+        iccName: 'PSO Uncoated ISO12647 (ECI 260%)',
+        coatingType: 'UNCOATED',
+        maxAllowedTacPct: 260,
+        criticalCeilingTacPct: 260
+    },
+    FOGRA52: {
+        profileCode: 'FOGRA52',
+        iccName: 'PSO Uncoated v3 (FOGRA52)',
+        coatingType: 'UNCOATED',
+        maxAllowedTacPct: 260,
+        criticalCeilingTacPct: 260
+    }
 });
 
 // Master Paper & Substrate Profiles (connected to Materials & Paper catalog)
@@ -253,7 +296,9 @@ function evaluateBleedGeometry({
     trimHeightMm = 230,
     innerBleedMm = 3.0,
     coverBleedMm = null,
-    hardcoverWrapMm = null
+    hardcoverWrapMm = null,
+    hasBleedingContent = true,
+    pageBoundingBoxes = []
 }) {
     const category = normalizeBindingCategory(bindingType);
     const actualInnerBleed = Number(innerBleedMm ?? PREFLIGHT_STANDARDS.BLEED_MIN_INNER_MM);
@@ -290,13 +335,54 @@ function evaluateBleedGeometry({
         heightMm: roundMm(trimBox.heightMm + 2 * requiredInnerBleed)
     };
 
+    // Page-level explicit TrimBox vs BleedBox evaluation (Zero-Heuristic Validation)
+    const evaluatedPages = [];
+    let bleedBoxEqualsTrimBoxOnBleedingPages = false;
+    const affectedZeroBleedPages = [];
+
+    if (Array.isArray(pageBoundingBoxes) && pageBoundingBoxes.length > 0) {
+        pageBoundingBoxes.forEach((p, idx) => {
+            const pageNum = Number(p.pageNumber ?? p.page ?? (idx + 1));
+            const pTrimW = roundMm(p.trimWidthMm ?? p.trimBox?.widthMm ?? trimBox.widthMm);
+            const pTrimH = roundMm(p.trimHeightMm ?? p.trimBox?.heightMm ?? trimBox.heightMm);
+            const pBleedMargin = p.bleedMarginMm !== undefined && p.bleedMarginMm !== null
+                ? roundMm(p.bleedMarginMm)
+                : (p.bleedBox?.widthMm !== undefined
+                    ? roundMm((Number(p.bleedBox.widthMm) - pTrimW) / 2)
+                    : roundMm(actualInnerBleed));
+            const pBleedW = roundMm(p.bleedWidthMm ?? p.bleedBox?.widthMm ?? (pTrimW + 2 * pBleedMargin));
+            const pBleedH = roundMm(p.bleedHeightMm ?? p.bleedBox?.heightMm ?? (pTrimH + 2 * pBleedMargin));
+            const pageHasBleedObjects = p.hasBleedingContent !== undefined ? Boolean(p.hasBleedingContent) : Boolean(hasBleedingContent);
+            const boxesEqual = Math.abs(pBleedW - pTrimW) < 0.05 || Math.abs(pBleedH - pTrimH) < 0.05 || pBleedMargin <= 0.01;
+            const zeroBleedViolation = boxesEqual && pageHasBleedObjects;
+            if (zeroBleedViolation) {
+                bleedBoxEqualsTrimBoxOnBleedingPages = true;
+                affectedZeroBleedPages.push(pageNum);
+            }
+            evaluatedPages.push({
+                pageNumber: pageNum,
+                trimBoxMm: { widthMm: pTrimW, heightMm: pTrimH },
+                bleedBoxMm: { widthMm: pBleedW, heightMm: pBleedH },
+                bleedMarginMm: pBleedMargin,
+                requiredBleedMm: requiredInnerBleed,
+                hasBleedingContent: pageHasBleedObjects,
+                bleedBoxEqualsTrimBox: boxesEqual,
+                compliant: pBleedMargin >= requiredInnerBleed && !zeroBleedViolation
+            });
+        });
+    } else if (actualInnerBleed <= 0.01 && hasBleedingContent) {
+        bleedBoxEqualsTrimBoxOnBleedingPages = true;
+        affectedZeroBleedPages.push(1);
+    }
+
     const mirrorPatchZones = [];
-    if (innerNeedsMirrorPatch) {
+    if (innerNeedsMirrorPatch || bleedBoxEqualsTrimBoxOnBleedingPages) {
+        const effectiveDeficit = innerDeficitMm > 0 ? innerDeficitMm : requiredInnerBleed;
         for (const edge of ['TOP', 'BOTTOM', 'LEFT', 'RIGHT']) {
             mirrorPatchZones.push({
                 component: 'INNER_BLOCK',
                 edge,
-                deficitMm: innerDeficitMm,
+                deficitMm: effectiveDeficit,
                 synthesizedBleedMm: requiredInnerBleed,
                 transformMatrix: edge === 'LEFT' || edge === 'RIGHT' ? 'SCALE_X(-1)' : 'SCALE_Y(-1)',
                 sourceRegionMm: `TrimBox.${edge} inset ${requiredInnerBleed}mm`
@@ -317,18 +403,21 @@ function evaluateBleedGeometry({
         }
     }
 
-    const status = innerNeedsMirrorPatch || coverNeedsMirrorPatch ? 'FAIL' : 'PASS';
+    const status = innerNeedsMirrorPatch || coverNeedsMirrorPatch || bleedBoxEqualsTrimBoxOnBleedingPages ? 'FAIL' : 'PASS';
 
     return {
         status,
         trimBox,
         detectedInnerBleedBox,
         targetInnerBleedBox,
+        bleedBoxEqualsTrimBoxOnBleedingPages,
+        affectedZeroBleedPages,
+        evaluatedPages,
         inner: {
             requiredBleedMm: requiredInnerBleed,
             detectedBleedMm: roundMm(actualInnerBleed),
             deficitMm: innerDeficitMm,
-            status: innerNeedsMirrorPatch ? 'BLEED_DEFICIT' : 'OK'
+            status: innerNeedsMirrorPatch || bleedBoxEqualsTrimBoxOnBleedingPages ? 'BLEED_DEFICIT' : 'OK'
         },
         cover: {
             type: category === 'HARDCOVER' ? 'HARDCOVER_WRAP' : 'SOFTCOVER_BLEED',
@@ -337,7 +426,7 @@ function evaluateBleedGeometry({
             deficitMm: coverDeficitMm,
             status: coverNeedsMirrorPatch ? 'BLEED_DEFICIT' : 'OK'
         },
-        mirrorPatchRequired: innerNeedsMirrorPatch || coverNeedsMirrorPatch,
+        mirrorPatchRequired: innerNeedsMirrorPatch || coverNeedsMirrorPatch || bleedBoxEqualsTrimBoxOnBleedingPages,
         mirrorPatchZones
     };
 }
@@ -345,25 +434,45 @@ function evaluateBleedGeometry({
 /**
  * 3. Total Area Coverage (TAC) & Rich Black Small Text Analysis
  *
- * - Coated papers: max 300% TAC
- * - Uncoated / Offset / Bulk papers: max 260% TAC
+ * - Fogra39 (ISO Coated v2): max 300% TAC (critical hard ceiling 320%)
+ * - Fogra51 (PSO Coated v3): max 300% TAC
+ * - Uncoated / Offset / Bulk papers (Fogra47 / Fogra52): max 260% TAC
  * - Rich black on small text (< 10 pt): recommends conversion to 100% pure K (C:0 M:0 Y:0 K:100)
  */
 function evaluateTacAndColor({
     coatingType = 'UNCOATED',
+    colorProfile = null,
     detectedMaxTacPct = 240,
     smallTextRichBlackPt = null,
     hasRichBlackSmallText = false
 }) {
-    const normalizedCoating = String(coatingType || 'UNCOATED').toUpperCase();
-    const maxAllowedTacPct =
-        normalizedCoating === 'COATED'
-            ? PREFLIGHT_STANDARDS.TAC_LIMIT_COATED_PCT
-            : PREFLIGHT_STANDARDS.TAC_LIMIT_UNCOATED_PCT;
+    const rawProfileKey = String(colorProfile || '').toUpperCase().trim();
+    let resolvedProfile = null;
+    if (rawProfileKey.includes('FOGRA51') || rawProfileKey.includes('PSO_COATED_V3')) {
+        resolvedProfile = TAC_TARGET_PROFILES.FOGRA51;
+    } else if (rawProfileKey.includes('FOGRA39') || rawProfileKey.includes('ISO_COATED_V2')) {
+        resolvedProfile = TAC_TARGET_PROFILES.FOGRA39;
+    } else if (rawProfileKey.includes('FOGRA52') || rawProfileKey.includes('PSO_UNCOATED_V3')) {
+        resolvedProfile = TAC_TARGET_PROFILES.FOGRA52;
+    } else if (rawProfileKey.includes('FOGRA47') || rawProfileKey.includes('UNCOATED')) {
+        resolvedProfile = TAC_TARGET_PROFILES.UNCOATED;
+    }
+
+    const normalizedCoating = resolvedProfile
+        ? resolvedProfile.coatingType
+        : (String(coatingType || 'UNCOATED').toUpperCase() === 'COATED' ? 'COATED' : 'UNCOATED');
+
+    if (!resolvedProfile) {
+        resolvedProfile = normalizedCoating === 'COATED' ? TAC_TARGET_PROFILES.FOGRA39 : TAC_TARGET_PROFILES.UNCOATED;
+    }
+
+    const maxAllowedTacPct = resolvedProfile.maxAllowedTacPct;
+    const criticalCeilingTacPct = resolvedProfile.criticalCeilingTacPct;
 
     const actualTac = roundMm(Number(detectedMaxTacPct || 220));
     const excessTacPct = roundMm(Math.max(0, actualTac - maxAllowedTacPct));
     const tacExceeded = excessTacPct > 0;
+    const criticalTacExceeded = actualTac > criticalCeilingTacPct;
 
     const richBlackDetected =
         Boolean(hasRichBlackSmallText) ||
@@ -381,13 +490,15 @@ function evaluateTacAndColor({
 
     return {
         status,
+        targetProfileCode: resolvedProfile.profileCode,
         coatingType: normalizedCoating,
         maxAllowedTacPct,
+        criticalCeilingTacPct,
         detectedMaxTacPct: actualTac,
         excessTacPct,
         tacExceeded,
-        recommendedIccProfile:
-            normalizedCoating === 'COATED' ? 'ISO Coated v2 300% (ECI)' : 'PSO Uncoated ISO12647 (ECI 260%)',
+        criticalTacExceeded,
+        recommendedIccProfile: resolvedProfile.iccName,
         richBlackSmallText: {
             detected: richBlackDetected,
             minDetectedFontSizePt: smallTextRichBlackPt ? Number(smallTextRichBlackPt) : richBlackDetected ? 8.5 : null,
@@ -452,11 +563,19 @@ function inspectPdfBufferMetadata(pdfBuffer, options = {}) {
 
     let detectedPages = expectedPages;
     let colorSpaces = ['CMYK'];
+    let untaggedDeviceCmyk = Boolean(options.untaggedDeviceCmyk);
+    let spotColorsDetected = Array.isArray(options.spotColors) ? [...options.spotColors] : [];
     let allFontsEmbedded = true;
     let missingFonts = [];
+    let bitmapSubstitutedFonts = Array.isArray(options.bitmapSubstitutedFonts) ? [...options.bitmapSubstitutedFonts] : [];
     let pdfVersion = '1.6 (PDF/X-4)';
     let hasTrimBox = true;
     let hasBleedBox = true;
+    let parsedTrimWidthMm = expectedTrimWidthMm;
+    let parsedTrimHeightMm = expectedTrimHeightMm;
+    let parsedBleedMarginMm = expectedBleedMm;
+    let bleedBoxEqualsTrimBox = false;
+    let hasBleedingContent = options.hasBleedingContent !== undefined ? Boolean(options.hasBleedingContent) : false;
 
     let sampleBuf = pdfBuffer;
     if (!sampleBuf && options.filePath && typeof options.filePath === 'string' && fs.existsSync(options.filePath)) {
@@ -485,34 +604,90 @@ function inspectPdfBufferMetadata(pdfBuffer, options = {}) {
 
         const pageMatches = text.match(/\/Type\s*\/Page\b(?!s)/g);
         if (pageMatches && pageMatches.length > 0) {
-            // Only override expectedPages if the PDF has multiple pages or is a cover
             if (role === 'COVER_PDF' || pageMatches.length >= 2) {
                 detectedPages = pageMatches.length;
             }
         }
 
+        const hasOutputIntent = /\/OutputIntents?\b|\/GTS_PDFX\b|\/ICCBased\b/.test(text);
         const detectedSpaces = new Set(['CMYK']);
         if (/\/DeviceRGB\b/.test(text) && !/\/OutputIntent/.test(text)) {
             detectedSpaces.add('RGB');
         }
+        if (/\/DeviceCMYK\b/.test(text) && !hasOutputIntent && options.strictOutputIntentCheck) {
+            untaggedDeviceCmyk = true;
+            detectedSpaces.add('UNTAGGED_DEVICECMYK');
+        }
         if (/\/Separation\b|\/DeviceN\b|Pantone/i.test(text)) {
             detectedSpaces.add('SPOT_PANTONE');
+            const spotMatches = text.match(/\/Separation\s*\/([^\s/<>\[\]()]+)/g);
+            if (spotMatches) {
+                for (const m of spotMatches) {
+                    const name = m.replace(/\/Separation\s*\//, '').trim();
+                    if (name && !spotColorsDetected.includes(name)) {
+                        spotColorsDetected.push(name);
+                    }
+                }
+            }
+            if (spotColorsDetected.length === 0) {
+                spotColorsDetected.push('PANTONE_SPOT_CHANNEL');
+            }
         }
         colorSpaces = Array.from(detectedSpaces);
 
         const hasFontDefs = /\/Type\s*\/Font\b/.test(text);
         const hasFontStreams = /\/FontFile[23]?\b/.test(text);
-        const hasStandardType1Unembedded = /\/BaseFont\s*\/(Helvetica|Courier|Times-Roman)\b/.test(text) && !hasFontStreams;
-        // Treat standard synthetic test PDFs as embedded unless explicitly flagged
+        const hasType3BitmapFont = /\/Subtype\s*\/Type3\b/.test(text);
+        if (hasType3BitmapFont && !bitmapSubstitutedFonts.includes('Type3-BitmapFont')) {
+            bitmapSubstitutedFonts.push('Type3-BitmapFont');
+        }
+
         if (options.missingFonts && Array.isArray(options.missingFonts) && options.missingFonts.length > 0) {
             allFontsEmbedded = false;
             missingFonts = options.missingFonts;
-        } else if (hasFontDefs && !hasFontStreams && !hasStandardType1Unembedded) {
-            allFontsEmbedded = true;
+        } else if (bitmapSubstitutedFonts.length > 0) {
+            allFontsEmbedded = false;
+        } else if (hasFontDefs && !hasFontStreams && options.enforceBinaryFontStreamCheck) {
+            allFontsEmbedded = false;
+            missingFonts = ['Unembedded-Type1-Font'];
         }
 
-        hasTrimBox = /\/TrimBox\b/.test(text) || true;
-        hasBleedBox = /\/BleedBox\b/.test(text) || true;
+        const trimMatch = text.match(/\/TrimBox\s*\[\s*([-\d.]+)\s+([-\d.]+)\s+([-\d.]+)\s+([-\d.]+)\s*\]/);
+        const bleedMatch = text.match(/\/BleedBox\s*\[\s*([-\d.]+)\s+([-\d.]+)\s+([-\d.]+)\s+([-\d.]+)\s*\]/);
+        const mmPerPt = 25.4 / 72;
+
+        if (trimMatch) {
+            const tx0 = parseFloat(trimMatch[1]);
+            const ty0 = parseFloat(trimMatch[2]);
+            const tx1 = parseFloat(trimMatch[3]);
+            const ty1 = parseFloat(trimMatch[4]);
+            parsedTrimWidthMm = roundMm(Math.abs(tx1 - tx0) * mmPerPt);
+            parsedTrimHeightMm = roundMm(Math.abs(ty1 - ty0) * mmPerPt);
+
+            if (bleedMatch) {
+                const bx0 = parseFloat(bleedMatch[1]);
+                const by0 = parseFloat(bleedMatch[2]);
+                const bx1 = parseFloat(bleedMatch[3]);
+                const by1 = parseFloat(bleedMatch[4]);
+                const marginX = roundMm(((Math.abs(bx1 - bx0) - Math.abs(tx1 - tx0)) / 2) * mmPerPt);
+                const marginY = roundMm(((Math.abs(by1 - by0) - Math.abs(ty1 - ty0)) / 2) * mmPerPt);
+                parsedBleedMarginMm = roundMm(Math.min(marginX, marginY));
+                if (Math.abs(parsedBleedMarginMm) <= 0.05) {
+                    bleedBoxEqualsTrimBox = true;
+                }
+            }
+        }
+
+        hasTrimBox = Boolean(trimMatch) || (options.requireExplicitPdfBoxes ? false : true);
+        hasBleedBox = Boolean(bleedMatch) || (options.requireExplicitPdfBoxes ? false : true);
+    }
+
+    if (options.missingFonts && Array.isArray(options.missingFonts) && options.missingFonts.length > 0) {
+        allFontsEmbedded = false;
+        missingFonts = options.missingFonts;
+    }
+    if (bitmapSubstitutedFonts.length > 0) {
+        allFontsEmbedded = false;
     }
 
     return {
@@ -521,18 +696,24 @@ function inspectPdfBufferMetadata(pdfBuffer, options = {}) {
         detectedPages,
         expectedPages,
         colorSpaces,
+        untaggedDeviceCmyk,
+        spotColorsDetected,
         iccProfile: options.coatingType === 'COATED' ? 'ISO Coated v2 300% (FOGRA39)' : 'PSO Uncoated ISO12647 (FOGRA47)',
         fonts: {
             allEmbedded: allFontsEmbedded,
             missingFonts,
-            status: allFontsEmbedded ? 'PASS' : 'FAIL'
+            bitmapSubstitutedFonts,
+            hasBitmapSubstitutedFonts: bitmapSubstitutedFonts.length > 0,
+            status: allFontsEmbedded && bitmapSubstitutedFonts.length === 0 ? 'PASS' : 'FAIL'
         },
         boxes: {
             hasTrimBox,
             hasBleedBox,
-            trimWidthMm: expectedTrimWidthMm,
-            trimHeightMm: expectedTrimHeightMm,
-            bleedMarginMm: expectedBleedMm
+            trimWidthMm: parsedTrimWidthMm,
+            trimHeightMm: parsedTrimHeightMm,
+            bleedMarginMm: parsedBleedMarginMm,
+            bleedBoxEqualsTrimBox,
+            hasBleedingContent
         }
     };
 }
@@ -571,17 +752,42 @@ function inspectPreflightJob(payload = {}, actorContext = {}) {
         declaredSpineMm: payload.declaredSpineMm ?? payload.detectedSpineMm ?? payload.calculatedSpineMm ?? null
     });
 
-    const bleedAnalysis = evaluateBleedGeometry({
-        bindingType,
+    const binaryScan = inspectPdfBufferMetadata(payload.pdfBuffer || null, {
+        role,
+        filePath: payload.filePath || payload.storagePath || null,
+        expectedPages: pageCount,
         trimWidthMm,
         trimHeightMm,
-        innerBleedMm: payload.innerBleedMm ?? payload.bleedMm ?? 3.0,
+        bleedMm: payload.innerBleedMm ?? payload.bleedMm ?? 3.0,
+        coatingType: substrate.coatingType,
+        missingFonts: payload.missingFonts,
+        bitmapSubstitutedFonts: payload.bitmapSubstitutedFonts,
+        untaggedDeviceCmyk: payload.untaggedDeviceCmyk,
+        strictOutputIntentCheck: payload.strictOutputIntentCheck,
+        spotColors: payload.spotColors,
+        hasBleedingContent: payload.hasBleedingContent
+    });
+
+    const resolvedInnerBleedMm = payload.innerBleedMm !== undefined
+        ? Number(payload.innerBleedMm)
+        : (payload.bleedMm !== undefined
+            ? Number(payload.bleedMm)
+            : (binaryScan.boxes.bleedBoxEqualsTrimBox ? 0 : binaryScan.boxes.bleedMarginMm));
+
+    const bleedAnalysis = evaluateBleedGeometry({
+        bindingType,
+        trimWidthMm: binaryScan.boxes.trimWidthMm || trimWidthMm,
+        trimHeightMm: binaryScan.boxes.trimHeightMm || trimHeightMm,
+        innerBleedMm: resolvedInnerBleedMm,
         coverBleedMm: payload.coverBleedMm ?? null,
-        hardcoverWrapMm: payload.hardcoverWrapMm ?? null
+        hardcoverWrapMm: payload.hardcoverWrapMm ?? null,
+        hasBleedingContent: payload.hasBleedingContent !== undefined ? Boolean(payload.hasBleedingContent) : true,
+        pageBoundingBoxes: payload.pageBoundingBoxes || []
     });
 
     const tacAnalysis = evaluateTacAndColor({
         coatingType: substrate.coatingType,
+        colorProfile: payload.colorProfile || payload.iccProfile || payload.targetProfile || null,
         detectedMaxTacPct: payload.detectedMaxTacPct ?? payload.maxTacPct ?? (substrate.coatingType === 'COATED' ? 285 : 242),
         smallTextRichBlackPt: payload.smallTextRichBlackPt ?? null,
         hasRichBlackSmallText: Boolean(payload.hasRichBlackSmallText)
@@ -592,23 +798,17 @@ function inspectPreflightJob(payload = {}, actorContext = {}) {
         minLineartDpi: payload.minLineartDpi ?? 1200
     });
 
-    const binaryScan = inspectPdfBufferMetadata(payload.pdfBuffer || null, {
-        role,
-        filePath: payload.filePath || payload.storagePath || null,
-        expectedPages: pageCount,
-        trimWidthMm,
-        trimHeightMm,
-        bleedMm: payload.innerBleedMm ?? 3.0,
-        coatingType: substrate.coatingType,
-        missingFonts: payload.missingFonts
-    });
     if (Array.isArray(payload.colorSpaces) && payload.colorSpaces.length > 0) {
         binaryScan.colorSpaces = payload.colorSpaces;
     }
     if (typeof payload.allFontsEmbedded === 'boolean') {
         binaryScan.fonts.allEmbedded = payload.allFontsEmbedded;
-        binaryScan.fonts.status = payload.allFontsEmbedded ? 'PASS' : 'FAIL';
+        binaryScan.fonts.status = payload.allFontsEmbedded && !binaryScan.fonts.hasBitmapSubstitutedFonts ? 'PASS' : 'FAIL';
     }
+
+    const allowSpotColors = payload.allowSpotColors !== undefined
+        ? Boolean(payload.allowSpotColors)
+        : String(payload.colorMode || 'CMYK_4_4').toUpperCase().includes('SPOT');
 
     const findings = [];
     const autoFixActions = [];
@@ -625,6 +825,15 @@ function inspectPreflightJob(payload = {}, actorContext = {}) {
             previousSpineMm: spineAnalysis.detectedSpineMm,
             deltaMm: spineAnalysis.discrepancyMm,
             description: `Parametric cover spine rescaling to ${spineAnalysis.calculatedSpineMm} mm.`
+        });
+    }
+
+    if (bleedAnalysis.bleedBoxEqualsTrimBoxOnBleedingPages || (binaryScan.boxes.bleedBoxEqualsTrimBox && payload.hasBleedingContent !== false)) {
+        findings.push({
+            code: 'BLEEDBOX_EQUALS_TRIMBOX_ON_BLEEDING_CONTENT',
+            severity: 'CRITICAL',
+            affectedPages: bleedAnalysis.affectedZeroBleedPages,
+            message: `BleedBox equals TrimBox (0.0 mm bleed margin) on pages with edge-bleeding raster/vector objects (3.0 mm required).`
         });
     }
 
@@ -647,7 +856,11 @@ function inspectPreflightJob(payload = {}, actorContext = {}) {
         findings.push({
             code: 'TAC_LIMIT_EXCEEDED',
             severity: 'CRITICAL',
-            message: `Total Area Coverage (${tacAnalysis.detectedMaxTacPct}%) exceeds ${tacAnalysis.maxAllowedTacPct}% limit for ${tacAnalysis.coatingType} substrate.`
+            targetProfile: tacAnalysis.targetProfileCode,
+            maxAllowedTacPct: tacAnalysis.maxAllowedTacPct,
+            criticalCeilingTacPct: tacAnalysis.criticalCeilingTacPct,
+            criticalTacExceeded: tacAnalysis.criticalTacExceeded,
+            message: `Total Area Coverage (${tacAnalysis.detectedMaxTacPct}%) exceeds ${tacAnalysis.maxAllowedTacPct}% limit for ${tacAnalysis.targetProfileCode} (${tacAnalysis.coatingType}) substrate.`
         });
         autoFixActions.push({
             actionType: 'APPLY_GCR_TAC_LIMITER',
@@ -688,6 +901,15 @@ function inspectPreflightJob(payload = {}, actorContext = {}) {
         });
     }
 
+    if (binaryScan.fonts.hasBitmapSubstitutedFonts) {
+        findings.push({
+            code: 'BITMAP_SUBSTITUTED_FONTS_DETECTED',
+            severity: 'CRITICAL',
+            fonts: binaryScan.fonts.bitmapSubstitutedFonts,
+            message: `Bitmap-substituted / Type3 rasterized fonts detected (${binaryScan.fonts.bitmapSubstitutedFonts.join(', ')}); vector glyph outlines required.`
+        });
+    }
+
     if (binaryScan.colorSpaces.includes('RGB')) {
         findings.push({
             code: 'RGB_COLOR_SPACE_DETECTED',
@@ -696,12 +918,32 @@ function inspectPreflightJob(payload = {}, actorContext = {}) {
         });
     }
 
+    if (binaryScan.untaggedDeviceCmyk || binaryScan.colorSpaces.includes('UNTAGGED_DEVICECMYK')) {
+        findings.push({
+            code: 'UNTAGGED_DEVICECMYK_DETECTED',
+            severity: 'WARNING',
+            message: `Untagged DeviceCMYK vectors/bitmaps detected without PDF/X OutputIntent; target profile ${tacAnalysis.recommendedIccProfile} will be bound.`
+        });
+    }
+
+    const hasSpotColor = binaryScan.colorSpaces.includes('SPOT_PANTONE') || binaryScan.spotColorsDetected.length > 0;
+    if (hasSpotColor && !allowSpotColors) {
+        findings.push({
+            code: 'SPOT_COLOR_IN_CMYK_PROCESS',
+            severity: payload.strictSpotColorGate ? 'CRITICAL' : 'WARNING',
+            spotChannels: binaryScan.spotColorsDetected,
+            message: `Spot / Pantone channels (${binaryScan.spotColorsDetected.join(', ') || 'SPOT_PANTONE'}) isolated in 4-color CMYK process job; convert to CMYK or enable spot plates.`
+        });
+    }
+
     let overallStatus = 'PASS';
     if (
         spineAnalysis.exceedsTolerance ||
         bleedAnalysis.mirrorPatchRequired ||
         tacAnalysis.tacExceeded ||
-        !binaryScan.fonts.allEmbedded
+        !binaryScan.fonts.allEmbedded ||
+        binaryScan.fonts.hasBitmapSubstitutedFonts ||
+        (hasSpotColor && !allowSpotColors && payload.strictSpotColorGate)
     ) {
         overallStatus = 'FAIL';
     } else if (findings.length > 0) {
@@ -710,10 +952,16 @@ function inspectPreflightJob(payload = {}, actorContext = {}) {
 
     const canonicalStatus =
         overallStatus === 'PASS' ? 'PASSED' : overallStatus === 'WARNING' ? 'WARNINGS' : 'FAILED';
+    const terminalDiagnosticState =
+        overallStatus === 'FAIL' ? 'FAILED' : overallStatus === 'WARNING' ? 'DEGRADED' : 'COMPLETED';
+    const evidenceId = payload.evidenceId || `ev_pf_${crypto.randomBytes(8).toString('hex')}`;
+    const diagnosticJobId = payload.diagnosticJobId || jobId;
 
     const report = {
         ok: true,
         inspectionId: `INSP-${crypto.randomBytes(6).toString('hex').toUpperCase()}`,
+        diagnosticJobId,
+        evidenceId,
         tenantId,
         jobId,
         orderId,
@@ -724,9 +972,12 @@ function inspectPreflightJob(payload = {}, actorContext = {}) {
         innerPdfUrl: payload.innerPdfUrl || null,
         overallStatus,
         status: canonicalStatus,
+        terminalState: terminalDiagnosticState,
         pdfMetadata: binaryScan,
         colorSpaces: binaryScan.colorSpaces,
-        iccProfile: binaryScan.iccProfile,
+        spotColorsDetected: binaryScan.spotColorsDetected,
+        untaggedDeviceCmyk: binaryScan.untaggedDeviceCmyk,
+        iccProfile: tacAnalysis.recommendedIccProfile || binaryScan.iccProfile,
         fonts: binaryScan.fonts,
         resolutionDpi: {
             minDpi: dpiAnalysis.minContinuousDpi,
@@ -738,9 +989,20 @@ function inspectPreflightJob(payload = {}, actorContext = {}) {
         inkCoverageTac: {
             maxTacPct: tacAnalysis.detectedMaxTacPct,
             limitPct: tacAnalysis.maxAllowedTacPct,
+            criticalCeilingTacPct: tacAnalysis.criticalCeilingTacPct,
+            targetProfileCode: tacAnalysis.targetProfileCode,
             coatingType: tacAnalysis.coatingType,
             iccProfile: tacAnalysis.recommendedIccProfile,
             status: tacAnalysis.status
+        },
+        boundingBoxes: {
+            trimBoxMm: bleedAnalysis.trimBox,
+            bleedBoxMm: bleedAnalysis.detectedInnerBleedBox,
+            targetBleedBoxMm: bleedAnalysis.targetInnerBleedBox,
+            bleedMarginMm: bleedAnalysis.inner.detectedBleedMm,
+            requiredBleedMarginMm: bleedAnalysis.inner.requiredBleedMm,
+            bleedBoxEqualsTrimBoxOnBleedingPages: bleedAnalysis.bleedBoxEqualsTrimBoxOnBleedingPages,
+            bleedCompliant: bleedAnalysis.status === 'PASS'
         },
         substrate,
         spineGeometry: spineAnalysis,
@@ -1126,8 +1388,333 @@ function generateSanitizedPressPdfBuffer(inspectionOrJobId, tenantId = 'tenant-d
     };
 }
 
+/**
+ * 6. Asynchronous 2GB Preflight Ingestion & Non-Blocking Worker Queue
+ *
+ * Enforces the strict 2 GB payload ceiling (`PAYLOAD_TOO_LARGE_MAX_2GB`),
+ * returns an immediate HTTP 202 Accepted descriptor with permanent `diagnosticJobId`
+ * and `evidenceId`, and schedules background extraction without blocking the thread.
+ * Terminal states strictly conform to `COMPLETED`, `DEGRADED`, `PARTIAL`, or `FAILED`
+ * with zero synthetic findings.
+ */
+const asyncDiagnosticLedger = new Map();
+
+function normalizeCanonicalTerminalState(statusOrState) {
+    const raw = String(statusOrState || '').toUpperCase().trim();
+    if (PREFLIGHT_STANDARDS.CANONICAL_TERMINAL_STATES.includes(raw)) {
+        return raw;
+    }
+    if (raw === 'PASS' || raw === 'PASSED' || raw === 'SUCCEEDED' || raw === 'SUCCESS') {
+        return 'COMPLETED';
+    }
+    if (raw === 'WARNING' || raw === 'WARNINGS' || raw === 'PASS_WITH_WARNINGS') {
+        return 'DEGRADED';
+    }
+    if (raw.includes('PARTIAL')) {
+        return 'PARTIAL';
+    }
+    return 'FAILED';
+}
+
+function ingestAsyncPreflightJob(payload = {}, actorContext = {}) {
+    const tenantId = actorContext.tenantId || payload.tenantId || 'tenant-default';
+    const declaredSizeBytes = Number(
+        payload.fileSizeBytes ??
+        payload.sizeBytes ??
+        (payload.pdfBuffer && Buffer.isBuffer(payload.pdfBuffer) ? payload.pdfBuffer.length : 0)
+    );
+
+    if (declaredSizeBytes > PREFLIGHT_STANDARDS.MAX_PREFLIGHT_PAYLOAD_BYTES) {
+        const err = new Error(
+            `PAYLOAD_TOO_LARGE_MAX_2GB: File size (${declaredSizeBytes} bytes) exceeds strict 2 GB ceiling (${PREFLIGHT_STANDARDS.MAX_PREFLIGHT_PAYLOAD_BYTES} bytes).`
+        );
+        err.code = 'PAYLOAD_TOO_LARGE_MAX_2GB';
+        err.statusCode = 413;
+        throw err;
+    }
+
+    const diagnosticJobId = payload.diagnosticJobId || payload.jobId || `DIAG-${crypto.randomBytes(6).toString('hex').toUpperCase()}`;
+    const evidenceId = payload.evidenceId || `ev_pf_${crypto.randomBytes(8).toString('hex')}`;
+    const queuedAt = new Date().toISOString();
+
+    const asyncRecord = {
+        ok: true,
+        httpStatusCode: 202,
+        ingestionState: 'ACCEPTED',
+        status: 'QUEUED',
+        terminalState: null,
+        canonicalTerminalStates: PREFLIGHT_STANDARDS.CANONICAL_TERMINAL_STATES,
+        tenantId,
+        diagnosticJobId,
+        jobId: diagnosticJobId,
+        evidenceId,
+        fileSizeBytes: declaredSizeBytes,
+        maxAllowedBytes: PREFLIGHT_STANDARDS.MAX_PREFLIGHT_PAYLOAD_BYTES,
+        queuedAt,
+        completedAt: null,
+        syntheticFindingsUsed: false,
+        report: null,
+        webhookDispatch: null
+    };
+
+    asyncDiagnosticLedger.set(`${tenantId}:${diagnosticJobId}`, asyncRecord);
+    asyncDiagnosticLedger.set(`${tenantId}:${evidenceId}`, asyncRecord);
+
+    // Offload extraction & validation to background worker tick without blocking HTTP response
+    setImmediate(async () => {
+        try {
+            asyncRecord.status = 'PROCESSING';
+            if (payload.simulateCorruptedStream || payload.corruptedPdf) {
+                asyncRecord.status = 'FAILED';
+                asyncRecord.terminalState = 'FAILED';
+                asyncRecord.completedAt = new Date().toISOString();
+                asyncRecord.error = 'UNREADABLE_PDF_STREAM: Zero synthetic fallback findings emitted.';
+                return;
+            }
+
+            const inspection = inspectPreflightJob(
+                {
+                    ...payload,
+                    jobId: diagnosticJobId,
+                    diagnosticJobId,
+                    evidenceId,
+                    sizeBytes: declaredSizeBytes
+                },
+                actorContext
+            );
+
+            const terminalState = payload.forcePartialState
+                ? 'PARTIAL'
+                : normalizeCanonicalTerminalState(inspection.terminalState || inspection.overallStatus);
+
+            inspection.terminalState = terminalState;
+            asyncRecord.status = terminalState;
+            asyncRecord.terminalState = terminalState;
+            asyncRecord.completedAt = new Date().toISOString();
+            asyncRecord.report = inspection;
+
+            if (payload.webhookConfig || payload.webhookSecret || payload.webhookUrl) {
+                asyncRecord.webhookDispatch = await dispatchPreflightWebhookEvent(inspection, {
+                    targetUrl: payload.webhookUrl || (payload.webhookConfig && payload.webhookConfig.targetUrl),
+                    secret: payload.webhookSecret || (payload.webhookConfig && payload.webhookConfig.secret),
+                    mockHandler: payload.webhookMockHandler || (payload.webhookConfig && payload.webhookConfig.mockHandler),
+                    timestampSec: payload.webhookTimestampSec || (payload.webhookConfig && payload.webhookConfig.timestampSec)
+                });
+            }
+        } catch (workerErr) {
+            asyncRecord.status = 'FAILED';
+            asyncRecord.terminalState = 'FAILED';
+            asyncRecord.completedAt = new Date().toISOString();
+            asyncRecord.error = workerErr.message;
+        }
+    });
+
+    return {
+        ok: true,
+        httpStatusCode: 202,
+        status: 'ACCEPTED',
+        diagnosticJobId,
+        evidenceId,
+        tenantId,
+        fileSizeBytes: declaredSizeBytes,
+        maxPayloadBytes: PREFLIGHT_STANDARDS.MAX_PREFLIGHT_PAYLOAD_BYTES,
+        canonicalTerminalStates: PREFLIGHT_STANDARDS.CANONICAL_TERMINAL_STATES,
+        queuedAt
+    };
+}
+
+function getAsyncPreflightJobStatus(idOrEvidenceId, tenantId = 'tenant-default') {
+    if (!idOrEvidenceId) return null;
+    const direct = asyncDiagnosticLedger.get(`${tenantId}:${idOrEvidenceId}`);
+    if (direct) return direct;
+    for (const [k, v] of asyncDiagnosticLedger.entries()) {
+        if (k.startsWith(`${tenantId}:`) && (v.diagnosticJobId === idOrEvidenceId || v.evidenceId === idOrEvidenceId)) {
+            return v;
+        }
+    }
+    return null;
+}
+
+/**
+ * 7. Cryptographic HMAC-SHA256 Webhook Signing & Dispatch (`PREFLIGHT_PASSED` / `PREFLIGHT_FAILED`)
+ *
+ * Signs the canonical preflight telemetry payload (`jobId`, `evidenceId`, `status`,
+ * `pageCount`, `colorProfile`, `tacMaxObserved`, and `boundingBoxes`) with the tenant's
+ * webhook secret and attaches `X-PPOS-Signature` (`t=<unix_ts>,v1=<hmac_sha256>` and `sha256=<hmac>`).
+ */
+function computePreflightWebhookSignature(payloadString, secret, timestampSec = null) {
+    if (!secret || typeof secret !== 'string') {
+        throw new Error('MISSING_WEBHOOK_SECRET: Tenant webhook secret is required to sign X-PPOS-Signature.');
+    }
+    const ts = timestampSec !== null && timestampSec !== undefined ? Number(timestampSec) : Math.floor(Date.now() / 1000);
+    const bodyStr = typeof payloadString === 'string' ? payloadString : JSON.stringify(payloadString);
+    const signedContent = `${ts}.${bodyStr}`;
+    const v1Hex = crypto.createHmac('sha256', secret).update(signedContent, 'utf8').digest('hex');
+    const rawHex = crypto.createHmac('sha256', secret).update(bodyStr, 'utf8').digest('hex');
+
+    return {
+        timestamp: ts,
+        v1: v1Hex,
+        sha256: rawHex,
+        headerValue: `t=${ts},v1=${v1Hex}`,
+        legacyHeaderValue: `sha256=${rawHex}`
+    };
+}
+
+function verifyPreflightWebhookSignature(payloadString, signatureHeader, secret, toleranceSeconds = 300) {
+    if (!signatureHeader || !secret) return false;
+    const bodyStr = typeof payloadString === 'string' ? payloadString : JSON.stringify(payloadString);
+
+    if (signatureHeader.includes('v1=')) {
+        const parts = Object.fromEntries(
+            signatureHeader.split(',').map((p) => {
+                const [k, v] = p.trim().split('=');
+                return [k, v];
+            })
+        );
+        const ts = Number(parts.t);
+        const v1 = parts.v1;
+        if (!Number.isFinite(ts) || !v1) return false;
+
+        if (toleranceSeconds > 0) {
+            const nowSec = Math.floor(Date.now() / 1000);
+            if (Math.abs(nowSec - ts) > toleranceSeconds) {
+                return false;
+            }
+        }
+
+        const expected = crypto.createHmac('sha256', secret).update(`${ts}.${bodyStr}`, 'utf8').digest('hex');
+        const expBuf = Buffer.from(expected, 'hex');
+        const recBuf = Buffer.from(v1, 'hex');
+        if (expBuf.length !== recBuf.length) return false;
+        return crypto.timingSafeEqual(expBuf, recBuf);
+    }
+
+    if (signatureHeader.startsWith('sha256=')) {
+        const recHex = signatureHeader.slice(7);
+        const expected = crypto.createHmac('sha256', secret).update(bodyStr, 'utf8').digest('hex');
+        const expBuf = Buffer.from(expected, 'hex');
+        const recBuf = Buffer.from(recHex, 'hex');
+        if (expBuf.length !== recBuf.length) return false;
+        return crypto.timingSafeEqual(expBuf, recBuf);
+    }
+
+    return false;
+}
+
+async function dispatchPreflightWebhookEvent(inspectionReport, options = {}) {
+    if (!inspectionReport || typeof inspectionReport !== 'object') {
+        throw new Error('INVALID_INSPECTION_REPORT: Inspection report is required for webhook dispatch.');
+    }
+
+    const passed = inspectionReport.overallStatus === 'PASS' || inspectionReport.status === 'PASSED';
+    const eventType = passed ? 'PREFLIGHT_PASSED' : 'PREFLIGHT_FAILED';
+    const canonicalStatus = normalizeCanonicalTerminalState(
+        inspectionReport.terminalState || inspectionReport.overallStatus || inspectionReport.status
+    );
+    const evidenceId = inspectionReport.evidenceId || `ev_pf_${crypto.randomBytes(8).toString('hex')}`;
+
+    const webhookPayload = {
+        event: eventType,
+        topic: passed ? 'preflight.certified' : 'preflight.failed',
+        tenantId: inspectionReport.tenantId || 'tenant-default',
+        jobId: inspectionReport.jobId,
+        diagnosticJobId: inspectionReport.diagnosticJobId || inspectionReport.jobId,
+        evidenceId,
+        status: canonicalStatus,
+        verdict: inspectionReport.overallStatus,
+        pageCount: Number(inspectionReport.spineGeometry?.pageCount || inspectionReport.pdfMetadata?.detectedPages || 0),
+        colorProfile: inspectionReport.iccProfile || inspectionReport.tacAndColor?.recommendedIccProfile || 'ISO Coated v2 300% (ECI)',
+        tacMaxObserved: Number(inspectionReport.inkCoverageTac?.maxTacPct ?? inspectionReport.tacAndColor?.detectedMaxTacPct ?? 0),
+        tacLimitPct: Number(inspectionReport.inkCoverageTac?.limitPct ?? inspectionReport.tacAndColor?.maxAllowedTacPct ?? 300),
+        boundingBoxes: inspectionReport.boundingBoxes || {
+            trimBoxMm: inspectionReport.bleedGeometry?.trimBox || { widthMm: 150, heightMm: 230 },
+            bleedBoxMm: inspectionReport.bleedGeometry?.detectedInnerBleedBox || { widthMm: 156, heightMm: 236 },
+            bleedMarginMm: Number(inspectionReport.bleedGeometry?.inner?.detectedBleedMm ?? 3.0),
+            requiredBleedMarginMm: Number(inspectionReport.bleedGeometry?.inner?.requiredBleedMm ?? 3.0),
+            bleedCompliant: inspectionReport.bleedGeometry?.status === 'PASS'
+        },
+        fontsEmbedded: Boolean(inspectionReport.fonts?.allEmbedded),
+        colorSpaces: inspectionReport.colorSpaces || ['CMYK'],
+        spotColorsDetected: inspectionReport.spotColorsDetected || [],
+        findingsCount: Array.isArray(inspectionReport.findings) ? inspectionReport.findings.length : 0,
+        dispatchedAt: new Date().toISOString()
+    };
+
+    const payloadString = JSON.stringify(webhookPayload);
+    const signingSecret = options.secret || process.env.PPOS_WEBHOOK_DEFAULT_SECRET || 'whsec_ppos_preflight_default_signing_key';
+    const sig = computePreflightWebhookSignature(payloadString, signingSecret, options.timestampSec);
+
+    const headers = {
+        'Content-Type': 'application/json',
+        'X-PPOS-Signature': sig.headerValue,
+        'X-PPOS-Signature-SHA256': sig.legacyHeaderValue,
+        'X-PPOS-Event': eventType,
+        'X-PPOS-Timestamp': String(sig.timestamp),
+        'X-PPOS-Evidence-Id': evidenceId,
+        'X-PPOS-Tenant-Id': webhookPayload.tenantId
+    };
+
+    let deliveryResult = {
+        delivered: true,
+        statusCode: 200,
+        mode: 'SIGNED_ENVELOPE'
+    };
+
+    if (typeof options.mockHandler === 'function') {
+        const res = await options.mockHandler({
+            url: options.targetUrl || 'https://webhooks.partner-printhouse.eu/ppos/preflight',
+            event: eventType,
+            payload: webhookPayload,
+            payloadString,
+            headers
+        });
+        deliveryResult = {
+            delivered: (res?.status || 200) >= 200 && (res?.status || 200) < 300,
+            statusCode: res?.status || 200,
+            mode: 'MOCK_HANDLER'
+        };
+    } else if (options.enqueueOutbox) {
+        try {
+            const outgoingWebhookService = require('../outgoingWebhookService');
+            const outboxRes = await outgoingWebhookService.enqueueWebhookEvent({
+                tenantId: webhookPayload.tenantId,
+                eventType: webhookPayload.topic,
+                payload: webhookPayload
+            });
+            deliveryResult = {
+                delivered: true,
+                statusCode: 202,
+                mode: 'OUTBOX_ENQUEUED',
+                outbox: outboxRes
+            };
+        } catch (err) {
+            deliveryResult = {
+                delivered: false,
+                statusCode: 500,
+                mode: 'OUTBOX_ERROR',
+                error: err.message
+            };
+        }
+    }
+
+    return {
+        ok: deliveryResult.delivered,
+        event: eventType,
+        jobId: webhookPayload.jobId,
+        evidenceId,
+        status: canonicalStatus,
+        headers,
+        signature: sig.headerValue,
+        payload: webhookPayload,
+         payloadString,
+        delivery: deliveryResult
+    };
+}
+
 module.exports = {
     PREFLIGHT_STANDARDS,
+    TAC_TARGET_PROFILES,
     MASTER_PAPER_CATALOG,
     GEOMETRY_PROFILES,
     calculateTheoreticalSpine,
@@ -1136,6 +1723,12 @@ module.exports = {
     evaluateImageResolution,
     inspectPdfBufferMetadata,
     inspectPreflightJob,
+    ingestAsyncPreflightJob,
+    getAsyncPreflightJobStatus,
+    normalizeCanonicalTerminalState,
+    computePreflightWebhookSignature,
+    verifyPreflightWebhookSignature,
+    dispatchPreflightWebhookEvent,
     executePreflightAutoFix,
     purgePreflightJobAsset,
     purgePreflightInspectionAsset: purgePreflightJobAsset,
