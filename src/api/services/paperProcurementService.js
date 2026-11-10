@@ -2402,6 +2402,561 @@ class PaperProcurementService {
     calculateTotalAmount(priceAmount, priceBasis, totalSheets, variant, sheetsPerPack) {
         return calculateTotalAmount(priceAmount, priceBasis, totalSheets, variant, sheetsPerPack);
     }
+
+    // ─── TENANT-SCOPED COMMERCIAL RATE AGREEMENTS & DISTRIBUTOR HUB ──────────
+
+    async ensurePaperAgreementsSchema(dbClient = db) {
+        if (this._agreementsSchemaEnsured) return;
+        if (!dbClient || typeof dbClient.query !== 'function' || process.env.PPOS_CI_EPHEMERAL_FIXTURES === 'true') {
+            return;
+        }
+        try {
+            await dbClient.query(`
+                CREATE TABLE IF NOT EXISTS printhouse_paper_agreements (
+                    id VARCHAR(64) PRIMARY KEY,
+                    tenant_id VARCHAR(64) NOT NULL,
+                    printhouse_id VARCHAR(64) NOT NULL DEFAULT 'GLOBAL_MASTER',
+                    supplier_id VARCHAR(64) NOT NULL,
+                    agreement_name VARCHAR(180) NOT NULL,
+                    valid_from DATETIME NOT NULL,
+                    valid_until DATETIME NOT NULL,
+                    vendor_sku VARCHAR(120) NOT NULL,
+                    master_variant_id VARCHAR(120) NOT NULL,
+                    product_name VARCHAR(180) NULL,
+                    brand VARCHAR(120) NULL,
+                    category VARCHAR(64) NULL,
+                    gsm INT NULL,
+                    contracted_price_eur_kg DECIMAL(10,4) NOT NULL,
+                    benchmark_price_eur_kg DECIMAL(10,4) NOT NULL DEFAULT 1.3400,
+                    min_order_qty_kg DECIMAL(10,2) NOT NULL DEFAULT 500.00,
+                    version_number INT NOT NULL DEFAULT 1,
+                    status ENUM('ACTIVE', 'EXPIRED', 'REVOKED') NOT NULL DEFAULT 'ACTIVE',
+                    created_by VARCHAR(120) NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    UNIQUE KEY uq_tenant_supplier_variant (tenant_id, supplier_id, master_variant_id),
+                    INDEX idx_ppa_tenant_lookup (tenant_id, status, valid_until),
+                    INDEX idx_ppa_variant_lookup (tenant_id, master_variant_id)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+            `);
+            this._agreementsSchemaEnsured = true;
+        } catch (_) {
+            // Non-fatal in mock/ephemeral environments
+        }
+    }
+
+    _getRuntimeAgreementsStore() {
+        if (!this._runtimeAgreementsByTenant) {
+            this._runtimeAgreementsByTenant = new Map();
+        }
+        return this._runtimeAgreementsByTenant;
+    }
+
+    getEuropeanDistributorsCatalog() {
+        return [
+            {
+                supplierId: 'SUP-LECTA-TORRASPAPEL',
+                name: 'Lecta / Torraspapel',
+                country: 'ES',
+                tier: 'STRATEGIC_MILL_MERCHANT',
+                specialties: ['GardaPat 13 Kiara', 'Coral Book Ivory', 'Creator Vol', 'Condat Matt Périgord'],
+                defaultBenchmarkEurKg: 1.32
+            },
+            {
+                supplierId: 'SUP-ANTALIS-EUROPE',
+                name: 'Antalis',
+                country: 'FR',
+                tier: 'PAN_EUROPEAN_DISTRIBUTOR',
+                specialties: ['Olin Regular Cream', 'Cocoon Offset FSC Recycled', 'Novatech Matt', 'Rives Tradition'],
+                defaultBenchmarkEurKg: 1.44
+            },
+            {
+                supplierId: 'SUP-FEDRIGONI-GROUP',
+                name: 'Fedrigoni',
+                country: 'IT',
+                tier: 'SPECIALTY_FINE_PAPER_MILL',
+                specialties: ['Arena Natural Bulk', 'Sirio Color', 'Symbol Tatami', 'Materica Clay', 'Geltex'],
+                defaultBenchmarkEurKg: 1.85
+            },
+            {
+                supplierId: 'SUP-SAPPI-EUROPE',
+                name: 'Sappi',
+                country: 'BE',
+                tier: 'HIGH_VOLUME_COATED_MILL',
+                specialties: ['Magno Volume', 'Magno Gloss', 'Magno Satin', 'Algro Design 1S'],
+                defaultBenchmarkEurKg: 1.29
+            },
+            {
+                supplierId: 'SUP-ARCTIC-PAPER',
+                name: 'Arctic Paper',
+                country: 'SE',
+                tier: 'BOOK_PUBLISHING_MILL',
+                specialties: ['Munken Print Cream 18', 'Munken Pure Rough', 'Munken Polar', 'Arctic Volume White'],
+                defaultBenchmarkEurKg: 1.48
+            }
+        ];
+    }
+
+    /**
+     * Resolves a canonical master variant from `paper_variants`, `supplier_paper_catalog_variants`,
+     * or `EUROPEAN_MASTER_SUBSTRATES`. Throws `UNKNOWN_MASTER_VARIANT_ID` (400) if not found.
+     */
+    async resolveMasterCatalogVariant(masterVariantId, dbClient = db) {
+        const rawId = String(masterVariantId || '').trim();
+        if (!rawId) {
+            const err = new Error('MASTER_VARIANT_ID_REQUIRED: Each rate item must reference a valid masterVariantId.');
+            err.statusCode = 400;
+            err.code = 'MASTER_VARIANT_ID_REQUIRED';
+            throw err;
+        }
+
+        const { EUROPEAN_MASTER_SUBSTRATES } = require('./materials/industrialMaterialsCatalogService');
+        const normalizedLookupId = rawId.replace(/^MAT-/, '');
+
+        // 1. Check canonical in-memory master substrates first (fast path)
+        const memMatch = EUROPEAN_MASTER_SUBSTRATES.find(
+            (m) =>
+                m.id === rawId ||
+                m.id === `MAT-${rawId}` ||
+                m.id.replace(/^MAT-/, '') === normalizedLookupId
+        );
+        if (memMatch) {
+            return {
+                masterVariantId: memMatch.id,
+                canonicalVariantId: memMatch.id,
+                productName: memMatch.name,
+                brand: memMatch.manufacturer,
+                category: memMatch.category,
+                gsm: Number(memMatch.basis_weight_gsm || 90),
+                benchmarkPriceEurKg: Number(memMatch.cost_per_kg_eur || 1.34)
+            };
+        }
+
+        // 2. Check MySQL `paper_variants` / `supplier_paper_catalog_variants`
+        if (dbClient && typeof dbClient.query === 'function') {
+            try {
+                const vRows = unwrapRows(
+                    await dbClient.query(
+                        `SELECT v.*, p.name AS product_name, p.brand, p.manufacturer, p.category
+                         FROM paper_variants v
+                         LEFT JOIN paper_products p ON v.product_id = p.id
+                         WHERE v.id IN (?, ?)
+                         LIMIT 1`,
+                        [rawId, normalizedLookupId]
+                    ).catch(() => [])
+                );
+                if (vRows && vRows.length > 0) {
+                    const row = vRows[0];
+                    return {
+                        masterVariantId: row.id,
+                        canonicalVariantId: row.id,
+                        productName: row.product_name || row.name || `Variant ${row.id}`,
+                        brand: row.brand || row.manufacturer || 'European Mill',
+                        category: row.category || 'OFFSET_UNCOATED',
+                        gsm: Number(row.gsm || 90),
+                        benchmarkPriceEurKg: Number(row.benchmark_price_eur_kg || 1.34)
+                    };
+                }
+
+                const scvRows = unwrapRows(
+                    await dbClient.query(
+                        `SELECT scv.*, v.gsm, p.name AS product_name, p.brand, p.category
+                         FROM supplier_paper_catalog_variants scv
+                         LEFT JOIN paper_variants v ON scv.variant_id = v.id
+                         LEFT JOIN paper_products p ON v.product_id = p.id
+                         WHERE scv.variant_id IN (?, ?) OR scv.id IN (?, ?)
+                         LIMIT 1`,
+                        [rawId, normalizedLookupId, rawId, normalizedLookupId]
+                    ).catch(() => [])
+                );
+                if (scvRows && scvRows.length > 0) {
+                    const row = scvRows[0];
+                    return {
+                        masterVariantId: row.variant_id || row.id,
+                        canonicalVariantId: row.variant_id || row.id,
+                        productName: row.product_name || `Variant ${row.variant_id || row.id}`,
+                        brand: row.brand || 'European Mill',
+                        category: row.category || 'OFFSET_UNCOATED',
+                        gsm: Number(row.gsm || 90),
+                        benchmarkPriceEurKg: 1.34
+                    };
+                }
+            } catch (_) {
+                // Continue to error below
+            }
+        }
+
+        const err = new Error(
+            `UNKNOWN_MASTER_VARIANT_ID: '${rawId}' does not match any active substrate in the 1,524 master catalog.`
+        );
+        err.statusCode = 400;
+        err.code = 'UNKNOWN_MASTER_VARIANT_ID';
+        throw err;
+    }
+
+    /**
+     * Ingests a supplier rate sheet agreement for a specific tenant (`POST /api/suppliers/agreements/ingest`).
+     * Enforces:
+     * - Strict tenant isolation (`tenantId`)
+     * - Date consistency (`validUntil > validFrom`)
+     * - Master variant existence against the 1,524 master catalog
+     * - Version tracking and audit stamps on upsert
+     */
+    async ingestSupplierRateAgreement(tenantId, payload = {}, actorContext = {}, dbClient = db) {
+        const cleanTenantId = String(tenantId || actorContext.tenantId || '').trim();
+        if (!cleanTenantId) {
+            const err = new Error('TENANT_ID_REQUIRED: Multi-tenant scope is mandatory for commercial rate agreements.');
+            err.statusCode = 400;
+            err.code = 'TENANT_ID_REQUIRED';
+            throw err;
+        }
+
+        const supplierId = String(payload.supplierId || '').trim();
+        const agreementName = String(payload.agreementName || '').trim();
+        const validFromRaw = payload.validFrom;
+        const validUntilRaw = payload.validUntil;
+        const items = Array.isArray(payload.items) ? payload.items : [];
+
+        if (!supplierId) {
+            const err = new Error('SUPPLIER_ID_REQUIRED: supplierId is mandatory.');
+            err.statusCode = 400;
+            err.code = 'SUPPLIER_ID_REQUIRED';
+            throw err;
+        }
+        if (!agreementName) {
+            const err = new Error('AGREEMENT_NAME_REQUIRED: agreementName is mandatory.');
+            err.statusCode = 400;
+            err.code = 'AGREEMENT_NAME_REQUIRED';
+            throw err;
+        }
+
+        const validFromDate = new Date(validFromRaw);
+        const validUntilDate = new Date(validUntilRaw);
+        if (Number.isNaN(validFromDate.getTime()) || Number.isNaN(validUntilDate.getTime())) {
+            const err = new Error('INVALID_AGREEMENT_DATES: validFrom and validUntil must be valid ISO-8601 dates.');
+            err.statusCode = 400;
+            err.code = 'INVALID_AGREEMENT_DATES';
+            throw err;
+        }
+        if (validUntilDate.getTime() <= validFromDate.getTime()) {
+            const err = new Error('INVALID_AGREEMENT_DATE_RANGE: validUntil must be strictly greater than validFrom.');
+            err.statusCode = 400;
+            err.code = 'INVALID_AGREEMENT_DATE_RANGE';
+            throw err;
+        }
+
+        if (items.length === 0) {
+            const err = new Error('EMPTY_AGREEMENT_ITEMS: At least one rate line item is required.');
+            err.statusCode = 400;
+            err.code = 'EMPTY_AGREEMENT_ITEMS';
+            throw err;
+        }
+
+        await this.ensurePaperAgreementsSchema(dbClient);
+        const store = this._getRuntimeAgreementsStore();
+        if (!store.has(cleanTenantId)) {
+            store.set(cleanTenantId, new Map());
+        }
+        const tenantMap = store.get(cleanTenantId);
+
+        const printhouseId = String(actorContext.printhouseId || payload.printhouseId || cleanTenantId);
+        const createdBy = String(actorContext.userId || actorContext.actorId || 'system-procurement');
+        const nowMs = Date.now();
+        const isExpiredNow = validUntilDate.getTime() < nowMs;
+        const computedStatus = isExpiredNow ? 'EXPIRED' : 'ACTIVE';
+
+        const upsertedItems = [];
+
+        for (let idx = 0; idx < items.length; idx++) {
+            const rawItem = items[idx] || {};
+            const vendorSku = String(rawItem.vendorSku || `SKU-${supplierId}-${idx + 1}`).trim();
+            const contractedPriceEurKg = Number(rawItem.contractedPriceEurKg);
+            const minOrderQtyKg = Number(rawItem.minOrderQtyKg ?? 500);
+
+            if (!Number.isFinite(contractedPriceEurKg) || contractedPriceEurKg <= 0) {
+                const err = new Error(
+                    `INVALID_CONTRACTED_PRICE: Item at index ${idx} must have a positive contractedPriceEurKg.`
+                );
+                err.statusCode = 400;
+                err.code = 'INVALID_CONTRACTED_PRICE';
+                throw err;
+            }
+            if (!Number.isFinite(minOrderQtyKg) || minOrderQtyKg < 0) {
+                const err = new Error(
+                    `INVALID_MIN_ORDER_QTY: Item at index ${idx} must have a non-negative minOrderQtyKg.`
+                );
+                err.statusCode = 400;
+                err.code = 'INVALID_MIN_ORDER_QTY';
+                throw err;
+            }
+
+            // Validate & resolve canonical masterVariantId
+            const resolvedVariant = await this.resolveMasterCatalogVariant(rawItem.masterVariantId, dbClient);
+            const canonicalId = resolvedVariant.canonicalVariantId;
+            const compositeKey = `${supplierId}::${canonicalId}`;
+
+            const existingEntry =
+                tenantMap.get(compositeKey) ||
+                tenantMap.get(`${supplierId}::${rawItem.masterVariantId}`);
+            const nextVersion = existingEntry ? Number(existingEntry.versionNumber || 1) + 1 : 1;
+            const agreementRowId = existingEntry
+                ? existingEntry.id
+                : `AGR-${crypto.createHash('sha256').update(`${cleanTenantId}|${supplierId}|${canonicalId}`).digest('hex').slice(0, 16).toUpperCase()}`;
+
+            const nowIso = new Date().toISOString();
+            const record = {
+                id: agreementRowId,
+                tenantId: cleanTenantId,
+                printhouseId,
+                supplierId,
+                agreementName,
+                validFrom: validFromDate.toISOString(),
+                validUntil: validUntilDate.toISOString(),
+                vendorSku,
+                masterVariantId: canonicalId,
+                requestedMasterVariantId: String(rawItem.masterVariantId),
+                productName: resolvedVariant.productName,
+                brand: resolvedVariant.brand,
+                category: resolvedVariant.category,
+                gsm: resolvedVariant.gsm,
+                contractedPriceEurKg: Number(contractedPriceEurKg.toFixed(4)),
+                benchmarkPriceEurKg: Number(resolvedVariant.benchmarkPriceEurKg.toFixed(4)),
+                minOrderQtyKg: Number(minOrderQtyKg.toFixed(2)),
+                versionNumber: nextVersion,
+                status: computedStatus,
+                createdBy,
+                createdAt: existingEntry ? existingEntry.createdAt : nowIso,
+                updatedAt: nowIso
+            };
+
+            tenantMap.set(compositeKey, record);
+            // Also index by raw requested masterVariantId if different (e.g. without MAT- prefix)
+            if (String(rawItem.masterVariantId) !== canonicalId) {
+                tenantMap.set(`${supplierId}::${String(rawItem.masterVariantId)}`, record);
+            }
+
+            // Persist to MySQL `printhouse_paper_agreements` if available
+            if (dbClient && typeof dbClient.query === 'function') {
+                const validFromSql = validFromDate.toISOString().slice(0, 19).replace('T', ' ');
+                const validUntilSql = validUntilDate.toISOString().slice(0, 19).replace('T', ' ');
+                await dbClient
+                    .query(
+                        `INSERT INTO printhouse_paper_agreements (
+                            id, tenant_id, printhouse_id, supplier_id, agreement_name,
+                            valid_from, valid_until, vendor_sku, master_variant_id,
+                            product_name, brand, category, gsm,
+                            contracted_price_eur_kg, benchmark_price_eur_kg, min_order_qty_kg,
+                            version_number, status, created_by
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        ON DUPLICATE KEY UPDATE
+                            agreement_name = VALUES(agreement_name),
+                            valid_from = VALUES(valid_from),
+                            valid_until = VALUES(valid_until),
+                            vendor_sku = VALUES(vendor_sku),
+                            contracted_price_eur_kg = VALUES(contracted_price_eur_kg),
+                            min_order_qty_kg = VALUES(min_order_qty_kg),
+                            version_number = version_number + 1,
+                            status = VALUES(status),
+                            updated_at = CURRENT_TIMESTAMP`,
+                        [
+                            record.id,
+                            record.tenantId,
+                            record.printhouseId,
+                            record.supplierId,
+                            record.agreementName,
+                            validFromSql,
+                            validUntilSql,
+                            record.vendorSku,
+                            record.masterVariantId,
+                            record.productName,
+                            record.brand,
+                            record.category,
+                            record.gsm,
+                            record.contractedPriceEurKg,
+                            record.benchmarkPriceEurKg,
+                            record.minOrderQtyKg,
+                            record.versionNumber,
+                            record.status,
+                            record.createdBy
+                        ]
+                    )
+                    .catch(() => {});
+            }
+
+            upsertedItems.push(record);
+        }
+
+        return {
+            ok: true,
+            tenantId: cleanTenantId,
+            supplierId,
+            agreementName,
+            validFrom: validFromDate.toISOString(),
+            validUntil: validUntilDate.toISOString(),
+            ingestedCount: upsertedItems.length,
+            items: upsertedItems
+        };
+    }
+
+    /**
+     * Lists commercial paper agreements strictly isolated to `tenantId`.
+     * Under NO circumstances are agreements belonging to another tenant returned.
+     */
+    async listTenantSupplierAgreements(tenantId, filters = {}, dbClient = db) {
+        const cleanTenantId = String(tenantId || '').trim();
+        if (!cleanTenantId) {
+            const err = new Error('TENANT_ID_REQUIRED');
+            err.statusCode = 400;
+            throw err;
+        }
+
+        await this.ensurePaperAgreementsSchema(dbClient);
+        const store = this._getRuntimeAgreementsStore();
+        const tenantMap = store.get(cleanTenantId) || new Map();
+
+        const byId = new Map();
+        for (const rec of tenantMap.values()) {
+            // Double-verify strict tenant isolation
+            if (rec.tenantId === cleanTenantId) {
+                byId.set(rec.id, rec);
+            }
+        }
+
+        if (dbClient && typeof dbClient.query === 'function' && process.env.PPOS_CI_EPHEMERAL_FIXTURES !== 'true') {
+            try {
+                const rows = unwrapRows(
+                    await dbClient
+                        .query(
+                            `SELECT * FROM printhouse_paper_agreements
+                             WHERE tenant_id = ?
+                             ORDER BY updated_at DESC`,
+                            [cleanTenantId]
+                        )
+                        .catch(() => [])
+                );
+                for (const r of rows) {
+                    if (String(r.tenant_id) !== cleanTenantId) continue;
+                    const mapped = {
+                        id: r.id,
+                        tenantId: r.tenant_id,
+                        printhouseId: r.printhouse_id,
+                        supplierId: r.supplier_id,
+                        agreementName: r.agreement_name,
+                        validFrom: new Date(r.valid_from).toISOString(),
+                        validUntil: new Date(r.valid_until).toISOString(),
+                        vendorSku: r.vendor_sku,
+                        masterVariantId: r.master_variant_id,
+                        productName: r.product_name,
+                        brand: r.brand,
+                        category: r.category,
+                        gsm: Number(r.gsm || 90),
+                        contractedPriceEurKg: Number(r.contracted_price_eur_kg),
+                        benchmarkPriceEurKg: Number(r.benchmark_price_eur_kg || 1.34),
+                        minOrderQtyKg: Number(r.min_order_qty_kg || 500),
+                        versionNumber: Number(r.version_number || 1),
+                        status: r.status,
+                        createdBy: r.created_by,
+                        createdAt: r.created_at,
+                        updatedAt: r.updated_at
+                    };
+                    if (!byId.has(mapped.id)) {
+                        byId.set(mapped.id, mapped);
+                    }
+                }
+            } catch (_) {
+                // Fallback to in-memory tenant store
+            }
+        }
+
+        const nowMs = filters.referenceDate ? new Date(filters.referenceDate).getTime() : Date.now();
+        const soonThresholdMs = 30 * 24 * 60 * 60 * 1000; // 30 days
+
+        let list = Array.from(byId.values()).map((item) => {
+            const validFromMs = new Date(item.validFrom).getTime();
+            const validUntilMs = new Date(item.validUntil).getTime();
+            const isExpired = validUntilMs < nowMs || item.status === 'EXPIRED' || item.status === 'REVOKED';
+            const isExpiringSoon = !isExpired && validUntilMs - nowMs <= soonThresholdMs;
+            const isEffectiveNow = !isExpired && validFromMs <= nowMs && validUntilMs >= nowMs;
+            return {
+                ...item,
+                lifecycleStatus: isExpired ? 'EXPIRED' : isExpiringSoon ? 'EXPIRING_SOON' : 'ACTIVE',
+                isEffectiveNow
+            };
+        });
+
+        if (filters.supplierId) {
+            list = list.filter((a) => a.supplierId === filters.supplierId);
+        }
+        if (filters.masterVariantId) {
+            const normVar = String(filters.masterVariantId).replace(/^MAT-/, '');
+            list = list.filter(
+                (a) =>
+                    a.masterVariantId === filters.masterVariantId ||
+                    a.masterVariantId.replace(/^MAT-/, '') === normVar ||
+                    a.requestedMasterVariantId === filters.masterVariantId
+            );
+        }
+
+        return {
+            tenantId: cleanTenantId,
+            total: list.length,
+            items: list
+        };
+    }
+
+    /**
+     * Builds the European Distributor Hub overview for `/supplier/hub` scoped to `tenantId`.
+     */
+    async getDistributorHubOverview(tenantId, dbClient = db) {
+        const cleanTenantId = String(tenantId || 'tenant-default').trim();
+        const distributors = this.getEuropeanDistributorsCatalog();
+        const { items: agreements } = await this.listTenantSupplierAgreements(cleanTenantId, {}, dbClient);
+
+        const distributorCards = distributors.map((dist) => {
+            const distAgreements = agreements.filter(
+                (a) =>
+                    a.supplierId === dist.supplierId ||
+                    a.supplierId.toLowerCase().includes(dist.name.split('/')[0].trim().toLowerCase())
+            );
+            const activeAgreements = distAgreements.filter((a) => a.lifecycleStatus === 'ACTIVE');
+            const expiringSoonAgreements = distAgreements.filter((a) => a.lifecycleStatus === 'EXPIRING_SOON');
+
+            let agreementStatus = 'MISSING';
+            if (expiringSoonAgreements.length > 0) {
+                agreementStatus = 'EXPIRING_SOON';
+            } else if (activeAgreements.length > 0) {
+                agreementStatus = 'ACTIVE';
+            } else if (distAgreements.length > 0) {
+                agreementStatus = 'EXPIRED';
+            }
+
+            const avgContractedEurKg =
+                distAgreements.length > 0
+                    ? Number(
+                          (
+                              distAgreements.reduce((acc, r) => acc + Number(r.contractedPriceEurKg), 0) /
+                              distAgreements.length
+                          ).toFixed(4)
+                      )
+                    : null;
+
+            return {
+                ...dist,
+                agreementStatus,
+                contractedSkuCount: distAgreements.length,
+                activeSkuCount: activeAgreements.length + expiringSoonAgreements.length,
+                avgContractedEurKg,
+                latestAgreementName: distAgreements[0]?.agreementName || null,
+                validUntil: distAgreements[0]?.validUntil || null
+            };
+        });
+
+        return {
+            tenantId: cleanTenantId,
+            distributors: distributorCards,
+            agreements
+        };
+    }
 }
 
 module.exports = new PaperProcurementService();

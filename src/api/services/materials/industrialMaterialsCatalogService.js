@@ -952,32 +952,63 @@ async function listIndustrialMaterials(filters = {}, scope = {}, dbClient = db) 
 
     const unwrap = (r) => (Array.isArray(r) ? (Array.isArray(r[0]) ? r[0] : r) : []);
     const byId = new Map();
+    const targetTenantId = scope.tenantId || 'tenant-default';
+    const targetPrinthouseId = scope.printhouseId || 'GLOBAL_MASTER';
 
-    // 1. Seed baseline from runtime map so the catalog is never empty in workspace/calibrator
+    const isVisibleToTenant = (item) => {
+        const itemTenant = String(item.tenant_id || 'tenant-default');
+        const itemPh = String(item.printhouse_id || 'GLOBAL_MASTER');
+        // Global master benchmark entries are visible as baseline
+        if (itemTenant === 'tenant-default' && itemPh === 'GLOBAL_MASTER') return true;
+        // Private tenant rates/agreements are strictly isolated to the owning tenant
+        return itemTenant === targetTenantId || (targetPrinthouseId !== 'GLOBAL_MASTER' && itemPh === targetPrinthouseId);
+    };
+
+    // 1. Seed baseline from runtime map, strictly filtering out other tenants' custom overrides
     for (const [id, item] of runtimeIndustrialMaterials.entries()) {
-        byId.set(id, item);
+        if (isVisibleToTenant(item)) {
+            const baseId = String(item.base_material_id || id.replace(/^TENANT-[^:]+::/, ''));
+            // Prefer tenant-specific override over global baseline for the same baseId
+            if (!byId.has(baseId) || String(item.tenant_id) === targetTenantId) {
+                byId.set(baseId, { ...item, id: baseId });
+            }
+        }
     }
 
-    // 2. Hydrate from MySQL `printhouse_materials` and `materials_catalog` if available
+    // 2. Hydrate from MySQL `printhouse_materials` and `materials_catalog` scoped to tenant + global baseline
     if (dbClient && typeof dbClient.query === 'function' && process.env.PPOS_CI_EPHEMERAL_FIXTURES !== 'true') {
         try {
             const phRows = unwrap(
-                await dbClient.query('SELECT * FROM printhouse_materials ORDER BY updated_at DESC').catch(() => [])
+                await dbClient.query(
+                    `SELECT * FROM printhouse_materials
+                     WHERE tenant_id IN (?, 'tenant-default') OR printhouse_id IN (?, 'GLOBAL_MASTER')
+                     ORDER BY updated_at DESC`,
+                    [targetTenantId, targetPrinthouseId]
+                ).catch(() => [])
             );
             for (const row of phRows) {
                 const norm = normalizeIndustrialMaterialRecord(row);
-                byId.set(norm.id, norm);
-                runtimeIndustrialMaterials.set(norm.id, norm);
+                if (!isVisibleToTenant(norm)) continue;
+                const baseId = String(norm.id).replace(/^TENANT-[^:]+::/, '');
+                if (!byId.has(baseId) || String(norm.tenant_id) === targetTenantId) {
+                    byId.set(baseId, { ...norm, id: baseId });
+                }
             }
 
             const catRows = unwrap(
-                await dbClient.query('SELECT * FROM materials_catalog ORDER BY created_at DESC').catch(() => [])
+                await dbClient.query(
+                    `SELECT * FROM materials_catalog
+                     WHERE tenant_id IN (?, 'tenant-default') OR printhouse_id IN (?, 'GLOBAL_MASTER')
+                     ORDER BY created_at DESC`,
+                    [targetTenantId, targetPrinthouseId]
+                ).catch(() => [])
             );
             for (const row of catRows) {
                 const norm = normalizeIndustrialMaterialRecord(row);
-                if (!byId.has(norm.id)) {
-                    byId.set(norm.id, norm);
-                    runtimeIndustrialMaterials.set(norm.id, norm);
+                if (!isVisibleToTenant(norm)) continue;
+                const baseId = String(norm.id).replace(/^TENANT-[^:]+::/, '');
+                if (!byId.has(baseId)) {
+                    byId.set(baseId, { ...norm, id: baseId });
                 }
             }
         } catch (_) {
@@ -1047,7 +1078,10 @@ async function upsertIndustrialMaterial(payload = {}, scope = {}, dbClient = db,
     await ensurePrinthouseMaterialsSchema(dbClient);
 
     const existingId = payload.id || payload.paperId || null;
-    const existingItem = existingId ? runtimeIndustrialMaterials.get(String(existingId)) : null;
+    const targetTenantId = scope.tenantId || payload.tenant_id || 'tenant-default';
+    const existingItem = existingId
+        ? runtimeIndustrialMaterials.get(`TENANT-${targetTenantId}::${existingId}`) || runtimeIndustrialMaterials.get(String(existingId))
+        : null;
 
     const mergedPayload = {
         ...(existingItem || {}),
@@ -1092,7 +1126,11 @@ async function upsertIndustrialMaterial(payload = {}, scope = {}, dbClient = db,
     });
 
     const previousCostKg = existingItem ? Number(existingItem.cost_per_kg_eur) : null;
-    runtimeIndustrialMaterials.set(normalized.id, normalized);
+    const runtimeKey =
+        normalized.tenant_id && normalized.tenant_id !== 'tenant-default'
+            ? `TENANT-${normalized.tenant_id}::${normalized.id}`
+            : normalized.id;
+    runtimeIndustrialMaterials.set(runtimeKey, normalized);
 
     // Persist to MySQL tables if available
     if (dbClient && typeof dbClient.query === 'function') {

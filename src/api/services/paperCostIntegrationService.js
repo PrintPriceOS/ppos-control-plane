@@ -162,13 +162,31 @@ class PaperCostIntegrationService {
             category = null,
             widthMm = null,
             heightMm = null,
-            variantId = null
+            variantId = null,
+            masterVariantId = null
         } = crit;
 
         const targetCurrency = (crit.targetCurrency || crit.currency)
             ? String(crit.targetCurrency || crit.currency).trim().toUpperCase()
             : null;
         const exchangeRates = crit.exchangeRates || crit.currencyConversions || null;
+
+        // ─── STEP 1: Check Tenant-Scoped Contracted Paper Agreement (Priority 1) ───
+        try {
+            const agreementRate = await this.resolveTenantContractedRate(tenantId, {
+                masterVariantId: masterVariantId || variantId,
+                gsm,
+                category,
+                finish,
+                brand: crit.brand || null,
+                referenceDate: crit.referenceDate || null
+            });
+            if (agreementRate && agreementRate.isEffectiveNow) {
+                return agreementRate;
+            }
+        } catch (_) {
+            // Non-blocking fallback to marketplace offers and benchmark catalog
+        }
 
         let whereClauses = [
             "o.deleted_at IS NULL",
@@ -232,8 +250,11 @@ class PaperCostIntegrationService {
             WHERE ${whereClauses.join(' AND ')}
         `;
 
-        const rows = unwrapRows(await db.query(sql, params));
+        const rows = unwrapRows(await db.query(sql, params).catch(() => []));
         if (!rows || rows.length === 0) {
+            if (crit.allowBenchmarkFallback === true) {
+                return this.resolveCatalogBenchmarkRate(crit);
+            }
             return null;
         }
 
@@ -606,10 +627,25 @@ class PaperCostIntegrationService {
         const coverGsm = Number(opts.coverGsm) || 250;
         const targetCurrency = String(opts.targetCurrency || opts.currency || 'EUR').toUpperCase();
         const exchangeRates = opts.exchangeRates || opts.currencyConversions || null;
+        const allowBenchmarkFallback = Boolean(opts.allowBenchmarkFallback || opts.interiorMasterVariantId || opts.coverMasterVariantId || opts.useBenchmarkFallback);
 
         const [resolvedInterior, resolvedCover] = await Promise.all([
-            this.resolveMarketPaperRate(tenantId, { gsm: interiorGsm, targetCurrency, exchangeRates }),
-            this.resolveMarketPaperRate(tenantId, { gsm: coverGsm, targetCurrency, exchangeRates })
+            this.resolveMarketPaperRate(tenantId, {
+                gsm: interiorGsm,
+                masterVariantId: opts.interiorMasterVariantId || opts.masterVariantId || null,
+                targetCurrency,
+                exchangeRates,
+                allowBenchmarkFallback,
+                referenceDate: opts.referenceDate || null
+            }),
+            this.resolveMarketPaperRate(tenantId, {
+                gsm: coverGsm,
+                masterVariantId: opts.coverMasterVariantId || null,
+                targetCurrency,
+                exchangeRates,
+                allowBenchmarkFallback,
+                referenceDate: opts.referenceDate || null
+            })
         ]);
 
         const candidateOverrides = {};
@@ -632,6 +668,8 @@ class PaperCostIntegrationService {
                 supplierName: resolvedInterior.supplierName,
                 sku: resolvedInterior.supplierSku,
                 pricePerKg: resolvedInterior.pricePerKg,
+                effective_paper_cost_eur_kg: resolvedInterior.effective_paper_cost_eur_kg ?? resolvedInterior.pricePerKg,
+                rateSource: resolvedInterior.rateSource || 'MARKETPLACE_OFFER',
                 currency: resolvedInterior.currency,
                 gsm: resolvedInterior.gsm,
                 finish: resolvedInterior.finish,
@@ -655,6 +693,8 @@ class PaperCostIntegrationService {
                 supplierName: resolvedCover.supplierName,
                 sku: resolvedCover.supplierSku,
                 pricePerKg: resolvedCover.pricePerKg,
+                effective_paper_cost_eur_kg: resolvedCover.effective_paper_cost_eur_kg ?? resolvedCover.pricePerKg,
+                rateSource: resolvedCover.rateSource || 'MARKETPLACE_OFFER',
                 currency: resolvedCover.currency,
                 gsm: resolvedCover.gsm,
                 finish: resolvedCover.finish,
@@ -768,6 +808,171 @@ class PaperCostIntegrationService {
             logger.warn({ event: 'resolve_offer_by_id_failed', offerId, tenantId, error: err.message });
             return null;
         }
+    }
+
+    /**
+     * Resolves a tenant's active, non-expired commercial rate agreement for a given substrate.
+     * Enforces strict tenant isolation (`tenantId`).
+     * Returns null if no agreement exists for `tenantId` or if the agreement is expired (`validUntil < NOW`).
+     */
+    async resolveTenantContractedRate(tenantId, criteria = {}) {
+        const cleanTenantId = String(tenantId || '').trim();
+        if (!cleanTenantId) return null;
+
+        const paperProcurementService = require('./paperProcurementService');
+        const { items: agreements } = await paperProcurementService.listTenantSupplierAgreements(cleanTenantId, {
+            referenceDate: criteria.referenceDate || null
+        });
+
+        if (!agreements || agreements.length === 0) return null;
+
+        const targetVar = criteria.masterVariantId ? String(criteria.masterVariantId).trim() : null;
+        const targetVarNorm = targetVar ? targetVar.replace(/^MAT-/, '') : null;
+        const targetGsm = criteria.gsm ? Number(criteria.gsm) : null;
+        const targetBrand = criteria.brand ? String(criteria.brand).toLowerCase() : null;
+        const targetCategory = criteria.category ? String(criteria.category).toUpperCase() : null;
+
+        // Filter only active, non-expired agreements belonging strictly to this tenant
+        const activeAgreements = agreements.filter((a) => a.tenantId === cleanTenantId && a.isEffectiveNow === true);
+        if (activeAgreements.length === 0) return null;
+
+        // 1. Canonical exact match on masterVariantId
+        let matched = null;
+        if (targetVar) {
+            matched = activeAgreements.find(
+                (a) =>
+                    a.masterVariantId === targetVar ||
+                    a.masterVariantId.replace(/^MAT-/, '') === targetVarNorm ||
+                    a.requestedMasterVariantId === targetVar
+            );
+        }
+
+        // 2. Fuzzy match by GSM + optional brand/category when masterVariantId is not explicitly passed
+        if (!matched && targetGsm) {
+            const gsmCandidates = activeAgreements.filter((a) => Number(a.gsm) === targetGsm);
+            if (targetBrand) {
+                matched = gsmCandidates.find(
+                    (a) =>
+                        String(a.brand || '').toLowerCase().includes(targetBrand) ||
+                        String(a.productName || '').toLowerCase().includes(targetBrand)
+                );
+            }
+            if (!matched && targetCategory) {
+                matched = gsmCandidates.find((a) => String(a.category || '').toUpperCase().includes(targetCategory));
+            }
+            if (!matched && gsmCandidates.length > 0) {
+                // Sort by lowest contracted price €/kg
+                gsmCandidates.sort((a, b) => Number(a.contractedPriceEurKg) - Number(b.contractedPriceEurKg));
+                matched = gsmCandidates[0];
+            }
+        }
+
+        if (!matched) return null;
+
+        return {
+            offerId: matched.id,
+            agreementId: matched.id,
+            supplierId: matched.supplierId,
+            supplierName: matched.supplierId,
+            supplierSku: matched.vendorSku,
+            sku: matched.vendorSku,
+            variantId: matched.masterVariantId,
+            masterVariantId: matched.masterVariantId,
+            productName: matched.productName,
+            brand: matched.brand,
+            category: matched.category,
+            finish: criteria.finish || 'MATTE',
+            gsm: matched.gsm,
+            currency: 'EUR',
+            pricePerKg: Number(matched.contractedPriceEurKg),
+            effective_paper_cost_eur_kg: Number(matched.contractedPriceEurKg),
+            benchmarkPriceEurKg: Number(matched.benchmarkPriceEurKg || 1.34),
+            minOrderQtyKg: Number(matched.minOrderQtyKg || 500),
+            versionNumber: Number(matched.versionNumber || 1),
+            rateSource: 'TENANT_CONTRACTED_AGREEMENT',
+            isEffectiveNow: true,
+            validFrom: matched.validFrom,
+            validUntil: matched.validUntil,
+            resolvedAt: new Date().toISOString()
+        };
+    }
+
+    /**
+     * Resolves the base market benchmark rate from the master catalog (`EUROPEAN_MASTER_SUBSTRATES`)
+     * when a tenant has no active private agreement or when its agreement has expired.
+     */
+    resolveCatalogBenchmarkRate(criteria = {}) {
+        const { EUROPEAN_MASTER_SUBSTRATES } = require('./materials/industrialMaterialsCatalogService');
+        const targetVar = criteria.masterVariantId || criteria.variantId ? String(criteria.masterVariantId || criteria.variantId).trim() : null;
+        const targetVarNorm = targetVar ? targetVar.replace(/^MAT-/, '') : null;
+        const targetGsm = criteria.gsm ? Number(criteria.gsm) : null;
+        const targetCategory = criteria.category ? String(criteria.category).toUpperCase() : null;
+
+        let match = null;
+        if (targetVar) {
+            match = EUROPEAN_MASTER_SUBSTRATES.find(
+                (m) =>
+                    m.id === targetVar ||
+                    m.id === `MAT-${targetVar}` ||
+                    m.id.replace(/^MAT-/, '') === targetVarNorm
+            );
+        }
+
+        if (!match && targetGsm) {
+            const byGsm = EUROPEAN_MASTER_SUBSTRATES.filter((m) => Math.abs(Number(m.basis_weight_gsm) - targetGsm) <= 10);
+            if (targetCategory) {
+                match = byGsm.find((m) => String(m.category).toUpperCase().includes(targetCategory));
+            }
+            if (!match && byGsm.length > 0) {
+                match = byGsm[0];
+            }
+        }
+
+        if (!match) {
+            match = EUROPEAN_MASTER_SUBSTRATES[0];
+        }
+
+        const benchmarkEurKg = Number(match?.cost_per_kg_eur || 1.34);
+        return {
+            offerId: `BENCHMARK-${match?.id || 'DEFAULT'}`,
+            supplierId: 'CATALOG_BENCHMARK',
+            supplierName: match?.manufacturer || 'European Master Benchmark',
+            supplierSku: match?.id || 'MAT-BENCHMARK',
+            sku: match?.id || 'MAT-BENCHMARK',
+            variantId: match?.id || 'MAT-BENCHMARK',
+            masterVariantId: match?.id || 'MAT-BENCHMARK',
+            productName: match?.name || 'Standard Offset Substrate',
+            brand: match?.manufacturer || 'European Mill',
+            category: match?.category || 'OFFSET_UNCOATED',
+            finish: criteria.finish || 'UNCOATED',
+            gsm: Number(match?.basis_weight_gsm || targetGsm || 90),
+            currency: 'EUR',
+            pricePerKg: benchmarkEurKg,
+            effective_paper_cost_eur_kg: benchmarkEurKg,
+            benchmarkPriceEurKg: benchmarkEurKg,
+            rateSource: 'CATALOG_BENCHMARK_RATE',
+            isFallbackBenchmark: true,
+            resolvedAt: new Date().toISOString()
+        };
+    }
+
+    /**
+     * Canonical Matchmaker & BPE Rate Resolver:
+     * 1. Checks tenant's active, non-expired commercial agreement (`TENANT_CONTRACTED_AGREEMENT`).
+     * 2. If missing or expired, falls back to the catalog's base market benchmark rate (`CATALOG_BENCHMARK_RATE`).
+     */
+    async resolveEffectivePaperRateForBpe(tenantId, criteria = {}) {
+        const cleanTenantId = String(tenantId || '').trim();
+        if (!cleanTenantId) {
+            throw new Error('TENANT_ID_REQUIRED');
+        }
+
+        const contracted = await this.resolveTenantContractedRate(cleanTenantId, criteria);
+        if (contracted && contracted.isEffectiveNow) {
+            return contracted;
+        }
+
+        return this.resolveCatalogBenchmarkRate(criteria);
     }
 }
 

@@ -10,8 +10,12 @@ const router = express.Router();
 const db = require('../services/mysqlClient');
 const { requireAdmin, resolveActorContext, requireSupplierScope, requireApprovedSupplier } = require('../middleware/auth');
 
-// Feature Flag Middleware: Default OFF
+// Feature Flag Middleware: Default OFF for legacy pilot routes, but tenant rate agreements (/agreements, /hub) are always enabled
 function requirePaperSupplierHubFlag(req, res, next) {
+    const reqPath = String(req.path || req.url || '');
+    if (reqPath.startsWith('/agreements') || reqPath.startsWith('/hub')) {
+        return next();
+    }
     const isEnabled = process.env.PAPER_SUPPLIER_HUB_ENABLED === 'true';
     if (!isEnabled) {
         return res.status(403).json({
@@ -1983,6 +1987,109 @@ router.post('/accreditation/variants/:variantId/evidences/:evidenceId/promotions
     } catch (err) {
         console.error('[PAPER-SUPPLIERS][PROMOTION-REVERT-ERROR]', err);
         return sendEvidenceError(res, err, 'PROMOTION_REVERT_FAILED');
+    }
+});
+
+/**
+ * -------------------------------------------------------------
+ * TENANT-SCOPED COMMERCIAL RATE AGREEMENTS & DISTRIBUTOR HUB
+ * -------------------------------------------------------------
+ */
+const paperCostIntegrationService = require('../services/paperCostIntegrationService');
+
+/**
+ * GET /api/suppliers/hub
+ * GET /api/v1/paper-suppliers/hub
+ * Returns the European Paper Distributors Hub overview and tenant-scoped rate agreements.
+ */
+router.get('/hub', async (req, res) => {
+    try {
+        const context = resolveActorContext(req);
+        const tenantId = context.tenantId || req.headers['x-tenant-id'] || 'tenant-default';
+        const overview = await paperProcurementService.getDistributorHubOverview(tenantId);
+        return res.json({ ok: true, data: overview });
+    } catch (err) {
+        console.error('[PAPER-SUPPLIERS][HUB-OVERVIEW-ERROR]', err);
+        return res.status(err.statusCode || 500).json({
+            ok: false,
+            error: {
+                code: err.code || 'HUB_OVERVIEW_FAILED',
+                message: err.message
+            }
+        });
+    }
+});
+
+/**
+ * GET /api/suppliers/agreements
+ * GET /api/v1/paper-suppliers/agreements
+ * Lists commercial rate agreements strictly isolated to the caller's tenant.
+ */
+router.get('/agreements', async (req, res) => {
+    try {
+        const context = resolveActorContext(req);
+        const tenantId = context.tenantId || req.headers['x-tenant-id'] || 'tenant-default';
+        const result = await paperProcurementService.listTenantSupplierAgreements(tenantId, {
+            supplierId: req.query.supplierId || null,
+            masterVariantId: req.query.masterVariantId || null,
+            referenceDate: req.query.referenceDate || null
+        });
+        return res.json({ ok: true, data: result });
+    } catch (err) {
+        console.error('[PAPER-SUPPLIERS][AGREEMENTS-LIST-ERROR]', err);
+        return res.status(err.statusCode || 500).json({
+            ok: false,
+            error: {
+                code: err.code || 'AGREEMENTS_LIST_FAILED',
+                message: err.message
+            }
+        });
+    }
+});
+
+/**
+ * POST /api/suppliers/agreements/ingest
+ * POST /api/v1/paper-suppliers/agreements/ingest
+ * Ingests a merchant rate agreement into `printhouse_paper_agreements` scoped strictly to `tenantId`.
+ */
+router.post('/agreements/ingest', async (req, res) => {
+    try {
+        const context = resolveActorContext(req);
+        const tenantId = context.tenantId || req.headers['x-tenant-id'] || req.body?.tenantId || 'tenant-default';
+        const result = await paperProcurementService.ingestSupplierRateAgreement(tenantId, req.body || {}, context);
+        return res.status(201).json({ ok: true, data: result });
+    } catch (err) {
+        console.error('[PAPER-SUPPLIERS][AGREEMENT-INGEST-ERROR]', err);
+        return res.status(err.statusCode || 400).json({
+            ok: false,
+            error: {
+                code: err.code || 'AGREEMENT_INGEST_FAILED',
+                message: err.message
+            }
+        });
+    }
+});
+
+/**
+ * POST /api/suppliers/agreements/resolve-rate
+ * POST /api/v1/paper-suppliers/agreements/resolve-rate
+ * Resolves the effective paper rate (€/kg) for a tenant with automatic fallback to catalog benchmark.
+ */
+router.post('/agreements/resolve-rate', async (req, res) => {
+    try {
+        const context = resolveActorContext(req);
+        const tenantId = context.tenantId || req.headers['x-tenant-id'] || req.body?.tenantId || 'tenant-default';
+        const resolved = await paperCostIntegrationService.resolveEffectivePaperRateForBpe(tenantId, req.body || {});
+        return res.json({ ok: true, data: resolved });
+    } catch (err) {
+        console.error('[PAPER-SUPPLIERS][RESOLVE-RATE-ERROR]', err);
+        return res.status(err.statusCode || 400).json({
+            ok: false,
+            error: {
+                code: err.code || 'RESOLVE_RATE_FAILED',
+                message: err.message
+            }
+        });
     }
 });
 

@@ -88,6 +88,7 @@ import { SupplierDashboardPage } from './pages/supplier/SupplierDashboardPage';
 import { SupplierCatalogOffersPage } from './pages/supplier/SupplierCatalogOffersPage';
 import { SupplierOrdersPage } from './pages/supplier/SupplierOrdersPage';
 import { SupplierSettingsPage } from './pages/supplier/SupplierSettingsPage';
+import { PaperSupplierHubPage } from './pages/suppliers/PaperSupplierHubPage';
 import { SupplierRegistrationPage } from './pages/supplier/SupplierRegistrationPage';
 import { ActivationGuard } from './components/auth/ActivationGuard';
 
@@ -385,7 +386,9 @@ export const App: React.FC = () => {
                 <Route path="/settings" element={<GlobalSettingsPage />} />
 
                 {/* PAPER SUPPLIER HUB (Phase I1: Flag & Role Protected) */}
-                <Route path="/supplier" element={<Navigate to="/supplier/dashboard" replace />} />
+                <Route path="/supplier" element={<Navigate to="/supplier/hub" replace />} />
+                <Route path="/supplier/hub" element={<PaperSupplierHubPage />} />
+                <Route path="/suppliers/hub" element={<PaperSupplierHubPage />} />
                 <Route path="/supplier/dashboard" element={
                     <SupplierRouteGuard>
                         <div className="p-8"><SupplierDashboardPage /></div>

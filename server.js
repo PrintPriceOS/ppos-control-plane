@@ -557,6 +557,7 @@ const start = async () => {
             fastify.use('/api/system', require('./src/api/routes/system'));
             fastify.use('/api/federation', federationRouter);
             fastify.use('/api/v1/paper-suppliers', require('./src/api/routes/paperSuppliersRoutes'));
+            fastify.use('/api/suppliers', require('./src/api/routes/paperSuppliersRoutes'));
             fastify.use('/api/v1/spine', require('./src/api/routes/spineRoutes'));
             fastify.use('/api/logistics', require('./src/api/routes/logisticsRoutes'));
             fastify.use('/api/printhouses', require('./src/api/routes/logisticsRoutes'));
@@ -609,6 +610,8 @@ const start = async () => {
             fastify.all('/api/federation/*', apiNotFoundFallback);
             fastify.all('/api/v1/paper-suppliers', apiNotFoundFallback);
             fastify.all('/api/v1/paper-suppliers/*', apiNotFoundFallback);
+            fastify.all('/api/suppliers', apiNotFoundFallback);
+            fastify.all('/api/suppliers/*', apiNotFoundFallback);
             fastify.all('/api/v1/spine', apiNotFoundFallback);
             fastify.all('/api/v1/spine/*', apiNotFoundFallback);
             fastify.all('/api/logistics', apiNotFoundFallback);
