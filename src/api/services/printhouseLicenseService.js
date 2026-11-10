@@ -109,11 +109,28 @@ async function getLockedSummary(tenantId) {
           WHERE p.tenant_id = ? AND mo.dispatch_lock_reason = 'AWAITING_PRINTHOUSE_LICENSE'`,
         [tenantId]
     );
+    const lockedRows = await mysqlClient.query(
+        `SELECT mo.id, mo.order_code, mo.status, mo.total_amount_eur, mo.currency, mo.created_at
+           FROM marketplace_orders mo
+           JOIN printhouses p ON p.id = mo.printhouse_id
+          WHERE p.tenant_id = ? AND mo.dispatch_lock_reason = 'AWAITING_PRINTHOUSE_LICENSE'
+          ORDER BY mo.created_at DESC
+          LIMIT 50`,
+        [tenantId]
+    );
     const ph = await resolvePrinthouse(null, tenantId);
     return {
         licenseActive: ph?.subscription_status === 'ACTIVE',
         count: Number(rows?.[0]?.cnt || 0),
-        totalRevenueEur: Number(rows?.[0]?.total || 0)
+        totalRevenueEur: Number(rows?.[0]?.total || 0),
+        lockedOrders: (lockedRows || []).map(r => ({
+            id: r.id,
+            orderCode: r.order_code,
+            status: r.status,
+            amountEur: Number(r.total_amount_eur || 0),
+            currency: r.currency || 'EUR',
+            createdAt: r.created_at
+        }))
     };
 }
 
