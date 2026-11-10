@@ -9,6 +9,8 @@ const mysqlClient = require('./mysqlClient');
 const logger = require('./logger').child('marketplace-order-service');
 const humanReportSnapshotService = require('./preflightHumanReportSnapshotService');
 const reviewApprovalService = require('./preflightReviewApprovalService');
+const escrowService = require('./escrowService');
+const logisticsDispatchService = require('./logisticsDispatchService');
 
 /**
  * Robust JSON parsing helper.
@@ -1627,6 +1629,120 @@ class MarketplaceOrderService {
             humanReportGates: readiness.humanReportGates || [],
             readiness
         };
+    }
+
+    /**
+     * Funds / locks an Escrow Hold (`OFFER_SELECTED` -> `FUNDS_ESCROWED`) for an order.
+     */
+    async fundOrderEscrow(orderId, payload = {}, actorContext = {}) {
+        const result = await escrowService.createOrFundEscrowHold(orderId, payload, actorContext);
+        try {
+            await this.addAuditEvent(
+                orderId,
+                'ESCROW_FUNDS_LOCKED',
+                {
+                    holdId: result.escrowHold?.holdId,
+                    grossAmountEur: result.escrowHold?.grossAmountEur,
+                    status: result.status
+                },
+                actorContext.actorId || 'ESCROW_LEDGER'
+            );
+        } catch (_) {}
+        return result;
+    }
+
+    /**
+     * Transitions an order deterministically through the canonical Escrow & Manufacturing State Machine.
+     * Rejects invalid state jumps with `INVALID_ORDER_STATE_TRANSITION` (HTTP 409).
+     */
+    async transitionOrderState(orderId, targetState, actorContext = {}) {
+        const result = await escrowService.transitionOrderState(orderId, targetState, actorContext);
+        try {
+            await this.addAuditEvent(
+                orderId,
+                'ORDER_STATE_TRANSITIONED',
+                {
+                    previousState: result.previousState,
+                    status: result.status,
+                    escrowStatus: result.escrowStatus
+                },
+                actorContext.actorId || 'SYSTEM_STATE_MACHINE'
+            );
+        } catch (_) {}
+        return result;
+    }
+
+    /**
+     * Packs an order for dispatch, generates a canonical GS1-128 / SSCC-18 tracking code,
+     * persists `logistics_shipments`, transitions state (`PACKED_READY_FOR_DISPATCH -> IN_TRANSIT`),
+     * and emits `PALLET_IN_TRANSIT`.
+     */
+    async packAndDispatchOrder(orderId, payload = {}, actorContext = {}) {
+        const result = await logisticsDispatchService.packAndDispatchOrder(orderId, payload, actorContext);
+        try {
+            await this.addAuditEvent(
+                orderId,
+                'PALLET_IN_TRANSIT',
+                {
+                    shipmentId: result.shipment?.shipmentId,
+                    carrierName: result.shipment?.carrierName,
+                    sscc18: result.shipment?.sscc18,
+                    gs1128Barcode: result.shipment?.gs1128Barcode,
+                    palletTierCount: result.shipment?.palletTierCount,
+                    grossWeightKg: result.shipment?.grossWeightKg
+                },
+                actorContext.actorId || 'LOGISTICS_DISPATCH'
+            );
+        } catch (_) {}
+        return result;
+    }
+
+    /**
+     * Captures cryptographic ePOD (`SHA-256` over payload + base64 signature),
+     * persists in `order_epod_records`, and transitions order to `DELIVERED_PENDING_CONFIRMATION`
+     * (or `DISPUTED` if `damagedPackagesCount > 0`).
+     */
+    async signOrderEpod(orderId, payload = {}, actorContext = {}) {
+        const result = await escrowService.captureCryptographicEpod(orderId, payload, actorContext);
+        try {
+            await this.addAuditEvent(
+                orderId,
+                result.disputeTriggered ? 'ORDER_EPOD_DISPUTE_TRIGGERED' : 'ORDER_EPOD_SIGNED',
+                {
+                    epodId: result.epodRecord?.epodId,
+                    payloadSha256: result.epodRecord?.payloadSha256,
+                    signatureSha256: result.epodRecord?.signatureSha256,
+                    damagedPackagesCount: result.epodRecord?.damagedPackagesCount,
+                    status: result.status
+                },
+                actorContext.actorId || 'EPOD_TERMINAL'
+            );
+        } catch (_) {}
+        return result;
+    }
+
+    /**
+     * Releases escrowed funds to the assigned printhouse net of the platform take-rate (default 4.0%),
+     * updates status to `SETTLED_FUNDS_RELEASED`, and guards idempotently against double disbursement (`ALREADY_SETTLED`).
+     */
+    async releaseOrderEscrow(orderId, payload = {}, actorContext = {}) {
+        const result = await escrowService.releaseOrderEscrow(orderId, payload, actorContext);
+        if (result.ok) {
+            try {
+                await this.addAuditEvent(
+                    orderId,
+                    'ESCROW_FUNDS_RELEASED',
+                    {
+                        settlementTxRef: result.settlementTxRef,
+                        netPrinthouseCreditEur: result.settlement?.netPrinthouseCreditEur,
+                        platformFeeEur: result.settlement?.platformFeeEur,
+                        platformTakeRatePct: result.settlement?.platformTakeRatePct
+                    },
+                    actorContext.actorId || 'ESCROW_SETTLEMENT_ENGINE'
+                );
+            } catch (_) {}
+        }
+        return result;
     }
 }
 

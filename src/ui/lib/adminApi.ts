@@ -1574,7 +1574,31 @@ export async function deletePrinthouse(mongoId: string) {
 }
 
 // --- Orders ---
-export type OrderStatus = 'pending' | 'reviewing' | 'in_production' | 'shipped' | 'delivered' | 'cancelled' | 'FILES_PENDING' | 'FILES_VALIDATED' | 'INVOICE_PENDING' | 'PAYMENT_PENDING' | 'READY_FOR_PRINTHOUSE';
+export type OrderStatus =
+    | 'pending'
+    | 'reviewing'
+    | 'in_production'
+    | 'shipped'
+    | 'delivered'
+    | 'cancelled'
+    | 'FILES_PENDING'
+    | 'FILES_VALIDATED'
+    | 'INVOICE_PENDING'
+    | 'PAYMENT_PENDING'
+    | 'READY_FOR_PRINTHOUSE'
+    | 'OFFER_SELECTED'
+    | 'FUNDS_ESCROWED'
+    | 'AWAITING_PRINTHOUSE_LICENSE'
+    | 'ACCEPTED'
+    | 'IN_PREPRESS'
+    | 'IMPOSITION_DISPATCHED'
+    | 'PRINTING'
+    | 'BINDING_FINISHING'
+    | 'PACKED_READY_FOR_DISPATCH'
+    | 'IN_TRANSIT'
+    | 'DELIVERED_PENDING_CONFIRMATION'
+    | 'SETTLED_FUNDS_RELEASED'
+    | 'DISPUTED';
 
 export type Order = {
     id: number;

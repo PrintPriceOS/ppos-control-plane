@@ -38,7 +38,8 @@ const INDUSTRIAL_WEBHOOK_TOPICS = {
     fintech: [
         'escrow.released',
         'einvoice.issued',
-        'shipping.dispatched'
+        'shipping.dispatched',
+        'PALLET_IN_TRANSIT'
     ]
 };
 

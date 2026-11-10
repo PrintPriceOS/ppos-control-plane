@@ -668,4 +668,156 @@ router.get('/:orderId/preflight/report', requireMarketplaceOrAdmin, async (req, 
     }
 });
 
+/**
+ * 15. POST /api/marketplace/orders/:orderId/escrow-hold
+ * Creates or funds an Escrow Hold (`OFFER_SELECTED -> FUNDS_ESCROWED`).
+ */
+router.post('/:orderId/escrow-hold', requireMarketplaceOrAdmin, async (req, res) => {
+    const { orderId } = req.params;
+    try {
+        const result = await marketplaceOrderService.fundOrderEscrow(
+            orderId,
+            req.body || {},
+            {
+                actorId: req.user?.id || 'STRIPE_ESCROW_LEDGER',
+                tenantId: req.body?.tenantId || req.user?.tenantId
+            }
+        );
+        return res.status(200).json(result);
+    } catch (err) {
+        const statusCode = err.statusCode || (err.code === 'INVALID_ORDER_STATE_TRANSITION' ? 409 : 400);
+        return res.status(statusCode).json({
+            ok: false,
+            code: err.code || 'ESCROW_HOLD_FAILED',
+            error: err.code || 'ESCROW_HOLD_FAILED',
+            message: err.message
+        });
+    }
+});
+
+/**
+ * 16. POST /api/marketplace/orders/:orderId/state
+ * Enforces deterministic progression across canonical order & manufacturing states.
+ * Throws HTTP 409 `INVALID_ORDER_STATE_TRANSITION` on illegal jumps.
+ */
+router.post('/:orderId/state', requireMarketplaceOrAdmin, async (req, res) => {
+    const { orderId } = req.params;
+    const targetState = req.body?.targetState || req.body?.status || req.body?.state;
+    try {
+        const result = await marketplaceOrderService.transitionOrderState(
+            orderId,
+            targetState,
+            {
+                actorId: req.user?.id || req.body?.actorId || 'SHOPFLOOR_OPERATOR',
+                reason: req.body?.reason || null,
+                tenantId: req.body?.tenantId || req.user?.tenantId
+            }
+        );
+        return res.status(200).json(result);
+    } catch (err) {
+        const statusCode = err.statusCode || (err.code === 'INVALID_ORDER_STATE_TRANSITION' ? 409 : 400);
+        return res.status(statusCode).json({
+            ok: false,
+            code: err.code || 'INVALID_ORDER_STATE_TRANSITION',
+            error: err.code || 'INVALID_ORDER_STATE_TRANSITION',
+            fromState: err.fromState || null,
+            toState: err.toState || targetState || null,
+            allowedTargets: err.allowedTargets || [],
+            message: err.message
+        });
+    }
+});
+
+/**
+ * 17. POST /api/marketplace/orders/:orderId/pack-dispatch
+ * Generates canonical GS1-128 / SSCC-18 tracking code (`(00)` + Extension + GS1 Prefix + Serial + Mod10 Check Digit),
+ * records shipment in `logistics_shipments`, transitions `PACKED_READY_FOR_DISPATCH -> IN_TRANSIT`,
+ * and emits `PALLET_IN_TRANSIT`.
+ */
+router.post('/:orderId/pack-dispatch', requireMarketplaceOrAdmin, async (req, res) => {
+    const { orderId } = req.params;
+    try {
+        const result = await marketplaceOrderService.packAndDispatchOrder(
+            orderId,
+            req.body || {},
+            {
+                actorId: req.user?.id || req.body?.actorId || 'LOGISTICS_DOCK_OPERATOR',
+                tenantId: req.body?.tenantId || req.user?.tenantId,
+                printhouseId: req.body?.printhouseId || req.user?.printhouseId
+            }
+        );
+        return res.status(200).json(result);
+    } catch (err) {
+        const statusCode = err.statusCode || (err.code === 'INVALID_ORDER_STATE_TRANSITION' ? 409 : 400);
+        return res.status(statusCode).json({
+            ok: false,
+            code: err.code || 'PACK_DISPATCH_FAILED',
+            error: err.code || 'PACK_DISPATCH_FAILED',
+            message: err.message
+        });
+    }
+});
+
+/**
+ * 18. POST /api/marketplace/orders/:orderId/epod-sign
+ * Captures cryptographic ePOD (`SHA-256` digest of delivery payload + base64 SVG/PNG signature),
+ * records in `order_epod_records`, and transitions order to `DELIVERED_PENDING_CONFIRMATION`
+ * (or `DISPUTED` when `damagedPackagesCount > 0`).
+ */
+router.post('/:orderId/epod-sign', requireMarketplaceOrAdmin, async (req, res) => {
+    const { orderId } = req.params;
+    try {
+        const result = await marketplaceOrderService.signOrderEpod(
+            orderId,
+            req.body || {},
+            {
+                actorId: req.user?.id || req.body?.recipientName || 'CARRIER_EPOD_TERMINAL',
+                tenantId: req.body?.tenantId || req.user?.tenantId
+            }
+        );
+        return res.status(200).json(result);
+    } catch (err) {
+        const statusCode = err.statusCode || (err.code === 'INVALID_ORDER_STATE_TRANSITION' ? 409 : 400);
+        return res.status(statusCode).json({
+            ok: false,
+            code: err.code || 'EPOD_SIGN_FAILED',
+            error: err.code || 'EPOD_SIGN_FAILED',
+            message: err.message
+        });
+    }
+});
+
+/**
+ * 19. POST /api/marketplace/orders/:orderId/release-escrow
+ * Credits printhouse account net of platform take-rate (default 4.0%),
+ * updates status to `SETTLED_FUNDS_RELEASED`, and prevents double disbursement (`ALREADY_SETTLED`).
+ */
+router.post('/:orderId/release-escrow', requireMarketplaceOrAdmin, async (req, res) => {
+    const { orderId } = req.params;
+    try {
+        const result = await marketplaceOrderService.releaseOrderEscrow(
+            orderId,
+            req.body || {},
+            {
+                actorId: req.user?.id || 'ESCROW_SETTLEMENT_ENGINE',
+                tenantId: req.body?.tenantId || req.user?.tenantId
+            }
+        );
+        if (!result.ok && result.code === 'ALREADY_SETTLED') {
+            return res.status(200).json(result);
+        }
+        return res.status(200).json(result);
+    } catch (err) {
+        const statusCode = err.statusCode || 409;
+        return res.status(statusCode).json({
+            ok: false,
+            code: err.code || 'ESCROW_RELEASE_FAILED',
+            error: err.code || 'ESCROW_RELEASE_FAILED',
+            orderStatus: err.orderStatus || null,
+            escrowStatus: err.escrowStatus || null,
+            message: err.message
+        });
+    }
+});
+
 module.exports = router;
