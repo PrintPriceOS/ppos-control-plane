@@ -120,104 +120,134 @@ const SEED_PROFILES: EconomicProfileRow[] = [
     }
 ];
 
-const SEED_PAPERS: PaperCatalogItem[] = [
-    {
-        paperId: 'paper-offset-80',
-        name: 'Offset Blanco Sin Estucar 80 g/m²',
-        grammageGsm: 80,
-        bulkFactor: 1.25,
-        costPerTonEur: 1180
-    },
-    {
-        paperId: 'paper-ahuesado-90',
-        name: 'Ahuesado Editorial Novela 90 g/m² (Vol 1.5)',
-        grammageGsm: 90,
-        bulkFactor: 1.5,
-        costPerTonEur: 1320
-    },
-    {
-        paperId: 'paper-estucado-115',
-        name: 'Estucado Mate Arte 115 g/m²',
-        grammageGsm: 115,
-        bulkFactor: 0.95,
-        costPerTonEur: 1290
-    },
-    {
-        paperId: 'paper-estucado-150',
-        name: 'Estucado Semimate Catálogo 150 g/m²',
-        grammageGsm: 150,
-        bulkFactor: 0.9,
-        costPerTonEur: 1340
-    }
-];
-
-const SEED_CROSSOVER: CrossoverAnalysis = {
-    crossoverCopies: 410,
-    explanation:
-        'A partir de 410 ejemplares, la amortización de planchas CTP y puesta a punto en Heidelberg Speedmaster XL 106-8P hace que el coste unitario Offset sea inferior al coste por clic digital en HP Indigo 12000 HD.',
-    digitalMachine: {
-        id: 'prof-digital-sra3-indigo',
-        printerName: 'HP Indigo 12000 HD Digital Press',
-        technology: 'DIGITAL_TONER'
-    },
-    offsetMachine: {
-        id: 'prof-offset-b1-xl106',
-        printerName: 'Heidelberg Speedmaster XL 106-8P',
-        technology: 'OFFSET_B1'
-    },
-    curve: [
+function getSeedPapers(locale: string): PaperCatalogItem[] {
+    const loc = locale === 'es' ? 'es' : locale === 'de' ? 'de' : 'en';
+    return [
         {
-            copies: 100,
-            digitalTotalEur: 382.4,
-            digitalUnitEur: 3.824,
-            offsetTotalEur: 964.2,
-            offsetUnitEur: 9.642,
-            savingsEur: 581.8,
-            recommendedTechnology: 'DIGITAL_TONER',
-            recommendedPrinterName: 'HP Indigo 12000 HD Digital Press'
+            paperId: 'paper-offset-80',
+            name:
+                loc === 'es'
+                    ? 'Offset Blanco Sin Estucar 80 g/m²'
+                    : loc === 'de'
+                      ? 'Ungestrichenes Offsetpapier Weiß 80 g/m²'
+                      : 'Uncoated White Offset 80 g/m²',
+            grammageGsm: 80,
+            bulkFactor: 1.25,
+            costPerTonEur: 1180
         },
         {
-            copies: 250,
-            digitalTotalEur: 745.8,
-            digitalUnitEur: 2.983,
-            offsetTotalEur: 1085.5,
-            offsetUnitEur: 4.342,
-            savingsEur: 339.7,
-            recommendedTechnology: 'DIGITAL_TONER',
-            recommendedPrinterName: 'HP Indigo 12000 HD Digital Press'
+            paperId: 'paper-ahuesado-90',
+            name:
+                loc === 'es'
+                    ? 'Ahuesado Editorial Novela 90 g/m² (Vol 1.5)'
+                    : loc === 'de'
+                      ? 'Werkdruckpapier Creme Roman 90 g/m² (Vol 1.5)'
+                      : 'Cream Book Trade Novel 90 g/m² (Bulk 1.5)',
+            grammageGsm: 90,
+            bulkFactor: 1.5,
+            costPerTonEur: 1320
         },
         {
-            copies: 500,
-            digitalTotalEur: 1352.0,
-            digitalUnitEur: 2.704,
-            offsetTotalEur: 1288.4,
-            offsetUnitEur: 2.577,
-            savingsEur: 63.6,
-            recommendedTechnology: 'OFFSET_B1',
-            recommendedPrinterName: 'Heidelberg Speedmaster XL 106-8P'
+            paperId: 'paper-estucado-115',
+            name:
+                loc === 'es'
+                    ? 'Estucado Mate Arte 115 g/m²'
+                    : loc === 'de'
+                      ? 'Bilderdruck Matt Kunst 115 g/m²'
+                      : 'Silk / Matte Art Coated 115 g/m²',
+            grammageGsm: 115,
+            bulkFactor: 0.95,
+            costPerTonEur: 1290
         },
         {
-            copies: 1000,
-            digitalTotalEur: 2564.0,
-            digitalUnitEur: 2.564,
-            offsetTotalEur: 1692.8,
-            offsetUnitEur: 1.693,
-            savingsEur: 871.2,
-            recommendedTechnology: 'OFFSET_B1',
-            recommendedPrinterName: 'Heidelberg Speedmaster XL 106-8P'
-        },
-        {
-            copies: 5000,
-            digitalTotalEur: 12260.0,
-            digitalUnitEur: 2.452,
-            offsetTotalEur: 4928.0,
-            offsetUnitEur: 0.986,
-            savingsEur: 7332.0,
-            recommendedTechnology: 'OFFSET_B1',
-            recommendedPrinterName: 'Heidelberg Speedmaster XL 106-8P'
+            paperId: 'paper-estucado-150',
+            name:
+                loc === 'es'
+                    ? 'Estucado Semimate Catálogo 150 g/m²'
+                    : loc === 'de'
+                      ? 'Halbmatt gestrichenes Katalogpapier 150 g/m²'
+                      : 'Semi-Matte Catalog Coated 150 g/m²',
+            grammageGsm: 150,
+            bulkFactor: 0.9,
+            costPerTonEur: 1340
         }
-    ]
-};
+    ];
+}
+
+function getSeedCrossover(locale: string): CrossoverAnalysis {
+    const loc = locale === 'es' ? 'es' : locale === 'de' ? 'de' : 'en';
+    return {
+        crossoverCopies: 410,
+        explanation:
+            loc === 'es'
+                ? 'A partir de 410 ejemplares, la amortización de planchas CTP y puesta a punto en Heidelberg Speedmaster XL 106-8P hace que el coste unitario Offset sea inferior al coste por clic digital en HP Indigo 12000 HD.'
+                : loc === 'de'
+                  ? 'Ab 410 Exemplaren führt die Amortisation der CTP-Platten und Rüstkosten auf der Heidelberg Speedmaster XL 106-8P dazu, dass der Offset-Stückpreis unter die digitalen Klickkosten der HP Indigo 12000 HD fällt.'
+                  : 'Starting at 410 copies, CTP plate and makeready amortization on the Heidelberg Speedmaster XL 106-8P brings the unit Offset cost below the digital click cost on the HP Indigo 12000 HD.',
+        digitalMachine: {
+            id: 'prof-digital-sra3-indigo',
+            printerName: 'HP Indigo 12000 HD Digital Press',
+            technology: 'DIGITAL_TONER'
+        },
+        offsetMachine: {
+            id: 'prof-offset-b1-xl106',
+            printerName: 'Heidelberg Speedmaster XL 106-8P',
+            technology: 'OFFSET_B1'
+        },
+        curve: [
+            {
+                copies: 100,
+                digitalTotalEur: 382.4,
+                digitalUnitEur: 3.824,
+                offsetTotalEur: 964.2,
+                offsetUnitEur: 9.642,
+                savingsEur: 581.8,
+                recommendedTechnology: 'DIGITAL_TONER',
+                recommendedPrinterName: 'HP Indigo 12000 HD Digital Press'
+            },
+            {
+                copies: 250,
+                digitalTotalEur: 745.8,
+                digitalUnitEur: 2.983,
+                offsetTotalEur: 1085.5,
+                offsetUnitEur: 4.342,
+                savingsEur: 339.7,
+                recommendedTechnology: 'DIGITAL_TONER',
+                recommendedPrinterName: 'HP Indigo 12000 HD Digital Press'
+            },
+            {
+                copies: 500,
+                digitalTotalEur: 1352.0,
+                digitalUnitEur: 2.704,
+                offsetTotalEur: 1288.4,
+                offsetUnitEur: 2.577,
+                savingsEur: 63.6,
+                recommendedTechnology: 'OFFSET_B1',
+                recommendedPrinterName: 'Heidelberg Speedmaster XL 106-8P'
+            },
+            {
+                copies: 1000,
+                digitalTotalEur: 2564.0,
+                digitalUnitEur: 2.564,
+                offsetTotalEur: 1692.8,
+                offsetUnitEur: 1.693,
+                savingsEur: 871.2,
+                recommendedTechnology: 'OFFSET_B1',
+                recommendedPrinterName: 'Heidelberg Speedmaster XL 106-8P'
+            },
+            {
+                copies: 5000,
+                digitalTotalEur: 12260.0,
+                digitalUnitEur: 2.452,
+                offsetTotalEur: 4928.0,
+                offsetUnitEur: 0.986,
+                savingsEur: 7332.0,
+                recommendedTechnology: 'OFFSET_B1',
+                recommendedPrinterName: 'Heidelberg Speedmaster XL 106-8P'
+            }
+        ]
+    };
+}
 
 export const PricingIntelligenceTab: React.FC<SharedModuleProps> = ({
     mode = 'workspace',
@@ -230,7 +260,7 @@ export const PricingIntelligenceTab: React.FC<SharedModuleProps> = ({
 
     const [view, setView] = useState<'profiles' | 'routing' | 'calibrator'>('profiles');
     const [profiles, setProfiles] = useState<EconomicProfileRow[]>(SEED_PROFILES);
-    const [papers, setPapers] = useState<PaperCatalogItem[]>(SEED_PAPERS);
+    const [papers, setPapers] = useState<PaperCatalogItem[]>(() => getSeedPapers(locale));
     const [routingHistory, setRoutingHistory] = useState<any[]>([
         {
             id: 'rt-decision-901',
@@ -280,7 +310,7 @@ export const PricingIntelligenceTab: React.FC<SharedModuleProps> = ({
         }
     ]);
     const [conflicts, setConflicts] = useState<any[]>([]);
-    const [crossover, setCrossover] = useState<CrossoverAnalysis>(SEED_CROSSOVER);
+    const [crossover, setCrossover] = useState<CrossoverAnalysis>(() => getSeedCrossover(locale));
     const [loading, setLoading] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -312,34 +342,92 @@ export const PricingIntelligenceTab: React.FC<SharedModuleProps> = ({
 
     const labels = {
         es: {
-            title: 'Pricing Intelligence Engine',
+            title: 'Motor de Inteligencia de Precios',
             subtitle: 'Modela la economía de producción, calibra costes por tirada y gestiona márgenes.',
-            tabProfiles: 'PROFILES',
-            tabRouting: 'ROUTING DECISIONS',
-            tabCalibrator: 'LIVE CALIBRATOR',
-            newProfile: 'NEW PROFILE',
-            openCalibrator: 'LIVE CALIBRATOR',
-            kpiProfiles: 'ACTIVE PROFILES',
-            kpiNodes: 'ACTIVE NODES',
-            kpiMarkup: 'AVG TARGET MARKUP',
-            kpiHealth: 'ECONOMIC HEALTH',
-            tableTitle: 'ACTIVE ECONOMIC PROFILES',
-            saveAndContinue: 'Guardar y Continuar'
+            tabProfiles: 'PERFILES',
+            tabRouting: 'DECISIONES DE ENRUTAMIENTO',
+            tabCalibrator: 'CALIBRADOR EN VIVO',
+            newProfile: '+ NUEVO PERFIL',
+            openCalibrator: 'CALIBRADOR EN VIVO',
+            kpiProfiles: 'PERFILES ACTIVOS',
+            kpiNodes: 'NODOS ACTIVOS',
+            kpiNodesSub: (avgRate: number) => `Prom. €${avgRate}/h`,
+            kpiMarkup: 'MARGEN OBJETIVO PROM.',
+            kpiMarkupSub: 'Margen Industrial Objetivo',
+            kpiHealth: 'SALUD ECONÓMICA',
+            kpiHealthSub: 'Viabilidad OEE y Merma',
+            tableTitle: 'PERFILES ECONÓMICOS ACTIVOS',
+            saveAndContinue: 'Guardar y Continuar',
+            backBtn: 'Atrás',
+            modalEditTitle: 'Editar Perfil Económico',
+            modalCreateTitle: 'Crear Perfil Económico',
+            modalClose: 'ESC / CERRAR',
+            fieldMachineName: 'Impresora / Nombre de Máquina',
+            fieldMachinePlaceholder: 'ej. Heidelberg XL 106',
+            fieldTechnology: 'Tecnología',
+            techRotaryOption: 'WEB_ROTARY (Rotativa)',
+            sectionFormats: '2. FORMATOS MÍN / MÁX ACEPTADOS POR LA MÁQUINA (MM)',
+            fieldMinWidth: 'Mín Ancho',
+            fieldMinHeight: 'Mín Alto',
+            fieldMaxWidth: 'Máx Ancho',
+            fieldMaxHeight: 'Máx Alto',
+            sectionFamilies: '3. FAMILIAS DE ENCUADERNACIÓN VIABLES',
+            famHardcover: 'Tapa Dura (Hardcover)',
+            famSoftcover: 'Rústica PUR (Softcover)',
+            famWireO: 'Wire-O (Espiral)',
+            famSaddle: 'Grapado (Saddle Stitch)',
+            fieldHourlyRate: 'Tarifa Horaria (€/h)',
+            fieldSetupFee: 'Puesta a Punto (€)',
+            fieldPlateCost: 'Plancha CTP (€/pl)',
+            fieldTargetMargin: 'Margen Objetivo (%)',
+            fieldMinOrderFee: 'Pedido Mínimo (€)',
+            btnSaving: 'Guardando...',
+            btnSaveProfile: 'Guardar Perfil Económico',
+            btnCancel: 'Cancelar'
         },
         de: {
             title: 'Pricing Intelligence Engine',
             subtitle: 'Produktionsökonomie modellieren, Auflagenkosten kalibrieren und Margen steuern.',
-            tabProfiles: 'PROFILES',
-            tabRouting: 'ROUTING DECISIONS',
-            tabCalibrator: 'LIVE CALIBRATOR',
-            newProfile: 'NEW PROFILE',
-            openCalibrator: 'LIVE CALIBRATOR',
-            kpiProfiles: 'ACTIVE PROFILES',
-            kpiNodes: 'ACTIVE NODES',
-            kpiMarkup: 'AVG TARGET MARKUP',
-            kpiHealth: 'ECONOMIC HEALTH',
-            tableTitle: 'ACTIVE ECONOMIC PROFILES',
-            saveAndContinue: 'Speichern & Weiter'
+            tabProfiles: 'PROFILE',
+            tabRouting: 'ROUTING-ENTSCHEIDUNGEN',
+            tabCalibrator: 'LIVE-KALIBRIERUNG',
+            newProfile: '+ NEUES PROFIL',
+            openCalibrator: 'LIVE-KALIBRIERUNG',
+            kpiProfiles: 'AKTIVE PROFILE',
+            kpiNodes: 'AKTIVE KNOTEN',
+            kpiNodesSub: (avgRate: number) => `Ø €${avgRate}/Std.`,
+            kpiMarkup: 'Ø ZIEL-AUFSCHLAG',
+            kpiMarkupSub: 'Industrielle Zielmarge',
+            kpiHealth: 'WIRTSCHAFTLICHKEIT',
+            kpiHealthSub: 'OEE & Makulatur-Effizienz',
+            tableTitle: 'AKTIVE WIRTSCHAFTSPROFILE',
+            saveAndContinue: 'Speichern & Weiter',
+            backBtn: 'Zurück',
+            modalEditTitle: 'Wirtschaftsprofil bearbeiten',
+            modalCreateTitle: 'Wirtschaftsprofil erstellen',
+            modalClose: 'ESC / SCHLIESSEN',
+            fieldMachineName: 'Druckmaschine / Anlagenname',
+            fieldMachinePlaceholder: 'z.B. Heidelberg XL 106',
+            fieldTechnology: 'Technologie',
+            techRotaryOption: 'WEB_ROTARY (Rollenoffset)',
+            sectionFormats: '2. MIN / MAX BOGENFORMATE DER MASCHINE (MM)',
+            fieldMinWidth: 'Min Breite',
+            fieldMinHeight: 'Min Höhe',
+            fieldMaxWidth: 'Max Breite',
+            fieldMaxHeight: 'Max Höhe',
+            sectionFamilies: '3. KOMPATIBLE BINDEFAMILIEN',
+            famHardcover: 'Hardcover (Deckenband)',
+            famSoftcover: 'Softcover (PUR-Klebebindung)',
+            famWireO: 'Wire-O (Spiralbindung)',
+            famSaddle: 'Rückstichheftung (Klammer)',
+            fieldHourlyRate: 'Stundensatz (€/Std.)',
+            fieldSetupFee: 'Rüstkosten (€)',
+            fieldPlateCost: 'CTP-Platte (€/Pl.)',
+            fieldTargetMargin: 'Zielmarge (%)',
+            fieldMinOrderFee: 'Mindestauftragswert (€)',
+            btnSaving: 'Speichert...',
+            btnSaveProfile: 'Wirtschaftsprofil speichern',
+            btnCancel: 'Abbrechen'
         },
         en: {
             title: 'Pricing Intelligence Engine',
@@ -347,14 +435,43 @@ export const PricingIntelligenceTab: React.FC<SharedModuleProps> = ({
             tabProfiles: 'PROFILES',
             tabRouting: 'ROUTING DECISIONS',
             tabCalibrator: 'LIVE CALIBRATOR',
-            newProfile: 'NEW PROFILE',
+            newProfile: '+ NEW PROFILE',
             openCalibrator: 'LIVE CALIBRATOR',
             kpiProfiles: 'ACTIVE PROFILES',
             kpiNodes: 'ACTIVE NODES',
+            kpiNodesSub: (avgRate: number) => `Avg €${avgRate}/h`,
             kpiMarkup: 'AVG TARGET MARKUP',
+            kpiMarkupSub: 'Target Industrial Margin',
             kpiHealth: 'ECONOMIC HEALTH',
+            kpiHealthSub: 'OEE & Waste Viability',
             tableTitle: 'ACTIVE ECONOMIC PROFILES',
-            saveAndContinue: 'Save & Continue'
+            saveAndContinue: 'Save & Continue',
+            backBtn: 'Back',
+            modalEditTitle: 'Edit Economic Profile',
+            modalCreateTitle: 'Create Economic Profile',
+            modalClose: 'ESC / CLOSE',
+            fieldMachineName: 'Printer / Machine Name',
+            fieldMachinePlaceholder: 'e.g. Heidelberg XL 106',
+            fieldTechnology: 'Technology',
+            techRotaryOption: 'WEB_ROTARY (Web Offset)',
+            sectionFormats: '2. MIN / MAX ACCEPTED SHEET FORMATS (MM)',
+            fieldMinWidth: 'Min Width',
+            fieldMinHeight: 'Min Height',
+            fieldMaxWidth: 'Max Width',
+            fieldMaxHeight: 'Max Height',
+            sectionFamilies: '3. VIABLE BINDING FAMILIES',
+            famHardcover: 'Hardcover (Casebound)',
+            famSoftcover: 'Softcover (PUR Perfect Bound)',
+            famWireO: 'Wire-O (Spiral)',
+            famSaddle: 'Saddle Stitch (Stapled)',
+            fieldHourlyRate: 'Hourly Rate (€/h)',
+            fieldSetupFee: 'Setup Fee (€)',
+            fieldPlateCost: 'CTP Plate (€/pl)',
+            fieldTargetMargin: 'Target Margin (%)',
+            fieldMinOrderFee: 'Min. Order Fee (€)',
+            btnSaving: 'Saving...',
+            btnSaveProfile: 'Save Economic Profile',
+            btnCancel: 'Cancel'
         }
     }[locale === 'es' ? 'es' : locale === 'de' ? 'de' : 'en'];
 
@@ -675,8 +792,11 @@ export const PricingIntelligenceTab: React.FC<SharedModuleProps> = ({
                 labels={{
                     kpiProfiles: labels.kpiProfiles,
                     kpiNodes: labels.kpiNodes,
+                    kpiNodesSub: labels.kpiNodesSub(kpiSummary.avgHourlyRateEur),
                     kpiMarkup: labels.kpiMarkup,
-                    kpiHealth: labels.kpiHealth
+                    kpiMarkupSub: labels.kpiMarkupSub,
+                    kpiHealth: labels.kpiHealth,
+                    kpiHealthSub: labels.kpiHealthSub
                 }}
             />
 
@@ -749,21 +869,21 @@ export const PricingIntelligenceTab: React.FC<SharedModuleProps> = ({
                         >
                             <div className="flex items-center justify-between mb-5">
                                 <h3 className="text-lg font-black uppercase tracking-wider m-0">
-                                    {formData.id ? 'Edit Economic Profile' : 'Create Economic Profile'}
+                                    {formData.id ? labels.modalEditTitle : labels.modalCreateTitle}
                                 </h3>
                                 <button
                                     type="button"
                                     onClick={() => setIsProfileModalOpen(false)}
                                     className="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-[#1f2228] text-[10px] font-bold text-slate-400 hover:text-white cursor-pointer"
                                 >
-                                    ESC / CLOSE
+                                    {labels.modalClose}
                                 </button>
                             </div>
                         <div className="space-y-4 font-mono text-xs">
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-[10px] font-black uppercase tracking-widest mb-1 text-slate-400">
-                                        Printer / Machine Name
+                                        {labels.fieldMachineName}
                                     </label>
                                     <input
                                         type="text"
@@ -771,12 +891,12 @@ export const PricingIntelligenceTab: React.FC<SharedModuleProps> = ({
                                         value={formData.printerName}
                                         onChange={(e) => setFormData({ ...formData, printerName: e.target.value })}
                                         className="w-full px-3 py-2.5 rounded-lg border font-bold bg-slate-100/50 dark:bg-[#0a0b0d] text-slate-900 dark:text-white border-slate-200 dark:border-[#1f2228]"
-                                        placeholder="e.g. Heidelberg XL 106"
+                                        placeholder={labels.fieldMachinePlaceholder}
                                     />
                                 </div>
                                 <div>
                                     <label className="block text-[10px] font-black uppercase tracking-widest mb-1 text-slate-400">
-                                        Technology
+                                        {labels.fieldTechnology}
                                     </label>
                                     <select
                                         data-testid="profile-select-technology"
@@ -801,7 +921,7 @@ export const PricingIntelligenceTab: React.FC<SharedModuleProps> = ({
                                         <option value="OFFSET_B1">OFFSET_B1 (70×100 cm)</option>
                                         <option value="OFFSET_B2">OFFSET_B2 (50×70 cm)</option>
                                         <option value="DIGITAL_TONER">DIGITAL_TONER (SRA3 / B2)</option>
-                                        <option value="WEB_ROTARY">WEB_ROTARY (Rotativa)</option>
+                                        <option value="WEB_ROTARY">{labels.techRotaryOption}</option>
                                     </select>
                                 </div>
                             </div>
@@ -809,11 +929,11 @@ export const PricingIntelligenceTab: React.FC<SharedModuleProps> = ({
                             {/* 2. Min / Max Sheet Format Bounds (mm) */}
                             <div className="p-3 rounded-lg bg-slate-50 dark:bg-[#0a0b0d] border border-slate-200 dark:border-[#1f2228] space-y-2">
                                 <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                                    2. FORMATOS MÍN / MÁX ACEPTADOS POR LA MÁQUINA (MM)
+                                    {labels.sectionFormats}
                                 </div>
                                 <div className="grid grid-cols-4 gap-2">
                                     <div>
-                                        <label className="block text-[9px] text-slate-400 mb-0.5">Mín Ancho</label>
+                                        <label className="block text-[9px] text-slate-400 mb-0.5">{labels.fieldMinWidth}</label>
                                         <input
                                             type="number"
                                             data-testid="profile-input-min-width"
@@ -825,7 +945,7 @@ export const PricingIntelligenceTab: React.FC<SharedModuleProps> = ({
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-[9px] text-slate-400 mb-0.5">Mín Alto</label>
+                                        <label className="block text-[9px] text-slate-400 mb-0.5">{labels.fieldMinHeight}</label>
                                         <input
                                             type="number"
                                             data-testid="profile-input-min-height"
@@ -837,7 +957,7 @@ export const PricingIntelligenceTab: React.FC<SharedModuleProps> = ({
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-[9px] text-slate-400 mb-0.5">Máx Ancho</label>
+                                        <label className="block text-[9px] text-slate-400 mb-0.5">{labels.fieldMaxWidth}</label>
                                         <input
                                             type="number"
                                             data-testid="profile-input-max-width"
@@ -849,7 +969,7 @@ export const PricingIntelligenceTab: React.FC<SharedModuleProps> = ({
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-[9px] text-slate-400 mb-0.5">Máx Alto</label>
+                                        <label className="block text-[9px] text-slate-400 mb-0.5">{labels.fieldMaxHeight}</label>
                                         <input
                                             type="number"
                                             data-testid="profile-input-max-height"
@@ -866,14 +986,14 @@ export const PricingIntelligenceTab: React.FC<SharedModuleProps> = ({
                             {/* 3. Viable Binding Families */}
                             <div className="p-3 rounded-lg bg-slate-50 dark:bg-[#0a0b0d] border border-slate-200 dark:border-[#1f2228] space-y-2">
                                 <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                                    3. FAMILIAS DE ENCUADERNACIÓN VIABLES
+                                    {labels.sectionFamilies}
                                 </div>
                                 <div className="grid grid-cols-2 gap-2">
                                     {[
-                                        { id: 'HARDCOVER', label: 'Hardcover (Tapa Dura)' },
-                                        { id: 'SOFTCOVER', label: 'Softcover (Rústica PUR)' },
-                                        { id: 'WIRE_O', label: 'Wire-O (Espiral)' },
-                                        { id: 'SADDLE_STITCH', label: 'Saddle Stitch (Grapado)' }
+                                        { id: 'HARDCOVER', label: labels.famHardcover },
+                                        { id: 'SOFTCOVER', label: labels.famSoftcover },
+                                        { id: 'WIRE_O', label: labels.famWireO },
+                                        { id: 'SADDLE_STITCH', label: labels.famSaddle }
                                     ].map((fam) => {
                                         const checked = formData.supportedFamilies.includes(fam.id);
                                         return (
@@ -909,7 +1029,7 @@ export const PricingIntelligenceTab: React.FC<SharedModuleProps> = ({
                             <div className="grid grid-cols-3 gap-3">
                                 <div>
                                     <label className="block text-[10px] font-black uppercase tracking-widest mb-1 text-slate-400">
-                                        Hourly Rate (€/h)
+                                        {labels.fieldHourlyRate}
                                     </label>
                                     <input
                                         type="number"
@@ -922,7 +1042,7 @@ export const PricingIntelligenceTab: React.FC<SharedModuleProps> = ({
                                 </div>
                                 <div>
                                     <label className="block text-[10px] font-black uppercase tracking-widest mb-1 text-slate-400">
-                                        Setup Fee (€)
+                                        {labels.fieldSetupFee}
                                     </label>
                                     <input
                                         type="number"
@@ -935,7 +1055,7 @@ export const PricingIntelligenceTab: React.FC<SharedModuleProps> = ({
                                 </div>
                                 <div>
                                     <label className="block text-[10px] font-black uppercase tracking-widest mb-1 text-slate-400">
-                                        CTP Plate (€/pl)
+                                        {labels.fieldPlateCost}
                                     </label>
                                     <input
                                         type="number"
@@ -951,7 +1071,7 @@ export const PricingIntelligenceTab: React.FC<SharedModuleProps> = ({
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-[10px] font-black uppercase tracking-widest mb-1 text-slate-400">
-                                        Target Margin (%)
+                                        {labels.fieldTargetMargin}
                                     </label>
                                     <input
                                         type="number"
@@ -965,7 +1085,7 @@ export const PricingIntelligenceTab: React.FC<SharedModuleProps> = ({
                                 </div>
                                 <div>
                                     <label className="block text-[10px] font-black uppercase tracking-widest mb-1 text-slate-400">
-                                        Min. Order Fee (€)
+                                        {labels.fieldMinOrderFee}
                                     </label>
                                     <input
                                         type="number"
@@ -987,14 +1107,14 @@ export const PricingIntelligenceTab: React.FC<SharedModuleProps> = ({
                                 disabled={isSaving || !formData.printerName.trim()}
                                 className="flex-1 py-2.5 rounded-lg font-black uppercase text-xs tracking-widest disabled:opacity-50 transition-all bg-[#dc2626] text-white hover:bg-[#e11d48] cursor-pointer"
                             >
-                                {isSaving ? 'Saving...' : 'Save Economic Profile'}
+                                {isSaving ? labels.btnSaving : labels.btnSaveProfile}
                             </button>
                             <button
                                 type="button"
                                 onClick={() => setIsProfileModalOpen(false)}
                                 className="px-5 py-2.5 border rounded-lg font-black uppercase text-xs tracking-widest transition-all border-slate-200 dark:border-[#1f2228] text-slate-400 hover:bg-white/5 cursor-pointer"
                             >
-                                Cancel
+                                {labels.btnCancel}
                             </button>
                         </div>
                     </div>
@@ -1017,7 +1137,7 @@ export const PricingIntelligenceTab: React.FC<SharedModuleProps> = ({
                             onClick={onPrevStep}
                             className="px-4 py-2 rounded-lg border border-slate-200 dark:border-[#1f2228] text-xs font-black uppercase tracking-wider text-slate-400 hover:text-white cursor-pointer"
                         >
-                            Back
+                            {labels.backBtn}
                         </button>
                     ) : (
                         <span />

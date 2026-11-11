@@ -131,7 +131,121 @@ export const LivePriceCalibratorModal: React.FC<LivePriceCalibratorModalProps> =
     onPaperAdded,
     embedded = false
 }) => {
-    const { t } = useLocale();
+    const { t, locale } = useLocale();
+    const loc = (locale === 'es' || locale === 'de' ? locale : 'en') as 'en' | 'de' | 'es';
+    const ui = {
+        en: {
+            title: 'Live Industrial Price Calibrator',
+            connectedBadge: (count: number) => `MATERIALS CATALOG CONNECTED (${count})`,
+            subtitle: 'Unified Product Family + Machine Node Hierarchy · Real-time technical cost breakdown',
+            closeBtn: 'ESC / CLOSE',
+            lblFamily: '1. PRODUCT FAMILY / BINDING',
+            lblMachine: '2. PRIMARY MACHINE / PRESS NODE',
+            incompatibleSuffix: ' [Incompatible w/ Family]',
+            lblSubstrate: '3. SUBSTRATE / PAPER STOCK (MYSQL MATERIALS CATALOG)',
+            placeholderNewPaper: 'e.g. Munken Print White',
+            lblTrimSize: 'TRIM SIZE (MM)',
+            lblInteriorPages: 'INTERIOR PAGES',
+            lblInksPlates: 'INKS / CTP PLATES',
+            lblBindingLine: 'BINDING LINE',
+            lblPrintRun: 'PRINT RUN QUANTITY (COPIES)',
+            copiesUnit: 'copies',
+            selectedRunSummary: (c: string, spine: number) => `Selected: ${c} copies · Spine: ${spine} mm`,
+            slidersHeader: 'INTERACTIVE RATE & MARGIN CALIBRATION SLIDERS',
+            lblTargetMargin: 'Target Margin %',
+            lblHourlyRate: 'Hourly Rate (€/h)',
+            lblSetupFee: 'Setup Fee (€)',
+            breakdownHeader: 'TECHNICAL COST BREAKDOWN',
+            rowPaper: (kg: number) => `1. Paper (${kg} kg):`,
+            rowPlates: (pl: number) => `2. CTP Plates (${pl} pl):`,
+            rowSetup: (sig: number) => `3. Make-Ready Setup (${sig} sig):`,
+            rowPressRun: (h: number) => `4. Press Run (${h} h):`,
+            rowFinishing: (b: string) => `5. Binding & Finishing (${b}):`,
+            rowBaseCost: 'BASE INDUSTRIAL COST:',
+            rowTargetMargin: (pct: number) => `+ TARGET MARGIN (${pct}%):`,
+            lblSellingPriceTotal: 'SELLING PRICE (TOTAL)',
+            lblUnitPriceCopy: 'UNIT PRICE / COPY:',
+            unitCopySuffix: '/ copy',
+            catBoard: 'Board / Cover',
+            catCoated: 'Coated',
+            catUncoated: 'Uncoated / Cream',
+            fallbackPaperName: 'Cream Book Trade Novel 90 g/m² (Bulk 1.5)'
+        },
+        de: {
+            title: 'Industrielle Live-Preiskalibrierung',
+            connectedBadge: (count: number) => `MATERIALKATALOG VERBUNDEN (${count})`,
+            subtitle: 'Vereinheitlichte Produktfamilien- & Maschinenhierarchie · Technische Echtzeit-Kalkulation',
+            closeBtn: 'ESC / SCHLIESSEN',
+            lblFamily: '1. PRODUKTFAMILIE / BINDUNG',
+            lblMachine: '2. PRIMÄRE DRUCKMASCHINE / KNOTEN',
+            incompatibleSuffix: ' [Inkompatibel mit Familie]',
+            lblSubstrate: '3. BEDRUCKSTOFF / PAPIERSORTE (MYSQL MATERIALKATALOG)',
+            placeholderNewPaper: 'z.B. Munken Print White',
+            lblTrimSize: 'ENDFORMAT (MM)',
+            lblInteriorPages: 'INNENSEITEN',
+            lblInksPlates: 'FARBIGKEIT / CTP-PLATTEN',
+            lblBindingLine: 'BINDELINIE',
+            lblPrintRun: 'AUFLAGENHÖHE (EXEMPLARE)',
+            copiesUnit: 'Ex.',
+            selectedRunSummary: (c: string, spine: number) => `Ausgewählt: ${c} Ex. · Rückenbreite: ${spine} mm`,
+            slidersHeader: 'INTERAKTIVE STUNDENSATZ- & MARGEN-REGLER',
+            lblTargetMargin: 'Zielmarge %',
+            lblHourlyRate: 'Stundensatz (€/Std.)',
+            lblSetupFee: 'Rüstkosten (€)',
+            breakdownHeader: 'TECHNISCHE KOSTENAUFSCHLÜSSELUNG',
+            rowPaper: (kg: number) => `1. Papier (${kg} kg):`,
+            rowPlates: (pl: number) => `2. CTP-Platten (${pl} Pl.):`,
+            rowSetup: (sig: number) => `3. Einrichten / Rüsten (${sig} Bg.):`,
+            rowPressRun: (h: number) => `4. Fortdruck (${h} Std.):`,
+            rowFinishing: (b: string) => `5. Bindung & Weiterverarbeitung (${b}):`,
+            rowBaseCost: 'INDUSTRIELLE SELBSTKOSTEN:',
+            rowTargetMargin: (pct: number) => `+ ZIELMARGE (${pct}%):`,
+            lblSellingPriceTotal: 'VERKAUFSPREIS (GESAMT)',
+            lblUnitPriceCopy: 'STÜCKPREIS / EXEMPLAR:',
+            unitCopySuffix: '/ Ex.',
+            catBoard: 'Karton / Umschlag',
+            catCoated: 'Gestrichen (Bilderdruck)',
+            catUncoated: 'Ungestrichen / Werkdruck',
+            fallbackPaperName: 'Werkdruckpapier Creme Roman 90 g/m² (Vol 1.5)'
+        },
+        es: {
+            title: 'Calibrador Industrial de Precios en Vivo',
+            connectedBadge: (count: number) => `CATÁLOGO DE MATERIALES CONECTADO (${count})`,
+            subtitle: 'Jerarquía Unificada Familia de Producto + Máquina · Desglose técnico de costes en tiempo real',
+            closeBtn: 'ESC / CERRAR',
+            lblFamily: '1. FAMILIA DE PRODUCTO / ENCUADERNACIÓN',
+            lblMachine: '2. MÁQUINA PRINCIPAL / NODO DE PRENSA',
+            incompatibleSuffix: ' [Incompatible con Familia]',
+            lblSubstrate: '3. SUSTRATO / PAPEL (CATÁLOGO MYSQL)',
+            placeholderNewPaper: 'Ej. Munken Print White',
+            lblTrimSize: 'FORMATO CERRADO (MM)',
+            lblInteriorPages: 'PÁGINAS INTERIORES',
+            lblInksPlates: 'TINTAS / PLANCHAS CTP',
+            lblBindingLine: 'LÍNEA DE ENCUADERNACIÓN',
+            lblPrintRun: 'CANTIDAD DE TIRADA (EJEMPLARES)',
+            copiesUnit: 'ej.',
+            selectedRunSummary: (c: string, spine: number) => `Seleccionado: ${c} ejemplares · Lomo: ${spine} mm`,
+            slidersHeader: 'CONTROLES INTERACTIVOS DE TARIFA Y MARGEN',
+            lblTargetMargin: 'Margen Objetivo %',
+            lblHourlyRate: 'Tarifa Horaria (€/h)',
+            lblSetupFee: 'Puesta a Punto (€)',
+            breakdownHeader: 'DESGLOSE TÉCNICO DE COSTES',
+            rowPaper: (kg: number) => `1. Papel (${kg} kg):`,
+            rowPlates: (pl: number) => `2. Planchas CTP (${pl} pl):`,
+            rowSetup: (sig: number) => `3. Puesta a Punto (${sig} cuad.):`,
+            rowPressRun: (h: number) => `4. Tirada en Prensa (${h} h):`,
+            rowFinishing: (b: string) => `5. Encuadernación y Acabado (${b}):`,
+            rowBaseCost: 'COSTE INDUSTRIAL BASE:',
+            rowTargetMargin: (pct: number) => `+ MARGEN OBJETIVO (${pct}%):`,
+            lblSellingPriceTotal: 'PRECIO DE VENTA (TOTAL)',
+            lblUnitPriceCopy: 'PRECIO UNITARIO / EJEMPLAR:',
+            unitCopySuffix: '/ ej.',
+            catBoard: 'Cartoncillo / Cubierta',
+            catCoated: 'Estucado',
+            catUncoated: 'Offset / Ahuesado',
+            fallbackPaperName: 'Ahuesado Editorial Novela 90 g/m² (Vol 1.5)'
+        }
+    }[loc];
     const activeProfileDefault = initialProfile || profiles[0] || {
         id: 'prof-offset-b1-xl106',
         printerId: 'mach-heidelberg-xl106',
@@ -545,14 +659,14 @@ export const LivePriceCalibratorModal: React.FC<LivePriceCalibratorModalProps> =
                     <div className="flex items-center gap-2">
                         <span className="w-2 h-2 rounded-full bg-[#dc2626] animate-pulse" />
                         <h3 className="text-sm font-black uppercase tracking-wider text-slate-900 dark:text-white m-0">
-                            Live Industrial Price Calibrator
+                            {ui.title}
                         </h3>
                         <span className="px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/30 text-[10px] font-mono font-bold text-emerald-400">
-                            MATERIALS CATALOG CONNECTED ({catalogPapers.length})
+                            {ui.connectedBadge(catalogPapers.length)}
                         </span>
                     </div>
                     <p className="text-[11px] text-slate-400 m-0 mt-0.5">
-                        Unified Product Family + Machine Node Hierarchy · Real-time technical cost breakdown
+                        {ui.subtitle}
                     </p>
                 </div>
                 {!embedded && (
@@ -562,7 +676,7 @@ export const LivePriceCalibratorModal: React.FC<LivePriceCalibratorModalProps> =
                         onClick={onClose}
                         className="px-3 py-1 rounded-lg border border-slate-200 dark:border-[#1f2228] text-xs font-bold text-slate-400 hover:text-white cursor-pointer"
                     >
-                        ESC / CLOSE
+                        {ui.closeBtn}
                     </button>
                 )}
             </div>
@@ -574,7 +688,7 @@ export const LivePriceCalibratorModal: React.FC<LivePriceCalibratorModalProps> =
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-3.5 rounded-xl bg-slate-50/70 dark:bg-[#0a0b0d]/70 border border-slate-200 dark:border-[#1f2228]">
                         <div>
                             <label className="block text-[10px] font-black uppercase tracking-wider text-[#dc2626] mb-1.5">
-                                1. PRODUCT FAMILY / BINDING
+                                {ui.lblFamily}
                             </label>
                             <select
                                 data-testid="calibrator-family-select"
@@ -592,7 +706,7 @@ export const LivePriceCalibratorModal: React.FC<LivePriceCalibratorModalProps> =
 
                         <div>
                             <label className="block text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1.5">
-                                2. PRIMARY MACHINE / PRESS NODE
+                                {ui.lblMachine}
                             </label>
                             <select
                                 data-testid="calibrator-machine-select"
@@ -604,7 +718,7 @@ export const LivePriceCalibratorModal: React.FC<LivePriceCalibratorModalProps> =
                                     const compatible = isProfileCompatibleWithFamily(p, productFamily);
                                     return (
                                         <option key={p.id} value={p.id}>
-                                            {p.printerName} ({p.technology}){compatible ? '' : ' [Incompatible w/ Family]'}
+                                            {p.printerName} ({p.technology}){compatible ? '' : ui.incompatibleSuffix}
                                         </option>
                                     );
                                 })}
@@ -616,7 +730,7 @@ export const LivePriceCalibratorModal: React.FC<LivePriceCalibratorModalProps> =
                     <div className="space-y-2">
                         <div className="flex items-center justify-between">
                             <label className="block text-[10px] font-black uppercase tracking-wider text-slate-400">
-                                3. SUBSTRATE / PAPER STOCK (MYSQL MATERIALS CATALOG)
+                                {ui.lblSubstrate}
                             </label>
                             <button
                                 type="button"
@@ -682,7 +796,7 @@ export const LivePriceCalibratorModal: React.FC<LivePriceCalibratorModalProps> =
                                     <input
                                         type="text"
                                         data-testid="new-paper-name-input"
-                                        placeholder="Ej. Munken Print White"
+                                        placeholder={ui.placeholderNewPaper}
                                         value={newPaperName}
                                         onChange={(e) => setNewPaperName(e.target.value)}
                                         className="w-full px-2.5 py-1.5 rounded text-xs bg-white dark:bg-[#14161a] border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
@@ -747,7 +861,7 @@ export const LivePriceCalibratorModal: React.FC<LivePriceCalibratorModalProps> =
                     <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
                         <div>
                             <label className="block text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1.5">
-                                TRIM SIZE (MM)
+                                {ui.lblTrimSize}
                             </label>
                             <select
                                 data-testid="calibrator-trim-select"
@@ -765,7 +879,7 @@ export const LivePriceCalibratorModal: React.FC<LivePriceCalibratorModalProps> =
 
                         <div>
                             <label className="block text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1.5">
-                                INTERIOR PAGES
+                                {ui.lblInteriorPages}
                             </label>
                             <input
                                 type="number"
@@ -781,7 +895,7 @@ export const LivePriceCalibratorModal: React.FC<LivePriceCalibratorModalProps> =
 
                         <div>
                             <label className="block text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1.5">
-                                INKS / CTP PLATES
+                                {ui.lblInksPlates}
                             </label>
                             <select
                                 data-testid="calibrator-colormode-select"
@@ -797,7 +911,7 @@ export const LivePriceCalibratorModal: React.FC<LivePriceCalibratorModalProps> =
 
                         <div>
                             <label className="block text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1.5">
-                                BINDING LINE
+                                {ui.lblBindingLine}
                             </label>
                             <select
                                 data-testid="calibrator-binding-select"
@@ -829,7 +943,7 @@ export const LivePriceCalibratorModal: React.FC<LivePriceCalibratorModalProps> =
                     <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-[#0a0b0d] border border-slate-200 dark:border-[#1f2228]">
                         <div className="flex items-center justify-between mb-2">
                             <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">
-                                PRINT RUN QUANTITY (COPIES)
+                                {ui.lblPrintRun}
                             </span>
                             <div className="flex items-center gap-1.5">
                                 {PRINT_RUN_PRESETS.map((preset) => (
@@ -844,7 +958,7 @@ export const LivePriceCalibratorModal: React.FC<LivePriceCalibratorModalProps> =
                                                 : 'bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-700'
                                         }`}
                                     >
-                                        {preset.toLocaleString()} ex.
+                                        {preset.toLocaleString()} {ui.copiesUnit}
                                     </button>
                                 ))}
                             </div>
@@ -860,24 +974,24 @@ export const LivePriceCalibratorModal: React.FC<LivePriceCalibratorModalProps> =
                             className="w-full accent-[#dc2626] cursor-pointer"
                         />
                         <div className="flex justify-between text-[10px] font-mono text-slate-400 mt-1">
-                            <span>50 copies</span>
+                            <span>50 {ui.copiesUnit}</span>
                             <span className="text-slate-900 dark:text-white font-black">
-                                Selected: {copies.toLocaleString()} copies · Spine: {calculation.spineWidthMm} mm
+                                {ui.selectedRunSummary(copies.toLocaleString(), calculation.spineWidthMm)}
                             </span>
-                            <span>5,000 copies</span>
+                            <span>5,000 {ui.copiesUnit}</span>
                         </div>
                     </div>
 
                     {/* Interactive Calibration Sliders */}
                     <div className="space-y-3 pt-2 border-t border-slate-200 dark:border-[#1f2228]">
                         <div className="text-[10px] font-black uppercase tracking-widest text-[#dc2626]">
-                            INTERACTIVE RATE & MARGIN CALIBRATION SLIDERS
+                            {ui.slidersHeader}
                         </div>
 
                         {/* Slider 1: Target Margin % */}
                         <div className="grid grid-cols-12 items-center gap-3">
                             <span className="col-span-4 text-xs font-bold text-slate-700 dark:text-slate-300">
-                                Target Margin %
+                                {ui.lblTargetMargin}
                             </span>
                             <input
                                 type="range"
@@ -900,7 +1014,7 @@ export const LivePriceCalibratorModal: React.FC<LivePriceCalibratorModalProps> =
                         {/* Slider 2: Machine Hourly Rate (€/h) */}
                         <div className="grid grid-cols-12 items-center gap-3">
                             <span className="col-span-4 text-xs font-bold text-slate-700 dark:text-slate-300">
-                                Hourly Rate (€/h)
+                                {ui.lblHourlyRate}
                             </span>
                             <input
                                 type="range"
@@ -923,7 +1037,7 @@ export const LivePriceCalibratorModal: React.FC<LivePriceCalibratorModalProps> =
                         {/* Slider 3: Make-Ready Setup Fee (€) */}
                         <div className="grid grid-cols-12 items-center gap-3">
                             <span className="col-span-4 text-xs font-bold text-slate-700 dark:text-slate-300">
-                                Setup Fee (€)
+                                {ui.lblSetupFee}
                             </span>
                             <input
                                 type="range"
@@ -951,7 +1065,7 @@ export const LivePriceCalibratorModal: React.FC<LivePriceCalibratorModalProps> =
                         <div className="flex items-center justify-between border-b border-slate-800 pb-3">
                             <div>
                                 <div className="text-[10px] font-mono uppercase tracking-widest text-slate-400">
-                                    TECHNICAL COST BREAKDOWN
+                                    {ui.breakdownHeader}
                                 </div>
                                 <div className="text-xs font-bold text-white mt-0.5">
                                     {currentProfile.printerName}
@@ -964,45 +1078,45 @@ export const LivePriceCalibratorModal: React.FC<LivePriceCalibratorModalProps> =
 
                         <div className="space-y-2.5 mt-4 text-xs font-mono">
                             <div className="flex items-center justify-between text-slate-300">
-                                <span>1. Paper ({calculation.paperWeightKg} kg):</span>
+                                <span>{ui.rowPaper(calculation.paperWeightKg)}</span>
                                 <span data-testid="breakdown-paper-cost" className="font-bold text-white">
                                     €{calculation.paperCostEur.toFixed(2)}
                                 </span>
                             </div>
                             <div className="flex items-center justify-between text-slate-300">
-                                <span>2. CTP Plates ({calculation.totalPlates} pl):</span>
+                                <span>{ui.rowPlates(calculation.totalPlates)}</span>
                                 <span data-testid="breakdown-plates-cost" className="font-bold text-white">
                                     €{calculation.platesCostEur.toFixed(2)}
                                 </span>
                             </div>
                             <div className="flex items-center justify-between text-slate-300">
-                                <span>3. Make-Ready Setup ({calculation.signaturesCount} sig):</span>
+                                <span>{ui.rowSetup(calculation.signaturesCount)}</span>
                                 <span data-testid="breakdown-setup-cost" className="font-bold text-white">
                                     €{calculation.setupCostEur.toFixed(2)}
                                 </span>
                             </div>
                             <div className="flex items-center justify-between text-slate-300">
-                                <span>4. Press Run ({calculation.pressRunHours} h):</span>
+                                <span>{ui.rowPressRun(calculation.pressRunHours)}</span>
                                 <span data-testid="breakdown-runtime-cost" className="font-bold text-white">
                                     €{calculation.runTimeCostEur.toFixed(2)}
                                 </span>
                             </div>
                             <div className="flex items-center justify-between text-slate-300">
-                                <span>5. Binding & Finishing ({bindingType}):</span>
+                                <span>{ui.rowFinishing(bindingType)}</span>
                                 <span data-testid="breakdown-finishing-cost" className="font-bold text-white">
                                     €{calculation.finishingCostEur.toFixed(2)}
                                 </span>
                             </div>
 
                             <div className="pt-2.5 border-t border-slate-800 flex items-center justify-between text-slate-200 font-bold">
-                                <span>BASE INDUSTRIAL COST:</span>
+                                <span>{ui.rowBaseCost}</span>
                                 <span data-testid="breakdown-base-cost" className="text-sm text-white">
                                     €{calculation.baseIndustrialCostEur.toFixed(2)}
                                 </span>
                             </div>
 
                             <div className="flex items-center justify-between text-[#10b981]">
-                                <span>+ TARGET MARGIN ({targetMarginPct}%):</span>
+                                <span>{ui.rowTargetMargin(targetMarginPct)}</span>
                                 <span data-testid="breakdown-margin-eur" className="font-bold">
                                     +€{calculation.effectiveMarginEur.toFixed(2)}
                                 </span>
@@ -1014,7 +1128,7 @@ export const LivePriceCalibratorModal: React.FC<LivePriceCalibratorModalProps> =
                     <div className="p-4 rounded-xl bg-[#14161a] border border-slate-800 space-y-3">
                         <div className="flex items-baseline justify-between">
                             <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">
-                                SELLING PRICE (TOTAL)
+                                {ui.lblSellingPriceTotal}
                             </span>
                             <span
                                 data-testid="calibrator-total-selling-price"
@@ -1024,12 +1138,12 @@ export const LivePriceCalibratorModal: React.FC<LivePriceCalibratorModalProps> =
                             </span>
                         </div>
                         <div className="flex items-center justify-between text-xs font-mono border-t border-slate-800/80 pt-2">
-                            <span className="text-slate-400">UNIT PRICE / COPY:</span>
+                            <span className="text-slate-400">{ui.lblUnitPriceCopy}</span>
                             <span
                                 data-testid="calibrator-unit-selling-price"
                                 className="font-black text-white text-sm"
                             >
-                                €{calculation.unitSellingPriceEur.toFixed(4)} / copy
+                                €{calculation.unitSellingPriceEur.toFixed(4)} {ui.unitCopySuffix}
                             </span>
                         </div>
 

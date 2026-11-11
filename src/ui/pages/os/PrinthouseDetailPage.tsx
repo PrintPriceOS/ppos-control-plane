@@ -183,21 +183,21 @@ function OperationalTab({ ph }: { ph: Printhouse }) {
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             <EligibilityCheck label="GEOSPATIAL ID" subtitle={`${lat.toFixed(4)}, ${lng.toFixed(4)}`} passed={true} />
                             <EligibilityCheck label="REGIONAL MAPPING" subtitle={region} passed={true} />
-                            <EligibilityCheck label="CAPACITY SYNC" subtitle={`${(ph.weeklySheetsCapacity ?? 250000).toLocaleString()} pliegos/sem`} passed={true} />
+                            <EligibilityCheck label="CAPACITY SYNC" subtitle={`${(ph.weeklySheetsCapacity ?? 250000).toLocaleString()} ${t('printhouse.detail.sheetsPerWeek') || 'sheets/wk'}`} passed={true} />
                             <EligibilityCheck label="ECONOMIC READY" subtitle="Hawk-Eye 100% Canonical" passed={true} />
                         </div>
 
                         <div className="p-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 space-y-2 text-xs">
                             <div className="flex items-center justify-between">
-                                <span className="text-zinc-400 font-bold uppercase text-[10px]">Corredor Logístico</span>
+                                <span className="text-zinc-400 font-bold uppercase text-[10px]">{t('printhouse.detail.logisticsCorridor') || 'Logistics Corridor'}</span>
                                 <span className="font-mono font-bold text-zinc-900 dark:text-zinc-100">DIN A4 / A6 · GS1-128 SSCC-18</span>
                             </div>
                             <div className="flex items-center justify-between">
-                                <span className="text-zinc-400 font-bold uppercase text-[10px]">Radio de Expedición Directa</span>
+                                <span className="text-zinc-400 font-bold uppercase text-[10px]">{t('printhouse.detail.dispatchRadius') || 'Direct Dispatch Radius'}</span>
                                 <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">{dispatchRadiusKm.toLocaleString()} km (EU Cross-Border)</span>
                             </div>
                             <div className="flex items-center justify-between">
-                                <span className="text-zinc-400 font-bold uppercase text-[10px]">Facturación Electrónica</span>
+                                <span className="text-zinc-400 font-bold uppercase text-[10px]">{t('printhouse.detail.eInvoicing') || 'Electronic Invoicing'}</span>
                                 <span className="font-mono font-bold text-zinc-900 dark:text-zinc-100">{ph.basicProfile?.eInvoiceProfile || 'EN 16931 (Facturae / XRechnung)'}</span>
                             </div>
                         </div>

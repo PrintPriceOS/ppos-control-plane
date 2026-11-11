@@ -38,8 +38,11 @@ export interface PricingKpiSummaryBarProps {
     labels?: {
         kpiProfiles?: string;
         kpiNodes?: string;
+        kpiNodesSub?: string;
         kpiMarkup?: string;
+        kpiMarkupSub?: string;
         kpiHealth?: string;
+        kpiHealthSub?: string;
     };
 }
 
@@ -66,7 +69,7 @@ export const PricingKpiSummaryBar: React.FC<PricingKpiSummaryBarProps> = ({
                         id: 'active-nodes',
                         label: labels?.kpiNodes || 'ACTIVE NODES / MACHINES',
                         value: summary.activeMachinesCount,
-                        subvalue: `Avg €${summary.avgHourlyRateEur}/h`,
+                        subvalue: labels?.kpiNodesSub || `Avg €${summary.avgHourlyRateEur}/h`,
                         icon: CalculatorIcon,
                         accent: 'emerald'
                     },
@@ -74,7 +77,7 @@ export const PricingKpiSummaryBar: React.FC<PricingKpiSummaryBarProps> = ({
                         id: 'avg-markup',
                         label: labels?.kpiMarkup || 'AVG TARGET MARKUP',
                         value: `${summary.avgTargetMarginPct}%`,
-                        subvalue: 'Target Industrial Margin',
+                        subvalue: labels?.kpiMarkupSub || 'Target Industrial Margin',
                         icon: TagIcon,
                         accent: 'amber'
                     },
@@ -82,7 +85,7 @@ export const PricingKpiSummaryBar: React.FC<PricingKpiSummaryBarProps> = ({
                         id: 'economic-health',
                         label: labels?.kpiHealth || 'ECONOMIC HEALTH',
                         value: `${summary.economicHealthPct}%`,
-                        subvalue: 'OEE & Waste Viability',
+                        subvalue: labels?.kpiHealthSub || 'OEE & Waste Viability',
                         icon: ChartPieIcon,
                         accent: 'rose'
                     }

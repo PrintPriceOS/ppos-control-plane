@@ -51,13 +51,14 @@ export const SupplierSettingsPage: React.FC = () => {
         const key = `status.${st.toLowerCase()}`;
         const translated = t(key as any);
         if (translated && translated !== key) return translated;
-        const statusMap: Record<string, string> = {
-            ACTIVE: 'Activo',
-            APPROVED: 'Aprobado',
-            SUSPENDED: 'Suspendido',
-            PENDING_REVIEW: 'En revisión'
+        const statusMap: Record<string, { en: string; de: string; es: string }> = {
+            ACTIVE: { en: 'Active', de: 'Aktiv', es: 'Activo' },
+            APPROVED: { en: 'Approved', de: 'Genehmigt', es: 'Aprobado' },
+            SUSPENDED: { en: 'Suspended', de: 'Gesperrt', es: 'Suspendido' },
+            PENDING_REVIEW: { en: 'Pending Review', de: 'In Prüfung', es: 'En revisión' }
         };
-        return statusMap[st] || st;
+        const loc = (locale === 'es' || locale === 'de' ? locale : 'en') as 'en' | 'de' | 'es';
+        return statusMap[st]?.[loc] || st;
     };
 
     const getRoleLabel = (r?: string) => {

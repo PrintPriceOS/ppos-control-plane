@@ -1092,7 +1092,7 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                     {/* Catalog Page select-all banner with prompt to select all matching across pagination */}
                     {isCatalogPageSelected && catalogTotalCount > allVisibleCatalogVariantIds.length && !isAllMatchingCatalogSelected && (
                         <div className="p-3 bg-blue-500/10 border border-blue-500/30 text-blue-600 dark:text-blue-400 text-xs rounded-xl flex items-center justify-between">
-                            <span>{t('supplier.hub.selectedVariantsCount', { count: allVisibleCatalogVariantIds.length })} (página actual).</span>
+                            <span>{t('supplier.hub.selectedVariantsCount', { count: allVisibleCatalogVariantIds.length })} ({t('common.currentPage') || 'current page'}).</span>
                             <button
                                 onClick={handleSelectAllMatchingCatalog}
                                 className="underline font-bold text-xs hover:text-blue-700 dark:hover:text-blue-300 cursor-pointer"
@@ -1498,7 +1498,7 @@ export const SupplierCatalogOffersPage: React.FC = () => {
                     {/* Page select-all banner with prompt to select all matching across pagination */}
                     {isPageSelected && offersTotalCount > offers.length && !isAllMatchingSelected && (
                         <div className="p-3 bg-blue-500/10 border border-blue-500/30 text-blue-600 dark:text-blue-400 text-xs rounded-xl flex items-center justify-between">
-                            <span>{t('supplier.hub.selectedCount', { count: offers.length })} (página actual).</span>
+                            <span>{t('supplier.hub.selectedCount', { count: offers.length })} ({t('common.currentPage') || 'current page'}).</span>
                             <button
                                 onClick={handleSelectAllMatching}
                                 className="underline font-bold text-xs hover:text-blue-700 dark:hover:text-blue-300 cursor-pointer"

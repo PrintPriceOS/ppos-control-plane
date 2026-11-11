@@ -306,7 +306,7 @@ export const SupplierSelect: React.FC<SupplierSelectProps> = ({
                         {loading && (
                             <div className="py-4 px-3 text-center text-zinc-400 text-xs flex items-center justify-center gap-2">
                                 <Loader2 size={14} className="animate-spin text-red-500" />
-                                <span>Cargando proveedores...</span>
+                                <span>{t('setup.materials.loadingSuppliers') || 'Loading suppliers...'}</span>
                             </div>
                         )}
 
@@ -319,10 +319,10 @@ export const SupplierSelect: React.FC<SupplierSelectProps> = ({
                                 <div className="flex items-center gap-1.5 truncate">
                                     <Plus size={14} className="shrink-0" />
                                     <span className="truncate">
-                                        {t('setup.materials.customSupplier') || 'Usar como proveedor:'} <span className="font-bold underline">"{searchQuery.trim()}"</span>
+                                        {t('setup.materials.customSupplier') || 'Use supplier:'} <span className="font-bold underline">"{searchQuery.trim()}"</span>
                                     </span>
                                 </div>
-                                <span className="text-[10px] uppercase font-bold shrink-0 opacity-80">Nuevo</span>
+                                <span className="text-[10px] uppercase font-bold shrink-0 opacity-80">{t('common.new') || 'New'}</span>
                             </div>
                         )}
 

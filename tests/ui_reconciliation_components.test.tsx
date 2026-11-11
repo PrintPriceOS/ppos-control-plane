@@ -455,13 +455,14 @@ describe('Dark Industrial Telemetry UI — Canonical Components & Dual-Mode Reco
         fireEvent.click(duplicateBtn);
         expect(await screen.findByText(/HP Indigo 12000 HD Digital Press \(Copy\)/)).toBeInTheDocument();
 
-        const deleteBtns = screen.getAllByText('DELETE');
+        // In ES locale, delete button text is 'ELIMINAR' or accessible via title / delete-profile-btn-*
+        const deleteBtns = screen.getAllByRole('button', { name: /DELETE|ELIMINAR|LÖSCHEN/i });
         expect(deleteBtns.length).toBeGreaterThan(0);
         fireEvent.click(deleteBtns[0]);
         expect(screen.queryByText(/HP Indigo 12000 HD Digital Press \(Copy\)/)).not.toBeInTheDocument();
 
-        // Switch to Routing Decisions & Crossover tab
-        fireEvent.click(screen.getByRole('tab', { name: 'ROUTING DECISIONS' }));
+        // Switch to Routing Decisions & Crossover tab (localized in ES as 'DECISIONES DE ENRUTAMIENTO')
+        fireEvent.click(screen.getByRole('tab', { name: /ROUTING DECISIONS|DECISIONES DE ENRUTAMIENTO|ROUTING-ENTSCHEIDUNGEN/i }));
 
         expect(await screen.findByTestId('routing-rules-tab')).toBeInTheDocument();
         expect(screen.getByTestId('crossover-analyzer-card')).toBeInTheDocument();
