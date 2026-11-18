@@ -17496,8 +17496,8 @@
     "semantic_hash": ""
   },
   "src/ui/pages/os/PrinthouseDetailPage.tsx": {
-    "mtime": 1794359698.6580663,
-    "seen": 1794359962.7258117,
+    "mtime": 1794361557.2648542,
+    "seen": 1794995937.8091066,
     "ast_hash": "3c04deae7e0cb595ad15f1eb646514ca",
     "semantic_hash": ""
   },
@@ -24684,8 +24684,8 @@
     "semantic_hash": ""
   },
   "src/ui/pages/supplier/SupplierCatalogOffersPage.tsx": {
-    "mtime": 1794359716.403838,
-    "seen": 1794359962.7438114,
+    "mtime": 1794361558.3991833,
+    "seen": 1794995937.8271077,
     "ast_hash": "d31d34ec7e9ca08ea90e7ada69883298",
     "semantic_hash": ""
   },
@@ -24702,8 +24702,8 @@
     "semantic_hash": ""
   },
   "src/ui/pages/supplier/SupplierSettingsPage.tsx": {
-    "mtime": 1794359724.044644,
-    "seen": 1794359962.7448118,
+    "mtime": 1794361558.6021845,
+    "seen": 1794995937.8281076,
     "ast_hash": "2414343e02df2e6af2037d17bae8b509",
     "semantic_hash": ""
   },
@@ -24990,8 +24990,8 @@
     "semantic_hash": ""
   },
   "src/ui/components/common/SupplierSelect.tsx": {
-    "mtime": 1794359681.0175996,
-    "seen": 1794359962.5648117,
+    "mtime": 1794361556.3452742,
+    "seen": 1794995937.6418731,
     "ast_hash": "94ab076599df97bfc08aa644a4ff3a68",
     "semantic_hash": ""
   },
@@ -26586,8 +26586,8 @@
     "semantic_hash": ""
   },
   "tests/ui_reconciliation_components.test.tsx": {
-    "mtime": 1794359645.1873403,
-    "seen": 1794359962.8448074,
+    "mtime": 1794361559.0405917,
+    "seen": 1794995937.9271066,
     "ast_hash": "9d384cab957141e5f2902a2ac4e387e7",
     "semantic_hash": ""
   },
@@ -26796,8 +26796,8 @@
     "semantic_hash": ""
   },
   "src/ui/components/pricing/LivePriceCalibratorModal.tsx": {
-    "mtime": 1794359577.8044803,
-    "seen": 1794359962.5718117,
+    "mtime": 1794361556.5872755,
+    "seen": 1794995937.6498659,
     "ast_hash": "a2f7f2de66e2a3cce3ef61b4e4a23567",
     "semantic_hash": ""
   },
@@ -27807,6 +27807,48 @@
     "mtime": 1794349212.690803,
     "seen": 1794359962.784808,
     "ast_hash": "d84a4cd4de293d706a447ee6ab7711ab",
+    "semantic_hash": ""
+  },
+  "ppos-mcp-server/package.json": {
+    "mtime": 1794995666.5333712,
+    "seen": 1794995936.9088657,
+    "ast_hash": "5b28b1456acc1bcbd74ac85c8cdb150c",
+    "semantic_hash": ""
+  },
+  "ppos-mcp-server/src/client.ts": {
+    "mtime": 1794995671.0398016,
+    "seen": 1794995936.9088657,
+    "ast_hash": "40bc092b37673c6d47154f9645192125",
+    "semantic_hash": ""
+  },
+  "ppos-mcp-server/src/index.ts": {
+    "mtime": 1794995674.1631472,
+    "seen": 1794995936.9088657,
+    "ast_hash": "97c2f28caa60c323f4dd2c4777062f44",
+    "semantic_hash": ""
+  },
+  "ppos-mcp-server/src/schemas.ts": {
+    "mtime": 1794995672.8071706,
+    "seen": 1794995936.9088657,
+    "ast_hash": "3cedbd0bc0e52e6be11c00ccf4975332",
+    "semantic_hash": ""
+  },
+  "ppos-mcp-server/tsconfig.json": {
+    "mtime": 1794995667.7286558,
+    "seen": 1794995936.9088657,
+    "ast_hash": "2e3ccf28a470545a1f91fc631c949c20",
+    "semantic_hash": ""
+  },
+  "ppos-mcp-server/.github/workflows/ci.yml": {
+    "mtime": 1794996450.8315282,
+    "seen": 1794996714.5766087,
+    "ast_hash": "067a5a16ea34ef8ad0b259158bf85a0e",
+    "semantic_hash": ""
+  },
+  "ppos-mcp-server/README.md": {
+    "mtime": 1794996453.002917,
+    "seen": 1794996714.5766087,
+    "ast_hash": "c1fea6b943d7e88b4cf4366d87ce1124",
     "semantic_hash": ""
   }
 }
