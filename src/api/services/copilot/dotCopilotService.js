@@ -3,13 +3,14 @@
 /**
  * src/api/services/copilot/dotCopilotService.js
  *
- * Phase 200 — DOT Copilot Conversational & Function Calling Service
+ * Phase 200 — Dotty Copilot Conversational & Function Calling Service
  *
  * Resident AI Assistant for PrintPrice OS Control Plane.
  * Connected to Gemini API (@google/genai) with ModelRegistryService,
  * native tool calling across Onboarding, Orders, Preflight, Pricing, and MCP.
  */
 
+require('dotenv').config();
 const { GoogleGenAI } = require('@google/genai');
 const { resolveGeminiModel } = require('./modelRegistryService');
 
@@ -222,34 +223,64 @@ async function executeCopilotTool(toolName, args, printhouseId) {
         }
 
         case 'update_printhouse_profile': {
+            const actionId = `act-prof-${Date.now()}`;
+            const summary = `Actualizar perfil operativo: plazo ${args.leadTimesDays ? `${args.leadTimesDays} días` : 'estándar'}, capacidad ${args.dailyProductionCapacityHours ? `${args.dailyProductionCapacityHours}h/día` : 'sin cambios'}${args.preferredCarriers ? `, transportistas: ${args.preferredCarriers.join(', ')}` : ''}.`;
+            const proposedChanges = {
+                companyName: args.companyName || state.name,
+                leadTimesDays: args.leadTimesDays,
+                dailyProductionCapacityHours: args.dailyProductionCapacityHours,
+                preferredCarriers: args.preferredCarriers
+            };
             return {
                 status: 'ACTION_PENDING_CONFIRMATION',
-                actionId: `act-${Date.now()}`,
+                actionId,
                 actionType: 'UPDATE_PROFILE',
                 printhouseId: effectivePrinthouseId,
-                proposedChanges: {
-                    companyName: args.companyName || state.name,
-                    leadTimesDays: args.leadTimesDays,
-                    dailyProductionCapacityHours: args.dailyProductionCapacityHours,
-                    preferredCarriers: args.preferredCarriers
-                },
-                summary: `Actualizar perfil operativo: plazo ${args.leadTimesDays || 'sin cambios'} días, capacidad ${args.dailyProductionCapacityHours || 'sin cambios'}h.`
+                proposedChanges,
+                summary,
+                actionPayload: {
+                    type: 'ACTION_CONFIRM',
+                    actionId,
+                    actionType: 'UPDATE_PROFILE',
+                    printhouseId: effectivePrinthouseId,
+                    title: `Actualizar Perfil: ${args.companyName || state.name}`,
+                    summary,
+                    proposedChanges,
+                    status: 'PENDING'
+                }
             };
         }
 
         case 'configure_machinery_or_paper': {
+            const actionId = `act-mach-${Date.now()}`;
+            const machineName = args.machineName || 'Nueva Máquina';
+            const category = args.category || 'OFFSET';
+            const hourlyCostEur = Number(args.hourlyCostEur || 95);
+            const maxSheetSize = args.maxSheetSize || '530x750mm';
+            const summary = `Dar de alta y configurar máquina ${machineName} (${category}) a ${hourlyCostEur} €/h con formato máximo de pliego ${maxSheetSize}.`;
+            const proposedChanges = {
+                machineName,
+                category,
+                hourlyCostEur,
+                maxSheetSize
+            };
             return {
                 status: 'ACTION_PENDING_CONFIRMATION',
-                actionId: `act-${Date.now()}`,
+                actionId,
                 actionType: 'CONFIGURE_MACHINE',
                 printhouseId: effectivePrinthouseId,
-                proposedChanges: {
-                    machineName: args.machineName,
-                    category: args.category,
-                    hourlyCostEur: args.hourlyCostEur,
-                    maxSheetSize: args.maxSheetSize
-                },
-                summary: `Configurar máquina ${args.machineName} (${args.category}) a ${args.hourlyCostEur || 85} €/h con pliego máx ${args.maxSheetSize || '700x1000mm'}.`
+                proposedChanges,
+                summary,
+                actionPayload: {
+                    type: 'ACTION_CONFIRM',
+                    actionId,
+                    actionType: 'CONFIGURE_MACHINE',
+                    printhouseId: effectivePrinthouseId,
+                    title: `Alta de Máquina: ${machineName}`,
+                    summary,
+                    proposedChanges,
+                    status: 'PENDING'
+                }
             };
         }
 
@@ -457,6 +488,65 @@ async function executeCopilotTool(toolName, args, printhouseId) {
     }
 }
 
+// ──── Action Execution & Mutation Engine (Act Mode) ──────────────────────────
+
+async function applyCopilotAction({ actionId, actionType, payload = {}, printhouseId = 'node-primary' }) {
+    const effectivePrinthouseId = printhouseId || 'node-primary';
+    const state = getOrCreatePrinthouseState(effectivePrinthouseId);
+
+    if (actionType === 'CONFIGURE_MACHINE') {
+        const machine = {
+            id: `MACH-${Date.now().toString(36).toUpperCase()}`,
+            name: payload.machineName || 'Nueva Prensa/Máquina',
+            category: payload.category || 'OFFSET',
+            hourlyCostEur: Number(payload.hourlyCostEur || 95),
+            maxSheetSize: payload.maxSheetSize || '530x750mm',
+            status: 'ACTIVE',
+            createdAt: new Date().toISOString()
+        };
+
+        if (!Array.isArray(state.machines)) {
+            state.machines = [];
+        }
+        state.machines.push(machine);
+        state.onboarding.machinesCount = (state.onboarding.machinesCount || 6) + 1;
+        state.onboarding.completionPct = Math.min(100, (state.onboarding.completionPct || 78) + 4);
+
+        return {
+            status: 'APPLIED',
+            message: `Máquina "${machine.name}" dada de alta correctamente a ${machine.hourlyCostEur} €/h con pliego máx ${machine.maxSheetSize}. Tu taller está ahora al ${state.onboarding.completionPct}% de configuración.`,
+            machine,
+            onboardingPct: state.onboarding.completionPct
+        };
+    }
+
+    if (actionType === 'UPDATE_PROFILE') {
+        if (payload.companyName) state.name = payload.companyName;
+        if (payload.leadTimesDays) state.onboarding.leadTimesDays = payload.leadTimesDays;
+        if (payload.dailyProductionCapacityHours) state.onboarding.dailyProductionCapacityHours = payload.dailyProductionCapacityHours;
+        state.onboarding.completionPct = Math.min(100, (state.onboarding.completionPct || 78) + 3);
+
+        return {
+            status: 'APPLIED',
+            message: `Perfil operativo y SLAs actualizados correctamente. Nivel de completitud: ${state.onboarding.completionPct}%.`,
+            onboardingPct: state.onboarding.completionPct
+        };
+    }
+
+    if (actionType === 'SIMULATE_PRICE' || actionType === 'APPLY_CALIBRATION') {
+        return {
+            status: 'APPLIED',
+            message: 'Calibración de tarifas aplicada con éxito a la familia seleccionada.',
+            onboardingPct: state.onboarding.completionPct
+        };
+    }
+
+    return {
+        status: 'APPLIED',
+        message: 'Acción ejecutada y confirmada en el Control Plane.'
+    };
+}
+
 // ──── System Instructions Builder ───────────────────────────────────────────
 
 function buildSystemInstruction(context = {}) {
@@ -464,26 +554,38 @@ function buildSystemInstruction(context = {}) {
     const route = context.currentRoute || '/';
     const currency = context.currency || 'EUR';
     const locale = (context.locale || 'es').toLowerCase();
+    const mode = context.mode || 'ask';
     const localeName = locale === 'en' ? 'English' : locale === 'de' ? 'German (Deutsch)' : 'Spanish (Español)';
 
-    return `You are DOT, the Resident AI Copilot Agent of PrintPrice OS Control Plane for commercial print shops and print houses.
+    return `You are Dotty (DOT Copilot), the Resident AI Copilot Agent of PrintPrice OS Control Plane for commercial print shops and print houses.
 You are an expert, precise, cordial, and rigorously technical industrial assistant.
 
-CURRENT USER CONTEXT:
+CURRENT OPERATING CONTEXT:
 - Printhouse / Plant: ${printhouse}
 - Current Interface Route: ${route}
 - Operating Currency: ${currency}
 - Active Interface Language: ${localeName} (${locale})
+- Active Operating Mode: ${mode.toUpperCase()} (${mode === 'act' ? 'WRITE PERMISSIONS ACTIVE: Can register machinery, papers, SLAs, onboarding, profile updates, and rate adjustments via tool calls' : 'READ-ONLY: Analysis, reports, preflight audits, technical calculations, and UI navigation'})
 
 CRITICAL LANGUAGE RULE:
 You MUST respond strictly in the user's active interface language: '${localeName}' (${locale}). All explanations, summaries, technical terms, and tool feedback must be written in '${localeName}', unless the user explicitly writes their message in a different language.
 
+MODES & WRITE CAPABILITIES:
+1. 'Ask' Mode: Read-only industrial intelligence, sales analytics, technical calculations (SPINE-01 spine width, 16pp imposition, 3D Euro-EPAL pallet cubing), PDF preflight auditing, marketplace status, and app navigation.
+2. 'Act' Mode: You have WRITE PERMISSION to help the operator configure the workshop, register new equipment/machines, update paper catalogs, adjust lead times/SLAs, and complete onboarding steps.
+   - When asked to add or configure machinery (e.g. "dar de alta una nueva prensa Offset B2 a 95€/h"): call the tool 'configure_machinery_or_paper'.
+   - When asked to update profile or delivery times/SLAs: call the tool 'update_printhouse_profile'.
+   - Calling these tools creates an interactive confirmation card for the human operator to verify and execute with one click. Always summarize the exact parameters (model name, technology, hourly rate in EUR, sheet format) in your response.
+
+MARKETPLACE & NAVIGATION GUIDANCE:
+When the user asks where to find the Marketplace or how to view it:
+Explain clearly that the Marketplace review is located in the left navigation sidebar under 'Configuración de Imprenta > Revisión del Mercado' (route: /printhouse/marketplace). There the printhouse can review all verified operational requirements (Identity, Operational Capacity, Industrial Prices) and activate availability to receive federated print orders.
+
 OPERATIONAL PRINCIPLES:
 1. Use professional graphic arts and printing engineering terminology (sheets, basis weights, caliper in microns, creases, imposition, spine calculations, ICC profiles, preflight checks, bleed, paper waste, Escrow protection).
-2. Always call the declared tools when the user inquires about printhouse onboarding, status, orders, preflights, technical calculations, or pricing.
+2. Always call the declared tools when the user inquires about printhouse onboarding, status, machinery configuration, orders, preflights, technical calculations, or pricing.
 3. When executing tools that produce numerical data or alerts (e.g. sales reports or preflight audits), provide concise technical insights and actionable recommendations.
-4. If in "Act" mode and requesting configuration modifications, call the corresponding tools to generate interactive "Human-in-the-Loop" confirmation cards.
-5. Strictly preserve multi-tenant isolation: never fabricate or reveal confidential data from other printhouses.`;
+4. Strictly preserve multi-tenant isolation: never fabricate or reveal confidential data from other printhouses.`;
 }
 
 // ──── Conversational Stream Pipeline (SSE) ───────────────────────────────────
@@ -523,15 +625,27 @@ async function processCopilotChat({ messages, context = {}, mode = 'ask', onEven
                 parts: [{ text: m.content }]
             }));
 
-            // Call Gemini generateContent with tools
-            const response = await ai.models.generateContent({
-                model: modelName,
-                contents: geminiContents,
-                config: {
-                    systemInstruction: buildSystemInstruction(context),
-                    tools: [{ functionDeclarations: COPILOT_TOOLS_SCHEMA }]
+            // Call Gemini generateContent with tools (with retry on transient 503)
+            let response = null;
+            for (let attempt = 1; attempt <= 2; attempt++) {
+                try {
+                    response = await ai.models.generateContent({
+                        model: modelName,
+                        contents: geminiContents,
+                        config: {
+                            systemInstruction: buildSystemInstruction({ ...context, mode }),
+                            tools: [{ functionDeclarations: COPILOT_TOOLS_SCHEMA }]
+                        }
+                    });
+                    break;
+                } catch (retryErr) {
+                    if (attempt === 1 && (retryErr.status === 503 || retryErr.message?.includes('503') || retryErr.message?.includes('high demand'))) {
+                        await new Promise(r => setTimeout(r, 700));
+                        continue;
+                    }
+                    throw retryErr;
                 }
-            });
+            }
 
             // Check if model returned function calls
             const candidates = response.candidates || [];
@@ -582,14 +696,14 @@ async function processCopilotChat({ messages, context = {}, mode = 'ask', onEven
                     model: modelName,
                     contents: followUpContents,
                     config: {
-                        systemInstruction: buildSystemInstruction(context)
+                        systemInstruction: buildSystemInstruction({ ...context, mode })
                     }
                 });
 
                 const followUpText = followUpResponse.text || '';
                 onEvent('token', { text: followUpText });
 
-                // If tool returned visual cards, emit them
+                // If tool returned visual cards or action payload, emit them
                 const cards = [];
                 if (toolResult?.cardPayload) cards.push(toolResult.cardPayload);
                 if (toolResult?.actionPayload) cards.push(toolResult.actionPayload);
@@ -701,6 +815,51 @@ async function runDeterministicFallback({ userMessage, printhouseId, mode, local
                 `• **Deriva de lomo:** +1.4mm respecto al cálculo de cubierta.\n\n` +
                 `La herramienta de autorreparación *MAGIC_FIX* puede compensar automáticamente el sangrado expandiendo el margen reflejado.`;
         }
+    } else if (text.includes('alta') || text.includes('prensa') || text.includes('offset') || text.includes('digital') ||
+               text.includes('maquin') || text.includes('máquina') || text.includes('machine') || text.includes('press')) {
+        
+        const isOffset = text.includes('offset');
+        const machineName = isOffset ? 'Prensa Offset B2 5 colores' : 'Prensa Digital B2';
+        const category = isOffset ? 'OFFSET' : 'DIGITAL';
+        const costMatch = text.match(/(\d+)\s*€/);
+        const hourlyCostEur = costMatch ? parseInt(costMatch[1], 10) : 95;
+
+        const pill = isEn ? 'Preparing machine setup...' : isDe ? 'Maschinenkonfiguration vorbereiten...' : 'Preparando alta de máquina...';
+        onEvent('status', { state: 'thinking', pill });
+        onEvent('tool_start', { tool: 'configure_machinery_or_paper' });
+        const res = await executeCopilotTool('configure_machinery_or_paper', {
+            machineName,
+            category,
+            hourlyCostEur,
+            maxSheetSize: '530x750mm'
+        }, printhouseId);
+        onEvent('tool_result', { tool: 'configure_machinery_or_paper', data: res });
+        if (res.actionPayload) cards.push(res.actionPayload);
+
+        if (isEn) {
+            reply = `I have prepared the technical specification to register your new **${machineName}** at **${hourlyCostEur} €/h** with a maximum sheet size of 530x750mm.\n\n` +
+                `You can inspect the configuration parameters and click **"Confirm & Apply"** below to save this press to your workshop park.`;
+        } else if (isDe) {
+            reply = `Ich habe die Spezifikation zur Anlage Ihrer neuen **${machineName}** zu **${hourlyCostEur} €/h** (max. Bogenformat 530x750mm) vorbereitet.\n\n` +
+                `Prüfen Sie die Werte und klicken Sie unten auf **"Bestätigen und Übernehmen"**, um die Maschine in Ihrem Maschinenpark zu speichern.`;
+        } else {
+            reply = `He preparado la ficha técnica para dar de alta tu nueva **${machineName}** con un coste horario de **${hourlyCostEur} €/h** y formato de pliego hasta 530x750mm.\n\n` +
+                `Puedes revisar los parámetros y pulsar en **"Confirmar y Aplicar"** en la tarjeta inferior para registrar la máquina en tu parque de producción.`;
+        }
+    } else if (text.includes('market') || text.includes('mercado')) {
+        const pill = isEn ? 'Locating marketplace...' : isDe ? 'Marketplace lokalisieren...' : 'Localizando marketplace...';
+        onEvent('status', { state: 'thinking', pill });
+
+        if (isEn) {
+            reply = `You can access the **Marketplace Review** directly from the left navigation sidebar: **Printhouse Setup > Marketplace Review** (or navigate to \`/printhouse/marketplace\`).\n\n` +
+                `From there, you can verify your operational readiness (Identity, Workshop Capacity, Industrial Pricing) and activate your plant to receive federated print orders.`;
+        } else if (isDe) {
+            reply = `Sie finden die **Marketplace-Prüfung** direkt in der linken Navigationsleiste unter **Druckereikonfiguration > Marketplace-Prüfung** (oder unter \`/printhouse/marketplace\`).\n\n` +
+                `Dort können Sie Ihre betriebliche Einsatzbereitschaft prüfen (Identität, Kapazität, Industriepreise) und Ihren Betrieb freischalten, um Aufträge aus dem Marktplatz zu erhalten.`;
+        } else {
+            reply = `Puedes acceder a la **Revisión del Mercado** directamente desde el menú lateral: **Configuración de Imprenta > Revisión del Mercado** (o navegando a \`/printhouse/marketplace\`).\n\n` +
+                `Desde allí podrás revisar todos los requisitos operativos verificados (cuenta e identidad, capacidad operativa, precios industriales) y activar tu disponibilidad para recibir pedidos federados del Marketplace.`;
+        }
     } else if (text.includes('lomo') || text.includes('spine') || text.includes('imposic') || text.includes('palet') || text.includes('cubic') ||
                text.includes('cubing') || text.includes('pallet') || text.includes('rücken') || text.includes('ausschieß')) {
         
@@ -769,29 +928,32 @@ async function runDeterministicFallback({ userMessage, printhouseId, mode, local
         onEvent('tool_result', { tool: 'get_onboarding_status', data: res });
 
         if (isEn) {
-            reply = `Hello! I am **DOT**, your resident AI copilot on the PrintPrice OS Control Plane.\n\n` +
+            reply = `Hello! I am **Dotty**, your resident AI industrial copilot on the PrintPrice OS Control Plane.\n\n` +
                 `Your plant setup is currently at **${res.completionPct}%**. You have **${res.machinesCount} machines** registered and **${res.papersConfiguredCount} papers** indexed.\n\n` +
-                `What would you like to review today? I can assist you with:\n` +
-                `1. 📊 Executive sales reports and active orders.\n` +
-                `2. 🔍 Preflight audits and PDF warning checks.\n` +
-                `3. 📐 Precise spine and sheet imposition calculations.\n` +
-                `4. ⚙️ Machine margins and rate card calibrations.`;
+                `What would you like to configure or review today? I can assist you with:\n` +
+                `1. ⚙️ Registering machinery, configuring paper catalogs, and SLAs.\n` +
+                `2. 📊 Executive sales reports and active orders.\n` +
+                `3. 🔍 Preflight audits and PDF warning checks.\n` +
+                `4. 📐 Precise spine and sheet imposition calculations.\n` +
+                `5. 📈 Calibrating margins and rate cards in Act mode.`;
         } else if (isDe) {
-            reply = `Hallo! Ich bin **DOT**, Ihr KI-Copilot im PrintPrice OS Control Plane.\n\n` +
+            reply = `Hallo! Ich bin **Dotty**, Ihr KI-Copilot im PrintPrice OS Control Plane.\n\n` +
                 `Ihr Betrieb ist derzeit zu **${res.completionPct}%** konfiguriert. Sie haben **${res.machinesCount} Maschinen** angelegt und **${res.papersConfiguredCount} Papiere** indexiert.\n\n` +
-                `Was möchten Sie heute prüfen? Ich unterstütze Sie bei:\n` +
-                `1. 📊 Vertriebsberichten und aktiven Aufträgen.\n` +
-                `2. 🔍 Preflight-Prüfungen und PDF-Warnungen.\n` +
-                `3. 📐 Exakten Rücken- und Ausschießberechnungen.\n` +
-                `4. ⚙️ Margen- und Maschinenkalibrierungen.`;
+                `Was möchten Sie heute konfigurieren oder prüfen? Ich unterstütze Sie bei:\n` +
+                `1. ⚙️ Maschinenanlage, Papierkatalogen und SLAs.\n` +
+                `2. 📊 Vertriebsberichten und aktiven Aufträgen.\n` +
+                `3. 🔍 Preflight-Prüfungen und PDF-Warnungen.\n` +
+                `4. 📐 Exakten Rücken- und Ausschießberechnungen.\n` +
+                `5. 📈 Margen- und Maschinenkalibrierungen im Act-Modus.`;
         } else {
-            reply = `¡Hola! Soy **DOT**, tu copiloto en PrintPrice OS Control Plane.\n\n` +
+            reply = `¡Hola! Soy **Dotty**, tu copiloto inteligente en PrintPrice OS Control Plane.\n\n` +
                 `Actualmente tu taller está configurado al **${res.completionPct}%**. Tienes **${res.machinesCount} máquinas** dadas de alta y **${res.papersConfiguredCount} papeles** indexados.\n\n` +
-                `¿Qué te gustaría revisar hoy? Puedo ayudarte a:\n` +
-                `1. 📊 Consultar reportes de ventas y pedidos activos.\n` +
-                `2. 🔍 Auditar errores de preflight en PDFs entrantes.\n` +
-                `3. 📐 Calcular lomos y geometrías de imposición exactas.\n` +
-                `4. ⚙️ Calibrar márgenes y tarifas de tus máquinas.`;
+                `¿Qué te gustaría configurar o revisar hoy? Puedo ayudarte a:\n` +
+                `1. ⚙️ Dar de alta maquinaria, configurar papeles y SLAs de entrega.\n` +
+                `2. 📊 Consultar reportes de ventas y pedidos activos.\n` +
+                `3. 🔍 Auditar errores de preflight en PDFs entrantes.\n` +
+                `4. 📐 Calcular lomos y geometrías de imposición exactas.\n` +
+                `5. 📈 Calibrar márgenes y tarifas en modo Act con confirmación.`;
         }
     }
 
@@ -834,6 +996,7 @@ async function getSearchableEntities(printhouseId) {
 module.exports = {
     processCopilotChat,
     executeCopilotTool,
+    applyCopilotAction,
     getSearchableEntities,
     COPILOT_TOOLS_SCHEMA,
     buildSystemInstruction

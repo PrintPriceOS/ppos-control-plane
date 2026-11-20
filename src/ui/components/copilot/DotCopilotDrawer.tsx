@@ -23,7 +23,8 @@ import {
     FileText,
     SlidersHorizontal,
     HelpCircle,
-    Check
+    Check,
+    Trash2
 } from 'lucide-react';
 import { getAuthUser } from '../../lib/authStore';
 import { useLocale } from '../../i18n';
@@ -131,6 +132,8 @@ export const DotCopilotDrawer: React.FC = () => {
         activeSessionId,
         selectSession,
         createNewSession,
+        clearCurrentSession,
+        deleteSession,
         messages,
         sendMessage,
         isStreaming,
@@ -426,21 +429,38 @@ export const DotCopilotDrawer: React.FC = () => {
                                         ? (t('copilot.newConversation') || 'Nueva conversación')
                                         : s.title;
                                     return (
-                                        <button
+                                        <div
                                             key={s.id}
-                                            type="button"
-                                            onClick={() => {
-                                                selectSession(s.id);
-                                                setHistoryOpen(false);
-                                            }}
-                                            className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center justify-between cursor-pointer ${s.id === activeSessionId
+                                            className={`group/session w-full flex items-center justify-between rounded-lg transition-colors ${s.id === activeSessionId
                                                     ? 'bg-red-500/10 text-[#dc0000] font-bold'
                                                     : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800'
                                                 }`}
                                         >
-                                            <span className="truncate pr-2">{displayTitle}</span>
-                                            {s.id === activeSessionId && <Check size={12} className="shrink-0" />}
-                                        </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    selectSession(s.id);
+                                                    setHistoryOpen(false);
+                                                }}
+                                                className="flex-1 text-left px-2.5 py-1.5 text-xs truncate cursor-pointer flex items-center justify-between min-w-0"
+                                            >
+                                                <span className="truncate pr-1">{displayTitle}</span>
+                                                {s.id === activeSessionId && <Check size={12} className="shrink-0" />}
+                                            </button>
+                                            {sessions.length > 1 && (
+                                                <button
+                                                    type="button"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        deleteSession(s.id);
+                                                    }}
+                                                    title={t('copilot.deleteSessionTooltip') || 'Eliminar conversación'}
+                                                    className="p-1 mr-1 text-zinc-400 hover:text-red-600 dark:hover:text-red-400 opacity-0 group-hover/session:opacity-100 transition-opacity cursor-pointer shrink-0"
+                                                >
+                                                    <Trash2 size={12} />
+                                                </button>
+                                            )}
+                                        </div>
                                     );
                                 })}
                             </div>
@@ -461,8 +481,17 @@ export const DotCopilotDrawer: React.FC = () => {
                     )}
                 </div>
 
-                {/* Right Action Icons: New Chat, Expand, Close */}
+                {/* Right Action Icons: Clear Chat, New Chat, Expand, Close */}
                 <div className="flex items-center gap-1">
+                    <button
+                        type="button"
+                        onClick={clearCurrentSession}
+                        disabled={messages.length === 0}
+                        title={t('copilot.clearChatTooltip') || 'Borrar conversación actual'}
+                        className="p-1.5 rounded-lg text-zinc-500 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer disabled:opacity-30 disabled:pointer-events-none"
+                    >
+                        <Trash2 size={15} />
+                    </button>
                     <button
                         type="button"
                         onClick={createNewSession}

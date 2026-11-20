@@ -11,7 +11,7 @@
 
 const express = require('express');
 const router = express.Router();
-const { processCopilotChat, getSearchableEntities } = require('../services/copilot/dotCopilotService');
+const { processCopilotChat, getSearchableEntities, applyCopilotAction } = require('../services/copilot/dotCopilotService');
 const { getRegistryState, resolveGeminiModel } = require('../services/copilot/modelRegistryService');
 
 /**
@@ -94,6 +94,33 @@ router.get('/entities', async (req, res) => {
             ok: true,
             printhouseId,
             entities
+        });
+    } catch (err) {
+        return res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
+/**
+ * POST /api/copilot/actions/:actionId/confirm
+ * Applies a confirmed mutation in Act mode (e.g. machinery setup, profile/SLA update) with multi-tenant isolation.
+ */
+router.post('/actions/:actionId/confirm', async (req, res) => {
+    const printhouseId = extractPrinthouseContext(req);
+    const { actionId } = req.params;
+    const { actionType, payload } = req.body || {};
+
+    try {
+        const result = await applyCopilotAction({
+            actionId,
+            actionType,
+            payload,
+            printhouseId
+        });
+        return res.json({
+            ok: true,
+            actionId,
+            printhouseId,
+            ...result
         });
     } catch (err) {
         return res.status(500).json({ ok: false, error: err.message });

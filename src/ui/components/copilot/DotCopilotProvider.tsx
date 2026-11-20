@@ -30,6 +30,8 @@ interface DotCopilotContextType {
     activeSessionId: string;
     selectSession: (id: string) => void;
     createNewSession: () => void;
+    clearCurrentSession: () => void;
+    deleteSession: (id: string) => void;
     messages: CopilotMessage[];
     sendMessage: (content: string, mentions?: string[]) => Promise<void>;
     isStreaming: boolean;
@@ -170,6 +172,41 @@ export const DotCopilotProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         setActiveToolPill(null);
         setGlobalDotState('idle');
     }, []);
+
+    // Clear Current Session Messages
+    const clearCurrentSession = useCallback(() => {
+        setSessions(prev => prev.map(s => {
+            if (s.id === activeSessionId) {
+                return {
+                    ...s,
+                    title: t('copilot.newConversation') || 'Nueva conversación',
+                    updatedAt: Date.now(),
+                    messages: []
+                };
+            }
+            return s;
+        }));
+        setActiveToolPill(null);
+        setGlobalDotState('idle');
+    }, [activeSessionId, t]);
+
+    // Delete a Session completely
+    const deleteSession = useCallback((sessionIdToDelete: string) => {
+        setSessions(prev => {
+            const filtered = prev.filter(s => s.id !== sessionIdToDelete);
+            if (filtered.length === 0) {
+                const fresh = createDefaultSession(t('copilot.newConversation') || 'Nueva conversación');
+                setActiveSessionId(fresh.id);
+                return [fresh];
+            }
+            if (activeSessionId === sessionIdToDelete) {
+                setActiveSessionId(filtered[0].id);
+            }
+            return filtered;
+        });
+        setActiveToolPill(null);
+        setGlobalDotState('idle');
+    }, [activeSessionId, t]);
 
     // Streaming Message Sender
     const sendMessage = useCallback(async (content: string, mentions: string[] = []) => {
@@ -361,6 +398,8 @@ export const DotCopilotProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         activeSessionId,
         selectSession,
         createNewSession,
+        clearCurrentSession,
+        deleteSession,
         messages,
         sendMessage,
         isStreaming,
@@ -381,6 +420,8 @@ export const DotCopilotProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         activeSessionId,
         selectSession,
         createNewSession,
+        clearCurrentSession,
+        deleteSession,
         messages,
         sendMessage,
         isStreaming,

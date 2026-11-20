@@ -3627,9 +3627,12 @@ export const es = {
   'dashboard.hub.colActions': 'Acciones Rápidas',
 
   // ──── DOT COPILOT i18n ────
-  'copilot.askDot': 'Ask Dot',
-  'copilot.topbarTooltip': 'Abrir asistente DOT Copilot (⌘I / Ctrl+I)',
+  'copilot.askDot': 'Ask Dotty',
+  'copilot.topbarTooltip': 'Abrir asistente DOT Copilot — Dotty (⌘I / Ctrl+I)',
   'copilot.newConversation': 'Nueva conversación',
+  'copilot.clearChatTooltip': 'Borrar conversación actual',
+  'copilot.clearChatConfirm': '¿Deseas vaciar los mensajes de esta conversación?',
+  'copilot.deleteSessionTooltip': 'Eliminar conversación',
   'copilot.recentSessions': 'Sesiones Recientes',
   'copilot.noSessions': 'Sin conversaciones previas',
   'copilot.historyTitle': 'Historial de conversaciones de la imprenta',

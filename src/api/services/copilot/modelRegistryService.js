@@ -23,8 +23,8 @@ let cachedRegistry = {
 
 // Safe fallback aliases if models.list() is unreachable or offline
 const FALLBACK_MODELS = {
-    fast: 'gemini-2.5-flash',
-    reasoning: 'gemini-2.5-pro'
+    fast: 'gemini-3.5-flash-lite',
+    reasoning: 'gemini-pro-latest'
 };
 
 /**
@@ -91,6 +91,11 @@ async function discoverModels(apiKey) {
                 return false;
             }
 
+            // Exclude deprecated models (e.g. gemini-1.x, gemini-2.0, gemini-2.5) to enforce latest cost-effective models
+            if (/gemini-(1\.|2\.)/i.test(name)) {
+                return false;
+            }
+
             // Must support generateContent
             if (m.supportedActions && Array.isArray(m.supportedActions)) {
                 if (!m.supportedActions.includes('generateContent')) return false;
@@ -102,7 +107,12 @@ async function discoverModels(apiKey) {
             return raw.replace(/^models\//, '');
         });
 
-        // Find flash models
+        // Find flash-lite models first for fast/economic profile
+        const liteModels = validModels
+            .filter(name => /flash.*lite|lite.*flash/i.test(name))
+            .sort(compareModels);
+
+        // Find general flash models
         const flashModels = validModels
             .filter(name => /flash/i.test(name))
             .sort(compareModels);
@@ -112,8 +122,8 @@ async function discoverModels(apiKey) {
             .filter(name => /pro/i.test(name))
             .sort(compareModels);
 
-        const chosenFast = flashModels[0] || FALLBACK_MODELS.fast;
-        const chosenReasoning = proModels[0] || FALLBACK_MODELS.reasoning;
+        const chosenFast = liteModels[0] || flashModels[0] || FALLBACK_MODELS.fast;
+        const chosenReasoning = proModels[0] || flashModels[0] || FALLBACK_MODELS.reasoning;
 
         return {
             fast: chosenFast,

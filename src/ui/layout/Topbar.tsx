@@ -306,7 +306,7 @@ export const Topbar: React.FC<{ onMenuClick?: () => void }> = ({ onMenuClick }) 
           >
             <DotChatAvatar size={18} state={globalDotState} />
             <span className="text-xs font-bold text-zinc-900 dark:text-zinc-100 group-hover:text-[#dc0000] transition-colors">
-              {t('copilot.askDot') || 'Ask Dot'}
+              {t('copilot.askDot') || 'Ask Dotty'}
             </span>
             <kbd className="hidden lg:inline-flex items-center text-[10px] font-mono font-bold text-zinc-400 bg-white/80 dark:bg-zinc-800/80 px-1.5 py-0.5 rounded border border-zinc-200 dark:border-zinc-700">
               ⌘I
