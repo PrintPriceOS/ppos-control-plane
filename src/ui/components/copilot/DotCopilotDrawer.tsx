@@ -1,31 +1,32 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useDotCopilot } from './DotCopilotProvider';
 import { DotInteractiveHero, DotChatAvatar } from '../mascot';
-import { 
-    ContextualQuickAction, 
-    PrinthouseEntity 
+import {
+    ContextualQuickAction,
+    PrinthouseEntity
 } from './types';
 import { CopilotKpiSummaryCard } from './cards/CopilotKpiSummaryCard';
 import { CopilotPreflightAlertCard } from './cards/CopilotPreflightAlertCard';
 import { CopilotActionConfirmCard } from './cards/CopilotActionConfirmCard';
-import { 
-    X, 
-    Plus, 
-    Maximize2, 
-    Minimize2, 
-    Send, 
-    AtSign, 
-    ChevronDown, 
-    Clock, 
-    Sparkles, 
-    Zap, 
-    Shield, 
-    FileText, 
-    SlidersHorizontal, 
+import {
+    X,
+    Plus,
+    Maximize2,
+    Minimize2,
+    Send,
+    AtSign,
+    ChevronDown,
+    Clock,
+    Sparkles,
+    Zap,
+    Shield,
+    FileText,
+    SlidersHorizontal,
     HelpCircle,
     Check
 } from 'lucide-react';
 import { getAuthUser } from '../../lib/authStore';
+import { useLocale } from '../../i18n';
 
 export const DotCopilotDrawer: React.FC = () => {
     const {
@@ -50,6 +51,8 @@ export const DotCopilotDrawer: React.FC = () => {
         isStreaming,
         searchableEntities
     } = useDotCopilot();
+
+    const { locale, t } = useLocale();
 
     const [inputValue, setInputValue] = useState('');
     const [historyOpen, setHistoryOpen] = useState(false);
@@ -118,65 +121,65 @@ export const DotCopilotDrawer: React.FC = () => {
     // Greeting according to time of day
     const greetingText = useMemo(() => {
         const hour = new Date().getHours();
-        const prefix = hour >= 6 && hour < 13
-            ? 'Buenos días'
+        const greetingKey = hour >= 6 && hour < 13
+            ? 'copilot.greetingMorning'
             : hour >= 13 && hour < 20
-                ? 'Buenas tardes'
-                : 'Buenas noches';
-        return `${prefix}, ${printhouseName}. ¿Qué configuramos o revisamos hoy?`;
-    }, [printhouseName]);
+                ? 'copilot.greetingAfternoon'
+                : 'copilot.greetingEvening';
+        return t(greetingKey, { name: printhouseName });
+    }, [printhouseName, t]);
 
     // 5 Contextual Quick Actions based on route
     const contextualActions = useMemo((): ContextualQuickAction[] => {
         if (currentRoute.includes('pricing') || currentRoute.includes('calibrat')) {
             return [
-                { id: 'p1', title: 'Calibrar márgenes y tarifas', subtitle: 'Simula un escalado de tirada o ajuste de margen', prompt: 'Simula un ajuste de margen de +5% en la familia Rústica (Softcover) y compáralo.' },
-                { id: 'p2', title: 'Calcular lomo SPINE-01', subtitle: 'Calcula el lomo con encuadernación cosida', prompt: 'Calcula las cotas de lomo y cubierta abierta SPINE-01 para un libro de 192 páginas en estucado 115g.' },
-                { id: 'p3', title: 'Cruce Digital vs Offset', subtitle: 'Halla el punto de inflexión económico Q*', prompt: 'Calcula la curva de cruce y punto Q* entre Digital y Offset para formato A5 en papel offset 90g.' },
-                { id: 'p4', title: 'Revisar matrices de papel', subtitle: 'Comprueba el coste por kilogramo de sustratos', prompt: 'Muéstrame el resumen de papeles configurados y costes de plancha en taller.' },
-                { id: 'p5', title: 'Auditoría de salud de tarifas', subtitle: 'Detecta familias sin calibrar o reglas incompletas', prompt: '¿Qué familias de producto tienen pendientes matrices o escalados en el calibrador?' }
+                { id: 'p1', title: t('copilot.action.pricing1.title'), subtitle: t('copilot.action.pricing1.subtitle'), prompt: t('copilot.action.pricing1.prompt') },
+                { id: 'p2', title: t('copilot.action.pricing2.title'), subtitle: t('copilot.action.pricing2.subtitle'), prompt: t('copilot.action.pricing2.prompt') },
+                { id: 'p3', title: t('copilot.action.pricing3.title'), subtitle: t('copilot.action.pricing3.subtitle'), prompt: t('copilot.action.pricing3.prompt') },
+                { id: 'p4', title: t('copilot.action.pricing4.title'), subtitle: t('copilot.action.pricing4.subtitle'), prompt: t('copilot.action.pricing4.prompt') },
+                { id: 'p5', title: t('copilot.action.pricing5.title'), subtitle: t('copilot.action.pricing5.subtitle'), prompt: t('copilot.action.pricing5.prompt') }
             ];
         }
 
         if (currentRoute.includes('order') || currentRoute.includes('queue')) {
             return [
-                { id: 'o1', title: 'Reporte de ventas y pedidos', subtitle: 'Resumen de facturación y pedidos aceptados', prompt: 'Genera el reporte ejecutivo de ventas y pedidos de esta semana con ticket medio.' },
-                { id: 'o2', title: 'Inspeccionar @Pedido-1043', subtitle: 'Ver detalles técnicos y archivo PDF', prompt: 'Inspecciona las especificaciones técnicas completas del pedido @ORD-1043.' },
-                { id: 'o3', title: 'Pedidos en producción', subtitle: 'Identifica órdenes activas en máquina', prompt: '¿Cuántos pedidos tenemos actualmente en fase de impresión y encuadernación?' },
-                { id: 'o4', title: 'Estado de pagos Escrow', subtitle: 'Comprueba fondos garantizados contra POD', prompt: 'Revisa el estado de custodia de fondos en Escrow de los pedidos listos para expedición.' },
-                { id: 'o5', title: 'Cubicaje en palets EPAL', subtitle: 'Calcula peso y bultos para el transportista', prompt: 'Calcula el cubicaje 3D en palet Euro-EPAL para 2.500 ejemplares de 420g por libro.' }
+                { id: 'o1', title: t('copilot.action.orders1.title'), subtitle: t('copilot.action.orders1.subtitle'), prompt: t('copilot.action.orders1.prompt') },
+                { id: 'o2', title: t('copilot.action.orders2.title'), subtitle: t('copilot.action.orders2.subtitle'), prompt: t('copilot.action.orders2.prompt') },
+                { id: 'o3', title: t('copilot.action.orders3.title'), subtitle: t('copilot.action.orders3.subtitle'), prompt: t('copilot.action.orders3.prompt') },
+                { id: 'o4', title: t('copilot.action.orders4.title'), subtitle: t('copilot.action.orders4.subtitle'), prompt: t('copilot.action.orders4.prompt') },
+                { id: 'o5', title: t('copilot.action.orders5.title'), subtitle: t('copilot.action.orders5.subtitle'), prompt: t('copilot.action.orders5.prompt') }
             ];
         }
 
         if (currentRoute.includes('preflight')) {
             return [
-                { id: 'pf1', title: 'Revisar estado de Preflights', subtitle: 'Analiza los últimos PDFs con advertencias', prompt: 'Revisa las alertas de preflight recientes e indica si hay errores de sangrado o resolución.' },
-                { id: 'pf2', title: 'Corregir sangrado con Auto-Fix', subtitle: 'Aplica compensación reflejada en PDFs', prompt: '¿Cómo puedo autorreparar la falta de sangrado en los interiores del pedido @ORD-1043?' },
-                { id: 'pf3', title: 'Auditoría de resolución DPI', subtitle: 'Detecta imágenes por debajo de 300 DPI', prompt: '¿Qué páginas presentan imágenes a baja resolución en los últimos archivos subidos?' },
-                { id: 'pf4', title: 'Desviación de lomo vs cubierta', subtitle: 'Contrasta cota calculada con el PDF', prompt: 'Audita la deriva de lomo detectada en la maqueta de cubierta frente a las 288 páginas.' },
-                { id: 'pf5', title: 'Perfiles de color e ICC', subtitle: 'Verifica conversión CMYK y tintas planas', prompt: 'Comprueba la cobertura total de tinta (TAC) y perfil Fogra51 en los pedidos activos.' }
+                { id: 'pf1', title: t('copilot.action.preflight1.title'), subtitle: t('copilot.action.preflight1.subtitle'), prompt: t('copilot.action.preflight1.prompt') },
+                { id: 'pf2', title: t('copilot.action.preflight2.title'), subtitle: t('copilot.action.preflight2.subtitle'), prompt: t('copilot.action.preflight2.prompt') },
+                { id: 'pf3', title: t('copilot.action.preflight3.title'), subtitle: t('copilot.action.preflight3.subtitle'), prompt: t('copilot.action.preflight3.prompt') },
+                { id: 'pf4', title: t('copilot.action.preflight4.title'), subtitle: t('copilot.action.preflight4.subtitle'), prompt: t('copilot.action.preflight4.prompt') },
+                { id: 'pf5', title: t('copilot.action.preflight5.title'), subtitle: t('copilot.action.preflight5.subtitle'), prompt: t('copilot.action.preflight5.prompt') }
             ];
         }
 
         if (currentRoute.includes('onboarding') || currentRoute.includes('setup')) {
             return [
-                { id: 's1', title: 'Configurar mi imprenta', subtitle: 'Completa datos fiscales, maquinaria y formatos', prompt: '¿Cuál es el estado de completitud de mi imprenta y qué pasos me faltan para terminar?' },
-                { id: 's2', title: 'Dar de alta una máquina', subtitle: 'Ajusta pliego máximo y coste por hora', prompt: 'Ayúdame a dar de alta una nueva prensa Offset B2 de 5 colores a 95€/h.' },
-                { id: 's3', title: 'Configurar catálogo de papeles', subtitle: 'Vincula sustratos y gramajes base', prompt: '¿Cuántos papeles tengo configurados y cuáles faltan por definir en el taller?' },
-                { id: 's4', title: 'Configurar SLAs de transporte', subtitle: 'Establece plazos y transportistas preferidos', prompt: 'Configura un plazo estándar de entrega de 5 días con transportistas DHL y SEUR.' },
-                { id: 's5', title: 'Activar modo producción', subtitle: 'Comprueba requisitos para recibir pedidos', prompt: '¿Cumple mi imprenta todos los requisitos para recibir pedidos en el Marketplace?' }
+                { id: 's1', title: t('copilot.action.setup1.title'), subtitle: t('copilot.action.setup1.subtitle'), prompt: t('copilot.action.setup1.prompt') },
+                { id: 's2', title: t('copilot.action.setup2.title'), subtitle: t('copilot.action.setup2.subtitle'), prompt: t('copilot.action.setup2.prompt') },
+                { id: 's3', title: t('copilot.action.setup3.title'), subtitle: t('copilot.action.setup3.subtitle'), prompt: t('copilot.action.setup3.prompt') },
+                { id: 's4', title: t('copilot.action.setup4.title'), subtitle: t('copilot.action.setup4.subtitle'), prompt: t('copilot.action.setup4.prompt') },
+                { id: 's5', title: t('copilot.action.setup5.title'), subtitle: t('copilot.action.setup5.subtitle'), prompt: t('copilot.action.setup5.prompt') }
             ];
         }
 
         // Default General / Home Cards
         return [
-            { id: 'g1', title: 'Configurar mi imprenta', subtitle: 'Completa datos fiscales, maquinaria y formatos base', prompt: '¿Cuál es el estado del onboarding de mi imprenta y qué pasos me faltan para estar al 100%?' },
-            { id: 'g2', title: 'Revisar estado de Preflights', subtitle: 'Analiza los últimos PDFs con advertencias o errores', prompt: 'Revisa las alertas de preflight recientes y dime qué archivos requieren atención.' },
-            { id: 'g3', title: 'Reporte de ventas y pedidos', subtitle: 'Resumen de presupuestos aceptados esta semana', prompt: 'Genera el reporte ejecutivo de ventas y facturación de pedidos de esta semana.' },
-            { id: 'g4', title: 'Calibrar márgenes y tarifas', subtitle: 'Ajusta escalados de tirada o precios de papel', prompt: 'Simula un incremento del 5% en la tarifa de Rústica (Softcover) y muéstrame el impacto.' },
-            { id: 'g5', title: 'Auditoría de salud del catálogo', subtitle: 'Detecta productos sin tarifa o reglas incompletas', prompt: 'Ejecuta una auditoría de salud del catálogo e identifica sustratos o familias sin tarifa activa.' }
+            { id: 'g1', title: t('copilot.action.general1.title'), subtitle: t('copilot.action.general1.subtitle'), prompt: t('copilot.action.general1.prompt') },
+            { id: 'g2', title: t('copilot.action.general2.title'), subtitle: t('copilot.action.general2.subtitle'), prompt: t('copilot.action.general2.prompt') },
+            { id: 'g3', title: t('copilot.action.general3.title'), subtitle: t('copilot.action.general3.subtitle'), prompt: t('copilot.action.general3.prompt') },
+            { id: 'g4', title: t('copilot.action.general4.title'), subtitle: t('copilot.action.general4.subtitle'), prompt: t('copilot.action.general4.prompt') },
+            { id: 'g5', title: t('copilot.action.general5.title'), subtitle: t('copilot.action.general5.subtitle'), prompt: t('copilot.action.general5.prompt') }
         ];
-    }, [currentRoute]);
+    }, [currentRoute, t]);
 
     // Handle typing and '@' autocomplete triggers
     const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -212,7 +215,7 @@ export const DotCopilotDrawer: React.FC = () => {
     // Filtered entities for '@' autocomplete
     const filteredEntities = useMemo(() => {
         if (mentionSearch === null) return [];
-        return searchableEntities.filter(ent => 
+        return searchableEntities.filter(ent =>
             ent.label.toLowerCase().includes(mentionSearch) ||
             ent.detail.toLowerCase().includes(mentionSearch)
         ).slice(0, 6);
@@ -301,7 +304,7 @@ export const DotCopilotDrawer: React.FC = () => {
             <div
                 onMouseDown={handleMouseDownResize}
                 className="absolute left-0 top-0 bottom-0 w-1.5 hover:w-2 hover:bg-[#dc0000] cursor-ew-resize transition-all z-10 -ml-1"
-                title="Arrastra para cambiar el ancho del panel"
+                title={t('copilot.resizeHandleTitle') || 'Arrastra para cambiar el ancho del panel'}
             />
 
             {/* ──── 1. HEADER ──────────────────────────────────────────────── */}
@@ -311,11 +314,17 @@ export const DotCopilotDrawer: React.FC = () => {
                         type="button"
                         onClick={() => setHistoryOpen(prev => !prev)}
                         className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-bold text-zinc-900 dark:text-zinc-100 hover:bg-zinc-200/60 dark:hover:bg-zinc-800 transition-colors cursor-pointer truncate max-w-[210px]"
-                        title="Historial de conversaciones de la imprenta"
+                        title={t('copilot.historyTitle') || 'Historial de conversaciones de la imprenta'}
                     >
                         <DotChatAvatar size={18} state={globalDotState} />
                         <span className="truncate">
-                            {sessions.find(s => s.id === activeSessionId)?.title || 'Nueva conversación'}
+                            {(() => {
+                                const currentSession = sessions.find(s => s.id === activeSessionId);
+                                if (!currentSession || currentSession.title === 'Nueva conversación' || currentSession.title === 'New conversation') {
+                                    return t('copilot.newConversation') || 'Nueva conversación';
+                                }
+                                return currentSession.title;
+                            })()}
                         </span>
                         <ChevronDown size={13} className={`text-zinc-400 transition-transform ${historyOpen ? 'rotate-180' : ''}`} />
                     </button>
@@ -324,27 +333,31 @@ export const DotCopilotDrawer: React.FC = () => {
                     {historyOpen && (
                         <div className="absolute left-0 top-full mt-1.5 w-64 rounded-xl bg-white dark:bg-[#18181b] border border-zinc-200 dark:border-zinc-800 shadow-xl p-1.5 z-50 space-y-1">
                             <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-zinc-400">
-                                Sesiones Recientes
+                                {t('copilot.recentSessions') || 'Sesiones Recientes'}
                             </div>
                             <div className="max-h-56 overflow-y-auto custom-scrollbar space-y-1">
-                                {sessions.map(s => (
-                                    <button
-                                        key={s.id}
-                                        type="button"
-                                        onClick={() => {
-                                            selectSession(s.id);
-                                            setHistoryOpen(false);
-                                        }}
-                                        className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center justify-between cursor-pointer ${
-                                            s.id === activeSessionId
-                                                ? 'bg-red-500/10 text-[#dc0000] font-bold'
-                                                : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800'
-                                        }`}
-                                    >
-                                        <span className="truncate pr-2">{s.title}</span>
-                                        {s.id === activeSessionId && <Check size={12} className="shrink-0" />}
-                                    </button>
-                                ))}
+                                {sessions.map(s => {
+                                    const displayTitle = (s.title === 'Nueva conversación' || s.title === 'New conversation')
+                                        ? (t('copilot.newConversation') || 'Nueva conversación')
+                                        : s.title;
+                                    return (
+                                        <button
+                                            key={s.id}
+                                            type="button"
+                                            onClick={() => {
+                                                selectSession(s.id);
+                                                setHistoryOpen(false);
+                                            }}
+                                            className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center justify-between cursor-pointer ${s.id === activeSessionId
+                                                    ? 'bg-red-500/10 text-[#dc0000] font-bold'
+                                                    : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800'
+                                                }`}
+                                        >
+                                            <span className="truncate pr-2">{displayTitle}</span>
+                                            {s.id === activeSessionId && <Check size={12} className="shrink-0" />}
+                                        </button>
+                                    );
+                                })}
                             </div>
                             <div className="pt-1 border-t border-zinc-100 dark:border-zinc-800">
                                 <button
@@ -356,7 +369,7 @@ export const DotCopilotDrawer: React.FC = () => {
                                     className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-bold text-[#dc0000] hover:bg-red-500/10 transition-colors flex items-center gap-1.5 cursor-pointer"
                                 >
                                     <Plus size={13} />
-                                    Nueva conversación
+                                    {t('copilot.newConversation') || 'Nueva conversación'}
                                 </button>
                             </div>
                         </div>
@@ -368,7 +381,7 @@ export const DotCopilotDrawer: React.FC = () => {
                     <button
                         type="button"
                         onClick={createNewSession}
-                        title="Nueva conversación (+)"
+                        title={t('copilot.newSessionTooltip') || 'Nueva conversación (+)'}
                         className="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-200/60 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
                     >
                         <Plus size={16} />
@@ -376,7 +389,7 @@ export const DotCopilotDrawer: React.FC = () => {
                     <button
                         type="button"
                         onClick={toggleExpand}
-                        title={isExpanded ? 'Contraer ancho' : 'Expandir ancho'}
+                        title={isExpanded ? (t('copilot.collapseTooltip') || 'Contraer ancho') : (t('copilot.expandTooltip') || 'Expandir ancho')}
                         className="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-200/60 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
                     >
                         {isExpanded ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
@@ -384,7 +397,7 @@ export const DotCopilotDrawer: React.FC = () => {
                     <button
                         type="button"
                         onClick={closeDrawer}
-                        title="Cerrar panel (Esc)"
+                        title={t('copilot.closeTooltip') || 'Cerrar panel (Esc)'}
                         className="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-200/60 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
                     >
                         <X size={16} />
@@ -408,7 +421,7 @@ export const DotCopilotDrawer: React.FC = () => {
 
                         <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-red-500/10 border border-red-500/20 text-[#dc0000] text-[11px] font-bold tracking-wider uppercase mb-2">
                             <Sparkles size={11} />
-                            <span>DOT COPILOT · RESIDENT AI</span>
+                            <span>{t('copilot.residentAiBadge') || 'DOT COPILOT · RESIDENT AI'}</span>
                         </div>
 
                         <h2 className="text-base font-extrabold text-zinc-900 dark:text-zinc-100 max-w-[340px] leading-snug m-0">
@@ -416,13 +429,13 @@ export const DotCopilotDrawer: React.FC = () => {
                         </h2>
 
                         <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 max-w-[320px]">
-                            Conectado a los motores de producción, tarifas, imposición y preflight de PrintPrice OS.
+                            {t('copilot.heroSubtitle') || 'Conectado a los motores de producción, tarifas, imposición y preflight de PrintPrice OS.'}
                         </p>
 
                         {/* 5 Tarjetas de Acción Rápida Contextuales */}
                         <div className="w-full mt-6 space-y-2 text-left">
                             <span className="text-[10px] uppercase font-bold text-zinc-400 px-1 tracking-wider block">
-                                Acciones rápidas contextuales
+                                {t('copilot.contextualActionsHeader') || 'Acciones rápidas contextuales'}
                             </span>
                             {contextualActions.map((act) => (
                                 <button
@@ -495,7 +508,7 @@ export const DotCopilotDrawer: React.FC = () => {
                         {isStreaming && (
                             <div className="flex items-center gap-2 p-2 rounded-xl bg-zinc-100/80 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700/80 max-w-max text-xs font-semibold text-zinc-700 dark:text-zinc-300 animate-pulse">
                                 <DotChatAvatar size={18} state="thinking" />
-                                <span>{activeToolPill || 'Dot está procesando...'}</span>
+                                <span>{activeToolPill || (t('copilot.statusProcessing') || 'Dot está procesando...')}</span>
                             </div>
                         )}
 
@@ -510,18 +523,17 @@ export const DotCopilotDrawer: React.FC = () => {
                 {mentionSearch !== null && filteredEntities.length > 0 && (
                     <div className="mb-2 rounded-xl bg-white dark:bg-[#18181b] border border-zinc-200 dark:border-zinc-700 shadow-xl p-1.5 space-y-1">
                         <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-zinc-400">
-                            Entidades disponibles para etiquetar
+                            {t('copilot.mentionPopoverTitle') || 'Entidades disponibles para etiquetar'}
                         </div>
                         {filteredEntities.map((ent, idx) => (
                             <button
                                 key={ent.id}
                                 type="button"
                                 onClick={() => handleSelectEntity(ent)}
-                                className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs transition-colors flex items-center justify-between cursor-pointer ${
-                                    idx === selectedMentionIndex
+                                className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs transition-colors flex items-center justify-between cursor-pointer ${idx === selectedMentionIndex
                                         ? 'bg-red-500/10 text-[#dc0000] font-bold'
                                         : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800'
-                                }`}
+                                    }`}
                             >
                                 <span className="font-mono font-bold">{ent.label}</span>
                                 <span className="text-[11px] text-zinc-500 truncate max-w-[200px]">{ent.detail}</span>
@@ -536,30 +548,28 @@ export const DotCopilotDrawer: React.FC = () => {
                         <button
                             type="button"
                             onClick={() => setMode('ask')}
-                            className={`px-2 py-0.5 rounded-md transition-all cursor-pointer ${
-                                mode === 'ask'
+                            className={`px-2 py-0.5 rounded-md transition-all cursor-pointer ${mode === 'ask'
                                     ? 'bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white shadow-2xs'
                                     : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-white'
-                            }`}
+                                }`}
                         >
-                            Ask
+                            {t('copilot.modeAsk') || 'Ask'}
                         </button>
                         <button
                             type="button"
                             onClick={() => setMode('act')}
-                            className={`px-2 py-0.5 rounded-md transition-all cursor-pointer flex items-center gap-1 ${
-                                mode === 'act'
+                            className={`px-2 py-0.5 rounded-md transition-all cursor-pointer flex items-center gap-1 ${mode === 'act'
                                     ? 'bg-[#dc0000] text-white shadow-2xs'
                                     : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-white'
-                            }`}
+                                }`}
                         >
                             <Zap size={10} />
-                            Act
+                            {t('copilot.modeAct') || 'Act'}
                         </button>
                     </div>
 
                     <span className="text-[10px] text-zinc-400">
-                        {mode === 'act' ? 'Modo asistido con tarjetas de confirmación' : 'Modo consultas y reportes de solo lectura'}
+                        {mode === 'act' ? (t('copilot.modeActDesc') || 'Modo asistido con tarjetas de confirmación') : (t('copilot.modeAskDesc') || 'Modo consultas y reportes de solo lectura')}
                     </span>
                 </div>
 
@@ -571,7 +581,7 @@ export const DotCopilotDrawer: React.FC = () => {
                         value={inputValue}
                         onChange={handleInputChange}
                         onKeyDown={handleKeyDown}
-                        placeholder="Escribe @ para etiquetar un pedido, máquina o tarifa..."
+                        placeholder={t('copilot.inputPlaceholder') || 'Escribe @ para etiquetar un pedido, máquina o tarifa...'}
                         className="w-full bg-transparent border-0 outline-none resize-none text-xs text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 p-1 min-h-[32px] max-h-[120px] custom-scrollbar"
                     />
 
@@ -584,24 +594,24 @@ export const DotCopilotDrawer: React.FC = () => {
                                     setMentionSearch('');
                                     textareaRef.current?.focus();
                                 }}
-                                title="Etiquetar entidad (@)"
+                                title={t('copilot.tagEntityTooltip') || 'Etiquetar entidad (@)'}
                                 className="p-1 rounded-md text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
                             >
                                 <AtSign size={13} />
                             </button>
                             <span className="text-[10px] text-zinc-400 hidden sm:inline">
-                                ⌘I para alternar panel
+                                {t('copilot.toggleShortcut') || '⌘I para alternar panel'}
                             </span>
                         </div>
 
                         <button
                             type="submit"
                             disabled={!inputValue.trim() || isStreaming}
-                            className={`p-1.5 rounded-xl transition-all cursor-pointer ${
-                                inputValue.trim() && !isStreaming
+                            title={t('copilot.sendTooltip') || 'Enviar mensaje'}
+                            className={`p-1.5 rounded-xl transition-all cursor-pointer ${inputValue.trim() && !isStreaming
                                     ? 'bg-[#dc0000] text-white hover:bg-red-700 shadow-2xs'
                                     : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-400 cursor-not-allowed'
-                            }`}
+                                }`}
                         >
                             <Send size={13} />
                         </button>

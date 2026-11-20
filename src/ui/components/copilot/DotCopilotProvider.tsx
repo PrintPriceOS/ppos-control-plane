@@ -9,6 +9,7 @@ import {
     CopilotCardPayload 
 } from './types';
 import { getAuthToken } from '../../lib/authStore';
+import { useLocale } from '../../i18n';
 
 interface DotCopilotContextType {
     isOpen: boolean;
@@ -39,11 +40,11 @@ const DotCopilotContext = createContext<DotCopilotContextType | undefined>(undef
 
 const SESSIONS_STORAGE_KEY = 'ppos_dot_copilot_sessions_v1';
 
-function createDefaultSession(): CopilotSession {
+function createDefaultSession(title = 'Nueva conversación'): CopilotSession {
     const id = `session-${Date.now()}`;
     return {
         id,
-        title: 'Nueva conversación',
+        title,
         createdAt: Date.now(),
         updatedAt: Date.now(),
         messages: []
@@ -53,6 +54,7 @@ function createDefaultSession(): CopilotSession {
 export const DotCopilotProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const location = useLocation();
     const currentRoute = location.pathname;
+    const { locale, t } = useLocale();
 
     const [isOpen, setIsOpen] = useState(false);
     const [width, setWidth] = useState(420);
@@ -155,12 +157,13 @@ export const DotCopilotProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
     // Create New Session
     const createNewSession = useCallback(() => {
-        const newSession = createDefaultSession();
+        const defaultTitle = t('copilot.newConversation') || 'Nueva conversación';
+        const newSession = createDefaultSession(defaultTitle);
         setSessions(prev => [newSession, ...prev]);
         setActiveSessionId(newSession.id);
         setActiveToolPill(null);
         setGlobalDotState('idle');
-    }, []);
+    }, [t]);
 
     const selectSession = useCallback((id: string) => {
         setActiveSessionId(id);
@@ -198,7 +201,7 @@ export const DotCopilotProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
         setIsStreaming(true);
         setGlobalDotState('thinking');
-        setActiveToolPill('Consultando al asistente industrial...');
+        setActiveToolPill(t('copilot.statusConsulting') || 'Consultando al asistente industrial...');
 
         // Placeholder for assistant response
         const assistantMsgId = `msg-dot-${Date.now()}`;
@@ -215,6 +218,7 @@ export const DotCopilotProvider: React.FC<{ children: React.ReactNode }> = ({ ch
                 body: JSON.stringify({
                     messages: updatedMessages.map(m => ({ role: m.role, content: m.content })),
                     context: {
+                        locale,
                         currentRoute,
                         printhouseName: 'Gráficas Industriales Philologica',
                         currency: 'EUR'
@@ -253,7 +257,7 @@ export const DotCopilotProvider: React.FC<{ children: React.ReactNode }> = ({ ch
                                 if (data.pill) setActiveToolPill(data.pill);
                             } else if (currentEventType === 'tool_start') {
                                 setGlobalDotState('thinking');
-                                setActiveToolPill(`Ejecutando ${data.tool}...`);
+                                setActiveToolPill(t('copilot.statusExecutingTool', { tool: data.tool }) || `Ejecutando ${data.tool}...`);
                             } else if (currentEventType === 'token') {
                                 fullText += (data.text || '');
                                 setGlobalDotState('speaking');
@@ -296,7 +300,7 @@ export const DotCopilotProvider: React.FC<{ children: React.ReactNode }> = ({ ch
                     const finalMsg: CopilotMessage = {
                         id: assistantMsgId,
                         role: 'assistant',
-                        content: fullText || 'Operación completada con éxito.',
+                        content: fullText || t('copilot.statusCompleted') || 'Operación completada con éxito.',
                         timestamp: Date.now(),
                         cards
                     };
@@ -324,7 +328,7 @@ export const DotCopilotProvider: React.FC<{ children: React.ReactNode }> = ({ ch
             const errorMsg: CopilotMessage = {
                 id: `msg-err-${Date.now()}`,
                 role: 'assistant',
-                content: `No se pudo conectar con el servicio de Dot Copilot (${err.message || 'Error'}). Inténtalo de nuevo o comprueba tu conexión.`,
+                content: t('copilot.errorConnection', { error: err.message || 'Error' }) || `No se pudo conectar con el servicio de Dot Copilot (${err.message || 'Error'}). Inténtalo de nuevo o comprueba tu conexión.`,
                 timestamp: Date.now()
             };
             setSessions(prev => prev.map(s => {
@@ -336,7 +340,7 @@ export const DotCopilotProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         } finally {
             setIsStreaming(false);
         }
-    }, [messages, isStreaming, activeSessionId, currentRoute, mode]);
+    }, [messages, isStreaming, activeSessionId, currentRoute, mode, locale, t]);
 
     const contextValue = useMemo(() => ({
         isOpen,

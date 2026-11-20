@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { PreflightAlertsPayload } from '../types';
 import { AlertTriangle, ShieldAlert, CheckCircle2, Wrench, ArrowUpRight } from 'lucide-react';
+import { useLocale } from '../../../i18n';
 
 export const CopilotPreflightAlertCard: React.FC<{ payload: PreflightAlertsPayload }> = ({ payload }) => {
+    const { t } = useLocale();
     const [fixedMap, setFixedMap] = useState<Record<string, boolean>>({});
 
     const handleAutoFix = (orderId: string, issueType: string) => {
@@ -18,11 +20,11 @@ export const CopilotPreflightAlertCard: React.FC<{ payload: PreflightAlertsPaylo
                         <ShieldAlert size={15} />
                     </div>
                     <span className="text-xs font-bold text-red-950 dark:text-red-200">
-                        Auditoría Preflight de 6 Ejes
+                        {t('copilot.preflight.title') || 'Auditoría Preflight de 6 Ejes'}
                     </span>
                 </div>
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300">
-                    {payload.alerts.length} archivos con alertas
+                    {t('copilot.preflight.alertsCount', { count: payload.alerts.length }) || `${payload.alerts.length} archivos con alertas`}
                 </span>
             </div>
 
@@ -63,7 +65,7 @@ export const CopilotPreflightAlertCard: React.FC<{ payload: PreflightAlertsPaylo
                                             <div className="shrink-0">
                                                 {isFixed ? (
                                                     <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded">
-                                                        <CheckCircle2 size={11} /> Reparado
+                                                        <CheckCircle2 size={11} /> {t('copilot.preflight.repairedBadge') || 'Reparado'}
                                                     </span>
                                                 ) : (
                                                     <button
@@ -71,7 +73,7 @@ export const CopilotPreflightAlertCard: React.FC<{ payload: PreflightAlertsPaylo
                                                         onClick={() => handleAutoFix(alert.orderId, iss.type)}
                                                         className="inline-flex items-center gap-1 text-[10px] font-bold text-red-600 dark:text-red-400 bg-red-500/10 hover:bg-red-500/20 px-2 py-0.5 rounded cursor-pointer transition-colors"
                                                     >
-                                                        <Wrench size={10} /> Auto-Fix
+                                                        <Wrench size={10} /> {t('copilot.preflight.autoFixBtn') || 'Auto-Fix'}
                                                     </button>
                                                 )}
                                             </div>
@@ -82,12 +84,12 @@ export const CopilotPreflightAlertCard: React.FC<{ payload: PreflightAlertsPaylo
                         </div>
 
                         <div className="mt-2.5 pt-2 border-t border-zinc-100 dark:border-zinc-800/80 flex items-center justify-between text-[11px]">
-                            <span className="text-zinc-400">Inspección de Sangrado, Lomo y TAC</span>
+                            <span className="text-zinc-400">{t('copilot.preflight.inspectionFooter') || 'Inspección de Sangrado, Lomo y TAC'}</span>
                             <a 
                                 href={`#/orders`} 
                                 className="inline-flex items-center gap-1 text-[#dc0000] hover:underline font-bold"
                             >
-                                Abrir orden en taller <ArrowUpRight size={11} />
+                                {t('copilot.preflight.openOrder') || 'Abrir orden en taller'} <ArrowUpRight size={11} />
                             </a>
                         </div>
                     </div>

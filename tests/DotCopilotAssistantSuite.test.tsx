@@ -9,10 +9,11 @@ import { CopilotKpiSummaryCard } from '../src/ui/components/copilot/cards/Copilo
 import { CopilotPreflightAlertCard } from '../src/ui/components/copilot/cards/CopilotPreflightAlertCard';
 import { CopilotActionConfirmCard } from '../src/ui/components/copilot/cards/CopilotActionConfirmCard';
 import { Topbar } from '../src/ui/layout/Topbar';
+import { LocaleProvider, useLocale } from '../src/ui/i18n';
 
 // Backend services import for direct unit testing
 const { resolveGeminiModel, clearCache, getRegistryState } = require('../src/api/services/copilot/modelRegistryService');
-const { executeCopilotTool, processCopilotChat } = require('../src/api/services/copilot/dotCopilotService');
+const { executeCopilotTool, processCopilotChat, buildSystemInstruction } = require('../src/api/services/copilot/dotCopilotService');
 
 describe('DOT Copilot Assistant & Model Registry Suite (Phase 200)', () => {
 
@@ -179,17 +180,19 @@ describe('DOT Copilot Assistant & Model Registry Suite (Phase 200)', () => {
     describe('3. Generative UI Cards Component Tests', () => {
         it('renders CopilotKpiSummaryCard with revenue, accepted quotes, and ticket', () => {
             render(
-                <CopilotKpiSummaryCard
-                    payload={{
-                        type: 'KPI_SUMMARY',
-                        periodLabel: 'Esta semana',
-                        revenue: 11640,
-                        acceptedQuotes: 4,
-                        pendingOrders: 2,
-                        avgTicket: 2910,
-                        currency: 'EUR'
-                    }}
-                />
+                <LocaleProvider initialLocale="es">
+                    <CopilotKpiSummaryCard
+                        payload={{
+                            type: 'KPI_SUMMARY',
+                            periodLabel: 'Esta semana',
+                            revenue: 11640,
+                            acceptedQuotes: 4,
+                            pendingOrders: 2,
+                            avgTicket: 2910,
+                            currency: 'EUR'
+                        }}
+                    />
+                </LocaleProvider>
             );
 
             expect(screen.getByText('Reporte Ejecutivo de Ventas')).toBeInTheDocument();
@@ -201,22 +204,24 @@ describe('DOT Copilot Assistant & Model Registry Suite (Phase 200)', () => {
 
         it('renders CopilotPreflightAlertCard with issues and Auto-Fix trigger', () => {
             render(
-                <CopilotPreflightAlertCard
-                    payload={{
-                        type: 'PREFLIGHT_ALERTS',
-                        alerts: [{
-                            orderId: 'ORD-1043',
-                            fileName: 'Interior_Catalogo.pdf',
-                            issuesCount: 1,
-                            issues: [{
-                                type: 'BLEED_INSUFFICIENT',
-                                desc: 'Sangrado de 1.8mm detectado',
-                                severity: 'CRITICAL',
-                                autoFixable: true
+                <LocaleProvider initialLocale="es">
+                    <CopilotPreflightAlertCard
+                        payload={{
+                            type: 'PREFLIGHT_ALERTS',
+                            alerts: [{
+                                orderId: 'ORD-1043',
+                                fileName: 'Interior_Catalogo.pdf',
+                                issuesCount: 1,
+                                issues: [{
+                                    type: 'BLEED_INSUFFICIENT',
+                                    desc: 'Sangrado de 1.8mm detectado',
+                                    severity: 'CRITICAL',
+                                    autoFixable: true
+                                }]
                             }]
-                        }]
-                    }}
-                />
+                        }}
+                    />
+                </LocaleProvider>
             );
 
             expect(screen.getByText('Auditoría Preflight de 6 Ejes')).toBeInTheDocument();
@@ -232,14 +237,16 @@ describe('DOT Copilot Assistant & Model Registry Suite (Phase 200)', () => {
 
         it('renders CopilotActionConfirmCard and responds to Confirm action', () => {
             render(
-                <CopilotActionConfirmCard
-                    payload={{
-                        type: 'ACTION_CONFIRM',
-                        actionId: 'act-001',
-                        title: 'Confirmar Calibración +5%',
-                        summary: 'Ajuste de margen simulado en Rústica'
-                    }}
-                />
+                <LocaleProvider initialLocale="es">
+                    <CopilotActionConfirmCard
+                        payload={{
+                            type: 'ACTION_CONFIRM',
+                            actionId: 'act-001',
+                            title: 'Confirmar Calibración +5%',
+                            summary: 'Ajuste de margen simulado en Rústica'
+                        }}
+                    />
+                </LocaleProvider>
             );
 
             expect(screen.getByText('Confirmar Calibración +5%')).toBeInTheDocument();
@@ -270,13 +277,15 @@ describe('DOT Copilot Assistant & Model Registry Suite (Phase 200)', () => {
         it('renders Topbar Ask Dot pill button with shortcut indicator', () => {
             render(
                 <MemoryRouter>
-                    <DotCopilotProvider>
-                        <TestWrapper />
-                    </DotCopilotProvider>
+                    <LocaleProvider initialLocale="es">
+                        <DotCopilotProvider>
+                            <TestWrapper />
+                        </DotCopilotProvider>
+                    </LocaleProvider>
                 </MemoryRouter>
             );
 
-            const askDotBtn = screen.getByRole('button', { name: /Abrir asistente DOT Copilot/i });
+            const askDotBtn = screen.getByRole('button', { name: /asistente DOT Copilot|DOT Copilot assistant/i });
             expect(askDotBtn).toBeInTheDocument();
             expect(askDotBtn).toHaveTextContent('Ask Dot');
             expect(askDotBtn).toHaveTextContent('⌘I');
@@ -285,13 +294,15 @@ describe('DOT Copilot Assistant & Model Registry Suite (Phase 200)', () => {
         it('opens DotCopilotDrawer on Ask Dot click and shows intelligent zero-state with 5 contextual cards', async () => {
             render(
                 <MemoryRouter initialEntries={['/']}>
-                    <DotCopilotProvider>
-                        <TestWrapper />
-                    </DotCopilotProvider>
+                    <LocaleProvider initialLocale="es">
+                        <DotCopilotProvider>
+                            <TestWrapper />
+                        </DotCopilotProvider>
+                    </LocaleProvider>
                 </MemoryRouter>
             );
 
-            const askDotBtn = screen.getByRole('button', { name: /Abrir asistente DOT Copilot/i });
+            const askDotBtn = screen.getByRole('button', { name: /asistente DOT Copilot|DOT Copilot assistant/i });
             fireEvent.click(askDotBtn);
 
             await waitFor(() => {
@@ -313,13 +324,15 @@ describe('DOT Copilot Assistant & Model Registry Suite (Phase 200)', () => {
         it('allows toggling between Ask and Act modes in composer', async () => {
             render(
                 <MemoryRouter initialEntries={['/']}>
-                    <DotCopilotProvider>
-                        <TestWrapper />
-                    </DotCopilotProvider>
+                    <LocaleProvider initialLocale="es">
+                        <DotCopilotProvider>
+                            <TestWrapper />
+                        </DotCopilotProvider>
+                    </LocaleProvider>
                 </MemoryRouter>
             );
 
-            fireEvent.click(screen.getByRole('button', { name: /Abrir asistente DOT Copilot/i }));
+            fireEvent.click(screen.getByRole('button', { name: /asistente DOT Copilot|DOT Copilot assistant/i }));
 
             await waitFor(() => {
                 expect(screen.getByRole('button', { name: /^Act$/i })).toBeInTheDocument();
@@ -339,13 +352,15 @@ describe('DOT Copilot Assistant & Model Registry Suite (Phase 200)', () => {
         it('triggers @ mention autocomplete when user types @ in composer', async () => {
             render(
                 <MemoryRouter initialEntries={['/']}>
-                    <DotCopilotProvider>
-                        <TestWrapper />
-                    </DotCopilotProvider>
+                    <LocaleProvider initialLocale="es">
+                        <DotCopilotProvider>
+                            <TestWrapper />
+                        </DotCopilotProvider>
+                    </LocaleProvider>
                 </MemoryRouter>
             );
 
-            fireEvent.click(screen.getByRole('button', { name: /Abrir asistente DOT Copilot/i }));
+            fireEvent.click(screen.getByRole('button', { name: /asistente DOT Copilot|DOT Copilot assistant/i }));
 
             const textarea = await screen.findByPlaceholderText(/Escribe @ para etiquetar un pedido/i);
             fireEvent.change(textarea, { target: { value: 'Revisa @' } });
@@ -354,6 +369,139 @@ describe('DOT Copilot Assistant & Model Registry Suite (Phase 200)', () => {
             await waitFor(() => {
                 expect(screen.getByText(/Entidades disponibles para etiquetar/i)).toBeInTheDocument();
             });
+        });
+    });
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // 5. Trilingual i18n & Locale Synchronization Tests (Mission Phase 200)
+    // ──────────────────────────────────────────────────────────────────────────
+    describe('5. Trilingual i18n & Locale Synchronization (EN, ES, DE)', () => {
+        const I18nTestContainer: React.FC<{ initialLocale: 'en' | 'es' | 'de' }> = ({ initialLocale }) => {
+            const { openDrawer } = useDotCopilot();
+            return (
+                <div>
+                    <button id="open-btn" onClick={openDrawer}>Open</button>
+                    <DotCopilotDrawer />
+                </div>
+            );
+        };
+
+        it('renders full drawer UI in English when locale is EN', async () => {
+            render(
+                <MemoryRouter initialEntries={['/']}>
+                    <LocaleProvider initialLocale="en">
+                        <DotCopilotProvider>
+                            <I18nTestContainer initialLocale="en" />
+                        </DotCopilotProvider>
+                    </LocaleProvider>
+                </MemoryRouter>
+            );
+
+            fireEvent.click(screen.getByRole('button', { name: /Open/i }));
+
+            await waitFor(() => {
+                expect(screen.getByLabelText('DOT Copilot Sidecar Drawer')).toBeInTheDocument();
+            });
+
+            // Zero-state in English
+            expect(screen.getByText(/What are we configuring or reviewing today\?/i)).toBeInTheDocument();
+            expect(screen.getByText(/Connected to PrintPrice OS production, pricing, imposition, and preflight engines\./i)).toBeInTheDocument();
+            expect(screen.getByText(/Contextual quick actions/i)).toBeInTheDocument();
+
+            // English action titles
+            expect(screen.getByText('Configure my printhouse')).toBeInTheDocument();
+            expect(screen.getByText('Review preflight status')).toBeInTheDocument();
+            expect(screen.getByText('Sales & orders report')).toBeInTheDocument();
+            expect(screen.getByText('Calibrate margins and rate cards')).toBeInTheDocument();
+            expect(screen.getByText('Catalog health audit')).toBeInTheDocument();
+
+            // English placeholder and modes
+            expect(screen.getByPlaceholderText(/Type @ to tag an order, press, or rate\.\.\./i)).toBeInTheDocument();
+            expect(screen.getByText(/Read-only queries and reports/i)).toBeInTheDocument();
+        });
+
+        it('renders full drawer UI in German when locale is DE', async () => {
+            render(
+                <MemoryRouter initialEntries={['/']}>
+                    <LocaleProvider initialLocale="de">
+                        <DotCopilotProvider>
+                            <I18nTestContainer initialLocale="de" />
+                        </DotCopilotProvider>
+                    </LocaleProvider>
+                </MemoryRouter>
+            );
+
+            fireEvent.click(screen.getByRole('button', { name: /Open/i }));
+
+            await waitFor(() => {
+                expect(screen.getByLabelText('DOT Copilot Sidecar Drawer')).toBeInTheDocument();
+            });
+
+            // Zero-state in German
+            expect(screen.getByText(/Was konfigurieren oder prüfen wir heute\?/i)).toBeInTheDocument();
+            expect(screen.getByText(/Verbunden mit den Produktions-, Preis-, Ausschieß- und Preflight-Engines/i)).toBeInTheDocument();
+            expect(screen.getByText(/Kontextuelle Schnellaktionen/i)).toBeInTheDocument();
+
+            // German action titles
+            expect(screen.getByText('Druckerei konfigurieren')).toBeInTheDocument();
+            expect(screen.getByText('Preflight-Status prüfen')).toBeInTheDocument();
+            expect(screen.getByText('Vertriebs- und Auftragsbericht')).toBeInTheDocument();
+            expect(screen.getByText('Margen und Tarife kalibrieren')).toBeInTheDocument();
+            expect(screen.getByText('Kataloggesundheitsprüfung')).toBeInTheDocument();
+
+            // German placeholder and modes
+            expect(screen.getByPlaceholderText(/Tippe @ um einen Auftrag, eine Maschine oder einen Tarif zu taggen\.\.\./i)).toBeInTheDocument();
+            expect(screen.getByText(/Schreibgeschützte Abfragen und Berichte/i)).toBeInTheDocument();
+        });
+
+        it('injects dynamic language rule into Gemini system instruction based on context.locale', () => {
+            const sysInstEn = buildSystemInstruction({ locale: 'en', printhouseName: 'Test Print UK' });
+            expect(sysInstEn).toContain("CRITICAL LANGUAGE RULE:");
+            expect(sysInstEn).toContain("You MUST respond strictly in the user's active interface language: 'English' (en)");
+
+            const sysInstEs = buildSystemInstruction({ locale: 'es', printhouseName: 'Gráficas Sol' });
+            expect(sysInstEs).toContain("CRITICAL LANGUAGE RULE:");
+            expect(sysInstEs).toContain("You MUST respond strictly in the user's active interface language: 'Spanish (Español)' (es)");
+
+            const sysInstDe = buildSystemInstruction({ locale: 'de', printhouseName: 'Druckhaus Berlin' });
+            expect(sysInstDe).toContain("CRITICAL LANGUAGE RULE:");
+            expect(sysInstDe).toContain("You MUST respond strictly in the user's active interface language: 'German (Deutsch)' (de)");
+        });
+
+        it('dispatches deterministic fallback in English when locale is en', async () => {
+            const events: Array<{ type: string; data: any }> = [];
+
+            await processCopilotChat({
+                messages: [{ role: 'user', content: 'sales and orders report' }],
+                context: { printhouseId: 'node-primary', locale: 'en' },
+                mode: 'ask',
+                onEvent: (type, data) => {
+                    events.push({ type, data });
+                }
+            });
+
+            const doneEvent = events.find(e => e.type === 'done');
+            expect(doneEvent).toBeDefined();
+            expect(doneEvent?.data.fullText).toContain('I have analyzed the orders and quotes for your plant this week');
+            expect(doneEvent?.data.fullText).toContain('Accumulated revenue');
+        });
+
+        it('dispatches deterministic fallback in German when locale is de', async () => {
+            const events: Array<{ type: string; data: any }> = [];
+
+            await processCopilotChat({
+                messages: [{ role: 'user', content: 'auftrag und umsatz' }],
+                context: { printhouseId: 'node-primary', locale: 'de' },
+                mode: 'ask',
+                onEvent: (type, data) => {
+                    events.push({ type, data });
+                }
+            });
+
+            const doneEvent = events.find(e => e.type === 'done');
+            expect(doneEvent).toBeDefined();
+            expect(doneEvent?.data.fullText).toContain('Ich habe die Aufträge und Angebote Ihres Betriebs für diese Woche analysiert');
+            expect(doneEvent?.data.fullText).toContain('Gesamtumsatz');
         });
     });
 });

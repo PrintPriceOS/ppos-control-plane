@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { ActionConfirmPayload } from '../types';
 import { Check, X, ShieldCheck, AlertCircle } from 'lucide-react';
+import { useLocale } from '../../../i18n';
 
 export const CopilotActionConfirmCard: React.FC<{ payload: ActionConfirmPayload }> = ({ payload }) => {
+    const { t } = useLocale();
     const [status, setStatus] = useState<'PENDING' | 'CONFIRMED' | 'CANCELLED'>(payload.status || 'PENDING');
 
     const handleConfirm = () => {
@@ -21,11 +23,11 @@ export const CopilotActionConfirmCard: React.FC<{ payload: ActionConfirmPayload 
                         <ShieldCheck size={15} />
                     </div>
                     <span className="text-xs font-bold text-zinc-900 dark:text-zinc-100">
-                        {payload.title || 'Confirmación Requerida (Modo Act)'}
+                        {payload.title || (t('copilot.actionConfirm.title') || 'Confirmación Requerida (Modo Act)')}
                     </span>
                 </div>
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400">
-                    HUMAN-IN-THE-LOOP
+                    {t('copilot.actionConfirm.badge') || 'HUMAN-IN-THE-LOOP'}
                 </span>
             </div>
 
@@ -41,7 +43,7 @@ export const CopilotActionConfirmCard: React.FC<{ payload: ActionConfirmPayload 
                         className="px-3 py-1.5 rounded-lg text-xs font-semibold text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors flex items-center gap-1 cursor-pointer"
                     >
                         <X size={13} />
-                        Cancelar
+                        {t('copilot.actionConfirm.cancelBtn') || 'Cancelar'}
                     </button>
                     <button
                         type="button"
@@ -49,7 +51,7 @@ export const CopilotActionConfirmCard: React.FC<{ payload: ActionConfirmPayload 
                         className="px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-[#dc0000] hover:bg-red-700 shadow-2xs transition-colors flex items-center gap-1 cursor-pointer"
                     >
                         <Check size={13} />
-                        Confirmar y Aplicar
+                        {t('copilot.actionConfirm.confirmBtn') || 'Confirmar y Aplicar'}
                     </button>
                 </div>
             )}
@@ -57,14 +59,14 @@ export const CopilotActionConfirmCard: React.FC<{ payload: ActionConfirmPayload 
             {status === 'CONFIRMED' && (
                 <div className="mt-3 p-2.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 text-xs font-bold flex items-center gap-2">
                     <Check size={14} className="text-emerald-600 dark:text-emerald-400" />
-                    <span>Cambios aplicados correctamente en la configuración de la imprenta.</span>
+                    <span>{t('copilot.actionConfirm.successNotice') || 'Cambios aplicados correctamente en la configuración de la imprenta.'}</span>
                 </div>
             )}
 
             {status === 'CANCELLED' && (
                 <div className="mt-3 p-2.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 text-xs font-medium flex items-center gap-2">
                     <AlertCircle size={14} />
-                    <span>Operación cancelada por el operador. No se modificó ningún dato.</span>
+                    <span>{t('copilot.actionConfirm.cancelNotice') || 'Operación cancelada por el operador. No se modificó ningún dato.'}</span>
                 </div>
             )}
         </div>

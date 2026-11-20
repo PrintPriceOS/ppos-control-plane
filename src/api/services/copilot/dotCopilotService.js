@@ -460,24 +460,30 @@ async function executeCopilotTool(toolName, args, printhouseId) {
 // ──── System Instructions Builder ───────────────────────────────────────────
 
 function buildSystemInstruction(context = {}) {
-    const printhouse = context.printhouseName || 'Imprenta Autorizada';
+    const printhouse = context.printhouseName || 'Imprenta Autorizada / Authorized Printhouse';
     const route = context.currentRoute || '/';
     const currency = context.currency || 'EUR';
+    const locale = (context.locale || 'es').toLowerCase();
+    const localeName = locale === 'en' ? 'English' : locale === 'de' ? 'German (Deutsch)' : 'Spanish (Español)';
 
-    return `Eres DOT, el Agente IA Copiloto de PrintPrice OS Control Plane para talleres e imprentas profesionales.
-Eres un asistente industrial experto, preciso, cordial y rigurosamente técnico.
+    return `You are DOT, the Resident AI Copilot Agent of PrintPrice OS Control Plane for commercial print shops and print houses.
+You are an expert, precise, cordial, and rigorously technical industrial assistant.
 
-CONTEXTO ACTUAL DEL USUARIO:
-- Taller / Imprenta: ${printhouse}
-- Ruta actual de la interfaz: ${route}
-- Moneda operativa: ${currency}
+CURRENT USER CONTEXT:
+- Printhouse / Plant: ${printhouse}
+- Current Interface Route: ${route}
+- Operating Currency: ${currency}
+- Active Interface Language: ${localeName} (${locale})
 
-CAPACIDADES Y REGLAS OPERATIVAS:
-1. Habla en español técnico y profesional de artes gráficas (pliegos, gramajes, micras, hendidos, imposición, lomo, perfiles ICC, preflight, sangrados, mermas).
-2. Utiliza siempre las herramientas declaradas cuando el usuario pregunte por el estado de su imprenta, onboarding, pedidos, preflight, cálculos técnicos o precios.
-3. Cuando ejecutes herramientas que produzcan datos numéricos o alertas (ej. ventas o preflights), añade explicaciones concisas y recomendaciones accionables.
-4. Si el usuario está en modo "Act" y pide modificar configuraciones, utiliza las herramientas correspondientes que devuelven tarjetas de confirmación "Human-in-the-Loop".
-5. Nunca inventes datos confidenciales de otras imprentas; el aislamiento multi-tenant es sagrado e inviolable.`;
+CRITICAL LANGUAGE RULE:
+You MUST respond strictly in the user's active interface language: '${localeName}' (${locale}). All explanations, summaries, technical terms, and tool feedback must be written in '${localeName}', unless the user explicitly writes their message in a different language.
+
+OPERATIONAL PRINCIPLES:
+1. Use professional graphic arts and printing engineering terminology (sheets, basis weights, caliper in microns, creases, imposition, spine calculations, ICC profiles, preflight checks, bleed, paper waste, Escrow protection).
+2. Always call the declared tools when the user inquires about printhouse onboarding, status, orders, preflights, technical calculations, or pricing.
+3. When executing tools that produce numerical data or alerts (e.g. sales reports or preflight audits), provide concise technical insights and actionable recommendations.
+4. If in "Act" mode and requesting configuration modifications, call the corresponding tools to generate interactive "Human-in-the-Loop" confirmation cards.
+5. Strictly preserve multi-tenant isolation: never fabricate or reveal confidential data from other printhouses.`;
 }
 
 // ──── Conversational Stream Pipeline (SSE) ───────────────────────────────────
@@ -487,17 +493,24 @@ CAPACIDADES Y REGLAS OPERATIVAS:
  * 
  * @param {Object} options
  * @param {Array} options.messages - [{ role: 'user' | 'assistant', content: string }]
- * @param {Object} options.context - PageContext { currentRoute, printhouseId, printhouseName, mode }
+ * @param {Object} options.context - PageContext { currentRoute, printhouseId, printhouseName, mode, locale }
  * @param {string} options.mode - 'ask' | 'act'
  * @param {Function} options.onEvent - Callback for SSE events: (eventType, payload) => void
  */
 async function processCopilotChat({ messages, context = {}, mode = 'ask', onEvent }) {
     const printhouseId = context.printhouseId || 'node-primary';
+    const locale = (context.locale || 'es').toLowerCase();
     const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
     const latestUserMsg = messages[messages.length - 1]?.content || '';
 
+    const initialPill = locale === 'en'
+        ? 'Analyzing industrial context...'
+        : locale === 'de'
+            ? 'Industriellen Kontext analysieren...'
+            : 'Analizando contexto industrial...';
+
     // Step 1: Notify initial thinking state
-    onEvent('status', { state: 'thinking', pill: 'Analizando contexto industrial...' });
+    onEvent('status', { state: 'thinking', pill: initialPill });
 
     // Step 2: Check if Gemini API is available, otherwise run deterministic fallback
     if (apiKey) {
@@ -529,7 +542,13 @@ async function processCopilotChat({ messages, context = {}, mode = 'ask', onEven
 
             if (functionCallPart) {
                 const fc = functionCallPart.functionCall;
-                onEvent('status', { state: 'thinking', pill: `Ejecutando ${fc.name}...` });
+                const toolPill = locale === 'en'
+                    ? `Executing ${fc.name}...`
+                    : locale === 'de'
+                        ? `${fc.name} wird ausgeführt...`
+                        : `Ejecutando ${fc.name}...`;
+
+                onEvent('status', { state: 'thinking', pill: toolPill });
                 onEvent('tool_start', { tool: fc.name, args: fc.args });
 
                 // Execute tool locally
@@ -551,7 +570,13 @@ async function processCopilotChat({ messages, context = {}, mode = 'ask', onEven
                     }
                 ];
 
-                onEvent('status', { state: 'speaking', pill: 'Generando respuesta...' });
+                const respPill = locale === 'en'
+                    ? 'Generating response...'
+                    : locale === 'de'
+                        ? 'Antwort generieren...'
+                        : 'Generando respuesta...';
+
+                onEvent('status', { state: 'speaking', pill: respPill });
 
                 const followUpResponse = await ai.models.generateContent({
                     model: modelName,
@@ -578,7 +603,8 @@ async function processCopilotChat({ messages, context = {}, mode = 'ask', onEven
             }
 
             // Direct text response without tools
-            onEvent('status', { state: 'speaking', pill: 'Respondiendo...' });
+            const directPill = locale === 'en' ? 'Responding...' : locale === 'de' ? 'Antworten...' : 'Respondiendo...';
+            onEvent('status', { state: 'speaking', pill: directPill });
             const directText = response.text || '';
             onEvent('token', { text: directText });
             onEvent('done', {
@@ -597,6 +623,7 @@ async function processCopilotChat({ messages, context = {}, mode = 'ask', onEven
         userMessage: latestUserMsg,
         printhouseId,
         mode,
+        locale,
         onEvent
     });
 }
@@ -604,38 +631,81 @@ async function processCopilotChat({ messages, context = {}, mode = 'ask', onEven
 /**
  * Resilient deterministic dispatcher that matches intent and provides immediate rich responses.
  */
-async function runDeterministicFallback({ userMessage, printhouseId, mode, onEvent }) {
+async function runDeterministicFallback({ userMessage, printhouseId, mode, locale = 'es', onEvent }) {
     const text = userMessage.toLowerCase();
     const cards = [];
     let reply = '';
 
-    if (text.includes('venta') || text.includes('pedido') || text.includes('facturaci') || text.includes('reporte') || text.includes('@pedido')) {
-        onEvent('status', { state: 'thinking', pill: 'Consultando pedidos y ventas...' });
+    const isEn = locale === 'en';
+    const isDe = locale === 'de';
+
+    if (text.includes('venta') || text.includes('pedido') || text.includes('facturaci') || text.includes('reporte') || text.includes('@pedido') ||
+        text.includes('order') || text.includes('sale') || text.includes('revenue') || text.includes('kpi') ||
+        text.includes('auftrag') || text.includes('umsatz') || text.includes('bericht')) {
+        
+        const pill = isEn ? 'Checking orders and sales...' : isDe ? 'Aufträge und Umsätze prüfen...' : 'Consultando pedidos y ventas...';
+        onEvent('status', { state: 'thinking', pill });
         onEvent('tool_start', { tool: 'get_sales_and_orders_report' });
         const res = await executeCopilotTool('get_sales_and_orders_report', { period: 'this_week' }, printhouseId);
         onEvent('tool_result', { tool: 'get_sales_and_orders_report', data: res });
         if (res.cardPayload) cards.push(res.cardPayload);
 
-        reply = `He analizado los pedidos y presupuestos de tu taller para esta semana:\n\n` +
-            `• Facturación acumulada: **${res.totalRevenueEur.toLocaleString('es-ES')} €**\n` +
-            `• Presupuestos aceptados: **${res.acceptedQuotesCount} pedidos**\n` +
-            `• Trabajos en máquina activos: **${res.pendingOrdersCount}**\n` +
-            `• Ticket medio: **${res.avgTicketEur} €**\n\n` +
-            `Todo el flujo económico está cubierto bajo la garantía de custodia de fondos de PrintPrice OS. ¿Quieres inspeccionar algún pedido en detalle?`;
-    } else if (text.includes('preflight') || text.includes('pdf') || text.includes('sangrado') || text.includes('resoluci')) {
-        onEvent('status', { state: 'thinking', pill: 'Analizando reportes de preflight...' });
+        if (isEn) {
+            reply = `I have analyzed the orders and quotes for your plant this week:\n\n` +
+                `• Accumulated revenue: **${res.totalRevenueEur.toLocaleString('en-US')} €**\n` +
+                `• Accepted quotes: **${res.acceptedQuotesCount} orders**\n` +
+                `• Active jobs on press: **${res.pendingOrdersCount}**\n` +
+                `• Average ticket: **${res.avgTicketEur} €**\n\n` +
+                `All financial transactions are secured under the PrintPrice OS Escrow guarantee. Would you like to inspect any order in detail?`;
+        } else if (isDe) {
+            reply = `Ich habe die Aufträge und Angebote Ihres Betriebs für diese Woche analysiert:\n\n` +
+                `• Gesamtumsatz: **${res.totalRevenueEur.toLocaleString('de-DE')} €**\n` +
+                `• Angenommene Angebote: **${res.acceptedQuotesCount} Aufträge**\n` +
+                `• Aktive Aufträge in Produktion: **${res.pendingOrdersCount}**\n` +
+                `• Durchschnittlicher Auftragswert: **${res.avgTicketEur} €**\n\n` +
+                `Alle Zahlungsflüsse sind über die PrintPrice OS Escrow-Garantie abgesichert. Möchten Sie einen Auftrag im Detail prüfen?`;
+        } else {
+            reply = `He analizado los pedidos y presupuestos de tu taller para esta semana:\n\n` +
+                `• Facturación acumulada: **${res.totalRevenueEur.toLocaleString('es-ES')} €**\n` +
+                `• Presupuestos aceptados: **${res.acceptedQuotesCount} pedidos**\n` +
+                `• Trabajos en máquina activos: **${res.pendingOrdersCount}**\n` +
+                `• Ticket medio: **${res.avgTicketEur} €**\n\n` +
+                `Todo el flujo económico está cubierto bajo la garantía de custodia de fondos de PrintPrice OS. ¿Quieres inspeccionar algún pedido en detalle?`;
+        }
+    } else if (text.includes('preflight') || text.includes('pdf') || text.includes('sangrado') || text.includes('resoluci') ||
+               text.includes('bleed') || text.includes('resolution') || text.includes('anschnitt') || text.includes('auflösung')) {
+        
+        const pill = isEn ? 'Analyzing preflight reports...' : isDe ? 'Preflight-Berichte analysieren...' : 'Analizando reportes de preflight...';
+        onEvent('status', { state: 'thinking', pill });
         onEvent('tool_start', { tool: 'get_recent_preflight_reports' });
         const res = await executeCopilotTool('get_recent_preflight_reports', { onlyWithIssues: true }, printhouseId);
         onEvent('tool_result', { tool: 'get_recent_preflight_reports', data: res });
         if (res.cardPayload) cards.push(res.cardPayload);
 
-        reply = `He auditado los últimos archivos PDF recibidos. Hemos detectado advertencias en el pedido **ORD-1043** (*Monografia_Escultores_Interior_v2.pdf*):\n\n` +
-            `• **Sangrado insuficiente:** 1.8mm detectado (requerido 3.0mm en páginas 14, 45, 92).\n` +
-            `• **Imágenes a baja resolución:** 4 imágenes a 192 DPI (umbral estándar: 300 DPI).\n` +
-            `• **Deriva de lomo:** +1.4mm respecto al cálculo de cubierta.\n\n` +
-            `La herramienta de autorreparación *MAGIC_FIX* puede compensar automáticamente el sangrado expandiendo el margen reflejado.`;
-    } else if (text.includes('lomo') || text.includes('spine') || text.includes('imposic') || text.includes('palet') || text.includes('cubic')) {
-        onEvent('status', { state: 'thinking', pill: 'Calculando cotas técnicas de ingeniería...' });
+        if (isEn) {
+            reply = `I audited the latest PDF production files received. We detected warnings on order **ORD-1043** (*Monografia_Escultores_Interior_v2.pdf*):\n\n` +
+                `• **Insufficient bleed:** 1.8mm detected (minimum 3.0mm required on pages 14, 45, 92).\n` +
+                `• **Low DPI raster images:** 4 images at 192 DPI (safe production threshold: 300 DPI).\n` +
+                `• **Spine drift:** +1.4mm drift against cover template.\n\n` +
+                `The *MAGIC_FIX* auto-repair tool can compensate bleed by reflecting edge margins.`;
+        } else if (isDe) {
+            reply = `Ich habe die neuesten PDF-Produktionsdateien geprüft. Warnungen bei Auftrag **ORD-1043** (*Monografia_Escultores_Interior_v2.pdf*) erkannt:\n\n` +
+                `• **Unzureichender Anschnitt:** 1.8mm erkannt (mindestens 3.0mm erforderlich auf Seiten 14, 45, 92).\n` +
+                `• **Niedrig aufgelöste Rasterbilder:** 4 Bilder mit 192 DPI (Standard: 300 DPI).\n` +
+                `• **Rückenabweichung:** +1.4mm Abweichung zur Umschlagvorlage.\n\n` +
+                `Das *MAGIC_FIX* Werkzeug kann Anschnittfehler durch gespiegelte Randerweiterung automatisch reparieren.`;
+        } else {
+            reply = `He auditado los últimos archivos PDF recibidos. Hemos detectado advertencias en el pedido **ORD-1043** (*Monografia_Escultores_Interior_v2.pdf*):\n\n` +
+                `• **Sangrado insuficiente:** 1.8mm detectado (requerido 3.0mm en páginas 14, 45, 92).\n` +
+                `• **Imágenes a baja resolución:** 4 imágenes a 192 DPI (umbral estándar: 300 DPI).\n` +
+                `• **Deriva de lomo:** +1.4mm respecto al cálculo de cubierta.\n\n` +
+                `La herramienta de autorreparación *MAGIC_FIX* puede compensar automáticamente el sangrado expandiendo el margen reflejado.`;
+        }
+    } else if (text.includes('lomo') || text.includes('spine') || text.includes('imposic') || text.includes('palet') || text.includes('cubic') ||
+               text.includes('cubing') || text.includes('pallet') || text.includes('rücken') || text.includes('ausschieß')) {
+        
+        const pill = isEn ? 'Calculating technical engineering specs...' : isDe ? 'Technische Spezifikationen berechnen...' : 'Calculando cotas técnicas de ingeniería...';
+        onEvent('status', { state: 'thinking', pill });
         onEvent('tool_start', { tool: 'run_technical_calculation' });
         const res = await executeCopilotTool('run_technical_calculation', {
             calculationType: 'calc_spine',
@@ -643,39 +713,90 @@ async function runDeterministicFallback({ userMessage, printhouseId, mode, onEve
         }, printhouseId);
         onEvent('tool_result', { tool: 'run_technical_calculation', data: res });
 
-        reply = `Cálculo de lomo certificado **SPINE-01** ejecutado:\n\n` +
-            `• Grosor neto del bloque: **${res.textBlockThicknessMm} mm**\n` +
-            `• Hinchamiento por cosido hilo (1.08x) + cartón 2.4mm: **${res.roundedSpineMm} mm** de lomo final\n` +
-            `• Ancho total de cubierta extendida: **${res.totalOpenCoverWidthMm} mm** (incluye hendidos y sangrado)\n\n` +
-            `Cálculo listo para enviar a producción y contrastar con la maqueta del diseñador.`;
-    } else if (text.includes('tarifa') || text.includes('calibr') || text.includes('margen') || text.includes('precio')) {
-        onEvent('status', { state: 'thinking', pill: 'Simulando ajuste de tarifas...' });
+        if (isEn) {
+            reply = `Certified **SPINE-01** spine calculation executed:\n\n` +
+                `• Net text block thickness: **${res.textBlockThicknessMm} mm**\n` +
+                `• Sewn swelling factor (1.08x) + 2.4mm binder board: **${res.roundedSpineMm} mm** final spine width\n` +
+                `• Total open cover spread: **${res.totalOpenCoverWidthMm} mm** (includes hinges and bleed)\n\n` +
+                `Calculation ready to forward to prepress and compare against customer artwork.`;
+        } else if (isDe) {
+            reply = `Zertifizierte **SPINE-01** Rückenberechnung durchgeführt:\n\n` +
+                `• Netto-Buchblockstärke: **${res.textBlockThicknessMm} mm**\n` +
+                `• Fadenheftungsschwellung (1.08x) + 2.4mm Buchbinderpappe: **${res.roundedSpineMm} mm** finaler Rücken\n` +
+                `• Gesamtbreite des offenen Umschlags: **${res.totalOpenCoverWidthMm} mm** (inkl. Falz und Anschnitt)\n\n` +
+                `Berechnung bereit zur Übernahme in die Druckvorstufe und zum Abgleich mit der Kundendatei.`;
+        } else {
+            reply = `Cálculo de lomo certificado **SPINE-01** ejecutado:\n\n` +
+                `• Grosor neto del bloque: **${res.textBlockThicknessMm} mm**\n` +
+                `• Hinchamiento por cosido hilo (1.08x) + cartón 2.4mm: **${res.roundedSpineMm} mm** de lomo final\n` +
+                `• Ancho total de cubierta extendida: **${res.totalOpenCoverWidthMm} mm** (incluye hendidos y sangrado)\n\n` +
+                `Cálculo listo para enviar a producción y contrastar con la maqueta del diseñador.`;
+        }
+    } else if (text.includes('tarifa') || text.includes('calibr') || text.includes('margen') || text.includes('precio') ||
+               text.includes('rate') || text.includes('margin') || text.includes('price') || text.includes('preis')) {
+        
+        const pill = isEn ? 'Simulating rate card adjustment...' : isDe ? 'Tarifanpassung simulieren...' : 'Simulando ajuste de tarifas...';
+        onEvent('status', { state: 'thinking', pill });
         onEvent('tool_start', { tool: 'simulate_price_adjustment' });
         const res = await executeCopilotTool('simulate_price_adjustment', { category: 'SOFTCOVER', marginDeltaPercent: 5 }, printhouseId);
         onEvent('tool_result', { tool: 'simulate_price_adjustment', data: res });
         if (res.actionPayload) cards.push(res.actionPayload);
 
-        reply = `He simulado una variación de margen del **+5%** en la familia **Rústica (Softcover)**:\n\n` +
-            `• Puesta a punto base: de ${res.baseline.setupFee}€ a **${res.simulated.setupFee}€**\n` +
-            `• Tirada de 500 copias: de ${res.baseline.example500Copies}€ a **${res.simulated.example500Copies}€** (+${res.simulated.example500Copies - res.baseline.example500Copies}€)\n` +
-            `• Tirada de 1.000 copias: de ${res.baseline.example1000Copies}€ a **${res.simulated.example1000Copies}€**\n\n` +
-            `Puedes revisar los datos y pulsar en la tarjeta interactiva para aplicar este ajuste al Calibrador.`;
+        if (isEn) {
+            reply = `I have simulated a **+5%** margin adjustment on the **Softcover** family:\n\n` +
+                `• Base machine setup fee: from ${res.baseline.setupFee}€ to **${res.simulated.setupFee}€**\n` +
+                `• Run of 500 copies: from ${res.baseline.example500Copies}€ to **${res.simulated.example500Copies}€** (+${res.simulated.example500Copies - res.baseline.example500Copies}€)\n` +
+                `• Run of 1,000 copies: from ${res.baseline.example1000Copies}€ to **${res.simulated.example1000Copies}€**\n\n` +
+                `You can inspect the values and click the interactive card below to apply this calibration to your rate cards.`;
+        } else if (isDe) {
+            reply = `Ich habe eine Margenanpassung von **+5%** für die **Softcover**-Familie simuliert:\n\n` +
+                `• Grundrüstkosten: von ${res.baseline.setupFee}€ auf **${res.simulated.setupFee}€**\n` +
+                `• Auflage 500 Exemplare: von ${res.baseline.example500Copies}€ auf **${res.simulated.example500Copies}€** (+${res.simulated.example500Copies - res.baseline.example500Copies}€)\n` +
+                `• Auflage 1.000 Exemplare: von ${res.baseline.example1000Copies}€ auf **${res.simulated.example1000Copies}€**\n\n` +
+                `Sie können die Werte prüfen und auf die interaktive Karte klicken, um die Kalibrierung zu übernehmen.`;
+        } else {
+            reply = `He simulado una variación de margen del **+5%** en la familia **Rústica (Softcover)**:\n\n` +
+                `• Puesta a punto base: de ${res.baseline.setupFee}€ a **${res.simulated.setupFee}€**\n` +
+                `• Tirada de 500 copias: de ${res.baseline.example500Copies}€ a **${res.simulated.example500Copies}€** (+${res.simulated.example500Copies - res.baseline.example500Copies}€)\n` +
+                `• Tirada de 1.000 copias: de ${res.baseline.example1000Copies}€ a **${res.simulated.example1000Copies}€**\n\n` +
+                `Puedes revisar los datos y pulsar en la tarjeta interactiva para aplicar este ajuste al Calibrador.`;
+        }
     } else {
-        onEvent('status', { state: 'thinking', pill: 'Revisando estado del taller...' });
+        const pill = isEn ? 'Checking printhouse status...' : isDe ? 'Druckereistatus prüfen...' : 'Revisando estado del taller...';
+        onEvent('status', { state: 'thinking', pill });
         onEvent('tool_start', { tool: 'get_onboarding_status' });
         const res = await executeCopilotTool('get_onboarding_status', {}, printhouseId);
         onEvent('tool_result', { tool: 'get_onboarding_status', data: res });
 
-        reply = `¡Hola! Soy **DOT**, tu copiloto en PrintPrice OS Control Plane.\n\n` +
-            `Actualmente tu taller está configurado al **${res.completionPct}%**. Tienes **${res.machinesCount} máquinas** dadas de alta y **${res.papersConfiguredCount} papeles** indexados.\n\n` +
-            `¿Qué te gustaría revisar hoy? Puedo ayudarte a:\n` +
-            `1. 📊 Consultar reportes de ventas y pedidos activos.\n` +
-            `2. 🔍 Auditar errores de preflight en PDFs entrantes.\n` +
-            `3. 📐 Calcular lomos y geometrías de imposición exactas.\n` +
-            `4. ⚙️ Calibrar márgenes y tarifas de tus máquinas.`;
+        if (isEn) {
+            reply = `Hello! I am **DOT**, your resident AI copilot on the PrintPrice OS Control Plane.\n\n` +
+                `Your plant setup is currently at **${res.completionPct}%**. You have **${res.machinesCount} machines** registered and **${res.papersConfiguredCount} papers** indexed.\n\n` +
+                `What would you like to review today? I can assist you with:\n` +
+                `1. 📊 Executive sales reports and active orders.\n` +
+                `2. 🔍 Preflight audits and PDF warning checks.\n` +
+                `3. 📐 Precise spine and sheet imposition calculations.\n` +
+                `4. ⚙️ Machine margins and rate card calibrations.`;
+        } else if (isDe) {
+            reply = `Hallo! Ich bin **DOT**, Ihr KI-Copilot im PrintPrice OS Control Plane.\n\n` +
+                `Ihr Betrieb ist derzeit zu **${res.completionPct}%** konfiguriert. Sie haben **${res.machinesCount} Maschinen** angelegt und **${res.papersConfiguredCount} Papiere** indexiert.\n\n` +
+                `Was möchten Sie heute prüfen? Ich unterstütze Sie bei:\n` +
+                `1. 📊 Vertriebsberichten und aktiven Aufträgen.\n` +
+                `2. 🔍 Preflight-Prüfungen und PDF-Warnungen.\n` +
+                `3. 📐 Exakten Rücken- und Ausschießberechnungen.\n` +
+                `4. ⚙️ Margen- und Maschinenkalibrierungen.`;
+        } else {
+            reply = `¡Hola! Soy **DOT**, tu copiloto en PrintPrice OS Control Plane.\n\n` +
+                `Actualmente tu taller está configurado al **${res.completionPct}%**. Tienes **${res.machinesCount} máquinas** dadas de alta y **${res.papersConfiguredCount} papeles** indexados.\n\n` +
+                `¿Qué te gustaría revisar hoy? Puedo ayudarte a:\n` +
+                `1. 📊 Consultar reportes de ventas y pedidos activos.\n` +
+                `2. 🔍 Auditar errores de preflight en PDFs entrantes.\n` +
+                `3. 📐 Calcular lomos y geometrías de imposición exactas.\n` +
+                `4. ⚙️ Calibrar márgenes y tarifas de tus máquinas.`;
+        }
     }
 
-    onEvent('status', { state: 'speaking', pill: 'Transmitiendo...' });
+    const speakingPill = isEn ? 'Broadcasting...' : isDe ? 'Übertragen...' : 'Transmitiendo...';
+    onEvent('status', { state: 'speaking', pill: speakingPill });
     onEvent('token', { text: reply });
     onEvent('done', {
         messageId: `msg-${Date.now()}`,
