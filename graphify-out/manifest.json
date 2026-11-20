@@ -14400,9 +14400,9 @@
     "semantic_hash": ""
   },
   "src/ui/components/printhouse/pricing/PricingWorkflowSelector.tsx": {
-    "mtime": 1793411530.2588756,
-    "seen": 1793449041.9399414,
-    "ast_hash": "a13043c790860747c8a6b941d91a93f7",
+    "mtime": 1795170330.4213252,
+    "seen": 1795170750.040799,
+    "ast_hash": "784b742c0070852f8f65b8bbe2d69f78",
     "semantic_hash": ""
   },
   "src/ui/components/printhouse/pricing/printhouseSuggestedRates.ts": {
@@ -14430,9 +14430,9 @@
     "semantic_hash": ""
   },
   "src/ui/components/printhouse/pricing/quick-calibration/CalibrationConversation.tsx": {
-    "mtime": 1793411530.261875,
-    "seen": 1793449041.9399414,
-    "ast_hash": "055bdc0571d1425bda3c99af53179cbf",
+    "mtime": 1795167990.5191894,
+    "seen": 1795170750.0428002,
+    "ast_hash": "658edc9a71373e9dba4cde3dfdce7134",
     "semantic_hash": ""
   },
   "src/ui/components/printhouse/pricing/quick-calibration/CalibrationRateComparison.tsx": {
@@ -14568,9 +14568,9 @@
     "semantic_hash": ""
   },
   "src/ui/components/printhouse/setup/PricingPanel.tsx": {
-    "mtime": 1793530496.9134717,
-    "seen": 1793530638.3255365,
-    "ast_hash": "b173655c80a1a8fcadc943cc1846426f",
+    "mtime": 1795170330.572327,
+    "seen": 1795170750.048807,
+    "ast_hash": "dee8a4bf2ed0b0ca55d41163eb626e3f",
     "semantic_hash": ""
   },
   "src/ui/components/printhouse/setup/PricingPreview.tsx": {
@@ -23802,9 +23802,9 @@
     "semantic_hash": ""
   },
   "src/ui/components/printhouse/onboarding/SimplifiedOnboardingJourney.tsx": {
-    "mtime": 1793530496.527392,
-    "seen": 1793530638.3165364,
-    "ast_hash": "c9c6b6828ff5b268499113e64f34ef61",
+    "mtime": 1795166625.8513844,
+    "seen": 1795170750.039799,
+    "ast_hash": "954526e5fbb3d892b85a413fe4b26e70",
     "semantic_hash": ""
   },
   "src/ui/components/printhouse/onboarding/VariantSpecTable.tsx": {
@@ -26796,9 +26796,9 @@
     "semantic_hash": ""
   },
   "src/ui/components/pricing/LivePriceCalibratorModal.tsx": {
-    "mtime": 1794361556.5872755,
-    "seen": 1794995937.6498659,
-    "ast_hash": "a2f7f2de66e2a3cce3ef61b4e4a23567",
+    "mtime": 1795166970.069476,
+    "seen": 1795170750.0307994,
+    "ast_hash": "2c4959c334294e57b4b06ea90771a32d",
     "semantic_hash": ""
   },
   "src/ui/components/pricing/PricingKpiSummaryBar.tsx": {
@@ -27809,46 +27809,22 @@
     "ast_hash": "d84a4cd4de293d706a447ee6ab7711ab",
     "semantic_hash": ""
   },
-  "ppos-mcp-server/package.json": {
-    "mtime": 1794995666.5333712,
-    "seen": 1794995936.9088657,
-    "ast_hash": "5b28b1456acc1bcbd74ac85c8cdb150c",
+  "src/ui/components/mascot/DotChatAvatar.tsx": {
+    "mtime": 1795166265.5367994,
+    "seen": 1795170750.0268004,
+    "ast_hash": "bfe41a415280cb527bf47e3918dc7169",
     "semantic_hash": ""
   },
-  "ppos-mcp-server/src/client.ts": {
-    "mtime": 1794995671.0398016,
-    "seen": 1794995936.9088657,
-    "ast_hash": "40bc092b37673c6d47154f9645192125",
+  "src/ui/components/mascot/DotInteractiveHero.tsx": {
+    "mtime": 1795167488.0463386,
+    "seen": 1795170750.0268004,
+    "ast_hash": "9eca66789a59879b93648ceeed1ec267",
     "semantic_hash": ""
   },
-  "ppos-mcp-server/src/index.ts": {
-    "mtime": 1794995674.1631472,
-    "seen": 1794995936.9088657,
-    "ast_hash": "97c2f28caa60c323f4dd2c4777062f44",
-    "semantic_hash": ""
-  },
-  "ppos-mcp-server/src/schemas.ts": {
-    "mtime": 1794995672.8071706,
-    "seen": 1794995936.9088657,
-    "ast_hash": "3cedbd0bc0e52e6be11c00ccf4975332",
-    "semantic_hash": ""
-  },
-  "ppos-mcp-server/tsconfig.json": {
-    "mtime": 1794995667.7286558,
-    "seen": 1794995936.9088657,
-    "ast_hash": "2e3ccf28a470545a1f91fc631c949c20",
-    "semantic_hash": ""
-  },
-  "ppos-mcp-server/.github/workflows/ci.yml": {
-    "mtime": 1794996450.8315282,
-    "seen": 1794996714.5766087,
-    "ast_hash": "067a5a16ea34ef8ad0b259158bf85a0e",
-    "semantic_hash": ""
-  },
-  "ppos-mcp-server/README.md": {
-    "mtime": 1794996453.002917,
-    "seen": 1794996714.5766087,
-    "ast_hash": "c1fea6b943d7e88b4cf4366d87ce1124",
+  "src/ui/components/mascot/index.ts": {
+    "mtime": 1795166300.955723,
+    "seen": 1795170750.0268004,
+    "ast_hash": "ed83237c0c917cda2898c45724472ece",
     "semantic_hash": ""
   }
 }

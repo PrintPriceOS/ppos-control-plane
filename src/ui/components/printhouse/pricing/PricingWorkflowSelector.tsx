@@ -10,6 +10,7 @@
  * Presentation-only component: no pricing state mutation, zero backend calls.
  */
 import { Sparkles, Calculator, CheckCircle2, Layers } from 'lucide-react';
+import { DotChatAvatar } from '../../mascot';
 import { useLocale } from '../../../i18n';
 
 export type PricingWorkflow = 'onboarding' | 'assistant' | 'manual';
@@ -90,7 +91,11 @@ export const PricingWorkflowSelector: React.FC<PricingWorkflowSelectorProps> = (
                             : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white'
                     }`}
                 >
-                    <Sparkles size={14} className={selectedWorkflow === 'assistant' ? 'text-[#dc0000]' : 'text-zinc-400'} />
+                    <DotChatAvatar 
+                        size={16} 
+                        state={selectedWorkflow === 'assistant' ? 'listening' : 'idle'} 
+                        title="Dot · AI Assistant"
+                    />
                     <span>{t('pricing.mode.assistant') || 'AI assistant'}</span>
                 </button>
 

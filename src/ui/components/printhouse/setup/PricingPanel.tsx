@@ -17,6 +17,7 @@ import { PricingWorkflowSelector, PricingWorkflow } from '../pricing/PricingWork
 import { SimplifiedOnboardingJourney } from '../onboarding/SimplifiedOnboardingJourney';
 import { SetupDrawer } from './SetupDrawer';
 import { LivePriceCalibratorModal, EconomicProfileRow, PaperCatalogItem } from '../../pricing';
+import { DotChatAvatar } from '../../mascot';
 import { Tag, Plus, Edit, Copy, Trash2, ShieldAlert, BadgeAlert, CheckCircle, CheckCircle2, Calculator, Info, ShieldCheck, HelpCircle, Layers, ChevronDown, ChevronUp, Sparkles, Sliders, ArrowLeft } from 'lucide-react';
 import { useLocale } from '../../../i18n';
 import { ProductFamilyId, FamilyState, FamilyStatus } from '../../../types/printhouseOnboardingTypes';
@@ -712,12 +713,16 @@ export const PricingPanel: React.FC<PricingPanelProps> = ({ sites = [], onSaved 
                                 : 'bg-zinc-50/50 dark:bg-zinc-800/40 hover:bg-zinc-100/70 dark:hover:bg-zinc-800/80 border-zinc-200 dark:border-zinc-700/80'
                         }`}
                     >
-                        <div className={`p-2 rounded-lg shrink-0 mt-0.5 ${
+                        <div className={`w-[36px] h-[36px] rounded-lg shrink-0 mt-0.5 flex items-center justify-center overflow-visible transition-all ${
                             selectedWorkflow === 'assistant'
-                                ? 'bg-[#dc0000] text-white shadow-2xs'
-                                : 'bg-zinc-200/70 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-300'
+                                ? 'bg-red-500/15 dark:bg-red-950/40 border border-red-500/30 shadow-2xs'
+                                : 'bg-zinc-200/70 dark:bg-zinc-700'
                         }`}>
-                            <Sparkles size={18} />
+                            <DotChatAvatar 
+                                size={28} 
+                                state={selectedWorkflow === 'assistant' ? 'listening' : 'idle'} 
+                                title="Dot · AI Assistant" 
+                            />
                         </div>
                         <div className="min-w-0 flex-1 pr-5">
                             <div className="flex items-center gap-1.5">

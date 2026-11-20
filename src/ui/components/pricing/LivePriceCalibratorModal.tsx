@@ -17,6 +17,7 @@ import { createPortal } from 'react-dom';
 import { EconomicProfileRow } from './EconomicProfilesTable';
 import { getAuthToken } from '../../lib/authStore';
 import { useLocale } from '../../i18n';
+import { DotChatAvatar, DotChatState } from '../mascot';
 
 export type ProductFamilyId = 'SOFTCOVER' | 'HARDCOVER' | 'WIRE_O' | 'SADDLE_STITCH';
 
@@ -293,6 +294,7 @@ export const LivePriceCalibratorModal: React.FC<LivePriceCalibratorModalProps> =
     const [targetMarginPct, setTargetMarginPct] = useState<number>(Number(activeProfileDefault.targetMarginPct ?? 28));
     const [minimumJobFeeEur, setMinimumJobFeeEur] = useState<number>(Number(activeProfileDefault.minimumJobFeeEur ?? 380));
     const [saving, setSaving] = useState<boolean>(false);
+    const [calibratorState, setCalibratorState] = useState<DotChatState>('idle');
 
     useEffect(() => {
         if (Array.isArray(papers) && papers.length > 0) {
@@ -628,6 +630,7 @@ export const LivePriceCalibratorModal: React.FC<LivePriceCalibratorModalProps> =
             return;
         }
         setSaving(true);
+        setCalibratorState('thinking');
         try {
             await onApplyProfileCalibration({
                 id: currentProfile.id,
@@ -642,7 +645,15 @@ export const LivePriceCalibratorModal: React.FC<LivePriceCalibratorModalProps> =
                 paperId: currentPaper.paperId,
                 active: true
             });
-            if (!embedded) onClose();
+            setCalibratorState('success');
+            if (!embedded) {
+                setTimeout(() => onClose(), 600);
+            } else {
+                setTimeout(() => setCalibratorState('idle'), 1200);
+            }
+        } catch (err) {
+            setCalibratorState('idle');
+            console.error('Failed to commit profile calibration:', err);
         } finally {
             setSaving(false);
         }
@@ -656,8 +667,8 @@ export const LivePriceCalibratorModal: React.FC<LivePriceCalibratorModalProps> =
             {/* Header */}
             <div className="px-6 py-4 border-b border-slate-200 dark:border-[#1f2228] flex items-center justify-between bg-slate-50 dark:bg-[#0a0b0d]/80">
                 <div>
-                    <div className="flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full bg-[#dc2626] animate-pulse" />
+                    <div className="flex items-center gap-2.5">
+                        <DotChatAvatar size={32} state={calibratorState} />
                         <h3 className="text-sm font-black uppercase tracking-wider text-slate-900 dark:text-white m-0">
                             {ui.title}
                         </h3>

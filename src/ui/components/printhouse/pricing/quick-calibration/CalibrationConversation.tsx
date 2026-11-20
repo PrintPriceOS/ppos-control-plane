@@ -5,6 +5,7 @@
  */
 import React, { useState, useRef } from 'react';
 import { Sparkles, Send, Loader2, Bot, User, AlertTriangle, ArrowRight, Paperclip, X, FileText, CheckCircle2 } from 'lucide-react';
+import { DotChatAvatar, DotChatState } from '../../../mascot';
 import { CalibrationClarificationPanel } from './CalibrationClarificationPanel';
 import { StructuredQuoteReviewCard } from './StructuredQuoteReviewCard';
 import { SetupDrawer } from '../../setup/SetupDrawer';
@@ -65,6 +66,15 @@ export const CalibrationConversation: React.FC<CalibrationConversationProps> = (
 
     const lastMsgWithEvidence = [...messages].reverse().find(m => m.quoteEvidence);
     const effectiveEvidence = activeQuoteEvidence || lastMsgWithEvidence?.quoteEvidence;
+
+    const dotState: DotChatState = 
+        sending || uploadState === 'UPLOADING' || uploadState === 'PROCESSING'
+            ? 'thinking'
+            : input.trim().length > 0
+                ? 'listening'
+                : activeProposal
+                    ? 'success'
+                    : 'idle';
 
     const handleSend = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -170,7 +180,7 @@ export const CalibrationConversation: React.FC<CalibrationConversationProps> = (
             {/* Header */}
             <div className="px-3.5 py-2 bg-zinc-50 dark:bg-zinc-900/70 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                    <Sparkles size={15} className="text-[#dc0000]" />
+                    <DotChatAvatar size={18} state={dotState} title="Dot · PrintPrice AI Assistant" />
                     <span className="text-xs font-bold text-zinc-900 dark:text-white uppercase tracking-wider">
                         {t('pricing.assistant.title')}
                     </span>
@@ -303,8 +313,8 @@ export const CalibrationConversation: React.FC<CalibrationConversationProps> = (
             <div className="flex-1 overflow-y-auto p-3 space-y-2.5">
                 {messages.length === 0 ? (
                     <div className="h-full flex flex-col items-center justify-center text-center p-2 text-zinc-500 space-y-2">
-                        <div className="w-7 h-7 rounded-full bg-red-50 dark:bg-red-950/30 text-[#dc0000] flex items-center justify-center">
-                            <Sparkles size={15} />
+                        <div className="py-1">
+                            <DotChatAvatar size={48} state={dotState} title="Dot · PrintPrice AI Assistant" />
                         </div>
                         <div>
                             <h5 className="text-xs font-bold text-zinc-900 dark:text-white">{t('pricing.assistant.header')}</h5>
@@ -410,8 +420,8 @@ export const CalibrationConversation: React.FC<CalibrationConversationProps> = (
                             className={`flex gap-2.5 ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}
                         >
                             {m.role !== 'user' && (
-                                <div className="w-6 h-6 rounded-full bg-red-100 dark:bg-red-950/50 text-[#dc0000] flex items-center justify-center shrink-0 mt-0.5">
-                                    <Bot size={13} />
+                                <div className="shrink-0 mt-0.5">
+                                    <DotChatAvatar size={24} state="idle" title="Dot" />
                                 </div>
                             )}
                             <div
@@ -507,6 +517,18 @@ export const CalibrationConversation: React.FC<CalibrationConversationProps> = (
 
             {/* Input Bar - Non-shrinking pinned row */}
             <form onSubmit={handleSend} className="p-2.5 sm:p-3 bg-zinc-50 dark:bg-zinc-900/80 border-t border-zinc-200 dark:border-zinc-800 flex gap-2 items-center shrink-0">
+                {/* Dot Mascot Avatar Companion */}
+                <div
+                    className="shrink-0 flex items-center justify-center cursor-pointer transition-transform hover:scale-105 active:scale-95"
+                    onClick={() => {
+                        const inputEl = document.getElementById('calibration-chat-input');
+                        inputEl?.focus();
+                    }}
+                    title="Dot · PrintPrice AI Assistant"
+                >
+                    <DotChatAvatar size={34} state={dotState} />
+                </div>
+
                 {/* Accessible Attachment / Paperclip Control */}
                 <button
                     type="button"
@@ -525,6 +547,7 @@ export const CalibrationConversation: React.FC<CalibrationConversationProps> = (
                 </button>
 
                 <input
+                    id="calibration-chat-input"
                     type="text"
                     placeholder={t('chatInputPlaceholder')}
                     value={input}

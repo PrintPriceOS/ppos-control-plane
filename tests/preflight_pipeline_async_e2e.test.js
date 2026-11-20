@@ -354,3 +354,4 @@ describe('Preflight Pipeline Audit — Async 2GB Ingestion, Box Geometry, TAC & 
         expect(capturedDeliveries.length).toBe(2);
     });
 });
+

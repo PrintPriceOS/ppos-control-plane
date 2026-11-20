@@ -39,6 +39,7 @@ import { canonicalizeToEngineBookSpec } from '../../../lib/bookSpecCanonicalizer
 import { normalizeUiError } from '../../../utils/errorUtils';
 import { FamilyPricingSessionDraft } from '../../../lib/onboardingDraftStore';
 import { PaperCatalogItem, EconomicProfileRow } from '../../pricing';
+import { DotChatAvatar, DotChatState } from '../../mascot';
 
 export interface SimplifiedOnboardingJourneyProps {
     printerNodeId?: string;
@@ -186,6 +187,26 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
     const uploadRequestIdRef = useRef<number>(0);
     const [calculatingSolver, setCalculatingSolver] = useState<boolean>(false);
     const [isSubmittingAcceptance, setIsSubmittingAcceptance] = useState<boolean>(false);
+    const [onboardingDotState, setOnboardingDotState] = useState<DotChatState>('idle');
+    const isFirstMountRef = useRef(true);
+
+    React.useEffect(() => {
+        if (isFirstMountRef.current) {
+            isFirstMountRef.current = false;
+            return;
+        }
+        setOnboardingDotState('success');
+        const timer = setTimeout(() => setOnboardingDotState('idle'), 1200);
+        return () => clearTimeout(timer);
+    }, [currentStep]);
+
+    React.useEffect(() => {
+        if (uploadingPdf || calculatingSolver || isSubmittingAcceptance) {
+            setOnboardingDotState('thinking');
+        } else if (onboardingDotState === 'thinking') {
+            setOnboardingDotState('idle');
+        }
+    }, [uploadingPdf, calculatingSolver, isSubmittingAcceptance]);
 
     const [comparisonData, setComparisonData] = useState<{
         originalPrice: number | null;
@@ -1265,6 +1286,18 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
                 </div>
             ) : (
                 <div className="bg-white dark:bg-[#18181b] border border-zinc-200 dark:border-zinc-800 rounded-2xl p-3 sm:p-4 shadow-2xs">
+                    <div className="flex items-center gap-3 mb-3 pb-3 border-b border-zinc-100 dark:border-zinc-800/80">
+                        <DotChatAvatar size={44} state={onboardingDotState} />
+                        <div>
+                            <div className="text-xs font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+                                <span>Dot · {t('wizard.assistantGuideTitle') || 'Asistente de Calibración Industrial'}</span>
+                                <span className="px-2 py-0.5 rounded-full bg-red-500/10 text-[#E5352B] font-mono text-[10px] font-bold">ONBOARDING GUIDE</span>
+                            </div>
+                            <p className="text-[11px] text-zinc-500 dark:text-zinc-400 m-0">
+                                {t('wizard.assistantGuideDesc') || 'Sigue los 5 pasos para calibrar las familias y maquinaria de tu taller con garantías de producción.'}
+                            </p>
+                        </div>
+                    </div>
                     <div className="flex items-center justify-between gap-2 overflow-x-auto pb-1 sm:pb-0">
                         {[
                             { num: 1, label: t('wizard.step1') || 'Qué productos fabricas', icon: Layers },
