@@ -28,6 +28,91 @@ import {
 import { getAuthUser } from '../../lib/authStore';
 import { useLocale } from '../../i18n';
 
+/**
+ * Lightweight, zero-dependency Markdown renderer for inline bold, italic, code, and lists.
+ */
+export const FormattedMessageText: React.FC<{ content: string }> = ({ content }) => {
+    const lines = content.split('\n');
+
+    const parseInline = (text: string) => {
+        const parts: React.ReactNode[] = [];
+        const regex = /(`[^`]+`|\*\*[^*]+\*\*|\*[^*]+\*)/g;
+        let lastIndex = 0;
+        let match: RegExpExecArray | null;
+        let pIdx = 0;
+
+        while ((match = regex.exec(text)) !== null) {
+            if (match.index > lastIndex) {
+                parts.push(text.slice(lastIndex, match.index));
+            }
+
+            const matchStr = match[0];
+            if (matchStr.startsWith('`') && matchStr.endsWith('`')) {
+                parts.push(
+                    <code key={pIdx++} className="px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-red-600 dark:text-red-400 font-mono text-[11px] font-semibold">
+                        {matchStr.slice(1, -1)}
+                    </code>
+                );
+            } else if (matchStr.startsWith('**') && matchStr.endsWith('**')) {
+                parts.push(
+                    <strong key={pIdx++} className="font-extrabold text-zinc-900 dark:text-zinc-100">
+                        {matchStr.slice(2, -2)}
+                    </strong>
+                );
+            } else if (matchStr.startsWith('*') && matchStr.endsWith('*')) {
+                parts.push(
+                    <em key={pIdx++} className="italic text-zinc-700 dark:text-zinc-300">
+                        {matchStr.slice(1, -1)}
+                    </em>
+                );
+            }
+
+            lastIndex = regex.lastIndex;
+        }
+
+        if (lastIndex < text.length) {
+            parts.push(text.slice(lastIndex));
+        }
+
+        return parts.length > 0 ? parts : text;
+    };
+
+    return (
+        <div className="space-y-1.5">
+            {lines.map((line, lIdx) => {
+                if (!line.trim()) {
+                    return <div key={lIdx} className="h-1" />;
+                }
+
+                if (line.startsWith('• ') || line.startsWith('- ')) {
+                    return (
+                        <div key={lIdx} className="flex items-start gap-1.5 pl-1">
+                            <span className="text-[#dc0000] font-bold shrink-0">•</span>
+                            <span className="flex-1">{parseInline(line.slice(2))}</span>
+                        </div>
+                    );
+                }
+
+                const numMatch = line.match(/^(\d+)\.\s+(.*)$/);
+                if (numMatch) {
+                    return (
+                        <div key={lIdx} className="flex items-start gap-1.5 pl-1">
+                            <span className="font-bold text-zinc-400 shrink-0">{numMatch[1]}.</span>
+                            <span className="flex-1">{parseInline(numMatch[2])}</span>
+                        </div>
+                    );
+                }
+
+                return (
+                    <p key={lIdx} className="m-0 leading-relaxed">
+                        {parseInline(line)}
+                    </p>
+                );
+            })}
+        </div>
+    );
+};
+
 export const DotCopilotDrawer: React.FC = () => {
     const {
         isOpen,
@@ -476,8 +561,8 @@ export const DotCopilotDrawer: React.FC = () => {
                                                 <DotChatAvatar size={24} state="idle" />
                                             </div>
                                             <div className="flex-1 min-w-0">
-                                                <div className="text-xs text-zinc-800 dark:text-zinc-200 leading-relaxed prose dark:prose-invert max-w-none">
-                                                    <p className="m-0 whitespace-pre-wrap">{msg.content}</p>
+                                                <div className="text-xs text-zinc-800 dark:text-zinc-200 leading-relaxed">
+                                                    <FormattedMessageText content={msg.content} />
                                                 </div>
 
                                                 {/* Render Generative UI Cards */}
