@@ -81,8 +81,24 @@ export const FormattedMessageText: React.FC<{ content: string }> = ({ content })
     return (
         <div className="space-y-1.5">
             {lines.map((line, lIdx) => {
-                if (!line.trim()) {
+                const trimmed = line.trim();
+                if (!trimmed) {
                     return <div key={lIdx} className="h-1" />;
+                }
+
+                // Horizontal dividers (-- or --- or ***)
+                if (/^[-*_]{2,}\s*$/.test(trimmed)) {
+                    return <hr key={lIdx} className="my-2 border-zinc-200 dark:border-zinc-800" />;
+                }
+
+                // Markdown headings: strip #/##/### (and optional trailing hashes) and render as crisp, styled header
+                const hMatch = line.match(/^\s*#{1,6}\s*(.*?)(?:\s*#+)?$/);
+                if (hMatch && hMatch[1]) {
+                    return (
+                        <div key={lIdx} className="pt-2 pb-0.5 font-extrabold text-zinc-900 dark:text-zinc-100 text-xs tracking-tight">
+                            {parseInline(hMatch[1])}
+                        </div>
+                    );
                 }
 
                 if (line.startsWith('• ') || line.startsWith('- ')) {
