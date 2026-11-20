@@ -74,6 +74,7 @@ fastify.addHook('onRequest', async (request, reply) => {
     if (url.startsWith('/api/billing/stripe/webhook')) return;
     if (url.includes('/api/v2/analytics/public')) return;
     if (url.startsWith('/api/public/preflight')) return;
+    if (url.startsWith('/api/copilot')) return;
     if (url === '/api/preflight/capabilities' || url.startsWith('/api/preflight/capabilities?')) return;
     if (url.includes('/quote-revisions/review/')) return;
 
@@ -545,6 +546,7 @@ const start = async () => {
             fastify.use('/api/public/marketplace', require('./src/api/routes/marketplacePublic'));
             fastify.use('/api/budget', require('./src/api/routes/marketplacePublic'));
             fastify.use('/api/connectors/factory', require('./src/api/routes/factoryConnectorRoutes'));
+            fastify.use('/api/copilot', require('./src/api/routes/copilotRoutes'));
             fastify.use('/api/public/preflight', require('./src/api/routes/publicPreflight'));
             fastify.use('/api/system', require('./src/api/routes/system'));
             fastify.use('/api/federation', federationRouter);

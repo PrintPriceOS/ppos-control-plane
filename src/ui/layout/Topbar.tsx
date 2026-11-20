@@ -18,6 +18,8 @@ import { NotificationBell } from '../components/NotificationBell';
 import { clearAdminKey, getSystemHealth } from '../lib/adminApi';
 import { getAuthUser, getUserRole, isPrinthouseUser, isSupplierUser, getActiveContext, setActiveContext, isPaperSupplierHubEnabled } from '../lib/authStore';
 import { PrintPriceLogo } from '../components/PrintPriceLogo';
+import { useDotCopilot } from '../components/copilot';
+import { DotChatAvatar } from '../components/mascot';
 
 
 
@@ -28,6 +30,7 @@ import { getTheme, setTheme, subscribeTheme } from '../lib/themeStore';
 export const Topbar: React.FC<{ onMenuClick?: () => void }> = ({ onMenuClick }) => {
   const navigate = useNavigate();
   const { locale, setLocale, t } = useLocale();
+  const { openDrawer, globalDotState } = useDotCopilot();
   const [currentTheme, setCurrentThemeState] = useState(getTheme());
   const [telemetryState, setTelemetryState] = useState<{
     status: 'VERIFYING' | 'HEALTHY' | 'DEGRADED' | 'OFFLINE' | 'RESTRICTED';
@@ -292,6 +295,23 @@ export const Topbar: React.FC<{ onMenuClick?: () => void }> = ({ onMenuClick }) 
 
           {/* Global Notifications */}
           <NotificationBell />
+
+          {/* Ask Dot Global Copilot Pill Button */}
+          <button
+            onClick={openDrawer}
+            id="topbar-ask-dot-btn"
+            aria-label="Abrir asistente DOT Copilot (⌘I / Ctrl+I)"
+            title="Abrir asistente DOT Copilot (⌘I / Ctrl+I)"
+            className="flex items-center gap-2 px-2.5 sm:px-3 py-1.5 rounded-xl border border-red-500/30 dark:border-red-950/60 bg-red-50/50 dark:bg-red-950/30 hover:bg-red-100/60 dark:hover:bg-red-900/40 hover:border-red-500/50 transition-all cursor-pointer shadow-2xs group"
+          >
+            <DotChatAvatar size={18} state={globalDotState} />
+            <span className="text-xs font-bold text-zinc-900 dark:text-zinc-100 group-hover:text-[#dc0000] transition-colors">
+              Ask Dot
+            </span>
+            <kbd className="hidden lg:inline-flex items-center text-[10px] font-mono font-bold text-zinc-400 bg-white/80 dark:bg-zinc-800/80 px-1.5 py-0.5 rounded border border-zinc-200 dark:border-zinc-700">
+              ⌘I
+            </kbd>
+          </button>
 
           {/* Separator */}
           <div className="h-6 w-[1px] bg-zinc-200 dark:bg-zinc-800 mx-1 hidden sm:block" />

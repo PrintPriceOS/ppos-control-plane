@@ -20,6 +20,7 @@
         "@fastify/express": "^4.0.4",
         "@fastify/http-proxy": "^11.4.3",
         "@fastify/static": "^9.1.0",
+        "@google/genai": "^3.6.1",
         "@headlessui/react": "^2.2.9",
         "@heroicons/react": "^2.2.0",
         "@ppos/pricing-engine": "git+https://github.com/PrintPriceOS/ppos-pricing-engine.git#1f8997eb34b14db6787986249a1fb8c4e01ea77e",

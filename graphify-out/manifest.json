@@ -24,9 +24,9 @@
     "semantic_hash": ""
   },
   "package.json": {
-    "mtime": 1793411528.4323795,
-    "seen": 1793449041.8839395,
-    "ast_hash": "df4a0bc3a6ace83da13e10f0f9a472e5",
+    "mtime": 1795170975.3718693,
+    "seen": 1795171871.3527694,
+    "ast_hash": "2d99a7ed0e2af8b7db06d61576a19164",
     "semantic_hash": ""
   },
   "postcss.config.js": {
@@ -7464,9 +7464,9 @@
     "semantic_hash": "f59c98983eb0657a28d6d105e8c06fb9"
   },
   "server.js": {
-    "mtime": 1794346056.1654525,
-    "seen": 1794346064.5286076,
-    "ast_hash": "6af112c2a0d8a7c872cf8dd36eda234d",
+    "mtime": 1795171277.9621823,
+    "seen": 1795171871.7203984,
+    "ast_hash": "2a26d5efdaf76e7c74f737480399b004",
     "semantic_hash": ""
   },
   "services/FederatedHealthAggregator.js": {
@@ -14724,9 +14724,9 @@
     "semantic_hash": ""
   },
   "src/ui/layout/Layout.tsx": {
-    "mtime": 1793411530.2988749,
-    "seen": 1793449041.940942,
-    "ast_hash": "f8aae7d9a992ffa3e78b72958725148f",
+    "mtime": 1795171803.0897813,
+    "seen": 1795171872.1050658,
+    "ast_hash": "155322a40670f51cd9cb953803810965",
     "semantic_hash": ""
   },
   "src/ui/layout/Sidebar.tsx": {
@@ -14736,9 +14736,9 @@
     "semantic_hash": ""
   },
   "src/ui/layout/Topbar.tsx": {
-    "mtime": 1793411530.3008752,
-    "seen": 1793449041.940942,
-    "ast_hash": "16ff09ad4160eb187ca53145cfe26f67",
+    "mtime": 1795171474.6529346,
+    "seen": 1795171872.106067,
+    "ast_hash": "423198879b38c59c59f65eb7a67efa9a",
     "semantic_hash": ""
   },
   "src/ui/lib/adminApi.ts": {
@@ -27825,6 +27825,72 @@
     "mtime": 1795166300.955723,
     "seen": 1795170750.0268004,
     "ast_hash": "ed83237c0c917cda2898c45724472ece",
+    "semantic_hash": ""
+  },
+  "src/api/routes/copilotRoutes.js": {
+    "mtime": 1795171257.8419087,
+    "seen": 1795171871.7583985,
+    "ast_hash": "d33e1761a112c63fe6703ad815bfb6a5",
+    "semantic_hash": ""
+  },
+  "src/api/services/copilot/dotCopilotService.js": {
+    "mtime": 1795171243.3274026,
+    "seen": 1795171871.8869016,
+    "ast_hash": "5f2700c29366dfc6fc290efa619b9d76",
+    "semantic_hash": ""
+  },
+  "src/api/services/copilot/modelRegistryService.js": {
+    "mtime": 1795171167.4943702,
+    "seen": 1795171871.8869016,
+    "ast_hash": "ad2ed0e4b37214949edf7a13f4d1c98c",
+    "semantic_hash": ""
+  },
+  "src/ui/components/copilot/DotCopilotDrawer.tsx": {
+    "mtime": 1795171429.6233315,
+    "seen": 1795171872.0710692,
+    "ast_hash": "714b468405e3a1c727c00940bcf6cf10",
+    "semantic_hash": ""
+  },
+  "src/ui/components/copilot/DotCopilotProvider.tsx": {
+    "mtime": 1795171363.361784,
+    "seen": 1795171872.0710692,
+    "ast_hash": "88dc744ca619c60f5e7870069d8f66cb",
+    "semantic_hash": ""
+  },
+  "src/ui/components/copilot/cards/CopilotActionConfirmCard.tsx": {
+    "mtime": 1795171336.0484822,
+    "seen": 1795171872.0710692,
+    "ast_hash": "5e9e74c7cc83188f975cdafe9888f599",
+    "semantic_hash": ""
+  },
+  "src/ui/components/copilot/cards/CopilotKpiSummaryCard.tsx": {
+    "mtime": 1795171313.474058,
+    "seen": 1795171872.0710692,
+    "ast_hash": "2389ff0a446508f0c2934198837d2a06",
+    "semantic_hash": ""
+  },
+  "src/ui/components/copilot/cards/CopilotPreflightAlertCard.tsx": {
+    "mtime": 1795171326.0264316,
+    "seen": 1795171872.0710692,
+    "ast_hash": "de39d15bf4b4af3a7761d364d83453df",
+    "semantic_hash": ""
+  },
+  "src/ui/components/copilot/index.ts": {
+    "mtime": 1795171446.3576312,
+    "seen": 1795171872.0710692,
+    "ast_hash": "8fc32e7cad30e28adb12a9ad0ede1c62",
+    "semantic_hash": ""
+  },
+  "src/ui/components/copilot/types.ts": {
+    "mtime": 1795171300.8936057,
+    "seen": 1795171872.0710692,
+    "ast_hash": "0699e976a002926a1af6e5d721b8267e",
+    "semantic_hash": ""
+  },
+  "tests/DotCopilotAssistantSuite.test.tsx": {
+    "mtime": 1795171626.0917418,
+    "seen": 1795171872.2800663,
+    "ast_hash": "462ab054a7c04a1fe4c98dbe2e251da8",
     "semantic_hash": ""
   }
 }
