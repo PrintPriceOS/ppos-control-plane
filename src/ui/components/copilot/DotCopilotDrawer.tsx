@@ -267,6 +267,12 @@ export const DotCopilotDrawer: React.FC = () => {
 
         if (currentRoute.includes('onboarding') || currentRoute.includes('setup')) {
             return [
+                {
+                    id: 's0',
+                    title: '⚡ Kit de Alta Rápida (15 min) — Early Adopter',
+                    subtitle: 'Preconfigura prensas Offset/Digital B2, 6 papeles maestros y tarifas 5-Axis al 100%',
+                    prompt: 'Aplica el Kit de Onboarding Acelerado de 15 minutos para dejar mi imprenta lista al 100% para el Marketplace.'
+                },
                 { id: 's1', title: t('copilot.action.setup1.title'), subtitle: t('copilot.action.setup1.subtitle'), prompt: t('copilot.action.setup1.prompt') },
                 { id: 's2', title: t('copilot.action.setup2.title'), subtitle: t('copilot.action.setup2.subtitle'), prompt: t('copilot.action.setup2.prompt') },
                 { id: 's3', title: t('copilot.action.setup3.title'), subtitle: t('copilot.action.setup3.subtitle'), prompt: t('copilot.action.setup3.prompt') },
@@ -281,7 +287,13 @@ export const DotCopilotDrawer: React.FC = () => {
             { id: 'g2', title: t('copilot.action.general2.title'), subtitle: t('copilot.action.general2.subtitle'), prompt: t('copilot.action.general2.prompt') },
             { id: 'g3', title: t('copilot.action.general3.title'), subtitle: t('copilot.action.general3.subtitle'), prompt: t('copilot.action.general3.prompt') },
             { id: 'g4', title: t('copilot.action.general4.title'), subtitle: t('copilot.action.general4.subtitle'), prompt: t('copilot.action.general4.prompt') },
-            { id: 'g5', title: t('copilot.action.general5.title'), subtitle: t('copilot.action.general5.subtitle'), prompt: t('copilot.action.general5.prompt') }
+            { id: 'g5', title: t('copilot.action.general5.title'), subtitle: t('copilot.action.general5.subtitle'), prompt: t('copilot.action.general5.prompt') },
+            {
+                id: 'g0',
+                title: '⚡ Kit de Onboarding Acelerado (15 min)',
+                subtitle: 'Activa parque base Offset/Digital, papeles certificados y tarifas en 1 clic',
+                prompt: 'Aplica el Kit de Onboarding Acelerado de 15 minutos para dejar mi imprenta lista al 100% para el Marketplace.'
+            }
         ];
     }, [currentRoute, t]);
 

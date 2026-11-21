@@ -136,6 +136,22 @@ const COPILOT_TOOLS_SCHEMA = [
             },
             required: ['printhouseId', 'category', 'marginDeltaPercent']
         }
+    },
+    {
+        name: 'apply_accelerated_onboarding_kit',
+        description: 'Kit de Onboarding Acelerado (Early Adopter 15 min): Preconfigura de una sola vez el parque base de prensas (Offset B2 + Digital B2 + Tren PUR/Hilo), los 6 papeles editoriales estándar con calibres certificados, los SLAs de 5 días y las tarifas 5-Axis base para dejar la imprenta lista al 100% para el Marketplace.',
+        parameters: {
+            type: 'OBJECT',
+            properties: {
+                printhouseId: { type: 'STRING', description: 'ID de la imprenta' },
+                presetProfile: {
+                    type: 'STRING',
+                    description: 'HYBRID_EDITORIAL_PLANT | OFFSET_BOOK_SPECIALIST | DIGITAL_SHORT_RUN_POD',
+                    default: 'HYBRID_EDITORIAL_PLANT'
+                }
+            },
+            required: ['printhouseId']
+        }
     }
 ];
 
@@ -483,6 +499,42 @@ async function executeCopilotTool(toolName, args, printhouseId) {
             };
         }
 
+        case 'apply_accelerated_onboarding_kit': {
+            const preset = args.presetProfile || 'HYBRID_EDITORIAL_PLANT';
+            const actionId = `act-kit-${Date.now()}`;
+            const proposedChanges = {
+                presetProfile: preset,
+                machinesBundle: [
+                    'Prensa Offset B2 5 Colores (530x750mm · 95 €/h)',
+                    'Prensa Digital B2 Color (750x530mm · 65 €/h)',
+                    'Tren de Encuadernación Rústica PUR & Cosido Hilo (55 €/h)'
+                ],
+                substratesBundle: '6 Papeles Editoriales Estándar (Ahuesado 80g/90g Mano 1.5, Offset 90g, Estucado Mate 115g/135g, Cartulina 300g)',
+                calibratedFamilies: ['SOFTCOVER', 'HARDCOVER', 'SADDLE_STITCH', 'WIRE_O'],
+                standardSlaDays: 5,
+                targetCompletionPct: 100
+            };
+            const summary = `Activar Kit Early Adopter (${preset}): 3 líneas de maquinaria (Offset B2 + Digital B2 + Encuadernación PUR/Hilo), 6 sustratos maestros con calibre certificado, 4 familias calibradas y SLA 5 días (100% Listo para Marketplace).`;
+            return {
+                status: 'ACTION_PENDING_CONFIRMATION',
+                actionId,
+                actionType: 'APPLY_ONBOARDING_KIT',
+                printhouseId: effectivePrinthouseId,
+                proposedChanges,
+                summary,
+                actionPayload: {
+                    type: 'ACTION_CONFIRM',
+                    actionId,
+                    actionType: 'APPLY_ONBOARDING_KIT',
+                    printhouseId: effectivePrinthouseId,
+                    title: `Kit Onboarding Acelerado (15 min): ${preset}`,
+                    summary,
+                    proposedChanges,
+                    status: 'PENDING'
+                }
+            };
+        }
+
         default:
             return { error: `Herramienta no implementada: ${toolName}` };
     }
@@ -538,6 +590,22 @@ async function applyCopilotAction({ actionId, actionType, payload = {}, printhou
             status: 'APPLIED',
             message: 'Calibración de tarifas aplicada con éxito a la familia seleccionada.',
             onboardingPct: state.onboarding.completionPct
+        };
+    }
+
+    if (actionType === 'APPLY_ONBOARDING_KIT') {
+        state.onboarding.fiscalDataComplete = true;
+        state.onboarding.iccProfilesLoaded = true;
+        state.onboarding.machinesCount = Math.max(state.onboarding.machinesCount || 6, 9);
+        state.onboarding.papersConfiguredCount = Math.max(state.onboarding.papersConfiguredCount || 148, 154);
+        state.onboarding.calibratedFamilies = ['SOFTCOVER', 'HARDCOVER', 'SADDLE_STITCH', 'WIRE_O'];
+        state.onboarding.pendingSteps = [];
+        state.onboarding.completionPct = 100;
+
+        return {
+            status: 'APPLIED',
+            message: 'Kit de Onboarding Acelerado aplicado al 100%. Parque de maquinaria (Offset B2 + Digital B2 + PUR/Hilo), catálogo de sustratos, tarifas 5-Axis y SLAs activados. Tu imprenta está lista para recibir pedidos en el Marketplace.',
+            onboardingPct: 100
         };
     }
 
@@ -815,6 +883,33 @@ async function runDeterministicFallback({ userMessage, printhouseId, mode, local
                 `• **Imágenes a baja resolución:** 4 imágenes a 192 DPI (umbral estándar: 300 DPI).\n` +
                 `• **Deriva de lomo:** +1.4mm respecto al cálculo de cubierta.\n\n` +
                 `La herramienta de autorreparación *MAGIC_FIX* puede compensar automáticamente el sangrado expandiendo el margen reflejado.`;
+        }
+    } else if (text.includes('kit') || text.includes('acelerad') || text.includes('15 min') || text.includes('early adopter') || text.includes('fast-track') || text.includes('schnellstart')) {
+        const pill = isEn ? 'Preparing 15-min Accelerated Onboarding Kit...' : isDe ? '15-Minuten Schnellstart-Onboarding-Kit vorbereiten...' : 'Preparando Kit de Onboarding Acelerado (15 min)...';
+        onEvent('status', { state: 'thinking', pill });
+        onEvent('tool_start', { tool: 'apply_accelerated_onboarding_kit' });
+        const res = await executeCopilotTool('apply_accelerated_onboarding_kit', { presetProfile: 'HYBRID_EDITORIAL_PLANT' }, printhouseId);
+        onEvent('tool_result', { tool: 'apply_accelerated_onboarding_kit', data: res });
+        if (res.actionPayload) cards.push(res.actionPayload);
+
+        if (isEn) {
+            reply = `I have prepared the **15-Minute Early-Adopter Accelerated Onboarding Kit** (*HYBRID_EDITORIAL_PLANT*) for your workshop:\n\n` +
+                `• **Press & Bindery Fleet:** Offset B2 5-Color (95 €/h) + Digital B2 (65 €/h) + PUR/Sewn Bindery (55 €/h).\n` +
+                `• **Certified Substrate Pack:** Cream Book 80g/90g (Bulk 1.5), White Offset 90g, Matte Coated 115g/135g, and 300g Artboard.\n` +
+                `• **5-Axis Rate Cards & SLAs:** All 4 binding families calibrated (Softcover, Hardcover, Saddle Stitch, Wire-O) with a 5-day standard SLA.\n\n` +
+                `Click **"Confirm & Apply"** on the card below to bring your plant to **100% Marketplace Readiness** in one step.`;
+        } else if (isDe) {
+            reply = `Ich habe das **15-Minuten Schnellstart-Onboarding-Kit** (*HYBRID_EDITORIAL_PLANT*) für Ihren Betrieb vorbereitet:\n\n` +
+                `• **Maschinenpark:** Offset B2 5-Farben (95 €/h) + Digital B2 (65 €/h) + PUR/Fadenheftung (55 €/h).\n` +
+                `• **Zertifiziertes Papierpaket:** Werkdruck 80g/90g (Volumen 1.5), Offset 90g, Bilderdruck Matt 115g/135g und 300g Karton.\n` +
+                `• **5-Achsen-Tarife & SLAs:** Alle 4 Produktfamilien kalibriert mit 5 Werktagen Standard-SLA.\n\n` +
+                `Klicken Sie unten auf **"Bestätigen und Übernehmen"**, um Ihre Druckerei sofort auf **100 % Marketplace-Bereitschaft** zu schalten.`;
+        } else {
+            reply = `He preparado el **Kit de Onboarding Acelerado en 15 Minutos** (*HYBRID_EDITORIAL_PLANT*) para tu imprenta:\n\n` +
+                `• **Parque Base Preconfigurado:** Prensa Offset B2 5 colores (95 €/h) + Digital B2 (65 €/h) + Línea PUR y Cosido Hilo (55 €/h).\n` +
+                `• **Pack de 6 Sustratos Editoriales:** Ahuesado 80g/90g (Mano 1.5), Offset Blanco 90g, Estucado Mate 115g/135g y Cartulina 300g con calibres certificados.\n` +
+                `• **Tarifas 5-Axis y SLA:** Calibración completa de las 4 familias (Rústica, Tapa Dura, Grapa y Wire-O) con SLA estándar de 5 días hábiles.\n\n` +
+                `Pulsa en **"Confirmar y Aplicar"** en la tarjeta interactiva inferior para completar tu taller al **100% y activar el Marketplace** en un solo clic.`;
         }
     } else if (text.includes('alta') || text.includes('prensa') || text.includes('offset') || text.includes('digital') ||
                text.includes('maquin') || text.includes('máquina') || text.includes('machine') || text.includes('press')) {
