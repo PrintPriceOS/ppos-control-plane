@@ -14688,15 +14688,15 @@
     "semantic_hash": "6fc6620fa009162671ca0a6ca8c9fd5b"
   },
   "src/ui/en.ts": {
-    "mtime": 1795173394.8316095,
-    "seen": 1795173707.0067086,
-    "ast_hash": "0dd04b2c62342c7ee27dee746ff7c1cb",
+    "mtime": 1795200702.0999916,
+    "seen": 1795293498.5432968,
+    "ast_hash": "31ca5a2f4069546161db9586f7a59569",
     "semantic_hash": ""
   },
   "src/ui/es.ts": {
-    "mtime": 1795173395.0139432,
-    "seen": 1795173707.0067086,
-    "ast_hash": "9f384d4e9cb4c1b353d1abf4144f2248",
+    "mtime": 1795200702.3800032,
+    "seen": 1795293498.5432968,
+    "ast_hash": "80a402864bfad9f36b531ebb8d2721a5",
     "semantic_hash": ""
   },
   "src/ui/hooks/useAdminData.ts": {
@@ -14736,9 +14736,9 @@
     "semantic_hash": ""
   },
   "src/ui/layout/Topbar.tsx": {
-    "mtime": 1795173395.1199403,
-    "seen": 1795173707.0087092,
-    "ast_hash": "fa591b721a5fd00ba644cffb1fe4ef26",
+    "mtime": 1795200702.6580055,
+    "seen": 1795293498.5442975,
+    "ast_hash": "d8779ace27dd4033de20e0e7ac9e2ec4",
     "semantic_hash": ""
   },
   "src/ui/lib/adminApi.ts": {
@@ -20322,9 +20322,9 @@
     "semantic_hash": ""
   },
   "src/ui/de.ts": {
-    "mtime": 1795173394.6366093,
-    "seen": 1795173707.004709,
-    "ast_hash": "a6953ec0e9b8836ef1c2f069d83200fc",
+    "mtime": 1795200701.8549943,
+    "seen": 1795293498.541297,
+    "ast_hash": "9cb45786991fde6ddef02cd735b3dc40",
     "semantic_hash": ""
   },
   "tests/backend_tenant_security.test.js": {
@@ -27828,39 +27828,39 @@
     "semantic_hash": ""
   },
   "src/api/routes/copilotRoutes.js": {
-    "mtime": 1795171257.8419087,
-    "seen": 1795171871.7583985,
-    "ast_hash": "d33e1761a112c63fe6703ad815bfb6a5",
+    "mtime": 1795199493.0806897,
+    "seen": 1795293498.1952987,
+    "ast_hash": "b47238480670b20fa1b9735ae3a8bf12",
     "semantic_hash": ""
   },
   "src/api/services/copilot/dotCopilotService.js": {
-    "mtime": 1795173393.086556,
-    "seen": 1795173706.7810628,
-    "ast_hash": "511493aced25bb3b6e76edf94949a8eb",
+    "mtime": 1795201358.4158077,
+    "seen": 1795293498.3175273,
+    "ast_hash": "4151da145d0df4fa127cf6ba3dc973b4",
     "semantic_hash": ""
   },
   "src/api/services/copilot/modelRegistryService.js": {
-    "mtime": 1795171167.4943702,
-    "seen": 1795171871.8869016,
-    "ast_hash": "ad2ed0e4b37214949edf7a13f4d1c98c",
+    "mtime": 1795199493.1956887,
+    "seen": 1795293498.3175273,
+    "ast_hash": "e4a58a74839216ba1fcc09d9c4b45074",
     "semantic_hash": ""
   },
   "src/ui/components/copilot/DotCopilotDrawer.tsx": {
-    "mtime": 1795173393.3112473,
-    "seen": 1795173706.9707084,
-    "ast_hash": "77d65828978ccf97eda4ac611aa49916",
+    "mtime": 1795201358.5108063,
+    "seen": 1795293498.5081644,
+    "ast_hash": "b6c5a1eeed6c110d0a7ef5d59a3fd001",
     "semantic_hash": ""
   },
   "src/ui/components/copilot/DotCopilotProvider.tsx": {
-    "mtime": 1795173393.637249,
-    "seen": 1795173706.9707084,
-    "ast_hash": "fb287198a43b4185e5eba6a0532c6fa4",
+    "mtime": 1795199943.937831,
+    "seen": 1795293498.5081644,
+    "ast_hash": "5c3fb833eef7c001889060a133e4057e",
     "semantic_hash": ""
   },
   "src/ui/components/copilot/cards/CopilotActionConfirmCard.tsx": {
-    "mtime": 1795173393.8499868,
-    "seen": 1795173706.9707084,
-    "ast_hash": "c217e2c1b74ebed20a8034dd6c04c546",
+    "mtime": 1795199493.2536974,
+    "seen": 1795293498.5081644,
+    "ast_hash": "cd78e12c3709814152f6d01592381c92",
     "semantic_hash": ""
   },
   "src/ui/components/copilot/cards/CopilotKpiSummaryCard.tsx": {
@@ -27891,6 +27891,12 @@
     "mtime": 1795173395.1879394,
     "seen": 1795173707.1917093,
     "ast_hash": "9df6292d124d533d5ac00fbf8cdfb9ca",
+    "semantic_hash": ""
+  },
+  "scripts/check_repos_audit.py": {
+    "mtime": 1795174720.256814,
+    "seen": 1795293497.8518934,
+    "ast_hash": "97b784e8e7d6501b28b98022d22a674a",
     "semantic_hash": ""
   }
 }
