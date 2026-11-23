@@ -7,6 +7,7 @@ import { canonicalizeToEngineBookSpec, formatCanonicalizerErrors } from '../src/
 import { CalculationComparisonView } from '../src/ui/components/printhouse/onboarding/CalculationComparisonView';
 import { VariantSpecTable } from '../src/ui/components/printhouse/onboarding/VariantSpecTable';
 import { GuidedStepReview } from '../src/ui/components/printhouse/onboarding/GuidedStepReview';
+import { GuidedStepProducts } from '../src/ui/components/printhouse/onboarding/GuidedStepProducts';
 
 describe('Onboarding Step 3 & Step 4 UX Fixes (Trilingual DE / EN / ES)', () => {
     const offerMissingLamination = {
@@ -132,5 +133,75 @@ describe('Onboarding Step 3 & Step 4 UX Fixes (Trilingual DE / EN / ES)', () => 
 
         fireEvent.click(screen.getByTestId('activate-calibrated-only-btn'));
         expect(onActivateCalibratedOnly).toHaveBeenCalledTimes(1);
+    });
+
+    it('5. GuidedStepProducts renders direct PDF upload per active family card and uploads on file selection', () => {
+        const onUploadFamilyQuote = vi.fn();
+        const families: any = {
+            HARDCOVER: { id: 'HARDCOVER', titleKey: 'family.hardcover', status: 'NOT_STARTED', quoteCount: 0 },
+            SOFTCOVER: { id: 'SOFTCOVER', titleKey: 'family.softcover', status: 'NOT_STARTED', quoteCount: 0 },
+            WIRE_O: { id: 'WIRE_O', titleKey: 'family.wireO', status: 'NOT_STARTED', quoteCount: 0 },
+            SADDLE_STITCH: { id: 'SADDLE_STITCH', titleKey: 'family.saddleStitch', status: 'NOT_STARTED', quoteCount: 0 }
+        };
+
+        render(
+            <LocaleProvider>
+                <GuidedStepProducts
+                    families={families}
+                    enabledFamilies={{ HARDCOVER: true, SOFTCOVER: false, WIRE_O: false, SADDLE_STITCH: false }}
+                    selectedFamilyId="HARDCOVER"
+                    onUploadFamilyQuote={onUploadFamilyQuote}
+                    onToggleFamily={vi.fn()}
+                    onSelectActiveFamily={vi.fn()}
+                    onContinueToPricing={vi.fn()}
+                    onBackToCompany={vi.fn()}
+                />
+            </LocaleProvider>
+        );
+
+        expect(screen.getByTestId('product-card-upload-HARDCOVER')).toBeInTheDocument();
+        expect(screen.queryByTestId('product-card-upload-SOFTCOVER')).not.toBeInTheDocument();
+
+        const file = new File(['%PDF-1.4 test'], 'hardcover-offer.pdf', { type: 'application/pdf' });
+        const input = screen.getByTestId('product-card-file-input-HARDCOVER') as HTMLInputElement;
+        fireEvent.change(input, { target: { files: [file] } });
+
+        expect(onUploadFamilyQuote).toHaveBeenCalledWith('HARDCOVER', file);
+    });
+
+    it('6. VariantSpecTable 1-click all-in buttons confirm all 4 inclusions (and optional no-lamination) in a single click', () => {
+        const onUpdateInclusions = vi.fn();
+        const onUpdateSpec = vi.fn();
+
+        render(
+            <LocaleProvider>
+                <VariantSpecTable
+                    spec={{
+                        family: 'HARDCOVER',
+                        productTitle: 'All-in Book',
+                        lamination: undefined,
+                        includesPaper: null,
+                        includesBinding: null,
+                        includesFinishing: null,
+                        includesPackaging: null,
+                        runs: [{ id: 'r1', quantity: 1000, manufacturingPrice: 2400, transportPrice: 120, quotedTotalPrice: 2520 }]
+                    }}
+                    onUpdateInclusions={onUpdateInclusions}
+                    onUpdateSpec={onUpdateSpec}
+                />
+            </LocaleProvider>
+        );
+
+        expect(screen.getByTestId('confirm-all-inclusions-btn')).toBeInTheDocument();
+        expect(screen.getByTestId('confirm-all-inclusions-no-lamination-btn')).toBeInTheDocument();
+
+        fireEvent.click(screen.getByTestId('confirm-all-inclusions-no-lamination-btn'));
+        expect(onUpdateInclusions).toHaveBeenCalledWith({
+            includesPaper: true,
+            includesBinding: true,
+            includesFinishing: true,
+            includesPackaging: true
+        });
+        expect(onUpdateSpec).toHaveBeenCalledWith({ lamination: 'none' });
     });
 });

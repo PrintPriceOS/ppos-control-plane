@@ -389,22 +389,73 @@ export const VariantSpecTable: React.FC<VariantSpecTableProps> = ({
 
                 {/* ── INCLUSION CONFIRMATIONS CARD (AMBIGUITY_PREVENTS_READY RESOLVER) ── */}
                 <div className="p-4 bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700 rounded-xl space-y-3">
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
                         <div className="flex items-center gap-2">
                             <CheckCircle2 size={16} className={hasMissingInclusions ? 'text-amber-500' : 'text-emerald-500'} />
                             <h5 className="font-bold text-zinc-900 dark:text-white text-xs">
                                 {t('inclusions.title') || 'Confirmación de Inclusiones del Presupuesto (Requisito para Calibración)'}
                             </h5>
                         </div>
-                        {hasMissingInclusions ? (
-                            <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 px-2 py-0.5 rounded-md border border-amber-200 dark:border-amber-800">
-                                {missingInclusions.length} {t('inclusions.pendingCount') || 'confirmaciones pendientes'}
-                            </span>
-                        ) : (
-                            <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded-md border border-emerald-200 dark:border-emerald-800">
-                                {t('inclusions.allConfirmed') || 'Inclusiones confirmadas'}
-                            </span>
-                        )}
+                        <div className="flex flex-wrap items-center gap-2">
+                            {hasMissingInclusions && (
+                                <>
+                                    <button
+                                        type="button"
+                                        data-testid="confirm-all-inclusions-btn"
+                                        onClick={() => {
+                                            setIncludesPaper(true);
+                                            setIncludesBinding(true);
+                                            setIncludesFinishing(true);
+                                            setIncludesPackaging(true);
+                                            if (onUpdateInclusions) {
+                                                onUpdateInclusions({
+                                                    includesPaper: true,
+                                                    includesBinding: true,
+                                                    includesFinishing: true,
+                                                    includesPackaging: true
+                                                });
+                                            }
+                                        }}
+                                        className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition-colors cursor-pointer shadow-2xs"
+                                    >
+                                        {t('inclusions.confirmAllStandardBtn')}
+                                    </button>
+                                    {isLaminationUnspecified && onUpdateSpec && (
+                                        <button
+                                            type="button"
+                                            data-testid="confirm-all-inclusions-no-lamination-btn"
+                                            onClick={() => {
+                                                setIncludesPaper(true);
+                                                setIncludesBinding(true);
+                                                setIncludesFinishing(true);
+                                                setIncludesPackaging(true);
+                                                if (onUpdateInclusions) {
+                                                    onUpdateInclusions({
+                                                        includesPaper: true,
+                                                        includesBinding: true,
+                                                        includesFinishing: true,
+                                                        includesPackaging: true
+                                                    });
+                                                }
+                                                onUpdateSpec({ lamination: 'none' });
+                                            }}
+                                            className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-[#dc0000] hover:bg-[#b50000] text-white transition-colors cursor-pointer shadow-2xs"
+                                        >
+                                            {t('inclusions.confirmAllNoLaminationBtn')}
+                                        </button>
+                                    )}
+                                </>
+                            )}
+                            {hasMissingInclusions ? (
+                                <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 px-2 py-0.5 rounded-md border border-amber-200 dark:border-amber-800">
+                                    {missingInclusions.length} {t('inclusions.pendingCount') || 'confirmaciones pendientes'}
+                                </span>
+                            ) : (
+                                <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded-md border border-emerald-200 dark:border-emerald-800">
+                                    {t('inclusions.allConfirmed') || 'Inclusiones confirmadas'}
+                                </span>
+                            )}
+                        </div>
                     </div>
                     <p className="text-[11px] text-zinc-600 dark:text-zinc-400 leading-relaxed">
                         {t('inclusions.description') || 'El motor de calibración exige confirmar explícitamente si el precio de fabricación incluye o excluye cada partida. No se admiten suposiciones silenciosas.'}

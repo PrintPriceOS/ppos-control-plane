@@ -731,6 +731,151 @@ export const GuidedPrinthouseJourney: React.FC<GuidedPrinthouseJourneyProps> = (
     };
 
     // ── STAGE B HANDLERS: Qué produces ──
+    const [uploadingProductsPdf, setUploadingProductsPdf] = useState<Partial<Record<ProductFamilyId, boolean>>>({});
+    const [uploadProductsError, setUploadProductsError] = useState<Partial<Record<ProductFamilyId, string | null>>>({});
+
+    const handleUploadQuoteFromProducts = async (familyId: ProductFamilyId, file: File) => {
+        const token = getAuthToken();
+        setUploadingProductsPdf(prev => ({ ...prev, [familyId]: true }));
+        setUploadProductsError(prev => ({ ...prev, [familyId]: null }));
+
+        try {
+            const formData = new FormData();
+            formData.append('file', file);
+            if (printerNodeId) {
+                formData.append('printerNodeId', printerNodeId);
+            }
+
+            let res = await fetch('/api/printhouse/onboarding/pricing/quote-evidence/upload', {
+                method: 'POST',
+                headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+                body: formData
+            });
+
+            let extractedData: any = null;
+            if (!res.ok) {
+                let errPayload: any = null;
+                try { errPayload = await res.json(); } catch {}
+                if (res.status === 409 && errPayload?.evidenceId) {
+                    const existingRes = await fetch(`/api/printhouse/onboarding/pricing/quote-evidence/${encodeURIComponent(errPayload.evidenceId)}`, {
+                        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+                    });
+                    if (existingRes.ok) {
+                        const existingJson = await existingRes.json();
+                        extractedData = existingJson?.data || existingJson;
+                    }
+                }
+                if (!extractedData) {
+                    throw new Error(errPayload?.message || errPayload?.error || t('compare.errProcessPdf'));
+                }
+            } else {
+                const json = await res.json();
+                extractedData = json?.data || json;
+            }
+
+            const rawOffers: any[] = extractedData?.offers || extractedData?.runs || [];
+            if (!Array.isArray(rawOffers) || rawOffers.length === 0) {
+                throw new Error(t('compare.errProcessPdf'));
+            }
+
+            const extractedRuns = rawOffers.map((off: any, idx: number) => {
+                const q = Number(off.quantity);
+                const mfg = Number(off.manufacturingPrice);
+                const trans = Number(off.transportPrice ?? 0);
+                const total = Number(off.quotedTotalPrice ?? (mfg + trans));
+                const unit = Number(off.quotedUnitPrice ?? (total / (q || 1)));
+                return {
+                    id: off.id || `run-${idx + 1}`,
+                    variantKey: off.variantKey || `run-${idx + 1}`,
+                    quantity: q,
+                    manufacturingPrice: mfg,
+                    transportPrice: trans,
+                    quotedTotalPrice: total,
+                    quotedUnitPrice: unit,
+                    computedTotalPrice: off.computedTotalPrice ?? total,
+                    computedUnitPrice: off.computedUnitPrice ?? unit,
+                    validationStatus: off.validationStatus || 'CONSISTENT',
+                    paperVariant: off.variantName || off.paperVariant || extractedData?.specification?.interiorPaper || 'Standard',
+                    deliveryOption: trans > 0 ? 'Freight' : 'Standard',
+                    sourceText: off.sourceText,
+                    provenance: off.provenance
+                };
+            });
+
+            const spec = extractedData?.specification || {};
+            const generatedRef = extractedData?.evidenceId || `REF-${Date.now().toString().slice(-4)}`;
+            const initialVariantId = extractedRuns[0]?.id || extractedRuns[0]?.variantKey || 'run-1';
+            const builtOffer: any = {
+                family: spec.family || familyId,
+                productTitle: extractedData?.printhouseName || extractedData?.productTitle || file.name.replace(/\.pdf$/i, ''),
+                quoteRef: generatedRef,
+                quoteReference: generatedRef,
+                evidenceId: extractedData?.evidenceId || generatedRef,
+                quoteDate: extractedData?.quoteDate || new Date().toISOString().split('T')[0],
+                currency: 'EUR',
+                widthMm: spec.formatWidthMm,
+                heightMm: spec.formatHeightMm,
+                formatWidthMm: spec.formatWidthMm,
+                formatHeightMm: spec.formatHeightMm,
+                interiorPages: spec.interiorPages || extractedData?.pageCount,
+                pageCount: spec.interiorPages || extractedData?.pageCount,
+                interiorPaper: spec.interiorPaper,
+                interiorWeightGsm: spec.interiorWeightGsm,
+                interiorColors: spec.interiorColors,
+                coverPaper: spec.coverPaper,
+                coverWeightGsm: spec.coverWeightGsm,
+                coverColors: spec.coverColors,
+                boardThicknessMm: spec.boardThicknessMm,
+                bindingMethod: spec.bindingMethod,
+                spineType: spec.spineType,
+                lamination: spec.lamination,
+                hasEndpapers: spec.hasEndpapers,
+                endpaperPaper: spec.endpaperPaper,
+                endpaperWeightGsm: spec.endpaperWeightGsm,
+                endpaperColors: spec.endpaperColors,
+                hasAmbiguity: Boolean(extractedData?.hasInconsistentOffers || (extractedData?.warnings && extractedData?.warnings.length > 0)),
+                ambiguityDetails: extractedData?.warnings?.length ? extractedData.warnings.join(', ') : undefined,
+                ambiguityNote: extractedData?.warnings?.length ? extractedData.warnings.join(', ') : undefined,
+                hasDiscrepancy: Boolean(extractedData?.hasInconsistentOffers),
+                deliveryCountry: spec.deliveryCountry,
+                includesPaper: spec.includesPaper !== undefined ? spec.includesPaper : extractedData?.includesPaper,
+                includesBinding: spec.includesBinding !== undefined ? spec.includesBinding : extractedData?.includesBinding,
+                includesFinishing: spec.includesFinishing !== undefined ? spec.includesFinishing : extractedData?.includesFinishing,
+                includesPackaging: spec.includesPackaging !== undefined ? spec.includesPackaging : extractedData?.includesPackaging,
+                runs: extractedRuns
+            };
+
+            updateDraft(prev => ({
+                ...prev,
+                selectedFamilyId: familyId,
+                pricingContinuity: {
+                    ...prev.pricingContinuity,
+                    [familyId]: {
+                        ...(prev.pricingContinuity?.[familyId] || {
+                            sessionId: null,
+                            activeRun: null,
+                            proposedPatch: {}
+                        }),
+                        pricingMethod: 'ASSISTANT',
+                        entryMode: 'UPLOAD_PDF',
+                        uploadedFileName: file.name,
+                        step: 3,
+                        selectedVariantId: initialVariantId,
+                        offer: builtOffer,
+                        lastSavedTimestamp: Date.now()
+                    }
+                }
+            }));
+        } catch (err: any) {
+            setUploadProductsError(prev => ({
+                ...prev,
+                [familyId]: normalizeUiError(err, t('compare.errProcessPdf'))
+            }));
+        } finally {
+            setUploadingProductsPdf(prev => ({ ...prev, [familyId]: false }));
+        }
+    };
+
     const handleToggleFamily = (familyId: ProductFamilyId) => {
         updateDraft(prev => ({
             ...prev,
@@ -1095,6 +1240,10 @@ export const GuidedPrinthouseJourney: React.FC<GuidedPrinthouseJourneyProps> = (
                         families={families}
                         enabledFamilies={draft.enabledFamilies}
                         selectedFamilyId={draft.selectedFamilyId}
+                        pricingContinuity={draft.pricingContinuity}
+                        uploadingByFamily={uploadingProductsPdf}
+                        uploadErrorsByFamily={uploadProductsError}
+                        onUploadFamilyQuote={handleUploadQuoteFromProducts}
                         onToggleFamily={handleToggleFamily}
                         onSelectActiveFamily={handleSelectActiveFamily}
                         onContinueToPricing={handleContinueToPricing}
