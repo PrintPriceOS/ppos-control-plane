@@ -117,8 +117,16 @@ CRITICAL BOUNDARIES & INVARIANTS:
      * paper_weight_cover: number in gsm (e.g. 300, 350)
      * cover_print: "4/0", "4/4", "1/0", "1/1", etc.
      * binding_method: "perfect bound", "saddle stitch", "thread sewn", "hardcover", "wire-o", "spiral"
-     * lamination: "gloss", "matt", "varnish", null
+     * lamination: "gloss", "matt", "varnish", null (ONLY set to null if the quote explicitly states unlaminated/no finish; if finishing is omitted from the text, omit lamination and ask for clarification)
      * delivery_country: 2-letter uppercase ISO (e.g. "ES", "DE", "FR", "PL", "RE", "JP")
+   - German (DE) Print Terminology Mapping (apply ONLY when explicitly present in the quote):
+     * lamination = "matt": Mattfolie, Mattfolienkaschierung, Cellophanierung matt, matt cellophaniert, Mattkaschierung, Samtfolie, Soft-Touch-Folie
+     * lamination = "gloss": Glanzfolie, Glanzfolienkaschierung, Cellophanierung glänzend, glänzend cellophaniert, Glanzkaschierung
+     * lamination = "varnish": Dispersionslack, Schutzlack, UV-Lack, Offsetlack, Drucklack, matt lackiert, glänzend lackiert
+     * lamination = null: ohne Veredelung, keine Veredelung, unveredelt, ohne Kaschierung, ohne Lack
+     * binding_method: Festeinband/Hardcover -> "hardcover"; Broschur/Klebebindung/PUR-Bindung -> "perfect bound"; Fadenheftung -> "thread sewn"; Rückstichheftung/Drahtheftung -> "saddle stitch"; Spiralbindung/Wire-O -> "wire-o"
+     * inks: 4/4-farbig -> "4/4", 1/1-farbig -> "1/1", 4/0-farbig -> "4/0"
+     * paper: Bilderdruck -> "mc", Werkdruck/Naturpapier/Offset -> "offset", Bilderdruckkarton/Chromokarton -> "artboard"
    - Declared commercial fields:
      * targetManufacturingPrice: number | null (e.g. 2450)
      * currency: string (e.g. "EUR")
@@ -656,7 +664,14 @@ Highlight whether the residual is acceptable (< 0.50 EUR) and remind them that c
                 if (!ALLOWED_SPEC_FIELDS.includes(key)) continue;
 
                 let val = preNormalized[key];
-                if (val === null || val === undefined) continue;
+                if (val === undefined) continue;
+                if (val === null) {
+                    // Preserve explicit null for lamination (explicitly unlaminated / "ohne Veredelung")
+                    if (key === 'lamination') {
+                        normalized.specPatch[key] = null;
+                    }
+                    continue;
+                }
 
                 // Type & Taxonomy Validation
                 if (key === 'copies' || key === 'interior_pages' || key === 'cover_pages') {
@@ -669,7 +684,7 @@ Highlight whether the residual is acceptable (< 0.50 EUR) and remind them that c
                         normalized.specPatch[key] = num;
                     }
                 } else if (key === 'interior_print') {
-                    const s = String(val).trim();
+                    const s = String(val).trim().replace(/\+/g, '/').replace(/\s*-?\s*farbig$/i, '');
                     if (VALID_INTERIOR_PRINT.includes(s)) {
                         normalized.specPatch[key] = s;
                     } else {
@@ -679,7 +694,7 @@ Highlight whether the residual is acceptable (< 0.50 EUR) and remind them that c
                         }
                     }
                 } else if (key === 'cover_print') {
-                    const s = String(val).trim();
+                    const s = String(val).trim().replace(/\+/g, '/').replace(/\s*-?\s*farbig$/i, '');
                     if (VALID_COVER_PRINT.includes(s)) {
                         normalized.specPatch[key] = s;
                     } else {
@@ -692,38 +707,48 @@ Highlight whether the residual is acceptable (< 0.50 EUR) and remind them that c
                     const s = String(val).toLowerCase().trim();
                     if (VALID_BINDING_METHOD.includes(s)) {
                         normalized.specPatch[key] = s;
-                    } else if (s === 'perfect' || s === 'pb') {
+                    } else if (s === 'perfect' || s === 'pb' || s === 'klebebindung' || s === 'pur-bindung' || s === 'pur bindung' || s === 'broschur' || s === 'softcover') {
                         normalized.specPatch[key] = 'perfect bound';
-                    } else if (s === 'sewn' || s === 'thread-sewn') {
+                    } else if (s === 'sewn' || s === 'thread-sewn' || s === 'fadenheftung') {
                         normalized.specPatch[key] = 'thread sewn';
-                    } else if (s === 'case' || s === 'casebound' || s === 'hardback') {
+                    } else if (s === 'case' || s === 'casebound' || s === 'hardback' || s === 'festeinband') {
                         normalized.specPatch[key] = 'hardcover';
+                    } else if (s === 'rückstichheftung' || s === 'rueckstichheftung' || s === 'drahtheftung' || s === 'sattelheftung') {
+                        normalized.specPatch[key] = 'saddle stitch';
+                    } else if (s === 'spiralbindung' || s === 'wire_o') {
+                        normalized.specPatch[key] = 'wire-o';
                     }
                 } else if (key === 'paper_type_interior') {
                     const s = String(val).toLowerCase().trim();
                     if (VALID_PAPER_TYPE_INTERIOR.includes(s)) {
                         normalized.specPatch[key] = s;
-                    } else if (s === 'coated' || s === 'gloss' || s === 'matt') {
+                    } else if (s === 'coated' || s === 'gloss' || s === 'matt' || s.includes('bilderdruck')) {
                         normalized.specPatch[key] = 'mc';
-                    } else if (s === 'uncoated' || s === 'woodfree') {
+                    } else if (s === 'uncoated' || s === 'woodfree' || s.includes('werkdruck') || s.includes('naturpapier')) {
                         normalized.specPatch[key] = 'offset';
                     }
                 } else if (key === 'paper_type_cover') {
                     const s = String(val).toLowerCase().trim();
                     if (VALID_PAPER_TYPE_COVER.includes(s)) {
                         normalized.specPatch[key] = s;
-                    } else if (s === 'coated') {
+                    } else if (s.includes('karton') || s.includes('artboard')) {
+                        normalized.specPatch[key] = 'artboard';
+                    } else if (s === 'coated' || s.includes('bilderdruck')) {
                         normalized.specPatch[key] = 'mc';
                     }
                 } else if (key === 'paper_type_endpapers' && VALID_PAPER_TYPE_ENDPAPER.includes(val)) {
                     normalized.specPatch[key] = val;
                 } else if (key === 'lamination') {
                     const s = String(val).toLowerCase().trim();
-                    if (VALID_LAMINATION.includes(s)) {
+                    if (s === 'none' || s === 'null' || s === 'unlaminated' || /^(?:ohne\s+(?:veredelung|kaschierung|folienkaschierung|lack|lackierung)|keine\s+(?:veredelung|kaschierung|lackierung)|unveredelt|unlaminiert|sin\s+(?:laminado|acabado))$/.test(s)) {
+                        normalized.specPatch[key] = null;
+                    } else if (VALID_LAMINATION.includes(s)) {
                         normalized.specPatch[key] = s;
-                    } else if (s === 'matte') {
+                    } else if (/(?:dispersionslack|schutzlack|uv[-\s]?lack|offsetlack|drucklack|lackiert|barniz)/.test(s)) {
+                        normalized.specPatch[key] = 'varnish';
+                    } else if (s === 'matte' || /(?:mattfolie|mattkaschierung|cellophanierung\s+matt|matt\s+cellophaniert|samtfolie|soft[-\s]?touch|matt\s*laminiert|mattlaminiert)/.test(s)) {
                         normalized.specPatch[key] = 'matt';
-                    } else if (s === 'glossy') {
+                    } else if (s === 'glossy' || /(?:glanzfolie|glanzkaschierung|cellophanierung\s+gl(?:ä|ae)nzend|gl(?:ä|ae)nzend\s+cellophaniert|glanz\s*laminiert|glanzlaminiert)/.test(s)) {
                         normalized.specPatch[key] = 'gloss';
                     }
                 } else if (key === 'orientation' && VALID_ORIENTATION.includes(val)) {

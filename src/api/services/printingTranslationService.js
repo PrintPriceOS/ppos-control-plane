@@ -37,7 +37,21 @@ const GLOSSARY_MAP = [
         de: 'Klebebindung',
         en: 'Perfect bound',
         es: 'Encolado',
-        matchRegex: /\b(klebebindung|perfect bound|encolado|pb)\b/i
+        matchRegex: /\b(pur[-\s]?bindung|pur[-\s]?klebebindung|klebebindung|perfect bound|encolado|pb)\b/i
+    },
+    {
+        canonical: 'SADDLE_STITCH',
+        de: 'Rückstichheftung',
+        en: 'Saddle stitch',
+        es: 'Grapa',
+        matchRegex: /\b(r(?:ü|ue)ckstichheftung|drahtheftung|sattelheftung|saddle stitch|grapa)\b/i
+    },
+    {
+        canonical: 'WIRE_O',
+        de: 'Spiralbindung',
+        en: 'Wire-O',
+        es: 'Wire-O',
+        matchRegex: /\b(spiralbindung|wire-?o)\b/i
     },
     {
         canonical: 'ROUNDED_SPINE',
@@ -54,18 +68,32 @@ const GLOSSARY_MAP = [
         matchRegex: /\b(gerader rücken|gerader ruecken|straight spine|lomo recto)\b/i
     },
     {
+        canonical: 'UNLAMINATED',
+        de: 'ohne Veredelung',
+        en: 'Unlaminated',
+        es: 'Sin laminado',
+        matchRegex: /\b(ohne veredelung|keine veredelung|unveredelt|ohne kaschierung|ohne lack|unlaminiert|unlaminated|sin laminado)\b/i
+    },
+    {
         canonical: 'MATT_LAMINATED',
         de: 'matt laminiert',
         en: 'Matte laminated',
         es: 'Laminado mate',
-        matchRegex: /\b(matt laminiert|matte laminated|laminado mate|mattfolie)\b/i
+        matchRegex: /\b(matt laminiert|mattlaminiert|matte laminated|laminado mate|mattfolie(?:nkaschierung)?|mattkaschierung|cellophanierung matt|matt cellophaniert|samtfolie|soft[-\s]?touch[-\s]?folie)\b/i
     },
     {
         canonical: 'GLOSS_LAMINATED',
         de: 'glanzlaminiert',
         en: 'Gloss laminated',
         es: 'Laminado brillo',
-        matchRegex: /\b(glanzlaminiert|gloss laminated|laminado brillo|glanzfolie)\b/i
+        matchRegex: /\b(glanzlaminiert|glanz laminiert|gloss laminated|laminado brillo|glanzfolie(?:nkaschierung)?|glanzkaschierung|cellophanierung gl(?:ä|ae)nzend|gl(?:ä|ae)nzend cellophaniert)\b/i
+    },
+    {
+        canonical: 'VARNISH',
+        de: 'Dispersionslack',
+        en: 'Protective varnish',
+        es: 'Barniz protector',
+        matchRegex: /\b(dispersionslack|schutzlack|uv[-\s]?lack|offsetlack|drucklack|matt lackiert|gl(?:ä|ae)nzend lackiert|protective varnish|dispersion varnish)\b/i
     },
     {
         canonical: 'SAMPLE_COPIES',

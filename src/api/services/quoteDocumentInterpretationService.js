@@ -258,7 +258,6 @@ class QuoteDocumentInterpretationService {
         }
 
         // Family & Binding Method
-        const lower = text.toLowerCase();
         let family = 'SOFTCOVER';
         let bindingMethod = 'perfect bound';
 
@@ -271,14 +270,16 @@ class QuoteDocumentInterpretationService {
         } else if (/\b(?:wire-?o|spiral(?:e|bindung)?)\b/i.test(text)) {
             family = 'WIRE_O';
             bindingMethod = 'wire-o';
-        } else if (/\b(?:rückstich|sattelheftung|heftung|staple)\b/i.test(text) && !/fadenheftung/i.test(text)) {
+        } else if (/\b(?:r(?:ü|ue)ckstich(?:heftung)?|drahtheftung|sattelheftung|heftung|staple)\b/i.test(text) && !/fadenheftung/i.test(text)) {
             family = 'SADDLE_STITCH';
             bindingMethod = 'saddle stitch';
+        } else if (/\b(?:broschur|softcover)\b/i.test(text)) {
+            family = 'SOFTCOVER';
         }
 
         if (/\bfadenheftung\b/i.test(text) || /\bthread\s*sewn\b/i.test(text)) {
             bindingMethod = 'thread sewn';
-        } else if (/\bklebebindung\b/i.test(text) || /\bperfect\s*bound\b/i.test(text)) {
+        } else if (/\b(?:pur[-\s]?bindung|pur[-\s]?klebebindung|klebebindung)\b/i.test(text) || /\bperfect\s*bound\b/i.test(text)) {
             bindingMethod = 'perfect bound';
         }
 
@@ -299,11 +300,17 @@ class QuoteDocumentInterpretationService {
             spec.boardThicknessMm = parseLocaleNumber(mgpMatch[1]);
         }
 
-        // Lamination (glanz / matt / kratzfest matt)
-        if (/\bkratzfest\s*matt\b/i.test(text) || /\bmatt\s*laminiert\b/i.test(text) || /\bmatte\s*laminat/i.test(text)) {
+        // Lamination / Cover Finishing (DE / EN / ES)
+        // Golden rule: NEVER default to 'none' or any finish if the PDF does not mention finishing explicitly.
+        // Check explicit negation ("ohne Veredelung", "ohne Lack", etc.) first so it never false-matches varnish/lamination.
+        if (/\b(?:ohne\s+(?:veredelung|kaschierung|folienkaschierung|cellophanierung|lack|lackierung)|keine\s+(?:veredelung|kaschierung|folienkaschierung|lackierung)|unveredelt|unlaminiert|unlaminated|no\s+lamination|sin\s+(?:laminado|plastificado|acabado))\b/i.test(text)) {
+            spec.lamination = 'none';
+        } else if (/\b(?:mattfolie(?:nkaschierung)?|mattkaschierung|cellophanierung\s+matt|matt\s+cellophaniert|samtfolie|soft[-\s]?touch[-\s]?folie|kratzfest\s*matt|matt\s*laminiert|mattlaminiert|matte\s*laminat\w*|laminado\s+mate|plastificado\s+mate)\b/i.test(text)) {
             spec.lamination = 'matt';
-        } else if (/\bglanz\s*laminiert\b/i.test(text) || /\bgloss\s*laminat/i.test(text)) {
+        } else if (/\b(?:glanzfolie(?:nkaschierung)?|glanzkaschierung|cellophanierung\s+gl(?:ä|ae)nzend|gl(?:ä|ae)nzend\s+cellophaniert|glanz\s*laminiert|glanzlaminiert|gloss\s*laminat\w*|laminado\s+brillo|plastificado\s+brillo)\b/i.test(text)) {
             spec.lamination = 'gloss';
+        } else if (/\b(?:dispersionslack|schutzlack|uv[-\s]?lack|offsetlack|drucklack|matt\s+lackiert|gl(?:ä|ae)nzend\s+lackiert|protective\s+varnish|dispersion\s+varnish|barniz\s+(?:protector|de\s+m(?:á|a)quina|uv))\b/i.test(text)) {
+            spec.lamination = 'varnish';
         }
 
         // Headband & Ribbon
@@ -328,23 +335,31 @@ class QuoteDocumentInterpretationService {
         }
 
         // Papers & Colors
-        // Look for tabular or line patterns like:
-        // Inhalt \n G-Print 115 g
+        // Look for tabular or inline German/EN patterns like:
+        // Inhalt \n G-Print 115 g   OR   Inhalt: 115g Bilderdruck matt, 4/4-farbig
         // Vorsatz/Nachsatz \n Offset 170 g
-        // Umschlag \n Silk 130 g
-        const inhaltPaperMatch = text.match(/Inhalt\s*[\r\n]+\s*([A-Za-z0-9\-_ ]+?)\s+(\d+)\s*g\b/i);
+        // Umschlag \n Silk 130 g    OR   Umschlag: 300g Bilderdruck matt, 4/0-farbig
+        const inhaltPaperMatch = text.match(/Inhalt\s*[\r\n]+\s*([A-Za-z0-9\-_ ]+?)\s+(\d+)\s*g(?:\/m[²2])?\b/i);
+        const inhaltInlineWeightFirst = text.match(/Inhalt\s*[:\t ][^\r\n]*?\b(\d{2,3})\s*g(?:\/m[²2])?\s+([A-Za-zÄÖÜäöüß0-9\-_ ]+?)(?:,|\r|\n|$)/i);
         if (inhaltPaperMatch) {
             spec.interiorPaper = inhaltPaperMatch[1].trim();
             spec.interiorWeightGsm = parseInt(inhaltPaperMatch[2], 10);
+        } else if (inhaltInlineWeightFirst) {
+            spec.interiorWeightGsm = parseInt(inhaltInlineWeightFirst[1], 10);
+            spec.interiorPaper = inhaltInlineWeightFirst[2].trim();
         }
 
-        const umschlagPaperMatch = text.match(/Umschlag\s*[\r\n]+\s*([A-Za-z0-9\-_ ]+?)\s+(\d+)\s*g\b/i);
+        const umschlagPaperMatch = text.match(/Umschlag\s*[\r\n]+\s*([A-Za-z0-9\-_ ]+?)\s+(\d+)\s*g(?:\/m[²2])?\b/i);
+        const umschlagInlineWeightFirst = text.match(/Umschlag\s*[:\t ][^\r\n]*?\b(\d{2,3})\s*g(?:\/m[²2])?\s+([A-Za-zÄÖÜäöüß0-9\-_ ]+?)(?:,|\r|\n|$)/i);
         if (umschlagPaperMatch) {
             spec.coverPaper = umschlagPaperMatch[1].trim();
             spec.coverWeightGsm = parseInt(umschlagPaperMatch[2], 10);
+        } else if (umschlagInlineWeightFirst) {
+            spec.coverWeightGsm = parseInt(umschlagInlineWeightFirst[1], 10);
+            spec.coverPaper = umschlagInlineWeightFirst[2].trim();
         }
 
-        const vorsatzPaperMatch = text.match(/Vorsatz(?:\/Nachsatz)?\s*[\r\n]+\s*([A-Za-z0-9\-_ ]+?)\s+(\d+)\s*g\b/i);
+        const vorsatzPaperMatch = text.match(/Vorsatz(?:\/Nachsatz)?\s*[\r\n]+\s*([A-Za-z0-9\-_ ]+?)\s+(\d+)\s*g(?:\/m[²2])?\b/i);
         if (vorsatzPaperMatch) {
             spec.hasEndpapers = true;
             spec.endpaperPaper = vorsatzPaperMatch[1].trim();
@@ -354,21 +369,27 @@ class QuoteDocumentInterpretationService {
             spec.hasEndpapers = true;
         }
 
-        // Inks (e.g. Inhalt \n 4+4, Umschlag \n 4+0, Vorsatz \n 0+0)
-        const inhaltInkMatch = text.match(/Inhalt\s*[\r\n]+\s*([0-5][+/][0-5])/i);
+        // Inks (e.g. Inhalt \n 4+4, Umschlag \n 4+0, or inline "4/4-farbig", "1/1-farbig", "4/0-farbig")
+        const inhaltInkMatch =
+            text.match(/Inhalt\s*[\r\n]+\s*([0-5][+/][0-5])(?:\s*-?\s*farbig)?/i) ||
+            text.match(/Inhalt\s*[:\t ][^\r\n]*?\b([1-4][+/][1-4])(?:\s*-?\s*farbig)?\b/i);
         if (inhaltInkMatch) {
             spec.interiorColors = inhaltInkMatch[1].replace('+', '/');
         } else {
-            const genericInk = text.match(/\b([1-4]\/[1-4]|[1-4]\+[1-4])\b/);
+            const genericInk = text.match(/\b([1-4]\/[1-4]|[1-4]\+[1-4])(?:\s*-?\s*farbig)?\b/i);
             if (genericInk) spec.interiorColors = genericInk[1].replace('+', '/');
         }
 
-        const coverInkMatch = text.match(/Umschlag\s*[\r\n]+\s*([0-5][+/][0-5])/i);
+        const coverInkMatch =
+            text.match(/Umschlag\s*[\r\n]+\s*([0-5][+/][0-5])(?:\s*-?\s*farbig)?/i) ||
+            text.match(/Umschlag\s*[:\t ][^\r\n]*?\b([1-5][+/][0-5])(?:\s*-?\s*farbig)?\b/i);
         if (coverInkMatch) {
             spec.coverColors = coverInkMatch[1].replace('+', '/');
         }
 
-        const vorsatzInkMatch = text.match(/Vorsatz(?:\/Nachsatz)?\s*[\r\n]+\s*([0-5][+/][0-5])/i);
+        const vorsatzInkMatch =
+            text.match(/Vorsatz(?:\/Nachsatz)?\s*[\r\n]+\s*([0-5][+/][0-5])(?:\s*-?\s*farbig)?/i) ||
+            text.match(/Vorsatz(?:\/Nachsatz)?\s*[:\t ][^\r\n]*?\b([0-5][+/][0-5])(?:\s*-?\s*farbig)?\b/i);
         if (vorsatzInkMatch) {
             spec.endpaperColors = vorsatzInkMatch[1].replace('+', '/');
         }

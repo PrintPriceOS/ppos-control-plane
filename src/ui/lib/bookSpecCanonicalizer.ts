@@ -163,8 +163,8 @@ function normalizePaperTypeInterior(raw?: string): string | null {
     const s = raw.toLowerCase().trim();
     if (s.includes('munken')) return 'munken';
     if (s.includes('lux') || s.includes('crema') || s.includes('cream')) return 'lux';
-    if (s.includes('offset') || s.includes('uncoated') || s.includes('woodfree') || s.includes('natural')) return 'offset';
-    if (s.includes('mc') || s.includes('coated') || s.includes('silk') || s.includes('matt') || s.includes('gloss') || s.includes('g-print')) return 'mc';
+    if (s.includes('offset') || s.includes('uncoated') || s.includes('woodfree') || s.includes('natural') || s.includes('werkdruck') || s.includes('naturpapier')) return 'offset';
+    if (s.includes('mc') || s.includes('coated') || s.includes('silk') || s.includes('matt') || s.includes('gloss') || s.includes('g-print') || s.includes('bilderdruck')) return 'mc';
     return VALID_INTERIOR_PAPERS.has(s) ? s : null;
 }
 
@@ -172,9 +172,9 @@ function normalizePaperTypeCover(raw?: string): string | null {
     if (!raw) return null;
     const s = raw.toLowerCase().trim();
     if (s.includes('cartulina') || s.includes('artboard') || s.includes('cardstock') || s.includes('invercote') || s.includes('karton')) return 'artboard';
-    if (s.includes('offset') || s.includes('uncoated')) return 'offset';
+    if (s.includes('offset') || s.includes('uncoated') || s.includes('naturpapier')) return 'offset';
     if (s.includes('wfmc')) return 'wfmc';
-    if (s.includes('silk') || s.includes('mc') || s.includes('estucado') || s.includes('gloss') || s.includes('matt') || s.includes('couché')) return 'mc';
+    if (s.includes('silk') || s.includes('mc') || s.includes('estucado') || s.includes('gloss') || s.includes('matt') || s.includes('couché') || s.includes('bilderdruck')) return 'mc';
     return VALID_COVER_PAPERS.has(s) ? s : null;
 }
 
@@ -187,26 +187,30 @@ function normalizeBindingMethod(raw?: string): string | null {
     if (!raw) return null;
     const s = raw.toLowerCase().trim();
     if (s === 'thread_sewn' || s === 'thread sewn' || s === 'sewn' || s === 'fadenheftung') return 'thread sewn';
-    if (s === 'adhesive_pur' || s === 'perfect bound' || s === 'glued' || s === 'pur' || s === 'klebebindung') return 'perfect bound';
-    if (s === 'wire_o' || s === 'wire-o' || s === 'spiral') return 'wire-o';
-    if (s === 'saddle_stitch' || s === 'saddle stitch' || s === 'staple' || s === 'grapa' || s === 'rückstich') return 'saddle stitch';
-    if (s === 'hardcover' || s === 'casebound') return 'hardcover';
+    if (s === 'adhesive_pur' || s === 'perfect bound' || s === 'glued' || s === 'pur' || s === 'pur-bindung' || s === 'pur bindung' || s === 'klebebindung' || s === 'broschur' || s === 'softcover') return 'perfect bound';
+    if (s === 'wire_o' || s === 'wire-o' || s === 'spiral' || s === 'spiralbindung') return 'wire-o';
+    if (s === 'saddle_stitch' || s === 'saddle stitch' || s === 'staple' || s === 'grapa' || s === 'rückstich' || s === 'rückstichheftung' || s === 'rueckstichheftung' || s === 'drahtheftung' || s === 'sattelheftung') return 'saddle stitch';
+    if (s === 'hardcover' || s === 'casebound' || s === 'festeinband') return 'hardcover';
     return VALID_BINDING_METHODS.has(s) ? s : null;
 }
 
 /**
- * Normalizes print colors string (e.g. "4+4", "4/4", "4+0", "4/0", "1/1").
+ * Normalizes print colors string (e.g. "4+4", "4/4", "4/4-farbig", "1/1-farbig", "4+0", "4/0").
  * Returns null if not provided or invalid.
  */
 function normalizePrintColors(raw?: string): string | null {
     if (!raw) return null;
-    const clean = raw.trim().replace('+', '/');
+    const clean = raw
+        .trim()
+        .replace(/\+/g, '/')
+        .replace(/\s*-?\s*(?:farbig|colors?|colores?)$/i, '')
+        .trim();
     return clean;
 }
 
 /**
  * Normalizes lamination.
- * Distinguishes explicit absence ('none', 'unlaminated', null) from unspecified/unknown.
+ * Distinguishes explicit absence ('none', 'unlaminated', 'ohne Veredelung', null) from unspecified/unknown.
  * Returns:
  *   - 'gloss' | 'matt' | 'varnish' for recognized finishes
  *   - null for explicit unlaminated / absence
@@ -217,10 +221,60 @@ export function normalizeLamination(raw?: string | null): 'gloss' | 'matt' | 'va
     if (raw === undefined) return undefined;
     const s = String(raw).toLowerCase().trim();
     if (!s) return undefined;
-    if (s === 'none' || s === 'null' || s === 'sin laminado' || s === 'unlaminated' || s === 'uncoated' || s === 'ohne') return null;
-    if (s === 'matt' || s === 'matte' || s === 'soft_touch' || s.includes('matt')) return 'matt';
-    if (s === 'gloss' || s === 'glossy' || s.includes('glanz')) return 'gloss';
-    if (s === 'varnish' || s.includes('barniz')) return 'varnish';
+    if (
+        s === 'none' ||
+        s === 'null' ||
+        s === 'sin laminado' ||
+        s === 'sin acabado' ||
+        s === 'unlaminated' ||
+        s === 'uncoated' ||
+        s === 'ohne' ||
+        s === 'unveredelt' ||
+        s === 'unlaminiert' ||
+        /^(?:ohne|keine)\s+(?:veredelung|kaschierung|folienkaschierung|cellophanierung|lack|lackierung)$/.test(s) ||
+        s === 'no lamination'
+    ) {
+        return null;
+    }
+    if (
+        s === 'varnish' ||
+        s.includes('barniz') ||
+        s.includes('dispersionslack') ||
+        s.includes('schutzlack') ||
+        s.includes('uv-lack') ||
+        s.includes('uv lack') ||
+        s.includes('offsetlack') ||
+        s.includes('drucklack') ||
+        s.includes('lackiert')
+    ) {
+        return 'varnish';
+    }
+    if (
+        s === 'matt' ||
+        s === 'matte' ||
+        s === 'soft_touch' ||
+        s.includes('mattfolie') ||
+        s.includes('mattkaschierung') ||
+        s.includes('samtfolie') ||
+        s.includes('soft-touch') ||
+        s.includes('softtouch') ||
+        s.includes('cellophanierung matt') ||
+        s.includes('matt cellophaniert') ||
+        s.includes('matt')
+    ) {
+        return 'matt';
+    }
+    if (
+        s === 'gloss' ||
+        s === 'glossy' ||
+        s.includes('glanzfolie') ||
+        s.includes('glanzkaschierung') ||
+        s.includes('cellophanierung glänzend') ||
+        s.includes('glänzend cellophaniert') ||
+        s.includes('glanz')
+    ) {
+        return 'gloss';
+    }
     return undefined; // Unrecognized/unknown
 }
 
