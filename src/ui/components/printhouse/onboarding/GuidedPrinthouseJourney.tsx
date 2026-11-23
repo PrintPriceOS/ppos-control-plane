@@ -733,6 +733,98 @@ export const GuidedPrinthouseJourney: React.FC<GuidedPrinthouseJourneyProps> = (
     // ── STAGE B HANDLERS: Qué produces ──
     const [uploadingProductsPdf, setUploadingProductsPdf] = useState<Partial<Record<ProductFamilyId, boolean>>>({});
     const [uploadProductsError, setUploadProductsError] = useState<Partial<Record<ProductFamilyId, string | null>>>({});
+    const [paperDbImportedCount, setPaperDbImportedCount] = useState<number>(0);
+    const [uploadingPaperDb, setUploadingPaperDb] = useState<boolean>(false);
+    const [paperDbError, setPaperDbError] = useState<string | null>(null);
+
+    const handleUploadPaperDatabaseCsv = async (file: File) => {
+        const token = getAuthToken();
+        setUploadingPaperDb(true);
+        setPaperDbError(null);
+        try {
+            const rawText = await file.text();
+            const lines = rawText
+                .split(/\r?\n/)
+                .map(l => l.trim())
+                .filter(Boolean);
+
+            const parsedRows: Array<{
+                material_name: string;
+                material_type: string;
+                substrate_class: string;
+                sheet_format: string;
+                finish_type: string;
+                gsm: number;
+                cost_per_unit?: number;
+            }> = [];
+
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i];
+                const sep = line.includes(';') ? ';' : ',';
+                const cols = line.split(sep).map(c => c.trim().replace(/^"|"$/g, ''));
+                if (cols.length < 2) continue;
+                // Skip header row
+                if (i === 0 && /(?:name|brand|sorte|papel|paper|gramm|gsm)/i.test(cols[0])) continue;
+
+                const name = cols[0];
+                const gsmVal = Number(String(cols[1] || '').replace(/[^0-9.,]/g, '').replace(',', '.'));
+                if (!name || !Number.isFinite(gsmVal) || gsmVal <= 0) continue;
+
+                const format = cols[2] && cols[2].length >= 3 ? cols[2] : '70x100';
+                const priceVal = cols[3] ? Number(String(cols[3]).replace(/[^0-9.,]/g, '').replace(',', '.')) : undefined;
+                const lowerName = name.toLowerCase();
+                const substrateClass = /(?:karton|board|cartulina|invercote)/.test(lowerName)
+                    ? 'BOARD'
+                    : /(?:bilderdruck|silk|matt|gloss|coated|estucado|magno|satin|g-print)/.test(lowerName)
+                        ? 'COATED'
+                        : 'UNCOATED';
+                const finishType = lowerName.includes('gloss') || lowerName.includes('glanz')
+                    ? 'GLOSS'
+                    : lowerName.includes('silk') || lowerName.includes('satin')
+                        ? 'SILK'
+                        : lowerName.includes('matt') || lowerName.includes('bilderdruck')
+                            ? 'MATT'
+                            : 'UNCOATED';
+
+                parsedRows.push({
+                    material_name: `${name} ${gsmVal}g`,
+                    material_type: 'PAPER',
+                    substrate_class: substrateClass,
+                    sheet_format: format,
+                    finish_type: finishType,
+                    gsm: Math.round(gsmVal),
+                    ...(priceVal && Number.isFinite(priceVal) && priceVal > 0 ? { cost_per_unit: priceVal } : {})
+                });
+            }
+
+            if (parsedRows.length === 0) {
+                throw new Error(t('guided.products.paperDbErrEmpty'));
+            }
+
+            let createdCount = 0;
+            if (printerNodeId && token) {
+                for (const row of parsedRows.slice(0, 100)) {
+                    const res = await fetch(`/api/printhouse/onboarding/sites/${encodeURIComponent(printerNodeId)}/materials`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${token}`
+                        },
+                        body: JSON.stringify(row)
+                    });
+                    if (res.ok) createdCount += 1;
+                }
+            } else {
+                createdCount = parsedRows.length;
+            }
+
+            setPaperDbImportedCount(prev => prev + (createdCount || parsedRows.length));
+        } catch (err: any) {
+            setPaperDbError(normalizeUiError(err, t('guided.products.paperDbErrEmpty')));
+        } finally {
+            setUploadingPaperDb(false);
+        }
+    };
 
     const handleUploadQuoteFromProducts = async (familyId: ProductFamilyId, file: File) => {
         const token = getAuthToken();
@@ -1244,6 +1336,10 @@ export const GuidedPrinthouseJourney: React.FC<GuidedPrinthouseJourneyProps> = (
                         uploadingByFamily={uploadingProductsPdf}
                         uploadErrorsByFamily={uploadProductsError}
                         onUploadFamilyQuote={handleUploadQuoteFromProducts}
+                        paperDbImportedCount={paperDbImportedCount}
+                        uploadingPaperDb={uploadingPaperDb}
+                        paperDbError={paperDbError}
+                        onUploadPaperDatabaseCsv={handleUploadPaperDatabaseCsv}
                         onToggleFamily={handleToggleFamily}
                         onSelectActiveFamily={handleSelectActiveFamily}
                         onContinueToPricing={handleContinueToPricing}

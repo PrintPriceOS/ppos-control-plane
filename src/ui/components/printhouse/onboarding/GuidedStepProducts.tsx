@@ -25,6 +25,10 @@ interface GuidedStepProductsProps {
     uploadingByFamily?: Partial<Record<ProductFamilyId, boolean>>;
     uploadErrorsByFamily?: Partial<Record<ProductFamilyId, string | null>>;
     onUploadFamilyQuote?: (familyId: ProductFamilyId, file: File) => void;
+    paperDbImportedCount?: number;
+    uploadingPaperDb?: boolean;
+    paperDbError?: string | null;
+    onUploadPaperDatabaseCsv?: (file: File) => void;
     onToggleFamily: (familyId: ProductFamilyId) => void;
     onSelectActiveFamily: (familyId: ProductFamilyId) => void;
     onContinueToPricing: () => void;
@@ -72,6 +76,10 @@ export const GuidedStepProducts: React.FC<GuidedStepProductsProps> = ({
     uploadingByFamily,
     uploadErrorsByFamily,
     onUploadFamilyQuote,
+    paperDbImportedCount = 0,
+    uploadingPaperDb = false,
+    paperDbError = null,
+    onUploadPaperDatabaseCsv,
     onToggleFamily,
     onSelectActiveFamily,
     onContinueToPricing,
@@ -81,6 +89,7 @@ export const GuidedStepProducts: React.FC<GuidedStepProductsProps> = ({
     const { t } = useLocale();
     const activeCount = Object.values(enabledFamilies).filter(Boolean).length;
     const fileInputRefs = useRef<Partial<Record<ProductFamilyId, HTMLInputElement | null>>>({});
+    const paperCsvInputRef = useRef<HTMLInputElement | null>(null);
     const [dragOverFamily, setDragOverFamily] = useState<ProductFamilyId | null>(null);
 
     const handleFilePicked = (familyId: ProductFamilyId, file?: File | null) => {
@@ -265,32 +274,39 @@ export const GuidedStepProducts: React.FC<GuidedStepProductsProps> = ({
                 })}
             </div>
 
-            {/* Live Calibration Coverage Indicator (What 4 offers cover in PrintPrice OS) */}
+            {/* Live Calibration Coverage Indicator (What 4 offers + Paper DB cover in PrintPrice OS) */}
             {(() => {
                 const uploadedFamiliesCount = FAMILY_DEFINITIONS.filter(
                     (d) => enabledFamilies[d.id] && Boolean(pricingContinuity?.[d.id]?.uploadedFileName || pricingContinuity?.[d.id]?.offer || families[d.id]?.status === 'DATA_VALIDATED')
                 ).length;
-                const estimatedCoveragePct = Math.min(80, uploadedFamiliesCount * 20);
+                const offersCoveragePct = Math.min(80, uploadedFamiliesCount * 20);
+                const paperBonusPct = paperDbImportedCount > 0 ? 20 : 0;
+                const estimatedCoveragePct = Math.min(100, offersCoveragePct + paperBonusPct);
+                const isFullCoverage = estimatedCoveragePct >= 100;
                 return (
                     <div
                         data-testid="products-calibration-coverage-meter"
-                        className="p-4 rounded-2xl bg-white dark:bg-[#18181b] border border-zinc-200 dark:border-zinc-800 space-y-2.5"
+                        className="p-4 rounded-2xl bg-white dark:bg-[#18181b] border border-zinc-200 dark:border-zinc-800 space-y-3"
                     >
                         <div className="flex flex-wrap items-center justify-between gap-2">
                             <div className="flex items-center gap-2">
-                                <ShieldCheck size={16} className="text-[#dc0000] shrink-0" />
+                                <ShieldCheck size={16} className={isFullCoverage ? 'text-emerald-600 shrink-0' : 'text-[#dc0000] shrink-0'} />
                                 <span className="text-xs font-bold text-zinc-900 dark:text-zinc-100">
                                     {t('guided.products.coverageTitle')}
                                 </span>
                             </div>
-                            <span className="text-xs font-extrabold text-zinc-900 dark:text-zinc-100 bg-zinc-100 dark:bg-zinc-800 px-2.5 py-0.5 rounded-full">
-                                {uploadedFamiliesCount}/{activeCount || 4} {t('guided.products.coverageFamiliesCount')} · ~{estimatedCoveragePct}%
+                            <span className={`text-xs font-extrabold px-2.5 py-0.5 rounded-full ${
+                                isFullCoverage
+                                    ? 'bg-emerald-100 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300'
+                                    : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100'
+                            }`}>
+                                {uploadedFamiliesCount}/{activeCount || 4} {t('guided.products.coverageFamiliesCount')} · {isFullCoverage ? '100%' : `~${estimatedCoveragePct}%`}
                             </span>
                         </div>
                         <div className="w-full h-2 rounded-full bg-zinc-100 dark:bg-zinc-800 overflow-hidden">
                             <div
-                                className="h-full bg-[#dc0000] rounded-full transition-all duration-300"
-                                style={{ width: `${Math.max(uploadedFamiliesCount > 0 ? 12 : 0, estimatedCoveragePct)}%` }}
+                                className={`h-full rounded-full transition-all duration-300 ${isFullCoverage ? 'bg-emerald-500' : 'bg-[#dc0000]'}`}
+                                style={{ width: `${Math.max(estimatedCoveragePct > 0 ? 12 : 0, estimatedCoveragePct)}%` }}
                             />
                         </div>
                         <p className="text-[11px] text-zinc-600 dark:text-zinc-400 leading-relaxed">
@@ -304,6 +320,70 @@ export const GuidedStepProducts: React.FC<GuidedStepProductsProps> = ({
                                 {t('guided.products.coverageSeparateLabel')}
                             </div>
                         </div>
+
+                        {/* Direct Paper Database CSV Upload (+20% -> 100%) */}
+                        {onUploadPaperDatabaseCsv && (
+                            <div
+                                data-testid="products-paper-db-upload"
+                                className={`p-3 rounded-xl border border-dashed flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 transition-colors ${
+                                    paperDbImportedCount > 0
+                                        ? 'border-emerald-300 dark:border-emerald-800 bg-emerald-50/60 dark:bg-emerald-950/20'
+                                        : 'border-zinc-300 dark:border-zinc-700 bg-zinc-50/80 dark:bg-zinc-900/50'
+                                }`}
+                            >
+                                <input
+                                    ref={paperCsvInputRef}
+                                    type="file"
+                                    accept=".csv,.txt,text/csv"
+                                    data-testid="products-paper-db-file-input"
+                                    className="hidden"
+                                    onChange={(e) => {
+                                        const f = e.target.files?.[0];
+                                        if (f) onUploadPaperDatabaseCsv(f);
+                                        e.target.value = '';
+                                    }}
+                                />
+                                <div className="space-y-0.5 min-w-0">
+                                    <div className="text-xs font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5">
+                                        <Layers size={14} className={paperDbImportedCount > 0 ? 'text-emerald-600' : 'text-[#dc0000]'} />
+                                        <span>{t('guided.products.paperDbTitle')}</span>
+                                    </div>
+                                    <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
+                                        {paperDbImportedCount > 0
+                                            ? `✓ ${paperDbImportedCount} ${t('guided.products.paperDbImported')}`
+                                            : t('guided.products.paperDbHint')}
+                                    </p>
+                                    {paperDbError && (
+                                        <div className="text-[11px] text-red-600 dark:text-red-400 flex items-center gap-1 pt-0.5">
+                                            <AlertCircle size={12} />
+                                            <span>{paperDbError}</span>
+                                        </div>
+                                    )}
+                                </div>
+                                <button
+                                    type="button"
+                                    disabled={uploadingPaperDb}
+                                    onClick={() => paperCsvInputRef.current?.click()}
+                                    className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 shrink-0 cursor-pointer disabled:opacity-60 ${
+                                        paperDbImportedCount > 0
+                                            ? 'bg-white dark:bg-zinc-800 border border-emerald-300 dark:border-emerald-700 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-50'
+                                            : 'bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 hover:bg-[#dc0000] dark:hover:bg-[#dc0000] dark:hover:text-white'
+                                    }`}
+                                >
+                                    {uploadingPaperDb ? (
+                                        <>
+                                            <Loader2 size={13} className="animate-spin" />
+                                            <span>{t('guided.products.paperDbUploading')}</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Upload size={13} />
+                                            <span>{paperDbImportedCount > 0 ? t('guided.products.paperDbReplace') : t('guided.products.paperDbBtn')}</span>
+                                        </>
+                                    )}
+                                </button>
+                            </div>
+                        )}
                     </div>
                 );
             })()}

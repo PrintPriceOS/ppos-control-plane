@@ -258,13 +258,18 @@ class DeterministicInversePricingSolver {
         const bindFixedKey = `binding_${p.bindingCode}_fixed_by_sections`;
         const bindVarKey = `binding_${p.bindingCode}_var_per_1000_by_sections`;
 
-        // Family-specific binding priors: PB is historically governed (0.164, 14.7). Other families do NOT inherit PB priors.
-        let bindFixedPrior = null;
-        let bindVarPrior = null;
-        if (p.bindingCode === 'pb') {
-            bindFixedPrior = 0.164;
-            bindVarPrior = 14.7;
-        }
+        // Family-specific governed starting priors for inverse calibration of new printhouses.
+        const SAFE_BINDING_PRIORS = {
+            pb: { fixed: 0.164, varPer1000: 14.7 },
+            hc: { fixed: 40.0, varPer1000: 450.0 },
+            ts: { fixed: 35.0, varPer1000: 120.0 },
+            ss: { fixed: 25.0, varPer1000: 65.0 },
+            wo: { fixed: 30.0, varPer1000: 220.0 },
+            sp: { fixed: 30.0, varPer1000: 200.0 }
+        };
+        const bindPrior = SAFE_BINDING_PRIORS[p.bindingCode] || null;
+        const bindFixedPrior = bindPrior ? bindPrior.fixed : null;
+        const bindVarPrior = bindPrior ? bindPrior.varPer1000 : null;
 
         let blockBindFixedKey = null;
         let blockBindVarKey = null;
@@ -273,9 +278,10 @@ class DeterministicInversePricingSolver {
         if (p.isHardcover && p.blockBindingCode) {
             blockBindFixedKey = `binding_${p.blockBindingCode}_fixed_by_sections`;
             blockBindVarKey = `binding_${p.blockBindingCode}_var_per_1000_by_sections`;
-            if (p.blockBindingCode === 'pb') {
-                blockFixedPrior = 0.164;
-                blockVarPrior = 14.7;
+            const blockPrior = SAFE_BINDING_PRIORS[p.blockBindingCode] || null;
+            if (blockPrior) {
+                blockFixedPrior = blockPrior.fixed;
+                blockVarPrior = blockPrior.varPer1000;
             }
         }
 
@@ -694,8 +700,17 @@ class DeterministicInversePricingSolver {
         const bindFixedKey = `binding_${p.bindingCode}_fixed_by_sections`;
         const bindVarKey = `binding_${p.bindingCode}_var_per_1000_by_sections`;
 
-        let bindFixedPrior = p.bindingCode === 'pb' ? 0.164 : null;
-        let bindVarPrior = p.bindingCode === 'pb' ? 14.7 : null;
+        const SAFE_BINDING_PRIORS_MULTI = {
+            pb: { fixed: 0.164, varPer1000: 14.7 },
+            hc: { fixed: 40.0, varPer1000: 450.0 },
+            ts: { fixed: 35.0, varPer1000: 120.0 },
+            ss: { fixed: 25.0, varPer1000: 65.0 },
+            wo: { fixed: 30.0, varPer1000: 220.0 },
+            sp: { fixed: 30.0, varPer1000: 200.0 }
+        };
+        const bindPriorMulti = SAFE_BINDING_PRIORS_MULTI[p.bindingCode] || null;
+        let bindFixedPrior = bindPriorMulti ? bindPriorMulti.fixed : null;
+        let bindVarPrior = bindPriorMulti ? bindPriorMulti.varPer1000 : null;
 
         let blockBindFixedKey = null;
         let blockBindVarKey = null;
@@ -704,9 +719,10 @@ class DeterministicInversePricingSolver {
         if (p.isHardcover && p.blockBindingCode) {
             blockBindFixedKey = `binding_${p.blockBindingCode}_fixed_by_sections`;
             blockBindVarKey = `binding_${p.blockBindingCode}_var_per_1000_by_sections`;
-            if (p.blockBindingCode === 'pb') {
-                blockFixedPrior = 0.164;
-                blockVarPrior = 14.7;
+            const blockPriorMulti = SAFE_BINDING_PRIORS_MULTI[p.blockBindingCode] || null;
+            if (blockPriorMulti) {
+                blockFixedPrior = blockPriorMulti.fixed;
+                blockVarPrior = blockPriorMulti.varPer1000;
             }
         }
 

@@ -166,12 +166,17 @@ class CalibrationReachabilityService {
             const bindFixedKey = `binding_${p.bindingCode}_fixed_by_sections`;
             const bindVarKey = `binding_${p.bindingCode}_var_per_1000_by_sections`;
 
-            let bindFixedPrior = null;
-            let bindVarPrior = null;
-            if (p.bindingCode === 'pb') {
-                bindFixedPrior = 0.164;
-                bindVarPrior = 14.7;
-            }
+            const SAFE_BINDING_PRIORS = {
+                pb: { fixed: 0.164, varPer1000: 14.7 },
+                hc: { fixed: 40.0, varPer1000: 450.0 },
+                ts: { fixed: 35.0, varPer1000: 120.0 },
+                ss: { fixed: 25.0, varPer1000: 65.0 },
+                wo: { fixed: 30.0, varPer1000: 220.0 },
+                sp: { fixed: 30.0, varPer1000: 200.0 }
+            };
+            const bindPrior = SAFE_BINDING_PRIORS[p.bindingCode] || null;
+            const bindFixedPrior = bindPrior ? bindPrior.fixed : null;
+            const bindVarPrior = bindPrior ? bindPrior.varPer1000 : null;
 
             const unqualifiedZeroAnchors = [];
             const baseActive = {};
@@ -220,8 +225,9 @@ class CalibrationReachabilityService {
                 if (p.isHardcover && p.blockBindingCode) {
                     const blockBindFixedKey = `binding_${p.blockBindingCode}_fixed_by_sections`;
                     const blockBindVarKey = `binding_${p.blockBindingCode}_var_per_1000_by_sections`;
-                    let blockFixedPrior = p.blockBindingCode === 'pb' ? 0.164 : null;
-                    let blockVarPrior = p.blockBindingCode === 'pb' ? 14.7 : null;
+                    const blockPrior = SAFE_BINDING_PRIORS[p.blockBindingCode] || null;
+                    const blockFixedPrior = blockPrior ? blockPrior.fixed : null;
+                    const blockVarPrior = blockPrior ? blockPrior.varPer1000 : null;
                     baseActive[blockBindFixedKey] = checkAndResolveRate(blockBindFixedKey, secKey, blockFixedPrior, true);
                     baseActive[blockBindVarKey] = checkAndResolveRate(blockBindVarKey, secKey, blockVarPrior, true);
                 }
