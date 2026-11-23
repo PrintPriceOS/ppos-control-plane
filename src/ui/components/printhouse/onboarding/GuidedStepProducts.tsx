@@ -12,7 +12,7 @@
  */
 
 import React, { useRef, useState } from 'react';
-import { Layers, ArrowRight, ArrowLeft, Info, Check, ShieldCheck, Upload, FileText, Loader2, AlertCircle } from 'lucide-react';
+import { Layers, ArrowRight, ArrowLeft, Info, Check, ShieldCheck, Upload, FileText, Loader2, AlertCircle, Download } from 'lucide-react';
 import { useLocale } from '../../../i18n';
 import { ProductFamilyId, FamilyState } from '../../../types/printhouseOnboardingTypes';
 import { BindingIcon } from './BindingFamilyIcons';
@@ -96,6 +96,26 @@ export const GuidedStepProducts: React.FC<GuidedStepProductsProps> = ({
         if (!file || !onUploadFamilyQuote) return;
         onSelectActiveFamily(familyId);
         onUploadFamilyQuote(familyId, file);
+    };
+
+    const handleDownloadPaperCsvTemplate = () => {
+        const csvContent = [
+            'brand_or_name,grammage_gsm,sheet_format,price_eur_kg',
+            'Munken Print White,90,70x100,1.42',
+            'Offset Uncoated White,80,70x100,1.18',
+            'Bilderdruck Matt,115,70x100,1.26',
+            'Magno Satin Silk,135,70x100,1.29',
+            'Chromokarton Cover,300,70x100,1.65'
+        ].join('\n');
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', 'printprice-paper-catalog-template.csv');
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
     };
 
     return (
@@ -360,28 +380,39 @@ export const GuidedStepProducts: React.FC<GuidedStepProductsProps> = ({
                                         </div>
                                     )}
                                 </div>
-                                <button
-                                    type="button"
-                                    disabled={uploadingPaperDb}
-                                    onClick={() => paperCsvInputRef.current?.click()}
-                                    className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 shrink-0 cursor-pointer disabled:opacity-60 ${
-                                        paperDbImportedCount > 0
-                                            ? 'bg-white dark:bg-zinc-800 border border-emerald-300 dark:border-emerald-700 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-50'
-                                            : 'bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 hover:bg-[#dc0000] dark:hover:bg-[#dc0000] dark:hover:text-white'
-                                    }`}
-                                >
-                                    {uploadingPaperDb ? (
-                                        <>
-                                            <Loader2 size={13} className="animate-spin" />
-                                            <span>{t('guided.products.paperDbUploading')}</span>
-                                        </>
-                                    ) : (
-                                        <>
-                                            <Upload size={13} />
-                                            <span>{paperDbImportedCount > 0 ? t('guided.products.paperDbReplace') : t('guided.products.paperDbBtn')}</span>
-                                        </>
-                                    )}
-                                </button>
+                                <div className="flex flex-wrap items-center gap-2 shrink-0">
+                                    <button
+                                        type="button"
+                                        data-testid="products-paper-db-template-btn"
+                                        onClick={handleDownloadPaperCsvTemplate}
+                                        className="px-3 py-2 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-200 text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer"
+                                    >
+                                        <Download size={13} />
+                                        <span>{t('guided.products.paperDbDownloadTemplate')}</span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        disabled={uploadingPaperDb}
+                                        onClick={() => paperCsvInputRef.current?.click()}
+                                        className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 shrink-0 cursor-pointer disabled:opacity-60 ${
+                                            paperDbImportedCount > 0
+                                                ? 'bg-white dark:bg-zinc-800 border border-emerald-300 dark:border-emerald-700 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-50'
+                                                : 'bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 hover:bg-[#dc0000] dark:hover:bg-[#dc0000] dark:hover:text-white'
+                                        }`}
+                                    >
+                                        {uploadingPaperDb ? (
+                                            <>
+                                                <Loader2 size={13} className="animate-spin" />
+                                                <span>{t('guided.products.paperDbUploading')}</span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Upload size={13} />
+                                                <span>{paperDbImportedCount > 0 ? t('guided.products.paperDbReplace') : t('guided.products.paperDbBtn')}</span>
+                                            </>
+                                        )}
+                                    </button>
+                                </div>
                             </div>
                         )}
                     </div>

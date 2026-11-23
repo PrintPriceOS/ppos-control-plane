@@ -1819,6 +1819,7 @@ export const en = {
   'guided.products.paperDbReplace': 'Upload another CSV',
   'guided.products.paperDbHint': 'CSV columns: Name, Weight (gsm), Format (e.g. 70x100), €/kg',
   'guided.products.paperDbErrEmpty': 'No valid paper rows found in the uploaded CSV file.',
+  'guided.products.paperDbDownloadTemplate': 'CSV Template',
   'guided.pricing.substepAdd': '1. Add quote',
   'guided.pricing.substepReview': '2. Review specification',
   'guided.pricing.substepCompare': '3. Compare prices',

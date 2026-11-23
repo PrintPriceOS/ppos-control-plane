@@ -1819,6 +1819,7 @@ export const de = {
   'guided.products.paperDbReplace': 'Weitere CSV laden',
   'guided.products.paperDbHint': 'CSV mit Spalten: Sorte, Grammatur (g/m²), Format (z. B. 70x100), €/kg',
   'guided.products.paperDbErrEmpty': 'Keine gültigen Papierzeilen in der CSV-Datei gefunden.',
+  'guided.products.paperDbDownloadTemplate': 'CSV-Vorlage',
   'guided.pricing.substepAdd': '1. Angebot hinzufügen',
   'guided.pricing.substepReview': '2. Spezifikation prüfen',
   'guided.pricing.substepCompare': '3. Preise vergleichen',

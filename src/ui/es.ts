@@ -1819,6 +1819,7 @@ export const es = {
   'guided.products.paperDbReplace': 'Subir otro CSV',
   'guided.products.paperDbHint': 'CSV con columnas: Nombre, Gramaje (g/m²), Formato (ej. 70x100), €/kg',
   'guided.products.paperDbErrEmpty': 'No se encontraron filas de papel válidas en el archivo CSV.',
+  'guided.products.paperDbDownloadTemplate': 'Plantilla CSV',
   'guided.pricing.substepAdd': '1. Añadir oferta',
   'guided.pricing.substepReview': '2. Revisar especificación',
   'guided.pricing.substepCompare': '3. Comparar precios',
