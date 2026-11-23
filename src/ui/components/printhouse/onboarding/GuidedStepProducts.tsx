@@ -265,6 +265,49 @@ export const GuidedStepProducts: React.FC<GuidedStepProductsProps> = ({
                 })}
             </div>
 
+            {/* Live Calibration Coverage Indicator (What 4 offers cover in PrintPrice OS) */}
+            {(() => {
+                const uploadedFamiliesCount = FAMILY_DEFINITIONS.filter(
+                    (d) => enabledFamilies[d.id] && Boolean(pricingContinuity?.[d.id]?.uploadedFileName || pricingContinuity?.[d.id]?.offer || families[d.id]?.status === 'DATA_VALIDATED')
+                ).length;
+                const estimatedCoveragePct = Math.min(80, uploadedFamiliesCount * 20);
+                return (
+                    <div
+                        data-testid="products-calibration-coverage-meter"
+                        className="p-4 rounded-2xl bg-white dark:bg-[#18181b] border border-zinc-200 dark:border-zinc-800 space-y-2.5"
+                    >
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                                <ShieldCheck size={16} className="text-[#dc0000] shrink-0" />
+                                <span className="text-xs font-bold text-zinc-900 dark:text-zinc-100">
+                                    {t('guided.products.coverageTitle')}
+                                </span>
+                            </div>
+                            <span className="text-xs font-extrabold text-zinc-900 dark:text-zinc-100 bg-zinc-100 dark:bg-zinc-800 px-2.5 py-0.5 rounded-full">
+                                {uploadedFamiliesCount}/{activeCount || 4} {t('guided.products.coverageFamiliesCount')} · ~{estimatedCoveragePct}%
+                            </span>
+                        </div>
+                        <div className="w-full h-2 rounded-full bg-zinc-100 dark:bg-zinc-800 overflow-hidden">
+                            <div
+                                className="h-full bg-[#dc0000] rounded-full transition-all duration-300"
+                                style={{ width: `${Math.max(uploadedFamiliesCount > 0 ? 12 : 0, estimatedCoveragePct)}%` }}
+                            />
+                        </div>
+                        <p className="text-[11px] text-zinc-600 dark:text-zinc-400 leading-relaxed">
+                            {t('guided.products.coverageSubtitle')}
+                        </p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-0.5 text-[11px]">
+                            <div className="p-2 rounded-xl bg-emerald-50/70 dark:bg-emerald-950/20 border border-emerald-200/70 dark:border-emerald-900/50 text-emerald-900 dark:text-emerald-300">
+                                {t('guided.products.coverageCoveredLabel')}
+                            </div>
+                            <div className="p-2 rounded-xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400">
+                                {t('guided.products.coverageSeparateLabel')}
+                            </div>
+                        </div>
+                    </div>
+                );
+            })()}
+
             {/* Informative Note: Declaration vs Technical Machine */}
             <div className="p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 flex items-start gap-3">
                 <Info size={18} className="text-[#dc0000] shrink-0 mt-0.5" />

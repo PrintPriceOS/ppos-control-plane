@@ -415,6 +415,10 @@ export const VariantSpecTable: React.FC<VariantSpecTableProps> = ({
                                                     includesPackaging: true
                                                 });
                                             }
+                                            if (!isAmbiguityActive && !isEndpaperPending) {
+                                                const proceedFn = onProceedToCalculation || onProceedToCalculate || onProceedToComparison;
+                                                if (proceedFn) proceedFn();
+                                            }
                                         }}
                                         className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition-colors cursor-pointer shadow-2xs"
                                     >
@@ -438,6 +442,10 @@ export const VariantSpecTable: React.FC<VariantSpecTableProps> = ({
                                                     });
                                                 }
                                                 onUpdateSpec({ lamination: 'none' });
+                                                if (!isAmbiguityActive && !isEndpaperPending) {
+                                                    const proceedFn = onProceedToCalculation || onProceedToCalculate || onProceedToComparison;
+                                                    if (proceedFn) proceedFn();
+                                                }
                                             }}
                                             className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-[#dc0000] hover:bg-[#b50000] text-white transition-colors cursor-pointer shadow-2xs"
                                         >
@@ -617,17 +625,17 @@ export const VariantSpecTable: React.FC<VariantSpecTableProps> = ({
                     <table className="w-full border-collapse text-left text-xs">
                         <thead>
                             <tr className="bg-zinc-100 dark:bg-zinc-800 text-[11px] font-bold text-zinc-600 dark:text-zinc-400 uppercase tracking-wider border-b border-zinc-200 dark:border-zinc-800">
-                                <th className="p-3">Variante / Tirada</th>
-                                <th className="p-3">Papel / Gramaje</th>
-                                <th className="p-3">Acabado</th>
-                                <th className="p-3">Plazo</th>
-                                <th className="p-3">Opción Logística</th>
-                                <th className="p-3 text-right">Fabricación (€)</th>
-                                <th className="p-3 text-right">Transporte (€)</th>
-                                <th className="p-3 text-right">Otros (€)</th>
-                                <th className="p-3 text-right">Total sin IVA (€)</th>
-                                <th className="p-3 text-right">Precio Unitario</th>
-                                <th className="p-3 text-center">Estado</th>
+                                <th className="p-3">{t('review.col.variantRun')}</th>
+                                <th className="p-3">{t('review.col.paperWeight')}</th>
+                                <th className="p-3">{t('review.col.finishing')}</th>
+                                <th className="p-3">{t('review.col.turnaround')}</th>
+                                <th className="p-3">{t('review.col.logistics')}</th>
+                                <th className="p-3 text-right">{t('review.col.manufacturing')}</th>
+                                <th className="p-3 text-right">{t('review.col.transport')}</th>
+                                <th className="p-3 text-right">{t('review.col.other')}</th>
+                                <th className="p-3 text-right">{t('review.col.totalNet')}</th>
+                                <th className="p-3 text-right">{t('review.col.unitPrice')}</th>
+                                <th className="p-3 text-center">{t('review.col.status')}</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
@@ -668,7 +676,7 @@ export const VariantSpecTable: React.FC<VariantSpecTableProps> = ({
                                                 <div>
                                                     <div className="font-bold text-zinc-900 dark:text-white flex items-center gap-1.5">
                                                         <span>{r.quantity >= 1000 ? r.quantity.toLocaleString('de-DE') : r.quantity}</span>
-                                                        <span className="text-[10px] text-zinc-500 font-normal">ej.</span>
+                                                        <span className="text-[10px] text-zinc-500 font-normal">{t('compare.copiesUnit') || 'ej.'}</span>
                                                     </div>
                                                     <span className="text-[10px] font-mono text-zinc-400">
                                                         {variantKeyDisplay}
@@ -687,7 +695,7 @@ export const VariantSpecTable: React.FC<VariantSpecTableProps> = ({
                                         </td>
                                         <td className="p-3">
                                             <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700">
-                                                {r.logisticsOption || r.deliveryOption || 'Estándar'}
+                                                {r.logisticsOption || r.deliveryOption || (t('compare.standardVariant') || 'Standard')}
                                             </span>
                                         </td>
                                         <td className="p-3 text-right font-bold text-zinc-900 dark:text-white">
@@ -712,22 +720,22 @@ export const VariantSpecTable: React.FC<VariantSpecTableProps> = ({
                                                     className="inline-flex items-center gap-1 text-amber-600 dark:text-amber-400 font-bold text-[10px] px-2 py-0.5 rounded-full bg-amber-100/60 dark:bg-amber-900/40"
                                                 >
                                                     <AlertTriangle size={11} />
-                                                    <span>Revisión</span>
+                                                    <span>{t('review.status.review')}</span>
                                                 </span>
                                             ) : hasIncompleteBreakdown ? (
                                                 <span 
-                                                    title="Sin desglose independiente de fabricación y transporte"
+                                                    title={t('review.status.incompleteBreakdownTip')}
                                                     className="inline-flex items-center gap-1 text-amber-600 dark:text-amber-400 font-bold text-[10px] px-2 py-0.5 rounded-full bg-amber-100/60 dark:bg-amber-900/40"
                                                 >
                                                     <AlertTriangle size={11} />
-                                                    <span>Incompleta</span>
+                                                    <span>{t('review.status.incomplete')}</span>
                                                 </span>
                                             ) : (
                                                 <span 
                                                     className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-bold text-[10px] px-2 py-0.5 rounded-full bg-emerald-100/60 dark:bg-emerald-900/40"
                                                 >
                                                     <CheckCircle2 size={11} />
-                                                    <span>Coherente</span>
+                                                    <span>{t('review.status.consistent')}</span>
                                                 </span>
                                             )}
                                         </td>

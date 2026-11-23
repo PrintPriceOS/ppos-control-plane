@@ -160,6 +160,7 @@ describe('Onboarding Step 3 & Step 4 UX Fixes (Trilingual DE / EN / ES)', () => 
         );
 
         expect(screen.getByTestId('product-card-upload-HARDCOVER')).toBeInTheDocument();
+        expect(screen.getByTestId('products-calibration-coverage-meter')).toBeInTheDocument();
         expect(screen.queryByTestId('product-card-upload-SOFTCOVER')).not.toBeInTheDocument();
 
         const file = new File(['%PDF-1.4 test'], 'hardcover-offer.pdf', { type: 'application/pdf' });
@@ -169,9 +170,10 @@ describe('Onboarding Step 3 & Step 4 UX Fixes (Trilingual DE / EN / ES)', () => 
         expect(onUploadFamilyQuote).toHaveBeenCalledWith('HARDCOVER', file);
     });
 
-    it('6. VariantSpecTable 1-click all-in buttons confirm all 4 inclusions (and optional no-lamination) in a single click', () => {
+    it('6. VariantSpecTable 1-click all-in buttons confirm all 4 inclusions (and optional no-lamination) and jump straight to calculation', () => {
         const onUpdateInclusions = vi.fn();
         const onUpdateSpec = vi.fn();
+        const onProceedToCalculation = vi.fn();
 
         render(
             <LocaleProvider>
@@ -188,6 +190,7 @@ describe('Onboarding Step 3 & Step 4 UX Fixes (Trilingual DE / EN / ES)', () => 
                     }}
                     onUpdateInclusions={onUpdateInclusions}
                     onUpdateSpec={onUpdateSpec}
+                    onProceedToCalculation={onProceedToCalculation}
                 />
             </LocaleProvider>
         );
@@ -203,5 +206,6 @@ describe('Onboarding Step 3 & Step 4 UX Fixes (Trilingual DE / EN / ES)', () => 
             includesPackaging: true
         });
         expect(onUpdateSpec).toHaveBeenCalledWith({ lamination: 'none' });
+        expect(onProceedToCalculation).toHaveBeenCalledTimes(1);
     });
 });

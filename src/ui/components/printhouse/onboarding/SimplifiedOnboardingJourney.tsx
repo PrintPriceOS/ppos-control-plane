@@ -1688,7 +1688,7 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
                             });
 
                             const updatedOffer = {
-                                ...currentOffer,
+                                ...currentOfferRef.current,
                                 ...inclusions
                             };
                             currentOfferRef.current = updatedOffer;
@@ -1715,7 +1715,7 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
                         onUpdateSpec={(patch) => {
                             invalidateCalculation();
                             const updated = {
-                                ...currentOffer,
+                                ...currentOfferRef.current,
                                 ...patch
                             };
                             currentOfferRef.current = updated;
