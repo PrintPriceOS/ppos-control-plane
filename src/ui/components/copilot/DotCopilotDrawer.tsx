@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useDotCopilot } from './DotCopilotProvider';
 import { DotInteractiveHero, DotChatAvatar } from '../mascot';
 import {
@@ -157,6 +158,7 @@ export const DotCopilotDrawer: React.FC = () => {
     } = useDotCopilot();
 
     const { locale, t } = useLocale();
+    const navigate = useNavigate();
 
     const [inputValue, setInputValue] = useState('');
     const [historyOpen, setHistoryOpen] = useState(false);
@@ -634,6 +636,35 @@ export const DotCopilotDrawer: React.FC = () => {
                                                             }
                                                             if (card.type === 'ACTION_CONFIRM') {
                                                                 return <CopilotActionConfirmCard key={cIdx} payload={card} />;
+                                                            }
+                                                            if (card.type === 'NAVIGATION') {
+                                                                return (
+                                                                    <button
+                                                                        key={cIdx}
+                                                                        type="button"
+                                                                        data-testid="copilot-navigation-card"
+                                                                        onClick={() => {
+                                                                            if (card.route && card.route.startsWith('/')) {
+                                                                                navigate(card.route);
+                                                                            }
+                                                                        }}
+                                                                        className="w-full p-2.5 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900 hover:border-[#dc0000] hover:bg-red-50/40 dark:hover:bg-red-950/20 transition-all flex items-center justify-between gap-2 text-left cursor-pointer group"
+                                                                    >
+                                                                        <div className="min-w-0">
+                                                                            <div className="text-xs font-bold text-zinc-900 dark:text-zinc-100 group-hover:text-[#dc0000] truncate">
+                                                                                {card.label}
+                                                                            </div>
+                                                                            {card.description && (
+                                                                                <div className="text-[11px] text-zinc-500 dark:text-zinc-400 truncate">
+                                                                                    {card.description}
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
+                                                                        <span className="px-2.5 py-1 rounded-lg bg-[#dc0000] text-white text-[10px] font-bold shrink-0">
+                                                                            {t('copilot.navigation.openBtn')} →
+                                                                        </span>
+                                                                    </button>
+                                                                );
                                                             }
                                                             return null;
                                                         })}

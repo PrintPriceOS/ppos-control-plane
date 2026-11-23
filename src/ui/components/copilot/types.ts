@@ -56,7 +56,20 @@ export interface ActionConfirmPayload {
     status?: 'PENDING' | 'CONFIRMED' | 'CANCELLED';
 }
 
-export type CopilotCardPayload = KpiSummaryCardPayload | PreflightAlertsPayload | ActionConfirmPayload;
+export interface NavigationCardPayload {
+    type: 'NAVIGATION';
+    destinationId: string;
+    route: string;
+    label: string;
+    description?: string;
+    autoNavigate?: boolean;
+}
+
+export type CopilotCardPayload =
+    | KpiSummaryCardPayload
+    | PreflightAlertsPayload
+    | ActionConfirmPayload
+    | NavigationCardPayload;
 
 export interface CopilotMessage {
     id: string;

@@ -3763,6 +3763,7 @@ export const es = {
 
   // ──── DOT COPILOT i18n ────
   'copilot.askDot': 'Ask Dotty',
+  'copilot.navigation.openBtn': 'Abrir',
   'copilot.topbarTooltip': 'Abrir asistente DOT Copilot — Dotty (⌘I / Ctrl+I)',
   'copilot.newConversation': 'Nueva conversación',
   'copilot.clearChatTooltip': 'Borrar conversación actual',

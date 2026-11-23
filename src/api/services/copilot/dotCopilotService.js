@@ -152,8 +152,143 @@ const COPILOT_TOOLS_SCHEMA = [
             },
             required: ['printhouseId']
         }
+    },
+    {
+        name: 'navigate_to_screen',
+        description: 'Navega inmediatamente al usuario a una pantalla o pestaña concreta del Control Plane de PrintPrice OS (estilo asistente de navegación en vivo). Usar siempre que el usuario pregunte dónde está una sección, cómo ir a un módulo o pida abrir una pantalla (ej. precios de papel, máquinas, tarifas, envíos, marketplace, onboarding, pedidos, API keys).',
+        parameters: {
+            type: 'OBJECT',
+            properties: {
+                destinationId: {
+                    type: 'STRING',
+                    description: 'Uno de: ONBOARDING_GUIDED | SETUP_OVERVIEW | COMPANY_PROFILE | PRODUCTION_SITES | MACHINES | CAPABILITIES | MATERIALS | CAPACITY | LEAD_TIMES | PRICING | SHIPPING | INTEGRATIONS | MARKETPLACE_REVIEW | DASHBOARD | ORDERS | DEVELOPERS | SETTINGS'
+                },
+                reason: {
+                    type: 'STRING',
+                    description: 'Breve motivo contextual de por qué se abre esta pantalla'
+                }
+            },
+            required: ['destinationId']
+        }
     }
 ];
+
+// ──── Strict Allowlist of Verified Internal Control Plane Routes ─────────────
+const NAVIGATION_CATALOG = {
+    ONBOARDING_GUIDED: {
+        route: '/printhouse/onboarding-guided',
+        labels: { de: 'Geführte Druckereieinrichtung', en: 'Guided Printhouse Onboarding', es: 'Asistente Guiado de Imprenta' },
+        descriptions: { de: 'Schritt-für-Schritt-Einrichtung & Angebotskalibrierung', en: 'Step-by-step setup & quote calibration wizard', es: 'Alta paso a paso y calibración con presupuestos' }
+    },
+    SETUP_OVERVIEW: {
+        route: '/printhouse/setup',
+        labels: { de: 'Druckereikonfiguration (Übersicht)', en: 'Printhouse Setup Overview', es: 'Configuración de Imprenta (Resumen)' },
+        descriptions: { de: 'Alle Konfigurationsmodule im Überblick', en: 'All workshop configuration modules at a glance', es: 'Resumen general de todos los módulos del taller' }
+    },
+    COMPANY_PROFILE: {
+        route: '/printhouse/setup?tab=COMPANY',
+        labels: { de: 'Firmendaten & Identität', en: 'Company Profile & Identity', es: 'Datos de Empresa e Identidad' },
+        descriptions: { de: 'Firmenname, USt-IdNr., Adresse & Kontakt', en: 'Legal name, VAT ID, address & contact', es: 'Razón social, NIF/VAT, dirección y contacto' }
+    },
+    PRODUCTION_SITES: {
+        route: '/printhouse/setup?tab=SITES',
+        labels: { de: 'Produktionsstandorte', en: 'Production Sites', es: 'Sedes de Producción' },
+        descriptions: { de: 'Werke, Zeitzonen & Versandstandorte', en: 'Plants, timezones & dispatch locations', es: 'Plantas, zonas horarias y ubicaciones de expedición' }
+    },
+    MACHINES: {
+        route: '/printhouse/setup?tab=MACHINES',
+        labels: { de: 'Maschinenpark', en: 'Machine Fleet', es: 'Parque de Maquinaria' },
+        descriptions: { de: 'Offset-, Digitaldruck- & Weiterverarbeitungsmaschinen', en: 'Offset, digital presses & bindery equipment', es: 'Prensas offset, digitales y trenes de encuadernación' }
+    },
+    CAPABILITIES: {
+        route: '/printhouse/setup?tab=CAPABILITIES',
+        labels: { de: 'Produktionsfähigkeiten & Bindearten', en: 'Production Capabilities & Bindings', es: 'Capacidades y Familias de Encuadernación' },
+        descriptions: { de: 'Hardcover, Softcover, Wire-O, Rückstichheftung', en: 'Hardcover, Softcover, Wire-O, Saddle Stitch', es: 'Tapa dura, Rústica, Wire-O y Grapa' }
+    },
+    MATERIALS: {
+        route: '/printhouse/setup?tab=MATERIALS',
+        labels: { de: 'Materialien & Papierkatalog', en: 'Materials & Paper Catalog', es: 'Materiales y Catálogo de Papel' },
+        descriptions: { de: 'Papiersorten, Grammaturen, Volumen & €/kg-Preise', en: 'Paper grades, weights, bulk & €/kg pricing', es: 'Sustratos, gramajes, volumen y precios €/kg' }
+    },
+    CAPACITY: {
+        route: '/printhouse/setup?tab=CAPACITY',
+        labels: { de: 'Kapazität & Schichten', en: 'Workshop Capacity & Shifts', es: 'Capacidad y Turnos' },
+        descriptions: { de: 'Tägliche Produktionskapazität & Auslastung', en: 'Daily output capacity & scheduling', es: 'Capacidad productiva diaria y carga de taller' }
+    },
+    LEAD_TIMES: {
+        route: '/printhouse/setup?tab=LEAD_TIMES',
+        labels: { de: 'Lieferzeiten & SLAs', en: 'Lead Times & SLAs', es: 'Plazos de Entrega y SLAs' },
+        descriptions: { de: 'Standard- und Express-Produktionszeiten', en: 'Standard & express production turnarounds', es: 'Plazos estándar y exprés de fabricación' }
+    },
+    PRICING: {
+        route: '/printhouse/setup?tab=PRICING',
+        labels: { de: 'Industrietarife & Kalibrierung', en: 'Industrial Pricing & Calibration', es: 'Precios Industriales y Calibración' },
+        descriptions: { de: '5-Achsen-Tarifmatrix & inverser Kalibrierer', en: '5-Axis rate matrix & inverse quote calibrator', es: 'Matriz de tarifas 5 ejes y calibrador inverso' }
+    },
+    SHIPPING: {
+        route: '/printhouse/setup?tab=SHIPPING',
+        labels: { de: 'Versand, Paletten & Frachtmatrizen', en: 'Shipping, Pallets & Freight Matrices', es: 'Logística, Palets y Matrices de Flete' },
+        descriptions: { de: 'Euro-Paletten EPAL, Speditionen & GS1-128 Etiketten', en: 'Euro-Pallets EPAL, carriers & GS1-128 labels', es: 'Euro-Palets EPAL, transportistas y etiquetas GS1-128' }
+    },
+    INTEGRATIONS: {
+        route: '/printhouse/setup?tab=INTEGRATIONS',
+        labels: { de: 'Integrationen & Webhooks', en: 'Integrations & Webhooks', es: 'Integraciones y Webhooks' },
+        descriptions: { de: 'MIS/ERP-Anbindung & automatische Benachrichtigungen', en: 'MIS/ERP connections & automated webhooks', es: 'Conexión MIS/ERP y notificaciones automáticas' }
+    },
+    MARKETPLACE_REVIEW: {
+        route: '/printhouse/setup?tab=MARKETPLACE',
+        labels: { de: 'Marktplatz-Prüfung & Aktivierung', en: 'Marketplace Review & Activation', es: 'Revisión del Mercado y Activación' },
+        descriptions: { de: 'Betriebsbereitschaft prüfen & Druckerei freischalten', en: 'Review readiness checks & go live on the Marketplace', es: 'Revisar requisitos y activar imprenta en el Marketplace' }
+    },
+    DASHBOARD: {
+        route: '/dashboard',
+        labels: { de: 'Command Center (Dashboard)', en: 'Command Center (Dashboard)', es: 'Panel de Control (Dashboard)' },
+        descriptions: { de: 'Echtzeit-Überblick über Betrieb & Aufträge', en: 'Real-time overview of operations & orders', es: 'Vista en tiempo real de operaciones y pedidos' }
+    },
+    ORDERS: {
+        route: '/orders',
+        labels: { de: 'Aufträge & Produktion', en: 'Orders & Production', es: 'Pedidos y Producción' },
+        descriptions: { de: 'Aktive Druckaufträge, Preflight & Versandstatus', en: 'Active print orders, preflight & dispatch status', es: 'Pedidos activos, preflight y estado de expedición' }
+    },
+    DEVELOPERS: {
+        route: '/developers',
+        labels: { de: 'Developer Hub & API-Schlüssel', en: 'Developer Hub & API Keys', es: 'Developer Hub y API Keys' },
+        descriptions: { de: 'API-Keys, MCP-Endpunkte & technische Doku', en: 'API keys, MCP endpoints & technical docs', es: 'Claves API, endpoints MCP y documentación técnica' }
+    },
+    SETTINGS: {
+        route: '/settings',
+        labels: { de: 'Systemeinstellungen', en: 'System Settings', es: 'Ajustes del Sistema' },
+        descriptions: { de: 'Sprache, Design, Kontoeinstellungen', en: 'Language, theme & account preferences', es: 'Idioma, tema y preferencias de cuenta' }
+    }
+};
+
+function resolveNavigationIntent(rawText = '') {
+    const text = String(rawText || '').toLowerCase();
+    const isNavVerb = /\b(go to|take me|open|show me|where is|where can i|navigate|find|bring me|switch to|ir a|ll[eé]vame|abrir|abre|d[oó]nde est[aá]|mostrar|mu[eé]strame|navegar|gehe zu|[öo]ffne|zeige mir|wo finde ich|wo stelle ich|wo trage ich|navigiere|bring mich)\b/i.test(text);
+    const isShortDirectQuery = text.trim().split(/\s+/).length <= 4;
+
+    if (!isNavVerb && !isShortDirectQuery) return null;
+
+    if (/(?:marketplace|marktplatz|mercado|readiness|freischalt|revisi[oó]n del mercado)/i.test(text)) return 'MARKETPLACE_REVIEW';
+    if (/(?:paper|papier|papel|material|substrat|sustrato|katalog|cat[aá]logo)/i.test(text)) return 'MATERIALS';
+    if (/(?:machine|maschin|m[aá]quina|maquinaria|press|prensa|fleet|parque)/i.test(text)) return 'MACHINES';
+    if (/(?:shipping|versand|fracht|freight|palett|palet|log[ií]stic|logistik|flete|env[ií]o)/i.test(text)) return 'SHIPPING';
+    if (/(?:lead\s*time|lieferzeit|plazo|\bsla\b|turnaround)/i.test(text)) return 'LEAD_TIMES';
+    if (/(?:capacity|kapazit[aä]t|capacidad|shift|schicht|turno)/i.test(text)) return 'CAPACITY';
+    if (/(?:capabilit|f[aä]higkeit|capacidades|bindeart)/i.test(text)) return 'CAPABILITIES';
+    if (/(?:onboarding|einrichtung|wizard|asistente|alta guiada)/i.test(text)) return 'ONBOARDING_GUIDED';
+    if (/(?:company|firma|firmendaten|empresa|\bvat\b|ust-id|\bnif\b|profile|perfil)/i.test(text)) return 'COMPANY_PROFILE';
+    if (/(?:\bsite\b|standort|werk|\bsede\b|planta)/i.test(text)) return 'PRODUCTION_SITES';
+    if (/(?:pricing|tarif|preis|precio|rate\s*card|calibrat|kalibrier)/i.test(text)) return 'PRICING';
+    if (/(?:api\s*key|developer|entwickler|\bmcp\b|token)/i.test(text)) return 'DEVELOPERS';
+    if (/(?:integrat|webhook|\berp\b|\bmis\b)/i.test(text)) return 'INTEGRATIONS';
+    if (/(?:order|auftrag|auftr[aä]ge|pedido)/i.test(text)) return 'ORDERS';
+    if (/(?:setting|einstellung|ajuste|configuraci[oó]n general)/i.test(text)) return 'SETTINGS';
+    if (/(?:dashboard|command\s*center|inicio|panel)/i.test(text)) return 'DASHBOARD';
+    if (/(?:setup|konfiguration|configuraci[oó]n de imprenta)/i.test(text)) return 'SETUP_OVERVIEW';
+
+    return null;
+}
 
 // ──── In-Memory Data / Mock Providers for Tenant-Isolated Fallback ───────────
 
@@ -217,7 +352,7 @@ function getOrCreatePrinthouseState(printhouseId) {
 
 // ──── Tool Execution Implementation ──────────────────────────────────────────
 
-async function executeCopilotTool(toolName, args, printhouseId) {
+async function executeCopilotTool(toolName, args, printhouseId, locale = 'es') {
     // Tenant safety check
     const effectivePrinthouseId = args.printhouseId || printhouseId || 'node-primary';
     const state = getOrCreatePrinthouseState(effectivePrinthouseId);
@@ -535,6 +670,36 @@ async function executeCopilotTool(toolName, args, printhouseId) {
             };
         }
 
+        case 'navigate_to_screen': {
+            const destKey = String(args.destinationId || '').toUpperCase().trim();
+            const entry = NAVIGATION_CATALOG[destKey];
+            if (!entry) {
+                return {
+                    ok: false,
+                    error: `Unknown navigation destination: ${destKey}`,
+                    availableDestinations: Object.keys(NAVIGATION_CATALOG)
+                };
+            }
+            const lang = locale === 'de' ? 'de' : locale === 'en' ? 'en' : 'es';
+            const label = entry.labels[lang] || entry.labels.en;
+            const description = entry.descriptions[lang] || entry.descriptions.en;
+            return {
+                ok: true,
+                destinationId: destKey,
+                route: entry.route,
+                label,
+                description,
+                cardPayload: {
+                    type: 'NAVIGATION',
+                    destinationId: destKey,
+                    route: entry.route,
+                    label,
+                    description,
+                    autoNavigate: true
+                }
+            };
+        }
+
         default:
             return { error: `Herramienta no implementada: ${toolName}` };
     }
@@ -645,9 +810,11 @@ MODES & WRITE CAPABILITIES:
    - When asked to update profile or delivery times/SLAs: call the tool 'update_printhouse_profile'.
    - Calling these tools creates an interactive confirmation card for the human operator to verify and execute with one click. Always summarize the exact parameters (model name, technology, hourly rate in EUR, sheet format) in your response.
 
-MARKETPLACE & NAVIGATION GUIDANCE:
-When the user asks where to find the Marketplace or how to view it:
-Explain clearly that the Marketplace review is located in the left navigation sidebar under 'Configuración de Imprenta > Revisión del Mercado' (route: /printhouse/marketplace). There the printhouse can review all verified operational requirements (Identity, Operational Capacity, Industrial Prices) and activate availability to receive federated print orders.
+MARKETPLACE & IN-APP NAVIGATION (LIVE ROUTER CONNECTED):
+You are directly connected to the Control Plane in-app router via the 'navigate_to_screen' tool!
+Whenever the user asks where to find a section, how to reach a setting, or asks you to open/navigate to a page (e.g. "where do I set paper prices?", "take me to machines", "wo finde ich Versand?", "open Marketplace Review", "ir a tarifas industriales", "show API keys"):
+- ALWAYS call 'navigate_to_screen' with the matching destinationId so the app navigates them there immediately AND displays a clickable navigation card in chat.
+- Available destinations: ONBOARDING_GUIDED, SETUP_OVERVIEW, COMPANY_PROFILE, PRODUCTION_SITES, MACHINES, CAPABILITIES, MATERIALS, CAPACITY, LEAD_TIMES, PRICING, SHIPPING, INTEGRATIONS, MARKETPLACE_REVIEW (/printhouse/setup?tab=MARKETPLACE), DASHBOARD, ORDERS, DEVELOPERS, SETTINGS.
 
 OPERATIONAL PRINCIPLES & FORMATTING RULES:
 1. NEVER output markdown heading hashtags (#, ##, ###) in your responses. For section titles or emphasized headers, use clean bold text (e.g. **Estado de Completitud:** or **Pasos pendientes:**).
@@ -735,7 +902,7 @@ async function processCopilotChat({ messages, context = {}, mode = 'ask', onEven
                 onEvent('tool_start', { tool: fc.name, args: fc.args });
 
                 // Execute tool locally
-                const toolResult = await executeCopilotTool(fc.name, fc.args || {}, printhouseId);
+                const toolResult = await executeCopilotTool(fc.name, fc.args || {}, printhouseId, locale);
                 onEvent('tool_result', { tool: fc.name, data: toolResult });
 
                 // Multi-turn resolution: Send tool result back to Gemini for final response
@@ -942,19 +1109,34 @@ async function runDeterministicFallback({ userMessage, printhouseId, mode, local
             reply = `He preparado la ficha técnica para dar de alta tu nueva **${machineName}** con un coste horario de **${hourlyCostEur} €/h** y formato de pliego hasta 530x750mm.\n\n` +
                 `Puedes revisar los parámetros y pulsar en **"Confirmar y Aplicar"** en la tarjeta inferior para registrar la máquina en tu parque de producción.`;
         }
-    } else if (text.includes('market') || text.includes('mercado')) {
-        const pill = isEn ? 'Locating marketplace...' : isDe ? 'Marketplace lokalisieren...' : 'Localizando marketplace...';
+    } else if (resolveNavigationIntent(latestUserMsg)) {
+        const detectedNavDest = resolveNavigationIntent(latestUserMsg);
+        const pill = isEn ? 'Navigating to screen...' : isDe ? 'Navigiere zur Ansicht...' : 'Navegando a la pantalla...';
         onEvent('status', { state: 'thinking', pill });
+        onEvent('tool_start', { tool: 'navigate_to_screen', args: { destinationId: detectedNavDest } });
+        const navRes = await executeCopilotTool('navigate_to_screen', { destinationId: detectedNavDest }, printhouseId, locale);
+        onEvent('tool_result', { tool: 'navigate_to_screen', data: navRes });
+        if (navRes.cardPayload) cards.push(navRes.cardPayload);
 
         if (isEn) {
-            reply = `You can access the **Marketplace Review** directly from the left navigation sidebar: **Printhouse Setup > Marketplace Review** (or navigate to \`/printhouse/marketplace\`).\n\n` +
-                `From there, you can verify your operational readiness (Identity, Workshop Capacity, Industrial Pricing) and activate your plant to receive federated print orders.`;
+            reply = `Taking you directly to **${navRes.label}** (\`${navRes.route}\`).\n\n${navRes.description}. You can also use the button below anytime to jump back here.`;
         } else if (isDe) {
-            reply = `Sie finden die **Marketplace-Prüfung** direkt in der linken Navigationsleiste unter **Druckereikonfiguration > Marketplace-Prüfung** (oder unter \`/printhouse/marketplace\`).\n\n` +
-                `Dort können Sie Ihre betriebliche Einsatzbereitschaft prüfen (Identität, Kapazität, Industriepreise) und Ihren Betrieb freischalten, um Aufträge aus dem Marktplatz zu erhalten.`;
+            reply = `Ich leite Sie direkt zu **${navRes.label}** (\`${navRes.route}\`) weiter.\n\n${navRes.description}. Über die Schaltfläche unten können Sie die Ansicht jederzeit erneut öffnen.`;
         } else {
-            reply = `Puedes acceder a la **Revisión del Mercado** directamente desde el menú lateral: **Configuración de Imprenta > Revisión del Mercado** (o navegando a \`/printhouse/marketplace\`).\n\n` +
-                `Desde allí podrás revisar todos los requisitos operativos verificados (cuenta e identidad, capacidad operativa, precios industriales) y activar tu disponibilidad para recibir pedidos federados del Marketplace.`;
+            reply = `Te llevo directamente a **${navRes.label}** (\`${navRes.route}\`).\n\n${navRes.description}. También puedes usar el botón inferior en cualquier momento para volver a abrir esta vista.`;
+        }
+    } else if (text.includes('market') || text.includes('mercado') || text.includes('marktplatz')) {
+        const pill = isEn ? 'Opening Marketplace Review...' : isDe ? 'Marketplace-Prüfung wird geöffnet...' : 'Abriendo Revisión del Mercado...';
+        onEvent('status', { state: 'thinking', pill });
+        const navRes = await executeCopilotTool('navigate_to_screen', { destinationId: 'MARKETPLACE_REVIEW' }, printhouseId, locale);
+        if (navRes.cardPayload) cards.push(navRes.cardPayload);
+
+        if (isEn) {
+            reply = `Opening **${navRes.label}** (\`${navRes.route}\`).\n\nFrom there, you can verify your operational readiness (Identity, Workshop Capacity, Industrial Pricing) and activate your plant to receive federated print orders.`;
+        } else if (isDe) {
+            reply = `Ich öffne **${navRes.label}** (\`${navRes.route}\`).\n\nDort können Sie Ihre betriebliche Einsatzbereitschaft prüfen (Identität, Kapazität, Industriepreise) und Ihren Betrieb für Marktplatz-Aufträge freischalten.`;
+        } else {
+            reply = `Abriendo **${navRes.label}** (\`${navRes.route}\`).\n\nDesde allí podrás revisar todos los requisitos operativos verificados (identidad, capacidad operativa, precios industriales) y activar tu imprenta para recibir pedidos del Marketplace.`;
         }
     } else if (text.includes('lomo') || text.includes('spine') || text.includes('imposic') || text.includes('palet') || text.includes('cubic') ||
                text.includes('cubing') || text.includes('pallet') || text.includes('rücken') || text.includes('ausschieß')) {
@@ -1095,5 +1277,7 @@ module.exports = {
     applyCopilotAction,
     getSearchableEntities,
     COPILOT_TOOLS_SCHEMA,
+    NAVIGATION_CATALOG,
+    resolveNavigationIntent,
     buildSystemInstruction
 };

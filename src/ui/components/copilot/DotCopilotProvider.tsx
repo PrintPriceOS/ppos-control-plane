@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { DotChatState } from '../mascot';
 import { 
     CopilotMode, 
@@ -55,6 +55,7 @@ function createDefaultSession(title = 'Nueva conversación'): CopilotSession {
 
 export const DotCopilotProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const location = useLocation();
+    const navigate = useNavigate();
     const currentRoute = location.pathname;
     const { locale, t } = useLocale();
 
@@ -352,6 +353,18 @@ export const DotCopilotProvider: React.FC<{ children: React.ReactNode }> = ({ ch
                 return s;
             }));
 
+            // Auto-navigate when Dotty returns a verified internal NAVIGATION card
+            const navCard = cards.find(
+                (c): c is Extract<CopilotCardPayload, { type: 'NAVIGATION' }> =>
+                    c.type === 'NAVIGATION' && Boolean(c.autoNavigate) && typeof c.route === 'string' && c.route.startsWith('/')
+            );
+            if (navCard) {
+                const currentFull = `${location.pathname}${location.search || ''}`;
+                if (currentFull !== navCard.route) {
+                    navigate(navCard.route);
+                }
+            }
+
             setGlobalDotState('success');
             setTimeout(() => {
                 setGlobalDotState('idle');
@@ -377,7 +390,7 @@ export const DotCopilotProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         } finally {
             setIsStreaming(false);
         }
-    }, [messages, isStreaming, activeSessionId, currentRoute, mode, locale, t]);
+    }, [messages, isStreaming, activeSessionId, currentRoute, location.pathname, location.search, navigate, mode, locale, t]);
 
     const contextValue = useMemo(() => ({
         isOpen,
