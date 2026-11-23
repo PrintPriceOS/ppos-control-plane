@@ -21,11 +21,117 @@
 
 import { ProgressiveSpecState, OfferVariantRow } from '../types/printhouseOnboardingTypes';
 
+export type CanonicalMissingField =
+    | 'copies'
+    | 'interior_pages'
+    | 'book_width_mm'
+    | 'book_height_mm'
+    | 'interior_print'
+    | 'cover_print'
+    | 'paper_type_interior'
+    | 'paper_weight_interior'
+    | 'paper_type_cover'
+    | 'paper_weight_cover'
+    | 'binding_method'
+    | 'delivery_country'
+    | 'lamination'
+    | 'target_manufacturing_price';
+
 export interface CanonicalizationResult {
     valid: boolean;
     bookSpec?: Record<string, any>;
     targetManufacturingPrice?: number;
     errors: string[];
+    missingFields: CanonicalMissingField[];
+}
+
+/**
+ * Translates canonicalizer validation error messages cleanly into DE, EN, or ES
+ * without mixing languages.
+ */
+export function localizeCanonicalizerError(rawError: string, locale: string = 'es'): string {
+    const lang = (locale || 'es').toLowerCase().startsWith('de')
+        ? 'de'
+        : (locale || 'es').toLowerCase().startsWith('en')
+            ? 'en'
+            : 'es';
+
+    if (rawError.startsWith('lamination must be explicitly specified')) {
+        if (lang === 'de') return 'Laminierung / Veredelung muss ausdrücklich gewählt werden (Matt, Glänzend, Schutzlack oder Keine).';
+        if (lang === 'en') return 'Cover lamination / finish must be explicitly specified (Matt, Gloss, Varnish, or None).';
+        return 'El laminado / acabado de cubierta debe especificarse explícitamente (Mate, Brillo, Barniz o Sin laminado).';
+    }
+    if (rawError.startsWith('interior_print must be one of')) {
+        if (lang === 'de') return 'Innendruckfarben müssen angegeben werden (1/1, 2/2 oder 4/4).';
+        if (lang === 'en') return 'Interior print colors must be specified (1/1, 2/2, or 4/4).';
+        return 'Las tintas del interior deben especificarse (1/1, 2/2 o 4/4).';
+    }
+    if (rawError.startsWith('cover_print must be one of')) {
+        if (lang === 'de') return 'Umschlagdruckfarben müssen angegeben werden (z. B. 4/0 oder 4/4).';
+        if (lang === 'en') return 'Cover print colors must be specified (e.g. 4/0 or 4/4).';
+        return 'Las tintas de cubierta deben especificarse (ej. 4/0 o 4/4).';
+    }
+    if (rawError.startsWith('paper_type_interior')) {
+        if (lang === 'de') return 'Innenpapiertyp fehlt oder wurde nicht erkannt (z. B. Offset, Bilderdruck, Werkdruck).';
+        if (lang === 'en') return 'Interior paper type is required and must be recognized (e.g. Offset, Coated, Uncoated).';
+        return 'El tipo de papel interior es obligatorio y debe ser reconocido (ej. Offset, Estucado, Ahuesado).';
+    }
+    if (rawError.startsWith('paper_weight_interior')) {
+        if (lang === 'de') return 'Grammatur des Innenpapiers muss zwischen 40 und 400 g/m² liegen.';
+        if (lang === 'en') return 'Interior paper weight must be between 40 and 400 gsm.';
+        return 'El gramaje del papel interior debe estar entre 40 y 400 g/m².';
+    }
+    if (rawError.startsWith('paper_type_cover')) {
+        if (lang === 'de') return 'Umschlagpapiertyp fehlt oder wurde nicht erkannt (z. B. Bilderdruckkarton, Offset).';
+        if (lang === 'en') return 'Cover paper type is required and must be recognized (e.g. Artboard, Coated, Offset).';
+        return 'El tipo de papel de cubierta es obligatorio y debe ser reconocido (ej. Cartulina, Estucado, Offset).';
+    }
+    if (rawError.startsWith('paper_weight_cover')) {
+        if (lang === 'de') return 'Grammatur des Umschlagpapiers muss zwischen 100 und 600 g/m² liegen.';
+        if (lang === 'en') return 'Cover paper weight must be between 100 and 600 gsm.';
+        return 'El gramaje del papel de cubierta debe estar entre 100 y 600 g/m².';
+    }
+    if (rawError.startsWith('binding_method')) {
+        if (lang === 'de') return 'Bindeart muss ausdrücklich angegeben werden (Klebebindung, Fadenheftung, Hardcover, Rückstichheftung oder Wire-O).';
+        if (lang === 'en') return 'Binding method must be explicitly specified (Perfect bound, Thread sewn, Hardcover, Saddle stitch, or Wire-O).';
+        return 'El método de encuadernación debe especificarse (Rústica fresada, Cosido hilo, Tapa dura, Grapa o Wire-O).';
+    }
+    if (rawError.startsWith('delivery_country')) {
+        if (lang === 'de') return 'Lieferland muss ein gültiger ISO-2-Ländercode sein (z. B. DE, ES, LV).';
+        if (lang === 'en') return 'Delivery country must be a valid ISO-2 country code (e.g. DE, ES, UK).';
+        return 'El país de entrega debe ser un código ISO-2 válido (ej. ES, DE, FR).';
+    }
+    if (rawError.startsWith('copies must be')) {
+        if (lang === 'de') return 'Auflagenmenge muss eine positive ganze Zahl sein.';
+        if (lang === 'en') return 'Print run copies must be a positive integer.';
+        return 'La tirada de ejemplares debe ser un número entero positivo.';
+    }
+    if (rawError.startsWith('interior_pages')) {
+        if (lang === 'de') return 'Seitenzahl des Inhalts muss eine positive ganze Zahl sein.';
+        if (lang === 'en') return 'Interior page count must be a positive integer.';
+        return 'El número de páginas interiores debe ser un entero positivo.';
+    }
+    if (rawError.startsWith('book_width_mm')) {
+        if (lang === 'de') return 'Buchbreite muss zwischen 50 und 500 mm liegen.';
+        if (lang === 'en') return 'Book width must be between 50 and 500 mm.';
+        return 'El ancho del libro debe estar entre 50 y 500 mm.';
+    }
+    if (rawError.startsWith('book_height_mm')) {
+        if (lang === 'de') return 'Buchhöhe muss zwischen 50 und 700 mm liegen.';
+        if (lang === 'en') return 'Book height must be between 50 and 700 mm.';
+        return 'El alto del libro debe estar entre 50 y 700 mm.';
+    }
+    if (rawError.startsWith('target_manufacturing_price')) {
+        if (lang === 'de') return 'Vorgegebener Fertigungspreis (ohne Transport) muss größer als 0 € sein.';
+        if (lang === 'en') return 'Target manufacturing price (excluding freight) must be greater than €0.';
+        return 'El precio objetivo de fabricación (sin transporte) debe ser superior a 0 €.';
+    }
+
+    return rawError;
+}
+
+export function formatCanonicalizerErrors(errors: string[], locale: string = 'es'): string {
+    return errors.map((e) => localizeCanonicalizerError(e, locale)).join(' ');
 }
 
 const VALID_INTERIOR_PRINTS = new Set(['1/1', '2/2', '4/4']);
@@ -106,7 +212,7 @@ function normalizePrintColors(raw?: string): string | null {
  *   - null for explicit unlaminated / absence
  *   - undefined for unknown or unprovided
  */
-function normalizeLamination(raw?: string | null): 'gloss' | 'matt' | 'varnish' | null | undefined {
+export function normalizeLamination(raw?: string | null): 'gloss' | 'matt' | 'varnish' | null | undefined {
     if (raw === null) return null;
     if (raw === undefined) return undefined;
     const s = String(raw).toLowerCase().trim();
@@ -127,18 +233,20 @@ export function canonicalizeToEngineBookSpec(
     targetRun: Partial<OfferVariantRow> | null | undefined
 ): CanonicalizationResult {
     const errors: string[] = [];
+    const missingFields: CanonicalMissingField[] = [];
 
     if (!offer) {
-        return { valid: false, errors: ['Oferta de especificación no definida'] };
+        return { valid: false, errors: ['Oferta de especificación no definida'], missingFields: [] };
     }
     if (!targetRun) {
-        return { valid: false, errors: ['Tirada seleccionada no definida'] };
+        return { valid: false, errors: ['Tirada seleccionada no definida'], missingFields: [] };
     }
 
     // 1. Copies
     const copies = Number(targetRun.quantity);
     if (!Number.isInteger(copies) || copies < 1) {
         errors.push('copies must be a positive integer');
+        missingFields.push('copies');
     }
 
     // 2. Interior pages
@@ -146,6 +254,7 @@ export function canonicalizeToEngineBookSpec(
     const interiorPages = Number(rawPages);
     if (!rawPages || !Number.isInteger(interiorPages) || interiorPages < 1) {
         errors.push('interior_pages must be a positive integer');
+        missingFields.push('interior_pages');
     }
 
     // 3. Dimensions
@@ -155,20 +264,24 @@ export function canonicalizeToEngineBookSpec(
     const height = Number(rawHeight);
     if (rawWidth === undefined || rawWidth === null || isNaN(width) || width < 50 || width > 500) {
         errors.push('book_width_mm must be between 50 and 500');
+        missingFields.push('book_width_mm');
     }
     if (rawHeight === undefined || rawHeight === null || isNaN(height) || height < 50 || height > 700) {
         errors.push('book_height_mm must be between 50 and 700');
+        missingFields.push('book_height_mm');
     }
 
     // 4. Print Colors
     const interiorPrint = normalizePrintColors(offer.interiorColors);
     if (!interiorPrint || !VALID_INTERIOR_PRINTS.has(interiorPrint)) {
         errors.push(`interior_print must be one of: 1/1, 2/2, 4/4 (received: ${interiorPrint || 'none'})`);
+        missingFields.push('interior_print');
     }
 
     const coverPrint = normalizePrintColors(offer.coverColors);
     if (!coverPrint || !VALID_COVER_PRINTS.has(coverPrint)) {
         errors.push(`cover_print must be one of: 1/0, 1/1, 2/0, 2/2, 3/0, 3/3, 4/0, 4/4, 5/0, 5/5 (received: ${coverPrint || 'none'})`);
+        missingFields.push('cover_print');
     }
 
     // 5. Paper Types & Weights
@@ -176,36 +289,42 @@ export function canonicalizeToEngineBookSpec(
     const paperTypeInterior = normalizePaperTypeInterior(rawInteriorPaper);
     if (!paperTypeInterior) {
         errors.push(`paper_type_interior is required and must be recognized (received: ${rawInteriorPaper || 'none'})`);
+        missingFields.push('paper_type_interior');
     }
 
     const rawInteriorWeight = offer.interiorWeightGsm !== undefined ? offer.interiorWeightGsm : offer.interiorPaperWeightGsm;
     const paperWeightInterior = Number(rawInteriorWeight);
     if (rawInteriorWeight === undefined || rawInteriorWeight === null || isNaN(paperWeightInterior) || paperWeightInterior < 40 || paperWeightInterior > 400) {
         errors.push('paper_weight_interior must be between 40 and 400');
+        missingFields.push('paper_weight_interior');
     }
 
     const rawCoverPaper = offer.coverPaper || offer.coverPaperType;
     const paperTypeCover = normalizePaperTypeCover(rawCoverPaper);
     if (!paperTypeCover) {
         errors.push(`paper_type_cover is required and must be recognized (received: ${rawCoverPaper || 'none'})`);
+        missingFields.push('paper_type_cover');
     }
 
     const rawCoverWeight = offer.coverWeightGsm !== undefined ? offer.coverWeightGsm : offer.coverPaperWeightGsm;
     const paperWeightCover = Number(rawCoverWeight);
     if (rawCoverWeight === undefined || rawCoverWeight === null || isNaN(paperWeightCover) || paperWeightCover < 100 || paperWeightCover > 600) {
         errors.push('paper_weight_cover must be between 100 and 600');
+        missingFields.push('paper_weight_cover');
     }
 
     // 6. Binding Method
     const bindingMethod = normalizeBindingMethod(offer.bindingMethod);
     if (!bindingMethod || !VALID_BINDING_METHODS.has(bindingMethod)) {
         errors.push(`binding_method must be one of: ${Array.from(VALID_BINDING_METHODS).join(', ')} (received: ${offer.bindingMethod || 'none'})`);
+        missingFields.push('binding_method');
     }
 
     // 7. Delivery Country (ISO-2)
     const rawCountry = offer.deliveryCountry ? String(offer.deliveryCountry).toUpperCase().trim() : null;
     if (!rawCountry || !/^[A-Z]{2}$/.test(rawCountry)) {
         errors.push('delivery_country must be a valid ISO-2 uppercase country code (e.g. ES, DE, FR)');
+        missingFields.push('delivery_country');
     }
     const deliveryCountry = rawCountry || '';
 
@@ -216,6 +335,7 @@ export function canonicalizeToEngineBookSpec(
     if (normLam === undefined) {
         // If unknown or unspecified, do NOT silently assume unlaminated; require confirmation
         errors.push(`lamination must be explicitly specified (gloss, matt, varnish, or none; received: ${offer.lamination || 'unspecified'})`);
+        missingFields.push('lamination');
     } else {
         lamination = normLam;
     }
@@ -227,6 +347,7 @@ export function canonicalizeToEngineBookSpec(
     const targetMfg = Number(targetRun.manufacturingPrice);
     if (isNaN(targetMfg) || targetMfg <= 0) {
         errors.push('target_manufacturing_price must be a positive value');
+        missingFields.push('target_manufacturing_price');
     }
 
     const isHardcover = offer.family === 'HARDCOVER' || offer.product_family === 'HARDCOVER' || (offer as any).construction === 'hardcover' || bindingMethod === 'hardcover';
@@ -319,6 +440,7 @@ export function canonicalizeToEngineBookSpec(
         valid: errors.length === 0,
         bookSpec,
         targetManufacturingPrice: targetMfg,
-        errors
+        errors,
+        missingFields
     };
 }

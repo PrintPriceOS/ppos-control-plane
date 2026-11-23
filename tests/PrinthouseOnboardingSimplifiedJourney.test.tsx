@@ -1077,8 +1077,8 @@ describe('Simplified Printhouse Onboarding Journey Suite', () => {
 
         // When block binding is unknown, canonicalizer rejects it and halts calculation with actionable error
         await waitFor(() => {
-            expect(screen.getByText(/Especificación incompleta para calibración/i)).toBeInTheDocument();
-            expect(screen.getAllByText(/binding_method must be one of/i).length).toBeGreaterThanOrEqual(1);
+            expect(screen.getAllByText(/Especificación incompleta/i).length).toBeGreaterThanOrEqual(1);
+            expect(screen.getAllByText(/método de encuadernación/i).length).toBeGreaterThanOrEqual(1);
             expect(createSpy).not.toHaveBeenCalled();
         });
     });

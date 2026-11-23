@@ -1209,7 +1209,7 @@ export const GuidedPrinthouseJourney: React.FC<GuidedPrinthouseJourneyProps> = (
                             <div className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-2xl bg-zinc-100/70 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800">
                                 <div className="flex flex-wrap items-center gap-2">
                                     <span className="text-xs font-bold text-zinc-500 mr-1">
-                                        Familia:
+                                        {t('guided.pricing.familyLabel') || 'Familia'}:
                                     </span>
                                     {enabledFamilyIds.map(fid => {
                                         const fam = families[fid];
@@ -1230,7 +1230,11 @@ export const GuidedPrinthouseJourney: React.FC<GuidedPrinthouseJourneyProps> = (
                                                 <span>{t(fam?.titleKey || fid)}</span>
                                                 {famMethod && (
                                                     <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-200 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300">
-                                                        {famMethod === 'TEMPLATE' ? 'Plantilla' : famMethod === 'ASSISTANT' ? 'IA' : 'Manual'}
+                                                        {famMethod === 'TEMPLATE'
+                                                            ? (t('guided.pricing.badgeTemplate') || 'Plantilla')
+                                                            : famMethod === 'ASSISTANT'
+                                                                ? (t('guided.pricing.badgeAssistant') || 'IA')
+                                                                : (t('guided.pricing.badgeManual') || 'Manual')}
                                                     </span>
                                                 )}
                                             </button>
@@ -1835,8 +1839,103 @@ export const GuidedPrinthouseJourney: React.FC<GuidedPrinthouseJourneyProps> = (
                             setStage('COMPANY');
                         }}
                         onGoToFamilyPricing={(familyId) => {
+                            const existingDraft = draft.pricingContinuity?.[familyId];
+                            if (existingDraft && !existingDraft.pricingMethod && (existingDraft.offer?.runs?.length || existingDraft.uploadedFileName || existingDraft.sessionId)) {
+                                updateDraft(prev => ({
+                                    ...prev,
+                                    pricingContinuity: {
+                                        ...prev.pricingContinuity,
+                                        [familyId]: {
+                                            ...prev.pricingContinuity?.[familyId]!,
+                                            pricingMethod: 'ASSISTANT',
+                                            step: existingDraft.offer?.runs?.length ? 3 : (existingDraft.step || 2)
+                                        }
+                                    }
+                                }));
+                            }
                             handleSelectActiveFamily(familyId);
                             setStage('PRICING');
+                        }}
+                        onAutoCompleteBaseRatesFromCalibrated={async () => {
+                            const token = getAuthToken();
+                            if (!printerNodeId || !token) {
+                                return { ok: false, message: t('guided.pricing.prerequisiteNodeRequired') || 'Falta el nodo de impresión o la sesión ha expirado.' };
+                            }
+                            const pendingFids = enabledFamilyIds.filter(fid => {
+                                const cont = draft.pricingContinuity?.[fid];
+                                return !(cont?.calibrationAccepted || (cont?.pricingMethod === 'TEMPLATE' && cont?.templateSaved) || (cont?.pricingMethod === 'MANUAL' && cont?.manualRatesSaved));
+                            });
+                            const targetFids: ProductFamilyId[] = pendingFids.length > 0 ? pendingFids : [enabledFamilyIds[0] || 'SOFTCOVER'];
+
+                            for (const famId of targetFids) {
+                                const getRes = await fetch(`/api/printhouse/onboarding/pricing/industrial?nodeId=${encodeURIComponent(printerNodeId)}`, {
+                                    headers: { 'Authorization': `Bearer ${token}` }
+                                });
+                                if (!getRes.ok) {
+                                    return { ok: false, message: `HTTP ${getRes.status}` };
+                                }
+                                const getData = await getRes.json();
+                                const currentChecksum = getData?.data?.baselineChecksum;
+                                if (!currentChecksum) {
+                                    return { ok: false, message: 'Checksum de referencia no disponible.' };
+                                }
+                                const hydratedRates = getInitialHydratedRates(getData?.data?.rates);
+                                const putRes = await fetch('/api/printhouse/onboarding/pricing/industrial', {
+                                    method: 'PUT',
+                                    headers: {
+                                        'Content-Type': 'application/json',
+                                        'Authorization': `Bearer ${token}`
+                                    },
+                                    body: JSON.stringify({
+                                        nodeId: printerNodeId,
+                                        rates: hydratedRates,
+                                        expected_baseline_checksum: currentChecksum,
+                                        pricingMethod: 'TEMPLATE',
+                                        productFamily: famId
+                                    })
+                                });
+                                if (!putRes.ok) {
+                                    return { ok: false, message: `HTTP ${putRes.status}` };
+                                }
+                                updateDraft(prev => ({
+                                    ...prev,
+                                    pricingContinuity: {
+                                        ...prev.pricingContinuity,
+                                        [famId]: {
+                                            ...(prev.pricingContinuity?.[famId] || {
+                                                sessionId: null,
+                                                activeRun: null,
+                                                selectedVariantId: null,
+                                                proposedPatch: {},
+                                                entryMode: 'UPLOAD_PDF',
+                                                uploadedFileName: null
+                                            }),
+                                            pricingMethod: 'TEMPLATE',
+                                            templateSaved: true,
+                                            lastSavedTimestamp: Date.now()
+                                        }
+                                    }
+                                }));
+                            }
+                            await fetchServerState(tenantId, false);
+                            return { ok: true, message: t('guided.review.autoBaseRatesSuccess') || 'Tarifas base del taller consolidadas y guardadas correctamente.' };
+                        }}
+                        onActivateCalibratedOnly={() => {
+                            const calibratedIds = enabledFamilyIds.filter(
+                                fid => families[fid]?.status === 'DATA_VALIDATED' || Boolean(draft.pricingContinuity?.[fid]?.calibrationAccepted)
+                            );
+                            if (calibratedIds.length === 0) return;
+                            const nextEnabled: Record<ProductFamilyId, boolean> = {
+                                HARDCOVER: calibratedIds.includes('HARDCOVER'),
+                                SOFTCOVER: calibratedIds.includes('SOFTCOVER'),
+                                WIRE_O: calibratedIds.includes('WIRE_O'),
+                                SADDLE_STITCH: calibratedIds.includes('SADDLE_STITCH')
+                            };
+                            updateDraft(prev => ({
+                                ...prev,
+                                enabledFamilies: nextEnabled,
+                                activeFamilyId: calibratedIds[0]
+                            }));
                         }}
                     />
                 )}

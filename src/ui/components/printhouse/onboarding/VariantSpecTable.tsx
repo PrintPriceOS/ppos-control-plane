@@ -11,6 +11,7 @@
  */
 import React, { useState } from 'react';
 import { OfferVariantRow, ProductFamilyId, ProgressiveSpecState } from '../../../types/printhouseOnboardingTypes';
+import { normalizeLamination } from '../../../lib/bookSpecCanonicalizer';
 import { useLocale } from '../../../i18n';
 import { 
     AlertTriangle, CheckCircle2, Info, ArrowRight, 
@@ -111,6 +112,9 @@ export const VariantSpecTable: React.FC<VariantSpecTableProps> = ({
 
     // Endpapers pending check for Hardcover family when endpapers are unconfigured or absent from PDF
     const isEndpaperPending = familyId === 'HARDCOVER' && spec?.hasEndpapers === true && (!spec?.endpaperPaper || !spec?.endpaperColors);
+
+    // Lamination missing check (when PDF did not explicitly declare gloss/matt/varnish/none)
+    const isLaminationUnspecified = Boolean(spec && onUpdateSpec && normalizeLamination(spec.lamination) === undefined);
 
     const canProceed = !isAmbiguityActive && !hasMissingInclusions && !isEndpaperPending;
 
@@ -342,6 +346,44 @@ export const VariantSpecTable: React.FC<VariantSpecTableProps> = ({
                                 </div>
                             </div>
                         )}
+                    </div>
+                )}
+
+                {/* ── LAMINATION UNSPECIFIED INLINE RESOLVER (2. PRÜFUNG) ── */}
+                {isLaminationUnspecified && (
+                    <div
+                        data-testid="review-lamination-resolver"
+                        className="p-4 bg-amber-50 dark:bg-amber-950/40 border-2 border-amber-300 dark:border-amber-700 rounded-xl space-y-2.5"
+                    >
+                        <div className="flex items-start gap-2.5">
+                            <AlertTriangle size={16} className="text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                            <div className="space-y-0.5">
+                                <h5 className="font-bold text-amber-900 dark:text-amber-200 text-xs">
+                                    {t('review.laminationPendingTitle') || 'Laminado / acabado de cubierta no detectado en el PDF'}
+                                </h5>
+                                <p className="text-[11px] text-amber-800/90 dark:text-amber-300/90 leading-relaxed">
+                                    {t('review.laminationPendingDesc') || 'Selecciona el acabado de cubierta (o "Sin laminado") para que el motor inverso pueda calcular la calibración sin bloqueos.'}
+                                </p>
+                            </div>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2 pl-6">
+                            {([
+                                { value: 'none', labelKey: 'compare.lamination.none', fallback: 'Sin laminado' },
+                                { value: 'matt', labelKey: 'compare.lamination.matt', fallback: 'Mate' },
+                                { value: 'gloss', labelKey: 'compare.lamination.gloss', fallback: 'Brillo' },
+                                { value: 'varnish', labelKey: 'compare.lamination.varnish', fallback: 'Barniz' }
+                            ] as const).map((opt) => (
+                                <button
+                                    key={opt.value}
+                                    type="button"
+                                    data-testid={`review-lamination-opt-${opt.value}`}
+                                    onClick={() => onUpdateSpec && onUpdateSpec({ lamination: opt.value })}
+                                    className="px-3 py-1.5 rounded-lg text-xs font-bold bg-white dark:bg-zinc-900 border border-amber-300 dark:border-amber-700 text-amber-900 dark:text-amber-200 hover:bg-[#dc0000] hover:text-white hover:border-[#dc0000] transition-colors cursor-pointer"
+                                >
+                                    {t(opt.labelKey) || opt.fallback}
+                                </button>
+                            ))}
+                        </div>
                     </div>
                 )}
 

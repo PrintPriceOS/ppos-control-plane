@@ -38,6 +38,8 @@ interface GuidedStepReviewProps {
     onRefreshReadiness?: () => Promise<void>;
     onGoToFamilyPricing?: (familyId: ProductFamilyId) => void;
     onGoToCompanyField?: (fieldName: string) => void;
+    onAutoCompleteBaseRatesFromCalibrated?: () => Promise<{ ok: boolean; message?: string }>;
+    onActivateCalibratedOnly?: () => Promise<void> | void;
 }
 
 export const GuidedStepReview: React.FC<GuidedStepReviewProps> = ({
@@ -52,11 +54,15 @@ export const GuidedStepReview: React.FC<GuidedStepReviewProps> = ({
     onOpenFullSetup,
     onRefreshReadiness,
     onGoToFamilyPricing,
-    onGoToCompanyField
+    onGoToCompanyField,
+    onAutoCompleteBaseRatesFromCalibrated,
+    onActivateCalibratedOnly
 }) => {
     const { t } = useLocale();
     const [submittingReview, setSubmittingReview] = useState(false);
     const [submissionResult, setSubmissionResult] = useState<{ ok: boolean; message: string } | null>(null);
+    const [applyingBaseRates, setApplyingBaseRates] = useState(false);
+    const [baseRatesResult, setBaseRatesResult] = useState<{ ok: boolean; message: string } | null>(null);
 
     // Refresh readiness on mount to ensure fresh state
     useEffect(() => {
@@ -85,6 +91,35 @@ export const GuidedStepReview: React.FC<GuidedStepReviewProps> = ({
 
     const isGlobalPricingComplete = pricingReadiness?.status === 'COMPLETE';
     const isStageCComplete = stageCEval.isComplete;
+
+    // Detect calibrated families (either via DATA_VALIDATED status or explicit calibrationAccepted)
+    const calibratedFamilies = (['HARDCOVER', 'SOFTCOVER', 'WIRE_O', 'SADDLE_STITCH'] as ProductFamilyId[]).filter(
+        (fid) => enabledFamilies[fid] && (families[fid]?.status === 'DATA_VALIDATED' || Boolean(pricingContinuity?.[fid]?.calibrationAccepted))
+    );
+    const hasAtLeastOneCalibrated = calibratedFamilies.length > 0;
+    const canOfferAssistedBaseRates = hasAtLeastOneCalibrated && (!isGlobalPricingComplete || stageCEval.pendingFamilies.length > 0);
+
+    const handleAutoCompleteBaseRates = async () => {
+        if (!onAutoCompleteBaseRatesFromCalibrated || applyingBaseRates) return;
+        setApplyingBaseRates(true);
+        setBaseRatesResult(null);
+        try {
+            const res = await onAutoCompleteBaseRatesFromCalibrated();
+            setBaseRatesResult({
+                ok: res.ok,
+                message: res.message || (res.ok
+                    ? (t('guided.review.autoBaseRatesSuccess') || 'Tarifas base del taller consolidadas y guardadas correctamente.')
+                    : 'Error al aplicar tarifas base.')
+            });
+        } catch (err: any) {
+            setBaseRatesResult({
+                ok: false,
+                message: normalizeUiError(err, 'Error al aplicar tarifas base.')
+            });
+        } finally {
+            setApplyingBaseRates(false);
+        }
+    };
 
     // Explicit readiness freshness check:
     // Stale COMPLETE data must NEVER enable submission while refreshing or if that refresh failed.
@@ -367,6 +402,51 @@ export const GuidedStepReview: React.FC<GuidedStepReviewProps> = ({
                                 {isGlobalPricingComplete ? (t('guided.review.globalRatesConfigured') || 'Configuradas') : (t('guided.review.globalRatesPending') || 'Pendientes')}
                             </span>
                         </div>
+
+                        {/* Assisted Base Rates Completion / Partial Calibrated Launch */}
+                        {canOfferAssistedBaseRates && (onAutoCompleteBaseRatesFromCalibrated || onActivateCalibratedOnly) && (
+                            <div
+                                data-testid="assisted-calibrated-launch-card"
+                                className="p-3 rounded-xl bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/70 space-y-2"
+                            >
+                                <div className="text-[11px] font-bold text-emerald-900 dark:text-emerald-200">
+                                    {t('guided.review.autoBaseRatesTitle') || 'Activación asistida disponible desde familia calibrada'}
+                                </div>
+                                <p className="text-[10px] text-emerald-800/90 dark:text-emerald-300/90 leading-relaxed">
+                                    {t('guided.review.autoBaseRatesDesc') || 'Ya tienes al menos una familia calibrada. Puedes completar las tarifas base del taller automáticamente o continuar el primer día solo con las familias ya calibradas.'}
+                                </p>
+                                {baseRatesResult && (
+                                    <div className={`text-[10px] font-bold px-2 py-1 rounded ${baseRatesResult.ok ? 'bg-emerald-100 dark:bg-emerald-900/50 text-emerald-800 dark:text-emerald-200' : 'bg-red-100 dark:bg-red-900/50 text-red-800 dark:text-red-200'}`}>
+                                        {baseRatesResult.message}
+                                    </div>
+                                )}
+                                <div className="flex flex-col gap-1.5 pt-0.5">
+                                    {onAutoCompleteBaseRatesFromCalibrated && (
+                                        <button
+                                            type="button"
+                                            data-testid="auto-complete-base-rates-btn"
+                                            disabled={applyingBaseRates}
+                                            onClick={handleAutoCompleteBaseRates}
+                                            className="w-full px-3 py-1.5 rounded-lg bg-[#dc0000] hover:bg-[#b50000] disabled:opacity-50 text-white text-[11px] font-bold transition-colors cursor-pointer text-center"
+                                        >
+                                            {applyingBaseRates
+                                                ? (t('guided.review.autoBaseRatesApplying') || 'Guardando tarifas base...')
+                                                : (t('guided.review.autoBaseRatesBtn') || 'Completar tarifas base automáticamente desde familia calibrada')}
+                                        </button>
+                                    )}
+                                    {onActivateCalibratedOnly && stageCEval.pendingFamilies.length > 0 && (
+                                        <button
+                                            type="button"
+                                            data-testid="activate-calibrated-only-btn"
+                                            onClick={() => onActivateCalibratedOnly()}
+                                            className="w-full px-3 py-1.5 rounded-lg bg-white dark:bg-zinc-900 border border-emerald-300 dark:border-emerald-700 hover:bg-emerald-100/60 dark:hover:bg-emerald-900/40 text-emerald-800 dark:text-emerald-200 text-[11px] font-bold transition-colors cursor-pointer text-center"
+                                        >
+                                            {t('guided.review.activateCalibratedOnlyBtn') || 'Continuar solo con las familias calibradas'} ({calibratedFamilies.length})
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+                        )}
 
                         {/* Per-family pricing status breakdown */}
                         <div className="space-y-2">

@@ -35,7 +35,7 @@ import { GovernedAcceptanceView } from './GovernedAcceptanceView';
 import { BindingIcon } from './BindingFamilyIcons';
 import { printhouseCalibrationApi } from '../../../lib/printhouseCalibrationApi';
 import { getAuthToken } from '../../../lib/authStore';
-import { canonicalizeToEngineBookSpec } from '../../../lib/bookSpecCanonicalizer';
+import { canonicalizeToEngineBookSpec, formatCanonicalizerErrors, CanonicalMissingField } from '../../../lib/bookSpecCanonicalizer';
 import { normalizeUiError } from '../../../utils/errorUtils';
 import { FamilyPricingSessionDraft } from '../../../lib/onboardingDraftStore';
 import { PaperCatalogItem, EconomicProfileRow } from '../../pricing';
@@ -95,7 +95,7 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
     onPricingContinuityChange,
     isGuidedMode = false
 }) => {
-    const { t } = useLocale();
+    const { t, locale } = useLocale();
 
     // ── Initial State Hydration from pricing continuity ──
     const targetFam: ProductFamilyId = initialSpec?.family || targetFamilyId || 'HARDCOVER';
@@ -219,6 +219,7 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
         calculationError?: string | null;
         supportedParameters: string[];
         coverageGaps: string[];
+        missingFields?: CanonicalMissingField[];
     }>(() => {
         if (initPricingForTarget?.comparisonData) {
             return initPricingForTarget.comparisonData;
@@ -975,14 +976,15 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
 
             // Check required inclusion confirmations to prevent backend AMBIGUITY_PREVENTS_READY
             const missingInclusions: string[] = [];
-            if (offer.includesPaper === null || offer.includesPaper === undefined) missingInclusions.push('papel');
-            if (offer.includesBinding === null || offer.includesBinding === undefined) missingInclusions.push('encuadernación');
-            if (offer.includesFinishing === null || offer.includesFinishing === undefined) missingInclusions.push('acabados');
-            if (offer.includesPackaging === null || offer.includesPackaging === undefined) missingInclusions.push('empaquetado');
+            if (offer.includesPaper === null || offer.includesPaper === undefined) missingInclusions.push(t('inclusions.paper') || 'papel');
+            if (offer.includesBinding === null || offer.includesBinding === undefined) missingInclusions.push(t('inclusions.binding') || 'encuadernación');
+            if (offer.includesFinishing === null || offer.includesFinishing === undefined) missingInclusions.push(t('inclusions.finishing') || 'acabados');
+            if (offer.includesPackaging === null || offer.includesPackaging === undefined) missingInclusions.push(t('inclusions.packaging') || 'empaquetado');
 
             if (missingInclusions.length > 0) {
                 setActiveRun(null);
                 setProposedPatch({});
+                const incList = missingInclusions.join(', ');
                 setComparisonData({
                     originalPrice: targetManufacturing,
                     enginePrice: null,
@@ -990,10 +992,11 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
                     residual: null,
                     isCalculated: false,
                     hasEquivalentBreakdown: false,
-                    incompleteComparisonReason: `Inclusiones pendientes de confirmación: ${missingInclusions.join(', ')}`,
-                    calculationError: `El motor de calibración requiere confirmar explícitamente si el precio incluye o excluye: ${missingInclusions.join(', ')}. Por favor confirma estas partidas en la revisión técnica.`,
+                    incompleteComparisonReason: `${t('compare.pendingInclusionsPrefix') || 'Inclusiones pendientes de confirmación'}: ${incList}`,
+                    calculationError: `${t('compare.pendingInclusionsGuidance') || 'Por favor confirma si el precio incluye o excluye'}: ${incList}.`,
                     supportedParameters: [],
-                    coverageGaps: []
+                    coverageGaps: [],
+                    missingFields: []
                 });
                 return;
             }
@@ -1001,6 +1004,7 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
             // Canonicalize and validate reference book specification
             const canonicalResult = canonicalizeToEngineBookSpec(offer, targetRun);
             if (!canonicalResult.valid) {
+                const localizedDetails = formatCanonicalizerErrors(canonicalResult.errors, locale);
                 setActiveRun(null);
                 setProposedPatch({});
                 setComparisonData({
@@ -1010,10 +1014,11 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
                     residual: null,
                     isCalculated: false,
                     hasEquivalentBreakdown: false,
-                    incompleteComparisonReason: `Especificación incompleta: ${canonicalResult.errors.join('; ')}`,
-                    calculationError: `Especificación incompleta para calibración: ${canonicalResult.errors.join('; ')}. Por favor revisa y confirma los campos ausentes.`,
+                    incompleteComparisonReason: `${t('compare.incompleteSpecPrefix') || 'Especificación incompleta'}: ${localizedDetails}`,
+                    calculationError: `${t('compare.incompleteSpecPrefix') || 'Especificación incompleta'}: ${localizedDetails} ${t('compare.incompleteSpecGuidance') || 'Completa los campos obligatorios ausentes aquí mismo o revísalos en el paso 2.'}`,
                     supportedParameters: [],
-                    coverageGaps: []
+                    coverageGaps: [],
+                    missingFields: canonicalResult.missingFields || []
                 });
                 return;
             }
@@ -1742,6 +1747,17 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
                         coverageGaps={comparisonData.coverageGaps}
                         isCalculated={comparisonData.isCalculated}
                         calculationError={comparisonData.calculationError}
+                        missingFields={comparisonData.missingFields}
+                        onQuickFixSpec={(patch) => {
+                            invalidateCalculation();
+                            const updated = {
+                                ...currentOfferRef.current,
+                                ...patch
+                            };
+                            currentOfferRef.current = updated;
+                            setCurrentOffer(updated);
+                            handleRunSolver(updated);
+                        }}
                         onRunSolver={() => handleRunSolver(currentOfferRef.current)}
                         isCalculating={calculatingSolver}
                         onProceedToAcceptance={() => setCurrentStep(5)}

@@ -11,13 +11,14 @@
  * - BLOCK advancing to proposal (disabled button) whenever comparison is incomplete, missing, or failed.
  * - Zero auto-persistence: rates are NOT mutated until explicit governed acceptance in Step 5.
  */
-import React from 'react';
+import React, { useState } from 'react';
 import { useLocale } from '../../../i18n';
 import { 
     Calculator, CheckCircle2, AlertTriangle, ArrowRight, 
     ArrowLeft, RefreshCw, Info, Layers, XCircle, ChevronDown, ChevronUp 
 } from 'lucide-react';
-import { ProductFamilyId } from '../../../types/printhouseOnboardingTypes';
+import { ProductFamilyId, ProgressiveSpecState } from '../../../types/printhouseOnboardingTypes';
+import { CanonicalMissingField } from '../../../lib/bookSpecCanonicalizer';
 
 interface CalculationComparisonViewProps {
     targetPrice?: number | null;
@@ -41,6 +42,8 @@ interface CalculationComparisonViewProps {
     calculating?: boolean;
     isCalculating?: boolean;
     calculationError?: string | null;
+    missingFields?: CanonicalMissingField[];
+    onQuickFixSpec?: (patch: Partial<ProgressiveSpecState>) => Promise<void> | void;
     onCalculate?: () => Promise<void> | void;
     onRunSolver?: () => Promise<void> | void;
     onProceedToAccept?: () => void;
@@ -71,6 +74,8 @@ export const CalculationComparisonView: React.FC<CalculationComparisonViewProps>
     calculating: explicitCalculating,
     isCalculating,
     calculationError,
+    missingFields = [],
+    onQuickFixSpec,
     onCalculate,
     onRunSolver,
     onProceedToAccept,
@@ -79,6 +84,30 @@ export const CalculationComparisonView: React.FC<CalculationComparisonViewProps>
     onBackToReview
 }) => {
     const { t } = useLocale();
+
+    // Local draft state for inline quick-fix controls when required fields are missing in step 3
+    const [quickLamination, setQuickLamination] = useState<'none' | 'matt' | 'gloss' | 'varnish'>('none');
+    const [quickInteriorColors, setQuickInteriorColors] = useState<string>(spec?.interiorColors || '1/1');
+    const [quickCoverColors, setQuickCoverColors] = useState<string>(spec?.coverColors || '4/0');
+    const [quickInteriorWeight, setQuickInteriorWeight] = useState<string>(String(spec?.interiorWeightGsm || 90));
+    const [quickCoverWeight, setQuickCoverWeight] = useState<string>(String(spec?.coverWeightGsm || 300));
+    const [quickBindingMethod, setQuickBindingMethod] = useState<string>(spec?.bindingMethod || 'perfect bound');
+
+    const actionableMissingFields = missingFields.filter((f) =>
+        ['lamination', 'interior_print', 'cover_print', 'paper_weight_interior', 'paper_weight_cover', 'binding_method'].includes(f)
+    );
+
+    const handleApplyQuickFix = () => {
+        if (!onQuickFixSpec) return;
+        const patch: Partial<ProgressiveSpecState> = {};
+        if (missingFields.includes('lamination')) patch.lamination = quickLamination;
+        if (missingFields.includes('interior_print')) patch.interiorColors = quickInteriorColors;
+        if (missingFields.includes('cover_print')) patch.coverColors = quickCoverColors;
+        if (missingFields.includes('paper_weight_interior')) patch.interiorWeightGsm = Number(quickInteriorWeight) || 90;
+        if (missingFields.includes('paper_weight_cover')) patch.coverWeightGsm = Number(quickCoverWeight) || 300;
+        if (missingFields.includes('binding_method')) patch.bindingMethod = quickBindingMethod;
+        onQuickFixSpec(patch);
+    };
 
     // Strict validator for positive finite financial amounts
     const isFinitePositive = (val: unknown): val is number => {
@@ -164,7 +193,9 @@ export const CalculationComparisonView: React.FC<CalculationComparisonViewProps>
     const isComparisonValid = hasValidTarget && hasValidEnginePrice && resolvedHasEquivalentBreakdown && !calculationError && residualPercent !== null && Number.isFinite(residualPercent);
 
     // Variants analyzed
-    const variantsUsed = explicitVariantsUsed || (spec?.runs?.map((r: any) => `${r.quantity} ej. (${r.paperVariant || 'estándar'})`) || []);
+    const copiesUnit = t('compare.copiesUnit') || 'ej.';
+    const defaultVariant = t('compare.standardVariant') || 'estándar';
+    const variantsUsed = explicitVariantsUsed || (spec?.runs?.map((r: any) => `${r.quantity} ${copiesUnit} (${r.paperVariant || defaultVariant})`) || []);
 
     const handleCalculate = onRunSolver || onCalculate || (() => {});
     const handleProceed = onProceedToAcceptance || onProceedToAccept || (() => {});
@@ -243,12 +274,171 @@ export const CalculationComparisonView: React.FC<CalculationComparisonViewProps>
                 )}
 
                 {calculationError && (
-                    <div className="p-3.5 bg-red-50 dark:bg-red-950/40 border border-red-300 dark:border-red-700 rounded-xl flex items-start gap-2.5">
-                        <XCircle size={16} className="text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
-                        <div className="space-y-0.5 text-xs">
-                            <span className="font-bold text-red-900 dark:text-red-200">{t('compare.calculationErrorTitle') || 'Error en el cálculo'}</span>
-                            <p className="text-[11px] text-red-800/90 dark:text-red-300/90">{calculationError}</p>
+                    <div className="p-4 bg-red-50 dark:bg-red-950/40 border border-red-300 dark:border-red-700 rounded-xl space-y-3">
+                        <div className="flex items-start gap-2.5">
+                            <XCircle size={16} className="text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
+                            <div className="space-y-0.5 text-xs flex-1">
+                                <span className="font-bold text-red-900 dark:text-red-200">{t('compare.calculationErrorTitle') || 'Error en el cálculo'}</span>
+                                <p className="text-[11px] text-red-800/90 dark:text-red-300/90 leading-relaxed">{calculationError}</p>
+                            </div>
                         </div>
+
+                        {/* Inline Quick-Fix Resolver for Missing Inverse-Solver Fields */}
+                        {actionableMissingFields.length > 0 && onQuickFixSpec && (
+                            <div
+                                data-testid="calculation-inline-quickfix"
+                                className="p-3.5 bg-white dark:bg-zinc-900 border border-red-200 dark:border-red-800/70 rounded-xl space-y-3"
+                            >
+                                <div>
+                                    <div className="text-xs font-bold text-zinc-900 dark:text-zinc-100">
+                                        {t('compare.quickFixTitle') || 'Completar campos obligatorios aquí mismo'}
+                                    </div>
+                                    <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5">
+                                        {t('compare.quickFixDesc') || 'Selecciona los parámetros ausentes y vuelve a lanzar el cálculo de inmediato sin perder tu progreso.'}
+                                    </p>
+                                </div>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    {actionableMissingFields.includes('lamination') && (
+                                        <div className="space-y-1.5 sm:col-span-2">
+                                            <label className="text-[11px] font-bold text-zinc-700 dark:text-zinc-300 block">
+                                                {t('compare.laminationLabel') || 'Laminado / acabado de cubierta'}
+                                            </label>
+                                            <div className="flex flex-wrap gap-1.5">
+                                                {([
+                                                    { value: 'none', key: 'compare.lamination.none', fallback: 'Sin laminado' },
+                                                    { value: 'matt', key: 'compare.lamination.matt', fallback: 'Mate' },
+                                                    { value: 'gloss', key: 'compare.lamination.gloss', fallback: 'Brillo' },
+                                                    { value: 'varnish', key: 'compare.lamination.varnish', fallback: 'Barniz' }
+                                                ] as const).map((opt) => (
+                                                    <button
+                                                        key={opt.value}
+                                                        type="button"
+                                                        data-testid={`quickfix-lamination-${opt.value}`}
+                                                        onClick={() => setQuickLamination(opt.value)}
+                                                        className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors cursor-pointer ${
+                                                            quickLamination === opt.value
+                                                                ? 'bg-[#dc0000] text-white border-[#dc0000]'
+                                                                : 'bg-zinc-50 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700 hover:border-red-400'
+                                                        }`}
+                                                    >
+                                                        {t(opt.key) || opt.fallback}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {actionableMissingFields.includes('interior_print') && (
+                                        <div className="space-y-1">
+                                            <label className="text-[11px] font-bold text-zinc-700 dark:text-zinc-300 block">
+                                                {t('compare.interiorColorsLabel') || 'Tintas de interior'}
+                                            </label>
+                                            <select
+                                                value={quickInteriorColors}
+                                                onChange={(e) => setQuickInteriorColors(e.target.value)}
+                                                className="w-full px-2.5 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-xs font-semibold text-zinc-900 dark:text-white"
+                                            >
+                                                <option value="1/1">1/1 (B/N)</option>
+                                                <option value="2/2">2/2</option>
+                                                <option value="4/4">4/4 (CMYK)</option>
+                                            </select>
+                                        </div>
+                                    )}
+
+                                    {actionableMissingFields.includes('cover_print') && (
+                                        <div className="space-y-1">
+                                            <label className="text-[11px] font-bold text-zinc-700 dark:text-zinc-300 block">
+                                                {t('compare.coverColorsLabel') || 'Tintas de cubierta'}
+                                            </label>
+                                            <select
+                                                value={quickCoverColors}
+                                                onChange={(e) => setQuickCoverColors(e.target.value)}
+                                                className="w-full px-2.5 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-xs font-semibold text-zinc-900 dark:text-white"
+                                            >
+                                                <option value="4/0">4/0 (CMYK exterior)</option>
+                                                <option value="4/4">4/4 (CMYK ambos lados)</option>
+                                                <option value="1/0">1/0</option>
+                                                <option value="1/1">1/1</option>
+                                            </select>
+                                        </div>
+                                    )}
+
+                                    {actionableMissingFields.includes('paper_weight_interior') && (
+                                        <div className="space-y-1">
+                                            <label className="text-[11px] font-bold text-zinc-700 dark:text-zinc-300 block">
+                                                {t('compare.interiorWeightLabel') || 'Gramaje interior (g/m²)'}
+                                            </label>
+                                            <input
+                                                type="number"
+                                                min={40}
+                                                max={400}
+                                                value={quickInteriorWeight}
+                                                onChange={(e) => setQuickInteriorWeight(e.target.value)}
+                                                className="w-full px-2.5 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-xs font-semibold text-zinc-900 dark:text-white"
+                                            />
+                                        </div>
+                                    )}
+
+                                    {actionableMissingFields.includes('paper_weight_cover') && (
+                                        <div className="space-y-1">
+                                            <label className="text-[11px] font-bold text-zinc-700 dark:text-zinc-300 block">
+                                                {t('compare.coverWeightLabel') || 'Gramaje cubierta (g/m²)'}
+                                            </label>
+                                            <input
+                                                type="number"
+                                                min={100}
+                                                max={600}
+                                                value={quickCoverWeight}
+                                                onChange={(e) => setQuickCoverWeight(e.target.value)}
+                                                className="w-full px-2.5 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-xs font-semibold text-zinc-900 dark:text-white"
+                                            />
+                                        </div>
+                                    )}
+
+                                    {actionableMissingFields.includes('binding_method') && (
+                                        <div className="space-y-1">
+                                            <label className="text-[11px] font-bold text-zinc-700 dark:text-zinc-300 block">
+                                                {t('compare.bindingMethodLabel') || 'Encuadernación'}
+                                            </label>
+                                            <select
+                                                value={quickBindingMethod}
+                                                onChange={(e) => setQuickBindingMethod(e.target.value)}
+                                                className="w-full px-2.5 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-xs font-semibold text-zinc-900 dark:text-white"
+                                            >
+                                                <option value="perfect bound">Perfect bound (PUR)</option>
+                                                <option value="thread sewn">Thread sewn</option>
+                                                <option value="hardcover">Hardcover</option>
+                                                <option value="saddle stitch">Saddle stitch</option>
+                                                <option value="wire-o">Wire-O</option>
+                                            </select>
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="flex flex-wrap items-center gap-2 pt-1">
+                                    <button
+                                        type="button"
+                                        data-testid="quickfix-apply-recalculate-btn"
+                                        disabled={calculating}
+                                        onClick={handleApplyQuickFix}
+                                        className="px-4 py-2 rounded-xl bg-[#dc0000] hover:bg-red-700 disabled:bg-zinc-400 text-white font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+                                    >
+                                        <RefreshCw size={12} className={calculating ? 'animate-spin' : ''} />
+                                        <span>{t('compare.applyAndRecalculate') || 'Aplicar y Recalcular'}</span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        data-testid="quickfix-back-to-review-btn"
+                                        onClick={handleBack}
+                                        className="px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-200 font-semibold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+                                    >
+                                        <ArrowLeft size={12} />
+                                        <span>{t('compare.backToPruefung') || 'Volver a 2. Revisión'}</span>
+                                    </button>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 )}
 
