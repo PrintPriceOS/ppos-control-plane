@@ -550,9 +550,9 @@ export const CalculationComparisonView: React.FC<CalculationComparisonViewProps>
                                         supportedParameters.map((param, i) => <li key={i}>{param}</li>)
                                     ) : (
                                         <>
-                                            <li>Tiradas y costes fijos/variables para el formato aportado.</li>
-                                            <li>Coste de pliegos e impresión interior declarados.</li>
-                                            <li>Mano de obra y montaje de la encuadernación declarada.</li>
+                                            <li>{t('compare.defaultSupportedRuns')}</li>
+                                            <li>{t('compare.defaultSupportedInterior')}</li>
+                                            <li>{t('compare.defaultSupportedBinding')}</li>
                                         </>
                                     )}
                                 </ul>
@@ -569,9 +569,9 @@ export const CalculationComparisonView: React.FC<CalculationComparisonViewProps>
                                         coverageGaps.map((gap, i) => <li key={i}>{gap}</li>)
                                     ) : (
                                         <>
-                                            <li>Wire-O y grapado al caballete no están acreditados por esta oferta.</li>
-                                            <li>Sin datos de comparación controlada entre cosido y encolado.</li>
-                                            <li>Estampación, golpe en seco y plastificados especiales no incluidos.</li>
+                                            <li>{t('compare.defaultGapWireOSaddle')}</li>
+                                            <li>{t('compare.defaultGapSewnVsAdhesive')}</li>
+                                            <li>{t('compare.defaultGapSpecialFinishing')}</li>
                                         </>
                                     )}
                                 </ul>

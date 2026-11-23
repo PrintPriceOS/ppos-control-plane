@@ -651,7 +651,7 @@ export const ManualOfferForm: React.FC<ManualOfferFormProps> = ({
                                         onClick={() => setShowNewPaperModal((prev) => !prev)}
                                         className="text-[10px] font-bold text-[#dc0000] hover:underline cursor-pointer"
                                     >
-                                        + Añadir al catálogo
+                                        {t('form.addPaperToCatalog')}
                                     </button>
                                 </div>
                                 {catalogPapers.length > 0 && (
@@ -661,13 +661,13 @@ export const ManualOfferForm: React.FC<ManualOfferFormProps> = ({
                                         onChange={(e) => handleSelectInteriorCatalogPaper(e.target.value)}
                                         className="w-full px-3 py-1.5 mb-1.5 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-white font-medium text-xs"
                                     >
-                                        <option value="">Seleccionar papel registrado en Materials & Paper...</option>
+                                        <option value="">{t('form.selectCatalogInteriorPaper')}</option>
                                         {catalogPapers.map((p) => (
                                             <option key={p.paperId} value={p.paperId}>
                                                 {p.name} · {p.grammageGsm}g · Vol {p.bulkFactor}
                                             </option>
                                         ))}
-                                        <option value="__ADD_NEW_PAPER__">+ Añadir nuevo papel al catálogo...</option>
+                                        <option value="__ADD_NEW_PAPER__">{t('form.addNewPaperOption')}</option>
                                     </select>
                                 )}
                                 <input
@@ -837,13 +837,13 @@ export const ManualOfferForm: React.FC<ManualOfferFormProps> = ({
                                         onChange={(e) => handleSelectCoverCatalogPaper(e.target.value)}
                                         className="w-full px-3 py-1.5 mb-1.5 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-white font-medium text-xs"
                                     >
-                                        <option value="">Seleccionar cubierta en Materials & Paper...</option>
+                                        <option value="">{t('form.selectCatalogCoverPaper')}</option>
                                         {catalogPapers.map((p) => (
                                             <option key={p.paperId} value={p.paperId}>
                                                 {p.name} · {p.grammageGsm}g
                                             </option>
                                         ))}
-                                        <option value="__ADD_NEW_PAPER__">+ Añadir nuevo papel al catálogo...</option>
+                                        <option value="__ADD_NEW_PAPER__">{t('form.addNewPaperOption')}</option>
                                     </select>
                                 )}
                                 <input

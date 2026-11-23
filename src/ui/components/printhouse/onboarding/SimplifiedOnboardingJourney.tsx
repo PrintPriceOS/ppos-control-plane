@@ -686,7 +686,7 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
             setCurrentStep(3);
         } catch (err: any) {
             if (uploadRequestIdRef.current === thisUploadId && selectedFamilyIdRef.current === uploadFamilyId) {
-                setUploadError(normalizeUiError(err, 'Error al procesar el presupuesto PDF'));
+                setUploadError(normalizeUiError(err, t('compare.errProcessPdf')));
             }
         } finally {
             if (uploadRequestIdRef.current === thisUploadId) {
@@ -793,7 +793,7 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
             setDuplicateEvidence(null);
             setCurrentStep(3);
         } catch (err: any) {
-            setUploadError(normalizeUiError(err, 'Error al reabrir la evidencia existente'));
+            setUploadError(normalizeUiError(err, t('compare.errReopenEvidence')));
         } finally {
             setLoadingExistingEvidence(false);
         }
@@ -1127,16 +1127,16 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
                     isCalculated: true,
                     calculationError: null,
                     supportedParameters: [
-                        `Formato cerrado ${offer.widthMm || 148} × ${offer.heightMm || 210} mm`,
-                        `${offer.pageCount || 64} páginas ${offer.interiorPaper || 'Offset'}`,
-                        `Tintas interior ${offer.interiorColors || '1/1'}`,
-                        `Cubierta ${offer.coverPaper || 'Papel estucado'} ${offer.coverColors || '4/0'}`,
-                        offer.family === 'HARDCOVER' ? `Cartón Graupappe ${offer.boardThicknessMm || 2.0} mm` : 'Encuadernación de taller',
-                        `Tirada calibrada: ${targetRun.quantity} ej.`
+                        `${t('compare.specClosedFormat')} ${offer.widthMm || 148} × ${offer.heightMm || 210} mm`,
+                        `${offer.pageCount || 64} ${t('compare.specPagesAndPaper')} ${offer.interiorPaper || 'Offset'}`,
+                        `${t('compare.specInteriorColors')} ${offer.interiorColors || '1/1'}`,
+                        `${t('compare.specCoverPaperColors')} ${offer.coverPaper || 'MC'} ${offer.coverColors || '4/0'}`,
+                        offer.family === 'HARDCOVER' ? `${t('compare.specHardcoverBoard')} ${offer.boardThicknessMm || 2.0} mm` : t('compare.specWorkshopBinding'),
+                        `${t('compare.specCalibratedRun')}: ${targetRun.quantity} ${t('compare.copiesUnit') || 'ej.'}`
                     ],
                     coverageGaps: [
-                        'Sin acreditación para Wire-O ni grapado al caballete en este presupuesto.',
-                        'Estampación térmica y barniz selectivo pendientes de presupuesto específico.'
+                        t('compare.gapNoWireOSaddle'),
+                        t('compare.gapSpecialFinishing')
                     ]
                 });
             } else {
@@ -1148,13 +1148,13 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
                     difference: null,
                     residual: null,
                     isCalculated: false,
-                    calculationError: runError || (printerNodeId ? 'El motor de cálculo no devolvió un resultado numérico positivo.' : 'Pendiente de cálculo por el motor PrintPrice OS.'),
+                    calculationError: runError || (printerNodeId ? t('compare.errNoPositiveEngineResult') : t('compare.errPendingEngineCalc')),
                     supportedParameters: [
-                        `Formato cerrado ${offer.widthMm || 148} × ${offer.heightMm || 210} mm`,
-                        `${offer.pageCount || 64} páginas ${offer.interiorPaper || 'Offset'}`
+                        `${t('compare.specClosedFormat')} ${offer.widthMm || 148} × ${offer.heightMm || 210} mm`,
+                        `${offer.pageCount || 64} ${t('compare.specPagesAndPaper')} ${offer.interiorPaper || 'Offset'}`
                     ],
                     coverageGaps: [
-                        'Cálculo pendiente de respuesta válida del motor de cálculo'
+                        t('compare.gapPendingEngineResponse')
                     ]
                 });
             }
@@ -1785,10 +1785,10 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
                         <div className="space-y-0.5">
                             <div className="text-xs font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5">
                                 <CheckCircle2 size={14} className="text-[#dc0000]" />
-                                <span>Matriz Logística Estándar de la Plataforma (Cubicaje 3D y Tarifas por Palet)</span>
+                                <span>{t('accept.logisticsAdoptTitle')}</span>
                             </div>
                             <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
-                                Adopta con 1 clic las tarifas base por palet (Dachser, Schenker, Raben) y perfiles de almacén editorial (Zeitfracht Erfurt 1200mm, Arvato VVA 1300mm) sin bloquear el alta de tus 4 ofertas y precios de papel.
+                                {t('accept.logisticsAdoptDesc')}
                             </p>
                         </div>
                         <button
@@ -1810,7 +1810,7 @@ export const SimplifiedOnboardingJourney: React.FC<SimplifiedOnboardingJourneyPr
                             }}
                             className="px-3.5 py-2 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 hover:bg-[#dc0000] dark:hover:bg-[#dc0000] dark:hover:text-white text-xs font-bold rounded-xl transition-colors shrink-0 cursor-pointer"
                         >
-                            Adoptar Matriz Logística Estándar (1 Clic)
+                            {t('accept.logisticsAdoptBtn')}
                         </button>
                     </div>
                 </div>

@@ -1513,7 +1513,7 @@ export const GuidedPrinthouseJourney: React.FC<GuidedPrinthouseJourneyProps> = (
                                         <div className="p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 space-y-1">
                                             <div className="text-zinc-500 font-semibold">Puesta en máquina</div>
                                             <div className="text-base font-black text-zinc-900 dark:text-zinc-100">
-                                                {SUGGESTED_RATES_METADATA.interior_11_fixed?.value || 80.31} € fijo
+                                                {SUGGESTED_RATES_METADATA.interior_11_fixed?.value || 80.31} {t('guided.pricing.fixedSuffix')}
                                             </div>
                                         </div>
                                     </div>
@@ -1523,7 +1523,7 @@ export const GuidedPrinthouseJourney: React.FC<GuidedPrinthouseJourneyProps> = (
                                             <div className="flex items-start gap-2.5">
                                                 <AlertCircle size={18} className="text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
                                                 <div className="space-y-1">
-                                                    <div className="font-bold">Error al guardar plantilla de tarifas</div>
+                                                    <div className="font-bold">{t('guided.pricing.templateSaveErrorTitle')}</div>
                                                     <p className="text-[11px] text-red-800 dark:text-red-300">{templateSaveError}</p>
                                                 </div>
                                             </div>
@@ -1532,7 +1532,7 @@ export const GuidedPrinthouseJourney: React.FC<GuidedPrinthouseJourneyProps> = (
                                                 onClick={() => setTemplateSaveError(null)}
                                                 className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg text-[11px] shrink-0 transition-colors cursor-pointer"
                                             >
-                                                Reintentar
+                                                {t('guided.pricing.retryBtn')}
                                             </button>
                                         </div>
                                     )}
@@ -1614,7 +1614,7 @@ export const GuidedPrinthouseJourney: React.FC<GuidedPrinthouseJourneyProps> = (
                                                 try {
                                                     // Invariant: Do not mark templateSaved or advance if printerNodeId or token is missing
                                                     if (!printerNodeId || !token) {
-                                                        throw new Error('Falta el nodo de impresión o la sesión ha expirado.');
+                                                        throw new Error(t('guided.pricing.errMissingNodeOrSession'));
                                                     }
 
                                                     const getRes = await fetch(`/api/printhouse/onboarding/pricing/industrial?nodeId=${encodeURIComponent(printerNodeId)}`, {
@@ -1623,13 +1623,13 @@ export const GuidedPrinthouseJourney: React.FC<GuidedPrinthouseJourneyProps> = (
                                                     if (!getRes.ok) {
                                                         let getErrJson: any = null;
                                                         try { getErrJson = await getRes.json(); } catch (_) {}
-                                                        throw new Error(getErrJson?.error?.message || getErrJson?.message || `Error al obtener estado base de tarifas (HTTP ${getRes.status}).`);
+                                                        throw new Error(getErrJson?.error?.message || getErrJson?.message || `${t('guided.pricing.errFetchBaseRates')} (HTTP ${getRes.status}).`);
                                                     }
 
                                                     const getData = await getRes.json();
                                                     const currentChecksum = getData?.data?.baselineChecksum;
                                                     if (!currentChecksum) {
-                                                        throw new Error('Checksum de referencia no disponible en el servidor.');
+                                                        throw new Error(t('guided.pricing.errMissingChecksum'));
                                                     }
 
                                                     const hydratedRates = getInitialHydratedRates(getData?.data?.rates);
@@ -1651,13 +1651,13 @@ export const GuidedPrinthouseJourney: React.FC<GuidedPrinthouseJourneyProps> = (
                                                     if (!putRes.ok) {
                                                         let putErrJson: any = null;
                                                         try { putErrJson = await putRes.json(); } catch (_) {}
-                                                        const msg = putErrJson?.error?.message || putErrJson?.message || (putRes.status === 409 ? 'Conflicto de concurrencia: las tarifas base cambiaron en el servidor (409 Conflict).' : `Error al guardar tarifas en el servidor (HTTP ${putRes.status}).`);
+                                                        const msg = putErrJson?.error?.message || putErrJson?.message || (putRes.status === 409 ? t('guided.pricing.errConcurrencyConflict') : `${t('guided.pricing.errSaveServerRates')} (HTTP ${putRes.status}).`);
                                                         throw new Error(msg);
                                                     }
 
                                                     const putJson = await putRes.json().catch(() => ({}));
                                                     if (putJson && putJson.ok === false) {
-                                                        throw new Error(putJson.error?.message || putJson.message || 'El servidor rechazó el guardado de la plantilla.');
+                                                        throw new Error(putJson.error?.message || putJson.message || t('guided.pricing.errServerRejectedTemplate'));
                                                     }
 
                                                     // Fetch fresh server state to derive verifiable confirmation from server revision
@@ -1706,7 +1706,7 @@ export const GuidedPrinthouseJourney: React.FC<GuidedPrinthouseJourneyProps> = (
                                                         currentStage: isStageCComplete ? 'REVIEW' : 'PRICING'
                                                     }));
                                                 } catch (e: any) {
-                                                    setTemplateSaveError(e.message || 'Error al persistir la plantilla en el servidor.');
+                                                    setTemplateSaveError(e.message || t('guided.pricing.errPersistTemplate'));
                                                 } finally {
                                                     setIsSavingTemplate(false);
                                                 }
@@ -1715,7 +1715,7 @@ export const GuidedPrinthouseJourney: React.FC<GuidedPrinthouseJourneyProps> = (
                                                 isSavingTemplate ? 'opacity-60 cursor-not-allowed' : ''
                                             }`}
                                         >
-                                            <span>{isSavingTemplate ? 'Guardando...' : 'Guardar plantilla y continuar'}</span>
+                                            <span>{isSavingTemplate ? t('guided.pricing.savingBtn') : t('guided.pricing.saveTemplateAndContinue')}</span>
                                             <ArrowRight size={14} />
                                         </button>
                                     </div>
@@ -1725,9 +1725,9 @@ export const GuidedPrinthouseJourney: React.FC<GuidedPrinthouseJourneyProps> = (
                                 <div className="space-y-4">
                                     <div className="flex items-center justify-between p-4 rounded-2xl bg-white dark:bg-[#18181b] border border-zinc-200 dark:border-zinc-800">
                                         <div>
-                                            <div className="text-xs font-bold text-[#dc0000]">Modo Tarifas Manuales</div>
+                                            <div className="text-xs font-bold text-[#dc0000]">{t('guided.pricing.manualModeLabel')}</div>
                                             <div className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
-                                                Editando matriz para {t(families[effectiveActiveFamilyId]?.titleKey || effectiveActiveFamilyId)}
+                                                {t('guided.pricing.editingMatrixFor')} {t(families[effectiveActiveFamilyId]?.titleKey || effectiveActiveFamilyId)}
                                             </div>
                                         </div>
                                         <button
@@ -1748,7 +1748,7 @@ export const GuidedPrinthouseJourney: React.FC<GuidedPrinthouseJourneyProps> = (
                                             const targetNodeId = printerNodeId || payload?.id || payload?.nodeId;
 
                                             if (!targetNodeId || !token) {
-                                                throw new Error('Falta el nodo de impresión o la sesión ha expirado.');
+                                                throw new Error(t('guided.pricing.errMissingNodeOrSession'));
                                             }
 
                                             const fullPayload = {
@@ -1768,7 +1768,7 @@ export const GuidedPrinthouseJourney: React.FC<GuidedPrinthouseJourneyProps> = (
                                             if (!res.ok) {
                                                 let errJson: any = null;
                                                 try { errJson = await res.json(); } catch (_) {}
-                                                const err: any = new Error(errJson?.error?.message || errJson?.message || 'Error al guardar tarifas industriales.');
+                                                const err: any = new Error(errJson?.error?.message || errJson?.message || t('guided.pricing.errSaveIndustrialRates'));
                                                 err.code = res.status === 409 ? 'STALE_BASELINE_CONFLICT' : 'SAVE_ERROR';
                                                 err.status = res.status;
                                                 throw err;
@@ -1777,7 +1777,7 @@ export const GuidedPrinthouseJourney: React.FC<GuidedPrinthouseJourneyProps> = (
                                             // Authoritative server verification: query server state to confirm persisted rates
                                             const refreshRes = await fetchServerState(tenantId, false);
                                             if (!refreshRes || !refreshRes.ok || !refreshRes.pricingOk) {
-                                                throw new Error('Las tarifas se guardaron, pero no se pudo contrastar la confirmación en el servidor.');
+                                                throw new Error(t('guided.pricing.errUnverifiedRates'));
                                             }
 
                                             const isFamilyConfirmed = Boolean(refreshRes.pricingContinuity?.[famId]?.manualRatesSaved);

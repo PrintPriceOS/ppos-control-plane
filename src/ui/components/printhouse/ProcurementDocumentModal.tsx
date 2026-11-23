@@ -130,7 +130,7 @@ export const ProcurementDocumentModal: React.FC<ProcurementDocumentModalProps> =
                             onClick={() => setViewMode(viewMode === 'preview' ? 'summary' : 'preview')}
                             className="px-3 py-1.5 text-xs font-semibold rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-slate-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-700 cursor-pointer"
                         >
-                            {viewMode === 'preview' ? 'Ver Ficha de Datos' : 'Ver Formato Imprimible'}
+                            {viewMode === 'preview' ? t('procurement.document.viewDataSheet') : t('procurement.document.viewPrintable')}
                         </button>
                     </div>
                     <div className="flex items-center gap-2">

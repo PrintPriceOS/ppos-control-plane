@@ -38,27 +38,32 @@ interface ParameterDisplayInfo {
     currentValue: number | string;
 }
 
-const PARAM_METADATA: Record<string, { label: string; unit: string; currentValue: number | string }> = {
-    machine_hourly_rate: { label: 'Coste hora máquina impresión offset', unit: '€/hora', currentValue: 65.00 },
-    plate_cost: { label: 'Coste de plancha CTP', unit: '€/plancha', currentValue: 9.50 },
-    sewing_cost_per_sig: { label: 'Coste de cosido con hilo por pliego', unit: '€/pliego', currentValue: 0.0400 },
-    casing_in_rate: { label: 'Coste de montaje y encarte de tapa dura', unit: '€/ejemplar', currentValue: 0.3500 },
-    freight_pallet_rate: { label: 'Tarifa de transporte por palé estándar', unit: '€/palé', currentValue: 155.00 },
-    adhesive_binding_cost: { label: 'Coste de encolado rústica fresada / PUR', unit: '€/ejemplar', currentValue: 0.2200 },
-    wire_o_binding_cost: { label: 'Coste de encuadernación Wire-O', unit: '€/ejemplar', currentValue: 0.2800 },
-    saddle_stitch_cost: { label: 'Coste de grapado al caballete', unit: '€/ejemplar', currentValue: 0.1200 },
-    paper_waste_factor: { label: 'Factor de merma técnica de papel', unit: '%', currentValue: 4.5 }
+const PARAM_METADATA: Record<string, { labelKey: string; unitKey: string; fallbackLabel: string; fallbackUnit: string; currentValue: number | string }> = {
+    machine_hourly_rate: { labelKey: 'accept.param.machine_hourly_rate', unitKey: 'accept.unit.perHour', fallbackLabel: 'Coste hora máquina impresión offset', fallbackUnit: '€/hora', currentValue: 65.00 },
+    plate_cost: { labelKey: 'accept.param.plate_cost', unitKey: 'accept.unit.perPlate', fallbackLabel: 'Coste de plancha CTP', fallbackUnit: '€/plancha', currentValue: 9.50 },
+    sewing_cost_per_sig: { labelKey: 'accept.param.sewing_cost_per_sig', unitKey: 'accept.unit.perSignature', fallbackLabel: 'Coste de cosido con hilo por pliego', fallbackUnit: '€/pliego', currentValue: 0.0400 },
+    casing_in_rate: { labelKey: 'accept.param.casing_in_rate', unitKey: 'accept.unit.perCopy', fallbackLabel: 'Coste de montaje y encarte de tapa dura', fallbackUnit: '€/ejemplar', currentValue: 0.3500 },
+    freight_pallet_rate: { labelKey: 'accept.param.freight_pallet_rate', unitKey: 'accept.unit.perPallet', fallbackLabel: 'Tarifa de transporte por palé estándar', fallbackUnit: '€/palé', currentValue: 155.00 },
+    adhesive_binding_cost: { labelKey: 'accept.param.adhesive_binding_cost', unitKey: 'accept.unit.perCopy', fallbackLabel: 'Coste de encolado rústica fresada / PUR', fallbackUnit: '€/ejemplar', currentValue: 0.2200 },
+    wire_o_binding_cost: { labelKey: 'accept.param.wire_o_binding_cost', unitKey: 'accept.unit.perCopy', fallbackLabel: 'Coste de encuadernación Wire-O', fallbackUnit: '€/ejemplar', currentValue: 0.2800 },
+    saddle_stitch_cost: { labelKey: 'accept.param.saddle_stitch_cost', unitKey: 'accept.unit.perCopy', fallbackLabel: 'Coste de grapado al caballete', fallbackUnit: '€/ejemplar', currentValue: 0.1200 },
+    paper_waste_factor: { labelKey: 'accept.param.paper_waste_factor', unitKey: '', fallbackLabel: 'Factor de merma técnica de papel', fallbackUnit: '%', currentValue: 4.5 }
 };
 
-const getParamInfo = (key: string, val: any): ParameterDisplayInfo => {
-    if (PARAM_METADATA[key]) {
-        return PARAM_METADATA[key];
+const getParamInfo = (key: string, val: any, t?: (k: string) => string): ParameterDisplayInfo => {
+    const meta = PARAM_METADATA[key];
+    if (meta) {
+        return {
+            label: (t && t(meta.labelKey)) || meta.fallbackLabel,
+            unit: (meta.unitKey && t && t(meta.unitKey)) || meta.fallbackUnit,
+            currentValue: meta.currentValue
+        };
     }
     // Clean human fallback for unmapped keys
     const words = key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
     return {
         label: words,
-        unit: typeof val === 'number' && val < 5 ? '€/ud' : '€',
+        unit: typeof val === 'number' && val < 5 ? ((t && t('accept.unit.perCopy')) || '€/ud') : '€',
         currentValue: typeof val === 'number' ? (val * 0.95).toFixed(4) : '—'
     };
 };
@@ -160,7 +165,7 @@ export const GovernedAcceptanceView: React.FC<GovernedAcceptanceViewProps> = ({
                                 </thead>
                                 <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
                                     {patchEntries.map(([key, val]) => {
-                                        const info = getParamInfo(key, val);
+                                        const info = getParamInfo(key, val, t);
                                         const formattedCurrent = typeof info.currentValue === 'number'
                                             ? `${info.currentValue.toFixed(info.currentValue < 1 ? 4 : 2)} ${info.unit}`
                                             : `${info.currentValue} ${info.unit}`;
@@ -295,12 +300,12 @@ export const GovernedAcceptanceView: React.FC<GovernedAcceptanceViewProps> = ({
                                 className="px-3.5 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-50 font-semibold text-xs text-zinc-700 dark:text-zinc-200 flex items-center gap-1.5 cursor-pointer"
                             >
                                 <History size={13} />
-                                <span>Ver Historial de Revisiones</span>
+                                <span>{t('accept.viewRevisionHistory')}</span>
                             </button>
                         )}
                         <span className="text-emerald-700 dark:text-emerald-400 font-bold text-xs flex items-center gap-1">
                             <CheckCircle2 size={15} />
-                            <span>Proceso de Onboarding y Calibración Completado</span>
+                            <span>{t('accept.onboardingCompleted')}</span>
                         </span>
                     </div>
                 )}

@@ -109,12 +109,12 @@ export const GuidedStepReview: React.FC<GuidedStepReviewProps> = ({
                 ok: res.ok,
                 message: res.message || (res.ok
                     ? (t('guided.review.autoBaseRatesSuccess') || 'Tarifas base del taller consolidadas y guardadas correctamente.')
-                    : 'Error al aplicar tarifas base.')
+                    : t('guided.review.errApplyBaseRates'))
             });
         } catch (err: any) {
             setBaseRatesResult({
                 ok: false,
-                message: normalizeUiError(err, 'Error al aplicar tarifas base.')
+                message: normalizeUiError(err, t('guided.review.errApplyBaseRates'))
             });
         } finally {
             setApplyingBaseRates(false);
@@ -270,7 +270,7 @@ export const GuidedStepReview: React.FC<GuidedStepReviewProps> = ({
                         </div>
                         <div>
                             <div className="font-extrabold text-sm text-zinc-900 dark:text-zinc-100">
-                                {company.legalName || 'Imprenta'}
+                                {company.legalName || t('guided.review.defaultCompanyName')}
                             </div>
                             {company.tradingName && company.tradingName !== company.legalName && (
                                 <div className="text-xs text-zinc-500">
